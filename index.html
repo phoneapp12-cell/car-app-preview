@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Car &amp; Life Due Dates</title>
-<meta name="description" content="WOF, rego, servicing, bills, to-dos and appointments in one place, with reminders. Your data stays on your phone.">
+<meta name="description" content="WOF, rego, servicing, bills, to-dos, appointments, birthdays and ideas in one place, with reminders. Your data stays on your phone.">
 <meta name="theme-color" content="#0F766E">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -18,7 +18,7 @@
   --bg:#F4F6F5; --card:#fff; --ink:#15201D; --ink2:#51605B; --ink3:#86938F; --line:#E4E9E7;
   --brand:#0F766E; --brand2:#E6F4F1;
   --red:#C62828; --redbg:#FDE8E8; --amber:#A15C07; --amberbg:#FEF1D6; --green:#1B7A3E; --greenbg:#E3F5E9;
-  --due:#0F766E; --appt:#8B5CF6;
+  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8;
   --radius:18px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -45,6 +45,8 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .pill{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;border-radius:999px;padding:4px 9px;white-space:nowrap}
 .pill.over{color:var(--red);background:var(--redbg)} .pill.soon{color:var(--amber);background:var(--amberbg)} .pill.fine{color:var(--green);background:var(--greenbg)}
 .pill.paid{color:var(--green);background:var(--greenbg)} .pill.none{color:var(--ink2);background:#EEF2F1}
+.pill.bdaypill{color:#fff;background:var(--bday)} .pill.bdaysoon{color:#BE185D;background:#FCE7F3}
+.row.bdtoday{background:#FDF2F8}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .tile{border-radius:16px;padding:12px;color:var(--ink);text-align:left}
@@ -67,8 +69,11 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .row .t{font-weight:650;font-size:15.5px;line-height:1.25;overflow-wrap:anywhere}
 .row .s{font-size:13px;color:var(--ink2);margin-top:2px;line-height:1.3}
 .ic.car{background:#E6F4F1;color:var(--brand)} .ic.bill{background:#FFF3E3;color:#B45309} .ic.todo{background:#EEF0FF;color:#4F46E5} .ic.appt{background:#F2ECFF;color:#7C3AED}
+.ic.bday{background:#FCE7F3;color:#BE185D} .ic.idea{background:#FEF6C7;color:#A16207} .ic.set{background:#EEF2F1;color:var(--ink2)} .ic.ext{background:#E6EFFB;color:var(--ext)}
+.row>svg.i:last-child{color:var(--ink3);width:18px;height:18px}
 .tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;color:#fff;display:inline-block;vertical-align:1px;white-space:nowrap}
-.tag.due{background:var(--due)} .tag.appt{background:var(--appt)}
+.tag.due{background:var(--due)} .tag.appt{background:var(--appt)} .tag.bday{background:var(--bday)} .tag.ext{background:var(--ext)}
+.tag{max-width:92px;overflow:hidden;text-overflow:ellipsis}
 .empty{text-align:center;padding:22px 16px}
 .empty .t{font-weight:700;font-size:16px}
 .empty .s{color:var(--ink2);font-size:14px;margin:4px 0 12px;line-height:1.4}
@@ -162,6 +167,22 @@ select.sel{font:inherit;font-size:15px;font-weight:600;color:var(--brand);border
 .ev .time{width:62px;flex:none;font-size:12.5px;font-weight:650;color:var(--ink2)}
 .ev .t{font-weight:650;font-size:15px;overflow-wrap:anywhere}
 .ev .s{font-size:12.5px;color:var(--ink2);margin-top:3px}
+/* ideas */
+.star{width:40px;height:40px;margin:-8px -4px -8px -8px;display:grid;place-items:center;flex:none;color:#B8C4C0}
+.star.on{color:#E0A100} .star.on svg.i{fill:#F5B90B}
+.cattag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--ink2);background:#EEF2F1;border-radius:6px;padding:1px 6px;margin-right:2px}
+.search{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:14px;padding:0 12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.06);color:var(--ink3)}
+.search input{flex:1;min-width:0;border:0;outline:none;font:inherit;font-size:16px;padding:11px 0;background:none;color:var(--ink)}
+.search svg.i{width:19px;height:19px}
+/* calendar links */
+details.help{background:var(--card);border-radius:14px;margin-top:10px;padding:0 14px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+details.help summary{font-weight:700;font-size:15px;padding:13px 0;cursor:pointer;color:var(--brand);list-style-position:inside}
+details.help[open] summary{padding-bottom:4px}
+details.help ol{margin:0 0 12px}
+.seg.swatches button{flex:1;min-width:0;padding:8px 0;display:grid;place-items:center}
+.seg.swatches button i{width:24px;height:24px;border-radius:50%;background:var(--sw);display:block}
+.seg.swatches button.on{background:#fff;border:2px solid var(--ink)}
+.dcard.feed .btn.small{min-height:34px;padding:6px 10px;font-size:13.5px}
 /* settings */
 .srow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);width:100%;text-align:left;min-height:54px}
 .srow:first-child{border-top:0}
@@ -212,6 +233,7 @@ select.sel{font:inherit;font-size:15px;font-weight:600;color:var(--brand);border
 <div id="sheet"></div>
 <div id="toast" role="status" aria-live="polite"><span id="toastmsg"></span><button id="toastbtn"></button></div>
 <script src="core.js"></script>
+<script src="ical-import.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

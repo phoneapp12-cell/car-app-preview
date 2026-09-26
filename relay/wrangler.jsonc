@@ -1,0 +1,12 @@
+{
+  // Due Dates calendar link relay (Cloudflare Workers, free plan).
+  "name": "due-dates-calendar-relay",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-25",
+  "workers_dev": true,
+  // No request logs, traces or analytics are kept for this Worker.
+  "observability": { "enabled": false, "logs": { "enabled": false, "invocation_logs": false } },
+  "vars": {
+    "ALLOWED_ORIGIN": "https://phoneapp12-cell.github.io"
+  }
+}

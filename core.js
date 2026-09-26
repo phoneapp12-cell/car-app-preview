@@ -68,6 +68,27 @@
     return out;
   }
 
+  /* ---------- birthdays: { day, month, year (optional) } ---------- */
+  const leap = y => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  function bdayInYear(b, y) { let d = +b.day; const m = +b.month; if (m === 2 && d === 29 && !leap(y)) d = 28; return Date.UTC(y, m - 1, d); }
+  // Next birthday on or after today, as 'YYYY-MM-DD'
+  function nextBday(b, now) {
+    const T = todayT(now), y = new Date(T).getUTCFullYear();
+    const t = bdayInYear(b, y);
+    return isoT(t >= T ? t : bdayInYear(b, y + 1));
+  }
+  const bdayAge = (b, iso) => (b.year ? +iso.slice(0, 4) - +b.year : null);
+  // Birthday dates between two UTC-midnight times (inclusive)
+  function bdayDates(b, fromT, toT) {
+    const out = [];
+    for (let y = new Date(fromT).getUTCFullYear(); y <= new Date(toT).getUTCFullYear(); y++) {
+      const t = bdayInYear(b, y);
+      if (t >= fromT && t <= toT && (!b.year || y >= +b.year)) out.push(isoT(t));
+    }
+    return out;
+  }
+  const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+
   /* ---------- everything that has a due date ---------- */
   function dueItems(data, now) {
     const out = [];
@@ -125,9 +146,10 @@
   }
 
   // Works out which reminders should fire now. `fired` is an object of key -> time fired.
-  function pendingReminders(data, fired, now = new Date()) {
+  function pendingReminders(data, fired, now = new Date(), cal = {}) {
     const s = data.settings || {};
     const out = [];
+    const daytime = !quietNow(now);
     dueItems(data, now).forEach(x => {
       const st = stage(x); if (!st) return;
       const key = [x.kind, x.id, x.part, x.date, st].join('|');
@@ -151,6 +173,36 @@
         }
       });
     }
+    // Birthdays: 3 days before and on the day, never between 9 pm and 7 am
+    if (s.bdayReminders !== false && daytime) {
+      (data.birthdays || []).forEach(b => {
+        if (!b.day || !b.month) return;
+        const iso = nextBday(b, now), d = daysLeft(iso, now);
+        const st = d === 0 ? 'd0' : d > 0 && d <= 3 ? 's3' : null; if (!st) return;
+        const key = ['bday', b.id, iso, st].join('|'); if (fired[key]) return;
+        const age = bdayAge(b, iso), turns = age && age > 0 ? ` turns ${age}` : '';
+        if (d === 0) out.push({ key, title: `It’s ${b.name}’s birthday today 🎂`, body: `${b.name}${turns || ' has a birthday'} today.${b.notes ? ' ' + b.notes : ''}`, url: '#birthdays', days: 0 });
+        else out.push({ key, title: `${b.name}’s birthday ${inWords(d)}`, body: `${b.name}${turns ? turns + ' on' : '’s birthday is'} ${fmtW(iso, now)}.${b.notes ? ' ' + b.notes : ''}`, url: '#birthdays', days: d });
+      });
+    }
+    // Events imported from Outlook / Google: 1 hour before timed events, morning of all-day ones
+    (data.feeds || []).forEach(f => {
+      if (f.reminders === false) return;
+      const c = cal && cal[f.id]; if (!c || !Array.isArray(c.events)) return;
+      const from = ' · from ' + (f.name || 'your calendar');
+      c.events.forEach(e => {
+        if (e.allDay) {
+          if (!daytime || e.date !== todayISO(now)) return;
+          const key = ['ical', f.id, e.key, e.date, 'd0'].join('|');
+          if (!fired[key]) out.push({ key, title: `Today: ${e.title}`, body: 'All day' + from, url: '#calendar', days: 0 });
+        } else {
+          const diff = e.start - now.getTime();
+          if (!(diff > 0 && diff <= 60 * 60 * 1000)) return;
+          const key = ['ical', f.id, e.key, e.start, 'h1'].join('|');
+          if (!fired[key]) out.push({ key, title: `${e.title} at ${fmtTime(e.time)}`, body: `Starts in ${Math.max(1, Math.round(diff / 60000))} minutes${e.location ? ' · ' + e.location : ''}${from}`, url: '#calendar', days: 0 });
+        }
+      });
+    });
     return out.sort((a, b) => a.days - b.days);
   }
 
@@ -191,7 +243,9 @@
     if (!enabled || perm !== 'granted' || !reg) return { shown: 0, badge };
     if (opts.respectQuiet && quietNow(now)) return { shown: 0, badge, quiet: true };
     const fired = (await kvGet('fired')) || {};
-    const list = pendingReminders(data, fired, now);
+    let cal = opts.cal;
+    if (!cal) { try { cal = (await kvGet('calcache')) || {}; } catch (e) { cal = {}; } }
+    const list = pendingReminders(data, fired, now, cal);
     let shown = 0;
     for (const r of list.slice(0, 8)) {
       try {
@@ -207,5 +261,5 @@
   }
 
   g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money,
-    REPEATS, nextDue, billDates, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
+    REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);

@@ -1,0 +1,15 @@
+{
+  "name": "due-dates-calendar-relay",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Tiny CORS relay so the Due Dates web app can read your Outlook / Google calendar (.ics) link.",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "test": "node test/relay.test.mjs",
+    "local": "node local-server.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

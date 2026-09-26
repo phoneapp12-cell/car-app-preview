@@ -1,8 +1,8 @@
 /* Car & Life Due Dates – the app. Data lives only on this device (IndexedDB). */
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
-  money, REPEATS, nextDue, billDates, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.0.0';
+  money, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
+const APP_VERSION = '1.1.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -36,6 +36,13 @@ const P = {
   house: '<path d="M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-5h4v5"/>',
   umbrella: '<path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9zM12 12v7a2 2 0 0 0 4 0"/>',
   drop: '<path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"/>',
+  cake: '<path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c1.5 1 2.5 1 4 0s2.5-1 4 0 2.5 1 4 0 1.5-.6 2-.8M12 12V8M12 5.5c-.8-.8-.8-1.8 0-3 .8 1.2.8 2.2 0 3z"/>',
+  bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2V16h5v-.2c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3z"/>',
+  more: '<circle cx="6" cy="6" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/><circle cx="12" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>',
+  refresh: '<path d="M20 11a8 8 0 0 0-14.8-3.5M4 4v4h4M4 13a8 8 0 0 0 14.8 3.5M20 20v-4h-4"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   phoneDown: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
@@ -57,14 +64,17 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    settings: { name: 'Shane', reminders: true, apptReminders: true }
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [],
+    settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
+const IDEA_CATS = ['Gifts', 'Home', 'Trips', 'Other'];
 function normalise(d) {
   d = d && typeof d === 'object' ? d : {};
-  ['cars', 'bills', 'todos', 'appts'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
+  ['cars', 'bills', 'todos', 'appts', 'birthdays', 'ideas', 'feeds'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
   if (!Array.isArray(d.lists) || !d.lists.length) d.lists = ['Home', 'Cars', 'Shopping'];
-  d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true }, d.settings || {});
+  if (!Array.isArray(d.ideaCats)) d.ideaCats = IDEA_CATS.slice();
+  d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
   d.version = 1;
   return d;
 }
@@ -126,7 +136,7 @@ function openSheet(title, inner, onSubmit, submitLabel = 'Save', extraBtns = '')
   el.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="panel" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="grab"></div><h3>${title}</h3>
     <form id="sf" novalidate autocomplete="off">${inner}<div class="formerr" id="ferr"></div>
-    <div class="btns">${extraBtns}<button type="button" class="btn" onclick="closeSheet()">Cancel</button>${onSubmit ? `<button type="submit" class="btn primary">${submitLabel}</button>` : ''}</div></form></div>`;
+    <div class="btns">${extraBtns}<button type="button" class="btn" onclick="closeSheet()">${onSubmit ? 'Cancel' : 'Close'}</button>${onSubmit ? `<button type="submit" class="btn primary">${submitLabel}</button>` : ''}</div></form></div>`;
   el.classList.add('show');
   // Show the chosen date in words, whatever date format the phone uses
   el.querySelectorAll('input[type=date]').forEach(i => {
@@ -196,7 +206,7 @@ function Home() {
       ${n ? `<span class="pill ${status(d)}">${n[0]} ${d < 0 ? 'overdue' : d === 0 ? 'today' : d + 'd'}</span>` : '<span class="pill none">No dates</span>'}</button>`;
   }).join('');
   const t7 = todayT() + 7 * DAY;
-  const upcoming = S.appts.filter(a => a.date && parseD(a.date) >= todayT() && parseD(a.date) <= t7).sort(apptSort);
+  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due');
   return header('Kia ora, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + cards +
     `<div class="tiles">
       <div class="tile over"><b>${over}</b><span>Overdue</span></div>
@@ -207,9 +217,10 @@ function Home() {
     <div class="sec">Needs attention <a href="#calendar">See calendar</a></div>
     ${attention.length ? `<div class="list">${attention.map(rowFor).join('')}</div>` : `<div class="card empty"><div class="t">All good for the next 30 days</div><div class="s">Nothing is overdue or due soon. Sweet as.</div></div>`}
     <div class="sec">Coming up this week <button onclick="apptForm()">Add</button></div>
-    ${upcoming.length ? `<div class="list">${upcoming.map(a => `<button class="row" onclick="apptForm('${a.id}')"><div class="ic appt">${I('cal')}</div>
-      <div class="tx"><div class="t">${esc(a.title)}</div><div class="s">${fmtW(a.date)} · ${a.time ? fmtTime(a.time) : 'All day'}</div></div></button>`).join('')}</div>`
+    ${upcoming.length ? `<div class="list">${upcoming.map(e => `<button class="row" onclick="${e.go}"><div class="ic ${e.src}" ${e.color ? `style="background:${e.color}1f;color:${e.color}"` : ''}>${I(e.src === 'bday' ? 'cake' : 'cal')}</div>
+      <div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${fmtW(e.date)} · ${e.src === 'bday' ? 'Birthday' : esc(e.time)}${e.src === 'ext' ? ' · ' + esc(e.tag) : ''}</div></div></button>`).join('')}</div>`
       : empty('Nothing booked this week', 'Add appointments like a haircut or the dentist and we’ll remind you an hour before.', 'Add an appointment', 'apptForm()')}
+    ${syncNote()}
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
 
@@ -524,7 +535,13 @@ function calItems(fromT, toT) {
   S.bills.forEach(b => billDates(b, fromT, toT).forEach(d => ev.push({ src: 'due', title: `${b.name} · ${money(b.amount)}`, date: d, time: 'Bill', go: `go('#bills')` })));
   S.todos.filter(t => !t.done && t.due && inR(t.due)).forEach(t => ev.push({ src: 'due', title: t.title, date: t.due, time: 'To-do', go: `go('#todo')` }));
   S.appts.filter(a => inR(a.date)).forEach(a => ev.push({ src: 'appt', title: a.title, date: a.date, time: a.time ? fmtTime(a.time) : 'All day', sort: a.time || '00:00', go: `apptForm('${a.id}')`, notes: a.notes }));
-  return ev.sort((a, b) => parseD(a.date) - parseD(b.date) || (a.src === 'appt' ? 1 : 0) - (b.src === 'appt' ? 1 : 0) || (a.sort || '').localeCompare(b.sort || ''));
+  S.birthdays.forEach(b => bdayDates(b, fromT, toT).forEach(d => {
+    const age = bdayAge(b, d);
+    ev.push({ src: 'bday', title: `${b.name}’s ${age > 0 ? ordinal(age) + ' ' : ''}birthday`, date: d, time: 'Birthday', sort: '', tag: 'Birthday', go: `birthdayForm('${b.id}')` });
+  }));
+  extEvents(fromT, toT).forEach(x => ev.push(x));
+  const rank = { due: 0, bday: 1, appt: 2, ext: 2 };
+  return ev.sort((a, b) => parseD(a.date) - parseD(b.date) || rank[a.src] - rank[b.src] || (a.sort || '').localeCompare(b.sort || ''));
 }
 let calMonth = null, calSel = null;
 function Calendar() {
@@ -539,12 +556,12 @@ function Calendar() {
   for (let i = 0; i < 42; i++) {
     const t = gridStart + i * DAY, d = new Date(t), other = d.getUTCMonth() !== m;
     if (i >= 35 && other) break;
-    const iso = isoT(t), srcs = [...new Set((byDay[iso] || []).map(e => e.src))];
+    const iso = isoT(t), cols = [...new Set((byDay[iso] || []).map(e => e.color || `var(--${e.src})`))].slice(0, 4);
     cells += `<button class="${other ? 'other' : ''} ${t === T ? 'today' : ''} ${t === calSel ? 'sel' : ''}" aria-label="${fmtLong(iso)}" onclick="pickDay(${t})">
-      <span class="n">${d.getUTCDate()}</span><span class="dots">${srcs.map(s => `<i style="background:var(--${s})"></i>`).join('')}</span></button>`;
+      <span class="n">${d.getUTCDate()}</span><span class="dots">${cols.map(c => `<i style="background:${c}"></i>`).join('')}</span></button>`;
   }
-  const evRow = e => `<button class="ev" onclick="${e.go}"><span class="bar" style="background:var(--${e.src})"></span><span class="time">${e.time}</span>
-     <div style="flex:1;min-width:0"><div class="t">${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}">${e.src === 'appt' ? 'Appt' : 'Due'}</span></button>`;
+  const evRow = e => `<button class="ev" onclick="${e.go}"><span class="bar" style="background:${e.color || `var(--${e.src})`}"></span><span class="time">${esc(e.time)}</span>
+     <div style="flex:1;min-width:0"><div class="t">${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}" ${e.color ? `style="background:${e.color}"` : ''}>${esc(e.tag || (e.src === 'appt' ? 'Appt' : 'Due'))}</span></button>`;
   const dayLabel = s => { const d = daysLeft(s); return (d === 0 ? 'Today · ' : d === 1 ? 'Tomorrow · ' : '') + fmtW(s); };
   let agenda;
   if (calSel !== null) {
@@ -561,14 +578,15 @@ function Calendar() {
       (Object.keys(groups).length ? Object.keys(groups).map(k => `<div class="agday">${dayLabel(k)}</div>${groups[k].map(evRow).join('')}`).join('')
         : empty('Nothing in the next 3 weeks', 'Add an appointment, or tap a day on the calendar.', 'Add an appointment', 'apptForm()'));
   }
-  return header('Calendar', 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
+  return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
     `<div class="card"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
-     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>
+     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
       ${y !== now.getFullYear() || m !== now.getMonth() ? `<button style="margin-left:auto;color:var(--brand);font-weight:700" onclick="calMonth=null;calSel=null;render()">Back to today</button>` : ''}</div>
      <div class="grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>
     ${agenda}
-    <div class="callout blue" style="margin-top:16px">${I('info')}<div><b>Coming soon: automatic Outlook and Google import.</b> For now, add appointments yourself with the + button.</div></div>`;
+    ${S.feeds.length ? syncNote(true) : `<div class="callout blue" style="margin-top:16px">${I('link')}<div><b>Bring in your Outlook or Google calendar.</b> Paste your calendar link once and your appointments show up here, with reminders.
+      <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="go('#settings');setTimeout(()=>{const x=document.getElementById('calsec');x&&x.scrollIntoView()},50)">Connect a calendar</button></div></div></div>`}`;
 }
 function pickDay(t) { calSel = calSel === t ? null : t; render(); }
 function shiftMonth(n) { let { y, m } = calMonth; m += n; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } calMonth = { y, m }; calSel = null; render(); }
@@ -591,6 +609,356 @@ async function deleteAppt(id) {
   const s = snap(); S.appts = S.appts.filter(x => x.id !== id); await save(); await closeSheet(); render(); toast('Appointment deleted.', 'Undo', undoTo(s));
 }
 
+/* ================= CALENDAR IMPORT (Outlook / Google / iCloud links) ================= */
+// The calendar link service ("relay") fetches your .ics link for the app, because Outlook and Google
+// don't let web apps read calendar links directly. It keeps nothing. Set once it's deployed:
+const RELAY_DEFAULT = '';
+const RELAY_URL = (() => {
+  try { if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem('relayOverride')) return localStorage.getItem('relayOverride'); } catch (e) { }
+  return RELAY_DEFAULT;
+})().replace(/\/+$/, '');
+const CAL_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
+const SYNC_EVERY = 15 * 60 * 1000;
+const FEED_COLOURS = [['#0A64C8', 'Blue'], ['#E8710A', 'Orange'], ['#188038', 'Green'], ['#D01884', 'Pink'], ['#7C3AED', 'Purple'], ['#0E7C86', 'Teal']];
+let CAL = {};            // feedId -> { events, syncedAt, lastAttempt, error, count }
+const syncingNow = new Set();
+let extReg = [];         // imported events shown on screen, for taps
+
+function cleanFeedUrl(raw) {
+  let s = String(raw || '').trim().replace(/\s+/g, '');
+  if (/^webcals?:\/\//i.test(s)) s = 'https://' + s.replace(/^webcals?:\/\//i, '');
+  if (/^http:\/\//i.test(s)) s = 'https://' + s.slice(7);
+  let u; try { u = new URL(s); } catch (e) { return null; }
+  const h = u.hostname.toLowerCase();
+  if (u.protocol !== 'https:' || !(CAL_HOSTS.includes(h) || (h.endsWith('.icloud.com') && h.length > 11))) return null;
+  return u.toString();
+}
+function feedKind(url) {
+  const h = (() => { try { return new URL(url).hostname; } catch (e) { return ''; } })();
+  if (/google/.test(h)) return 'Google'; if (/icloud/.test(h)) return 'iCloud'; if (/outlook/.test(h)) return 'Outlook'; return 'Calendar';
+}
+const feedById = id => S.feeds.find(f => f.id === id);
+function ago(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return 'just now'; if (m < 60) return m + ' min ago';
+  const h = Math.round(m / 60); if (h < 24) return plural(h, 'hour') + ' ago';
+  return plural(Math.round(h / 24), 'day') + ' ago';
+}
+function feedError(code, f) {
+  const n = esc(f ? f.name : 'The calendar'), k = f ? feedKind(f.url) : 'the calendar';
+  return ({
+    setup: 'The calendar link service is still being set up. Your events will show up once it’s ready.',
+    offline: 'No internet just now. We’ll try again next time you open the app.',
+    timeout: `${k} took too long to answer. We’ll try again soon.`,
+    not_found: `${k} says this link doesn’t work any more. If you unpublished or reset the calendar, remove it here and add the new link.`,
+    denied: `${k} wouldn’t share the calendar with this link. Check it’s the ICS link and the calendar is still published.`,
+    not_calendar: 'That link didn’t give back a calendar. Make sure you copied the ICS link (it ends in .ics), not the HTML one.',
+    too_large: 'That calendar is too big to bring in (over 5 MB).',
+    parse: 'The calendar came back but the app couldn’t read it.',
+    bad_url: 'That isn’t an Outlook, Google or iCloud calendar link.', host_not_allowed: 'That isn’t an Outlook, Google or iCloud calendar link.',
+    forbidden_origin: 'The calendar link service turned this app away.'
+  })[code] || `Couldn’t reach ${n} just now. We’ll try again soon.`;
+}
+async function loadCal() { try { CAL = (await kvGet('calcache')) || {}; } catch (e) { CAL = {}; } }
+async function saveCal() { try { await kvSet('calcache', CAL); } catch (e) { } }
+
+// Sync on open / coming back to the app (at most every 15 min), or straight away when forced.
+async function syncFeeds(force = false, onlyId = null) {
+  if (!S || !S.feeds.length) return;
+  const due = S.feeds.filter(f => (!onlyId || f.id === onlyId) && !syncingNow.has(f.id) &&
+    (force || !CAL[f.id] || !CAL[f.id].lastAttempt || Date.now() - CAL[f.id].lastAttempt > SYNC_EVERY));
+  if (!due.length) return;
+  if (!RELAY_URL) { due.forEach(f => { CAL[f.id] = Object.assign(CAL[f.id] || { events: [] }, { error: 'setup' }); }); await saveCal(); if (!sheetOpen) render(); return; }
+  due.forEach(f => syncingNow.add(f.id));
+  if (!sheetOpen && /settings/.test(location.hash)) render();
+  try { await CalImport.loadICAL(); } catch (e) { due.forEach(f => syncingNow.delete(f.id)); return; }
+  await Promise.all(due.map(syncOne));
+  await saveCal();
+  if (!sheetOpen) render();
+  queueCheck();
+}
+async function syncOne(f) {
+  const c = CAL[f.id] = CAL[f.id] || { events: [] };
+  c.lastAttempt = Date.now();
+  const fail = code => { const e = new Error(code); e.code = code; return e; };
+  try {
+    if (navigator.onLine === false) throw fail('offline');
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 30000);
+    let res;
+    try {
+      res = await fetch(RELAY_URL + '/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: f.url }),
+        cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctl.signal });
+    } catch (e) { throw fail(ctl.signal.aborted ? 'timeout' : navigator.onLine === false ? 'offline' : 'relay'); }
+    finally { clearTimeout(timer); }
+    if (!res.ok) { let j = {}; try { j = await res.json(); } catch (e) { } throw fail(j.error || 'relay'); }
+    const text = await res.text();
+    let r; try { r = CalImport.parseFeed(text); } catch (e) { throw fail('parse'); }
+    Object.assign(c, { events: r.events, count: r.count, calName: r.calName, syncedAt: Date.now(), error: null });
+  } catch (e) { c.error = e.code || 'relay'; }
+  finally { syncingNow.delete(f.id); }
+}
+// Imported events between two UTC-midnight day values, as calendar items
+function extEvents(fromT, toT) {
+  const out = [];
+  S.feeds.forEach(f => {
+    const c = CAL[f.id]; if (!c || !c.events) return;
+    c.events.forEach(e => {
+      if (e.birthday && bdayMatch(e)) return; // already in Birthdays, don't show it twice
+      const s = parseD(e.date), en = Math.min(parseD(e.endDate || e.date) || s, s + 62 * DAY);
+      if (en < fromT || s > toT) return;
+      for (let t = Math.max(s, fromT); t <= Math.min(en, toT); t += DAY) {
+        const i = extReg.length; extReg.push({ f, e });
+        const multi = en > s;
+        out.push({ src: 'ext', color: f.colour, tag: f.name, title: e.title, date: isoT(t),
+          time: e.allDay ? (multi ? 'All day' : 'All day') : (t === s ? fmtTime(e.time) : 'Cont.'), sort: e.allDay ? '' : (t === s ? e.time : ''),
+          notes: [e.location, multi ? `until ${fmtW(e.endDate)}` : ''].filter(Boolean).join(' · '), go: `showExt(${i})` });
+      }
+    });
+  });
+  if (extReg.length > 20000) extReg = [];
+  return out;
+}
+function bdayMatch(e) {
+  const [, mo, d] = e.date.split('-').map(Number), name = (e.bdayName || e.title).trim().toLowerCase();
+  return S.birthdays.find(b => +b.day === d && +b.month === mo && b.name.trim().toLowerCase() === name);
+}
+function showExt(i) {
+  const x = extReg[i]; if (!x) return;
+  const { f, e } = x;
+  const when = e.allDay ? (e.endDate && e.endDate !== e.date ? `${fmtW(e.date)} to ${fmtW(e.endDate)} · all day` : `${fmtLong(e.date)} · all day`)
+    : `${fmtLong(e.date)}<br>${fmtTime(e.time)} – ${e.endDate !== e.date ? fmtW(e.endDate) + ' ' : ''}${fmtTime(e.endTime)}`;
+  let bd = null;
+  if (e.birthday) {
+    const [, mo, d] = e.date.split('-').map(Number);
+    bd = { name: e.bdayName || e.title, d, mo, have: bdayMatch(e) };
+  }
+  openSheet(esc(e.title), `<div class="dcard"><div class="h"><i class="dot" style="background:${esc(f.colour)}"></i> From ${esc(f.name)}</div>
+      <div class="big" style="font-size:18px">${when}</div>
+      ${e.location ? `<div class="muted" style="margin-top:6px"><b>Where:</b> ${esc(e.location)}</div>` : ''}
+      ${e.desc ? `<div class="muted notes" style="margin-top:6px">${esc(e.desc)}</div>` : ''}</div>
+    <p class="muted" style="margin:0 2px 6px">This is from your ${esc(f.name)} calendar, so it can’t be changed here. Change it in ${esc(feedKind(f.url))} and it updates next time the app syncs.</p>
+    ${bd && bd.have ? `<p class="muted" style="margin:0 2px 6px"><span class="ok">✓</span> ${esc(bd.name)} is already in your Birthdays.</p>` : ''}`,
+    bd && !bd.have ? async () => {
+      S.birthdays.push({ id: uid('bday'), name: bd.name.slice(0, 60), day: bd.d, month: bd.mo, year: '', notes: '' });
+      await save(); render();
+      return () => toast(`${bd.name} added to Birthdays.`, 'View', () => go('#birthdays'));
+    } : null, `${I('cake')} Add to Birthdays`);
+}
+function syncNote(card) {
+  if (!S.feeds.length) return '';
+  const names = S.feeds.map(f => esc(f.name)).join(' and ');
+  const times = S.feeds.map(f => CAL[f.id] && CAL[f.id].syncedAt).filter(Boolean);
+  const errs = S.feeds.filter(f => CAL[f.id] && CAL[f.id].error);
+  const when = syncingNow.size ? 'Updating now…' : times.length ? 'Last updated ' + ago(Math.min(...times)) + '.' : 'Not updated yet.';
+  const txt = `${names} events refresh each time you open the app. ${when}${errs.length ? ` <a href="#settings" style="color:var(--red);font-weight:700">${errs.length === 1 ? 'There’s a problem with ' + esc(errs[0].name) : 'Some calendars have a problem'}.</a>` : ''}`;
+  return card ? `<div class="callout blue" style="margin-top:16px">${I('refresh')}<div>${txt}</div></div>` : `<div class="muted" style="margin:8px 4px 0;font-size:13px">${txt}</div>`;
+}
+function feedsSection() {
+  const rows = S.feeds.map(f => {
+    const c = CAL[f.id] || {};
+    let st;
+    if (syncingNow.has(f.id)) st = 'Syncing…';
+    else if (c.error) st = `<span class="bad">${feedError(c.error, f)}</span>${c.syncedAt ? `<br>Showing ${plural(c.count || 0, 'event')} from ${ago(c.syncedAt)}.` : ''}`;
+    else if (c.syncedAt) st = `<span class="ok">✓</span> Synced ${ago(c.syncedAt)} · ${plural(c.count || 0, 'event')}`;
+    else st = 'Not synced yet';
+    return `<div class="dcard feed"><div class="h" style="color:var(--ink)"><i class="dot" style="background:${esc(f.colour)};width:12px;height:12px"></i><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(f.name)}</span>
+        <button class="btn small" onclick="feedForm('${f.id}')">${I('edit')} Edit</button></div>
+      <div class="muted" style="margin-top:6px">${st}</div>
+      <div class="srow" style="padding:10px 0 0;border:0;min-height:0"><div class="tx"><div class="t" style="font-size:14px">Reminders</div><div class="s">1 hour before, all-day ones in the morning</div></div>
+        <button class="switch ${f.reminders !== false ? 'on' : ''}" role="switch" aria-checked="${f.reminders !== false}" aria-label="Reminders for ${esc(f.name)}" onclick="toggleFeedReminders('${f.id}')"></button></div>
+      <div class="btns"><button class="btn" onclick="syncFeeds(true,'${f.id}')" ${syncingNow.has(f.id) ? 'disabled' : ''}>${I('refresh')} Sync now</button>
+        <button class="btn danger" onclick="removeFeed('${f.id}')">${I('trash')} Remove</button></div></div>`;
+  }).join('');
+  return `<div class="sec" id="calsec">Connect calendars</div>
+  ${RELAY_URL ? '' : `<div class="callout">${I('info')}<div><b>The calendar link service is being set up.</b> You can add your calendar link now. It will start syncing once the service is ready.</div></div>`}
+  ${rows}
+  <button class="btn primary" style="width:100%" onclick="feedForm()">${I('plus')} Add a calendar</button>
+  <div class="muted" style="margin:8px 4px 0">Outlook.com, Google or iCloud. Events are read-only here, refresh when you open the app, and still show when you’re offline.</div>
+  ${linkHelp()}`;
+}
+function linkHelp() {
+  return `<details class="help"><summary>How to get your Outlook.com link</summary><ol class="steps">
+      <li>Outlook’s phone app can’t do this, so open <b>outlook.live.com</b> in Chrome. Tap ⋮ and tick <b>Desktop site</b>, then sign in.</li>
+      <li>Go to the Calendar, then tap <b>Settings</b> (the cog, top right) › <b>Calendar</b> › <b>Shared calendars</b>.</li>
+      <li>Under <b>Publish a calendar</b>, choose your calendar and <b>Can view all details</b>, then tap <b>Publish</b>.</li>
+      <li>Tap the <b>ICS</b> link (not HTML) and <b>Copy link</b>. Paste it here with <b>Add a calendar</b>.</li></ol></details>
+    <details class="help"><summary>How to get your Google Calendar link</summary><ol class="steps">
+      <li>The Google Calendar app can’t do this, so open <b>calendar.google.com</b> in Chrome. Tap ⋮ and tick <b>Desktop site</b>.</li>
+      <li>Tap <b>Settings</b> (the cog, top right). On the left, under <b>Settings for my calendars</b>, tap your calendar.</li>
+      <li>Tap <b>Integrate calendar</b>. Copy the <b>Secret address in iCal format</b>.</li>
+      <li>Paste it here with <b>Add a calendar</b>.</li></ol></details>
+    <div class="callout red" style="margin-top:10px">${I('warn')}<div><b>Keep your link private.</b> Anyone who has it can see your calendar. Don’t share it or post it anywhere.
+      If it gets out: in Outlook, go back to Shared calendars and tap <b>Unpublish</b> (the old link stops working), then publish again for a new link.
+      In Google, tap <b>Reset</b> next to the secret address. Then paste the new link here.</div></div>
+    <div class="muted" style="margin:0 4px">Your link is saved on this phone (and in your backups). To read it, the app passes it to our calendar link service, which fetches the calendar and hands it straight back. It doesn’t keep your link or your events.</div>`;
+}
+function feedForm(id) {
+  const f = id ? feedById(id) : { name: '', url: '', colour: '', reminders: true };
+  const used = S.feeds.map(x => x.colour);
+  const col = f.colour || (FEED_COLOURS.find(c => !used.includes(c[0])) || FEED_COLOURS[0])[0];
+  openSheet(id ? 'Edit calendar' : 'Add a calendar',
+    field('Calendar link', `<textarea name="url" rows="3" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://outlook.live.com/owa/calendar/…/calendar.ics" style="font-size:14px;word-break:break-all">${esc(f.url)}</textarea>`,
+      'Paste the ICS link (Outlook) or secret iCal address (Google). webcal:// links are fine too.') +
+    field('Name', inp('name', f.name, 'placeholder="e.g. Outlook" maxlength="24"'), 'Shown on each event, e.g. “from Outlook”.') +
+    `<div class="field"><span>Colour</span><div class="seg swatches" data-seg="colour">${FEED_COLOURS.map(([hex, n]) => `<button type="button" class="${hex === col ? 'on' : ''}" data-v="${hex}" aria-label="${n}" style="--sw:${hex}"><i></i></button>`).join('')}</div><input type="hidden" name="colour" value="${col}"></div>` +
+    (id ? '' : linkHelp()),
+    async v => {
+      const url = cleanFeedUrl(v.url);
+      if (!v.url) return 'Please paste your calendar link.';
+      if (!url) return 'That doesn’t look like an Outlook, Google or iCloud calendar link. It should start with https:// or webcal:// and usually ends in .ics.';
+      if (S.feeds.some(x => x.url === url && x.id !== id)) return 'You’ve already added that calendar.';
+      const name = (v.name || feedKind(url)).slice(0, 24);
+      let fid = id;
+      if (id) { const changed = f.url !== url; Object.assign(f, { name, url, colour: v.colour }); if (changed) delete CAL[id]; }
+      else { fid = uid('feed'); S.feeds.push({ id: fid, name, url, colour: v.colour, reminders: true, added: Date.now() }); }
+      await save(); render();
+      return () => { toast(RELAY_URL ? `${name} added. Syncing…` : `${name} saved. It will sync once the calendar link service is ready.`); syncFeeds(true, fid); };
+    }, id ? 'Save' : 'Add calendar');
+  const box = document.querySelector('[data-seg="colour"]'), hid = document.querySelector('input[name="colour"]');
+  box.querySelectorAll('button').forEach(b => b.onclick = () => { box.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); hid.value = b.dataset.v; });
+  const ta = document.querySelector('#sf [name=url]'), nm = document.querySelector('#sf [name=name]');
+  ta.addEventListener('input', () => { const u = cleanFeedUrl(ta.value); if (u && !nm.value) nm.placeholder = 'e.g. ' + feedKind(u); });
+}
+async function toggleFeedReminders(id) { const f = feedById(id); f.reminders = f.reminders === false; await save(); render(); }
+function removeFeed(id) {
+  const f = feedById(id);
+  confirmSheet(`Remove ${esc(f.name)}?`, 'Its events will disappear from the app. Nothing changes in your calendar itself.', 'Remove', async () => {
+    S.feeds = S.feeds.filter(x => x.id !== id); delete CAL[id]; await saveCal(); await save(); render(); toast(`${f.name} removed.`);
+  });
+}
+
+/* ================= BIRTHDAYS ================= */
+function bdayInfo(b) { const iso = nextBday(b), d = daysLeft(iso), age = bdayAge(b, iso); return { iso, d, age }; }
+function Birthdays() {
+  const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).sort((x, y) => x.d - y.d || x.b.name.localeCompare(y.b.name));
+  const today = list.filter(x => x.d === 0);
+  const row = x => `<button class="row ${x.d === 0 ? 'bdtoday' : ''}" onclick="birthdayForm('${x.b.id}')"><div class="ic bday">${I('cake')}</div>
+    <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${fmtW(x.iso)}${x.age > 0 ? ` · turns ${x.age}` : ''}${x.b.notes ? ' · ' + esc(x.b.notes) : ''}</div></div>
+    ${x.d === 0 ? '<span class="pill bdaypill">Today! 🎂</span>' : `<span class="pill ${x.d <= 7 ? 'bdaysoon' : 'none'}">${x.d === 1 ? 'Tomorrow' : x.d + ' days'}</span>`}</button>`;
+  return header('Birthdays', S.birthdays.length ? plural(S.birthdays.length, 'person', 'people') : 'Never miss one', addBtn('Add a birthday', 'birthdayForm()')) +
+    today.map(x => `<div class="callout green">${I('cake')}<div><b>Today! It’s ${esc(x.b.name)}’s birthday${x.age > 0 ? ` – they’re ${x.age}` : ''}.</b> Don’t forget to say happy birthday.</div></div>`).join('') +
+    (list.length ? `<div class="list">${list.map(row).join('')}</div>`
+      : empty('No birthdays yet', 'Add the people you don’t want to forget. We’ll remind you 3 days before and on the day.', 'Add a birthday', 'birthdayForm()')) +
+    `<div class="card muted" style="margin-top:12px"><b>Reminders</b> go out 3 days before and on the morning of the day (never between 9 pm and 7 am). Birthdays also show on the Calendar.<br><br>
+     Facebook no longer lets you export birthdays, so they can’t be brought in from there. If your Google or Outlook calendar has birthdays in it, tap one on the Calendar and choose <b>Add to Birthdays</b>.</div>`;
+}
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function birthdayForm(id) {
+  const b = id ? S.birthdays.find(x => x.id === id) : { name: '', day: '', month: '', year: '', notes: '' };
+  if (!b) return;
+  openSheet(id ? 'Edit birthday' : 'Add a birthday',
+    field('Name', inp('name', b.name, 'placeholder="e.g. Sarah" required maxlength="60"')) +
+    `<div class="two">${field('Day', sel('day', [['', 'Day'], ...Array.from({ length: 31 }, (_, i) => [i + 1, i + 1])], b.day))}${field('Month', sel('month', [['', 'Month'], ...MONTHS.map((m, i) => [i + 1, m])], b.month))}</div>` +
+    field('Year born', inp('year', b.year, 'inputmode="numeric" placeholder="Optional" maxlength="4"'), 'Add the year to see how old they’re turning.') +
+    field('Notes', area('notes', b.notes, 'e.g. gift ideas, likes chocolate')),
+    async v => {
+      if (!v.name) return 'Please type their name.';
+      const d = +v.day, m = +v.month, y = v.year ? +digits(v.year) : '';
+      if (!d || !m) return 'Please choose the day and month.';
+      if (d > [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]) return `${MONTHS[m - 1]} doesn’t have ${d} days.`;
+      const thisYear = new Date().getFullYear();
+      if (v.year && (!y || y < 1900 || y > thisYear)) return `Please type the year as 4 numbers, like 1986, or leave it blank.`;
+      if (y && m === 2 && d === 29 && !((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0)) return `${y} wasn’t a leap year, so there was no 29 February.`;
+      const upd = { name: v.name, day: d, month: m, year: y, notes: v.notes };
+      if (id) Object.assign(b, upd); else S.birthdays.push(Object.assign({ id: uid('bday') }, upd));
+      await save(); render(); toast(id ? 'Birthday updated.' : `${v.name}’s birthday added.`);
+    }, id ? 'Save' : 'Add',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete birthday" onclick="deleteBirthday('${id}')">${I('trash')}</button>` : '');
+}
+async function deleteBirthday(id) {
+  const s = snap(), b = S.birthdays.find(x => x.id === id);
+  S.birthdays = S.birthdays.filter(x => x.id !== id); await save(); await closeSheet(); render(); toast(`${b.name} deleted.`, 'Undo', undoTo(s));
+}
+
+/* ================= IDEAS ================= */
+let ideaFilter = 'All', ideaQuery = '';
+function ideaList() {
+  const q = ideaQuery.trim().toLowerCase();
+  const vis = S.ideas.filter(i => (ideaFilter === 'All' || (ideaFilter === '★' ? i.pinned : i.cat === ideaFilter)) &&
+    (!q || (i.title + ' ' + (i.notes || '') + ' ' + (i.cat || '')).toLowerCase().includes(q)))
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.created || 0) - (a.created || 0));
+  if (!vis.length) return S.ideas.length ? `<div class="card empty"><div class="t">No ideas match</div><div class="s">${q ? 'Try a different word.' : 'Nothing in this category yet.'}</div></div>`
+    : empty('Nothing jotted down yet', 'Type an idea above and tap +. Gift ideas, things to do around the house, trips – anything.', '', '');
+  return `<div class="list">${vis.map(i => `<div class="row idea"><button class="star ${i.pinned ? 'on' : ''}" aria-label="${i.pinned ? 'Unstar' : 'Star'} ${esc(i.title)}" aria-pressed="${!!i.pinned}" onclick="toggleStar('${i.id}')">${I('star')}</button>
+    <button class="tapzone" onclick="ideaForm('${i.id}')"><div class="tx"><div class="t">${esc(i.title)}</div>
+    ${i.notes || i.cat ? `<div class="s">${i.cat ? `<span class="cattag">${esc(i.cat)}</span> ` : ''}${esc((i.notes || '').split('\n')[0].slice(0, 90))}</div>` : ''}</div></button></div>`).join('')}</div>`;
+}
+function Ideas() {
+  if (ideaFilter !== 'All' && ideaFilter !== '★' && !S.ideaCats.includes(ideaFilter)) ideaFilter = 'All';
+  return header('Ideas', S.ideas.length ? plural(S.ideas.length, 'idea') : 'Jot things down', addBtn('Add an idea', 'ideaForm()')) +
+    `<form class="addbar" onsubmit="quickIdea(event)"><input id="newidea" placeholder="Jot down an idea…" autocomplete="off" enterkeyhint="done" maxlength="140" aria-label="New idea"><button aria-label="Add idea">${I('plus')}</button></form>
+    ${S.ideas.length ? `<label class="search">${I('search')}<input id="ideaq" type="search" placeholder="Search ideas" value="${esc(ideaQuery)}" aria-label="Search ideas" oninput="ideaQuery=this.value;document.getElementById('idealist').innerHTML=ideaList()"></label>` : ''}
+    <div class="chips">${['All', '★', ...S.ideaCats].map(c => `<button class="chip ${c === ideaFilter ? 'on' : ''}" onclick="ideaFilter=${jsArg(c)};render()">${c === '★' ? '★ Starred' : esc(c)}</button>`).join('')}
+      <button class="chip plus" onclick="catsForm()">Edit categories</button></div>
+    <div id="idealist">${ideaList()}</div>`;
+}
+async function quickIdea(e) {
+  e.preventDefault();
+  const v = $('#newidea').value.trim(); if (!v) return;
+  const id = uid('idea');
+  S.ideas.push({ id, title: v, notes: '', cat: S.ideaCats.includes(ideaFilter) ? ideaFilter : '', pinned: ideaFilter === '★', created: Date.now() });
+  await save(); render(); $('#newidea').focus();
+  toast('Idea saved.', 'Add notes', () => ideaForm(id));
+}
+async function toggleStar(id) { const i = S.ideas.find(x => x.id === id); i.pinned = !i.pinned; await save(); render(); }
+function ideaForm(id) {
+  const i = id ? S.ideas.find(x => x.id === id) : { title: '', notes: '', cat: S.ideaCats.includes(ideaFilter) ? ideaFilter : '', pinned: false };
+  if (!i) return;
+  openSheet(id ? 'Edit idea' : 'Add an idea',
+    field('Idea', inp('title', i.title, 'placeholder="e.g. Kayak trip to Tutukaka" required maxlength="140"')) +
+    field('Notes', area('notes', i.notes, 'Optional: links, prices, who it’s for…')) +
+    `<div class="two">${field('Category', sel('cat', [['', 'None'], ...S.ideaCats.map(c => [c, c])], i.cat || ''))}<div class="field"><span>Starred</span>${segHtml('pinned', [['0', 'No'], ['1', '★ Yes']], i.pinned ? '1' : '0')}</div></div>` +
+    (id ? `<button type="button" class="btn" style="width:100%;margin-bottom:4px" onclick="ideaToTodo('${id}')">${I('todo')} Turn into to-do</button>` : ''),
+    async v => {
+      if (!v.title) return 'Please type the idea.';
+      const upd = { title: v.title, notes: v.notes, cat: v.cat, pinned: v.pinned === '1', updated: Date.now() };
+      if (id) Object.assign(i, upd); else S.ideas.push(Object.assign({ id: uid('idea'), created: Date.now() }, upd));
+      await save(); render(); toast(id ? 'Idea updated.' : 'Idea saved.');
+    }, id ? 'Save' : 'Add',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete idea" onclick="deleteIdea('${id}')">${I('trash')}</button>` : '');
+  wireSeg('pinned');
+}
+async function ideaToTodo(id) {
+  const i = S.ideas.find(x => x.id === id);
+  const list = S.lists.includes(i.cat) ? i.cat : S.lists[0];
+  S.todos.push({ id: uid('todo'), title: i.title.slice(0, 120), list, due: '', notes: i.notes || '', done: false, created: Date.now(), fromIdea: id });
+  await save(); await closeSheet(); render();
+  toast(`Added to your ${list} to-do list.`, 'View', () => { todoFilter = 'All'; go('#todo'); });
+}
+async function deleteIdea(id) {
+  const s = snap(); S.ideas = S.ideas.filter(x => x.id !== id); await save(); await closeSheet(); render(); toast('Idea deleted.', 'Undo', undoTo(s));
+}
+function catsForm() {
+  openSheet('Idea categories', `<p class="muted" style="margin:-4px 0 12px">Rename a category by typing over it. Clear one to remove it (its ideas stay, with no category).</p>` +
+    S.ideaCats.map((c, n) => field('Category ' + (n + 1), inp('c' + n, c, 'maxlength="20"'))).join('') +
+    field('Add a category', inp('cnew', '', 'placeholder="e.g. Garden" maxlength="20"')),
+    async v => {
+      const next = [], seen = new Set(), ren = {};
+      S.ideaCats.forEach((c, n) => { const nv = (v['c' + n] || '').trim(); ren[c] = nv && !seen.has(nv.toLowerCase()) && nv !== 'All' ? nv : ''; if (ren[c]) { next.push(nv); seen.add(nv.toLowerCase()); } });
+      if (v.cnew && !seen.has(v.cnew.toLowerCase()) && v.cnew !== 'All') next.push(v.cnew);
+      S.ideas.forEach(i => { if (i.cat && i.cat in ren) i.cat = ren[i.cat]; });
+      S.ideaCats = next; await save(); render(); toast('Categories saved.');
+    }, 'Save');
+}
+
+/* ================= MORE ================= */
+function More() {
+  const T = todayT(), t30 = T + 30 * DAY;
+  const unpaid = S.bills.filter(b => !b.paid), over = unpaid.filter(b => daysLeft(b.due) < 0).length;
+  const due30 = unpaid.filter(b => parseD(b.due) <= t30).length;
+  const nb = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).sort((x, y) => x.d - y.d)[0];
+  const starred = S.ideas.filter(i => i.pinned).length;
+  const item = (href, icon, cls, t, sub, pillHtml = '') => `<button class="row" onclick="go('${href}')"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div><div class="s">${sub}</div></div>${pillHtml}${I('right')}</button>`;
+  return header('More', 'Bills, birthdays, ideas and settings') +
+    `<div class="list">
+      ${item('#bills', 'bill', 'bill', 'Bills', S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…', over ? `<span class="pill over">${over} overdue</span>` : '')}
+      ${item('#birthdays', 'cake', 'bday', 'Birthdays', nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one', nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '')}
+      ${item('#ideas', 'bulb', 'idea', 'Ideas', S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down')}
+      ${item('#settings', 'gear', 'set', 'Settings', 'Reminders, calendars and backup')}
+    </div>
+    <div class="foot">Your information is saved on this phone only.</div>`;
+}
+
 /* ================= SETTINGS ================= */
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 function Settings() {
@@ -609,13 +977,14 @@ function Settings() {
   const last = S.settings.lastBackup ? `Last backup: ${fmtW(isoT(todayT(new Date(S.settings.lastBackup))))}` : 'No backup made yet';
   let canShare = false;
   try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] })); } catch (e) { }
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>
-  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Reminders, backup and calendars</div></div></div>
+  return `<button class="back" onclick="go('#more')">${I('left')} More</button>
+  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Reminders, calendars and backup</div></div></div>
   <div class="sec">Reminders</div>
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Notifications</div><div class="s">${permTxt}</div></div></div>
    ${perm === 'granted' ? `<div class="srow"><div class="tx"><div class="t">Reminders</div><div class="s">Show reminder notifications on this phone</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Reminders" onclick="toggleSetting('reminders')"></button></div>` : ''}
    <div class="srow"><div class="tx"><div class="t">Appointment reminders</div><div class="s">1 hour before (all-day ones on the day)</div></div><button class="switch ${S.settings.apptReminders !== false ? 'on' : ''}" role="switch" aria-checked="${S.settings.apptReminders !== false}" aria-label="Appointment reminders" onclick="toggleSetting('apptReminders')"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Birthday reminders</div><div class="s">3 days before and on the morning of the day</div></div><button class="switch ${S.settings.bdayReminders !== false ? 'on' : ''}" role="switch" aria-checked="${S.settings.bdayReminders !== false}" aria-label="Birthday reminders" onclick="toggleSetting('bdayReminders')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Background checks</div><div class="s">${bg}</div></div></div>
   </div>
   <div class="btns" style="margin-top:10px">
@@ -624,13 +993,14 @@ function Settings() {
   <div class="card" style="margin-top:10px"><div class="muted"><b>When you get a nudge</b><br>
    WOF and rego: 30, 14 and 3 days before, on the day, then every 3 days while overdue.<br>
    Service: 14 days before. Bills: 3 days before and on the day. To-dos: on the day.<br>
-   Appointments: 1 hour before, if the app is open.<br><br>
+   Appointments and connected calendars: 1 hour before (all-day ones in the morning).<br>
+   Birthdays: 3 days before and on the day, never between 9 pm and 7 am.<br><br>
    Reminders are checked every time you open the app. Background checks skip 9 pm to 7 am.
    <b>Android may delay background reminders if you don’t open the app for a while.</b> Opening it every few days keeps them coming.</div></div>
 
   <div class="sec">Backup</div>
   <div class="list">
-   <div class="srow"><div class="tx"><div class="t">Your data stays on this phone</div><div class="s">Nothing is sent anywhere. If you lose or reset your phone it’s gone, so make a backup now and then and save it somewhere safe, like Google Drive or an email to yourself. ${last}.</div></div></div>
+   <div class="srow"><div class="tx"><div class="t">Your data stays on this phone</div><div class="s">Nothing is sent anywhere, apart from your calendar links when the app syncs them. If you lose or reset your phone it’s gone, so make a backup now and then and save it somewhere safe, like Google Drive or an email to yourself. ${last}.</div></div></div>
   </div>
   <div class="btns" style="margin-top:10px">
    <button class="btn" onclick="exportData()">${I('download')} Export backup</button>
@@ -638,11 +1008,7 @@ function Settings() {
    ${canShare ? `<button class="btn" onclick="shareBackup()">${I('share')} Share backup</button>` : ''}</div>
   <input type="file" id="importfile" accept=".json,application/json" style="display:none" onchange="importFile(this)">
 
-  <div class="sec">Calendars</div>
-  <div class="list">
-   <div class="srow"><div class="logo" style="background:#EEF2F1;color:var(--brand)">+</div><div class="tx"><div class="t">Connect a calendar</div><div class="s">Outlook.com or Google</div></div><span class="pill none">Coming soon</span></div>
-  </div>
-  <div class="card muted" style="margin-top:10px"><b>Coming soon: automatic Outlook and Google import.</b> Outlook.com and Google don’t let a web app read your private calendar link straight from your phone. Getting round that would mean sending your calendar through someone else’s server, and we won’t do that. For now, add appointments in the Calendar tab.</div>
+  ${feedsSection()}
 
   <div class="sec">Install</div>
   <div class="list"><div class="srow"><div class="tx"><div class="t">${isStandalone() ? 'Installed on this phone ✓' : 'Put the app on your home screen'}</div>
@@ -707,7 +1073,7 @@ let checkTimer = null, checking = false;
 function queueCheck() { clearTimeout(checkTimer); checkTimer = setTimeout(check, 800); }
 async function check() {
   if (checking || !S) return; checking = true;
-  try { await runCheck(await getReg(), { data: S }); } catch (e) { /* ignore */ } finally { checking = false; }
+  try { await runCheck(await getReg(), { data: S, cal: CAL }); } catch (e) { /* ignore */ } finally { checking = false; }
 }
 async function requestPersist() { try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) { } }
 
@@ -737,8 +1103,8 @@ function importFile(input) {
     const d = obj && obj.data ? obj.data : obj;
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
-    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')} and ${plural((d.appts || []).length, 'appointment')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); await save(); render(); toast('Backup restored.', 'Undo', undoTo(s));
+    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')} and ${plural((d.ideas || []).length, 'idea')}.`, 'Restore', async () => {
+      const s = snap(); S = normalise(d); await save(); render(); toast('Backup restored.', 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
@@ -755,21 +1121,25 @@ async function installApp() {
 }
 
 /* ---------- router ---------- */
-const TABS = [['home', 'Home', 'home'], ['cars', 'Cars', 'car'], ['bills', 'Bills', 'bill'], ['todo', 'To-do', 'todo'], ['calendar', 'Calendar', 'cal']];
+const TABS = [['home', 'Home', 'home'], ['cars', 'Cars', 'car'], ['calendar', 'Calendar', 'cal'], ['todo', 'To-do', 'todo'], ['more', 'More', 'more']];
+const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings'];
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
+  const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
+  const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge ? `<span class="badge">${moreBadge}</span>` : '';
   $('#tabbar').innerHTML = TABS.map(([k, l, ic]) =>
-    `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="go('#${k}')"><span class="w">${I(ic)}${k === 'home' && over ? `<span class="badge">${over}</span>` : ''}</span>${l}</button>`).join('');
+    `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span>${l}</button>`).join('');
 }
 let renderedDay = todayISO();
 function render() {
   if (!S) return;
-  renderedDay = todayISO();
+  renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas };
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : (map[r] || Home)();
-  tabbar(r === 'car' ? 'cars' : (map[r] && r !== 'settings') ? r : 'home');
+  tabbar(r === 'car' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : map[r] ? r : 'home');
 }
+window.addEventListener('online', () => { if (S) syncFeeds(); });
 window.addEventListener('hashchange', () => { if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
 
 /* ---------- start ---------- */
@@ -782,7 +1152,9 @@ async function start() {
     S = normalise(seed());
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
+  await loadCal();
   render();
+  syncFeeds();
   if ('serviceWorker' in navigator) {
     let hadController = !!navigator.serviceWorker.controller, reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -800,12 +1172,14 @@ async function start() {
     if (document.visibilityState !== 'visible') return;
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     check();
+    syncFeeds();
     if (swReg) swReg.update().catch(() => { });
   });
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
     if (todayISO() !== renderedDay && !sheetOpen) render();
     check();
+    syncFeeds();
   }, 60 * 1000);
 }
 start();
