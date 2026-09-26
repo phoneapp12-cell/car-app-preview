@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.1.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -761,8 +761,8 @@ async function deleteAppt(id) {
 
 /* ================= CALENDAR IMPORT (Outlook / Google / iCloud links) ================= */
 // The calendar link service ("relay") fetches your .ics link for the app, because Outlook and Google
-// don't let web apps read calendar links directly. It keeps nothing. Set once it's deployed:
-const RELAY_DEFAULT = '';
+// don't let web apps read calendar links directly. It keeps nothing.
+const RELAY_DEFAULT = 'https://due-dates-calendar-relay.phoneapp12.workers.dev';
 const RELAY_URL = (() => {
   try { if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem('relayOverride')) return localStorage.getItem('relayOverride'); } catch (e) { }
   return RELAY_DEFAULT;

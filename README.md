@@ -17,7 +17,7 @@ A small installable web app (PWA) for keeping track of WOF, rego and servicing f
 - `manifest.webmanifest`, `icons/` – install details and app icons
 
 ## Calendar link service
-Set `RELAY_DEFAULT` in `app.js` to the deployed address (e.g. `https://due-dates-calendar-relay.<name>.workers.dev`). Until then the app says the service is being set up and everything else works as normal.
+`RELAY_DEFAULT` in `app.js` is the deployed address: `https://due-dates-calendar-relay.phoneapp12.workers.dev` (Cloudflare Workers, free plan; only accepts requests from `https://phoneapp12-cell.github.io`). If it's ever set back to empty, the app says the service is being set up and everything else works as normal.
 
 ## Shipping an update
 Change `VERSION` in `sw.js` (and `APP_VERSION` in `app.js`), commit and push. The app picks up the new version the next time it's opened.

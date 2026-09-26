@@ -10,6 +10,6 @@
     "local": "node local-server.mjs"
   },
   "devDependencies": {
-    "wrangler": "^4"
+    "wrangler": "^3.114.17"
   }
 }
