@@ -18,7 +18,7 @@
   --bg:#F4F6F5; --card:#fff; --ink:#15201D; --ink2:#51605B; --ink3:#86938F; --line:#E4E9E7;
   --brand:#0F766E; --brand2:#E6F4F1;
   --red:#C62828; --redbg:#FDE8E8; --amber:#A15C07; --amberbg:#FEF1D6; --green:#1B7A3E; --greenbg:#E3F5E9;
-  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8;
+  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8; --hol:#C2410C;
   --radius:18px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -69,10 +69,10 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .row .t{font-weight:650;font-size:15.5px;line-height:1.25;overflow-wrap:anywhere}
 .row .s{font-size:13px;color:var(--ink2);margin-top:2px;line-height:1.3}
 .ic.car{background:#E6F4F1;color:var(--brand)} .ic.bill{background:#FFF3E3;color:#B45309} .ic.todo{background:#EEF0FF;color:#4F46E5} .ic.appt{background:#F2ECFF;color:#7C3AED}
-.ic.bday{background:#FCE7F3;color:#BE185D} .ic.idea{background:#FEF6C7;color:#A16207} .ic.set{background:#EEF2F1;color:var(--ink2)} .ic.ext{background:#E6EFFB;color:var(--ext)}
+.ic.bday{background:#FCE7F3;color:#BE185D} .ic.hol{background:#FFEDD5;color:var(--hol)} .holhome{margin:0 0 12px} .ic.idea{background:#FEF6C7;color:#A16207} .ic.set{background:#EEF2F1;color:var(--ink2)} .ic.ext{background:#E6EFFB;color:var(--ext)}
 .row>svg.i:last-child{color:var(--ink3);width:18px;height:18px}
 .tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;color:#fff;display:inline-block;vertical-align:1px;white-space:nowrap}
-.tag.due{background:var(--due)} .tag.appt{background:var(--appt)} .tag.bday{background:var(--bday)} .tag.ext{background:var(--ext)}
+.tag.due{background:var(--due)} .tag.appt{background:var(--appt)} .tag.bday{background:var(--bday)} .tag.ext{background:var(--ext)} .tag.hol{background:var(--hol);max-width:104px}
 .tag{max-width:92px;overflow:hidden;text-overflow:ellipsis}
 .empty{text-align:center;padding:22px 16px}
 .empty .t{font-weight:700;font-size:16px}

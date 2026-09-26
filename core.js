@@ -43,6 +43,63 @@
   }
   const money = n => '$' + (Number(n) || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  /* ---------- NZ public holidays (built in, works offline, no setup) ----------
+     Rules from the Holidays Act 2003 as described by employment.govt.nz and govt.nz:
+     - Waitangi Day and ANZAC Day on a Saturday or Sunday are also observed on the following Monday.
+     - Christmas/Boxing Day and 1/2 January on a weekend are observed on the following Monday (and Tuesday).
+     - Good Friday/Easter Monday follow Easter; King's Birthday is the 1st Monday in June; Labour Day the 4th Monday in October.
+     - Matariki dates are fixed by Schedule 1 of Te Kāhui o Matariki Public Holiday Act 2022.
+     - Northland observes Auckland Anniversary Day: the Monday nearest 29 January.
+     Checked against the official 2026 and 2027 lists on employment.govt.nz and govt.nz. */
+  const MATARIKI = { 2022: '06-24', 2023: '07-14', 2024: '06-28', 2025: '06-20', 2026: '07-10', 2027: '06-25', 2028: '07-14', 2029: '07-06',
+    2030: '06-21', 2031: '07-11', 2032: '07-02', 2033: '06-24', 2034: '07-07', 2035: '06-29', 2036: '07-18', 2037: '07-10', 2038: '06-25',
+    2039: '07-15', 2040: '07-06', 2041: '07-19', 2042: '07-11', 2043: '07-03', 2044: '06-24', 2045: '07-07', 2046: '06-29', 2047: '07-19',
+    2048: '07-03', 2049: '06-25', 2050: '07-15', 2051: '06-30', 2052: '06-21' };
+  function easterT(y) { // Gregorian Easter Sunday (anonymous algorithm)
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g2 = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g2 + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1;
+    return Date.UTC(y, mo - 1, da);
+  }
+  const holCache = {};
+  function nzHolidays(y) {
+    if (holCache[y]) return holCache[y];
+    const D = (m, d) => Date.UTC(y, m - 1, d), wd = t => new Date(t).getUTCDay(), out = [];
+    const add = (t, name, kw, extra) => out.push(Object.assign({ date: isoT(t), name, kw }, extra || {}));
+    // a holiday that may also be observed on a later weekday
+    const obs = (t, name, kw, ot) => {
+      add(t, name, kw, ot ? { observedOn: isoT(ot) } : null);
+      if (ot) add(ot, name + ' (observed)', kw, { observedFor: isoT(t) });
+    };
+    const mondayise = t => wd(t) === 6 ? t + 2 * DAY : wd(t) === 0 ? t + DAY : null;
+    const pair = (a, n1, k1, n2, k2) => { // 25/26 Dec and 1/2 Jan
+      const b = a + DAY, w = wd(a);
+      obs(a, n1, k1, w === 6 || w === 0 ? a + 2 * DAY : null);
+      obs(b, n2, k2, w === 6 ? a + 3 * DAY : w === 5 ? b + 2 * DAY : null);
+    };
+    pair(D(1, 1), 'New Year’s Day', ['new year'], 'Day after New Year’s Day', ['new year']);
+    const j29 = D(1, 29), back = (wd(j29) + 6) % 7; // days since the Monday before
+    add(back <= 3 ? j29 - back * DAY : j29 + (7 - back) * DAY, 'Auckland Anniversary Day', ['auckland', 'northland', 'anniversary'], { regional: 'Northland’s regional holiday' });
+    obs(D(2, 6), 'Waitangi Day', ['waitangi'], mondayise(D(2, 6)));
+    const e = easterT(y);
+    add(e - 2 * DAY, 'Good Friday', ['good friday']);
+    add(e + DAY, 'Easter Monday', ['easter monday']);
+    obs(D(4, 25), 'ANZAC Day', ['anzac'], mondayise(D(4, 25)));
+    const j1 = D(6, 1); add(j1 + ((8 - wd(j1)) % 7) * DAY, 'King’s Birthday', ['king', 'sovereign', 'queen']);
+    if (MATARIKI[y]) add(parseD(y + '-' + MATARIKI[y]), 'Matariki', ['matariki']);
+    const o1 = D(10, 1); add(o1 + ((8 - wd(o1)) % 7) * DAY + 21 * DAY, 'Labour Day', ['labour']);
+    pair(D(12, 25), 'Christmas Day', ['christmas day'], 'Boxing Day', ['boxing']);
+    out.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    return (holCache[y] = out);
+  }
+  // Holidays between two UTC-midnight day values
+  function holidaysBetween(fromT, toT) {
+    const out = [];
+    for (let y = new Date(fromT).getUTCFullYear(); y <= new Date(toT).getUTCFullYear(); y++)
+      nzHolidays(y).forEach(h => { const t = parseD(h.date); if (t >= fromT && t <= toT) out.push(h); });
+    return out;
+  }
+
   /* ---------- bills ---------- */
   const REPEATS = { none: 'One-off', weekly: 'Weekly', fortnightly: 'Fortnightly', monthly: 'Monthly', quarterly: 'Every 3 months', yearly: 'Yearly' };
   function nextDue(bill, from) {
@@ -274,5 +331,5 @@
   }
 
   g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money,
-    REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
+    nzHolidays, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);

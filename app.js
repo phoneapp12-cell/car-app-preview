@@ -1,8 +1,8 @@
 /* Car & Life Due Dates – the app. Data lives only on this device (IndexedDB). */
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
-  money, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.2.0';
+  money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
+const APP_VERSION = '1.2.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14,6 +14,7 @@ const P = {
   car: '<path d="M3 13l2.2-5.3A2.5 2.5 0 0 1 7.5 6h9a2.5 2.5 0 0 1 2.3 1.7L21 13v4a1 1 0 0 1-1 1h-1.2M3 13v4a1 1 0 0 0 1 1h1.2M3 13h18M9.8 18h4.4"/><circle cx="7.5" cy="17.5" r="2"/><circle cx="16.5" cy="17.5" r="2"/>',
   bill: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   todo: '<rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 12l3 3 5-6"/>',
+  flag: '<path d="M5.5 21V4"/><path d="M5.5 4.5h11.5l-2.5 4.25 2.5 4.25H5.5"/>',
   cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
@@ -230,8 +231,8 @@ function Home() {
       ${n ? `<span class="pill ${status(d)}">${n[0]} ${d < 0 ? 'overdue' : d === 0 ? 'today' : d + 'd'}</span>` : '<span class="pill none">No dates</span>'}</button>`;
   }).join('');
   const t7 = todayT() + 7 * DAY;
-  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due');
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + cards + wxCard() +
+  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'hol');
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + cards + wxCard() + homeHolidays() +
     `<div class="tiles">
       <div class="tile over"><b>${over}</b><span>Overdue</span></div>
       <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
@@ -703,9 +704,48 @@ function calItems(fromT, toT) {
     const age = bdayAge(b, d);
     ev.push({ src: 'bday', title: `${b.name}’s ${age > 0 ? ordinal(age) + ' ' : ''}birthday`, date: d, time: 'Birthday', sort: '', tag: 'Birthday', go: `birthdayForm('${b.id}')` });
   }));
+  holItems(fromT, toT).forEach(x => ev.push(x));
   extEvents(fromT, toT).forEach(x => ev.push(x));
-  const rank = { due: 0, bday: 1, appt: 2, ext: 2 };
+  const rank = { due: 0, hol: 1, bday: 1, appt: 2, ext: 2 };
   return ev.sort((a, b) => parseD(a.date) - parseD(b.date) || rank[a.src] - rank[b.src] || (a.sort || '').localeCompare(b.sort || ''));
+}
+/* NZ public holidays: built in (core.js), on unless turned off in Settings */
+const showHolidays = () => !S.settings || S.settings.holidays !== false;
+const holList = (fromT, toT) => showHolidays() ? holidaysBetween(fromT, toT) : [];
+function holNote(h) {
+  if (h.observedFor) return `Day off for ${h.name.replace(' (observed)', '')} (${fmtW(h.observedFor)})`;
+  if (h.observedOn) return `Most people get ${fmtW(h.observedOn)} off`;
+  return h.regional || '';
+}
+function holItems(fromT, toT) {
+  return holList(fromT, toT).map(h => ({ src: 'hol', title: h.name, date: h.date, time: 'Holiday', sort: '', tag: 'Public holiday', notes: holNote(h),
+    go: `showHol('${h.date}',${JSON.stringify(h.name).replace(/"/g, '&quot;')})` }));
+}
+// A connected calendar (e.g. Google's NZ holidays) that has the same holiday on the same day isn't shown twice
+const normT = t => String(t || '').toLowerCase().replace(/[’‘`]/g, "'");
+function holDup(e, byDate) {
+  const hs = byDate[e.date]; if (!hs || (e.endDate && e.endDate !== e.date)) return false;
+  const t = normT(e.title);
+  return hs.some(h => h.kw.some(k => t.includes(k)));
+}
+function showHol(date, name) {
+  const h = holidaysBetween(parseD(date), parseD(date)).find(x => x.name === name); if (!h) return;
+  const note = holNote(h);
+  openSheet(esc(h.name), `<div class="dcard"><div class="h"><i class="dot" style="background:var(--hol)"></i> Public holiday</div>
+      <div class="big" style="font-size:18px">${fmtLong(h.date)}</div>
+      ${note ? `<div class="muted" style="margin-top:6px">${esc(note)}</div>` : ''}</div>
+    <p class="muted" style="margin:0 2px 6px">New Zealand public holidays are built into the app, using the official dates from employment.govt.nz. You can hide them in Settings.</p>`);
+}
+function homeHolidays() {
+  const T = todayT(), list = holList(T, T + 14 * DAY);
+  // show each holiday once: its actual day, plus the day off if it moves to a Monday
+  const shown = list.filter(h => !(h.observedFor && list.some(x => x.date === h.observedFor)));
+  if (!shown.length) return '';
+  return `<div class="list holhome">${shown.slice(0, 3).map(h => {
+    const d = daysLeft(h.date), off = h.observedOn ? ` · day off ${fmtW(h.observedOn)}` : '';
+    return `<button class="row" onclick="showHol('${h.date}',${JSON.stringify(h.name).replace(/"/g, '&quot;')})"><div class="ic hol">${I('flag')}</div>
+      <div class="tx"><div class="t">${esc(h.name)}, ${fmtW(h.date)}</div><div class="s">Public holiday · ${d === 0 ? 'today' : d === 1 ? 'tomorrow' : 'in ' + d + ' days'}${off}${h.regional ? ' · ' + esc(h.regional) : ''}</div></div></button>`;
+  }).join('')}</div>`;
 }
 let calMonth = null, calSel = null;
 function Calendar() {
@@ -745,7 +785,7 @@ function Calendar() {
   return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
     `<div class="card"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
-     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
+     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
       ${y !== now.getFullYear() || m !== now.getMonth() ? `<button style="margin-left:auto;color:var(--brand);font-weight:700" onclick="calMonth=null;calSel=null;render()">Back to today</button>` : ''}</div>
      <div class="grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>
     ${agenda}
@@ -864,11 +904,13 @@ async function syncOne(f) {
 }
 // Imported events between two UTC-midnight day values, as calendar items
 function extEvents(fromT, toT) {
-  const out = [];
+  const out = [], hol = {};
+  holList(fromT, toT).forEach(h => (hol[h.date] = hol[h.date] || []).push(h));
   S.feeds.forEach(f => {
     const c = CAL[f.id]; if (!c || !c.events) return;
     c.events.forEach(e => {
       if (e.birthday && bdayMatch(e)) return; // already in Birthdays, don't show it twice
+      if (holDup(e, hol)) return; // already shown as a built-in public holiday
       const s = parseD(e.date), en = Math.min(parseD(e.endDate || e.date) || s, s + 62 * DAY);
       if (en < fromT || s > toT) return;
       for (let t = Math.max(s, fromT); t <= Math.min(en, toT); t += DAY) {
@@ -1381,6 +1423,11 @@ function Settings() {
    <button class="btn" onclick="importData()">${I('upload')} Import backup</button>
    ${canShare ? `<button class="btn" onclick="shareBackup()">${I('share')} Share backup</button>` : ''}</div>
   <input type="file" id="importfile" accept=".json,application/json" style="display:none" onchange="importFile(this)">
+
+  <div class="sec">Calendar</div>
+  <div class="list">
+   <div class="srow"><div class="tx"><div class="t">Show public holidays</div><div class="s">New Zealand public holidays and Auckland Anniversary Day (Northland’s regional holiday). Built in, works offline.</div></div><button class="switch ${showHolidays() ? 'on' : ''}" role="switch" aria-checked="${showHolidays()}" aria-label="Show public holidays" onclick="toggleSetting('holidays')"></button></div>
+  </div>
 
   ${feedsSection()}
 
