@@ -2,538 +2,216 @@
 <html lang="en-NZ">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Life Admin – clickable prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Car &amp; Life Due Dates</title>
+<meta name="description" content="WOF, rego, servicing, bills, to-dos and appointments in one place, with reminders. Your data stays on your phone.">
+<meta name="theme-color" content="#0F766E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Due Dates">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
 :root{
   --bg:#F4F6F5; --card:#fff; --ink:#15201D; --ink2:#51605B; --ink3:#86938F; --line:#E4E9E7;
   --brand:#0F766E; --brand2:#E6F4F1;
   --red:#C62828; --redbg:#FDE8E8; --amber:#A15C07; --amberbg:#FEF1D6; --green:#1B7A3E; --greenbg:#E3F5E9;
-  --app:#0F766E; --google:#1A73E8; --outlook:#8B5CF6;
+  --due:#0F766E; --appt:#8B5CF6;
   --radius:18px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:#DDE3E1;color:var(--ink)}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink)}
+body{overscroll-behavior-y:none}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
 a{color:inherit;text-decoration:none}
 svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
-#phone{position:relative;width:100%;max-width:390px;height:100vh;height:100dvh;margin:0 auto;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
-@media (min-width:520px){
-  body{display:flex;align-items:center;justify-content:center;padding:24px}
-  #phone{height:844px;border-radius:48px;box-shadow:0 0 0 10px #1c1f1e,0 30px 60px rgba(0,0,0,.35)}
-}
-.status{height:46px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 28px 0 34px;font-weight:600;font-size:15px}
-.status .sig{display:flex;gap:6px;align-items:center}
-.status .sig span{display:inline-block}
-.bat{width:25px;height:12px;border:1.5px solid var(--ink);border-radius:4px;padding:1.5px;position:relative}
-.bat:after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:4px;background:var(--ink);border-radius:1px}
-.bat i{display:block;height:100%;width:78%;background:var(--ink);border-radius:1.5px}
-#view{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 24px;scroll-behavior:smooth}
+#app{position:relative;width:100%;max-width:560px;height:100vh;height:100dvh;margin:0 auto;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+@media (min-width:600px){ html{background:#DDE3E1} #app{box-shadow:0 0 0 1px var(--line),0 10px 40px rgba(0,0,0,.08)} }
+#view{flex:1;overflow-y:auto;overflow-x:hidden;padding:calc(var(--sat) + 10px) calc(16px + var(--sar)) 28px calc(16px + var(--sal));-webkit-overflow-scrolling:touch}
 #view::-webkit-scrollbar{display:none}
-.top{display:flex;align-items:flex-start;justify-content:space-between;padding:6px 0 12px}
-.top h1{font-size:30px;line-height:1.1;margin:0;letter-spacing:-.5px}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:6px 0 12px}
+.top h1{font-size:28px;line-height:1.15;margin:0;letter-spacing:-.5px}
 .top .sub{color:var(--ink2);font-size:15px;margin-top:4px}
-.iconbtn{width:40px;height:40px;border-radius:50%;background:var(--card);display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.06);color:var(--ink)}
-.iconrow{display:flex;gap:8px}
-.note{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--ink2);background:#EEF1F0;border:1px dashed #C9D2CF;border-radius:10px;padding:6px 10px;margin:0 0 14px}
-.note svg.i{width:15px;height:15px}
+.iconbtn{width:42px;height:42px;border-radius:50%;background:var(--card);display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.08);color:var(--ink);flex:none}
+.iconbtn.add{background:var(--brand);color:#fff}
+.iconrow{display:flex;gap:8px;flex:none}
 .card{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 2px rgba(16,24,20,.05);padding:14px}
-.sec{font-size:13px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--ink3);margin:20px 4px 8px;display:flex;justify-content:space-between;align-items:center}
+.sec{font-size:13px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--ink3);margin:22px 4px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .sec a,.sec button{text-transform:none;letter-spacing:0;font-weight:600;color:var(--brand);font-size:14px}
 .pill{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;border-radius:999px;padding:4px 9px;white-space:nowrap}
 .pill.over{color:var(--red);background:var(--redbg)} .pill.soon{color:var(--amber);background:var(--amberbg)} .pill.fine{color:var(--green);background:var(--greenbg)}
-.pill.paid{color:var(--green);background:var(--greenbg)}
-.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.pill.paid{color:var(--green);background:var(--greenbg)} .pill.none{color:var(--ink2);background:#EEF2F1}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.tile{border-radius:16px;padding:12px;color:var(--ink)}
+.tile{border-radius:16px;padding:12px;color:var(--ink);text-align:left}
 .tile b{display:block;font-size:26px;line-height:1}
 .tile span{font-size:13px;font-weight:600}
 .tile.over{background:var(--redbg)} .tile.over b{color:var(--red)}
 .tile.soon{background:var(--amberbg)} .tile.soon b{color:var(--amber)}
 .tile.fine{background:var(--greenbg)} .tile.fine b{color:var(--green)}
-.plate{display:inline-block;background:#fff;border:2px solid #1b1b1b;border-radius:6px;padding:1px 7px;font-weight:800;letter-spacing:1.5px;font-size:14px;font-family:"DIN Alternate","Arial Narrow",Arial,sans-serif;color:#111;line-height:1.35}
-.glance{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.plate{display:inline-block;background:#fff;border:2px solid #1b1b1b;border-radius:6px;padding:1px 7px;font-weight:800;letter-spacing:1.5px;font-size:14px;font-family:"DIN Alternate","Arial Narrow",Arial,sans-serif;color:#111;line-height:1.35;white-space:nowrap}
+.glance{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
 .glance button{background:var(--card);border-radius:16px;padding:10px 8px;text-align:left;box-shadow:0 1px 2px rgba(0,0,0,.05);min-width:0}
 .glance .who{font-size:13px;font-weight:700;margin:7px 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .glance .pill{font-size:11.5px;padding:3px 7px}
 .list{background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:0 1px 2px rgba(16,24,20,.05)}
-.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);width:100%;text-align:left}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);width:100%;text-align:left;min-height:56px}
 .row:first-child{border-top:0}
 .row .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none}
 .row .ic svg.i{width:20px;height:20px}
 .row .tx{flex:1;min-width:0}
-.row .t{font-weight:650;font-size:15.5px;line-height:1.25}
+.row .t{font-weight:650;font-size:15.5px;line-height:1.25;overflow-wrap:anywhere}
 .row .s{font-size:13px;color:var(--ink2);margin-top:2px;line-height:1.3}
-.ic.car{background:#E6F4F1;color:var(--brand)} .ic.bill{background:#FFF3E3;color:#B45309} .ic.todo{background:#EEF0FF;color:#4F46E5} .ic.cal{background:#F2ECFF;color:#7C3AED}
-.tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;color:#fff;display:inline-block;vertical-align:1px}
-.tag.app{background:var(--app)} .tag.google{background:var(--google)} .tag.outlook{background:var(--outlook)}
+.ic.car{background:#E6F4F1;color:var(--brand)} .ic.bill{background:#FFF3E3;color:#B45309} .ic.todo{background:#EEF0FF;color:#4F46E5} .ic.appt{background:#F2ECFF;color:#7C3AED}
+.tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;color:#fff;display:inline-block;vertical-align:1px;white-space:nowrap}
+.tag.due{background:var(--due)} .tag.appt{background:var(--appt)}
+.empty{text-align:center;padding:22px 16px}
+.empty .t{font-weight:700;font-size:16px}
+.empty .s{color:var(--ink2);font-size:14px;margin:4px 0 12px;line-height:1.4}
 /* tab bar */
-.tabbar{flex:none;position:relative;z-index:1;display:grid;grid-template-columns:repeat(5,1fr);background:rgba(255,255,255,.96);border-top:1px solid var(--line);padding:6px 4px 24px;backdrop-filter:blur(12px)}
-.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--ink3);padding:4px 0}
+.tabbar{flex:none;position:relative;z-index:5;display:grid;grid-template-columns:repeat(5,1fr);background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:6px calc(4px + var(--sar)) calc(8px + var(--sab)) calc(4px + var(--sal))}
+.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;font-weight:600;color:var(--ink3);padding:4px 0;min-height:48px;justify-content:center}
 .tabbar button.on{color:var(--brand)}
-.tabbar button .badge{position:absolute;margin-left:18px;margin-top:-2px;background:var(--red);color:#fff;font-size:10px;border-radius:999px;padding:1px 5px;font-weight:700}
-.tabbar button span.w{position:relative;display:flex}
+.tabbar .badge{position:absolute;left:14px;top:-4px;background:var(--red);color:#fff;font-size:10px;border-radius:999px;padding:1px 5px;font-weight:700;line-height:1.3}
+.tabbar span.w{position:relative;display:flex}
 /* cars */
 .carcard{background:var(--card);border-radius:22px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.05);margin-bottom:12px;width:100%;text-align:left;display:block}
 .carhead{display:flex;align-items:center;gap:12px}
 .carpic{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
 .carpic svg.i{width:30px;height:30px;stroke:#fff}
-.carname{font-weight:750;font-size:17px}
+.carname{font-weight:750;font-size:17px;overflow-wrap:anywhere}
 .carmodel{font-size:13.5px;color:var(--ink2);margin-top:2px}
 .triple{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-.triple div{background:#F6F8F7;border-radius:12px;padding:8px 9px;min-width:0}
+.triple>div{background:#F6F8F7;border-radius:12px;padding:8px 9px;min-width:0}
 .triple small{display:block;font-size:11.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px}
-.triple b{display:block;font-size:14.5px;margin:2px 0 5px}
+.triple b{display:block;font-size:14.5px;margin:2px 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .triple .pill{font-size:11.5px;padding:3px 7px}
-.back{display:flex;align-items:center;gap:2px;color:var(--brand);font-weight:600;font-size:16px;padding:8px 0}
+.triple .addsvc{color:var(--brand);font-weight:700;font-size:13px;display:block;margin-top:4px;line-height:1.25}
+.back{display:flex;align-items:center;gap:2px;color:var(--brand);font-weight:600;font-size:16px;padding:8px 0;min-height:44px}
 .hero{display:flex;gap:14px;align-items:center;margin:4px 0 14px}
 .hero .carpic{width:64px;height:64px;border-radius:20px}
-.hero h2{margin:0 0 4px;font-size:24px;letter-spacing:-.3px}
+.hero h2{margin:0 0 4px;font-size:24px;letter-spacing:-.3px;overflow-wrap:anywhere}
 .callout{display:flex;gap:10px;background:var(--amberbg);color:#6B3D04;border-radius:14px;padding:11px 12px;font-size:14px;line-height:1.4;margin-bottom:12px}
+.callout.red{background:var(--redbg);color:#7F1D1D}
 .callout.blue{background:#E8F1FD;color:#123E73}
+.callout.green{background:var(--greenbg);color:#14532D}
 .callout svg.i{width:20px;height:20px;margin-top:1px}
 .dcard{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
 .dcard .h{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--ink2)}
 .dcard .h .pill{margin-left:auto}
-.big{font-size:24px;font-weight:750;margin:8px 0 2px;letter-spacing:-.3px}
-.muted{color:var(--ink2);font-size:13.5px;line-height:1.4}
+.big{font-size:23px;font-weight:750;margin:8px 0 2px;letter-spacing:-.3px}
+.muted{color:var(--ink2);font-size:13.5px;line-height:1.45}
 .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;padding:11px 12px;font-weight:700;font-size:14.5px;background:#EEF2F1;color:var(--ink);white-space:nowrap}
+.btn{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;padding:12px 12px;font-weight:700;font-size:14.5px;background:#EAF0EE;color:var(--ink);white-space:nowrap;min-height:46px}
 .btn.primary{background:var(--brand);color:#fff}
-.btn svg.i{width:17px;height:17px}
-select.sel{font:inherit;font-size:14px;font-weight:600;color:var(--brand);border:1px solid var(--line);background:#F6F8F7;border-radius:10px;padding:5px 8px}
+.btn.danger{background:var(--redbg);color:var(--red)}
+.btn.small{flex:0 0 auto;padding:8px 12px;min-height:38px;font-size:14px}
+.btn svg.i{width:18px;height:18px}
+.btn:disabled{opacity:.5}
+select.sel{font:inherit;font-size:15px;font-weight:600;color:var(--brand);border:1px solid var(--line);background:#F6F8F7;border-radius:10px;padding:7px 8px;min-height:40px}
 .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
 .prices div{background:#F6F8F7;border-radius:10px;padding:7px 8px;text-align:center;font-size:12px;color:var(--ink2)}
 .prices b{display:block;font-size:15px;color:var(--ink)}
+.notes{white-space:pre-wrap;overflow-wrap:anywhere}
 /* bills */
 .summary{background:linear-gradient(135deg,#0F766E,#115E59);color:#fff;border-radius:22px;padding:16px}
 .summary .amt{font-size:32px;font-weight:800;letter-spacing:-.5px;margin:4px 0}
 .summary .muted{color:#CDEAE5}
-.bill .right{text-align:right;flex:none}
+.bill .right{text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end}
 .bill .amt{font-weight:750;font-size:16px}
-.paybtn{margin-top:6px;font-size:13px;font-weight:700;color:var(--brand);background:var(--brand2);border-radius:999px;padding:5px 10px}
-.paybtn.done{color:var(--green);background:var(--greenbg)}
+.paybtn{margin-top:6px;font-size:13.5px;font-weight:700;color:var(--brand);background:var(--brand2);border-radius:999px;padding:7px 12px;white-space:nowrap}
+.tapzone{flex:1;min-width:0;display:flex;align-items:center;gap:12px;text-align:left}
 /* todo */
-.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;margin-bottom:12px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;padding:2px 2px 4px;margin-bottom:10px}
 .chips::-webkit-scrollbar{display:none}
-.chip{border-radius:999px;padding:7px 14px;background:var(--card);font-weight:650;font-size:14px;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.chip{border-radius:999px;padding:8px 14px;background:var(--card);font-weight:650;font-size:14px;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.06);flex:none}
 .chip.on{background:var(--ink);color:#fff}
+.chip.plus{color:var(--brand)}
 .addbar{display:flex;gap:8px;margin-bottom:12px}
-.addbar input{flex:1;min-width:0;border:0;border-radius:14px;padding:12px 14px;font:inherit;font-size:15px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.05);outline:none}
-.addbar button{width:46px;border-radius:14px;background:var(--brand);color:#fff;display:grid;place-items:center}
-.tick{width:26px;height:26px;border-radius:50%;border:2px solid #B8C4C0;display:grid;place-items:center;flex:none;transition:.15s}
+.addbar input{flex:1;min-width:0;border:0;border-radius:14px;padding:12px 14px;font:inherit;font-size:16px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.06);outline:none}
+.addbar input:focus{box-shadow:0 0 0 2px var(--brand)}
+.addbar button{width:48px;border-radius:14px;background:var(--brand);color:#fff;display:grid;place-items:center;flex:none}
+.tick{width:44px;height:44px;margin:-9px -6px -9px -9px;display:grid;place-items:center;flex:none}
+.tick span{width:26px;height:26px;border-radius:50%;border:2px solid #B8C4C0;display:grid;place-items:center;transition:.15s}
 .tick svg.i{width:15px;height:15px;stroke-width:3;color:#fff;opacity:0}
-.done .tick{background:var(--brand);border-color:var(--brand)}
+.done .tick span{background:var(--brand);border-color:var(--brand)}
 .done .tick svg.i{opacity:1}
 .done .t{text-decoration:line-through;color:var(--ink3)}
 /* calendar */
 .monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .monthbar b{font-size:18px}
-.monthbar .iconbtn{width:34px;height:34px}
+.monthbar .iconbtn{width:38px;height:38px;box-shadow:none;background:#F1F4F3}
 .legend{display:flex;gap:12px;font-size:12.5px;color:var(--ink2);font-weight:600;margin:0 2px 10px;flex-wrap:wrap}
 .legend span{display:flex;align-items:center;gap:5px}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
 .grid .dow{font-size:11.5px;font-weight:700;color:var(--ink3);padding:4px 0}
-.grid button{height:40px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:5px;font-size:14.5px;font-weight:600}
-.grid button.other{color:#C3CCC9}
-.grid button.today span.n{background:var(--brand);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;margin-top:-3px}
+.grid button{height:44px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:6px;font-size:14.5px;font-weight:600;min-width:0}
+.grid button.other{color:#B9C3C0}
+.grid button span.n{width:26px;height:26px;display:grid;place-items:center;margin-top:-3px;border-radius:50%}
+.grid button.today span.n{background:var(--brand);color:#fff}
 .grid button.sel{background:var(--brand2)}
-.grid .dots{display:flex;gap:2px;margin-top:3px;height:6px}
-.grid .dots i{width:5px;height:5px;border-radius:50%}
-.agday{font-size:13px;font-weight:700;color:var(--ink2);margin:12px 4px 6px}
-.ev{display:flex;gap:10px;align-items:center;background:var(--card);border-radius:14px;padding:9px 12px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.grid .dots{display:flex;gap:3px;margin-top:2px;height:6px}
+.grid .dots i{width:6px;height:6px;border-radius:50%}
+.agday{font-size:13px;font-weight:700;color:var(--ink2);margin:14px 4px 6px}
+.ev{display:flex;gap:10px;align-items:center;background:var(--card);border-radius:14px;padding:10px 12px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.04);width:100%;text-align:left;min-height:50px}
 .ev .bar{width:4px;align-self:stretch;border-radius:4px;flex:none}
-.ev .time{width:58px;flex:none;font-size:12.5px;font-weight:650;color:var(--ink2)}
-.ev .t{font-weight:650;font-size:15px}
+.ev .time{width:62px;flex:none;font-size:12.5px;font-weight:650;color:var(--ink2)}
+.ev .t{font-weight:650;font-size:15px;overflow-wrap:anywhere}
 .ev .s{font-size:12.5px;color:var(--ink2);margin-top:3px}
 /* settings */
-.srow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line)}
+.srow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);width:100%;text-align:left;min-height:54px}
 .srow:first-child{border-top:0}
 .srow .tx{flex:1;min-width:0}
 .srow .t{font-weight:650;font-size:15px}
-.srow .s{font-size:13px;color:var(--ink2);margin-top:2px;line-height:1.35}
+.srow .s{font-size:13px;color:var(--ink2);margin-top:2px;line-height:1.4}
 .srow .v{font-size:14px;color:var(--ink2);font-weight:600;white-space:nowrap}
-.switch{width:46px;height:28px;border-radius:999px;background:#CBD5D2;position:relative;flex:none;transition:.2s}
-.switch:after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.2s}
+.switch{width:48px;height:30px;border-radius:999px;background:#CBD5D2;position:relative;flex:none;transition:.2s}
+.switch:after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.2s}
 .switch.on{background:var(--brand)} .switch.on:after{left:21px}
-.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:750;flex:none}
+.ok{color:var(--green);font-weight:700} .warn{color:var(--amber);font-weight:700} .bad{color:var(--red);font-weight:700}
 .logo{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;flex:none}
-.ok{font-size:12px;font-weight:700;color:var(--green)}
-/* banner + toast */
-#banner{position:absolute;left:8px;right:8px;top:50px;z-index:30;background:rgba(250,250,250,.94);backdrop-filter:blur(20px);border-radius:22px;padding:12px 14px;box-shadow:0 12px 32px rgba(0,0,0,.22);display:flex;gap:11px;transform:translateY(-190%);opacity:0;transition:transform .45s cubic-bezier(.2,.9,.3,1.2),opacity .3s;cursor:pointer}
-#banner.show{transform:translateY(0);opacity:1}
-#banner .appic{width:38px;height:38px;border-radius:10px;background:var(--brand);display:grid;place-items:center;color:#fff;flex:none}
-#banner .appic svg.i{width:22px;height:22px}
-#banner .meta{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink2);font-weight:600}
-#banner .bt{font-weight:700;font-size:15px;margin-top:2px;line-height:1.3}
-#banner .bb{font-size:14px;color:#333;margin-top:2px;line-height:1.35}
-#scrim{position:absolute;inset:0;background:rgba(0,0,0,.18);z-index:25;opacity:0;pointer-events:none;transition:.3s}
-#scrim.show{opacity:1}
-#toast{position:absolute;left:16px;right:16px;bottom:96px;z-index:40;background:#1C2623;color:#fff;border-radius:14px;padding:12px 14px;font-size:14.5px;display:flex;align-items:center;gap:10px;opacity:0;transform:translateY(12px);transition:.25s;pointer-events:none}
-#toast.show{opacity:1;transform:none;pointer-events:auto}
-#toast button{margin-left:auto;color:#7FE0D2;font-weight:700}
-.foot{text-align:center;font-size:12px;color:var(--ink3);margin:18px 0 4px;line-height:1.5}
+.steps{margin:6px 0 0;padding-left:20px;font-size:13.5px;color:var(--ink2);line-height:1.5}
+/* sheet (pop-up forms) */
+#sheet{position:fixed;inset:0;z-index:50;display:none}
+#sheet.show{display:block}
+#sheet .scrim{position:absolute;inset:0;background:rgba(10,20,17,.4);animation:fade .2s}
+#sheet .panel{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;max-height:92%;overflow-y:auto;background:var(--bg);border-radius:22px 22px 0 0;padding:8px calc(16px + var(--sar)) calc(18px + var(--sab)) calc(16px + var(--sal));animation:up .22s cubic-bezier(.2,.9,.3,1)}
+#sheet .grab{width:40px;height:5px;border-radius:9px;background:#C9D2CF;margin:0 auto 8px}
+#sheet h3{margin:4px 0 12px;font-size:20px}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.field{display:block;margin-bottom:12px}
+.field>span{display:block;font-size:13.5px;font-weight:700;color:var(--ink2);margin:0 2px 5px}
+.field input,.field select,.field textarea{width:100%;font:inherit;font-size:16px;border:1px solid #D5DDDA;border-radius:12px;padding:11px 12px;background:#fff;color:var(--ink);outline:none;min-height:46px}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand);box-shadow:0 0 0 2px rgba(15,118,110,.18)}
+.field textarea{min-height:70px;resize:vertical}
+.field small.datehint{color:var(--brand);font-weight:650;font-size:13px}
+.field small{display:block;color:var(--ink3);font-size:12.5px;margin:4px 2px 0;line-height:1.35}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1;border-radius:12px;padding:11px 8px;background:#fff;border:1px solid #D5DDDA;font-weight:700;font-size:14.5px;min-height:46px}
+.seg button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.formerr{color:var(--red);font-size:14px;font-weight:600;margin:-4px 2px 10px;display:none}
+/* toast */
+#toast{position:fixed;left:50%;width:calc(100% - 32px);max-width:528px;transform:translate(-50%,12px);bottom:calc(84px + var(--sab));z-index:60;background:#1C2623;color:#fff;border-radius:14px;padding:12px 14px;font-size:14.5px;display:flex;align-items:center;gap:10px;opacity:0;transition:.25s;pointer-events:none}
+#toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#toast button{margin-left:auto;color:#7FE0D2;font-weight:700;padding:4px 2px;flex:none}
+.foot{text-align:center;font-size:12px;color:var(--ink3);margin:20px 0 4px;line-height:1.5}
+@media (max-width:370px){ .top h1{font-size:25px} .tile{padding:10px} .tile b{font-size:23px} .triple>div{padding:7px 7px} .triple b{font-size:13.5px} .triple .pill{font-size:11px;padding:3px 6px} .btn{font-size:14px;padding:11px 10px} }
 </style>
 </head>
 <body>
-<div id="phone">
-  <div class="status"><span>9:41</span><span class="sig"><span style="font-size:12px;letter-spacing:1px">▮▮▮▮</span><span style="font-size:13px">5G</span><span class="bat"><i></i></span></span></div>
-  <div id="scrim"></div>
-  <div id="banner" role="alert" onclick="bannerTap()">
-    <div class="appic"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-    <div style="flex:1;min-width:0">
-      <div class="meta"><span>LIFE ADMIN</span><span>now</span></div>
-      <div class="bt" id="bt"></div>
-      <div class="bb" id="bb"></div>
-    </div>
-  </div>
-  <main id="view"></main>
+<div id="app">
+  <main id="view"><noscript>This app needs JavaScript turned on.</noscript></main>
   <nav class="tabbar" id="tabbar"></nav>
-  <div id="toast"><span id="toastmsg"></span><button id="toastbtn"></button></div>
 </div>
-<script>
-/* ---------- fixed "today" so screenshots are consistent ---------- */
-const DAY=864e5;
-const D=(y,m,d)=>Date.UTC(y,m-1,d);          // UTC avoids the NZ daylight-saving jump on 27 Sep
-const TODAY=D(2026,9,26);
-const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const MONL=['January','February','March','April','May','June','July','August','September','October','November','December'];
-const WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const WDL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const dt=t=>new Date(t);
-const daysLeft=t=>Math.round((t-TODAY)/DAY);
-const fmt0=t=>dt(t).getUTCDate()+' '+MON[dt(t).getUTCMonth()];
-const fmt=t=>fmt0(t)+(dt(t).getUTCFullYear()!==2026?' '+dt(t).getUTCFullYear():'');
-const fmtY=t=>fmt0(t)+' '+dt(t).getUTCFullYear();
-const fmtW=t=>WD[dt(t).getUTCDay()]+' '+fmt(t);
-function addMonths(t,n){const d=dt(t);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,d.getUTCDate());}
-function status(d){return d<0?'over':d<=30?'soon':'fine';}
-function left(d){ if(d<0) return (-d)+(d===-1?' day':' days')+' overdue'; if(d===0) return 'Today'; if(d===1) return 'Tomorrow'; return d+' days'; }
-function pill(d){return `<span class="pill ${status(d)}">${left(d)}</span>`;}
-const money=n=>'$'+n.toFixed(2);
-
-/* ---------- icons ---------- */
-const P={
-home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
-car:'<path d="M3 13l2.2-5.3A2.5 2.5 0 0 1 7.5 6h9a2.5 2.5 0 0 1 2.3 1.7L21 13v4a1 1 0 0 1-1 1h-1.2M3 13v4a1 1 0 0 0 1 1h1.2M3 13h18M9.8 18h4.4"/><circle cx="7.5" cy="17.5" r="2"/><circle cx="16.5" cy="17.5" r="2"/>',
-bill:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
-todo:'<rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 12l3 3 5-6"/>',
-cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
-gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
-bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
-left:'<path d="M15 18l-6-6 6-6"/>', right:'<path d="M9 18l6-6-6-6"/>',
-wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
-shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
-doc:'<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
-info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
-ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
-plus:'<path d="M12 5v14M5 12h14"/>', check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
-zap:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
-wifi:'<path d="M5 12.55a11 11 0 0 1 14 0M8.5 16a6 6 0 0 1 7 0M2 8.8a16 16 0 0 1 20 0M12 20h.01"/>',
-phone:'<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/>',
-tv:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8M9 2l3 4 3-4"/>',
-house:'<path d="M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-5h4v5"/>',
-umbrella:'<path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9zM12 12v7a2 2 0 0 0 4 0"/>',
-scissors:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/>',
-clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
-moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
-link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
-};
-const I=(n,s='')=>`<svg class="i" viewBox="0 0 24 24" ${s}>${P[n]}</svg>`;
-
-/* ---------- data ---------- */
-// Car WOF/rego dates are Shane's real data. Service dates and odometers are EXAMPLES.
-const cars=[
- {id:'MUL27', name:"Shane's car", owner:'Shane', make:'2014 Honda Fit', desc:'Silver hatch · petrol hybrid', hex:'#9AA3A8',
-  wof:D(2027,9,25), wofMonths:12, rule:'Some 2013–2019 cars can move to a 2-year WOF from 1 Nov 2027, but this one will be nearly 14 by then, so it will most likely stay yearly.', rego:D(2026,12,25), svc:D(2026,10,12), svcKm:95000, odo:93870},
- {id:'PNU312', name:"Sarah's car", owner:'Sarah', make:'2022 Haval H6 Ultra Hybrid', desc:'Blue SUV · petrol hybrid', hex:'#2F5DA8',
-  wof:D(2026,10,16), wofMonths:12, rule:'After that, cars first registered from 1 Nov 2019 on (like this 2022 Haval) can get a 2-year WOF. This WOF is due on 16 Oct, before the change, so the next one will probably still be 12 months.', rego:D(2026,11,9), svc:D(2026,12,3), svcKm:30000, odo:24150},
- {id:'KBZ234', name:"Cass's car", owner:'Cass', make:'2007 Honda Fit', desc:'Blue hatch · petrol', hex:'#3C7DD9',
-  wof:D(2026,11,24), wofMonths:12, rule:'Cars over 14 years old stay on a yearly WOF, so nothing changes for this one.', rego:D(2026,11,15), svc:D(2026,9,20), svcKm:190000, odo:188900}
-];
-// Bills: Ecotricity is a real bill name; ALL amounts and every other bill are EXAMPLES.
-const bills=[
- {id:'b1', name:'Ecotricity power', icon:'zap', amt:168.40, due:D(2026,10,7), every:1, freq:'Monthly'},
- {id:'b2', name:'Mobile phone', icon:'phone', amt:65.00, due:D(2026,9,24), every:1, freq:'Monthly'},
- {id:'b3', name:'Streaming (Netflix)', icon:'tv', amt:18.49, due:D(2026,9,28), every:1, freq:'Monthly'},
- {id:'b4', name:'Broadband', icon:'wifi', amt:95.00, due:D(2026,10,12), every:1, freq:'Monthly'},
- {id:'b5', name:'Car insurance (3 cars)', icon:'umbrella', amt:146.20, due:D(2026,10,15), every:1, freq:'Monthly'},
- {id:'b6', name:'Council rates', icon:'house', amt:812.00, due:D(2026,11,20), every:3, freq:'Every 3 months'}
-];
-// To-dos: all EXAMPLES.
-const todos=[
- {id:'t1', title:'Mow the lawns', list:'Home', due:D(2026,9,26)},
- {id:'t2', title:'Buy wiper blades for Cass\u2019s Fit', list:'Cars', due:D(2026,10,3)},
- {id:'t3', title:'Book a WOF for Sarah\u2019s car', list:'Cars', due:D(2026,10,9)},
- {id:'t4', title:'Clean out the gutters', list:'Home', due:D(2026,10,10)},
- {id:'t5', title:'Milk, bread, dog food', list:'Shopping', due:null},
- {id:'t6', title:'Pay dog registration', list:'Home', due:D(2026,7,31), done:true}
-];
-// Imported calendar events (read-only). Haircut + Ecotricity are real event names (dates shown are placeholders); the rest are EXAMPLES.
-const imported=[
- {src:'outlook', title:'Haircut Appointment', date:D(2026,10,1), time:'10:30 am', icon:'scissors'},
- {src:'outlook', title:'Ecotricity power bill due', date:D(2026,10,7), time:'All day', icon:'zap'},
- {src:'google', title:'Coffee with Dave (example)', date:D(2026,9,29), time:'10:00 am', icon:'cal'},
- {src:'google', title:'BBQ at Mike\u2019s (example)', date:D(2026,10,3), time:'5:00 pm', icon:'cal'},
- {src:'google', title:'Dentist (example)', date:D(2026,10,13), time:'2:15 pm', icon:'cal'}
-];
-const SRC={app:'App',google:'Google',outlook:'Outlook'};
-
-/* ---------- derived "things due" across the app ---------- */
-function dueItems(){
-  const out=[];
-  cars.forEach(c=>{
-    out.push({kind:'car',car:c,label:'WOF',title:`${c.name} WOF`,date:c.wof,go:'#car/'+c.id,icon:'shield'});
-    out.push({kind:'car',car:c,label:'Rego',title:`${c.name} rego`,date:c.rego,go:'#car/'+c.id,icon:'doc'});
-    out.push({kind:'car',car:c,label:'Service',title:`${c.name} service`,date:c.svc,go:'#car/'+c.id,icon:'wrench',example:true});
-  });
-  bills.filter(b=>!b.paid).forEach(b=>out.push({kind:'bill',title:b.name,sub:money(b.amt)+' · '+b.freq,date:b.due,go:'#bills',icon:b.icon}));
-  todos.filter(t=>!t.done&&t.due).forEach(t=>out.push({kind:'todo',title:t.title,sub:'To-do · '+t.list,date:t.due,go:'#todo',icon:'todo'}));
-  return out.sort((a,b)=>a.date-b.date);
-}
-function calEvents(){
-  const ev=[];
-  dueItems().forEach(x=>ev.push({src:'app',title:x.kind==='car'?`${x.title} due`:x.kind==='bill'?`${x.title} · ${x.sub.split(' ·')[0]}`:x.title,date:x.date,time:x.kind==='todo'?'To-do':'Due',go:x.go}));
-  imported.forEach(e=>ev.push(Object.assign({},e)));
-  return ev.sort((a,b)=>a.date-b.date);
-}
-
-/* ---------- shell ---------- */
-const TABS=[['home','Home','home'],['cars','Cars','car'],['bills','Bills','bill'],['todo','To-do','todo'],['calendar','Calendar','cal']];
-function tabbar(active){
-  const over=dueItems().filter(x=>daysLeft(x.date)<0).length;
-  document.getElementById('tabbar').innerHTML=TABS.map(([k,l,ic])=>
-   `<button class="${k===active?'on':''}" onclick="go('#${k}')"><span class="w">${I(ic)}${k==='home'&&over?`<span class="badge">${over}</span>`:''}</span>${l}</button>`).join('');
-}
-function header(title,sub,extra=''){
-  return `<div class="top"><div><h1>${title}</h1>${sub?`<div class="sub">${sub}</div>`:''}</div>
-  <div class="iconrow">${extra}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
-}
-const exNote=(t='Example data – bills, to-dos and some appointments are made up for this preview.')=>`<div class="note">${I('info')}<span>${t}</span></div>`;
-function go(h){ if(location.hash===h) render(); else location.hash=h; }
-let toastTimer;
-function toast(msg,btn,fn){
-  const t=document.getElementById('toast');document.getElementById('toastmsg').textContent=msg;
-  const b=document.getElementById('toastbtn');b.textContent=btn||'';b.onclick=()=>{fn&&fn();t.classList.remove('show');};
-  t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3500);
-}
-
-/* ---------- screens ---------- */
-function Home(){
-  const items=dueItems();
-  const over=items.filter(x=>daysLeft(x.date)<0).length, soon=items.filter(x=>{const d=daysLeft(x.date);return d>=0&&d<=30}).length, fine=items.length-over-soon;
-  const attention=items.filter(x=>daysLeft(x.date)<=30).slice(0,7);
-  const t=dt(TODAY);
-  const glance=cars.map(c=>{const n=[['WOF',c.wof],['Rego',c.rego]].sort((a,b)=>a[1]-b[1])[0];const d=daysLeft(n[1]);
-    return `<button onclick="go('#car/${c.id}')"><span class="plate">${c.id}</span><div class="who">${c.owner}</div><span class="pill ${status(d)}">${n[0]} ${d<0?'overdue':d+'d'}</span></button>`}).join('');
-  const upcoming=imported.filter(e=>{const d=daysLeft(e.date);return d>=0&&d<=7}).sort((a,b)=>a.date-b.date);
-  return header('Kia ora, Shane',`${WDL[t.getUTCDay()]} ${t.getUTCDate()} ${MONL[t.getUTCMonth()]}`,
-    `<button class="iconbtn" aria-label="Preview a reminder" onclick="showBanner()">${I('bell')}</button>`)+
-  exNote()+
-  `<div class="tiles">
-    <div class="tile over"><b>${over}</b><span>Overdue</span></div>
-    <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
-    <div class="tile fine"><b>${fine}</b><span>All good</span></div></div>
-   <div class="sec">Cars at a glance <a href="#cars">All cars</a></div>
-   <div class="glance">${glance}</div>
-   <div class="sec">Needs attention <a href="#calendar">See calendar</a></div>
-   <div class="list">${attention.map(x=>{const d=daysLeft(x.date);
-     return `<button class="row" onclick="go('${x.go}')"><div class="ic ${x.kind}">${I(x.icon)}</div>
-       <div class="tx"><div class="t">${x.title}</div><div class="s">${x.kind==='car'?(x.label==='Service'?'Service (example) · ':'')+'Due '+fmtW(x.date):x.sub+' · '+fmtW(x.date)}</div></div>${pill(d)}</button>`}).join('')}</div>
-   <div class="sec">Coming up this week</div>
-   <div class="list">${upcoming.map(e=>`<div class="row"><div class="ic cal" style="background:${e.src==='outlook'?'#F1EBFF':'#E8F0FE'};color:var(--${e.src})">${I(e.icon)}</div>
-     <div class="tx"><div class="t">${e.title}</div><div class="s">${fmtW(e.date)} · ${e.time}</div></div><span class="tag ${e.src}">${SRC[e.src]}</span></div>`).join('')}</div>
-   <div class="foot">Prototype · “today” is fixed at Sat 26 Sep 2026</div>`;
-}
-
-function carTriple(c){
-  const cell=(l,t)=>`<div><small>${l}</small><b>${fmt(t)}</b>${pill(daysLeft(t))}</div>`;
-  return `<div class="triple">${cell('WOF',c.wof)}${cell('Rego',c.rego)}${cell('Service*',c.svc)}</div>`;
-}
-function Cars(){
-  return header('Cars','3 cars in the whānau',`<button class="iconbtn" aria-label="Add a car" onclick="toast('In the real app you\\'d type the plate, WOF and rego dates here.')">${I('plus')}</button>`)+
-  exNote('WOF and rego dates are real. *Service dates and odometer readings are examples.')+
-  cars.map(c=>`<button class="carcard" onclick="go('#car/${c.id}')"><div class="carhead">
-     <div class="carpic" style="background:${c.hex}">${I('car')}</div>
-     <div style="flex:1;min-width:0"><div class="carname">${c.name}</div><div class="carmodel">${c.make} · ${c.desc.split(' ·')[0]}</div></div>
-     <span class="plate">${c.id}</span></div>${carTriple(c)}</button>`).join('')+
-  `<div class="callout blue">${I('info')}<div>Tip: NZTA won’t renew rego unless the WOF is current – so the app nudges you to sort the WOF first.</div></div>`;
-}
-
-function CarDetail(id){
-  const c=cars.find(x=>x.id===id)||cars[1];
-  const wd=daysLeft(c.wof), rd=daysLeft(c.rego), sd=daysLeft(c.svc);
-  let call='';
-  if(c.wof<=c.rego && rd<=90) call=`<div class="callout">${I('info')}<div><b>Get the WOF done first.</b> The rego is due ${fmt(c.rego)}, and NZTA won’t renew it without a current WOF. The WOF runs out ${fmt(c.wof)}.</div></div>`;
-  else if(rd<=60) call=`<div class="callout">${I('info')}<div><b>Rego is up first</b> (${fmt(c.rego)}). The WOF is current until ${fmt(c.wof)}, so you can renew online any time.</div></div>`;
-  return `<button class="back" onclick="go('#cars')">${I('left')} Cars</button>
-  <div class="hero"><div class="carpic" style="background:${c.hex}">${I('car')}</div>
-   <div><h2>${c.name}</h2><div class="muted">${c.make}<br>${c.desc}</div><div style="margin-top:6px"><span class="plate">${c.id}</span></div></div></div>
-  ${call}
-  <div class="dcard"><div class="h">${I('shield')} Warrant of fitness (WOF) ${pill(wd)}</div>
-   <div class="big">${WDL[dt(c.wof).getUTCDay()]} ${fmtY(c.wof)}</div>
-   <div class="muted" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Checked every
-     <select class="sel" onchange="setInterval_('${c.id}',this.value)">${[6,12,24].map(m=>`<option value="${m}" ${m===c.wofMonths?'selected':''}>${m} months</option>`).join('')}</select></div>
-   <div class="btns"><button class="btn" onclick="toast('You\\'d pick the new expiry date from your WOF sticker.')">${I('check')} Got a new WOF</button>
-     <a class="btn" href="https://transact.nzta.govt.nz/v2/check-expiry" target="_blank" rel="noopener">${I('ext')} Check on NZTA</a></div></div>
-  <div class="dcard"><div class="h">${I('doc')} Rego (vehicle licence) ${pill(rd)}</div>
-   <div class="big">${WDL[dt(c.rego).getUTCDay()]} ${fmtY(c.rego)}</div>
-   <div class="muted">Renew online for 3, 6 or 12 months (petrol & hybrid car prices, incl. online fee):</div>
-   <div class="prices"><div><b>$51.85</b>3 months</div><div><b>$95.06</b>6 months</div><div><b>$181.45</b>12 months</div></div>
-   <div class="btns"><a class="btn primary" href="https://transact.nzta.govt.nz/v2/vehicle-licence-renewal" target="_blank" rel="noopener">${I('ext')} Renew rego on NZTA</a></div>
-   <div class="muted" style="margin-top:8px">Or pop into AA, VTNZ, VINZ or a selected NZ Post shop.</div></div>
-  <div class="dcard"><div class="h">${I('wrench')} Next service <span class="tag" style="background:#86938F">Example</span> ${pill(sd)}</div>
-   <div class="big">${fmtY(c.svc)} <span style="font-size:15px;color:var(--ink2);font-weight:600">or ${c.svcKm.toLocaleString('en-NZ')} km</span></div>
-   <div class="muted">Whichever comes first. Odometer: ${c.odo.toLocaleString('en-NZ')} km (${(c.svcKm-c.odo).toLocaleString('en-NZ')} km to go).</div>
-   <div class="btns"><button class="btn" onclick="toast('You\\'d type in the new odometer reading here.')">Update km</button><button class="btn" onclick="toast('Nice one – you\\'d enter the service date and next due date.')">${I('check')} Serviced</button></div></div>
-  <div class="dcard"><div class="h">${I('bell')} Reminders for this car</div>
-   <div class="muted" style="margin-top:6px">30 days, 14 days and 3 days before, on the day, then every 3 days until it’s sorted. Sent to <b>Shane</b>${c.owner!=='Shane'?` and <b>${c.owner}</b>`:''}.</div></div>
-  <div class="callout blue">${I('info')}<div><b>WOF rules change from 1 Nov 2026.</b> ${c.rule} You can change how often each car needs a WOF above. Check with your testing station.</div></div>
-  <div class="foot">Fines: $200 for an expired WOF and $200 for expired rego,<br>with no grace period. From 1 Nov 2026, a WOF more than<br>2 months out of date is $350.</div>`;
-}
-function setInterval_(id,v){const c=cars.find(x=>x.id===id);c.wofMonths=+v;toast(`${c.name}: WOF now checked every ${v} months.`);}
-
-function Bills(){
-  const unpaid=bills.filter(b=>!b.paid);
-  const next30=unpaid.filter(b=>daysLeft(b.due)<=30);
-  const total=next30.reduce((s,b)=>s+b.amt,0);
-  const over=unpaid.filter(b=>daysLeft(b.due)<0).length;
-  const sorted=[...bills].sort((a,b)=>(a.paid?1:0)-(b.paid?1:0)||a.due-b.due);
-  return header('Bills','Recurring bills and due dates',`<button class="iconbtn" aria-label="Add a bill" onclick="toast('You\\'d add the name, amount, due date and how often it repeats.')">${I('plus')}</button>`)+
-  exNote('Example data – amounts are made up (only the Ecotricity name is real).')+
-  `<div class="summary"><div class="muted">Due in the next 30 days</div><div class="amt">${money(total)}</div>
-    <div class="muted">${next30.length} bills${over?` · <b style="color:#fff">${over} overdue</b>`:''} · reminders 3 days before and on the day</div></div>
-   <div class="sec">Your bills</div>
-   <div class="list">${sorted.map(b=>{const d=daysLeft(b.due);
-     return `<div class="row bill"><div class="ic bill">${I(b.icon)}</div>
-      <div class="tx"><div class="t">${b.name}</div><div class="s">${b.freq} · ${b.paid?'next due '+fmt(b.due):'due '+fmtW(b.due)}</div>
-       <div style="margin-top:5px">${b.paid?'<span class="pill paid">Paid ✓</span>':pill(d)}</div></div>
-      <div class="right"><div class="amt">${money(b.amt)}</div>
-       <button class="paybtn ${b.paid?'done':''}" onclick="togglePaid('${b.id}')">${b.paid?'Undo':'Mark paid'}</button></div></div>`}).join('')}</div>`;
-}
-function togglePaid(id){
-  const b=bills.find(x=>x.id===id);
-  if(!b.paid){b.prev=b.due;b.due=addMonths(b.due,b.every);b.paid=true;render();
-    toast(`${b.name} marked paid. Next due ${fmt(b.due)}.`,'Undo',()=>{b.due=b.prev;b.paid=false;render();});}
-  else{b.due=b.prev;b.paid=false;render();}
-}
-
-let todoFilter='All';
-function Todo(){
-  const lists=['All','Home','Cars','Shopping'];
-  const vis=todos.filter(t=>todoFilter==='All'||t.list===todoFilter);
-  const open=vis.filter(t=>!t.done).sort((a,b)=>(a.due||9e15)-(b.due||9e15)), done=vis.filter(t=>t.done);
-  const row=t=>`<button class="row ${t.done?'done':''}" onclick="tick('${t.id}')"><span class="tick">${I('check')}</span>
-    <div class="tx"><div class="t">${t.title}</div><div class="s">${t.list}${t.due&&!t.done?' · '+fmtW(t.due):''}${!t.due?' · no date':''}</div></div>
-    ${t.due&&!t.done?pill(daysLeft(t.due)):''}</button>`;
-  return header('To-do',`${todos.filter(t=>!t.done).length} things to do`)+
-  exNote('Example data – these to-dos are made up for the preview.')+
-  `<div class="chips">${lists.map(l=>`<button class="chip ${l===todoFilter?'on':''}" onclick="todoFilter='${l}';render()">${l}</button>`).join('')}</div>
-   <form class="addbar" onsubmit="addTodo(event)"><input id="newtodo" placeholder="Add a to-do…" autocomplete="off"><button aria-label="Add">${I('plus')}</button></form>
-   <div class="list">${open.map(row).join('')||'<div class="row"><div class="tx"><div class="t">All done – good as gold!</div></div></div>'}</div>
-   ${done.length?`<div class="sec">Done</div><div class="list">${done.map(row).join('')}</div>`:''}`;
-}
-function tick(id){const t=todos.find(x=>x.id===id);t.done=!t.done;render();if(t.done)toast(`Ticked off: ${t.title}`,'Undo',()=>{t.done=false;render();});}
-function addTodo(e){e.preventDefault();const v=document.getElementById('newtodo').value.trim();if(!v)return;
-  todos.unshift({id:'t'+Date.now(),title:v,list:todoFilter==='All'?'Home':todoFilter,due:null});render();toast('Added to your list.');}
-
-let calMonth={y:2026,m:8}, calSel=null;
-function Calendar(){
-  const ev=calEvents();
-  const {y,m}=calMonth;
-  const first=Date.UTC(y,m,1), offset=(dt(first).getUTCDay()+6)%7, dim=new Date(Date.UTC(y,m+1,0)).getUTCDate();
-  let cells='';
-  for(let i=0;i<42;i++){
-    const t=first+(i-offset)*DAY, d=dt(t), other=d.getUTCMonth()!==m;
-    if(i>=35 && other) break;
-    const evs=ev.filter(e=>e.date===t), srcs=[...new Set(evs.map(e=>e.src))];
-    cells+=`<button class="${other?'other':''} ${t===TODAY?'today':''} ${t===calSel?'sel':''}" onclick="calSel=${t===calSel?'null':t};render()">
-      <span class="n">${d.getUTCDate()}</span><span class="dots">${srcs.map(s=>`<i style="background:var(--${s})"></i>`).join('')}</span></button>`;
-  }
-  let agenda, title;
-  if(calSel!==null){ agenda=ev.filter(e=>e.date>=calSel&&e.date<calSel+7*DAY); title='From '+fmtW(calSel); }
-  else { agenda=ev.filter(e=>{const d=daysLeft(e.date);return d>=0&&d<=21}); title=null; }
-  const groups={}; agenda.forEach(e=>(groups[e.date]=groups[e.date]||[]).push(e));
-  const dayLabel=t=>{const d=daysLeft(t);return (d===0?'Today · ':d===1?'Tomorrow · ':'')+fmtW(t);};
-  const evRow=e=>`<div class="ev" ${e.go?`onclick="go('${e.go}')" style="cursor:pointer"`:''}><span class="bar" style="background:var(--${e.src})"></span><span class="time">${e.time}</span>
-     <div style="flex:1;min-width:0"><div class="t">${e.title}</div>${e.src==='app'?'':'<div class="s">Imported · read-only</div>'}</div><span class="tag ${e.src}">${SRC[e.src]}</span></div>`;
-  return header('Calendar','Everything in one place')+
-  exNote('Example data – only the haircut & Ecotricity events are real (dates are placeholders).')+
-  `<div class="card"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
-     <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
-    <div class="legend"><span><i class="dot" style="background:var(--app)"></i>App</span><span><i class="dot" style="background:var(--google)"></i>Google</span><span><i class="dot" style="background:var(--outlook)"></i>Outlook</span><span style="margin-left:auto;font-weight:500">Synced 5 min ago</span></div>
-    <div class="grid">${['M','T','W','T','F','S','S'].map(d=>`<div class="dow">${d}</div>`).join('')}${cells}</div></div>
-   <div class="sec">${title?title:'Next 3 weeks'} ${title?`<button onclick="calSel=null;render()">Show all</button>`:''}</div>
-   ${Object.keys(groups).length?Object.keys(groups).map(k=>`<div class="agday">${dayLabel(+k)}</div>${groups[k].map(evRow).join('')}`).join(''):'<div class="card muted">Nothing on that week. Enjoy!</div>'}`;
-}
-function shiftMonth(n){let {y,m}=calMonth;m+=n;if(m<0){m=11;y--}if(m>11){m=0;y++}calMonth={y,m};calSel=null;render();}
-
-const settings={push:true, appts:true, nudges:true};
-function sw(k){settings[k]=!settings[k];render();}
-function Settings(){
-  const S=(k)=>`<button class="switch ${settings[k]?'on':''}" aria-label="toggle" onclick="sw('${k}')"></button>`;
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>
-  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Reminders, calendars and whānau</div></div></div>
-  <div class="sec">Reminders</div>
-  <div class="list">
-   <div class="srow"><div class="tx"><div class="t">Push notifications</div><div class="s">Reminders pop up on your phone</div></div>${S('push')}</div>
-   <div class="srow"><div class="tx"><div class="t">WOF & rego</div><div class="s">30, 14 and 3 days before, and on the day</div></div><span class="v">Edit</span></div>
-   <div class="srow"><div class="tx"><div class="t">Keep nudging if overdue</div><div class="s">Every 3 days until it’s sorted</div></div>${S('nudges')}</div>
-   <div class="srow"><div class="tx"><div class="t">Servicing</div><div class="s">14 days before, or 500 km before</div></div><span class="v">Edit</span></div>
-   <div class="srow"><div class="tx"><div class="t">Bills</div><div class="s">3 days before and on the day</div></div><span class="v">Edit</span></div>
-   <div class="srow"><div class="tx"><div class="t">To-dos</div><div class="s">On the day</div></div><span class="v">Edit</span></div>
-   <div class="srow"><div class="tx"><div class="t">Calendar appointments</div><div class="s">1 hour before (e.g. your haircut)</div></div>${S('appts')}</div>
-   <div class="srow"><div class="tx"><div class="t">Reminder time</div><div class="s">Quiet hours 9 pm – 7 am</div></div><span class="v">8:00 am</span></div>
-  </div>
-  <div class="btns" style="margin-top:10px"><button class="btn" onclick="go('#home');setTimeout(showBanner,250)">${I('bell')} Send me a test reminder</button></div>
-  <div class="sec">Connected calendars</div>
-  <div class="list">
-   <div class="srow"><div class="logo" style="background:var(--outlook)">O</div><div class="tx"><div class="t">Outlook.com</div><div class="s">shane_jenkins@outlook.co.nz<br><span class="ok">● Connected · read-only</span> · your haircuts</div></div></div>
-   <div class="srow"><div class="logo" style="background:var(--google)">G</div><div class="tx"><div class="t">Google Calendar</div><div class="s">Example account<br><span class="ok">● Connected · read-only</span></div></div></div>
-   <button class="srow" style="width:100%;text-align:left" onclick="toast('You\\'d sign in to Google or Microsoft and tap Allow (read-only).')"><div class="logo" style="background:#EEF2F1;color:var(--brand)">+</div><div class="tx"><div class="t" style="color:var(--brand)">Connect another calendar</div><div class="s">Google, Outlook.com or Microsoft 365</div></div></button>
-  </div>
-  <div class="muted" style="margin:8px 4px 0">The app only reads your calendars. It never changes or deletes anything in them.</div>
-  <div class="sec">Whānau (family)</div>
-  <div class="list">
-   <div class="srow"><div class="avatar" style="background:#0F766E">S</div><div class="tx"><div class="t">Shane (you)</div><div class="s">Sees everything · gets all car reminders</div></div></div>
-   <div class="srow"><div class="avatar" style="background:#2F5DA8">S</div><div class="tx"><div class="t">Sarah</div><div class="s">Gets reminders for the Haval (PNU312)</div></div><span class="v">Invited</span></div>
-   <div class="srow"><div class="avatar" style="background:#3C7DD9">C</div><div class="tx"><div class="t">Cass</div><div class="s">Gets reminders for the Fit (KBZ234)</div></div><span class="v">Invited</span></div>
-  </div>
-  <div class="sec">Handy NZTA links</div>
-  <div class="list">
-   <a class="srow" href="https://transact.nzta.govt.nz/v2/check-expiry" target="_blank" rel="noopener"><div class="tx"><div class="t">Check WOF & rego expiry dates</div><div class="s">transact.nzta.govt.nz</div></div>${I('ext')}</a>
-   <a class="srow" href="https://transact.nzta.govt.nz/v2/vehicle-licence-renewal" target="_blank" rel="noopener"><div class="tx"><div class="t">Renew rego online</div><div class="s">transact.nzta.govt.nz</div></div>${I('ext')}</a>
-  </div>
-  <div class="foot">Life Admin prototype · Example data<br>“Today” is fixed at Sat 26 Sep 2026</div>`;
-}
-
-/* ---------- push reminder preview ---------- */
-let bannerTimer;
-function showBanner(stay){
-  const c=cars.find(x=>x.id==='PNU312'), d=daysLeft(c.wof);
-  document.getElementById('bt').textContent=`${c.name} WOF due in ${d} days (${fmt(c.wof)})`;
-  document.getElementById('bb').textContent=`Book a WOF soon – you’ll need it to renew the rego on ${fmt(c.rego)}. Tap to see the car.`;
-  document.getElementById('banner').classList.add('show');document.getElementById('scrim').classList.add('show');
-  clearTimeout(bannerTimer); if(!stay) bannerTimer=setTimeout(hideBanner,6000);
-}
-function hideBanner(){document.getElementById('banner').classList.remove('show');document.getElementById('scrim').classList.remove('show');}
-function bannerTap(){hideBanner();go('#car/PNU312');}
-document.getElementById('scrim').onclick=hideBanner;
-
-/* ---------- router ---------- */
-function render(){
-  const h=(location.hash||'#home').slice(1);
-  const [r,arg]=h.split('/');
-  const v=document.getElementById('view');
-  const map={home:Home,cars:Cars,bills:Bills,todo:Todo,calendar:Calendar,settings:Settings,notify:Home};
-  v.innerHTML = r==='car' ? CarDetail(arg) : (map[r]||Home)();
-  tabbar(r==='car'?'cars':r==='notify'?'home':r);
-}
-let lastRoute='';
-window.addEventListener('hashchange',()=>{hideBanner();render();document.getElementById('view').scrollTop=0;if(location.hash==='#notify')showBanner(true);});
-render(); if(location.hash==='#notify') setTimeout(()=>showBanner(true),50);
-</script>
+<div id="sheet"></div>
+<div id="toast" role="status" aria-live="polite"><span id="toastmsg"></span><button id="toastbtn"></button></div>
+<script src="core.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
