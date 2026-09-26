@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -36,6 +36,8 @@ const P = {
   house: '<path d="M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-5h4v5"/>',
   umbrella: '<path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9zM12 12v7a2 2 0 0 0 4 0"/>',
   drop: '<path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"/>',
+  idcard: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16.2c.6-1.5 1.8-2.3 3.2-2.3s2.6.8 3.2 2.3M14.5 10h4M14.5 13.5h3"/>',
+  call: '<path d="M21 16.9v2.6a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 1.1 3.7 2 2 0 0 1 3 1.5h2.6a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.4 2.1L6.8 9.2a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
   cake: '<path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c1.5 1 2.5 1 4 0s2.5-1 4 0 2.5 1 4 0 1.5-.6 2-.8M12 12V8M12 5.5c-.8-.8-.8-1.8 0-3 .8 1.2.8 2.2 0 3z"/>',
   bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2V16h5v-.2c.1-.8.5-1.5 1.1-2A6 6 0 0 0 12 3z"/>',
   more: '<circle cx="6" cy="6" r="1.6"/><circle cx="12" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/><circle cx="6" cy="18" r="1.6"/><circle cx="12" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>',
@@ -64,16 +66,24 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [],
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(),
     settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
 const IDEA_CATS = ['Gifts', 'Home', 'Trips', 'Other'];
+const blankDriver = (id, name) => ({ id, name, aaNo: '', aaType: '', aaExpiry: '', licNo: '', licClass: '', licExpiry: '', notes: '' });
+const seedDrivers = () => [blankDriver('drv-shane', 'Shane'), blankDriver('drv-sarah', 'Sarah'), blankDriver('drv-cass', 'Cass')];
 function normalise(d) {
   d = d && typeof d === 'object' ? d : {};
   ['cars', 'bills', 'todos', 'appts', 'birthdays', 'ideas', 'feeds'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
   if (!Array.isArray(d.lists) || !d.lists.length) d.lists = ['Home', 'Cars', 'Shopping'];
   if (!Array.isArray(d.ideaCats)) d.ideaCats = IDEA_CATS.slice();
+  if (!Array.isArray(d.drivers)) d.drivers = seedDrivers(); // first time on this version: Shane, Sarah and Cass
+  d.cars.forEach(c => {
+    if (!Array.isArray(c.services)) c.services = [];
+    // Older versions only kept the date of the last service: turn it into a history entry
+    if (c.lastService && !c.services.length) c.services.push({ id: 'svc-' + c.id + '-' + c.lastService, date: c.lastService, km: '', garage: '', cost: '', notes: '', migrated: true });
+  });
   d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
   d.version = 1;
   return d;
@@ -183,6 +193,7 @@ function rowFor(x) {
   let icon = 'todo', sub;
   if (x.kind === 'car') { icon = { wof: 'shield', rego: 'doc', svc: 'wrench' }[x.part]; sub = (x.car.plate ? esc(x.car.plate) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = money(x.bill.amount) + ' · ' + fmtW(x.date); }
+  else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
   else sub = 'To-do · ' + esc(x.todo.list || '') + ' · ' + fmtW(x.date);
   return `<button class="row" onclick="go('${x.go}')"><div class="ic ${x.kind}">${I(icon)}</div>
     <div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div>${pill(x.days)}</button>`;
@@ -207,7 +218,7 @@ function Home() {
   }).join('');
   const t7 = todayT() + 7 * DAY;
   const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due');
-  return header('Kia ora, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + cards +
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + cards +
     `<div class="tiles">
       <div class="tile over"><b>${over}</b><span>Overdue</span></div>
       <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
@@ -235,13 +246,14 @@ function carTriple(c) {
   return `<div class="triple">${cell('WOF', c.wof)}${cell('Rego', c.rego)}${svcCell(c)}</div>`;
 }
 function Cars() {
-  return header('Cars', S.cars.length ? plural(S.cars.length, 'car') + ' in the whānau' : 'WOF, rego and servicing', addBtn('Add a car', 'carForm()')) +
+  return header('Cars', S.cars.length ? plural(S.cars.length, 'car') + ' in the family' : 'WOF, rego and servicing', addBtn('Add a car', 'carForm()')) +
     (S.cars.length ? S.cars.map(c => `<div class="carcard" role="button" tabindex="0" onclick="go('#car/${c.id}')"><div class="carhead">
       <div class="carpic" style="background:${esc(c.hex || colourHex(c.colour))}">${I('car')}</div>
       <div style="flex:1;min-width:0"><div class="carname">${esc(c.name)}</div><div class="carmodel">${esc(carSub(c))}</div></div>
       ${c.plate ? `<span class="plate">${esc(c.plate)}</span>` : ''}</div>${carTriple(c)}</div>`).join('')
       : empty('No cars yet', 'Add a car to keep track of its WOF, rego and servicing.', 'Add a car', 'carForm()')) +
-    `<div class="callout blue">${I('info')}<div>NZTA won’t renew rego unless the WOF is current, so the app warns you when the WOF runs out first.</div></div>`;
+    `<div class="callout blue">${I('info')}<div>NZTA won’t renew rego unless the WOF is current, so the app warns you when the WOF runs out first.</div></div>` +
+    driversSection();
 }
 function wofWarning(c) {
   if (!c.wof) return '';
@@ -261,11 +273,11 @@ function CarDetail(id) {
     svc = `<div class="dcard"><div class="h">${I('wrench')} Next service ${c.svcDate ? pill(daysLeft(c.svcDate)) : ''}</div>
       <div class="big">${c.svcDate ? fmtY(c.svcDate) + (km ? ` <span style="font-size:15px;color:var(--ink2);font-weight:600">or ${km}</span>` : '') : km}</div>
       <div class="muted">${c.svcDate && c.svcKm ? 'Whichever comes first. ' : ''}${c.odo ? `Odometer: ${Number(c.odo).toLocaleString('en-NZ')} km${kmTo != null ? ` (${kmTo >= 0 ? kmTo.toLocaleString('en-NZ') + ' km to go' : (-kmTo).toLocaleString('en-NZ') + ' km over'})` : ''}.` : 'Add an odometer reading to see how many km are left.'}</div>
-      <div class="btns"><button class="btn" onclick="kmForm('${c.id}')">Update km</button><button class="btn" onclick="serviceForm('${c.id}',true)">${I('check')} Serviced</button></div></div>`;
+      <div class="btns"><button class="btn" onclick="kmForm('${c.id}')">Update km</button><button class="btn" onclick="serviceForm('${c.id}',true)">${I('check')} Serviced</button></div>${serviceHistory(c)}</div>`;
   } else {
     svc = `<div class="dcard"><div class="h">${I('wrench')} Next service <span class="pill none">Not set</span></div>
       <div class="muted" style="margin-top:8px">No service date yet. Check the sticker on the windscreen or the service book, then add the date or km it’s next due.</div>
-      <div class="btns"><button class="btn primary" onclick="serviceForm('${c.id}',false)">${I('plus')} Add service date</button></div></div>`;
+      <div class="btns"><button class="btn primary" onclick="serviceForm('${c.id}',false)">${I('plus')} Add service date</button><button class="btn" onclick="serviceForm('${c.id}',true)">${I('check')} Serviced</button></div>${serviceHistory(c)}</div>`;
   }
   return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#cars')">${I('left')} Cars</button>
     <button class="btn small" onclick="carForm('${c.id}')">${I('edit')} Edit</button></div>
@@ -314,7 +326,7 @@ function carForm(id) {
         wof: v.wof, rego: v.rego, wofMonths: +v.wofMonths || 12, svcDate: v.svcDate, svcKm: digits(v.svcKm), odo: digits(v.odo), notes: v.notes };
       if (!id || upd.colour !== c.colour) upd.hex = colourHex(upd.colour);
       if (id) Object.assign(c, upd);
-      else { upd.id = uid('car'); S.cars.push(upd); }
+      else { upd.id = uid('car'); upd.services = []; S.cars.push(upd); }
       await save();
       toast(id ? 'Car updated.' : 'Car added.');
       if (id) render(); else return () => go('#car/' + upd.id);
@@ -364,19 +376,156 @@ function regoForm(id) {
     }, 'Save');
   wireSeg('months', v => { $('#sf input[name=rego]').value = calc(v); });
 }
+const parseMoney = v => { if (v === '' || v == null) return ''; const n = Number(String(v).replace(/[$,\s]/g, '')); return isNaN(n) || n < 0 ? NaN : Math.round(n * 100) / 100; };
+function garageList() {
+  const all = [];
+  S.cars.forEach(c => (c.services || []).forEach(x => { if (x.garage) all.push([x.date || '', x.garage]); }));
+  const seen = new Set(), out = [];
+  all.sort((a, b) => b[0].localeCompare(a[0])).forEach(([, g]) => { const k = g.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(g); } });
+  return out;
+}
+const garageField = val => field('Garage', inp('garage', val, 'list="garagelist" placeholder="e.g. Whangārei Honda" maxlength="60" autocomplete="off"') +
+  `<datalist id="garagelist">${garageList().map(g => `<option value="${esc(g)}">`).join('')}</datalist>`);
+const sortedServices = c => [...(c.services || [])].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+function syncLastService(c) { const l = sortedServices(c)[0]; if (l) c.lastService = l.date; else delete c.lastService; }
+function serviceHistory(c) {
+  const list = sortedServices(c), yr = String(new Date().getFullYear());
+  const sum = xs => xs.reduce((t, x) => t + (Number(x.cost) || 0), 0);
+  const anyCost = list.some(x => x.cost !== '' && x.cost != null);
+  const rows = list.map(x => {
+    const bits = [x.km ? Number(x.km).toLocaleString('en-NZ') + ' km' : '', x.garage ? esc(x.garage) : ''].filter(Boolean).join(' · ');
+    return `<button class="hrow" onclick="serviceEntryForm('${c.id}','${x.id}')"><div class="tx"><div class="t">${fmtY(x.date)}</div>
+      ${bits ? `<div class="s">${bits}</div>` : ''}${x.notes ? `<div class="s notes">${esc(x.notes)}</div>` : ''}</div>${x.cost !== '' && x.cost != null ? `<b class="cost">${money(x.cost)}</b>` : ''}</button>`;
+  }).join('');
+  return `<div class="hist"><div class="hhead"><b>Service history</b><button onclick="serviceEntryForm('${c.id}')">+ Add past service</button></div>
+    ${list.length ? `${anyCost ? `<div class="spent"><div><small>Spent in ${yr}</small><b>${money(sum(list.filter(x => (x.date || '').startsWith(yr))))}</b></div><div><small>All time</small><b>${money(sum(list))}</b></div></div>` : ''}
+      <div class="hlist">${rows}</div>` : '<div class="muted" style="margin-top:4px">No services logged yet. Tap “Serviced” after the next one, or add past services from the service book.</div>'}</div>`;
+}
 function serviceForm(id, justServiced) {
-  const c = getCar(id);
-  openSheet(justServiced ? 'Serviced' : 'Add service date',
-    `<p class="muted" style="margin:-4px 0 12px">${justServiced ? 'Good stuff. When is the next service due? It’s usually on a sticker on the windscreen or in the service book.' : 'When is the next service due? Fill in the date, the km, or both.'}</p>` +
-    field('Next service date', inp('svcDate', justServiced ? addMonths(todayISO(), 12) : (c.svcDate || ''), 'type="date"')) +
-    `<div class="two">${field('Or at (km)', inp('svcKm', justServiced ? '' : c.svcKm, 'inputmode="numeric" placeholder="e.g. 95000"'))}${field('Odometer now (km)', inp('odo', c.odo, 'inputmode="numeric" placeholder="Optional"'))}</div>`,
+  const c = getCar(id); if (!Array.isArray(c.services)) c.services = [];
+  if (!justServiced) {
+    openSheet('Add service date', `<p class="muted" style="margin:-4px 0 12px">When is the next service due? Fill in the date, the km, or both.</p>` +
+      field('Next service date', inp('svcDate', c.svcDate || '', 'type="date"')) +
+      `<div class="two">${field('Or at (km)', inp('svcKm', c.svcKm, 'inputmode="numeric" placeholder="e.g. 95000"'))}${field('Odometer now (km)', inp('odo', c.odo, 'inputmode="numeric" placeholder="Optional"'))}</div>`,
+      async v => {
+        if (!v.svcDate && !digits(v.svcKm)) return 'Please add a date or a km reading.';
+        const s = snap(); c.svcDate = v.svcDate; c.svcKm = digits(v.svcKm); c.odo = digits(v.odo);
+        await save(); render(); toast('Service date saved.', 'Undo', undoTo(s));
+      }, 'Save');
+    return;
+  }
+  openSheet('Serviced', `<p class="muted" style="margin:-4px 0 12px">Good stuff. Log the service, then set when the next one is due.</p>` +
+    `<div class="two">${field('Serviced on', inp('date', todayISO(), 'type="date" required'))}${field('Odometer (km)', inp('km', c.odo, 'inputmode="numeric" placeholder="e.g. 93870"'))}</div>` +
+    `<div class="two">${garageField('')}${field('Cost ($)', inp('cost', '', 'inputmode="decimal" placeholder="Optional"'))}</div>` +
+    field('What was done', area('notes', '', 'Optional, e.g. oil and filter, new wiper blades')) +
+    `<div class="subhead">Next service</div>` +
+    field('Next service date', inp('svcDate', addMonths(todayISO(), 12), 'type="date"'), 'Usually on a sticker on the windscreen or in the service book.') +
+    field('Or at (km)', inp('svcKm', '', 'inputmode="numeric" placeholder="e.g. 105000"')),
     async v => {
-      if (!v.svcDate && !digits(v.svcKm)) return 'Please add a date or a km reading.';
-      const s = snap(); c.svcDate = v.svcDate; c.svcKm = digits(v.svcKm); c.odo = digits(v.odo);
-      if (justServiced) c.lastService = todayISO();
+      if (!parseD(v.date)) return 'Please choose the date it was serviced.';
+      if (parseD(v.date) > todayT()) return 'The service date can’t be in the future.';
+      const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 289.50.';
+      const s = snap(), km = digits(v.km);
+      c.services.push({ id: uid('svc'), date: v.date, km, garage: v.garage, cost, notes: v.notes });
+      syncLastService(c);
+      if (km && (!c.odo || Number(km) > Number(c.odo))) c.odo = km;
+      c.svcDate = v.svcDate; c.svcKm = digits(v.svcKm);
       await save(); render();
-      toast(justServiced ? 'Service recorded.' : 'Service date saved.', 'Undo', undoTo(s));
+      toast('Service logged.', 'Undo', undoTo(s));
     }, 'Save');
+}
+function serviceEntryForm(carId, sid) {
+  const c = getCar(carId); if (!Array.isArray(c.services)) c.services = [];
+  const x = sid ? c.services.find(e => e.id === sid) : { date: '', km: '', garage: '', cost: '', notes: '' };
+  if (!x) return;
+  openSheet(sid ? 'Edit service' : 'Add past service',
+    `<div class="two">${field('Serviced on', inp('date', x.date, 'type="date" required'))}${field('Odometer (km)', inp('km', x.km, 'inputmode="numeric" placeholder="Optional"'))}</div>` +
+    `<div class="two">${garageField(x.garage)}${field('Cost ($)', inp('cost', x.cost === '' || x.cost == null ? '' : Number(x.cost).toFixed(2), 'inputmode="decimal" placeholder="Optional"'))}</div>` +
+    field('What was done', area('notes', x.notes, 'Optional')),
+    async v => {
+      if (!parseD(v.date)) return 'Please choose the date it was serviced.';
+      if (parseD(v.date) > todayT()) return 'The service date can’t be in the future.';
+      const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 289.50.';
+      const s = snap(), upd = { date: v.date, km: digits(v.km), garage: v.garage, cost, notes: v.notes };
+      if (sid) { Object.assign(x, upd); delete x.migrated; } else c.services.push(Object.assign({ id: uid('svc') }, upd));
+      syncLastService(c);
+      await save(); render(); toast(sid ? 'Service updated.' : 'Past service added.', 'Undo', undoTo(s));
+    }, sid ? 'Save' : 'Add',
+    sid ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete service" onclick="deleteServiceEntry('${carId}','${sid}')">${I('trash')}</button>` : '');
+}
+async function deleteServiceEntry(carId, sid) {
+  const c = getCar(carId), s = snap();
+  c.services = c.services.filter(e => e.id !== sid); syncLastService(c);
+  await save(); await closeSheet(); render(); toast('Service deleted.', 'Undo', undoTo(s));
+}
+
+/* ================= DRIVERS (on the Cars tab) ================= */
+const AA_PHONE = '0800 500 222', AA_RENEW = 'https://www.aa.co.nz/membership/';
+const getDriver = id => S.drivers.find(d => d.id === id);
+function driversSection() {
+  const row = d => {
+    const dates = [['AA', d.aaExpiry], ['Licence', d.licExpiry]].filter(a => a[1]).sort((a, b) => parseD(a[1]) - parseD(b[1]));
+    const sub = dates.length ? dates.map(([l, v]) => `${l} ${fmt(v)}`).join(' · ') : 'No AA or licence details yet';
+    const n = dates[0], dl = n ? daysLeft(n[1]) : null;
+    return `<button class="row" onclick="go('#driver/${d.id}')"><div class="ic driver">${I('idcard')}</div><div class="tx"><div class="t">${esc(d.name)}</div><div class="s">${sub}</div></div>
+      ${n ? `<span class="pill ${status(dl)}">${n[0]} ${dl < 0 ? 'expired' : dl === 0 ? 'today' : dl + 'd'}</span>` : '<span class="pill none">Add details</span>'}</button>`;
+  };
+  return `<div class="sec">Drivers <button onclick="driverForm()">Add</button></div>
+    ${S.drivers.length ? `<div class="list">${S.drivers.map(row).join('')}</div>` : empty('No drivers yet', 'Add a driver to keep their AA membership and licence dates handy.', 'Add a driver', 'driverForm()')}
+    <div class="muted" style="margin:8px 4px 0">AA and licence details stay on this phone only.</div>`;
+}
+function DriverDetail(id) {
+  const d = getDriver(id);
+  if (!d) return `<button class="back" onclick="go('#cars')">${I('left')} Cars</button>` + empty('That driver isn’t here any more', 'They may have been deleted.', '', '');
+  const ad = d.aaExpiry ? daysLeft(d.aaExpiry) : null, ld = d.licExpiry ? daysLeft(d.licExpiry) : null;
+  const kv = (k, v) => v ? `<div class="kv"><span>${k}</span><b>${esc(v)}</b></div>` : '';
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#cars')">${I('left')} Cars</button>
+    <button class="btn small" onclick="driverForm('${d.id}')">${I('edit')} Edit</button></div>
+  <div class="hero"><div class="carpic" style="background:#4F46E5">${I('idcard')}</div><div style="min-width:0"><h2>${esc(d.name)}</h2><div class="muted">Driver</div></div></div>
+  ${ad != null && ad < 0 ? `<div class="callout red">${I('warn')}<div><b>${esc(d.name)}’s AA membership has expired.</b> Roadservice may not come out until it’s renewed.</div></div>` : ''}
+  <div class="dcard"><div class="h">${I('shield')} AA membership ${ad != null ? pill(ad) : '<span class="pill none">Not set</span>'}</div>
+    <div class="big">${d.aaExpiry ? fmtLong(d.aaExpiry) : 'No expiry date yet'}</div>
+    ${kv('Membership number', d.aaNo)}${kv('Type', d.aaType)}
+    ${!d.aaNo && !d.aaType && !d.aaExpiry ? '<div class="muted">Add the membership number and expiry from the AA card or the AA app.</div>' : ''}
+    <div class="btns"><a class="btn primary" href="tel:0800500222">${I('call')} Call AA ${AA_PHONE}</a><a class="btn" href="${AA_RENEW}" target="_blank" rel="noopener">${I('ext')} Renew AA</a></div>
+    <div class="muted" style="margin-top:8px">AA Roadservice, 24/7: ${AA_PHONE}. Have the membership number ready.</div></div>
+  <div class="dcard"><div class="h">${I('idcard')} Driver licence ${ld != null ? pill(ld) : '<span class="pill none">Not set</span>'}</div>
+    <div class="big">${d.licExpiry ? fmtLong(d.licExpiry) : 'No expiry date yet'}</div>
+    ${kv('Licence number', d.licNo)}${kv('Class', d.licClass)}
+    ${!d.licNo && !d.licClass && !d.licExpiry ? '<div class="muted">Optional. The expiry date is on the front of the licence card.</div>' : ''}</div>
+  ${d.notes ? `<div class="dcard"><div class="h">${I('doc')} Notes</div><div class="muted notes" style="margin-top:6px">${esc(d.notes)}</div></div>` : ''}
+  <div class="dcard"><div class="h">${I('bell')} Reminders</div><div class="muted" style="margin-top:6px">AA membership and licence: 30, 14 and 3 days before, and on the day (never between 9 pm and 7 am).</div></div>
+  <div class="btns"><button class="btn danger" onclick="deleteDriver('${d.id}')">${I('trash')} Delete this driver</button></div>`;
+}
+const AA_TYPES = ['AA Membership', 'AA Membership + AA Plus'];
+const LIC_CLASSES = ['Class 1 (car) – full', 'Class 1 (car) – restricted', 'Class 1 (car) – learner', 'Class 6 (motorbike)', 'Class 2 (medium rigid)'];
+function driverForm(id) {
+  const d = id ? getDriver(id) : blankDriver('', '');
+  const dl = (lid, opts) => `<datalist id="${lid}">${opts.map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
+  openSheet(id ? 'Edit driver' : 'Add a driver',
+    field('Name', inp('name', d.name, 'placeholder="e.g. Shane" required maxlength="40"')) +
+    `<div class="subhead">AA membership</div>` +
+    `<div class="two">${field('Membership number', inp('aaNo', d.aaNo, 'inputmode="numeric" placeholder="Optional" maxlength="30" autocomplete="off"'))}${field('Expiry date', inp('aaExpiry', d.aaExpiry, 'type="date"'))}</div>` +
+    field('Membership type', inp('aaType', d.aaType, 'list="aatypes" placeholder="e.g. AA Membership + AA Plus" maxlength="50" autocomplete="off"') + dl('aatypes', AA_TYPES)) +
+    `<div class="subhead">Driver licence (optional)</div>` +
+    `<div class="two">${field('Licence number', inp('licNo', d.licNo, 'placeholder="e.g. AB123456" maxlength="20" autocapitalize="characters" autocomplete="off"'))}${field('Expiry date', inp('licExpiry', d.licExpiry, 'type="date"'))}</div>` +
+    field('Licence class', inp('licClass', d.licClass, 'list="licclasses" placeholder="e.g. Class 1 (car) – full" maxlength="50" autocomplete="off"') + dl('licclasses', LIC_CLASSES)) +
+    field('Notes', area('notes', d.notes)),
+    async v => {
+      if (!v.name) return 'Please type the driver’s name.';
+      const upd = { name: v.name, aaNo: v.aaNo, aaType: v.aaType, aaExpiry: v.aaExpiry, licNo: v.licNo.toUpperCase(), licClass: v.licClass, licExpiry: v.licExpiry, notes: v.notes };
+      if (id) { Object.assign(d, upd); await save(); render(); toast('Driver updated.'); return; }
+      const nid = uid('drv'); S.drivers.push(Object.assign({ id: nid }, upd)); await save(); toast('Driver added.');
+      return () => go('#driver/' + nid);
+    }, id ? 'Save' : 'Add driver',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete driver" onclick="deleteDriver('${id}')">${I('trash')}</button>` : '');
+}
+function deleteDriver(id) {
+  const d = getDriver(id);
+  confirmSheet(`Delete ${esc(d.name)}?`, 'Their AA and licence details will be removed from this phone.', 'Delete driver', async () => {
+    const s = snap(); S.drivers = S.drivers.filter(x => x.id !== id); await save();
+    return () => { go('#cars'); toast(`${d.name} deleted.`, 'Undo', undoTo(s)); };
+  });
 }
 function kmForm(id) {
   const c = getCar(id);
@@ -533,6 +682,7 @@ function calItems(fromT, toT) {
     [['wof', 'WOF', 'WOF'], ['rego', 'rego', 'Rego'], ['svcDate', 'service', 'Service']].forEach(([k, l, L]) => { if (c[k] && inR(c[k])) ev.push({ src: 'due', title: `${c.name} ${l} due`, date: c[k], time: L, go: `go('#car/${c.id}')` }); });
   });
   S.bills.forEach(b => billDates(b, fromT, toT).forEach(d => ev.push({ src: 'due', title: `${b.name} · ${money(b.amount)}`, date: d, time: 'Bill', go: `go('#bills')` })));
+  S.drivers.forEach(d => [['aaExpiry', 'AA membership expires', 'AA'], ['licExpiry', 'driver licence expires', 'Licence']].forEach(([k, l, L]) => { if (d[k] && inR(d[k])) ev.push({ src: 'due', title: `${d.name}’s ${l}`, date: d[k], time: L, go: `go('#driver/${d.id}')` }); }));
   S.todos.filter(t => !t.done && t.due && inR(t.due)).forEach(t => ev.push({ src: 'due', title: t.title, date: t.due, time: 'To-do', go: `go('#todo')` }));
   S.appts.filter(a => inR(a.date)).forEach(a => ev.push({ src: 'appt', title: a.title, date: a.date, time: a.time ? fmtTime(a.time) : 'All day', sort: a.time || '00:00', go: `apptForm('${a.id}')`, notes: a.notes }));
   S.birthdays.forEach(b => bdayDates(b, fromT, toT).forEach(d => {
@@ -1103,7 +1253,7 @@ function importFile(input) {
     const d = obj && obj.data ? obj.data : obj;
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
-    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')} and ${plural((d.ideas || []).length, 'idea')}.`, 'Restore', async () => {
+    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')} and ${plural((d.drivers || []).length, 'driver')}.`, 'Restore', async () => {
       const s = snap(); S = normalise(d); await save(); render(); toast('Backup restored.', 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
@@ -1136,8 +1286,8 @@ function render() {
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas };
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : (map[r] || Home)();
-  tabbar(r === 'car' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : map[r] ? r : 'home');
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : (map[r] || Home)();
+  tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : map[r] ? r : 'home');
 }
 window.addEventListener('online', () => { if (S) syncFeeds(); });
 window.addEventListener('hashchange', () => { if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });

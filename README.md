@@ -1,6 +1,6 @@
 # Car & Life Due Dates
 
-A small installable web app (PWA) for keeping track of WOF, rego and servicing for the family's cars, plus bills, to-dos, appointments, birthdays and ideas, with reminders. It can also show events from an Outlook.com, Google or iCloud calendar link.
+A small installable web app (PWA) for keeping track of WOF, rego and servicing for the family's cars, plus service history, drivers (AA membership and licence dates), bills, to-dos, appointments, birthdays and ideas, with reminders. It can also show events from an Outlook.com, Google or iCloud calendar link.
 
 - Open it: https://phoneapp12-cell.github.io/car-app-preview/
 - Install it: in Chrome on Android tap ⋮ then **Add to Home screen** / **Install app**. On iPhone (Safari) tap **Share** then **Add to Home Screen**.

@@ -98,6 +98,10 @@
       if (c.svcDate) out.push({ kind: 'car', part: 'svc', id: c.id, car: c, label: 'Service', title: c.name + ' service', date: c.svcDate, go: '#car/' + c.id });
     });
     (data.bills || []).filter(b => !b.paid && b.due).forEach(b => out.push({ kind: 'bill', part: 'bill', id: b.id, bill: b, title: b.name, date: b.due, go: '#bills' }));
+    (data.drivers || []).forEach(d => {
+      if (d.aaExpiry) out.push({ kind: 'driver', part: 'aa', id: d.id, driver: d, label: 'AA', title: d.name + ' AA membership', date: d.aaExpiry, go: '#driver/' + d.id });
+      if (d.licExpiry) out.push({ kind: 'driver', part: 'lic', id: d.id, driver: d, label: 'Licence', title: d.name + ' driver licence', date: d.licExpiry, go: '#driver/' + d.id });
+    });
     (data.todos || []).filter(t => !t.done && t.due).forEach(t => out.push({ kind: 'todo', part: 'todo', id: t.id, todo: t, title: t.title, date: t.due, go: '#todo' }));
     out.forEach(x => { x.days = daysLeft(x.date, now); });
     return out.sort((a, b) => a.days - b.days || a.title.localeCompare(b.title));
@@ -119,6 +123,8 @@
     if (x.part === 'svc') return d <= 14 ? 's14' : null;
     if (x.part === 'bill') { if (d <= 0) return 'd0'; if (d <= 3) return 's3'; return null; }
     if (x.part === 'todo') return d <= 0 ? 'd0' : null;
+    // AA membership and driver licence: 30, 14 and 3 days before, and on the day (or once, if already expired)
+    if (x.part === 'aa' || x.part === 'lic') { if (d > 30) return null; if (d > 14) return 's30'; if (d > 3) return 's14'; if (d > 0) return 's3'; return 'd0'; }
     return null;
   }
 
@@ -142,6 +148,12 @@
       const b = x.bill;
       return { title: `${b.name} ${d < 0 ? 'is overdue' : 'due ' + when}`, body: `${money(b.amount)} due ${fmtW(x.date, now)}. Tap to mark it paid.` };
     }
+    if (x.kind === 'driver') {
+      const n = x.driver.name, what = x.part === 'aa' ? 'AA membership' : 'driver licence';
+      const how = x.part === 'aa' ? 'Renew online at aa.co.nz or call 0800 500 222.' : 'You can renew at an AA or VTNZ centre.';
+      if (d < 0) return { title: `${n}’s ${what} has expired`, body: `It ran out on ${fmtW(x.date, now)}. ${how}` };
+      return { title: `${n}’s ${what} ${d === 0 ? 'expires today' : 'expires ' + when}`, body: `Expires ${fmtW(x.date, now)}. ${how}` };
+    }
     return { title: d < 0 ? `To-do overdue: ${x.title}` : `To-do today: ${x.title}`, body: d < 0 ? `It was due ${fmtW(x.date, now)}.` : 'Tap to tick it off.' };
   }
 
@@ -151,6 +163,7 @@
     const out = [];
     const daytime = !quietNow(now);
     dueItems(data, now).forEach(x => {
+      if (x.kind === 'driver' && !daytime) return; // AA / licence reminders wait until 7 am
       const st = stage(x); if (!st) return;
       const key = [x.kind, x.id, x.part, x.date, st].join('|');
       if (fired[key]) return;
