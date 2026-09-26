@@ -100,6 +100,77 @@
     return out;
   }
 
+  /* ---------- Lifting bridge on Dave Culham Drive (Te Matau ā Pohe) ----------
+     Not live: worked out from the council's published lift times (wdc.govt.nz, Te Matau a Pohe bridge):
+     - A scheduled lift at 12:00 noon every day (about 5–7 minutes to raise and lower).
+     - Staffed hours, when boats can ask for a lift at any time (about 5 a day, each about 5–7 minutes):
+       summer (from the last Sunday in September to the Saturday before the first Sunday in April): weekdays 9:00–16:00 and
+       18:00–19:00, weekends 7:00–19:00; winter: weekdays 9:00–16:00, weekends 8:00–17:00.
+     - Never lifted on weekdays 7:00–9:00 and 16:00–18:00 (peak traffic), or in gale-force wind (over 34 knots, about 63 km/h).
+     - Outside staffed hours lifts are on call (usually booked ahead), so they're uncommon. */
+  const BRIDGE = { lat: -35.73498, lon: 174.33534, galeKmh: 63, liftMins: 7 };
+  const wdOf = iso => new Date(parseD(iso)).getUTCDay();
+  function sundayOf(y, m, which) { // which: 1 = first, -1 = last Sunday of month m (1-12)
+    if (which === 1) { const t = Date.UTC(y, m - 1, 1); return isoT(t + ((7 - new Date(t).getUTCDay()) % 7) * DAY); }
+    const t = Date.UTC(y, m, 0); return isoT(t - new Date(t).getUTCDay() * DAY);
+  }
+  function bridgeSeason(iso) {
+    const y = +iso.slice(0, 4);
+    return iso >= sundayOf(y, 9, -1) || iso < sundayOf(y, 4, 1) ? 'summer' : 'winter';
+  }
+  function bridgeHours(iso) {
+    const we = wdOf(iso) === 0 || wdOf(iso) === 6, su = bridgeSeason(iso) === 'summer';
+    return su ? (we ? [[420, 1140]] : [[540, 960], [1080, 1140]]) : (we ? [[480, 1020]] : [[540, 960]]);
+  }
+  function bridgeStateAt(iso, min) {
+    const wd = wdOf(iso);
+    if (wd >= 1 && wd <= 5 && ((min >= 420 && min < 540) || (min >= 960 && min < 1080))) return 'peak';
+    if (min >= 720 && min < 720 + BRIDGE.liftMins) return 'noon';
+    return bridgeHours(iso).some(([a, b]) => min >= a && min < b) ? 'request' : 'after';
+  }
+  const BR_MARKS = [0, 420, 480, 540, 720, 720 + BRIDGE.liftMins, 960, 1020, 1080, 1140];
+  function bridgeNext(iso, min) {
+    const cur = bridgeStateAt(iso, min);
+    for (let d = 0; d < 4; d++) {
+      const day = addDays(iso, d);
+      for (const m of BR_MARKS) {
+        if (d === 0 && m <= min) continue;
+        const st = bridgeStateAt(day, m);
+        if (st !== cur) return { iso: day, min: m, state: st };
+      }
+    }
+    return null;
+  }
+  function nzClock(now = new Date()) {
+    const p = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(now).forEach(x => { p[x.type] = x.value; });
+    const iso = `${p.year}-${p.month}-${p.day}`, min = (+p.hour % 24) * 60 + +p.minute;
+    return { iso, min, stamp: `${iso}T${pad(Math.floor(min / 60))}:${pad(min % 60)}` };
+  }
+  const hm = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+  // opts: { windKmh (forecast, or null), closures: [{ title, where, desc, url, dates: [{ start, end, time, endTime }] }] }
+  function bridgeStatus(now = new Date(), opts = {}) {
+    const c = nzClock(now), base = bridgeStateAt(c.iso, c.min);
+    const out = { iso: c.iso, min: c.min, base, state: base, season: bridgeSeason(c.iso), hours: bridgeHours(c.iso), next: bridgeNext(c.iso, c.min), closure: null, upcoming: [] };
+    for (const cl of opts.closures || []) for (const d of cl.dates || []) {
+      const a = d.start + 'T' + (d.time || '00:00'), b = (d.end || d.start) + 'T' + (d.endTime || '23:59');
+      if (a <= c.stamp && c.stamp < b) { if (!out.closure || b > out.closure.until) out.closure = { ...cl, from: a, until: b }; }
+      else if (a > c.stamp) out.upcoming.push({ ...cl, from: a, until: b });
+    }
+    out.upcoming.sort((x, y) => x.from.localeCompare(y.from));
+    const w = typeof opts.windKmh === 'number' ? opts.windKmh : null;
+    out.windKmh = w;
+    if (out.closure) out.state = 'closed';
+    else if (w != null && w > BRIDGE.galeKmh && base !== 'peak') out.state = 'windy';
+    return out;
+  }
+  const bridgeMetres = (lat, lon) => {
+    const R = 6371000, r = x => x * Math.PI / 180, dLat = r(lat - BRIDGE.lat), dLon = r(lon - BRIDGE.lon);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(BRIDGE.lat)) * Math.cos(r(lat)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+
   /* ---------- bills ---------- */
   const REPEATS = { none: 'One-off', weekly: 'Weekly', fortnightly: 'Fortnightly', monthly: 'Monthly', quarterly: 'Every 3 months', yearly: 'Yearly' };
   function nextDue(bill, from) {
@@ -331,5 +402,5 @@
   }
 
   g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money,
-    nzHolidays, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
+    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);

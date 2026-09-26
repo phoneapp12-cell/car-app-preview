@@ -1,4 +1,4 @@
-/* Calendar link relay for the Due Dates app (plus two fixed, read-only extras: /events and /weather).
+/* Calendar link relay for the Due Dates app (plus three fixed, read-only extras: /events, /weather and /closures).
  *
  * Why it exists: Outlook.com and Google serve private iCal (.ics) links without CORS headers,
  * so a web app on phoneapp12-cell.github.io can't read them directly. This relay fetches one
@@ -13,8 +13,11 @@
  * GET /events: Whangārei District Council "What's On" as JSON (see events.js). Fixed source, no input.
  * GET /weather: Open-Meteo forecast for Whangārei, used only when the app can't reach Open-Meteo
  * itself. Fixed location, no input, kept for 20 minutes.
+ * GET /closures: council roadworks/closure notices that mention the lifting bridge on Dave Culham Drive
+ * (see closures.js). Fixed source, no input.
  */
 import { getFeed } from './events.js';
+import { getClosures } from './closures.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -58,7 +61,8 @@ const MESSAGES = {
   too_many_redirects: 'The calendar link redirected too many times.',
   not_found_route: 'Not found.',
   events_unavailable: 'Local events could not be loaded right now.',
-  weather_unavailable: 'The weather could not be loaded right now.'
+  weather_unavailable: 'The weather could not be loaded right now.',
+  closures_unavailable: 'Planned closures could not be checked right now.'
 };
 
 function allowedOrigins(env) {
@@ -152,14 +156,14 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     }
     return new Response('Due Dates calendar link service is running. It only answers requests from the Due Dates app.\n', { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'text/plain; charset=utf-8' } });
   }
-  if (path === '/events' || path === '/weather') {
+  if (path === '/events' || path === '/weather' || path === '/closures') {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     try {
-      const data = path === '/events' ? await getFeed(env, fetchImpl) : await getWeather(env, fetchImpl);
+      const data = path === '/events' ? await getFeed(env, fetchImpl) : path === '/closures' ? await getClosures(env, fetchImpl) : await getWeather(env, fetchImpl);
       return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) {
-      return json(502, path === '/events' ? 'events_unavailable' : 'weather_unavailable', origin, env);
+      return json(502, path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : 'weather_unavailable', origin, env);
     }
   }
   if (path !== '/fetch') return json(404, 'not_found_route', origin, env);

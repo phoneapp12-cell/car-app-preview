@@ -32,9 +32,9 @@ export function decode(s) {
     return ENT[e.toLowerCase()] != null ? ENT[e.toLowerCase()] : m;
   });
 }
-const text = s => decode(String(s || '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
+export const text = s => decode(String(s || '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 const pad = n => String(n).padStart(2, '0');
-const clip = (s, n) => s.length <= n ? s : s.slice(0, n).replace(/\s+\S*$/, '') + '…';
+export const clip = (s, n) => s.length <= n ? s : s.slice(0, n).replace(/\s+\S*$/, '') + '…';
 
 export function nzToday(now = Date.now()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
@@ -108,7 +108,7 @@ export function hiddenFields(html) {
   return { form: f, sel, go };
 }
 
-async function get(url, fetchImpl, init = {}) {
+export async function get(url, fetchImpl, init = {}) {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), FETCH_TIMEOUT);
   try {
     const r = await fetchImpl(url, { ...init, headers: { ...HEADERS, ...(init.headers || {}) }, redirect: 'follow', signal: ctl.signal });

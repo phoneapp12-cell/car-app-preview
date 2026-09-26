@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14,6 +14,7 @@ const P = {
   car: '<path d="M3 13l2.2-5.3A2.5 2.5 0 0 1 7.5 6h9a2.5 2.5 0 0 1 2.3 1.7L21 13v4a1 1 0 0 1-1 1h-1.2M3 13v4a1 1 0 0 0 1 1h1.2M3 13h18M9.8 18h4.4"/><circle cx="7.5" cy="17.5" r="2"/><circle cx="16.5" cy="17.5" r="2"/>',
   bill: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   todo: '<rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 12l3 3 5-6"/>',
+  bridge: '<path d="M2.5 16.5h7.5M15.5 16.5h6M10 16.5l6-8.5"/><path d="M4.5 16.5V20M9 16.5V20M17 16.5V20M20 16.5V20"/>',
   flag: '<path d="M5.5 21V4"/><path d="M5.5 4.5h11.5l-2.5 4.25 2.5 4.25H5.5"/>',
   cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
@@ -232,7 +233,8 @@ function Home() {
   }).join('');
   const t7 = todayT() + 7 * DAY;
   const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'hol');
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + cards + wxCard() + homeHolidays() +
+  const br = brOnHome();
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() +
     `<div class="tiles">
       <div class="tile over"><b>${over}</b><span>Overdue</span></div>
       <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
@@ -1160,6 +1162,7 @@ function More() {
   return header('More', 'Events, bills, birthdays, ideas and settings') +
     `<div class="list">
       ${item('#events', 'ticket', 'ev', 'Events', ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei')}
+      ${item('#bridge', 'bridge', 'br', 'Lifting bridge', 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3])}
       ${item('#bills', 'bill', 'bill', 'Bills', S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…', over ? `<span class="pill over">${over} overdue</span>` : '')}
       ${item('#birthdays', 'cake', 'bday', 'Birthdays', nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one', nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '')}
       ${item('#ideas', 'bulb', 'idea', 'Ideas', S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down')}
@@ -1167,6 +1170,186 @@ function More() {
     </div>
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
+
+/* ================= LIFTING BRIDGE (Dave Culham Drive, Te Matau ā Pohe) ================= */
+// Not live: the council doesn't publish lift status. The rules are in core.js (bridgeStatus); planned closures come from
+// the relay's /closures (the council's Roadworks and closures page); wind is the Open-Meteo forecast.
+const BRIDGE_TRAFFIC_URL = 'https://www.google.com/maps/@?api=1&map_action=map&center=-35.73498%2C174.33534&zoom=16&layer=traffic';
+const WDC_BRIDGE_URL = 'https://www.wdc.govt.nz/Services/Roads-and-Transportation/Transportation/Te-Matau-a-Pohe-bridge';
+const WDC_CLOSURES_URL = 'https://www.wdc.govt.nz/Services/Roads-and-Transportation/Roads/Roadworks-and-closures';
+const BR_NEAR_M = 2000, CLS_MAX_AGE = 3 * 3600 * 1000;
+let CLS = null, clsBusy = false, clsFailed = false;
+let brNear = null, brDist = null, brLocBusy = false, brLocAt = 0; // location is only kept in memory while the app is open
+function loadCls() { try { const c = JSON.parse(localStorage.getItem('closures') || 'null'); CLS = c && c.at && c.data && Array.isArray(c.data.closures) ? c : null; } catch (e) { CLS = null; } }
+async function refreshClosures(force = false) {
+  if (!RELAY_URL || clsBusy || (!force && CLS && Date.now() - CLS.at < CLS_MAX_AGE)) return;
+  clsBusy = true;
+  let data = null;
+  try { data = await getJSON(RELAY_URL + '/closures', 20000); } catch (e) { }
+  clsBusy = false;
+  if (data && Array.isArray(data.closures)) { CLS = { at: Date.now(), data }; clsFailed = false; try { localStorage.setItem('closures', JSON.stringify(CLS)); } catch (e) { } }
+  else clsFailed = true;
+  updBridge(true);
+}
+function brWind() {
+  if (!WX || Date.now() - WX.at > 3 * 3600 * 1000) return null;
+  const v = WX.data.current && WX.data.current.wind_speed_10m;
+  return typeof v === 'number' ? v : null;
+}
+function brWindToday() {
+  if (!WX || Date.now() - WX.at > 12 * 3600 * 1000) return null;
+  const d = wxDays()[0]; return d && d.iso === todayISO() && typeof d.wind === 'number' ? d.wind : null;
+}
+const brStatus = () => DD.bridgeStatus(new Date(), { windKmh: brWind(), closures: CLS ? CLS.data.closures : [] });
+const brMode = () => (S && S.settings.bridgeHome) || 'near';
+const pad = n => String(n).padStart(2, '0');
+const hmStr = m => pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60);
+function brWhen(iso, min, prep) {
+  const d = daysLeft(iso), t = fmtTime(hmStr(min));
+  return (d === 0 ? '' : d === 1 ? 'tomorrow ' : WDL[new Date(parseD(iso)).getUTCDay()] + ' ') + (prep ? prep + ' ' : '') + t;
+}
+const brStamp = st => { const [d, t] = st.split('T'); const [h, m] = t.split(':').map(Number); return { iso: d, min: h * 60 + m }; };
+const BR_TXT = {
+  closed: ['over', 'Closed', 'Road closed – planned closure', 'Closed (planned closure)'],
+  windy: ['fine', 'No lifts', 'Too windy for lifts (forecast)', 'Too windy for lifts (forecast)'],
+  peak: ['fine', 'No lifts', 'No lifts now – peak traffic', 'No lifts now (peak traffic)'],
+  noon: ['over', 'Noon lift', 'Noon lift – the road may be closed for about 5–7 minutes', 'Noon lift now'],
+  request: ['soon', 'Lifts possible', 'Lifts on request – each stops traffic for about 5–7 minutes', 'Lifts possible'],
+  after: ['none', 'After hours', 'After hours – lifts only on call', 'After hours']
+};
+function brNextText(st) {
+  if (st.state === 'closed') { const u = brStamp(st.closure.until); return 'Closed until ' + brWhen(u.iso, u.min) + ', according to the council’s notice'; }
+  if (st.state === 'windy') return 'Normal lift times apply again once the wind drops below gale force';
+  const n = st.next; if (!n) return '';
+  if (n.state === 'peak') return `Next: no lifts ${brWhen(n.iso, n.min, 'from')} (peak traffic)`;
+  if (n.state === 'noon') return `Next: noon lift ${brWhen(n.iso, n.min, 'at')}`;
+  if (n.state === 'request') return `Next: lifts possible ${brWhen(n.iso, n.min, 'from')}`;
+  return `Next: after hours ${brWhen(n.iso, n.min, 'from')}`;
+}
+function brDetail(st) {
+  if (st.state === 'closed') return esc([st.closure.where, clip(st.closure.desc || '', 220)].filter(Boolean).join(' – '));
+  if (st.state === 'windy') return `Forecast wind about ${Math.round(st.windKmh)} km/h. The council doesn’t lift the bridge in gale-force wind (over 34 knots, about 63 km/h), so the road should stay open.`;
+  return { peak: 'The bridge isn’t lifted on weekdays from 7 to 9 am or from 4 to 6 pm.',
+    noon: 'The council’s scheduled lift is at 12:00 noon every day, when conditions allow.',
+    request: 'In staffed hours boats can ask for a lift at any time, usually within 5 minutes. It lifts about 5 times a day.',
+    after: 'Outside staffed hours the bridge is only lifted on call, usually booked ahead, so lifts are uncommon.' }[st.state];
+}
+const clip = (t, n) => t.length <= n ? t : t.slice(0, n).replace(/\s+\S*$/, '') + '…';
+function brClosureWhen(c) {
+  const a = brStamp(c.from), b = brStamp(c.until), sameDay = a.iso === b.iso;
+  const t = (x, allDay) => allDay ? '' : ', ' + fmtTime(hmStr(x.min));
+  const allDay = c.from.endsWith('T00:00') && c.until.endsWith('T23:59');
+  return allDay ? (sameDay ? fmtW(a.iso) : `${fmtW(a.iso)} to ${fmtW(b.iso)}`) + ' (all day)'
+    : sameDay ? `${fmtW(a.iso)}, ${fmtTime(hmStr(a.min))} – ${fmtTime(hmStr(b.min))}` : `${fmtW(a.iso)}${t(a)} to ${fmtW(b.iso)}${t(b)}`;
+}
+function brWindNote(st) {
+  if (st.state === 'windy' || st.state === 'closed') return '';
+  const w = brWindToday();
+  return w != null && w > DD.BRIDGE.galeKmh ? `<div class="brwarn">${I('warn')} Strong wind forecast today (up to ${Math.round(w)} km/h), so lifts may be stopped.</div>` : '';
+}
+function brCard(full = false) {
+  const st = brStatus(), [pc, pl, head] = BR_TXT[st.state];
+  const up = st.upcoming[0];
+  return `<div class="card bridge" id="brcard" data-state="${st.state}">
+    <div class="brhead"><div class="ic br">${I('bridge')}</div><div class="tx"><div class="t">Lifting bridge – Dave Culham Drive</div><div class="s">Te Matau ā Pohe</div></div><span class="pill ${pc}">${pl}</span></div>
+    <div class="brstate">${head}</div>
+    ${full ? `<div class="brsub">${brDetail(st)}</div>` : ''}
+    <div class="brnext">${brNextText(st)}</div>
+    ${up ? `<div class="brclose">${I('warn')} Planned closure: ${brClosureWhen(up)}</div>` : ''}
+    ${brWindNote(st)}
+    <div class="brnote">Not live – based on the council’s lift times</div>
+    <div class="btns"><a class="btn" id="brtraffic" href="${BRIDGE_TRAFFIC_URL}" target="_blank" rel="noopener">${I('car')} Live traffic</a>${full ? '' : `<button class="btn" onclick="go('#bridge')">Details</button>`}</div></div>`;
+}
+function brLine() {
+  const st = brStatus();
+  return `<div class="list brlist" id="brline" data-state="${st.state}"><button class="row" onclick="go('#bridge')"><div class="ic br">${I('bridge')}</div>
+    <div class="tx"><div class="t">Lifting bridge: ${BR_TXT[st.state][3]}</div><div class="s">${brNextText(st)} · Not live – based on the council’s lift times</div></div>${I('right')}</button></div>`;
+}
+function brOnHome() {
+  const m = brMode();
+  if (m === 'always' || (m === 'near' && S.settings.bridgeLoc && brNear === true)) return 'card';
+  if (m === 'near' && !S.settings.bridgeLoc) return 'line';
+  return '';
+}
+function brSeasonText(iso) {
+  const y = +iso.slice(0, 4), sum = DD.bridgeSeason(iso) === 'summer';
+  const lastSunSep = yy => { const t = Date.UTC(yy, 9, 0); return isoT(t - new Date(t).getUTCDay() * DAY); };
+  const firstSunApr = yy => { const t = Date.UTC(yy, 3, 1); return isoT(t + ((7 - new Date(t).getUTCDay()) % 7) * DAY); };
+  if (sum) { const a = iso >= lastSunSep(y) ? lastSunSep(y) : lastSunSep(y - 1), b = addDays(firstSunApr(+a.slice(0, 4) + 1), -1); return `Summer hours (${fmtY(a)} to ${fmtY(b)})`; }
+  const a = firstSunApr(y), b = addDays(lastSunSep(y), -1); return `Winter hours (${fmtY(a)} to ${fmtY(b)})`;
+}
+function Bridge() {
+  if (!CLS && !clsBusy && !clsFailed) setTimeout(() => refreshClosures(), 0);
+  const st = brStatus(), T = st.iso, we = [0, 6].includes(new Date(parseD(T)).getUTCDay());
+  const rng = ([a, b]) => `${fmtTime(hmStr(a))} – ${fmtTime(hmStr(b))}`;
+  const hours = st.hours.map(rng).join(' and ');
+  const cl = CLS ? CLS.data.closures : [];
+  const clRows = cl.map(c => {
+    const now = DD.nzClock().stamp;
+    const dates = (c.dates || []).map(d => ({ from: d.start + 'T' + (d.time || '00:00'), until: (d.end || d.start) + 'T' + (d.endTime || '23:59') })).filter(d => d.until > now).slice(0, 4);
+    return `<div class="srow"><div class="tx"><div class="t">${esc(c.title)}</div>
+      <div class="s">${esc(c.where || '')}${dates.length ? '<br>' + dates.map(brClosureWhen).map(esc).join('<br>') : ''}${c.desc ? '<br>' + esc(clip(c.desc, 240)) : ''}</div>
+      <div class="s"><a href="${esc(c.url)}" target="_blank" rel="noopener">Council notice</a></div></div></div>`;
+  }).join('');
+  const locOn = !!S.settings.bridgeLoc;
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+    header('Lifting bridge', 'Dave Culham Drive · Te Matau ā Pohe') + brCard(true) +
+    `<div class="sec">Lift times today</div>
+    <div class="list"><div class="srow"><div class="tx"><div class="t">${brSeasonText(T)}</div>
+      <div class="s">Staffed ${we ? 'today (weekend)' : 'today'}: ${hours}<br>
+      ${we ? 'No peak-traffic breaks at weekends' : 'No lifts: 7:00 am – 9:00 am and 4:00 pm – 6:00 pm (weekdays)'}<br>
+      Scheduled lift: 12:00 noon every day<br>
+      Other times: on call, usually booked ahead</div></div></div>
+      <div class="srow"><div class="tx"><div class="t">How long a lift takes</div><div class="s">About 5–7 minutes to raise and lower. The council says it lifts about 5 times a day. No lifts in gale-force wind (over 34 knots).</div></div></div></div>
+    <div class="sec">Planned closures</div>
+    ${cl.length ? `<div class="list" id="brclosures">${clRows}</div>`
+      : CLS ? `<div class="card muted" id="brclosures">No planned closures for the bridge or Dave Culham Drive on the council’s Roadworks and closures page.</div>`
+      : clsBusy ? `<div class="card muted">Checking the council’s planned closures…</div>`
+      : `<div class="muted" style="margin:0 4px">Planned closures couldn’t be checked just now.</div>`}
+    <div class="sec">Show when I’m near</div>
+    <div class="list"><div class="srow"><div class="tx"><div class="t">${locOn ? 'On' : 'Off'}</div>
+      <div class="s">${locOn ? `The card shows at the top of Home when you open the app within about 2 km of the bridge.${brDist != null ? ` You’re about ${brDist < 1000 ? Math.round(brDist / 10) * 10 + ' m' : (brDist / 1000).toFixed(1) + ' km'} away.` : ''}` : 'Uses your location only while the app is open, to put this card at the top of Home within about 2 km of the bridge.'} Your location isn’t saved.</div></div>
+      ${locOn ? `<button class="btn small" onclick="stopBridgeLoc()">Stop</button>` : `<button class="btn primary small" id="brnearbtn" onclick="enableBridgeLoc()">${I('pin')} Show when I’m near</button>`}</div></div>
+    <div class="btns"><a class="btn" href="${WDC_BRIDGE_URL}" target="_blank" rel="noopener">${I('ext')} Council bridge page</a></div>
+    <div class="foot">Lift times from Whangārei District Council. Planned closures from the council’s <a href="${WDC_CLOSURES_URL}" target="_blank" rel="noopener">Roadworks and closures</a> page. Wind from the Open-Meteo forecast. The council doesn’t publish live lift status, so this can’t tell you if the bridge is up right now.</div>`;
+}
+function updBridge(force = false) {
+  if (!S || sheetOpen) return;
+  const h = (location.hash || '#home').slice(1).split('/')[0];
+  if (h === 'bridge') { const v = $('#view'), top = v.scrollTop; render(); v.scrollTop = top; return; }
+  if (h !== 'home' && h !== '') return;
+  const want = brOnHome(), has = document.getElementById('brcard') ? 'card' : document.getElementById('brline') ? 'line' : '';
+  if (want !== has) { const v = $('#view'), top = v.scrollTop; render(); v.scrollTop = top; return; }
+  const c = document.getElementById('brcard'); if (c) c.outerHTML = brCard();
+  const l = document.getElementById('brline'); if (l) l.outerHTML = brLine();
+}
+function gotPos(pos) {
+  brLocAt = Date.now(); brDist = DD.bridgeMetres(pos.coords.latitude, pos.coords.longitude);
+  brNear = brDist <= BR_NEAR_M;
+}
+async function checkBridgeLoc(force = false) {
+  if (!S || brMode() !== 'near' || !S.settings.bridgeLoc || brLocBusy || !navigator.geolocation) return;
+  if (!force && brNear !== null && Date.now() - brLocAt < 4 * 60 * 1000) return;
+  try { if (navigator.permissions && navigator.permissions.query) { const p = await navigator.permissions.query({ name: 'geolocation' }); if (p.state !== 'granted') { brNear = null; updBridge(); return; } } } catch (e) { }
+  brLocBusy = true;
+  navigator.geolocation.getCurrentPosition(pos => { brLocBusy = false; gotPos(pos); updBridge(); }, () => { brLocBusy = false; },
+    { enableHighAccuracy: false, maximumAge: force ? 0 : 2 * 60 * 1000, timeout: 15000 }); // fresh fix when the app is opened
+}
+function enableBridgeLoc() {
+  if (!navigator.geolocation) { toast('This phone or browser can’t share your location.'); return; }
+  brLocBusy = true;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    brLocBusy = false; gotPos(pos);
+    S.settings.bridgeLoc = true; if (brMode() !== 'near') S.settings.bridgeHome = 'near';
+    await save(); render();
+    toast(brNear ? 'You’re near the bridge, so it’s now at the top of Home.' : 'Done. The bridge will show at the top of Home when you’re within about 2 km.');
+  }, err => {
+    brLocBusy = false;
+    toast(err && err.code === 1 ? 'Location wasn’t allowed, so the bridge stays as a short line on Home.' : 'Couldn’t get your location just now. Try again in a moment.');
+  }, { enableHighAccuracy: false, maximumAge: 60 * 1000, timeout: 20000 });
+}
+async function stopBridgeLoc() { S.settings.bridgeLoc = false; brNear = null; brDist = null; await save(); render(); toast('The app won’t use your location for the bridge.'); }
+async function setBridgeHome(v) { S.settings.bridgeHome = v; await save(); render(); if (v === 'near') checkBridgeLoc(true); if (v !== 'off') refreshClosures(); }
 
 /* ================= WEATHER (Open-Meteo, Whangārei) ================= */
 // Open-Meteo is free, needs no key and allows browser requests. Credit: "Weather data by Open-Meteo.com" (CC BY 4.0).
@@ -1424,6 +1607,15 @@ function Settings() {
    ${canShare ? `<button class="btn" onclick="shareBackup()">${I('share')} Share backup</button>` : ''}</div>
   <input type="file" id="importfile" accept=".json,application/json" style="display:none" onchange="importFile(this)">
 
+  <div class="sec">Lifting bridge</div>
+  <div class="list">
+   <div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">On Home</div><div class="s">The lifting bridge on Dave Culham Drive (Te Matau ā Pohe). Not live – based on the council’s lift times.</div></div>
+    <div class="seg" id="brmode" style="width:100%">${[['near', 'Near only'], ['always', 'Always on Home'], ['off', 'Off']].map(([v, l]) => `<button type="button" class="${brMode() === v ? 'on' : ''}" aria-pressed="${brMode() === v}" onclick="setBridgeHome('${v}')">${l}</button>`).join('')}</div>
+    <div class="s" style="flex-basis:100%;color:var(--ink2);font-size:13px">${brMode() === 'near' ? (S.settings.bridgeLoc ? 'Shows at the top of Home when you open the app within about 2 km of the bridge.' : 'Shows as a short line under the weather. Tap “Show when I’m near” to see it at the top of Home only when you’re close.') : brMode() === 'always' ? 'Always at the top of Home.' : 'Not on Home. It’s still under More.'}</div></div>
+   <div class="srow"><div class="tx"><div class="t">Use my location</div><div class="s">${S.settings.bridgeLoc ? 'On, only while the app is open. Your location isn’t saved.' : 'Off. Only used if you tap “Show when I’m near”.'}</div></div>
+    ${S.settings.bridgeLoc ? `<button class="btn small" onclick="stopBridgeLoc()">Stop</button>` : `<button class="btn small" onclick="enableBridgeLoc()">${I('pin')} Show when I’m near</button>`}</div>
+  </div>
+
   <div class="sec">Calendar</div>
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Show public holidays</div><div class="s">New Zealand public holidays and Auckland Anniversary Day (Northland’s regional holiday). Built in, works offline.</div></div><button class="switch ${showHolidays() ? 'on' : ''}" role="switch" aria-checked="${showHolidays()}" aria-label="Show public holidays" onclick="toggleSetting('holidays')"></button></div>
@@ -1556,9 +1748,9 @@ function render() {
   if (!S) return;
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge };
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : (map[r] || Home)();
-  tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' ? 'home' : map[r] ? r : 'home');
+  tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' || r === 'bridge' ? 'home' : map[r] ? r : 'home');
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
@@ -1575,9 +1767,11 @@ async function start() {
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
   await loadCal();
-  loadWx(); loadEvs();
+  loadWx(); loadEvs(); loadCls();
   render();
   syncFeeds(); refreshWx(); refreshEvents();
+  if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
+  checkBridgeLoc(true);
   if ('serviceWorker' in navigator) {
     let hadController = !!navigator.serviceWorker.controller, reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1596,6 +1790,8 @@ async function start() {
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     check();
     syncFeeds(); refreshWx(); refreshEvents();
+    if (brMode() !== 'off') refreshClosures();
+    checkBridgeLoc(true);
     if (swReg) swReg.update().catch(() => { });
   });
   setInterval(() => {
@@ -1603,6 +1799,7 @@ async function start() {
     if (todayISO() !== renderedDay && !sheetOpen) render();
     check();
     syncFeeds(); refreshWx();
+    updBridge(); checkBridgeLoc();
   }, 60 * 1000);
 }
 start();

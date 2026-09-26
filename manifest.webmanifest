@@ -21,6 +21,7 @@
   "shortcuts": [
     { "name": "Cars", "url": "./#cars", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Bills", "url": "./#bills", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "To-do", "url": "./#todo", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+    { "name": "To-do", "url": "./#todo", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Bridge", "short_name": "Bridge", "description": "Lifting bridge – Dave Culham Drive", "url": "./#bridge", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

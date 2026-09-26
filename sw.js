@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '1.2.1';
+const VERSION = '1.3.0';
 const CACHE = 'due-dates-' + VERSION;
 const SHELL = ['./', './index.html', './app.js', './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png',
