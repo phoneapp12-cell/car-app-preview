@@ -8,5 +8,11 @@
   "observability": { "enabled": false, "logs": { "enabled": false, "invocation_logs": false } },
   "vars": {
     "ALLOWED_ORIGIN": "https://phoneapp12-cell.github.io"
-  }
+  },
+  // Holds the public Whangārei events list and a 20-minute copy of the weather. Nothing personal.
+  "kv_namespaces": [
+    { "binding": "EVENTS_KV", "id": "471149f31c3f46bda746283ffba8b4d3" }
+  ],
+  // Every 10 minutes: refresh the events list (every 3 hours) or read a few event pages for times.
+  "triggers": { "crons": ["*/10 * * * *"] }
 }

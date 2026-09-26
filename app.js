@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.2.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -45,7 +45,20 @@ const P = {
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>',
   refresh: '<path d="M20 11a8 8 0 0 0-14.8-3.5M4 4v4h4M4 13a8 8 0 0 0 14.8 3.5M20 20v-4h-4"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
-  phoneDown: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/>'
+  phoneDown: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  cloud: '<path d="M7 19h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 10.1 4.5 4.5 0 0 0 7 19z"/>',
+  cloudsun: '<path d="M8 2.5v1.5M2.5 8H4M4.1 4.1l1 1M11.9 4.1l-1 1"/><path d="M5.2 11a3.5 3.5 0 0 1 6.2-3.6"/><path d="M9 20.5h8.5a3.5 3.5 0 0 0 .5-6.96 5 5 0 0 0-9.6-.94A4 4 0 0 0 9 20.5z"/>',
+  cloudmoon: '<path d="M11.5 7.2A4.2 4.2 0 0 1 6.3 2.5a4.2 4.2 0 0 0-1.6 7.3"/><path d="M9 20.5h8.5a3.5 3.5 0 0 0 .5-6.96 5 5 0 0 0-9.6-.94A4 4 0 0 0 9 20.5z"/>',
+  rain: '<path d="M7 14.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 5.6 4.5 4.5 0 0 0 7 14.5z"/><path d="M8.5 17.5l-1 3M12.5 17.5l-1 3M16.5 17.5l-1 3"/>',
+  drizzle: '<path d="M7 14.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 5.6 4.5 4.5 0 0 0 7 14.5z"/><path d="M8 18v.01M12 18v.01M16 18v.01M10 21v.01M14 21v.01"/>',
+  storm: '<path d="M7 14.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 5.6 4.5 4.5 0 0 0 7 14.5z"/><path d="M12.5 15.5l-2 3h3l-2 3"/>',
+  snow: '<path d="M7 14.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 5.6 4.5 4.5 0 0 0 7 14.5z"/><path d="M8 17.5v3M6.5 19h3M16 17.5v3M14.5 19h3M12 18.5v3M10.5 20h3"/>',
+  fog: '<path d="M4 8h16M3 12h18M5 16h14M8 20h8"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pin: '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  ticket: '<path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v12" stroke-dasharray="2 2.2"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
 
@@ -218,7 +231,7 @@ function Home() {
   }).join('');
   const t7 = todayT() + 7 * DAY;
   const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due');
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + cards +
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + cards + wxCard() +
     `<div class="tiles">
       <div class="tile over"><b>${over}</b><span>Overdue</span></div>
       <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
@@ -231,6 +244,7 @@ function Home() {
     ${upcoming.length ? `<div class="list">${upcoming.map(e => `<button class="row" onclick="${e.go}"><div class="ic ${e.src}" ${e.color ? `style="background:${e.color}1f;color:${e.color}"` : ''}>${I(e.src === 'bday' ? 'cake' : 'cal')}</div>
       <div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${fmtW(e.date)} · ${e.src === 'bday' ? 'Birthday' : esc(e.time)}${e.src === 'ext' ? ' · ' + esc(e.tag) : ''}</div></div></button>`).join('')}</div>`
       : empty('Nothing booked this week', 'Add appointments like a haircut or the dentist and we’ll remind you an hour before.', 'Add an appointment', 'apptForm()')}
+    ${homeEvents()}
     ${syncNote()}
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
@@ -684,7 +698,7 @@ function calItems(fromT, toT) {
   S.bills.forEach(b => billDates(b, fromT, toT).forEach(d => ev.push({ src: 'due', title: `${b.name} · ${money(b.amount)}`, date: d, time: 'Bill', go: `go('#bills')` })));
   S.drivers.forEach(d => [['aaExpiry', 'AA membership expires', 'AA'], ['licExpiry', 'driver licence expires', 'Licence']].forEach(([k, l, L]) => { if (d[k] && inR(d[k])) ev.push({ src: 'due', title: `${d.name}’s ${l}`, date: d[k], time: L, go: `go('#driver/${d.id}')` }); }));
   S.todos.filter(t => !t.done && t.due && inR(t.due)).forEach(t => ev.push({ src: 'due', title: t.title, date: t.due, time: 'To-do', go: `go('#todo')` }));
-  S.appts.filter(a => inR(a.date)).forEach(a => ev.push({ src: 'appt', title: a.title, date: a.date, time: a.time ? fmtTime(a.time) : 'All day', sort: a.time || '00:00', go: `apptForm('${a.id}')`, notes: a.notes }));
+  S.appts.filter(a => inR(a.date)).forEach(a => ev.push({ src: 'appt', title: a.title, date: a.date, time: a.time ? fmtTime(a.time) : 'All day', sort: a.time || '00:00', go: `apptForm('${a.id}')`, notes: a.notes, tag: a.evId ? 'Event' : undefined }));
   S.birthdays.forEach(b => bdayDates(b, fromT, toT).forEach(d => {
     const age = bdayAge(b, d);
     ev.push({ src: 'bday', title: `${b.name}’s ${age > 0 ? ordinal(age) + ' ' : ''}birthday`, date: d, time: 'Birthday', sort: '', tag: 'Birthday', go: `birthdayForm('${b.id}')` });
@@ -745,7 +759,8 @@ function apptForm(id, date) {
   openSheet(id ? 'Edit appointment' : 'Add an appointment',
     field('What is it?', inp('title', a.title, 'placeholder="e.g. Haircut" required maxlength="80"')) +
     `<div class="two">${field('Date', inp('date', a.date, 'type="date" required'))}${field('Time', inp('time', a.time, 'type="time"'), 'Leave blank for all day')}</div>` +
-    field('Where / notes', area('notes', a.notes)),
+    field('Where / notes', area('notes', a.notes)) +
+    (a.evUrl ? `<p class="muted" style="margin:4px 0 0">From Whangārei events. <a href="${esc(a.evUrl)}" target="_blank" rel="noopener">Open the event page</a></p>` : ''),
     async v => {
       if (!v.title) return 'Please say what the appointment is.';
       if (!parseD(v.date)) return 'Please choose a date.';
@@ -1099,14 +1114,223 @@ function More() {
   const nb = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).sort((x, y) => x.d - y.d)[0];
   const starred = S.ideas.filter(i => i.pinned).length;
   const item = (href, icon, cls, t, sub, pillHtml = '') => `<button class="row" onclick="go('${href}')"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div><div class="s">${sub}</div></div>${pillHtml}${I('right')}</button>`;
-  return header('More', 'Bills, birthdays, ideas and settings') +
+  const ne = upcomingEvents()[0];
+  return header('More', 'Events, bills, birthdays, ideas and settings') +
     `<div class="list">
+      ${item('#events', 'ticket', 'ev', 'Events', ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei')}
       ${item('#bills', 'bill', 'bill', 'Bills', S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…', over ? `<span class="pill over">${over} overdue</span>` : '')}
       ${item('#birthdays', 'cake', 'bday', 'Birthdays', nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one', nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '')}
       ${item('#ideas', 'bulb', 'idea', 'Ideas', S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down')}
       ${item('#settings', 'gear', 'set', 'Settings', 'Reminders, calendars and backup')}
     </div>
     <div class="foot">Your information is saved on this phone only.</div>`;
+}
+
+/* ================= WEATHER (Open-Meteo, Whangārei) ================= */
+// Open-Meteo is free, needs no key and allows browser requests. Credit: "Weather data by Open-Meteo.com" (CC BY 4.0).
+const WX_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-35.7251&longitude=174.3237' +
+  '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,precipitation' +
+  '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset' +
+  '&timezone=Pacific%2FAuckland&forecast_days=7&wind_speed_unit=kmh';
+const WX_MAX_AGE = 30 * 60 * 1000;
+const METSERVICE_URL = 'https://www.metservice.com/towns-cities/regions/northland/locations/whangarei';
+const OPEN_METEO_URL = 'https://open-meteo.com/';
+let WX = null, wxBusy = false, wxFailed = false;
+function loadWx() { try { const w = JSON.parse(localStorage.getItem('wx') || 'null'); WX = w && w.at && validWx(w.data) ? w : null; } catch (e) { WX = null; } }
+function validWx(d) { return !!(d && d.current && typeof d.current.temperature_2m === 'number' && d.daily && Array.isArray(d.daily.time) && d.daily.time.length); }
+async function getJSON(url, ms) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+  try { const r = await fetch(url, { signal: ctl.signal, cache: 'no-store' }); if (!r.ok) throw new Error('http ' + r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+}
+async function refreshWx(force = false) {
+  if (wxBusy || (!force && WX && Date.now() - WX.at < WX_MAX_AGE)) return;
+  wxBusy = true; if (force) updWx();
+  let data = null;
+  try { data = await getJSON(WX_URL, 10000); } catch (e) { }
+  // If Open-Meteo can't be reached from this phone (or it's busy), ask the app's own service for its 20-minute copy
+  if (!validWx(data) && RELAY_URL) { try { data = await getJSON(RELAY_URL + '/weather', 12000); } catch (e) { } }
+  wxBusy = false;
+  if (validWx(data)) { WX = { at: Date.now(), data }; wxFailed = false; try { localStorage.setItem('wx', JSON.stringify(WX)); } catch (e) { } }
+  else wxFailed = true;
+  updWx();
+}
+function updWx() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  if (h === 'weather') { render(); return; }
+  const el = document.getElementById('wxcard'); if (el) el.outerHTML = wxCard();
+}
+const WMO = {
+  0: ['Sunny', 'Clear', 'sun', 'moon'], 1: ['Mostly sunny', 'Mostly clear', 'cloudsun', 'cloudmoon'], 2: ['Partly cloudy', 'Partly cloudy', 'cloudsun', 'cloudmoon'], 3: ['Cloudy', 'Cloudy', 'cloud', 'cloud'],
+  45: ['Fog', 0, 'fog'], 48: ['Fog', 0, 'fog'], 51: ['Light drizzle', 0, 'drizzle'], 53: ['Drizzle', 0, 'drizzle'], 55: ['Heavy drizzle', 0, 'drizzle'], 56: ['Freezing drizzle', 0, 'drizzle'], 57: ['Freezing drizzle', 0, 'drizzle'],
+  61: ['Light rain', 0, 'rain'], 63: ['Rain', 0, 'rain'], 65: ['Heavy rain', 0, 'rain'], 66: ['Freezing rain', 0, 'rain'], 67: ['Freezing rain', 0, 'rain'],
+  71: ['Light snow', 0, 'snow'], 73: ['Snow', 0, 'snow'], 75: ['Heavy snow', 0, 'snow'], 77: ['Snow', 0, 'snow'],
+  80: ['Light showers', 0, 'rain'], 81: ['Showers', 0, 'rain'], 82: ['Heavy showers', 0, 'rain'], 85: ['Snow showers', 0, 'snow'], 86: ['Snow showers', 0, 'snow'],
+  95: ['Thunderstorms', 0, 'storm'], 96: ['Thunderstorms with hail', 0, 'storm'], 99: ['Thunderstorms with hail', 0, 'storm']
+};
+function wmo(code, day = true) {
+  const w = WMO[code] || ['Weather', 0, 'cloud'];
+  return { words: day || !w[1] ? w[0] : w[1], icon: day || !w[3] ? w[2] : w[3] };
+}
+const deg = n => Math.round(n) + '°';
+function wxDays() {
+  if (!WX) return [];
+  const d = WX.data.daily, T = todayISO();
+  return d.time.map((iso, i) => ({ iso, code: d.weather_code[i], hi: d.temperature_2m_max[i], lo: d.temperature_2m_min[i], rain: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null,
+    wind: d.wind_speed_10m_max ? d.wind_speed_10m_max[i] : null, sunrise: d.sunrise ? d.sunrise[i] : '', sunset: d.sunset ? d.sunset[i] : '' })).filter(x => x.iso >= T);
+}
+function wxUpdated() {
+  if (!WX) return '';
+  const off = typeof navigator !== 'undefined' && navigator.onLine === false;
+  return 'Updated ' + ago(WX.at) + (off ? ' · offline' : wxFailed ? ' · couldn’t refresh just now' : '');
+}
+function wxCard() {
+  const days = wxDays();
+  if (!WX || !days.length) {
+    const msg = wxBusy || (!wxFailed && navigator.onLine !== false) ? 'Getting the Whangārei weather…' : 'The weather isn’t available right now. Tap to try again.';
+    return `<button class="card wx wxempty" id="wxcard" onclick="refreshWx(true)">${I('cloudsun')}<span>${msg}</span></button>`;
+  }
+  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0), t = days[0].iso === todayISO() ? days[0] : null;
+  const strip = days.slice(t ? 1 : 0, (t ? 1 : 0) + 5).map(x => {
+    const w = wmo(x.code);
+    return `<div><span class="d">${WDL[new Date(parseD(x.iso)).getUTCDay()].slice(0, 3)}</span>${I(w.icon, `aria-label="${w.words}"`)}<b>${deg(x.hi)}</b><span class="lo">${deg(x.lo)}</span></div>`;
+  }).join('');
+  return `<button class="card wx" id="wxcard" onclick="go('#weather')" aria-label="Whangārei weather: ${deg(c.temperature_2m)}, ${now.words}. Tap for the full forecast.">
+    <div class="wxnow"><span class="wxic">${I(now.icon)}</span>
+      <div class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${now.words}</span></div>
+      ${t ? `<div class="wxmeta"><span>H ${deg(t.hi)} · L ${deg(t.lo)}</span>${t.rain != null ? `<span>${I('drop')} ${t.rain}% rain</span>` : ''}</div>` : ''}</div>
+    <div class="wxdays">${strip}</div>
+    <div class="wxfoot">Whangārei · ${wxUpdated()} · Open-Meteo</div></button>`;
+}
+function Weather() {
+  const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
+  const days = wxDays();
+  if (!WX || !days.length) return back + header('Weather', 'Whangārei') +
+    `<div class="card empty"><div class="t">${wxBusy ? 'Getting the weather…' : 'The weather isn’t available right now'}</div><div class="s">Check your internet connection, then try again.</div>
+     <button class="btn primary" style="flex:none;padding:12px 22px" onclick="refreshWx(true)">${I('refresh')} Try again</button></div>
+     <div class="btns"><a class="btn" href="${METSERVICE_URL}" target="_blank" rel="noopener">MetService forecast ${I('ext')}</a></div>`;
+  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0), t = days[0].iso === todayISO() ? days[0] : null;
+  const hm = s => s ? fmtTime(String(s).slice(11, 16)) : '';
+  const rows = days.map((x, i) => {
+    const w = wmo(x.code), label = x.iso === todayISO() ? 'Today' : daysLeft(x.iso) === 1 ? 'Tomorrow' : WDL[new Date(parseD(x.iso)).getUTCDay()];
+    return `<div class="row wxrow"><div class="ic wxi">${I(w.icon)}</div><div class="tx"><div class="t">${label}</div><div class="s">${w.words}${x.rain != null ? ` · ${x.rain}% rain` : ''}${x.wind != null ? ` · wind ${Math.round(x.wind)} km/h` : ''}</div></div>
+      <div class="wxhl"><b>${deg(x.hi)}</b><span>${deg(x.lo)}</span></div></div>`;
+  }).join('');
+  return back + header('Weather', 'Whangārei') +
+    `<div class="card wxbig"><div class="wxnow"><span class="wxic">${I(now.icon)}</span><div class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${now.words}</span></div></div>
+      <div class="wxfacts">
+        ${c.apparent_temperature != null ? `<div><small>Feels like</small><b>${deg(c.apparent_temperature)}</b></div>` : ''}
+        ${t ? `<div><small>High / low</small><b>${deg(t.hi)} / ${deg(t.lo)}</b></div>` : ''}
+        ${t && t.rain != null ? `<div><small>Chance of rain</small><b>${t.rain}%</b></div>` : ''}
+        ${c.wind_speed_10m != null ? `<div><small>Wind</small><b>${Math.round(c.wind_speed_10m)} km/h</b></div>` : ''}
+        ${t && t.sunrise ? `<div><small>Sunrise</small><b>${hm(t.sunrise)}</b></div><div><small>Sunset</small><b>${hm(t.sunset)}</b></div>` : ''}
+      </div></div>
+    <div class="sec">Next 7 days <button onclick="refreshWx(true)">${wxBusy ? 'Updating…' : 'Refresh'}</button></div>
+    <div class="list">${rows}</div>
+    <div class="btns"><a class="btn" href="${METSERVICE_URL}" target="_blank" rel="noopener">MetService forecast for Whangārei ${I('ext')}</a></div>
+    <div class="foot">${wxUpdated()}<br>Weather data by <a href="${OPEN_METEO_URL}" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). For warnings, check MetService.</div>`;
+}
+
+/* ================= EVENTS (Whangārei District Council "What's On", via the app's service) ================= */
+const EV_MAX_AGE = 3 * 3600 * 1000;
+const WDC_WHATSON = 'https://www.wdc.govt.nz/Events/Whats-On';
+let EVS = null, evBusy = false, evFailed = false, evQuery = '', evCat = 'All';
+function loadEvs() { try { const e = JSON.parse(localStorage.getItem('events') || 'null'); EVS = e && e.at && e.data && Array.isArray(e.data.events) ? e : null; } catch (x) { EVS = null; } }
+async function refreshEvents(force = false) {
+  if (evBusy || (!force && EVS && Date.now() - EVS.at < EV_MAX_AGE)) return;
+  if (!RELAY_URL) { evFailed = true; updEvents(); return; }
+  evBusy = true; if (force) updEvents();
+  let data = null;
+  try { data = await getJSON(RELAY_URL + '/events', 25000); } catch (e) { }
+  evBusy = false;
+  if (data && Array.isArray(data.events)) { EVS = { at: Date.now(), data }; evFailed = false; try { localStorage.setItem('events', JSON.stringify(EVS)); } catch (e) { } }
+  else evFailed = true;
+  updEvents();
+}
+function updEvents() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  if (h === 'events' || h === 'home' || h === 'more' || h === '') {
+    const v = $('#view'), top = v.scrollTop, q = document.activeElement && document.activeElement.id === 'evq';
+    render(); v.scrollTop = top;
+    if (q) { const i = document.getElementById('evq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+  }
+}
+function upcomingEvents() {
+  if (!EVS) return [];
+  const T = todayISO(), d = new Date(), hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  return EVS.data.events.filter(e => (e.end || e.date) >= T && !(e.date === T && !e.end && e.endTime && e.endTime <= hm))
+    .map(e => e.date < T ? Object.assign({}, e, { date: T }) : e);
+}
+const evById = id => (EVS ? EVS.data.events.find(e => e.id === id) : null);
+const evAppt = id => S.appts.find(a => a.evId === id);
+function evWhen(e) {
+  if (e.time) return fmtTime(e.time) + (e.endTime ? ' – ' + fmtTime(e.endTime) : '');
+  return e.timeKnown === false ? 'Time on the event page' : 'All day';
+}
+function evCats() {
+  const n = {};
+  upcomingEvents().forEach(e => (e.cats || []).forEach(c => { n[c] = (n[c] || 0) + 1; }));
+  return Object.keys(n).sort((a, b) => n[b] - n[a] || a.localeCompare(b)).slice(0, 10);
+}
+function evMatches(e) {
+  if (evCat !== 'All' && !(e.cats || []).includes(evCat)) return false;
+  const q = evQuery.trim().toLowerCase();
+  return !q || [e.title, e.venue, e.desc, (e.cats || []).join(' ')].join(' ').toLowerCase().includes(q);
+}
+function evCard(e) {
+  const a = evAppt(e.id);
+  return `<div class="card evcard" data-ev="${esc(e.id)}"><div class="evt">${esc(e.title)}</div>
+    <div class="evm">${I('clock')}<span>${esc(evWhen(e))}${e.end ? ` · until ${fmtW(e.end)}` : ''}</span></div>
+    ${e.venue ? `<div class="evm">${I('pin')}<span>${esc(e.venue)}</span></div>` : ''}
+    ${e.desc ? `<div class="evd">${esc(e.desc)}</div>` : ''}
+    ${(e.cats && e.cats.length) || e.cost ? `<div class="evtags">${(e.cats || []).map(c => `<span>${esc(c)}</span>`).join('')}${e.cost ? `<span class="cost">${esc(e.cost)}</span>` : ''}</div>` : ''}
+    <div class="btns">${a ? `<button class="btn small added" onclick="apptForm('${a.id}')" aria-label="Added to your calendar: ${esc(e.title)}">${I('check')} Added</button>`
+      : `<button class="btn small primary" onclick="addEvent(${jsArg(e.id)})" aria-label="Add to calendar: ${esc(e.title)}">${I('plus')} Add to calendar</button>`}
+      <a class="btn small" href="${esc(e.url)}" target="_blank" rel="noopener">Details ${I('ext')}</a></div></div>`;
+}
+function evList() {
+  const list = upcomingEvents().filter(evMatches);
+  if (!list.length) return `<div class="card empty"><div class="t">No events match</div><div class="s">Try another word or category.</div></div>`;
+  const groups = {};
+  list.forEach(e => (groups[e.date] = groups[e.date] || []).push(e));
+  const dayLabel = s => { const d = daysLeft(s); return (d === 0 ? 'Today · ' : d === 1 ? 'Tomorrow · ' : '') + fmtW(s); };
+  return Object.keys(groups).map(k => `<div class="agday">${dayLabel(k)}</div>${groups[k].map(evCard).join('')}`).join('');
+}
+function setEvCat(c) { evCat = c; render(); }
+function Events() {
+  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
+  const head = back + header('Events', 'What’s on in Whangārei · next 60 days');
+  const src = `<a href="${WDC_WHATSON}" target="_blank" rel="noopener">Whangārei District Council’s What’s On</a>`;
+  if (!EVS) {
+    if (evBusy || (!evFailed && navigator.onLine !== false)) return head + `<div class="card empty"><div class="t">Loading events…</div><div class="s">Getting what’s on from the council’s events page.</div></div>`;
+    return head + `<div class="card empty" id="everr"><div class="t">Couldn’t load events</div><div class="s">Check your internet connection and try again. You can also look at ${src}.</div>
+      <button class="btn primary" style="flex:none;padding:12px 22px" onclick="refreshEvents(true)">${I('refresh')} Try again</button></div>`;
+  }
+  const up = upcomingEvents(), cats = evCats();
+  return head +
+    (evFailed ? `<div class="callout">${I('wifi')}<div>Couldn’t refresh events just now. Showing the list saved on this phone (${ago(EVS.at)}). <button style="color:inherit;font-weight:700;text-decoration:underline" onclick="refreshEvents(true)">Try again</button></div></div>` : '') +
+    (up.length ? `<label class="search">${I('search')}<input id="evq" type="search" placeholder="Search events" value="${esc(evQuery)}" aria-label="Search events" oninput="evQuery=this.value;document.getElementById('evlist').innerHTML=evList()"></label>
+      ${cats.length ? `<div class="chips scroll">${['All', ...cats].map(c => `<button class="chip ${c === evCat ? 'on' : ''}" onclick="setEvCat(${jsArg(c)})">${esc(c)}</button>`).join('')}</div>` : ''}
+      <div id="evlist">${evList()}</div>`
+      : `<div class="card empty"><div class="t">No events listed for the next 60 days</div><div class="s">Have a look at ${src} for anything new.</div></div>`) +
+    `<div class="foot">Events from ${src}. Check times and details with the organiser before you go.<br>Updated ${ago(EVS.data.updated ? Date.parse(EVS.data.updated) : EVS.at)}</div>`;
+}
+async function addEvent(id) {
+  const e = evById(id);
+  if (!e || evAppt(id)) return;
+  const s = snap();
+  const notes = [e.time && e.endTime ? evWhen(e) : (!e.time && e.timeKnown === false ? 'Check the time on the event page' : ''), e.venue, e.end ? 'Runs until ' + fmtLong(e.end) : ''].filter(Boolean).join(' · ');
+  S.appts.push({ id: uid('appt'), title: e.title, date: e.date < todayISO() ? todayISO() : e.date, time: e.time || '', notes, evId: e.id, evUrl: e.url });
+  await save(); updEvents(); toast('Added to your calendar.', 'Undo', undoTo(s));
+}
+function homeEvents() {
+  const next = upcomingEvents().slice(0, 2);
+  const row = e => `<button class="row" onclick="go('#events')"><div class="ic ev">${I('ticket')}</div><div class="tx"><div class="t">${esc(e.title)}</div>
+    <div class="s">${daysLeft(e.date) === 0 ? 'Today' : fmtW(e.date)}${e.time ? ' · ' + fmtTime(e.time) : ''}${e.venue ? ' · ' + esc(e.venue.split(',')[0]) : ''}</div></div>${evAppt(e.id) ? '<span class="pill fine">Added</span>' : ''}</button>`;
+  return `<div class="sec">What’s on in Whangārei <a href="#events">All events</a></div>
+    <div class="list">${next.length ? next.map(row).join('') : `<button class="row" onclick="go('#events')"><div class="ic ev">${I('ticket')}</div><div class="tx"><div class="t">See what’s on</div><div class="s">Local events for the next 60 days</div></div>${I('right')}</button>`}</div>`;
 }
 
 /* ================= SETTINGS ================= */
@@ -1272,7 +1496,7 @@ async function installApp() {
 
 /* ---------- router ---------- */
 const TABS = [['home', 'Home', 'home'], ['cars', 'Cars', 'car'], ['calendar', 'Calendar', 'cal'], ['todo', 'To-do', 'todo'], ['more', 'More', 'more']];
-const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings'];
+const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events'];
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
@@ -1285,11 +1509,12 @@ function render() {
   if (!S) return;
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather };
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : (map[r] || Home)();
-  tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : map[r] ? r : 'home');
+  tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' ? 'home' : map[r] ? r : 'home');
 }
-window.addEventListener('online', () => { if (S) syncFeeds(); });
+window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
+window.addEventListener('offline', () => { if (S) updWx(); });
 window.addEventListener('hashchange', () => { if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
 
 /* ---------- start ---------- */
@@ -1303,8 +1528,9 @@ async function start() {
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
   await loadCal();
+  loadWx(); loadEvs();
   render();
-  syncFeeds();
+  syncFeeds(); refreshWx(); refreshEvents();
   if ('serviceWorker' in navigator) {
     let hadController = !!navigator.serviceWorker.controller, reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -1322,14 +1548,14 @@ async function start() {
     if (document.visibilityState !== 'visible') return;
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     check();
-    syncFeeds();
+    syncFeeds(); refreshWx(); refreshEvents();
     if (swReg) swReg.update().catch(() => { });
   });
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
     if (todayISO() !== renderedDay && !sheetOpen) render();
     check();
-    syncFeeds();
+    syncFeeds(); refreshWx();
   }, 60 * 1000);
 }
 start();

@@ -243,6 +243,50 @@ details.help ol{margin:0 0 12px}
 #toast button{margin-left:auto;color:#7FE0D2;font-weight:700;padding:4px 2px;flex:none}
 .foot{text-align:center;font-size:12px;color:var(--ink3);margin:20px 0 4px;line-height:1.5}
 @media (max-width:370px){ .top h1{font-size:25px} .tile{padding:10px} .tile b{font-size:23px} .triple>div{padding:7px 7px} .triple b{font-size:13.5px} .triple .pill{font-size:11px;padding:3px 6px} .btn{font-size:14px;padding:11px 10px} }
+/* weather */
+.wx{display:block;width:100%;text-align:left;margin-bottom:12px;padding:12px 14px}
+.wxnow{display:flex;align-items:center;gap:10px}
+.wxic{width:46px;height:46px;border-radius:14px;background:#FFF6DC;color:#B7791F;display:grid;place-items:center;flex:none}
+.wxic svg.i{width:30px;height:30px}
+.wxmain{display:flex;flex-direction:column;min-width:0;flex:1}
+.wxtemp{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.5px}
+.wxwords{font-size:14px;color:var(--ink2);font-weight:600;margin-top:3px}
+.wxmeta{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:13px;font-weight:650;color:var(--ink2);white-space:nowrap}
+.wxmeta span{display:inline-flex;align-items:center;gap:3px}
+.wxmeta svg.i{width:14px;height:14px;color:var(--ext)}
+.wxdays{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.wxdays>div{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:13px}
+.wxdays .d{font-size:12px;color:var(--ink3);font-weight:700}
+.wxdays svg.i{width:22px;height:22px;color:var(--ink2)}
+.wxdays b{font-weight:750}
+.wxdays .lo{color:var(--ink3);font-size:12px}
+.wxfoot{font-size:11.5px;color:var(--ink3);margin-top:8px}
+.wxempty{display:flex;align-items:center;gap:10px;color:var(--ink2);font-size:14px;font-weight:600}
+.wxempty svg.i{color:var(--ink3)}
+.wxbig .wxic{width:58px;height:58px}
+.wxbig .wxic svg.i{width:38px;height:38px}
+.wxbig .wxtemp{font-size:40px}
+.wxfacts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 8px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.wxfacts small{display:block;font-size:12px;color:var(--ink3);font-weight:600}
+.wxfacts b{font-size:15px}
+.ic.wxi{background:#FFF6DC;color:#B7791F}
+.wxhl{display:flex;flex-direction:column;align-items:flex-end;font-size:15px}
+.wxhl span{color:var(--ink3);font-size:13px}
+.foot a{color:inherit;text-decoration:underline}
+/* events */
+.ic.ev{background:#FFEDE3;color:#C2410C}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin-left:-2px;margin-right:-2px;scrollbar-width:none}
+.evcard{margin-bottom:8px;padding:13px 14px}
+.evt{font-weight:750;font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+.evm{display:flex;gap:6px;align-items:flex-start;font-size:13.5px;color:var(--ink2);margin-top:5px;line-height:1.35}
+.evm svg.i{width:16px;height:16px;margin-top:1px;color:var(--ink3)}
+.evd{font-size:14px;color:var(--ink);margin-top:7px;line-height:1.4}
+.evtags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.evtags span{font-size:12px;font-weight:650;color:var(--ink2);background:#EEF2F1;border-radius:6px;padding:2px 7px}
+.evtags .cost{background:var(--greenbg);color:var(--green)}
+.evcard .btns{margin-top:10px}
+.btn.added{background:var(--greenbg);color:var(--green)}
+.tag.appt{max-width:92px}
 </style>
 </head>
 <body>

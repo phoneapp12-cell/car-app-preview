@@ -1,4 +1,4 @@
-/* Calendar link relay for the Due Dates app.
+/* Calendar link relay for the Due Dates app (plus two fixed, read-only extras: /events and /weather).
  *
  * Why it exists: Outlook.com and Google serve private iCal (.ics) links without CORS headers,
  * so a web app on phoneapp12-cell.github.io can't read them directly. This relay fetches one
@@ -9,7 +9,12 @@
  *
  * Safety: https only, allowlisted calendar hosts only (checked again on every redirect),
  * GET upstream only, 5 MB cap, 15 s timeout, response must look like an iCalendar file.
+ *
+ * GET /events: Whangārei District Council "What's On" as JSON (see events.js). Fixed source, no input.
+ * GET /weather: Open-Meteo forecast for Whangārei, used only when the app can't reach Open-Meteo
+ * itself. Fixed location, no input, kept for 20 minutes.
  */
+import { getFeed } from './events.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -41,6 +46,7 @@ const MESSAGES = {
   bad_url: 'That is not a valid https calendar link.',
   host_not_allowed: 'Only Outlook, Google and iCloud calendar links are allowed.',
   method_not_allowed: 'Use POST with {"url": "..."}.',
+  get_only: 'Use GET.',
   forbidden_origin: 'This service only works for the Due Dates app.',
   bad_request: 'Send JSON like {"url": "https://..."}.',
   not_found: 'The calendar service says this link does not exist.',
@@ -50,7 +56,9 @@ const MESSAGES = {
   too_large: 'That calendar is bigger than 5 MB.',
   not_calendar: 'That link did not return a calendar (.ics) file.',
   too_many_redirects: 'The calendar link redirected too many times.',
-  not_found_route: 'Not found.'
+  not_found_route: 'Not found.',
+  events_unavailable: 'Local events could not be loaded right now.',
+  weather_unavailable: 'The weather could not be loaded right now.'
 };
 
 function allowedOrigins(env) {
@@ -62,7 +70,7 @@ function corsHeaders(origin, env) {
   const h = { 'Vary': 'Origin', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' };
   if (origin && allowedOrigins(env).includes(origin)) {
     h['Access-Control-Allow-Origin'] = origin;
-    h['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
+    h['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
     h['Access-Control-Allow-Headers'] = 'Content-Type';
     h['Access-Control-Max-Age'] = '86400';
     h['Access-Control-Expose-Headers'] = 'X-Feed-Status, Last-Modified, ETag';
@@ -144,6 +152,16 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     }
     return new Response('Due Dates calendar link service is running. It only answers requests from the Due Dates app.\n', { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'text/plain; charset=utf-8' } });
   }
+  if (path === '/events' || path === '/weather') {
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try {
+      const data = path === '/events' ? await getFeed(env, fetchImpl) : await getWeather(env, fetchImpl);
+      return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (e) {
+      return json(502, path === '/events' ? 'events_unavailable' : 'weather_unavailable', origin, env);
+    }
+  }
   if (path !== '/fetch') return json(404, 'not_found_route', origin, env);
   if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
   if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
@@ -169,3 +187,29 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     return json(STATUS[code], code, origin, env);
   }
 }
+
+// ---- Weather fallback (Open-Meteo, Whangārei, fixed) ----
+export const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-35.7251&longitude=174.3237' +
+  '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,precipitation' +
+  '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset' +
+  '&timezone=Pacific%2FAuckland&forecast_days=7&wind_speed_unit=kmh';
+const WEATHER_TTL = 20 * 60 * 1000;
+let wxMem = null;
+export async function getWeather(env = {}, fetchImpl = fetch, now = Date.now()) {
+  if (wxMem && now - wxMem.at < WEATHER_TTL) return wxMem.data;
+  if (env.EVENTS_KV) {
+    try { const c = await env.EVENTS_KV.get('weather-v1', { type: 'json' }); if (c && now - c.at < WEATHER_TTL) { wxMem = c; return c.data; } } catch (e) { }
+  }
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 10000);
+  let data;
+  try {
+    const r = await fetchImpl(WEATHER_URL, { headers: { 'Accept': 'application/json', 'User-Agent': 'DueDatesApp/1.0' }, signal: ctl.signal });
+    if (!r.ok) throw new Error('upstream');
+    data = await r.json();
+  } finally { clearTimeout(t); }
+  if (!data || !data.current || !data.daily || !Array.isArray(data.daily.time)) throw new Error('bad_weather');
+  wxMem = { at: now, data };
+  if (env.EVENTS_KV) { try { await env.EVENTS_KV.put('weather-v1', JSON.stringify(wxMem), { expirationTtl: 3600 }); } catch (e) { } }
+  return data;
+}
+export function resetWeather() { wxMem = null; }
