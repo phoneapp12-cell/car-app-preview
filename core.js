@@ -255,6 +255,70 @@
     return n === 1 ? (u === 'week' ? 'Every week' : u === 'month' ? 'Monthly' : 'Yearly') : `Every ${n} ${u}s`;
   }
 
+  /* ---------- my events (Calendar › Add event), optionally repeating ----------
+     { id, title, start: 'YYYY-MM-DD', time: 'HH:MM' | '', notes, repeat, until: 'YYYY-MM-DD' | '', skips: [date], moves: { date: newDate },
+       remind: 'off' | 'day' | 'before', remindAt: 'HH:MM' }
+     repeat: none | weekly | fortnightly | 4weekly | monthly (same date, last day of the month if it's short) | lastday | yearly */
+  const REPEAT_STEP = { weekly: 7, fortnightly: 14, '4weekly': 28 };
+  const dim = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate(); // days in month m (0-11)
+  // The k-th date of the series (k = 0 is the start), before skips and moves
+  function repeatNth(ev, k) {
+    const t0 = parseD(ev.start); if (t0 == null) return null;
+    if (!ev.repeat || ev.repeat === 'none') return k ? null : ev.start;
+    if (!k && ev.repeat !== 'lastday') return ev.start;
+    if (REPEAT_STEP[ev.repeat]) return isoT(t0 + k * REPEAT_STEP[ev.repeat] * DAY);
+    const d = new Date(t0), y = d.getUTCFullYear(), m = d.getUTCMonth(), day = d.getUTCDate();
+    if (ev.repeat === 'monthly' || ev.repeat === 'lastday') {
+      const yy = y + Math.floor((m + k) / 12), mm = (m + k) % 12;
+      return isoT(Date.UTC(yy, mm, ev.repeat === 'lastday' ? dim(yy, mm) : Math.min(day, dim(yy, mm))));
+    }
+    if (ev.repeat === 'yearly') return isoT(Date.UTC(y + k, m, Math.min(day, dim(y + k, m))));
+    return null;
+  }
+  // Is `iso` one of the series' own dates (before skips/moves)?
+  function isSeriesDate(ev, iso) {
+    const t = parseD(iso), t0 = parseD(ev.start); if (t == null || t0 == null || t < t0) return false;
+    if (ev.until && iso > ev.until) return false;
+    if (REPEAT_STEP[ev.repeat]) return Math.round((t - t0) / DAY) % REPEAT_STEP[ev.repeat] === 0;
+    const a = new Date(t0), b = new Date(t);
+    const k = ev.repeat === 'yearly' ? b.getUTCFullYear() - a.getUTCFullYear() : ev.repeat === 'monthly' || ev.repeat === 'lastday' ? (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + b.getUTCMonth() - a.getUTCMonth() : 0;
+    return repeatNth(ev, k) === iso;
+  }
+  // Dates of a series between two UTC-midnight times (inclusive): [{ date, orig, moved }], sorted
+  function repeatDates(ev, fromT, toT) {
+    const out = [], t0 = parseD(ev.start); if (t0 == null || toT < fromT) return out;
+    const skips = new Set(ev.skips || []), moves = ev.moves || {};
+    const endT = ev.until && parseD(ev.until) != null ? Math.min(toT, parseD(ev.until)) : toT;
+    let k = 0;
+    const step = REPEAT_STEP[ev.repeat];
+    if (step && fromT > t0) k = Math.max(0, Math.floor((fromT - t0) / (step * DAY)));
+    else if ((ev.repeat === 'monthly' || ev.repeat === 'lastday') && fromT > t0) { const a = new Date(t0), b = new Date(fromT); k = Math.max(0, (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + b.getUTCMonth() - a.getUTCMonth() - 1); }
+    else if (ev.repeat === 'yearly' && fromT > t0) k = Math.max(0, new Date(fromT).getUTCFullYear() - new Date(t0).getUTCFullYear() - 1);
+    for (let n = 0; n < 2000; n++, k++) {
+      const iso = repeatNth(ev, k); if (!iso) break;
+      const t = parseD(iso); if (t > endT) break;
+      if (t >= fromT && !skips.has(iso) && !moves[iso]) out.push({ date: iso, orig: iso, moved: false });
+    }
+    // moved dates: shown on their new day, as long as the original date is part of the series and not skipped
+    Object.keys(moves).forEach(o => { const nt = parseD(moves[o]); if (nt != null && nt >= fromT && nt <= toT && !skips.has(o) && isSeriesDate(ev, o)) out.push({ date: moves[o], orig: o, moved: true }); });
+    return out.sort((a, b) => a.date.localeCompare(b.date) || a.orig.localeCompare(b.orig));
+  }
+  const REPEAT_LABEL = { none: 'Doesn’t repeat', weekly: 'Every week', fortnightly: 'Every 2 weeks', '4weekly': 'Every 4 weeks', monthly: 'Every month on the same date', lastday: 'Every month on the last day', yearly: 'Every year' };
+  function repeatText(ev) {
+    const s = ev.start, d = dObj(s), wd = WDL[d.getUTCDay()];
+    let t;
+    switch (ev.repeat) {
+      case 'weekly': t = 'Every ' + wd; break;
+      case 'fortnightly': t = 'Every 2 weeks on ' + wd; break;
+      case '4weekly': t = 'Every 4 weeks on ' + wd; break;
+      case 'monthly': t = 'Monthly on the ' + ordinal(d.getUTCDate()) + (d.getUTCDate() > 28 ? ' (or the last day)' : ''); break;
+      case 'lastday': t = 'Monthly on the last day'; break;
+      case 'yearly': t = 'Every year on ' + d.getUTCDate() + ' ' + MONL[d.getUTCMonth()]; break;
+      default: return 'One-off';
+    }
+    return t + (ev.until ? ', until ' + fmtY(ev.until) : '');
+  }
+
   /* ---------- everything that has a due date ---------- */
   function dueItems(data, now) {
     const out = [];
@@ -375,6 +439,23 @@
         else out.push({ key, title: `${b.name}’s birthday ${inWords(d)}`, body: `${b.name}${turns ? turns + ' on' : '’s birthday is'} ${fmtW(iso, now)}.${b.notes ? ' ' + b.notes : ''}`, url: '#birthdays', days: d });
       });
     }
+    // My events: on the day or the day before, at the time chosen for each event (7 am to 8:30 pm), never between 9 pm and 7 am
+    if (daytime) {
+      const T = todayT(now);
+      (data.myEvents || []).forEach(ev => {
+        if (!ev.remind || ev.remind === 'off') return;
+        const [h, mi] = String(ev.remindAt || (ev.remind === 'before' ? '19:00' : '07:00')).split(':').map(Number);
+        repeatDates(ev, T, T + 2 * DAY).forEach(o => {
+          const r = ev.remind === 'before' ? addDays(o.date, -1) : o.date;
+          const [y, mo, d] = r.split('-').map(Number), at = new Date(y, mo - 1, d, h, mi).getTime();
+          const [y2, mo2, d2] = o.date.split('-').map(Number), end = new Date(y2, mo2 - 1, d2, 23, 59).getTime();
+          if (now.getTime() < at || now.getTime() > end) return;
+          const key = ['mine', ev.id, o.date, ev.remind].join('|'); if (fired[key]) return;
+          const dl = daysLeft(o.date, now), when = dl === 0 ? 'Today' : 'Tomorrow';
+          out.push({ key, title: `${when}: ${ev.title}${ev.time ? ' at ' + fmtTime(ev.time) : ''}`, body: `${fmtW(o.date, now)}${ev.time ? ' · ' + fmtTime(ev.time) : ' · All day'}${o.moved ? ' (moved from ' + fmtW(o.orig, now) + ')' : ''}.${ev.notes ? ' ' + ev.notes : ''}`, url: '#calendar', days: dl });
+        });
+      });
+    }
     // Events imported from Outlook / Google: 1 hour before timed events, morning of all-day ones
     (data.feeds || []).forEach(f => {
       if (f.reminders === false) return;
@@ -451,5 +532,5 @@
   }
 
   g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money,
-    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
+    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatNth, isSeriesDate, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);

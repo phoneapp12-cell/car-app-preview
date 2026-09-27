@@ -1,6 +1,6 @@
 # Car & Life Due Dates
 
-A small installable web app (PWA) for keeping track of WOF, rego and servicing for the family's cars, plus service history, drivers (AA membership and licence dates), pets (flea treatment, worming, vaccinations, grooming, vet check-ups, dog registration), bills, to-dos, appointments, birthdays and ideas, with reminders. It can also show events from an Outlook.com, Google or iCloud calendar link.
+A small installable web app (PWA) for keeping track of WOF, rego and servicing for the family's cars, plus service history, drivers (AA membership and licence dates), pets (flea treatment, worming, vaccinations, grooming, vet check-ups, dog registration), bills, to-dos, appointments, repeating events of your own (payday, rubbish day…), birthdays and ideas, with reminders. It can also show events from an Outlook.com, Google or iCloud calendar link.
 
 - Open it: https://phoneapp12-cell.github.io/car-app-preview/
 - Install it: in Chrome on Android tap ⋮ then **Add to Home screen** / **Install app**. On iPhone (Safari) tap **Share** then **Add to Home Screen**.
@@ -9,6 +9,7 @@ A small installable web app (PWA) for keeping track of WOF, rego and servicing f
 
 - New Zealand public holidays are built in and on by default (Settings › Show public holidays). No setup and no internet needed.
 - **Meal planner** (More › Meal planner): plan dinners for your cooking nights only (Friday and Saturday to start with), with ideas, suggestions, a shopping list and history. Everything is written **gluten free** (Shane has coeliac disease). See below.
+- **My events** (Calendar › Add event, v1.6.0): your own events like payday, rubbish day or recycling, one-off or repeating, with an optional reminder. See below.
 - **Pets & Vet** (More › Pets & Vet, v1.5.0): your pets with their care items – flea treatment, worming, vaccinations, grooming, vet check-ups, dog registration and your own items – with due dates on Home and the Calendar. See below.
 - **Lifting bridge – Dave Culham Drive** (Te Matau ā Pohe): the likely state of the bridge and the next change, worked out from the council's lift times. It's **not live**. Open it from Home, **More › Lifting bridge**, or the **Bridge** app shortcut (long-press the app icon on Android).
 
@@ -34,6 +35,16 @@ holiday on the same day, it isn't shown twice. The 2026–2028 dates are checked
 - **Shopping list:** tick the planned nights, then **Add to To-do** (adds the ingredients to a to-do list, Shopping by default, without duplicates) or **Copy list** (one item per line, to paste into another grocery app).
 - **Home › Upcoming meals** (v1.4.2): a card under the weather, lifting bridge and holidays, above the tiles, listing planned meals with their dates, e.g. "Fri 2 Oct – Butter chicken" with the GF marker (or "Check it's gluten free") and Tonight / Tomorrow / In N days. Only nights with a meal entered are listed – empty nights are left out – and the whole card is hidden when nothing is planned. Today's meal is included until it's ticked as cooked; after that it's upcoming cooking nights within the planner's 4 weeks, up to 6, with **See all** (showing the count when there are more) going to the planner. Tapping a meal opens that night in the planner. It replaces the old "Tonight / Tomorrow" line, so a meal never shows twice on Home. **Calendar** shows planned meals with a "Meal" tag (turn off in the planner or Settings › Calendar).
 - Saved with everything else in `S.meals`, so it's in backups. The bottom bar stays at five tabs so it fits a 360 px screen. Tested by `pwtest/meals.mjs`.
+
+## My events (repeating)
+Add from the Calendar with the **Add event** button under the month, or tap a day first ("Add event on Mon 5 Oct"). Starts empty; the form offers quick-add **Payday** (every 2 weeks), **Rubbish day** (every week) and **Recycling day** (every 2 weeks), which fill in the title and repeat.
+- **Fields:** title, start date, **All day** (default) or **At a time**, repeat, optional end date, reminder, notes. The form shows the next few dates as you go.
+- **Repeat:** Doesn't repeat, Every week, Every 2 weeks (counted from the start date), Every 4 weeks, Every month on the same date (for the 29th–31st it's on the last day in shorter months, and the form says so), Every month on the last day, Every year (29 Feb → 28 Feb in other years). Optional end date (the last date can be on it).
+- **Tap a date** on the Calendar for: **Skip this date**, **Move this date** (just that one, e.g. rubbish day after a public holiday; "Put back" undoes it), **Edit series** and **Delete series** (asks first; Undo in the message). The edit form lists skipped and moved dates with **Put back**.
+- **Calendar:** its own "My event" tag, indigo colour and "My events" legend entry. **Settings › Calendar › Show my events** turns them off on the Calendar.
+- **Home:** a small line under the weather/bridge/holidays, above the tiles: "Today: Rubbish day" with "Tomorrow: Payday" underneath (or "Tomorrow: …" on its own). Tapping it opens that day on the Calendar. Only today and tomorrow, and they're not repeated in "Coming up this week". Hidden when nothing is on.
+- **Reminders** (per event): Off, On the day, or The day before, at a time you pick between 7 am and 8:30 pm (defaults 7 am on the day, 7 pm the day before). Never between 9 pm and 7 am; moved dates are reminded on their new day, skipped dates not at all.
+- Saved in `S.myEvents` (`start`, `repeat`, `until`, `skips`, `moves`, `remind`, `remindAt`), so they're in backups; older backups restore fine. Dates are worked out in `core.js` (`repeatDates`) so the service worker reminders use the same rules. Tested by `pwtest/recurring.mjs`.
 
 ## Pets & Vet
 **More › Pets & Vet** (the bottom bar stays at five tabs). Starts empty with an **Add your first pet** button; there are no example pets.

@@ -1,8 +1,8 @@
 /* Car & Life Due Dates – the app. Data lives only on this device (IndexedDB). */
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
-  money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.5.0';
+  money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
+const APP_VERSION = '1.6.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -69,6 +69,8 @@ const P = {
   scissors: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5L20 18M8 16.5L20 6"/>',
   pill: '<path d="M10.5 3.5a5 5 0 0 1 7.07 7.07l-7 7a5 5 0 0 1-7.07-7.07zM7 7l7 7"/>',
   heart: '<path d="M12 20s-7.5-4.6-9-9.3C2 7.5 4.2 4.5 7.3 4.5c1.9 0 3.5 1 4.7 2.7 1.2-1.7 2.8-2.7 4.7-2.7 3.1 0 5.3 3 4.3 6.2C19.5 15.4 12 20 12 20z"/>',
+  repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
   ticket: '<path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v12" stroke-dasharray="2 2.2"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
@@ -90,7 +92,7 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), pets: [],
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), pets: [], myEvents: [],
     settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
@@ -109,6 +111,7 @@ function normalise(d) {
     if (c.lastService && !c.services.length) c.services.push({ id: 'svc-' + c.id + '-' + c.lastService, date: c.lastService, km: '', garage: '', cost: '', notes: '', migrated: true });
   });
   d.meals = normMeals(d.meals); // first time on 1.4.0: Fri and Sat, with the starter ideas
+  d.myEvents = normMine(d.myEvents); // 1.6.0: my events (repeating), older data has none
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
   d.version = 1;
@@ -244,9 +247,9 @@ function Home() {
       ${n ? `<span class="pill ${status(d)}">${n[0]} ${d < 0 ? 'overdue' : d === 0 ? 'today' : d + 'd'}</span>` : '<span class="pill none">No dates</span>'}</button>`;
   }).join('');
   const t7 = todayT() + 7 * DAY;
-  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'pet' && e.src !== 'hol' && e.src !== 'meal'); // due dates and pet care are in Needs attention
+  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'pet' && e.src !== 'hol' && e.src !== 'meal' && e.src !== 'mine'); // due dates and pet care are in Needs attention; my events in the Today / Tomorrow line
   const br = brOnHome();
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() + homeMeal() +
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() + homeMine() + homeMeal() +
     `<div class="tiles">
       <div class="tile over"><b>${over}</b><span>Overdue</span></div>
       <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
@@ -722,7 +725,8 @@ function calItems(fromT, toT) {
   extEvents(fromT, toT).forEach(x => ev.push(x));
   mealCalItems(inR).forEach(x => ev.push(x));
   petCalItems(inR).forEach(x => ev.push(x));
-  const rank = { due: 0, pet: 0, hol: 1, bday: 1, appt: 2, ext: 2, meal: 3 };
+  mineItems(fromT, toT).forEach(x => ev.push(x));
+  const rank = { due: 0, pet: 0, hol: 1, bday: 1, appt: 2, mine: 2, ext: 2, meal: 3 };
   return ev.sort((a, b) => parseD(a.date) - parseD(b.date) || rank[a.src] - rank[b.src] || (a.sort || '').localeCompare(b.sort || ''));
 }
 /* NZ public holidays: built in (core.js), on unless turned off in Settings */
@@ -801,9 +805,10 @@ function Calendar() {
   return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
     `<div class="card"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
-     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${showPetsCal() && S.pets.some(p => p.care.some(c => careDue(c))) ? '<span><i class="dot" style="background:var(--pet)"></i>Pets</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
+     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${showMine() && S.myEvents.length ? '<span><i class="dot" style="background:var(--mine)"></i>My events</span>' : ''}${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${showPetsCal() && S.pets.some(p => p.care.some(c => careDue(c))) ? '<span><i class="dot" style="background:var(--pet)"></i>Pets</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
       ${y !== now.getFullYear() || m !== now.getMonth() ? `<button style="margin-left:auto;color:var(--brand);font-weight:700" onclick="calMonth=null;calSel=null;render()">Back to today</button>` : ''}</div>
      <div class="grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>
+    <div class="btns addev"><button class="btn primary" id="addevent" onclick="mineForm(null${calSel !== null ? `,'${isoT(calSel)}'` : ''})">${I('plus')} Add event${calSel !== null ? ' on ' + fmtW(isoT(calSel)) : ''}</button></div>
     ${agenda}
     ${S.feeds.length ? syncNote(true) : `<div class="callout blue" style="margin-top:16px">${I('link')}<div><b>Bring in your Outlook or Google calendar.</b> Paste your calendar link once and your appointments show up here, with reminders.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="go('#settings');setTimeout(()=>{const x=document.getElementById('calsec');x&&x.scrollIntoView()},50)">Connect a calendar</button></div></div></div>`}`;
@@ -1554,6 +1559,135 @@ function mealCalItems(inR) {
   return Object.entries(M().plan).filter(([d]) => inR(d)).map(([d, e]) => ({ src: 'meal', title: e.title, date: d, time: 'Dinner', sort: '18:00', tag: 'Meal', notes: e.notes || (e.cooked ? 'Cooked' : ''), go: `mealNight('${d}')` }));
 }
 
+/* ================= MY EVENTS (Calendar › Add event), e.g. payday, rubbish day ================= */
+// S.myEvents: see core.js (repeatDates). Shown on the Calendar ("My events"), on Home as a Today / Tomorrow line, with optional reminders.
+const REPEATS_ORDER = ['none', 'weekly', 'fortnightly', '4weekly', 'monthly', 'lastday', 'yearly'];
+const MINE_SUGGEST = [['Payday', 'fortnightly'], ['Rubbish day', 'weekly'], ['Recycling day', 'fortnightly']];
+const REMIND_TIMES = (() => { const o = []; for (let m = 7 * 60; m <= 20 * 60 + 30; m += 30) { const v = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); o.push([v, fmtTime(v)]); } return o; })();
+const showMine = () => !S.settings || S.settings.mineCal !== false;
+async function toggleMineCal() { S.settings.mineCal = !showMine(); await save(); render(); }
+const getMine = id => S.myEvents.find(e => e.id === id);
+function normMine(list) {
+  return (Array.isArray(list) ? list : []).filter(e => e && e.id && parseD(e.start) != null).map(e => {
+    e.title = String(e.title || 'Event'); if (!REPEATS_ORDER.includes(e.repeat)) e.repeat = 'none';
+    ['time', 'notes', 'until', 'remindAt'].forEach(k => { if (typeof e[k] !== 'string') e[k] = ''; });
+    if (!['off', 'day', 'before'].includes(e.remind)) e.remind = 'off';
+    if (!Array.isArray(e.skips)) e.skips = [];
+    if (!e.moves || typeof e.moves !== 'object' || Array.isArray(e.moves)) e.moves = {};
+    return e;
+  });
+}
+// Calendar entries for my events between two UTC-midnight times
+function mineItems(fromT, toT, all = false) {
+  if (!all && !showMine()) return [];
+  const out = [];
+  S.myEvents.forEach(ev => repeatDates(ev, fromT, toT).forEach(o => out.push({ src: 'mine', title: ev.title, date: o.date, time: ev.time ? fmtTime(ev.time) : 'All day', hm: ev.time, sort: ev.time || '00:00', tag: 'My event',
+    notes: [ev.repeat === 'none' ? '' : repeatText(ev), o.moved ? 'Moved from ' + fmtW(o.orig) : '', ev.notes ? ev.notes.split('\n')[0].slice(0, 60) : ''].filter(Boolean).join(' · '),
+    go: `mineSheet('${ev.id}','${o.orig}')` })));
+  return out;
+}
+function homeMine() {
+  const T = todayT(), day = t => mineItems(t, t, true).sort((a, b) => (a.hm || '').localeCompare(b.hm || ''));
+  const td = day(T), tm = day(T + DAY);
+  if (!td.length && !tm.length) return '';
+  const lab = l => l.map(e => esc(e.title) + (e.hm ? ' ' + fmtTime(e.hm) : '')).join(', ');
+  const first = td.length ? T : T + DAY;
+  const t = td.length ? 'Today: ' + lab(td) : 'Tomorrow: ' + lab(tm);
+  const s = td.length ? (tm.length ? 'Tomorrow: ' + lab(tm) : 'Nothing tomorrow') : fmtW(isoT(T + DAY));
+  return `<div class="list minehome" id="minehome"><button class="row" onclick="calOpenDay(${first})"><div class="ic mine">${I('repeat')}</div>
+    <div class="tx"><div class="t">${t}</div><div class="s">${s}</div></div>${I('right')}</button></div>`;
+}
+function calOpenDay(t) { const d = new Date(t); calMonth = { y: d.getUTCFullYear(), m: d.getUTCMonth() }; calSel = t; go('#calendar'); }
+function mineForm(id, date) {
+  const ev = id ? getMine(id) : { title: '', start: date || (calSel != null ? isoT(calSel) : todayISO()), time: '', notes: '', repeat: 'none', until: '', remind: 'off', remindAt: '' };
+  if (!ev) return;
+  const changed = id ? [...ev.skips.map(d => [d, 'skip']), ...Object.keys(ev.moves).map(d => [d, 'move'])].sort((a, b) => a[0].localeCompare(b[0])) : [];
+  openSheet(id ? 'Edit event' : 'Add event',
+    (id ? '' : `<div class="chips minesuggest">${MINE_SUGGEST.map(([t, r]) => `<button type="button" class="chip" data-t="${t}" data-r="${r}">${I('plus')} ${t}</button>`).join('')}</div>`) +
+    field('Title', inp('title', ev.title, 'placeholder="e.g. Payday" required maxlength="60"')) +
+    field('Start date', inp('start', ev.start, 'type="date" required')) +
+    `<div class="field"><span>Time</span>${segHtml('when', [['allday', 'All day'], ['time', 'At a time']], ev.time ? 'time' : 'allday')}</div>` +
+    `<div id="timebox" style="${ev.time ? '' : 'display:none'}">${field('At', inp('time', ev.time, 'type="time"'))}</div>` +
+    field('Repeat', sel('repeat', REPEATS_ORDER.map(k => [k, REPEAT_LABEL[k]]), ev.repeat)) +
+    `<p class="muted rephint" id="rephint"></p>` +
+    `<div id="untilbox">${field('End date (optional)', inp('until', ev.until, 'type="date"'), 'Leave blank to keep repeating.')}</div>` +
+    `<div class="two">${field('Reminder', sel('remind', [['off', 'Off'], ['day', 'On the day'], ['before', 'The day before']], ev.remind))}<div id="rtimebox">${field('At', sel('remindAt', REMIND_TIMES, ev.remindAt || (ev.remind === 'before' ? '19:00' : '07:00')))}</div></div>` +
+    field('Notes', area('notes', ev.notes, 'Optional')) +
+    (changed.length ? `<div class="field"><span>Changed dates</span><div class="list changed">${changed.map(([d, k]) => `<div class="srow" data-changed="${d}"><div class="tx"><div class="t">${fmtW(d)}</div><div class="s">${k === 'skip' ? 'Skipped' : 'Moved to ' + fmtW(ev.moves[d])}</div></div><button type="button" class="btn small" onclick="putBack('${id}','${d}',this)">Put back</button></div>`).join('')}</div></div>` : ''),
+    async v => {
+      if (!v.title) return 'Please give the event a title.';
+      if (!parseD(v.start)) return 'Please choose the start date.';
+      const time = v.when === 'time' ? v.time : '';
+      if (v.when === 'time' && !/^\d{2}:\d{2}$/.test(time)) return 'Please choose a time, or pick “All day”.';
+      const until = v.repeat === 'none' ? '' : v.until;
+      if (until && (!parseD(until) || until < v.start)) return 'The end date can’t be before the start date.';
+      const s = snap(), upd = { title: v.title, start: v.start, time, repeat: v.repeat, until, notes: v.notes, remind: v.remind, remindAt: v.remind === 'off' ? '' : v.remindAt };
+      if (id) Object.assign(ev, upd); else S.myEvents.push(Object.assign({ id: uid('myev'), skips: [], moves: {} }, upd));
+      await save(); render();
+      toast(id ? 'Event updated.' : `${v.title} added${v.repeat === 'none' ? '' : ' · ' + repeatText(upd).toLowerCase()}.`, 'Undo', undoTo(s));
+    }, id ? 'Save' : 'Add event',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete event" onclick="deleteMine('${id}')">${I('trash')}</button>` : '');
+  const f = $('#sf');
+  const upd = () => {
+    const x = { start: f.start.value, repeat: f.repeat.value, until: f.until.value };
+    $('#untilbox').style.display = x.repeat === 'none' ? 'none' : '';
+    $('#rtimebox').style.visibility = f.remind.value === 'off' ? 'hidden' : 'visible';
+    const h = $('#rephint'); if (!parseD(x.start)) { h.textContent = ''; return; }
+    const day = +x.start.slice(8), next = repeatDates(x, parseD(x.start), parseD(x.start) + 800 * DAY).slice(0, 4).map(o => fmtW(o.date));
+    h.textContent = x.repeat === 'none' ? `On ${fmtLong(x.start)}.` : `${repeatText(x)}. Next: ${next.join(', ')}${next.length === 4 ? '…' : ''}` +
+      (x.repeat === 'monthly' && day > 28 ? ` In months without a ${ordinal(day)}, it’s on the last day of the month.` : '') + (x.repeat === 'fortnightly' ? ' Counted from the start date.' : '');
+  };
+  f.querySelectorAll('input,select').forEach(x => { x.addEventListener('input', upd); x.addEventListener('change', upd); });
+  f.remind.addEventListener('change', () => { if (f.remind.value === 'before' && f.remindAt.value === '07:00') f.remindAt.value = '19:00'; if (f.remind.value === 'day' && f.remindAt.value === '19:00') f.remindAt.value = '07:00'; upd(); });
+  wireSeg('when', w => { $('#timebox').style.display = w === 'time' ? '' : 'none'; if (w === 'time' && !f.time.value) f.time.value = '09:00'; });
+  f.querySelectorAll('.minesuggest .chip').forEach(b => b.onclick = () => { f.title.value = b.dataset.t; f.repeat.value = b.dataset.r; upd(); });
+  upd();
+}
+async function putBack(id, d, btn) {
+  const ev = getMine(id); ev.skips = ev.skips.filter(x => x !== d); delete ev.moves[d];
+  await save(); const r = btn.closest('.srow'); r.querySelector('.s').textContent = 'Back on ' + fmtW(d); btn.remove(); toast(`${ev.title} is back on ${fmtW(d)}.`);
+}
+function mineSheet(id, orig) {
+  const ev = getMine(id); if (!ev) return;
+  const cur = (ev.moves || {})[orig] || orig, moved = cur !== orig, rep = ev.repeat !== 'none';
+  openSheet(esc(ev.title), `<div class="dcard"><div class="h"><i class="dot" style="background:var(--mine)"></i> My event</div>
+      <div class="big" style="font-size:18px">${fmtLong(cur)}</div>
+      <div class="muted" style="margin-top:4px">${ev.time ? fmtTime(ev.time) : 'All day'} · ${esc(repeatText(ev))}${moved ? `<br>Moved from ${fmtW(orig)}` : ''}${ev.remind !== 'off' ? `<br>Reminder ${ev.remind === 'day' ? 'on the day' : 'the day before'} at ${fmtTime(ev.remindAt)}` : ''}</div>
+      ${ev.notes ? `<div class="muted notes" style="margin-top:6px">${esc(ev.notes)}</div>` : ''}</div>
+    <div class="minebtns">
+      ${rep ? `<button type="button" class="btn" onclick="skipDate('${id}','${orig}')">${I('x')} Skip this date</button><button type="button" class="btn" onclick="moveForm('${id}','${orig}')">${I('cal')} Move this date</button>` : ''}
+      ${moved ? `<button type="button" class="btn" onclick="unmove('${id}','${orig}')">${I('refresh')} Put back on ${fmtW(orig)}</button>` : ''}
+      <button type="button" class="btn" onclick="mineForm('${id}')">${I('edit')} Edit ${rep ? 'series' : 'event'}</button>
+      <button type="button" class="btn danger" onclick="deleteMine('${id}')">${I('trash')} Delete ${rep ? 'series' : 'event'}</button></div>`, null);
+}
+async function skipDate(id, orig) {
+  const ev = getMine(id), s = snap(); if (!ev.skips.includes(orig)) ev.skips.push(orig); delete ev.moves[orig];
+  await save(); await closeSheet(); render(); toast(`${ev.title} skipped on ${fmtW(orig)}.`, 'Undo', undoTo(s));
+}
+async function unmove(id, orig) {
+  const ev = getMine(id), s = snap(); delete ev.moves[orig];
+  await save(); await closeSheet(); render(); toast(`${ev.title} is back on ${fmtW(orig)}.`, 'Undo', undoTo(s));
+}
+function moveForm(id, orig) {
+  const ev = getMine(id); if (!ev) return;
+  openSheet(`Move ${esc(ev.title)}`, `<p class="muted" style="margin:-4px 0 12px">Just this one: ${fmtLong(orig)}. The rest of the series stays the same.</p>` +
+    field('New date', inp('date', ev.moves[orig] || addDays(orig, 1), 'type="date" required')),
+    async v => {
+      if (!parseD(v.date)) return 'Please choose the new date.';
+      const s = snap();
+      if (v.date === orig) delete ev.moves[orig]; else ev.moves[orig] = v.date;
+      ev.skips = ev.skips.filter(x => x !== orig);
+      await save(); render(); toast(v.date === orig ? `${ev.title} is back on ${fmtW(orig)}.` : `${ev.title} moved from ${fmtW(orig)} to ${fmtW(v.date)}.`, 'Undo', undoTo(s));
+    }, 'Move');
+}
+function deleteMine(id) {
+  const ev = getMine(id); if (!ev) return;
+  confirmSheet(`Delete ${esc(ev.title)}?`, ev.repeat === 'none' ? 'It will be removed from the Calendar.' : 'Every date in this series will be removed from the Calendar.', ev.repeat === 'none' ? 'Delete event' : 'Delete series', async () => {
+    const s = snap(); S.myEvents = S.myEvents.filter(x => x.id !== id); await save();
+    return () => { render(); toast(`${ev.title} deleted.`, 'Undo', undoTo(s)); };
+  });
+}
+
 /* ================= PETS & VET (More › Pets & Vet) ================= */
 // S.pets = [{ id, name, type: 'dog'|'cat'|'other', breed, birthday, chip, vet, vetPhone, notes, care: [care item], history: [{ id, careId, name, date, notes, cost }] }]
 // Care items and their due dates are worked out in core.js (careDue), so the service worker can remind too.
@@ -2203,7 +2337,8 @@ function Settings() {
    Service: 14 days before. Bills: 3 days before and on the day. To-dos: on the day.<br>
    Appointments and connected calendars: 1 hour before (all-day ones in the morning).<br>
    Birthdays: 3 days before and on the day, never between 9 pm and 7 am.<br>
-   Pets: 3 days before and on the day, never between 9 pm and 7 am.<br><br>
+   Pets: 3 days before and on the day, never between 9 pm and 7 am.<br>
+   My events: if you turn it on for the event, on the day or the day before at the time you pick.<br><br>
    Reminders are checked every time you open the app. Background checks skip 9 pm to 7 am.
    <b>Android may delay background reminders if you don’t open the app for a while.</b> Opening it every few days keeps them coming.</div></div>
 
@@ -2230,6 +2365,7 @@ function Settings() {
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Show public holidays</div><div class="s">New Zealand public holidays and Auckland Anniversary Day (Northland’s regional holiday). Built in, works offline.</div></div><button class="switch ${showHolidays() ? 'on' : ''}" role="switch" aria-checked="${showHolidays()}" aria-label="Show public holidays" onclick="toggleSetting('holidays')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show planned meals</div><div class="s">Meals from the Meal planner, tagged “Meal”.</div></div><button class="switch ${showMealsCal() ? 'on' : ''}" role="switch" aria-checked="${showMealsCal()}" aria-label="Show planned meals on the Calendar" onclick="toggleMealsCal()"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Show my events</div><div class="s">Your own events like payday or rubbish day, tagged “My event”.</div></div><button class="switch ${showMine() ? 'on' : ''}" role="switch" aria-checked="${showMine()}" aria-label="Show my events on the Calendar" onclick="toggleMineCal()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show pets</div><div class="s">Flea treatment, vaccinations and other pet care from Pets &amp; Vet, tagged “Pet”.</div></div><button class="switch ${showPetsCal() ? 'on' : ''}" role="switch" aria-checked="${showPetsCal()}" aria-label="Show pet care on the Calendar" onclick="togglePetsCal()"></button></div>
   </div>
 
@@ -2328,7 +2464,7 @@ function importFile(input) {
     const d = obj && obj.data ? obj.data : obj;
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
-    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')} and ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}.`, 'Restore', async () => {
+    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')} and ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own.`, 'Restore', async () => {
       const s = snap(); S = normalise(d); const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };

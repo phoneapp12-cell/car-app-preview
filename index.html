@@ -18,7 +18,7 @@
   --bg:#F4F6F5; --card:#fff; --ink:#15201D; --ink2:#51605B; --ink3:#86938F; --line:#E4E9E7;
   --brand:#0F766E; --brand2:#E6F4F1;
   --red:#C62828; --redbg:#FDE8E8; --amber:#A15C07; --amberbg:#FEF1D6; --green:#1B7A3E; --greenbg:#E3F5E9;
-  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8; --hol:#C2410C; --meal:#65A30D; --pet:#8B5A2B;
+  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8; --hol:#C2410C; --meal:#65A30D; --pet:#8B5A2B; --mine:#4338CA;
   --radius:18px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -301,6 +301,17 @@ details.help ol{margin:0 0 12px}
 .row.mealup .t{font-size:15px}
 .row.mealup svg.i{width:18px;height:18px;color:var(--ink3);flex:none}
 .row.meal.flash{background:#F0FDF4;transition:background .3s}
+/* My events (1.6.0) */
+.ic.mine{background:#E0E7FF;color:var(--mine)} .tag.mine{background:var(--mine)} .minehome{margin:0 0 12px}
+.btns.addev{margin:0 0 4px}
+.minebtns{display:grid;gap:8px;margin:4px 0 8px}
+.minebtns .btn{width:100%}
+.rephint{font-size:13.5px;margin:-4px 2px 12px;line-height:1.4}
+.minesuggest{margin-bottom:12px}
+.minesuggest .chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);box-shadow:none}
+.minesuggest .chip svg.i{width:15px;height:15px}
+.list.changed{border:1px solid var(--line);box-shadow:none}
+.list.changed .srow:first-child{border-top:0}
 /* Pets & Vet (1.5.0) */
 .ic.pet{background:#F5EBDD;color:var(--pet)} .tag.pet{background:var(--pet)}
 .petpic svg.i{stroke:#fff}
