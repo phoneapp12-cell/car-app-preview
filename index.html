@@ -18,7 +18,7 @@
   --bg:#F4F6F5; --card:#fff; --ink:#15201D; --ink2:#51605B; --ink3:#86938F; --line:#E4E9E7;
   --brand:#0F766E; --brand2:#E6F4F1;
   --red:#C62828; --redbg:#FDE8E8; --amber:#A15C07; --amberbg:#FEF1D6; --green:#1B7A3E; --greenbg:#E3F5E9;
-  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8; --hol:#C2410C; --meal:#65A30D; --pet:#8B5A2B; --mine:#4338CA;
+  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8; --hol:#C2410C; --meal:#65A30D; --pet:#8B5A2B; --health:#0E7490; --mine:#4338CA;
   --radius:18px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px); --tabh:64px;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -313,6 +313,18 @@ details.help ol{margin:0 0 12px}
 .list.changed .srow:first-child{border-top:0}
 /* Pets & Vet (1.5.0) */
 .ic.pet{background:#F5EBDD;color:var(--pet)} .tag.pet{background:var(--pet)}
+/* Health (1.8.0) */
+.ic.health{background:#DDF1F5;color:var(--health)} .tag.health{background:var(--health)}
+.hpic{background:var(--health);color:#fff;font-weight:800;font-size:19px;letter-spacing:.3px}
+.hero .hpic{font-size:23px}
+.pill.booked{color:var(--health);background:#DDF1F5}
+.hrow .hbtns{display:flex;align-items:center;gap:6px;flex:none}
+.hrow .hcall{width:38px;height:38px;box-shadow:none;background:#E8F4F7;color:var(--health)}
+.hrow .hcall svg.i{width:18px;height:18px}
+.hrow.flash{animation:hflash 2s ease}
+@keyframes hflash{0%,45%{background:#DDF1F5}100%{background:transparent}}
+.hquick,.hpeople{margin-bottom:6px}
+.hnotes{margin-bottom:4px}
 .petpic svg.i{stroke:#fff}
 .petcard .carhead>svg.i{color:var(--ink3);width:18px;height:18px;flex:none}
 .petnext{margin-top:12px;border-top:1px solid var(--line)}

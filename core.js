@@ -227,6 +227,27 @@
     check: { name: 'Vet check-up', every: 1, unit: 'years' },
     reg: { name: 'Dog registration', every: 1, unit: 'years' }
   };
+  // Health (1.8.0): suggested check-up types and their usual intervals (all editable). every 0 / unit 'none' = doesn't repeat.
+  const HEALTH_TYPES = {
+    dentist: { name: 'Dentist', every: 6, unit: 'months' },
+    doctor: { name: 'Doctor check-up', every: 1, unit: 'years' },
+    chiro: { name: 'Chiropractor', every: 4, unit: 'weeks' },
+    opto: { name: 'Optometrist', every: 2, unit: 'years' },
+    hyg: { name: 'Hygienist', every: 6, unit: 'months' },
+    physio: { name: 'Physio', every: 0, unit: 'none' },
+    skin: { name: 'Skin check', every: 1, unit: 'years' },
+    flu: { name: 'Flu jab', every: 1, unit: 'years', note: 'Usually in autumn (March to May).' },
+    script: { name: 'Prescription repeat', every: 3, unit: 'months' }
+  };
+  // Booked health appointments between two dates (UTC day numbers), for the Calendar, Home and reminders
+  function healthAppts(data, fromT, toT) {
+    const out = [];
+    (data.health || []).forEach(p => (p.items || []).forEach(it => {
+      const t = parseD(it.apptDate); if (t == null || t < fromT || t > toT) return;
+      out.push({ person: p, item: it, date: it.apptDate, time: it.apptTime || '', title: p.name + ' – ' + it.name });
+    }));
+    return out.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  }
   function addInterval(s, n, unit) {
     n = Math.max(1, Math.round(+n || 1));
     return unit === 'weeks' ? addDays(s, 7 * n) : unit === 'years' ? addMonths(s, 12 * n) : addMonths(s, n);
@@ -336,6 +357,12 @@
       const date = careDue(it, now);
       if (date) out.push({ kind: 'pet', part: 'care', id: p.id + ':' + it.id, pet: p, care: it, title: p.name + ': ' + it.name, date, go: '#pet/' + p.id });
     }));
+    // Health check-ups. A booked appointment (today or later) stands in for the due date until it's done.
+    (data.health || []).forEach(p => (p.items || []).forEach(it => {
+      if (it.apptDate && it.apptDate >= todayISO(now)) return;
+      const date = careDue(it, now);
+      if (date) out.push({ kind: 'health', part: 'hcheck', id: p.id + ':' + it.id, person: p, item: it, title: p.name + ' – ' + it.name, date, go: '#health/' + p.id + '/' + it.id });
+    }));
     (data.todos || []).filter(t => !t.done && t.due).forEach(t => out.push({ kind: 'todo', part: 'todo', id: t.id, todo: t, title: t.title, date: t.due, go: '#todo' }));
     out.forEach(x => { x.days = daysLeft(x.date, now); });
     return out.sort((a, b) => a.days - b.days || a.title.localeCompare(b.title));
@@ -381,6 +408,8 @@
     // AA membership and driver licence: 30, 14 and 3 days before, and on the day (or once, if already expired)
     // Pet care: 3 days before and on the day (once, if already overdue)
     if (x.part === 'care') { if (d <= 0) return 'd0'; if (d <= 3) return 's3'; return null; }
+    // Health check-ups: the same, 3 days before and on the day
+    if (x.part === 'hcheck') { if (d <= 0) return 'd0'; if (d <= 3) return 's3'; return null; }
     if (x.part === 'aa' || x.part === 'lic') { if (d > 30) return null; if (d > 14) return 's30'; if (d > 3) return 's14'; if (d > 0) return 's3'; return 'd0'; }
     return null;
   }
@@ -416,6 +445,11 @@
       if (d < 0) return { title: `${n}: ${what} overdue`, body: `It was due ${fmtW(x.date, now)}. Tap Done once it’s sorted.` };
       return { title: `${n}: ${what} ${d === 0 ? 'due today' : 'due ' + when}`, body: `Due ${fmtW(x.date, now)}.${x.pet.vet ? ' ' + x.pet.vet + (x.pet.vetPhone ? ' · ' + x.pet.vetPhone : '') : ''}` };
     }
+    if (x.kind === 'health') {
+      const it = x.item, where = [it.clinic, it.phone].filter(Boolean).join(' · ');
+      if (d < 0) return { title: `${x.title} overdue`, body: `It was due ${fmtW(x.date, now)}.${where ? ' ' + where + '.' : ''} Book it in, or tap Done if it’s sorted.` };
+      return { title: `${x.title} ${d === 0 ? 'due today' : 'due ' + when}`, body: `Due ${fmtW(x.date, now)}.${where ? ' ' + where + '.' : ''} Time to book it in.` };
+    }
     return { title: d < 0 ? `To-do overdue: ${x.title}` : `To-do today: ${x.title}`, body: d < 0 ? `It was due ${fmtW(x.date, now)}.` : 'Tap to tick it off.' };
   }
 
@@ -425,7 +459,7 @@
     const out = [];
     const daytime = !quietNow(now);
     dueItems(data, now).forEach(x => {
-      if ((x.kind === 'driver' || x.kind === 'pet') && !daytime) return; // AA / licence / pet reminders wait until 7 am
+      if ((x.kind === 'driver' || x.kind === 'pet' || x.kind === 'health') && !daytime) return; // AA / licence / pet / health reminders wait until 7 am
       const st = stage(x); if (!st) return;
       const key = [x.kind, x.id, x.part, x.date, st].join('|');
       if (fired[key]) return;
@@ -475,6 +509,24 @@
           const dl = daysLeft(o.date, now), when = dl === 0 ? 'Today' : 'Tomorrow';
           out.push({ key, title: `${when}: ${ev.title}${ev.time ? ' at ' + fmtTime(ev.time) : ''}`, body: `${fmtW(o.date, now)}${ev.time ? ' · ' + fmtTime(ev.time) : ' · All day'}${o.moved ? ' (moved from ' + fmtW(o.orig, now) + ')' : ''}.${ev.notes ? ' ' + ev.notes : ''}`, url: '#calendar', days: dl });
         });
+      });
+    }
+    // Booked health appointments: the evening before at 7 pm, and 2 hours before if that's in waking hours (7 am to 9 pm)
+    if (daytime) {
+      const T = todayT(now);
+      healthAppts(data, T, T + DAY).forEach(a => {
+        const [y, mo, d] = a.date.split('-').map(Number), at = a.time ? ' at ' + fmtTime(a.time) : '';
+        const where = [a.item.clinic, a.item.phone].filter(Boolean).join(' · ');
+        const eve = new Date(y, mo - 1, d - 1, 19, 0).getTime(), eveEnd = new Date(y, mo - 1, d - 1, 23, 59).getTime();
+        const k1 = ['happt', a.person.id + ':' + a.item.id, a.date, 'eve'].join('|');
+        if (now.getTime() >= eve && now.getTime() <= eveEnd && !fired[k1])
+          out.push({ key: k1, title: `Tomorrow: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`, body: `Health appointment ${fmtW(a.date, now)}${at}.${where ? ' ' + where + '.' : ''}`, url: '#health/' + a.person.id + '/' + a.item.id, days: 1 });
+        if (a.time) {
+          const [h, mi] = a.time.split(':').map(Number), start = new Date(y, mo - 1, d, h, mi).getTime(), rt = start - 2 * 3600 * 1000;
+          const k2 = ['happt', a.person.id + ':' + a.item.id, a.date + 'T' + a.time, 'h2'].join('|');
+          if (!quietNow(new Date(rt)) && now.getTime() >= rt && now.getTime() < start && !fired[k2])
+            out.push({ key: k2, title: `${a.title}${at}`, body: `In about ${Math.max(1, Math.round((start - now.getTime()) / 3600000))} hour${Math.round((start - now.getTime()) / 3600000) > 1 ? 's' : ''}.${where ? ' ' + where + '.' : ''}`, url: '#health/' + a.person.id + '/' + a.item.id, days: 0 });
+        }
       });
     }
     // Commission (if turned on): 9 am the next morning, only if nothing has been entered for yesterday
@@ -560,5 +612,5 @@
   }
 
   g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money,
-    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatNth, isSeriesDate, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, isMonday, lastMonday, fortnightOf, commSum, taxYearOf, centsMoney, parseCents, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
+    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatNth, isSeriesDate, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, HEALTH_TYPES, healthAppts, isMonday, lastMonday, fortnightOf, commSum, taxYearOf, centsMoney, parseCents, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);

@@ -11,6 +11,7 @@ A small installable web app (PWA) for keeping track of WOF, rego and servicing f
 - **Meal planner** (More › Meal planner): plan dinners for your cooking nights only (Friday and Saturday to start with), with ideas, suggestions, a shopping list and history. Everything is written **gluten free** (Shane has coeliac disease). See below.
 - **Commission** (More › Commission, v1.7.0): enter each day's commission the day after, grouped into Monday-to-Sunday pay fortnights, with totals, a chart and an optional 9 am reminder. See below.
 - **My events** (Calendar › Add event, v1.6.0): your own events like payday, rubbish day or recycling, one-off or repeating, with an optional reminder. See below.
+- **Health** (More › Health, v1.8.0): dentist, doctor, chiropractor and other check-ups for each person, with clinic phone, repeat interval, booked appointments, reminders and history. See below.
 - **Pets & Vet** (More › Pets & Vet, v1.5.0): your pets with their care items – flea treatment, worming, vaccinations, grooming, vet check-ups, dog registration and your own items – with due dates on Home and the Calendar. See below.
 - **Lifting bridge – Dave Culham Drive** (Te Matau ā Pohe): the likely state of the bridge and the next change, worked out from the council's lift times. It's **not live**. Open it from Home, **More › Lifting bridge**, or the **Bridge** app shortcut (long-press the app icon on Android).
 
@@ -58,6 +59,17 @@ Add from the Calendar with the **Add event** button under the month, or tap a da
 - **Reminders:** 3 days before and on the day (once if overdue), never between 9 pm and 7 am.
 - Saved in `S.pets` (care items in `pet.care`, history in `pet.history`), so pets are in backups; older backups without pets restore fine. Due dates are worked out in `core.js` (`careDue`, `regDueAfter`) so the service worker reminders use the same rules. Tested by `pwtest/pets.mjs`.
 
+## Health
+**More › Health** (v1.8.0, right under Pets & Vet; the bottom bar stays at five tabs). The More row shows what's next (e.g. "Next: Sarah – Dentist, tomorrow 10:30 am") and an "N overdue" pill.
+- **People:** starts empty – nobody is added automatically and there's no example data. Quick-add chips for **Shane**, **Sarah** and **Cass** (on the empty page, under the list and in the Add a person form) add that person when tapped (with Undo); chips for people already added are hidden. Each person has a name, an optional **NHI number** (checked: 3 letters then 4 numbers, or 3 letters, 2 numbers and 2 letters; tidied to capitals) and notes (e.g. allergies or medications). Edit from the person page; **Delete** asks first, and the message has Undo.
+- **Check-ups:** a new person has none, just a quick-add row of the suggested types: Dentist (6 months), Doctor check-up (1 year), Chiropractor (4 weeks), Optometrist (2 years), Hygienist (6 months), Physio (doesn't repeat), Skin check (1 year), Flu jab (1 year, with a note that it's usually in autumn, March to May), Prescription repeat (3 months), or **Something else** for your own. Each has a type, name, clinic (suggested from clinics already used; picking a type fills in the clinic already used for it), clinic phone (a tap-to-call button on the row, a `tel:` link), repeat interval (weeks, months, years or "Doesn't repeat" for one-offs – all editable), **last done**, and an optional **next due** date set by hand that wins over the worked-out one.
+- **Booked appointment:** optional date and time on the check-up. While it's booked (today or later) the booking stands in for the due date: the row shows "Booked Fri 2 Oct 10:30 am", and the check-up isn't counted as due or overdue and gets no due-date reminders, so it never shows twice. If the date passes without ticking Done, the row asks you to tick Done and the due date counts again.
+- **Done** records the date (today, or the booking date if it's passed), optional notes and cost in the person's **History**, rolls the item forward and clears the booking (all with Undo). History entries can be edited or deleted; the last done date follows the latest entry.
+- **Home › Needs attention:** the `health` source in `ATT_SOURCES`. Check-ups due within 30 days or overdue ("Sarah – Dentist · Health · Smile Dental · Due Sat 10 Oct"; these are real due dates, so they count in the Overdue / Due soon tiles like pets), and bookings today and tomorrow ("Tomorrow: Sarah – Dentist 10:30 am"). Tapping opens the person's page with that check-up highlighted.
+- **Calendar:** bookings (at their time) and due check-ups, with a "Health" tag, teal colour and "Health" legend entry, plus the Overdue list. **Settings › Calendar › Show health** turns it off (Home still shows them).
+- **Reminders:** check-ups 3 days before and on the day (once if overdue); bookings the evening before at 7 pm ("Tomorrow: Sarah – Dentist 10:30 am") and 2 hours before if that falls between 7 am and 9 pm. Never between 9 pm and 7 am, like everything else.
+- Saved in `S.health` (`person.items`, `person.history`), so it's in backups (the restore summary counts people in Health); older backups without it restore fine. Due dates use the same `careDue` maths as pet care, and bookings come from `healthAppts`, both in `core.js`, so the service worker reminders follow the same rules. Tested by `pwtest/health.mjs`.
+
 ## Lifting bridge card
 The council doesn't publish live lift status, so the card says "Not live – based on the council's lift times". The rules (`bridgeStatus` in `core.js`) come from the
 [council's bridge page](https://www.wdc.govt.nz/Services/Roads-and-Transportation/Transportation/Te-Matau-a-Pohe-bridge):
@@ -75,7 +87,7 @@ Where it shows (Settings › Lifting bridge): **Near only** (default), **Always 
 
 ## Files
 - `index.html` – page and styles
-- `app.js` – the app screens (Home with weather and the lifting bridge, Cars, Calendar, To-do, More › Events, Meal planner, Pets & Vet, Bills, Birthdays, Ideas, Settings) and calendar sync
+- `app.js` – the app screens (Home with weather and the lifting bridge, Cars, Calendar, To-do, More › Events, Meal planner, Pets & Vet, Health, Bills, Birthdays, Ideas, Settings) and calendar sync
 - `core.js` – dates, reminder schedule and on-device storage (shared with the service worker)
 - `ical-import.js` – reads .ics calendars (time zones incl. Windows names, all-day, repeats, exceptions, cancellations)
 - `vendor/ical.min.js` – ical.js 2.2.1 (Mozilla, MPL-2.0), unmodified
@@ -88,11 +100,12 @@ Where it shows (Settings › Lifting bridge): **Near only** (default), **Always 
 
 ## Home › Needs attention (v1.7.0)
 One combined list of everything due soon, from every section. Each item has its own icon and label line, and tapping it opens where it lives:
-- **Cars** (WOF, rego, service), **drivers** (AA membership, licence), **bills**, **to-dos with a due date** and **pet care**: overdue or within 30 days, as before. These are the only things that can be overdue, and the only things counted in the Overdue / Due soon / All good tiles.
+- **Cars** (WOF, rego, service), **drivers** (AA membership, licence), **bills**, **to-dos with a due date**, **pet care** and **health check-ups** (v1.8.0): overdue or within 30 days, as before. These are the only things that can be overdue, and the only things counted in the Overdue / Due soon / All good tiles.
 - **Birthdays**: today ("Today!") and the next 7 days. Opens Birthdays.
 - **Appointments**, including What's On events you added ("Event you added"), and **connected calendars** (labelled with the calendar's name): today and tomorrow, e.g. "Today: Dentist 3:30 pm". Opens that day on the Calendar.
 - **My events**: today and tomorrow (see My events).
 - **Tonight's dinner** if one is planned and not ticked cooked: "Tonight: Butter chicken". Opens that night in the Meal planner.
+- **Health bookings** (v1.8.0): today and tomorrow, e.g. "Tomorrow: Sarah – Dentist 10:30 am". Opens the person at that check-up.
 - **Commission**: "Enter yesterday's commission" when the tracker is set up and nothing is entered for yesterday. Opens Add commission for yesterday.
 
 Sorted overdue first (most overdue at the top), then by date; on the same day due dates come first, then events by time, birthdays and dinner. Anything whose day has passed drops off. Up to 8 are shown with **Show all** (overdue items are always shown). "Cars at a glance" was removed (the car dates are all in this list), and "Coming up this week" became **Later this week** (appointments and calendar events 2–7 days out), so nothing shows twice. In `app.js` each source is a function in `ATT_SOURCES` returning `{ days, rank, sort, html }`; to add a section, add a source. Tested by `pwtest/home.mjs`.
