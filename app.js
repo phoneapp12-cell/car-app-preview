@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2504,6 +2504,35 @@ function render() {
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
 window.addEventListener('hashchange', () => { if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
+
+/* ---------- fixed tab bar + on-screen keyboard (v1.6.1) ----------
+   The tab bar is position:fixed and only #view scrolls. When the Android keyboard opens
+   (interactive-widget=resizes-content shrinks the viewport) the bar would ride up on top of the
+   keyboard and over the field being typed in, so we hide it while a text field has focus and the
+   viewport is clearly shorter than its full height. Also keep the page itself from ever scrolling. */
+const kbState = { full: 0, w: 0 };
+function isTextField(el) {
+  if (!el || !el.tagName) return false;
+  if (el.tagName === 'TEXTAREA' || el.isContentEditable) return true;
+  if (el.tagName !== 'INPUT') return false;
+  return !/^(checkbox|radio|date|time|datetime-local|month|week|file|range|color|button|submit|reset|image|hidden)$/i.test(el.type || 'text');
+}
+function kbCheck() {
+  const h = window.visualViewport ? Math.round(visualViewport.height * (visualViewport.scale || 1)) : window.innerHeight;
+  const w = window.innerWidth, typing = isTextField(document.activeElement);
+  if (w !== kbState.w) { kbState.w = w; kbState.full = h; } // rotated: start again
+  if (!typing || h > kbState.full) kbState.full = h;
+  const open = typing && kbState.full - h > 150;
+  document.body.classList.toggle('kb', open);
+  if (document.scrollingElement && document.scrollingElement.scrollTop) document.scrollingElement.scrollTop = 0;
+  const app = document.getElementById('app'); if (app && app.scrollTop) app.scrollTop = 0;
+}
+window.addEventListener('resize', kbCheck);
+kbCheck();
+if (window.visualViewport) visualViewport.addEventListener('resize', kbCheck);
+document.addEventListener('focusin', () => setTimeout(kbCheck, 0));
+document.addEventListener('focusout', () => setTimeout(kbCheck, 0));
+window.addEventListener('scroll', () => { if (!document.body.classList.contains('kb') && document.scrollingElement.scrollTop) document.scrollingElement.scrollTop = 0; });
 
 /* ---------- start ---------- */
 async function start() {

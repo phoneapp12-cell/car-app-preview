@@ -87,3 +87,7 @@ Where it shows (Settings › Lifting bridge): **Near only** (default), **Always 
 
 ## Shipping an update
 Change `VERSION` in `sw.js` (and `APP_VERSION` in `app.js`), commit and push. The app picks up the new version the next time it's opened.
+
+## Layout notes
+- **Bottom tab bar (v1.6.1):** the page itself never scrolls. `html, body` are `overflow:hidden`, `#app` is pinned to the screen (`position:fixed; inset 0`), `#view` is the only thing that scrolls, and the tab bar is `position:fixed` at the bottom with `env(safe-area-inset-bottom)` padding. `#view` has bottom padding of the bar height (`--tabh`) + the safe area + a gap, so the last item on a long page is never hidden behind the bar. Don't go back to sizing `#app` with `100vh`/`100dvh`: on Android Chrome those change as the address bar and keyboard come and go, which let the whole page (bar included) scroll away.
+- While the on-screen keyboard is up (a text field has focus and the screen is more than 150px shorter), `body` gets the class `kb` and the tab bar is hidden so it doesn't sit on top of the form. Sheets (`#sheet`, z-index 50) always cover the bar (z-index 20).
