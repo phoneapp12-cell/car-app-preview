@@ -8,7 +8,7 @@ A small installable web app (PWA) for keeping track of WOF, rego and servicing f
 - Home shows the Whangārei weather (from Open-Meteo, straight from the phone) and **More › Events** lists what's on in Whangārei over the next 60 days (from the council, through the relay). Neither sends anything about you.
 
 - New Zealand public holidays are built in and on by default (Settings › Show public holidays). No setup and no internet needed.
-- **Meal planner** (More › Meal planner): plan dinners for your cooking nights only (Friday and Saturday to start with), with ideas, suggestions, a shopping list and history. See below.
+- **Meal planner** (More › Meal planner): plan dinners for your cooking nights only (Friday and Saturday to start with), with ideas, suggestions, a shopping list and history. Everything is written **gluten free** (Shane has coeliac disease). See below.
 - **Lifting bridge – Dave Culham Drive** (Te Matau ā Pohe): the likely state of the bridge and the next change, worked out from the council's lift times. It's **not live**. Open it from Home, **More › Lifting bridge**, or the **Bridge** app shortcut (long-press the app icon on Android).
 
 ## Public holidays
@@ -22,6 +22,10 @@ weekend, the Monday (or Tuesday) day off is shown as "(observed)". If a connecte
 holiday on the same day, it isn't shown twice. The 2026–2028 dates are checked by `pwtest/holidays.mjs`.
 
 ## Meal planner
+**Gluten free (coeliac):** all 40 starter ideas are written with explicit gluten-free ingredients – gluten-free pasta/spaghetti/macaroni/lasagne sheets, gluten-free soy sauce (tamari), cornflour or gluten-free flour for thickening, gluten-free pastry, buns, wraps, breadcrumbs, gravy, pizza bases, stock, sausages and sauces (BBQ, Worcestershire, curry paste, taco seasoning), rice noodles and corn tortillas. In v1.4.1 two dishes that don't work well gluten free were swapped: **Beef and black bean → Beef and broccoli stir fry** (gluten-free black bean sauce is hard to find) and **Sausage sizzle → BBQ chicken thighs with corn** (it's all about the white bread). Ideas and planned meals show a small **GF** marker; the planner has one note: "All ideas are written gluten free. Always check labels for 'gluten free', especially stock, sauces, sausages and seasonings." Nothing is claimed to be guaranteed safe. Typed-in meals and own ideas not ticked "Gluten free" are flagged, and **Suggest / Surprise me only pick ideas ticked "Gluten free"** (the tick is on by default for new ideas). The shopping list keeps the GF wording and adds "check label" to items where gluten often hides (stock, sauces, tamari, gravy, curry paste, sausages, seasonings, bacon, ham, corn chips, baked beans, cornflour, tortillas…).
+
+*Updating from v1.4.0:* saved starter ideas get the new ingredients (favourites, hidden, notes and links are kept; starter ideas you've edited yourself are left alone from now on). Upcoming nights holding a swapped dish switch to its replacement (a one-off message says so); past nights keep what was cooked. Your own ideas and planned nights are kept; own ideas made before this start unticked, since they weren't written gluten free.
+
 - **Cooking nights:** tap the day chips at the top of the planner (default Fri and Sat). The plan shows only those nights for the next 4 weeks.
 - **Each night:** pick a meal from your ideas or type one in, with optional notes. **Suggest** picks one at random from your ideas, skipping anything planned in the 3 weeks before or after (favourites come up more often, hidden ideas never). **Surprise me for all** fills every empty night (Undo in the message).
 - **Cooked:** tick it on the night; past nights go into **History** (with "Cooked" or "Not ticked").

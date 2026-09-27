@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1161,51 +1161,93 @@ function catsForm() {
 // ideas: [{ id, title, tag, ingr: [..], link, notes, fav, hidden, builtin }], list: to-do list for shopping }
 const MEAL_TAGS = ['Quick', 'BBQ', 'Slow cook', 'Oven bake', 'Budget', 'Takeaway-style'];
 const MEAL_WEEKS = 4, MEAL_GAP = 21; // plan shows about 4 weeks; Suggest avoids meals planned within 3 weeks either side
+// Shane has coeliac disease: every starter is written gluten free (explicit GF products, cornflour, rice noodles, corn tortillas).
+// [title, tag, ingredients, notes]. The id comes from the title, so keep titles stable (see MEAL_REPLACED for swapped dishes).
 const MEAL_STARTERS = [
-  ['Butter chicken', 'Takeaway-style', 'chicken thighs, butter chicken sauce, onion, cream, rice, naan bread'],
-  ['Spaghetti bolognese', 'Budget', 'beef mince, onion, garlic, tinned tomatoes, tomato paste, spaghetti, parmesan'],
-  ['Roast lamb with veges', 'Oven bake', 'leg of lamb, potatoes, pumpkin, carrots, frozen peas, gravy mix, mint sauce'],
-  ['Fish and chips night', 'Takeaway-style', 'white fish fillets, potatoes, flour, eggs, breadcrumbs, lemons, tartare sauce, coleslaw'],
-  ['Homemade burgers', 'Takeaway-style', 'beef mince, burger buns, cheese slices, lettuce, tomatoes, sliced beetroot, onion, burger sauce'],
-  ['Beef nachos', 'Quick', 'beef mince, kidney beans, taco seasoning, corn chips, grated cheese, sour cream, avocado, salsa'],
-  ['Chicken stir fry', 'Quick', 'chicken breast, stir fry veges, garlic, ginger, soy sauce, oyster sauce, rice'],
-  ['Sausage casserole', 'Slow cook', 'sausages, onion, carrots, tinned tomatoes, baked beans, potatoes'],
-  ['Mince and cheese pies', 'Oven bake', 'beef mince, onion, gravy mix, grated cheese, puff pastry'],
-  ['Lasagne', 'Oven bake', 'beef mince, onion, tinned tomatoes, lasagne sheets, milk, flour, butter, grated cheese'],
-  ['BBQ – sausages, steak and salads', 'BBQ', 'sausages, steak, bread, onions, coleslaw, potato salad, tomato sauce'],
+  ['Butter chicken', 'Takeaway-style', 'chicken thighs, gluten-free butter chicken sauce, onion, cream, rice, gluten-free naan bread'],
+  ['Spaghetti bolognese', 'Budget', 'beef mince, onion, garlic, tinned tomatoes, tomato paste, gluten-free Worcestershire sauce, gluten-free spaghetti, parmesan'],
+  ['Roast lamb with veges', 'Oven bake', 'leg of lamb, potatoes, pumpkin, carrots, frozen peas, gluten-free gravy, mint sauce'],
+  ['Fish and chips night', 'Takeaway-style', 'white fish fillets, potatoes, gluten-free flour, eggs, gluten-free breadcrumbs, lemons, tartare sauce, coleslaw', 'Crumbed at home with gluten-free crumbs – no beer batter. Chips cooked in clean oil.'],
+  ['Homemade burgers', 'Takeaway-style', 'beef mince, gluten-free burger buns, cheese slices, lettuce, tomatoes, sliced beetroot, onion, gluten-free burger sauce'],
+  ['Beef nachos', 'Quick', 'beef mince, kidney beans, gluten-free taco seasoning, corn chips, grated cheese, sour cream, avocado, salsa'],
+  ['Chicken stir fry', 'Quick', 'chicken breast, stir fry veges, garlic, ginger, gluten-free soy sauce (tamari), gluten-free oyster sauce, rice noodles'],
+  ['Sausage casserole', 'Slow cook', 'gluten-free sausages, onion, carrots, tinned tomatoes, baked beans, potatoes'],
+  ['Mince and cheese pies', 'Oven bake', 'beef mince, onion, gluten-free gravy, grated cheese, gluten-free pastry'],
+  ['Lasagne', 'Oven bake', 'beef mince, onion, tinned tomatoes, gluten-free lasagne sheets, milk, cornflour, butter, grated cheese'],
+  ['BBQ – sausages, steak and salads', 'BBQ', 'gluten-free sausages, steak, gluten-free bread, onions, coleslaw, potato salad, tomato sauce'],
   ['Crispy pork belly', 'Oven bake', 'pork belly, salt, potatoes, apple sauce, broccoli'],
-  ['Fish tacos', 'Quick', 'white fish fillets, soft tortillas, red cabbage, limes, avocado, sour cream, coriander'],
-  ['Chicken curry', 'Slow cook', 'chicken thighs, curry paste, coconut milk, onion, spinach, rice'],
-  ['Roast chicken', 'Oven bake', 'whole chicken, potatoes, pumpkin, carrots, stuffing mix, gravy mix'],
-  ['Shepherd’s pie', 'Budget', 'lamb mince, onion, carrots, frozen peas, gravy mix, potatoes, grated cheese'],
+  ['Fish tacos', 'Quick', 'white fish fillets, corn tortillas, red cabbage, limes, avocado, sour cream, coriander'],
+  ['Chicken curry', 'Slow cook', 'chicken thighs, gluten-free curry paste, coconut milk, onion, spinach, rice'],
+  ['Roast chicken', 'Oven bake', 'whole chicken, potatoes, pumpkin, carrots, gluten-free stuffing, gluten-free gravy'],
+  ['Shepherd’s pie', 'Budget', 'lamb mince, onion, carrots, frozen peas, gluten-free gravy, potatoes, grated cheese'],
   ['Chilli con carne', 'Slow cook', 'beef mince, kidney beans, tinned tomatoes, onion, chilli powder, rice, sour cream'],
-  ['Beef and vege stew', 'Slow cook', 'gravy beef, onions, carrots, potatoes, beef stock, flour, bread rolls'],
-  ['Corned beef with white sauce', 'Slow cook', 'corned silverside, potatoes, carrots, cabbage, milk, butter, flour, mustard'],
-  ['Honey soy chicken drumsticks', 'Budget', 'chicken drumsticks, honey, soy sauce, garlic, rice, broccoli'],
-  ['Homemade pizza', 'Takeaway-style', 'pizza bases, pizza sauce, mozzarella, ham, pineapple, capsicum, mushrooms'],
-  ['Beef tacos', 'Quick', 'beef mince, taco shells, taco seasoning, lettuce, tomatoes, grated cheese, sour cream'],
-  ['Bacon and egg pie', 'Budget', 'puff pastry, bacon, eggs, frozen peas, onion, tomatoes'],
-  ['Steak, chips and salad', 'Quick', 'steaks, oven chips, salad greens, tomatoes, mushrooms'],
+  ['Beef and vege stew', 'Slow cook', 'gravy beef, onions, carrots, potatoes, gluten-free beef stock, cornflour, gluten-free bread rolls'],
+  ['Corned beef with white sauce', 'Slow cook', 'corned silverside, potatoes, carrots, cabbage, milk, butter, cornflour, mustard'],
+  ['Honey soy chicken drumsticks', 'Budget', 'chicken drumsticks, honey, gluten-free soy sauce (tamari), garlic, rice, broccoli'],
+  ['Homemade pizza', 'Takeaway-style', 'gluten-free pizza bases, pizza sauce, mozzarella, ham, pineapple, capsicum, mushrooms'],
+  ['Beef tacos', 'Quick', 'beef mince, corn taco shells, gluten-free taco seasoning, lettuce, tomatoes, grated cheese, sour cream'],
+  ['Bacon and egg pie', 'Budget', 'gluten-free pastry, bacon, eggs, frozen peas, onion, tomatoes'],
+  ['Steak, chips and salad', 'Quick', 'steaks, potatoes for home-made chips, salad greens, tomatoes, mushrooms', 'Bought oven chips often have a wheat coating, so home-made chips are the safe bet.'],
   ['Lamb chops, mash and peas', 'Quick', 'lamb chops, potatoes, butter, milk, frozen peas, mint sauce'],
   ['Pork chops with apple and mash', 'Quick', 'pork chops, apples, potatoes, green beans, butter'],
-  ['Pulled pork burgers', 'Slow cook', 'pork shoulder, BBQ sauce, burger buns, coleslaw'],
-  ['Chicken schnitzel with salad', 'Quick', 'chicken breasts, breadcrumbs, eggs, flour, potatoes, salad greens, lemons'],
-  ['Macaroni cheese', 'Budget', 'macaroni, grated cheese, milk, butter, flour, bacon'],
-  ['Savoury mince on toast', 'Budget', 'beef mince, onion, carrots, frozen peas, gravy mix, bread'],
-  ['Fried rice', 'Budget', 'rice, eggs, bacon, frozen peas and corn, spring onions, soy sauce'],
-  ['Sweet and sour pork', 'Takeaway-style', 'pork pieces, pineapple pieces, capsicum, onion, sweet and sour sauce, rice'],
-  ['Beef and black bean', 'Takeaway-style', 'beef strips, black bean sauce, onion, capsicum, rice'],
-  ['Chicken kebabs on the BBQ', 'BBQ', 'chicken thighs, capsicum, red onion, kebab skewers, wraps, tzatziki'],
+  ['Pulled pork burgers', 'Slow cook', 'pork shoulder, gluten-free BBQ sauce, gluten-free burger buns, coleslaw'],
+  ['Chicken schnitzel with salad', 'Quick', 'chicken breasts, gluten-free breadcrumbs, eggs, gluten-free flour, potatoes, salad greens, lemons'],
+  ['Macaroni cheese', 'Budget', 'gluten-free macaroni, grated cheese, milk, butter, cornflour, bacon'],
+  ['Savoury mince on toast', 'Budget', 'beef mince, onion, carrots, frozen peas, gluten-free gravy, gluten-free bread'],
+  ['Fried rice', 'Budget', 'rice, eggs, bacon, frozen peas and corn, spring onions, gluten-free soy sauce (tamari)'],
+  ['Sweet and sour pork', 'Takeaway-style', 'pork pieces, cornflour, pineapple pieces, capsicum, onion, gluten-free sweet and sour sauce, rice', 'Toss the pork in cornflour instead of batter.'],
+  ['Beef and broccoli stir fry', 'Takeaway-style', 'beef strips, broccoli, garlic, ginger, gluten-free soy sauce (tamari), cornflour, rice'],
+  ['Chicken kebabs on the BBQ', 'BBQ', 'chicken thighs, capsicum, red onion, kebab skewers, gluten-free wraps, tzatziki'],
   ['BBQ lamb steaks', 'BBQ', 'lamb leg steaks, rosemary, garlic, potatoes, salad greens'],
-  ['Sausage sizzle', 'BBQ', 'sausages, white bread, onions, tomato sauce, mustard'],
-  ['Chicken pasta bake', 'Oven bake', 'pasta, chicken breast, bacon, cream, spinach, grated cheese'],
-  ['Meatballs and spaghetti', 'Budget', 'beef mince, breadcrumbs, egg, pasta sauce, spaghetti, parmesan'],
-  ['Salmon with rice and greens', 'Quick', 'salmon fillets, rice, broccoli, bok choy, soy sauce, lemon'],
-  ['Satay chicken', 'Quick', 'chicken thighs, peanut butter, coconut milk, soy sauce, rice, green beans']
+  ['BBQ chicken thighs with corn', 'BBQ', 'chicken thighs, smoked paprika, garlic, lemons, corn cobs, potatoes, salad greens'],
+  ['Chicken pasta bake', 'Oven bake', 'gluten-free pasta, chicken breast, bacon, cream, spinach, grated cheese'],
+  ['Meatballs and spaghetti', 'Budget', 'beef mince, gluten-free breadcrumbs, egg, pasta sauce, gluten-free spaghetti, parmesan'],
+  ['Salmon with rice and greens', 'Quick', 'salmon fillets, rice, broccoli, bok choy, gluten-free soy sauce (tamari), lemon'],
+  ['Satay chicken', 'Quick', 'chicken thighs, peanut butter, coconut milk, gluten-free soy sauce (tamari), rice, green beans']
 ];
+// v1.4.1 swapped two v1.4.0 starters that don't work well gluten free (old id → new id)
+const MEAL_REPLACED = { 'meal-beef-and-black-bean': 'meal-beef-and-broccoli-stir-fry', 'meal-sausage-sizzle': 'meal-bbq-chicken-thighs-with-corn' };
+const MEAL_REPLACED_NAMES = { 'meal-beef-and-black-bean': 'Beef and black bean', 'meal-sausage-sizzle': 'Sausage sizzle' };
+const STARTER_VER = 2;
+// Ingredients where gluten often hides: shown with a "check label" hint on the shopping list
+const CHECK_LABEL = /stock|sauce|tamari|gravy|curry paste|salsa|mustard|tzatziki|sausage|seasoning|chilli powder|stuffing|bacon|\bham\b|corned|corn chips|baked beans|cornflour|coleslaw|potato salad|tortillas|taco shells|rice noodles|mayonnaise|marinade|spice/i;
+const needsCheck = g => CHECK_LABEL.test(g);
+const GF_NOTE = 'All ideas are written gluten free. Always check labels for “gluten free”, especially stock, sauces, sausages and seasonings.';
 const mealSlug = t => t.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-const starterMeals = () => MEAL_STARTERS.map(([title, tag, ingr]) => ({ id: 'meal-' + mealSlug(title), title, tag, ingr: ingr.split(', '), link: '', notes: '', fav: false, hidden: false, builtin: true }));
-const newMeals = () => ({ nights: [5, 6], plan: {}, ideas: starterMeals(), list: '' });
+const starterMeals = () => MEAL_STARTERS.map(([title, tag, ingr, notes]) => ({ id: 'meal-' + mealSlug(title), title, tag, ingr: ingr.split(', '), link: '', notes: notes || '', fav: false, hidden: false, gf: true, builtin: true }));
+const newMeals = () => ({ nights: [5, 6], plan: {}, ideas: starterMeals(), list: '', starterVer: STARTER_VER });
+// Bring saved starter ideas up to date (v1.4.1: gluten-free ingredients) without touching Shane's own ideas or planned nights.
+// Starter ideas keep his favourite/hidden/notes/link; the two swapped dishes are replaced, and upcoming (not cooked) nights
+// holding them switch to the replacement. Past nights keep their name. Own ideas from before this had no GF tick, so they
+// start unticked (not assumed gluten free).
+function migrateStarters(m) {
+  const fresh = new Map(starterMeals().map(i => [i.id, i])), T = todayISO(), switched = [];
+  const keep = [];
+  m.ideas.forEach(i => {
+    if (!i.builtin) { if (typeof i.gf !== 'boolean') i.gf = false; keep.push(i); return; }
+    if (MEAL_REPLACED[i.id]) { const n = fresh.get(MEAL_REPLACED[i.id]); if (n && i.fav) n._fav = true; return; }
+    const n = fresh.get(i.id);
+    if (n && !i.edited) Object.assign(i, { title: n.title, tag: n.tag, ingr: n.ingr.slice(), gf: true, notes: i.notes || n.notes });
+    else if (typeof i.gf !== 'boolean') i.gf = true;
+    keep.push(i);
+  });
+  const have = new Set(keep.map(i => i.id)), titles = new Set(keep.map(i => mNorm(i.title)));
+  fresh.forEach(n => { if (!have.has(n.id) && !titles.has(mNorm(n.title))) { n.fav = !!n._fav; delete n._fav; keep.push(n); } });
+  keep.forEach(i => delete i._fav);
+  m.ideas = keep;
+  Object.entries(m.plan).forEach(([d, e]) => {
+    const oldId = e.ideaId || Object.keys(MEAL_REPLACED_NAMES).find(k => mNorm(MEAL_REPLACED_NAMES[k]) === mNorm(e.title));
+    if (oldId && MEAL_REPLACED[oldId]) {
+      const n = m.ideas.find(i => i.id === MEAL_REPLACED[oldId]);
+      if (d >= T && !e.cooked && n) { switched.push({ d, from: e.title, to: n.title }); e.title = n.title; e.ideaId = n.id; }
+      else e.ideaId = '';
+      return;
+    }
+    const i = e.ideaId && m.ideas.find(x => x.id === e.ideaId); if (i) e.title = i.title;
+  });
+  m.starterVer = STARTER_VER;
+  m.gfNote = switched.length ? 'Updated for gluten free: ' + switched.map(x => `${x.from} → ${x.to} (${fmtW(x.d)})`).join(', ') + '.' : 'Meal ideas updated: all starter ideas are now written gluten free.';
+}
 function normMeals(m) {
   m = m && typeof m === 'object' && !Array.isArray(m) ? m : newMeals();
   if (!Array.isArray(m.nights)) m.nights = [5, 6];
@@ -1216,12 +1258,16 @@ function normMeals(m) {
   m.ideas = m.ideas.filter(i => i && i.id && String(i.title || '').trim());
   m.ideas.forEach(i => { if (!Array.isArray(i.ingr)) i.ingr = String(i.ingr || '').split(/\n|,/).map(s => s.trim()).filter(Boolean); if (!MEAL_TAGS.includes(i.tag)) i.tag = i.tag ? String(i.tag) : ''; });
   if (typeof m.list !== 'string') m.list = '';
+  if ((m.starterVer || 1) < STARTER_VER) migrateStarters(m);
+  m.ideas.forEach(i => { if (typeof i.gf !== 'boolean') i.gf = !!i.builtin; });
   return m;
 }
 const M = () => S.meals;
 const mNorm = t => String(t || '').trim().toLowerCase().replace(/[’‘`]/g, "'").replace(/\s+/g, ' ');
 const mealIdeaFor = t => { const n = mNorm(t); return n ? M().ideas.find(i => mNorm(i.title) === n) : null; };
 const visibleIdeas = () => M().ideas.filter(i => !i.hidden);
+const gfIdeas = () => visibleIdeas().filter(i => i.gf);
+const gfTag = (short = false) => `<span class="gftag">${short ? 'GF' : 'Gluten free'}</span>`;
 const isCookNight = iso => M().nights.includes(new Date(parseD(iso)).getUTCDay());
 const dayGap = (a, b) => Math.round((parseD(a) - parseD(b)) / DAY);
 const showMealsCal = () => !S.settings || S.settings.mealsCal !== false;
@@ -1234,12 +1280,12 @@ function nightLabel(iso) {
   const d = daysLeft(iso);
   return d === 0 ? 'Tonight · ' + fmtW(iso) : d === 1 ? 'Tomorrow · ' + fmtW(iso) : d === -1 ? 'Last night · ' + fmtW(iso) : fmtW(iso);
 }
-// Pick a meal for a night: from the visible ideas, avoiding anything planned within 3 weeks either side (favourites 3× as likely)
+// Pick a meal for a night: only from visible ideas ticked gluten free, avoiding anything planned within 3 weeks either side (favourites 3× as likely)
 function pickMeal(iso, plan = M().plan) {
   const near = new Set(Object.entries(plan).filter(([d, e]) => d !== iso && e.title && Math.abs(dayGap(d, iso)) < MEAL_GAP).map(([, e]) => mNorm(e.title)));
   const cur = plan[iso] ? mNorm(plan[iso].title) : '';
-  let pool = visibleIdeas().filter(i => !near.has(mNorm(i.title)) && mNorm(i.title) !== cur);
-  if (!pool.length) pool = visibleIdeas().filter(i => mNorm(i.title) !== cur);
+  let pool = gfIdeas().filter(i => !near.has(mNorm(i.title)) && mNorm(i.title) !== cur);
+  if (!pool.length) pool = gfIdeas().filter(i => mNorm(i.title) !== cur);
   if (!pool.length) return null;
   const bag = pool.flatMap(i => i.fav ? [i, i, i] : [i]);
   return bag[Math.floor(Math.random() * bag.length)];
@@ -1247,7 +1293,7 @@ function pickMeal(iso, plan = M().plan) {
 const planEntry = (idea, notes = '') => ({ title: idea.title, ideaId: idea.id, notes, cooked: false });
 async function suggestNight(iso) {
   const i = pickMeal(iso);
-  if (!i) { toast('Add some meal ideas first.'); return; }
+  if (!i) { toast('Add some gluten-free meal ideas first.'); return; }
   const s = snap(); const old = M().plan[iso];
   M().plan[iso] = planEntry(i, old ? old.notes : '');
   await save(); render(); toast(`${fmtW(iso)}: ${i.title}`, 'Undo', undoTo(s));
@@ -1256,7 +1302,7 @@ async function surpriseAll() {
   const empty = mealNights().filter(d => !M().plan[d]);
   if (!M().nights.length) { toast('Pick your cooking nights first.'); return; }
   if (!empty.length) { toast('Every cooking night is already planned.'); return; }
-  if (!visibleIdeas().length) { toast('Add some meal ideas first.'); return; }
+  if (!gfIdeas().length) { toast('Add some gluten-free meal ideas first.'); return; }
   const s = snap(); let n = 0;
   for (const d of empty) { const i = pickMeal(d); if (i) { M().plan[d] = planEntry(i); n++; } }
   await save(); render(); toast(`Planned ${plural(n, 'night')}.`, 'Undo', undoTo(s));
@@ -1275,7 +1321,8 @@ let mealHistAll = false;
 function mealRow(iso, hist = false) {
   const e = M().plan[iso], idea = e ? (M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title)) : null;
   const past = iso <= todayISO();
-  const sub = [hist ? fmtW(iso) : nightLabel(iso), idea && idea.tag ? idea.tag : '', e && e.notes ? esc(e.notes.split('\n')[0].slice(0, 60)) : '', hist && e ? (e.cooked ? 'Cooked' : 'Not ticked') : ''].filter(Boolean).join(' · ');
+  const mark = !e ? '' : idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
+  const sub = [mark, hist ? fmtW(iso) : nightLabel(iso), idea && idea.tag ? idea.tag : '', e && e.notes ? esc(e.notes.split('\n')[0].slice(0, 60)) : '', hist && e ? (e.cooked ? 'Cooked' : 'Not ticked') : ''].filter(Boolean).join(' · ');
   return `<div class="row meal ${e && e.cooked ? 'done' : ''}" data-date="${iso}">
     ${e && past ? `<button class="tick" aria-label="${e.cooked ? 'Untick' : 'Tick'} cooked: ${esc(e.title)}" onclick="toggleCooked('${iso}')"><span>${I('check')}</span></button>` : `<div class="ic meal">${I('meal')}</div>`}
     <button class="tapzone" onclick="mealNight('${iso}')"><div class="tx"><div class="t">${e ? esc(e.title) : '<span class="muted">Nothing planned</span>'}</div><div class="s">${sub}</div></div></button>
@@ -1298,6 +1345,7 @@ function Meals(arg) {
     `<div class="card mealset"><div class="t">Your cooking nights</div>
       <div class="daychips" role="group" aria-label="Cooking nights">${days.map(n => `<button class="${M().nights.includes(n) ? 'on' : ''}" aria-pressed="${M().nights.includes(n)}" aria-label="${WDL[n]}" onclick="toggleNight(${n})">${WDL[n].slice(0, 3)}</button>`).join('')}</div>
       <div class="s">The plan shows only these nights, for the next ${MEAL_WEEKS} weeks.</div></div>
+    <div class="gfnote" id="gfnote">${gfTag()}<span>${GF_NOTE}</span></div>
     ${nights.length ? `<div class="btns mealbtns"><button class="btn primary" id="surprise" onclick="surpriseAll()">${I('shuffle')} Surprise me for all</button><button class="btn" id="shopbtn" onclick="shopForm()">${I('cart')} Shopping list</button></div>
     <div class="sec">Next ${MEAL_WEEKS} weeks <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">${planned} of ${nights.length} planned</span></div>
     <div class="list" id="mealplan">${nights.map(d => mealRow(d)).join('')}</div>`
@@ -1307,7 +1355,7 @@ function Meals(arg) {
       ${hist.length > 6 ? `<div class="btns"><button class="btn" onclick="mealHistAll=!mealHistAll;render()">${mealHistAll ? 'Show less' : `Show all (${hist.length})`}</button></div>` : ''}`
       : `<div class="card muted">Past meals show here. Tick “Cooked” on the night to keep track.</div>`}
     <div class="list" style="margin-top:12px"><div class="srow"><div class="tx"><div class="t">Show meals on the Calendar</div><div class="s">Planned meals appear with a “Meal” tag.</div></div><button class="switch ${showMealsCal() ? 'on' : ''}" role="switch" aria-checked="${showMealsCal()}" aria-label="Show meals on the Calendar" onclick="toggleMealsCal()"></button></div></div>
-    <div class="foot">Suggestions come from your ideas and skip anything planned in the 3 weeks before or after. Favourites come up more often.</div>`;
+    <div class="foot">Suggestions only use ideas ticked “Gluten free”, and skip anything planned in the 3 weeks before or after. Favourites come up more often.</div>`;
 }
 function mealNight(iso) {
   const e = M().plan[iso] || { title: '', notes: '', cooked: false };
@@ -1316,7 +1364,7 @@ function mealNight(iso) {
   openSheet(esc(nightLabel(iso)),
     `<label class="field"><span>Meal</span><div style="display:flex;gap:8px"><input name="title" id="mealin" value="${esc(e.title)}" list="mealdl" placeholder="Pick from your ideas or type one" maxlength="80" style="flex:1;min-width:0">
       <button type="button" class="btn small" id="mealsug" style="flex:none" onclick="sheetSuggest('${iso}')">${I('shuffle')} Suggest</button></div>
-      <datalist id="mealdl">${visibleIdeas().map(i => `<option value="${esc(i.title)}">`).join('')}</datalist><small id="mealhint">${idea ? mealHint(idea) : 'Choose an idea or type anything.'}</small></label>` +
+      <datalist id="mealdl">${visibleIdeas().map(i => `<option value="${esc(i.title)}">`).join('')}</datalist><small id="mealhint">${idea ? mealHint(idea) : 'Choose an idea, or type one in – check it’s gluten free.'}</small></label>` +
     (favs.length ? `<div class="chips" style="margin:-4px 0 10px">${favs.map(i => `<button type="button" class="chip" onclick="setMealIn(${jsArg(i.title)})">★ ${esc(i.title)}</button>`).join('')}</div>` : '') +
     field('Notes', area('notes', e.notes || '', 'Optional: who’s coming, sides, defrost the lamb…')) +
     (iso <= todayISO() ? `<div class="field"><span>Cooked</span>${segHtml('cooked', [['0', 'Not yet'], ['1', '✓ Cooked']], e.cooked ? '1' : '0')}</div>` : ''),
@@ -1329,14 +1377,14 @@ function mealNight(iso) {
     }, 'Save',
     M().plan[iso] ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Clear this night" onclick="clearNight('${iso}')">${I('trash')}</button>` : '');
   if (iso <= todayISO()) wireSeg('cooked');
-  $('#mealin').addEventListener('input', () => { const i = mealIdeaFor($('#mealin').value); $('#mealhint').innerHTML = i ? mealHint(i) : 'Choose an idea or type anything.'; });
+  $('#mealin').addEventListener('input', () => { const i = mealIdeaFor($('#mealin').value); $('#mealhint').innerHTML = i ? mealHint(i) : 'Choose an idea, or type one in – check it’s gluten free.'; });
 }
-const mealHint = i => esc([i.tag, i.ingr.slice(0, 6).join(', ') + (i.ingr.length > 6 ? '…' : '')].filter(Boolean).join(' · ')) + (i.link ? ` · <a href="${esc(i.link)}" target="_blank" rel="noopener">Recipe</a>` : '');
+const mealHint = i => (i.gf ? gfTag() + ' ' : '<span class="nogf">Not marked gluten free</span> ') + esc([i.tag, i.ingr.slice(0, 6).join(', ') + (i.ingr.length > 6 ? '…' : '')].filter(Boolean).join(' · ')) + (i.link ? ` · <a href="${esc(i.link)}" target="_blank" rel="noopener">Recipe</a>` : '');
 function setMealIn(t) { const x = $('#mealin'); x.value = t; x.dispatchEvent(new Event('input')); }
 function sheetSuggest(iso) {
   const plan = Object.assign({}, M().plan); const cur = $('#mealin').value.trim();
   plan[iso] = cur ? { title: cur } : undefined; if (!cur) delete plan[iso];
-  const i = pickMeal(iso, plan); if (!i) { toast('Add some meal ideas first.'); return; }
+  const i = pickMeal(iso, plan); if (!i) { toast('Add some gluten-free meal ideas first.'); return; }
   setMealIn(i.title);
 }
 async function clearNight(iso) { const s = snap(); delete M().plan[iso]; await save(); await closeSheet(); render(); toast('Night cleared.', 'Undo', undoTo(s)); }
@@ -1351,7 +1399,7 @@ function mealIdeaList() {
   if (!vis.length) return `<div class="card empty"><div class="t">No meal ideas match</div><div class="s">${q ? 'Try a different word.' : mealFilter === 'Hidden' ? 'Nothing hidden.' : 'Nothing with this tag yet.'}</div></div>`;
   return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}"><button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
     <button class="tapzone" onclick="mealIdeaForm('${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.link ? ` <span class="muted" style="font-weight:600;font-size:12px">· recipe</span>` : ''}</div>
-    <div class="s">${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}</div></div></button>
+    <div class="s">${i.gf ? gfTag(true) + ' ' : '<span class="nogf">Not marked gluten free</span> '}${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}</div></div></button>
     ${i.hidden ? `<button class="btn small" onclick="toggleMealHidden('${i.id}')">Show</button>` : `<button class="btn small" onclick="planIdea('${i.id}')">Plan</button>`}</div>`).join('')}</div>`;
 }
 function MealIdeas() {
@@ -1361,7 +1409,7 @@ function MealIdeas() {
     `<label class="search">${I('search')}<input id="mealq" type="search" placeholder="Search meals or ingredients" value="${esc(mealQuery)}" aria-label="Search meal ideas" oninput="mealQuery=this.value;document.getElementById('meallist').innerHTML=mealIdeaList()"></label>
     <div class="chips scroll">${['All', '★', ...MEAL_TAGS, ...(hidden ? ['Hidden'] : [])].map(c => `<button class="chip ${c === mealFilter ? 'on' : ''}" onclick="mealFilter=${jsArg(c)};render()">${c === '★' ? '★ Favourites' : c === 'Hidden' ? `Hidden (${hidden})` : esc(c)}</button>`).join('')}</div>
     <div id="meallist">${mealIdeaList()}</div>
-    <div class="foot">Starter ideas can be edited or hidden. Hidden ideas aren’t suggested.</div>`;
+    <div class="foot">${gfTag(true)} marks ideas written gluten free – still check labels, especially stock, sauces, sausages and seasonings. Only ideas ticked “Gluten free” are suggested. Starter ideas can be edited or hidden.</div>`;
 }
 async function toggleMealFav(id) { const i = M().ideas.find(x => x.id === id); i.fav = !i.fav; await save(); render(); }
 async function toggleMealHidden(id) {
@@ -1372,15 +1420,16 @@ async function planIdea(id) {
   const i = M().ideas.find(x => x.id === id), d = mealNights().find(x => !M().plan[x]);
   if (!d) { toast(M().nights.length ? 'Every cooking night in the next 4 weeks is planned.' : 'Pick your cooking nights first.'); return; }
   const s = snap(); M().plan[d] = planEntry(i); await save(); await closeSheet(); render();
-  toast(`Planned for ${fmtW(d)}: ${i.title}`, 'Undo', undoTo(s));
+  toast(`Planned for ${fmtW(d)}: ${i.title}${i.gf ? '' : ' (not marked gluten free)'}`, 'Undo', undoTo(s));
 }
 function mealIdeaForm(id) {
-  const i = id ? M().ideas.find(x => x.id === id) : { title: '', tag: mealFilter !== 'All' && MEAL_TAGS.includes(mealFilter) ? mealFilter : '', ingr: [], link: '', notes: '', fav: mealFilter === '★' };
+  const i = id ? M().ideas.find(x => x.id === id) : { title: '', tag: mealFilter !== 'All' && MEAL_TAGS.includes(mealFilter) ? mealFilter : '', ingr: [], link: '', notes: '', fav: mealFilter === '★', gf: true };
   if (!i) return;
   openSheet(id ? 'Edit meal idea' : 'Add a meal idea',
     field('Meal', inp('title', i.title, 'placeholder="e.g. Nana’s mince stew" required maxlength="80"')) +
     `<div class="two">${field('Type', sel('tag', [['', 'None'], ...MEAL_TAGS.map(t => [t, t])], i.tag || ''))}<div class="field"><span>Favourite</span>${segHtml('fav', [['0', 'No'], ['1', '★ Yes']], i.fav ? '1' : '0')}</div></div>` +
-    field('Ingredients', area('ingr', i.ingr.join('\n'), 'One per line, e.g.\nbeef mince\nonion'), 'Used for the shopping list') +
+    `<label class="gfcheck"><input type="checkbox" name="gf" ${i.gf !== false ? 'checked' : ''}><span><b>Gluten free</b><small>Only ideas ticked here are suggested. Write ingredients as gluten-free versions, e.g. gluten-free soy sauce (tamari).</small></span></label>` +
+    field('Ingredients', area('ingr', i.ingr.join('\n'), 'One per line, e.g.\nbeef mince\ngluten-free gravy'), 'Used for the shopping list') +
     field('Recipe link', inp('link', i.link || '', 'type="url" inputmode="url" placeholder="https://…" maxlength="500"'), 'Optional') +
     field('Notes', area('notes', i.notes || '', 'Optional')) +
     (id ? `<div class="btns" style="margin:0 0 4px"><button type="button" class="btn" onclick="planIdea('${id}')">${I('cal')} Plan for the next free night</button><button type="button" class="btn" onclick="toggleMealHidden('${id}')">${i.hidden ? 'Show again' : 'Hide'}</button></div>` : ''),
@@ -1389,12 +1438,14 @@ function mealIdeaForm(id) {
       const dup = mealIdeaFor(v.title); if (dup && dup.id !== id) return 'You already have that meal in your ideas.';
       let link = v.link; if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
       if (link) { try { new URL(link); } catch (e) { return 'That recipe link doesn’t look right.'; } }
-      const upd = { title: v.title, tag: v.tag, ingr: v.ingr.split(/\n|,/).map(s => s.trim()).filter(Boolean), link, notes: v.notes, fav: v.fav === '1' };
+      const upd = { title: v.title, tag: v.tag, ingr: v.ingr.split(/\n|,/).map(s => s.trim()).filter(Boolean), link, notes: v.notes, fav: v.fav === '1', gf: v.gf === 'on' };
       if (id) {
-        const oldN = mNorm(i.title); Object.assign(i, upd);
+        const oldN = mNorm(i.title);
+        if (i.builtin && (upd.title !== i.title || upd.ingr.join('\n') !== i.ingr.join('\n'))) upd.edited = true; // keep his changes in future starter updates
+        Object.assign(i, upd);
         Object.values(M().plan).forEach(e => { if (e.ideaId === id || mNorm(e.title) === oldN) { e.title = i.title; e.ideaId = id; } });
       } else M().ideas.push(Object.assign({ id: uid('meal'), hidden: false, builtin: false, created: Date.now() }, upd));
-      await save(); render(); toast(id ? 'Meal idea updated.' : 'Meal idea added.');
+      await save(); render(); toast((id ? 'Meal idea updated' : 'Meal idea added') + (upd.gf ? '.' : ' – not marked gluten free, so it won’t be suggested.'));
     }, id ? 'Save' : 'Add',
     id && !i.builtin ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete meal idea" onclick="deleteMealIdea('${id}')">${I('trash')}</button>` : '');
   wireSeg('fav');
@@ -1403,6 +1454,7 @@ async function deleteMealIdea(id) { const s = snap(); M().ideas = M().ideas.filt
 
 /* ---- shopping list ---- */
 function shopNights() { const T = todayISO(); return Object.keys(M().plan).filter(d => d >= T && dayGap(d, T) < MEAL_WEEKS * 7 && !M().plan[d].cooked).sort(); }
+const shopLine = g => g + (needsCheck(g) ? ' (check label)' : '');
 function shopItems(dates) {
   const seen = new Map(), none = [];
   dates.forEach(d => { const e = M().plan[d], i = M().ideas.find(x => x.id === e.ideaId) || mealIdeaFor(e.title);
@@ -1413,7 +1465,7 @@ function shopItems(dates) {
 const shopDates = () => [...document.querySelectorAll('#sf input[data-night]:checked')].map(x => x.dataset.night);
 function shopPreview() {
   const { items, none } = shopItems(shopDates()), box = $('#shopprev'); if (!box) return;
-  box.innerHTML = items.length ? `<b>${plural(items.length, 'item')}</b><ul>${items.map(g => `<li>${esc(g)}</li>`).join('')}</ul>` : '<span class="muted">Tick at least one planned night with ingredients.</span>';
+  box.innerHTML = items.length ? `<b>${plural(items.length, 'item')}</b> <span class="muted" style="font-size:12.5px">· “check label”: gluten often hides in these, look for “gluten free” on the pack</span><ul>${items.map(g => `<li>${esc(g)}${needsCheck(g) ? ' <span class="chk">check label</span>' : ''}</li>`).join('')}</ul>` : '<span class="muted">Tick at least one planned night with ingredients.</span>';
   if (none.length) box.innerHTML += `<div class="muted" style="margin-top:6px">No ingredients saved for ${esc(none.join(', '))}. Add them in Ideas.</div>`;
 }
 function shopForm() {
@@ -1423,7 +1475,7 @@ function shopForm() {
   const lists = S.lists.slice(); const def = lists.includes(M().list) ? M().list : lists.find(l => /shop|grocer/i.test(l)) || '__new';
   openSheet('Shopping list',
     `<p class="muted" style="margin:-4px 0 10px">Pick the nights to shop for.</p>
-    <div class="list shopnights">${dates.map(d => `<label class="srow"><input type="checkbox" data-night="${d}" ${pre.has(d) ? 'checked' : ''} onchange="shopPreview()"><div class="tx"><div class="t">${esc(M().plan[d].title)}</div><div class="s">${nightLabel(d)}</div></div></label>`).join('')}</div>
+    <div class="list shopnights">${dates.map(d => `<label class="srow"><input type="checkbox" data-night="${d}" ${pre.has(d) ? 'checked' : ''} onchange="shopPreview()"><div class="tx"><div class="t">${esc(M().plan[d].title)}</div><div class="s">${nightLabel(d)}${(mealIdeaFor(M().plan[d].title) || {}).gf ? '' : ' · <span class="nogf">Check it’s gluten free</span>'}</div></div></label>`).join('')}</div>
     <div class="shopprev" id="shopprev"></div>` +
     field('Add to this to-do list', sel('list', [...lists.map(l => [l, l]), ...(lists.some(l => /^shopping$/i.test(l)) ? [] : [['__new', 'New list: Shopping']])], def)),
     async v => {
@@ -1432,7 +1484,7 @@ function shopForm() {
       let list = v.list; if (list === '__new') { list = 'Shopping'; if (!S.lists.includes(list)) S.lists.push(list); }
       const open = new Set(S.todos.filter(t => !t.done && t.list === list).map(t => mNorm(t.title)));
       const meals = ds.map(d => M().plan[d].title).join(', ');
-      const add = items.filter(g => !open.has(mNorm(g)));
+      const add = items.map(shopLine).filter(g => !open.has(mNorm(g)));
       add.forEach((g, n) => S.todos.push({ id: uid('todo'), title: g.slice(0, 120), list, due: '', notes: 'For ' + meals, done: false, created: Date.now() + n, fromMeal: true }));
       M().list = list;
       await save(); render();
@@ -1444,12 +1496,15 @@ function shopForm() {
 async function copyShop() {
   const { items } = shopItems(shopDates());
   if (!items.length) { toast('Tick at least one planned night with ingredients.'); return; }
-  const text = items.join('\n');
+  const text = items.map(shopLine).join('\n');
   let ok = false;
   try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); ok = true; } } catch (e) { }
   if (!ok) { const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { ok = document.execCommand('copy'); } catch (e) { } t.remove(); }
   toast(ok ? `Copied ${plural(items.length, 'item')}. Paste them into your grocery list app.` : 'Couldn’t copy on this phone. Use “Add to To-do” instead.');
 }
+
+// One-off message after the gluten-free update of the starter ideas (set by migrateStarters)
+function takeMealNote() { const n = S && S.meals && S.meals.gfNote; if (n) delete S.meals.gfNote; return n || ''; }
 
 /* ---- Home line ---- */
 function homeMeal() {
@@ -2045,7 +2100,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')} and ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); await save(); render(); toast('Backup restored.', 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
@@ -2097,6 +2152,7 @@ async function start() {
   await loadCal();
   loadWx(); loadEvs(); loadCls();
   render();
+  const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   syncFeeds(); refreshWx(); refreshEvents();
   if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
   checkBridgeLoc(true);
