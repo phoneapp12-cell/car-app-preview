@@ -194,15 +194,16 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
 
 // ---- Weather fallback (Open-Meteo, Whangārei, fixed) ----
 export const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-35.7251&longitude=174.3237' +
-  '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,precipitation' +
+  '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation' +
+  '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,is_day' +
   '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset' +
-  '&timezone=Pacific%2FAuckland&forecast_days=7&wind_speed_unit=kmh';
+  '&timezone=Pacific%2FAuckland&forecast_days=7&forecast_hours=48&wind_speed_unit=kmh'; // same fields as the app (v1.9.0 adds hourly)
 const WEATHER_TTL = 20 * 60 * 1000;
 let wxMem = null;
 export async function getWeather(env = {}, fetchImpl = fetch, now = Date.now()) {
   if (wxMem && now - wxMem.at < WEATHER_TTL) return wxMem.data;
   if (env.EVENTS_KV) {
-    try { const c = await env.EVENTS_KV.get('weather-v1', { type: 'json' }); if (c && now - c.at < WEATHER_TTL) { wxMem = c; return c.data; } } catch (e) { }
+    try { const c = await env.EVENTS_KV.get('weather-v2', { type: 'json' }); if (c && now - c.at < WEATHER_TTL) { wxMem = c; return c.data; } } catch (e) { }
   }
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 10000);
   let data;
@@ -213,7 +214,7 @@ export async function getWeather(env = {}, fetchImpl = fetch, now = Date.now()) 
   } finally { clearTimeout(t); }
   if (!data || !data.current || !data.daily || !Array.isArray(data.daily.time)) throw new Error('bad_weather');
   wxMem = { at: now, data };
-  if (env.EVENTS_KV) { try { await env.EVENTS_KV.put('weather-v1', JSON.stringify(wxMem), { expirationTtl: 3600 }); } catch (e) { } }
+  if (env.EVENTS_KV) { try { await env.EVENTS_KV.put('weather-v2', JSON.stringify(wxMem), { expirationTtl: 3600 }); } catch (e) { } }
   return data;
 }
 export function resetWeather() { wxMem = null; }

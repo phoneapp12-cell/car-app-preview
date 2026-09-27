@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -586,7 +586,7 @@ function Bills() {
   };
   return header('Bills', 'Regular bills and due dates', addBtn('Add a bill', 'billForm()')) +
     (S.bills.length ? `<div class="summary"><div class="muted">Due in the next 30 days</div><div class="amt">${money(total)}</div>
-      <div class="muted">${plural(count, 'payment')}${over ? ` · <b style="color:#fff">${over} overdue</b>` : ''} · reminders 3 days before and on the day</div></div>
+      <div class="muted">${plural(count, 'payment')}${over ? ` · <b style="color:var(--onbrand)">${over} overdue</b>` : ''} · reminders 3 days before and on the day</div></div>
       <div class="sec">Your bills</div>
       ${sorted.length ? `<div class="list">${sorted.map(row).join('')}</div>` : '<div class="card muted">All paid up. Good as gold!</div>'}
       ${paid.length ? `<div class="sec">Paid</div><div class="list">${paid.map(row).join('')}</div>` : ''}`
@@ -781,19 +781,19 @@ function Calendar() {
   for (let i = 0; i < 42; i++) {
     const t = gridStart + i * DAY, d = new Date(t), other = d.getUTCMonth() !== m;
     if (i >= 35 && other) break;
-    const iso = isoT(t), cols = [...new Set((byDay[iso] || []).map(e => e.color || `var(--${e.src})`))].slice(0, 4);
-    cells += `<button class="${other ? 'other' : ''} ${t === T ? 'today' : ''} ${t === calSel ? 'sel' : ''}" aria-label="${fmtLong(iso)}" onclick="pickDay(${t})">
-      <span class="n">${d.getUTCDate()}</span><span class="dots">${cols.map(c => `<i style="background:${c}"></i>`).join('')}</span></button>`;
+    // v1.9.0: coloured chips (short label where it fits, a plain bar on narrow screens), up to 3, else 2 and "+N more"
+    const iso = isoT(t), all = byDay[iso] || [], hol = all.some(e => e.src === 'hol'), dow = d.getUTCDay();
+    const items = [...all.filter(e => e.src === 'hol'), ...all.filter(e => e.src !== 'hol')];
+    const shown = items.length > 3 ? items.slice(0, 2) : items, more = items.length - shown.length;
+    cells += `<button class="${other ? 'other' : ''} ${t === T ? 'today' : ''} ${t === calSel ? 'sel' : ''} ${dow === 0 || dow === 6 ? 'we' : ''} ${hol ? 'holday' : ''}" aria-label="${fmtLong(iso)}" data-d="${iso}" data-n="${items.length}" onclick="pickDay(${t})">
+      <span class="n">${d.getUTCDate()}</span><span class="dots">${shown.map(e => `<i class="cc" title="${esc(e.title)}" style="--c:${e.color ? esc(e.color) : `var(--${e.src})`}">${esc(chipLabel(e))}</i>`).join('')}${more ? `<b class="more">+${more}<span class="mw"> more</span></b>` : ''}</span></button>`;
   }
-  const evRow = e => `<button class="ev" onclick="${e.go}"><span class="bar" style="background:${e.color || `var(--${e.src})`}"></span><span class="time">${esc(e.time)}</span>
+  const evRow = (e, ic) => `<button class="ev${ic ? ' evi' : ''}" onclick="${e.go}"><span class="bar" style="background:${e.color || `var(--${e.src})`}"></span>${ic ? `<span class="evic" style="--c:${e.color ? esc(e.color) : `var(--${e.src})`}">${I(calIcon(e))}</span>` : ''}<span class="time">${esc(e.time)}</span>
      <div style="flex:1;min-width:0"><div class="t">${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}" ${e.color ? `style="background:${e.color}"` : ''}>${esc(e.tag || (e.src === 'appt' ? 'Appt' : 'Due'))}</span></button>`;
   const dayLabel = s => { const d = daysLeft(s); return (d === 0 ? 'Today · ' : d === 1 ? 'Tomorrow · ' : '') + fmtW(s); };
   let agenda;
   if (calSel !== null) {
-    const iso = isoT(calSel), list = calItems(calSel, calSel);
-    agenda = `<div class="sec">${fmtLong(iso)} <button onclick="calSel=null;render()">Show all</button></div>
-      ${list.map(evRow).join('') || '<div class="card muted" style="margin-bottom:8px">Nothing on this day.</div>'}
-      <div class="btns" style="margin-top:4px"><button class="btn" onclick="apptForm(null,'${iso}')">${I('plus')} Add an appointment on this day</button></div>`;
+    agenda = dayView(calSel, evRow);
   } else {
     const overdue = dueItems(S).filter(x => x.days < 0 && (x.kind !== 'pet' || showPetsCal()) && (x.kind !== 'health' || showHealthCal()));
     const groups = {};
@@ -804,7 +804,7 @@ function Calendar() {
         : empty('Nothing in the next 3 weeks', 'Add an appointment, or tap a day on the calendar.', 'Add an appointment', 'apptForm()'));
   }
   return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
-    `<div class="card"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
+    `<div class="card calcard"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
      <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${showMine() && S.myEvents.length ? '<span><i class="dot" style="background:var(--mine)"></i>My events</span>' : ''}${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${showPetsCal() && S.pets.some(p => p.care.some(c => careDue(c))) ? '<span><i class="dot" style="background:var(--pet)"></i>Pets</span>' : ''}${showHealthCal() && S.health.some(p => p.items.some(it => it.apptDate || careDue(it))) ? '<span><i class="dot" style="background:var(--health)"></i>Health</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
       ${y !== now.getFullYear() || m !== now.getMonth() ? `<button style="margin-left:auto;color:var(--brand);font-weight:700" onclick="calMonth=null;calSel=null;render()">Back to today</button>` : ''}</div>
@@ -814,7 +814,39 @@ function Calendar() {
     ${S.feeds.length ? syncNote(true) : `<div class="callout blue" style="margin-top:16px">${I('link')}<div><b>Bring in your Outlook or Google calendar.</b> Paste your calendar link once and your appointments show up here, with reminders.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="go('#settings');setTimeout(()=>{const x=document.getElementById('calsec');x&&x.scrollIntoView()},50)">Connect a calendar</button></div></div></div>`}`;
 }
-function pickDay(t) { calSel = calSel === t ? null : t; render(); }
+function pickDay(t) { calSel = calSel === t ? null : t; render(); if (calSel !== null) setTimeout(dayIntoView, 30); }
+// v1.9.0 calendar helpers: short chip label, an icon per kind, and the day view (all-day items, then timed items)
+// month chips are narrow: long labels are cut to their first word ("Rubbish day" -> "Rubbish", "Labour Day" -> "Labour")
+function chipLabel(e) { const l = chipFull(e).trim(), w = l.split(/\s+/)[0]; return l.length > 8 && w.length >= 3 ? w.replace(/[’',:·-]+$/, '') : l; }
+function chipFull(e) {
+  if (e.src === 'due') return ({ Bill: e.title.split(' · ')[0] })[e.time] || (e.time === 'To-do' ? e.title : e.time);
+  if (e.src === 'bday') return e.title.replace(/’s .*$/, '');
+  if (e.src === 'health') return e.title.replace(/^[^–]*– /, '');
+  return e.title;
+}
+function calIcon(e) {
+  if (e.src === 'due') return { WOF: 'shield', Rego: 'doc', Service: 'wrench', Bill: 'bill', 'To-do': 'todo', AA: 'idcard', Licence: 'idcard' }[e.time] || 'cal';
+  return { appt: e.tag === 'Event' ? 'ticket' : 'clock', bday: 'cake', hol: 'flag', ext: 'link', meal: 'meal', pet: 'paw', health: 'heart', mine: 'repeat' }[e.src] || 'cal';
+}
+// timed = has a clock time (appointments, events, health bookings) or a set slot (tonight's dinner at 6 pm)
+const isTimed = e => /^\d\d:\d\d/.test(e.sort || '') && e.time !== 'All day';
+function dayView(t, evRow) {
+  const iso = isoT(t), list = calItems(t, t), d = daysLeft(iso);
+  const allDay = list.filter(e => !isTimed(e)), timed = list.filter(isTimed).sort((a, b) => a.sort.localeCompare(b.sort));
+  const hols = list.filter(e => e.src === 'hol');
+  const head = `<div class="dayhead" id="dayview"><div><div class="dwhen">${d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d === -1 ? 'Yesterday' : d > 1 ? 'In ' + d + ' days' : -d + ' days ago'}</div>
+    <div class="ddate">${fmtLong(iso)}</div>${hols.length ? `<div class="dhol">${I('flag')} ${hols.map(h => esc(h.title)).join(', ')}</div>` : ''}</div>
+    <span class="dcount">${list.length ? plural(list.length, 'item') : 'Free day'}</span></div>`;
+  const grp = (label, arr) => arr.length ? `<div class="agday">${label}</div>${arr.map(e => evRow(e, true)).join('')}` : '';
+  return `<div class="sec">Day view <button onclick="calSel=null;render()">Show all</button></div>
+    <div class="dayview">${head}
+    ${list.length ? grp('All day', allDay) + grp('At a set time', timed) : '<div class="card muted" style="margin-bottom:8px">Nothing on this day.</div>'}
+    <div class="btns" style="margin-top:4px"><button class="btn" onclick="apptForm(null,'${iso}')">${I('plus')} Add an appointment on this day</button></div></div>`;
+}
+function dayIntoView() {
+  const el = document.getElementById('dayview'), v = document.getElementById('view'); if (!el || !v) return;
+  const r = el.getBoundingClientRect(); if (r.top > innerHeight - 200) v.scrollBy({ top: r.top - innerHeight + 260, behavior: 'smooth' });
+}
 function shiftMonth(n) { let { y, m } = calMonth; m += n; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } calMonth = { y, m }; calSel = null; render(); }
 function apptForm(id, date) {
   const a = id ? S.appts.find(x => x.id === id) : { title: '', date: date || (calSel != null ? isoT(calSel) : todayISO()), time: '', notes: '' };
@@ -2389,6 +2421,49 @@ function commMoreSub() {
   return `This fortnight: <b>${centsMoney(commSum(CM().entries, f.start, f.end))}</b> · ${fmt(f.start)} – ${fmt(f.end)}`;
 }
 
+/* ================= APPEARANCE: colour themes (v1.9.0, Settings › Appearance) ================= */
+// The colours live in CSS variables (index.html); a theme just sets html[data-theme]. The choice is in S.settings
+// (so it's in backups) and copied to localStorage so the inline script in index.html can apply it before first paint.
+// [key, name, note, brand, background, card, ink, browser bar colour]
+const THEMES = [
+  ['teal', 'Teal', 'Standard', '#0F766E', '#F4F6F5', '#FFFFFF', '#15201D', '#0F766E'],
+  ['blue', 'Blue', '', '#1D5FBF', '#F3F5F9', '#FFFFFF', '#15201D', '#1D5FBF'],
+  ['green', 'Green', '', '#2E7D32', '#F3F6F2', '#FFFFFF', '#15201D', '#2E7D32'],
+  ['purple', 'Purple', '', '#6D3FC4', '#F6F4FA', '#FFFFFF', '#15201D', '#6D3FC4'],
+  ['orange', 'Orange', '', '#B4530A', '#F8F5F2', '#FFFFFF', '#15201D', '#B4530A'],
+  ['dark', 'Dark', 'Easy on the eyes at night', '#3CC4B3', '#0E1412', '#18201E', '#E8EEEC', '#0E1412']
+];
+const themeKey = () => { const t = S && S.settings && S.settings.theme; return THEMES.some(x => x[0] === t) ? t : 'teal'; };
+const phoneDark = () => { try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; } };
+// Match phone: Dark when the phone is in dark mode, otherwise the chosen light theme (Teal if Dark was chosen)
+function effectiveTheme() {
+  const t = themeKey();
+  if (!S || !S.settings || !S.settings.themeAuto) return t;
+  return phoneDark() ? 'dark' : t === 'dark' ? 'teal' : t;
+}
+function applyTheme() {
+  const t = effectiveTheme(), root = document.documentElement;
+  if (t === 'teal') root.removeAttribute('data-theme'); else if (root.getAttribute('data-theme') !== t) root.setAttribute('data-theme', t);
+  const th = THEMES.find(x => x[0] === t), m = document.querySelector('meta[name="theme-color"]');
+  if (m && m.content !== th[7]) m.content = th[7];
+  try { localStorage.setItem('theme', JSON.stringify({ t: themeKey(), auto: !!(S.settings && S.settings.themeAuto) })); } catch (e) { }
+}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S && S.settings.themeAuto) { applyTheme(); render(); } }); } catch (e) { }
+async function setTheme(k) {
+  if (!THEMES.some(x => x[0] === k)) return;
+  const s = snap(); S.settings.theme = k; applyTheme(); await save(); render();
+  const th = THEMES.find(x => x[0] === k);
+  toast(`${th[1]} theme on.${S.settings.themeAuto && (k === 'dark' ? !phoneDark() : phoneDark()) ? ' Match phone is on, so you’ll see it when the phone is in ' + (k === 'dark' ? 'dark' : 'light') + ' mode.' : ''}`, 'Undo', undoTo(s));
+}
+async function toggleThemeAuto() { S.settings.themeAuto = !S.settings.themeAuto; applyTheme(); await save(); render(); }
+function themePicker() {
+  const cur = themeKey();
+  return `<div class="themes" id="themepicker" role="radiogroup" aria-label="Colour theme">${THEMES.map(([k, name, note, brand, bg, card, ink]) =>
+    `<button class="theme ${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-theme-key="${k}" aria-label="${name} theme${note ? ' (' + note.toLowerCase() + ')' : ''}" onclick="setTheme('${k}')">
+      <span class="tprev" style="background:${bg}"><span class="tbar" style="background:${k === 'dark' ? card : brand}"></span><span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span><span class="tbtn" style="background:${brand}"></span></span>
+      <span class="tname">${k === cur ? I('check') : ''}${name}</span></button>`).join('')}</div>`;
+}
+
 /* ================= MORE ================= */
 function More() {
   const T = todayT(), t30 = T + 30 * DAY;
@@ -2599,9 +2674,10 @@ async function setBridgeHome(v) { S.settings.bridgeHome = v; await save(); rende
 /* ================= WEATHER (Open-Meteo, Whangārei) ================= */
 // Open-Meteo is free, needs no key and allows browser requests. Credit: "Weather data by Open-Meteo.com" (CC BY 4.0).
 const WX_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-35.7251&longitude=174.3237' +
-  '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,precipitation' +
+  '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation' +
+  '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,is_day' + // v1.9.0: hourly strip
   '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset' +
-  '&timezone=Pacific%2FAuckland&forecast_days=7&wind_speed_unit=kmh';
+  '&timezone=Pacific%2FAuckland&forecast_days=7&forecast_hours=48&wind_speed_unit=kmh';
 const WX_MAX_AGE = 30 * 60 * 1000;
 const METSERVICE_URL = 'https://www.metservice.com/towns-cities/regions/northland/locations/whangarei';
 const OPEN_METEO_URL = 'https://open-meteo.com/';
@@ -2631,47 +2707,117 @@ function updWx() {
   if (h === 'weather') { render(); return; }
   const el = document.getElementById('wxcard'); if (el) el.outerHTML = wxCard();
 }
+// Open-Meteo weather codes → words (day, night) and the icon kind drawn by wxIcon() (v1.9.0: coloured inline SVG icons)
 const WMO = {
-  0: ['Sunny', 'Clear', 'sun', 'moon'], 1: ['Mostly sunny', 'Mostly clear', 'cloudsun', 'cloudmoon'], 2: ['Partly cloudy', 'Partly cloudy', 'cloudsun', 'cloudmoon'], 3: ['Cloudy', 'Cloudy', 'cloud', 'cloud'],
+  0: ['Sunny', 'Clear', 'clear'], 1: ['Mostly sunny', 'Mostly clear', 'pc'], 2: ['Partly cloudy', 'Partly cloudy', 'pc'], 3: ['Cloudy', 'Cloudy', 'cloud'],
   45: ['Fog', 0, 'fog'], 48: ['Fog', 0, 'fog'], 51: ['Light drizzle', 0, 'drizzle'], 53: ['Drizzle', 0, 'drizzle'], 55: ['Heavy drizzle', 0, 'drizzle'], 56: ['Freezing drizzle', 0, 'drizzle'], 57: ['Freezing drizzle', 0, 'drizzle'],
   61: ['Light rain', 0, 'rain'], 63: ['Rain', 0, 'rain'], 65: ['Heavy rain', 0, 'rain'], 66: ['Freezing rain', 0, 'rain'], 67: ['Freezing rain', 0, 'rain'],
   71: ['Light snow', 0, 'snow'], 73: ['Snow', 0, 'snow'], 75: ['Heavy snow', 0, 'snow'], 77: ['Snow', 0, 'snow'],
-  80: ['Light showers', 0, 'rain'], 81: ['Showers', 0, 'rain'], 82: ['Heavy showers', 0, 'rain'], 85: ['Snow showers', 0, 'snow'], 86: ['Snow showers', 0, 'snow'],
+  80: ['Light showers', 0, 'showers'], 81: ['Showers', 0, 'showers'], 82: ['Heavy showers', 0, 'showers'], 85: ['Snow showers', 0, 'snow'], 86: ['Snow showers', 0, 'snow'],
   95: ['Thunderstorms', 0, 'storm'], 96: ['Thunderstorms with hail', 0, 'storm'], 99: ['Thunderstorms with hail', 0, 'storm']
 };
-function wmo(code, day = true) {
+const WX_WINDY = 40; // km/h: a dry day or hour this windy gets the wind icon
+// kind: clear | pc | cloud | fog | drizzle | rain | showers | snow | storm | wind (+ day/night for clear and pc)
+function wmo(code, day = true, wind = null) {
   const w = WMO[code] || ['Weather', 0, 'cloud'];
-  return { words: day || !w[1] ? w[0] : w[1], icon: day || !w[3] ? w[2] : w[3] };
+  let words = day || !w[1] ? w[0] : w[1], kind = w[2];
+  if (typeof wind === 'number' && wind >= WX_WINDY && ['clear', 'pc', 'cloud'].includes(kind)) { kind = 'wind'; words += ', windy'; }
+  const legacy = { clear: day ? 'sun' : 'moon', pc: day ? 'cloudsun' : 'cloudmoon', cloud: 'cloud', fog: 'fog', drizzle: 'drizzle', rain: 'rain', showers: 'rain', snow: 'snow', storm: 'storm', wind: 'cloud' }[kind];
+  return { words, kind, day, icon: legacy };
 }
-const deg = n => Math.round(n) + '°';
+// Coloured weather icons, drawn inline (no image hosts). Colours come from CSS variables so they suit every theme.
+const WXP = {
+  sun: '<g class="w-sun"><circle cx="16" cy="16" r="6"/><path d="M16 3.5v3M16 25.5v3M3.5 16h3M25.5 16h3M7.2 7.2l2.1 2.1M22.7 22.7l2.1 2.1M7.2 24.8l2.1-2.1M22.7 9.3l2.1-2.1"/></g>',
+  sunS: '<g class="w-sun"><circle cx="11.5" cy="11.5" r="4.6"/><path d="M11.5 2.8v2M11.5 18.2v2M2.8 11.5h2M18.2 11.5h2M5.3 5.3l1.4 1.4M16.3 16.3l1.4 1.4M5.3 17.7l1.4-1.4M16.3 6.7l1.4-1.4"/></g>',
+  moon: '<path class="w-moon" d="M20.5 25.5A10 10 0 0 1 13.2 6.6a10.5 10.5 0 1 0 12.2 14.1 10 10 0 0 1-4.9 4.8z"/>',
+  moonS: '<path class="w-moon" d="M14.6 18.4A6.6 6.6 0 0 1 9.8 5.9a7 7 0 1 0 8.1 9.4 6.6 6.6 0 0 1-3.3 3.1z"/>',
+  cloud: '<path class="w-cloud" d="M10 26h14.5a5.2 5.2 0 0 0 .8-10.3 7.4 7.4 0 0 0-14-1.7A6 6 0 0 0 10 26z"/>',
+  cloudUp: '<path class="w-cloud dk" d="M10 21.5h14.5a5.2 5.2 0 0 0 .8-10.3 7.4 7.4 0 0 0-14-1.7A6 6 0 0 0 10 21.5z"/>',
+  rain: '<path class="w-rain" d="M12 24.5l-1.6 4.2M17 24.5l-1.6 4.2M22 24.5l-1.6 4.2"/>',
+  showers: '<path class="w-rain" d="M14.5 24.5l-1.6 4.2M20.5 24.5l-1.6 4.2"/>',
+  drizzle: '<g class="w-drop"><circle cx="12" cy="26" r="1.2"/><circle cx="17" cy="27.5" r="1.2"/><circle cx="22" cy="26" r="1.2"/></g>',
+  snow: '<g class="w-snow"><circle cx="12" cy="26" r="1.5"/><circle cx="17" cy="28" r="1.5"/><circle cx="22" cy="26" r="1.5"/></g>',
+  bolt: '<path class="w-bolt" d="M17.5 18.5l-4.5 6.5h3.6l-1.6 5.5 6-8h-3.7l1.8-4z"/>',
+  fog: '<path class="w-fog" d="M5 20.5h22M8 24.5h18M6 28.5h14"/>',
+  fogCloud: '<path class="w-cloud" d="M9.5 17h15a4.8 4.8 0 0 0 .5-9.5 7 7 0 0 0-13.2-1.4A5.6 5.6 0 0 0 9.5 17z"/>',
+  wind: '<path class="w-wind" d="M3.5 12.5h15.5a3.8 3.8 0 1 0-3.8-3.8M3.5 18h21a3.8 3.8 0 1 1-3.8 3.8M3.5 23.5h9"/>'
+};
+function wxIcon(w, cls = '') {
+  const k = w.kind, parts = {
+    clear: w.day ? WXP.sun : WXP.moon, pc: (w.day ? WXP.sunS : WXP.moonS) + WXP.cloud, cloud: WXP.cloud, fog: WXP.fogCloud + WXP.fog,
+    drizzle: WXP.cloudUp + WXP.drizzle, rain: WXP.cloudUp + WXP.rain, showers: (w.day ? WXP.sunS : WXP.moonS) + WXP.cloudUp + WXP.showers,
+    snow: WXP.cloudUp + WXP.snow, storm: WXP.cloudUp + WXP.bolt, wind: WXP.wind
+  }[k] || WXP.cloud;
+  return `<svg class="wxsvg ${cls}" data-kind="${k}" viewBox="0 0 32 32" role="img" aria-label="${esc(w.words)}">${parts}</svg>`;
+}
+const deg = n => typeof n === 'number' && isFinite(n) ? Math.round(n) + '°' : '–';
+const num = n => typeof n === 'number' && isFinite(n);
+const compass = d => num(d) ? ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((d % 360) + 360) % 360 / 45) % 8] : '';
+const arr = (o, k, i) => o && Array.isArray(o[k]) ? o[k][i] : null;
 function wxDays() {
   if (!WX) return [];
   const d = WX.data.daily, T = todayISO();
-  return d.time.map((iso, i) => ({ iso, code: d.weather_code[i], hi: d.temperature_2m_max[i], lo: d.temperature_2m_min[i], rain: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null,
-    wind: d.wind_speed_10m_max ? d.wind_speed_10m_max[i] : null, sunrise: d.sunrise ? d.sunrise[i] : '', sunset: d.sunset ? d.sunset[i] : '' })).filter(x => x.iso >= T);
+  return d.time.map((iso, i) => ({ iso, code: arr(d, 'weather_code', i), hi: arr(d, 'temperature_2m_max', i), lo: arr(d, 'temperature_2m_min', i), rain: num(arr(d, 'precipitation_probability_max', i)) ? arr(d, 'precipitation_probability_max', i) : null,
+    wind: num(arr(d, 'wind_speed_10m_max', i)) ? arr(d, 'wind_speed_10m_max', i) : null, sunrise: arr(d, 'sunrise', i) || '', sunset: arr(d, 'sunset', i) || '' })).filter(x => x.iso >= T);
 }
+// Hourly forecast from this hour on (older saved forecasts just drop the hours that have passed). Empty if the data has no hourly part.
+function wxHours(n) {
+  const h = WX && WX.data.hourly;
+  if (!h || !Array.isArray(h.time)) return [];
+  const now = new Date(), key = todayISO() + 'T' + pad2(now.getHours());
+  const out = [];
+  h.time.forEach((t, i) => {
+    if (typeof t !== 'string' || t.slice(0, 13) < key || out.length >= n) return;
+    const hr = +t.slice(11, 13), isDay = num(arr(h, 'is_day', i)) ? arr(h, 'is_day', i) !== 0 : hr >= 6 && hr < 19;
+    out.push({ t, hr, temp: arr(h, 'temperature_2m', i), rain: num(arr(h, 'precipitation_probability', i)) ? arr(h, 'precipitation_probability', i) : null,
+      w: wmo(arr(h, 'weather_code', i), isDay, arr(h, 'wind_speed_10m', i)), now: t.slice(0, 13) === key });
+  });
+  return out;
+}
+const pad2 = n => String(n).padStart(2, '0');
+const hourLabel = x => x.now ? 'Now' : x.hr === 0 ? WDL[new Date(parseD(x.t.slice(0, 10))).getUTCDay()].slice(0, 3) : (x.hr % 12 || 12) + (x.hr < 12 ? ' am' : ' pm');
+const dayLabel = iso => iso === todayISO() ? 'Today' : WDL[new Date(parseD(iso)).getUTCDay()].slice(0, 3);
 function wxUpdated() {
   if (!WX) return '';
   const off = typeof navigator !== 'undefined' && navigator.onLine === false;
   return 'Updated ' + ago(WX.at) + (off ? ' · offline' : wxFailed ? ' · couldn’t refresh just now' : '');
 }
+function hoursStrip(hours) {
+  if (!hours.length) return '';
+  return `<div class="wxhours" role="list" aria-label="Next ${hours.length} hours">${hours.map(x => `<div class="wxh${x.now ? ' now' : ''}" role="listitem" aria-label="${hourLabel(x)}: ${deg(x.temp)}, ${esc(x.w.words)}${x.rain != null ? ', ' + x.rain + '% chance of rain' : ''}">
+    <span class="t">${hourLabel(x)}</span>${wxIcon(x.w)}<b>${deg(x.temp)}</b><span class="p${x.rain != null && x.rain >= 30 ? ' wet' : ''}">${x.rain != null ? x.rain + '%' : ''}</span></div>`).join('')}</div>`;
+}
+// 7-day rows with the high/low drawn as a bar on a shared scale for the week
+function weekRows(days, cls = '') {
+  const his = days.map(x => x.hi).filter(num), los = days.map(x => x.lo).filter(num);
+  const min = los.length ? Math.min(...los) : 0, max = his.length ? Math.max(...his) : 1, span = Math.max(1, max - min);
+  return days.map(x => {
+    const w = wmo(x.code, true, x.wind);
+    const bar = num(x.hi) && num(x.lo) ? `<span class="rng" aria-hidden="true"><i style="left:${Math.round((x.lo - min) / span * 100)}%;width:${Math.max(6, Math.round((x.hi - x.lo) / span * 100))}%"></i></span>` : '<span class="rng"></span>';
+    return `<div class="wxd ${cls}" data-day="${x.iso}" aria-label="${x.iso === todayISO() ? 'Today' : WDL[new Date(parseD(x.iso)).getUTCDay()]}: ${esc(w.words)}, high ${deg(x.hi)}, low ${deg(x.lo)}${x.rain != null ? ', ' + x.rain + '% chance of rain' : ''}">
+      <span class="d">${dayLabel(x.iso)}</span>${wxIcon(w)}<span class="p${x.rain != null && x.rain >= 30 ? ' wet' : ''}">${x.rain != null ? I('drop') + x.rain + '%' : ''}</span><span class="lo">${deg(x.lo)}</span>${bar}<span class="hi">${deg(x.hi)}</span></div>`;
+  }).join('');
+}
+let wxAll = false; // Home card: show all 7 days
 function wxCard() {
   const days = wxDays();
   if (!WX || !days.length) {
     const msg = wxBusy || (!wxFailed && navigator.onLine !== false) ? 'Getting the Whangārei weather…' : 'The weather isn’t available right now. Tap to try again.';
     return `<button class="card wx wxempty" id="wxcard" onclick="refreshWx(true)">${I('cloudsun')}<span>${msg}</span></button>`;
   }
-  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0), t = days[0].iso === todayISO() ? days[0] : null;
-  const strip = days.slice(t ? 1 : 0, (t ? 1 : 0) + 5).map(x => {
-    const w = wmo(x.code);
-    return `<div><span class="d">${WDL[new Date(parseD(x.iso)).getUTCDay()].slice(0, 3)}</span>${I(w.icon, `aria-label="${w.words}"`)}<b>${deg(x.hi)}</b><span class="lo">${deg(x.lo)}</span></div>`;
-  }).join('');
-  return `<button class="card wx" id="wxcard" onclick="go('#weather')" aria-label="Whangārei weather: ${deg(c.temperature_2m)}, ${now.words}. Tap for the full forecast.">
-    <div class="wxnow"><span class="wxic">${I(now.icon)}</span>
-      <div class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${now.words}</span></div>
-      ${t ? `<div class="wxmeta"><span>H ${deg(t.hi)} · L ${deg(t.lo)}</span>${t.rain != null ? `<span>${I('drop')} ${t.rain}% rain</span>` : ''}</div>` : ''}</div>
-    <div class="wxdays">${strip}</div>
-    <div class="wxfoot">Whangārei · ${wxUpdated()} · Open-Meteo</div></button>`;
+  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m), t = days[0].iso === todayISO() ? days[0] : null;
+  const facts = [num(c.apparent_temperature) ? `Feels like ${deg(c.apparent_temperature)}` : '', num(c.wind_speed_10m) ? `Wind ${Math.round(c.wind_speed_10m)} km/h${compass(c.wind_direction_10m) ? ' ' + compass(c.wind_direction_10m) : ''}` : ''].filter(Boolean);
+  const shown = wxAll ? days : days.slice(0, 3);
+  return `<div class="card wx" id="wxcard">
+    <button class="wxnow" onclick="go('#weather')" aria-label="Whangārei weather: ${deg(c.temperature_2m)}, ${esc(now.words)}. Tap for the full forecast.">
+      <span class="wxic">${wxIcon(now, 'big')}</span>
+      <span class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></span>
+      ${t ? `<span class="wxmeta"><span>H ${deg(t.hi)} · L ${deg(t.lo)}</span>${t.rain != null ? `<span>${I('drop')} ${t.rain}% rain</span>` : ''}</span>` : ''}</button>
+    ${facts.length ? `<div class="wxfacts2">${facts.map(f => `<span>${f}</span>`).join('')}</div>` : ''}
+    ${hoursStrip(wxHours(12))}
+    <div class="wxweek" id="wxweek">${weekRows(shown)}</div>
+    <div class="wxacts">${days.length > 3 ? `<button class="wxmore" id="wxmore" onclick="wxAll=!wxAll;updWx()" aria-expanded="${wxAll}">${wxAll ? 'Show fewer days' : `Show all ${days.length} days`}</button>` : '<span></span>'}<button class="wxfull" onclick="go('#weather')">Full forecast ${I('right')}</button></div>
+    <div class="wxfoot">Whangārei · ${wxUpdated()} · Open-Meteo</div></div>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
@@ -2680,24 +2826,27 @@ function Weather() {
     `<div class="card empty"><div class="t">${wxBusy ? 'Getting the weather…' : 'The weather isn’t available right now'}</div><div class="s">Check your internet connection, then try again.</div>
      <button class="btn primary" style="flex:none;padding:12px 22px" onclick="refreshWx(true)">${I('refresh')} Try again</button></div>
      <div class="btns"><a class="btn" href="${METSERVICE_URL}" target="_blank" rel="noopener">MetService forecast ${I('ext')}</a></div>`;
-  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0), t = days[0].iso === todayISO() ? days[0] : null;
+  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m), t = days[0].iso === todayISO() ? days[0] : null;
   const hm = s => s ? fmtTime(String(s).slice(11, 16)) : '';
-  const rows = days.map((x, i) => {
-    const w = wmo(x.code), label = x.iso === todayISO() ? 'Today' : daysLeft(x.iso) === 1 ? 'Tomorrow' : WDL[new Date(parseD(x.iso)).getUTCDay()];
-    return `<div class="row wxrow"><div class="ic wxi">${I(w.icon)}</div><div class="tx"><div class="t">${label}</div><div class="s">${w.words}${x.rain != null ? ` · ${x.rain}% rain` : ''}${x.wind != null ? ` · wind ${Math.round(x.wind)} km/h` : ''}</div></div>
+  const hours = wxHours(24);
+  const rows = days.map(x => {
+    const w = wmo(x.code, true, x.wind), label = x.iso === todayISO() ? 'Today' : daysLeft(x.iso) === 1 ? 'Tomorrow' : WDL[new Date(parseD(x.iso)).getUTCDay()];
+    return `<div class="row wxrow"><div class="wxri">${wxIcon(w)}</div><div class="tx"><div class="t">${label}</div><div class="s">${esc(w.words)}${x.rain != null ? ` · ${x.rain}% rain` : ''}${x.wind != null ? ` · wind ${Math.round(x.wind)} km/h` : ''}</div></div>
       <div class="wxhl"><b>${deg(x.hi)}</b><span>${deg(x.lo)}</span></div></div>`;
   }).join('');
   return back + header('Weather', 'Whangārei') +
-    `<div class="card wxbig"><div class="wxnow"><span class="wxic">${I(now.icon)}</span><div class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${now.words}</span></div></div>
+    `<div class="card wxbig"><div class="wxnow"><span class="wxic">${wxIcon(now, 'big')}</span><div class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></div></div>
       <div class="wxfacts">
-        ${c.apparent_temperature != null ? `<div><small>Feels like</small><b>${deg(c.apparent_temperature)}</b></div>` : ''}
+        ${num(c.apparent_temperature) ? `<div><small>Feels like</small><b>${deg(c.apparent_temperature)}</b></div>` : ''}
         ${t ? `<div><small>High / low</small><b>${deg(t.hi)} / ${deg(t.lo)}</b></div>` : ''}
         ${t && t.rain != null ? `<div><small>Chance of rain</small><b>${t.rain}%</b></div>` : ''}
-        ${c.wind_speed_10m != null ? `<div><small>Wind</small><b>${Math.round(c.wind_speed_10m)} km/h</b></div>` : ''}
+        ${num(c.wind_speed_10m) ? `<div><small>Wind</small><b>${Math.round(c.wind_speed_10m)} km/h${compass(c.wind_direction_10m) ? ' ' + compass(c.wind_direction_10m) : ''}</b></div>` : ''}
         ${t && t.sunrise ? `<div><small>Sunrise</small><b>${hm(t.sunrise)}</b></div><div><small>Sunset</small><b>${hm(t.sunset)}</b></div>` : ''}
       </div></div>
+    ${hours.length ? `<div class="sec">Next 24 hours</div><div class="card wxhcard">${hoursStrip(hours)}</div>` : ''}
     <div class="sec">Next 7 days <button onclick="refreshWx(true)">${wxBusy ? 'Updating…' : 'Refresh'}</button></div>
-    <div class="list">${rows}</div>
+    <div class="card wxweekcard"><div class="wxweek">${weekRows(days)}</div></div>
+    <div class="list" style="margin-top:10px">${rows}</div>
     <div class="btns"><a class="btn" href="${METSERVICE_URL}" target="_blank" rel="noopener">MetService forecast for Whangārei ${I('ext')}</a></div>
     <div class="foot">${wxUpdated()}<br>Weather data by <a href="${OPEN_METEO_URL}" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). For warnings, check MetService.</div>`;
 }
@@ -2822,7 +2971,12 @@ function Settings() {
   let canShare = false;
   try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] })); } catch (e) { }
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>
-  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Reminders, calendars and backup</div></div></div>
+  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Appearance, reminders, calendars and backup</div></div></div>
+  <div class="sec" id="appearance">Appearance</div>
+  ${themePicker()}
+  <div class="list" style="margin-top:10px">
+   <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">Use Dark when the phone is in dark mode${themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t'}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
+  </div>
   <div class="sec">Reminders</div>
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Notifications</div><div class="s">${permTxt}</div></div></div>
@@ -3005,6 +3159,7 @@ function tabbar(active) {
 let renderedDay = todayISO();
 function render() {
   if (!S) return;
+  applyTheme();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, pets: Pets };

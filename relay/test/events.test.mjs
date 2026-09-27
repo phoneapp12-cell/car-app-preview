@@ -4,6 +4,9 @@ import { handle, resetWeather, WEATHER_URL } from '../src/relay.js';
 let fails = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 const O = 'https://phoneapp12-cell.github.io';
 const NOW = Date.parse('2026-09-27T00:00:00Z'); // 1 pm, 27 Sep in NZ
+// The sample events are fixed dates around 27 Sep 2026, so the relay's own clock (Date.now) is pinned there too;
+// otherwise the /events checks start failing once those dates are in the past.
+{ const t0 = performance.now(); Date.now = () => NOW + Math.round(performance.now() - t0); }
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const item = (slug, title, iso, cats = ['Kids &amp; family', 'Sport'], addr = 'Forum North,&nbsp;Whangārei&nbsp;0110') => {
   const [y, m, d] = iso.split('-');
@@ -102,9 +105,10 @@ const wf = async (url) => { wcalls++; if (url !== WEATHER_URL) throw new Error('
 resetWeather();
 r = await handle(get('/weather'), env, wf);
 ok(r.status === 200 && (await r.json()).current.temperature_2m === 17.1 && wcalls === 1, 'GET /weather: Open-Meteo for Whangārei');
+ok(/hourly=temperature_2m,precipitation_probability,weather_code/.test(WEATHER_URL) && /forecast_hours=48/.test(WEATHER_URL), '/weather asks for the hourly forecast too (v1.9.0 hourly strip)');
 r = await handle(get('/weather'), env, wf);
 ok(r.status === 200 && wcalls === 1, 'weather kept for 20 minutes (no second request)');
-resetWeather(); delete store['weather-v1'];
+resetWeather(); delete store['weather-v2'];
 r = await handle(get('/weather'), env, async () => new Response('{"error":true}', { status: 429 }));
 ok(r.status === 502 && (await r.json()).error === 'weather_unavailable', 'Open-Meteo refusing: 502 weather_unavailable');
 r = await handle(get('/weather', 'https://evil.example'), env, wf);

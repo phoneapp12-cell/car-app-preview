@@ -13,6 +13,9 @@ A small installable web app (PWA) for keeping track of WOF, rego and servicing f
 - **My events** (Calendar › Add event, v1.6.0): your own events like payday, rubbish day or recycling, one-off or repeating, with an optional reminder. See below.
 - **Health** (More › Health, v1.8.0): dentist, doctor, chiropractor and other check-ups for each person, with clinic phone, repeat interval, booked appointments, reminders and history. See below.
 - **Pets & Vet** (More › Pets & Vet, v1.5.0): your pets with their care items – flea treatment, worming, vaccinations, grooming, vet check-ups, dog registration and your own items – with due dates on Home and the Calendar. See below.
+- **Colour themes** (Settings › Appearance, v1.9.0): Teal (the standard look), Blue, Green, Purple, Orange and Dark, plus **Match phone** to follow the phone's light or dark mode. See below.
+- **Weather card** (Home, v1.9.0): now graphical, with weather icons, the next 12 hours in a strip and each day's high and low drawn as a bar. See below.
+- **Calendar** (v1.9.0): each day in the month shows short coloured labels for what's on (up to 3, then "+N more"), and tapping a day opens a day view under the month. See below.
 - **Lifting bridge – Dave Culham Drive** (Te Matau ā Pohe): the likely state of the bridge and the next change, worked out from the council's lift times. It's **not live**. Open it from Home, **More › Lifting bridge**, or the **Bridge** app shortcut (long-press the app icon on Android).
 
 ## Public holidays
@@ -80,6 +83,20 @@ The council doesn't publish live lift status, so the card says "Not live – bas
 - **Live traffic** opens Google Maps at the bridge with the traffic layer.
 
 Where it shows (Settings › Lifting bridge): **Near only** (default), **Always on Home** or **Off**. With Near only, Home shows a short line under the weather until you tap **Show when I'm near**; after that the card appears at the top of Home only when the app is opened within about 2 km of the bridge. Location is used only while the app is open and never saved; only the yes/no choice is stored. Tested by `pwtest/bridge.mjs`.
+
+## Colour themes (v1.9.0)
+**Settings › Appearance** (at the top of Settings) has a picker with six themes: **Teal** (the standard look, same as before v1.9.0), **Blue**, **Green**, **Purple**, **Orange** and **Dark** (easy on the eyes at night). Tap one and it applies straight away, with Undo in the message. **Match phone** switches to Dark when the phone is in dark mode and back to the chosen light theme when it isn't (Teal if Dark was the choice).
+- The theme is saved in the app's settings (`S.settings.theme`, `S.settings.themeAuto`) and in `localStorage` key `theme`, so `index.html` can set it before the app starts (no light flash when Dark is on). The phone's top bar colour (`theme-color`) follows the theme.
+- Included in backups. Older backups without a theme restore as Teal.
+- All colours are CSS variables in `index.html` (`:root` for Teal, `[data-theme=…]` for the others); themes are listed in `THEMES` in `app.js`. Calendar category colours are spaced further apart, with their own set for Dark.
+
+## Weather card (v1.9.0)
+The Home card shows the current temperature with an icon, feels-like and wind, the **next 12 hours** as a strip (icon, temperature, chance of rain in blue from 30%; scrolls sideways inside the card), then 3 days with each day's low and high drawn as a bar on one scale for the week, and **Show all 7 days**. **Full forecast** opens the Weather screen with the next 24 hours, the 7-day bars and the day-by-day list. Missing values show "–" and missing sections are left out. The app asks Open-Meteo for 48 hours of hourly data; the relay's `/weather` copy asks for the same fields (saved as `weather-v2`).
+
+## Calendar (v1.9.0)
+Each day in the month shows up to 3 short coloured labels (the first word of the title, in the category's colour), then "+N more". Tapping a day opens a **day view** under the month with that day's items, all-day first, then by time, each with its icon and tag, and **Add event on …** for that day. **Show all** closes the day view. The legend lists the categories shown.
+
+Themes, the weather card and the calendar look are tested by `pwtest/visual.mjs` (themes apply, survive a reload and are in backups; Dark contrast spot checks; the weather card with full and missing data; chips, "+N more" and the day view; nothing scrolls sideways and the bottom bar stays flush, at 360 and 390 wide).
 
 ## Weather and events sources
 - **Weather:** [Open-Meteo](https://open-meteo.com/) forecast API (no key, free for non-commercial use). Weather data by Open-Meteo.com, licensed CC BY 4.0; the credit is shown on the weather screen. Whangārei: lat -35.7251, lon 174.3237, Pacific/Auckland, °C, km/h. The last forecast is saved on the phone (`localStorage` key `wx`) and refreshed when the app opens if it's more than 30 minutes old. If Open-Meteo can't be reached, the app tries the relay's `/weather` copy. The full forecast screen links to [MetService Whangārei](https://www.metservice.com/towns-cities/regions/northland/locations/whangarei) for warnings.
