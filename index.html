@@ -18,7 +18,7 @@
   --bg:#F4F6F5; --card:#fff; --ink:#15201D; --ink2:#51605B; --ink3:#86938F; --line:#E4E9E7;
   --brand:#0F766E; --brand2:#E6F4F1;
   --red:#C62828; --redbg:#FDE8E8; --amber:#A15C07; --amberbg:#FEF1D6; --green:#1B7A3E; --greenbg:#E3F5E9;
-  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8; --hol:#C2410C; --meal:#65A30D;
+  --due:#0F766E; --appt:#8B5CF6; --bday:#DB2777; --ext:#0A64C8; --hol:#C2410C; --meal:#65A30D; --pet:#8B5A2B;
   --radius:18px;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -301,6 +301,25 @@ details.help ol{margin:0 0 12px}
 .row.mealup .t{font-size:15px}
 .row.mealup svg.i{width:18px;height:18px;color:var(--ink3);flex:none}
 .row.meal.flash{background:#F0FDF4;transition:background .3s}
+/* Pets & Vet (1.5.0) */
+.ic.pet{background:#F5EBDD;color:var(--pet)} .tag.pet{background:var(--pet)}
+.petpic svg.i{stroke:#fff}
+.petcard .carhead>svg.i{color:var(--ink3);width:18px;height:18px;flex:none}
+.petnext{margin-top:12px;border-top:1px solid var(--line)}
+.petnext>div{display:flex;align-items:center;gap:8px;padding:8px 0 0;font-size:14px}
+.petnext .pn{flex:1;min-width:0;font-weight:650;overflow-wrap:anywhere}
+.petnext b{font-size:13.5px;color:var(--ink2);font-weight:600;white-space:nowrap}
+.petnext .pill{font-size:11.5px;padding:3px 7px}
+.row.care{gap:10px;padding:10px 12px 10px 14px}
+.row.care .tapzone{gap:12px}
+.row.care .s{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px}
+.row.care .duewhen{color:var(--ink);font-weight:650}
+.row.care .pill{font-size:11.5px;padding:3px 7px}
+.row.care .btn.small{padding:8px 10px;gap:4px}
+.row.care .btn.small svg.i{width:16px;height:16px}
+.hrowpet .cost{font-size:14.5px;white-space:nowrap}
+.vetcard .big{margin-top:4px;overflow-wrap:anywhere}
+@media (max-width:370px){ .row.care .btn.small{padding:8px 8px;font-size:13.5px} .row.care{padding-left:12px} .row.care .ic{width:34px;height:34px} }
 .mealtabs{margin-bottom:12px}
 .mealset{padding:12px 14px}
 .mealset .t{font-weight:700;font-size:15px}

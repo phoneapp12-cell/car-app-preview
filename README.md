@@ -1,6 +1,6 @@
 # Car & Life Due Dates
 
-A small installable web app (PWA) for keeping track of WOF, rego and servicing for the family's cars, plus service history, drivers (AA membership and licence dates), bills, to-dos, appointments, birthdays and ideas, with reminders. It can also show events from an Outlook.com, Google or iCloud calendar link.
+A small installable web app (PWA) for keeping track of WOF, rego and servicing for the family's cars, plus service history, drivers (AA membership and licence dates), pets (flea treatment, worming, vaccinations, grooming, vet check-ups, dog registration), bills, to-dos, appointments, birthdays and ideas, with reminders. It can also show events from an Outlook.com, Google or iCloud calendar link.
 
 - Open it: https://phoneapp12-cell.github.io/car-app-preview/
 - Install it: in Chrome on Android tap ⋮ then **Add to Home screen** / **Install app**. On iPhone (Safari) tap **Share** then **Add to Home Screen**.
@@ -9,6 +9,7 @@ A small installable web app (PWA) for keeping track of WOF, rego and servicing f
 
 - New Zealand public holidays are built in and on by default (Settings › Show public holidays). No setup and no internet needed.
 - **Meal planner** (More › Meal planner): plan dinners for your cooking nights only (Friday and Saturday to start with), with ideas, suggestions, a shopping list and history. Everything is written **gluten free** (Shane has coeliac disease). See below.
+- **Pets & Vet** (More › Pets & Vet, v1.5.0): your pets with their care items – flea treatment, worming, vaccinations, grooming, vet check-ups, dog registration and your own items – with due dates on Home and the Calendar. See below.
 - **Lifting bridge – Dave Culham Drive** (Te Matau ā Pohe): the likely state of the bridge and the next change, worked out from the council's lift times. It's **not live**. Open it from Home, **More › Lifting bridge**, or the **Bridge** app shortcut (long-press the app icon on Android).
 
 ## Public holidays
@@ -34,6 +35,17 @@ holiday on the same day, it isn't shown twice. The 2026–2028 dates are checked
 - **Home › Upcoming meals** (v1.4.2): a card under the weather, lifting bridge and holidays, above the tiles, listing planned meals with their dates, e.g. "Fri 2 Oct – Butter chicken" with the GF marker (or "Check it's gluten free") and Tonight / Tomorrow / In N days. Only nights with a meal entered are listed – empty nights are left out – and the whole card is hidden when nothing is planned. Today's meal is included until it's ticked as cooked; after that it's upcoming cooking nights within the planner's 4 weeks, up to 6, with **See all** (showing the count when there are more) going to the planner. Tapping a meal opens that night in the planner. It replaces the old "Tonight / Tomorrow" line, so a meal never shows twice on Home. **Calendar** shows planned meals with a "Meal" tag (turn off in the planner or Settings › Calendar).
 - Saved with everything else in `S.meals`, so it's in backups. The bottom bar stays at five tabs so it fits a 360 px screen. Tested by `pwtest/meals.mjs`.
 
+## Pets & Vet
+**More › Pets & Vet** (the bottom bar stays at five tabs). Starts empty with an **Add your first pet** button; there are no example pets.
+- **Pets:** add as many as you like: name, type (dog, cat or other), breed, birthday (optional, shows the age), microchip number (optional), vet clinic and phone (optional; the pet page has a **Call** button, a `tel:` link). Edit from the pet page; **Delete** asks first, and the message has Undo.
+- **Care items:** each new pet gets flea treatment (monthly), worming (every 3 months), vaccinations (yearly), grooming (every 6 weeks) and a vet check-up (yearly); dogs also get **dog registration**, due every **1 July** (the NZ registration year runs 1 July to 30 June; paying from May counts for the coming year, paying January–April counts for the current one; with nothing entered it shows the next 1 July). Every interval can be changed (weeks, months, years, or "Doesn't repeat"), items can be deleted, and you can add your own (e.g. a medication, heartworm, tick treatment).
+- Each item keeps its **last done** date and works out the **next due** date from it, or you can set the next due date yourself (a set date wins, and is cleared the next time you tick Done).
+- **Done** records the date (today unless you change it) with optional notes (product, vaccine…) and cost in the pet's **History**, and rolls the item forward. History entries can be edited or deleted.
+- **Home:** due pet care feeds the Overdue / Due soon / All good tiles and **Needs attention**, exactly like the car due dates (same 30-day due-soon window, paw icon, "Max: Flea treatment"); like car dates it isn't repeated in "Coming up this week". Tapping opens the pet.
+- **Calendar:** its own "Pet" tag, brown colour and "Pets" legend entry, plus the Overdue list. **Settings › Calendar › Show pets** turns it off (Home still shows them).
+- **Reminders:** 3 days before and on the day (once if overdue), never between 9 pm and 7 am.
+- Saved in `S.pets` (care items in `pet.care`, history in `pet.history`), so pets are in backups; older backups without pets restore fine. Due dates are worked out in `core.js` (`careDue`, `regDueAfter`) so the service worker reminders use the same rules. Tested by `pwtest/pets.mjs`.
+
 ## Lifting bridge card
 The council doesn't publish live lift status, so the card says "Not live – based on the council's lift times". The rules (`bridgeStatus` in `core.js`) come from the
 [council's bridge page](https://www.wdc.govt.nz/Services/Roads-and-Transportation/Transportation/Te-Matau-a-Pohe-bridge):
@@ -51,7 +63,7 @@ Where it shows (Settings › Lifting bridge): **Near only** (default), **Always 
 
 ## Files
 - `index.html` – page and styles
-- `app.js` – the app screens (Home with weather and the lifting bridge, Cars, Calendar, To-do, More › Events, Meal planner, Bills, Birthdays, Ideas, Settings) and calendar sync
+- `app.js` – the app screens (Home with weather and the lifting bridge, Cars, Calendar, To-do, More › Events, Meal planner, Pets & Vet, Bills, Birthdays, Ideas, Settings) and calendar sync
 - `core.js` – dates, reminder schedule and on-device storage (shared with the service worker)
 - `ical-import.js` – reads .ics calendars (time zones incl. Windows names, all-day, repeats, exceptions, cancellations)
 - `vendor/ical.min.js` – ical.js 2.2.1 (Mozilla, MPL-2.0), unmodified

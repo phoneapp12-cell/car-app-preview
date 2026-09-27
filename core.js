@@ -217,6 +217,44 @@
   }
   const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
 
+  /* ---------- pets: care items (flea, worming, vaccinations, grooming, check-up, dog registration, own items) ----------
+     Each item: { id, kind, name, every, unit: 'weeks' | 'months' | 'years' | 'none', last: 'YYYY-MM-DD', due: 'YYYY-MM-DD' (set by hand, optional) } */
+  const PET_CARE = {
+    flea: { name: 'Flea treatment', every: 1, unit: 'months' },
+    worm: { name: 'Worming', every: 3, unit: 'months' },
+    vacc: { name: 'Vaccinations', every: 1, unit: 'years' },
+    groom: { name: 'Grooming', every: 6, unit: 'weeks' },
+    check: { name: 'Vet check-up', every: 1, unit: 'years' },
+    reg: { name: 'Dog registration', every: 1, unit: 'years' }
+  };
+  function addInterval(s, n, unit) {
+    n = Math.max(1, Math.round(+n || 1));
+    return unit === 'weeks' ? addDays(s, 7 * n) : unit === 'years' ? addMonths(s, 12 * n) : addMonths(s, n);
+  }
+  // NZ dog registration year runs 1 July to 30 June, due each 1 July. Paying from May onwards counts for the coming year
+  // (councils send the new year's invoice before 1 July); paying Jan–Apr is a late payment for the current year.
+  function regDueAfter(done) { const d = dObj(done); return (d.getUTCFullYear() + (d.getUTCMonth() >= 4 ? 1 : 0)) + '-07-01'; }
+  function nextJuly1(now) { const T = todayISO(now), y = +T.slice(0, 4); return T <= y + '-07-01' ? y + '-07-01' : (y + 1) + '-07-01'; }
+  // Next due date of a care item ('' if it can't be worked out yet)
+  function careDue(it, now) {
+    if (!it) return '';
+    if (it.due && parseD(it.due) != null) return it.due;
+    if (it.kind === 'reg') return it.last ? regDueAfter(it.last) : nextJuly1(now);
+    if (!it.last || parseD(it.last) == null || it.unit === 'none' || !(+it.every > 0)) return '';
+    return addInterval(it.last, it.every, it.unit);
+  }
+  // Due date after ticking Done on `date`
+  function careNextAfter(it, date) {
+    if (it.kind === 'reg') return regDueAfter(date);
+    return it.unit === 'none' || !(+it.every > 0) ? '' : addInterval(date, it.every, it.unit);
+  }
+  function careEvery(it) {
+    if (it.kind === 'reg') return 'Every 1 July';
+    if (it.unit === 'none' || !(+it.every > 0)) return 'Doesn’t repeat';
+    const n = +it.every, u = it.unit === 'weeks' ? 'week' : it.unit === 'years' ? 'year' : 'month';
+    return n === 1 ? (u === 'week' ? 'Every week' : u === 'month' ? 'Monthly' : 'Yearly') : `Every ${n} ${u}s`;
+  }
+
   /* ---------- everything that has a due date ---------- */
   function dueItems(data, now) {
     const out = [];
@@ -230,6 +268,10 @@
       if (d.aaExpiry) out.push({ kind: 'driver', part: 'aa', id: d.id, driver: d, label: 'AA', title: d.name + ' AA membership', date: d.aaExpiry, go: '#driver/' + d.id });
       if (d.licExpiry) out.push({ kind: 'driver', part: 'lic', id: d.id, driver: d, label: 'Licence', title: d.name + ' driver licence', date: d.licExpiry, go: '#driver/' + d.id });
     });
+    (data.pets || []).forEach(p => (p.care || []).forEach(it => {
+      const date = careDue(it, now);
+      if (date) out.push({ kind: 'pet', part: 'care', id: p.id + ':' + it.id, pet: p, care: it, title: p.name + ': ' + it.name, date, go: '#pet/' + p.id });
+    }));
     (data.todos || []).filter(t => !t.done && t.due).forEach(t => out.push({ kind: 'todo', part: 'todo', id: t.id, todo: t, title: t.title, date: t.due, go: '#todo' }));
     out.forEach(x => { x.days = daysLeft(x.date, now); });
     return out.sort((a, b) => a.days - b.days || a.title.localeCompare(b.title));
@@ -252,6 +294,8 @@
     if (x.part === 'bill') { if (d <= 0) return 'd0'; if (d <= 3) return 's3'; return null; }
     if (x.part === 'todo') return d <= 0 ? 'd0' : null;
     // AA membership and driver licence: 30, 14 and 3 days before, and on the day (or once, if already expired)
+    // Pet care: 3 days before and on the day (once, if already overdue)
+    if (x.part === 'care') { if (d <= 0) return 'd0'; if (d <= 3) return 's3'; return null; }
     if (x.part === 'aa' || x.part === 'lic') { if (d > 30) return null; if (d > 14) return 's30'; if (d > 3) return 's14'; if (d > 0) return 's3'; return 'd0'; }
     return null;
   }
@@ -282,6 +326,11 @@
       if (d < 0) return { title: `${n}’s ${what} has expired`, body: `It ran out on ${fmtW(x.date, now)}. ${how}` };
       return { title: `${n}’s ${what} ${d === 0 ? 'expires today' : 'expires ' + when}`, body: `Expires ${fmtW(x.date, now)}. ${how}` };
     }
+    if (x.kind === 'pet') {
+      const n = x.pet.name, what = x.care.name.toLowerCase();
+      if (d < 0) return { title: `${n}: ${what} overdue`, body: `It was due ${fmtW(x.date, now)}. Tap Done once it’s sorted.` };
+      return { title: `${n}: ${what} ${d === 0 ? 'due today' : 'due ' + when}`, body: `Due ${fmtW(x.date, now)}.${x.pet.vet ? ' ' + x.pet.vet + (x.pet.vetPhone ? ' · ' + x.pet.vetPhone : '') : ''}` };
+    }
     return { title: d < 0 ? `To-do overdue: ${x.title}` : `To-do today: ${x.title}`, body: d < 0 ? `It was due ${fmtW(x.date, now)}.` : 'Tap to tick it off.' };
   }
 
@@ -291,7 +340,7 @@
     const out = [];
     const daytime = !quietNow(now);
     dueItems(data, now).forEach(x => {
-      if (x.kind === 'driver' && !daytime) return; // AA / licence reminders wait until 7 am
+      if ((x.kind === 'driver' || x.kind === 'pet') && !daytime) return; // AA / licence / pet reminders wait until 7 am
       const st = stage(x); if (!st) return;
       const key = [x.kind, x.id, x.part, x.date, st].join('|');
       if (fired[key]) return;
@@ -402,5 +451,5 @@
   }
 
   g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money,
-    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
+    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);

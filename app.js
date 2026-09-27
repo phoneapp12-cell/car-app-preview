@@ -1,8 +1,8 @@
 /* Car & Life Due Dates – the app. Data lives only on this device (IndexedDB). */
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
-  money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.4.2';
+  money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
+const APP_VERSION = '1.5.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -64,6 +64,11 @@ const P = {
   fog: '<path d="M4 8h16M3 12h18M5 16h14M8 20h8"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   pin: '<path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  paw: '<circle cx="5.5" cy="10" r="2"/><circle cx="9.2" cy="5.3" r="2"/><circle cx="14.8" cy="5.3" r="2"/><circle cx="18.5" cy="10" r="2"/><path d="M12 12c-2.6 0-5 3.2-5 5.6 0 1.7 1.3 2.6 2.8 2.4 1-.1 1.4-.6 2.2-.6s1.2.5 2.2.6c1.5.2 2.8-.7 2.8-2.4 0-2.4-2.4-5.6-5-5.6z"/>',
+  syringe: '<path d="M17 3l4 4M19 5l-3.5 3.5M15 5l4 4-9.5 9.5H5.5v-4zM5.5 18.5L3 21M9 11l2 2M12 8l2 2"/>',
+  scissors: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 7.5L20 18M8 16.5L20 6"/>',
+  pill: '<path d="M10.5 3.5a5 5 0 0 1 7.07 7.07l-7 7a5 5 0 0 1-7.07-7.07zM7 7l7 7"/>',
+  heart: '<path d="M12 20s-7.5-4.6-9-9.3C2 7.5 4.2 4.5 7.3 4.5c1.9 0 3.5 1 4.7 2.7 1.2-1.7 2.8-2.7 4.7-2.7 3.1 0 5.3 3 4.3 6.2C19.5 15.4 12 20 12 20z"/>',
   ticket: '<path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v12" stroke-dasharray="2 2.2"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
@@ -85,7 +90,7 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(),
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), pets: [],
     settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
@@ -104,6 +109,7 @@ function normalise(d) {
     if (c.lastService && !c.services.length) c.services.push({ id: 'svc-' + c.id + '-' + c.lastService, date: c.lastService, km: '', garage: '', cost: '', notes: '', migrated: true });
   });
   d.meals = normMeals(d.meals); // first time on 1.4.0: Fri and Sat, with the starter ideas
+  d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
   d.version = 1;
   return d;
@@ -213,6 +219,7 @@ function rowFor(x) {
   let icon = 'todo', sub;
   if (x.kind === 'car') { icon = { wof: 'shield', rego: 'doc', svc: 'wrench' }[x.part]; sub = (x.car.plate ? esc(x.car.plate) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = money(x.bill.amount) + ' · ' + fmtW(x.date); }
+  else if (x.kind === 'pet') { icon = 'paw'; sub = 'Pet · ' + esc(careEvery(x.care)) + ' · Due ' + fmtW(x.date); }
   else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
   else sub = 'To-do · ' + esc(x.todo.list || '') + ' · ' + fmtW(x.date);
   return `<button class="row" onclick="go('${x.go}')"><div class="ic ${x.kind}">${I(icon)}</div>
@@ -237,7 +244,7 @@ function Home() {
       ${n ? `<span class="pill ${status(d)}">${n[0]} ${d < 0 ? 'overdue' : d === 0 ? 'today' : d + 'd'}</span>` : '<span class="pill none">No dates</span>'}</button>`;
   }).join('');
   const t7 = todayT() + 7 * DAY;
-  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'hol' && e.src !== 'meal');
+  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'pet' && e.src !== 'hol' && e.src !== 'meal'); // due dates and pet care are in Needs attention
   const br = brOnHome();
   return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() + homeMeal() +
     `<div class="tiles">
@@ -714,7 +721,8 @@ function calItems(fromT, toT) {
   holItems(fromT, toT).forEach(x => ev.push(x));
   extEvents(fromT, toT).forEach(x => ev.push(x));
   mealCalItems(inR).forEach(x => ev.push(x));
-  const rank = { due: 0, hol: 1, bday: 1, appt: 2, ext: 2, meal: 3 };
+  petCalItems(inR).forEach(x => ev.push(x));
+  const rank = { due: 0, pet: 0, hol: 1, bday: 1, appt: 2, ext: 2, meal: 3 };
   return ev.sort((a, b) => parseD(a.date) - parseD(b.date) || rank[a.src] - rank[b.src] || (a.sort || '').localeCompare(b.sort || ''));
 }
 /* NZ public holidays: built in (core.js), on unless turned off in Settings */
@@ -782,7 +790,7 @@ function Calendar() {
       ${list.map(evRow).join('') || '<div class="card muted" style="margin-bottom:8px">Nothing on this day.</div>'}
       <div class="btns" style="margin-top:4px"><button class="btn" onclick="apptForm(null,'${iso}')">${I('plus')} Add an appointment on this day</button></div>`;
   } else {
-    const overdue = dueItems(S).filter(x => x.days < 0);
+    const overdue = dueItems(S).filter(x => x.days < 0 && (x.kind !== 'pet' || showPetsCal()));
     const groups = {};
     calItems(T, T + 21 * DAY).forEach(e => (groups[e.date] = groups[e.date] || []).push(e));
     agenda = (overdue.length ? `<div class="sec">Overdue</div><div class="list">${overdue.map(rowFor).join('')}</div>` : '') +
@@ -793,7 +801,7 @@ function Calendar() {
   return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
     `<div class="card"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
-     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
+     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${showPetsCal() && S.pets.some(p => p.care.some(c => careDue(c))) ? '<span><i class="dot" style="background:var(--pet)"></i>Pets</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
       ${y !== now.getFullYear() || m !== now.getMonth() ? `<button style="margin-left:auto;color:var(--brand);font-weight:700" onclick="calMonth=null;calSel=null;render()">Back to today</button>` : ''}</div>
      <div class="grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>
     ${agenda}
@@ -1546,6 +1554,208 @@ function mealCalItems(inR) {
   return Object.entries(M().plan).filter(([d]) => inR(d)).map(([d, e]) => ({ src: 'meal', title: e.title, date: d, time: 'Dinner', sort: '18:00', tag: 'Meal', notes: e.notes || (e.cooked ? 'Cooked' : ''), go: `mealNight('${d}')` }));
 }
 
+/* ================= PETS & VET (More › Pets & Vet) ================= */
+// S.pets = [{ id, name, type: 'dog'|'cat'|'other', breed, birthday, chip, vet, vetPhone, notes, care: [care item], history: [{ id, careId, name, date, notes, cost }] }]
+// Care items and their due dates are worked out in core.js (careDue), so the service worker can remind too.
+const PET_TYPES = [['dog', 'Dog'], ['cat', 'Cat'], ['other', 'Other']];
+const PET_HEX = { dog: '#8B5A2B', cat: '#64748B', other: '#0E7C86' };
+const CARE_ICON = { flea: 'drop', worm: 'pill', vacc: 'syringe', groom: 'scissors', check: 'heart', reg: 'idcard', custom: 'pill' };
+const CARE_NOTE_PH = { flea: 'e.g. which product, or cost', worm: 'e.g. which product, or cost', vacc: 'e.g. which vaccine, or cost', groom: 'e.g. where, or cost', check: 'e.g. what the vet said, or cost', reg: 'e.g. tag number, or cost', custom: 'e.g. dose, or cost' };
+const CARE_SUGGEST = ['Medication', 'Heartworm', 'Tick treatment', 'Dental clean', 'Nail trim', 'Kennel booking'];
+const UNITS = [['weeks', 'weeks'], ['months', 'months'], ['years', 'years'], ['none', 'Doesn’t repeat']];
+const careItem = kind => Object.assign({ id: 'care-' + kind, kind, last: '', due: '' }, PET_CARE[kind]);
+const defaultCare = type => ['flea', 'worm', 'vacc', 'groom', 'check'].concat(type === 'dog' ? ['reg'] : []).map(careItem);
+function normPets(list) {
+  return (Array.isArray(list) ? list : []).filter(p => p && typeof p === 'object' && p.id).map(p => {
+    p.name = String(p.name || 'Pet'); if (!['dog', 'cat', 'other'].includes(p.type)) p.type = 'other';
+    ['breed', 'birthday', 'chip', 'vet', 'vetPhone', 'notes'].forEach(k => { if (typeof p[k] !== 'string') p[k] = ''; });
+    p.care = (Array.isArray(p.care) ? p.care : []).filter(c => c && c.id).map(c => Object.assign({ kind: 'custom', name: 'Care', every: 1, unit: 'months', last: '', due: '' }, c));
+    p.history = (Array.isArray(p.history) ? p.history : []).filter(h => h && h.id && parseD(h.date) != null);
+    return p;
+  });
+}
+const getPet = id => S.pets.find(p => p.id === id);
+const getCare = (p, cid) => p && p.care.find(c => c.id === cid);
+const showPetsCal = () => !S.settings || S.settings.petsCal !== false;
+async function togglePetsCal() { S.settings.petsCal = !showPetsCal(); await save(); render(); }
+const petItems = p => dueItems({ pets: [p] });
+function petAge(b) {
+  const T = todayISO(); if (!parseD(b) || b > T) return '';
+  let m = (+T.slice(0, 4) - +b.slice(0, 4)) * 12 + (+T.slice(5, 7) - +b.slice(5, 7)); if (+T.slice(8) < +b.slice(8)) m--;
+  return m >= 12 ? plural(Math.floor(m / 12), 'year') : m >= 1 ? plural(m, 'month') : 'under a month';
+}
+const petSub = p => [PET_TYPES.find(t => t[0] === p.type)[1], p.breed ? esc(p.breed) : '', p.birthday ? petAge(p.birthday) : ''].filter(Boolean).join(' · ');
+const petPic = (p, big) => `<div class="carpic petpic" style="background:${PET_HEX[p.type]}">${I('paw')}</div>`;
+const telHref = n => 'tel:' + String(n || '').replace(/[^\d+]/g, '');
+function Pets() {
+  return header('Pets & Vet', S.pets.length ? plural(S.pets.length, 'pet') : 'Flea treatment, worming, vaccinations and more', addBtn('Add a pet', 'petForm()')) +
+    (S.pets.length ? S.pets.map(p => {
+      const next = petItems(p).slice(0, 3);
+      return `<div class="carcard petcard" role="button" tabindex="0" data-pet="${p.id}" onclick="go('#pet/${p.id}')"><div class="carhead">${petPic(p)}
+        <div style="flex:1;min-width:0"><div class="carname">${esc(p.name)}</div><div class="carmodel">${petSub(p)}</div></div>${I('right')}</div>
+        ${next.length ? `<div class="petnext">${next.map(x => `<div><span class="pn">${esc(x.care.name)}</span><b>${fmtW(x.date)}</b>${pill(x.days)}</div>`).join('')}</div>` : '<div class="muted" style="margin-top:10px;font-size:14px">No dates yet. Tap to add when things were last done.</div>'}</div>`;
+    }).join('') + `<div class="btns"><button class="btn" onclick="petForm()">${I('plus')} Add another pet</button></div>`
+      : empty('No pets yet', 'Keep track of flea treatment, worming, vaccinations, grooming, vet check-ups and dog registration.', 'Add your first pet', 'petForm()')) +
+    `<div class="foot">Due pet care shows on Home and the Calendar.<br>Your information is saved on this phone only.</div>`;
+}
+let petHistAll = false;
+function careRow(p, it) {
+  const due = careDue(it), d = due ? daysLeft(due) : null;
+  const bits = [careEvery(it), it.last ? 'Last done ' + fmt(it.last) : 'Not done yet'].concat(it.due ? ['Date set by you'] : []);
+  return `<div class="row care" data-care="${it.id}"><button class="tapzone" aria-label="Edit ${esc(it.name)}" onclick="careForm('${p.id}','${it.id}')"><div class="ic pet">${I(CARE_ICON[it.kind] || 'pill')}</div>
+    <div class="tx"><div class="t">${esc(it.name)}</div><div class="s">${due ? `<b class="duewhen">Due ${fmtW(due)}</b> ${pill(d)}` : '<span class="pill none">No date yet</span>'}</div><div class="s">${bits.join(' · ')}</div></div></button>
+    <button class="btn small" aria-label="Done: ${esc(it.name)}" onclick="doneForm('${p.id}','${it.id}')">${I('check')} Done</button></div>`;
+}
+function PetDetail(id) {
+  const p = getPet(id);
+  if (!p) return `<button class="back" onclick="go('#pets')">${I('left')} Pets &amp; Vet</button>` + empty('That pet isn’t here any more', 'It may have been deleted.', '', '');
+  const order = it => { const d = careDue(it); return d ? parseD(d) : Infinity; };
+  const care = [...p.care].sort((a, b) => order(a) - order(b));
+  const hist = [...p.history].sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0));
+  const shown = petHistAll ? hist : hist.slice(0, 8);
+  const info = [p.birthday ? `Born ${fmtY(p.birthday)}` : '', p.chip ? `Microchip ${esc(p.chip)}` : ''].filter(Boolean);
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#pets')">${I('left')} Pets &amp; Vet</button>
+    <button class="btn small" onclick="petForm('${p.id}')">${I('edit')} Edit</button></div>
+  <div class="hero">${petPic(p, true)}<div style="min-width:0"><h2>${esc(p.name)}</h2><div class="muted">${petSub(p)}${info.length ? '<br>' + info.join(' · ') : ''}</div></div></div>
+  ${p.vet || p.vetPhone ? `<div class="dcard vetcard"><div class="h">${I('heart')} Vet</div><div class="big" style="font-size:18px">${esc(p.vet || 'Vet clinic')}</div>
+    ${p.vetPhone ? `<div class="btns"><a class="btn primary" href="${telHref(p.vetPhone)}">${I('call')} Call ${esc(p.vetPhone)}</a></div>` : ''}</div>` : ''}
+  <div class="sec">Care <button onclick="careForm('${p.id}')">Add care item</button></div>
+  ${care.length ? `<div class="list" id="carelist">${care.map(it => careRow(p, it)).join('')}</div>` : empty('No care items', 'Add flea treatment, a medication or anything else you want reminding about.', 'Add care item', `careForm('${p.id}')`)}
+  <div class="sec">History ${hist.length > 8 ? `<button onclick="petHistAll=!petHistAll;render()">${petHistAll ? 'Show less' : `Show all (${hist.length})`}</button>` : ''}</div>
+  ${hist.length ? `<div class="list" id="pethist">${shown.map(h => `<button class="row hrowpet" data-hist="${h.id}" onclick="histForm('${p.id}','${h.id}')"><div class="tx"><div class="t">${esc(h.name)}</div>
+      <div class="s">${fmtW(h.date)}${h.date.slice(0, 4) !== todayISO().slice(0, 4) ? ' ' + h.date.slice(0, 4) : ''}${h.notes ? ' · ' + esc(h.notes) : ''}</div></div>${h.cost !== '' && h.cost != null ? `<b class="cost">${money(h.cost)}</b>` : ''}</button>`).join('')}</div>`
+    : `<div class="card muted" style="font-size:14px">Nothing logged yet. Tap “Done” on a care item and it’s saved here with the date and any notes.</div>`}
+  ${p.notes ? `<div class="dcard" style="margin-top:12px"><div class="h">${I('doc')} Notes</div><div class="muted notes" style="margin-top:6px">${esc(p.notes)}</div></div>` : ''}
+  <div class="card muted" style="margin-top:12px;font-size:13.5px">Reminders: 3 days before and on the day. Dog registration is due every 1 July (the registration year runs 1 July to 30 June).</div>
+  <div class="btns" style="margin-top:12px"><button class="btn danger" onclick="deletePet('${p.id}')">${I('trash')} Delete ${esc(p.name)}</button></div>`;
+}
+function petForm(id) {
+  const p = id ? getPet(id) : { name: '', type: 'dog', breed: '', birthday: '', chip: '', vet: '', vetPhone: '', notes: '' };
+  if (!p) return;
+  const vets = [...new Set(S.pets.map(x => x.vet).filter(Boolean))];
+  openSheet(id ? 'Edit pet' : 'Add a pet',
+    field('Name', inp('name', p.name, 'placeholder="e.g. Max" required maxlength="40"')) +
+    `<div class="field"><span>Type</span>${segHtml('type', PET_TYPES, p.type)}</div>` +
+    `<div class="two">${field('Breed', inp('breed', p.breed, 'placeholder="Optional" maxlength="50"'))}${field('Birthday', inp('birthday', p.birthday, 'type="date"'), 'Optional')}</div>` +
+    field('Microchip number', inp('chip', p.chip, 'inputmode="numeric" placeholder="Optional" maxlength="20"')) +
+    `<div class="two">${field('Vet clinic', inp('vet', p.vet, 'list="vetlist" placeholder="Optional" maxlength="60"') + `<datalist id="vetlist">${vets.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`)}${field('Vet phone', inp('vetPhone', p.vetPhone, 'type="tel" inputmode="tel" placeholder="Optional" maxlength="20"'))}</div>` +
+    field('Notes', area('notes', p.notes, 'Optional, e.g. allergies, food, insurance')) +
+    (id ? '' : `<p class="muted" style="margin:2px 2px 0;font-size:13.5px" id="petcarehint"></p>`),
+    async v => {
+      if (!v.name) return 'Please give your pet a name.';
+      if (v.birthday && (!parseD(v.birthday) || v.birthday > todayISO())) return 'The birthday can’t be in the future.';
+      if (v.vetPhone && digits(v.vetPhone).length < 6) return 'Please check the vet’s phone number.';
+      const upd = { name: v.name, type: v.type, breed: v.breed, birthday: v.birthday, chip: v.chip, vet: v.vet, vetPhone: v.vetPhone, notes: v.notes };
+      if (id) {
+        const s = snap(); let note = '';
+        Object.assign(p, upd);
+        const reg = p.care.find(c => c.kind === 'reg');
+        if (p.type === 'dog' && !reg) { p.care.push(careItem('reg')); note = ' Dog registration added.'; }
+        if (p.type !== 'dog' && reg) { p.care = p.care.filter(c => c !== reg); note = ' Dog registration removed.'; }
+        await save(); render(); toast('Pet updated.' + note, note ? 'Undo' : '', note ? undoTo(s) : null);
+      } else {
+        upd.id = uid('pet'); upd.care = defaultCare(v.type); upd.history = []; S.pets.push(upd);
+        await save(); toast(`${v.name} added. Tap a care item to add when it was last done.`);
+        return () => go('#pet/' + upd.id);
+      }
+    }, id ? 'Save' : 'Add pet',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete pet" onclick="deletePet('${id}')">${I('trash')}</button>` : '');
+  const hint = t => { const h = $('#petcarehint'); if (h) h.textContent = `We’ll add flea treatment (monthly), worming (every 3 months), vaccinations (yearly), grooming (every 6 weeks) and a yearly vet check-up${t === 'dog' ? ', plus dog registration (every 1 July)' : ''}. You can change or remove any of them.`; };
+  wireSeg('type', hint); hint(p.type);
+}
+function deletePet(id) {
+  const p = getPet(id); if (!p) return;
+  confirmSheet(`Delete ${esc(p.name)}?`, `${esc(p.name)}’s care items and history will be removed from this phone.`, 'Delete pet', async () => {
+    const s = snap(); S.pets = S.pets.filter(x => x.id !== id); await save();
+    return () => { go('#pets'); toast(`${p.name} deleted.`, 'Undo', undoTo(s)); };
+  });
+}
+function careForm(petId, cid) {
+  const p = getPet(petId); if (!p) return;
+  const it = cid ? getCare(p, cid) : { kind: 'custom', name: '', every: 1, unit: 'months', last: '', due: '' };
+  if (!it) return;
+  const reg = it.kind === 'reg';
+  openSheet(cid ? esc(it.name) : 'Add care item',
+    field('Name', inp('name', it.name, `placeholder="e.g. Medication" required maxlength="40" ${cid ? '' : 'list="caresuggest"'}`) + (cid ? '' : `<datalist id="caresuggest">${CARE_SUGGEST.map(x => `<option value="${x}">`).join('')}</datalist>`)) +
+    (reg ? `<p class="muted" style="margin:-2px 2px 12px;font-size:14px">Due every 1 July. The dog registration year runs 1 July to 30 June; paying from May counts for the coming year.</p>`
+      : `<div class="two">${field('Repeat every', inp('every', it.unit === 'none' ? '' : it.every, 'type="number" inputmode="numeric" min="1" max="99"'))}${field('&nbsp;', sel('unit', UNITS, it.unit || 'months'))}</div>`) +
+    field('Last done', inp('last', it.last, 'type="date"')) + field('Next due (optional)', inp('due', it.due, 'type="date"')) +
+    `<p class="muted" style="margin:0 2px 4px;font-size:13.5px" id="carehint"></p>`,
+    async v => {
+      if (!v.name) return 'Please give it a name.';
+      const unit = reg ? 'years' : v.unit, every = reg ? 1 : Math.round(+v.every);
+      if (!reg && unit !== 'none' && !(every >= 1 && every <= 99)) return 'Please choose how often, e.g. every 1 month.';
+      if (v.last && (!parseD(v.last) || v.last > todayISO())) return 'The last done date can’t be in the future.';
+      const s = snap(), upd = { name: v.name, every: unit === 'none' ? 0 : every, unit, last: v.last, due: v.due };
+      if (cid) Object.assign(it, upd); else p.care.push(Object.assign({ id: uid('care'), kind: 'custom' }, upd));
+      await save(); render(); toast(cid ? 'Saved.' : `${v.name} added.`, 'Undo', undoTo(s));
+    }, cid ? 'Save' : 'Add',
+    cid ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete care item" onclick="deleteCare('${petId}','${cid}')">${I('trash')}</button>` : '');
+  const f = $('#sf'), upd = () => {
+    const x = { kind: it.kind, every: reg ? 1 : +f.every.value, unit: reg ? 'years' : f.unit.value, last: f.last.value, due: f.due.value };
+    const d = careDue(x);
+    $('#carehint').textContent = x.due ? `Next due ${fmtLong(x.due)} (the date you set).` : d ? `Next due ${fmtLong(d)}, worked out from the last date. Or set a date yourself.` : 'Add the date it was last done and we’ll work out when it’s next due, or set the next due date.';
+  };
+  f.querySelectorAll('input,select').forEach(x => { x.addEventListener('input', upd); x.addEventListener('change', upd); }); upd();
+}
+async function deleteCare(petId, cid) {
+  const p = getPet(petId), it = getCare(p, cid), s = snap();
+  p.care = p.care.filter(c => c.id !== cid); await save(); await closeSheet(); render(); toast(`${it.name} removed.`, 'Undo', undoTo(s));
+}
+function doneForm(petId, cid) {
+  const p = getPet(petId), it = getCare(p, cid); if (!it) return;
+  openSheet(`Done: ${esc(it.name)}`,
+    `<div class="two">${field('Done on', inp('date', todayISO(), 'type="date" required'))}${field('Cost ($)', inp('cost', '', 'inputmode="decimal" placeholder="Optional"'))}</div>` +
+    field('Notes', area('notes', '', 'Optional, ' + (CARE_NOTE_PH[it.kind] || CARE_NOTE_PH.custom))) +
+    `<p class="muted" style="margin:0 2px 4px;font-size:13.5px" id="donehint"></p>`,
+    async v => {
+      if (!parseD(v.date)) return 'Please choose the date it was done.';
+      if (v.date > todayISO()) return 'The date can’t be in the future.';
+      const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 45.90.';
+      const s = snap();
+      p.history.push({ id: uid('ph'), careId: it.id, kind: it.kind, name: it.name, date: v.date, notes: v.notes, cost, at: Date.now() });
+      if (!it.last || v.date >= it.last) { it.last = v.date; it.due = ''; }
+      await save(); render();
+      const nd = careDue(it);
+      toast(`${it.name} done.${nd ? ' Next due ' + fmtW(nd) + '.' : ''}`, 'Undo', undoTo(s));
+    }, 'Save');
+  const upd = () => { const d = $('#sf input[name=date]').value, n = parseD(d) ? careNextAfter(it, d) : ''; $('#donehint').textContent = n ? `Next due: ${fmtLong(n)}.` : it.unit === 'none' ? 'This one doesn’t repeat.' : ''; };
+  $('#sf input[name=date]').addEventListener('input', upd); $('#sf input[name=date]').addEventListener('change', upd); upd();
+}
+function syncCareLast(p, careId) {
+  const it = getCare(p, careId); if (!it) return;
+  const l = p.history.filter(h => h.careId === careId).map(h => h.date).sort().pop();
+  if (l) it.last = l;
+}
+function histForm(petId, hid) {
+  const p = getPet(petId), h = p && p.history.find(x => x.id === hid); if (!h) return;
+  openSheet(esc(h.name),
+    `<div class="two">${field('Done on', inp('date', h.date, 'type="date" required'))}${field('Cost ($)', inp('cost', h.cost === '' || h.cost == null ? '' : Number(h.cost).toFixed(2), 'inputmode="decimal" placeholder="Optional"'))}</div>` +
+    field('Notes', area('notes', h.notes, 'Optional')),
+    async v => {
+      if (!parseD(v.date)) return 'Please choose the date it was done.';
+      if (v.date > todayISO()) return 'The date can’t be in the future.';
+      const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 45.90.';
+      const s = snap(); Object.assign(h, { date: v.date, notes: v.notes, cost }); syncCareLast(p, h.careId);
+      await save(); render(); toast('History updated.', 'Undo', undoTo(s));
+    }, 'Save',
+    `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete history entry" onclick="deleteHist('${petId}','${hid}')">${I('trash')}</button>`);
+}
+async function deleteHist(petId, hid) {
+  const p = getPet(petId), s = snap(), h = p.history.find(x => x.id === hid);
+  p.history = p.history.filter(x => x.id !== hid); syncCareLast(p, h.careId);
+  await save(); await closeSheet(); render(); toast('Entry deleted.', 'Undo', undoTo(s));
+}
+function petCalItems(inR) {
+  if (!showPetsCal()) return [];
+  return dueItems({ pets: S.pets }).filter(x => inR(x.date)).map(x => ({ src: 'pet', title: x.title, date: x.date, time: 'Pet', sort: '', tag: 'Pet', notes: careEvery(x.care), go: `go('#pet/${x.pet.id}')` }));
+}
+function petsMoreSub() {
+  if (!S.pets.length) return 'Flea treatment, vaccinations, grooming…';
+  const n = dueItems({ pets: S.pets })[0];
+  return n ? `Next: ${esc(n.title)}, ${n.days < 0 ? 'overdue' : n.days === 0 ? 'today' : fmtW(n.date)}` : plural(S.pets.length, 'pet');
+}
+
 /* ================= MORE ================= */
 function More() {
   const T = todayT(), t30 = T + 30 * DAY;
@@ -1555,10 +1765,12 @@ function More() {
   const starred = S.ideas.filter(i => i.pinned).length;
   const item = (href, icon, cls, t, sub, pillHtml = '') => `<button class="row" onclick="go('${href}')"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div><div class="s">${sub}</div></div>${pillHtml}${I('right')}</button>`;
   const ne = upcomingEvents()[0];
-  return header('More', 'Events, meals, bills, birthdays, ideas and settings') +
+  const petOver = dueItems({ pets: S.pets }).filter(x => x.days < 0).length;
+  return header('More', 'Events, meals, pets, bills, birthdays, ideas and settings') +
     `<div class="list">
       ${item('#events', 'ticket', 'ev', 'Events', ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei')}
       ${item('#meals', 'meal', 'meal', 'Meal planner', mealsMoreSub())}
+      ${item('#pets', 'paw', 'pet', 'Pets &amp; Vet', petsMoreSub(), petOver ? `<span class="pill over">${petOver} overdue</span>` : '')}
       ${item('#bridge', 'bridge', 'br', 'Lifting bridge', 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3])}
       ${item('#bills', 'bill', 'bill', 'Bills', S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…', over ? `<span class="pill over">${over} overdue</span>` : '')}
       ${item('#birthdays', 'cake', 'bday', 'Birthdays', nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one', nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '')}
@@ -1990,7 +2202,8 @@ function Settings() {
    WOF and rego: 30, 14 and 3 days before, on the day, then every 3 days while overdue.<br>
    Service: 14 days before. Bills: 3 days before and on the day. To-dos: on the day.<br>
    Appointments and connected calendars: 1 hour before (all-day ones in the morning).<br>
-   Birthdays: 3 days before and on the day, never between 9 pm and 7 am.<br><br>
+   Birthdays: 3 days before and on the day, never between 9 pm and 7 am.<br>
+   Pets: 3 days before and on the day, never between 9 pm and 7 am.<br><br>
    Reminders are checked every time you open the app. Background checks skip 9 pm to 7 am.
    <b>Android may delay background reminders if you don’t open the app for a while.</b> Opening it every few days keeps them coming.</div></div>
 
@@ -2017,6 +2230,7 @@ function Settings() {
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Show public holidays</div><div class="s">New Zealand public holidays and Auckland Anniversary Day (Northland’s regional holiday). Built in, works offline.</div></div><button class="switch ${showHolidays() ? 'on' : ''}" role="switch" aria-checked="${showHolidays()}" aria-label="Show public holidays" onclick="toggleSetting('holidays')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show planned meals</div><div class="s">Meals from the Meal planner, tagged “Meal”.</div></div><button class="switch ${showMealsCal() ? 'on' : ''}" role="switch" aria-checked="${showMealsCal()}" aria-label="Show planned meals on the Calendar" onclick="toggleMealsCal()"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Show pets</div><div class="s">Flea treatment, vaccinations and other pet care from Pets &amp; Vet, tagged “Pet”.</div></div><button class="switch ${showPetsCal() ? 'on' : ''}" role="switch" aria-checked="${showPetsCal()}" aria-label="Show pet care on the Calendar" onclick="togglePetsCal()"></button></div>
   </div>
 
   ${feedsSection()}
@@ -2114,7 +2328,7 @@ function importFile(input) {
     const d = obj && obj.data ? obj.data : obj;
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
-    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')} and ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}.`, 'Restore', async () => {
+    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')} and ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}.`, 'Restore', async () => {
       const s = snap(); S = normalise(d); const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
@@ -2133,7 +2347,7 @@ async function installApp() {
 
 /* ---------- router ---------- */
 const TABS = [['home', 'Home', 'home'], ['cars', 'Cars', 'car'], ['calendar', 'Calendar', 'cal'], ['todo', 'To-do', 'todo'], ['more', 'More', 'more']];
-const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events', 'meals'];
+const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events', 'meals', 'pets', 'pet'];
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
@@ -2146,8 +2360,8 @@ function render() {
   if (!S) return;
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals };
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : (map[r] || Home)();
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, pets: Pets };
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' || r === 'bridge' ? 'home' : map[r] ? r : 'home');
 }
