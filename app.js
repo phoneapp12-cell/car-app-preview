@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1506,19 +1506,34 @@ async function copyShop() {
 // One-off message after the gluten-free update of the starter ideas (set by migrateStarters)
 function takeMealNote() { const n = S && S.meals && S.meals.gfNote; if (n) delete S.meals.gfNote; return n || ''; }
 
-/* ---- Home line ---- */
+/* ---- Home: "Upcoming meals" card ---- */
+// Only nights with a meal entered (today's until it's ticked cooked), cooking nights within the planner's 4 weeks, up to 6.
+// Replaces the old "Tonight / Tomorrow" line, so a meal never shows twice on Home.
+const HOME_MEALS_MAX = 6;
+function upcomingMeals() {
+  const T = todayISO();
+  return Object.keys(M().plan).filter(d => d >= T && dayGap(d, T) < MEAL_WEEKS * 7 && isCookNight(d) && !(d === T && M().plan[d].cooked)).sort();
+}
 function homeMeal() {
-  if (!M().nights.length) return '';
-  const T = todayISO(), tm = addDays(T, 1), tN = isCookNight(T), mN = isCookNight(tm);
-  if (!tN && !mN) return '';
-  const pT = M().plan[T], pM = M().plan[tm];
-  const useToday = tN && !(pT && pT.cooked && mN);
-  const iso = useToday ? T : tm, e = useToday ? pT : pM;
-  const day = useToday ? 'Tonight' : WDL[new Date(parseD(tm)).getUTCDay()];
-  const title = e ? `${day}: ${esc(e.title)}` : `${day}: nothing planned – pick a meal`;
-  const sub = useToday ? (e && e.cooked ? 'Cooked ✓' : 'Cooking night') + (mN ? ` · Tomorrow: ${pM ? esc(pM.title) : 'nothing planned'}` : '') : 'Tomorrow · cooking night';
-  return `<div class="list mealhome" id="mealhome"><button class="row" onclick="${e ? `go('#meals')` : `mealNight('${iso}')`}"><div class="ic meal">${I('meal')}</div>
-    <div class="tx"><div class="t">${title}</div><div class="s">${sub}</div></div>${I('right')}</button></div>`;
+  const list = upcomingMeals(); if (!list.length) return '';
+  const T = todayISO(), when = d => { const n = dayGap(d, T); return n === 0 ? 'Tonight' : n === 1 ? 'Tomorrow' : 'In ' + n + ' days'; };
+  const row = d => { const e = M().plan[d], idea = M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title);
+    const mark = idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
+    return `<button class="row mealup" data-date="${d}" onclick="openNight('${d}')"><div class="tx"><div class="t">${fmtW(d)} – ${esc(e.title)}</div>
+      <div class="s">${[mark, when(d), idea && idea.tag ? esc(idea.tag) : ''].filter(Boolean).join(' · ')}</div></div>${I('right')}</button>`; };
+  return `<div class="list mealhome" id="mealcard"><div class="mealcardhead"><span>${I('meal')} Upcoming meals</span><a href="#meals">See all${list.length > HOME_MEALS_MAX ? ` (${list.length})` : ''}</a></div>
+    ${list.slice(0, HOME_MEALS_MAX).map(row).join('')}</div>`;
+}
+// Open one night in the planner: go to #meals, then open that night's sheet (after the page change has rendered)
+let pendingNight = null;
+function openNight(iso) { pendingNight = iso; if (location.hash === '#meals') render(); else location.hash = '#meals'; }
+function showPendingNight() {
+  const d = pendingNight; pendingNight = null; if (!d) return;
+  setTimeout(() => {
+    const r = document.querySelector(`#mealplan .row[data-date="${d}"]`);
+    if (r) { r.scrollIntoView({ block: 'center' }); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); }
+    mealNight(d);
+  }, 0);
 }
 function mealsMoreSub() {
   const d = mealNights().find(x => !M().plan[x] || !M().plan[x].cooked);
@@ -2133,6 +2148,7 @@ function render() {
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals };
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : (map[r] || Home)();
+  if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' || r === 'bridge' ? 'home' : map[r] ? r : 'home');
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
