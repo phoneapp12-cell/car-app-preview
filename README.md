@@ -8,6 +8,7 @@ A small installable web app (PWA) for keeping track of WOF, rego and servicing f
 - Home shows the Whangārei weather (from Open-Meteo, straight from the phone) and **More › Events** lists what's on in Whangārei over the next 60 days (from the council, through the relay). Neither sends anything about you.
 
 - New Zealand public holidays are built in and on by default (Settings › Show public holidays). No setup and no internet needed.
+- **Meal planner** (More › Meal planner): plan dinners for your cooking nights only (Friday and Saturday to start with), with ideas, suggestions, a shopping list and history. See below.
 - **Lifting bridge – Dave Culham Drive** (Te Matau ā Pohe): the likely state of the bridge and the next change, worked out from the council's lift times. It's **not live**. Open it from Home, **More › Lifting bridge**, or the **Bridge** app shortcut (long-press the app icon on Android).
 
 ## Public holidays
@@ -19,6 +20,15 @@ Te Kāhui o Matariki Public Holiday Act 2022, to 2052), Labour Day, Christmas Da
 (Northland's regional holiday, the Monday nearest 29 January). When Waitangi, ANZAC, Christmas, Boxing Day, 1 or 2 January falls on a
 weekend, the Monday (or Tuesday) day off is shown as "(observed)". If a connected calendar (e.g. Google's NZ holidays) has the same
 holiday on the same day, it isn't shown twice. The 2026–2028 dates are checked by `pwtest/holidays.mjs`.
+
+## Meal planner
+- **Cooking nights:** tap the day chips at the top of the planner (default Fri and Sat). The plan shows only those nights for the next 4 weeks.
+- **Each night:** pick a meal from your ideas or type one in, with optional notes. **Suggest** picks one at random from your ideas, skipping anything planned in the 3 weeks before or after (favourites come up more often, hidden ideas never). **Surprise me for all** fills every empty night (Undo in the message).
+- **Cooked:** tick it on the night; past nights go into **History** (with "Cooked" or "Not ticked").
+- **Ideas:** 40 family-friendly starter dinners, each tagged Quick, BBQ, Slow cook, Oven bake, Budget or Takeaway-style, with a short ingredient list. Add your own, edit, favourite (★) or hide them; each can have a recipe link and ingredients (starter ideas can be hidden rather than deleted).
+- **Shopping list:** tick the planned nights, then **Add to To-do** (adds the ingredients to a to-do list, Shopping by default, without duplicates) or **Copy list** (one item per line, to paste into another grocery app).
+- **Home** shows "Tonight: …" or "Friday: nothing planned – pick a meal" when a cooking night is today or tomorrow. **Calendar** shows planned meals with a "Meal" tag (turn off in the planner or Settings › Calendar).
+- Saved with everything else in `S.meals`, so it's in backups. The bottom bar stays at five tabs so it fits a 360 px screen. Tested by `pwtest/meals.mjs`.
 
 ## Lifting bridge card
 The council doesn't publish live lift status, so the card says "Not live – based on the council's lift times". The rules (`bridgeStatus` in `core.js`) come from the
@@ -37,7 +47,7 @@ Where it shows (Settings › Lifting bridge): **Near only** (default), **Always 
 
 ## Files
 - `index.html` – page and styles
-- `app.js` – the app screens (Home with weather and the lifting bridge, Cars, Calendar, To-do, More › Events, Bills, Birthdays, Ideas, Settings) and calendar sync
+- `app.js` – the app screens (Home with weather and the lifting bridge, Cars, Calendar, To-do, More › Events, Meal planner, Bills, Birthdays, Ideas, Settings) and calendar sync
 - `core.js` – dates, reminder schedule and on-device storage (shared with the service worker)
 - `ical-import.js` – reads .ics calendars (time zones incl. Windows names, all-day, repeats, exceptions, cancellations)
 - `vendor/ical.min.js` – ical.js 2.2.1 (Mozilla, MPL-2.0), unmodified

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -15,6 +15,10 @@ const P = {
   bill: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
   todo: '<rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M8 12l3 3 5-6"/>',
   bridge: '<path d="M2.5 16.5h7.5M15.5 16.5h6M10 16.5l6-8.5"/><path d="M4.5 16.5V20M9 16.5V20M17 16.5V20M20 16.5V20"/>',
+  meal: '<path d="M4 3v6a3 3 0 0 0 3 3h0a3 3 0 0 0 3-3V3M7 3v18M20 15V3a4 4 0 0 0-4 4v6a2 2 0 0 0 2 2h2zm0 0v6"/>',
+  shuffle: '<path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>',
+  cart: '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.5L21.5 8H6"/>',
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
   flag: '<path d="M5.5 21V4"/><path d="M5.5 4.5h11.5l-2.5 4.25 2.5 4.25H5.5"/>',
   cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
@@ -81,7 +85,7 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(),
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(),
     settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
@@ -99,6 +103,7 @@ function normalise(d) {
     // Older versions only kept the date of the last service: turn it into a history entry
     if (c.lastService && !c.services.length) c.services.push({ id: 'svc-' + c.id + '-' + c.lastService, date: c.lastService, km: '', garage: '', cost: '', notes: '', migrated: true });
   });
+  d.meals = normMeals(d.meals); // first time on 1.4.0: Fri and Sat, with the starter ideas
   d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
   d.version = 1;
   return d;
@@ -232,9 +237,9 @@ function Home() {
       ${n ? `<span class="pill ${status(d)}">${n[0]} ${d < 0 ? 'overdue' : d === 0 ? 'today' : d + 'd'}</span>` : '<span class="pill none">No dates</span>'}</button>`;
   }).join('');
   const t7 = todayT() + 7 * DAY;
-  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'hol');
+  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'hol' && e.src !== 'meal');
   const br = brOnHome();
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() +
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() + homeMeal() +
     `<div class="tiles">
       <div class="tile over"><b>${over}</b><span>Overdue</span></div>
       <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
@@ -708,7 +713,8 @@ function calItems(fromT, toT) {
   }));
   holItems(fromT, toT).forEach(x => ev.push(x));
   extEvents(fromT, toT).forEach(x => ev.push(x));
-  const rank = { due: 0, hol: 1, bday: 1, appt: 2, ext: 2 };
+  mealCalItems(inR).forEach(x => ev.push(x));
+  const rank = { due: 0, hol: 1, bday: 1, appt: 2, ext: 2, meal: 3 };
   return ev.sort((a, b) => parseD(a.date) - parseD(b.date) || rank[a.src] - rank[b.src] || (a.sort || '').localeCompare(b.sort || ''));
 }
 /* NZ public holidays: built in (core.js), on unless turned off in Settings */
@@ -787,7 +793,7 @@ function Calendar() {
   return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
     `<div class="card"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
-     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
+     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
       ${y !== now.getFullYear() || m !== now.getMonth() ? `<button style="margin-left:auto;color:var(--brand);font-weight:700" onclick="calMonth=null;calSel=null;render()">Back to today</button>` : ''}</div>
      <div class="grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>
     ${agenda}
@@ -1150,6 +1156,326 @@ function catsForm() {
     }, 'Save');
 }
 
+/* ================= MEAL PLANNER ================= */
+// Everything lives in S.meals (so it's in backups): { nights: [weekday numbers, 0 = Sunday], plan: { 'YYYY-MM-DD': { title, notes, ideaId, cooked, cookedAt } },
+// ideas: [{ id, title, tag, ingr: [..], link, notes, fav, hidden, builtin }], list: to-do list for shopping }
+const MEAL_TAGS = ['Quick', 'BBQ', 'Slow cook', 'Oven bake', 'Budget', 'Takeaway-style'];
+const MEAL_WEEKS = 4, MEAL_GAP = 21; // plan shows about 4 weeks; Suggest avoids meals planned within 3 weeks either side
+const MEAL_STARTERS = [
+  ['Butter chicken', 'Takeaway-style', 'chicken thighs, butter chicken sauce, onion, cream, rice, naan bread'],
+  ['Spaghetti bolognese', 'Budget', 'beef mince, onion, garlic, tinned tomatoes, tomato paste, spaghetti, parmesan'],
+  ['Roast lamb with veges', 'Oven bake', 'leg of lamb, potatoes, pumpkin, carrots, frozen peas, gravy mix, mint sauce'],
+  ['Fish and chips night', 'Takeaway-style', 'white fish fillets, potatoes, flour, eggs, breadcrumbs, lemons, tartare sauce, coleslaw'],
+  ['Homemade burgers', 'Takeaway-style', 'beef mince, burger buns, cheese slices, lettuce, tomatoes, sliced beetroot, onion, burger sauce'],
+  ['Beef nachos', 'Quick', 'beef mince, kidney beans, taco seasoning, corn chips, grated cheese, sour cream, avocado, salsa'],
+  ['Chicken stir fry', 'Quick', 'chicken breast, stir fry veges, garlic, ginger, soy sauce, oyster sauce, rice'],
+  ['Sausage casserole', 'Slow cook', 'sausages, onion, carrots, tinned tomatoes, baked beans, potatoes'],
+  ['Mince and cheese pies', 'Oven bake', 'beef mince, onion, gravy mix, grated cheese, puff pastry'],
+  ['Lasagne', 'Oven bake', 'beef mince, onion, tinned tomatoes, lasagne sheets, milk, flour, butter, grated cheese'],
+  ['BBQ – sausages, steak and salads', 'BBQ', 'sausages, steak, bread, onions, coleslaw, potato salad, tomato sauce'],
+  ['Crispy pork belly', 'Oven bake', 'pork belly, salt, potatoes, apple sauce, broccoli'],
+  ['Fish tacos', 'Quick', 'white fish fillets, soft tortillas, red cabbage, limes, avocado, sour cream, coriander'],
+  ['Chicken curry', 'Slow cook', 'chicken thighs, curry paste, coconut milk, onion, spinach, rice'],
+  ['Roast chicken', 'Oven bake', 'whole chicken, potatoes, pumpkin, carrots, stuffing mix, gravy mix'],
+  ['Shepherd’s pie', 'Budget', 'lamb mince, onion, carrots, frozen peas, gravy mix, potatoes, grated cheese'],
+  ['Chilli con carne', 'Slow cook', 'beef mince, kidney beans, tinned tomatoes, onion, chilli powder, rice, sour cream'],
+  ['Beef and vege stew', 'Slow cook', 'gravy beef, onions, carrots, potatoes, beef stock, flour, bread rolls'],
+  ['Corned beef with white sauce', 'Slow cook', 'corned silverside, potatoes, carrots, cabbage, milk, butter, flour, mustard'],
+  ['Honey soy chicken drumsticks', 'Budget', 'chicken drumsticks, honey, soy sauce, garlic, rice, broccoli'],
+  ['Homemade pizza', 'Takeaway-style', 'pizza bases, pizza sauce, mozzarella, ham, pineapple, capsicum, mushrooms'],
+  ['Beef tacos', 'Quick', 'beef mince, taco shells, taco seasoning, lettuce, tomatoes, grated cheese, sour cream'],
+  ['Bacon and egg pie', 'Budget', 'puff pastry, bacon, eggs, frozen peas, onion, tomatoes'],
+  ['Steak, chips and salad', 'Quick', 'steaks, oven chips, salad greens, tomatoes, mushrooms'],
+  ['Lamb chops, mash and peas', 'Quick', 'lamb chops, potatoes, butter, milk, frozen peas, mint sauce'],
+  ['Pork chops with apple and mash', 'Quick', 'pork chops, apples, potatoes, green beans, butter'],
+  ['Pulled pork burgers', 'Slow cook', 'pork shoulder, BBQ sauce, burger buns, coleslaw'],
+  ['Chicken schnitzel with salad', 'Quick', 'chicken breasts, breadcrumbs, eggs, flour, potatoes, salad greens, lemons'],
+  ['Macaroni cheese', 'Budget', 'macaroni, grated cheese, milk, butter, flour, bacon'],
+  ['Savoury mince on toast', 'Budget', 'beef mince, onion, carrots, frozen peas, gravy mix, bread'],
+  ['Fried rice', 'Budget', 'rice, eggs, bacon, frozen peas and corn, spring onions, soy sauce'],
+  ['Sweet and sour pork', 'Takeaway-style', 'pork pieces, pineapple pieces, capsicum, onion, sweet and sour sauce, rice'],
+  ['Beef and black bean', 'Takeaway-style', 'beef strips, black bean sauce, onion, capsicum, rice'],
+  ['Chicken kebabs on the BBQ', 'BBQ', 'chicken thighs, capsicum, red onion, kebab skewers, wraps, tzatziki'],
+  ['BBQ lamb steaks', 'BBQ', 'lamb leg steaks, rosemary, garlic, potatoes, salad greens'],
+  ['Sausage sizzle', 'BBQ', 'sausages, white bread, onions, tomato sauce, mustard'],
+  ['Chicken pasta bake', 'Oven bake', 'pasta, chicken breast, bacon, cream, spinach, grated cheese'],
+  ['Meatballs and spaghetti', 'Budget', 'beef mince, breadcrumbs, egg, pasta sauce, spaghetti, parmesan'],
+  ['Salmon with rice and greens', 'Quick', 'salmon fillets, rice, broccoli, bok choy, soy sauce, lemon'],
+  ['Satay chicken', 'Quick', 'chicken thighs, peanut butter, coconut milk, soy sauce, rice, green beans']
+];
+const mealSlug = t => t.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const starterMeals = () => MEAL_STARTERS.map(([title, tag, ingr]) => ({ id: 'meal-' + mealSlug(title), title, tag, ingr: ingr.split(', '), link: '', notes: '', fav: false, hidden: false, builtin: true }));
+const newMeals = () => ({ nights: [5, 6], plan: {}, ideas: starterMeals(), list: '' });
+function normMeals(m) {
+  m = m && typeof m === 'object' && !Array.isArray(m) ? m : newMeals();
+  if (!Array.isArray(m.nights)) m.nights = [5, 6];
+  m.nights = [...new Set(m.nights.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 6))].sort();
+  if (!m.plan || typeof m.plan !== 'object' || Array.isArray(m.plan)) m.plan = {};
+  Object.keys(m.plan).forEach(k => { const e = m.plan[k]; if (!/^\d{4}-\d\d-\d\d$/.test(k) || !e || typeof e !== 'object' || !String(e.title || '').trim()) delete m.plan[k]; });
+  if (!Array.isArray(m.ideas)) m.ideas = starterMeals();
+  m.ideas = m.ideas.filter(i => i && i.id && String(i.title || '').trim());
+  m.ideas.forEach(i => { if (!Array.isArray(i.ingr)) i.ingr = String(i.ingr || '').split(/\n|,/).map(s => s.trim()).filter(Boolean); if (!MEAL_TAGS.includes(i.tag)) i.tag = i.tag ? String(i.tag) : ''; });
+  if (typeof m.list !== 'string') m.list = '';
+  return m;
+}
+const M = () => S.meals;
+const mNorm = t => String(t || '').trim().toLowerCase().replace(/[’‘`]/g, "'").replace(/\s+/g, ' ');
+const mealIdeaFor = t => { const n = mNorm(t); return n ? M().ideas.find(i => mNorm(i.title) === n) : null; };
+const visibleIdeas = () => M().ideas.filter(i => !i.hidden);
+const isCookNight = iso => M().nights.includes(new Date(parseD(iso)).getUTCDay());
+const dayGap = (a, b) => Math.round((parseD(a) - parseD(b)) / DAY);
+const showMealsCal = () => !S.settings || S.settings.mealsCal !== false;
+function mealNights(weeks = MEAL_WEEKS) {
+  const T = todayISO(), out = [];
+  for (let i = 0; i < weeks * 7; i++) { const d = addDays(T, i); if (isCookNight(d)) out.push(d); }
+  return out;
+}
+function nightLabel(iso) {
+  const d = daysLeft(iso);
+  return d === 0 ? 'Tonight · ' + fmtW(iso) : d === 1 ? 'Tomorrow · ' + fmtW(iso) : d === -1 ? 'Last night · ' + fmtW(iso) : fmtW(iso);
+}
+// Pick a meal for a night: from the visible ideas, avoiding anything planned within 3 weeks either side (favourites 3× as likely)
+function pickMeal(iso, plan = M().plan) {
+  const near = new Set(Object.entries(plan).filter(([d, e]) => d !== iso && e.title && Math.abs(dayGap(d, iso)) < MEAL_GAP).map(([, e]) => mNorm(e.title)));
+  const cur = plan[iso] ? mNorm(plan[iso].title) : '';
+  let pool = visibleIdeas().filter(i => !near.has(mNorm(i.title)) && mNorm(i.title) !== cur);
+  if (!pool.length) pool = visibleIdeas().filter(i => mNorm(i.title) !== cur);
+  if (!pool.length) return null;
+  const bag = pool.flatMap(i => i.fav ? [i, i, i] : [i]);
+  return bag[Math.floor(Math.random() * bag.length)];
+}
+const planEntry = (idea, notes = '') => ({ title: idea.title, ideaId: idea.id, notes, cooked: false });
+async function suggestNight(iso) {
+  const i = pickMeal(iso);
+  if (!i) { toast('Add some meal ideas first.'); return; }
+  const s = snap(); const old = M().plan[iso];
+  M().plan[iso] = planEntry(i, old ? old.notes : '');
+  await save(); render(); toast(`${fmtW(iso)}: ${i.title}`, 'Undo', undoTo(s));
+}
+async function surpriseAll() {
+  const empty = mealNights().filter(d => !M().plan[d]);
+  if (!M().nights.length) { toast('Pick your cooking nights first.'); return; }
+  if (!empty.length) { toast('Every cooking night is already planned.'); return; }
+  if (!visibleIdeas().length) { toast('Add some meal ideas first.'); return; }
+  const s = snap(); let n = 0;
+  for (const d of empty) { const i = pickMeal(d); if (i) { M().plan[d] = planEntry(i); n++; } }
+  await save(); render(); toast(`Planned ${plural(n, 'night')}.`, 'Undo', undoTo(s));
+}
+async function toggleCooked(iso) {
+  const e = M().plan[iso]; if (!e) return;
+  e.cooked = !e.cooked; if (e.cooked) e.cookedAt = Date.now(); else delete e.cookedAt;
+  await save(); render(); if (e.cooked) toast(`Cooked: ${e.title}. Nice one!`);
+}
+async function toggleNight(n) {
+  const a = M().nights; M().nights = a.includes(n) ? a.filter(x => x !== n) : [...a, n].sort();
+  await save(); render();
+}
+async function toggleMealsCal() { S.settings.mealsCal = !showMealsCal(); await save(); render(); }
+let mealHistAll = false;
+function mealRow(iso, hist = false) {
+  const e = M().plan[iso], idea = e ? (M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title)) : null;
+  const past = iso <= todayISO();
+  const sub = [hist ? fmtW(iso) : nightLabel(iso), idea && idea.tag ? idea.tag : '', e && e.notes ? esc(e.notes.split('\n')[0].slice(0, 60)) : '', hist && e ? (e.cooked ? 'Cooked' : 'Not ticked') : ''].filter(Boolean).join(' · ');
+  return `<div class="row meal ${e && e.cooked ? 'done' : ''}" data-date="${iso}">
+    ${e && past ? `<button class="tick" aria-label="${e.cooked ? 'Untick' : 'Tick'} cooked: ${esc(e.title)}" onclick="toggleCooked('${iso}')"><span>${I('check')}</span></button>` : `<div class="ic meal">${I('meal')}</div>`}
+    <button class="tapzone" onclick="mealNight('${iso}')"><div class="tx"><div class="t">${e ? esc(e.title) : '<span class="muted">Nothing planned</span>'}</div><div class="s">${sub}</div></div></button>
+    ${!e && !hist ? `<button class="btn small" onclick="suggestNight('${iso}')">Suggest</button>` : ''}</div>`;
+}
+const mealTabs = on => `<div class="chips mealtabs"><button class="chip ${on === 'plan' ? 'on' : ''}" onclick="go('#meals')">Plan</button><button class="chip ${on === 'ideas' ? 'on' : ''}" onclick="go('#meals/ideas')">Ideas (${visibleIdeas().length})</button></div>`;
+function nightsText() {
+  const n = M().nights; if (!n.length) return 'No cooking nights picked';
+  const names = n.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(x => WDL[x]);
+  return 'Cooking nights: ' + (names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1]);
+}
+function Meals(arg) {
+  if (arg === 'ideas') return MealIdeas();
+  const nights = mealNights(), T = todayISO();
+  const planned = nights.filter(d => M().plan[d]).length;
+  const hist = Object.keys(M().plan).filter(d => d < T).sort().reverse();
+  const cooked8 = hist.filter(d => dayGap(T, d) <= 56 && M().plan[d].cooked).length;
+  const days = [1, 2, 3, 4, 5, 6, 0];
+  return header('Meal planner', nightsText()) + mealTabs('plan') +
+    `<div class="card mealset"><div class="t">Your cooking nights</div>
+      <div class="daychips" role="group" aria-label="Cooking nights">${days.map(n => `<button class="${M().nights.includes(n) ? 'on' : ''}" aria-pressed="${M().nights.includes(n)}" aria-label="${WDL[n]}" onclick="toggleNight(${n})">${WDL[n].slice(0, 3)}</button>`).join('')}</div>
+      <div class="s">The plan shows only these nights, for the next ${MEAL_WEEKS} weeks.</div></div>
+    ${nights.length ? `<div class="btns mealbtns"><button class="btn primary" id="surprise" onclick="surpriseAll()">${I('shuffle')} Surprise me for all</button><button class="btn" id="shopbtn" onclick="shopForm()">${I('cart')} Shopping list</button></div>
+    <div class="sec">Next ${MEAL_WEEKS} weeks <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">${planned} of ${nights.length} planned</span></div>
+    <div class="list" id="mealplan">${nights.map(d => mealRow(d)).join('')}</div>`
+      : `<div class="card empty"><div class="t">No cooking nights picked</div><div class="s">Tap the days you cook above, and they’ll show here.</div></div>`}
+    <div class="sec">History${hist.length ? ` <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">${cooked8} cooked in the last 8 weeks</span>` : ''}</div>
+    ${hist.length ? `<div class="list" id="mealhist">${hist.slice(0, mealHistAll ? 200 : 6).map(d => mealRow(d, true)).join('')}</div>
+      ${hist.length > 6 ? `<div class="btns"><button class="btn" onclick="mealHistAll=!mealHistAll;render()">${mealHistAll ? 'Show less' : `Show all (${hist.length})`}</button></div>` : ''}`
+      : `<div class="card muted">Past meals show here. Tick “Cooked” on the night to keep track.</div>`}
+    <div class="list" style="margin-top:12px"><div class="srow"><div class="tx"><div class="t">Show meals on the Calendar</div><div class="s">Planned meals appear with a “Meal” tag.</div></div><button class="switch ${showMealsCal() ? 'on' : ''}" role="switch" aria-checked="${showMealsCal()}" aria-label="Show meals on the Calendar" onclick="toggleMealsCal()"></button></div></div>
+    <div class="foot">Suggestions come from your ideas and skip anything planned in the 3 weeks before or after. Favourites come up more often.</div>`;
+}
+function mealNight(iso) {
+  const e = M().plan[iso] || { title: '', notes: '', cooked: false };
+  const favs = visibleIdeas().filter(i => i.fav).slice(0, 8);
+  const idea = e.title ? mealIdeaFor(e.title) : null;
+  openSheet(esc(nightLabel(iso)),
+    `<label class="field"><span>Meal</span><div style="display:flex;gap:8px"><input name="title" id="mealin" value="${esc(e.title)}" list="mealdl" placeholder="Pick from your ideas or type one" maxlength="80" style="flex:1;min-width:0">
+      <button type="button" class="btn small" id="mealsug" style="flex:none" onclick="sheetSuggest('${iso}')">${I('shuffle')} Suggest</button></div>
+      <datalist id="mealdl">${visibleIdeas().map(i => `<option value="${esc(i.title)}">`).join('')}</datalist><small id="mealhint">${idea ? mealHint(idea) : 'Choose an idea or type anything.'}</small></label>` +
+    (favs.length ? `<div class="chips" style="margin:-4px 0 10px">${favs.map(i => `<button type="button" class="chip" onclick="setMealIn(${jsArg(i.title)})">★ ${esc(i.title)}</button>`).join('')}</div>` : '') +
+    field('Notes', area('notes', e.notes || '', 'Optional: who’s coming, sides, defrost the lamb…')) +
+    (iso <= todayISO() ? `<div class="field"><span>Cooked</span>${segHtml('cooked', [['0', 'Not yet'], ['1', '✓ Cooked']], e.cooked ? '1' : '0')}</div>` : ''),
+    async v => {
+      const had = M().plan[iso];
+      if (!v.title) { if (had) delete M().plan[iso]; await save(); render(); if (had) toast('Night cleared.'); return; }
+      const i = mealIdeaFor(v.title), cooked = v.cooked === '1';
+      M().plan[iso] = { title: i ? i.title : v.title, ideaId: i ? i.id : '', notes: v.notes, cooked, ...(cooked ? { cookedAt: had && had.cookedAt || Date.now() } : {}) };
+      await save(); render(); toast(`${fmtW(iso)}: ${M().plan[iso].title}`);
+    }, 'Save',
+    M().plan[iso] ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Clear this night" onclick="clearNight('${iso}')">${I('trash')}</button>` : '');
+  if (iso <= todayISO()) wireSeg('cooked');
+  $('#mealin').addEventListener('input', () => { const i = mealIdeaFor($('#mealin').value); $('#mealhint').innerHTML = i ? mealHint(i) : 'Choose an idea or type anything.'; });
+}
+const mealHint = i => esc([i.tag, i.ingr.slice(0, 6).join(', ') + (i.ingr.length > 6 ? '…' : '')].filter(Boolean).join(' · ')) + (i.link ? ` · <a href="${esc(i.link)}" target="_blank" rel="noopener">Recipe</a>` : '');
+function setMealIn(t) { const x = $('#mealin'); x.value = t; x.dispatchEvent(new Event('input')); }
+function sheetSuggest(iso) {
+  const plan = Object.assign({}, M().plan); const cur = $('#mealin').value.trim();
+  plan[iso] = cur ? { title: cur } : undefined; if (!cur) delete plan[iso];
+  const i = pickMeal(iso, plan); if (!i) { toast('Add some meal ideas first.'); return; }
+  setMealIn(i.title);
+}
+async function clearNight(iso) { const s = snap(); delete M().plan[iso]; await save(); await closeSheet(); render(); toast('Night cleared.', 'Undo', undoTo(s)); }
+
+/* ---- ideas ---- */
+let mealFilter = 'All', mealQuery = '';
+function mealIdeaList() {
+  const q = mealQuery.trim().toLowerCase();
+  const vis = M().ideas.filter(i => (mealFilter === 'Hidden' ? i.hidden : !i.hidden) && (mealFilter === 'All' || mealFilter === 'Hidden' || (mealFilter === '★' ? i.fav : i.tag === mealFilter)) &&
+    (!q || (i.title + ' ' + i.ingr.join(' ') + ' ' + (i.tag || '') + ' ' + (i.notes || '')).toLowerCase().includes(q)))
+    .sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || a.title.localeCompare(b.title));
+  if (!vis.length) return `<div class="card empty"><div class="t">No meal ideas match</div><div class="s">${q ? 'Try a different word.' : mealFilter === 'Hidden' ? 'Nothing hidden.' : 'Nothing with this tag yet.'}</div></div>`;
+  return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}"><button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
+    <button class="tapzone" onclick="mealIdeaForm('${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.link ? ` <span class="muted" style="font-weight:600;font-size:12px">· recipe</span>` : ''}</div>
+    <div class="s">${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}</div></div></button>
+    ${i.hidden ? `<button class="btn small" onclick="toggleMealHidden('${i.id}')">Show</button>` : `<button class="btn small" onclick="planIdea('${i.id}')">Plan</button>`}</div>`).join('')}</div>`;
+}
+function MealIdeas() {
+  const hidden = M().ideas.filter(i => i.hidden).length;
+  if (mealFilter === 'Hidden' && !hidden) mealFilter = 'All';
+  return header('Meal ideas', plural(visibleIdeas().length, 'idea') + (hidden ? ` · ${hidden} hidden` : ''), addBtn('Add a meal idea', 'mealIdeaForm()')) + mealTabs('ideas') +
+    `<label class="search">${I('search')}<input id="mealq" type="search" placeholder="Search meals or ingredients" value="${esc(mealQuery)}" aria-label="Search meal ideas" oninput="mealQuery=this.value;document.getElementById('meallist').innerHTML=mealIdeaList()"></label>
+    <div class="chips scroll">${['All', '★', ...MEAL_TAGS, ...(hidden ? ['Hidden'] : [])].map(c => `<button class="chip ${c === mealFilter ? 'on' : ''}" onclick="mealFilter=${jsArg(c)};render()">${c === '★' ? '★ Favourites' : c === 'Hidden' ? `Hidden (${hidden})` : esc(c)}</button>`).join('')}</div>
+    <div id="meallist">${mealIdeaList()}</div>
+    <div class="foot">Starter ideas can be edited or hidden. Hidden ideas aren’t suggested.</div>`;
+}
+async function toggleMealFav(id) { const i = M().ideas.find(x => x.id === id); i.fav = !i.fav; await save(); render(); }
+async function toggleMealHidden(id) {
+  const i = M().ideas.find(x => x.id === id); i.hidden = !i.hidden; if (i.hidden) i.fav = false;
+  await save(); await closeSheet(); render(); toast(i.hidden ? `Hidden: ${i.title}. It won’t be suggested.` : `${i.title} is back in your ideas.`);
+}
+async function planIdea(id) {
+  const i = M().ideas.find(x => x.id === id), d = mealNights().find(x => !M().plan[x]);
+  if (!d) { toast(M().nights.length ? 'Every cooking night in the next 4 weeks is planned.' : 'Pick your cooking nights first.'); return; }
+  const s = snap(); M().plan[d] = planEntry(i); await save(); await closeSheet(); render();
+  toast(`Planned for ${fmtW(d)}: ${i.title}`, 'Undo', undoTo(s));
+}
+function mealIdeaForm(id) {
+  const i = id ? M().ideas.find(x => x.id === id) : { title: '', tag: mealFilter !== 'All' && MEAL_TAGS.includes(mealFilter) ? mealFilter : '', ingr: [], link: '', notes: '', fav: mealFilter === '★' };
+  if (!i) return;
+  openSheet(id ? 'Edit meal idea' : 'Add a meal idea',
+    field('Meal', inp('title', i.title, 'placeholder="e.g. Nana’s mince stew" required maxlength="80"')) +
+    `<div class="two">${field('Type', sel('tag', [['', 'None'], ...MEAL_TAGS.map(t => [t, t])], i.tag || ''))}<div class="field"><span>Favourite</span>${segHtml('fav', [['0', 'No'], ['1', '★ Yes']], i.fav ? '1' : '0')}</div></div>` +
+    field('Ingredients', area('ingr', i.ingr.join('\n'), 'One per line, e.g.\nbeef mince\nonion'), 'Used for the shopping list') +
+    field('Recipe link', inp('link', i.link || '', 'type="url" inputmode="url" placeholder="https://…" maxlength="500"'), 'Optional') +
+    field('Notes', area('notes', i.notes || '', 'Optional')) +
+    (id ? `<div class="btns" style="margin:0 0 4px"><button type="button" class="btn" onclick="planIdea('${id}')">${I('cal')} Plan for the next free night</button><button type="button" class="btn" onclick="toggleMealHidden('${id}')">${i.hidden ? 'Show again' : 'Hide'}</button></div>` : ''),
+    async v => {
+      if (!v.title) return 'Please type the meal.';
+      const dup = mealIdeaFor(v.title); if (dup && dup.id !== id) return 'You already have that meal in your ideas.';
+      let link = v.link; if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+      if (link) { try { new URL(link); } catch (e) { return 'That recipe link doesn’t look right.'; } }
+      const upd = { title: v.title, tag: v.tag, ingr: v.ingr.split(/\n|,/).map(s => s.trim()).filter(Boolean), link, notes: v.notes, fav: v.fav === '1' };
+      if (id) {
+        const oldN = mNorm(i.title); Object.assign(i, upd);
+        Object.values(M().plan).forEach(e => { if (e.ideaId === id || mNorm(e.title) === oldN) { e.title = i.title; e.ideaId = id; } });
+      } else M().ideas.push(Object.assign({ id: uid('meal'), hidden: false, builtin: false, created: Date.now() }, upd));
+      await save(); render(); toast(id ? 'Meal idea updated.' : 'Meal idea added.');
+    }, id ? 'Save' : 'Add',
+    id && !i.builtin ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete meal idea" onclick="deleteMealIdea('${id}')">${I('trash')}</button>` : '');
+  wireSeg('fav');
+}
+async function deleteMealIdea(id) { const s = snap(); M().ideas = M().ideas.filter(x => x.id !== id); await save(); await closeSheet(); render(); toast('Meal idea deleted.', 'Undo', undoTo(s)); }
+
+/* ---- shopping list ---- */
+function shopNights() { const T = todayISO(); return Object.keys(M().plan).filter(d => d >= T && dayGap(d, T) < MEAL_WEEKS * 7 && !M().plan[d].cooked).sort(); }
+function shopItems(dates) {
+  const seen = new Map(), none = [];
+  dates.forEach(d => { const e = M().plan[d], i = M().ideas.find(x => x.id === e.ideaId) || mealIdeaFor(e.title);
+    if (!i || !i.ingr.length) { none.push(e.title); return; }
+    i.ingr.forEach(g => { const k = mNorm(g); if (!seen.has(k)) seen.set(k, g); }); });
+  return { items: [...seen.values()], none };
+}
+const shopDates = () => [...document.querySelectorAll('#sf input[data-night]:checked')].map(x => x.dataset.night);
+function shopPreview() {
+  const { items, none } = shopItems(shopDates()), box = $('#shopprev'); if (!box) return;
+  box.innerHTML = items.length ? `<b>${plural(items.length, 'item')}</b><ul>${items.map(g => `<li>${esc(g)}</li>`).join('')}</ul>` : '<span class="muted">Tick at least one planned night with ingredients.</span>';
+  if (none.length) box.innerHTML += `<div class="muted" style="margin-top:6px">No ingredients saved for ${esc(none.join(', '))}. Add them in Ideas.</div>`;
+}
+function shopForm() {
+  const dates = shopNights();
+  if (!dates.length) { toast('Plan some meals first, then make the list.'); return; }
+  const week = dates.filter(d => dayGap(d, todayISO()) < 7), pre = new Set(week.length ? week : dates);
+  const lists = S.lists.slice(); const def = lists.includes(M().list) ? M().list : lists.find(l => /shop|grocer/i.test(l)) || '__new';
+  openSheet('Shopping list',
+    `<p class="muted" style="margin:-4px 0 10px">Pick the nights to shop for.</p>
+    <div class="list shopnights">${dates.map(d => `<label class="srow"><input type="checkbox" data-night="${d}" ${pre.has(d) ? 'checked' : ''} onchange="shopPreview()"><div class="tx"><div class="t">${esc(M().plan[d].title)}</div><div class="s">${nightLabel(d)}</div></div></label>`).join('')}</div>
+    <div class="shopprev" id="shopprev"></div>` +
+    field('Add to this to-do list', sel('list', [...lists.map(l => [l, l]), ...(lists.some(l => /^shopping$/i.test(l)) ? [] : [['__new', 'New list: Shopping']])], def)),
+    async v => {
+      const ds = shopDates(), { items } = shopItems(ds);
+      if (!items.length) return 'Tick at least one planned night with ingredients.';
+      let list = v.list; if (list === '__new') { list = 'Shopping'; if (!S.lists.includes(list)) S.lists.push(list); }
+      const open = new Set(S.todos.filter(t => !t.done && t.list === list).map(t => mNorm(t.title)));
+      const meals = ds.map(d => M().plan[d].title).join(', ');
+      const add = items.filter(g => !open.has(mNorm(g)));
+      add.forEach((g, n) => S.todos.push({ id: uid('todo'), title: g.slice(0, 120), list, due: '', notes: 'For ' + meals, done: false, created: Date.now() + n, fromMeal: true }));
+      M().list = list;
+      await save(); render();
+      return () => toast(`Added ${plural(add.length, 'item')} to your ${list} list${add.length < items.length ? ` (${items.length - add.length} already there)` : ''}.`, 'View', () => { todoFilter = list; go('#todo'); });
+    }, 'Add to To-do',
+    `<button type="button" class="btn" id="copylist" style="flex:0 0 auto" onclick="copyShop()">${I('copy')} Copy list</button>`);
+  shopPreview();
+}
+async function copyShop() {
+  const { items } = shopItems(shopDates());
+  if (!items.length) { toast('Tick at least one planned night with ingredients.'); return; }
+  const text = items.join('\n');
+  let ok = false;
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); ok = true; } } catch (e) { }
+  if (!ok) { const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { ok = document.execCommand('copy'); } catch (e) { } t.remove(); }
+  toast(ok ? `Copied ${plural(items.length, 'item')}. Paste them into your grocery list app.` : 'Couldn’t copy on this phone. Use “Add to To-do” instead.');
+}
+
+/* ---- Home line ---- */
+function homeMeal() {
+  if (!M().nights.length) return '';
+  const T = todayISO(), tm = addDays(T, 1), tN = isCookNight(T), mN = isCookNight(tm);
+  if (!tN && !mN) return '';
+  const pT = M().plan[T], pM = M().plan[tm];
+  const useToday = tN && !(pT && pT.cooked && mN);
+  const iso = useToday ? T : tm, e = useToday ? pT : pM;
+  const day = useToday ? 'Tonight' : WDL[new Date(parseD(tm)).getUTCDay()];
+  const title = e ? `${day}: ${esc(e.title)}` : `${day}: nothing planned – pick a meal`;
+  const sub = useToday ? (e && e.cooked ? 'Cooked ✓' : 'Cooking night') + (mN ? ` · Tomorrow: ${pM ? esc(pM.title) : 'nothing planned'}` : '') : 'Tomorrow · cooking night';
+  return `<div class="list mealhome" id="mealhome"><button class="row" onclick="${e ? `go('#meals')` : `mealNight('${iso}')`}"><div class="ic meal">${I('meal')}</div>
+    <div class="tx"><div class="t">${title}</div><div class="s">${sub}</div></div>${I('right')}</button></div>`;
+}
+function mealsMoreSub() {
+  const d = mealNights().find(x => !M().plan[x] || !M().plan[x].cooked);
+  if (!d) return M().nights.length ? 'Plan your cooking nights' : 'Pick your cooking nights';
+  const e = M().plan[d];
+  return `${daysLeft(d) === 0 ? 'Tonight' : fmtW(d)}: ${e ? esc(e.title) : 'nothing planned'}`;
+}
+function mealCalItems(inR) {
+  if (!showMealsCal()) return [];
+  return Object.entries(M().plan).filter(([d]) => inR(d)).map(([d, e]) => ({ src: 'meal', title: e.title, date: d, time: 'Dinner', sort: '18:00', tag: 'Meal', notes: e.notes || (e.cooked ? 'Cooked' : ''), go: `mealNight('${d}')` }));
+}
+
 /* ================= MORE ================= */
 function More() {
   const T = todayT(), t30 = T + 30 * DAY;
@@ -1159,9 +1485,10 @@ function More() {
   const starred = S.ideas.filter(i => i.pinned).length;
   const item = (href, icon, cls, t, sub, pillHtml = '') => `<button class="row" onclick="go('${href}')"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div><div class="s">${sub}</div></div>${pillHtml}${I('right')}</button>`;
   const ne = upcomingEvents()[0];
-  return header('More', 'Events, bills, birthdays, ideas and settings') +
+  return header('More', 'Events, meals, bills, birthdays, ideas and settings') +
     `<div class="list">
       ${item('#events', 'ticket', 'ev', 'Events', ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei')}
+      ${item('#meals', 'meal', 'meal', 'Meal planner', mealsMoreSub())}
       ${item('#bridge', 'bridge', 'br', 'Lifting bridge', 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3])}
       ${item('#bills', 'bill', 'bill', 'Bills', S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…', over ? `<span class="pill over">${over} overdue</span>` : '')}
       ${item('#birthdays', 'cake', 'bday', 'Birthdays', nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one', nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '')}
@@ -1619,6 +1946,7 @@ function Settings() {
   <div class="sec">Calendar</div>
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Show public holidays</div><div class="s">New Zealand public holidays and Auckland Anniversary Day (Northland’s regional holiday). Built in, works offline.</div></div><button class="switch ${showHolidays() ? 'on' : ''}" role="switch" aria-checked="${showHolidays()}" aria-label="Show public holidays" onclick="toggleSetting('holidays')"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Show planned meals</div><div class="s">Meals from the Meal planner, tagged “Meal”.</div></div><button class="switch ${showMealsCal() ? 'on' : ''}" role="switch" aria-checked="${showMealsCal()}" aria-label="Show planned meals on the Calendar" onclick="toggleMealsCal()"></button></div>
   </div>
 
   ${feedsSection()}
@@ -1716,7 +2044,7 @@ function importFile(input) {
     const d = obj && obj.data ? obj.data : obj;
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
-    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')} and ${plural((d.drivers || []).length, 'driver')}.`, 'Restore', async () => {
+    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')} and ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}.`, 'Restore', async () => {
       const s = snap(); S = normalise(d); await save(); render(); toast('Backup restored.', 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
@@ -1735,7 +2063,7 @@ async function installApp() {
 
 /* ---------- router ---------- */
 const TABS = [['home', 'Home', 'home'], ['cars', 'Cars', 'car'], ['calendar', 'Calendar', 'cal'], ['todo', 'To-do', 'todo'], ['more', 'More', 'more']];
-const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events'];
+const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events', 'meals'];
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
@@ -1748,8 +2076,8 @@ function render() {
   if (!S) return;
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge };
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : (map[r] || Home)();
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals };
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : (map[r] || Home)();
   tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' || r === 'bridge' ? 'home' : map[r] ? r : 'home');
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
