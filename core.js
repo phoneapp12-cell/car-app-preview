@@ -340,6 +340,27 @@
     out.forEach(x => { x.days = daysLeft(x.date, now); });
     return out.sort((a, b) => a.days - b.days || a.title.localeCompare(b.title));
   }
+  /* ---------- commission (1.7.0): pay fortnights run Monday to the Sunday 13 days later, lined up on a chosen Monday ---------- */
+  // All dates are UTC-midnight day numbers, so daylight saving changes can't shift a day into the wrong fortnight.
+  const isMonday = iso => { const t = parseD(iso); return t != null && new Date(t).getUTCDay() === 1; };
+  const lastMonday = now => { const T = todayT(now); return isoT(T - ((new Date(T).getUTCDay() + 6) % 7) * DAY); };
+  function fortnightOf(anchor, iso) {
+    const a = parseD(anchor), t = parseD(iso);
+    const k = Math.floor((t - a) / (14 * DAY)), st = a + k * 14 * DAY;
+    return { start: isoT(st), end: isoT(st + 13 * DAY), k };
+  }
+  const commSum = (entries, from, to) => (entries || []).reduce((n, e) => n + (e.date >= from && e.date <= to ? (Math.round(+e.cents) || 0) : 0), 0);
+  function taxYearOf(iso) { // NZ tax year: 1 April to 31 March
+    const y = +iso.slice(0, 4), s = iso.slice(5) >= '04-01' ? y : y - 1;
+    return { start: s + '-04-01', end: (s + 1) + '-03-31', label: s + '/' + String(s + 1).slice(2) };
+  }
+  const centsMoney = c => (c < 0 ? '−' : '') + money(Math.abs(c) / 100);
+  function parseCents(v) { // "120", "120.5", "$1,200.50" -> 12050; null if not a plain positive amount with up to 2 decimals
+    const t = String(v == null ? '' : v).replace(/[\s,$]/g, '');
+    if (!/^\d+(\.\d{1,2})?$|^\.\d{1,2}$/.test(t)) return null;
+    return Math.round(parseFloat(t) * 100);
+  }
+
   const status = d => d < 0 ? 'over' : d <= 30 ? 'soon' : 'fine';
   // Badge = overdue + due within 3 days
   const badgeCount = (data, now) => dueItems(data, now).filter(x => x.days <= 3).length;
@@ -456,6 +477,13 @@
         });
       });
     }
+    // Commission (if turned on): 9 am the next morning, only if nothing has been entered for yesterday
+    const cm = data.commission;
+    if (cm && cm.remind && cm.anchor && daytime && now.getHours() >= 9) {
+      const y = addDays(todayISO(now), -1), key = ['comm', y].join('|');
+      if (!fired[key] && !(cm.entries || []).some(e => e.date === y))
+        out.push({ key, title: 'Enter yesterday’s commission?', body: `Nothing entered for ${fmtW(y, now)} yet. Tap to add it.`, url: '#commission/add', days: 0 });
+    }
     // Events imported from Outlook / Google: 1 hour before timed events, morning of all-day ones
     (data.feeds || []).forEach(f => {
       if (f.reminders === false) return;
@@ -532,5 +560,5 @@
   }
 
   g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money,
-    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatNth, isSeriesDate, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
+    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatNth, isSeriesDate, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, isMonday, lastMonday, fortnightOf, commSum, taxYearOf, centsMoney, parseCents, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);

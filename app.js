@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.7.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -71,6 +71,7 @@ const P = {
   heart: '<path d="M12 20s-7.5-4.6-9-9.3C2 7.5 4.2 4.5 7.3 4.5c1.9 0 3.5 1 4.7 2.7 1.2-1.7 2.8-2.7 4.7-2.7 3.1 0 5.3 3 4.3 6.2C19.5 15.4 12 20 12 20z"/>',
   repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  cash: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   ticket: '<path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v12" stroke-dasharray="2 2.2"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
@@ -112,6 +113,7 @@ function normalise(d) {
   });
   d.meals = normMeals(d.meals); // first time on 1.4.0: Fri and Sat, with the starter ideas
   d.myEvents = normMine(d.myEvents); // 1.6.0: my events (repeating), older data has none
+  d.commission = normComm(d.commission); // 1.7.0: commission tracker (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
   d.version = 1;
@@ -231,7 +233,6 @@ function rowFor(x) {
 function Home() {
   const items = dueItems(S);
   const over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length, fine = items.length - over - soon;
-  const attention = items.filter(x => x.days <= 30);
   const now = new Date();
   let cards = '';
   if ('Notification' in window && Notification.permission === 'default' && S.settings.reminders !== false)
@@ -240,28 +241,20 @@ function Home() {
   if (deferredPrompt && !isStandalone())
     cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
-  const glance = S.cars.map(c => {
-    const n = [['WOF', c.wof], ['Rego', c.rego]].filter(a => a[1]).sort((a, b) => parseD(a[1]) - parseD(b[1]))[0];
-    const d = n ? daysLeft(n[1]) : null;
-    return `<button onclick="go('#car/${c.id}')"><span class="plate">${esc(c.plate || '—')}</span><div class="who">${esc(c.name)}</div>
-      ${n ? `<span class="pill ${status(d)}">${n[0]} ${d < 0 ? 'overdue' : d === 0 ? 'today' : d + 'd'}</span>` : '<span class="pill none">No dates</span>'}</button>`;
-  }).join('');
-  const t7 = todayT() + 7 * DAY;
-  const upcoming = calItems(todayT(), t7).filter(e => e.src !== 'due' && e.src !== 'pet' && e.src !== 'hol' && e.src !== 'meal' && e.src !== 'mine'); // due dates and pet care are in Needs attention; my events in the Today / Tomorrow line
+  // Today, tomorrow and birthdays within a week are in Needs attention; this is the rest of the week's appointments and calendar events
+  const upcoming = calItems(todayT() + 2 * DAY, todayT() + 7 * DAY).filter(e => e.src === 'appt' || e.src === 'ext');
   const br = brOnHome();
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() + homeMine() + homeMeal() +
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() + homeMeal() +
     `<div class="tiles">
       <div class="tile over"><b>${over}</b><span>Overdue</span></div>
       <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
       <div class="tile fine"><b>${fine}</b><span>All good</span></div></div>
-    <div class="sec">Cars at a glance <a href="#cars">All cars</a></div>
-    ${S.cars.length ? `<div class="glance">${glance}</div>` : empty('No cars yet', 'Add a car to keep track of its WOF, rego and servicing.', 'Add a car', 'carForm()')}
     <div class="sec">Needs attention <a href="#calendar">See calendar</a></div>
-    ${attention.length ? `<div class="list">${attention.map(rowFor).join('')}</div>` : `<div class="card empty"><div class="t">All good for the next 30 days</div><div class="s">Nothing is overdue or due soon. Sweet as.</div></div>`}
-    <div class="sec">Coming up this week <button onclick="apptForm()">Add</button></div>
-    ${upcoming.length ? `<div class="list">${upcoming.map(e => `<button class="row" onclick="${e.go}"><div class="ic ${e.src}" ${e.color ? `style="background:${e.color}1f;color:${e.color}"` : ''}>${I(e.src === 'bday' ? 'cake' : 'cal')}</div>
-      <div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${fmtW(e.date)} · ${e.src === 'bday' ? 'Birthday' : esc(e.time)}${e.src === 'ext' ? ' · ' + esc(e.tag) : ''}</div></div></button>`).join('')}</div>`
-      : empty('Nothing booked this week', 'Add appointments like a haircut or the dentist and we’ll remind you an hour before.', 'Add an appointment', 'apptForm()')}
+    ${attentionHtml()}
+    <div class="sec">Later this week <button onclick="apptForm()">Add</button></div>
+    ${upcoming.length ? `<div class="list" id="laterweek">${upcoming.map(e => `<button class="row" onclick="${e.go}"><div class="ic ${e.src}" ${e.color ? `style="background:${e.color}1f;color:${e.color}"` : ''}>${I('cal')}</div>
+      <div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${fmtW(e.date)} · ${esc(e.time)}${e.src === 'ext' ? ' · ' + esc(e.tag) : ''}</div></div></button>`).join('')}</div>`
+      : `<div class="card muted" id="laterweek">Nothing else booked for the rest of the week. Today and tomorrow are in Needs attention. <button class="linkbtn" onclick="apptForm()">Add an appointment</button></div>`}
     ${homeEvents()}
     ${syncNote()}
     <div class="foot">Your information is saved on this phone only.</div>`;
@@ -1528,7 +1521,7 @@ function upcomingMeals() {
   return Object.keys(M().plan).filter(d => d >= T && dayGap(d, T) < MEAL_WEEKS * 7 && isCookNight(d) && !(d === T && M().plan[d].cooked)).sort();
 }
 function homeMeal() {
-  const list = upcomingMeals(); if (!list.length) return '';
+  const list = upcomingMeals().filter(d => d !== todayISO()); if (!list.length) return ''; // tonight's dinner is in Needs attention (1.7.0)
   const T = todayISO(), when = d => { const n = dayGap(d, T); return n === 0 ? 'Tonight' : n === 1 ? 'Tomorrow' : 'In ' + n + ' days'; };
   const row = d => { const e = M().plan[d], idea = M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title);
     const mark = idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
@@ -1586,16 +1579,55 @@ function mineItems(fromT, toT, all = false) {
     go: `mineSheet('${ev.id}','${o.orig}')` })));
   return out;
 }
-function homeMine() {
-  const T = todayT(), day = t => mineItems(t, t, true).sort((a, b) => (a.hm || '').localeCompare(b.hm || ''));
-  const td = day(T), tm = day(T + DAY);
-  if (!td.length && !tm.length) return '';
-  const lab = l => l.map(e => esc(e.title) + (e.hm ? ' ' + fmtTime(e.hm) : '')).join(', ');
-  const first = td.length ? T : T + DAY;
-  const t = td.length ? 'Today: ' + lab(td) : 'Tomorrow: ' + lab(tm);
-  const s = td.length ? (tm.length ? 'Tomorrow: ' + lab(tm) : 'Nothing tomorrow') : fmtW(isoT(T + DAY));
-  return `<div class="list minehome" id="minehome"><button class="row" onclick="calOpenDay(${first})"><div class="ic mine">${I('repeat')}</div>
-    <div class="tx"><div class="t">${t}</div><div class="s">${s}</div></div>${I('right')}</button></div>`;
+/* ---------- Home: Needs attention (1.7.0) ----------
+   One combined list of everything due soon, from every section. Each source below returns items
+   { days, rank, sort, html } and keeps its own window; to add a section, write a source and add it to ATT_SOURCES.
+   Only real due dates (cars, drivers, bills, to-dos, pets) can be overdue and count in the tiles. */
+const ATT_MAX = 8; // shown before "Show all" (overdue items are always shown)
+let attShowAll = false;
+const attWhen = d => d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : 'In ' + d + ' days';
+function attRow(o) {
+  return `<button class="row att ${o.cls || ''}" data-kind="${o.kind}"${o.date ? ` data-date="${o.date}"` : ''} onclick="${o.go}"><div class="ic ${o.ic}"${o.icStyle ? ` style="${o.icStyle}"` : ''}>${I(o.icon)}</div>
+    <div class="tx"><div class="t">${o.title}</div><div class="s">${o.sub}</div></div>${o.right || I('right')}</button>`;
+}
+const ATT_SOURCES = {
+  // WOF / rego / service, AA and licence, bills, to-dos with a due date, pet care: within 30 days or overdue (as before)
+  due: T => dueItems(S).filter(x => x.days <= 30).map(x => ({ days: x.days, rank: 0, sort: '', html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })),
+  // My events (payday, rubbish day…), today and tomorrow. Skipped dates are left out and moved ones show on their new date.
+  mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).map(e => ({ days: d, rank: 1, sort: e.hm || '',
+    html: attRow({ kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${T + d * DAY})`, ic: 'mine', icon: 'repeat', title: `${attWhen(d)}: ${esc(e.title)}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
+      sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}` }) }))),
+  // Appointments, including What's On events you added, today and tomorrow
+  appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d === 0 || d === 1; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
+    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attWhen(d)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
+      sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; }),
+  // Connected Outlook / Google / iCloud calendars, today and tomorrow
+  ext: T => extEvents(T, T + DAY).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '',
+    html: attRow({ kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal',
+      title: `${attWhen(d)}: ${esc(e.title)}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + esc(e.time) : ''}`, sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}${e.time === 'All day' ? ' · All day' : ''}` }) }; }),
+  // Birthdays, today and the next 7 days
+  bday: T => S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 7).map(x => ({ days: x.d, rank: 2, sort: '',
+    html: attRow({ kind: 'bday', cls: x.d === 0 ? 'bdtoday' : '', date: x.iso, go: `go('#birthdays')`, ic: 'bday', icon: 'cake', title: `${esc(x.b.name)}’s ${x.age > 0 ? ordinal(x.age) + ' ' : ''}birthday`,
+      sub: `Birthday · ${fmtW(x.iso)}`, right: `<span class="pill ${x.d === 0 ? 'bdaypill' : 'bdaysoon'}">${x.d === 0 ? 'Today!' : attWhen(x.d)}</span>` }) })),
+  // Tonight's planned dinner (the Upcoming meals card then starts from the next night, so it isn't shown twice)
+  meal: T => { const d = todayISO(), e = M().plan[d]; if (!e || e.cooked || !isCookNight(d)) return [];
+    return [{ days: 0, rank: 3, sort: '', html: attRow({ kind: 'meal', date: d, go: `openNight('${d}')`, ic: 'meal', icon: 'meal', title: `Tonight: ${esc(e.title)}`, sub: 'Dinner · tap to see it or tick it cooked' }) }]; },
+  // Commission tracker set up and nothing entered for yesterday
+  comm: T => { if (!CM().anchor) return []; const y = yesterdayISO(); if (commDay(y).length) return [];
+    return [{ days: 0, rank: 0, sort: '', html: attRow({ kind: 'comm', go: `go('#commission/add')`, ic: 'comm', icon: 'cash', title: 'Enter yesterday’s commission', sub: `Commission · nothing entered for ${fmtW(y)} yet` }) }]; }
+};
+function homeAttention() {
+  const T = todayT(), all = [];
+  Object.values(ATT_SOURCES).forEach(src => { try { src(T).forEach(x => all.push(x)); } catch (e) { /* one broken source mustn't hide the rest */ } });
+  // overdue first (most overdue at the top), then by date; on the same day, due dates, then events by time, birthdays, dinner
+  return all.sort((a, b) => a.days - b.days || a.rank - b.rank || a.sort.localeCompare(b.sort));
+}
+function attentionHtml() {
+  const list = homeAttention();
+  if (!list.length) return `<div class="card empty"><div class="t">All good for the next 30 days</div><div class="s">Nothing is overdue or due soon. Sweet as.</div></div>`;
+  const over = list.filter(x => x.days < 0).length, n = attShowAll ? list.length : Math.max(ATT_MAX, over);
+  return `<div class="list" id="attention">${list.slice(0, n).map(x => x.html).join('')}</div>` +
+    (list.length > n ? `<div class="btns"><button class="btn" id="attmore" onclick="attShowAll=true;render()">Show all ${list.length}</button></div>` : attShowAll && list.length > ATT_MAX ? `<div class="btns"><button class="btn" id="attmore" onclick="attShowAll=false;render()">Show fewer</button></div>` : '');
 }
 function calOpenDay(t) { const d = new Date(t); calMonth = { y: d.getUTCFullYear(), m: d.getUTCMonth() }; calSel = t; go('#calendar'); }
 function mineForm(id, date) {
@@ -1890,6 +1922,206 @@ function petsMoreSub() {
   return n ? `Next: ${esc(n.title)}, ${n.days < 0 ? 'overdue' : n.days === 0 ? 'today' : fmtW(n.date)}` : plural(S.pets.length, 'pet');
 }
 
+/* ================= COMMISSION (1.7.0) ================= */
+// Pay fortnights run Monday to the Sunday 13 days later, lined up on a Monday Shane picks (S.commission.anchor).
+// Amounts are kept in whole cents so totals never pick up rounding errors. Adjustments (clawbacks) are stored as minus amounts.
+const { isMonday, lastMonday, fortnightOf, commSum, taxYearOf, centsMoney, parseCents } = DD;
+let commShowAll = false;
+const commOpenSet = new Set();
+function normComm(c) {
+  c = c && typeof c === 'object' ? c : {};
+  const entries = (Array.isArray(c.entries) ? c.entries : []).filter(e => e && parseD(e.date) != null && Number.isFinite(+e.cents) && Math.round(+e.cents) !== 0)
+    .map(e => ({ id: e.id || uid('comm'), date: e.date, cents: Math.round(+e.cents), note: String(e.note || '').slice(0, 80) }));
+  return { anchor: isMonday(c.anchor) ? c.anchor : '', entries, remind: c.remind === true };
+}
+const CM = () => S.commission;
+const yesterdayISO = () => addDays(todayISO(), -1);
+const commRange = f => `${fmtW(f.start)} – ${fmtW(f.end)}`;
+const curFortnight = () => fortnightOf(CM().anchor, todayISO());
+const commDay = iso => CM().entries.filter(e => e.date === iso);
+function commEntryLine(e) {
+  const adj = e.cents < 0;
+  return `<button class="centry" data-id="${e.id}" onclick="commForm('${e.id}')" aria-label="Edit ${adj ? 'adjustment' : 'commission'} ${esc(centsMoney(e.cents))} on ${fmtW(e.date)}">
+    <span class="cn">${adj ? '<span class="tag adj">Adjustment</span> ' : ''}${e.note ? esc(e.note) : `<span class="muted">${adj ? 'No note' : 'Commission'}</span>`}</span>
+    <span class="ca${adj ? ' neg' : ''}">${centsMoney(e.cents)}</span></button>`;
+}
+function commDayRow(iso, T) {
+  const list = commDay(iso), future = iso > T, tot = list.reduce((n, e) => n + e.cents, 0);
+  const cls = ['cday', iso === T ? 'today' : '', future ? 'future' : '', list.length ? '' : 'none'].join(' ').trim();
+  const add = future ? '' : list.length ? `<button class="cplus" aria-label="Add another for ${fmtW(iso)}" onclick="commForm(null,'${iso}')">${I('plus')}</button>`
+    : `<button class="cadd" aria-label="Add commission for ${fmtW(iso)}" onclick="commForm(null,'${iso}')">${I('plus')} Add</button>`;
+  return `<div class="${cls}" data-date="${iso}"><div class="cdh"><span class="dn">${fmtW(iso)}</span>${iso === T ? '<span class="tag due">Today</span>' : ''}
+    ${list.length > 1 ? `<span class="dt">Day total <b>${centsMoney(tot)}</b></span>` : '<span class="dt"></span>'}${add}</div>
+    ${list.map(commEntryLine).join('')}</div>`;
+}
+function anchorPicker(cur) {
+  const m0 = lastMonday(), m1 = addDays(m0, -7), T = todayISO();
+  const pick = cur ? fortnightOf(cur, T).start : m0;
+  const other = pick !== m0 && pick !== m1;
+  return `<div class="seg anchorseg" data-seg="anchor">${[[m0, 'most recent'], [m1, 'the week before']].map(([v, l]) => `<button type="button" class="${!other && pick === v ? 'on' : ''}" data-v="${v}">${fmtW(v)}<small>${l}${v === m0 ? ' · suggested' : ''}</small></button>`).join('')}</div>
+    <input type="hidden" name="anchor" value="${pick}">
+    <label class="field" style="margin-top:12px"><span>Or another Monday</span><input type="date" name="anchorother" value="${other ? pick : ''}" max="${T}" step="7" min="2000-01-03"></label>
+    <div class="anchorhint" id="anchorhint"></div>`;
+}
+function anchorCheck(v) {
+  if (!parseD(v)) return 'Please pick the Monday your pay fortnight started.';
+  if (!isMonday(v)) return `${fmtW(v)} is a ${WDL[new Date(parseD(v)).getUTCDay()]}. Please pick a Monday.`;
+  if (v > todayISO()) return 'Please pick a Monday that’s today or earlier.';
+  return '';
+}
+function wireAnchor(root) {
+  const box = root.querySelector('[data-seg="anchor"]'), hid = root.querySelector('input[name=anchor]'), oth = root.querySelector('input[name=anchorother]'), hint = root.querySelector('#anchorhint');
+  const upd = () => {
+    const err = anchorCheck(hid.value), f = err ? null : fortnightOf(hid.value, todayISO());
+    hint.innerHTML = err ? `<span class="bad">${esc(err)}</span>` : `This pay fortnight: <b>${commRange(f)}</b><br>Next one starts ${fmtW(addDays(f.end, 1))}.`;
+  };
+  box.querySelectorAll('button').forEach(b => b.onclick = () => { box.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); hid.value = b.dataset.v; oth.value = ''; oth.dispatchEvent(new Event('change')); upd(); });
+  const onOther = () => { if (!oth.value) return; box.querySelectorAll('button').forEach(x => x.classList.remove('on')); hid.value = oth.value; upd(); };
+  oth.addEventListener('input', onOther); oth.addEventListener('change', onOther);
+  upd();
+}
+async function setAnchor(v, fromSetup) {
+  const err = anchorCheck(v); if (err) return err;
+  const s = snap(), was = CM().anchor;
+  CM().anchor = v; await save(); render();
+  const f = curFortnight();
+  if (fromSetup) toast(`Set. This pay fortnight is ${commRange(f)}.`);
+  else if (was !== v) toast(`Fortnights now start ${fmtW(f.start)}. Entries regrouped – nothing lost.`, 'Undo', undoTo(s));
+  return '';
+}
+async function commSetupGo() {
+  const root = $('#commsetup'), err = await setAnchor(root.querySelector('input[name=anchor]').value, true);
+  if (err) { const x = root.querySelector('#anchorhint'); x.innerHTML = `<span class="bad">${esc(err)}</span>`; }
+}
+function anchorForm() {
+  openSheet('When does your pay fortnight start?', `<p class="muted" style="margin:0 0 12px">Pick the Monday your current pay fortnight started. Your entries are just regrouped – nothing is lost.</p>` + anchorPicker(CM().anchor),
+    async v => { const err = anchorCheck(v.anchor); if (err) return err; return () => setAnchor(v.anchor, !CM().anchor); }, 'Save');
+  wireAnchor($('#sf'));
+}
+function commShort(c) { const a = Math.abs(c), s = c < 0 ? '−' : ''; return a >= 100000 ? s + '$' + (a / 100000).toFixed(a >= 1000000 ? 0 : 1).replace(/\.0$/, '') + 'k' : s + '$' + Math.round(a / 100); }
+function commChart() {
+  const c = CM(), cur = curFortnight(), bars = [];
+  for (let i = 7; i >= 0; i--) { const st = addDays(cur.start, -14 * i), en = addDays(st, 13); bars.push({ st, en, v: commSum(c.entries, st, en), now: i === 0 }); }
+  const max = Math.max(1, ...bars.map(b => b.v)), W = 320, top = 20, base = 122, bw = 26, step = W / 8;
+  const g = bars.map((b, i) => {
+    const x = i * step + (step - bw) / 2, h = b.v > 0 ? Math.max(3, Math.round(b.v / max * (base - top))) : 0;
+    return `<g class="bar${b.now ? ' now' : ''}" data-start="${b.st}" data-total="${b.v}"><rect x="${x.toFixed(1)}" y="${base - h}" width="${bw}" height="${h}" rx="4"></rect>
+      <text class="v" x="${(x + bw / 2).toFixed(1)}" y="${base - h - 5}">${b.v ? commShort(b.v) : '$0'}</text>
+      <text class="d" x="${(x + bw / 2).toFixed(1)}" y="${base + 14}">${b.now ? 'Now' : fmtW(b.st).replace(/^\w+ /, '').replace(/ \d{4}$/, '')}</text></g>`;
+  }).join('');
+  const label = 'Fortnight totals: ' + bars.map(b => `${b.now ? 'this fortnight' : 'from ' + fmtW(b.st)} ${centsMoney(b.v)}`).join(', ');
+  const first = c.entries.length ? fortnightOf(c.anchor, c.entries.reduce((m, e) => e.date < m ? e.date : m, '9999')).start : null;
+  const done = bars.filter(b => !b.now && first && b.st >= first), avg = done.length ? Math.round(done.reduce((n, b) => n + b.v, 0) / done.length) : null;
+  return `<div class="card commchartcard"><svg class="commchart" viewBox="0 0 ${W} 142" role="img" aria-label="${esc(label)}"><line x1="0" x2="${W}" y1="${base + .5}" y2="${base + .5}"></line>${g}</svg>
+    <div class="muted" style="text-align:center;font-size:12.5px">Each bar is one pay fortnight, labelled with its Monday.${avg != null ? ` Average of the finished ones: <b>${centsMoney(avg)}</b>.` : ''}</div></div>`;
+}
+function commPast() {
+  const c = CM(), cur = curFortnight();
+  if (!c.entries.length) return '<div class="card muted">Past fortnights will show here with their totals.</div>';
+  const first = fortnightOf(c.anchor, c.entries.reduce((m, e) => e.date < m ? e.date : m, '9999'));
+  const out = [];
+  for (let st = addDays(cur.start, -14); st >= first.start; st = addDays(st, -14)) out.push({ start: st, end: addDays(st, 13) });
+  if (!out.length) return '<div class="card muted">Past fortnights will show here with their totals.</div>';
+  const shown = commShowAll ? out : out.slice(0, 13);
+  return `<div class="list pastlist">${shown.map(f => {
+    const es = c.entries.filter(e => e.date >= f.start && e.date <= f.end).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0), tot = es.reduce((n, e) => n + e.cents, 0);
+    const days = [...new Set(es.map(e => e.date))];
+    return `<details class="pastf" data-start="${f.start}" ${commOpenSet.has(f.start) ? 'open' : ''} ontoggle="this.open?commOpenSet.add('${f.start}'):commOpenSet.delete('${f.start}')">
+      <summary><span class="pr">${commRange(f)}<small>${es.length ? plural(es.length, 'entry', 'entries') : 'No entries'}</small></span><b class="pt${tot < 0 ? ' neg' : ''}">${es.length ? centsMoney(tot) : '–'}</b></summary>
+      <div class="pastdays">${days.length ? days.map(d => commDayRow(d, todayISO())).join('') : '<div class="muted" style="padding:6px 2px 12px">Nothing entered for this fortnight.</div>'}</div></details>`;
+  }).join('')}</div>${out.length > shown.length ? `<div class="btns"><button class="btn" onclick="commShowAll=true;render()">Show all ${out.length} past fortnights</button></div>` : ''}`;
+}
+function commRemindCard() {
+  const c = CM();
+  if (c.remind) return '';
+  return `<div class="card commremind"><div class="tx"><b>Want a reminder?</b><div class="muted">A nudge at 9 am the next morning – “Enter yesterday’s commission?” – only if nothing’s been entered for that day.</div></div>
+    <button class="btn small" onclick="toggleCommRemind()">${I('bell')} Turn on</button></div>`;
+}
+function Commission(arg) {
+  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`, c = CM(), T = todayISO();
+  if (!c.anchor) {
+    return back + header('Commission', 'Paid fortnightly · Mon to Sun') +
+      `<div class="card" id="commsetup"><div class="t" style="font-weight:750;font-size:17px">When did your current pay fortnight start?</div>
+      <p class="muted" style="margin:6px 0 14px">Each pay fortnight runs Monday to the Sunday 13 days later. Pick the Monday this one started and every fortnight lines up from there. You can change it later.</p>
+      ${anchorPicker('')}
+      <div class="btns"><button class="btn primary" id="commstart" onclick="commSetupGo()">Start tracking</button></div></div>
+      <div class="foot">Enter each day’s commission the day after you earn it.<br>Your information is saved on this phone only.</div>`;
+  }
+  const f = curFortnight(), tot = commSum(c.entries, f.start, f.end), n = c.entries.filter(e => e.date >= f.start && e.date <= f.end).length;
+  const dl = daysLeft(f.end), y = yesterdayISO(), yHas = commDay(y).length;
+  const week = (w) => { const st = addDays(f.start, 7 * w), en = addDays(st, 6), wt = commSum(c.entries, st, en), days = []; for (let i = 0; i < 7; i++) days.push(addDays(st, i));
+    return `<div class="sec"><span>Week ${w + 1} · ${fmtW(st).replace(/ \d{4}$/, '')} – ${fmtW(en)}</span>${wt ? `<span class="wk${wt < 0 ? ' neg' : ''}">${centsMoney(wt)}</span>` : ''}</div>
+      <div class="list cdays">${days.map(d => commDayRow(d, T)).join('')}</div>`; };
+  const mo = T.slice(0, 7), yr = T.slice(0, 4), tx = taxYearOf(T);
+  const mTot = commSum(c.entries, mo + '-01', mo + '-31'), yTot = commSum(c.entries, yr + '-01-01', yr + '-12-31'), tTot = commSum(c.entries, tx.start, tx.end);
+  return back + header('Commission', 'Paid fortnightly · Mon to Sun', addBtn('Add commission', `commForm(null,'${y}')`)) +
+    `<div class="summary commsum"><div class="muted">This pay fortnight</div><div class="crange">${commRange(f)}</div>
+      <div class="amt" id="commtotal">${centsMoney(tot)}</div>
+      <div class="muted">${dl <= 0 ? 'Last day today' : `${dl + 1} days left, counting today`} · ${plural(n, 'entry', 'entries')}</div></div>
+    <div class="btns"><button class="btn primary" id="addyest" onclick="commForm(null,'${y}')">${I('plus')} Add yesterday <span class="soft">(${fmtW(y)})</span></button></div>
+    ${yHas ? `<div class="muted" style="margin:6px 4px 0">${I('check')} Yesterday is entered. Tap a day below to add to another day.</div>` : ''}
+    ${commRemindCard()}
+    ${week(0)}${week(1)}
+    <div class="muted fnote">Fortnights start on Mondays, lined up with ${fmtW(f.start)}. <button class="linkbtn" onclick="anchorForm()">Change</button></div>
+    <div class="sec">Totals</div>
+    <div class="list"><div class="srow"><div class="tx"><div class="t">This month</div><div class="s">${MONL[+mo.slice(5) - 1]} ${yr}</div></div><b class="v" id="commmonth">${centsMoney(mTot)}</b></div>
+      <div class="srow"><div class="tx"><div class="t">This year</div><div class="s">1 Jan – 31 Dec ${yr}</div></div><b class="v" id="commyear">${centsMoney(yTot)}</b></div>
+      <div class="srow"><div class="tx"><div class="t">NZ tax year ${tx.label}</div><div class="s">1 Apr ${tx.start.slice(0, 4)} – 31 Mar ${tx.end.slice(0, 4)}</div></div><b class="v" id="commtax">${centsMoney(tTot)}</b></div></div>
+    <div class="muted" style="margin:6px 4px 0;font-size:12.5px">Totals go by the day the commission was earned. Adjustments are taken off.</div>
+    <div class="sec">Last 8 fortnights</div>${commChart()}
+    <div class="sec">Past fortnights</div>${commPast()}
+    ${c.remind ? `<div class="foot">Reminder on: 9 am if yesterday is blank. <button class="linkbtn" onclick="toggleCommRemind()">Turn off</button></div>` : ''}
+    <div class="foot">Your information is saved on this phone only.</div>`;
+}
+function commForm(id, date) {
+  const e = id ? CM().entries.find(x => x.id === id) : { date: date || yesterdayISO(), cents: '', note: '' };
+  if (!e) return;
+  const T = todayISO(), adj = id && e.cents < 0;
+  openSheet(id ? (adj ? 'Edit adjustment' : 'Edit commission') : 'Add commission',
+    field('Day earned', inp('date', e.date, `type="date" max="${T}" required`)) +
+    `<div class="field"><span>Type</span>${segHtml('kind', [['comm', 'Commission'], ['adj', 'Adjustment (minus)']], adj ? 'adj' : 'comm')}<small id="kindhint">${adj ? 'Taken off the total, e.g. a clawback or a correction.' : 'Money you earned that day.'}</small></div>` +
+    field('Amount (NZD)', `<div class="moneyin"><span>$</span><input name="amount" inputmode="decimal" placeholder="0.00" autocomplete="off" value="${e.cents === '' ? '' : (Math.abs(e.cents) / 100).toFixed(2)}" aria-label="Amount in dollars"></div>`) +
+    field('Note (optional)', inp('note', e.note, 'maxlength="80" placeholder="e.g. the sale or customer"')),
+    async v => {
+      if (!parseD(v.date)) return 'Please choose the day you earned it.';
+      if (v.date > todayISO()) return 'That day is in the future. Commission can only be entered for today or earlier.';
+      if (/-/.test(v.amount)) return 'Please type the amount without a minus sign. For a clawback, choose “Adjustment (minus)”.';
+      const c = parseCents(v.amount);
+      if (c == null) return 'Please type the amount in dollars and cents, like 120 or 85.50.';
+      if (c === 0) return 'The amount can’t be $0.00.';
+      if (c > 100000000) return 'That amount looks too big. Please check it.';
+      const s = snap(), upd = { date: v.date, cents: v.kind === 'adj' ? -c : c, note: v.note.slice(0, 80) };
+      if (id) Object.assign(e, upd); else CM().entries.push(Object.assign({ id: uid('comm') }, upd));
+      await save(); render();
+      const f = curFortnight(), other = v.date < f.start ? ` It’s in the fortnight ${commRange(fortnightOf(CM().anchor, v.date))}.` : '';
+      toast(id ? (upd.cents < 0 ? 'Adjustment updated.' : 'Commission updated.') + other : `${upd.cents < 0 ? 'Adjustment of ' + centsMoney(upd.cents) : 'Added ' + centsMoney(upd.cents)} for ${fmtW(v.date)}.${other}`, 'Undo', undoTo(s));
+    }, id ? 'Save' : 'Add',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete this entry" onclick="deleteComm('${id}')">${I('trash')}</button>` : '');
+  wireSeg('kind', k => { $('#kindhint').textContent = k === 'adj' ? 'Taken off the total, e.g. a clawback or a correction.' : 'Money you earned that day.'; });
+}
+async function deleteComm(id) {
+  const e = CM().entries.find(x => x.id === id); if (!e) return;
+  const s = snap(); CM().entries = CM().entries.filter(x => x.id !== id);
+  await save(); await closeSheet(); render();
+  toast(`Deleted ${centsMoney(e.cents)} for ${fmtW(e.date)}.`, 'Undo', undoTo(s));
+}
+async function toggleCommRemind() {
+  const c = CM();
+  if (c.remind) { c.remind = false; await save(); render(); toast('Commission reminder off.'); return; }
+  if (!('Notification' in window)) { toast('This browser can’t show notifications.'); return; }
+  let p = Notification.permission;
+  if (p !== 'granted') p = await Notification.requestPermission();
+  if (p !== 'granted') { toast(p === 'denied' ? 'Notifications are blocked. You can allow them in Chrome’s site settings.' : 'Please allow notifications to get the reminder.'); render(); return; }
+  c.remind = true; if (S.settings.reminders === false) S.settings.reminders = true;
+  await save(); requestPersist(); await setupBackground(); render();
+  toast('Reminder on. You’ll get a nudge at 9 am if yesterday is blank.');
+}
+function commMoreSub() {
+  if (!CM().anchor) return 'Track commission by pay fortnight';
+  const f = curFortnight();
+  return `This fortnight: <b>${centsMoney(commSum(CM().entries, f.start, f.end))}</b> · ${fmt(f.start)} – ${fmt(f.end)}`;
+}
+
 /* ================= MORE ================= */
 function More() {
   const T = todayT(), t30 = T + 30 * DAY;
@@ -1900,8 +2132,9 @@ function More() {
   const item = (href, icon, cls, t, sub, pillHtml = '') => `<button class="row" onclick="go('${href}')"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div><div class="s">${sub}</div></div>${pillHtml}${I('right')}</button>`;
   const ne = upcomingEvents()[0];
   const petOver = dueItems({ pets: S.pets }).filter(x => x.days < 0).length;
-  return header('More', 'Events, meals, pets, bills, birthdays, ideas and settings') +
+  return header('More', 'Commission, events, meals, pets, bills and more') +
     `<div class="list">
+      ${item('#commission', 'cash', 'comm', 'Commission', commMoreSub())}
       ${item('#events', 'ticket', 'ev', 'Events', ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei')}
       ${item('#meals', 'meal', 'meal', 'Meal planner', mealsMoreSub())}
       ${item('#pets', 'paw', 'pet', 'Pets &amp; Vet', petsMoreSub(), petOver ? `<span class="pill over">${petOver} overdue</span>` : '')}
@@ -2338,9 +2571,16 @@ function Settings() {
    Appointments and connected calendars: 1 hour before (all-day ones in the morning).<br>
    Birthdays: 3 days before and on the day, never between 9 pm and 7 am.<br>
    Pets: 3 days before and on the day, never between 9 pm and 7 am.<br>
-   My events: if you turn it on for the event, on the day or the day before at the time you pick.<br><br>
+   My events: if you turn it on for the event, on the day or the day before at the time you pick.<br>
+   Commission: if you turn it on, 9 am the next morning when nothing’s entered for yesterday.<br><br>
    Reminders are checked every time you open the app. Background checks skip 9 pm to 7 am.
    <b>Android may delay background reminders if you don’t open the app for a while.</b> Opening it every few days keeps them coming.</div></div>
+
+  <div class="sec">Commission</div>
+  <div class="list" id="commsettings">
+   <div class="srow"><div class="tx"><div class="t">Pay fortnight starts</div><div class="s">${S.commission.anchor ? `Mondays. This pay fortnight: ${commRange(curFortnight())}.` : 'Not set up yet. Pick the Monday your pay fortnight started.'}</div></div><button class="btn small" onclick="anchorForm()">${S.commission.anchor ? 'Change' : 'Set up'}</button></div>
+   <div class="srow"><div class="tx"><div class="t">Commission reminder</div><div class="s">9 am the next morning, only if nothing’s entered for yesterday</div></div><button class="switch ${S.commission.remind ? 'on' : ''}" role="switch" aria-checked="${S.commission.remind}" aria-label="Commission reminder" onclick="toggleCommRemind()"></button></div>
+  </div>
 
   <div class="sec">Backup</div>
   <div class="list">
@@ -2464,7 +2704,7 @@ function importFile(input) {
     const d = obj && obj.data ? obj.data : obj;
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
-    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')} and ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own.`, 'Restore', async () => {
+    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own and ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')}.`, 'Restore', async () => {
       const s = snap(); S = normalise(d); const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
@@ -2483,7 +2723,7 @@ async function installApp() {
 
 /* ---------- router ---------- */
 const TABS = [['home', 'Home', 'home'], ['cars', 'Cars', 'car'], ['calendar', 'Calendar', 'cal'], ['todo', 'To-do', 'todo'], ['more', 'More', 'more']];
-const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events', 'meals', 'pets', 'pet'];
+const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events', 'meals', 'pets', 'pet', 'commission'];
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
@@ -2497,8 +2737,9 @@ function render() {
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, pets: Pets };
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : (map[r] || Home)();
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
+  if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' || r === 'bridge' ? 'home' : map[r] ? r : 'home');
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
