@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.15.1';
+const APP_VERSION = '1.16.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -250,8 +250,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   meals: ['meal', 'meal', 'Upcoming meals', 'Your planned cooking nights', 1],
   shopping: ['cart', 'shop', 'Shopping list', 'Things still to get, with a tick button', 1],
   summary: ['shield', 'car', 'Overdue, due soon, all good', 'The three counters', 1],
-  attention: ['warn', 'bill', 'Needs attention', 'Everything due soon or overdue', 1],
-  week: ['cal', 'appt', 'Later this week', 'Appointments and calendar events', 1],
+  attention: ['warn', 'bill', 'Needs attention', 'Everything due soon or overdue, plus this week’s appointments and calendar events', 1],
   events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a tick button (ones due soon are in Needs attention)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
@@ -296,14 +295,6 @@ const HOME_CARD = {
       <div class="tile fine"><b>${fine}</b><span>All good</span></div></div>`;
   },
   attention: () => homeSec('Needs attention', '<a href="#calendar">See calendar</a>') + attentionHtml(),
-  week: () => {
-    // Today, tomorrow and birthdays within a week are in Needs attention; this is the rest of the week's appointments and calendar events
-    const upcoming = calItems(todayT() + 2 * DAY, todayT() + 7 * DAY).filter(e => e.src === 'appt' || e.src === 'ext');
-    return homeSec('Later this week', '<button onclick="apptForm()">Add</button>') +
-      (upcoming.length ? `<div class="list" id="laterweek">${upcoming.map(e => `<button class="row" onclick="${e.go}"><div class="ic ${e.src}" ${e.color ? `style="background:${e.color}1f;color:${e.color}"` : ''}>${I('cal')}</div>
-      <div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${fmtW(e.date)} · ${esc(e.time)}${e.src === 'ext' ? ' · ' + esc(e.tag) : ''}</div></div></button>`).join('')}</div>`
-      : `<div class="card muted" id="laterweek">Nothing else booked for the rest of the week. Today and tomorrow are in Needs attention. <button class="linkbtn" onclick="apptForm()">Add an appointment</button></div>`);
-  },
   events: () => homeEvents(),
   todo: () => {
     const att = homeOn('attention'); // to-dos due within 30 days are already in Needs attention
@@ -2058,6 +2049,9 @@ function mineItems(fromT, toT, all = false) {
 const ATT_MAX = 8; // shown before "Show all" (overdue items are always shown)
 let attShowAll = false;
 const attWhen = d => d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : 'In ' + d + ' days';
+// 1.16.0: appointments and calendar events for the next 7 days (the old Later this week card) say the day name after tomorrow
+const attDay = (d, iso) => d < 2 ? attWhen(d) : new Date(parseD(iso)).toLocaleDateString('en-NZ', { weekday: 'long', timeZone: 'UTC' });
+const ATT_WEEK = 7;
 function attRow(o) {
   return `<button class="row att ${o.cls || ''}" data-kind="${o.kind}"${o.date ? ` data-date="${o.date}"` : ''} onclick="${o.go}"><div class="ic ${o.ic}"${o.icStyle ? ` style="${o.icStyle}"` : ''}>${I(o.icon)}</div>
     <div class="tx"><div class="t">${o.title}</div><div class="s">${o.sub}</div></div>${o.right || I('right')}</button>`;
@@ -2069,14 +2063,14 @@ const ATT_SOURCES = {
   mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).map(e => ({ days: d, rank: 1, sort: e.hm || '',
     html: attRow({ kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${T + d * DAY})`, ic: 'mine', icon: 'repeat', title: `${attWhen(d)}: ${esc(e.title)}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
       sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}` }) }))),
-  // Appointments, including What's On events you added, today and tomorrow
-  appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d === 0 || d === 1; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
-    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attWhen(d)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
+  // Appointments, including What's On events you added, today and the next 7 days
+  appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
+    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
       sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; }),
-  // Connected Outlook / Google / iCloud calendars, today and tomorrow
-  ext: T => extEvents(T, T + DAY).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '',
+  // Connected Outlook / Google / iCloud calendars, today and the next 7 days (an event spanning several days shows once, on its first day here)
+  ext: T => { const seen = new Set(); return extEvents(T, T + ATT_WEEK * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '',
     html: attRow({ kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal',
-      title: `${attWhen(d)}: ${esc(e.title)}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + esc(e.time) : ''}`, sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}${e.time === 'All day' ? ' · All day' : ''}` }) }; }),
+      title: `${attDay(d, e.date)}: ${esc(e.title)}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + esc(e.time) : ''}`, sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}${e.time === 'All day' ? ' · All day' : ''}` }) }; }); },
   // Birthdays, today and the next 7 days
   bday: T => S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 7).map(x => ({ days: x.d, rank: 2, sort: '',
     html: attRow({ kind: 'bday', cls: x.d === 0 ? 'bdtoday' : '', date: x.iso, go: `go('#birthdays')`, ic: 'bday', icon: 'cake', title: `${esc(x.b.name)}’s ${x.age > 0 ? ordinal(x.age) + ' ' : ''}birthday`,
