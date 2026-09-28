@@ -7,9 +7,12 @@
   // No request logs, traces or analytics are kept for this Worker.
   "observability": { "enabled": false, "logs": { "enabled": false, "invocation_logs": false } },
   "vars": {
-    "ALLOWED_ORIGIN": "https://phoneapp12-cell.github.io"
+    "ALLOWED_ORIGIN": "https://phoneapp12-cell.github.io",
+    // Public half of the push (VAPID) key. The private half is the Worker secret VAPID_PRIVATE_JWK.
+    "VAPID_PUBLIC": "BEsNn0TcOiNQqSE7AbDFgYGL_v45EEm-mma2_6DtecoG5c7ZvwZ7lKpAXOQry7cqfvWM0JTjtPPdK93arc0VXMU"
   },
-  // Holds the public Whangārei events list, bridge closure notices and a 20-minute copy of the weather. Nothing personal.
+  // Holds the public Whangārei events list, bridge closure notices, a 20-minute copy of the weather,
+  // and the push subscriptions for bridge alerts (push address and its keys only).
   "kv_namespaces": [
     { "binding": "EVENTS_KV", "id": "471149f31c3f46bda746283ffba8b4d3" }
   ],

@@ -198,12 +198,13 @@ export async function getClosures(env, fetchImpl = fetch, now = Date.now()) {
 }
 export function resetClosures() { mem = null; building = null; }
 
-export async function scheduledClosures(env, fetchImpl = fetch, now = Date.now()) {
+// after(state) runs with the latest state on every run (used for push alerts)
+export async function scheduledClosures(env, fetchImpl = fetch, now = Date.now(), after = null) {
   const prev = await load(env);
   let r;
   try { r = await step(prev, fetchImpl, now); }
   catch (e) { if (!prev) return false; r = { state: Object.assign(prev, { error: String(e && e.message || e).slice(0, 60), errorAt: now }), changed: true }; }
-  if (!r.changed) return false;
-  await save(env, r.state);
-  return true;
+  if (r.changed) await save(env, r.state);
+  if (after) { try { await after(r.state); } catch (e) { /* alerts must never break the closures check */ } }
+  return r.changed;
 }

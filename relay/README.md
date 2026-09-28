@@ -44,7 +44,18 @@ app is stored.
   - Multi-location notices are matched per location; single-location notices also count if the map pin is within 400 m of the bridge.
   - On failure it returns `502 {"error":"closures_unavailable"}`; the app then quietly shows the schedule only.
 
-KV holds only those three public copies. If you deploy your own copy, create a KV namespace
+## Bridge closure alerts (push notifications)
+
+`POST /push/subscribe`, `/push/unsubscribe`, `/push/status`, `/push/test` (app origin only, JSON body). The app sends its
+browser push subscription (a push-service address plus two public keys; Chrome's is on fcm.googleapis.com). Only real
+push-service hosts are accepted, at most 10 subscriptions are kept, and a small hourly limit stops misuse.
+After each closures check the cron (`src/push.js`) sends an encrypted Web Push (RFC 8291) signed with the VAPID key
+(RFC 8292) when a new notice about the bridge appears (held until 7 am if found overnight) and at 6 pm the evening
+before each closure date. Expired subscriptions are removed. The VAPID private key is the Worker secret
+`VAPID_PRIVATE_JWK` (`npx wrangler secret put VAPID_PRIVATE_JWK`); the public key is `VAPID_PUBLIC` in `wrangler.jsonc`
+and in the app. KV keys: `push-subs-v1`, `push-alerts-v1`.
+
+KV holds only those three public copies, plus the push subscriptions above. If you deploy your own copy, create a KV namespace
 (`npx wrangler kv namespace create due-dates-events-cache`) and put its id in `wrangler.jsonc`.
 
 ## Deploy (free Cloudflare Workers plan)

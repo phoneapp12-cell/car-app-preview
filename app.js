@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.13.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2941,6 +2941,8 @@ function Bridge() {
       : CLS ? `<div class="card muted" id="brclosures">No planned closures for the bridge or Dave Culham Drive on the council’s Roadworks and closures page.</div>`
       : clsBusy ? `<div class="card muted">Checking the council’s planned closures…</div>`
       : `<div class="muted" style="margin:0 4px">Planned closures couldn’t be checked just now.</div>`}
+    <div class="sec">Closure alerts</div>
+    ${brPushSection()}
     <div class="sec">Show when I’m near</div>
     <div class="list"><div class="srow"><div class="tx"><div class="t">${locOn ? 'On' : 'Off'}</div>
       <div class="s">${locOn ? `The card shows at the top of Home when you open the app within about 2 km of the bridge.${brDist != null ? ` You’re about ${brDist < 1000 ? Math.round(brDist / 10) * 10 + ' m' : (brDist / 1000).toFixed(1) + ' km'} away.` : ''}` : 'Uses your location only while the app is open, to put this card at the top of Home within about 2 km of the bridge.'} Your location isn’t saved.</div></div>
@@ -2985,6 +2987,74 @@ function enableBridgeLoc() {
 }
 async function stopBridgeLoc() { S.settings.bridgeLoc = false; brNear = null; brDist = null; await save(); render(); toast('The app won’t use your location for the bridge.'); }
 async function setBridgeHome(v) { S.settings.bridgeHome = v; await save(); render(); if (v === 'near') checkBridgeLoc(true); if (v !== 'off') refreshClosures(); }
+
+/* ---- Bridge closure alerts (push, v1.13.0) ----
+   The relay checks the council's closures page every 10 minutes. When a new notice about the bridge or Dave Culham Drive
+   appears (or it's 6 pm the evening before a closure) it sends a push notification, which shows even when the app is closed. */
+const VAPID_PUBLIC = 'BEsNn0TcOiNQqSE7AbDFgYGL_v45EEm-mma2_6DtecoG5c7ZvwZ7lKpAXOQry7cqfvWM0JTjtPPdK93arc0VXMU';
+let brPush = null, brPushBusy = false, brPushChecked = false; // null = unknown, true/false = on/off on this phone
+const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const vapidKey = () => { const b = VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - VAPID_PUBLIC.length % 4) % 4); return Uint8Array.from(atob(b), c => c.charCodeAt(0)); };
+async function pushPost(path, data) {
+  const r = await fetch(RELAY_URL + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'relay_' + r.status); return j;
+}
+async function pushSub() { const reg = await navigator.serviceWorker.ready; return reg.pushManager.getSubscription(); }
+// On opening the bridge page (and app start if alerts are on): find out if alerts are on, re-register quietly if the relay lost it
+async function checkBridgePush() {
+  if (!pushOK() || brPushBusy) return;
+  try {
+    const sub = await pushSub();
+    if (!sub || Notification.permission !== 'granted') { brPush = false; }
+    else {
+      brPush = true;
+      if (S.settings.bridgePush) { const st = await pushPost('/push/status', { endpoint: sub.endpoint }); if (!st.subscribed) await pushPost('/push/subscribe', { subscription: sub.toJSON(), quiet: true }); }
+    }
+  } catch (e) { /* offline: keep what we know */ if (brPush === null) brPush = !!S.settings.bridgePush; }
+  brPushChecked = true; updBridge();
+}
+function brPushSection() {
+  if (!pushOK()) return `<div class="card muted">This phone or browser can’t get push notifications. On Android, open the app from its icon (installed from Chrome).</div>`;
+  if (!brPushChecked) setTimeout(checkBridgePush, 0);
+  const on = brPush === true, denied = Notification.permission === 'denied';
+  return `<div class="list" id="brpush"><div class="srow"><div class="tx"><div class="t">Notify me about bridge closures</div>
+    <div class="s">${denied ? 'Notifications are blocked for this app. Allow them in the phone’s settings for this app, then come back here.'
+      : on ? 'On. You’ll get a notification when the council posts a new closure for the bridge or Dave Culham Drive, and again at 6 pm the evening before. Works even when the app is closed.'
+      : 'Get a notification when the council posts a new closure for the bridge or Dave Culham Drive, and at 6 pm the evening before. Works even when the app is closed.'}</div></div>
+    <button class="switch ${on ? 'on' : ''}" id="brpushsw" role="switch" aria-checked="${on}" aria-label="Notify me about bridge closures" ${brPushBusy || denied ? 'disabled' : ''} onclick="toggleBridgePush()"></button></div>
+    ${on ? `<div class="srow"><div class="tx"><div class="s">Not sure it’s working? Send a test notification to this phone.</div></div><button class="btn small" id="brpushtest" onclick="testBridgePush()">Send test</button></div>` : ''}</div>`;
+}
+async function toggleBridgePush() {
+  if (brPushBusy) return; brPushBusy = true; updBridge();
+  try {
+    if (brPush) {
+      const sub = await pushSub();
+      if (sub) { await pushPost('/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => { }); await sub.unsubscribe(); }
+      brPush = false; S.settings.bridgePush = false; await save();
+      toast('Bridge closure alerts are off.');
+    } else {
+      let p = Notification.permission; if (p !== 'granted') p = await Notification.requestPermission();
+      if (p !== 'granted') { toast('Notifications weren’t allowed, so bridge alerts are still off.'); return; }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey() });
+      await pushPost('/push/subscribe', { subscription: sub.toJSON() });
+      brPush = true; S.settings.bridgePush = true; await save();
+      toast('Bridge closure alerts are on. A notification should pop up in a moment to confirm.');
+    }
+  } catch (e) {
+    toast(navigator.onLine === false ? 'You’re offline. Try again when you have signal.' : 'Couldn’t change bridge alerts just now. Try again in a moment.');
+  } finally { brPushBusy = false; updBridge(); }
+}
+async function testBridgePush() {
+  const b = $('#brpushtest'); if (b) b.disabled = true;
+  try {
+    const sub = await pushSub(); if (!sub) throw new Error('none');
+    const r = await pushPost('/push/test', { endpoint: sub.endpoint });
+    toast(r.test === 'ok' ? 'Test sent. It should appear in a few seconds.' : r.test === 'gone' ? 'This phone’s alert address expired. Turn the switch off and on again.' : 'The test didn’t go through. Try again in a moment.');
+    if (r.test === 'gone') { brPush = false; updBridge(); }
+  } catch (e) { toast('The test didn’t go through. Try again in a moment.'); }
+  finally { if (b) b.disabled = false; }
+}
 
 /* ================= WEATHER (Open-Meteo, Whangārei) ================= */
 // Open-Meteo is free, needs no key and allows browser requests. Credit: "Weather data by Open-Meteo.com" (CC BY 4.0).

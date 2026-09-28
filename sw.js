@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '1.12.0';
+const VERSION = '1.13.0';
 const CACHE = 'due-dates-' + VERSION;
 const SHELL = ['./', './index.html', './app.js', './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png',
@@ -54,6 +54,27 @@ self.addEventListener('message', e => {
 // Chrome on Android (installed app): runs roughly every 12 hours or more, at Android's discretion.
 self.addEventListener('periodicsync', e => {
   if (e.tag === 'due-check') e.waitUntil(DD.runCheck(self.registration, { respectQuiet: true }));
+});
+
+// Bridge closure alerts: sent by the relay when the council posts a new closure, and the evening before one.
+// These arrive even when the app is closed.
+const RELAY = 'https://due-dates-calendar-relay.phoneapp12.workers.dev';
+const VAPID_PUBLIC = 'BEsNn0TcOiNQqSE7AbDFgYGL_v45EEm-mma2_6DtecoG5c7ZvwZ7lKpAXOQry7cqfvWM0JTjtPPdK93arc0VXMU';
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Lifting bridge', {
+    body: d.body || 'There’s an update about the lifting bridge.', tag: d.tag || 'bridge', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: d.url || '#bridge' }
+  }));
+});
+// The phone occasionally renews its push address; tell the relay the new one (no "turned on" notification).
+self.addEventListener('pushsubscriptionchange', e => {
+  e.waitUntil((async () => {
+    const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - VAPID_PUBLIC.length % 4) % 4)), c => c.charCodeAt(0));
+    const sub = e.newSubscription || await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    if (e.oldSubscription) await fetch(RELAY + '/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: e.oldSubscription.endpoint }) }).catch(() => { });
+    await fetch(RELAY + '/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), quiet: true }) });
+  })());
 });
 
 self.addEventListener('notificationclick', e => {

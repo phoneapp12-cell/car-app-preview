@@ -18,6 +18,7 @@
  */
 import { getFeed } from './events.js';
 import { getClosures } from './closures.js';
+import { pushRoute } from './push.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -165,6 +166,14 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     } catch (e) {
       return json(502, path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : 'weather_unavailable', origin, env);
     }
+  }
+  if (path.startsWith('/push/')) {
+    if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    let body = {};
+    try { const raw = await request.text(); if (raw.length > 4096) throw new Error('big'); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
+    const [status, data] = await pushRoute(path, body, env, fetchImpl);
+    return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
   }
   if (path !== '/fetch') return json(404, 'not_found_route', origin, env);
   if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
