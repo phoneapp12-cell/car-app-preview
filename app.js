@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -71,6 +71,7 @@ const P = {
   heart: '<path d="M12 20s-7.5-4.6-9-9.3C2 7.5 4.2 4.5 7.3 4.5c1.9 0 3.5 1 4.7 2.7 1.2-1.7 2.8-2.7 4.7-2.7 3.1 0 5.3 3 4.3 6.2C19.5 15.4 12 20 12 20z"/>',
   repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  coins: '<ellipse cx="9" cy="6.5" rx="6" ry="2.5"/><path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4"/><path d="M15 10.5c3.3 0 6 1.1 6 2.5s-2.7 2.5-6 2.5-6-1.1-6-2.5"/><path d="M9 13v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4"/>',
   cash: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   tooth: '<path d="M7.5 3.5c-2.5 0-4 2-4 4.5 0 2 .8 3.3 1.3 5 .6 2.2.8 7.5 2.7 7.5 1.7 0 1.6-4.5 2.5-5.8.5-.8 1.5-.8 2 0 .9 1.3.8 5.8 2.5 5.8 1.9 0 2.1-5.3 2.7-7.5.5-1.7 1.3-3 1.3-5 0-2.5-1.5-4.5-4-4.5-1.9 0-2.7 1-4.5 1s-2.6-1-4.5-1z"/>',
   stetho: '<path d="M5 3H4v5a4 4 0 0 0 8 0V3h-1M8 12v2a5 5 0 0 0 10 0v-2"/><circle cx="18" cy="10" r="2"/>',
@@ -98,7 +99,7 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), pets: [], myEvents: [],
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), pets: [], myEvents: [], loans: [],
     settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
@@ -119,6 +120,7 @@ function normalise(d) {
   d.meals = normMeals(d.meals); // first time on 1.4.0: Fri and Sat, with the starter ideas
   d.myEvents = normMine(d.myEvents); // 1.6.0: my events (repeating), older data has none
   d.commission = normComm(d.commission); // 1.7.0: commission tracker (older data and backups have none)
+  d.loans = normLoans(d.loans); // 1.10.0: loans (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.health = normHealth(d.health); // 1.8.0: Health (older data and backups have none)
   d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
@@ -2421,6 +2423,216 @@ function commMoreSub() {
   return `This fortnight: <b>${centsMoney(commSum(CM().entries, f.start, f.end))}</b> · ${fmt(f.start)} – ${fmt(f.end)}`;
 }
 
+/* ================= LOANS (1.10.0, More › Loans) ================= */
+// Money Shane has borrowed, e.g. an interest-free loan from Mum. S.loans = [{ id, from, note, cents, startPaid, date, planCents, planFreq, payments: [{ id, date, cents, note, at }] }]
+// All amounts are whole cents. Owed = borrowed − already paid back (before tracking) − payments, never below $0. No interest.
+// A loan is paid off when nothing is owed; the paid-off date is the date of the latest payment.
+const LOAN_FREQ = [['week', 'Weekly', 'a week', 'weekly'], ['fortnight', 'Fortnightly', 'a fortnight', 'fortnightly'], ['month', 'Monthly', 'a month', 'monthly']];
+const MAX_CENTS = 100000000;
+let loanDoneOpen = false;
+function normLoans(list) {
+  const c = v => Number.isFinite(+v) && +v > 0 ? Math.min(Math.round(+v), MAX_CENTS) : 0;
+  return (Array.isArray(list) ? list : []).filter(l => l && typeof l === 'object' && l.id && c(l.cents) > 0).map(l => ({
+    id: String(l.id), from: String(l.from || 'Loan').slice(0, 40), note: String(l.note || '').slice(0, 80), cents: c(l.cents),
+    startPaid: Math.min(c(l.startPaid), c(l.cents)), date: parseD(l.date) != null ? l.date : todayISO(),
+    planCents: c(l.planCents), planFreq: LOAN_FREQ.some(f => f[0] === l.planFreq) ? l.planFreq : 'fortnight',
+    payments: (Array.isArray(l.payments) ? l.payments : []).filter(p => p && parseD(p.date) != null && c(p.cents) > 0)
+      .map(p => ({ id: String(p.id || uid('lp')), date: p.date, cents: c(p.cents), note: String(p.note || '').slice(0, 80), at: +p.at || 0 }))
+  }));
+}
+const getLoan = id => S.loans.find(l => l.id === id);
+const loanPaysSorted = l => [...l.payments].sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0));
+function loanCalc(l) {
+  const paid = l.startPaid + l.payments.reduce((n, p) => n + p.cents, 0), owed = Math.max(0, l.cents - paid);
+  const pct = owed === 0 ? 100 : Math.min(99, Math.floor(Math.min(paid, l.cents) / l.cents * 100));
+  const last = l.payments.reduce((m, p) => p.date > m ? p.date : m, '');
+  return { paid, owed, pct, done: owed === 0, doneDate: owed === 0 ? (last || l.date) : '', last };
+}
+const loanStep = (iso, f, k) => f === 'week' ? addDays(iso, 7 * k) : f === 'fortnight' ? addDays(iso, 14 * k) : addMonths(iso, k);
+// Repayment plan: how many payments are left and roughly when the last one lands (the next one is one step after the latest
+// payment, or today if that's already gone by)
+function loanPlan(l) {
+  const k = loanCalc(l); if (!l.planCents || k.done) return null;
+  const n = Math.ceil(k.owed / l.planCents), lastAmt = k.owed - (n - 1) * l.planCents;
+  let next = loanStep(k.last || l.date, l.planFreq, 1); if (next < todayISO()) next = todayISO();
+  return { n, lastAmt, next, end: loanStep(next, l.planFreq, n - 1), per: LOAN_FREQ.find(f => f[0] === l.planFreq)[2] };
+}
+const loanPlanText = (l, p) => `At ${centsMoney(l.planCents)} ${p.per}, paid off around ${fmtW(p.end)}`;
+const loanBar = (pct, label) => `<div class="lbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${esc(label)}"><i style="width:${pct}%"></i></div>`;
+const loanActive = () => S.loans.filter(l => !loanCalc(l).done);
+function loanCard(l) {
+  const k = loanCalc(l), p = loanPlan(l);
+  return `<div class="carcard loancard" role="button" tabindex="0" data-loan="${l.id}" onclick="go('#loan/${l.id}')">
+    <div class="carhead"><div class="carpic loanpic">${I('coins')}</div>
+      <div style="flex:1;min-width:0"><div class="carname">${esc(l.from)}</div><div class="carmodel">${[l.note ? esc(l.note) : '', 'Borrowed ' + fmt(l.date)].filter(Boolean).join(' · ')}</div></div>${I('right')}</div>
+    <div class="lowed"><small>Still owed</small><b class="lamt">${centsMoney(k.owed)}</b></div>
+    ${loanBar(k.pct, `${k.pct}% paid back`)}
+    <div class="lstats"><span>Borrowed <b>${centsMoney(l.cents)}</b></span><span>Paid <b>${centsMoney(k.paid)}</b></span><span class="lpct">${k.pct}% paid</span></div>
+    ${p ? `<div class="lplan">${I('repeat')} ${loanPlanText(l, p)}</div>` : ''}
+    <div class="btns"><button class="btn primary lpaybtn" onclick="event.stopPropagation();payForm('${l.id}')">${I('plus')} Record payment</button></div></div>`;
+}
+function Loans() {
+  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
+  const act = loanActive(), done = S.loans.filter(l => loanCalc(l).done).sort((a, b) => loanCalc(b).doneDate.localeCompare(loanCalc(a).doneDate));
+  const total = act.reduce((n, l) => n + loanCalc(l).owed, 0);
+  const sub = act.length ? `${plural(act.length, 'loan')} being paid back` : S.loans.length ? 'All paid off' : 'Money you’ve borrowed';
+  if (!S.loans.length) return back + header('Loans', sub, addBtn('Add a loan', 'loanForm()')) +
+    empty('No loans yet', 'Keep track of money you’ve borrowed, like an interest-free loan from family. Add how much you borrowed, record each payment as you make it, and you’ll always know how much you still owe.', 'Add a loan', 'loanForm()') +
+    `<div class="foot">Your information is saved on this phone only.</div>`;
+  return back + header('Loans', sub, addBtn('Add a loan', 'loanForm()')) +
+    (act.length > 1 ? `<div class="summary loansum"><div class="muted">Total owed</div><div class="amt" id="loantotal">${centsMoney(total)}</div><div class="muted">Across ${plural(act.length, 'loan')}</div></div>` : '') +
+    (act.length ? `<div id="loanlist">${act.map(loanCard).join('')}</div>` : `<div class="card muted" style="margin-bottom:12px">${I('check')} Nothing owed. Every loan is paid off.</div>`) +
+    (done.length ? `<details class="list pastf loansdone" id="loansdone" ${loanDoneOpen ? 'open' : ''} ontoggle="loanDoneOpen=this.open">
+      <summary><span class="pr">Paid off<small>${plural(done.length, 'loan')}</small></span></summary>
+      ${done.map(l => { const k = loanCalc(l); return `<button class="row" data-loan="${l.id}" onclick="go('#loan/${l.id}')"><div class="ic loan">${I('check')}</div>
+        <div class="tx"><div class="t">${esc(l.from)}${l.note ? ` <span class="muted">· ${esc(l.note)}</span>` : ''}</div><div class="s">Paid off ${fmtW(k.doneDate)} · ${centsMoney(l.cents)} borrowed</div></div>${I('right')}</button>`; }).join('')}</details>` : '') +
+    `<div class="btns" style="margin-top:12px"><button class="btn" onclick="loanForm()">${I('plus')} Add a loan</button></div>
+    <div class="foot">Interest free: what you owe only goes down when you record a payment.<br>Your information is saved on this phone only.</div>`;
+}
+const centsIn = c => c ? (c / 100).toFixed(2) : '';
+const moneyField = (label, name, cents, ph = '0.00', hint = '') => field(label, `<div class="moneyin"><span>$</span><input name="${name}" inputmode="decimal" placeholder="${ph}" autocomplete="off" value="${centsIn(cents)}" aria-label="${esc(label.replace(/<[^>]+>/g, ''))}"></div>`, hint);
+function loanForm(id) {
+  const l = id ? getLoan(id) : { from: '', note: '', cents: 0, startPaid: 0, date: todayISO(), planCents: 0, planFreq: 'fortnight', payments: [] };
+  if (!l) return;
+  const T = todayISO();
+  openSheet(id ? 'Edit loan' : 'Add a loan',
+    field('Who it’s from', inp('from', l.from, 'placeholder="e.g. Mum" required maxlength="40" autocapitalize="words"')) +
+    field('Note (optional)', inp('note', l.note, 'maxlength="80" placeholder="e.g. Car deposit"')) +
+    moneyField('Amount borrowed (NZD)', 'amount', l.cents) +
+    field('Date borrowed', inp('date', l.date, `type="date" max="${T}" required`)) +
+    moneyField('Already paid back (optional)', 'startpaid', l.startPaid, '0.00', 'Only if you’d paid some back before you started tracking it here.') +
+    `<div class="subhead" style="margin-top:4px">Repayment plan (optional)</div>
+    <div>${moneyField('Regular amount (NZD)', 'plan', l.planCents, 'e.g. 50')}</div><div class="field"><span>How often</span>${segHtml('freq', LOAN_FREQ.map(f => [f[0], f[1]]), l.planFreq)}</div>
+    <p class="muted" style="margin:-4px 2px 6px;font-size:13px">Interest free, so there’s no interest to add. Leave the plan blank if there isn’t one.</p>`,
+    async v => {
+      if (!v.from) return 'Please say who the loan is from, e.g. Mum.';
+      const cents = parseCents(v.amount);
+      if (cents == null) return 'Please type the amount borrowed in dollars and cents, like 2000 or 1250.50.';
+      if (cents === 0) return 'The amount borrowed can’t be $0.00.';
+      if (cents > MAX_CENTS) return 'That amount looks too big. Please check it.';
+      if (!parseD(v.date)) return 'Please choose the date you borrowed it.';
+      if (v.date > todayISO()) return 'The date borrowed can’t be in the future.';
+      const startPaid = v.startpaid ? parseCents(v.startpaid) : 0;
+      if (startPaid == null) return 'Please type the amount already paid back in dollars and cents, or leave it blank.';
+      if (startPaid > cents) return 'Already paid back can’t be more than the amount borrowed.';
+      const pays = l.payments.reduce((n, p) => n + p.cents, 0);
+      if (startPaid + pays > cents) return `The amount borrowed can’t be less than what’s been paid back so far (${centsMoney(startPaid + pays)}).`;
+      const planCents = v.plan ? parseCents(v.plan) : 0;
+      if (planCents == null || (v.plan && planCents === 0)) return 'Please type the regular amount in dollars and cents, like 50, or leave it blank.';
+      if (v.date > (l.payments.reduce((m, p) => p.date < m ? p.date : m, '9999'))) return 'There’s a payment before that date. Please check the date borrowed.';
+      const s = snap(), upd = { from: v.from.slice(0, 40), note: v.note.slice(0, 80), cents, startPaid, date: v.date, planCents, planFreq: v.freq };
+      if (id) { Object.assign(l, upd); await save(); render(); toast('Loan updated.', 'Undo', undoTo(s)); return; }
+      const nl = Object.assign({ id: uid('loan'), payments: [] }, upd); S.loans.push(nl); await save();
+      toast(`Loan from ${nl.from} added. You owe ${centsMoney(loanCalc(nl).owed)}.`, 'Undo', undoTo(s));
+      return () => go('#loan/' + nl.id);
+    }, id ? 'Save' : 'Add loan',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete loan" onclick="deleteLoan('${id}')">${I('trash')}</button>` : '');
+  wireSeg('freq');
+}
+function deleteLoan(id) {
+  const l = getLoan(id); if (!l) return;
+  confirmSheet(`Delete the loan from ${esc(l.from)}?`, `The loan and ${plural(l.payments.length, 'payment')} will be removed from this phone.`, 'Delete loan', async () => {
+    const s = snap(); S.loans = S.loans.filter(x => x.id !== id); await save();
+    return () => { go('#loans'); toast(`Loan from ${l.from} deleted.`, 'Undo', undoTo(s)); };
+  });
+}
+function loansMoreSub() {
+  if (!S.loans.length) return 'Money you’ve borrowed, and what’s left to pay';
+  const act = loanActive();
+  if (!act.length) return 'All paid off';
+  return `You owe <b>${centsMoney(act.reduce((n, l) => n + loanCalc(l).owed, 0))}</b>${act.length > 1 ? ' · ' + plural(act.length, 'loan') : ' to ' + esc(act[0].from)}`;
+}
+function LoanDetail(id) {
+  const l = getLoan(id);
+  if (!l) return `<button class="back" onclick="go('#loans')">${I('left')} Loans</button>` + empty('That loan isn’t here any more', 'It may have been deleted.', '', '');
+  const k = loanCalc(l), p = loanPlan(l), pays = loanPaysSorted(l);
+  const planCard = k.done ? '' : p
+    ? `<div class="dcard" id="loanplan"><div class="h">${I('repeat')} Repayment plan</div>
+        <div class="big" style="font-size:18px">${loanPlanText(l, p)}</div>
+        <div class="muted">${plural(p.n, 'payment')} left${p.n > 1 && p.lastAmt !== l.planCents ? `, the last one ${centsMoney(p.lastAmt)}` : ''}. Next one around ${fmtW(p.next)}.</div>
+        <div class="btns"><button class="btn small" onclick="planForm('${l.id}')">${I('edit')} Change plan</button></div></div>`
+    : `<div class="dcard" id="loanplan"><div class="h">${I('repeat')} Repayment plan <span class="pill none">Not set</span></div>
+        <div class="muted" style="margin-top:6px">Paying back a set amount regularly? Add it to see roughly when the loan will be paid off.</div>
+        <div class="btns"><button class="btn" onclick="planForm('${l.id}')">${I('plus')} Set a plan</button></div></div>`;
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#loans')">${I('left')} Loans</button>
+    <button class="btn small" onclick="loanForm('${l.id}')">${I('edit')} Edit</button></div>
+  <div class="hero"><div class="carpic loanpic">${I('coins')}</div><div style="min-width:0"><h2>${esc(l.from)}</h2><div class="muted">${[l.note ? esc(l.note) : '', 'Borrowed ' + fmtY(l.date), 'Interest free'].filter(Boolean).join(' · ')}</div></div></div>
+  <div class="summary loandet" id="loansummary">${k.done
+      ? `<div class="muted">${I('check')} Paid off</div><div class="amt">${centsMoney(0)}</div><div class="muted" id="paidoffon">Paid off ${fmtLong(k.doneDate)}</div>`
+      : `<div class="muted">Still owed</div><div class="amt" id="loanowed">${centsMoney(k.owed)}</div><div class="muted">of ${centsMoney(l.cents)} borrowed</div>`}
+    ${loanBar(k.pct, `${k.pct}% paid back`)}
+    <div class="lsumrow"><span>Paid <b id="loanpaid">${centsMoney(k.paid)}</b></span><span><b>${k.pct}%</b> paid</span></div></div>
+  ${k.done ? `<div class="callout green">${I('check')}<div><b>All paid back.</b> Nice work. It’s been moved to Paid off on the Loans list.</div></div>`
+      : `<div class="btns" style="margin:0 0 12px"><button class="btn primary xl" id="recordpay" onclick="payForm('${l.id}')">${I('plus')} Record payment</button></div>`}
+  ${planCard}
+  <div class="sec">Payments ${pays.length ? `<span class="wk">${plural(pays.length, 'payment')}</span>` : ''}</div>
+  ${pays.length || l.startPaid ? `<div class="list" id="loanpays">${pays.map(x => `<button class="row lpay" data-pay="${x.id}" onclick="payForm('${l.id}','${x.id}')" aria-label="Edit payment of ${esc(centsMoney(x.cents))} on ${fmtW(x.date)}">
+      <div class="tx"><div class="t">${fmtW(x.date)}</div>${x.note ? `<div class="s">${esc(x.note)}</div>` : ''}</div><b class="lpa">${centsMoney(x.cents)}</b></button>`).join('')}
+      ${l.startPaid ? `<button class="row lpay start" onclick="loanForm('${l.id}')"><div class="tx"><div class="t">Paid back before tracking</div><div class="s">Set when the loan was added. Tap to change.</div></div><b class="lpa">${centsMoney(l.startPaid)}</b></button>` : ''}</div>`
+    : `<div class="card muted" style="font-size:14px">No payments yet. Tap “Record payment” each time you pay some back.</div>`}
+  <div class="btns" style="margin-top:16px"><button class="btn danger" onclick="deleteLoan('${l.id}')">${I('trash')} Delete loan</button></div>
+  <div class="foot">Your information is saved on this phone only.</div>`;
+}
+function payForm(loanId, pid) {
+  const l = getLoan(loanId); if (!l) return;
+  const x = pid ? l.payments.find(p => p.id === pid) : { date: todayISO(), cents: 0, note: '' };
+  if (!x) return;
+  const k = loanCalc(l), room = k.owed + (pid ? x.cents : 0), T = todayISO();
+  const quick = pid ? '' : [l.planCents && l.planCents < room ? [l.planCents, `${centsMoney(l.planCents)} (plan)`] : null, [room, `All of it (${centsMoney(room)})`]].filter(Boolean);
+  openSheet(pid ? 'Edit payment' : 'Record payment',
+    `<p class="muted" style="margin:-4px 2px 12px">To ${esc(l.from)} · ${centsMoney(k.owed)} still owed</p>` +
+    moneyField('Amount paid (NZD)', 'amount', x.cents) +
+    (quick ? `<div class="chips lquick">${quick.map(([c, t]) => `<button type="button" class="chip" data-cents="${c}">${t}</button>`).join('')}</div>` : '') +
+    field('Date paid', inp('date', x.date, `type="date" min="${l.date}" max="${T}" required`)) +
+    field('Note (optional)', inp('note', x.note, 'maxlength="80" placeholder="e.g. Bank transfer"')),
+    async v => {
+      const c = parseCents(v.amount);
+      if (c == null) return 'Please type the amount in dollars and cents, like 200 or 85.50.';
+      if (c === 0) return 'The amount can’t be $0.00.';
+      if (c > room) return `That’s more than the ${centsMoney(room)} still owed. Please check the amount.`;
+      if (!parseD(v.date)) return 'Please choose the date you paid it.';
+      if (v.date > todayISO()) return 'The date paid can’t be in the future.';
+      if (v.date < l.date) return `That’s before the loan was borrowed (${fmtY(l.date)}). Please check the date.`;
+      const s = snap(), upd = { date: v.date, cents: c, note: v.note.slice(0, 80) };
+      if (pid) Object.assign(x, upd); else l.payments.push(Object.assign({ id: uid('lp'), at: Date.now() }, upd));
+      await save(); render();
+      const nk = loanCalc(l);
+      toast(nk.done ? `That’s the loan from ${l.from} paid off. Well done!` : pid ? `Payment updated. You owe ${centsMoney(nk.owed)}.` : `Payment of ${centsMoney(c)} recorded. You owe ${centsMoney(nk.owed)}.`, 'Undo', undoTo(s));
+    }, pid ? 'Save' : 'Save payment',
+    pid ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete this payment" onclick="deletePayment('${loanId}','${pid}')">${I('trash')}</button>` : '');
+  document.querySelectorAll('#sf .lquick .chip').forEach(b => b.onclick = () => { $('#sf input[name=amount]').value = (+b.dataset.cents / 100).toFixed(2); });
+}
+async function deletePayment(loanId, pid) {
+  const l = getLoan(loanId), x = l && l.payments.find(p => p.id === pid); if (!x) return;
+  const s = snap(); l.payments = l.payments.filter(p => p.id !== pid);
+  await save(); await closeSheet(); render();
+  toast(`Deleted the payment of ${centsMoney(x.cents)}. You owe ${centsMoney(loanCalc(l).owed)}.`, 'Undo', undoTo(s));
+}
+function planForm(loanId) {
+  const l = getLoan(loanId); if (!l) return;
+  openSheet('Repayment plan',
+    `<p class="muted" style="margin:-4px 2px 12px">How much you plan to pay back, and how often. It’s just for working out when the loan will be paid off – there are no reminders.</p>` +
+    moneyField('Regular amount (NZD)', 'plan', l.planCents, 'e.g. 50') +
+    `<div class="field"><span>How often</span>${segHtml('freq', LOAN_FREQ.map(f => [f[0], f[1]]), l.planFreq)}</div>
+    <p class="muted" id="planhint" style="margin:0 2px 4px;font-size:14px;min-height:20px"></p>`,
+    async v => {
+      const c = parseCents(v.plan);
+      if (c == null || c === 0) return 'Please type the regular amount in dollars and cents, like 50.';
+      const s = snap(); l.planCents = c; l.planFreq = v.freq; await save(); render();
+      toast('Repayment plan saved.', 'Undo', undoTo(s));
+    }, 'Save plan',
+    l.planCents ? `<button type="button" class="btn danger" style="flex:0 0 auto" onclick="removePlan('${loanId}')">Remove</button>` : '');
+  const hint = () => {
+    const c = parseCents($('#sf input[name=plan]').value), f = $('#sf input[name=freq]').value;
+    const p = c ? loanPlan(Object.assign({}, l, { planCents: c, planFreq: f })) : null;
+    $('#planhint').textContent = p ? `${loanPlanText({ planCents: c }, p)} (${plural(p.n, 'payment')} left).` : '';
+  };
+  wireSeg('freq'); document.querySelectorAll('#sf [data-seg=freq] button').forEach(b => b.addEventListener('click', hint)); $('#sf input[name=plan]').addEventListener('input', hint); hint();
+}
+async function removePlan(loanId) {
+  const l = getLoan(loanId), s = snap(); l.planCents = 0; await save(); await closeSheet(); render(); toast('Repayment plan removed.', 'Undo', undoTo(s));
+}
+
 /* ================= APPEARANCE: colour themes (v1.9.0, Settings › Appearance) ================= */
 // The colours live in CSS variables (index.html); a theme just sets html[data-theme]. The choice is in S.settings
 // (so it's in backups) and copied to localStorage so the inline script in index.html can apply it before first paint.
@@ -2475,9 +2687,10 @@ function More() {
   const ne = upcomingEvents()[0];
   const petOver = dueItems({ pets: S.pets }).filter(x => x.days < 0).length;
   const hOver = dueItems({ health: S.health }).filter(x => x.days < 0).length;
-  return header('More', 'Commission, events, meals, pets, health, bills and more') +
+  return header('More', 'Commission, loans, events, meals, pets, health, bills and more') +
     `<div class="list">
       ${item('#commission', 'cash', 'comm', 'Commission', commMoreSub())}
+      ${item('#loans', 'coins', 'loan', 'Loans', loansMoreSub())}
       ${item('#events', 'ticket', 'ev', 'Events', ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei')}
       ${item('#meals', 'meal', 'meal', 'Meal planner', mealsMoreSub())}
       ${item('#pets', 'paw', 'pet', 'Pets &amp; Vet', petsMoreSub(), petOver ? `<span class="pill over">${petOver} overdue</span>` : '')}
@@ -3129,7 +3342,7 @@ function importFile(input) {
     const d = obj && obj.data ? obj.data : obj;
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
-    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own and ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')}.`, 'Restore', async () => {
+    confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
       const s = snap(); S = normalise(d); const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
@@ -3148,7 +3361,7 @@ async function installApp() {
 
 /* ---------- router ---------- */
 const TABS = [['home', 'Home', 'home'], ['cars', 'Cars', 'car'], ['calendar', 'Calendar', 'cal'], ['todo', 'To-do', 'todo'], ['more', 'More', 'more']];
-const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events', 'meals', 'pets', 'pet', 'commission', 'health'];
+const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events', 'meals', 'pets', 'pet', 'commission', 'health', 'loans', 'loan'];
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
@@ -3162,8 +3375,8 @@ function render() {
   applyTheme();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, pets: Pets };
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : (map[r] || Home)();
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, pets: Pets, loans: Loans };
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' || r === 'bridge' ? 'home' : map[r] ? r : 'home');

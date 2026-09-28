@@ -34,7 +34,7 @@
   --bill-bg:#FFF3E3; --bill-fg:#B45309; --todo-bg:#EEF0FF; --todo-fg:#4F46E5; --appt-bg:#F2ECFF; --appt-fg:#7C3AED; --bday-bg:#FCE7F3; --bday-fg:#BE185D; --bday-row:#FDF2F8;
   --hol-bg:#FFEDD5; --idea-bg:#FEF6C7; --idea-fg:#A16207; --ext-bg:#E6EFFB; --wx-bg:#FFF6DC; --wx-fg:#B7791F; --ev-bg:#FFEDE3; --ev-fg:#C2410C; --br-bg:#E0F2FE; --br-fg:#0369A1;
   --meal-bg:#ECFCCB; --meal-fg:#4D7C0F; --gf-bg:#F0FDF4; --gf-line:#BBF7D0; --gftag-bg:#DCFCE7; --gftag-fg:#166534; --warn-bg:#FFEDD5; --warn-fg:#9A3412;
-  --mine-bg:#E0E7FF; --pet-bg:#F5EBDD; --health-bg:#DDF1F5; --health-bg2:#E8F4F7; --comm-bg:#DCFCE7; --comm-fg:#15803D; --star:#E0A100; --starfill:#F5B90B;
+  --mine-bg:#E0E7FF; --pet-bg:#F5EBDD; --health-bg:#DDF1F5; --health-bg2:#E8F4F7; --comm-bg:#DCFCE7; --comm-fg:#15803D; --loan-bg:#DBEAFE; --loan-fg:#1D4ED8; --loanpic:#2563EB; --star:#E0A100; --starfill:#F5B90B;
   --wxsun:#F5A524; --wxmoon:#B9A868; --wxcloud:#E3E8EC; --wxcloud2:#C3CCD4; --wxcloudline:#9AA6B0; --wxrain:#1F74D6; --wxsnow:#fff; --wxbolt:#F5B90B; --wxfog:#8C98A3; --wxcool:#5AA9E6; --wxwarm:#F59E0B;
   --plate:#fff; --plateink:#111; /* NZ number plates are white in every theme */
   --radius:18px;
@@ -56,7 +56,7 @@ html[data-theme="dark"]{color-scheme:dark;
   --bill-bg:#3A2A17;--bill-fg:#F5B454;--todo-bg:#23264A;--todo-fg:#A5ADFB;--appt-bg:#2C2248;--appt-fg:#C4B1FC;--bday-bg:#3F1D31;--bday-fg:#F9A8D4;--bday-row:#2E1A26;
   --hol-bg:#3D2413;--idea-bg:#3A3212;--idea-fg:#F2D66B;--ext-bg:#15294A;--wx-bg:#3A3014;--wx-fg:#F6C85F;--ev-bg:#3D2316;--ev-fg:#FDBA8C;--br-bg:#123047;--br-fg:#7DD3FC;
   --meal-bg:#243313;--meal-fg:#BEF264;--gf-bg:#142A1B;--gf-line:#24533A;--gftag-bg:#1B3D26;--gftag-fg:#86EFAC;--warn-bg:#3D2413;--warn-fg:#FDBA8C;
-  --mine-bg:#23264A;--pet-bg:#35281B;--health-bg:#123640;--health-bg2:#143038;--comm-bg:#16301F;--comm-fg:#6FD68F;--star:#F6C85F;--starfill:#F6C85F;
+  --mine-bg:#23264A;--pet-bg:#35281B;--health-bg:#123640;--health-bg2:#143038;--comm-bg:#16301F;--comm-fg:#6FD68F;--loan-bg:#172A4A;--loan-fg:#93B4FB;--loanpic:#3B6FD8;--star:#F6C85F;--starfill:#F6C85F;
   --wxsun:#F7B73A;--wxmoon:#E2D38C;--wxcloud:#7D8A95;--wxcloud2:#66727D;--wxcloudline:#A6B1BA;--wxrain:#5EA8FF;--wxsnow:#E8EEEC;--wxbolt:#FACC15;--wxfog:#9AA6B0;--wxcool:#5EA8FF;--wxwarm:#F7B73A}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink)}
@@ -524,6 +524,32 @@ details.help ol{margin:0 0 12px}
 .moneyin span{font-weight:700;color:var(--ink2);font-size:16px}
 .field .moneyin input{border:0;box-shadow:none;padding-left:6px;min-width:0}
 .moneyin:focus-within{border-color:var(--brand);box-shadow:0 0 0 2px var(--focus)}
+/* Loans (1.10.0) */
+.ic.loan{background:var(--loan-bg);color:var(--loan-fg)}
+.loanpic{background:var(--loanpic)}
+.loancard .carhead>svg.i{color:var(--ink3);width:18px;height:18px;flex:none}
+.lowed{margin-top:12px}
+.lowed small{display:block;font-size:11.5px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px}
+.lamt{display:block;font-size:30px;font-weight:800;letter-spacing:-.5px;color:var(--ink);margin-top:1px}
+.lbar{height:10px;border-radius:999px;background:var(--soft2);overflow:hidden;margin:8px 0}
+.lbar i{display:block;height:100%;border-radius:999px;background:var(--brand)}
+.lstats{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13.5px;color:var(--ink2)}
+.lstats b{color:var(--ink)}
+.lstats .lpct{margin-left:auto;font-weight:700;color:var(--brand)}
+.lplan{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:13.5px;color:var(--ink2);background:var(--soft);border-radius:10px;padding:8px 10px;line-height:1.35}
+.lplan svg.i{width:16px;height:16px;flex:none;color:var(--brand)}
+.summary .lbar{background:rgba(0,0,0,.2);margin:10px 0 8px}
+.summary .lbar i{background:var(--onbrand)}
+.lsumrow{display:flex;justify-content:space-between;gap:10px;font-size:14px;opacity:.92}
+.loandet .muted svg.i{width:16px;height:16px;vertical-align:-3px}
+.loansum,.loandet{margin-bottom:12px}
+.btn.xl{min-height:56px;font-size:16.5px;border-radius:14px}
+.lpay .lpa{font-size:15.5px;white-space:nowrap}
+.lpay.start .t{color:var(--ink2)}
+.lquick{margin:-4px 0 12px}
+.lquick .chip{background:var(--soft2);box-shadow:none;color:var(--brand)}
+.loansdone{margin-top:4px}
+.loansdone summary .pr{font-weight:700}
 /* Settings › Appearance (v1.9.0) */
 .themes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .theme{background:var(--card);border-radius:16px;padding:8px;border:2px solid transparent;box-shadow:0 1px 2px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:6px;min-width:0}
