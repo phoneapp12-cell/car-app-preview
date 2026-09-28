@@ -2441,7 +2441,7 @@ function normLoans(list) {
   }));
 }
 const getLoan = id => S.loans.find(l => l.id === id);
-const loanPaysSorted = l => [...l.payments].sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0));
+const loanPaysSorted = l => l.payments.map((p, i) => [p, i]).sort(([a, i], [b, j]) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0) || j - i).map(x => x[0]); // newest first; same day: the one entered last first
 function loanCalc(l) {
   const paid = l.startPaid + l.payments.reduce((n, p) => n + p.cents, 0), owed = Math.max(0, l.cents - paid);
   const pct = owed === 0 ? 100 : Math.min(99, Math.floor(Math.min(paid, l.cents) / l.cents * 100));
