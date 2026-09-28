@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -239,9 +239,129 @@ function rowFor(x) {
   return `<button class="row" onclick="go('${x.go}')"><div class="ic ${x.kind}">${I(icon)}</div>
     <div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div>${pill(x.days)}</button>`;
 }
+/* 1.14.0: Home cards can be reordered and switched on or off (Home › Customise). Saved as settings.homeOrder / settings.homeHidden.
+   Cards with nothing to show hide themselves. The reminder and install prompts always stay at the top. */
+const HOME = { // key: [icon, icon colour class, name, what it shows, on by default]
+  bridge: ['bridge', 'br', 'Lifting bridge', 'Lift times and closures when you’re nearby or it matters', 1],
+  weather: ['cloudsun', 'appt', 'Weather', 'Whangārei weather today', 1],
+  holidays: ['flag', 'hol', 'Public holidays', 'The next public holiday when it’s close', 1],
+  meals: ['meal', 'meal', 'Upcoming meals', 'Your planned cooking nights', 1],
+  summary: ['shield', 'car', 'Overdue, due soon, all good', 'The three counters', 1],
+  attention: ['warn', 'bill', 'Needs attention', 'Everything due soon or overdue', 1],
+  week: ['cal', 'appt', 'Later this week', 'Appointments and calendar events', 1],
+  events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
+  todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a tick button (ones due soon are in Needs attention)', 1],
+  loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
+  commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
+  birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays later this month (this week’s are in Needs attention)', 1],
+  pets: ['paw', 'pet', 'Pets', 'Next flea treatment, grooming and vet dates', 0],
+  bills: ['bill', 'bill', 'Bills', 'The next bills to pay', 0],
+  cars: ['car', 'car', 'Cars at a glance', 'Each car’s next WOF and rego', 0],
+  ideas: ['bulb', 'idea', 'Starred ideas', 'Ideas you’ve starred', 0]
+};
+const HOME_DEFAULT = Object.keys(HOME);
+let homeEdit = false;
+function homeOrder() {
+  const src = Array.isArray(S.settings.homeOrder) ? S.settings.homeOrder : [];
+  const o = src.filter((k, i, a) => HOME[k] && a.indexOf(k) === i);
+  HOME_DEFAULT.forEach(k => { if (!o.includes(k)) o.splice(Math.min(HOME_DEFAULT.indexOf(k), o.length), 0, k); });
+  return o;
+}
+function homeOn(k) {
+  const h = S.settings.homeHidden;
+  if (h && typeof h === 'object' && k in h) return !h[k];
+  return !!HOME[k][4];
+}
+async function setHomeOrder(o) { S.settings.homeOrder = o; await save(); render(); }
+async function toggleHomeCard(k) {
+  const on = homeOn(k); S.settings.homeHidden = Object.assign({}, S.settings.homeHidden, { [k]: on });
+  await save(); render();
+}
+async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
+const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
+const HOME_CARD = {
+  bridge: () => { const br = brOnHome(); return br === 'card' ? brCard() : br === 'line' ? brLine() : ''; },
+  weather: () => wxCard(),
+  holidays: () => homeHolidays(),
+  meals: () => homeMeal(),
+  summary: () => {
+    const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length, fine = items.length - over - soon;
+    return `<div class="tiles">
+      <div class="tile over"><b>${over}</b><span>Overdue</span></div>
+      <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
+      <div class="tile fine"><b>${fine}</b><span>All good</span></div></div>`;
+  },
+  attention: () => homeSec('Needs attention', '<a href="#calendar">See calendar</a>') + attentionHtml(),
+  week: () => {
+    // Today, tomorrow and birthdays within a week are in Needs attention; this is the rest of the week's appointments and calendar events
+    const upcoming = calItems(todayT() + 2 * DAY, todayT() + 7 * DAY).filter(e => e.src === 'appt' || e.src === 'ext');
+    return homeSec('Later this week', '<button onclick="apptForm()">Add</button>') +
+      (upcoming.length ? `<div class="list" id="laterweek">${upcoming.map(e => `<button class="row" onclick="${e.go}"><div class="ic ${e.src}" ${e.color ? `style="background:${e.color}1f;color:${e.color}"` : ''}>${I('cal')}</div>
+      <div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${fmtW(e.date)} · ${esc(e.time)}${e.src === 'ext' ? ' · ' + esc(e.tag) : ''}</div></div></button>`).join('')}</div>`
+      : `<div class="card muted" id="laterweek">Nothing else booked for the rest of the week. Today and tomorrow are in Needs attention. <button class="linkbtn" onclick="apptForm()">Add an appointment</button></div>`);
+  },
+  events: () => homeEvents(),
+  todo: () => {
+    const att = homeOn('attention'); // to-dos due within 30 days are already in Needs attention
+    const open = S.todos.filter(t => !t.done && !(att && t.due && daysLeft(t.due) <= 30)).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
+    if (!open.length) return '';
+    return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button class="tick" aria-label="Tick off ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
+      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}</div></div>${t.due ? pill(daysLeft(t.due)) : ''}</button></div>`).join('')}</div>` +
+      (open.length > 5 ? `<div class="homemore"><a href="#todo">${plural(open.length - 5, 'more to-do')}</a></div>` : '');
+  },
+  loans: () => {
+    const act = loanActive(); if (!act.length) return '';
+    return homeSec('Loans', '<a href="#loans">See all</a>') + `<div class="list" id="homeloans">${act.map(l => { const k = loanCalc(l); return `<button class="row" onclick="go('#loan/${l.id}')"><div class="ic loan">${I('coins')}</div>
+      <div class="tx"><div class="t">${esc(l.from)} · ${centsMoney(k.owed)} to go</div>${loanBar(k.pct, `${k.pct}% paid back`)}<div class="s">${k.pct}% paid back of ${centsMoney(l.cents)}</div></div>${I('right')}</button>`; }).join('')}</div>`;
+  },
+  commission: () => {
+    if (!CM().anchor) return '';
+    return homeSec('Commission', '<a href="#commission">See all</a>') + `<div class="list" id="homecomm"><div class="row"><button class="tapzone" onclick="go('#commission')"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">This fortnight</div><div class="s">${commMoreSub().replace(/^This fortnight: /, '')}</div></div></button>
+      <button class="paybtn" onclick="go('#commission/add')">Add</button></div></div>`;
+  },
+  birthdays: () => {
+    const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d <= 31 && !(homeOn('attention') && x.d <= 7)).sort((x, y) => x.d - y.d || x.b.name.localeCompare(y.b.name)).slice(0, 4); // this week's are in Needs attention
+    if (!list.length) return '';
+    return homeSec('Birthdays', '<a href="#birthdays">See all</a>') + `<div class="list" id="homebdays">${list.map(x => `<button class="row" onclick="birthdayForm('${x.b.id}')"><div class="ic bday">${I('cake')}</div>
+      <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${fmtW(x.iso)}${x.age > 0 ? ` · turns ${x.age}` : ''}</div></div>
+      ${x.d === 0 ? '<span class="pill bdaypill">Today! 🎂</span>' : `<span class="pill ${x.d <= 7 ? 'bdaysoon' : 'none'}">${x.d === 1 ? 'Tomorrow' : x.d + ' days'}</span>`}</button>`).join('')}</div>`;
+  },
+  pets: () => {
+    const list = dueItems(S).filter(x => x.kind === 'pet').slice(0, 4); if (!list.length) return '';
+    return homeSec('Pets', '<a href="#pets">See all</a>') + `<div class="list" id="homepets">${list.map(rowFor).join('')}</div>`;
+  },
+  bills: () => {
+    const list = S.bills.filter(b => !b.paid && b.due).sort((a, b) => parseD(a.due) - parseD(b.due)).slice(0, 4); if (!list.length) return '';
+    return homeSec('Bills', '<a href="#bills">See all</a>') + `<div class="list" id="homebills">${list.map(b => `<div class="row bill"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(b.name))}</div>
+      <div class="tx"><div class="t">${esc(b.name)} · ${money(b.amount)}</div><div class="s">Due ${fmtW(b.due)}</div></div>${pill(daysLeft(b.due))}</button>
+      <button class="paybtn" onclick="markPaid('${b.id}')">Paid</button></div>`).join('')}</div>`;
+  },
+  cars: () => {
+    if (!S.cars.length) return '';
+    const cell = (l, d) => d ? `<span class="cg"><small>${l}</small> ${fmt(d)} ${pill(daysLeft(d))}</span>` : '';
+    return homeSec('Cars', '<a href="#cars">See all</a>') + `<div class="list" id="homecars">${S.cars.map(c => `<button class="row" onclick="go('#car/${c.id}')"><div class="ic car">${I('car')}</div>
+      <div class="tx"><div class="t">${esc(c.name)}${c.plate ? ` <span class="plate small">${esc(c.plate)}</span>` : ''}</div><div class="cgrow">${cell('WOF', c.wof)}${cell('Rego', c.rego)}</div></div></button>`).join('')}</div>`;
+  },
+  ideas: () => {
+    const list = S.ideas.filter(i => i.pinned).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 5); if (!list.length) return '';
+    return homeSec('Starred ideas', '<a href="#ideas">See all</a>') + `<div class="list" id="homeideas">${list.map(i => `<button class="row" onclick="go('#ideas')"><div class="ic idea">${I('star')}</div>
+      <div class="tx"><div class="t">${esc(i.title)}</div>${i.cat ? `<div class="s">${esc(i.cat)}</div>` : ''}</div></button>`).join('')}</div>`;
+  }
+};
+function HomeEdit() {
+  const order = homeOrder();
+  return header('Customise Home', 'Press and hold a card, then drag it up or down') +
+    `<div class="reordhelp">Use the switches to show or hide cards. Cards with nothing to show stay hidden until there’s something in them.</div>
+    <div class="list reorder" id="reorderlist" data-save="home">${order.map(k => { const d = HOME[k], on = homeOn(k); return `<div class="row mrow${on ? '' : ' cardoff'}" data-k="${k}" aria-label="${d[2]}"><div class="ic ${d[1]}">${I(d[0])}</div>
+      <div class="tx"><div class="t">${d[2]}</div><div class="s">${d[3]}</div></div>
+      <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${d[2]} on Home" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>
+      <span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetHome()">Reset to default</button><button class="btn primary" id="homedone" onclick="homeEdit=false;render();$('#view').scrollTop=0">Done</button></div>
+    <div class="foot">The reminder and install prompts always show at the top when they’re needed.</div>`;
+}
 function Home() {
-  const items = dueItems(S);
-  const over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length, fine = items.length - over - soon;
+  if (homeEdit) return HomeEdit();
   const now = new Date();
   let cards = '';
   if ('Notification' in window && Notification.permission === 'default' && S.settings.reminders !== false)
@@ -250,22 +370,17 @@ function Home() {
   if (deferredPrompt && !isStandalone())
     cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
-  // Today, tomorrow and birthdays within a week are in Needs attention; this is the rest of the week's appointments and calendar events
-  const upcoming = calItems(todayT() + 2 * DAY, todayT() + 7 * DAY).filter(e => e.src === 'appt' || e.src === 'ext');
-  const br = brOnHome();
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (br === 'card' ? brCard() : '') + cards + wxCard() + (br === 'line' ? brLine() : '') + homeHolidays() + homeMeal() +
-    `<div class="tiles">
-      <div class="tile over"><b>${over}</b><span>Overdue</span></div>
-      <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
-      <div class="tile fine"><b>${fine}</b><span>All good</span></div></div>
-    <div class="sec">Needs attention <a href="#calendar">See calendar</a></div>
-    ${attentionHtml()}
-    <div class="sec">Later this week <button onclick="apptForm()">Add</button></div>
-    ${upcoming.length ? `<div class="list" id="laterweek">${upcoming.map(e => `<button class="row" onclick="${e.go}"><div class="ic ${e.src}" ${e.color ? `style="background:${e.color}1f;color:${e.color}"` : ''}>${I('cal')}</div>
-      <div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${fmtW(e.date)} · ${esc(e.time)}${e.src === 'ext' ? ' · ' + esc(e.tag) : ''}</div></div></button>`).join('')}</div>`
-      : `<div class="card muted" id="laterweek">Nothing else booked for the rest of the week. Today and tomorrow are in Needs attention. <button class="linkbtn" onclick="apptForm()">Add an appointment</button></div>`}
-    ${homeEvents()}
-    ${syncNote()}
+  const keys = homeOrder().filter(homeOn), br = brOnHome();
+  let top = '';
+  // As before 1.14.0: when the bridge is first, the full card (near the bridge, or a closure) goes right under the greeting,
+  // and the compact line sits under the weather if the weather card comes next
+  if (keys[0] === 'bridge' && br === 'card') { top = brCard(); keys.shift(); }
+  const bi = keys.indexOf('bridge');
+  if (br === 'line' && bi >= 0 && keys[bi + 1] === 'weather') { keys[bi] = 'weather'; keys[bi + 1] = 'bridge'; }
+  const feed = keys.map(k => { try { return HOME_CARD[k](); } catch (e) { console.error('Home card', k, e); return ''; } }).join('');
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + top + cards +
+    `<button class="linkbtn" id="homecustomise" style="display:block;margin:-4px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>` +
+    feed + `${syncNote()}
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
 
@@ -2803,7 +2918,7 @@ async function endDrag() {
   const st = rd; rd = null; cancelAnimationFrame(st.raf);
   const o = st.rows.map(r => r.dataset.k), [k] = o.splice(st.from, 1); o.splice(st.to, 0, k);
   if (st.to === st.from) { render(); return; }
-  await setNavOrder(o);
+  await ($('#reorderlist').dataset.save === 'home' ? setHomeOrder : setNavOrder)(o);
 }
 
 /* ================= LIFTING BRIDGE (Dave Culham Drive, Te Matau ā Pohe) ================= */
@@ -2955,6 +3070,7 @@ function updBridge(force = false) {
   const h = (location.hash || '#home').slice(1).split('/')[0];
   if (h === 'bridge') { const v = $('#view'), top = v.scrollTop; render(); v.scrollTop = top; return; }
   if (h !== 'home' && h !== '') return;
+  if (homeEdit) return;
   const want = brOnHome(), has = document.getElementById('brcard') ? 'card' : document.getElementById('brline') ? 'line' : '';
   if (want !== has) { const v = $('#view'), top = v.scrollTop; render(); v.scrollTop = top; return; }
   const c = document.getElementById('brcard'); if (c) c.outerHTML = brCard();
@@ -3255,7 +3371,7 @@ async function refreshEvents(force = false) {
 function updEvents() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if (h === 'events' || h === 'home' || h === 'more' || h === '') {
+  if (h === 'events' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
     const v = $('#view'), top = v.scrollTop, q = document.activeElement && document.activeElement.id === 'evq';
     render(); v.scrollTop = top;
     if (q) { const i = document.getElementById('evq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -3559,11 +3675,12 @@ function render() {
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, pets: Pets, loans: Loans };
   if (r !== 'more') moreEdit = false;
+  if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
-  if (r === 'more' && moreEdit) wireReorder();
+  if ((r === 'more' && moreEdit) || ((r === 'home' || r === '') && homeEdit)) wireReorder();
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });

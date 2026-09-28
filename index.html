@@ -535,6 +535,14 @@ details.help ol{margin:0 0 12px}
 .reorder.dragging .mrow:not(.lifted){transition:transform .18s ease}
 .reorder .mrow.lifted{z-index:5;transition:box-shadow .18s ease;box-shadow:0 10px 28px rgba(0,0,0,.22);border-radius:14px;border-top-color:transparent;cursor:grabbing}
 .reorder .mrow.lifted .grip{opacity:1;transform:none}
+/* Customise Home (1.14.0) */
+.reorder[data-save=home] .grip{display:none}
+.reorder[data-save=home] .switch{margin-left:auto}
+.reorder .mrow.cardoff .ic,.reorder .mrow.cardoff .tx{opacity:.45}
+.homemore{text-align:center;margin:-4px 0 10px;font-size:14px;font-weight:650} .homemore a{color:var(--brand);text-decoration:none}
+.cgrow{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:5px;font-size:13.5px;color:var(--ink2)} .cg{display:inline-flex;align-items:center;gap:5px} .cg small{font-weight:700;color:var(--ink2)}
+.plate.small{font-size:11.5px;padding:0 5px;border-width:1.5px;margin-left:4px;vertical-align:1px}
+#homeloans .lbar{margin:6px 0 4px}
 /* Loans (1.10.0) */
 .ic.loan{background:var(--loan-bg);color:var(--loan-fg)}
 .loanpic{background:var(--loanpic)}
