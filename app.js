@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.10.1';
+const APP_VERSION = '1.11.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23,7 +23,7 @@ const P = {
   cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
-  left: '<path d="M15 18l-6-6 6-6"/>', right: '<path d="M9 18l6-6-6-6"/>',
+  left: '<path d="M15 18l-6-6 6-6"/>', right: '<path d="M9 18l6-6-6-6"/>', up: '<path d="M6 15l6-6 6 6"/>', down: '<path d="M6 9l6 6 6-6"/>',
   wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   doc: '<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
@@ -2683,26 +2683,55 @@ function More() {
   const due30 = unpaid.filter(b => parseD(b.due) <= t30).length;
   const nb = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).sort((x, y) => x.d - y.d)[0];
   const starred = S.ideas.filter(i => i.pinned).length;
-  const item = (href, icon, cls, t, sub, pillHtml = '') => `<button class="row" onclick="go('${href}')"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div><div class="s">${sub}</div></div>${pillHtml}${I('right')}</button>`;
   const ne = upcomingEvents()[0];
   const petOver = dueItems({ pets: S.pets }).filter(x => x.days < 0).length;
   const hOver = dueItems({ health: S.health }).filter(x => x.days < 0).length;
+  const R = {
+    commission: ['cash', 'comm', 'Commission', () => commMoreSub()],
+    loans: ['coins', 'loan', 'Loans', () => loansMoreSub()],
+    events: ['ticket', 'ev', 'Events', () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei'],
+    meals: ['meal', 'meal', 'Meal planner', () => mealsMoreSub()],
+    pets: ['paw', 'pet', 'Pets &amp; Vet', () => petsMoreSub(), () => petOver ? `<span class="pill over">${petOver} overdue</span>` : ''],
+    health: ['medkit', 'health', 'Health', () => healthMoreSub(), () => hOver ? `<span class="pill over">${hOver} overdue</span>` : ''],
+    bridge: ['bridge', 'br', 'Lifting bridge', () => 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3]],
+    bills: ['bill', 'bill', 'Bills', () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…', () => over ? `<span class="pill over">${over} overdue</span>` : ''],
+    birthdays: ['cake', 'bday', 'Birthdays', () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one', () => nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : ''],
+    ideas: ['bulb', 'idea', 'Ideas', () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down']
+  };
+  const order = moreOrder();
+  if (moreEdit) {
+    const n = order.length;
+    return header('Reorder More', 'Use the arrows to move a section up or down') +
+      `<div class="list reorder">${order.map((k, i) => { const [icon, cls, t] = R[k]; return `<div class="row mrow" data-k="${k}"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div></div>
+        <button class="mv" aria-label="Move ${t} up" ${i === 0 ? 'disabled' : ''} onclick="moveMore('${k}',-1)">${I('up')}</button><button class="mv" aria-label="Move ${t} down" ${i === n - 1 ? 'disabled' : ''} onclick="moveMore('${k}',1)">${I('down')}</button></div>`; }).join('')}
+      </div>
+      <div class="hbtns" style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetMore()">Reset to default</button><button class="btn primary" id="moredone" onclick="moreEdit=false;render()">Done</button></div>
+      <div class="foot">Settings always stays at the bottom.</div>`;
+  }
+  const item = k => { const [icon, cls, t, sub, pl] = R[k]; return `<button class="row" onclick="go('#${k}')"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div><div class="s">${sub()}</div></div>${pl ? pl() : ''}${I('right')}</button>`; };
   return header('More', 'Commission, loans, events, meals, pets, health, bills and more') +
-    `<div class="list">
-      ${item('#commission', 'cash', 'comm', 'Commission', commMoreSub())}
-      ${item('#loans', 'coins', 'loan', 'Loans', loansMoreSub())}
-      ${item('#events', 'ticket', 'ev', 'Events', ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei')}
-      ${item('#meals', 'meal', 'meal', 'Meal planner', mealsMoreSub())}
-      ${item('#pets', 'paw', 'pet', 'Pets &amp; Vet', petsMoreSub(), petOver ? `<span class="pill over">${petOver} overdue</span>` : '')}
-      ${item('#health', 'medkit', 'health', 'Health', healthMoreSub(), hOver ? `<span class="pill over">${hOver} overdue</span>` : '')}
-      ${item('#bridge', 'bridge', 'br', 'Lifting bridge', 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3])}
-      ${item('#bills', 'bill', 'bill', 'Bills', S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…', over ? `<span class="pill over">${over} overdue</span>` : '')}
-      ${item('#birthdays', 'cake', 'bday', 'Birthdays', nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one', nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '')}
-      ${item('#ideas', 'bulb', 'idea', 'Ideas', S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down')}
-      ${item('#settings', 'gear', 'set', 'Settings', 'Reminders, calendars and backup')}
+    `<button class="linkbtn" id="morereorderlink" style="display:block;margin:-4px 0 6px auto" onclick="moreEdit=true;render()">Reorder</button>
+    <div class="list">
+      ${order.map(item).join('')}
+      <button class="row" onclick="go('#settings')"><div class="ic set">${I('gear')}</div><div class="tx"><div class="t">Settings</div><div class="s">Reminders, calendars and backup</div></div>${I('right')}</button>
     </div>
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
+// 1.11.0: the More sections can be put in any order (Settings stays last). Saved in settings, so it's in backups too.
+const MORE_DEFAULT = ['commission', 'loans', 'events', 'meals', 'pets', 'health', 'bridge', 'bills', 'birthdays', 'ideas'];
+let moreEdit = false;
+function moreOrder() {
+  const o = Array.isArray(S.settings.moreOrder) ? S.settings.moreOrder.filter((k, i, a) => MORE_DEFAULT.includes(k) && a.indexOf(k) === i) : [];
+  MORE_DEFAULT.forEach(k => { if (!o.includes(k)) o.splice(Math.min(MORE_DEFAULT.indexOf(k), o.length), 0, k); }); // new sections slot in near their usual place
+  return o;
+}
+async function moveMore(k, dir) {
+  const o = moreOrder(), i = o.indexOf(k), j = i + dir;
+  if (i < 0 || j < 0 || j >= o.length) return;
+  [o[i], o[j]] = [o[j], o[i]]; S.settings.moreOrder = o; await save(); render();
+  const b = document.querySelector(`.mrow[data-k="${k}"] .mv:not([disabled])${dir < 0 ? '' : ':last-child'}`); if (b) b.focus();
+}
+async function resetMore() { const s = snap(); delete S.settings.moreOrder; await save(); render(); toast('Back to the usual order.', 'Undo', undoTo(s)); }
 
 /* ================= LIFTING BRIDGE (Dave Culham Drive, Te Matau ā Pohe) ================= */
 // Not live: the council doesn't publish lift status. The rules are in core.js (bridgeStatus); planned closures come from
@@ -3376,6 +3405,7 @@ function render() {
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, pets: Pets, loans: Loans };
+  if (r !== 'more') moreEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
