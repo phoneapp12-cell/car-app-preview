@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23,7 +23,7 @@ const P = {
   cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
-  left: '<path d="M15 18l-6-6 6-6"/>', right: '<path d="M9 18l6-6-6-6"/>', up: '<path d="M6 15l6-6 6 6"/>', down: '<path d="M6 9l6 6 6-6"/>',
+  left: '<path d="M15 18l-6-6 6-6"/>', right: '<path d="M9 18l6-6-6-6"/>', grip: '<path d="M5 8h14M5 12h14M5 16h14"/>',
   wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   doc: '<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
@@ -2686,52 +2686,125 @@ function More() {
   const ne = upcomingEvents()[0];
   const petOver = dueItems({ pets: S.pets }).filter(x => x.days < 0).length;
   const hOver = dueItems({ health: S.health }).filter(x => x.days < 0).length;
-  const R = {
-    commission: ['cash', 'comm', 'Commission', () => commMoreSub()],
-    loans: ['coins', 'loan', 'Loans', () => loansMoreSub()],
-    events: ['ticket', 'ev', 'Events', () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei'],
-    meals: ['meal', 'meal', 'Meal planner', () => mealsMoreSub()],
-    pets: ['paw', 'pet', 'Pets &amp; Vet', () => petsMoreSub(), () => petOver ? `<span class="pill over">${petOver} overdue</span>` : ''],
-    health: ['medkit', 'health', 'Health', () => healthMoreSub(), () => hOver ? `<span class="pill over">${hOver} overdue</span>` : ''],
-    bridge: ['bridge', 'br', 'Lifting bridge', () => 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3]],
-    bills: ['bill', 'bill', 'Bills', () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…', () => over ? `<span class="pill over">${over} overdue</span>` : ''],
-    birthdays: ['cake', 'bday', 'Birthdays', () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one', () => nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : ''],
-    ideas: ['bulb', 'idea', 'Ideas', () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down']
-  };
-  const order = moreOrder();
+  const openTodos = S.todos.filter(t => !t.done).length;
+  const R = navDefs({
+    cars: () => `${plural(S.cars.length, 'car')} · rego, WOF and servicing`,
+    calendar: () => 'Appointments, events and holidays',
+    todo: () => openTodos ? `${openTodos} to do` : 'Your lists',
+    commission: () => commMoreSub(),
+    loans: () => loansMoreSub(),
+    events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
+    meals: () => mealsMoreSub(),
+    pets: () => petsMoreSub(),
+    health: () => healthMoreSub(),
+    bridge: () => 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3],
+    bills: () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…',
+    birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
+    ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down'
+  });
+  const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
+    bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
+  const order = navOrder();
   if (moreEdit) {
-    const n = order.length;
-    return header('Reorder More', 'Use the arrows to move a section up or down') +
-      `<div class="list reorder">${order.map((k, i) => { const [icon, cls, t] = R[k]; return `<div class="row mrow" data-k="${k}"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div></div>
-        <button class="mv" aria-label="Move ${t} up" ${i === 0 ? 'disabled' : ''} onclick="moveMore('${k}',-1)">${I('up')}</button><button class="mv" aria-label="Move ${t} down" ${i === n - 1 ? 'disabled' : ''} onclick="moveMore('${k}',1)">${I('down')}</button></div>`; }).join('')}
+    return header('Reorder', 'Press and hold an item, then drag it up or down') +
+      `<div class="reordhelp">The top ${NAV_TABS} go in the bottom bar, between Home and More. The rest are in More.</div>
+      <div class="list reorder" id="reorderlist">${order.map((k, i) => { const d = R[k]; return `<div class="row mrow${i < NAV_TABS ? ' istab' : ''}" data-k="${k}" aria-label="${d.t}"><div class="ic ${d.cls}">${I(d.icon)}</div><div class="tx"><div class="t">${d.t}</div>${i < NAV_TABS ? '<div class="s tabnote">In the bottom bar</div>' : ''}</div><span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
       </div>
-      <div class="hbtns" style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetMore()">Reset to default</button><button class="btn primary" id="moredone" onclick="moreEdit=false;render()">Done</button></div>
-      <div class="foot">Settings always stays at the bottom.</div>`;
+      <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetNav()">Reset to default</button><button class="btn primary" id="moredone" onclick="moreEdit=false;render()">Done</button></div>
+      <div class="foot">Home, More and Settings always stay where they are.</div>`;
   }
-  const item = k => { const [icon, cls, t, sub, pl] = R[k]; return `<button class="row" onclick="go('#${k}')"><div class="ic ${cls}">${I(icon)}</div><div class="tx"><div class="t">${t}</div><div class="s">${sub()}</div></div>${pl ? pl() : ''}${I('right')}</button>`; };
-  return header('More', 'Commission, loans, events, meals, pets, health, bills and more') +
+  const item = k => { const d = R[k]; return `<button class="row" onclick="go('#${k}')"><div class="ic ${d.cls}">${I(d.icon)}</div><div class="tx"><div class="t">${d.t}</div><div class="s">${d.sub()}</div></div>${pills[k] || ''}${I('right')}</button>`; };
+  return header('More', 'Everything else in the app', '') +
     `<button class="linkbtn" id="morereorderlink" style="display:block;margin:-4px 0 6px auto" onclick="moreEdit=true;render()">Reorder</button>
     <div class="list">
-      ${order.map(item).join('')}
+      ${order.slice(NAV_TABS).map(item).join('')}
       <button class="row" onclick="go('#settings')"><div class="ic set">${I('gear')}</div><div class="tx"><div class="t">Settings</div><div class="s">Reminders, calendars and backup</div></div>${I('right')}</button>
     </div>
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
-// 1.11.0: the More sections can be put in any order (Settings stays last). Saved in settings, so it's in backups too.
-const MORE_DEFAULT = ['commission', 'loans', 'events', 'meals', 'pets', 'health', 'bridge', 'bills', 'birthdays', 'ideas'];
+/* 1.12.0: one list for the bottom bar and More. The first NAV_TABS items are tabs (between Home and More), the rest are in More.
+   Press and hold a row on the Reorder screen, then drag. Saved as settings.navOrder, so it's in backups too. */
+const NAV_TABS = 3;
+const NAV = { // key: [icon, icon colour class, name, short name for the tab]
+  cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
+  commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'],
+  meals: ['meal', 'meal', 'Meal planner', 'Meals'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], health: ['medkit', 'health', 'Health', 'Health'],
+  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas']
+};
+const NAV_DEFAULT = Object.keys(NAV);
+const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 let moreEdit = false;
-function moreOrder() {
-  const o = Array.isArray(S.settings.moreOrder) ? S.settings.moreOrder.filter((k, i, a) => MORE_DEFAULT.includes(k) && a.indexOf(k) === i) : [];
-  MORE_DEFAULT.forEach(k => { if (!o.includes(k)) o.splice(Math.min(MORE_DEFAULT.indexOf(k), o.length), 0, k); }); // new sections slot in near their usual place
+function navOrder() {
+  const st = S.settings;
+  let src = Array.isArray(st.navOrder) ? st.navOrder : Array.isArray(st.moreOrder) ? ['cars', 'calendar', 'todo'].concat(st.moreOrder) : []; // 1.11.0 kept only the More order
+  const o = src.filter((k, i, a) => NAV[k] && a.indexOf(k) === i);
+  NAV_DEFAULT.forEach(k => { if (!o.includes(k)) o.splice(Math.min(NAV_DEFAULT.indexOf(k), o.length), 0, k); }); // new sections slot in near their usual place
   return o;
 }
-async function moveMore(k, dir) {
-  const o = moreOrder(), i = o.indexOf(k), j = i + dir;
-  if (i < 0 || j < 0 || j >= o.length) return;
-  [o[i], o[j]] = [o[j], o[i]]; S.settings.moreOrder = o; await save(); render();
-  const b = document.querySelector(`.mrow[data-k="${k}"] .mv:not([disabled])${dir < 0 ? '' : ':last-child'}`); if (b) b.focus();
+async function setNavOrder(o) { S.settings.navOrder = o; delete S.settings.moreOrder; await save(); render(); }
+async function resetNav() { const s = snap(); delete S.settings.navOrder; delete S.settings.moreOrder; await save(); render(); toast('Back to the usual order.', 'Undo', undoTo(s)); }
+
+/* Press-and-hold drag on the Reorder screen. Works with touch (Android) and a mouse. */
+const HOLD_MS = 350;
+let rd = null; // the drag in progress
+function wireReorder() {
+  const list = $('#reorderlist'); if (!list) return;
+  list.addEventListener('contextmenu', e => e.preventDefault());
+  const pt = e => e.touches ? e.touches[0] || e.changedTouches[0] : e;
+  const down = e => {
+    if (rd || (e.type === 'pointerdown' && e.pointerType !== 'mouse')) return;
+    const row = e.target.closest('.mrow'); if (!row) return;
+    const p = pt(e), st = { row, x: p.clientX, y: p.clientY, lastY: p.clientY, on: false };
+    st.timer = setTimeout(() => startDrag(st), e.type === 'pointerdown' ? 200 : HOLD_MS);
+    rd = st;
+  };
+  const move = e => {
+    if (!rd) return;
+    const p = pt(e);
+    if (!rd.on) { if (Math.abs(p.clientY - rd.y) > 8 || Math.abs(p.clientX - rd.x) > 8) cancelHold(); return; } // moved before the hold: it's a scroll
+    if (e.cancelable) e.preventDefault();
+    rd.lastY = p.clientY; dragTo();
+  };
+  const up = () => { if (!rd) return; if (rd.on) endDrag(); else cancelHold(); };
+  list.addEventListener('touchstart', down, { passive: true });
+  list.addEventListener('touchmove', move, { passive: false });
+  list.addEventListener('touchend', up); list.addEventListener('touchcancel', up);
+  list.addEventListener('pointerdown', down);
+  rdMouse = { move, up };
+  if (!rdWired) { rdWired = true; window.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && rdMouse) rdMouse.move(e); }); window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && rdMouse) rdMouse.up(); }); }
 }
-async function resetMore() { const s = snap(); delete S.settings.moreOrder; await save(); render(); toast('Back to the usual order.', 'Undo', undoTo(s)); }
+let rdMouse = null, rdWired = false;
+function cancelHold() { if (rd) clearTimeout(rd.timer); rd = null; }
+function startDrag(st) {
+  if (rd !== st) return;
+  const list = $('#reorderlist'), rows = [...list.querySelectorAll('.mrow')], lr = list.getBoundingClientRect();
+  st.on = true; st.rows = rows; st.from = rows.indexOf(st.row); st.to = st.from;
+  st.mids = rows.map(r => { const b = r.getBoundingClientRect(); return b.top - lr.top + b.height / 2; });
+  st.h = st.row.getBoundingClientRect().height; st.startTop = lr.top; st.startScroll = $('#view').scrollTop;
+  list.classList.add('dragging'); st.row.classList.add('lifted');
+  try { navigator.vibrate && navigator.vibrate(15); } catch (e) { }
+  const loop = () => { if (rd !== st || !st.on) return; autoScroll(); st.raf = requestAnimationFrame(loop); };
+  st.raf = requestAnimationFrame(loop);
+}
+function autoScroll() {
+  const v = $('#view'), vr = v.getBoundingClientRect(), bar = $('#tabbar').getBoundingClientRect().top, y = rd.lastY;
+  const step = y < vr.top + 70 ? -8 : y > Math.min(vr.bottom, bar) - 70 ? 8 : 0;
+  if (step) { const b = v.scrollTop; v.scrollTop += step; if (v.scrollTop !== b) dragTo(); }
+}
+function dragTo() {
+  const st = rd, scrolled = $('#view').scrollTop - st.startScroll, dy = st.lastY - st.y + scrolled;
+  const mid = st.mids[st.from] + dy;
+  let to = 0; st.mids.forEach((m, i) => { if (i !== st.from && m < mid) to++; });
+  st.to = to;
+  st.row.style.transform = `translateY(${dy}px)`;
+  st.rows.forEach((r, i) => { if (i === st.from) return; const shift = st.from < to && i > st.from && i <= to ? -st.h : st.from > to && i >= to && i < st.from ? st.h : 0; r.style.transform = shift ? `translateY(${shift}px)` : ''; });
+}
+async function endDrag() {
+  const st = rd; rd = null; cancelAnimationFrame(st.raf);
+  const o = st.rows.map(r => r.dataset.k), [k] = o.splice(st.from, 1); o.splice(st.to, 0, k);
+  if (st.to === st.from) { render(); return; }
+  await setNavOrder(o);
+}
 
 /* ================= LIFTING BRIDGE (Dave Culham Drive, Te Matau ā Pohe) ================= */
 // Not live: the council doesn't publish lift status. The rules are in core.js (bridgeStatus); planned closures come from
@@ -3389,14 +3462,24 @@ async function installApp() {
 }
 
 /* ---------- router ---------- */
-const TABS = [['home', 'Home', 'home'], ['cars', 'Cars', 'car'], ['calendar', 'Calendar', 'cal'], ['todo', 'To-do', 'todo'], ['more', 'More', 'more']];
-const MORE_PAGES = ['more', 'bills', 'birthdays', 'ideas', 'settings', 'events', 'meals', 'pets', 'pet', 'commission', 'health', 'loans', 'loan'];
+const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
+const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans' }; // detail pages belong to their section
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
-  const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge ? `<span class="badge">${moreBadge}</span>` : '';
-  $('#tabbar').innerHTML = TABS.map(([k, l, ic]) =>
+  const tabs = navOrder().slice(0, NAV_TABS);
+  const list = [['home', 'Home', 'home']].concat(tabs.map(k => [k, NAV[k][3], NAV[k][0]]), [['more', 'More', 'more']]);
+  const inTabs = k => tabs.includes(k);
+  const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge && !(inTabs('bills') && inTabs('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
+  $('#tabbar').innerHTML = list.map(([k, l, ic]) =>
     `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span>${l}</button>`).join('');
+}
+function activeTab(r) {
+  const item = ROUTE_ITEM[r] || r, tabs = navOrder().slice(0, NAV_TABS);
+  if (tabs.includes(item)) return item;
+  if (r === 'home' || r === 'weather' || r === 'drivers' || !r) return 'home';
+  if (r === 'bridge') return 'home';
+  return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
 }
 let renderedDay = todayISO();
 function render() {
@@ -3409,7 +3492,8 @@ function render() {
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
-  tabbar(r === 'car' || r === 'driver' ? 'cars' : MORE_PAGES.includes(r) ? 'more' : r === 'weather' || r === 'bridge' ? 'home' : map[r] ? r : 'home');
+  tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
+  if (r === 'more' && moreEdit) wireReorder();
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
