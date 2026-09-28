@@ -543,6 +543,39 @@ details.help ol{margin:0 0 12px}
 .cgrow{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:5px;font-size:13.5px;color:var(--ink2)} .cg{display:inline-flex;align-items:center;gap:5px} .cg small{font-weight:700;color:var(--ink2)}
 .plate.small{font-size:11.5px;padding:0 5px;border-width:1.5px;margin-left:4px;vertical-align:1px}
 #homeloans .lbar{margin:6px 0 4px}
+/* Recipes, shopping list, scanning, Home dividers (1.15.0) */
+.hsec{display:block}
+.hsec + .hsec{border-top:1px solid color-mix(in srgb,var(--ink3) 28%,transparent);margin-top:16px;padding-top:2px}
+.hsec > .sec:first-child{margin-top:12px}
+.hsec > .tiles:first-child,.hsec > .card:first-child,.hsec > .list:first-child,.hsec > .callout:first-child{margin-top:14px}
+.hsec > :last-child{margin-bottom:0}
+.hsec .mealhome{margin-bottom:0}
+.ic.recipe{background:var(--meal-bg);color:var(--meal-fg)}
+.ic.shop{background:var(--warn-bg);color:var(--warn-fg)}
+.recbtns,.shopbtns{margin:0 0 12px}
+.rectitle{font-size:26px;line-height:1.2;margin:4px 0 2px}
+.recsub{margin-bottom:8px}
+.recmeta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px;font-size:13px}
+.recplanned{margin-bottom:4px;font-size:14px}
+.recingr ul{margin:0;padding-left:20px}
+.recingr li{margin:3px 0;line-height:1.4}
+.recmethod ol{margin:0;padding-left:22px}
+.recmethod li{margin:0 0 10px;line-height:1.5}
+.recmethod li:last-child{margin-bottom:0}
+.onlist{display:inline-block;font-size:11px;font-weight:700;color:var(--gftag-fg);background:var(--gftag-bg);border-radius:5px;padding:0 5px;white-space:nowrap}
+textarea.tall{min-height:150px}
+.gfwarn{background:var(--warn-bg);color:var(--warn-fg);border-radius:12px;padding:10px 12px;margin:0 0 10px;font-size:14px;line-height:1.4}
+.scantips{background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:10px}
+.scanstat{margin:4px 0 12px}
+.scanstat .t{font-size:14px;font-weight:600;margin-bottom:6px}
+.scanstat .bar{height:8px;border-radius:4px;background:var(--soft);overflow:hidden}
+.scanstat .bar i{display:block;height:100%;width:0;background:var(--brand);transition:width .3s}
+.scanpage{background:var(--soft);border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.scanhead{display:flex;gap:8px;align-items:center;font-size:14px;margin-bottom:6px}
+.scanhead .linkbtn{margin-left:auto}
+.scanpage pre{margin:0;white-space:pre-wrap;word-break:break-word;font:inherit;font-size:13px;color:var(--ink2);max-height:140px;overflow:auto}
+.plannights{margin-bottom:12px}
+.shopitem .t .chk{margin-left:4px}
 /* Loans (1.10.0) */
 .ic.loan{background:var(--loan-bg);color:var(--loan-fg)}
 .loanpic{background:var(--loanpic)}

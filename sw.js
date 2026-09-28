@@ -1,7 +1,8 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '1.14.0';
+const VERSION = '1.15.0';
 const CACHE = 'due-dates-' + VERSION;
+const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['./', './index.html', './app.js', './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png',
   './icons/apple-touch-icon.png', './icons/favicon-32.png'];
@@ -36,6 +37,19 @@ self.addEventListener('fetch', e => {
       const hit = await c.match('./index.html');
       if (hit) return hit;
       try { return await fetch(req); } catch (err) { return new Response('Offline', { status: 503 }); }
+    })());
+    return;
+  }
+  // The recipe scanner's text reader (about 7 MB) is only downloaded on the first scan, then kept for offline use.
+  // It lives in its own cache so app updates don't throw it away.
+  if (url.pathname.includes('/vendor/tesseract/')) {
+    e.respondWith((async () => {
+      const c = await caches.open(OCR_CACHE);
+      const hit = await c.match(req, { ignoreSearch: true });
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) c.put(req, res.clone()).catch(() => { });
+      return res;
     })());
     return;
   }

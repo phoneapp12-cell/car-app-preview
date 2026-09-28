@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.15.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -30,7 +30,8 @@ const P = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
   warn: '<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', camera: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/>', book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5z"/><path d="M4 19a2 2 0 0 1 2-2h13v4H6a2 2 0 0 1-2-2zM9 7h6"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   trash: '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>',
   download: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>', upload: '<path d="M12 21V9M7 14l5-5 5 5M4 4h16"/>',
@@ -99,7 +100,7 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), pets: [], myEvents: [], loans: [],
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), shop: newShop(), pets: [], myEvents: [], loans: [],
     settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
@@ -118,6 +119,7 @@ function normalise(d) {
     if (c.lastService && !c.services.length) c.services.push({ id: 'svc-' + c.id + '-' + c.lastService, date: c.lastService, km: '', garage: '', cost: '', notes: '', migrated: true });
   });
   d.meals = normMeals(d.meals); // first time on 1.4.0: Fri and Sat, with the starter ideas
+  d.shop = normShop(d.shop, d); // 1.15.0: shopping list tab (open Shopping to-dos move here the first time)
   d.myEvents = normMine(d.myEvents); // 1.6.0: my events (repeating), older data has none
   d.commission = normComm(d.commission); // 1.7.0: commission tracker (older data and backups have none)
   d.loans = normLoans(d.loans); // 1.10.0: loans (older data and backups have none)
@@ -246,6 +248,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   weather: ['cloudsun', 'appt', 'Weather', 'Whangārei weather today', 1],
   holidays: ['flag', 'hol', 'Public holidays', 'The next public holiday when it’s close', 1],
   meals: ['meal', 'meal', 'Upcoming meals', 'Your planned cooking nights', 1],
+  shopping: ['cart', 'shop', 'Shopping list', 'Things still to get, with a tick button', 1],
   summary: ['shield', 'car', 'Overdue, due soon, all good', 'The three counters', 1],
   attention: ['warn', 'bill', 'Needs attention', 'Everything due soon or overdue', 1],
   week: ['cal', 'appt', 'Later this week', 'Appointments and calendar events', 1],
@@ -284,6 +287,7 @@ const HOME_CARD = {
   weather: () => wxCard(),
   holidays: () => homeHolidays(),
   meals: () => homeMeal(),
+  shopping: () => homeShop(),
   summary: () => {
     const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length, fine = items.length - over - soon;
     return `<div class="tiles">
@@ -377,8 +381,12 @@ function Home() {
   if (keys[0] === 'bridge' && br === 'card') { top = brCard(); keys.shift(); }
   const bi = keys.indexOf('bridge');
   if (br === 'line' && bi >= 0 && keys[bi + 1] === 'weather') { keys[bi] = 'weather'; keys[bi + 1] = 'bridge'; }
-  const feed = keys.map(k => { try { return HOME_CARD[k](); } catch (e) { console.error('Home card', k, e); return ''; } }).join('');
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + top + cards +
+  // 1.15.0: each Home section sits in its own block with a divider line between them (the compact bridge line stays with the weather above it)
+  const parts = keys.map(k => { try { return [k, HOME_CARD[k]()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
+  const groups = [];
+  parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') g.h += h; else groups.push({ k, h }); });
+  const feed = groups.map(g => `<section class="hsec" data-k="${g.k}">${g.h}</section>`).join('');
+  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
     `<button class="linkbtn" id="homecustomise" style="display:block;margin:-4px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>` +
     feed + `${syncNote()}
     <div class="foot">Your information is saved on this phone only.</div>`;
@@ -1491,14 +1499,14 @@ function mealRow(iso, hist = false) {
     <button class="tapzone" onclick="mealNight('${iso}')"><div class="tx"><div class="t">${e ? esc(e.title) : '<span class="muted">Nothing planned</span>'}</div><div class="s">${sub}</div></div></button>
     ${!e && !hist ? `<button class="btn small" onclick="suggestNight('${iso}')">Suggest</button>` : ''}</div>`;
 }
-const mealTabs = on => `<div class="chips mealtabs"><button class="chip ${on === 'plan' ? 'on' : ''}" onclick="go('#meals')">Plan</button><button class="chip ${on === 'ideas' ? 'on' : ''}" onclick="go('#meals/ideas')">Ideas (${visibleIdeas().length})</button></div>`;
+const mealTabs = on => `<div class="chips mealtabs"><button class="chip ${on === 'plan' ? 'on' : ''}" id="tabplan" onclick="go('#meals')">Meal plan</button><button class="chip ${on === 'recipes' ? 'on' : ''}" id="tabrecipes" onclick="go('#recipes')">Recipes (${visibleIdeas().length})</button><button class="chip ${on === 'shop' ? 'on' : ''}" id="tabshop" onclick="go('#shopping')">Shopping${S.shop.items.some(x => !x.done) ? ` (${S.shop.items.filter(x => !x.done).length})` : ''}</button></div>`;
 function nightsText() {
   const n = M().nights; if (!n.length) return 'No cooking nights picked';
   const names = n.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(x => WDL[x]);
   return 'Cooking nights: ' + (names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1]);
 }
 function Meals(arg) {
-  if (arg === 'ideas') return MealIdeas();
+  if (arg === 'ideas') return Recipes(); // older link
   const nights = mealNights(), T = todayISO();
   const planned = nights.filter(d => M().plan[d]).length;
   const hist = Object.keys(M().plan).filter(d => d < T).sort().reverse();
@@ -1542,7 +1550,7 @@ function mealNight(iso) {
   if (iso <= todayISO()) wireSeg('cooked');
   $('#mealin').addEventListener('input', () => { const i = mealIdeaFor($('#mealin').value); $('#mealhint').innerHTML = i ? mealHint(i) : 'Choose an idea, or type one in – check it’s gluten free.'; });
 }
-const mealHint = i => (i.gf ? gfTag() + ' ' : '<span class="nogf">Not marked gluten free</span> ') + esc([i.tag, i.ingr.slice(0, 6).join(', ') + (i.ingr.length > 6 ? '…' : '')].filter(Boolean).join(' · ')) + (i.link ? ` · <a href="${esc(i.link)}" target="_blank" rel="noopener">Recipe</a>` : '');
+const mealHint = i => (i.gf ? gfTag() + ' ' : '<span class="nogf">Not marked gluten free</span> ') + esc([i.tag, i.ingr.slice(0, 6).join(', ') + (i.ingr.length > 6 ? '…' : '')].filter(Boolean).join(' · ')) + ` · <a href="#recipe/${i.id}">See recipe</a>`;
 function setMealIn(t) { const x = $('#mealin'); x.value = t; x.dispatchEvent(new Event('input')); }
 function sheetSuggest(iso) {
   const plan = Object.assign({}, M().plan); const cur = $('#mealin').value.trim();
@@ -1552,32 +1560,103 @@ function sheetSuggest(iso) {
 }
 async function clearNight(iso) { const s = snap(); delete M().plan[iso]; await save(); await closeSheet(); render(); toast('Night cleared.', 'Undo', undoTo(s)); }
 
-/* ---- ideas ---- */
+/* ================= RECIPES (1.15.0) =================
+   Recipes are the meal planner's ideas (S.meals.ideas), so everything planned or saved before carries over.
+   Each recipe: { id, title, tag, ingr: [..], method, serves, time, source, link, notes, fav, hidden, gf, builtin, scanned }.
+   Pages: #recipes (list), #recipe/<id> (one recipe). "Scan" reads a recipe book page with the camera (text is read on the phone). */
 let mealFilter = 'All', mealQuery = '';
+const recipeOf = e => e ? (M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title)) : null;
 function mealIdeaList() {
   const q = mealQuery.trim().toLowerCase();
-  const vis = M().ideas.filter(i => (mealFilter === 'Hidden' ? i.hidden : !i.hidden) && (mealFilter === 'All' || mealFilter === 'Hidden' || (mealFilter === '★' ? i.fav : i.tag === mealFilter)) &&
-    (!q || (i.title + ' ' + i.ingr.join(' ') + ' ' + (i.tag || '') + ' ' + (i.notes || '')).toLowerCase().includes(q)))
+  const vis = M().ideas.filter(i => (mealFilter === 'Hidden' ? i.hidden : !i.hidden) && (mealFilter === 'All' || mealFilter === 'Hidden' || (mealFilter === '★' ? i.fav : mealFilter === 'Mine' ? !i.builtin : i.tag === mealFilter)) &&
+    (!q || (i.title + ' ' + i.ingr.join(' ') + ' ' + (i.tag || '') + ' ' + (i.notes || '') + ' ' + (i.method || '') + ' ' + (i.source || '')).toLowerCase().includes(q)))
     .sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || a.title.localeCompare(b.title));
-  if (!vis.length) return `<div class="card empty"><div class="t">No meal ideas match</div><div class="s">${q ? 'Try a different word.' : mealFilter === 'Hidden' ? 'Nothing hidden.' : 'Nothing with this tag yet.'}</div></div>`;
+  if (!vis.length) return `<div class="card empty"><div class="t">No recipes match</div><div class="s">${q ? 'Try a different word.' : mealFilter === 'Hidden' ? 'Nothing hidden.' : mealFilter === 'Mine' ? 'Recipes you add or scan show here.' : 'Nothing with this tag yet.'}</div></div>`;
   return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}"><button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
-    <button class="tapzone" onclick="mealIdeaForm('${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.link ? ` <span class="muted" style="font-weight:600;font-size:12px">· recipe</span>` : ''}</div>
+    <button class="tapzone" onclick="go('#recipe/${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.method ? ` <span class="muted" style="font-weight:600;font-size:12px">· method</span>` : i.link ? ` <span class="muted" style="font-weight:600;font-size:12px">· link</span>` : ''}</div>
     <div class="s">${i.gf ? gfTag(true) + ' ' : '<span class="nogf">Not marked gluten free</span> '}${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}</div></div></button>
     ${i.hidden ? `<button class="btn small" onclick="toggleMealHidden('${i.id}')">Show</button>` : `<button class="btn small" onclick="planIdea('${i.id}')">Plan</button>`}</div>`).join('')}</div>`;
 }
-function MealIdeas() {
-  const hidden = M().ideas.filter(i => i.hidden).length;
-  if (mealFilter === 'Hidden' && !hidden) mealFilter = 'All';
-  return header('Meal ideas', plural(visibleIdeas().length, 'idea') + (hidden ? ` · ${hidden} hidden` : ''), addBtn('Add a meal idea', 'mealIdeaForm()')) + mealTabs('ideas') +
-    `<label class="search">${I('search')}<input id="mealq" type="search" placeholder="Search meals or ingredients" value="${esc(mealQuery)}" aria-label="Search meal ideas" oninput="mealQuery=this.value;document.getElementById('meallist').innerHTML=mealIdeaList()"></label>
-    <div class="chips scroll">${['All', '★', ...MEAL_TAGS, ...(hidden ? ['Hidden'] : [])].map(c => `<button class="chip ${c === mealFilter ? 'on' : ''}" onclick="mealFilter=${jsArg(c)};render()">${c === '★' ? '★ Favourites' : c === 'Hidden' ? `Hidden (${hidden})` : esc(c)}</button>`).join('')}</div>
+function Recipes() {
+  const hidden = M().ideas.filter(i => i.hidden).length, mine = M().ideas.some(i => !i.builtin && !i.hidden);
+  if ((mealFilter === 'Hidden' && !hidden) || (mealFilter === 'Mine' && !mine)) mealFilter = 'All';
+  return header('Recipes', plural(visibleIdeas().length, 'recipe') + (hidden ? ` · ${hidden} hidden` : ''), addBtn('Add a recipe', 'mealIdeaForm()')) + mealTabs('recipes') +
+    `<div class="btns recbtns"><button class="btn primary" id="scanbtn" onclick="scanForm()">${I('camera')} Scan a recipe</button><button class="btn" onclick="mealIdeaForm()">${I('plus')} Type one in</button></div>
+    <label class="search">${I('search')}<input id="mealq" type="search" placeholder="Search recipes or ingredients" value="${esc(mealQuery)}" aria-label="Search recipes" oninput="mealQuery=this.value;document.getElementById('meallist').innerHTML=mealIdeaList()"></label>
+    <div class="chips scroll">${['All', '★', ...(mine ? ['Mine'] : []), ...MEAL_TAGS, ...(hidden ? ['Hidden'] : [])].map(c => `<button class="chip ${c === mealFilter ? 'on' : ''}" onclick="mealFilter=${jsArg(c)};render()">${c === '★' ? '★ Favourites' : c === 'Mine' ? 'Added by me' : c === 'Hidden' ? `Hidden (${hidden})` : esc(c)}</button>`).join('')}</div>
     <div id="meallist">${mealIdeaList()}</div>
-    <div class="foot">${gfTag(true)} marks ideas written gluten free – still check labels, especially stock, sauces, sausages and seasonings. Only ideas ticked “Gluten free” are suggested. Starter ideas can be edited or hidden.</div>`;
+    <div class="foot">${gfTag(true)} marks recipes written gluten free – still check labels, especially stock, sauces, sausages and seasonings. Only recipes ticked “Gluten free” are suggested in the meal planner. Starter recipes can be edited or hidden.</div>`;
+}
+// One recipe: ingredients (with "check label" and gluten hints), method, and buttons for the planner and shopping list
+function RecipeDetail(id) {
+  const i = M().ideas.find(x => x.id === id);
+  if (!i) return `<button class="back" onclick="go('#recipes')">${I('left')} Recipes</button>` + empty('Recipe not found', 'It may have been deleted.', '', '');
+  const T = todayISO(), planned = Object.keys(M().plan).filter(d => d >= T && (M().plan[d].ideaId === i.id || mNorm(M().plan[d].title) === mNorm(i.title))).sort();
+  const last = Object.keys(M().plan).filter(d => d < T && M().plan[d].cooked && (M().plan[d].ideaId === i.id || mNorm(M().plan[d].title) === mNorm(i.title))).sort().pop();
+  const facts = [i.serves ? 'Serves ' + esc(i.serves) : '', i.time ? esc(i.time) : '', i.tag ? esc(i.tag) : ''].filter(Boolean).join(' · ');
+  const steps = methodSteps(i.method);
+  const onList = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#recipes')">${I('left')} Recipes</button>
+    <button class="btn small" id="recedit" aria-label="Edit recipe" onclick="mealIdeaForm('${i.id}')">${I('edit')} Edit</button></div>
+    <h1 class="rectitle">${esc(i.title)}</h1><div class="sub recsub">${facts || (i.builtin ? 'Starter recipe' : 'Your recipe')}</div>
+    <div class="recmeta">${i.gf ? gfTag() : '<span class="nogf">Not marked gluten free</span>'}${i.fav ? ' <span class="cattag">★ Favourite</span>' : ''}${i.source ? ` <span class="muted">From ${esc(i.source)}</span>` : ''}</div>
+    <div class="btns recbtns"><button class="btn primary" id="recplan" onclick="planRecipeForm('${i.id}')">${I('cal')} Plan it</button><button class="btn" id="recshop" onclick="recipeToShop('${i.id}')">${I('cart')} Add to shopping list</button></div>
+    ${planned.length || last ? `<div class="card recplanned">${planned.length ? `Planned for ${planned.map(d => `<button class="linkbtn" onclick="openNight('${d}')">${fmtW(d)}</button>`).join(', ')}.` : ''}${last ? ` Last cooked ${fmtW(last)}.` : ''}</div>` : ''}
+    <div class="sec">Ingredients <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">${i.ingr.length}</span></div>
+    ${i.ingr.length ? `<div class="card recingr" id="recingr"><ul>${i.ingr.map(g => `<li>${esc(g)}${glutenRisk(g) ? ' <span class="nogf">may have gluten</span>' : needsCheck(g) ? ' <span class="chk">check label</span>' : ''}${onList.has(mNorm(shopName(g))) ? ' <span class="onlist">on list</span>' : ''}</li>`).join('')}</ul></div>` : `<div class="card muted">No ingredients yet. <button class="linkbtn" onclick="mealIdeaForm('${i.id}')">Add them</button></div>`}
+    <div class="sec">Method</div>
+    ${steps.length ? `<div class="card recmethod" id="recmethod"><ol>${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>` : `<div class="card muted">No method saved.${i.link ? '' : ` <button class="linkbtn" onclick="mealIdeaForm('${i.id}')">Add one</button> or scan it from the book.`}</div>`}
+    ${i.link ? `<div class="btns"><a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">${I('link')} Open the recipe link</a></div>` : ''}
+    ${i.notes ? `<div class="sec">Notes</div><div class="card" style="white-space:pre-wrap">${esc(i.notes)}</div>` : ''}
+    <div class="foot">${i.gf ? 'Written gluten free. Still check labels for “gluten free”, especially stock, sauces, sausages and seasonings.' : 'This recipe isn’t ticked gluten free, so the planner won’t suggest it. Swap anything marked “may have gluten” for a gluten-free version, then tick “Gluten free” in Edit.'}</div>`;
+}
+// Method text: numbered lines ("1.", "Step 2") or blank lines start a new step; other line breaks are joined (scanned text breaks lines mid-sentence)
+function methodSteps(m) {
+  const lines = String(m || '').split('\n').map(s => s.trim());
+  const out = []; let cur = '';
+  const flush = () => { if (cur.trim()) out.push(cur.trim()); cur = ''; };
+  lines.forEach(l => {
+    if (!l) { flush(); return; }
+    const n = l.match(/^(?:step\s*)?\d{1,2}\s*[.):]\s*(.*)$/i);
+    if (n) { flush(); cur = n[1]; return; }
+    cur += (cur ? ' ' : '') + l;
+  });
+  flush();
+  return out;
+}
+// Common gluten ingredients, unless the line already says gluten free (or is a naturally gluten-free version)
+const GLUTEN_RX = /\b(flour|bread|breadcrumbs?|panko|pasta|spaghetti|penne|fettuccine|macaroni|lasagne|noodles?|couscous|barley|wheat|semolina|bulgur|soy sauce|beer|pastry|filo|biscuits?|crackers?|tortillas?|wraps?|pita|naan|rolls?|buns?|oats|rye|malt|spelt|udon|oyster sauce|hoisin|worcestershire|stock cubes?|gravy|cake|crumbs?|batter|self[- ]raising|baking powder)\b/i;
+const GF_SAFE_RX = /gluten[- ]?free|\bgf\b|\b(rice|corn|maize|tapioca|almond|coconut|potato|chickpea|buckwheat|sorghum|quinoa)\s+(flour|noodles?|pasta|tortillas?|starch|crackers?|wraps?)|cornflour|tamari|rice paper|rolled up|gravy beef/i;
+const glutenRisk = g => GLUTEN_RX.test(g) && !GF_SAFE_RX.test(g);
+function planRecipeForm(id) {
+  const i = M().ideas.find(x => x.id === id); if (!i) return;
+  const nights = mealNights();
+  if (!nights.length) { toast('Pick your cooking nights in the meal planner first.'); return; }
+  const free = nights.find(d => !M().plan[d]) || nights[0];
+  openSheet('Plan ' + esc(i.title),
+    `<p class="muted" style="margin:-4px 0 10px">Pick a cooking night. ${i.gf ? '' : '<span class="nogf">Not marked gluten free</span>'}</p>
+    <div class="list plannights">${nights.map(d => { const e = M().plan[d]; return `<label class="srow"><input type="radio" name="night" value="${d}" ${d === free ? 'checked' : ''}><div class="tx"><div class="t">${nightLabel(d)}</div><div class="s">${e ? 'Replaces ' + esc(e.title) : 'Free'}</div></div></label>`; }).join('')}</div>` +
+    `<label class="gfcheck"><input type="checkbox" name="shop" checked><span><b>Add the ingredients to the shopping list</b><small>Skips anything already on it.</small></span></label>`,
+    async v => {
+      if (!v.night) return 'Pick a night.';
+      const s = snap(), old = M().plan[v.night];
+      M().plan[v.night] = planEntry(i, old && mNorm(old.title) === mNorm(i.title) ? old.notes : '');
+      const n = v.shop === 'on' ? addToShop(i.ingr, i.title) : 0;
+      await save(); render();
+      return () => toast(`Planned for ${fmtW(v.night)}${n ? ` · ${plural(n, 'item')} added to the shopping list` : ''}.`, 'Undo', undoTo(s));
+    }, 'Plan it');
+}
+async function recipeToShop(id) {
+  const i = M().ideas.find(x => x.id === id); if (!i) return;
+  if (!i.ingr.length) { toast('This recipe has no ingredients yet.'); return; }
+  const s = snap(), n = addToShop(i.ingr, i.title);
+  await save(); render();
+  toast(n ? `Added ${plural(n, 'item')} to the shopping list${n < i.ingr.length ? ` (${i.ingr.length - n} already there)` : ''}.` : 'Everything’s already on the shopping list.', n ? 'Undo' : 'View', n ? undoTo(s) : () => go('#shopping'));
 }
 async function toggleMealFav(id) { const i = M().ideas.find(x => x.id === id); i.fav = !i.fav; await save(); render(); }
 async function toggleMealHidden(id) {
   const i = M().ideas.find(x => x.id === id); i.hidden = !i.hidden; if (i.hidden) i.fav = false;
-  await save(); await closeSheet(); render(); toast(i.hidden ? `Hidden: ${i.title}. It won’t be suggested.` : `${i.title} is back in your ideas.`);
+  await save(); await closeSheet(); render(); toast(i.hidden ? `Hidden: ${i.title}. It won’t be suggested.` : `${i.title} is back in your recipes.`);
 }
 async function planIdea(id) {
   const i = M().ideas.find(x => x.id === id), d = mealNights().find(x => !M().plan[x]);
@@ -1585,42 +1664,275 @@ async function planIdea(id) {
   const s = snap(); M().plan[d] = planEntry(i); await save(); await closeSheet(); render();
   toast(`Planned for ${fmtW(d)}: ${i.title}${i.gf ? '' : ' (not marked gluten free)'}`, 'Undo', undoTo(s));
 }
-function mealIdeaForm(id) {
-  const i = id ? M().ideas.find(x => x.id === id) : { title: '', tag: mealFilter !== 'All' && MEAL_TAGS.includes(mealFilter) ? mealFilter : '', ingr: [], link: '', notes: '', fav: mealFilter === '★', gf: true };
+// Add or edit a recipe. pre = values from a scan (title, ingr, method, serves, time).
+function mealIdeaForm(id, pre) {
+  const i = id ? M().ideas.find(x => x.id === id) : Object.assign({ title: '', tag: MEAL_TAGS.includes(mealFilter) ? mealFilter : '', ingr: [], method: '', serves: '', time: '', source: '', link: '', notes: '', fav: mealFilter === '★', gf: true }, pre || {});
   if (!i) return;
-  openSheet(id ? 'Edit meal idea' : 'Add a meal idea',
-    field('Meal', inp('title', i.title, 'placeholder="e.g. Nana’s mince stew" required maxlength="80"')) +
+  const risky = i.ingr.filter(glutenRisk);
+  openSheet(id ? 'Edit recipe' : pre ? 'Check the scanned recipe' : 'Add a recipe',
+    (pre ? `<p class="muted" style="margin:-4px 0 10px">Here’s what the app read from the page. Fix anything it got wrong, then save.</p>` : '') +
+    field('Recipe name', inp('title', i.title, 'placeholder="e.g. Nana’s mince stew" required maxlength="80"')) +
+    `<div class="two">${field('Serves', inp('serves', i.serves || '', 'placeholder="e.g. 4" maxlength="20"'), 'Optional')}${field('Time', inp('time', i.time || '', 'placeholder="e.g. 45 min" maxlength="30"'), 'Optional')}</div>` +
     `<div class="two">${field('Type', sel('tag', [['', 'None'], ...MEAL_TAGS.map(t => [t, t])], i.tag || ''))}<div class="field"><span>Favourite</span>${segHtml('fav', [['0', 'No'], ['1', '★ Yes']], i.fav ? '1' : '0')}</div></div>` +
-    `<label class="gfcheck"><input type="checkbox" name="gf" ${i.gf !== false ? 'checked' : ''}><span><b>Gluten free</b><small>Only ideas ticked here are suggested. Write ingredients as gluten-free versions, e.g. gluten-free soy sauce (tamari).</small></span></label>` +
-    field('Ingredients', area('ingr', i.ingr.join('\n'), 'One per line, e.g.\nbeef mince\ngluten-free gravy'), 'Used for the shopping list') +
+    (risky.length ? `<div class="gfwarn" id="gfwarn"><b>Check for gluten:</b> ${esc(risky.slice(0, 6).join(', '))}${risky.length > 6 ? '…' : ''}. Swap these for gluten-free versions (e.g. gluten-free flour, tamari), then tick “Gluten free”.</div>` : '') +
+    `<label class="gfcheck"><input type="checkbox" name="gf" ${i.gf !== false ? 'checked' : ''}><span><b>Gluten free</b><small>Only recipes ticked here are suggested. Write ingredients as gluten-free versions, e.g. gluten-free soy sauce (tamari).</small></span></label>` +
+    field('Ingredients', area('ingr', i.ingr.join('\n'), 'One per line, e.g.\n500 g beef mince\ngluten-free gravy'), 'One per line. Used for the shopping list.') +
+    field('Method', `<textarea name="method" class="tall" placeholder="${esc('One step per line, e.g.\n1. Brown the mince\n2. Add the vegetables')}">${esc(i.method || '')}</textarea>`, 'Optional. Start each step on a new line, or number them.') +
+    field('From', inp('source', i.source || '', 'placeholder="e.g. Edmonds Cookbook, page 42" maxlength="80"'), 'Optional: the book or person it came from') +
     field('Recipe link', inp('link', i.link || '', 'type="url" inputmode="url" placeholder="https://…" maxlength="500"'), 'Optional') +
     field('Notes', area('notes', i.notes || '', 'Optional')) +
     (id ? `<div class="btns" style="margin:0 0 4px"><button type="button" class="btn" onclick="planIdea('${id}')">${I('cal')} Plan for the next free night</button><button type="button" class="btn" onclick="toggleMealHidden('${id}')">${i.hidden ? 'Show again' : 'Hide'}</button></div>` : ''),
     async v => {
-      if (!v.title) return 'Please type the meal.';
-      const dup = mealIdeaFor(v.title); if (dup && dup.id !== id) return 'You already have that meal in your ideas.';
+      if (!v.title) return 'Please type the recipe name.';
+      const dup = mealIdeaFor(v.title); if (dup && dup.id !== id) return 'You already have a recipe with that name.';
       let link = v.link; if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
       if (link) { try { new URL(link); } catch (e) { return 'That recipe link doesn’t look right.'; } }
-      const upd = { title: v.title, tag: v.tag, ingr: v.ingr.split(/\n|,/).map(s => s.trim()).filter(Boolean), link, notes: v.notes, fav: v.fav === '1', gf: v.gf === 'on' };
+      const upd = { title: v.title, tag: v.tag, ingr: v.ingr.split('\n').map(s => s.replace(/^[•·\-*–]\s*/, '').trim()).filter(Boolean), method: v.method, serves: v.serves, time: v.time, source: v.source, link, notes: v.notes, fav: v.fav === '1', gf: v.gf === 'on' };
+      let nid = id;
       if (id) {
         const oldN = mNorm(i.title);
         if (i.builtin && (upd.title !== i.title || upd.ingr.join('\n') !== i.ingr.join('\n'))) upd.edited = true; // keep his changes in future starter updates
         Object.assign(i, upd);
         Object.values(M().plan).forEach(e => { if (e.ideaId === id || mNorm(e.title) === oldN) { e.title = i.title; e.ideaId = id; } });
-      } else M().ideas.push(Object.assign({ id: uid('meal'), hidden: false, builtin: false, created: Date.now() }, upd));
-      await save(); render(); toast((id ? 'Meal idea updated' : 'Meal idea added') + (upd.gf ? '.' : ' – not marked gluten free, so it won’t be suggested.'));
-    }, id ? 'Save' : 'Add',
-    id && !i.builtin ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete meal idea" onclick="deleteMealIdea('${id}')">${I('trash')}</button>` : '');
+      } else { nid = uid('meal'); M().ideas.push(Object.assign({ id: nid, hidden: false, builtin: false, created: Date.now(), scanned: !!pre }, upd)); }
+      await save();
+      const msg = (id ? 'Recipe updated' : 'Recipe saved') + (upd.gf ? '.' : ' – not ticked gluten free, so it won’t be suggested.');
+      if (!id) return () => { go('#recipe/' + nid); toast(msg); };
+      render(); return () => toast(msg);
+    }, id ? 'Save' : 'Save recipe',
+    id && !i.builtin ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete recipe" onclick="deleteMealIdea('${id}')">${I('trash')}</button>` : '');
   wireSeg('fav');
 }
-async function deleteMealIdea(id) { const s = snap(); M().ideas = M().ideas.filter(x => x.id !== id); await save(); await closeSheet(); render(); toast('Meal idea deleted.', 'Undo', undoTo(s)); }
+async function deleteMealIdea(id) {
+  const s = snap(); M().ideas = M().ideas.filter(x => x.id !== id); await save(); await closeSheet();
+  if (location.hash.startsWith('#recipe/')) location.hash = '#recipes'; else render();
+  toast('Recipe deleted.', 'Undo', undoTo(s));
+}
 
-/* ---- shopping list ---- */
+/* ---- Scan a recipe book page (1.15.0) ----
+   Uses Tesseract (vendor/tesseract, loaded only when you scan). The photo is read on the phone; nothing is uploaded.
+   The first scan downloads the text reader (about 7 MB); after that it's saved on the phone and works offline. */
+const OCR_BASE = new URL('vendor/tesseract/', location.href).href;
+let ocrWorker = null, ocrLoading = null, scanPages = [], scanBusy = false;
+function loadScriptOnce(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[data-src="${src}"]`)) return res();
+    const s = document.createElement('script'); s.src = src; s.dataset.src = src; s.onload = res; s.onerror = () => { s.remove(); rej(new Error('load')); };
+    document.head.appendChild(s);
+  });
+}
+function getOcr(progress) {
+  if (ocrWorker) return Promise.resolve(ocrWorker);
+  if (!ocrLoading) ocrLoading = (async () => {
+    await loadScriptOnce(OCR_BASE + 'tesseract.min.js');
+    const w = await Tesseract.createWorker('eng', 1, {
+      workerPath: OCR_BASE + 'worker.min.js', corePath: OCR_BASE, langPath: OCR_BASE, workerBlobURL: false,
+      logger: m => { if (scanLog) scanLog(m); }
+    });
+    await w.setParameters({ preserve_interword_spaces: '1' });
+    ocrWorker = w; return w;
+  })().catch(e => { ocrLoading = null; throw e; });
+  return ocrLoading;
+}
+let scanLog = null;
+function scanForm() {
+  scanPages = []; scanBusy = false;
+  openSheet('Scan a recipe', scanInner(), async () => {
+    if (scanBusy) return 'Still reading the page. Hang on a moment.';
+    const text = scanPages.join('\n\n').trim();
+    if (!text) return 'Take a photo of the recipe first.';
+    const pre = parseRecipe(text);
+    return () => mealIdeaForm(null, pre);
+  }, 'Next');
+  scanButtons();
+}
+function scanInner() {
+  return `<p class="muted" style="margin:-4px 0 10px">Take a photo of a recipe book page. The app reads the text on your phone, then you check it and save.</p>
+    <div class="scantips">For the best result, lay the book flat in good light, fill the photo with the recipe and hold the phone straight over it.</div>
+    <input type="file" accept="image/*" capture="environment" id="scancam" hidden onchange="scanFile(this)">
+    <input type="file" accept="image/*" id="scanpick" hidden onchange="scanFile(this)">
+    <div class="btns" id="scanbtns"></div>
+    <div id="scanstat" class="scanstat" hidden><div class="t" id="scanmsg"></div><div class="bar"><i id="scanbar"></i></div></div>
+    <div id="scanpages"></div>`;
+}
+function scanButtons() {
+  const b = $('#scanbtns'); if (!b) return;
+  const more = scanPages.length > 0;
+  b.innerHTML = `<button type="button" class="btn ${more ? '' : 'primary'}" id="scantake" onclick="document.getElementById('scancam').click()" ${scanBusy ? 'disabled' : ''}>${I('camera')} ${more ? 'Add another page' : 'Take a photo'}</button>
+    <button type="button" class="btn" id="scanchoose" onclick="document.getElementById('scanpick').click()" ${scanBusy ? 'disabled' : ''}>${I('image')} ${more ? 'Choose another' : 'Choose a photo'}</button>`;
+  const p = $('#scanpages');
+  if (p) p.innerHTML = scanPages.map((t, n) => `<div class="scanpage"><div class="scanhead"><b>Page ${n + 1}</b> <span class="muted">${plural(t.split('\n').filter(Boolean).length, 'line')} read</span><button type="button" class="linkbtn" onclick="scanPages.splice(${n},1);scanButtons()">Remove</button></div><pre>${esc(t.slice(0, 600))}${t.length > 600 ? '…' : ''}</pre></div>`).join('');
+}
+function scanStatus(msg, pct) {
+  const box = $('#scanstat'); if (!box) return;
+  box.hidden = !msg; $('#scanmsg').textContent = msg || ''; $('#scanbar').style.width = Math.round((pct || 0) * 100) + '%';
+}
+// Shrink and grey the photo first: faster, and Tesseract reads it better
+async function scanImage(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) { bmp = await createImageBitmap(file); }
+  const max = 2000, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  const x = c.getContext('2d'); x.filter = 'grayscale(1) contrast(1.15)'; x.drawImage(bmp, 0, 0, c.width, c.height);
+  if (bmp.close) bmp.close();
+  return c;
+}
+async function scanFile(input) {
+  const file = input.files && input.files[0]; input.value = '';
+  if (!file || scanBusy) return;
+  scanBusy = true; scanButtons();
+  const first = !ocrWorker;
+  scanLog = m => {
+    if (m.status === 'recognizing text') scanStatus('Reading the page…', m.progress);
+    else if (/load|initiali/.test(m.status)) scanStatus(first ? 'Getting the text reader ready (first time only, about 7 MB)…' : 'Getting ready…', m.progress);
+  };
+  try {
+    scanStatus('Preparing the photo…', 0.02);
+    const img = await scanImage(file);
+    scanStatus(first ? 'Getting the text reader ready (first time only, about 7 MB)…' : 'Getting ready…', 0.05);
+    const w = await getOcr();
+    scanStatus('Reading the page…', 0);
+    const { data } = await w.recognize(img);
+    const text = cleanOcr(data.text || '');
+    if (!sheetOpen) return;
+    if (text.replace(/[^a-z]/gi, '').length < 15) { scanStatus(''); toast('Couldn’t find much text in that photo. Try again closer, in better light.'); }
+    else { scanPages.push(text); scanStatus(''); toast(scanPages.length === 1 ? 'Page read. Tap Next to check it, or add another page.' : `Page ${scanPages.length} read.`); }
+  } catch (e) {
+    scanStatus('');
+    toast(navigator.onLine ? 'Sorry, the photo couldn’t be read. Try again.' : 'The first scan needs internet to get the text reader. Try again when you’re online.');
+  } finally { scanBusy = false; scanLog = null; scanButtons(); }
+}
+// Tidy what Tesseract returns: odd characters, bullets, broken hyphenation
+function cleanOcr(t) {
+  return t.replace(/\r/g, '').replace(/[|¦]/g, 'I').replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+    .replace(/(\w)-\n(\w)/g, '$1$2').replace(/[ \t]+/g, ' ').split('\n').map(l => l.trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+// Split scanned text into name, serves, time, ingredients and method. Headings like "Ingredients" and "Method" are used when present;
+// otherwise short lines starting with an amount are ingredients and the rest is method.
+function parseRecipe(text) {
+  const lines = text.split('\n').map(l => l.replace(/^[•·●○▪■*\-–]\s*/, '').trim());
+  const ING = /^(ingredients?|you will need|you'?ll need|what you need)\b[:\s]*$/i, MET = /^(method|directions?|instructions?|preparation|steps|to make|how to make( it)?)\b[:\s]*$/i;
+  const QTY = /^(\d|½|¼|¾|⅓|⅔|⅛|a |an |one |two |three |four |pinch|handful|dash|few |some |salt|pepper|oil\b)/i;
+  let serves = '', time = '', title = '';
+  const sv = text.match(/\b(?:serves|makes|servings?|feeds)\s*:?\s*(\d+(?:\s*(?:-|–|to)\s*\d+)?)/i); if (sv) serves = sv[1].replace(/\s+/g, '');
+  const tm = [...text.matchAll(/\b(prep(?:aration)?|cook(?:ing)?|total)\s*(?:time)?\s*:?\s*(\d+\s*(?:-|–)?\s*\d*\s*(?:min(?:ute)?s?|hrs?|hours?))/gi)].map(m => m[1][0].toUpperCase() + m[1].slice(1).toLowerCase().replace(/aration|ing/, '') + ' ' + m[2].replace(/\s+/g, ' ').replace(/minutes?|mins?/i, 'min'));
+  if (tm.length) time = tm.join(', ').slice(0, 30);
+  const meta = l => /^(serves|makes|servings?|feeds|prep|preparation|cook|cooking|total)\b/i.test(l) || /^page\s*\d+$/i.test(l) || /^\d+$/.test(l);
+  let iIng = lines.findIndex(l => ING.test(l)), iMet = lines.findIndex(l => MET.test(l));
+  for (const l of lines) { if (!l || meta(l) || ING.test(l) || MET.test(l)) continue; if (/[a-z]{3}/i.test(l) && l.length <= 70 && !QTY.test(l)) { title = l; break; } if (QTY.test(l)) break; }
+  title = title.replace(/[.:]+$/, '');
+  if (title && title === title.toUpperCase()) title = title.toLowerCase().replace(/^\w/, c => c.toUpperCase());
+  let ingr = [], method = [];
+  const body = (a, b) => lines.slice(a, b < 0 ? undefined : b).filter(l => l && !meta(l) && l !== title && !ING.test(l) && !MET.test(l));
+  if (iIng >= 0) {
+    ingr = body(iIng + 1, iMet > iIng ? iMet : -1);
+    method = iMet > iIng ? body(iMet + 1, -1) : [];
+    if (iMet < 0) { // no Method heading: ingredients stop at the first long sentence
+      const k = ingr.findIndex(l => l.length > 60 && /[a-z]/.test(l) && !QTY.test(l)); if (k > 0) { method = ingr.slice(k); ingr = ingr.slice(0, k); }
+    }
+  } else if (iMet >= 0) {
+    const before = body(0, iMet); ingr = before.filter(l => QTY.test(l) || l.length <= 45); method = body(iMet + 1, -1);
+  } else {
+    body(0, -1).forEach(l => ((QTY.test(l) && l.length <= 60 && !method.length) ? ingr : method).push(l));
+  }
+  // Join an ingredient's wrapped second line (starts lower case) onto the line above
+  ingr = ingr.reduce((a, l) => { if (a.length && /^[a-z(]/.test(l) && !QTY.test(l)) a[a.length - 1] += ' ' + l; else a.push(l); return a; }, []).map(l => l.slice(0, 120));
+  return { title: title.slice(0, 80), serves, time, ingr, method: methodSteps(method.join('\n')).map((s, n) => (n + 1) + '. ' + s).join('\n'), gf: !ingr.some(glutenRisk) };
+}
+
+/* ================= SHOPPING LIST (1.15.0) =================
+   S.shop = { items: [{ id, name, done, doneAt, created, meals: [recipe names] }] }. Its own tab; the meal planner and recipes add to it.
+   Before 1.15.0 the planner added ingredients to a "Shopping" to-do list: open ones move here the first time. */
+const newShop = () => ({ items: [], v: 1 });
+function normShop(sh, d) {
+  sh = sh && typeof sh === 'object' && !Array.isArray(sh) ? sh : newShop();
+  if (!Array.isArray(sh.items)) sh.items = [];
+  sh.items = sh.items.filter(x => x && x.id && String(x.name || '').trim());
+  sh.items.forEach(x => { if (!Array.isArray(x.meals)) x.meals = []; x.done = !!x.done; });
+  if (!sh.moved && d && Array.isArray(d.todos)) {
+    const lists = d.meals && d.meals.list ? [d.meals.list] : [];
+    const isShop = t => !t.done && (t.fromMeal || /^(shopping|groceries|grocery)$/i.test(t.list || '') || lists.includes(t.list) && t.fromMeal);
+    const move = d.todos.filter(isShop);
+    if (move.length) {
+      const have = new Set(sh.items.map(x => mNorm(x.name)));
+      move.forEach((t, n) => { const name = shopName(t.title); if (have.has(mNorm(name))) return; have.add(mNorm(name));
+        sh.items.push({ id: uid('shop'), name, done: false, created: (t.created || Date.now()) + n, meals: t.notes && /^For /.test(t.notes) ? t.notes.slice(4).split(', ') : [] }); });
+      const ids = new Set(move.map(t => t.id)); d.todos = d.todos.filter(t => !ids.has(t.id));
+      sh.movedNote = `Your shopping list has its own tab now. ${plural(move.length, 'item')} moved there from To-do.`;
+    }
+    sh.moved = true;
+  }
+  return sh;
+}
+const shopName = g => String(g || '').replace(/\s*\(check label\)\s*$/i, '').trim();
+// Add ingredients, skipping any already on the list (not yet ticked). Returns how many were added.
+function addToShop(names, meal) {
+  const open = new Map(S.shop.items.filter(x => !x.done).map(x => [mNorm(x.name), x])); let n = 0;
+  names.map(shopName).filter(Boolean).forEach(g => {
+    const k = mNorm(g), had = open.get(k);
+    if (had) { if (meal && !had.meals.includes(meal)) had.meals.push(meal); return; }
+    const it = { id: uid('shop'), name: g.slice(0, 120), done: false, created: Date.now() + n, meals: meal ? [meal] : [] };
+    S.shop.items.push(it); open.set(k, it); n++;
+  });
+  return n;
+}
+function shopRow(x) {
+  const hint = needsCheck(x.name) ? ' <span class="chk">check label</span>' : '';
+  const sub = x.meals.length ? 'For ' + esc(x.meals.slice(0, 3).join(', ')) + (x.meals.length > 3 ? '…' : '') : '';
+  return `<div class="row shopitem ${x.done ? 'done' : ''}" data-id="${x.id}"><button class="tick" aria-label="${x.done ? 'Untick' : 'Tick off'} ${esc(x.name)}" onclick="shopTick('${x.id}')"><span>${I('check')}</span></button>
+    <button class="tapzone" onclick="shopEdit('${x.id}')"><div class="tx"><div class="t">${esc(x.name)}${hint}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div></button></div>`;
+}
+function Shopping() {
+  const open = S.shop.items.filter(x => !x.done).sort((a, b) => (a.created || 0) - (b.created || 0));
+  const got = S.shop.items.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  const nights = shopNights().length;
+  return header('Shopping list', open.length ? plural(open.length, 'thing') + ' to get' : 'Nothing to get') + mealTabs('shop') +
+    `<form class="addbar" onsubmit="shopQuickAdd(event)"><input id="newshop" placeholder="Add an item…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New shopping item"><button aria-label="Add">${I('plus')}</button></form>
+    <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button>` : ''}</div>
+    ${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
+    ${got.length ? `<div class="sec">Got <button onclick="clearGot()">Clear</button></div><div class="list" id="shopgot">${got.map(shopRow).join('')}</div>` : ''}
+    <div class="foot">“Check label” means gluten often hides in it, so look for “gluten free” on the pack. Tap an item to change or delete it.</div>`;
+}
+async function shopQuickAdd(e) {
+  e.preventDefault();
+  const v = $('#newshop').value.trim(); if (!v) return;
+  const n = addToShop(v.split(/\s*,\s*/), '');
+  await save(); render(); $('#newshop').focus(); toast(n ? (n === 1 ? 'Added.' : `Added ${n} items.`) : 'That’s already on the list.');
+}
+async function shopTick(id) {
+  const x = S.shop.items.find(i => i.id === id); if (!x) return;
+  x.done = !x.done; if (x.done) x.doneAt = Date.now(); else delete x.doneAt;
+  await save(); render();
+}
+function clearGot() {
+  const n = S.shop.items.filter(x => x.done).length;
+  const s = snap(); S.shop.items = S.shop.items.filter(x => !x.done);
+  save().then(() => { render(); toast(`Cleared ${plural(n, 'item')}.`, 'Undo', undoTo(s)); });
+}
+function shopEdit(id) {
+  const x = S.shop.items.find(i => i.id === id); if (!x) return;
+  openSheet('Edit item', field('Item', inp('name', x.name, 'required maxlength="120"')) + (x.meals.length ? `<p class="muted" style="margin:-4px 0 8px">For ${esc(x.meals.join(', '))}</p>` : ''),
+    async v => { if (!v.name) return 'Please type the item.'; x.name = v.name; await save(); render(); }, 'Save',
+    `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete item" onclick="shopDelete('${id}')">${I('trash')}</button>`);
+}
+async function shopDelete(id) { const s = snap(); S.shop.items = S.shop.items.filter(i => i.id !== id); await save(); await closeSheet(); render(); toast('Item deleted.', 'Undo', undoTo(s)); }
+async function copyText(text) {
+  let ok = false;
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); ok = true; } } catch (e) { }
+  if (!ok) { const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { ok = document.execCommand('copy'); } catch (e) { } t.remove(); }
+  return ok;
+}
+async function copyShopList() {
+  const items = S.shop.items.filter(x => !x.done); if (!items.length) { toast('Nothing to copy.'); return; }
+  const ok = await copyText(items.map(x => shopLine(x.name)).join('\n'));
+  toast(ok ? `Copied ${plural(items.length, 'item')}. Paste them into your grocery list app.` : 'Couldn’t copy on this phone.');
+}
+/* ---- add from the meal plan (the planner's "Shopping list" button, and "Add from meal plan") ---- */
 function shopNights() { const T = todayISO(); return Object.keys(M().plan).filter(d => d >= T && dayGap(d, T) < MEAL_WEEKS * 7 && !M().plan[d].cooked).sort(); }
 const shopLine = g => g + (needsCheck(g) ? ' (check label)' : '');
 function shopItems(dates) {
   const seen = new Map(), none = [];
-  dates.forEach(d => { const e = M().plan[d], i = M().ideas.find(x => x.id === e.ideaId) || mealIdeaFor(e.title);
+  dates.forEach(d => { const e = M().plan[d], i = recipeOf(e);
     if (!i || !i.ingr.length) { none.push(e.title); return; }
     i.ingr.forEach(g => { const k = mNorm(g); if (!seen.has(k)) seen.set(k, g); }); });
   return { items: [...seen.values()], none };
@@ -1628,43 +1940,46 @@ function shopItems(dates) {
 const shopDates = () => [...document.querySelectorAll('#sf input[data-night]:checked')].map(x => x.dataset.night);
 function shopPreview() {
   const { items, none } = shopItems(shopDates()), box = $('#shopprev'); if (!box) return;
-  box.innerHTML = items.length ? `<b>${plural(items.length, 'item')}</b> <span class="muted" style="font-size:12.5px">· “check label”: gluten often hides in these, look for “gluten free” on the pack</span><ul>${items.map(g => `<li>${esc(g)}${needsCheck(g) ? ' <span class="chk">check label</span>' : ''}</li>`).join('')}</ul>` : '<span class="muted">Tick at least one planned night with ingredients.</span>';
-  if (none.length) box.innerHTML += `<div class="muted" style="margin-top:6px">No ingredients saved for ${esc(none.join(', '))}. Add them in Ideas.</div>`;
+  const open = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
+  const already = items.filter(g => open.has(mNorm(g))).length;
+  box.innerHTML = items.length ? `<b>${plural(items.length, 'item')}</b>${already ? ` <span class="muted" style="font-size:12.5px">· ${already} already on the list</span>` : ''} <span class="muted" style="font-size:12.5px">· “check label”: gluten often hides in these, look for “gluten free” on the pack</span><ul>${items.map(g => `<li>${esc(g)}${needsCheck(g) ? ' <span class="chk">check label</span>' : ''}</li>`).join('')}</ul>` : '<span class="muted">Tick at least one planned night with ingredients.</span>';
+  if (none.length) box.innerHTML += `<div class="muted" style="margin-top:6px">No ingredients saved for ${esc(none.join(', '))}. Add them in Recipes.</div>`;
 }
 function shopForm() {
   const dates = shopNights();
-  if (!dates.length) { toast('Plan some meals first, then make the list.'); return; }
+  if (!dates.length) { toast('Plan some meals first, then add their ingredients.'); return; }
   const week = dates.filter(d => dayGap(d, todayISO()) < 7), pre = new Set(week.length ? week : dates);
-  const lists = S.lists.slice(); const def = lists.includes(M().list) ? M().list : lists.find(l => /shop|grocer/i.test(l)) || '__new';
-  openSheet('Shopping list',
+  openSheet('Add from meal plan',
     `<p class="muted" style="margin:-4px 0 10px">Pick the nights to shop for.</p>
-    <div class="list shopnights">${dates.map(d => `<label class="srow"><input type="checkbox" data-night="${d}" ${pre.has(d) ? 'checked' : ''} onchange="shopPreview()"><div class="tx"><div class="t">${esc(M().plan[d].title)}</div><div class="s">${nightLabel(d)}${(mealIdeaFor(M().plan[d].title) || {}).gf ? '' : ' · <span class="nogf">Check it’s gluten free</span>'}</div></div></label>`).join('')}</div>
-    <div class="shopprev" id="shopprev"></div>` +
-    field('Add to this to-do list', sel('list', [...lists.map(l => [l, l]), ...(lists.some(l => /^shopping$/i.test(l)) ? [] : [['__new', 'New list: Shopping']])], def)),
-    async v => {
-      const ds = shopDates(), { items } = shopItems(ds);
+    <div class="list shopnights">${dates.map(d => `<label class="srow"><input type="checkbox" data-night="${d}" ${pre.has(d) ? 'checked' : ''} onchange="shopPreview()"><div class="tx"><div class="t">${esc(M().plan[d].title)}</div><div class="s">${nightLabel(d)}${(recipeOf(M().plan[d]) || {}).gf ? '' : ' · <span class="nogf">Check it’s gluten free</span>'}</div></div></label>`).join('')}</div>
+    <div class="shopprev" id="shopprev"></div>`,
+    async () => {
+      const ds = shopDates(); if (!ds.length) return 'Tick at least one planned night with ingredients.';
+      const { items } = shopItems(ds);
       if (!items.length) return 'Tick at least one planned night with ingredients.';
-      let list = v.list; if (list === '__new') { list = 'Shopping'; if (!S.lists.includes(list)) S.lists.push(list); }
-      const open = new Set(S.todos.filter(t => !t.done && t.list === list).map(t => mNorm(t.title)));
-      const meals = ds.map(d => M().plan[d].title).join(', ');
-      const add = items.map(shopLine).filter(g => !open.has(mNorm(g)));
-      add.forEach((g, n) => S.todos.push({ id: uid('todo'), title: g.slice(0, 120), list, due: '', notes: 'For ' + meals, done: false, created: Date.now() + n, fromMeal: true }));
-      M().list = list;
-      await save(); render();
-      return () => toast(`Added ${plural(add.length, 'item')} to your ${list} list${add.length < items.length ? ` (${items.length - add.length} already there)` : ''}.`, 'View', () => { todoFilter = list; go('#todo'); });
-    }, 'Add to To-do',
-    `<button type="button" class="btn" id="copylist" style="flex:0 0 auto" onclick="copyShop()">${I('copy')} Copy list</button>`);
+      let add = 0;
+      ds.forEach(d => { const i = recipeOf(M().plan[d]); if (i) add += addToShop(i.ingr, M().plan[d].title); });
+      await save();
+      const onPage = location.hash === '#shopping';
+      if (onPage) render(); 
+      return () => toast(`Added ${plural(add, 'item')} to the shopping list${add < items.length ? ` (${items.length - add} already there)` : ''}.`, onPage ? '' : 'View', onPage ? null : () => go('#shopping'));
+    }, 'Add to shopping list',
+    `<button type="button" class="btn" id="copylist" style="flex:0 0 auto" onclick="copyShop()">${I('copy')} Copy</button>`);
   shopPreview();
 }
 async function copyShop() {
   const { items } = shopItems(shopDates());
   if (!items.length) { toast('Tick at least one planned night with ingredients.'); return; }
-  const text = items.map(shopLine).join('\n');
-  let ok = false;
-  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); ok = true; } } catch (e) { }
-  if (!ok) { const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { ok = document.execCommand('copy'); } catch (e) { } t.remove(); }
-  toast(ok ? `Copied ${plural(items.length, 'item')}. Paste them into your grocery list app.` : 'Couldn’t copy on this phone. Use “Add to To-do” instead.');
+  const ok = await copyText(items.map(shopLine).join('\n'));
+  toast(ok ? `Copied ${plural(items.length, 'item')}. Paste them into your grocery list app.` : 'Couldn’t copy on this phone. Use “Add to shopping list” instead.');
 }
+function shopMoreSub() { const n = S.shop.items.filter(x => !x.done).length; return n ? `${plural(n, 'thing')} to get` : 'Groceries for your meals and more'; }
+function homeShop() {
+  const open = S.shop.items.filter(x => !x.done); if (!open.length) return '';
+  return homeSec('Shopping list', '<a href="#shopping">See all</a>') + `<div class="list" id="homeshop">${open.slice(0, 5).map(shopRow).join('')}</div>` +
+    (open.length > 5 ? `<div class="homemore"><a href="#shopping">${plural(open.length - 5, 'more item')}</a></div>` : '');
+}
+function takeShopNote() { const n = S && S.shop && S.shop.movedNote; if (n) delete S.shop.movedNote; return n || ''; }
 
 // One-off message after the gluten-free update of the starter ideas (set by migrateStarters)
 function takeMealNote() { const n = S && S.meals && S.meals.gfNote; if (n) delete S.meals.gfNote; return n || ''; }
@@ -2810,6 +3125,8 @@ function More() {
     loans: () => loansMoreSub(),
     events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
     meals: () => mealsMoreSub(),
+    recipes: () => plural(visibleIdeas().length, 'recipe') + (M().ideas.some(i => i.fav && !i.hidden) ? ` · ${M().ideas.filter(i => i.fav && !i.hidden).length} favourites` : ''),
+    shopping: () => shopMoreSub(),
     pets: () => petsMoreSub(),
     health: () => healthMoreSub(),
     bridge: () => 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3],
@@ -2843,7 +3160,7 @@ const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
   commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'],
-  meals: ['meal', 'meal', 'Meal planner', 'Meals'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], health: ['medkit', 'health', 'Health', 'Health'],
+  meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], health: ['medkit', 'health', 'Health', 'Health'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas']
 };
 const NAV_DEFAULT = Object.keys(NAV);
@@ -3649,7 +3966,7 @@ async function installApp() {
 
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
-const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans' }; // detail pages belong to their section
+const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
@@ -3673,10 +3990,10 @@ function render() {
   applyTheme();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, pets: Pets, loans: Loans };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans };
   if (r !== 'more') moreEdit = false;
   if (r !== 'home' && r !== '') homeEdit = false;
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : (map[r] || Home)();
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
@@ -3728,6 +4045,7 @@ async function start() {
   await loadCal();
   loadWx(); loadEvs(); loadCls();
   render();
+  const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   syncFeeds(); refreshWx(); refreshEvents();
   if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
