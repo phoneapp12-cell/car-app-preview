@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.21.0';
+const APP_VERSION = '1.22.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -80,6 +80,7 @@ const P = {
   spine: '<path d="M12 3v18M9 5h6M8.5 9h7M8.5 13h7M9 17h6"/>',
   medkit: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M12 10.5v6M9 13.5h6"/>',
   ticket: '<path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v12" stroke-dasharray="2 2.2"/>',
+  play: '<circle cx="12" cy="12" r="9"/><path d="M10.2 8.8v6.4L16.2 12z"/>',
   leaf: '<path d="M12 21V11"/><path d="M12 13C8 12 4 9.5 4 5c5 .2 8 3.2 8 8z"/><path d="M12 11c4-1 7.2-3.6 8-7-4.2.8-7 4-8 7z"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
@@ -254,6 +255,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   summary: ['shield', 'car', 'Overdue, due soon, all good', 'The three counters', 1],
   attention: ['warn', 'bill', 'Upcoming', 'Everything due soon or overdue, plus this week’s appointments and calendar events', 1],
   events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
+  videos: ['play', 'vid', 'Videos', 'A few suggestions from the video categories you leave on', 0],
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a tick button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
@@ -272,6 +274,8 @@ function homeOrder() {
   return o;
 }
 function homeOn(k) {
+  // Videos uses its own switch (settings.homeVideos), off until turned on, so Home stays as it was.
+  if (k === 'videos') return !!(S.settings && S.settings.homeVideos === true);
   const h = S.settings.homeHidden;
   if (h && typeof h === 'object' && k in h) return !h[k];
   return !!HOME[k][4];
@@ -279,6 +283,7 @@ function homeOn(k) {
 async function setHomeOrder(o) { S.settings.homeOrder = o; await save(); render(); }
 async function toggleHomeCard(k) {
   const on = homeOn(k); S.settings.homeHidden = Object.assign({}, S.settings.homeHidden, { [k]: on });
+  if (k === 'videos') S.settings.homeVideos = !on;
   await save(); render();
 }
 // 1.17.0: when the Weather card is switched off, Upcoming can show the weather instead (on unless turned off)
@@ -286,7 +291,9 @@ const wxInUp = () => !homeOn('weather') && homeOn('attention') && S.settings.wxU
 async function toggleWxUpcoming() { S.settings.wxUpcoming = S.settings.wxUpcoming === false; await save(); render(); }
 const homeEventCount = () => { const n = Number(S.settings.homeEvents); return n >= 1 && n <= 6 ? n : 2; };
 async function setHomeEventCount(n) { S.settings.homeEvents = n; await save(); render(); }
-async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
+const homeVideoCount = () => { const n = Number(S.settings.homeVideoCount); return n >= 1 && n <= 4 ? n : 2; };
+async function setHomeVideoCount(n) { S.settings.homeVideoCount = n; await save(); render(); }
+async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; S.settings.homeVideos = false; delete S.settings.homeVideoCount; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
 const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
 const HOME_CARD = {
   bridge: () => { const br = brOnHome(); return br === 'card' ? brCard() : br === 'line' ? brLine() : ''; },
@@ -303,6 +310,7 @@ const HOME_CARD = {
   },
   attention: () => homeSec('Upcoming', '<a href="#calendar">See calendar</a>') + attentionHtml(),
   events: () => homeEvents(),
+  videos: () => homeVideosCard(),
   todo: () => {
     const att = homeOn('attention'); // to-dos due within 30 days are already in Needs attention
     const open = S.todos.filter(t => !t.done && !(att && t.due && daysLeft(t.due) <= 30)).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
@@ -361,6 +369,8 @@ function HomeEdit() {
     </div>
     ${homeOn('events') ? `<div class="list" id="evcountopt" style="margin-top:12px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Events on Home</div><div class="s">How many to show under What’s on in Whangārei. The rest stay on the Events page.</div></div>
       <div class="seg" id="evcount" role="group" aria-label="How many events on Home" style="width:100%">${[1,2,3,4,5,6].map(n => `<button type="button" class="${homeEventCount() === n ? 'on' : ''}" aria-pressed="${homeEventCount() === n}" onclick="setHomeEventCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
+    ${homeOn('videos') ? `<div class="list" id="vidcountopt" style="margin-top:12px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Videos on Home</div><div class="s">How many to show under Videos. The rest stay on the Videos page.</div></div>
+      <div class="seg" id="vidcount" role="group" aria-label="How many videos on Home" style="width:100%">${[1,2,3,4].map(n => `<button type="button" class="${homeVideoCount() === n ? 'on' : ''}" aria-pressed="${homeVideoCount() === n}" onclick="setHomeVideoCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
     ${homeOn('weather') ? '' : `<div class="list" id="wxupopt" style="margin-top:12px"><div class="srow"><div class="ic appt">${I('cloudsun')}</div><div class="tx"><div class="t">Weather in Upcoming</div><div class="s">The Weather card is off. Show today’s weather at the top of Upcoming, and the forecast on the day of each appointment.</div></div><button class="switch ${S.settings.wxUpcoming !== false ? 'on' : ''}" role="switch" aria-checked="${S.settings.wxUpcoming !== false}" aria-label="Show weather in Upcoming" onclick="toggleWxUpcoming()"></button></div></div>`}
     <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetHome()">Reset to default</button><button class="btn primary" id="homedone" onclick="homeEdit=false;render();$('#view').scrollTop=0">Done</button></div>
     <div class="foot">The reminder and install prompts always show at the top when they’re needed.</div>`;
@@ -3388,7 +3398,8 @@ function More() {
     bridge: () => 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3],
     bills: () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…',
     birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
-    ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down'
+    ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down',
+    videos: () => { const n = VIDEO_CATS.filter(c => videoCatOn(c.id)).length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; }
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
     bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
@@ -3417,7 +3428,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
   commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'],
-  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas']
+  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
+  videos: ['play', 'vid', 'Videos', 'Videos']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -4031,6 +4043,94 @@ function homeEvents() {
     <div class="list">${next.length ? next.map(row).join('') : `<button class="row" onclick="go('#events')"><div class="ic ev">${I('ticket')}</div><div class="tx"><div class="t">See what’s on</div><div class="s">Local events for the next 60 days</div></div>${I('right')}</button>`}</div>`;
 }
 
+
+/* ================= VIDEOS ================= */
+// VIDEO_LIST_UPDATED = '2026-09-30'
+const VIDEO_CATS = [
+  { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
+  { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
+  { id: 'garden', name: 'Gardening', sub: 'Citrus, tomatoes, strawberries and peaches' },
+  { id: 'time', name: 'Time organisation', sub: 'Planning the week and using your time' },
+  { id: 'cook', name: 'Cooking', sub: 'Gluten-free dinners only' },
+  { id: 'reno', name: 'Renovation', sub: 'Beginner room and painting jobs' },
+  { id: 'cars', name: 'Cars', sub: 'Maintenance and the Warrant of Fitness' }
+];
+const VIDEOS = [
+  { id: 'EKOU3JWDNLI', title: 'The unhinged world of tech in 2026...', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=EKOU3JWDNLI', reason: 'A plain-language look at the technology stories of 2026.' },
+  { id: 'zt0JA5rxdfM', title: 'AI Trends 2026: Quantum, Agentic AI & Smarter Automation', channel: 'IBM Technology', category: 'tech', url: 'https://www.youtube.com/watch?v=zt0JA5rxdfM', reason: 'What IBM expects from AI, quantum computing and automation in 2026.' },
+  { id: '9OQ5vaYbGV0', title: 'Google’s AI endgame is here… everything you missed at I/O 2026', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=9OQ5vaYbGV0', reason: 'A short recap of what Google showed at I/O 2026.' },
+  { id: 'nZmoq_XJW6Y', title: 'Big Tech is Acting Dodgy At the Moment', channel: 'ColdFusion', category: 'tech', url: 'https://www.youtube.com/watch?v=nZmoq_XJW6Y', reason: 'A look at how the big technology companies are behaving right now.' },
+  { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
+  { id: 'B9UYbXqBnhk', title: 'I Bought The CHEAPEST Gaming PC from PB Tech…', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=B9UYbXqBnhk', reason: 'A full look at a budget gaming PC bought from PB Tech in Auckland.' },
+  { id: 'agPJG1DlkTQ', title: 'HP Elitebook G10 Review', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=agPJG1DlkTQ', reason: 'PB Tech’s hands-on review of the HP Elitebook G10 laptop.' },
+  { id: 'hdC4STCaVSc', title: 'OPPO Find X5 Pro - Hands On Review', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=hdC4STCaVSc', reason: 'PB Tech’s hands-on review of the OPPO Find X5 Pro phone.' },
+  { id: 'jkAKY0Gic3E', title: 'How to plant citrus: The Ian Tolley Way', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=jkAKY0Gic3E', reason: 'How to plant citrus trees and pick the right rootstock for the soil.' },
+  { id: 'LwDmsd-nOrg', title: 'How to Treat Leaf Curl in Peach and Nectarine Trees', channel: 'Urban Farmstead', category: 'garden', url: 'https://www.youtube.com/watch?v=LwDmsd-nOrg', reason: 'How to treat leaf curl on peach and nectarine trees.' },
+  { id: 'stw9KEpSNEg', title: 'Growing Strawberries In Pots Or Containers!', channel: 'The Ripe Tomato Farms', category: 'garden', url: 'https://www.youtube.com/watch?v=stw9KEpSNEg', reason: 'How to grow strawberries in pots or containers.' },
+  { id: 'OMIbtIZ2E-Q', title: 'How to Grow Tomatoes from Seed to Harvest | COMPLETE GUIDE', channel: 'LucasGrowsBest', category: 'garden', url: 'https://www.youtube.com/watch?v=OMIbtIZ2E-Q', reason: 'A full guide to growing tomatoes from seed through to harvest.' },
+  { id: 'jozNEpY8iik', title: 'How to Plan Your Week Effectively', channel: 'The Art of Improvement', category: 'time', url: 'https://www.youtube.com/watch?v=jozNEpY8iik', reason: 'A simple way to plan the week so the important jobs get a time.' },
+  { id: 'n3kNlFMXslo', title: 'How to gain control of your free time | Laura Vanderkam | TED', channel: 'TED', category: 'time', url: 'https://www.youtube.com/watch?v=n3kNlFMXslo', reason: 'Laura Vanderkam on making room in a busy week for what matters.' },
+  { id: 'iONDebHX9qk', title: 'How I Manage My Time - 10 Time Management Tips', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=iONDebHX9qk', reason: 'Ten practical tips for managing your time.' },
+  { id: 'iDbdXTMnOmE', title: 'How to manage your time more effectively (according to machines) - Brian Christian', channel: 'TED-Ed', category: 'time', url: 'https://www.youtube.com/watch?v=iDbdXTMnOmE', reason: 'A short lesson on managing time the way computers schedule work.' },
+  { id: 'MkfYM6oiLMo', title: 'Easy Gluten-Free Chicken Piccata In Just 20 Minutes!', channel: 'Matthew Augusta', category: 'cook', url: 'https://www.youtube.com/watch?v=MkfYM6oiLMo', reason: 'A gluten-free chicken piccata you can cook in about 20 minutes.' },
+  { id: '7ZjAdGLfIv4', title: '7 EASY Family Favorite Dinners | Gluten Free + Low Carb | Minimal Dishes!', channel: 'Shelby Marybeth', category: 'cook', url: 'https://www.youtube.com/watch?v=7ZjAdGLfIv4', reason: 'Seven gluten-free family dinners that don’t leave a pile of dishes.' },
+  { id: 'gYWE-zO-QUg', title: '4 Amazing Gluten Free Dinners | Gluten Free Recipes | Weeknight Dinners | Twisted', channel: 'Twisted', category: 'cook', url: 'https://www.youtube.com/watch?v=gYWE-zO-QUg', reason: 'Four gluten-free weeknight dinners.' },
+  { id: '_U-caadWVgE', title: 'Gluten Free Dinner Ideas in Under 30 Minutes!', channel: 'The Gluten Free Blogger', category: 'cook', url: 'https://www.youtube.com/watch?v=_U-caadWVgE', reason: 'Gluten-free dinner ideas that are ready in under 30 minutes.' },
+  { id: 'LBpkMqVOJmk', title: 'Home Remodeling Tips For Beginners - The Family Room Remodel Part 1', channel: 'JFKreations', category: 'reno', url: 'https://www.youtube.com/watch?v=LBpkMqVOJmk', reason: 'Beginner tips for remodelling a family room, from the start of the job.' },
+  { id: 'CRXCB_3gLok', title: 'How to Paint a Room - Basic Painting Tips', channel: 'Lowe\'s Home Improvement', category: 'reno', url: 'https://www.youtube.com/watch?v=CRXCB_3gLok', reason: 'The basic steps for painting a room.' },
+  { id: 'ZcilSwuaHog', title: 'How to Renovate a Living Room - D.I.Y. At Bunnings', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=ZcilSwuaHog', reason: 'How to renovate a living room, shown with materials from Bunnings.' },
+  { id: 'pOZFn3kexsc', title: 'Bedroom Makeover - DIY Bedroom Renovation', channel: 'Workin\' with Wolkon', category: 'reno', url: 'https://www.youtube.com/watch?v=pOZFn3kexsc', reason: 'A DIY bedroom renovation from start to finish.' },
+  { id: 'HJZXHfs0fgA', title: 'How To Maintain Your Car For Beginners | The Ultimate Guide to Making Your Car Last Longer', channel: 'The Car Care Nut', category: 'cars', url: 'https://www.youtube.com/watch?v=HJZXHfs0fgA', reason: 'A beginner’s guide to the checks that help a car last.' },
+  { id: '25-HG471MIc', title: 'A Mechanics Guide To Maintaining Your Car', channel: 'EricTheCarGuy', category: 'cars', url: 'https://www.youtube.com/watch?v=25-HG471MIc', reason: 'A mechanic’s walk-through of routine car maintenance.' },
+  { id: 'CY1MLjYOf1o', title: 'Top tips to passing your WoF', channel: 'VTNZ', category: 'cars', url: 'https://www.youtube.com/watch?v=CY1MLjYOf1o', reason: 'VTNZ’s tips for getting a car through its Warrant of Fitness.' },
+  { id: 'w_wNj7387Ck', title: 'Warrant of Fitness (WoF) in New Zealand: Everything You Need to Know', channel: 'Euromotive', category: 'cars', url: 'https://www.youtube.com/watch?v=w_wNj7387Ck', reason: 'What a Warrant of Fitness covers for a car in New Zealand.' }
+];
+function videoCatOn(id) {
+  const c = S.settings.videoCats;
+  if (c && typeof c === 'object' && Object.prototype.hasOwnProperty.call(c, id)) return !!c[id];
+  return true;
+}
+async function toggleVideoCat(id) {
+  S.settings.videoCats = Object.assign({}, S.settings.videoCats, { [id]: !videoCatOn(id) });
+  await save(); render();
+}
+function videoSuggestions() {
+  const on = VIDEO_CATS.map(c => c.id).filter(videoCatOn);
+  const by = {};
+  on.forEach(id => { by[id] = VIDEOS.filter(v => v.category === id); });
+  const out = [];
+  let i = 0, added = true;
+  while (added) {
+    added = false;
+    on.forEach(id => { if (by[id][i]) { out.push(by[id][i]); added = true; } });
+    i++;
+  }
+  return out;
+}
+function videoRow(v, home) {
+  return `<a class="row" href="${esc(v.url)}" target="_blank" rel="noopener"><div class="ic vid">${I('play')}</div>
+    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div>${home ? '' : `<div class="s">${esc(v.reason)}</div>`}</div>${I('ext')}</a>`;
+}
+function homeVideosCard() {
+  const list = videoSuggestions().slice(0, homeVideoCount());
+  if (!list.length) return '';
+  return `<div class="sec"><a class="sechead" href="#videos">Videos</a><a href="#videos">All videos</a></div>
+    <div class="list" id="homevideos">${list.map(v => videoRow(v, true)).join('')}</div>`;
+}
+function Videos() {
+  const list = videoSuggestions();
+  const switches = `<div class="list" id="videocats">${VIDEO_CATS.map(c => {
+    const on = videoCatOn(c.id);
+    return `<div class="srow" data-cat="${c.id}"><div class="tx"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.sub)}</div></div>
+      <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(c.name)}" onclick="toggleVideoCat('${c.id}')"></button></div>`;
+  }).join('')}</div>`;
+  const body = list.length
+    ? `<div class="sec">Suggestions</div><div class="list" id="videolist">${list.map(v => videoRow(v, false)).join('')}</div>`
+    : `<div class="card empty" id="videonone"><div class="t">No videos to show</div><div class="s">Turn a category back on to see suggestions.</div></div>`;
+  return header('Videos', 'Suggestions from the categories you leave on') + switches + body +
+    `<div class="foot">Updated 30 Sep 2026. These refresh every couple of weeks.<br>Each video opens on YouTube.</div>`;
+}
+
 /* ================= SETTINGS ================= */
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 function Settings() {
@@ -4253,7 +4353,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos };
   if (r !== 'more') moreEdit = false;
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : (map[r] || Home)();
