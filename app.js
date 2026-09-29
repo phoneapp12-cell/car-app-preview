@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.24.0';
+const APP_VERSION = '1.24.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3908,6 +3908,24 @@ function moonPhaseName(now = new Date()) {
   return phases[Math.floor((age / synodic) * 8 + 0.5) % 8];
 }
 // Compact home line, directly under "Hi Shane" and the date. Tap opens the full forecast.
+// Compare wall-clock times in Whangārei so the line follows Open-Meteo's real sunrise/sunset,
+// even if the phone's own timezone is different.
+function wxLocalNow(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+  const p = Object.fromEntries(parts.filter(x => x.type !== 'literal').map(x => [x.type, x.value]));
+  return { iso: `${p.year}-${p.month}-${p.day}`, hm: `${p.hour}:${p.minute}` };
+}
+function wxIsDay() {
+  const local = wxLocalNow(), d = WX && WX.data && WX.data.daily;
+  const i = d && Array.isArray(d.time) ? d.time.indexOf(local.iso) : -1;
+  const sunrise = i >= 0 && Array.isArray(d.sunrise) ? d.sunrise[i] : '';
+  const sunset = i >= 0 && Array.isArray(d.sunset) ? d.sunset[i] : '';
+  if (sunrise && sunset) {
+    const rise = String(sunrise).slice(11, 16), set = String(sunset).slice(11, 16);
+    return local.hm >= rise && local.hm < set;
+  }
+  return local.hm >= '07:00' && local.hm < '19:00';
+}
 function wxGreet() {
   const moon = moonPhaseName();
   if (!WX || !validWx(WX.data)) {
