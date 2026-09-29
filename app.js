@@ -1,8 +1,8 @@
 /* Car & Life Due Dates – the app. Data lives only on this device (IndexedDB). */
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
-  money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.19.2';
+  money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
+const APP_VERSION = '1.20.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -79,7 +79,8 @@ const P = {
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   spine: '<path d="M12 3v18M9 5h6M8.5 9h7M8.5 13h7M9 17h6"/>',
   medkit: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M12 10.5v6M9 13.5h6"/>',
-  ticket: '<path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v12" stroke-dasharray="2 2.2"/>'
+  ticket: '<path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v12" stroke-dasharray="2 2.2"/>',
+  leaf: '<path d="M12 21V11"/><path d="M12 13C8 12 4 9.5 4 5c5 .2 8 3.2 8 8z"/><path d="M12 11c4-1 7.2-3.6 8-7-4.2.8-7 4-8 7z"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
 
@@ -125,6 +126,7 @@ function normalise(d) {
   d.loans = normLoans(d.loans); // 1.10.0: loans (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.health = normHealth(d.health); // 1.8.0: Health (older data and backups have none)
+  d.garden = normGarden(d.garden); // 1.20.0: Gardening (older data and backups have none)
   d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
   d.version = 1;
   return d;
@@ -910,9 +912,10 @@ function calItems(fromT, toT) {
   extEvents(fromT, toT).forEach(x => ev.push(x));
   mealCalItems(inR).forEach(x => ev.push(x));
   petCalItems(inR).forEach(x => ev.push(x));
+  gardenCalItems(fromT, toT).forEach(x => ev.push(x));
   healthCalItems(fromT, toT, inR).forEach(x => ev.push(x));
   mineItems(fromT, toT).forEach(x => ev.push(x));
-  const rank = { due: 0, pet: 0, hol: 1, bday: 1, appt: 2, health: 2, mine: 2, ext: 2, meal: 3 };
+  const rank = { due: 0, pet: 0, garden: 0, hol: 1, bday: 1, appt: 2, health: 2, mine: 2, ext: 2, meal: 3 };
   return ev.sort((a, b) => parseD(a.date) - parseD(b.date) || rank[a.src] - rank[b.src] || (a.sort || '').localeCompare(b.sort || ''));
 }
 /* NZ public holidays: built in (core.js), on unless turned off in Settings */
@@ -991,7 +994,7 @@ function Calendar() {
   return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
     `<div class="card calcard"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
-     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${showMine() && S.myEvents.length ? '<span><i class="dot" style="background:var(--mine)"></i>My events</span>' : ''}${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${showPetsCal() && S.pets.some(p => p.care.some(c => careDue(c))) ? '<span><i class="dot" style="background:var(--pet)"></i>Pets</span>' : ''}${showHealthCal() && S.health.some(p => p.items.some(it => it.apptDate || careDue(it))) ? '<span><i class="dot" style="background:var(--health)"></i>Health</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
+     <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${showMine() && S.myEvents.length ? '<span><i class="dot" style="background:var(--mine)"></i>My events</span>' : ''}${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${showPetsCal() && S.pets.some(p => p.care.some(c => careDue(c))) ? '<span><i class="dot" style="background:var(--pet)"></i>Pets</span>' : ''}${gardenCalItems(gridStart, gridEnd).length ? '<span><i class="dot" style="background:var(--garden)"></i>Garden</span>' : ''}${showHealthCal() && S.health.some(p => p.items.some(it => it.apptDate || careDue(it))) ? '<span><i class="dot" style="background:var(--health)"></i>Health</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
       ${y !== now.getFullYear() || m !== now.getMonth() ? `<button style="margin-left:auto;color:var(--brand);font-weight:700" onclick="calMonth=null;calSel=null;render()">Back to today</button>` : ''}</div>
      <div class="grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>
     <div class="btns addev"><button class="btn primary" id="addevent" onclick="mineForm(null${calSel !== null ? `,'${isoT(calSel)}'` : ''})">${I('plus')} Add event${calSel !== null ? ' on ' + fmtW(isoT(calSel)) : ''}</button></div>
@@ -1011,7 +1014,7 @@ function chipFull(e) {
 }
 function calIcon(e) {
   if (e.src === 'due') return { WOF: 'shield', Rego: 'doc', Service: 'wrench', Bill: 'bill', 'To-do': 'todo', AA: 'idcard', Licence: 'idcard' }[e.time] || 'cal';
-  return { appt: e.tag === 'Event' ? 'ticket' : 'clock', bday: 'cake', hol: 'flag', ext: 'link', meal: 'meal', pet: 'paw', health: 'heart', mine: 'repeat' }[e.src] || 'cal';
+  return { appt: e.tag === 'Event' ? 'ticket' : 'clock', bday: 'cake', hol: 'flag', ext: 'link', meal: 'meal', pet: 'paw', garden: 'leaf', health: 'heart', mine: 'repeat' }[e.src] || 'cal';
 }
 // timed = has a clock time (appointments, events, health bookings) or a set slot (tonight's dinner at 6 pm)
 const isTimed = e => /^\d\d:\d\d/.test(e.sort || '') && e.time !== 'All day';
@@ -2171,6 +2174,10 @@ const ATT_SOURCES = {
     .concat(healthAppts(S, T, T + DAY).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
       html: attRow({ wx: 1, kind: 'health', cls: 'happt', date: a.date, go: `go('#health/${a.person.id}/${a.item.id}')`, ic: 'health', icon: HEALTH_ICON[a.item.kind] || 'medkit',
         title: `${attWhen(d)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`, sub: `Health appointment · ${a.item.clinic ? esc(a.item.clinic) + ' · ' : ''}${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; })),
+  // Gardening (1.20.0): jobs in the next 14 days for plants that are on and not marked done this year. Not overdue later.
+  garden: T => gardenJobs(S, T, T + 14 * DAY).filter(j => !j.done && j.days >= 0 && j.days <= 14).map(j => ({ days: j.days, rank: 0, sort: j.title,
+    html: attRow({ kind: 'garden', date: j.date, go: `go('#garden/${j.go}')`, ic: 'garden', icon: 'leaf', title: esc(j.title),
+      sub: `Garden · ${fmtW(j.date)}`, right: pill(j.days) }) })),
   // Commission tracker set up and nothing entered for yesterday
   comm: T => { if (!CM().anchor) return []; const y = yesterdayISO(); if (commDay(y).length) return [];
     return [{ days: 0, rank: 0, sort: '', html: attRow({ kind: 'comm', go: `go('#commission/add')`, ic: 'comm', icon: 'cash', title: 'Enter yesterday’s commission', sub: `Commission · nothing entered for ${fmtW(y)} yet` }) }]; }
@@ -2481,6 +2488,153 @@ function petsMoreSub() {
   const n = dueItems({ pets: S.pets })[0];
   return n ? `Next: ${esc(n.title)}, ${n.days < 0 ? 'overdue' : n.days === 0 ? 'today' : fmtW(n.date)}` : plural(S.pets.length, 'pet');
 }
+
+/* ================= GARDENING (1.20.0, More › Gardening) ================= */
+// Seven built-in plants. S.garden.off lists the ones the user does not grow. S.garden.done marks a job done for that year.
+// Job dates and reminder text live in core.js (gardenJobs) so the service worker can notify too.
+const GARDEN_META = {
+  lemon: { name: 'Lemon' },
+  orange: { name: 'Orange' },
+  mandarin: { name: 'Mandarin' },
+  peach: { name: 'Golden Queen peach' },
+  plum: { name: 'Plum' },
+  strawberries: { name: 'Strawberries' },
+  tomatoes: { name: 'Tomatoes' }
+};
+const GARDEN_COPY = {
+  lemon: {
+    intro: 'Full sun, free-draining soil, and out of the wind. It fruits most of the year. Yellow leaves in spring often want magnesium or a trace-element spray.',
+    planting: 'Plant March to May while the soil is warm, or any time from March through November. Do not bury the graft.',
+    feeding: 'Feed on the job dates below, and not from May through August.',
+    care: 'Water deeply in dry spells while fruit is sizing. Mulch, but keep it off the trunk.'
+  },
+  orange: {
+    intro: 'Same planting, feeding and watering as the lemon. Navel types are usually ready about June to September. Later varieties hold into summer. Taste one before you strip the tree.',
+    planting: 'Plant March to May while the soil is warm, or any time from March through November. Full sun, free-draining soil, out of the wind. Do not bury the graft.',
+    feeding: 'Same feeding as the lemon: on the job dates below, and not from May through August.',
+    care: 'Water deeply in dry spells while fruit is sizing. Mulch, but keep it off the trunk.'
+  },
+  mandarin: {
+    intro: 'Same planting, feeding and watering as the lemon. Easy-peel types are usually ready about June to August. Later types can hold into January. Taste one first, and do not leave an early type on the tree until it dries out.',
+    planting: 'Plant March to May while the soil is warm, or any time from March through November. Full sun, free-draining soil, out of the wind. Do not bury the graft.',
+    feeding: 'Same feeding as the lemon: on the job dates below, and not from May through August.',
+    care: 'Water deeply in dry spells while fruit is sizing. Mulch, but keep it off the trunk.'
+  },
+  peach: {
+    intro: 'Fruit is late, typically February into March here, when the shoulder turns deep gold and gives slightly. Good for bottling. It is a clingstone. Whangārei’s mild winter can mean a lighter crop.',
+    planting: 'Plant June to August. Full sun, shelter, free-draining soil. Self-fertile, so one tree is enough. About 3 to 4 metres.',
+    feeding: 'Feed in late August as the buds move, and again in March after harvest. Do not push nitrogen late in autumn.',
+    care: 'Water from flowering through harvest. Uneven watering splits the fruit. Prune in late August as the buds swell, not in mid-winter, because silverleaf gets into winter cuts. Keep an open vase. Fruit grows on last year’s wood. Leaf curl is prevented, not cured: copper at leaf fall in May and again at bud swell in August before any green shows. A spray after the leaves are out does little. Rake up fallen leaves. Thin the fruit once they are marble sized. If it flowers and sets little fruit, a low-chill peach is the more reliable tree here.'
+  },
+  plum: {
+    intro: 'Japanese plums such as Santa Rosa, Omega, Luisa and Billington suit Whangārei. European plums want a colder winter. Most need a second Japanese plum that flowers at the same time. European and Japanese plums do not pollinate each other.',
+    planting: 'Plant June to August. Santa Rosa, Duff’s Early Jewel, Luisa and Hawera fruit on their own or close to it.',
+    feeding: 'Feed in September and December.',
+    care: 'Water in dry spells while fruit is sizing. Too much water near harvest splits them. Prune in late summer after harvest, not from March through July. Thin a heavy crop. Ripe when they soften on the tree, any time from December to March depending on the variety.'
+  },
+  strawberries: {
+    intro: 'Winter planting often gives a bigger crop. Pick every couple of days once they colour. Replace the plants every 2 or 3 years.',
+    planting: 'Plant June to November. Late August to October is the easy window. The crown sits just above the soil, about 30 cm apart.',
+    feeding: 'Feed every 4 weeks from September through February. Too much nitrogen gives leaves instead of fruit.',
+    care: 'Straw under the fruit. Net them once they flower or the birds will take them. Water at the base. Pick every couple of days once they colour, about November through February.'
+  },
+  tomatoes: {
+    intro: 'Full sun. Cover them if a night looks like 4 degrees or under. Pick as they colour, roughly December through April.',
+    planting: 'Sow in pots from August. Plant seedlings outside from early to mid-September through to January.',
+    feeding: 'Once the first flowers open, feed every two weeks with a high-potash tomato food until the fruit is finishing (the reminders cover November through March).',
+    care: 'Stake them, and pinch the side shoots on tall types. Water evenly. A dry spell followed by a soak splits the fruit.'
+  }
+};
+function normGarden(g) {
+  const ids = new Set(GARDEN_IDS);
+  const src = g && typeof g === 'object' ? g : {};
+  const off = [];
+  (Array.isArray(src.off) ? src.off : []).forEach(id => { if (ids.has(id) && !off.includes(id)) off.push(id); });
+  const done = {};
+  const d = src.done && typeof src.done === 'object' && !Array.isArray(src.done) ? src.done : {};
+  Object.keys(d).forEach(k => { if (d[k] === true && /^[a-z0-9-]{1,60}$/.test(k)) done[k] = true; });
+  return { off, done };
+}
+const gardenGrowing = id => !S.garden.off.includes(id);
+function gardenAhead(id) {
+  const T = todayT();
+  return gardenJobs(S, T, T + 400 * DAY).filter(j => !j.done && j.plants.includes(id) && j.days >= 0);
+}
+function gardenNextLine(id) {
+  if (!gardenGrowing(id)) return 'Off';
+  const n = gardenAhead(id)[0];
+  return n ? n.title + ' · ' + fmt(n.date) : 'Nothing due soon';
+}
+function gardenYearJobs(id) {
+  const y = +todayISO().slice(0, 4);
+  return gardenJobs(S, parseD(y + '-01-01'), parseD(y + '-12-31')).filter(j => j.plants.includes(id));
+}
+function gardenCalItems(fromT, toT) {
+  return gardenJobs(S, fromT, toT).filter(j => !j.done && j.days >= 0).map(j => ({
+    src: 'garden', title: j.title, date: j.date, time: 'Garden', sort: '', tag: 'Garden', notes: j.body, go: `go('#garden/${j.go}')`
+  }));
+}
+function gardenMoreSub() {
+  const nOn = GARDEN_IDS.filter(gardenGrowing).length;
+  if (!nOn) return 'All plants are off';
+  const T = todayT(), n = gardenJobs(S, T, T + 400 * DAY).find(j => !j.done && j.days >= 0);
+  return n ? `Next: ${n.title}, ${n.days === 0 ? 'today' : fmtW(n.date)}` : 'Planting and feeding reminders';
+}
+async function toggleGrow(id) {
+  if (!GARDEN_IDS.includes(id)) return;
+  const i = S.garden.off.indexOf(id);
+  if (i >= 0) S.garden.off.splice(i, 1); else S.garden.off.push(id);
+  await save(); render();
+}
+async function gardenDone(key) {
+  if (!/^[a-z0-9-]{1,60}$/.test(key)) return;
+  S.garden.done[key] = true;
+  await save(); render();
+  toast('Done for this year. It won’t remind you again until next year.');
+}
+function gardenSwitch(id) {
+  const on = gardenGrowing(id);
+  return `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="I grow this" onclick="toggleGrow('${id}')"></button>`;
+}
+function Garden() {
+  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
+  return back + header('Gardening', 'Planting, feeding and spraying') +
+    `<div class="callout green" id="gardennote">${I('info')}<div>Times are for Whangārei. A cold spring or a dry summer can move them by a couple of weeks. Reminders use the app’s existing notifications. Turn a plant off if you don’t grow it.</div></div>` +
+    `<div id="gardenlist">${GARDEN_IDS.map(id => {
+      const on = gardenGrowing(id);
+      return `<div class="carcard gardencard" data-plant="${id}"><div class="carhead"><div class="carpic" style="background:var(--garden)">${I('leaf')}</div>
+        <button class="tapzone" onclick="go('#garden/${id}')"><span class="carname">${esc(GARDEN_META[id].name)}</span><span class="carmodel">${esc(gardenNextLine(id))}</span></button>
+        ${gardenSwitch(id)}</div></div>`;
+    }).join('')}</div>` +
+    `<div class="foot">A job only reminds you on the morning it is due.<br>Your information is saved on this phone only.</div>`;
+}
+function gardenJobRows(id) {
+  const jobs = gardenYearJobs(id), today = todayISO();
+  const upcoming = jobs.filter(j => !j.done && j.date >= today);
+  const nextDate = upcoming.length ? upcoming[0].date : '';
+  if (!jobs.length) return '<div class="card muted">No jobs this year.</div>';
+  return `<div class="list" id="gardenjobs">${jobs.map(j => {
+    const btn = nextDate && j.date === nextDate ? `<button class="btn small" onclick="gardenDone('${j.key}')">Done for this year</button>` : '';
+    const pillHtml = j.done ? '<span class="pill paid">Done</span>' : j.date < today ? '<span class="pill none">Passed</span>' : '';
+    return `<div class="row gjob" data-job="${j.key}"><div class="tx"><div class="t">${esc(j.title)}</div><div class="s">${fmtW(j.date)}${j.body ? ' · ' + esc(j.body) : ''}</div></div>${pillHtml}${btn}</div>`;
+  }).join('')}</div>`;
+}
+function GardenDetail(id) {
+  const meta = GARDEN_META[id], copy = GARDEN_COPY[id];
+  const back = `<button class="back" onclick="go('#garden')">${I('left')} Gardening</button>`;
+  if (!meta) return back + empty('That plant isn’t here', 'It isn’t one of the plants built into the app.', '', '');
+  const on = gardenGrowing(id);
+  const block = (h, t) => `<div class="sec">${h}</div><div class="card"><div class="muted notes">${esc(t)}</div></div>`;
+  return back +
+    `<div class="hero"><div class="carpic" style="background:var(--garden)">${I('leaf')}</div><div style="min-width:0"><h2>${esc(meta.name)}</h2><div class="muted">${on ? 'I grow this' : 'Off'}</div></div></div>` +
+    `<div class="list" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">I grow this</div><div class="s">${on ? 'Jobs and reminders are on.' : 'Jobs and reminders are hidden.'}</div></div>${gardenSwitch(id)}</div></div>` +
+    `<div class="card" style="margin-bottom:4px"><div class="muted notes">${esc(copy.intro)}</div></div>` +
+    block('Planting', copy.planting) + block('Feeding', copy.feeding) + block('Care', copy.care) +
+    `<div class="sec">This year’s jobs</div>` +
+    (on ? gardenJobRows(id) : '<div class="card muted">Jobs and reminders are hidden while this plant is off.</div>') +
+    `<div class="card muted" style="margin-top:12px;font-size:13.5px">Reminders use the app’s existing notifications, on the morning of each job. Mark the next one done and it will not notify again until next year.</div>`;
+}
+
 
 /* ================= HEALTH (1.8.0, More › Health) ================= */
 // S.health = [{ id, name, nhi, notes, items: [check-up], history: [{ id, itemId, kind, name, date, notes, cost, at }] }]
@@ -3208,6 +3362,7 @@ function More() {
     recipes: () => plural(visibleIdeas().length, 'recipe') + (M().ideas.some(i => i.fav && !i.hidden) ? ` · ${M().ideas.filter(i => i.fav && !i.hidden).length} favourites` : ''),
     shopping: () => shopMoreSub(),
     pets: () => petsMoreSub(),
+    garden: () => gardenMoreSub(),
     health: () => healthMoreSub(),
     bridge: () => 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3],
     bills: () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…',
@@ -3240,7 +3395,7 @@ const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
   commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'],
-  meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], health: ['medkit', 'health', 'Health', 'Health'],
+  meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas']
 };
 const NAV_DEFAULT = Object.keys(NAV);
@@ -4078,7 +4233,7 @@ function render() {
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans };
   if (r !== 'more') moreEdit = false;
   if (r !== 'home' && r !== '') homeEdit = false;
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : (map[r] || Home)();
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));

@@ -340,6 +340,73 @@
     return t + (ev.until ? ', until ' + fmtY(ev.until) : '');
   }
 
+
+  /* ---------- gardening (1.20.0): built-in plants, annual jobs for Whangārei ----------
+     S.garden = { off: [plantId], done: { "jobKey-year": true } }.
+     A plant in `off` is one the user does not grow. Jobs are hidden and not reminded.
+     `done` marks this year's occurrence finished, so it leaves Upcoming and will not notify again until next year.
+     Citrus feeding (and the March planting reminder) is one shared job for whichever of lemon, orange and mandarin are on. */
+  const GARDEN_IDS = ['lemon', 'orange', 'mandarin', 'peach', 'plum', 'strawberries', 'tomatoes'];
+  const GARDEN_CITRUS = ['lemon', 'orange', 'mandarin'];
+  const GARDEN_WORD = { lemon: 'lemon', orange: 'orange', mandarin: 'mandarin', peach: 'peach', plum: 'plum' };
+  function gardenOff(data) { const g = data && data.garden; return g && Array.isArray(g.off) ? g.off : []; }
+  function gardenDoneMap(data) {
+    const g = data && data.garden;
+    return g && g.done && typeof g.done === 'object' && !Array.isArray(g.done) ? g.done : {};
+  }
+  function gardenOn(data, id) { return gardenOff(data).indexOf(id) < 0; }
+  function gardenThe(ids) {
+    const w = ids.map(id => GARDEN_WORD[id]).filter(Boolean);
+    const body = w.length <= 1 ? (w[0] || '') : w.length === 2 ? w[0] + ' and ' + w[1] : w.slice(0, -1).join(', ') + ' and ' + w[w.length - 1];
+    return 'the ' + body;
+  }
+  function gardenSpecs(data) {
+    const on = id => gardenOn(data, id), specs = [];
+    const add = (m, d, kind, title, body, plants) => specs.push({ m, d, kind, title, body, plants: plants.slice() });
+    const citrus = GARDEN_CITRUS.filter(on);
+    if (citrus.length) {
+      const who = gardenThe(citrus);
+      const feed = 'Citrus fertiliser around the drip line of ' + who + ', then water it in.';
+      [[9, 1], [11, 1], [1, 1], [3, 1]].forEach(([m, d]) => add(m, d, 'citrus-feed', 'Feed the citrus', feed, citrus));
+      add(3, 1, 'citrus-plant', 'Best time to plant citrus', 'Plant ' + who + ' from March to May while the soil is warm, or any time through November.', citrus);
+    }
+    if (on('peach')) {
+      add(5, 15, 'peach-curl', 'Spray the Golden Queen for leaf curl', 'Copper at leaf fall, before any green shows.', ['peach']);
+      add(8, 15, 'peach-bud', 'Spray the Golden Queen again, and feed it', 'At bud swell, before any green shows, with a balanced fertiliser.', ['peach']);
+      add(3, 1, 'peach-harvest', 'Feed the Golden Queen after harvest', 'Fruit should be finishing.', ['peach']);
+    }
+    if (on('plum')) {
+      add(9, 1, 'plum-feed', 'Feed the plum', 'Feed in September, then again in December.', ['plum']);
+      add(12, 1, 'plum-feed2', 'Feed the plum again', 'The second feed of the year.', ['plum']);
+      add(1, 15, 'plum-prune', 'Prune the plum once the fruit is off', 'A summer prune, not in autumn or winter.', ['plum']);
+    }
+    const stone = ['peach', 'plum'].filter(on);
+    if (stone.length) add(6, 1, 'bare-root', 'Bare-root time for ' + gardenThe(stone), 'Plant June to August.', stone);
+    if (on('strawberries')) {
+      [9, 10, 11, 12, 1, 2].forEach(m => add(m, 1, 'straw-feed', 'Feed the strawberries', 'Feed every 4 weeks from September through February, without so much nitrogen that you get leaves instead of fruit.', ['strawberries']));
+      add(6, 1, 'straw-plant', 'Strawberry planting is open', 'Plant from June to November, with late August to October the easy window.', ['strawberries']);
+    }
+    if (on('tomatoes')) {
+      add(9, 1, 'tomato-plant', 'Tomato planting time', 'Seedlings can go outside in Whangārei now.', ['tomatoes']);
+      [[11, 1], [11, 15], [12, 1], [12, 15], [1, 1], [1, 15], [2, 1], [2, 15], [3, 1]].forEach(([m, d]) => add(m, d, 'tomato-feed', 'Feed the tomatoes', 'A high-potash tomato food until the fruit is finishing.', ['tomatoes']));
+    }
+    return specs;
+  }
+  // Jobs whose date falls between two UTC-midnight times (inclusive). Includes past and done ones; callers filter.
+  function gardenJobs(data, fromT, toT, now) {
+    if (fromT == null || toT == null || toT < fromT) return [];
+    const done = gardenDoneMap(data), specs = gardenSpecs(data), out = [];
+    for (let y = new Date(fromT).getUTCFullYear(); y <= new Date(toT).getUTCFullYear(); y++) {
+      specs.forEach(sp => {
+        const md = pad(sp.m) + '-' + pad(sp.d), date = y + '-' + md, t = parseD(date);
+        if (t == null || t < fromT || t > toT) return;
+        const jobKey = sp.kind + '-' + md, key = jobKey + '-' + y;
+        out.push({ jobKey, key, notifyId: 'garden-' + sp.kind + '-' + y + '-' + md, title: sp.title, body: sp.body, date, plants: sp.plants, go: sp.plants[0], done: !!done[key], days: daysLeft(date, now) });
+      });
+    }
+    return out.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.title.localeCompare(b.title));
+  }
+
   /* ---------- everything that has a due date ---------- */
   function dueItems(data, now) {
     const out = [];
@@ -529,6 +596,15 @@
         }
       });
     }
+    // Gardening: one notification on the morning of the job date (waking hours, same 7 am–9 pm window as birthdays).
+    // A date that has already passed does not fire late. The key is stable for that occurrence, e.g. garden-citrus-feed-2026-09-01.
+    if (daytime) {
+      const gT = todayT(now), gIso = todayISO(now);
+      gardenJobs(data, gT, gT, now).forEach(j => {
+        if (j.done || j.date !== gIso || fired[j.notifyId]) return;
+        out.push({ key: j.notifyId, title: j.title, body: j.body, url: '#garden/' + j.go, days: 0 });
+      });
+    }
     // Commission (if turned on): 9 am the next morning, only if nothing has been entered for yesterday
     const cm = data.commission;
     if (cm && cm.remind && cm.anchor && daytime && now.getHours() >= 9) {
@@ -611,6 +687,6 @@
     return { shown, badge };
   }
 
-  g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money,
+  g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money, GARDEN_IDS, gardenJobs,
     nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatNth, isSeriesDate, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, HEALTH_TYPES, healthAppts, isMonday, lastMonday, fortnightOf, commSum, taxYearOf, centsMoney, parseCents, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);
