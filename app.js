@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.19.1';
+const APP_VERSION = '1.19.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -282,6 +282,8 @@ async function toggleHomeCard(k) {
 // 1.17.0: when the Weather card is switched off, Upcoming can show the weather instead (on unless turned off)
 const wxInUp = () => !homeOn('weather') && homeOn('attention') && S.settings.wxUpcoming !== false;
 async function toggleWxUpcoming() { S.settings.wxUpcoming = S.settings.wxUpcoming === false; await save(); render(); }
+const homeEventCount = () => { const n = Number(S.settings.homeEvents); return n >= 1 && n <= 6 ? n : 2; };
+async function setHomeEventCount(n) { S.settings.homeEvents = n; await save(); render(); }
 async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
 const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
 const HOME_CARD = {
@@ -355,6 +357,8 @@ function HomeEdit() {
       <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${d[2]} on Home" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>
       <span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
     </div>
+    ${homeOn('events') ? `<div class="list" id="evcountopt" style="margin-top:12px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Events on Home</div><div class="s">How many to show under What’s on in Whangārei. The rest stay on the Events page.</div></div>
+      <div class="seg" id="evcount" role="group" aria-label="How many events on Home" style="width:100%">${[1,2,3,4,5,6].map(n => `<button type="button" class="${homeEventCount() === n ? 'on' : ''}" aria-pressed="${homeEventCount() === n}" onclick="setHomeEventCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
     ${homeOn('weather') ? '' : `<div class="list" id="wxupopt" style="margin-top:12px"><div class="srow"><div class="ic appt">${I('cloudsun')}</div><div class="tx"><div class="t">Weather in Upcoming</div><div class="s">The Weather card is off. Show today’s weather at the top of Upcoming, and the forecast on the day of each appointment.</div></div><button class="switch ${S.settings.wxUpcoming !== false ? 'on' : ''}" role="switch" aria-checked="${S.settings.wxUpcoming !== false}" aria-label="Show weather in Upcoming" onclick="toggleWxUpcoming()"></button></div></div>`}
     <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetHome()">Reset to default</button><button class="btn primary" id="homedone" onclick="homeEdit=false;render();$('#view').scrollTop=0">Done</button></div>
     <div class="foot">The reminder and install prompts always show at the top when they’re needed.</div>`;
@@ -3844,7 +3848,7 @@ async function addEvent(id) {
   await save(); updEvents(); toast('Added to your calendar.', 'Undo', undoTo(s));
 }
 function homeEvents() {
-  const next = upcomingEvents().slice(0, 2);
+  const next = upcomingEvents().slice(0, homeEventCount());
   const row = e => `<button class="row" onclick="go('#events')"><div class="ic ev">${I('ticket')}</div><div class="tx"><div class="t">${esc(e.title)}</div>
     <div class="s">${daysLeft(e.date) === 0 ? 'Today' : fmtW(e.date)}${e.time ? ' · ' + fmtTime(e.time) : ''}${e.venue ? ' · ' + esc(e.venue.split(',')[0]) : ''}</div></div>${evAppt(e.id) ? '<span class="pill fine">Added</span>' : ''}</button>`;
   return `<div class="sec">What’s on in Whangārei <a href="#events">All events</a></div>
