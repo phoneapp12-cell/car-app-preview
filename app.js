@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.18.0';
+const APP_VERSION = '1.18.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -688,36 +688,87 @@ function kmForm(id) {
 }
 
 /* ================= BILLS ================= */
-// Billing cycle: every repeating bill converted to a weekly, fortnightly or monthly cost (fortnightly by default).
+// Bills are grouped by pay cycle: payday up to the day before the next payday (fortnightly).
+// Payday comes from S.settings.payday (any payday, picked in Bills) or else a fortnightly "Payday" event in Calendar › My events.
 const BILL_PER_YEAR = { weekly: 52, fortnightly: 26, monthly: 12, quarterly: 4, yearly: 1 };
-const BILL_CYCLES = [['weekly', 'Weekly', 52, 'a week', 'week'], ['fortnightly', 'Fortnightly', 26, 'a fortnight', 'fortnight'], ['monthly', 'Monthly', 12, 'a month', 'month']];
-const billCycle = () => BILL_CYCLES.find(c => c[0] === S.settings.billCycle) || BILL_CYCLES[1];
-const billPer = (b, c) => BILL_PER_YEAR[b.repeat] ? (Number(b.amount) || 0) * BILL_PER_YEAR[b.repeat] / c[2] : null;
-async function setBillCycle(v) { S.settings.billCycle = v; await save(); render(); }
+let payOff = 0;
+const payEvent = () => (S.myEvents || []).find(e => /\bpay ?day\b/i.test(e.title) && e.repeat === 'fortnightly');
+function paydays() {
+  const T = todayT(), from = T - 420 * DAY, to = T + 420 * DAY;
+  let ev = null;
+  if (S.settings.payday && parseD(S.settings.payday) != null) { const a = parseD(S.settings.payday), k = Math.ceil((a - from) / (14 * DAY)); ev = { start: isoT(a - k * 14 * DAY), repeat: 'fortnightly' }; }
+  else ev = payEvent();
+  if (!ev) return null;
+  const ds = repeatDates(ev, from, to).map(x => x.date);
+  if (!ds.length) return null;
+  if (ds[0] > todayISO()) ds.unshift(addDays(ds[0], -14));
+  return ds;
+}
+function payPeriod(off) {
+  const ds = paydays(); if (!ds) return null;
+  const T = todayISO(); let i = 0; ds.forEach((d, j) => { if (d <= T) i = j; });
+  const j = Math.max(0, Math.min(ds.length - 2, i + off));
+  return { start: ds[j], next: ds[j + 1], end: addDays(ds[j + 1], -1), off: j - i, canBack: j > 0, canFwd: j < ds.length - 2 };
+}
+const payLabel = o => o === 0 ? 'This pay' : o === 1 ? 'Next pay' : o === -1 ? 'Last pay' : o > 1 ? `In ${o} pays` : `${-o} pays ago`;
+async function payShift(n) { payOff += n; render(); }
+function paydayForm() {
+  const ds = paydays(), T = todayISO(), nxt = ds ? (ds.find(d => d > T) || T) : T;
+  openSheet('Your payday',
+    `<p class="muted" style="margin:0 0 12px">You’re paid every fortnight. Pick your next payday and Bills will show what’s due from each payday up to the next one.</p>` +
+    field('Next payday', inp('payday', nxt, 'type="date" required')),
+    async v => {
+      if (!parseD(v.payday)) return 'Please choose your next payday.';
+      S.settings.payday = v.payday; payOff = 0; await save(); render(); toast('Payday saved.');
+    }, 'Save');
+}
 function Bills() {
   const unpaid = S.bills.filter(b => !b.paid);
-  const t30 = todayT() + 30 * DAY;
-  let total = 0, count = 0;
-  unpaid.forEach(b => billDates(b, -Infinity, t30).forEach(() => { total += Number(b.amount) || 0; count++; }));
   const over = unpaid.filter(b => daysLeft(b.due) < 0).length;
   const sorted = [...unpaid].sort((a, b) => parseD(a.due) - parseD(b.due));
   const paid = S.bills.filter(b => b.paid);
-  const cyc = billCycle(), reg = unpaid.filter(b => BILL_PER_YEAR[b.repeat]);
-  const cycTotal = reg.reduce((t, b) => t + billPer(b, cyc), 0), oneOff = unpaid.length - reg.length;
+  const reg = unpaid.filter(b => BILL_PER_YEAR[b.repeat]);
+  const avg = reg.reduce((t, b) => t + (Number(b.amount) || 0) * BILL_PER_YEAR[b.repeat] / 26, 0);
   const row = b => {
-    const d = daysLeft(b.due), per = b.paid ? null : billPer(b, cyc);
+    const d = daysLeft(b.due);
     return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}"><div class="ic bill">${I(billIcon(b.name))}</div>
       <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}</div>
       <div style="margin-top:5px">${b.paid ? '<span class="pill paid">Paid ✓</span>' : pill(d)}</div></div></button>
-      <div class="right"><div class="amt">${money(b.amount)}</div>${per !== null && b.repeat !== cyc[0] ? `<div class="billper">${money(per)} ${cyc[3]}</div>` : ''}
+      <div class="right"><div class="amt">${money(b.amount)}</div>
       ${b.paid ? `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>` : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
+  let pay = '';
+  const pp = S.bills.length ? payPeriod(payOff) : null;
+  if (S.bills.length && !pp) {
+    pay = `<div class="callout green" id="paysetup">${I('cal')}<div style="flex:1"><b>Line your bills up with your pay</b><br>Set your payday and we’ll show what’s due from each payday up to the next one.
+      <div style="margin-top:10px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
+  } else if (pp) {
+    payOff = pp.off;
+    const sT = parseD(pp.start), eT = parseD(pp.end), items = [];
+    unpaid.forEach(b => {
+      billDates(b, sT, eT).forEach(d => items.push({ b, d }));
+      if (pp.off === 0 && parseD(b.due) < sT) items.push({ b, d: b.due, late: 1 });
+    });
+    items.sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : 0);
+    const tot = items.reduce((t, x) => t + (Number(x.b.amount) || 0), 0), late = items.filter(x => x.late).length;
+    const prow = x => { const cur = x.d === x.b.due, dl = daysLeft(x.d);
+      return `<div class="row bill payrow"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}"><div class="ic bill">${I(billIcon(x.b.name))}</div>
+        <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.d)}</div>
+        ${pp.off <= 0 || dl <= 7 ? `<div style="margin-top:5px">${pill(dl)}</div>` : ''}</div></button>
+        <div class="right"><div class="amt">${money(x.b.amount)}</div>${cur ? `<button class="paybtn" onclick="markPaid('${x.b.id}')">Mark paid</button>` : ''}</div></div>`; };
+    pay = `<div class="summary" id="paysum">
+      <div class="paynav"><button class="paystep" id="payprev" aria-label="Previous pay" ${pp.canBack ? '' : 'disabled'} onclick="payShift(-1)">${I('left')}</button>
+        <div class="paytitle"><b>${payLabel(pp.off)}</b><span>${fmtW(pp.start)} to ${fmtW(pp.end)}</span></div>
+        <button class="paystep" id="paynext" aria-label="Next pay" ${pp.canFwd ? '' : 'disabled'} onclick="payShift(1)">${I('right')}</button></div>
+      <div class="muted">${pp.off < 0 ? 'Bills that were due' : 'To pay before the next payday'}</div><div class="amt" id="paytotal">${money(tot)}</div>
+      <div class="muted">${items.length ? plural(items.length, 'bill') : 'Nothing due'}${late ? ` · <b style="color:var(--onbrand)">${late} overdue</b>` : ''} · next payday ${fmtW(pp.next)}</div>
+      <div class="muted billsub">${reg.length ? `Your regular bills average ${money(avg)} a fortnight. ` : ''}<button class="linkbtn" id="paychange" onclick="paydayForm()">Change payday</button></div></div>
+      <div class="sec">Due ${pp.off === 0 ? 'this pay' : pp.off === 1 ? 'next pay' : pp.off === -1 ? 'last pay' : fmtW(pp.start) + ' to ' + fmtW(pp.end)}</div>
+      ${items.length ? `<div class="list" id="paylist">${items.map(prow).join('')}</div>` : `<div class="card muted" id="paylist">No bills due ${pp.off < 0 ? 'in that pay' : 'in this pay'}.</div>`}`;
+  }
   return header('Bills', 'Regular bills and due dates', addBtn('Add a bill', 'billForm()')) +
-    (S.bills.length ? `<div class="seg" id="billcyc" role="group" aria-label="Billing cycle" style="margin-bottom:12px">${BILL_CYCLES.map(([v, l]) => `<button type="button" class="${cyc[0] === v ? 'on' : ''}" aria-pressed="${cyc[0] === v}" onclick="setBillCycle('${v}')">${l}</button>`).join('')}</div>
-      <div class="summary" id="billsum"><div class="muted">Your regular bills cost</div><div class="amt">${money(cycTotal)} <span class="per">${cyc[3]}</span></div>
-      <div class="muted">${reg.length ? `Across ${plural(reg.length, 'repeating bill')}` : 'No repeating bills yet'}${oneOff ? `, not counting ${plural(oneOff, 'one-off bill')}` : ''}</div>
-      <div class="muted billsub">${money(total)} due in the next 30 days (${plural(count, 'payment')})${over ? ` · <b style="color:var(--onbrand)">${over} overdue</b>` : ''}</div></div>
-      <div class="sec">Your bills</div>
+    (S.bills.length ? `${pay}
+      <div class="sec">All bills${over && !pp ? ` · ${over} overdue` : ''}</div>
       ${sorted.length ? `<div class="list">${sorted.map(row).join('')}</div>` : '<div class="card muted">All paid up. Good as gold!</div>'}
       ${paid.length ? `<div class="sec">Paid</div><div class="list">${paid.map(row).join('')}</div>` : ''}`
       : empty('No bills yet', 'Add your regular bills, like power, phone or insurance, and we’ll remind you 3 days before each one is due.', 'Add a bill', 'billForm()'));

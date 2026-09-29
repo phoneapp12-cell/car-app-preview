@@ -162,7 +162,14 @@ select.sel{font:inherit;font-size:15px;font-weight:600;color:var(--brand);border
 .summary .muted{color:var(--onbrand);opacity:.82}
 .summary .amt .per{font-size:17px;font-weight:700;opacity:.85;letter-spacing:0}
 .summary .billsub{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.25)}
-.billper{font-size:12.5px;color:var(--ink3);font-weight:600;margin:1px 0 4px;white-space:nowrap}
+.paynav{display:flex;align-items:center;gap:8px;margin:-2px -4px 10px}
+.paystep{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.18);color:var(--onbrand);display:grid;place-items:center;flex:0 0 auto}
+.paystep svg{width:20px;height:20px}
+.paystep:disabled{opacity:.3}
+.paytitle{flex:1;text-align:center;line-height:1.25}
+.paytitle b{display:block;font-size:17px}
+.paytitle span{font-size:13.5px;opacity:.85}
+.summary .linkbtn{color:var(--onbrand);text-decoration:underline;padding:2px 0}
 .bill .right{text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end}
 .bill .amt{font-weight:750;font-size:16px}
 .paybtn{margin-top:6px;font-size:13.5px;font-weight:700;color:var(--brand);background:var(--brand2);border-radius:999px;padding:7px 12px;white-space:nowrap}
