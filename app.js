@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.19.0';
+const APP_VERSION = '1.19.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3752,7 +3752,8 @@ const WDC_WHATSON = 'https://www.wdc.govt.nz/Events/Whats-On';
 let EVS = null, evBusy = false, evFailed = false, evQuery = '', evCat = 'All';
 function loadEvs() { try { const e = JSON.parse(localStorage.getItem('events') || 'null'); EVS = e && e.at && e.data && Array.isArray(e.data.events) ? e : null; } catch (x) { EVS = null; } }
 async function refreshEvents(force = false) {
-  if (evBusy || (!force && EVS && Date.now() - EVS.at < EV_MAX_AGE)) return;
+  const thin = EVS && !(EVS.data.events || []).some(e => (e.cats || []).includes('Movies'));
+  if (evBusy || (!force && EVS && Date.now() - EVS.at < EV_MAX_AGE && !thin)) return;
   if (!RELAY_URL) { evFailed = true; updEvents(); return; }
   evBusy = true; if (force) updEvents();
   let data = null;
