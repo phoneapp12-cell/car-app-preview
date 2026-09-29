@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.22.1';
+const APP_VERSION = '1.22.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4054,7 +4054,8 @@ const VIDEO_CATS = [
   { id: 'cook', name: 'Cooking', sub: 'Gluten-free dinners only' },
   { id: 'reno', name: 'Renovation', sub: 'Beginner room and painting jobs' },
   { id: 'cars', name: 'Cars', sub: 'Maintenance and the Warrant of Fitness' },
-  { id: 'pets', name: 'Cats and dogs', sub: 'Care, training and day-to-day with cats and dogs' }
+  { id: 'pets', name: 'Cats and dogs', sub: 'Care, training and day-to-day with cats and dogs' },
+  { id: 'travel', name: 'Travel', sub: 'Trip ideas and how to plan them' }
 ];
 const VIDEOS = [
   { id: 'EKOU3JWDNLI', title: 'The unhinged world of tech in 2026...', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=EKOU3JWDNLI', reason: 'A plain-language look at the technology stories of 2026.' },
@@ -4088,7 +4089,11 @@ const VIDEOS = [
   { id: 'vHrHBZIA5h4', title: 'How to train your dog to leave your cat alone', channel: 'Zak George', category: 'pets', url: 'https://www.youtube.com/watch?v=vHrHBZIA5h4', reason: 'How to train a dog to leave a cat alone.' },
   { id: 'peUVLEUj-AM', title: 'OWNING A DOG | Things to Know Before Getting a Puppy! | Doctor Mike', channel: 'Doctor Mike', category: 'pets', url: 'https://www.youtube.com/watch?v=peUVLEUj-AM', reason: 'What to know before getting a puppy.' },
   { id: '2Ex99RuKqAw', title: "Instantly Improve Your Cat's Life with these 7 Things", channel: 'Jackson Galaxy', category: 'pets', url: 'https://www.youtube.com/watch?v=2Ex99RuKqAw', reason: "Seven things that can improve a cat's day-to-day life." },
-  { id: 'AW77b_qat1g', title: "7 Secrets to a Long, Healthy Dog Life: Dr. Jones' Tips for Aging Dogs", channel: 'Veterinary Secrets', category: 'pets', url: 'https://www.youtube.com/watch?v=AW77b_qat1g', reason: "A vet's tips for a longer, healthier life for an aging dog." }
+  { id: 'AW77b_qat1g', title: "7 Secrets to a Long, Healthy Dog Life: Dr. Jones' Tips for Aging Dogs", channel: 'Veterinary Secrets', category: 'pets', url: 'https://www.youtube.com/watch?v=AW77b_qat1g', reason: "A vet's tips for a longer, healthier life for an aging dog." },
+  { id: 'H0wGjEUDkQ4', title: 'Explore Paihia & Russell: Gateway to New Zealand’s Bay of Islands | New Zealand Travel Guide', channel: 'OziTraveler', category: 'travel', url: 'https://www.youtube.com/watch?v=H0wGjEUDkQ4', reason: 'A travel guide to Paihia and Russell, the gateway to the Bay of Islands.' },
+  { id: 'XCsMvEMX11Y', title: 'New Zealand -  Watch BEFORE You Go! Essential Travel Tips NZ', channel: 'CJ Explores', category: 'travel', url: 'https://www.youtube.com/watch?v=XCsMvEMX11Y', reason: 'Essential travel tips to watch before a trip to New Zealand.' },
+  { id: 'E47FGfv14Mc', title: 'How to Plan a Trip for Solo or Group Travel', channel: 'Brady Skye', category: 'travel', url: 'https://www.youtube.com/watch?v=E47FGfv14Mc', reason: 'How to plan a trip for solo or group travel.' },
+  { id: 'PxDB8a4swb4', title: '9 Things to Do to Plan the PERFECT Trip (Travel 101: Episode 1)', channel: 'Aly Smalls', category: 'travel', url: 'https://www.youtube.com/watch?v=PxDB8a4swb4', reason: 'Nine things to do to plan a trip.' }
 ];
 function videoCatOn(id) {
   const c = S.settings.videoCats;
