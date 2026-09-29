@@ -1,4 +1,5 @@
-/* Local events for the Due Dates app: Whangārei District Council "What's On".
+import { parseCinema, localEvents, CINEMA_SCHEDULE } from './local.js';
+/* Local events for the Due Dates app: Whangārei District Council "What's On", plus Event Cinemas and local markets (local.js).
  *
  * Source: https://www.wdc.govt.nz/Events/Whats-On (official council listing; robots.txt allows it).
  * Council terms allow reproducing and using the content for personal, informational and
@@ -22,6 +23,7 @@ const LIST_MAX_AGE = 3 * 3600 * 1000;       // re-read the list every 3 hours
 const DETAIL_MAX_AGE = 24 * 3600 * 1000;    // re-read an event page once a day
 const DETAILS_PER_RUN = 8;
 const KV_KEY = 'wdc-events-v1';
+const MOVIE_MAX_AGE = 6 * 3600 * 1000;
 const FETCH_TIMEOUT = 15000;
 const MON = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
 
@@ -148,8 +150,10 @@ export async function refresh(state, fetchImpl = fetch, now = Date.now(), opts =
     state.listAt = now;
     state.error = null;
     state.changed = true;
+    await attachMovies(state, fetchImpl, now);
     if (!opts.alsoDetails) return state; // keep each run small: the list, or a few event pages
   }
+  await attachMovies(state, fetchImpl, now);
   // Exact dates/times for events in the window, a few pages per run, oldest first
   const want = [...new Set(state.list.filter(e => e.date <= until).map(e => e.url))]
     .filter(u => !state.details[u] || now - state.details[u].at > DETAIL_MAX_AGE)
@@ -214,8 +218,21 @@ export async function getFeed(env, fetchImpl = fetch, now = Date.now()) {
     state = await building;
   }
   const feed = toFeed(state, now);
+  const extra = localEvents(state && state.movies, nzToday(now));
+  const ids = new Set(feed.events.map(e => e.id));
+  for (const e of extra) if (!ids.has(e.id)) feed.events.push(e);
+  feed.events.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99') || a.title.localeCompare(b.title));
+  feed.events = feed.events.slice(0, 700);
+  feed.count = feed.events.length;
   mem = { readAt: now, feed };
   return feed;
+}
+async function attachMovies(state, fetchImpl, now) {
+  if (state.movies && now - state.movies.at < MOVIE_MAX_AGE) return;
+  let items = [];
+  try { items = parseCinema(await get(CINEMA_SCHEDULE, fetchImpl)); } catch (e) { /* keep going; markets still show */ }
+  state.movies = { at: now, items };
+  state.changed = true;
 }
 export function resetMemory() { mem = null; building = null; }
 
