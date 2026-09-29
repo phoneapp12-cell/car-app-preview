@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.23.0';
+const APP_VERSION = '1.24.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -372,7 +372,6 @@ function HomeEdit() {
       <div class="seg" id="evcount" role="group" aria-label="How many events on Home" style="width:100%">${[1,2,3,4,5,6].map(n => `<button type="button" class="${homeEventCount() === n ? 'on' : ''}" aria-pressed="${homeEventCount() === n}" onclick="setHomeEventCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
     ${homeOn('videos') ? `<div class="list" id="vidcountopt" style="margin-top:12px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Videos on Home</div><div class="s">How many to show under Videos. The rest stay on the Videos page.</div></div>
       <div class="seg" id="vidcount" role="group" aria-label="How many videos on Home" style="width:100%">${[1,2,3,4].map(n => `<button type="button" class="${homeVideoCount() === n ? 'on' : ''}" aria-pressed="${homeVideoCount() === n}" onclick="setHomeVideoCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
-    ${homeOn('weather') ? '' : `<div class="list" id="wxupopt" style="margin-top:12px"><div class="srow"><div class="ic appt">${I('cloudsun')}</div><div class="tx"><div class="t">Weather in Upcoming</div><div class="s">The Weather card is off. Show today’s weather at the top of Upcoming, and the forecast on the day of each appointment.</div></div><button class="switch ${S.settings.wxUpcoming !== false ? 'on' : ''}" role="switch" aria-checked="${S.settings.wxUpcoming !== false}" aria-label="Show weather in Upcoming" onclick="toggleWxUpcoming()"></button></div></div>`}
     <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetHome()">Reset to default</button><button class="btn primary" id="homedone" onclick="homeEdit=false;render();$('#view').scrollTop=0">Done</button></div>
     <div class="foot">The reminder and install prompts always show at the top when they’re needed.</div>`;
 }
@@ -398,7 +397,7 @@ function Home() {
   const groups = [];
   parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') g.h += h; else groups.push({ k, h }); });
   const feed = groups.map(g => `<section class="hsec" data-k="${g.k}">${g.h}</section>`).join('');
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
     `<button class="linkbtn" id="homecustomise" style="display:block;margin:-4px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>` +
     feed + `${syncNote()}
     <div class="foot">Your information is saved on this phone only.</div>`;
@@ -2135,21 +2134,9 @@ const attWhen = d => d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : 'In ' + d + ' da
 // 1.16.0: appointments and calendar events for the next 7 days (the old Later this week card) say the day name after tomorrow
 const attDay = (d, iso) => d < 2 ? attWhen(d) : new Date(parseD(iso)).toLocaleDateString('en-NZ', { weekday: 'long', timeZone: 'UTC' });
 const ATT_WEEK = 7;
-function attWxChip(iso) {
-  if (!iso || !wxInUp()) return '';
-  const x = wxDays().find(d => d.iso === iso); if (!x || !num(x.hi)) return '';
-  const w = wmo(x.code, true, x.wind);
-  return ` <span class="attwx" aria-label="Forecast: ${esc(w.words)}, high ${deg(x.hi)}${x.rain != null ? ', ' + x.rain + '% chance of rain' : ''}">${wxIcon(w)}${deg(x.hi)}${x.rain != null && x.rain >= 30 ? `<em>${x.rain}%</em>` : ''}</span>`;
-}
-// Today's weather as the first row of Upcoming (only when the Weather card is off and the option is on)
-function attWxRow() {
-  if (!wxInUp()) return '';
-  const days = wxDays(), t = days[0] && days[0].iso === todayISO() ? days[0] : null;
-  if (!WX || !t) return `<button class="row att" id="attwx" data-kind="weather" onclick="refreshWx(true)"><div class="ic appt">${I('cloudsun')}</div><div class="tx"><div class="t">Weather</div><div class="s">${wxBusy || (!wxFailed && navigator.onLine !== false) ? 'Getting the Whangārei weather…' : 'Not available right now. Tap to try again.'}</div></div></button>`;
-  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m);
-  return `<button class="row att" id="attwx" data-kind="weather" onclick="go('#weather')"><div class="ic wxic2">${wxIcon(now)}</div>
-    <div class="tx"><div class="t">Today: ${deg(c.temperature_2m)} ${esc(now.words)}</div><div class="s">High ${deg(t.hi)} · Low ${deg(t.lo)}${t.rain != null ? ' · ' + t.rain + '% chance of rain' : ''} · Whangārei</div></div>${I('right')}</button>`;
-}
+// 1.24.0: weather is the line under the greeting (wxGreet), not a row or forecast chip in Upcoming
+function attWxChip(iso) { return ''; }
+function attWxRow() { return ''; }
 function attRow(o) {
   if (o.wx) o = Object.assign({}, o, { sub: o.sub + attWxChip(o.date) });
   return `<button class="row att ${o.cls || ''}" data-kind="${o.kind}"${o.date ? ` data-date="${o.date}"` : ''} onclick="${o.go}"><div class="ic ${o.ic}"${o.icStyle ? ` style="${o.icStyle}"` : ''}>${I(o.icon)}</div>
@@ -3795,6 +3782,7 @@ function updWx() {
   const h = (location.hash || '#home').slice(1);
   if (h === 'weather') { render(); return; }
   const el = document.getElementById('wxcard'); if (el) el.outerHTML = wxCard();
+  const greet = document.getElementById('wxgreet'); if (greet) greet.outerHTML = wxGreet();
   else if ((h === 'home' || h === '') && !homeEdit && wxInUp()) render();
 }
 // Open-Meteo weather codes → words (day, night) and the icon kind drawn by wxIcon() (v1.9.0: coloured inline SVG icons)
@@ -3896,7 +3884,7 @@ function wxCard() {
     return `<button class="card wx wxempty" id="wxcard" onclick="refreshWx(true)">${I('cloudsun')}<span>${msg}</span></button>`;
   }
   const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m), t = days[0].iso === todayISO() ? days[0] : null;
-  const facts = [num(c.apparent_temperature) ? `Feels like ${deg(c.apparent_temperature)}` : '', num(c.wind_speed_10m) ? `Wind ${Math.round(c.wind_speed_10m)} km/h${compass(c.wind_direction_10m) ? ' ' + compass(c.wind_direction_10m) : ''}` : ''].filter(Boolean);
+  const facts = [num(c.apparent_temperature) ? `Feels like ${deg(c.apparent_temperature)}` : '', num(c.wind_speed_10m) ? `Wind ${Math.round(c.wind_speed_10m)} km/h${compass(c.wind_direction_10m) ? ' ' + compass(c.wind_direction_10m) : ''}` : '', moonPhaseName()].filter(Boolean);
   const shown = wxAll ? days : days.slice(0, 3);
   return `<div class="card wx" id="wxcard">
     <button class="wxnow" onclick="go('#weather')" aria-label="Whangārei weather: ${deg(c.temperature_2m)}, ${esc(now.words)}. Tap for the full forecast.">
@@ -3908,6 +3896,28 @@ function wxCard() {
     <div class="wxweek" id="wxweek">${weekRows(shown)}</div>
     <div class="wxacts">${days.length > 3 ? `<button class="wxmore" id="wxmore" onclick="wxAll=!wxAll;updWx()" aria-expanded="${wxAll}">${wxAll ? 'Show fewer days' : `Show all ${days.length} days`}</button>` : '<span></span>'}<button class="wxfull" onclick="go('#weather')">Full forecast ${I('right')}</button></div>
     <div class="wxfoot">Whangārei · ${wxUpdated()} · Open-Meteo</div></div>`;
+}
+// Moon phase for the current instant, which is today's date in Pacific/Auckland (Whangārei).
+// Age is measured from the new moon of 6 January 2000, 18:14 UTC, over the mean synodic month.
+// Eight equal bins are centred on the principal phases, so the name is the phase in the sky now, not a guessed label.
+function moonPhaseName(now = new Date()) {
+  const phases = ['New moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'];
+  const synodic = 29.530588853 * 86400000;
+  let age = (now.getTime() - Date.UTC(2000, 0, 6, 18, 14, 0)) % synodic;
+  if (age < 0) age += synodic;
+  return phases[Math.floor((age / synodic) * 8 + 0.5) % 8];
+}
+// Compact home line, directly under "Hi Shane" and the date. Tap opens the full forecast.
+function wxGreet() {
+  const moon = moonPhaseName();
+  if (!WX || !validWx(WX.data)) {
+    const loading = wxBusy || (!wxFailed && navigator.onLine !== false);
+    const msg = loading ? 'Getting the Whangārei weather…' : 'Not available right now. Tap to try again.';
+    return `<button class="wxgreet" id="wxgreet" onclick="refreshWx(true)">${I('cloudsun')}<span>${msg}</span></button>`;
+  }
+  const c = WX.data.current, nowW = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m);
+  return `<button class="wxgreet" id="wxgreet" onclick="go('#weather')" aria-label="Whangārei weather: ${deg(c.temperature_2m)}, ${esc(nowW.words)}. Moon: ${esc(moon)}. Tap for the full forecast.">
+    <span class="wxgico">${wxIcon(nowW)}</span><span class="wxgtx"><b>${deg(c.temperature_2m)}</b> ${esc(nowW.words)} · ${esc(moon)}</span></button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
@@ -3927,6 +3937,7 @@ function Weather() {
   return back + header('Weather', 'Whangārei') +
     `<div class="card wxbig"><div class="wxnow"><span class="wxic">${wxIcon(now, 'big')}</span><div class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></div></div>
       <div class="wxfacts">
+        <div><small>Moon</small><b>${esc(moonPhaseName())}</b></div>
         ${num(c.apparent_temperature) ? `<div><small>Feels like</small><b>${deg(c.apparent_temperature)}</b></div>` : ''}
         ${t ? `<div><small>High / low</small><b>${deg(t.hi)} / ${deg(t.lo)}</b></div>` : ''}
         ${t && t.rain != null ? `<div><small>Chance of rain</small><b>${t.rain}%</b></div>` : ''}
