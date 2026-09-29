@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.24.1';
+const APP_VERSION = '1.24.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -55,6 +55,14 @@ const P = {
   phoneDown: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  moonnew: '<circle cx="12" cy="12" r="8" fill="currentColor" stroke="none"/>',
+  moonwaxingcrescent: '<path d="M12 3a9 9 0 1 0 0 18 7 9 0 0 1 0-18z" fill="currentColor" stroke="none"/>',
+  moonfirstquarter: '<path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>',
+  moonwaxinggibbous: '<path d="M12 3a9 9 0 1 0 0 18 3 9 0 0 1 0-18z" fill="currentColor" stroke="none"/>',
+  moonfull: '<circle cx="12" cy="12" r="8" fill="currentColor" stroke="none"/>',
+  moonwaninggibbous: '<path d="M12 3a9 9 0 1 1 0 18 3 9 0 0 0 0-18z" fill="currentColor" stroke="none"/>',
+  moonlastquarter: '<path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>',
+  moonwaningcrescent: '<path d="M12 3a9 9 0 1 1 0 18 7 9 0 0 0 0-18z" fill="currentColor" stroke="none"/>',
   cloud: '<path d="M7 19h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 10.1 4.5 4.5 0 0 0 7 19z"/>',
   cloudsun: '<path d="M8 2.5v1.5M2.5 8H4M4.1 4.1l1 1M11.9 4.1l-1 1"/><path d="M5.2 11a3.5 3.5 0 0 1 6.2-3.6"/><path d="M9 20.5h8.5a3.5 3.5 0 0 0 .5-6.96 5 5 0 0 0-9.6-.94A4 4 0 0 0 9 20.5z"/>',
   cloudmoon: '<path d="M11.5 7.2A4.2 4.2 0 0 1 6.3 2.5a4.2 4.2 0 0 0-1.6 7.3"/><path d="M9 20.5h8.5a3.5 3.5 0 0 0 .5-6.96 5 5 0 0 0-9.6-.94A4 4 0 0 0 9 20.5z"/>',
@@ -3925,6 +3933,15 @@ function wxIsDay() {
     return local.hm >= rise && local.hm < set;
   }
   return local.hm >= '07:00' && local.hm < '19:00';
+}
+function wxPhaseIcon(phase) {
+  return { 'New moon': 'moonnew', 'Waxing crescent': 'moonwaxingcrescent', 'First quarter': 'moonfirstquarter', 'Waxing gibbous': 'moonwaxinggibbous', 'Full moon': 'moonfull', 'Waning gibbous': 'moonwaninggibbous', 'Last quarter': 'moonlastquarter', 'Waning crescent': 'moonwaningcrescent' }[phase] || 'moon';
+}
+function wxCompactIcon(w, day, phase) {
+  if (day) return I(({ clear: 'sun', pc: 'cloudsun', cloud: 'cloud', fog: 'fog', drizzle: 'drizzle', rain: 'rain', showers: 'rain', snow: 'snow', storm: 'storm', wind: 'cloud' }[w.kind] || 'cloud'));
+  if (w.kind === 'clear') return I(wxPhaseIcon(phase));
+  const condition = ({ pc: 'cloud', cloud: 'cloud', fog: 'fog', drizzle: 'drizzle', rain: 'rain', showers: 'rain', snow: 'snow', storm: 'storm', wind: 'cloud' }[w.kind] || 'cloud');
+  return `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${P[condition]}<g transform="translate(12 0) scale(.55)">${P[wxPhaseIcon(phase)]}</g></svg>`;
 }
 function wxGreet() {
   const moon = moonPhaseName();
