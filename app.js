@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.22.2';
+const APP_VERSION = '1.22.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -397,7 +397,7 @@ function Home() {
   const groups = [];
   parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') g.h += h; else groups.push({ k, h }); });
   const feed = groups.map(g => `<section class="hsec" data-k="${g.k}">${g.h}</section>`).join('');
-  return header('Hi, ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
     `<button class="linkbtn" id="homecustomise" style="display:block;margin:-4px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>` +
     feed + `${syncNote()}
     <div class="foot">Your information is saved on this phone only.</div>`;
