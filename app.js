@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.22.0';
+const APP_VERSION = '1.22.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4053,7 +4053,8 @@ const VIDEO_CATS = [
   { id: 'time', name: 'Time organisation', sub: 'Planning the week and using your time' },
   { id: 'cook', name: 'Cooking', sub: 'Gluten-free dinners only' },
   { id: 'reno', name: 'Renovation', sub: 'Beginner room and painting jobs' },
-  { id: 'cars', name: 'Cars', sub: 'Maintenance and the Warrant of Fitness' }
+  { id: 'cars', name: 'Cars', sub: 'Maintenance and the Warrant of Fitness' },
+  { id: 'pets', name: 'Cats and dogs', sub: 'Care, training and day-to-day with cats and dogs' }
 ];
 const VIDEOS = [
   { id: 'EKOU3JWDNLI', title: 'The unhinged world of tech in 2026...', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=EKOU3JWDNLI', reason: 'A plain-language look at the technology stories of 2026.' },
@@ -4083,7 +4084,11 @@ const VIDEOS = [
   { id: 'HJZXHfs0fgA', title: 'How To Maintain Your Car For Beginners | The Ultimate Guide to Making Your Car Last Longer', channel: 'The Car Care Nut', category: 'cars', url: 'https://www.youtube.com/watch?v=HJZXHfs0fgA', reason: 'A beginner’s guide to the checks that help a car last.' },
   { id: '25-HG471MIc', title: 'A Mechanics Guide To Maintaining Your Car', channel: 'EricTheCarGuy', category: 'cars', url: 'https://www.youtube.com/watch?v=25-HG471MIc', reason: 'A mechanic’s walk-through of routine car maintenance.' },
   { id: 'CY1MLjYOf1o', title: 'Top tips to passing your WoF', channel: 'VTNZ', category: 'cars', url: 'https://www.youtube.com/watch?v=CY1MLjYOf1o', reason: 'VTNZ’s tips for getting a car through its Warrant of Fitness.' },
-  { id: 'w_wNj7387Ck', title: 'Warrant of Fitness (WoF) in New Zealand: Everything You Need to Know', channel: 'Euromotive', category: 'cars', url: 'https://www.youtube.com/watch?v=w_wNj7387Ck', reason: 'What a Warrant of Fitness covers for a car in New Zealand.' }
+  { id: 'w_wNj7387Ck', title: 'Warrant of Fitness (WoF) in New Zealand: Everything You Need to Know', channel: 'Euromotive', category: 'cars', url: 'https://www.youtube.com/watch?v=w_wNj7387Ck', reason: 'What a Warrant of Fitness covers for a car in New Zealand.' },
+  { id: 'vHrHBZIA5h4', title: 'How to train your dog to leave your cat alone', channel: 'Zak George', category: 'pets', url: 'https://www.youtube.com/watch?v=vHrHBZIA5h4', reason: 'How to train a dog to leave a cat alone.' },
+  { id: 'peUVLEUj-AM', title: 'OWNING A DOG | Things to Know Before Getting a Puppy! | Doctor Mike', channel: 'Doctor Mike', category: 'pets', url: 'https://www.youtube.com/watch?v=peUVLEUj-AM', reason: 'What to know before getting a puppy.' },
+  { id: '2Ex99RuKqAw', title: "Instantly Improve Your Cat's Life with these 7 Things", channel: 'Jackson Galaxy', category: 'pets', url: 'https://www.youtube.com/watch?v=2Ex99RuKqAw', reason: "Seven things that can improve a cat's day-to-day life." },
+  { id: 'AW77b_qat1g', title: "7 Secrets to a Long, Healthy Dog Life: Dr. Jones' Tips for Aging Dogs", channel: 'Veterinary Secrets', category: 'pets', url: 'https://www.youtube.com/watch?v=AW77b_qat1g', reason: "A vet's tips for a longer, healthier life for an aging dog." }
 ];
 function videoCatOn(id) {
   const c = S.settings.videoCats;
