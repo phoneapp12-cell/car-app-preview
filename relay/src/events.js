@@ -212,6 +212,10 @@ let mem = null, building = null; // per-isolate copy, so busy periods don't even
 export async function getFeed(env, fetchImpl = fetch, now = Date.now()) {
   if (mem && now - mem.readAt < 5 * 60 * 1000) return mem.feed;
   let state = await loadState(env);
+  if (state && state.list && (!state.movies || now - state.movies.at > MOVIE_MAX_AGE)) {
+    await attachMovies(state, fetchImpl, now);
+    await saveState(env, state).catch(() => { });
+  }
   if (!state || !state.list) {
     // First run (before the cron has filled KV): read the list now, times follow on the next cron run
     building = building || refresh(state, fetchImpl, now).then(async s => { await saveState(env, s).catch(() => { }); return s; }).finally(() => { building = null; });
