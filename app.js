@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.18.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -688,6 +688,12 @@ function kmForm(id) {
 }
 
 /* ================= BILLS ================= */
+// Billing cycle: every repeating bill converted to a weekly, fortnightly or monthly cost (fortnightly by default).
+const BILL_PER_YEAR = { weekly: 52, fortnightly: 26, monthly: 12, quarterly: 4, yearly: 1 };
+const BILL_CYCLES = [['weekly', 'Weekly', 52, 'a week', 'week'], ['fortnightly', 'Fortnightly', 26, 'a fortnight', 'fortnight'], ['monthly', 'Monthly', 12, 'a month', 'month']];
+const billCycle = () => BILL_CYCLES.find(c => c[0] === S.settings.billCycle) || BILL_CYCLES[1];
+const billPer = (b, c) => BILL_PER_YEAR[b.repeat] ? (Number(b.amount) || 0) * BILL_PER_YEAR[b.repeat] / c[2] : null;
+async function setBillCycle(v) { S.settings.billCycle = v; await save(); render(); }
 function Bills() {
   const unpaid = S.bills.filter(b => !b.paid);
   const t30 = todayT() + 30 * DAY;
@@ -696,17 +702,21 @@ function Bills() {
   const over = unpaid.filter(b => daysLeft(b.due) < 0).length;
   const sorted = [...unpaid].sort((a, b) => parseD(a.due) - parseD(b.due));
   const paid = S.bills.filter(b => b.paid);
+  const cyc = billCycle(), reg = unpaid.filter(b => BILL_PER_YEAR[b.repeat]);
+  const cycTotal = reg.reduce((t, b) => t + billPer(b, cyc), 0), oneOff = unpaid.length - reg.length;
   const row = b => {
-    const d = daysLeft(b.due);
+    const d = daysLeft(b.due), per = b.paid ? null : billPer(b, cyc);
     return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}"><div class="ic bill">${I(billIcon(b.name))}</div>
       <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}</div>
       <div style="margin-top:5px">${b.paid ? '<span class="pill paid">Paid ✓</span>' : pill(d)}</div></div></button>
-      <div class="right"><div class="amt">${money(b.amount)}</div>
+      <div class="right"><div class="amt">${money(b.amount)}</div>${per !== null && b.repeat !== cyc[0] ? `<div class="billper">${money(per)} ${cyc[3]}</div>` : ''}
       ${b.paid ? `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>` : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
   return header('Bills', 'Regular bills and due dates', addBtn('Add a bill', 'billForm()')) +
-    (S.bills.length ? `<div class="summary"><div class="muted">Due in the next 30 days</div><div class="amt">${money(total)}</div>
-      <div class="muted">${plural(count, 'payment')}${over ? ` · <b style="color:var(--onbrand)">${over} overdue</b>` : ''} · reminders 3 days before and on the day</div></div>
+    (S.bills.length ? `<div class="seg" id="billcyc" role="group" aria-label="Billing cycle" style="margin-bottom:12px">${BILL_CYCLES.map(([v, l]) => `<button type="button" class="${cyc[0] === v ? 'on' : ''}" aria-pressed="${cyc[0] === v}" onclick="setBillCycle('${v}')">${l}</button>`).join('')}</div>
+      <div class="summary" id="billsum"><div class="muted">Your regular bills cost</div><div class="amt">${money(cycTotal)} <span class="per">${cyc[3]}</span></div>
+      <div class="muted">${reg.length ? `Across ${plural(reg.length, 'repeating bill')}` : 'No repeating bills yet'}${oneOff ? `, not counting ${plural(oneOff, 'one-off bill')}` : ''}</div>
+      <div class="muted billsub">${money(total)} due in the next 30 days (${plural(count, 'payment')})${over ? ` · <b style="color:var(--onbrand)">${over} overdue</b>` : ''}</div></div>
       <div class="sec">Your bills</div>
       ${sorted.length ? `<div class="list">${sorted.map(row).join('')}</div>` : '<div class="card muted">All paid up. Good as gold!</div>'}
       ${paid.length ? `<div class="sec">Paid</div><div class="list">${paid.map(row).join('')}</div>` : ''}`
