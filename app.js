@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck } = DD;
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.17.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -250,12 +250,12 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   meals: ['meal', 'meal', 'Upcoming meals', 'Your planned cooking nights', 1],
   shopping: ['cart', 'shop', 'Shopping list', 'Things still to get, with a tick button', 1],
   summary: ['shield', 'car', 'Overdue, due soon, all good', 'The three counters', 1],
-  attention: ['warn', 'bill', 'Needs attention', 'Everything due soon or overdue, plus this week’s appointments and calendar events', 1],
+  attention: ['warn', 'bill', 'Upcoming', 'Everything due soon or overdue, plus this week’s appointments and calendar events', 1],
   events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
-  todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a tick button (ones due soon are in Needs attention)', 1],
+  todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a tick button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
-  birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays later this month (this week’s are in Needs attention)', 1],
+  birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays later this month (this week’s are in Upcoming)', 1],
   pets: ['paw', 'pet', 'Pets', 'Next flea treatment, grooming and vet dates', 0],
   bills: ['bill', 'bill', 'Bills', 'The next bills to pay', 0],
   cars: ['car', 'car', 'Cars at a glance', 'Each car’s next WOF and rego', 0],
@@ -279,6 +279,9 @@ async function toggleHomeCard(k) {
   const on = homeOn(k); S.settings.homeHidden = Object.assign({}, S.settings.homeHidden, { [k]: on });
   await save(); render();
 }
+// 1.17.0: when the Weather card is switched off, Upcoming can show the weather instead (on unless turned off)
+const wxInUp = () => !homeOn('weather') && homeOn('attention') && S.settings.wxUpcoming !== false;
+async function toggleWxUpcoming() { S.settings.wxUpcoming = S.settings.wxUpcoming === false; await save(); render(); }
 async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
 const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
 const HOME_CARD = {
@@ -294,7 +297,7 @@ const HOME_CARD = {
       <div class="tile soon"><b>${soon}</b><span>Due soon</span></div>
       <div class="tile fine"><b>${fine}</b><span>All good</span></div></div>`;
   },
-  attention: () => homeSec('Needs attention', '<a href="#calendar">See calendar</a>') + attentionHtml(),
+  attention: () => homeSec('Upcoming', '<a href="#calendar">See calendar</a>') + attentionHtml(),
   events: () => homeEvents(),
   todo: () => {
     const att = homeOn('attention'); // to-dos due within 30 days are already in Needs attention
@@ -352,6 +355,7 @@ function HomeEdit() {
       <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${d[2]} on Home" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>
       <span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
     </div>
+    ${homeOn('weather') ? '' : `<div class="list" id="wxupopt" style="margin-top:12px"><div class="srow"><div class="ic appt">${I('cloudsun')}</div><div class="tx"><div class="t">Weather in Upcoming</div><div class="s">The Weather card is off. Show today’s weather at the top of Upcoming, and the forecast on the day of each appointment.</div></div><button class="switch ${S.settings.wxUpcoming !== false ? 'on' : ''}" role="switch" aria-checked="${S.settings.wxUpcoming !== false}" aria-label="Show weather in Upcoming" onclick="toggleWxUpcoming()"></button></div></div>`}
     <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetHome()">Reset to default</button><button class="btn primary" id="homedone" onclick="homeEdit=false;render();$('#view').scrollTop=0">Done</button></div>
     <div class="foot">The reminder and install prompts always show at the top when they’re needed.</div>`;
 }
@@ -2052,7 +2056,23 @@ const attWhen = d => d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : 'In ' + d + ' da
 // 1.16.0: appointments and calendar events for the next 7 days (the old Later this week card) say the day name after tomorrow
 const attDay = (d, iso) => d < 2 ? attWhen(d) : new Date(parseD(iso)).toLocaleDateString('en-NZ', { weekday: 'long', timeZone: 'UTC' });
 const ATT_WEEK = 7;
+function attWxChip(iso) {
+  if (!iso || !wxInUp()) return '';
+  const x = wxDays().find(d => d.iso === iso); if (!x || !num(x.hi)) return '';
+  const w = wmo(x.code, true, x.wind);
+  return ` <span class="attwx" aria-label="Forecast: ${esc(w.words)}, high ${deg(x.hi)}${x.rain != null ? ', ' + x.rain + '% chance of rain' : ''}">${wxIcon(w)}${deg(x.hi)}${x.rain != null && x.rain >= 30 ? `<em>${x.rain}%</em>` : ''}</span>`;
+}
+// Today's weather as the first row of Upcoming (only when the Weather card is off and the option is on)
+function attWxRow() {
+  if (!wxInUp()) return '';
+  const days = wxDays(), t = days[0] && days[0].iso === todayISO() ? days[0] : null;
+  if (!WX || !t) return `<button class="row att" id="attwx" data-kind="weather" onclick="refreshWx(true)"><div class="ic appt">${I('cloudsun')}</div><div class="tx"><div class="t">Weather</div><div class="s">${wxBusy || (!wxFailed && navigator.onLine !== false) ? 'Getting the Whangārei weather…' : 'Not available right now. Tap to try again.'}</div></div></button>`;
+  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m);
+  return `<button class="row att" id="attwx" data-kind="weather" onclick="go('#weather')"><div class="ic wxic2">${wxIcon(now)}</div>
+    <div class="tx"><div class="t">Today: ${deg(c.temperature_2m)} ${esc(now.words)}</div><div class="s">High ${deg(t.hi)} · Low ${deg(t.lo)}${t.rain != null ? ' · ' + t.rain + '% chance of rain' : ''} · Whangārei</div></div>${I('right')}</button>`;
+}
 function attRow(o) {
+  if (o.wx) o = Object.assign({}, o, { sub: o.sub + attWxChip(o.date) });
   return `<button class="row att ${o.cls || ''}" data-kind="${o.kind}"${o.date ? ` data-date="${o.date}"` : ''} onclick="${o.go}"><div class="ic ${o.ic}"${o.icStyle ? ` style="${o.icStyle}"` : ''}>${I(o.icon)}</div>
     <div class="tx"><div class="t">${o.title}</div><div class="s">${o.sub}</div></div>${o.right || I('right')}</button>`;
 }
@@ -2061,15 +2081,15 @@ const ATT_SOURCES = {
   due: T => dueItems(S).filter(x => x.days <= 30 && x.kind !== 'health').map(x => ({ days: x.days, rank: 0, sort: '', html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })),
   // My events (payday, rubbish day…), today and tomorrow. Skipped dates are left out and moved ones show on their new date.
   mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).map(e => ({ days: d, rank: 1, sort: e.hm || '',
-    html: attRow({ kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${T + d * DAY})`, ic: 'mine', icon: 'repeat', title: `${attWhen(d)}: ${esc(e.title)}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
+    html: attRow({ wx: 1, kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${T + d * DAY})`, ic: 'mine', icon: 'repeat', title: `${attWhen(d)}: ${esc(e.title)}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
       sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}` }) }))),
   // Appointments, including What's On events you added, today and the next 7 days
   appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
-    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
+    html: attRow({ wx: 1, kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
       sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; }),
   // Connected Outlook / Google / iCloud calendars, today and the next 7 days (an event spanning several days shows once, on its first day here)
   ext: T => { const seen = new Set(); return extEvents(T, T + ATT_WEEK * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '',
-    html: attRow({ kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal',
+    html: attRow({ wx: 1, kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal',
       title: `${attDay(d, e.date)}: ${esc(e.title)}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + esc(e.time) : ''}`, sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}${e.time === 'All day' ? ' · All day' : ''}` }) }; }); },
   // Birthdays, today and the next 7 days
   bday: T => S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 7).map(x => ({ days: x.d, rank: 2, sort: '',
@@ -2084,7 +2104,7 @@ const ATT_SOURCES = {
     html: attRow({ kind: 'health', cls: 'hdue', date: x.date, go: `go('${x.go}')`, ic: 'health', icon: HEALTH_ICON[x.item.kind] || 'medkit', title: esc(x.title),
       sub: `Health · ${x.item.clinic ? esc(x.item.clinic) + ' · ' : ''}Due ${fmtW(x.date)}`, right: pill(x.days) }) }))
     .concat(healthAppts(S, T, T + DAY).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
-      html: attRow({ kind: 'health', cls: 'happt', date: a.date, go: `go('#health/${a.person.id}/${a.item.id}')`, ic: 'health', icon: HEALTH_ICON[a.item.kind] || 'medkit',
+      html: attRow({ wx: 1, kind: 'health', cls: 'happt', date: a.date, go: `go('#health/${a.person.id}/${a.item.id}')`, ic: 'health', icon: HEALTH_ICON[a.item.kind] || 'medkit',
         title: `${attWhen(d)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`, sub: `Health appointment · ${a.item.clinic ? esc(a.item.clinic) + ' · ' : ''}${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; })),
   // Commission tracker set up and nothing entered for yesterday
   comm: T => { if (!CM().anchor) return []; const y = yesterdayISO(); if (commDay(y).length) return [];
@@ -2097,10 +2117,11 @@ function homeAttention() {
   return all.sort((a, b) => a.days - b.days || a.rank - b.rank || a.sort.localeCompare(b.sort));
 }
 function attentionHtml() {
-  const list = homeAttention();
+  const list = homeAttention(), wx = attWxRow();
+  if (!list.length && wx) return `<div class="list" id="attention">${wx}</div><div class="card empty"><div class="t">All good for the next 30 days</div><div class="s">Nothing is overdue or due soon. Sweet as.</div></div>`;
   if (!list.length) return `<div class="card empty"><div class="t">All good for the next 30 days</div><div class="s">Nothing is overdue or due soon. Sweet as.</div></div>`;
   const over = list.filter(x => x.days < 0).length, n = attShowAll ? list.length : Math.max(ATT_MAX, over);
-  return `<div class="list" id="attention">${list.slice(0, n).map(x => x.html).join('')}</div>` +
+  return `<div class="list" id="attention">${wx}${list.slice(0, n).map(x => x.html).join('')}</div>` +
     (list.length > n ? `<div class="btns"><button class="btn" id="attmore" onclick="attShowAll=true;render()">Show all ${list.length}</button></div>` : attShowAll && list.length > ATT_MAX ? `<div class="btns"><button class="btn" id="attmore" onclick="attShowAll=false;render()">Show fewer</button></div>` : '');
 }
 function calOpenDay(t) { const d = new Date(t); calMonth = { y: d.getUTCFullYear(), m: d.getUTCMonth() }; calSel = t; go('#calendar'); }
@@ -3518,6 +3539,7 @@ function updWx() {
   const h = (location.hash || '#home').slice(1);
   if (h === 'weather') { render(); return; }
   const el = document.getElementById('wxcard'); if (el) el.outerHTML = wxCard();
+  else if ((h === 'home' || h === '') && !homeEdit && wxInUp()) render();
 }
 // Open-Meteo weather codes → words (day, night) and the icon kind drawn by wxIcon() (v1.9.0: coloured inline SVG icons)
 const WMO = {
