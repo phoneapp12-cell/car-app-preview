@@ -9,6 +9,7 @@ const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDa
 const dow = iso => new Date(iso + 'T00:00:00Z').getUTCDay();
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 const hh = t => t.length === 4 ? '0' + t : t; // 9:00 -> 09:00
+const niceTime = t => { const [h, m] = hh(t).split(':').map(Number); return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + (h < 12 ? ' am' : ' pm'); };
 
 export function parseCinema(html) {
   const out = [];
@@ -41,7 +42,7 @@ function movieEvents(items, today) {
       id: 'mov-' + slug(m.title) + '-' + d, title: m.title, url: CINEMA_HOME, date: d, end: '',
       time: times[0], endTime: times.length > 1 ? times[times.length - 1] : '', timeKnown: true,
       venue: 'Event Cinemas, 18 James Street',
-      desc: 'Sessions this day: ' + times.join(', ') + '. Times change, so check Event Cinemas before you go.',
+      desc: 'Sessions this day: ' + times.map(niceTime).join(', ') + '. Times change, so check Event Cinemas before you go.',
       cats: ['Movies'], cost: ''
     });
   }
