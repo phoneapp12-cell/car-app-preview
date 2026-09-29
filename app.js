@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.20.0';
+const APP_VERSION = '1.21.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -223,7 +223,7 @@ window.addEventListener('popstate', () => {
   if (sheetOpen) hideSheet();
 });
 function confirmSheet(title, text, okLabel, fn) {
-  openSheet(title, `<p class="muted" style="font-size:15px;margin:0 0 6px">${text}</p>`, async () => fn(), okLabel);
+  openSheet(title, `<p class="muted" style="font-size:0.9375rem;margin:0 0 6px">${text}</p>`, async () => fn(), okLabel);
   const b = $('#sf button[type=submit]'); b.classList.remove('primary'); b.classList.add('danger');
 }
 const field = (label, input, hint = '') => `<label class="field"><span>${label}</span>${input}${hint ? `<small>${hint}</small>` : ''}</label>`;
@@ -429,7 +429,7 @@ function CarDetail(id) {
     const kmTo = c.svcKm && c.odo ? Number(c.svcKm) - Number(c.odo) : null;
     const km = c.svcKm ? Number(c.svcKm).toLocaleString('en-NZ') + ' km' : '';
     svc = `<div class="dcard"><div class="h">${I('wrench')} Next service ${c.svcDate ? pill(daysLeft(c.svcDate)) : ''}</div>
-      <div class="big">${c.svcDate ? fmtY(c.svcDate) + (km ? ` <span style="font-size:15px;color:var(--ink2);font-weight:600">or ${km}</span>` : '') : km}</div>
+      <div class="big">${c.svcDate ? fmtY(c.svcDate) + (km ? ` <span style="font-size:0.9375rem;color:var(--ink2);font-weight:600">or ${km}</span>` : '') : km}</div>
       <div class="muted">${c.svcDate && c.svcKm ? 'Whichever comes first. ' : ''}${c.odo ? `Odometer: ${Number(c.odo).toLocaleString('en-NZ')} km${kmTo != null ? ` (${kmTo >= 0 ? kmTo.toLocaleString('en-NZ') + ' km to go' : (-kmTo).toLocaleString('en-NZ') + ' km over'})` : ''}.` : 'Add an odometer reading to see how many km are left.'}</div>
       <div class="btns"><button class="btn" onclick="kmForm('${c.id}')">Update km</button><button class="btn" onclick="serviceForm('${c.id}',true)">${I('check')} Serviced</button></div>${serviceHistory(c)}</div>`;
   } else {
@@ -831,7 +831,7 @@ function Todo() {
   return header('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()')) +
     `<div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${esc(l)}</button>`).join('')}
       <button class="chip plus" onclick="listForm()">+ New list</button></div>
-    ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:14px;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
+    ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
     <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="Add a to-do${todoFilter !== 'All' ? ' to ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
     ${open.length ? `<div class="list">${open.map(row).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">All done. Good as gold!</div></div>' : empty('Nothing on your list', 'Type a to-do above and tap +, or add one with a due date.', 'Add a to-do', 'todoForm()'))}
     ${done.length ? `<div class="sec">Done <button onclick="clearDone()">Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}`;
@@ -941,7 +941,7 @@ function showHol(date, name) {
   const h = holidaysBetween(parseD(date), parseD(date)).find(x => x.name === name); if (!h) return;
   const note = holNote(h);
   openSheet(esc(h.name), `<div class="dcard"><div class="h"><i class="dot" style="background:var(--hol)"></i> Public holiday</div>
-      <div class="big" style="font-size:18px">${fmtLong(h.date)}</div>
+      <div class="big" style="font-size:1.125rem">${fmtLong(h.date)}</div>
       ${note ? `<div class="muted" style="margin-top:6px">${esc(note)}</div>` : ''}</div>
     <p class="muted" style="margin:0 2px 6px">New Zealand public holidays are built into the app, using the official dates from employment.govt.nz. You can hide them in Settings.</p>`);
 }
@@ -1182,7 +1182,7 @@ function showExt(i) {
     bd = { name: e.bdayName || e.title, d, mo, have: bdayMatch(e) };
   }
   openSheet(esc(e.title), `<div class="dcard"><div class="h"><i class="dot" style="background:${esc(f.colour)}"></i> From ${esc(f.name)}</div>
-      <div class="big" style="font-size:18px">${when}</div>
+      <div class="big" style="font-size:1.125rem">${when}</div>
       ${e.location ? `<div class="muted" style="margin-top:6px"><b>Where:</b> ${esc(e.location)}</div>` : ''}
       ${e.desc ? `<div class="muted notes" style="margin-top:6px">${esc(e.desc)}</div>` : ''}</div>
     <p class="muted" style="margin:0 2px 6px">This is from your ${esc(f.name)} calendar, so it can’t be changed here. Change it in ${esc(feedKind(f.url))} and it updates next time the app syncs.</p>
@@ -1200,7 +1200,7 @@ function syncNote(card) {
   const errs = S.feeds.filter(f => CAL[f.id] && CAL[f.id].error);
   const when = syncingNow.size ? 'Updating now…' : times.length ? 'Last updated ' + ago(Math.min(...times)) + '.' : 'Not updated yet.';
   const txt = `${names} events refresh each time you open the app. ${when}${errs.length ? ` <a href="#settings" style="color:var(--red);font-weight:700">${errs.length === 1 ? 'There’s a problem with ' + esc(errs[0].name) : 'Some calendars have a problem'}.</a>` : ''}`;
-  return card ? `<div class="callout blue" style="margin-top:16px">${I('refresh')}<div>${txt}</div></div>` : `<div class="muted" style="margin:8px 4px 0;font-size:13px">${txt}</div>`;
+  return card ? `<div class="callout blue" style="margin-top:16px">${I('refresh')}<div>${txt}</div></div>` : `<div class="muted" style="margin:8px 4px 0;font-size:0.8125rem">${txt}</div>`;
 }
 function feedsSection() {
   const rows = S.feeds.map(f => {
@@ -1213,7 +1213,7 @@ function feedsSection() {
     return `<div class="dcard feed"><div class="h" style="color:var(--ink)"><i class="dot" style="background:${esc(f.colour)};width:12px;height:12px"></i><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(f.name)}</span>
         <button class="btn small" onclick="feedForm('${f.id}')">${I('edit')} Edit</button></div>
       <div class="muted" style="margin-top:6px">${st}</div>
-      <div class="srow" style="padding:10px 0 0;border:0;min-height:0"><div class="tx"><div class="t" style="font-size:14px">Reminders</div><div class="s">1 hour before, all-day ones in the morning</div></div>
+      <div class="srow" style="padding:10px 0 0;border:0;min-height:0"><div class="tx"><div class="t" style="font-size:0.875rem">Reminders</div><div class="s">1 hour before, all-day ones in the morning</div></div>
         <button class="switch ${f.reminders !== false ? 'on' : ''}" role="switch" aria-checked="${f.reminders !== false}" aria-label="Reminders for ${esc(f.name)}" onclick="toggleFeedReminders('${f.id}')"></button></div>
       <div class="btns"><button class="btn" onclick="syncFeeds(true,'${f.id}')" ${syncingNow.has(f.id) ? 'disabled' : ''}>${I('refresh')} Sync now</button>
         <button class="btn danger" onclick="removeFeed('${f.id}')">${I('trash')} Remove</button></div></div>`;
@@ -1246,7 +1246,7 @@ function feedForm(id) {
   const used = S.feeds.map(x => x.colour);
   const col = f.colour || (FEED_COLOURS.find(c => !used.includes(c[0])) || FEED_COLOURS[0])[0];
   openSheet(id ? 'Edit calendar' : 'Add a calendar',
-    field('Calendar link', `<textarea name="url" rows="3" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://outlook.live.com/owa/calendar/…/calendar.ics" style="font-size:14px;word-break:break-all">${esc(f.url)}</textarea>`,
+    field('Calendar link', `<textarea name="url" rows="3" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://outlook.live.com/owa/calendar/…/calendar.ics" style="font-size:0.875rem;word-break:break-all">${esc(f.url)}</textarea>`,
       'Paste the ICS link (Outlook) or secret iCal address (Google). webcal:// links are fine too.') +
     field('Name', inp('name', f.name, 'placeholder="e.g. Outlook" maxlength="24"'), 'Shown on each event, e.g. “from Outlook”.') +
     `<div class="field"><span>Colour</span><div class="seg swatches" data-seg="colour">${FEED_COLOURS.map(([hex, n]) => `<button type="button" class="${hex === col ? 'on' : ''}" data-v="${hex}" aria-label="${n}" style="--sw:${hex}"><i></i></button>`).join('')}</div><input type="hidden" name="colour" value="${col}"></div>` +
@@ -1636,7 +1636,7 @@ function mealIdeaList() {
     .sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || a.title.localeCompare(b.title));
   if (!vis.length) return `<div class="card empty"><div class="t">No recipes match</div><div class="s">${q ? 'Try a different word.' : mealFilter === 'Hidden' ? 'Nothing hidden.' : mealFilter === 'Mine' ? 'Recipes you add or scan show here.' : 'Nothing with this tag yet.'}</div></div>`;
   return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}"><button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
-    <button class="tapzone" onclick="go('#recipe/${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.method ? ` <span class="muted" style="font-weight:600;font-size:12px">· method</span>` : i.link ? ` <span class="muted" style="font-weight:600;font-size:12px">· link</span>` : ''}</div>
+    <button class="tapzone" onclick="go('#recipe/${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.method ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· method</span>` : i.link ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· link</span>` : ''}</div>
     <div class="s">${i.gf ? gfTag(true) + ' ' : '<span class="nogf">Not marked gluten free</span> '}${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}</div></div></button>
     ${i.hidden ? `<button class="btn small" onclick="toggleMealHidden('${i.id}')">Show</button>` : `<button class="btn small" onclick="planIdea('${i.id}')">Plan</button>`}</div>`).join('')}</div>`;
 }
@@ -2005,7 +2005,7 @@ function shopPreview() {
   const { items, none } = shopItems(shopDates()), box = $('#shopprev'); if (!box) return;
   const open = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
   const already = items.filter(g => open.has(mNorm(g))).length;
-  box.innerHTML = items.length ? `<b>${plural(items.length, 'item')}</b>${already ? ` <span class="muted" style="font-size:12.5px">· ${already} already on the list</span>` : ''} <span class="muted" style="font-size:12.5px">· “check label”: gluten often hides in these, look for “gluten free” on the pack</span><ul>${items.map(g => `<li>${esc(g)}${needsCheck(g) ? ' <span class="chk">check label</span>' : ''}</li>`).join('')}</ul>` : '<span class="muted">Tick at least one planned night with ingredients.</span>';
+  box.innerHTML = items.length ? `<b>${plural(items.length, 'item')}</b>${already ? ` <span class="muted" style="font-size:0.78125rem">· ${already} already on the list</span>` : ''} <span class="muted" style="font-size:0.78125rem">· “check label”: gluten often hides in these, look for “gluten free” on the pack</span><ul>${items.map(g => `<li>${esc(g)}${needsCheck(g) ? ' <span class="chk">check label</span>' : ''}</li>`).join('')}</ul>` : '<span class="muted">Tick at least one planned night with ingredients.</span>';
   if (none.length) box.innerHTML += `<div class="muted" style="margin-top:6px">No ingredients saved for ${esc(none.join(', '))}. Add them in Recipes.</div>`;
 }
 function shopForm() {
@@ -2250,7 +2250,7 @@ function mineSheet(id, orig) {
   const ev = getMine(id); if (!ev) return;
   const cur = (ev.moves || {})[orig] || orig, moved = cur !== orig, rep = ev.repeat !== 'none';
   openSheet(esc(ev.title), `<div class="dcard"><div class="h"><i class="dot" style="background:var(--mine)"></i> My event</div>
-      <div class="big" style="font-size:18px">${fmtLong(cur)}</div>
+      <div class="big" style="font-size:1.125rem">${fmtLong(cur)}</div>
       <div class="muted" style="margin-top:4px">${ev.time ? fmtTime(ev.time) : 'All day'} · ${esc(repeatText(ev))}${moved ? `<br>Moved from ${fmtW(orig)}` : ''}${ev.remind !== 'off' ? `<br>Reminder ${ev.remind === 'day' ? 'on the day' : 'the day before'} at ${fmtTime(ev.remindAt)}` : ''}</div>
       ${ev.notes ? `<div class="muted notes" style="margin-top:6px">${esc(ev.notes)}</div>` : ''}</div>
     <div class="minebtns">
@@ -2326,7 +2326,7 @@ function Pets() {
       const next = petItems(p).slice(0, 3);
       return `<div class="carcard petcard" role="button" tabindex="0" data-pet="${p.id}" onclick="go('#pet/${p.id}')"><div class="carhead">${petPic(p)}
         <div style="flex:1;min-width:0"><div class="carname">${esc(p.name)}</div><div class="carmodel">${petSub(p)}</div></div>${I('right')}</div>
-        ${next.length ? `<div class="petnext">${next.map(x => `<div><span class="pn">${esc(x.care.name)}</span><b>${fmtW(x.date)}</b>${pill(x.days)}</div>`).join('')}</div>` : '<div class="muted" style="margin-top:10px;font-size:14px">No dates yet. Tap to add when things were last done.</div>'}</div>`;
+        ${next.length ? `<div class="petnext">${next.map(x => `<div><span class="pn">${esc(x.care.name)}</span><b>${fmtW(x.date)}</b>${pill(x.days)}</div>`).join('')}</div>` : '<div class="muted" style="margin-top:10px;font-size:0.875rem">No dates yet. Tap to add when things were last done.</div>'}</div>`;
     }).join('') + `<div class="btns"><button class="btn" onclick="petForm()">${I('plus')} Add another pet</button></div>`
       : empty('No pets yet', 'Keep track of flea treatment, worming, vaccinations, grooming, vet check-ups and dog registration.', 'Add your first pet', 'petForm()')) +
     `<div class="foot">Due pet care shows on Home and the Calendar.<br>Your information is saved on this phone only.</div>`;
@@ -2350,16 +2350,16 @@ function PetDetail(id) {
   return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#pets')">${I('left')} Pets &amp; Vet</button>
     <button class="btn small" onclick="petForm('${p.id}')">${I('edit')} Edit</button></div>
   <div class="hero">${petPic(p, true)}<div style="min-width:0"><h2>${esc(p.name)}</h2><div class="muted">${petSub(p)}${info.length ? '<br>' + info.join(' · ') : ''}</div></div></div>
-  ${p.vet || p.vetPhone ? `<div class="dcard vetcard"><div class="h">${I('heart')} Vet</div><div class="big" style="font-size:18px">${esc(p.vet || 'Vet clinic')}</div>
+  ${p.vet || p.vetPhone ? `<div class="dcard vetcard"><div class="h">${I('heart')} Vet</div><div class="big" style="font-size:1.125rem">${esc(p.vet || 'Vet clinic')}</div>
     ${p.vetPhone ? `<div class="btns"><a class="btn primary" href="${telHref(p.vetPhone)}">${I('call')} Call ${esc(p.vetPhone)}</a></div>` : ''}</div>` : ''}
   <div class="sec">Care <button onclick="careForm('${p.id}')">Add care item</button></div>
   ${care.length ? `<div class="list" id="carelist">${care.map(it => careRow(p, it)).join('')}</div>` : empty('No care items', 'Add flea treatment, a medication or anything else you want reminding about.', 'Add care item', `careForm('${p.id}')`)}
   <div class="sec">History ${hist.length > 8 ? `<button onclick="petHistAll=!petHistAll;render()">${petHistAll ? 'Show less' : `Show all (${hist.length})`}</button>` : ''}</div>
   ${hist.length ? `<div class="list" id="pethist">${shown.map(h => `<button class="row hrowpet" data-hist="${h.id}" onclick="histForm('${p.id}','${h.id}')"><div class="tx"><div class="t">${esc(h.name)}</div>
       <div class="s">${fmtW(h.date)}${h.date.slice(0, 4) !== todayISO().slice(0, 4) ? ' ' + h.date.slice(0, 4) : ''}${h.notes ? ' · ' + esc(h.notes) : ''}</div></div>${h.cost !== '' && h.cost != null ? `<b class="cost">${money(h.cost)}</b>` : ''}</button>`).join('')}</div>`
-    : `<div class="card muted" style="font-size:14px">Nothing logged yet. Tap “Done” on a care item and it’s saved here with the date and any notes.</div>`}
+    : `<div class="card muted" style="font-size:0.875rem">Nothing logged yet. Tap “Done” on a care item and it’s saved here with the date and any notes.</div>`}
   ${p.notes ? `<div class="dcard" style="margin-top:12px"><div class="h">${I('doc')} Notes</div><div class="muted notes" style="margin-top:6px">${esc(p.notes)}</div></div>` : ''}
-  <div class="card muted" style="margin-top:12px;font-size:13.5px">Reminders: 3 days before and on the day. Dog registration is due every 1 July (the registration year runs 1 July to 30 June).</div>
+  <div class="card muted" style="margin-top:12px;font-size:0.84375rem">Reminders: 3 days before and on the day. Dog registration is due every 1 July (the registration year runs 1 July to 30 June).</div>
   <div class="btns" style="margin-top:12px"><button class="btn danger" onclick="deletePet('${p.id}')">${I('trash')} Delete ${esc(p.name)}</button></div>`;
 }
 function petForm(id) {
@@ -2373,7 +2373,7 @@ function petForm(id) {
     field('Microchip number', inp('chip', p.chip, 'inputmode="numeric" placeholder="Optional" maxlength="20"')) +
     `<div class="two">${field('Vet clinic', inp('vet', p.vet, 'list="vetlist" placeholder="Optional" maxlength="60"') + `<datalist id="vetlist">${vets.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`)}${field('Vet phone', inp('vetPhone', p.vetPhone, 'type="tel" inputmode="tel" placeholder="Optional" maxlength="20"'))}</div>` +
     field('Notes', area('notes', p.notes, 'Optional, e.g. allergies, food, insurance')) +
-    (id ? '' : `<p class="muted" style="margin:2px 2px 0;font-size:13.5px" id="petcarehint"></p>`),
+    (id ? '' : `<p class="muted" style="margin:2px 2px 0;font-size:0.84375rem" id="petcarehint"></p>`),
     async v => {
       if (!v.name) return 'Please give your pet a name.';
       if (v.birthday && (!parseD(v.birthday) || v.birthday > todayISO())) return 'The birthday can’t be in the future.';
@@ -2410,10 +2410,10 @@ function careForm(petId, cid) {
   const reg = it.kind === 'reg';
   openSheet(cid ? esc(it.name) : 'Add care item',
     field('Name', inp('name', it.name, `placeholder="e.g. Medication" required maxlength="40" ${cid ? '' : 'list="caresuggest"'}`) + (cid ? '' : `<datalist id="caresuggest">${CARE_SUGGEST.map(x => `<option value="${x}">`).join('')}</datalist>`)) +
-    (reg ? `<p class="muted" style="margin:-2px 2px 12px;font-size:14px">Due every 1 July. The dog registration year runs 1 July to 30 June; paying from May counts for the coming year.</p>`
+    (reg ? `<p class="muted" style="margin:-2px 2px 12px;font-size:0.875rem">Due every 1 July. The dog registration year runs 1 July to 30 June; paying from May counts for the coming year.</p>`
       : `<div class="two">${field('Repeat every', inp('every', it.unit === 'none' ? '' : it.every, 'type="number" inputmode="numeric" min="1" max="99"'))}${field('&nbsp;', sel('unit', UNITS, it.unit || 'months'))}</div>`) +
     field('Last done', inp('last', it.last, 'type="date"')) + field('Next due (optional)', inp('due', it.due, 'type="date"')) +
-    `<p class="muted" style="margin:0 2px 4px;font-size:13.5px" id="carehint"></p>`,
+    `<p class="muted" style="margin:0 2px 4px;font-size:0.84375rem" id="carehint"></p>`,
     async v => {
       if (!v.name) return 'Please give it a name.';
       const unit = reg ? 'years' : v.unit, every = reg ? 1 : Math.round(+v.every);
@@ -2440,7 +2440,7 @@ function doneForm(petId, cid) {
   openSheet(`Done: ${esc(it.name)}`,
     `<div class="two">${field('Done on', inp('date', todayISO(), 'type="date" required'))}${field('Cost ($)', inp('cost', '', 'inputmode="decimal" placeholder="Optional"'))}</div>` +
     field('Notes', area('notes', '', 'Optional, ' + (CARE_NOTE_PH[it.kind] || CARE_NOTE_PH.custom))) +
-    `<p class="muted" style="margin:0 2px 4px;font-size:13.5px" id="donehint"></p>`,
+    `<p class="muted" style="margin:0 2px 4px;font-size:0.84375rem" id="donehint"></p>`,
     async v => {
       if (!parseD(v.date)) return 'Please choose the date it was done.';
       if (v.date > todayISO()) return 'The date can’t be in the future.';
@@ -2632,7 +2632,7 @@ function GardenDetail(id) {
     block('Planting', copy.planting) + block('Feeding', copy.feeding) + block('Care', copy.care) +
     `<div class="sec">This year’s jobs</div>` +
     (on ? gardenJobRows(id) : '<div class="card muted">Jobs and reminders are hidden while this plant is off.</div>') +
-    `<div class="card muted" style="margin-top:12px;font-size:13.5px">Reminders use the app’s existing notifications, on the morning of each job. Mark the next one done and it will not notify again until next year.</div>`;
+    `<div class="card muted" style="margin-top:12px;font-size:0.84375rem">Reminders use the app’s existing notifications, on the morning of each job. Mark the next one done and it will not notify again until next year.</div>`;
 }
 
 
@@ -2689,8 +2689,8 @@ function Health(arg, iid) {
       return `<div class="carcard petcard hcard" role="button" tabindex="0" data-person="${p.id}" onclick="go('#health/${p.id}')"><div class="carhead">${hPic(p)}
         <div style="flex:1;min-width:0"><div class="carname">${esc(p.name)}</div><div class="carmodel">${p.items.length ? plural(p.items.length, 'check-up') : 'No check-ups yet'}</div></div>${I('right')}</div>
         ${next.length ? `<div class="petnext">${next.map(x => `<div><span class="pn">${esc(x.item.name)}</span><b>${x.booked ? apptWhen(x.item) : fmtW(x.date)}</b>${x.booked ? bookedPill(x.days) : pill(x.days)}</div>`).join('')}</div>`
-          : `<div class="muted" style="margin-top:10px;font-size:14px">${p.items.length ? 'No dates yet. Tap to add when things were last done.' : 'Tap to add a dentist, doctor or other check-up.'}</div>`}</div>`;
-    }).join('') + (chips ? `<div class="muted" style="margin:14px 2px 6px;font-size:14px">Quick add</div>${chips}` : '') + `<div class="btns"><button class="btn" onclick="personForm()">${I('plus')} Add ${S.health.length ? 'another person' : 'a person'}</button></div>`
+          : `<div class="muted" style="margin-top:10px;font-size:0.875rem">${p.items.length ? 'No dates yet. Tap to add when things were last done.' : 'Tap to add a dentist, doctor or other check-up.'}</div>`}</div>`;
+    }).join('') + (chips ? `<div class="muted" style="margin:14px 2px 6px;font-size:0.875rem">Quick add</div>${chips}` : '') + `<div class="btns"><button class="btn" onclick="personForm()">${I('plus')} Add ${S.health.length ? 'another person' : 'a person'}</button></div>`
       : `<div class="card empty"><div class="t">No one added yet</div><div class="s">Add each person, then their dentist, doctor, chiropractor and other check-ups. You’ll get a reminder when each one is due.</div>
         ${chips ? `<div class="s" style="margin-top:4px">Quick add:</div>${chips}` : ''}<button class="btn primary" style="flex:none;padding:12px 22px" onclick="personForm()">${I('plus')} Add a person</button></div>`) +
     `<div class="foot">Due check-ups and booked appointments show on Home and the Calendar.<br>Your information is saved on this phone only.</div>`;
@@ -2721,13 +2721,13 @@ function PersonDetail(id, iid) {
   <div class="hero">${hPic(p)}<div style="min-width:0"><h2>${esc(p.name)}</h2><div class="muted">${p.items.length ? plural(p.items.length, 'check-up') : 'No check-ups yet'}${p.nhi ? `<br><span class="nhi">NHI number ${esc(p.nhi)}</span>` : ''}</div></div></div>
   ${p.notes ? `<div class="dcard hnotes"><div class="h">${I('doc')} Notes</div><div class="muted notes" style="margin-top:6px">${esc(p.notes)}</div></div>` : ''}
   <div class="sec">Check-ups <button onclick="hItemForm('${p.id}')">Add check-up</button></div>
-  ${items.length ? `<div class="list" id="hlist">${items.map(it => hRow(p, it)).join('')}</div>` : `<div class="card muted" id="hnone" style="font-size:14px">No check-ups yet. Tap one below to add it, or add your own.</div>`}
-  ${quick.length ? `<div class="muted" style="margin:14px 2px 6px;font-size:14px">${items.length ? 'Add another' : 'Quick add'}</div><div class="chips hquick">${quick.map(k => `<button class="chip" data-kind="${k}" onclick="hItemForm('${p.id}',null,'${k}')">${I('plus')} ${HEALTH_TYPES[k].name}</button>`).join('')}<button class="chip" data-kind="custom" onclick="hItemForm('${p.id}',null,'custom')">${I('plus')} Something else</button></div>` : ''}
+  ${items.length ? `<div class="list" id="hlist">${items.map(it => hRow(p, it)).join('')}</div>` : `<div class="card muted" id="hnone" style="font-size:0.875rem">No check-ups yet. Tap one below to add it, or add your own.</div>`}
+  ${quick.length ? `<div class="muted" style="margin:14px 2px 6px;font-size:0.875rem">${items.length ? 'Add another' : 'Quick add'}</div><div class="chips hquick">${quick.map(k => `<button class="chip" data-kind="${k}" onclick="hItemForm('${p.id}',null,'${k}')">${I('plus')} ${HEALTH_TYPES[k].name}</button>`).join('')}<button class="chip" data-kind="custom" onclick="hItemForm('${p.id}',null,'custom')">${I('plus')} Something else</button></div>` : ''}
   <div class="sec">History ${hist.length > 8 ? `<button onclick="hHistAll=!hHistAll;render()">${hHistAll ? 'Show less' : `Show all (${hist.length})`}</button>` : ''}</div>
   ${hist.length ? `<div class="list" id="hhist">${shown.map(h => `<button class="row hrowpet hrowh" data-hist="${h.id}" onclick="hHistForm('${p.id}','${h.id}')"><div class="tx"><div class="t">${esc(h.name)}</div>
       <div class="s">${fmtW(h.date)}${h.date.slice(0, 4) !== todayISO().slice(0, 4) ? ' ' + h.date.slice(0, 4) : ''}${h.notes ? ' · ' + esc(h.notes) : ''}</div></div>${h.cost !== '' && h.cost != null ? `<b class="cost">${money(h.cost)}</b>` : ''}</button>`).join('')}</div>`
-    : `<div class="card muted" style="font-size:14px">Nothing logged yet. Tap “Done” on a check-up and it’s saved here with the date and any notes.</div>`}
-  <div class="card muted" style="margin-top:12px;font-size:13.5px">Reminders: 3 days before a check-up is due and on the day. For a booked appointment, the evening before at 7 pm and 2 hours before. Never between 9 pm and 7 am.</div>
+    : `<div class="card muted" style="font-size:0.875rem">Nothing logged yet. Tap “Done” on a check-up and it’s saved here with the date and any notes.</div>`}
+  <div class="card muted" style="margin-top:12px;font-size:0.84375rem">Reminders: 3 days before a check-up is due and on the day. For a booked appointment, the evening before at 7 pm and 2 hours before. Never between 9 pm and 7 am.</div>
   <div class="btns" style="margin-top:12px"><button class="btn danger" onclick="deletePerson('${p.id}')">${I('trash')} Delete ${esc(p.name)}</button></div>`;
 }
 async function quickPerson(name) {
@@ -2780,9 +2780,9 @@ function hItemForm(pid, iid, kind) {
     `<div class="two">${field('Type', sel('kind', types, it.kind))}${field('Name', inp('name', it.name, 'placeholder="e.g. Blood test" required maxlength="40"'))}</div>` +
     `<div class="two">${field('Clinic', inp('clinic', it.clinic, 'list="hcliniclist" placeholder="Optional" maxlength="60"') + `<datalist id="hcliniclist">${clinics.map(c => `<option value="${esc(c[0])}">`).join('')}</datalist>`)}${field('Clinic phone', inp('phone', it.phone, 'type="tel" inputmode="tel" placeholder="Optional" maxlength="20"'))}</div>` +
     `<div class="two">${field('Repeat every', inp('every', it.unit === 'none' ? '' : it.every, 'type="number" inputmode="numeric" min="1" max="99"'))}${field('&nbsp;', sel('unit', UNITS, it.unit || 'none'))}</div>` +
-    `<p class="muted" style="margin:-4px 2px 10px;font-size:13.5px" id="htypehint"></p>` +
+    `<p class="muted" style="margin:-4px 2px 10px;font-size:0.84375rem" id="htypehint"></p>` +
     field('Last done', inp('last', it.last, 'type="date"')) + field('Next due (optional)', inp('due', it.due, 'type="date"')) +
-    `<p class="muted" style="margin:-4px 2px 12px;font-size:13.5px" id="hhint"></p>` +
+    `<p class="muted" style="margin:-4px 2px 12px;font-size:0.84375rem" id="hhint"></p>` +
     field('Booked appointment (optional)', inp('apptDate', it.apptDate, 'type="date"')) +
     field('Appointment time', inp('apptTime', it.apptTime, 'type="time"'), 'Optional. The booking shows on the Calendar and is cleared when you tick Done.') +
     (it.apptDate ? `<div class="btns" style="margin:-4px 0 8px"><button type="button" class="btn small" id="hclearappt">${I('x')} Clear booking</button></div>` : ''),
@@ -2829,7 +2829,7 @@ function hDoneForm(pid, iid) {
   openSheet(`Done: ${esc(it.name)}`,
     `<div class="two">${field('Done on', inp('date', it.apptDate && it.apptDate <= todayISO() ? it.apptDate : todayISO(), 'type="date" required'))}${field('Cost ($)', inp('cost', '', 'inputmode="decimal" placeholder="Optional"'))}</div>` +
     field('Notes', area('notes', '', 'Optional, e.g. what they said, or what’s next')) +
-    `<p class="muted" style="margin:0 2px 4px;font-size:13.5px" id="donehint"></p>`,
+    `<p class="muted" style="margin:0 2px 4px;font-size:0.84375rem" id="donehint"></p>`,
     async v => {
       if (!parseD(v.date)) return 'Please choose the date it was done.';
       if (v.date > todayISO()) return 'The date can’t be in the future.';
@@ -2978,7 +2978,7 @@ function commChart() {
   const first = c.entries.length ? fortnightOf(c.anchor, c.entries.reduce((m, e) => e.date < m ? e.date : m, '9999')).start : null;
   const done = bars.filter(b => !b.now && first && b.st >= first), avg = done.length ? Math.round(done.reduce((n, b) => n + b.v, 0) / done.length) : null;
   return `<div class="card commchartcard"><svg class="commchart" viewBox="0 0 ${W} 142" role="img" aria-label="${esc(label)}"><line x1="0" x2="${W}" y1="${base + .5}" y2="${base + .5}"></line>${g}</svg>
-    <div class="muted" style="text-align:center;font-size:12.5px">Each bar is one pay fortnight, labelled with its Monday.${avg != null ? ` Average of the finished ones: <b>${centsMoney(avg)}</b>.` : ''}</div></div>`;
+    <div class="muted" style="text-align:center;font-size:0.78125rem">Each bar is one pay fortnight, labelled with its Monday.${avg != null ? ` Average of the finished ones: <b>${centsMoney(avg)}</b>.` : ''}</div></div>`;
 }
 function commPast() {
   const c = CM(), cur = curFortnight();
@@ -3006,7 +3006,7 @@ function Commission(arg) {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`, c = CM(), T = todayISO();
   if (!c.anchor) {
     return back + header('Commission', 'Paid fortnightly · Mon to Sun') +
-      `<div class="card" id="commsetup"><div class="t" style="font-weight:750;font-size:17px">When did your current pay fortnight start?</div>
+      `<div class="card" id="commsetup"><div class="t" style="font-weight:750;font-size:1.0625rem">When did your current pay fortnight start?</div>
       <p class="muted" style="margin:6px 0 14px">Each pay fortnight runs Monday to the Sunday 13 days later. Pick the Monday this one started and every fortnight lines up from there. You can change it later.</p>
       ${anchorPicker('')}
       <div class="btns"><button class="btn primary" id="commstart" onclick="commSetupGo()">Start tracking</button></div></div>
@@ -3032,7 +3032,7 @@ function Commission(arg) {
     <div class="list"><div class="srow"><div class="tx"><div class="t">This month</div><div class="s">${MONL[+mo.slice(5) - 1]} ${yr}</div></div><b class="v" id="commmonth">${centsMoney(mTot)}</b></div>
       <div class="srow"><div class="tx"><div class="t">This year</div><div class="s">1 Jan – 31 Dec ${yr}</div></div><b class="v" id="commyear">${centsMoney(yTot)}</b></div>
       <div class="srow"><div class="tx"><div class="t">NZ tax year ${tx.label}</div><div class="s">1 Apr ${tx.start.slice(0, 4)} – 31 Mar ${tx.end.slice(0, 4)}</div></div><b class="v" id="commtax">${centsMoney(tTot)}</b></div></div>
-    <div class="muted" style="margin:6px 4px 0;font-size:12.5px">Totals go by the day the commission was earned. Adjustments are taken off.</div>
+    <div class="muted" style="margin:6px 4px 0;font-size:0.78125rem">Totals go by the day the commission was earned. Adjustments are taken off.</div>
     <div class="sec">Last 8 fortnights</div>${commChart()}
     <div class="sec">Past fortnights</div>${commPast()}
     ${c.remind ? `<div class="foot">Reminder on: 9 am if yesterday is blank. <button class="linkbtn" onclick="toggleCommRemind()">Turn off</button></div>` : ''}
@@ -3167,7 +3167,7 @@ function loanForm(id) {
     moneyField('Already paid back (optional)', 'startpaid', l.startPaid, '0.00', 'Only if you’d paid some back before you started tracking it here.') +
     `<div class="subhead" style="margin-top:4px">Repayment plan (optional)</div>
     <div>${moneyField('Regular amount (NZD)', 'plan', l.planCents, 'e.g. 50')}</div><div class="field"><span>How often</span>${segHtml('freq', LOAN_FREQ.map(f => [f[0], f[1]]), l.planFreq)}</div>
-    <p class="muted" style="margin:-4px 2px 6px;font-size:13px">Interest free, so there’s no interest to add. Leave the plan blank if there isn’t one.</p>`,
+    <p class="muted" style="margin:-4px 2px 6px;font-size:0.8125rem">Interest free, so there’s no interest to add. Leave the plan blank if there isn’t one.</p>`,
     async v => {
       if (!v.from) return 'Please say who the loan is from, e.g. Mum.';
       const cents = parseCents(v.amount);
@@ -3212,7 +3212,7 @@ function LoanDetail(id) {
   const k = loanCalc(l), p = loanPlan(l), pays = loanPaysSorted(l);
   const planCard = k.done ? '' : p
     ? `<div class="dcard" id="loanplan"><div class="h">${I('repeat')} Repayment plan</div>
-        <div class="big" style="font-size:18px">${loanPlanText(l, p)}</div>
+        <div class="big" style="font-size:1.125rem">${loanPlanText(l, p)}</div>
         <div class="muted">${plural(p.n, 'payment')} left${p.n > 1 && p.lastAmt !== l.planCents ? `, the last one ${centsMoney(p.lastAmt)}` : ''}. Next one around ${fmtW(p.next)}.</div>
         <div class="btns"><button class="btn small" onclick="planForm('${l.id}')">${I('edit')} Change plan</button></div></div>`
     : `<div class="dcard" id="loanplan"><div class="h">${I('repeat')} Repayment plan <span class="pill none">Not set</span></div>
@@ -3233,7 +3233,7 @@ function LoanDetail(id) {
   ${pays.length || l.startPaid ? `<div class="list" id="loanpays">${pays.map(x => `<button class="row lpay" data-pay="${x.id}" onclick="payForm('${l.id}','${x.id}')" aria-label="Edit payment of ${esc(centsMoney(x.cents))} on ${fmtW(x.date)}">
       <div class="tx"><div class="t">${fmtW(x.date)}</div>${x.note ? `<div class="s">${esc(x.note)}</div>` : ''}</div><b class="lpa">${centsMoney(x.cents)}</b></button>`).join('')}
       ${l.startPaid ? `<button class="row lpay start" onclick="loanForm('${l.id}')"><div class="tx"><div class="t">Paid back before tracking</div><div class="s">Set when the loan was added. Tap to change.</div></div><b class="lpa">${centsMoney(l.startPaid)}</b></button>` : ''}</div>`
-    : `<div class="card muted" style="font-size:14px">No payments yet. Tap “Record payment” each time you pay some back.</div>`}
+    : `<div class="card muted" style="font-size:0.875rem">No payments yet. Tap “Record payment” each time you pay some back.</div>`}
   <div class="btns" style="margin-top:16px"><button class="btn danger" onclick="deleteLoan('${l.id}')">${I('trash')} Delete loan</button></div>
   <div class="foot">Your information is saved on this phone only.</div>`;
 }
@@ -3278,7 +3278,7 @@ function planForm(loanId) {
     `<p class="muted" style="margin:-4px 2px 12px">How much you plan to pay back, and how often. It’s just for working out when the loan will be paid off – there are no reminders.</p>` +
     moneyField('Regular amount (NZD)', 'plan', l.planCents, 'e.g. 50') +
     `<div class="field"><span>How often</span>${segHtml('freq', LOAN_FREQ.map(f => [f[0], f[1]]), l.planFreq)}</div>
-    <p class="muted" id="planhint" style="margin:0 2px 4px;font-size:14px;min-height:20px"></p>`,
+    <p class="muted" id="planhint" style="margin:0 2px 4px;font-size:0.875rem;min-height:20px"></p>`,
     async v => {
       const c = parseCents(v.plan);
       if (c == null || c === 0) return 'Please type the regular amount in dollars and cents, like 50.';
@@ -3338,6 +3338,27 @@ function themePicker() {
     `<button class="theme ${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-theme-key="${k}" aria-label="${name} theme${note ? ' (' + note.toLowerCase() + ')' : ''}" onclick="setTheme('${k}')">
       <span class="tprev" style="background:${bg}"><span class="tbar" style="background:${k === 'dark' ? card : brand}"></span><span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span><span class="tbtn" style="background:${brand}"></span></span>
       <span class="tname">${k === cur ? I('check') : ''}${name}</span></button>`).join('')}</div>`;
+}
+
+/* Text size (v1.21.0). Stored as S.settings.textSize (sm, md, lg, xl, xxl) and copied to localStorage
+   so the inline script in index.html can set the class before first paint. Missing or unknown = Normal. */
+const TEXT_SIZES = [['sm', 'Small', 'text-sm'], ['md', 'Normal', ''], ['lg', 'Large', 'text-lg'], ['xl', 'Extra large', 'text-xl'], ['xxl', 'Huge', 'text-xxl']];
+const TEXT_SIZE_CLASSES = ['text-sm', 'text-lg', 'text-xl', 'text-xxl'];
+const textSizeKey = () => { const t = S && S.settings && S.settings.textSize; return TEXT_SIZES.some(x => x[0] === t) ? t : 'md'; };
+function applyTextSize() {
+  const k = textSizeKey(), root = document.documentElement, cls = TEXT_SIZES.find(x => x[0] === k)[2];
+  TEXT_SIZE_CLASSES.forEach(c => { if (c !== cls) root.classList.remove(c); });
+  if (cls) root.classList.add(cls);
+  try { localStorage.setItem('textSize', k); } catch (e) { }
+}
+async function setTextSize(k) {
+  if (!TEXT_SIZES.some(x => x[0] === k)) return;
+  S.settings.textSize = k; applyTextSize(); await save(); render();
+}
+function textSizePicker() {
+  const cur = textSizeKey(), name = TEXT_SIZES.find(x => x[0] === cur)[1];
+  return `<div class="list" id="textsize" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Text size</div><div class="s">${name}</div></div>
+    <div class="seg" id="textsizepick" role="group" aria-label="Text size" style="width:100%">${TEXT_SIZES.map(([k, label]) => `<button type="button" class="${k === cur ? 'on' : ''}" aria-pressed="${k === cur}" onclick="setTextSize('${k}')">${label}</button>`).join('')}</div></div></div>`;
 }
 
 /* ================= MORE ================= */
@@ -4032,6 +4053,7 @@ function Settings() {
   <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Appearance, reminders, calendars and backup</div></div></div>
   <div class="sec" id="appearance">Appearance</div>
   ${themePicker()}
+  ${textSizePicker()}
   <div class="list" style="margin-top:10px">
    <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">Use Dark when the phone is in dark mode${themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t'}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
   </div>
@@ -4078,7 +4100,7 @@ function Settings() {
   <div class="list">
    <div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">On Home</div><div class="s">The lifting bridge on Dave Culham Drive (Te Matau ā Pohe). Not live – based on the council’s lift times.</div></div>
     <div class="seg" id="brmode" style="width:100%">${[['near', 'Near only'], ['always', 'Always on Home'], ['off', 'Off']].map(([v, l]) => `<button type="button" class="${brMode() === v ? 'on' : ''}" aria-pressed="${brMode() === v}" onclick="setBridgeHome('${v}')">${l}</button>`).join('')}</div>
-    <div class="s" style="flex-basis:100%;color:var(--ink2);font-size:13px">${brMode() === 'near' ? (S.settings.bridgeLoc ? 'Shows at the top of Home when you open the app within about 2 km of the bridge.' : 'Shows as a short line under the weather. Tap “Show when I’m near” to see it at the top of Home only when you’re close.') : brMode() === 'always' ? 'Always at the top of Home.' : 'Not on Home. It’s still under More.'}</div></div>
+    <div class="s" style="flex-basis:100%;color:var(--ink2);font-size:0.8125rem">${brMode() === 'near' ? (S.settings.bridgeLoc ? 'Shows at the top of Home when you open the app within about 2 km of the bridge.' : 'Shows as a short line under the weather. Tap “Show when I’m near” to see it at the top of Home only when you’re close.') : brMode() === 'always' ? 'Always at the top of Home.' : 'Not on Home. It’s still under More.'}</div></div>
    <div class="srow"><div class="tx"><div class="t">Use my location</div><div class="s">${S.settings.bridgeLoc ? 'On, only while the app is open. Your location isn’t saved.' : 'Off. Only used if you tap “Show when I’m near”.'}</div></div>
     ${S.settings.bridgeLoc ? `<button class="btn small" onclick="stopBridgeLoc()">Stop</button>` : `<button class="btn small" onclick="enableBridgeLoc()">${I('pin')} Show when I’m near</button>`}</div>
   </div>
@@ -4228,6 +4250,7 @@ let renderedDay = todayISO();
 function render() {
   if (!S) return;
   applyTheme();
+  applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans };
