@@ -55,6 +55,8 @@ before each closure date. Expired subscriptions are removed. The VAPID private k
 `VAPID_PRIVATE_JWK` (`npx wrangler secret put VAPID_PRIVATE_JWK`); the public key is `VAPID_PUBLIC` in `wrangler.jsonc`
 and in the app. KV keys: `push-subs-v1`, `push-alerts-v1`.
 
+`POST /push/reminders` stores reminders for that phone (`{subscription, reminders:[{id,title,date,time}]}`) and replaces its pending list. `date` is `YYYY-MM-DD` and `time` is `HH:MM` in Pacific/Auckland. A separate cron (`* * * * *`) sends the push in that minute, including evenings and weekends. It does not use the bridge quiet hours (a new bridge notice found overnight still waits until 7 am). A phone that only turns on reminders is saved with `bridge: false`, so it does not start receiving bridge alerts. Turning bridge alerts off keeps the subscription while reminders are still pending. KV key: `push-reminders-v1` (title, date and time only, tied to the existing push subscription).
+
 KV holds only those three public copies, plus the push subscriptions above. If you deploy your own copy, create a KV namespace
 (`npx wrangler kv namespace create due-dates-events-cache`) and put its id in `wrangler.jsonc`.
 

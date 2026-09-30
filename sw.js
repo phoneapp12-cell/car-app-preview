@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '1.26.1';
+const VERSION = '1.27.0';
 const CACHE = 'due-dates-' + VERSION;
 const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['./', './index.html', './app.js', './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest',
@@ -70,8 +70,8 @@ self.addEventListener('periodicsync', e => {
   if (e.tag === 'due-check') e.waitUntil(DD.runCheck(self.registration, { respectQuiet: true }));
 });
 
-// Bridge closure alerts: sent by the relay when the council posts a new closure, and the evening before one.
-// These arrive even when the app is closed.
+// Push from the relay: bridge closure alerts, and reminders at the time you set.
+// Both arrive even when the app is closed. The payload says what to show.
 const RELAY = 'https://due-dates-calendar-relay.phoneapp12.workers.dev';
 const VAPID_PUBLIC = 'BEsNn0TcOiNQqSE7AbDFgYGL_v45EEm-mma2_6DtecoG5c7ZvwZ7lKpAXOQry7cqfvWM0JTjtPPdK93arc0VXMU';
 self.addEventListener('push', e => {
@@ -86,8 +86,9 @@ self.addEventListener('pushsubscriptionchange', e => {
   e.waitUntil((async () => {
     const key = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - VAPID_PUBLIC.length % 4) % 4)), c => c.charCodeAt(0));
     const sub = e.newSubscription || await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-    if (e.oldSubscription) await fetch(RELAY + '/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: e.oldSubscription.endpoint }) }).catch(() => { });
-    await fetch(RELAY + '/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), quiet: true }) });
+    // Register the new address first and move any reminders across, then drop the old one.
+    await fetch(RELAY + '/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), quiet: true, previous: e.oldSubscription ? e.oldSubscription.endpoint : undefined }) });
+    if (e.oldSubscription && e.oldSubscription.endpoint !== sub.endpoint) await fetch(RELAY + '/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: e.oldSubscription.endpoint }) }).catch(() => { });
   })());
 });
 

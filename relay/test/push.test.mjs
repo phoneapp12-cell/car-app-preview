@@ -1,6 +1,6 @@
 // node test/push.test.mjs – bridge closure push alerts: planning, subscriptions, routes, cron (no network)
 import crypto from 'crypto';
-import { planAlerts, cleanSub, endpointAllowed, whenTxt, runAlerts, b64u, encryptPayload } from '../src/push.js';
+import { planAlerts, cleanSub, endpointAllowed, whenTxt, runAlerts, b64u, encryptPayload, aucklandDue, setReminders, runReminders, subscribe } from '../src/push.js';
 import { handle } from '../src/relay.js';
 let fails = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 const O = 'https://phoneapp12-cell.github.io';
@@ -82,5 +82,80 @@ res = await runAlerts(env, state, fake, at('2026-09-28T22:30:00Z'));
 ok(res.removed === 1 && JSON.parse(mem['push-subs-v1']).length === 0, 'expired subscription (410) removed');
 r = await post('/push/unsubscribe', { endpoint: SUB.endpoint }); ok(r.status === 200, 'unsubscribe ok');
 ok(!/console\.log/.test((await import('fs')).readFileSync(new URL('../src/push.js', import.meta.url), 'utf8')), 'no logging in push.js');
+
+// Reminders: exact Auckland minute, including evening and weekend. No 7 am hold.
+const satNight = aucklandDue('2026-10-03', '22:15');
+ok(satNight === Date.parse('2026-10-03T09:15:00Z'), 'Sat 10:15 pm NZDT is 09:15 UTC');
+const sunEarly = aucklandDue('2026-10-04', '02:00');
+ok(sunEarly === Date.parse('2026-10-03T13:00:00Z'), 'Sun 2:00 am NZDT is 13:00 UTC Saturday');
+ok(aucklandDue('2026-02-31', '10:00') === null && aucklandDue('2026-10-03', '24:00') === null, 'impossible dates and times rejected');
+
+const memR = {};
+const envR = { ALLOWED_ORIGIN: O, VAPID_PRIVATE_JWK: env.VAPID_PRIVATE_JWK, VAPID_PUBLIC: 'pub',
+  EVENTS_KV: { get: async k => memR[k] ? JSON.parse(memR[k]) : null, put: async (k, v) => { memR[k] = v; } } };
+const sentR = [];
+const fakeR = async (url, o) => { sentR.push({ url, o }); return new Response('', { status: 201 }); };
+const postR = (path, data) => handle(new Request('https://relay.example' + path, { method: 'POST', headers: { Origin: O, 'Content-Type': 'application/json' }, body: JSON.stringify(data) }), envR, fakeR);
+const REM = { id: 'rem-parcel1', title: 'Pick up the parcel', date: '2026-10-03', time: '22:15' };
+let rr = await postR('/push/reminders', { subscription: SUB, reminders: [REM] });
+let rj = await rr.json();
+ok(rr.status === 200 && rj.saved === 1 && sentR.length === 0, 'saving a reminder does not push yet and does not send a bridge “on” notice');
+ok(JSON.parse(memR['push-subs-v1'])[0].bridge === false, 'reminder-only subscription is not opted into bridge alerts');
+let fired = await runReminders(envR, fakeR, satNight - 60 * 1000);
+ok(fired.sent === 0 && sentR.length === 0, 'one minute early: nothing sent');
+fired = await runReminders(envR, fakeR, satNight);
+ok(fired.sent === 1 && sentR.length === 1, 'fires at the chosen minute');
+ok(sentR[0].url === SUB.endpoint, 'reminder uses the same push endpoint');
+fired = await runReminders(envR, fakeR, satNight + 60 * 1000);
+ok(fired.sent === 0 && sentR.length === 1, 'does not fire again the next minute');
+
+// Evening and overnight are not held until 7 am (bridge alerts still are; covered above).
+sentR.length = 0;
+const early = { id: 'rem-early01', title: 'Early start', date: '2026-10-04', time: '02:00' };
+rr = await postR('/push/reminders', { subscription: SUB, reminders: [early] });
+ok((await rr.json()).saved === 1, 'replaced the list with a 2 am reminder');
+fired = await runReminders(envR, fakeR, sunEarly);
+ok(fired.sent === 1 && sentR.length === 1, '2 am Sunday fires immediately, not held until 7 am');
+
+// Edit moves the time; delete cancels.
+sentR.length = 0;
+const moved = { id: 'rem-early01', title: 'Early start', date: '2026-10-04', time: '02:05' };
+await postR('/push/reminders', { subscription: SUB, reminders: [moved] });
+fired = await runReminders(envR, fakeR, sunEarly);
+ok(fired.sent === 0 && sentR.length === 0, 'edited reminder does not fire at the old time');
+fired = await runReminders(envR, fakeR, sunEarly + 5 * 60 * 1000);
+ok(fired.sent === 1, 'edited reminder fires at the new time');
+sentR.length = 0;
+await postR('/push/reminders', { subscription: SUB, reminders: [] });
+fired = await runReminders(envR, fakeR, sunEarly + 5 * 60 * 1000);
+ok(fired.sent === 0 && !memR['push-reminders-v1']?.includes('rem-early01') && sentR.length === 0, 'delete cancels the pending notification');
+
+// Bridge alerts still go to a bridge subscription, and not to a reminder-only one.
+const memB = {};
+const envB = { ALLOWED_ORIGIN: O, VAPID_PRIVATE_JWK: env.VAPID_PRIVATE_JWK, VAPID_PUBLIC: 'pub',
+  EVENTS_KV: { get: async k => memB[k] ? JSON.parse(memB[k]) : null, put: async (k, v) => { memB[k] = v; } } };
+const sentB = [];
+const fakeB = async (url, o) => { sentB.push(url); return new Response('', { status: 201 }); };
+await setReminders(envB, SUB, [{ id: 'rem-only0001', title: 'Only me', date: '2026-10-10', time: '09:00' }], at('2026-10-01T00:00:00Z'));
+const stB = { listAt: 1, list: [{ url: 'u9', title: 'New bridge works', desc: '', where: 'Dave Culham Drive' }], pages: { u9: { at: 1, entries: [{ where: 'Dave Culham Drive', desc: '', dates: [{ start: '2026-10-12', end: '2026-10-12', time: '09:00', endTime: '15:00' }] }] } } };
+await runAlerts(envB, stB, fakeB, at('2026-09-28T22:00:00Z')); // seed
+stB.list.push({ url: 'u10', title: 'Extra works', desc: '', where: 'Dave Culham Drive' });
+stB.pages.u10 = { at: 2, entries: [{ where: 'Dave Culham Drive', desc: '', dates: [{ start: '2026-10-20', end: '2026-10-20', time: '10:00', endTime: '12:00' }] }] };
+let ba = await runAlerts(envB, stB, fakeB, at('2026-09-28T23:00:00Z'));
+ok(ba.sent === 0 && sentB.length === 0, 'reminder-only phone does not get bridge alerts');
+await subscribe(envB, SUB, at('2026-09-28T23:10:00Z'), { bridge: true });
+ba = await runAlerts(envB, { ...stB, list: stB.list.concat([{ url: 'u11', title: 'Later works', desc: '', where: 'Dave Culham Drive' }]), pages: { ...stB.pages, u11: { at: 3, entries: [{ where: 'Dave Culham Drive', desc: '', dates: [{ start: '2026-10-21', end: '2026-10-21', time: '10:00', endTime: '11:00' }] }] } } }, fakeB, at('2026-09-28T23:20:00Z'));
+ok(ba.sent === 1, 'turning bridge on still sends a bridge alert');
+
+// Turning bridge off while a reminder is pending keeps the subscription.
+const off = await (await postR('/push/reminders', { subscription: SUB, reminders: [{ id: 'rem-keep0001', title: 'Keep me', date: '2026-12-01', time: '18:00' }] })).json();
+ok(off.saved === 1, 'reminder stored before bridge-off');
+// that phone is bridge false already; subscribe as bridge on then unsubscribe
+await subscribe(envR, SUB, Date.now(), { bridge: true });
+const un = await (await postR('/push/unsubscribe', { endpoint: SUB.endpoint })).json();
+ok(un.kept === true && un.removed === false && JSON.parse(memR['push-subs-v1'])[0].bridge === false, 'bridge off keeps the push address while a reminder is pending');
+const still = JSON.parse(memR['push-reminders-v1']);
+ok(Object.values(still).some(b => (b.items || []).some(i => i.id === 'rem-keep0001')), 'pending reminder survives bridge off');
+
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
 process.exit(fails ? 1 : 0);

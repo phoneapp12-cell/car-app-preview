@@ -90,20 +90,44 @@ const subId = async ep => b64u(await crypto.subtle.digest('SHA-256', enc.encode(
 export async function loadSubs(env) { if (!env.EVENTS_KV) return []; try { return (await env.EVENTS_KV.get(SUBS_KEY, { type: 'json' })) || []; } catch (e) { return []; } }
 async function saveSubs(env, subs) { await env.EVENTS_KV.put(SUBS_KEY, JSON.stringify(subs)); }
 
-export async function subscribe(env, raw, now = Date.now()) {
+// opts.bridge true/false forces the flag. A normal subscribe (bridge alerts turned on) forces true.
+// A quiet re-register keeps the previous flag (so a reminder-only phone is not opted into bridge alerts).
+export async function subscribe(env, raw, now = Date.now(), opts = {}) {
   const sub = cleanSub(raw); if (!sub) throw new Error('bad_subscription');
   const id = await subId(sub.endpoint);
-  let subs = (await loadSubs(env)).filter(s => s.id !== id);
-  subs.push({ id, ...sub, at: now });
+  let subs = await loadSubs(env);
+  const prev = subs.find(s => s.id === id);
+  let fromOld = null;
+  if (!prev && opts.previous && typeof opts.previous === 'string') {
+    const oid = await subId(opts.previous);
+    fromOld = subs.find(s => s.id === oid) || null;
+  }
+  let bridge;
+  if (opts.bridge === true) bridge = true;
+  else if (opts.bridge === false) bridge = false;
+  else if (opts.quiet) bridge = (prev || fromOld) ? (prev || fromOld).bridge !== false : true;
+  else bridge = true;
+  subs = subs.filter(s => s.id !== id);
+  subs.push({ id, endpoint: sub.endpoint, keys: sub.keys, at: now, bridge });
   subs = subs.slice(-MAX_SUBS);
   await saveSubs(env, subs);
-  return { id, ...sub };
+  if (opts.previous) await migrateReminders(env, opts.previous, sub.endpoint);
+  return { id, endpoint: sub.endpoint, keys: sub.keys, bridge };
 }
 export async function unsubscribe(env, endpoint) {
-  if (typeof endpoint !== 'string') return false;
-  const id = await subId(endpoint), subs = await loadSubs(env), left = subs.filter(s => s.id !== id);
-  if (left.length !== subs.length) await saveSubs(env, left);
-  return left.length !== subs.length;
+  if (typeof endpoint !== 'string') return { removed: false, kept: false };
+  const id = await subId(endpoint), subs = await loadSubs(env);
+  const cur = subs.find(s => s.id === id);
+  if (!cur) return { removed: false, kept: false };
+  const book = await loadRem(env);
+  const pending = book[id] && Array.isArray(book[id].items) && book[id].items.length;
+  if (pending) {
+    cur.bridge = false; // reminders still need this push address; bridge alerts stop
+    await saveSubs(env, subs);
+    return { removed: false, kept: true };
+  }
+  await saveSubs(env, subs.filter(s => s.id !== id));
+  return { removed: true, kept: false };
 }
 export async function isSubscribed(env, endpoint) {
   if (typeof endpoint !== 'string') return false;
@@ -186,7 +210,7 @@ export async function runAlerts(env, closuresState, fetchImpl = fetch, now = Dat
   const plan = planAlerts(feed, alerts, now);
   let sent = 0; const gone = new Set();
   for (const m of plan.msgs) for (const s of subs) {
-    if (gone.has(s.id)) continue;
+    if (s.bridge === false || gone.has(s.id)) continue;
     const r = await sendPush(s, m, env, fetchImpl, now);
     if (r === 'gone') gone.add(s.id); else if (r === 'ok') sent++;
   }
@@ -195,17 +219,151 @@ export async function runAlerts(env, closuresState, fetchImpl = fetch, now = Dat
   return { sent, msgs: plan.msgs.length, removed: gone.size };
 }
 
+
+// ---- Reminders (exact Auckland time; not the bridge quiet hours) ----
+// The phone sends the pending list. A cron every minute pushes when that minute arrives,
+// including evenings and weekends. Bridge alerts still wait until 7 am; this does not.
+const REM_KEY = 'push-reminders-v1';
+const MAX_REMS = 40;
+const REM_GRACE = 36 * 3600 * 1000;
+
+export function aucklandDue(date, time) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
+  const [Y, M, D] = date.split('-').map(Number);
+  const [h, m] = time.split(':').map(Number);
+  if (M < 1 || M > 12 || h > 23 || m > 59) return null;
+  const cal = new Date(Date.UTC(Y, M - 1, D));
+  if (cal.getUTCFullYear() !== Y || cal.getUTCMonth() !== M - 1 || cal.getUTCDate() !== D) return null;
+  const want = date + 'T' + time;
+  let t = Date.UTC(Y, M - 1, D, h, m) - 13 * 3600000;
+  for (let i = 0; i < 6; i++) {
+    const got = nzStamp(t);
+    if (got === want) return t;
+    const [gd, gt] = got.split('T');
+    const [gy, gm, gd2] = gd.split('-').map(Number);
+    const [gh, gmin] = gt.split(':').map(Number);
+    t += Date.UTC(Y, M - 1, D, h, m) - Date.UTC(gy, gm - 1, gd2, gh, gmin);
+  }
+  return nzStamp(t) === want ? t : null;
+}
+export function reminderBody(date, time) { return dayTxt(date) + ', ' + timeTxt(time); }
+
+export function cleanReminder(r, now = Date.now()) {
+  if (!r || typeof r !== 'object') return null;
+  const id = String(r.id || '');
+  if (!/^rem-[a-z0-9]{4,32}$/i.test(id)) return null;
+  const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (!title) return null;
+  const date = String(r.date || ''), time = String(r.time || '');
+  const due = aucklandDue(date, time);
+  if (due == null || due < now - REM_GRACE) return null;
+  return { id, title, date, time, due, body: reminderBody(date, time) };
+}
+
+async function loadRem(env) {
+  if (!env.EVENTS_KV) return {};
+  try {
+    const v = await env.EVENTS_KV.get(REM_KEY, { type: 'json' });
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch (e) { return {}; }
+}
+async function saveRem(env, book) { await env.EVENTS_KV.put(REM_KEY, JSON.stringify(book)); }
+
+export async function migrateReminders(env, previousEndpoint, nextEndpoint) {
+  if (typeof previousEndpoint !== 'string' || typeof nextEndpoint !== 'string' || previousEndpoint === nextEndpoint) return;
+  const oldId = await subId(previousEndpoint), newId = await subId(nextEndpoint);
+  const book = await loadRem(env);
+  if (!book[oldId]) return;
+  book[newId] = book[oldId];
+  delete book[oldId];
+  await saveRem(env, book);
+}
+
+export async function setReminders(env, rawSub, list, now = Date.now()) {
+  const sub = cleanSub(rawSub);
+  if (!sub) throw new Error('bad_subscription');
+  const id = await subId(sub.endpoint);
+  const subs = await loadSubs(env);
+  const prev = subs.find(s => s.id === id);
+  if (!prev) await subscribe(env, sub, now, { bridge: false, quiet: true });
+  else if (prev.keys.p256dh !== sub.keys.p256dh || prev.keys.auth !== sub.keys.auth) await subscribe(env, sub, now, { quiet: true });
+  const items = []; const seen = new Set();
+  for (const r of (Array.isArray(list) ? list : []).slice(0, MAX_REMS)) {
+    const c = cleanReminder(r, now);
+    if (!c || seen.has(c.id)) continue;
+    seen.add(c.id); items.push(c);
+  }
+  const book = await loadRem(env);
+  if (items.length) book[id] = { items }; else delete book[id];
+  await saveRem(env, book);
+  if (!items.length) {
+    const again = await loadSubs(env);
+    const cur = again.find(s => s.id === id);
+    if (cur && cur.bridge === false) await saveSubs(env, again.filter(s => s.id !== id));
+  }
+  return { saved: items.length };
+}
+
+export async function runReminders(env, fetchImpl = fetch, now = Date.now()) {
+  if (!env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return { sent: 0 };
+  const book = await loadRem(env);
+  const ids = Object.keys(book);
+  if (!ids.length) return { sent: 0 };
+  let subs = await loadSubs(env);
+  const gone = new Set();
+  let sent = 0, changed = false, budget = 5;
+  for (const id of ids) {
+    const sub = subs.find(s => s.id === id);
+    const items = (book[id] && book[id].items) || [];
+    if (!sub) { delete book[id]; changed = true; continue; }
+    const keep = [];
+    for (const item of items) {
+      if (!item || typeof item.due !== 'number') { changed = true; continue; }
+      if (item.due > now) { keep.push(item); continue; }
+      if (now - item.due > REM_GRACE) { changed = true; continue; }
+      if (gone.has(id) || budget <= 0) { keep.push(item); continue; }
+      budget--;
+      const r = await sendPush(sub, { title: item.title, body: item.body || 'Reminder', url: '#reminders', tag: 'rem-' + item.id, ttl: 12 * 3600 }, env, fetchImpl, now);
+      if (r === 'gone') { gone.add(id); changed = true; continue; }
+      if (r === 'ok') { sent++; changed = true; continue; }
+      keep.push(item);
+    }
+    if (gone.has(id)) { delete book[id]; changed = true; }
+    else if (keep.length !== items.length || keep.some((x, i) => x !== items[i])) { if (keep.length) book[id] = { items: keep }; else delete book[id]; changed = true; }
+  }
+  if (gone.size) await saveSubs(env, subs.filter(s => !gone.has(s.id)));
+  if (changed) await saveRem(env, book);
+  return { sent, removed: gone.size };
+}
+
 // ---- Routes: /push/subscribe, /push/unsubscribe, /push/status, /push/test (app origin only, POST JSON) ----
 const hits = []; // small per-instance limit so nobody can use this to spam a push service
 function limited(now) { while (hits.length && now - hits[0] > 3600e3) hits.shift(); if (hits.length >= 30) return true; hits.push(now); return false; }
 export async function pushRoute(path, body, env, fetchImpl = fetch, now = Date.now()) {
   if (!env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return [503, { error: 'push_unavailable' }];
   if (path === '/push/key') return [200, { key: env.VAPID_PUBLIC || null }];
-  if (path === '/push/status') return [200, { subscribed: await isSubscribed(env, body && body.endpoint) }];
-  if (path === '/push/unsubscribe') return [200, { removed: await unsubscribe(env, body && body.endpoint) }];
+  if (path === '/push/status') {
+    const endpoint = body && body.endpoint;
+    const subscribed = await isSubscribed(env, endpoint);
+    let bridge = false;
+    if (subscribed) {
+      const id = await subId(endpoint);
+      const rec = (await loadSubs(env)).find(x => x.id === id);
+      bridge = !rec || rec.bridge !== false;
+    }
+    return [200, { subscribed, bridge }];
+  }
+  if (path === '/push/unsubscribe') return [200, await unsubscribe(env, body && body.endpoint)];
+  if (path === '/push/reminders') {
+    try { return [200, await setReminders(env, body && body.subscription, body && body.reminders, now)]; }
+    catch (e) { return [400, { error: 'bad_subscription' }]; }
+  }
   if (limited(now)) return [429, { error: 'too_many' }];
   if (path === '/push/subscribe') {
-    let sub; try { sub = await subscribe(env, body && body.subscription, now); } catch (e) { return [400, { error: 'bad_subscription' }]; }
+    const opt = { quiet: !!(body && body.quiet), previous: body && body.previous };
+    if (body && body.bridge === true) opt.bridge = true;
+    else if (body && body.bridge === false) opt.bridge = false;
+    let sub; try { sub = await subscribe(env, body && body.subscription, now, opt); } catch (e) { return [400, { error: 'bad_subscription' }]; }
     if (body.quiet) return [200, { subscribed: true }]; // re-registering after the phone renewed its push address
     const r = await sendPush(sub, { title: 'Bridge closure alerts are on', body: 'You’ll get a notification when the council posts a new closure for the lifting bridge or Dave Culham Drive, and again the evening before.', url: '#bridge', tag: 'bridge-on' }, env, fetchImpl, now);
     return [200, { subscribed: true, test: r }];

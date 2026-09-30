@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.26.1';
+const APP_VERSION = '1.27.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -135,6 +135,7 @@ function normalise(d) {
   d.myEvents = normMine(d.myEvents); // 1.6.0: my events (repeating), older data has none
   d.commission = normComm(d.commission); // 1.7.0: commission tracker (older data and backups have none)
   d.loans = normLoans(d.loans); // 1.10.0: loans (older data and backups have none)
+  d.reminders = normReminders(d.reminders); // 1.27.0: reminders (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.health = normHealth(d.health); // 1.8.0: Health (older data and backups have none)
   d.garden = normGarden(d.garden); // 1.20.0: Gardening (older data and backups have none)
@@ -3473,6 +3474,138 @@ function textSizePicker() {
     <div class="seg" id="textsizepick" role="group" aria-label="Text size" style="width:100%">${TEXT_SIZES.map(([k, label]) => `<button type="button" class="${k === cur ? 'on' : ''}" aria-pressed="${k === cur}" onclick="setTextSize('${k}')">${label}</button>`).join('')}</div></div></div>`;
 }
 
+
+/* ================= REMINDERS (1.27.0) ================= */
+// A title plus a date and time in Pacific/Auckland. The list stays on this phone.
+// The relay sends the push at that minute, including evenings and weekends (not held until 7 am).
+function normReminders(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [], seen = new Set();
+  for (const r of list) {
+    if (!r || typeof r !== 'object') continue;
+    const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    const date = String(r.date || ''), time = String(r.time || '');
+    if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) continue;
+    let id = String(r.id || '');
+    if (!/^rem-[a-z0-9]{4,32}$/i.test(id)) id = uid('rem');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, title, date, time });
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+function nzStampLocal(now = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+const remKey = r => r.date + 'T' + r.time;
+function upcomingReminders(now) {
+  const k = nzStampLocal(now);
+  return (S.reminders || []).filter(r => remKey(r) >= k).sort((a, b) => remKey(a).localeCompare(remKey(b)));
+}
+function remindersMoreSub() {
+  const n = upcomingReminders();
+  if (!n.length) return 'None set';
+  const r = n[0];
+  return `Next: ${esc(r.title)}, ${fmtW(r.date)} ${fmtTime(r.time)}`;
+}
+function remPermCard() {
+  if (!pushOK()) return `<div class="card muted">This phone or browser can’t get push notifications. On Android, open the app from its icon (installed from Chrome).</div>`;
+  if (Notification.permission === 'granted') return '';
+  const denied = Notification.permission === 'denied';
+  if (denied) return `<div class="card muted">Notifications are blocked for this app. Allow them in the phone’s settings for this app, then come back here.</div>`;
+  return `<div class="callout green">${I('bell')}<div style="flex:1"><b>Allow notifications</b><br>Reminders can only alert you if notifications are allowed.
+    <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="enableReminderPush()">Allow notifications</button></div></div></div>`;
+}
+function Reminders() {
+  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
+  const nowK = nzStampLocal();
+  const up = upcomingReminders(), past = (S.reminders || []).filter(r => remKey(r) < nowK).sort((a, b) => remKey(b).localeCompare(remKey(a)));
+  const row = r => `<button class="row" onclick="remForm('${r.id}')"><div class="ic rem">${I('bell')}</div><div class="tx"><div class="t">${esc(r.title)}</div><div class="s">${fmtW(r.date)} · ${fmtTime(r.time)}</div></div>${I('right')}</button>`;
+  const list = (S.reminders || []).length
+    ? `<div class="list" id="remlist">${up.map(row).join('')}${past.map(row).join('')}</div>`
+    : `<p class="muted" id="remempty">No reminders yet.</p>`;
+  return back + header('Reminders', 'A notification at the time you set', addBtn('Add a reminder', 'remForm()')) + remPermCard() + list +
+    `<div class="foot">Times are New Zealand time. With notifications on, it still arrives if the app is closed.</div>`;
+}
+function undoRem(s) {
+  return async () => {
+    const had = !!S.settings.remOnRelay;
+    S = JSON.parse(s);
+    if (had) S.settings.remOnRelay = true; // so a cancelled add or edit is cleared on the relay too
+    await save(); await scheduleReminders(); render();
+  };
+}
+async function scheduleReminders() {
+  if (!S || !pushOK() || !RELAY_URL) return 'unsupported';
+  if (Notification.permission !== 'granted') return 'need';
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    const k = nzStampLocal();
+    const reminders = (S.reminders || []).filter(r => remKey(r) >= k).map(r => ({ id: r.id, title: r.title, date: r.date, time: r.time }));
+    if (!sub) {
+      if (!reminders.length && !S.settings.remOnRelay) return '';
+      if (!reminders.length) { /* still clear the relay below once we have a subscription */ }
+      else sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey() });
+    }
+    if (!sub) return reminders.length ? 'fail' : '';
+    if (!reminders.length && !S.settings.remOnRelay) return '';
+    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders });
+    const on = reminders.length > 0;
+    if (!!S.settings.remOnRelay !== on) { S.settings.remOnRelay = on; await save(); }
+    return '';
+  } catch (e) { return 'fail'; }
+}
+async function enableReminderPush() {
+  if (!pushOK()) { toast('This phone or browser can’t get push notifications. On Android, open the app from its icon (installed from Chrome).'); return; }
+  let p = Notification.permission;
+  if (p !== 'granted') p = await Notification.requestPermission();
+  if (p !== 'granted') { toast(p === 'denied' ? 'Notifications are blocked. You can allow them in the phone’s settings for this app.' : 'Notifications weren’t allowed.'); render(); return; }
+  const sync = await scheduleReminders();
+  render();
+  toast(sync === 'fail' ? 'Notifications are allowed, but the alert couldn’t be set just now.' : 'Notifications are on. You’ll be alerted at the time you set, even if the app is closed.');
+}
+function remForm(id) {
+  const e = id ? (S.reminders || []).find(x => x.id === id) : { title: '', date: nzStampLocal().slice(0, 10), time: '' };
+  if (!e) return;
+  openSheet(id ? 'Edit reminder' : 'Add a reminder',
+    field('Title', inp('title', e.title, 'required maxlength="80" placeholder="What to remember"')) +
+    `<div class="two">${field('Date', inp('date', e.date, 'type="date" required'))}${field('Time', inp('time', e.time, 'type="time" required'))}</div>`,
+    async v => {
+      const title = String(v.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if (!title) return 'Please type what to remember.';
+      if (!parseD(v.date)) return 'Please choose a date.';
+      if (!/^\d{2}:\d{2}$/.test(v.time || '')) return 'Please choose a time.';
+      if (v.date + 'T' + v.time < nzStampLocal()) return 'That time has already passed.';
+      if (pushOK() && Notification.permission === 'default') {
+        const p = await Notification.requestPermission();
+        if (p !== 'granted') { /* saved anyway; the section keeps asking */ }
+      }
+      const snapS = snap();
+      const upd = { title, date: v.date, time: v.time };
+      if (id) Object.assign(e, upd); else S.reminders.push(Object.assign({ id: uid('rem') }, upd));
+      await save();
+      const sync = await scheduleReminders();
+      render();
+      const extra = sync === 'fail' ? ' Saved on this phone. The notification will be set when you next open the app online.'
+        : (sync === 'need' || sync === 'unsupported') ? ' Allow notifications to be alerted at that time.'
+        : ' You’ll be notified then, even if the app is closed.';
+      toast((id ? 'Reminder updated.' : 'Reminder added.') + extra, 'Undo', undoRem(snapS));
+    }, id ? 'Save' : 'Add',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete this reminder" onclick="deleteRem('${id}')">${I('trash')}</button>` : '');
+}
+async function deleteRem(id) {
+  if (!(S.reminders || []).some(x => x.id === id)) return;
+  const snapS = snap();
+  S.reminders = S.reminders.filter(x => x.id !== id);
+  await save();
+  const sync = await scheduleReminders();
+  await closeSheet(); render();
+  toast(sync === 'fail' ? 'Deleted on this phone. The notification couldn’t be cancelled just now.' : 'Reminder deleted.', 'Undo', undoRem(snapS));
+}
+
 /* ================= MORE ================= */
 function More() {
   const T = todayT(), t30 = T + 30 * DAY;
@@ -3489,6 +3622,7 @@ function More() {
     calendar: () => 'Appointments, events and holidays',
     todo: () => openTodos ? `${openTodos} to do` : 'Your lists',
     commission: () => commMoreSub(),
+    reminders: () => remindersMoreSub(),
     loans: () => loansMoreSub(),
     events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
     meals: () => mealsMoreSub(),
@@ -3529,7 +3663,7 @@ function More() {
 const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
-  commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'],
+  reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
@@ -3810,10 +3944,12 @@ async function checkBridgePush() {
   if (!pushOK() || brPushBusy) return;
   try {
     const sub = await pushSub();
-    if (!sub || Notification.permission !== 'granted') { brPush = false; }
+    // A reminder-only subscription must not switch bridge alerts on.
+    if (!sub || Notification.permission !== 'granted' || !S.settings.bridgePush) { brPush = false; }
     else {
+      const st = await pushPost('/push/status', { endpoint: sub.endpoint });
+      if (!st.subscribed || st.bridge === false) await pushPost('/push/subscribe', { subscription: sub.toJSON(), quiet: true, bridge: true });
       brPush = true;
-      if (S.settings.bridgePush) { const st = await pushPost('/push/status', { endpoint: sub.endpoint }); if (!st.subscribed) await pushPost('/push/subscribe', { subscription: sub.toJSON(), quiet: true }); }
     }
   } catch (e) { /* offline: keep what we know */ if (brPush === null) brPush = !!S.settings.bridgePush; }
   brPushChecked = true; updBridge();
@@ -3834,7 +3970,10 @@ async function toggleBridgePush() {
   try {
     if (brPush) {
       const sub = await pushSub();
-      if (sub) { await pushPost('/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => { }); await sub.unsubscribe(); }
+      if (sub) {
+        const res = await pushPost('/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => ({}));
+        if (!res || !res.kept) await sub.unsubscribe(); // keep the address while a reminder still needs it
+      }
       brPush = false; S.settings.bridgePush = false; await save();
       toast('Bridge closure alerts are off.');
     } else {
@@ -4727,7 +4866,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40 };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders };
   if (r !== 'more') moreEdit = false;
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : (map[r] || Home)();
@@ -4796,6 +4935,7 @@ async function start() {
     });
     navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'go') go(e.data.hash); });
     try { swReg = await navigator.serviceWorker.register('sw.js'); } catch (e) { swReg = null; }
+    scheduleReminders().catch(() => { });
   }
   if (isStandalone()) requestPersist();
   await setupBackground();
@@ -4809,6 +4949,7 @@ async function start() {
     if (brMode() !== 'off') refreshClosures();
     checkBridgeLoc(true);
     if (swReg) swReg.update().catch(() => { });
+    scheduleReminders().catch(() => { });
   });
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
