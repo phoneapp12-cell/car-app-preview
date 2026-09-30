@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.28.0';
+const APP_VERSION = '1.29.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4691,20 +4691,89 @@ const TOP40 = [
   { rank: 15, id: 's3a4OQR-10M', title: 'Loser', artist: 'Tame Impala', url: 'https://www.youtube.com/watch?v=s3a4OQR-10M' },
   { rank: 16, id: 'DLV8FpyxZPQ', title: 'Stop The Wedding!', artist: 'Ashe', url: 'https://www.youtube.com/watch?v=DLV8FpyxZPQ' },
   { rank: 17, id: 'mrV8kK5t0V8', title: 'I Just Might', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=mrV8kK5t0V8' },
+  { rank: 18, id: 'n7QlUH0zrPg', title: "Movin' To The Sun", artist: 'HUGEL, Imael Angel and Ultra Naté', url: 'https://www.youtube.com/watch?v=n7QlUH0zrPg' },
   { rank: 19, id: 'Dg47eNL_Usw', title: 'Be Her', artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=Dg47eNL_Usw' },
   { rank: 20, id: 'lY5V4hSLWY8', title: 'Risk It All', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=lY5V4hSLWY8' },
   { rank: 21, id: 'ofywN3NgGqY', title: "My Body Isn't Ready", artist: 'sombr', url: 'https://www.youtube.com/watch?v=ofywN3NgGqY' },
-  { rank: 22, id: 'EZOiy1-cnxM', title: 'Material Lover', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=EZOiy1-cnxM' }
+  { rank: 22, id: 'EZOiy1-cnxM', title: 'Material Lover', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=EZOiy1-cnxM' },
+  { rank: 23, id: 'FOJ4A4wixDg', title: 'bloodstream', artist: 'Alyssa Grace', url: 'https://www.youtube.com/watch?v=FOJ4A4wixDg' },
+  { rank: 24, id: 'ko70cExuzZM', title: 'The Fate Of Ophelia', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=ko70cExuzZM' },
+  { rank: 25, id: 'rK5TyISxZ_M', title: 'WHERE IS MY HUSBAND!', artist: 'RAYE', url: 'https://www.youtube.com/watch?v=rK5TyISxZ_M' },
+  { rank: 26, id: 'mQezde_qeXw', title: 'Homewrecker', artist: 'sombr', url: 'https://www.youtube.com/watch?v=mQezde_qeXw' },
+  { rank: 27, id: 'c8zq4kAn_O0', title: 'back to friends', artist: 'sombr', url: 'https://www.youtube.com/watch?v=c8zq4kAn_O0' },
+  { rank: 28, id: 'Y4AgCABdZ3Y', title: 'iloveitiloveitiloveit', artist: 'Bella Kay', url: 'https://www.youtube.com/watch?v=Y4AgCABdZ3Y' },
+  { rank: 29, id: '82-jTNka3uc', title: 'hate that i made you love me', artist: 'Ariana Grande', url: 'https://www.youtube.com/watch?v=82-jTNka3uc' },
+  { rank: 30, id: 'KFMYx1TibeQ', title: 'Folded', artist: 'Kehlani', url: 'https://www.youtube.com/watch?v=KFMYx1TibeQ' },
+  { rank: 31, id: 'hohuFW0zQUw', title: 'Golden', artist: 'KPop Demon Hunters Cast', url: 'https://www.youtube.com/watch?v=hohuFW0zQUw' },
+  { rank: 32, id: 'SOJpE1KMUbo', title: 'Raindance', artist: 'Dave feat. Tems', url: 'https://www.youtube.com/watch?v=SOJpE1KMUbo' },
+  { rank: 33, id: 'uvY8fdgezLQ', title: 'Midnight Sun', artist: 'Zara Larsson', url: 'https://www.youtube.com/watch?v=uvY8fdgezLQ' },
+  { rank: 35, id: '5RNy_1odv20', title: 'Die On This Hill', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=5RNy_1odv20' },
+  { rank: 36, id: 'cZgUiR31m-Y', title: '12 To 12', artist: 'sombr', url: 'https://www.youtube.com/watch?v=cZgUiR31m-Y' },
+  { rank: 38, id: 'Pz-SZlU4C10', title: 'Noble', artist: 'F3miii', url: 'https://www.youtube.com/watch?v=Pz-SZlU4C10' }
 ];
 function top40Row(v) {
   const reason = (v.reason || '').trim() || ('Official video for ' + v.title + ' by ' + v.artist + '.');
-  return `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${videoThumb(v.id)}
+  return `<a class="row vrow" data-rank="${v.rank}" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${videoThumb(v.id)}
     <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div><div class="s">${esc(reason)}</div></div>${I('ext')}</a>`;
 }
 function Top40() {
   return header('Top 40', 'Current chart music videos') +
+    `<div class="top40bar" id="top40bar"><button type="button" class="btn primary" id="top40surprise" onclick="surpriseTop40()">${I('shuffle')} Surprise me</button></div>` +
     `<div class="list" id="top40list">${TOP40.map(top40Row).join('')}</div>` +
-    `<div class="foot">Chart as of 30 Sep 2026. New Zealand Official Top 40 singles, 25 September to 1 October 2026. Songs with an official video.<br>Each video opens on YouTube.</div>`;
+    `<div class="foot">Chart as of 30 Sep 2026. New Zealand Official Top 40 singles, 25 September to 1 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, then opens it on YouTube. Each video opens on YouTube.</div>`;
+}
+let top40SurpriseToken = 0;
+function surpriseTop40() {
+  const scroller = document.getElementById('view');
+  const rows = [...document.querySelectorAll('#top40list a.row')];
+  if (!scroller || !rows.length) return;
+  const i = Math.floor(Math.random() * rows.length);
+  const row = rows[i];
+  const id = TOP40[i].id;
+  const token = ++top40SurpriseToken;
+  rows.forEach(r => r.classList.remove('surprise'));
+  const destFor = () => {
+    const s = scroller.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    const bar = document.getElementById('top40bar');
+    const barH = bar ? bar.offsetHeight : 0;
+    const raw = scroller.scrollTop + (r.top - s.top) - barH - 8;
+    const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    return Math.max(0, Math.min(max, raw));
+  };
+  // A short jump back to the top, when the row is not already well below, makes the scroll down visible.
+  if (destFor() - scroller.scrollTop < 240) scroller.scrollTop = 0;
+  const from = scroller.scrollTop;
+  const dest = destFor();
+  const dist = dest - from;
+  const finish = () => {
+    if (token !== top40SurpriseToken) return;
+    row.classList.add('surprise');
+    setTimeout(() => { if (token === top40SurpriseToken) row.classList.remove('surprise'); }, 1700);
+    setTimeout(() => {
+      if (token !== top40SurpriseToken) return;
+      const a = document.createElement('a');
+      a.href = 'https://www.youtube.com/watch?v=' + id;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }, 450);
+  };
+  if (dist < 28) { finish(); return; }
+  const ms = Math.min(1600, Math.max(900, Math.abs(dist) * 0.55));
+  const t0 = performance.now();
+  const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+  const step = now => {
+    if (token !== top40SurpriseToken) return;
+    const p = Math.min(1, (now - t0) / ms);
+    scroller.scrollTop = from + dist * ease(p);
+    if (p < 1) requestAnimationFrame(step);
+    else finish();
+  };
+  requestAnimationFrame(step);
 }
 
 /* ================= SETTINGS ================= */
