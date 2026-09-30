@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.25.3';
+const APP_VERSION = '1.26.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3501,7 +3501,7 @@ function More() {
     bills: () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…',
     birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
     ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down',
-    videos: () => { const n = VIDEO_CATS.filter(c => videoCatOn(c.id)).length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
+    videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
     top40: () => 'Official Top 40 · chart as of 30 Sep 2026'
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
@@ -4213,7 +4213,11 @@ const VIDEO_CATS = [
   { id: 'reno', name: 'Renovation', sub: 'Beginner room and painting jobs' },
   { id: 'cars', name: 'Cars', sub: 'Maintenance and the Warrant of Fitness' },
   { id: 'pets', name: 'Cats and dogs', sub: 'Care, training and day-to-day with cats and dogs' },
-  { id: 'travel', name: 'Travel', sub: 'Trip ideas and how to plan them' }
+  { id: 'travel', name: 'Travel', sub: 'Trip ideas and how to plan them' },
+  // extra: not on until he adds it from search, so today's categories stay as they are
+  { id: 'diy', name: 'DIY', sub: 'Small jobs around the house', extra: true },
+  { id: 'gf', name: 'Gluten-free cooking', sub: 'Gluten-free baking and bread', extra: true },
+  { id: 'wood', name: 'Woodworking', sub: 'Beginner projects with basic tools', extra: true }
 ];
 const VIDEOS = [
   { id: 'EKOU3JWDNLI', title: 'The unhinged world of tech in 2026...', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=EKOU3JWDNLI', reason: 'A plain-language look at the technology stories of 2026.' },
@@ -4251,16 +4255,100 @@ const VIDEOS = [
   { id: 'H0wGjEUDkQ4', title: 'Explore Paihia & Russell: Gateway to New Zealand’s Bay of Islands | New Zealand Travel Guide', channel: 'OziTraveler', category: 'travel', url: 'https://www.youtube.com/watch?v=H0wGjEUDkQ4', reason: 'A travel guide to Paihia and Russell, the gateway to the Bay of Islands.' },
   { id: 'XCsMvEMX11Y', title: 'New Zealand -  Watch BEFORE You Go! Essential Travel Tips NZ', channel: 'CJ Explores', category: 'travel', url: 'https://www.youtube.com/watch?v=XCsMvEMX11Y', reason: 'Essential travel tips to watch before a trip to New Zealand.' },
   { id: 'E47FGfv14Mc', title: 'How to Plan a Trip for Solo or Group Travel', channel: 'Brady Skye', category: 'travel', url: 'https://www.youtube.com/watch?v=E47FGfv14Mc', reason: 'How to plan a trip for solo or group travel.' },
-  { id: 'PxDB8a4swb4', title: '9 Things to Do to Plan the PERFECT Trip (Travel 101: Episode 1)', channel: 'Aly Smalls', category: 'travel', url: 'https://www.youtube.com/watch?v=PxDB8a4swb4', reason: 'Nine things to do to plan a trip.' }
+  { id: 'PxDB8a4swb4', title: '9 Things to Do to Plan the PERFECT Trip (Travel 101: Episode 1)', channel: 'Aly Smalls', category: 'travel', url: 'https://www.youtube.com/watch?v=PxDB8a4swb4', reason: 'Nine things to do to plan a trip.' },
+  { id: 'zMH61Yabdj0', title: 'How to Repair a Leaking Faucet | This Old House', channel: 'This Old House', category: 'diy', url: 'https://www.youtube.com/watch?v=zMH61Yabdj0', reason: 'How to stop a tap from leaking.' },
+  { id: 'PLGmTzEGSIY', title: 'How to Patch a Drywall Hole | Ask This Old House', channel: 'This Old House', category: 'diy', url: 'https://www.youtube.com/watch?v=PLGmTzEGSIY', reason: 'How to patch small, medium and large holes in a wall.' },
+  { id: 'qbupCzSPW9o', title: 'How to Patch Small Holes in Walls | Ask This Old House', channel: 'This Old House', category: 'diy', url: 'https://www.youtube.com/watch?v=qbupCzSPW9o', reason: 'A quick way to fill small holes left by nails and screws.' },
+  { id: 'cWmb1D4Wciw', title: 'DIY Floating Shelves | $15 Per Shelf', channel: 'Nathan Builds', category: 'diy', url: 'https://www.youtube.com/watch?v=cWmb1D4Wciw', reason: 'How to build simple floating shelves from a sheet of plywood.' },
+  { id: 'geKL87hX210', title: 'How To Make Anything Gluten Free by Becky Excell', channel: 'Waterstones', category: 'gf', url: 'https://www.youtube.com/watch?v=geKL87hX210', reason: 'Becky Excell bakes a gluten-free Swiss roll.' },
+  { id: 'zFkDZ1ljNC8', title: 'Gluten-Free Basics & Beyond | GF Tips, Ingredient Swaps, Guides, Recipes from America\'s Test Kitchen', channel: "America's Test Kitchen", category: 'gf', url: 'https://www.youtube.com/watch?v=zFkDZ1ljNC8', reason: 'Gluten-free baking and cooking basics from America\'s Test Kitchen.' },
+  { id: 'WQyK_jTLMsY', title: '3-Ingredient Gluten-Free Flatbread | Liv Baking', channel: 'Bigger Bolder Baking with Gemma Stafford', category: 'gf', url: 'https://www.youtube.com/watch?v=WQyK_jTLMsY', reason: 'A gluten-free flatbread made with almond flour and tapioca starch.' },
+  { id: 'H5gZO37HX0E', title: 'How to Make Gluten Free Banana BREAD (ONE BOWL,  SUGAR FREE, DAIRY FREE OPTION) || How To Coeliac', channel: 'How To Coeliac', category: 'gf', url: 'https://www.youtube.com/watch?v=H5gZO37HX0E', reason: 'A one-bowl gluten-free banana bread.' },
+  { id: '8vFGrNjT4P4', title: 'How to make a basic box. And why you need to know how | Woodworking BASICS | Power Tools', channel: 'Steve Ramsey - Woodworking for Mere Mortals', category: 'wood', url: 'https://www.youtube.com/watch?v=8vFGrNjT4P4', reason: 'Why a simple box is the first woodworking project to learn.' },
+  { id: 'mvO6zaIUO18', title: 'Beginner\'s guide to pocket hole joinery | WOODWORKING BASICS', channel: 'Steve Ramsey - Woodworking for Mere Mortals', category: 'wood', url: 'https://www.youtube.com/watch?v=mvO6zaIUO18', reason: 'How pocket-hole joints work, for a beginner.' },
+  { id: 'T5nt7f8tMXA', title: 'Make this simple patio table with just a miter saw', channel: 'Steve Ramsey - Woodworking for Mere Mortals', category: 'wood', url: 'https://www.youtube.com/watch?v=T5nt7f8tMXA', reason: 'A simple outdoor table you can build with a miter saw.' },
+  { id: 'ZKmtQiKgyFI', title: 'Storage Shelf - Cheap and Easy Build Plans', channel: 'Dave Wirth', category: 'wood', url: 'https://www.youtube.com/watch?v=ZKmtQiKgyFI', reason: 'A cheap storage shelf you can build for a garage or basement.' }
 ];
 function videoCatOn(id) {
   const c = S.settings.videoCats;
   if (c && typeof c === 'object' && Object.prototype.hasOwnProperty.call(c, id)) return !!c[id];
-  return true;
+  const built = VIDEO_CATS.find(x => x.id === id);
+  if (built) return !built.extra;
+  return false;
 }
-async function toggleVideoCat(id) {
-  S.settings.videoCats = Object.assign({}, S.settings.videoCats, { [id]: !videoCatOn(id) });
-  await save(); render();
+function videoCustomList() {
+  const a = S.settings && S.settings.videoCustom;
+  if (!Array.isArray(a)) return [];
+  const out = [], seen = new Set();
+  a.forEach(x => {
+    if (!x || typeof x.id !== 'string' || typeof x.name !== 'string') return;
+    const name = x.name.replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!name || !x.id || seen.has(x.id) || VIDEO_CATS.some(c => c.id === x.id)) return;
+    seen.add(x.id);
+    out.push({ id: x.id, name, sub: '', custom: true });
+  });
+  return out;
+}
+function allVideoCats() {
+  return VIDEO_CATS.concat(videoCustomList());
+}
+function enabledVideoCats() {
+  return allVideoCats().filter(c => videoCatOn(c.id));
+}
+let videoTab = '';
+let videoCatQuery = '';
+function selectVideoCat(id) {
+  videoTab = id;
+  render();
+  const v = document.getElementById('view'); if (v) v.scrollTop = 0;
+}
+function customVideoId(name) {
+  let base = 'cus-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24);
+  if (base === 'cus-') base = 'cus-x';
+  let id = base, n = 2;
+  const taken = new Set(allVideoCats().map(c => c.id));
+  while (taken.has(id)) { id = base.slice(0, 20) + n; n++; }
+  return id;
+}
+async function addVideoCat(id) {
+  const cat = allVideoCats().find(c => c.id === id);
+  if (!cat || videoCatOn(id)) { if (cat) selectVideoCat(id); return; }
+  S.settings.videoCats = Object.assign({}, S.settings.videoCats, { [id]: true });
+  videoTab = id;
+  videoCatQuery = '';
+  await save();
+  render();
+  const v = document.getElementById('view'); if (v) v.scrollTop = 0;
+  toast(cat.name + ' added.');
+}
+async function addCustomVideoCat(name) {
+  name = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  if (!name) return;
+  const existing = allVideoCats().find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (existing) return addVideoCat(existing.id);
+  const id = customVideoId(name);
+  S.settings.videoCustom = videoCustomList().concat([{ id, name }]);
+  S.settings.videoCats = Object.assign({}, S.settings.videoCats, { [id]: true });
+  videoTab = id;
+  videoCatQuery = '';
+  await save();
+  render();
+  const v = document.getElementById('view'); if (v) v.scrollTop = 0;
+  toast(name + ' added.');
+}
+function videoCatSearchHtml() {
+  const q = videoCatQuery.replace(/\s+/g, ' ').trim();
+  const nq = q.toLowerCase();
+  if (!nq) return '';
+  const all = allVideoCats();
+  const hits = all.filter(c => !videoCatOn(c.id) && c.name.toLowerCase().includes(nq));
+  if (hits.length) {
+    return `<div class="list" id="vidcathits">${hits.map(c => `<button type="button" class="row" onclick="addVideoCat(${jsArg(c.id)})"><div class="tx"><div class="t">${esc(c.name)}</div>${c.sub ? `<div class="s">${esc(c.sub)}</div>` : ''}</div>${I('plus')}</button>`).join('')}</div>`;
+  }
+  const owned = all.filter(c => videoCatOn(c.id) && c.name.toLowerCase().includes(nq));
+  if (owned.length) return `<div class="card empty"><div class="t">You already have this</div><div class="s">${esc(owned[0].name)} is already a tab.</div></div>`;
+  if (q.length > 40) return `<div class="card empty"><div class="s">Use a shorter name, up to 40 characters.</div></div>`;
+  return `<div class="list"><button type="button" class="row" onclick="addCustomVideoCat(${jsArg(q)})"><div class="tx"><div class="t">Add ${esc(q)}</div><div class="s">Use this exact name</div></div>${I('plus')}</button></div>`;
 }
 function videoSuggestions() {
   const on = VIDEO_CATS.map(c => c.id).filter(videoCatOn);
@@ -4299,38 +4387,21 @@ function videoDismissedIds() {
   d.ids.forEach(id => { if (known.has(id) && !out.includes(id)) out.push(id); });
   return out;
 }
-// One current video per enabled category. The others in that category stay off the list so a swipe can bring one in.
-function videosPageList() {
+function videosForCat(id) {
   const skip = new Set(videoDismissedIds());
-  const out = [];
-  VIDEO_CATS.forEach(c => {
-    if (!videoCatOn(c.id)) return;
-    const v = VIDEOS.find(x => x.category === c.id && !skip.has(x.id));
-    if (v) out.push(v);
-  });
-  return out;
-}
-// Next video in the same category that is not on the page and is not the one just skipped.
-function nextVideoInCategory(category, showing, skipId) {
-  const skip = new Set(videoDismissedIds());
-  if (skipId) skip.add(skipId);
-  return VIDEOS.find(v => v.category === category && videoCatOn(v.category) && v.id !== skipId && !showing.has(v.id) && !skip.has(v.id)) || null;
+  return VIDEOS.filter(v => v.category === id && !skip.has(v.id));
 }
 async function skipVideo(id) {
   const cur = VIDEOS.find(v => v.id === id);
-  if (!cur) return;
-  const list = videosPageList();
-  if (!list.some(v => v.id === id)) return;
+  if (!cur || videoDismissedIds().includes(id)) return;
+  if (!videosForCat(cur.category).some(v => v.id === id)) return;
   const shot = snap();
   const dismissed = videoDismissedIds();
-  if (!dismissed.includes(id)) dismissed.push(id);
+  dismissed.push(id);
   S.settings.videoDismissed = { day: todayISO(), ids: dismissed };
-  const showing = new Set(list.map(v => v.id));
-  showing.delete(id);
-  const repl = nextVideoInCategory(cur.category, showing, id);
   await save();
   render();
-  toast(repl ? 'Next video.' : 'No more in that category today.', 'Undo', undoTo(shot));
+  toast(videosForCat(cur.category).length ? 'Skipped for today.' : 'No more in that category today.', 'Undo', undoTo(shot));
 }
 let vs = null;
 function wireVideoSwipe() {
@@ -4379,20 +4450,21 @@ function homeVideosCard() {
     <div class="list" id="homevideos">${list.map(v => videoRow(v)).join('')}</div>`;
 }
 function Videos() {
-  const list = videosPageList();
-  const switches = `<div class="list" id="videocats">${VIDEO_CATS.map(c => {
-    const on = videoCatOn(c.id);
-    return `<div class="srow" data-cat="${c.id}"><div class="tx"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.sub)}</div></div>
-      <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(c.name)}" onclick="toggleVideoCat('${c.id}')"></button></div>`;
-  }).join('')}</div>`;
-  const anyOn = VIDEO_CATS.some(c => videoCatOn(c.id));
-  const body = list.length
-    ? `<div class="sec">Suggestions</div><div class="list" id="videolist">${list.map(v => videoRow(v, true)).join('')}</div>`
-    : anyOn
-      ? `<div class="card empty" id="videonone"><div class="t">No videos left today</div><div class="s">Skipped videos come back tomorrow.</div></div>`
-      : `<div class="card empty" id="videonone"><div class="t">No videos to show</div><div class="s">Turn a category back on to see suggestions.</div></div>`;
-  return header('Videos', 'Suggestions from the categories you leave on') + switches + body +
-    `<div class="foot">Swipe a video left to see another from that category. Skipped ones stay hidden for the rest of today.<br>Updated 30 Sep 2026. These refresh every couple of weeks.<br>Each video opens on YouTube.</div>`;
+  const cats = enabledVideoCats();
+  if (!cats.some(c => c.id === videoTab)) videoTab = cats.length ? cats[0].id : '';
+  const tabs = cats.length ? `<div class="chips scroll" id="videotabs" role="tablist" aria-label="Video categories">${cats.map(c => `<button type="button" class="chip${c.id === videoTab ? ' on' : ''}" role="tab" aria-selected="${c.id === videoTab}" onclick="selectVideoCat(${jsArg(c.id)})">${esc(c.name)}</button>`).join('')}</div>` : '';
+  const list = videoTab ? videosForCat(videoTab) : [];
+  const curated = videoTab ? VIDEOS.some(v => v.category === videoTab) : false;
+  const body = !cats.length
+    ? `<div class="card empty" id="videonone"><div class="t">No categories yet</div><div class="s">Add a category to see videos.</div></div>`
+    : list.length
+      ? `<div class="list" id="videolist">${list.map(v => videoRow(v, true)).join('')}</div>`
+      : curated
+        ? `<div class="card empty" id="videonone"><div class="t">No videos left today</div><div class="s">Skipped videos come back tomorrow.</div></div>`
+        : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
+  const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
+  return header('Videos', 'One category at a time') + tabs + body + search +
+    `<div class="foot">Swipe a video left to skip it for today. It stays hidden until tomorrow.<br>Updated 30 Sep 2026. These refresh every couple of weeks.<br>Each video opens on YouTube.</div>`;
 }
 
 
@@ -4663,7 +4735,7 @@ function render() {
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
   if ((r === 'more' && moreEdit) || ((r === 'home' || r === '') && homeEdit)) wireReorder();
-  if (r === 'videos') wireVideoSwipe();
+  if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
