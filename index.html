@@ -124,6 +124,18 @@ body.kb #view{padding-bottom:28px}
 .row:first-child{border-top:0}
 .row .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
 .row .ic svg.i{width:22px;height:22px}
+/* Home feed imagery (1.25.2): give Upcoming and its related cards room to match the writing.
+   Keep the Cars page and Meal planner at their existing sizes. */
+.hsec[data-k="attention"] .row.att .ic,
+.hsec[data-k="events"] .row .ic,
+.hsec[data-k="videos"] .row .ic{width:52px;height:52px;border-radius:16px}
+.hsec[data-k="attention"] .row.att .ic svg.i,
+.hsec[data-k="events"] .row .ic svg.i,
+.hsec[data-k="videos"] .row .ic svg.i{width:26px;height:26px}
+.hsec[data-k="meals"] .mealpic{width:98px;height:98px;border-radius:20px}
+.hsec[data-k="meals"] .mealpic .mealplate{width:98px;height:98px}
+.hsec[data-k="meals"] .mealpic>svg.i{width:49px;height:49px;margin-top:-12px}
+.hsec[data-k="videos"] .vthumb{width:132px;height:74px;border-radius:12px}
 .row .tx{flex:1;min-width:0}
 .row .t{font-weight:650;font-size:0.96875rem;line-height:1.25;overflow-wrap:anywhere}
 .row .s{font-size:0.8125rem;color:var(--ink2);margin-top:2px;line-height:1.3}
