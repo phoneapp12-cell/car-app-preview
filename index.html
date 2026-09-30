@@ -426,6 +426,10 @@ details.help ol{margin:0 0 12px}
 .vthumb{width:112px;height:63px;border-radius:10px;object-fit:cover;flex:none;background:var(--soft2)}
 .row.vrow{align-items:center}
 .row.vrow .s{overflow-wrap:anywhere}
+.vsw{position:relative;overflow:hidden}
+.vsw .vswbg{position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding-right:16px;background:var(--brand);color:var(--onbrand);font-weight:700;font-size:0.875rem}
+.vsw .vrow{position:relative;z-index:1;background:var(--card);touch-action:pan-y}
+.list>.vsw:first-child .vrow{border-top:0}
 .ic.br{background:var(--br-bg);color:var(--br-fg)}
 .card.bridge{margin-bottom:12px;padding:14px}
 .brhead{display:flex;align-items:center;gap:10px}

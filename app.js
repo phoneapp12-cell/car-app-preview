@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.25.2';
+const APP_VERSION = '1.25.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4284,9 +4284,93 @@ function videoReason(v) {
 function videoThumb(id) {
   return `<img class="vthumb" src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" width="112" height="63" loading="lazy" decoding="async">`;
 }
-function videoRow(v) {
-  return `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${videoThumb(v.id)}
+function videoRow(v, swipe) {
+  const link = `<a class="row vrow"${swipe ? ' draggable="false"' : ''} href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${videoThumb(v.id)}
     <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div>${I('ext')}</a>`;
+  if (!swipe) return link;
+  return `<div class="vsw" data-vid="${esc(v.id)}" data-cat="${esc(v.category)}"><div class="vswbg" aria-hidden="true">Skip</div>${link}</div>`;
+}
+// Videos skipped on the Videos page, for today only. A refresh keeps them out; tomorrow they can come back.
+function videoDismissedIds() {
+  const d = S.settings && S.settings.videoDismissed;
+  if (!d || d.day !== todayISO() || !Array.isArray(d.ids)) return [];
+  const known = new Set(VIDEOS.map(v => v.id));
+  const out = [];
+  d.ids.forEach(id => { if (known.has(id) && !out.includes(id)) out.push(id); });
+  return out;
+}
+// One current video per enabled category. The others in that category stay off the list so a swipe can bring one in.
+function videosPageList() {
+  const skip = new Set(videoDismissedIds());
+  const out = [];
+  VIDEO_CATS.forEach(c => {
+    if (!videoCatOn(c.id)) return;
+    const v = VIDEOS.find(x => x.category === c.id && !skip.has(x.id));
+    if (v) out.push(v);
+  });
+  return out;
+}
+// Next video in the same category that is not on the page and is not the one just skipped.
+function nextVideoInCategory(category, showing, skipId) {
+  const skip = new Set(videoDismissedIds());
+  if (skipId) skip.add(skipId);
+  return VIDEOS.find(v => v.category === category && videoCatOn(v.category) && v.id !== skipId && !showing.has(v.id) && !skip.has(v.id)) || null;
+}
+async function skipVideo(id) {
+  const cur = VIDEOS.find(v => v.id === id);
+  if (!cur) return;
+  const list = videosPageList();
+  if (!list.some(v => v.id === id)) return;
+  const shot = snap();
+  const dismissed = videoDismissedIds();
+  if (!dismissed.includes(id)) dismissed.push(id);
+  S.settings.videoDismissed = { day: todayISO(), ids: dismissed };
+  const showing = new Set(list.map(v => v.id));
+  showing.delete(id);
+  const repl = nextVideoInCategory(cur.category, showing, id);
+  await save();
+  render();
+  toast(repl ? 'Next video.' : 'No more in that category today.', 'Undo', undoTo(shot));
+}
+let vs = null;
+function wireVideoSwipe() {
+  const list = document.getElementById('videolist');
+  if (!list) return;
+  const end = e => {
+    if (!vs || e.pointerId !== vs.pid) return;
+    const st = vs; vs = null;
+    const w = st.wrap.getBoundingClientRect().width || 1;
+    const gone = st.drag && -st.dx > Math.max(72, w * 0.34);
+    st.a.style.transition = 'transform .18s ease';
+    if (st.drag) {
+      const block = ev => { ev.preventDefault(); ev.stopPropagation(); st.a.removeEventListener('click', block, true); };
+      st.a.addEventListener('click', block, true);
+    }
+    if (!gone) { st.a.style.transform = ''; return; }
+    st.a.style.transform = 'translateX(-100%)';
+    setTimeout(() => skipVideo(st.id), 180);
+  };
+  list.addEventListener('pointerdown', e => {
+    if (vs || (e.button != null && e.button !== 0)) return;
+    const wrap = e.target.closest('.vsw'); if (!wrap) return;
+    const a = wrap.querySelector('.vrow'); if (!a) return;
+    vs = { wrap, a, id: wrap.dataset.vid, x: e.clientX, y: e.clientY, dx: 0, drag: false, pid: e.pointerId };
+  });
+  list.addEventListener('pointermove', e => {
+    if (!vs || e.pointerId !== vs.pid) return;
+    const dx = e.clientX - vs.x, dy = e.clientY - vs.y;
+    if (!vs.drag) {
+      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { vs = null; return; }
+      if (dx > -8) return;
+      vs.drag = true;
+      try { vs.wrap.setPointerCapture(e.pointerId); } catch (err) { }
+    }
+    vs.dx = Math.min(0, dx);
+    vs.a.style.transition = 'none';
+    vs.a.style.transform = `translateX(${vs.dx}px)`;
+  });
+  list.addEventListener('pointerup', end);
+  list.addEventListener('pointercancel', end);
 }
 function homeVideosCard() {
   const list = videoSuggestions().slice(0, homeVideoCount());
@@ -4295,17 +4379,20 @@ function homeVideosCard() {
     <div class="list" id="homevideos">${list.map(v => videoRow(v)).join('')}</div>`;
 }
 function Videos() {
-  const list = videoSuggestions();
+  const list = videosPageList();
   const switches = `<div class="list" id="videocats">${VIDEO_CATS.map(c => {
     const on = videoCatOn(c.id);
     return `<div class="srow" data-cat="${c.id}"><div class="tx"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.sub)}</div></div>
       <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(c.name)}" onclick="toggleVideoCat('${c.id}')"></button></div>`;
   }).join('')}</div>`;
+  const anyOn = VIDEO_CATS.some(c => videoCatOn(c.id));
   const body = list.length
-    ? `<div class="sec">Suggestions</div><div class="list" id="videolist">${list.map(videoRow).join('')}</div>`
-    : `<div class="card empty" id="videonone"><div class="t">No videos to show</div><div class="s">Turn a category back on to see suggestions.</div></div>`;
+    ? `<div class="sec">Suggestions</div><div class="list" id="videolist">${list.map(v => videoRow(v, true)).join('')}</div>`
+    : anyOn
+      ? `<div class="card empty" id="videonone"><div class="t">No videos left today</div><div class="s">Skipped videos come back tomorrow.</div></div>`
+      : `<div class="card empty" id="videonone"><div class="t">No videos to show</div><div class="s">Turn a category back on to see suggestions.</div></div>`;
   return header('Videos', 'Suggestions from the categories you leave on') + switches + body +
-    `<div class="foot">Updated 30 Sep 2026. These refresh every couple of weeks.<br>Each video opens on YouTube.</div>`;
+    `<div class="foot">Swipe a video left to see another from that category. Skipped ones stay hidden for the rest of today.<br>Updated 30 Sep 2026. These refresh every couple of weeks.<br>Each video opens on YouTube.</div>`;
 }
 
 
@@ -4576,6 +4663,7 @@ function render() {
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
   if ((r === 'more' && moreEdit) || ((r === 'home' || r === '') && homeEdit)) wireReorder();
+  if (r === 'videos') wireVideoSwipe();
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
