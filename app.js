@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.24.5';
+const APP_VERSION = '1.25.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -128,6 +128,7 @@ function normalise(d) {
     if (!Array.isArray(c.services)) c.services = [];
     // Older versions only kept the date of the last service: turn it into a history entry
     if (c.lastService && !c.services.length) c.services.push({ id: 'svc-' + c.id + '-' + c.lastService, date: c.lastService, km: '', garage: '', cost: '', notes: '', migrated: true });
+    if (!storedPhoto(c.photo)) delete c.photo; // only a small JPEG taken on this phone, never a web address
   });
   d.meals = normMeals(d.meals); // first time on 1.4.0: Fri and Sat, with the starter ideas
   d.shop = normShop(d.shop, d); // 1.15.0: shopping list tab (open Shopping to-dos move here the first time)
@@ -358,7 +359,7 @@ const HOME_CARD = {
   cars: () => {
     if (!S.cars.length) return '';
     const cell = (l, d) => d ? `<span class="cg"><small>${l}</small> ${fmt(d)} ${pill(daysLeft(d))}</span>` : '';
-    return homeSec('Cars', '<a href="#cars">See all</a>') + `<div class="list" id="homecars">${S.cars.map(c => `<button class="row" onclick="go('#car/${c.id}')"><div class="ic car">${I('car')}</div>
+    return homeSec('Cars', '<a href="#cars">See all</a>') + `<div class="list" id="homecars">${S.cars.map(c => `<button class="row" onclick="go('#car/${c.id}')">${carMark(c)}
       <div class="tx"><div class="t">${esc(c.name)}${c.plate ? ` <span class="plate small">${esc(c.plate)}</span>` : ''}</div><div class="cgrow">${cell('WOF', c.wof)}${cell('Rego', c.rego)}</div></div></button>`).join('')}</div>`;
   },
   ideas: () => {
@@ -411,6 +412,101 @@ function Home() {
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
 
+/* ---------- photos (1.25.0) ----------
+   A car or recipe photo is a JPEG the user took or picked on this phone, shrunk to about 400px wide,
+   and saved in the same local data as everything else. Nothing is downloaded from the web. */
+const PHOTO_MAX = 400;
+const PHOTO_LIMIT = 160000;
+function storedPhoto(s) {
+  return typeof s === 'string' && s.length > 30 && s.length < PHOTO_LIMIT && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(s) ? s : '';
+}
+function photoOwner(kind, id) {
+  if (kind === 'car') return getCar(id) || null;
+  if (kind === 'recipe') return (M().ideas || []).find(x => x.id === id) || null;
+  return null;
+}
+function loadPhotoEl(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('read')); };
+    img.src = url;
+  });
+}
+function drawPhoto(src, sw, sh, max, q) {
+  const k = Math.min(1, max / sw, max / sh);
+  const w = Math.max(1, Math.round(sw * k)), h = Math.max(1, Math.round(sh * k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d').drawImage(src, 0, 0, w, h);
+  return c.toDataURL('image/jpeg', q);
+}
+async function fileToJpeg(file) {
+  if (!file || (file.type && !/^image\//i.test(file.type))) throw new Error('type');
+  let src, sw, sh, close = () => {};
+  try {
+    let bmp;
+    try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+    catch (e) { bmp = await createImageBitmap(file); }
+    src = bmp; sw = bmp.width; sh = bmp.height; close = () => { if (bmp.close) bmp.close(); };
+  } catch (e) {
+    src = await loadPhotoEl(file); sw = src.naturalWidth; sh = src.naturalHeight;
+  }
+  try {
+    if (!sw || !sh) throw new Error('read');
+    for (const max of [PHOTO_MAX, 320]) {
+      for (const q of (max === PHOTO_MAX ? [0.72, 0.55, 0.42] : [0.6, 0.45])) {
+        const url = drawPhoto(src, sw, sh, max, q);
+        if (storedPhoto(url)) return url;
+      }
+    }
+    throw new Error('big');
+  } finally { close(); }
+}
+async function photoPicked(input, kind, id) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  const owner = photoOwner(kind, id);
+  if (!file || !owner) return;
+  try {
+    owner.photo = await fileToJpeg(file);
+    await save(); render();
+    toast('Photo saved on this phone.');
+  } catch (e) {
+    toast('Couldn’t use that photo. Try another from your camera or gallery.');
+  }
+}
+async function clearPhoto(kind, id) {
+  const owner = photoOwner(kind, id);
+  if (!owner || !owner.photo) return;
+  delete owner.photo;
+  await save(); render();
+  toast('Photo removed.');
+}
+function photoBtns(kind, id) {
+  const has = !!storedPhoto((photoOwner(kind, id) || {}).photo);
+  const what = kind === 'car' ? 'this car' : 'this recipe';
+  const cam = 'pcam-' + kind + '-' + id, pick = 'ppick-' + kind + '-' + id;
+  return `<div class="btns photobtns" onclick="event.stopPropagation()">
+    <input type="file" accept="image/*" capture="environment" id="${esc(cam)}" hidden onchange="photoPicked(this,${jsArg(kind)},${jsArg(id)})">
+    <input type="file" accept="image/*" id="${esc(pick)}" hidden onchange="photoPicked(this,${jsArg(kind)},${jsArg(id)})">
+    <button type="button" class="btn small" aria-label="${has ? 'Take a new photo' : 'Take a photo'} of ${what}" onclick="event.stopPropagation();document.getElementById(${jsArg(cam)}).click()">${I('camera')} Take a photo</button>
+    <button type="button" class="btn small" aria-label="Choose a photo of ${what} from your gallery" onclick="event.stopPropagation();document.getElementById(${jsArg(pick)}).click()">${I('image')} Choose a photo</button>
+    ${has ? `<button type="button" class="btn small" aria-label="Remove the photo of ${what}" onclick="event.stopPropagation();clearPhoto(${jsArg(kind)},${jsArg(id)})">Remove</button>` : ''}</div>`;
+}
+function carPic(c, shot) {
+  const src = storedPhoto(c.photo);
+  const cls = 'carpic' + (shot ? ' carshot' : '') + (src ? ' hasphoto' : '');
+  const bg = esc(c.hex || colourHex(c.colour));
+  if (src) return `<div class="${cls}" style="background:${bg}"><img alt="" src="${esc(src)}"></div>`;
+  return `<div class="${cls}" style="background:${bg}">${I('car')}</div>`;
+}
+function carMark(c) {
+  const src = storedPhoto(c.photo);
+  if (src) return `<div class="ic car hasphoto"><img alt="" src="${esc(src)}"></div>`;
+  return `<div class="ic car">${I('car')}</div>`;
+}
+
 /* ================= CARS ================= */
 function svcCell(c) {
   if (c.svcDate) return `<div><small>Service</small><b>${fmt(c.svcDate)}</b>${pill(daysLeft(c.svcDate))}</div>`;
@@ -424,9 +520,9 @@ function carTriple(c) {
 function Cars() {
   return header('Cars', S.cars.length ? plural(S.cars.length, 'car') + ' in the family' : 'WOF, rego and servicing', addBtn('Add a car', 'carForm()')) +
     (S.cars.length ? S.cars.map(c => `<div class="carcard" role="button" tabindex="0" onclick="go('#car/${c.id}')"><div class="carhead">
-      <div class="carpic carshot" style="background:${esc(c.hex || colourHex(c.colour))}">${I('car')}</div>
+      ${carPic(c, true)}
       <div style="flex:1;min-width:0"><div class="carname">${esc(c.name)}</div><div class="carmodel">${esc(carSub(c))}</div></div>
-      ${c.plate ? `<span class="plate">${esc(c.plate)}</span>` : ''}</div>${carTriple(c)}</div>`).join('')
+      ${c.plate ? `<span class="plate">${esc(c.plate)}</span>` : ''}</div>${photoBtns('car', c.id)}${carTriple(c)}</div>`).join('')
       : empty('No cars yet', 'Add a car to keep track of its WOF, rego and servicing.', 'Add a car', 'carForm()')) +
     `<div class="callout blue">${I('info')}<div>NZTA won’t renew rego unless the WOF is current, so the app warns you when the WOF runs out first.</div></div>` +
     driversSection();
@@ -457,8 +553,9 @@ function CarDetail(id) {
   }
   return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#cars')">${I('left')} Cars</button>
     <button class="btn small" onclick="carForm('${c.id}')">${I('edit')} Edit</button></div>
-  <div class="hero"><div class="carpic" style="background:${esc(c.hex || colourHex(c.colour))}">${I('car')}</div>
+  <div class="hero">${carPic(c, false)}
    <div style="min-width:0"><h2>${esc(c.name)}</h2><div class="muted">${esc(carSub(c))}${c.details ? '<br>' + esc(c.details) : ''}</div>${c.plate ? `<div style="margin-top:6px"><span class="plate">${esc(c.plate)}</span></div>` : ''}</div></div>
+  ${photoBtns('car', c.id)}
   ${wofWarning(c)}
   <div class="dcard"><div class="h">${I('shield')} Warrant of fitness (WOF) ${wd != null ? pill(wd) : '<span class="pill none">Not set</span>'}</div>
    <div class="big">${c.wof ? fmtLong(c.wof) : 'No date yet'}</div>
@@ -1508,7 +1605,7 @@ function normMeals(m) {
   Object.keys(m.plan).forEach(k => { const e = m.plan[k]; if (!/^\d{4}-\d\d-\d\d$/.test(k) || !e || typeof e !== 'object' || !String(e.title || '').trim()) delete m.plan[k]; });
   if (!Array.isArray(m.ideas)) m.ideas = starterMeals();
   m.ideas = m.ideas.filter(i => i && i.id && String(i.title || '').trim());
-  m.ideas.forEach(i => { if (!Array.isArray(i.ingr)) i.ingr = String(i.ingr || '').split(/\n|,/).map(s => s.trim()).filter(Boolean); if (!MEAL_TAGS.includes(i.tag)) i.tag = i.tag ? String(i.tag) : ''; });
+  m.ideas.forEach(i => { if (!Array.isArray(i.ingr)) i.ingr = String(i.ingr || '').split(/\n|,/).map(s => s.trim()).filter(Boolean); if (!MEAL_TAGS.includes(i.tag)) i.tag = i.tag ? String(i.tag) : ''; if (!storedPhoto(i.photo)) delete i.photo; });
   if (typeof m.list !== 'string') m.list = '';
   if ((m.starterVer || 1) < STARTER_VER) migrateStarters(m);
   m.ideas.forEach(i => { if (typeof i.gf !== 'boolean') i.gf = !!i.builtin; });
@@ -1570,8 +1667,10 @@ async function toggleNight(n) {
 }
 async function toggleMealsCal() { S.settings.mealsCal = !showMealsCal(); await save(); render(); }
 let mealHistAll = false;
-// Recipes store text only (a scan reads words, not a photo). This is a drawn picture, never a web address.
-function mealPic() {
+// A recipe photo is optional: a small JPEG saved on this phone. If there isn’t one, keep the drawn meal icon. Never a web address.
+function mealPic(idea) {
+  const src = idea && storedPhoto(idea.photo);
+  if (src) return `<div class="mealpic hasphoto"><img alt="" src="${esc(src)}"></div>`;
   const plate = `<svg class="mealplate" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="40" r="22" fill="var(--card)"/><circle cx="36" cy="40" r="16.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/><ellipse cx="36" cy="38" rx="9" ry="5.5" fill="currentColor" opacity=".5"/><ellipse cx="29.5" cy="36.5" rx="4.2" ry="3" fill="currentColor" opacity=".32"/><circle cx="43" cy="37" r="3.2" fill="currentColor" opacity=".28"/></svg>`;
   return `<div class="mealpic" aria-hidden="true">${plate}${P.meal ? I('meal') : ''}</div>`;
 }
@@ -1581,7 +1680,7 @@ function mealRow(iso, hist = false) {
   const mark = !e ? '' : idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
   const sub = [mark, hist ? fmtW(iso) : nightLabel(iso), idea && idea.tag ? idea.tag : '', e && e.notes ? esc(e.notes.split('\n')[0].slice(0, 60)) : '', hist && e ? (e.cooked ? 'Cooked' : 'Not ticked') : ''].filter(Boolean).join(' · ');
   return `<div class="row meal ${e && e.cooked ? 'done' : ''}" data-date="${iso}">
-    ${e ? mealPic() : `<div class="ic meal">${I('meal')}</div>`}
+    ${e ? mealPic(idea) : `<div class="ic meal">${I('meal')}</div>`}
     ${e && past ? `<button class="tick" aria-label="${e.cooked ? 'Untick' : 'Tick'} cooked: ${esc(e.title)}" onclick="toggleCooked('${iso}')"><span>${I('check')}</span></button>` : ''}
     <button class="tapzone" onclick="mealNight('${iso}')"><div class="tx"><div class="t">${e ? esc(e.title) : '<span class="muted">Nothing planned</span>'}</div><div class="s">${sub}</div></div></button>
     ${!e && !hist ? `<button class="btn small" onclick="suggestNight('${iso}')">Suggest</button>` : ''}</div>`;
@@ -1649,7 +1748,7 @@ async function clearNight(iso) { const s = snap(); delete M().plan[iso]; await s
 
 /* ================= RECIPES (1.15.0) =================
    Recipes are the meal planner's ideas (S.meals.ideas), so everything planned or saved before carries over.
-   Each recipe: { id, title, tag, ingr: [..], method, serves, time, source, link, notes, fav, hidden, gf, builtin, scanned }.
+   Each recipe: { id, title, tag, ingr: [..], method, serves, time, source, link, notes, fav, hidden, gf, builtin, scanned, photo }.
    Pages: #recipes (list), #recipe/<id> (one recipe). "Scan" reads a recipe book page with the camera (text is read on the phone). */
 let mealFilter = 'All', mealQuery = '';
 const recipeOf = e => e ? (M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title)) : null;
@@ -1659,7 +1758,7 @@ function mealIdeaList() {
     (!q || (i.title + ' ' + i.ingr.join(' ') + ' ' + (i.tag || '') + ' ' + (i.notes || '') + ' ' + (i.method || '') + ' ' + (i.source || '')).toLowerCase().includes(q)))
     .sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || a.title.localeCompare(b.title));
   if (!vis.length) return `<div class="card empty"><div class="t">No recipes match</div><div class="s">${q ? 'Try a different word.' : mealFilter === 'Hidden' ? 'Nothing hidden.' : mealFilter === 'Mine' ? 'Recipes you add or scan show here.' : 'Nothing with this tag yet.'}</div></div>`;
-  return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}">${mealPic()}<button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
+  return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}">${mealPic(i)}<button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
     <button class="tapzone" onclick="go('#recipe/${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.method ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· method</span>` : i.link ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· link</span>` : ''}</div>
     <div class="s">${i.gf ? gfTag(true) + ' ' : '<span class="nogf">Not marked gluten free</span> '}${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}</div></div></button>
     ${i.hidden ? `<button class="btn small" onclick="toggleMealHidden('${i.id}')">Show</button>` : `<button class="btn small" onclick="planIdea('${i.id}')">Plan</button>`}</div>`).join('')}</div>`;
@@ -1685,8 +1784,9 @@ function RecipeDetail(id) {
   const onList = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
   return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#recipes')">${I('left')} Recipes</button>
     <button class="btn small" id="recedit" aria-label="Edit recipe" onclick="mealIdeaForm('${i.id}')">${I('edit')} Edit</button></div>
-    <h1 class="rectitle">${esc(i.title)}</h1><div class="sub recsub">${facts || (i.builtin ? 'Starter recipe' : 'Your recipe')}</div>
+    <div class="rechead">${mealPic(i)}<div style="min-width:0"><h1 class="rectitle">${esc(i.title)}</h1><div class="sub recsub">${facts || (i.builtin ? 'Starter recipe' : 'Your recipe')}</div></div></div>
     <div class="recmeta">${i.gf ? gfTag() : '<span class="nogf">Not marked gluten free</span>'}${i.fav ? ' <span class="cattag">★ Favourite</span>' : ''}${i.source ? ` <span class="muted">From ${esc(i.source)}</span>` : ''}</div>
+    ${photoBtns('recipe', i.id)}
     <div class="btns recbtns"><button class="btn primary" id="recplan" onclick="planRecipeForm('${i.id}')">${I('cal')} Plan it</button><button class="btn" id="recshop" onclick="recipeToShop('${i.id}')">${I('cart')} Add to shopping list</button></div>
     ${planned.length || last ? `<div class="card recplanned">${planned.length ? `Planned for ${planned.map(d => `<button class="linkbtn" onclick="openNight('${d}')">${fmtW(d)}</button>`).join(', ')}.` : ''}${last ? ` Last cooked ${fmtW(last)}.` : ''}</div>` : ''}
     <div class="sec">Ingredients <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">${i.ingr.length}</span></div>
@@ -2084,7 +2184,7 @@ function homeMeal() {
   const T = todayISO(), when = d => { const n = dayGap(d, T); return n === 0 ? 'Tonight' : n === 1 ? 'Tomorrow' : 'In ' + n + ' days'; };
   const row = d => { const e = M().plan[d], idea = M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title);
     const mark = idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
-    return `<button class="row mealup" data-date="${d}" onclick="openNight('${d}')">${mealPic()}<div class="tx"><div class="t">${fmtW(d)} – ${esc(e.title)}</div>
+    return `<button class="row mealup" data-date="${d}" onclick="openNight('${d}')">${mealPic(idea)}<div class="tx"><div class="t">${fmtW(d)} – ${esc(e.title)}</div>
       <div class="s">${[mark, when(d), idea && idea.tag ? esc(idea.tag) : ''].filter(Boolean).join(' · ')}</div></div>${I('right')}</button>`; };
   return `<div class="list mealhome" id="mealcard"><div class="mealcardhead"><span>${I('meal')} Upcoming meals</span><a href="#meals">See all${list.length > HOME_MEALS_MAX ? ` (${list.length})` : ''}</a></div>
     ${list.slice(0, HOME_MEALS_MAX).map(row).join('')}</div>`;
