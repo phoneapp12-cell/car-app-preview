@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.29.0';
+const APP_VERSION = '1.30.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4471,12 +4471,66 @@ const VIDEOS = [
   { id: 'T5nt7f8tMXA', title: 'Make this simple patio table with just a miter saw', channel: 'Steve Ramsey - Woodworking for Mere Mortals', category: 'wood', url: 'https://www.youtube.com/watch?v=T5nt7f8tMXA', reason: 'A simple outdoor table you can build with a miter saw.' },
   { id: 'ZKmtQiKgyFI', title: 'Storage Shelf - Cheap and Easy Build Plans', channel: 'Dave Wirth', category: 'wood', url: 'https://www.youtube.com/watch?v=ZKmtQiKgyFI', reason: 'A cheap storage shelf you can build for a garage or basement.' }
 ];
+// Extra videos for each category. They stay off the list until a left swipe, then the next one takes that row's place.
+// Every id was confirmed with YouTube oembed. Titles and channels are the oembed text, not written by hand.
+const VIDEO_RESERVE = [
+  {"id": "Otim2mDjsYM", "title": "Top 17 New Technology Trends That Will Define 2026", "channel": "AI Uncovered", "category": "tech", "reserve": true, "url": "https://www.youtube.com/watch?v=Otim2mDjsYM", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "dxWb1Vd9aq8", "title": "20 INVENTIONS THAT WILL CHANGE THE WORLD", "channel": "TechZone", "category": "tech", "reserve": true, "url": "https://www.youtube.com/watch?v=dxWb1Vd9aq8", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "cbe84W30GM8", "title": "Top 17 New Technology Trends That Will Define 2026", "channel": "TechTrends", "category": "tech", "reserve": true, "url": "https://www.youtube.com/watch?v=cbe84W30GM8", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "t47GyPKaDP0", "title": "Bose Noise Cancelling Headphones 700 + 1.4 Update - Review", "channel": "PB Tech", "category": "nz", "reserve": true, "url": "https://www.youtube.com/watch?v=t47GyPKaDP0", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "DD_ECSPFL-A", "title": "Is it worth it? - Cheap 4K on a budget", "channel": "PB Tech", "category": "nz", "reserve": true, "url": "https://www.youtube.com/watch?v=DD_ECSPFL-A", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "HzZ4ee7p7cg", "title": "Surface Laptop - Hands On Review", "channel": "PB Tech", "category": "nz", "reserve": true, "url": "https://www.youtube.com/watch?v=HzZ4ee7p7cg", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "9seQurhbLPM", "title": "EVERYTHING I Wish I Knew When I Started Growing Tomatoes 🍅", "channel": "Epic Gardening", "category": "garden", "reserve": true, "url": "https://www.youtube.com/watch?v=9seQurhbLPM", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "k-cH10nkM7A", "title": "BEST TIPS for growing TOMATOES: No gimmicks, just fundamental principles for GREAT TOMATOES.", "channel": "Growing In The Garden", "category": "garden", "reserve": true, "url": "https://www.youtube.com/watch?v=k-cH10nkM7A", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "uKagD87Y_Lk", "title": "2 Ways to Plant Tomatoes for Best Results", "channel": "MIgardener", "category": "garden", "reserve": true, "url": "https://www.youtube.com/watch?v=uKagD87Y_Lk", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "sZyDy69JK6M", "title": "How to Plan for a Productive Week | Christian Productivity", "channel": "Redeeming Productivity", "category": "time", "reserve": true, "url": "https://www.youtube.com/watch?v=sZyDy69JK6M", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "bWLizOvhZXY", "title": "HOW TO MAKE TIME FOR EVERYTHING (seriously): staying productive, time management, planning tips", "channel": "Carlino Denver", "category": "time", "reserve": true, "url": "https://www.youtube.com/watch?v=bWLizOvhZXY", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "Y-jbe-je5XM", "title": "How to Actually Stick to Your Schedule (2 Simple Rules)", "channel": "Justin Sung", "category": "time", "reserve": true, "url": "https://www.youtube.com/watch?v=Y-jbe-je5XM", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "VrB-Te3PQnE", "title": "Gluten Free Italian Classics | Chicken Marsala & Chicken Parm", "channel": "Giada De Laurentiis", "category": "cook", "reserve": true, "url": "https://www.youtube.com/watch?v=VrB-Te3PQnE", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "PKMy-ph1xaM", "title": "SIMPLE & EASY DINNER RECIPES | gluten free & dairy free, healthy meal ideas 🍚🥦🥩", "channel": "Sidney Thompson", "category": "cook", "reserve": true, "url": "https://www.youtube.com/watch?v=PKMy-ph1xaM", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "1p6ro_0ST6Q", "title": "Easy Honey garlic chicken | No flour (Gluten-Free) Recipe | Dinner ready in 15 minutes", "channel": "Kitchen Savouries", "category": "cook", "reserve": true, "url": "https://www.youtube.com/watch?v=1p6ro_0ST6Q", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "bLbUIevOxzY", "title": "How To Paint A Room | DIY For Beginners", "channel": "Home RenoVision DIY", "category": "reno", "reserve": true, "url": "https://www.youtube.com/watch?v=bLbUIevOxzY", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "L2R0qKAxdzc", "title": "How to Paint a Room for Beginners", "channel": "MrsAshleyFrench", "category": "reno", "reserve": true, "url": "https://www.youtube.com/watch?v=L2R0qKAxdzc", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "8JCoJvYPKBE", "title": "How to Paint a Room | Painting Tips | The Home Depot", "channel": "The Home Depot", "category": "reno", "reserve": true, "url": "https://www.youtube.com/watch?v=8JCoJvYPKBE", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "a2hoTbNDpYA", "title": "17 Habits to Make Your Car Last Over 500k Miles Without Repairs", "channel": "Torque Tactics", "category": "cars", "reserve": true, "url": "https://www.youtube.com/watch?v=a2hoTbNDpYA", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "rXNJs4xPY5I", "title": "How To Learn To Fix Cars (Beginner’s Guide)", "channel": "Lucky Seven Flips", "category": "cars", "reserve": true, "url": "https://www.youtube.com/watch?v=rXNJs4xPY5I", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "u6FY_X12Bqo", "title": "Car Maintenance MOST People Ignore! Make Your Engine Last 200,000+ Miles!", "channel": "The Car Guy Online", "category": "cars", "reserve": true, "url": "https://www.youtube.com/watch?v=u6FY_X12Bqo", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "YreSGULrnx8", "title": "10 Proven Tips To Raise Dogs And Cats Together Peacefully", "channel": "Amazing Dogs", "category": "pets", "reserve": true, "url": "https://www.youtube.com/watch?v=YreSGULrnx8", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "TqRhrC-tPwg", "title": "Bringing Home a Cat: The Ultimate Beginner’s Guide", "channel": "The Purring Journal", "category": "pets", "reserve": true, "url": "https://www.youtube.com/watch?v=TqRhrC-tPwg", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "sctuy_arPMg", "title": "10 Things I Wish I Knew Before Adopting A Cat", "channel": "Jackson Galaxy", "category": "pets", "reserve": true, "url": "https://www.youtube.com/watch?v=sctuy_arPMg", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "PR0iIva4Ues", "title": "You're Planning Trips Wrong (Do This Instead)", "channel": "Away Together w/ Nik and Allie", "category": "travel", "reserve": true, "url": "https://www.youtube.com/watch?v=PR0iIva4Ues", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "DS3qVi8p_e4", "title": "How to Make a Travel Budget", "channel": "Wolters World", "category": "travel", "reserve": true, "url": "https://www.youtube.com/watch?v=DS3qVi8p_e4", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "HrDpZT9xtls", "title": "13 TRAVEL TIPS For Your Next Long-Term Trip", "channel": "Zoe and Simon", "category": "travel", "reserve": true, "url": "https://www.youtube.com/watch?v=HrDpZT9xtls", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "taO2_XYX4M4", "title": "10 HOME RENOVATION TIPS for DIYers & Beginners *What I Wish I Knew Before* | XO, MaCenna", "channel": "XO, MaCenna", "category": "diy", "reserve": true, "url": "https://www.youtube.com/watch?v=taO2_XYX4M4", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "4GvI55Of41M", "title": "20 Commonly Forgotten Home Maintenance Tasks", "channel": "Specific Love Creations", "category": "diy", "reserve": true, "url": "https://www.youtube.com/watch?v=4GvI55Of41M", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "xOiXbP5QIrM", "title": "DIY Home Upgrades that You WON'T REGRET! ✨ BIG Impact on a SMALL Budget", "channel": "Living with LK", "category": "diy", "reserve": true, "url": "https://www.youtube.com/watch?v=xOiXbP5QIrM", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "LgR1OxUdbxg", "title": "BUTTERY GLUTEN FREE BREAD | King Arthur Gluten Free Bread Flour Recipe", "channel": "SavorySaver", "category": "gf", "reserve": true, "url": "https://www.youtube.com/watch?v=LgR1OxUdbxg", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "CZhMCVFTz6c", "title": "How to Make the Best Gluten-free Bread | Easy Gluten-free Sandwich Bread Recipe", "channel": "fitfoodieselma", "category": "gf", "reserve": true, "url": "https://www.youtube.com/watch?v=CZhMCVFTz6c", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "y93I95wAxNg", "title": "GLUTEN FREE TOASTING AND SANDWICH BREAD | King Arthur Gluten Free Bread Recipe", "channel": "SavorySaver", "category": "gf", "reserve": true, "url": "https://www.youtube.com/watch?v=y93I95wAxNg", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "GeH-QUwdeic", "title": "BEST First Woodworking Project for Beginners", "channel": "YouCanMakeThisToo", "category": "wood", "reserve": true, "url": "https://www.youtube.com/watch?v=GeH-QUwdeic", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "RLaqxMZ3cEw", "title": "5 Easy Woodworking Projects With Real Demand You Can Sell This Month", "channel": "Artisan Workshop", "category": "wood", "reserve": true, "url": "https://www.youtube.com/watch?v=RLaqxMZ3cEw", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "Xv_YNpLiODA", "title": "3 EASY Woodworking Projects That Sell Or Make AMAZING Gifts", "channel": "Knot Just Wood", "category": "wood", "reserve": true, "url": "https://www.youtube.com/watch?v=Xv_YNpLiODA", "reason": "Another video from this category, ready when you skip one."},
+];
+
 function videoCatOn(id) {
   const c = S.settings.videoCats;
   if (c && typeof c === 'object' && Object.prototype.hasOwnProperty.call(c, id)) return !!c[id];
   const built = VIDEO_CATS.find(x => x.id === id);
   if (built) return !built.extra;
   return false;
+}
+function cleanCustomVideos(arr) {
+  if (!Array.isArray(arr)) return [];
+  const out = [], seen = new Set();
+  arr.forEach(v => {
+    if (!v || typeof v.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(v.id) || seen.has(v.id)) return;
+    const title = String(v.title || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+    const channel = String(v.channel || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (!title || !channel) return;
+    seen.add(v.id);
+    out.push({ id: v.id, title, channel, reserve: !!v.reserve });
+  });
+  return out.slice(0, 8);
 }
 function videoCustomList() {
   const a = S.settings && S.settings.videoCustom;
@@ -4487,7 +4541,7 @@ function videoCustomList() {
     const name = x.name.replace(/\s+/g, ' ').trim().slice(0, 40);
     if (!name || !x.id || seen.has(x.id) || VIDEO_CATS.some(c => c.id === x.id)) return;
     seen.add(x.id);
-    out.push({ id: x.id, name, sub: '', custom: true });
+    out.push({ id: x.id, name, sub: '', custom: true, videos: cleanCustomVideos(x.videos) });
   });
   return out;
 }
@@ -4523,20 +4577,88 @@ async function addVideoCat(id) {
   const v = document.getElementById('view'); if (v) v.scrollTop = 0;
   toast(cat.name + ' added.');
 }
+// Food topics are always searched gluten-free. He has coeliac disease.
+function isFoodTopic(s) {
+  return /\b(food|cook(?:ing)?|recipe|recipes|bake|baking|bread|dinner|lunch|breakfast|meal|meals|cake|cakes|pasta|pizza|soup|salad|dessert|biscuit|biscuits|cookie|cookies|pastry|gluten|coeliac|celiac|noodle|noodles|chicken|beef|pork|lamb|fish|pie|pies|muffin|muffins|pancake|pancakes|roast|stew|curry|sandwich|sandwiches|flour)\b/i.test(String(s || ''));
+}
+function videoSearchQuery(name) {
+  let q = String(name || '').replace(/\s+/g, ' ').trim();
+  if (isFoodTopic(q) && !/gluten[-\s]?free/i.test(q)) q = (q + ' gluten free').trim();
+  return q.slice(0, 80);
+}
+let videoCatBusy = false;
+async function findCategoryVideos(name) {
+  const q = videoSearchQuery(name);
+  const food = isFoodTopic(name);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  let list = [];
+  try {
+    const r = await fetch(RELAY_URL + '/videos', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q }), signal: ctl.signal, cache: 'no-store'
+    });
+    if (!r.ok) throw new Error('search');
+    const j = await r.json();
+    list = Array.isArray(j.videos) ? j.videos : [];
+  } finally { clearTimeout(timer); }
+  const out = [], seen = new Set();
+  for (const v of list) {
+    const id = v && v.id;
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(id) || seen.has(id)) continue;
+    let title = '', channel = '';
+    let unreachable = false;
+    try {
+      const o = await fetch('https://www.youtube.com/oembed?url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id) + '&format=json');
+      if (!o.ok) continue;
+      const d = await o.json();
+      title = String(d.title || '').replace(/\s+/g, ' ').trim();
+      channel = String(d.author_name || '').replace(/\s+/g, ' ').trim();
+      if (!title || !channel) continue;
+    } catch (e) {
+      unreachable = true;
+    }
+    if (unreachable) {
+      // The relay already confirmed this id with oembed. Use that only if the phone could not reach oembed itself.
+      title = String(v.title || '').replace(/\s+/g, ' ').trim();
+      channel = String(v.channel || '').replace(/\s+/g, ' ').trim();
+      if (!title || !channel) continue;
+    }
+    if (food && !/gluten|coeliac|celiac|\bgf\b/i.test(title)) continue;
+    seen.add(id);
+    out.push({ id, title: title.slice(0, 180), channel: channel.slice(0, 80), reserve: out.length >= 4 });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
 async function addCustomVideoCat(name) {
   name = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-  if (!name) return;
+  if (!name || videoCatBusy) return;
   const existing = allVideoCats().find(c => c.name.toLowerCase() === name.toLowerCase());
   if (existing) return addVideoCat(existing.id);
-  const id = customVideoId(name);
-  S.settings.videoCustom = videoCustomList().concat([{ id, name }]);
-  S.settings.videoCats = Object.assign({}, S.settings.videoCats, { [id]: true });
-  videoTab = id;
-  videoCatQuery = '';
-  await save();
-  render();
-  const v = document.getElementById('view'); if (v) v.scrollTop = 0;
-  toast(name + ' added.');
+  videoCatBusy = true;
+  const box = document.getElementById('vidcatres');
+  if (box) box.innerHTML = '<div class="card empty" id="vidlooking"><div class="t">Looking for videos…</div><div class="s">Checking YouTube for this topic.</div></div>';
+  try {
+    const videos = await findCategoryVideos(name);
+    if (!videos.length) {
+      toast('No videos found for that. Try a different name.');
+      if (box && document.body.contains(box)) box.innerHTML = videoCatSearchHtml();
+      return;
+    }
+    const id = customVideoId(name);
+    S.settings.videoCustom = videoCustomList().concat([{ id, name, videos }]);
+    S.settings.videoCats = Object.assign({}, S.settings.videoCats, { [id]: true });
+    videoTab = id;
+    videoCatQuery = '';
+    await save();
+    render();
+    const v = document.getElementById('view'); if (v) v.scrollTop = 0;
+    toast(name + ' added.');
+  } catch (e) {
+    toast('Couldn’t look up videos just now. Try again.');
+    if (box && document.body.contains(box)) box.innerHTML = videoCatSearchHtml();
+  } finally { videoCatBusy = false; }
 }
 function videoCatSearchHtml() {
   const q = videoCatQuery.replace(/\s+/g, ' ').trim();
@@ -4568,8 +4690,7 @@ function videoSuggestions() {
 function videoReason(v) {
   const r = (v.reason || '').trim();
   if (r) return r;
-  const who = v.channel || v.artist || '';
-  return who ? (who + ' — ' + v.title + '.') : v.title;
+  return 'A video about this topic.';
 }
 function videoThumb(id) {
   return `<img class="vthumb" src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" width="112" height="63" loading="lazy" decoding="async">`;
@@ -4581,29 +4702,58 @@ function videoRow(v, swipe) {
   return `<div class="vsw" data-vid="${esc(v.id)}" data-cat="${esc(v.category)}"><div class="vswbg" aria-hidden="true">Skip</div>${link}</div>`;
 }
 // Videos skipped on the Videos page, for today only. A refresh keeps them out; tomorrow they can come back.
+function knownVideoIds() {
+  const s = new Set();
+  VIDEOS.forEach(v => s.add(v.id));
+  VIDEO_RESERVE.forEach(v => s.add(v.id));
+  videoCustomList().forEach(c => (c.videos || []).forEach(v => s.add(v.id)));
+  return s;
+}
 function videoDismissedIds() {
   const d = S.settings && S.settings.videoDismissed;
   if (!d || d.day !== todayISO() || !Array.isArray(d.ids)) return [];
-  const known = new Set(VIDEOS.map(v => v.id));
+  const known = knownVideoIds();
   const out = [];
   d.ids.forEach(id => { if (known.has(id) && !out.includes(id)) out.push(id); });
   return out;
 }
+function poolForCat(id) {
+  const custom = videoCustomList().find(c => c.id === id);
+  if (custom) return (custom.videos || []).map(v => ({ id: v.id, title: v.title, channel: v.channel, category: id, reserve: !!v.reserve, url: 'https://www.youtube.com/watch?v=' + v.id }));
+  return VIDEOS.filter(v => v.category === id).concat(VIDEO_RESERVE.filter(v => v.category === id));
+}
+// The category tab lists the curated videos. A left swipe hides that one for today and the next video
+// from this category that is not already on screen takes its place. When none are left, the row goes.
 function videosForCat(id) {
   const skip = new Set(videoDismissedIds());
-  return VIDEOS.filter(v => v.category === id && !skip.has(v.id));
+  const all = poolForCat(id);
+  const reserves = all.filter(v => v.reserve && !skip.has(v.id));
+  let ri = 0;
+  const out = [];
+  for (const v of all) {
+    if (v.reserve) continue;
+    if (!skip.has(v.id)) out.push(v);
+    else if (ri < reserves.length) out.push(reserves[ri++]);
+  }
+  return out;
 }
 async function skipVideo(id) {
-  const cur = VIDEOS.find(v => v.id === id);
-  if (!cur || videoDismissedIds().includes(id)) return;
-  if (!videosForCat(cur.category).some(v => v.id === id)) return;
+  let cat = '';
+  for (const c of allVideoCats()) {
+    if (poolForCat(c.id).some(v => v.id === id)) { cat = c.id; break; }
+  }
+  if (!cat || videoDismissedIds().includes(id)) return;
+  const before = videosForCat(cat);
+  if (!before.some(v => v.id === id)) return;
+  const beforeIds = new Set(before.map(v => v.id));
   const shot = snap();
   const dismissed = videoDismissedIds();
   dismissed.push(id);
   S.settings.videoDismissed = { day: todayISO(), ids: dismissed };
   await save();
+  const repl = videosForCat(cat).some(v => !beforeIds.has(v.id));
   render();
-  toast(videosForCat(cur.category).length ? 'Skipped for today.' : 'No more in that category today.', 'Undo', undoTo(shot));
+  toast(repl ? 'Next video.' : 'No more in that category today.', 'Undo', undoTo(shot));
 }
 let vs = null;
 function wireVideoSwipe() {
@@ -4656,7 +4806,7 @@ function Videos() {
   if (!cats.some(c => c.id === videoTab)) videoTab = cats.length ? cats[0].id : '';
   const tabs = cats.length ? `<div class="chips scroll" id="videotabs" role="tablist" aria-label="Video categories">${cats.map(c => `<button type="button" class="chip${c.id === videoTab ? ' on' : ''}" role="tab" aria-selected="${c.id === videoTab}" onclick="selectVideoCat(${jsArg(c.id)})">${esc(c.name)}</button>`).join('')}</div>` : '';
   const list = videoTab ? videosForCat(videoTab) : [];
-  const curated = videoTab ? VIDEOS.some(v => v.category === videoTab) : false;
+  const curated = videoTab ? poolForCat(videoTab).some(v => !v.reserve) : false;
   const body = !cats.length
     ? `<div class="card empty" id="videonone"><div class="t">No categories yet</div><div class="s">Add a category to see videos.</div></div>`
     : list.length
@@ -4666,7 +4816,7 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. It stays hidden until tomorrow.<br>Updated 30 Sep 2026. These refresh every day.<br>Each video opens on YouTube.</div>`;
+    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>Updated 30 Sep 2026. These refresh every day.<br>Each video opens on YouTube.</div>`;
 }
 
 

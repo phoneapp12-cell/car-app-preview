@@ -15,10 +15,13 @@
  * itself. Fixed location, no input, kept for 20 minutes.
  * GET /closures: council roadworks/closure notices that mention the lifting bridge on Dave Culham Drive
  * (see closures.js). Fixed source, no input.
+ * POST /videos: search YouTube for one short English topic and return oembed-confirmed videos
+ * (see videos.js). The query is the topic only. No arbitrary links. Nothing is stored.
  */
 import { getFeed } from './events.js';
 import { getClosures } from './closures.js';
 import { pushRoute } from './push.js';
+import { searchVideos } from './videos.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -63,7 +66,9 @@ const MESSAGES = {
   not_found_route: 'Not found.',
   events_unavailable: 'Local events could not be loaded right now.',
   weather_unavailable: 'The weather could not be loaded right now.',
-  closures_unavailable: 'Planned closures could not be checked right now.'
+  closures_unavailable: 'Planned closures could not be checked right now.',
+  bad_query: 'Use a short English topic name.',
+  videos_unavailable: 'Videos could not be looked up just now.'
 };
 
 function allowedOrigins(env) {
@@ -165,6 +170,23 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) {
       return json(502, path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : 'weather_unavailable', origin, env);
+    }
+  }
+  if (path === '/videos') {
+    if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    let body;
+    try {
+      const raw = await request.text();
+      if (raw.length > 512) throw new Error('big');
+      body = raw ? JSON.parse(raw) : {};
+    } catch (e) { return json(400, 'bad_request', origin, env); }
+    try {
+      const data = await searchVideos(body && body.q, fetchImpl);
+      return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (e) {
+      const code = e.message === 'bad_query' ? 'bad_query' : 'videos_unavailable';
+      return json(code === 'bad_query' ? 400 : 502, code, origin, env);
     }
   }
   if (path.startsWith('/push/')) {
