@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.27.0';
+const APP_VERSION = '1.28.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3475,9 +3475,13 @@ function textSizePicker() {
 }
 
 
-/* ================= REMINDERS (1.27.0) ================= */
-// A title plus a date and time in Pacific/Auckland. The list stays on this phone.
-// The relay sends the push at that minute, including evenings and weekends (not held until 7 am).
+/* ================= REMINDERS (1.27.0, repeat in 1.28.0) ================= */
+// A title plus a date and time in Pacific/Auckland, and whether it repeats.
+// The list stays on this phone. The relay sends the push at that minute, including evenings
+// and weekends (not held until 7 am). Daily, weekly and monthly stay in the list after they fire.
+const REM_REPEAT_OPTS = [['none', 'Does not repeat'], ['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']];
+const REM_REPEAT_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
+function remRepeat(r) { return r && REM_REPEAT_LABEL[r.repeat] ? r.repeat : 'none'; }
 function normReminders(list) {
   if (!Array.isArray(list)) return [];
   const out = [], seen = new Set();
@@ -3490,7 +3494,8 @@ function normReminders(list) {
     if (!/^rem-[a-z0-9]{4,32}$/i.test(id)) id = uid('rem');
     if (seen.has(id)) continue;
     seen.add(id);
-    out.push({ id, title, date, time });
+    const repeat = remRepeat(r);
+    out.push(repeat === 'none' ? { id, title, date, time, repeat: 'none' } : { id, title, date, time, repeat });
     if (out.length >= 40) break;
   }
   return out;
@@ -3500,15 +3505,46 @@ function nzStampLocal(now = new Date()) {
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
 }
 const remKey = r => r.date + 'T' + r.time;
+// Next date this reminder fires, in Pacific/Auckland. The stored date is the anchor the user picked
+// (so a monthly 31st stays the 31st). Shorter months use the last day, then the 31st returns.
+function remNextDate(r, now = new Date()) {
+  const repeat = remRepeat(r);
+  if (repeat === 'none') return r.date;
+  const nowK = nzStampLocal(now);
+  const dom = Number(r.date.slice(8, 10));
+  let date = r.date;
+  if (date + 'T' + r.time < nowK) {
+    const today = nowK.slice(0, 10);
+    if (repeat === 'daily') date = addDays(today, -1);
+    else if (repeat === 'weekly') {
+      const want = new Date(parseD(r.date)).getUTCDay();
+      let d = today;
+      for (let i = 0; i < 7; i++) {
+        if (new Date(parseD(d)).getUTCDay() === want) { date = addDays(d, -7); break; }
+        d = addDays(d, -1);
+      }
+    } else date = addMonths(today, -1, dom);
+    if (date < r.date) date = r.date;
+  }
+  for (let i = 0; i < 50; i++) {
+    if (date + 'T' + r.time >= nowK) return date;
+    const n = repeat === 'daily' ? addDays(date, 1) : repeat === 'weekly' ? addDays(date, 7) : addMonths(date, 1, dom);
+    if (!n || n <= date) break;
+    date = n;
+  }
+  return date;
+}
+function remWhenKey(r, now) { return (remRepeat(r) === 'none' ? r.date : remNextDate(r, now)) + 'T' + r.time; }
 function upcomingReminders(now) {
   const k = nzStampLocal(now);
-  return (S.reminders || []).filter(r => remKey(r) >= k).sort((a, b) => remKey(a).localeCompare(remKey(b)));
+  return (S.reminders || []).filter(r => remRepeat(r) !== 'none' || remKey(r) >= k).sort((a, b) => remWhenKey(a, now).localeCompare(remWhenKey(b, now)));
 }
 function remindersMoreSub() {
   const n = upcomingReminders();
   if (!n.length) return 'None set';
-  const r = n[0];
-  return `Next: ${esc(r.title)}, ${fmtW(r.date)} ${fmtTime(r.time)}`;
+  const r = n[0], when = remRepeat(r) === 'none' ? r.date : remNextDate(r);
+  const tag = REM_REPEAT_LABEL[r.repeat];
+  return `Next: ${esc(r.title)}, ${fmtW(when)} ${fmtTime(r.time)}${tag ? ' · ' + tag : ''}`;
 }
 function remPermCard() {
   if (!pushOK()) return `<div class="card muted">This phone or browser can’t get push notifications. On Android, open the app from its icon (installed from Chrome).</div>`;
@@ -3521,12 +3557,15 @@ function remPermCard() {
 function Reminders() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
   const nowK = nzStampLocal();
-  const up = upcomingReminders(), past = (S.reminders || []).filter(r => remKey(r) < nowK).sort((a, b) => remKey(b).localeCompare(remKey(a)));
-  const row = r => `<button class="row" onclick="remForm('${r.id}')"><div class="ic rem">${I('bell')}</div><div class="tx"><div class="t">${esc(r.title)}</div><div class="s">${fmtW(r.date)} · ${fmtTime(r.time)}</div></div>${I('right')}</button>`;
+  const up = upcomingReminders(), past = (S.reminders || []).filter(r => remRepeat(r) === 'none' && remKey(r) < nowK).sort((a, b) => remKey(b).localeCompare(remKey(a)));
+  const row = r => {
+    const repeat = remRepeat(r), when = repeat === 'none' ? r.date : remNextDate(r), tag = REM_REPEAT_LABEL[repeat];
+    return `<button class="row" onclick="remForm('${r.id}')"><div class="ic rem">${I('bell')}</div><div class="tx"><div class="t">${esc(r.title)}</div><div class="s">${fmtW(when)} · ${fmtTime(r.time)}${tag ? ' · ' + tag : ''}</div></div>${I('right')}</button>`;
+  };
   const list = (S.reminders || []).length
     ? `<div class="list" id="remlist">${up.map(row).join('')}${past.map(row).join('')}</div>`
     : `<p class="muted" id="remempty">No reminders yet.</p>`;
-  return back + header('Reminders', 'A notification at the time you set', addBtn('Add a reminder', 'remForm()')) + remPermCard() + list +
+  return back + header('Reminders', 'Once, or every day, week or month', addBtn('Add a reminder', 'remForm()')) + remPermCard() + list +
     `<div class="foot">Times are New Zealand time. With notifications on, it still arrives if the app is closed.</div>`;
 }
 function undoRem(s) {
@@ -3544,7 +3583,7 @@ async function scheduleReminders() {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     const k = nzStampLocal();
-    const reminders = (S.reminders || []).filter(r => remKey(r) >= k).map(r => ({ id: r.id, title: r.title, date: r.date, time: r.time }));
+    const reminders = (S.reminders || []).filter(r => remRepeat(r) !== 'none' || remKey(r) >= k).map(r => ({ id: r.id, title: r.title, date: r.date, time: r.time, repeat: remRepeat(r) }));
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay) return '';
       if (!reminders.length) { /* still clear the relay below once we have a subscription */ }
@@ -3567,34 +3606,58 @@ async function enableReminderPush() {
   render();
   toast(sync === 'fail' ? 'Notifications are allowed, but the alert couldn’t be set just now.' : 'Notifications are on. You’ll be alerted at the time you set, even if the app is closed.');
 }
+function remHintText(r) {
+  const repeat = remRepeat(r);
+  if (!parseD(r.date) || !/^\d{2}:\d{2}$/.test(r.time || '')) return '';
+  const when = fmtW(remNextDate(r)) + ' at ' + fmtTime(r.time);
+  if (repeat === 'none') return 'One notification, at that time.';
+  if (repeat === 'daily') return 'Every day at ' + fmtTime(r.time) + '. Next: ' + when + '.';
+  if (repeat === 'weekly') return 'Every ' + fmtLong(r.date).split(' ')[0] + ' at ' + fmtTime(r.time) + '. Next: ' + when + '.';
+  const dom = Number(r.date.slice(8, 10));
+  const tail = dom >= 29 ? ', or the last day of a shorter month' : '';
+  return 'Every month on the ' + ordinal(dom) + tail + '. Next: ' + when + '.';
+}
+function remHintLive() {
+  const f = $('#sf'), hint = $('#rephint');
+  if (!f || !hint || !f.date) return;
+  hint.textContent = remHintText({ date: f.date.value, time: f.time.value, repeat: f.repeat ? f.repeat.value : 'none' });
+}
 function remForm(id) {
-  const e = id ? (S.reminders || []).find(x => x.id === id) : { title: '', date: nzStampLocal().slice(0, 10), time: '' };
+  const e = id ? (S.reminders || []).find(x => x.id === id) : { title: '', date: nzStampLocal().slice(0, 10), time: '', repeat: 'none' };
   if (!e) return;
+  const repeat = remRepeat(e);
   openSheet(id ? 'Edit reminder' : 'Add a reminder',
     field('Title', inp('title', e.title, 'required maxlength="80" placeholder="What to remember"')) +
-    `<div class="two">${field('Date', inp('date', e.date, 'type="date" required'))}${field('Time', inp('time', e.time, 'type="time" required'))}</div>`,
+    `<div class="two">${field('Date', inp('date', e.date, 'type="date" required'))}${field('Time', inp('time', e.time, 'type="time" required'))}</div>` +
+    field('Repeats', sel('repeat', REM_REPEAT_OPTS, repeat)) +
+    `<p class="muted" id="rephint" style="margin:0 2px 8px;font-size:0.8125rem">${esc(remHintText(e))}</p>`,
     async v => {
       const title = String(v.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
       if (!title) return 'Please type what to remember.';
       if (!parseD(v.date)) return 'Please choose a date.';
       if (!/^\d{2}:\d{2}$/.test(v.time || '')) return 'Please choose a time.';
-      if (v.date + 'T' + v.time < nzStampLocal()) return 'That time has already passed.';
+      const repeat = remRepeat({ repeat: v.repeat });
+      if (repeat === 'none' && v.date + 'T' + v.time < nzStampLocal()) return 'That time has already passed.';
       if (pushOK() && Notification.permission === 'default') {
         const p = await Notification.requestPermission();
         if (p !== 'granted') { /* saved anyway; the section keeps asking */ }
       }
       const snapS = snap();
-      const upd = { title, date: v.date, time: v.time };
+      const upd = { title, date: v.date, time: v.time, repeat };
       if (id) Object.assign(e, upd); else S.reminders.push(Object.assign({ id: uid('rem') }, upd));
       await save();
       const sync = await scheduleReminders();
       render();
+      const again = repeat === 'daily' ? 'every day' : repeat === 'weekly' ? 'every week' : repeat === 'monthly' ? 'every month' : '';
       const extra = sync === 'fail' ? ' Saved on this phone. The notification will be set when you next open the app online.'
         : (sync === 'need' || sync === 'unsupported') ? ' Allow notifications to be alerted at that time.'
+        : again ? ' You’ll be notified ' + again + ' at that time, even if the app is closed.'
         : ' You’ll be notified then, even if the app is closed.';
       toast((id ? 'Reminder updated.' : 'Reminder added.') + extra, 'Undo', undoRem(snapS));
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete this reminder" onclick="deleteRem('${id}')">${I('trash')}</button>` : '');
+  const f = $('#sf');
+  if (f) ['date', 'time', 'repeat'].forEach(n => { if (f[n]) { f[n].addEventListener('input', remHintLive); f[n].addEventListener('change', remHintLive); } });
 }
 async function deleteRem(id) {
   if (!(S.reminders || []).some(x => x.id === id)) return;

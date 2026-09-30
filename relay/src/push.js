@@ -223,9 +223,13 @@ export async function runAlerts(env, closuresState, fetchImpl = fetch, now = Dat
 // ---- Reminders (exact Auckland time; not the bridge quiet hours) ----
 // The phone sends the pending list. A cron every minute pushes when that minute arrives,
 // including evenings and weekends. Bridge alerts still wait until 7 am; this does not.
+// repeat none fires once and leaves the pending list. daily / weekly / monthly stay scheduled
+// for the next Auckland occurrence (monthly: the same date, or the last day of a shorter month).
 const REM_KEY = 'push-reminders-v1';
 const MAX_REMS = 40;
 const REM_GRACE = 36 * 3600 * 1000;
+const REM_SLOP = 90 * 1000; // the minute just gone still counts, so a save during that minute is not skipped
+const REM_REPEATS = new Set(['daily', 'weekly', 'monthly']);
 
 export function aucklandDue(date, time) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
@@ -248,6 +252,89 @@ export function aucklandDue(date, time) {
 }
 export function reminderBody(date, time) { return dayTxt(date) + ', ' + timeTxt(time); }
 
+function ymd(y, m, d) { return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
+function ymdParts(date) { return { Y: +date.slice(0, 4), M: +date.slice(5, 7), D: +date.slice(8, 10) }; }
+export function addDaysIso(date, n) {
+  const { Y, M, D } = ymdParts(date);
+  const t = new Date(Date.UTC(Y, M - 1, D) + n * 86400000);
+  return ymd(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+}
+function weekdayIso(date) { const { Y, M, D } = ymdParts(date); return new Date(Date.UTC(Y, M - 1, D)).getUTCDay(); }
+// Add n calendar months. The day is the anchor day, clamped to the month length (31st → 28/29/30).
+export function addMonthsIso(date, n, anchorDay) {
+  const { Y, M, D } = ymdParts(date);
+  const first = new Date(Date.UTC(Y, M - 1 + n, 1));
+  const y = first.getUTCFullYear(), m = first.getUTCMonth();
+  const want = anchorDay || D;
+  const dim = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return ymd(y, m + 1, Math.min(want, dim));
+}
+export function stepRepeat(date, repeat, dom) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  if (repeat === 'daily') return addDaysIso(date, 1);
+  if (repeat === 'weekly') return addDaysIso(date, 7);
+  if (repeat === 'monthly') return addMonthsIso(date, 1, dom);
+  return null;
+}
+function realDate(date, time) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return false;
+  const { Y, M, D } = ymdParts(date);
+  const h = +time.slice(0, 2), mi = +time.slice(3, 5);
+  if (M < 1 || M > 12 || h > 23 || mi > 59) return false;
+  const t = new Date(Date.UTC(Y, M - 1, D));
+  return t.getUTCFullYear() === Y && t.getUTCMonth() === M - 1 && t.getUTCDate() === D;
+}
+// First occurrence at or after now (with a short slop so the current minute still counts).
+// Starts at the anchor the phone stored, so nothing fires before the date the user picked.
+export function nextOccurrence(anchor, time, repeat, dom, now) {
+  const cutoff = now - REM_SLOP;
+  const first = aucklandDue(anchor, time);
+  if (first != null && first >= cutoff) return { date: anchor, due: first };
+  const today = nzStamp(now).slice(0, 10);
+  let date = anchor;
+  if (repeat === 'daily') date = addDaysIso(today, -1);
+  else if (repeat === 'weekly') {
+    let d = today;
+    const want = weekdayIso(anchor);
+    for (let i = 0; i < 7; i++) { if (weekdayIso(d) === want) { date = addDaysIso(d, -7); break; } d = addDaysIso(d, -1); }
+  } else if (repeat === 'monthly') date = addMonthsIso(today, -1, dom);
+  if (date < anchor) date = anchor;
+  for (let i = 0; i < 50; i++) {
+    const due = aucklandDue(date, time);
+    if (due != null && due >= cutoff) return { date, due };
+    const n = stepRepeat(date, repeat, dom);
+    if (!n || n <= date) return null;
+    date = n;
+  }
+  return null;
+}
+// The occurrence after `from`, strictly later than now. Used once a reminder has fired or was missed.
+function nextAfter(from, time, repeat, dom, now) {
+  let d = stepRepeat(from, repeat, dom);
+  if (!d) return null;
+  const today = nzStamp(now).slice(0, 10);
+  if (d < addDaysIso(today, -2)) {
+    const snap = nextOccurrence(d, time, repeat, dom, now + 1000);
+    if (snap && snap.date > from && snap.due > now) return snap;
+    if (snap && snap.date > from) d = snap.date;
+  }
+  for (let i = 0; i < 48; i++) {
+    const due = aucklandDue(d, time);
+    if (due != null && due > now) return { date: d, due };
+    const n = stepRepeat(d, repeat, dom);
+    if (!n || n <= d) return null;
+    d = n;
+  }
+  return null;
+}
+function scheduleNext(item, now) {
+  const dom = item.dom || Number(String(item.date || '').slice(8, 10));
+  const from = item.nextDate || item.date;
+  const nxt = nextAfter(from, item.time, item.repeat, dom, now);
+  if (!nxt) return null;
+  return { id: item.id, title: item.title, date: item.date, time: item.time, repeat: item.repeat, dom, due: nxt.due, nextDate: nxt.date, body: reminderBody(nxt.date, item.time) };
+}
+
 export function cleanReminder(r, now = Date.now()) {
   if (!r || typeof r !== 'object') return null;
   const id = String(r.id || '');
@@ -255,9 +342,18 @@ export function cleanReminder(r, now = Date.now()) {
   const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
   if (!title) return null;
   const date = String(r.date || ''), time = String(r.time || '');
-  const due = aucklandDue(date, time);
-  if (due == null || due < now - REM_GRACE) return null;
-  return { id, title, date, time, due, body: reminderBody(date, time) };
+  if (!realDate(date, time)) return null;
+  let repeat = String(r.repeat || 'none');
+  if (!REM_REPEATS.has(repeat)) repeat = 'none';
+  if (repeat === 'none') {
+    const due = aucklandDue(date, time);
+    if (due == null || due < now - REM_GRACE) return null;
+    return { id, title, date, time, repeat: 'none', due, body: reminderBody(date, time) };
+  }
+  const dom = Number(date.slice(8, 10));
+  const next = nextOccurrence(date, time, repeat, dom, now);
+  if (!next) return null;
+  return { id, title, date, time, repeat, dom, due: next.due, nextDate: next.date, body: reminderBody(next.date, time) };
 }
 
 async function loadRem(env) {
@@ -287,13 +383,25 @@ export async function setReminders(env, rawSub, list, now = Date.now()) {
   const prev = subs.find(s => s.id === id);
   if (!prev) await subscribe(env, sub, now, { bridge: false, quiet: true });
   else if (prev.keys.p256dh !== sub.keys.p256dh || prev.keys.auth !== sub.keys.auth) await subscribe(env, sub, now, { quiet: true });
+  const book = await loadRem(env);
+  const prevItems = (book[id] && Array.isArray(book[id].items)) ? book[id].items : [];
+  const prevById = new Map(prevItems.filter(Boolean).map(it => [it.id, it]));
   const items = []; const seen = new Set();
   for (const r of (Array.isArray(list) ? list : []).slice(0, MAX_REMS)) {
     const c = cleanReminder(r, now);
     if (!c || seen.has(c.id)) continue;
+    // The phone re-sends the anchor date. If this occurrence already fired, keep the later due
+    // so a resync in the same minute does not schedule it again.
+    const old = prevById.get(c.id);
+    if (old && old.time === c.time && (old.repeat || 'none') === c.repeat && old.date === c.date && typeof old.due === 'number' && old.due > c.due) {
+      c.due = old.due;
+      if (old.nextDate && (!c.nextDate || old.nextDate > c.nextDate)) {
+        c.nextDate = old.nextDate;
+        c.body = reminderBody(old.nextDate, c.time);
+      }
+    }
     seen.add(c.id); items.push(c);
   }
-  const book = await loadRem(env);
   if (items.length) book[id] = { items }; else delete book[id];
   await saveRem(env, book);
   if (!items.length) {
@@ -320,12 +428,23 @@ export async function runReminders(env, fetchImpl = fetch, now = Date.now()) {
     for (const item of items) {
       if (!item || typeof item.due !== 'number') { changed = true; continue; }
       if (item.due > now) { keep.push(item); continue; }
-      if (now - item.due > REM_GRACE) { changed = true; continue; }
+      const repeat = !!(item.repeat && item.repeat !== 'none');
+      if (now - item.due > REM_GRACE) {
+        changed = true;
+        if (repeat) { const nxt = scheduleNext(item, now); if (nxt) keep.push(nxt); }
+        continue; // a one-off that was missed by more than the grace period is dropped
+      }
       if (gone.has(id) || budget <= 0) { keep.push(item); continue; }
       budget--;
-      const r = await sendPush(sub, { title: item.title, body: item.body || 'Reminder', url: '#reminders', tag: 'rem-' + item.id, ttl: 12 * 3600 }, env, fetchImpl, now);
+      const occ = item.nextDate || item.date;
+      const tag = repeat ? 'rem-' + item.id + '-' + occ : 'rem-' + item.id;
+      const r = await sendPush(sub, { title: item.title, body: item.body || 'Reminder', url: '#reminders', tag, ttl: 12 * 3600 }, env, fetchImpl, now);
       if (r === 'gone') { gone.add(id); changed = true; continue; }
-      if (r === 'ok') { sent++; changed = true; continue; }
+      if (r === 'ok') {
+        sent++; changed = true;
+        if (repeat) { const nxt = scheduleNext(item, now); if (nxt) keep.push(nxt); }
+        continue; // one-off: leave it off the pending list. The phone still has its own copy.
+      }
       keep.push(item);
     }
     if (gone.has(id)) { delete book[id]; changed = true; }
