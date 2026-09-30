@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.31.0';
+const APP_VERSION = '1.32.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4712,10 +4712,30 @@ function videoThumb(id) {
   return `<img class="vthumb" src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" width="112" height="63" loading="lazy" decoding="async">`;
 }
 function videoRow(v, swipe) {
-  const link = `<a class="row vrow"${swipe ? ' draggable="false"' : ''} href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${videoThumb(v.id)}
-    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div>${I('ext')}</a>`;
+  const body = `${videoThumb(v.id)}
+    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div>${swipe ? I('play') : I('ext')}`;
+  // Home keeps the old link that leaves for YouTube. The Videos page plays inside the app.
+  const link = swipe
+    ? `<button type="button" class="row vrow" draggable="false" onclick="playVideo(${jsArg(v.id)},${jsArg(v.title)})">${body}</button>`
+    : `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${body}</a>`;
   if (!swipe) return link;
   return `<div class="vsw" data-vid="${esc(v.id)}" data-cat="${esc(v.category)}"><div class="vswbg" aria-hidden="true">Skip</div>${link}</div>`;
+}
+function playVideo(id, title) {
+  id = String(id || '');
+  if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+  title = String(title || '').replace(/\s+/g, ' ').trim() || 'Video';
+  const embed = 'https://www.youtube-nocookie.com/embed/' + id;
+  const watch = 'https://www.youtube.com/watch?v=' + id;
+  const el = $('#sheet');
+  sheetSubmit = null;
+  el.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="panel" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="grab"></div><h3 id="vplaytitle">${esc(title)}</h3>
+    <div class="vframe"><iframe src="${embed}" title="${esc(title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+    <p class="muted vplaynote">If this video will not play here, use Open on YouTube.</p>
+    <div class="btns"><a class="btn primary" id="ytopen" href="${watch}" target="_blank" rel="noopener">${I('ext')} Open on YouTube</a><button type="button" class="btn" id="vplayclose" onclick="closeSheet()">Close</button></div></div>`;
+  el.classList.add('show');
+  if (!sheetOpen) { history.pushState({ sheet: true }, '', location.href); sheetOpen = true; }
 }
 // Videos skipped on the Videos page, for today only. A refresh keeps them out; tomorrow they can come back.
 function knownVideoIds() {
@@ -4837,7 +4857,7 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 30 Sep 2026. These refresh every day.<br>Each video opens on YouTube.</div>`;
+    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 30 Sep 2026. These refresh every day.<br>Tap a video to play it in the app. Open on YouTube is there if you want the YouTube site.</div>`;
 }
 
 
@@ -4884,19 +4904,19 @@ const TOP40 = [
 ];
 function top40Row(v) {
   const reason = (v.reason || '').trim() || ('Official video for ' + v.title + ' by ' + v.artist + '.');
-  return `<a class="row vrow" data-rank="${v.rank}" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${videoThumb(v.id)}
-    <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div><div class="s">${esc(reason)}</div></div>${I('ext')}</a>`;
+  return `<button type="button" class="row vrow" data-rank="${v.rank}" onclick="playVideo(${jsArg(v.id)},${jsArg(v.title)})">${videoThumb(v.id)}
+    <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div><div class="s">${esc(reason)}</div></div>${I('play')}</button>`;
 }
 function Top40() {
   return header('Top 40', 'Current chart music videos') +
     `<div class="top40bar" id="top40bar"><button type="button" class="btn primary" id="top40surprise" onclick="surpriseTop40()">${I('shuffle')} Surprise me</button></div>` +
     `<div class="list" id="top40list">${TOP40.map(top40Row).join('')}</div>` +
-    `<div class="foot">Chart as of 30 Sep 2026. New Zealand Official Top 40 singles, 25 September to 1 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, then opens it on YouTube. Each video opens on YouTube.</div>`;
+    `<div class="foot">Chart as of 30 Sep 2026. New Zealand Official Top 40 singles, 25 September to 1 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it here. Tap a song to play it in the app.</div>`;
 }
 let top40SurpriseToken = 0;
 function surpriseTop40() {
   const scroller = document.getElementById('view');
-  const rows = [...document.querySelectorAll('#top40list a.row')];
+  const rows = [...document.querySelectorAll('#top40list button.row')];
   if (!scroller || !rows.length) return;
   const i = Math.floor(Math.random() * rows.length);
   const row = rows[i];
@@ -4923,14 +4943,7 @@ function surpriseTop40() {
     setTimeout(() => { if (token === top40SurpriseToken) row.classList.remove('surprise'); }, 1700);
     setTimeout(() => {
       if (token !== top40SurpriseToken) return;
-      const a = document.createElement('a');
-      a.href = 'https://www.youtube.com/watch?v=' + id;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      playVideo(id, TOP40[i].title);
     }, 450);
   };
   if (dist < 28) { finish(); return; }
