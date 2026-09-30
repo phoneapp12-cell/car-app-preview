@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.32.0';
+const APP_VERSION = '1.33.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4708,34 +4708,188 @@ function videoReason(v) {
   if (r) return r;
   return 'A video about this topic.';
 }
+// Publish dates read from each video's YouTube watch page (publishDate). oEmbed does not include a date.
+// Stored here so the phone shows a real date and does not look it up again on every tap.
+const VIDEO_DATES = {
+  'EKOU3JWDNLI': '2026-01-14',
+  'zt0JA5rxdfM': '2025-12-22',
+  '9OQ5vaYbGV0': '2026-05-22',
+  'nZmoq_XJW6Y': '2026-07-12',
+  'O9kNF_xOM5s': '2026-09-21',
+  'B9UYbXqBnhk': '2025-09-07',
+  'agPJG1DlkTQ': '2023-10-30',
+  'hdC4STCaVSc': '2022-06-12',
+  'jkAKY0Gic3E': '2019-08-16',
+  'LwDmsd-nOrg': '2020-02-29',
+  'stw9KEpSNEg': '2020-04-24',
+  'OMIbtIZ2E-Q': '2022-06-10',
+  'jozNEpY8iik': '2022-01-23',
+  'n3kNlFMXslo': '2017-02-07',
+  'iONDebHX9qk': '2021-04-18',
+  'iDbdXTMnOmE': '2018-01-02',
+  'MkfYM6oiLMo': '2023-10-01',
+  '7ZjAdGLfIv4': '2025-02-18',
+  'gYWE-zO-QUg': '2019-01-06',
+  '_U-caadWVgE': '2025-03-07',
+  'LBpkMqVOJmk': '2018-12-24',
+  'CRXCB_3gLok': '2014-07-10',
+  'ZcilSwuaHog': '2018-05-23',
+  'pOZFn3kexsc': '2024-11-08',
+  'HJZXHfs0fgA': '2025-03-01',
+  '25-HG471MIc': '2023-09-01',
+  'CY1MLjYOf1o': '2016-04-18',
+  'w_wNj7387Ck': '2023-11-01',
+  'vHrHBZIA5h4': '2013-07-24',
+  'peUVLEUj-AM': '2018-02-18',
+  '2Ex99RuKqAw': '2022-09-17',
+  'AW77b_qat1g': '2023-10-24',
+  'H0wGjEUDkQ4': '2025-01-22',
+  'XCsMvEMX11Y': '2024-06-14',
+  'E47FGfv14Mc': '2020-01-10',
+  'PxDB8a4swb4': '2024-10-07',
+  'zMH61Yabdj0': '2014-08-22',
+  'PLGmTzEGSIY': '2021-10-18',
+  'qbupCzSPW9o': '2016-11-07',
+  'cWmb1D4Wciw': '2025-05-25',
+  'geKL87hX210': '2021-02-09',
+  'zFkDZ1ljNC8': '2016-07-28',
+  'WQyK_jTLMsY': '2019-03-10',
+  'H5gZO37HX0E': '2022-06-24',
+  '8vFGrNjT4P4': '2019-02-15',
+  'mvO6zaIUO18': '2016-02-26',
+  'T5nt7f8tMXA': '2026-05-19',
+  'ZKmtQiKgyFI': '2013-10-29',
+  'Otim2mDjsYM': '2025-07-30',
+  'dxWb1Vd9aq8': '2024-07-14',
+  'cbe84W30GM8': '2026-08-10',
+  't47GyPKaDP0': '2020-06-01',
+  'DD_ECSPFL-A': '2017-01-25',
+  'HzZ4ee7p7cg': '2017-07-13',
+  '9seQurhbLPM': '2024-07-11',
+  'k-cH10nkM7A': '2020-06-08',
+  'uKagD87Y_Lk': '2021-05-11',
+  'sZyDy69JK6M': '2024-02-20',
+  'bWLizOvhZXY': '2025-09-11',
+  'Y-jbe-je5XM': '2024-04-26',
+  'VrB-Te3PQnE': '2024-02-06',
+  'PKMy-ph1xaM': '2025-10-15',
+  '1p6ro_0ST6Q': '2024-09-06',
+  'bLbUIevOxzY': '2022-01-15',
+  'L2R0qKAxdzc': '2024-02-20',
+  '8JCoJvYPKBE': '2018-10-09',
+  'a2hoTbNDpYA': '2025-07-31',
+  'rXNJs4xPY5I': '2024-08-20',
+  'u6FY_X12Bqo': '2025-02-09',
+  'YreSGULrnx8': '2021-01-27',
+  'TqRhrC-tPwg': '2025-06-19',
+  'sctuy_arPMg': '2024-02-02',
+  'PR0iIva4Ues': '2026-08-08',
+  'DS3qVi8p_e4': '2024-03-06',
+  'HrDpZT9xtls': '2023-04-01',
+  'taO2_XYX4M4': '2021-06-06',
+  '4GvI55Of41M': '2022-02-17',
+  'xOiXbP5QIrM': '2024-07-28',
+  'LgR1OxUdbxg': '2023-07-08',
+  'CZhMCVFTz6c': '2022-05-12',
+  'y93I95wAxNg': '2021-08-20',
+  'GeH-QUwdeic': '2023-05-18',
+  'RLaqxMZ3cEw': '2026-03-18',
+  'Xv_YNpLiODA': '2025-10-04',
+  'nUsrYVxrDwI': '2026-04-01',
+  '3triLkS0nq4': '2025-06-20',
+  'oIv_Y2RPQ_A': '2025-08-15',
+  '3sB4Iv_tM7U': '2026-09-03',
+  '0ijm2Xui5N8': '2026-07-23',
+  '3sur4BmjQt8': '2025-09-26',
+  'B452TVVco2Q': '2026-07-03',
+  'Xh0GyxWgKPs': '2026-06-10',
+  'VI0NDsh2b8k': '2025-05-30',
+  'mh4AQkw4Jjc': '2026-02-15',
+  'B402rKl4bUg': '2026-05-21',
+  'Rt9tW3cMLhI': '2026-06-11',
+  'SenovvZlWIA': '2024-10-18',
+  's3a4OQR-10M': '2025-09-03',
+  'DLV8FpyxZPQ': '2026-08-07',
+  'mrV8kK5t0V8': '2026-01-08',
+  'n7QlUH0zrPg': '2026-05-22',
+  'Dg47eNL_Usw': '2026-02-12',
+  'lY5V4hSLWY8': '2026-02-26',
+  'ofywN3NgGqY': '2026-06-25',
+  'EZOiy1-cnxM': '2026-04-30',
+  'FOJ4A4wixDg': '2026-06-04',
+  'ko70cExuzZM': '2025-10-05',
+  'rK5TyISxZ_M': '2025-09-18',
+  'mQezde_qeXw': '2026-02-05',
+  'c8zq4kAn_O0': '2025-04-03',
+  'Y4AgCABdZ3Y': '2026-02-25',
+  '82-jTNka3uc': '2026-06-01',
+  'KFMYx1TibeQ': '2025-06-26',
+  'hohuFW0zQUw': '2025-07-03',
+  'SOJpE1KMUbo': '2026-01-09',
+  'uvY8fdgezLQ': '2025-06-23',
+  '5RNy_1odv20': '2026-01-23',
+  'cZgUiR31m-Y': '2025-07-24',
+  'Pz-SZlU4C10': '2026-01-22',
+};
 function videoThumb(id) {
   return `<img class="vthumb" src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" width="112" height="63" loading="lazy" decoding="async">`;
 }
-function videoRow(v, swipe) {
-  const body = `${videoThumb(v.id)}
-    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div>${swipe ? I('play') : I('ext')}`;
-  // Home keeps the old link that leaves for YouTube. The Videos page plays inside the app.
-  const link = swipe
-    ? `<button type="button" class="row vrow" draggable="false" onclick="playVideo(${jsArg(v.id)},${jsArg(v.title)})">${body}</button>`
-    : `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${body}</a>`;
-  if (!swipe) return link;
-  return `<div class="vsw" data-vid="${esc(v.id)}" data-cat="${esc(v.category)}"><div class="vswbg" aria-hidden="true">Skip</div>${link}</div>`;
+const VIDEO_DATE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function videoDateText(id) {
+  const iso = VIDEO_DATES[id] || '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return '';
+  const mon = Number(m[2]), day = Number(m[3]);
+  if (mon < 1 || mon > 12 || day < 1 || day > 31) return '';
+  return day + ' ' + VIDEO_DATE_MONTHS[mon - 1] + ' ' + m[1];
 }
-function playVideo(id, title) {
+function videoDateLine(id) {
+  const t = videoDateText(id);
+  return t ? `<div class="s vdate">${esc(t)}</div>` : '';
+}
+function videoOpenLink(id) {
+  return `<a class="ytopen" href="https://www.youtube.com/watch?v=${esc(id)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${I('ext')} Open on YouTube</a>`;
+}
+function videoThumbBox(id) {
+  return `<span class="vthumbbox" data-yt="${esc(id)}">${videoThumb(id)}</span>`;
+}
+let playingVideoId = '';
+function stopInlineVideo() {
+  document.querySelectorAll('.vthumbbox.playing').forEach(box => {
+    box.classList.remove('playing');
+    box.innerHTML = videoThumb(box.getAttribute('data-yt') || '');
+  });
+  playingVideoId = '';
+}
+// Play in the thumbnail box beside the title and description. No sheet, and the page does not change.
+function playInlineVideo(id, title) {
   id = String(id || '');
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+  const current = document.querySelector('.vthumbbox.playing');
+  if (playingVideoId === id && current && current.getAttribute('data-yt') === id) return;
+  stopInlineVideo();
+  const box = document.querySelector('.vthumbbox[data-yt="' + id + '"]');
+  if (!box) return;
   title = String(title || '').replace(/\s+/g, ' ').trim() || 'Video';
-  const embed = 'https://www.youtube-nocookie.com/embed/' + id;
-  const watch = 'https://www.youtube.com/watch?v=' + id;
-  const el = $('#sheet');
-  sheetSubmit = null;
-  el.innerHTML = `<div class="scrim" onclick="closeSheet()"></div><div class="panel" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-    <div class="grab"></div><h3 id="vplaytitle">${esc(title)}</h3>
-    <div class="vframe"><iframe src="${embed}" title="${esc(title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
-    <p class="muted vplaynote">If this video will not play here, use Open on YouTube.</p>
-    <div class="btns"><a class="btn primary" id="ytopen" href="${watch}" target="_blank" rel="noopener">${I('ext')} Open on YouTube</a><button type="button" class="btn" id="vplayclose" onclick="closeSheet()">Close</button></div></div>`;
-  el.classList.add('show');
-  if (!sheetOpen) { history.pushState({ sheet: true }, '', location.href); sheetOpen = true; }
+  const embed = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1';
+  box.classList.add('playing');
+  box.innerHTML = `<iframe src="${embed}" title="${esc(title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+  playingVideoId = id;
+}
+function onVideoRowClick(e, id, title) {
+  if (e && e.target && e.target.closest && e.target.closest('a')) return;
+  playInlineVideo(id, title);
+}
+function videoRow(v, swipe) {
+  // Home keeps the old link that leaves for YouTube. The Videos page plays in the thumbnail box.
+  if (!swipe) {
+    const body = `${videoThumb(v.id)}
+    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div>${I('ext')}`;
+    return `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${body}</a>`;
+  }
+  const link = `<div class="row vrow" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})">${videoThumbBox(v.id)}
+    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>${I('play')}</div>`;
+  return `<div class="vsw" data-vid="${esc(v.id)}" data-cat="${esc(v.category)}"><div class="vswbg" aria-hidden="true">Skip</div>${link}</div>`;
 }
 // Videos skipped on the Videos page, for today only. A refresh keeps them out; tomorrow they can come back.
 function knownVideoIds() {
@@ -4857,7 +5011,7 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 30 Sep 2026. These refresh every day.<br>Tap a video to play it in the app. Open on YouTube is there if you want the YouTube site.</div>`;
+    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 30 Sep 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
 }
 
 
@@ -4904,19 +5058,19 @@ const TOP40 = [
 ];
 function top40Row(v) {
   const reason = (v.reason || '').trim() || ('Official video for ' + v.title + ' by ' + v.artist + '.');
-  return `<button type="button" class="row vrow" data-rank="${v.rank}" onclick="playVideo(${jsArg(v.id)},${jsArg(v.title)})">${videoThumb(v.id)}
-    <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div><div class="s">${esc(reason)}</div></div>${I('play')}</button>`;
+  return `<div class="row vrow" data-rank="${v.rank}" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})">${videoThumbBox(v.id)}
+    <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div><div class="s">${esc(reason)}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>${I('play')}</div>`;
 }
 function Top40() {
   return header('Top 40', 'Current chart music videos') +
     `<div class="top40bar" id="top40bar"><button type="button" class="btn primary" id="top40surprise" onclick="surpriseTop40()">${I('shuffle')} Surprise me</button></div>` +
     `<div class="list" id="top40list">${TOP40.map(top40Row).join('')}</div>` +
-    `<div class="foot">Chart as of 30 Sep 2026. New Zealand Official Top 40 singles, 25 September to 1 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it here. Tap a song to play it in the app.</div>`;
+    `<div class="foot">Chart as of 30 Sep 2026. New Zealand Official Top 40 singles, 25 September to 1 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it in that row. Tap a song to play it in the picture beside the description.</div>`;
 }
 let top40SurpriseToken = 0;
 function surpriseTop40() {
   const scroller = document.getElementById('view');
-  const rows = [...document.querySelectorAll('#top40list button.row')];
+  const rows = [...document.querySelectorAll('#top40list .row.vrow')];
   if (!scroller || !rows.length) return;
   const i = Math.floor(Math.random() * rows.length);
   const row = rows[i];
@@ -4943,7 +5097,7 @@ function surpriseTop40() {
     setTimeout(() => { if (token === top40SurpriseToken) row.classList.remove('surprise'); }, 1700);
     setTimeout(() => {
       if (token !== top40SurpriseToken) return;
-      playVideo(id, TOP40[i].title);
+      playInlineVideo(id, TOP40[i].title);
     }, 450);
   };
   if (dist < 28) { finish(); return; }
