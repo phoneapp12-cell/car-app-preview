@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.34.0';
+const APP_VERSION = '1.35.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4325,13 +4325,19 @@ function updEvents() {
     if (q) { const i = document.getElementById('evq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
   }
 }
+// Leave out anything tagged Silver Festival (title, tags, categories, or the event text).
+function isSilverFestival(e) {
+  if (!e || typeof e !== 'object') return false;
+  const bits = [e.title, e.venue, e.desc, e.url, ...(Array.isArray(e.cats) ? e.cats : []), ...(Array.isArray(e.tags) ? e.tags : [])];
+  return bits.join('\n').toLowerCase().includes('silver festival');
+}
 function upcomingEvents() {
   if (!EVS) return [];
   const T = todayISO(), d = new Date(), hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  return EVS.data.events.filter(e => (e.end || e.date) >= T && !(e.date === T && !e.end && e.endTime && e.endTime <= hm))
+  return EVS.data.events.filter(e => !isSilverFestival(e) && (e.end || e.date) >= T && !(e.date === T && !e.end && e.endTime && e.endTime <= hm))
     .map(e => e.date < T ? Object.assign({}, e, { date: T }) : e);
 }
-const evById = id => (EVS ? EVS.data.events.find(e => e.id === id) : null);
+const evById = id => (EVS ? EVS.data.events.find(e => e.id === id && !isSilverFestival(e)) : null);
 const evAppt = id => S.appts.find(a => a.evId === id);
 function evWhen(e) {
   if (e.time) return fmtTime(e.time) + (e.endTime ? ' – ' + fmtTime(e.endTime) : '');
