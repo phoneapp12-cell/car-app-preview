@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.30.0';
+const APP_VERSION = '1.31.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -34,6 +34,7 @@ const P = {
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/>', book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5z"/><path d="M4 19a2 2 0 0 1 2-2h13v4H6a2 2 0 0 1-2-2zM9 7h6"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   trash: '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
   download: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>', upload: '<path d="M12 21V9M7 14l5-5 5 5M4 4h16"/>',
   share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>',
   zap: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
@@ -4558,6 +4559,21 @@ function selectVideoCat(id) {
   render();
   const v = document.getElementById('view'); if (v) v.scrollTop = 0;
 }
+// Hide a category tab. The videos stay in the lists; videoCats false keeps the tab off after reopen.
+// A custom category stays in videoCustom so search can turn it back on.
+function askRemoveVideoCat(id) {
+  const cat = allVideoCats().find(c => c.id === id);
+  if (!cat || !videoCatOn(id)) return;
+  confirmSheet('Remove ' + esc(cat.name) + '?', 'This tab and its videos will be hidden. You can add it again from search.', 'Remove', async () => {
+    const shot = snap();
+    S.settings.videoCats = Object.assign({}, S.settings.videoCats, { [id]: false });
+    const left = enabledVideoCats();
+    if (!left.some(c => c.id === videoTab)) videoTab = left.length ? left[0].id : '';
+    await save();
+    render();
+    toast(cat.name + ' removed.', 'Undo', async () => { S = JSON.parse(shot); videoTab = id; await save(); render(); });
+  });
+}
 function customVideoId(name) {
   let base = 'cus-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24);
   if (base === 'cus-') base = 'cus-x';
@@ -4804,7 +4820,12 @@ function homeVideosCard() {
 function Videos() {
   const cats = enabledVideoCats();
   if (!cats.some(c => c.id === videoTab)) videoTab = cats.length ? cats[0].id : '';
-  const tabs = cats.length ? `<div class="chips scroll" id="videotabs" role="tablist" aria-label="Video categories">${cats.map(c => `<button type="button" class="chip${c.id === videoTab ? ' on' : ''}" role="tab" aria-selected="${c.id === videoTab}" onclick="selectVideoCat(${jsArg(c.id)})">${esc(c.name)}</button>`).join('')}</div>` : '';
+  const tabs = cats.length ? `<div class="chips scroll" id="videotabs" role="tablist" aria-label="Video categories">${cats.map(c => {
+    const on = c.id === videoTab;
+    const name = esc(c.name);
+    if (!on) return `<button type="button" class="chip" role="tab" aria-selected="false" onclick="selectVideoCat(${jsArg(c.id)})">${name}</button>`;
+    return `<div class="chip on vsel" role="tab" aria-selected="true"><button type="button" class="vname" onclick="selectVideoCat(${jsArg(c.id)})">${name}</button><button type="button" class="vidx" id="vidcatdel" aria-label="Remove ${name}" onclick="askRemoveVideoCat(${jsArg(c.id)})">${I('x')}</button></div>`;
+  }).join('')}</div>` : '';
   const list = videoTab ? videosForCat(videoTab) : [];
   const curated = videoTab ? poolForCat(videoTab).some(v => !v.reserve) : false;
   const body = !cats.length
@@ -4816,7 +4837,7 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>Updated 30 Sep 2026. These refresh every day.<br>Each video opens on YouTube.</div>`;
+    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 30 Sep 2026. These refresh every day.<br>Each video opens on YouTube.</div>`;
 }
 
 
