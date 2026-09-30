@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.24.2';
+const APP_VERSION = '1.24.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3891,15 +3891,16 @@ function wxCard() {
     const msg = wxBusy || (!wxFailed && navigator.onLine !== false) ? 'Getting the Whangārei weather…' : 'The weather isn’t available right now. Tap to try again.';
     return `<button class="card wx wxempty" id="wxcard" onclick="refreshWx(true)">${I('cloudsun')}<span>${msg}</span></button>`;
   }
-  const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m), t = days[0].iso === todayISO() ? days[0] : null;
-  const facts = [num(c.apparent_temperature) ? `Feels like ${deg(c.apparent_temperature)}` : '', num(c.wind_speed_10m) ? `Wind ${Math.round(c.wind_speed_10m)} km/h${compass(c.wind_direction_10m) ? ' ' + compass(c.wind_direction_10m) : ''}` : '', moonPhaseName()].filter(Boolean);
+  const c = WX.data.current, day = wxIsDay(), now = wmo(c.weather_code, day, c.wind_speed_10m), t = days[0].iso === todayISO() ? days[0] : null;
+  const phase = moonPhaseName();
+  const facts = [num(c.apparent_temperature) ? `Feels like ${deg(c.apparent_temperature)}` : '', num(c.wind_speed_10m) ? `Wind ${Math.round(c.wind_speed_10m)} km/h${compass(c.wind_direction_10m) ? ' ' + compass(c.wind_direction_10m) : ''}` : '', !day ? `<span class="wxphase">${I(wxPhaseIcon(phase))}${esc(phase)}</span>` : ''].filter(Boolean);
   const shown = wxAll ? days : days.slice(0, 3);
   return `<div class="card wx" id="wxcard">
     <button class="wxnow" onclick="go('#weather')" aria-label="Whangārei weather: ${deg(c.temperature_2m)}, ${esc(now.words)}. Tap for the full forecast.">
       <span class="wxic">${wxIcon(now, 'big')}</span>
       <span class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></span>
       ${t ? `<span class="wxmeta"><span>H ${deg(t.hi)} · L ${deg(t.lo)}</span>${t.rain != null ? `<span>${I('drop')} ${t.rain}% rain</span>` : ''}</span>` : ''}</button>
-    ${facts.length ? `<div class="wxfacts2">${facts.map(f => `<span>${f}</span>`).join('')}</div>` : ''}
+    ${facts.length ? `<div class="wxfacts2">${facts.map(f => f.startsWith('<span') ? f : `<span>${f}</span>`).join('')}</div>` : ''}
     ${hoursStrip(wxHours(12))}
     <div class="wxweek" id="wxweek">${weekRows(shown)}</div>
     <div class="wxacts">${days.length > 3 ? `<button class="wxmore" id="wxmore" onclick="wxAll=!wxAll;updWx()" aria-expanded="${wxAll}">${wxAll ? 'Show fewer days' : `Show all ${days.length} days`}</button>` : '<span></span>'}<button class="wxfull" onclick="go('#weather')">Full forecast ${I('right')}</button></div>
@@ -3950,9 +3951,11 @@ function wxGreet() {
     const msg = loading ? 'Getting the Whangārei weather…' : 'Not available right now. Tap to try again.';
     return `<button class="wxgreet" id="wxgreet" onclick="refreshWx(true)">${I('cloudsun')}<span>${msg}</span></button>`;
   }
-  const c = WX.data.current, nowW = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m);
-  return `<button class="wxgreet" id="wxgreet" onclick="go('#weather')" aria-label="Whangārei weather: ${deg(c.temperature_2m)}, ${esc(nowW.words)}. Moon: ${esc(moon)}. Tap for the full forecast.">
-    <span class="wxgico">${wxIcon(nowW)}</span><span class="wxgtx"><b>${deg(c.temperature_2m)}</b> ${esc(nowW.words)} · ${esc(moon)}</span></button>`;
+  const c = WX.data.current, day = wxIsDay(), nowW = wmo(c.weather_code, day, c.wind_speed_10m);
+  const words = day ? nowW.words : nowW.kind === 'clear' ? moon : `${nowW.words} · ${moon}`;
+  const line = `${deg(c.temperature_2m)} ${words}`;
+  return `<button class="wxgreet" id="wxgreet" onclick="go('#weather')" aria-label="Whangārei weather: ${esc(line)}. Tap for the full forecast.">
+    <span class="wxgico">${wxCompactIcon(nowW, day, moon)}</span><span class="wxgtx"><b>${deg(c.temperature_2m)}</b> ${esc(words)}</span></button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
