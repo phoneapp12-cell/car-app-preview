@@ -148,6 +148,8 @@ body.kb .tabbar{display:none}
 .carhead{display:flex;align-items:center;gap:12px}
 .carpic{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
 .carpic svg.i{width:30px;height:30px;stroke:var(--white)}
+.carpic.carshot{width:72px;height:72px;border-radius:18px}
+.carpic.carshot svg.i{width:42px;height:42px}
 .carname{font-weight:750;font-size:1.0625rem;overflow-wrap:anywhere}
 .carmodel{font-size:0.84375rem;color:var(--ink2);margin-top:2px}
 .triple{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
@@ -432,7 +434,11 @@ details.help ol{margin:0 0 12px}
 .mealcardhead a{color:var(--brand);font-size:0.875rem;white-space:nowrap}
 .row.mealup{min-height:50px;padding:9px 14px}
 .row.mealup .t{font-size:0.9375rem}
-.row.mealup svg.i{width:18px;height:18px;color:var(--ink3);flex:none}
+.row.mealup>svg.i{width:18px;height:18px;color:var(--ink3);flex:none}
+.mealpic{width:72px;height:72px;border-radius:16px;background:var(--meal-bg);color:var(--meal-fg);display:grid;place-items:center;flex:none;position:relative;overflow:hidden}
+.mealpic .mealplate{position:absolute;inset:0;width:72px;height:72px}
+.mealpic>svg.i{width:36px;height:36px;position:relative;z-index:1;margin-top:-8px;color:var(--meal-fg)}
+.row.meal .mealpic+.tick{margin-left:0}
 .row.meal.flash{background:var(--gf-bg);transition:background .3s}
 /* My events (1.6.0) */
 .ic.mine{background:var(--mine-bg);color:var(--mine)} .tag.mine{background:var(--mine)}

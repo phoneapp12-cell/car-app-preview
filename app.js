@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.24.4';
+const APP_VERSION = '1.24.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -424,7 +424,7 @@ function carTriple(c) {
 function Cars() {
   return header('Cars', S.cars.length ? plural(S.cars.length, 'car') + ' in the family' : 'WOF, rego and servicing', addBtn('Add a car', 'carForm()')) +
     (S.cars.length ? S.cars.map(c => `<div class="carcard" role="button" tabindex="0" onclick="go('#car/${c.id}')"><div class="carhead">
-      <div class="carpic" style="background:${esc(c.hex || colourHex(c.colour))}">${I('car')}</div>
+      <div class="carpic carshot" style="background:${esc(c.hex || colourHex(c.colour))}">${I('car')}</div>
       <div style="flex:1;min-width:0"><div class="carname">${esc(c.name)}</div><div class="carmodel">${esc(carSub(c))}</div></div>
       ${c.plate ? `<span class="plate">${esc(c.plate)}</span>` : ''}</div>${carTriple(c)}</div>`).join('')
       : empty('No cars yet', 'Add a car to keep track of its WOF, rego and servicing.', 'Add a car', 'carForm()')) +
@@ -1570,13 +1570,19 @@ async function toggleNight(n) {
 }
 async function toggleMealsCal() { S.settings.mealsCal = !showMealsCal(); await save(); render(); }
 let mealHistAll = false;
+// Recipes store text only (a scan reads words, not a photo). This is a drawn picture, never a web address.
+function mealPic() {
+  const plate = `<svg class="mealplate" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="40" r="22" fill="var(--card)"/><circle cx="36" cy="40" r="16.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/><ellipse cx="36" cy="38" rx="9" ry="5.5" fill="currentColor" opacity=".5"/><ellipse cx="29.5" cy="36.5" rx="4.2" ry="3" fill="currentColor" opacity=".32"/><circle cx="43" cy="37" r="3.2" fill="currentColor" opacity=".28"/></svg>`;
+  return `<div class="mealpic" aria-hidden="true">${plate}${P.meal ? I('meal') : ''}</div>`;
+}
 function mealRow(iso, hist = false) {
   const e = M().plan[iso], idea = e ? (M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title)) : null;
   const past = iso <= todayISO();
   const mark = !e ? '' : idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
   const sub = [mark, hist ? fmtW(iso) : nightLabel(iso), idea && idea.tag ? idea.tag : '', e && e.notes ? esc(e.notes.split('\n')[0].slice(0, 60)) : '', hist && e ? (e.cooked ? 'Cooked' : 'Not ticked') : ''].filter(Boolean).join(' · ');
   return `<div class="row meal ${e && e.cooked ? 'done' : ''}" data-date="${iso}">
-    ${e && past ? `<button class="tick" aria-label="${e.cooked ? 'Untick' : 'Tick'} cooked: ${esc(e.title)}" onclick="toggleCooked('${iso}')"><span>${I('check')}</span></button>` : `<div class="ic meal">${I('meal')}</div>`}
+    ${e ? mealPic() : `<div class="ic meal">${I('meal')}</div>`}
+    ${e && past ? `<button class="tick" aria-label="${e.cooked ? 'Untick' : 'Tick'} cooked: ${esc(e.title)}" onclick="toggleCooked('${iso}')"><span>${I('check')}</span></button>` : ''}
     <button class="tapzone" onclick="mealNight('${iso}')"><div class="tx"><div class="t">${e ? esc(e.title) : '<span class="muted">Nothing planned</span>'}</div><div class="s">${sub}</div></div></button>
     ${!e && !hist ? `<button class="btn small" onclick="suggestNight('${iso}')">Suggest</button>` : ''}</div>`;
 }
@@ -1653,7 +1659,7 @@ function mealIdeaList() {
     (!q || (i.title + ' ' + i.ingr.join(' ') + ' ' + (i.tag || '') + ' ' + (i.notes || '') + ' ' + (i.method || '') + ' ' + (i.source || '')).toLowerCase().includes(q)))
     .sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || a.title.localeCompare(b.title));
   if (!vis.length) return `<div class="card empty"><div class="t">No recipes match</div><div class="s">${q ? 'Try a different word.' : mealFilter === 'Hidden' ? 'Nothing hidden.' : mealFilter === 'Mine' ? 'Recipes you add or scan show here.' : 'Nothing with this tag yet.'}</div></div>`;
-  return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}"><button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
+  return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}">${mealPic()}<button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
     <button class="tapzone" onclick="go('#recipe/${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.method ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· method</span>` : i.link ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· link</span>` : ''}</div>
     <div class="s">${i.gf ? gfTag(true) + ' ' : '<span class="nogf">Not marked gluten free</span> '}${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}</div></div></button>
     ${i.hidden ? `<button class="btn small" onclick="toggleMealHidden('${i.id}')">Show</button>` : `<button class="btn small" onclick="planIdea('${i.id}')">Plan</button>`}</div>`).join('')}</div>`;
@@ -2078,7 +2084,7 @@ function homeMeal() {
   const T = todayISO(), when = d => { const n = dayGap(d, T); return n === 0 ? 'Tonight' : n === 1 ? 'Tomorrow' : 'In ' + n + ' days'; };
   const row = d => { const e = M().plan[d], idea = M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title);
     const mark = idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
-    return `<button class="row mealup" data-date="${d}" onclick="openNight('${d}')"><div class="tx"><div class="t">${fmtW(d)} – ${esc(e.title)}</div>
+    return `<button class="row mealup" data-date="${d}" onclick="openNight('${d}')">${mealPic()}<div class="tx"><div class="t">${fmtW(d)} – ${esc(e.title)}</div>
       <div class="s">${[mark, when(d), idea && idea.tag ? esc(idea.tag) : ''].filter(Boolean).join(' · ')}</div></div>${I('right')}</button>`; };
   return `<div class="list mealhome" id="mealcard"><div class="mealcardhead"><span>${I('meal')} Upcoming meals</span><a href="#meals">See all${list.length > HOME_MEALS_MAX ? ` (${list.length})` : ''}</a></div>
     ${list.slice(0, HOME_MEALS_MAX).map(row).join('')}</div>`;
