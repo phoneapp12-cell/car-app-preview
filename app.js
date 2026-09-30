@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.24.3';
+const APP_VERSION = '1.24.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4169,15 +4169,24 @@ function videoSuggestions() {
   }
   return out;
 }
-function videoRow(v, home) {
-  return `<a class="row" href="${esc(v.url)}" target="_blank" rel="noopener"><div class="ic vid">${I('play')}</div>
-    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div>${home ? '' : `<div class="s">${esc(v.reason)}</div>`}</div>${I('ext')}</a>`;
+function videoReason(v) {
+  const r = (v.reason || '').trim();
+  if (r) return r;
+  const who = v.channel || v.artist || '';
+  return who ? (who + ' — ' + v.title + '.') : v.title;
+}
+function videoThumb(id) {
+  return `<img class="vthumb" src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" width="112" height="63" loading="lazy" decoding="async">`;
+}
+function videoRow(v) {
+  return `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${videoThumb(v.id)}
+    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div>${I('ext')}</a>`;
 }
 function homeVideosCard() {
   const list = videoSuggestions().slice(0, homeVideoCount());
   if (!list.length) return '';
   return `<div class="sec"><a class="sechead" href="#videos">Videos</a><a href="#videos">All videos</a></div>
-    <div class="list" id="homevideos">${list.map(v => videoRow(v, true)).join('')}</div>`;
+    <div class="list" id="homevideos">${list.map(v => videoRow(v)).join('')}</div>`;
 }
 function Videos() {
   const list = videoSuggestions();
@@ -4187,7 +4196,7 @@ function Videos() {
       <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(c.name)}" onclick="toggleVideoCat('${c.id}')"></button></div>`;
   }).join('')}</div>`;
   const body = list.length
-    ? `<div class="sec">Suggestions</div><div class="list" id="videolist">${list.map(v => videoRow(v, false)).join('')}</div>`
+    ? `<div class="sec">Suggestions</div><div class="list" id="videolist">${list.map(videoRow).join('')}</div>`
     : `<div class="card empty" id="videonone"><div class="t">No videos to show</div><div class="s">Turn a category back on to see suggestions.</div></div>`;
   return header('Videos', 'Suggestions from the categories you leave on') + switches + body +
     `<div class="foot">Updated 30 Sep 2026. These refresh every couple of weeks.<br>Each video opens on YouTube.</div>`;
@@ -4221,8 +4230,9 @@ const TOP40 = [
   { rank: 22, id: 'EZOiy1-cnxM', title: 'Material Lover', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=EZOiy1-cnxM' }
 ];
 function top40Row(v) {
-  return `<a class="row" href="${esc(v.url)}" target="_blank" rel="noopener"><div class="ic t40">${I('music')}</div>
-    <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div></div>${I('ext')}</a>`;
+  const reason = (v.reason || '').trim() || ('Official video for ' + v.title + ' by ' + v.artist + '.');
+  return `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${videoThumb(v.id)}
+    <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div><div class="s">${esc(reason)}</div></div>${I('ext')}</a>`;
 }
 function Top40() {
   return header('Top 40', 'Current chart music videos') +
