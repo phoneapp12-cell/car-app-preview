@@ -93,7 +93,7 @@ body.kb #view{padding-bottom:28px}
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:6px 0 12px}
 .top h1{font-size:1.75rem;line-height:1.15;margin:0;letter-spacing:-.5px}
 .top .sub{color:var(--ink2);font-size:0.9375rem;margin-top:4px}
-.wxgreet{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin:-6px 0 10px;padding:6px 10px;color:var(--ink2);font-size:0.9375rem;font-weight:650;line-height:1.35;background:color-mix(in srgb,#e8a317 16%,transparent);border-radius:14px}
+.wxgreet{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin:-6px 0 10px;padding:6px 10px;color:var(--ink2);font-size:0.9375rem;font-weight:600;line-height:1.35;background:color-mix(in srgb,#e8a317 16%,transparent);border-radius:14px}
 html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transparent)}
 .wxgreet b{color:var(--ink);font-weight:800}
 .wxgreet .wxgico{width:28px;height:28px;display:grid;place-items:center;flex:none}
@@ -458,10 +458,11 @@ details.help ol{margin:0 0 12px}
 .ytopen{display:inline-flex;align-items:center;gap:4px;margin-top:4px;color:var(--brand);font-weight:700;font-size:0.8125rem;line-height:1.3}
 .ytopen svg.i{width:15px;height:15px}
 .row.vrow{align-items:center;cursor:pointer}
-/* Videos page and Top 40 (1.48.0): the Home video layout. Picture 198×111 on the left, title clamped to 3 lines on the right, description full width underneath. Date and Open on YouTube stay under the description. No scroll autoplay. */
+/* Videos page and Top 40 (1.48.0): the Home video layout. Picture 198×111 on the left, title clamped to 3 lines on the right, description full width underneath. Top 40 keeps the date under the description. Videos (1.52.0) puts the date on the bottom of the picture. No scroll autoplay. */
 #videolist .vthumb,#top40list .vthumb{width:198px;height:111px;border-radius:12px}
 #videolist .vthumbbox,#top40list .vthumbbox{width:198px;height:111px;border-radius:12px}
 #videolist .vthumbbox .vthumb,#top40list .vthumbbox .vthumb{width:100%;height:100%;border-radius:0}
+#videolist .vthumbbox .vdatecap{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:2px 6px 3px;background:rgba(0,0,0,.72);color:#f4f4f5;font-size:11px;font-weight:650;line-height:1.25;letter-spacing:.01em;text-align:left;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #videolist .row.hvrow,#top40list .row.hvrow{flex-wrap:wrap;align-items:flex-start;align-content:flex-start;row-gap:8px}
 #videolist .hvhead,#top40list .hvhead{display:flex;align-items:flex-start;gap:12px;flex:1 0 100%;min-width:0}
 #videolist .hvhead .tx,#top40list .hvhead .tx{padding-top:1px}

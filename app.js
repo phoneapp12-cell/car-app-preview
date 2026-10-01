@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.51.0';
+const APP_VERSION = '1.52.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4917,14 +4917,21 @@ function videoDateLine(id) {
 function videoOpenLink(id) {
   return `<a class="ytopen" href="https://www.youtube.com/watch?v=${esc(id)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${I('ext')} Open on YouTube</a>`;
 }
-function videoThumbBox(id) {
-  return `<span class="vthumbbox" data-yt="${esc(id)}">${videoThumb(id)}</span>`;
+function videoDateOverlay(id) {
+  const t = videoDateText(id);
+  // No date: no strip. Videos page only; Home and Top 40 do not pass this.
+  return t ? `<span class="vdatecap">${esc(t)}</span>` : '';
+}
+function videoThumbBox(id, opts) {
+  const withDate = !!(opts && opts.date);
+  return `<span class="vthumbbox" data-yt="${esc(id)}"${withDate ? ' data-vdate="1"' : ''}>${videoThumb(id)}${withDate ? videoDateOverlay(id) : ''}</span>`;
 }
 let playingVideoId = '';
 function stopInlineVideo() {
   document.querySelectorAll('.vthumbbox.playing').forEach(box => {
     box.classList.remove('playing');
-    box.innerHTML = videoThumb(box.getAttribute('data-yt') || '');
+    const id = box.getAttribute('data-yt') || '';
+    box.innerHTML = videoThumb(id) + (box.hasAttribute('data-vdate') ? videoDateOverlay(id) : '');
   });
   playingVideoId = '';
 }
@@ -4955,10 +4962,10 @@ function videoRow(v, swipe) {
     return `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${body}</a>`;
   }
   // Same layout as Home: large picture on the left, bold title (and channel) on the right, description full width underneath.
-  // Tap still plays in that picture. The date and Open on YouTube stay under the description.
-  const link = `<div class="row vrow hvrow" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})"><div class="hvhead">${videoThumbBox(v.id)}
+  // Tap still plays in that picture. The date sits on the bottom of the picture, not under the description.
+  const link = `<div class="row vrow hvrow" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})"><div class="hvhead">${videoThumbBox(v.id, { date: true })}
     <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div></div></div>
-    <div class="s hvwhy">${esc(videoReason(v))}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>`;
+    <div class="s hvwhy">${esc(videoReason(v))}</div>${videoOpenLink(v.id)}</div>`;
   return `<div class="vsw" data-vid="${esc(v.id)}" data-cat="${esc(v.category)}"><div class="vswbg" aria-hidden="true">Skip</div>${link}</div>`;
 }
 // Videos skipped on the Videos page, for today only. A refresh keeps them out; tomorrow they can come back.
