@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.37.0';
+const APP_VERSION = '1.38.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4992,54 +4992,11 @@ function wireVideoSwipe() {
   list.addEventListener('pointercancel', end);
 }
 // Home only. The box, title and description all come from this one video.
-// Scrolling the box into view plays it muted inside the box. Scrolling it out stops it.
+// The box stays a still thumbnail. It does not play on its own.
 function homeVideoRow(v) {
   const id = v && v.id;
   return `<div class="row vrow hvrow" data-yt="${esc(id)}">${videoThumbBox(id)}
     <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div></div>`;
-}
-let homeVideoObserver = null;
-const homeVideoRatios = new Map();
-function stopHomeVideo(box) {
-  if (!box || !box.classList.contains('playing')) return;
-  box.classList.remove('playing');
-  box.innerHTML = videoThumb(box.getAttribute('data-yt') || '');
-}
-function playHomeVideo(box) {
-  if (!box || box.classList.contains('playing')) return;
-  const id = box.getAttribute('data-yt') || '';
-  if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
-  const row = box.closest('.hvrow');
-  const titleEl = row && row.querySelector('.t');
-  const title = (titleEl && titleEl.textContent || 'Video').replace(/\s+/g, ' ').trim() || 'Video';
-  const embed = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&mute=1&playsinline=1';
-  box.classList.add('playing');
-  box.innerHTML = `<iframe src="${embed}" title="${esc(title)}" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
-}
-function pickHomeVideo() {
-  let best = null, bestR = 0;
-  homeVideoRatios.forEach((r, b) => { if (b.isConnected && r > bestR) { bestR = r; best = b; } });
-  const current = document.querySelector('#homevideos .vthumbbox.playing');
-  const curR = current ? (homeVideoRatios.get(current) || 0) : 0;
-  let next = null;
-  if (best && bestR >= 0.6) next = best;
-  else if (current && curR >= 0.25) next = current;
-  document.querySelectorAll('#homevideos .vthumbbox.playing').forEach(b => { if (b !== next) stopHomeVideo(b); });
-  if (next) playHomeVideo(next);
-}
-function wireHomeVideos() {
-  if (homeVideoObserver) { homeVideoObserver.disconnect(); homeVideoObserver = null; }
-  homeVideoRatios.clear();
-  const list = document.getElementById('homevideos');
-  const root = document.getElementById('view');
-  if (!list || !root || !('IntersectionObserver' in window)) return;
-  const boxes = [...list.querySelectorAll('.vthumbbox')];
-  if (!boxes.length) return;
-  homeVideoObserver = new IntersectionObserver(entries => {
-    entries.forEach(e => homeVideoRatios.set(e.target, e.isIntersecting ? e.intersectionRatio : 0));
-    pickHomeVideo();
-  }, { root, threshold: [0, 0.25, 0.5, 0.6, 0.75, 1] });
-  boxes.forEach(b => homeVideoObserver.observe(b));
 }
 function homeVideosCard() {
   const list = videoSuggestions().slice(0, homeVideoCount());
@@ -5401,8 +5358,6 @@ function render() {
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
   if ((r === 'more' && moreEdit) || ((r === 'home' || r === '') && homeEdit)) wireReorder();
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
-  if ((r === 'home' || r === '') && !homeEdit) wireHomeVideos();
-  else if (homeVideoObserver) { homeVideoObserver.disconnect(); homeVideoObserver = null; homeVideoRatios.clear(); }
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
