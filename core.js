@@ -471,7 +471,7 @@
     }
     if (x.part === 'svc') return d <= 14 ? 's14' : null;
     if (x.part === 'bill') { if (d <= 0) return 'd0'; if (d <= 3) return 's3'; return null; }
-    if (x.part === 'todo') return d <= 0 ? 'd0' : null;
+    if (x.part === 'todo') return d < 0 ? 'd0' : null; // due today uses the four daytime slots below, not one nudge
     // AA membership and driver licence: 30, 14 and 3 days before, and on the day (or once, if already expired)
     // Pet care: 3 days before and on the day (once, if already overdue)
     if (x.part === 'care') { if (d <= 0) return 'd0'; if (d <= 3) return 's3'; return null; }
@@ -521,10 +521,34 @@
   }
 
   // Works out which reminders should fire now. `fired` is an object of key -> time fired.
+  // To-dos due today: 8:00, 12:00, 16:00 and 20:00 Pacific/Auckland. One catch-up if several slots were missed.
+  const TODO_DAY_SLOTS = [
+    { id: '08', mins: 8 * 60, label: '8:00 am' },
+    { id: '12', mins: 12 * 60, label: '12:00 pm' },
+    { id: '16', mins: 16 * 60, label: '4:00 pm' },
+    { id: '20', mins: 20 * 60, label: '8:00 pm' }
+  ];
+  function aklClock(now) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now).map(x => [x.type, x.value]));
+    let h = +p.hour; if (h === 24) h = 0;
+    return { iso: p.year + '-' + p.month + '-' + p.day, mins: h * 60 + (+p.minute || 0) };
+  }
   function pendingReminders(data, fired, now = new Date(), cal = {}) {
     const s = data.settings || {};
     const out = [];
     const daytime = !quietNow(now);
+    const ak = aklClock(now);
+    (data.todos || []).forEach(td => {
+      if (!td || td.done || !td.due || td.due !== ak.iso) return;
+      const passed = TODO_DAY_SLOTS.filter(s => ak.mins >= s.mins);
+      const keyOf = s => ['todo4', td.id, ak.iso, s.id].join('|');
+      const unsent = passed.filter(s => !fired[keyOf(s)]);
+      if (!unsent.length) return;
+      const slot = unsent[unsent.length - 1];
+      // Mark earlier missed slots as sent so a late open does not fire every one of them.
+      unsent.slice(0, -1).forEach(s => { fired[keyOf(s)] = now.getTime(); });
+      out.push({ key: keyOf(slot), title: 'To-do today: ' + td.title, body: 'Still to do. ' + slot.label + ' reminder. Tap to tick it off.', url: '#todo', days: 0 });
+    });
     dueItems(data, now).forEach(x => {
       if ((x.kind === 'driver' || x.kind === 'pet' || x.kind === 'health') && !daytime) return; // AA / licence / pet / health reminders wait until 7 am
       const st = stage(x); if (!st) return;

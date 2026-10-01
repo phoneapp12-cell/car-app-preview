@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.55.0';
+const APP_VERSION = '1.56.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5301,7 +5301,7 @@ function Settings() {
    <button class="btn" onclick="testNotification()">${I('bell')} Send a test notification</button></div>
   <div class="card" style="margin-top:10px"><div class="muted"><b>When you get a nudge</b><br>
    WOF and rego: 30, 14 and 3 days before, on the day, then every 3 days while overdue.<br>
-   Service: 14 days before. Bills: 3 days before and on the day. To-dos: on the day.<br>
+   Service: 14 days before. Bills: 3 days before and on the day. To-dos: on the day, at 8 am, noon, 4 pm and 8 pm, until you tick them off.<br>
    Appointments and connected calendars: 1 hour before (all-day ones in the morning).<br>
    Birthdays: 3 days before and on the day, never between 9 pm and 7 am.<br>
    Pets: 3 days before and on the day, never between 9 pm and 7 am.<br>
