@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.58.0';
+const APP_VERSION = '1.59.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4834,6 +4834,21 @@ function videoReason(v) {
 // Publish dates read from each video's YouTube watch page (publishDate). oEmbed does not include a date.
 // Stored here so the phone shows a real date and does not look it up again on every tap.
 const VIDEO_DATES = {
+  // 2 Oct 2026 list. Dates are the publishDate on each video's YouTube watch page.
+  'ohqxP8EEumo': '2026-09-16',
+  'TbkUKCm3CHQ': '2026-09-21',
+  '9LRozsApCWA': '2015-09-08',
+  'rlO4Zqw-6WQ': '2025-05-27',
+  '9UhNYzdZNb8': '2023-09-26',
+  'NL2Vq32jyeo': '2023-07-31',
+  '20MqQoe8rtA': '2024-04-26',
+  'YK90uKtx8pQ': '2026-01-22',
+  'xNEiUeGfOv0': '2025-09-29',
+  'GvgDcBpKhAQ': '2026-05-22',
+  'nWjBe3P_JiA': '2025-05-10',
+  '0Rp9KJCEIvg': '2026-09-02',
+  'VpN78TXMSUM': '2025-02-18',
+  'lRH0jNgfkKs': '2026-01-09',
   'EKOU3JWDNLI': '2026-01-14',
   'zt0JA5rxdfM': '2025-12-22',
   '9OQ5vaYbGV0': '2026-05-22',
@@ -5018,10 +5033,10 @@ function videoRow(v, swipe) {
     return `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${body}</a>`;
   }
   // Same layout as Home: large picture on the left, bold title (and channel) on the right, description full width underneath.
-  // Tap still plays in that picture. The date sits on the bottom of the picture, not under the description.
+  // Tap still plays in that picture. The date is on the bottom of the picture and again under the description.
   const link = `<div class="row vrow hvrow" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})"><div class="hvhead">${videoThumbBox(v.id, { date: true })}
     <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div></div></div>
-    <div class="s hvwhy">${esc(videoReason(v))}</div>${videoOpenLink(v.id)}</div>`;
+    <div class="s hvwhy">${esc(videoReason(v))}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>`;
   return `<div class="vsw" data-vid="${esc(v.id)}" data-cat="${esc(v.category)}"><div class="vswbg" aria-hidden="true">Skip</div>${link}</div>`;
 }
 // Videos skipped on the Videos page, for today only. A refresh keeps them out; tomorrow they can come back.
