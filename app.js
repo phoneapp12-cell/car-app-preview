@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.60.0';
+const APP_VERSION = '1.61.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2317,6 +2317,8 @@ function attRow(o) {
   return `<button class="row att ${o.cls || ''}" data-kind="${o.kind}"${o.date ? ` data-date="${o.date}"` : ''} onclick="${o.go}"><div class="ic ${o.ic}"${o.icStyle ? ` style="${o.icStyle}"` : ''}>${I(o.icon)}</div>
     <div class="tx"><div class="t">${o.title}</div><div class="s">${o.sub}</div></div>${o.right || I('right')}</button>`;
 }
+// A feeding job, not a spray, prune or planting reminder. Matched on the built-in job, not a new date.
+const gardenIsFeed = j => /feed/i.test(j.jobKey || '') || /^Feed\b/.test(j.title || '');
 const ATT_SOURCES = {
   // WOF / rego / service, AA and licence, bills, to-dos with a due date, pet care: within 30 days or overdue (as before)
   due: T => dueItems(S).filter(x => x.days <= 30 && x.kind !== 'health').map(x => ({ days: x.days, rank: 0, sort: '', html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })),
@@ -2347,10 +2349,14 @@ const ATT_SOURCES = {
     .concat(healthAppts(S, T, T + DAY).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
       html: attRow({ wx: 1, kind: 'health', cls: 'happt', date: a.date, go: `go('#health/${a.person.id}/${a.item.id}')`, ic: 'health', icon: HEALTH_ICON[a.item.kind] || 'medkit',
         title: `${attWhen(d)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`, sub: `Health appointment · ${a.item.clinic ? esc(a.item.clinic) + ' · ' : ''}${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; })),
-  // Gardening (1.20.0): jobs in the next 14 days for plants that are on and not marked done this year. Not overdue later.
-  garden: T => gardenJobs(S, T, T + 14 * DAY).filter(j => !j.done && j.days >= 0 && j.days <= 14).map(j => ({ days: j.days, rank: 0, sort: j.title,
-    html: attRow({ kind: 'garden', date: j.date, go: `go('#garden/${j.go}')`, ic: 'garden', icon: 'leaf', title: esc(j.title),
-      sub: `Garden · ${fmtW(j.date)}`, right: pill(j.days) }) })),
+  // Gardening (1.20.0): other jobs for the next 14 days, not marked done, and not once the day has passed.
+  // Feeding jobs (1.61.0) stay on Home and in Upcoming on the day they are due, and after that day, until marked done for the year.
+  garden: T => {
+    const y0 = parseD(todayISO().slice(0, 4) + '-01-01');
+    return gardenJobs(S, y0, T + 14 * DAY).filter(j => !j.done && (gardenIsFeed(j) ? j.days <= 14 : j.days >= 0 && j.days <= 14)).map(j => ({ days: j.days, rank: 0, sort: j.title,
+      html: attRow({ kind: 'garden', date: j.date, go: `go('#garden/${j.go}')`, ic: 'garden', icon: 'leaf', title: esc(j.title),
+        sub: `Garden · ${fmtW(j.date)}`, right: pill(j.days) }) }));
+  },
   // Commission tracker set up and nothing entered for yesterday
   comm: T => { if (!CM().anchor) return []; const y = yesterdayISO(); if (commDay(y).length) return [];
     return [{ days: 0, rank: 0, sort: '', html: attRow({ kind: 'comm', go: `go('#commission/add')`, ic: 'comm', icon: 'cash', title: 'Enter yesterday’s commission', sub: `Commission · nothing entered for ${fmtW(y)} yet` }) }]; }
@@ -2787,7 +2793,8 @@ function gardenJobRows(id) {
   const nextDate = upcoming.length ? upcoming[0].date : '';
   if (!jobs.length) return '<div class="card muted">No jobs this year.</div>';
   return `<div class="list" id="gardenjobs">${jobs.map(j => {
-    const btn = nextDate && j.date === nextDate ? `<button class="btn small" onclick="gardenDone('${j.key}')">Done for this year</button>` : '';
+    const feedDue = gardenIsFeed(j) && !j.done && j.date <= today;
+    const btn = (nextDate && j.date === nextDate) || feedDue ? `<button class="btn small" onclick="gardenDone('${j.key}')">Done for this year</button>` : '';
     const pillHtml = j.done ? '<span class="pill paid">Done</span>' : j.date < today ? '<span class="pill none">Passed</span>' : '';
     return `<div class="row gjob" data-job="${j.key}"><div class="tx"><div class="t">${esc(j.title)}</div><div class="s">${fmtW(j.date)}${j.body ? ' · ' + esc(j.body) : ''}</div></div>${pillHtml}${btn}</div>`;
   }).join('')}</div>`;
