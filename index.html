@@ -84,10 +84,10 @@ body{overscroll-behavior:none}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
 a{color:inherit;text-decoration:none}
 svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
-/* The page itself never scrolls: #app is pinned to the viewport, #view is the only scroller and the tab bar is position:fixed (v1.6.1). */
+/* The page itself never scrolls: #app is pinned to the viewport and #view is the only scroller (v1.6.1). The tab strip sits on the left and stays off-screen until a swipe (v1.50.0). */
 #app{position:fixed;top:0;bottom:0;left:0;right:0;width:100%;max-width:560px;margin:0 auto;background:var(--bg);overflow:hidden}
 @media (min-width:600px){ html{background:var(--desk)} #app{box-shadow:0 0 0 1px var(--line),0 10px 40px rgba(0,0,0,.08)} }
-#view{position:absolute;top:0;bottom:0;left:0;right:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:calc(var(--sat) + 10px) calc(16px + var(--sar)) calc(var(--tabh) + var(--sab) + 28px) calc(16px + var(--sal));-webkit-overflow-scrolling:touch}
+#view{position:absolute;top:0;bottom:0;left:0;right:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:calc(var(--sat) + 10px) calc(16px + var(--sar)) calc(28px + var(--sab)) calc(16px + var(--sal));-webkit-overflow-scrolling:touch}
 body.kb #view{padding-bottom:28px}
 #view::-webkit-scrollbar{display:none}
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:6px 0 12px}
@@ -161,13 +161,18 @@ html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transp
 .empty{text-align:center;padding:22px 16px}
 .empty .t{font-weight:700;font-size:1rem}
 .empty .s{color:var(--ink2);font-size:0.875rem;margin:4px 0 12px;line-height:1.4}
-/* tab bar */
-.tabbar{position:fixed;left:0;right:0;bottom:0;width:100%;max-width:560px;margin:0 auto;box-sizing:border-box;min-height:calc(var(--tabh) + var(--sab));z-index:20;display:grid;grid-template-columns:repeat(5,1fr);background:var(--tabbg);background:color-mix(in srgb,color-mix(in srgb,var(--brand) 20%,var(--card)) 82%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border-top:1px solid var(--line);border-top:1px solid color-mix(in srgb,var(--brand) 22%,transparent);padding:6px calc(4px + var(--sar)) calc(8px + var(--sab)) calc(4px + var(--sal))}
-.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:0.71875rem;font-weight:600;color:var(--ink3);padding:4px 0;min-height:48px;justify-content:center}
+/* Left tab strip (v1.50.0). Off-screen until a swipe from the left edge. #app clips it while it is hidden. */
+.tabscrim{position:absolute;inset:0;z-index:25;background:color-mix(in srgb,var(--scrim) 40%,transparent)}
+.tabscrim[hidden]{display:none}
+.tabbar{position:absolute;top:0;bottom:0;left:0;width:96px;box-sizing:border-box;z-index:30;display:flex;flex-direction:column;justify-content:safe center;gap:2px;overflow-x:hidden;overflow-y:auto;background:var(--tabbg);background:color-mix(in srgb,color-mix(in srgb,var(--brand) 20%,var(--card)) 94%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border-right:1px solid color-mix(in srgb,var(--brand) 22%,transparent);border-radius:0 18px 18px 0;box-shadow:8px 0 28px rgba(0,0,0,.16);padding:calc(10px + var(--sat)) 6px calc(10px + var(--sab)) 6px;transform:translateX(calc(-100% - 16px));touch-action:pan-y}
+.tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:0.71875rem;font-weight:600;line-height:1.15;text-align:center;color:var(--ink3);padding:6px 2px;min-height:52px;justify-content:center;width:100%}
 .tabbar button.on{color:var(--brand)}
-.tabbar .badge{position:absolute;left:14px;top:-4px;background:var(--red);color:var(--card);font-size:0.625rem;border-radius:999px;padding:1px 5px;font-weight:700;line-height:1.3}
+.tabbar .badge{position:absolute;left:auto;right:-10px;top:-6px;background:var(--red);color:var(--card);font-size:0.625rem;border-radius:999px;padding:1px 5px;font-weight:700;line-height:1.3}
 .tabbar span.w{position:relative;display:flex}
-body.kb .tabbar{display:none}
+.tabhint{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:22;display:flex;align-items:center;height:64px;pointer-events:none}
+.tabhint i{width:4px;height:46px;border-radius:0 4px 4px 0;background:color-mix(in srgb,var(--brand) 78%,var(--ink));display:block}
+.tabhint::after{content:"";width:7px;height:7px;margin-left:1px;border-right:2px solid var(--brand);border-bottom:2px solid var(--brand);transform:rotate(-45deg);opacity:.9}
+body.tabs-open .tabhint,body.tabs-drag .tabhint{visibility:hidden}
 /* cars */
 .carcard{background:var(--card);border-radius:22px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.05);margin-bottom:12px;width:100%;text-align:left;display:block}
 .carhead{display:flex;align-items:center;gap:12px}
@@ -374,7 +379,7 @@ details.help ol{margin:0 0 12px}
 .seg button.on{background:var(--brand);border-color:var(--brand);color:var(--onbrand)}
 .formerr{color:var(--red);font-size:0.875rem;font-weight:600;margin:-4px 2px 10px;display:none}
 /* toast */
-#toast{position:fixed;left:50%;width:calc(100% - 32px);max-width:528px;transform:translate(-50%,12px);bottom:calc(84px + var(--sab));z-index:60;background:var(--toast);color:var(--ontoast);border-radius:14px;padding:12px 14px;font-size:0.90625rem;display:flex;align-items:center;gap:10px;opacity:0;transition:.25s;pointer-events:none}
+#toast{position:fixed;left:50%;width:calc(100% - 32px);max-width:528px;transform:translate(-50%,12px);bottom:calc(16px + var(--sab));z-index:60;background:var(--toast);color:var(--ontoast);border-radius:14px;padding:12px 14px;font-size:0.90625rem;display:flex;align-items:center;gap:10px;opacity:0;transition:.25s;pointer-events:none}
 #toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 #toast button{margin-left:auto;color:var(--toastbtn);font-weight:700;padding:4px 2px;flex:none}
 .foot{text-align:center;font-size:0.75rem;color:var(--ink3);margin:20px 0 4px;line-height:1.5}
@@ -637,7 +642,7 @@ details.help ol{margin:0 0 12px}
 .moneyin span{font-weight:700;color:var(--ink2);font-size:1rem}
 .field .moneyin input{border:0;box-shadow:none;padding-left:6px;min-width:0}
 .moneyin:focus-within{border-color:var(--brand);box-shadow:0 0 0 2px var(--focus)}
-/* Reorder the bottom bar and More (1.12.0): press and hold, then drag */
+/* Reorder which sections sit in the left strip (1.12.0): press and hold a row, then drag */
 .reordhelp{font-size:0.875rem;color:var(--ink2);margin:-2px 2px 10px;line-height:1.4}
 .reorder{overflow:visible}
 .reorder .mrow{position:relative;background:var(--card);cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-y;transition:transform .18s ease,box-shadow .18s ease}
@@ -761,7 +766,9 @@ textarea.tall{min-height:150px}
 <body>
 <div id="app">
   <main id="view"><noscript>This app needs JavaScript turned on.</noscript></main>
-  <nav class="tabbar" id="tabbar"></nav>
+  <div class="tabscrim" id="tabscrim" hidden></div>
+  <nav class="tabbar" id="tabbar" aria-label="Pages" aria-hidden="true"></nav>
+  <div class="tabhint" aria-hidden="true"><i></i></div>
 </div>
 <div id="sheet"></div>
 <div id="toast" role="status" aria-live="polite"><span id="toastmsg"></span><button id="toastbtn"></button></div>

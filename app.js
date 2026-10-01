@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.49.0';
+const APP_VERSION = '1.50.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3708,8 +3708,8 @@ function More() {
   const order = navOrder();
   if (moreEdit) {
     return header('Reorder', 'Press and hold an item, then drag it up or down') +
-      `<div class="reordhelp">The top ${NAV_TABS} go in the bottom bar, between Home and More. The rest are in More.</div>
-      <div class="list reorder" id="reorderlist">${order.map((k, i) => { const d = R[k]; return `<div class="row mrow${i < NAV_TABS ? ' istab' : ''}" data-k="${k}" aria-label="${d.t}"><div class="ic ${d.cls}">${I(d.icon)}</div><div class="tx"><div class="t">${d.t}</div>${i < NAV_TABS ? '<div class="s tabnote">In the bottom bar</div>' : ''}</div><span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
+      `<div class="reordhelp">The top ${NAV_TABS} go in the left strip, between Home and More. The rest are in More. Swipe in from the left edge to open that strip.</div>
+      <div class="list reorder" id="reorderlist">${order.map((k, i) => { const d = R[k]; return `<div class="row mrow${i < NAV_TABS ? ' istab' : ''}" data-k="${k}" aria-label="${d.t}"><div class="ic ${d.cls}">${I(d.icon)}</div><div class="tx"><div class="t">${d.t}</div>${i < NAV_TABS ? '<div class="s tabnote">In the left strip</div>' : ''}</div><span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
       </div>
       <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetNav()">Reset to default</button><button class="btn primary" id="moredone" onclick="moreEdit=false;render()">Done</button></div>
       <div class="foot">Home, More and Settings always stay where they are.</div>`;
@@ -3723,7 +3723,7 @@ function More() {
     </div>
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
-/* 1.12.0: one list for the bottom bar and More. The first NAV_TABS items are tabs (between Home and More), the rest are in More.
+/* 1.12.0: one list for the left strip and More. The first NAV_TABS items are tabs (between Home and More), the rest are in More.
    Press and hold a row on the Reorder screen, then drag. Saved as settings.navOrder, so it's in backups too. */
 const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
@@ -3790,8 +3790,8 @@ function startDrag(st) {
   st.raf = requestAnimationFrame(loop);
 }
 function autoScroll() {
-  const v = $('#view'), vr = v.getBoundingClientRect(), bar = $('#tabbar').getBoundingClientRect().top, y = rd.lastY;
-  const step = y < vr.top + 70 ? -8 : y > Math.min(vr.bottom, bar) - 70 ? 8 : 0;
+  const v = $('#view'), vr = v.getBoundingClientRect(), y = rd.lastY;
+  const step = y < vr.top + 70 ? -8 : y > vr.bottom - 70 ? 8 : 0;
   if (step) { const b = v.scrollTop; v.scrollTop += step; if (v.scrollTop !== b) dragTo(); }
 }
 function dragTo() {
@@ -5401,7 +5401,7 @@ function tabbar(active) {
   const inTabs = k => tabs.includes(k);
   const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge && !(inTabs('bills') && inTabs('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
   $('#tabbar').innerHTML = list.map(([k, l, ic]) =>
-    `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span>${l}</button>`).join('');
+    `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span>${l}</button>`).join('');
 }
 function activeTab(r) {
   const item = ROUTE_ITEM[r] || r, tabs = navOrder().slice(0, NAV_TABS);
@@ -5429,13 +5429,13 @@ function render() {
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
-window.addEventListener('hashchange', () => { if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
+window.addEventListener('hashchange', () => { setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
 
-/* ---------- fixed tab bar + on-screen keyboard (v1.6.1) ----------
-   The tab bar is position:fixed and only #view scrolls. When the Android keyboard opens
-   (interactive-widget=resizes-content shrinks the viewport) the bar would ride up on top of the
-   keyboard and over the field being typed in, so we hide it while a text field has focus and the
-   viewport is clearly shorter than its full height. Also keep the page itself from ever scrolling. */
+/* ---------- on-screen keyboard (v1.6.1) ----------
+   Only #view scrolls. When the Android keyboard opens (interactive-widget=resizes-content shrinks
+   the viewport) a text field can sit under the keys, so body.kb tightens the bottom padding while
+   a text field has focus and the viewport is clearly shorter than its full height. The tab strip
+   is on the left (v1.50.0), not along the bottom. Also keep the page itself from ever scrolling. */
 const kbState = { full: 0, w: 0 };
 function isTextField(el) {
   if (!el || !el.tagName) return false;
@@ -5459,6 +5459,105 @@ if (window.visualViewport) visualViewport.addEventListener('resize', kbCheck);
 document.addEventListener('focusin', () => setTimeout(kbCheck, 0));
 document.addEventListener('focusout', () => setTimeout(kbCheck, 0));
 window.addEventListener('scroll', () => { if (!document.body.classList.contains('kb') && document.scrollingElement.scrollTop) document.scrollingElement.scrollTop = 0; });
+
+/* ---------- left tab strip (v1.50.0) ----------
+   Hidden off the left edge. A swipe that starts on that edge pulls it open. A swipe back,
+   or a tap outside the strip, hides it. Press-and-hold reorder stays on the Reorder screen. */
+let tabsOpen = false;
+const TABS_HIDDEN = 'translateX(calc(-100% - 16px))';
+function setTabsOpen(on, animate) {
+  tabsOpen = !!on;
+  document.body.classList.toggle('tabs-open', tabsOpen);
+  const bar = document.getElementById('tabbar');
+  const scrim = document.getElementById('tabscrim');
+  if (bar) {
+    bar.style.transition = animate === false ? 'none' : 'transform .22s cubic-bezier(.2,.8,.2,1)';
+    if (animate !== false) void bar.offsetWidth;
+    bar.style.transform = tabsOpen ? 'translateX(0)' : TABS_HIDDEN;
+    bar.setAttribute('aria-hidden', tabsOpen ? 'false' : 'true');
+    bar.inert = !tabsOpen;
+    if (!tabsOpen && bar.contains(document.activeElement)) document.activeElement.blur();
+  }
+  if (scrim) scrim.hidden = !tabsOpen;
+}
+let tabSwallow = false;
+function armTabSwallow() {
+  tabSwallow = true;
+  setTimeout(() => { tabSwallow = false; }, 400);
+}
+function wireTabSwipe() {
+  const EDGE = 20;
+  let g = null;
+  const barEl = () => document.getElementById('tabbar');
+  const appEl = () => document.getElementById('app');
+  const barW = () => { const b = barEl(); return (b && b.offsetWidth) || 96; };
+  document.addEventListener('pointerdown', e => {
+    if (g || sheetOpen || e.isPrimary === false || (e.button != null && e.button !== 0)) return;
+    if (rd) return;
+    const app = appEl(); if (!app) return;
+    const left = app.getBoundingClientRect().left;
+    const onBar = !!e.target.closest('#tabbar');
+    if (!tabsOpen) {
+      if (e.clientX - left > EDGE) return;
+      if (e.target.closest('.reorder')) return;
+    } else if (!onBar) {
+      g = { mode: 'outside', x: e.clientX, y: e.clientY, pid: e.pointerId, dx: 0, drag: false, left, t: performance.now(), lx: e.clientX, vx: 0 };
+      return;
+    }
+    g = { mode: tabsOpen ? 'close' : 'open', x: e.clientX, y: e.clientY, pid: e.pointerId, dx: 0, drag: false, left, t: performance.now(), lx: e.clientX, vx: 0 };
+  }, true);
+  document.addEventListener('pointermove', e => {
+    if (!g || e.pointerId !== g.pid) return;
+    const dx = e.clientX - g.x, dy = e.clientY - g.y;
+    const now = performance.now();
+    g.vx = (e.clientX - g.lx) / Math.max(1, now - g.t);
+    g.lx = e.clientX; g.t = now;
+    if (g.mode === 'outside') {
+      if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) { g = null; return; }
+      if (dx > -10) return;
+      g.mode = 'close';
+    }
+    if (!g.drag) {
+      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { g = null; return; }
+      if (g.mode === 'open' && dx < 8) return;
+      if (g.mode === 'close' && dx > -8) return;
+      if (Math.abs(dx) < 8) return;
+      g.drag = true;
+      document.body.classList.add('tabs-drag');
+      const b = barEl();
+      if (b) b.style.transition = 'none';
+    }
+    g.dx = dx;
+    if (e.cancelable) e.preventDefault();
+    const b = barEl(); if (!b) return;
+    const w = barW() + 16;
+    const tx = g.mode === 'open' ? Math.min(0, -w + dx) : Math.max(-w, Math.min(0, dx));
+    b.style.transform = 'translateX(' + tx + 'px)';
+  }, { passive: false });
+  const end = e => {
+    if (!g || (e && e.pointerId != null && e.pointerId !== g.pid)) return;
+    const st = g; g = null;
+    document.body.classList.remove('tabs-drag');
+    if (st.drag) {
+      armTabSwallow();
+      if (st.mode === 'open') setTabsOpen(st.dx > 52 || st.vx > 0.45);
+      else setTabsOpen(!(st.dx < -40 || st.vx < -0.45));
+      return;
+    }
+    if (tabsOpen && st.mode === 'outside') { armTabSwallow(); setTabsOpen(false); }
+  };
+  document.addEventListener('pointerup', end, true);
+  document.addEventListener('pointercancel', end, true);
+  document.addEventListener('click', e => {
+    if (!tabSwallow) return;
+    tabSwallow = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+  const bar = barEl();
+  if (bar) bar.inert = true;
+}
+wireTabSwipe();
 
 /* ---------- start ---------- */
 async function start() {
