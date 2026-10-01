@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.57.0';
+const APP_VERSION = '1.58.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5459,6 +5459,20 @@ function stopSync() {
     toast('Sync is off on this phone.');
   });
 }
+const WEBSITE_ADDRESS = 'phoneapp12-cell.github.io/car-app-preview';
+function websiteSettingsRow() {
+  return `<div class="list" id="websiterow" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap">
+    <div class="tx" style="flex-basis:100%"><div class="t">On a computer, open</div>
+      <div class="s" id="websiteaddr" style="user-select:text;-webkit-user-select:text;word-break:break-all">${esc(WEBSITE_ADDRESS)}</div></div>
+    <div class="btns" style="flex-basis:100%;margin:0">
+      <button type="button" class="btn small" id="websitecopy" onclick="copyWebsiteAddress()">${I('copy')} Copy</button>
+    </div>
+  </div></div>`;
+}
+async function copyWebsiteAddress() {
+  const ok = await copyText(WEBSITE_ADDRESS);
+  toast(ok ? 'Website address copied.' : 'Couldn’t copy. The address is on the screen to copy by hand.');
+}
 function syncSettingsRow() {
   const code = syncCode();
   const pretty = code ? SyncLogic.formatSyncCode(code) : '';
@@ -5498,6 +5512,7 @@ function Settings() {
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>
   <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Appearance, sync, reminders, calendars and backup</div></div></div>
   ${syncSettingsRow()}
+  ${websiteSettingsRow()}
   <div class="sec" id="appearance">Appearance</div>
   ${themePicker()}
   ${textSizePicker()}
