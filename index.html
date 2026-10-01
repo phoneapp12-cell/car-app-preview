@@ -138,6 +138,11 @@ body.kb #view{padding-bottom:28px}
 .hsec[data-k="videos"] .vthumb{width:198px;height:111px;border-radius:12px}
 .hsec[data-k="videos"] .vthumbbox{width:198px;height:111px;border-radius:12px}
 .hsec[data-k="videos"] .vthumbbox .vthumb{width:100%;height:100%;border-radius:0}
+/* Home videos only (1.39.0): still picture on the left, bold title beside it, description full width underneath. Videos page and Top 40 stay as they are. */
+.hsec[data-k="videos"] .row.hvrow{flex-wrap:wrap;align-items:flex-start;align-content:flex-start;row-gap:8px}
+.hsec[data-k="videos"] .hvhead{display:flex;align-items:flex-start;gap:12px;flex:1 0 100%;min-width:0}
+.hsec[data-k="videos"] .hvhead .tx{padding-top:1px}
+.hsec[data-k="videos"] .hvwhy{flex:1 0 100%;min-width:0;margin-top:0}
 .row .tx{flex:1;min-width:0}
 .row .t{font-weight:650;font-size:0.96875rem;line-height:1.25;overflow-wrap:anywhere}
 .row .s{font-size:0.8125rem;color:var(--ink2);margin-top:2px;line-height:1.3}
