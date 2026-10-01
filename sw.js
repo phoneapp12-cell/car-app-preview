@@ -1,11 +1,11 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '1.45.0';
+const VERSION = '1.46.0';
 const CACHE = 'due-dates-' + VERSION;
 const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['./', './index.html', './app.js', './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-192.png', './icons/maskable-512.png',
-  './icons/apple-touch-icon.png', './icons/favicon-32.png'];
+  './icons/apple-touch-icon.png', './icons/favicon-32.png', './images/whangarei-growers-market.jpg'];
 
 importScripts('core.js?v=' + VERSION);
 

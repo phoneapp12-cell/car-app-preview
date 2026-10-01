@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.45.0';
+const APP_VERSION = '1.46.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -271,7 +271,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a tick button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
-  birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays later this month (this week’s are in Upcoming)', 1],
+  birthdays: ['cake', 'bday', 'Birthdays', 'Tomorrow through 30 days away. They can also show in Upcoming.', 1],
   pets: ['paw', 'pet', 'Pets', 'Next flea treatment, grooming and vet dates', 0],
   bills: ['bill', 'bill', 'Bills', 'The next bills to pay', 0],
   cars: ['car', 'car', 'Cars at a glance', 'Each car’s next WOF and rego', 0],
@@ -342,7 +342,8 @@ const HOME_CARD = {
       <button class="paybtn" onclick="go('#commission/add')">Add</button></div></div>`;
   },
   birthdays: () => {
-    const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 2).sort((x, y) => x.d - y.d || x.b.name.localeCompare(y.b.name));
+    // Tomorrow through 30 days. Today stays off this list. The same birthdays can still show in Upcoming. No cap.
+    const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((x, y) => x.d - y.d || x.b.name.localeCompare(y.b.name));
     if (!list.length) return '';
     return homeSec('Birthdays', '<a href="#birthdays">See all</a>') + `<div class="list" id="homebdays">${list.map(x => `<button class="row" onclick="birthdayForm('${x.b.id}')"><div class="ic bday">${I('cake')}</div>
       <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${fmtW(x.iso)}${x.age > 0 ? ` · turns ${x.age}` : ''}</div></div>
@@ -4355,7 +4356,10 @@ function evMatches(e) {
 }
 function evCard(e) {
   const a = evAppt(e.id);
-  return `<div class="card evcard" data-ev="${esc(e.id)}"><div class="evt">${esc(e.title)}</div>
+  const head = isWhangareiGrowersMarket(e)
+    ? `<div class="evhead">${growersMarketThumb()}<div class="evt">${esc(e.title)}</div></div>`
+    : `<div class="evt">${esc(e.title)}</div>`;
+  return `<div class="card evcard" data-ev="${esc(e.id)}">${head}
     <div class="evm">${I('clock')}<span>${esc(evWhen(e))}${e.end ? ` · until ${fmtW(e.end)}` : ''}</span></div>
     ${e.venue ? `<div class="evm">${I('pin')}<span>${esc(e.venue)}</span></div>` : ''}
     ${e.desc ? `<div class="evd">${esc(e.desc)}</div>` : ''}
@@ -4443,10 +4447,19 @@ function movieTrailerPicture(e) {
   if (!/^https:\/\/\S+$/i.test(url) || url.length > 500 || url === e.url) return '';
   return url;
 }
+// Shane's photo of the Whangārei Growers Market stall. Only this title, not other markets or movies.
+const GROWERS_MARKET_PIC = 'images/whangarei-growers-market.jpg';
+function isWhangareiGrowersMarket(e) {
+  const t = String(e && e.title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return t.includes('whangarei growers market');
+}
+function growersMarketThumb() {
+  return `<img class="evthumb" src="${esc(GROWERS_MARKET_PIC)}" alt="" width="92" height="52" loading="lazy" decoding="async">`;
+}
 function homeEvents() {
   const next = upcomingEvents().slice(0, homeEventCount());
   const row = e => {
-    const pic = movieTrailerPicture(e);
+    const pic = movieTrailerPicture(e) || (isWhangareiGrowersMarket(e) ? GROWERS_MARKET_PIC : '');
     const mark = pic
       ? `<img class="evthumb" src="${esc(pic)}" alt="" width="92" height="52" loading="lazy" decoding="async">`
       : `<div class="ic ev">${I('ticket')}</div>`;
