@@ -4,7 +4,7 @@ A small installable web app (PWA) for keeping track of WOF, rego and servicing f
 
 - Open it: https://phoneapp12-cell.github.io/car-app-preview/
 - Install it: in Chrome on Android tap ⋮ then **Add to Home screen** / **Install app**. On iPhone (Safari) tap **Share** then **Add to Home Screen**.
-- Your data is saved on your phone only (IndexedDB). The only thing that leaves the phone is a connected calendar link, which is passed to the calendar link service (`relay/`) to fetch the calendar. Use **Settings › Export backup** now and then.
+- Your data is saved on your phone (IndexedDB). Settings › Sync can also keep a second device in step: you create a private code on one device and type it on the other. The copy is encrypted with that code and stored by the calendar link service (`relay/`, `POST /sync`). A connected calendar link is still passed to that service to fetch the calendar. Use **Settings › Export backup** now and then.
 - Home shows the Whangārei weather (from Open-Meteo, straight from the phone) and **More › Events** lists what's on in Whangārei over the next 60 days (from the council, through the relay). Neither sends anything about you.
 
 - New Zealand public holidays are built in and on by default (Settings › Show public holidays). No setup and no internet needed.

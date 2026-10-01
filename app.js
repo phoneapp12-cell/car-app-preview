@@ -1,8 +1,8 @@
-/* Car & Life Due Dates – the app. Data lives only on this device (IndexedDB). */
+/* Car & Life Due Dates – the app. Data lives on this device (IndexedDB). Settings can also sync it to another device. */
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.56.0';
+const APP_VERSION = '1.57.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -148,6 +148,7 @@ async function save() {
   S.updatedAt = new Date().toISOString();
   try { await kvSet('data', S); } catch (e) { toast('Sorry, that couldn’t be saved on this phone.'); throw e; }
   queueCheck();
+  schedulePhoneSync();
 }
 // Take a copy so an action can be undone
 const snap = () => JSON.stringify(S);
@@ -466,7 +467,7 @@ function Home() {
   const feed = groups.map(g => `<section class="hsec" data-k="${g.k}">${g.h}</section>`).join('');
   return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
     feed + `${syncNote()}
-    <div class="foot">Your information is saved on this phone only.</div>
+    <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
 }
 
@@ -2499,7 +2500,7 @@ function Pets() {
         ${next.length ? `<div class="petnext">${next.map(x => `<div><span class="pn">${esc(x.care.name)}</span><b>${fmtW(x.date)}</b>${pill(x.days)}</div>`).join('')}</div>` : '<div class="muted" style="margin-top:10px;font-size:0.875rem">No dates yet. Tap to add when things were last done.</div>'}</div>`;
     }).join('') + `<div class="btns"><button class="btn" onclick="petForm()">${I('plus')} Add another pet</button></div>`
       : empty('No pets yet', 'Keep track of flea treatment, worming, vaccinations, grooming, vet check-ups and dog registration.', 'Add your first pet', 'petForm()')) +
-    `<div class="foot">Due pet care shows on Home and the Calendar.<br>Your information is saved on this phone only.</div>`;
+    `<div class="foot">Due pet care shows on Home and the Calendar.<br>${savedWhere()}</div>`;
 }
 let petHistAll = false;
 function careRow(p, it) {
@@ -2776,7 +2777,7 @@ function Garden() {
         <button class="tapzone" onclick="go('#garden/${id}')"><span class="carname">${esc(GARDEN_META[id].name)}</span><span class="carmodel">${esc(gardenNextLine(id))}</span></button>
         ${gardenSwitch(id)}</div></div>`;
     }).join('')}</div>` +
-    `<div class="foot">A job only reminds you on the morning it is due.<br>Your information is saved on this phone only.</div>`;
+    `<div class="foot">A job only reminds you on the morning it is due.<br>${savedWhere()}</div>`;
 }
 function gardenJobRows(id) {
   const jobs = gardenYearJobs(id), today = todayISO();
@@ -2863,7 +2864,7 @@ function Health(arg, iid) {
     }).join('') + (chips ? `<div class="muted" style="margin:14px 2px 6px;font-size:0.875rem">Quick add</div>${chips}` : '') + `<div class="btns"><button class="btn" onclick="personForm()">${I('plus')} Add ${S.health.length ? 'another person' : 'a person'}</button></div>`
       : `<div class="card empty"><div class="t">No one added yet</div><div class="s">Add each person, then their dentist, doctor, chiropractor and other check-ups. You’ll get a reminder when each one is due.</div>
         ${chips ? `<div class="s" style="margin-top:4px">Quick add:</div>${chips}` : ''}<button class="btn primary" style="flex:none;padding:12px 22px" onclick="personForm()">${I('plus')} Add a person</button></div>`) +
-    `<div class="foot">Due check-ups and booked appointments show on Home and the Calendar.<br>Your information is saved on this phone only.</div>`;
+    `<div class="foot">Due check-ups and booked appointments show on Home and the Calendar.<br>${savedWhere()}</div>`;
 }
 let hHistAll = false;
 function hRow(p, it) {
@@ -3180,7 +3181,7 @@ function Commission(arg) {
       <p class="muted" style="margin:6px 0 14px">Each pay fortnight runs Monday to the Sunday 13 days later. Pick the Monday this one started and every fortnight lines up from there. You can change it later.</p>
       ${anchorPicker('')}
       <div class="btns"><button class="btn primary" id="commstart" onclick="commSetupGo()">Start tracking</button></div></div>
-      <div class="foot">Enter each day’s commission the day after you earn it.<br>Your information is saved on this phone only.</div>`;
+      <div class="foot">Enter each day’s commission the day after you earn it.<br>${savedWhere()}</div>`;
   }
   const f = curFortnight(), tot = commSum(c.entries, f.start, f.end), n = c.entries.filter(e => e.date >= f.start && e.date <= f.end).length;
   const dl = daysLeft(f.end), y = yesterdayISO(), yHas = commDay(y).length;
@@ -3206,7 +3207,7 @@ function Commission(arg) {
     <div class="sec">Last 8 fortnights</div>${commChart()}
     <div class="sec">Past fortnights</div>${commPast()}
     ${c.remind ? `<div class="foot">Reminder on: 9 am if yesterday is blank. <button class="linkbtn" onclick="toggleCommRemind()">Turn off</button></div>` : ''}
-    <div class="foot">Your information is saved on this phone only.</div>`;
+    <div class="foot">${savedWhere()}</div>`;
 }
 function commForm(id, date) {
   const e = id ? CM().entries.find(x => x.id === id) : { date: date || yesterdayISO(), cents: '', note: '' };
@@ -3312,7 +3313,7 @@ function Loans() {
   const sub = act.length ? `${plural(act.length, 'loan')} being paid back` : S.loans.length ? 'All paid off' : 'Money you’ve borrowed';
   if (!S.loans.length) return back + header('Loans', sub, addBtn('Add a loan', 'loanForm()')) +
     empty('No loans yet', 'Keep track of money you’ve borrowed, like an interest-free loan from family. Add how much you borrowed, record each payment as you make it, and you’ll always know how much you still owe.', 'Add a loan', 'loanForm()') +
-    `<div class="foot">Your information is saved on this phone only.</div>`;
+    `<div class="foot">${savedWhere()}</div>`;
   return back + header('Loans', sub, addBtn('Add a loan', 'loanForm()')) +
     (act.length > 1 ? `<div class="summary loansum"><div class="muted">Total owed</div><div class="amt" id="loantotal">${centsMoney(total)}</div><div class="muted">Across ${plural(act.length, 'loan')}</div></div>` : '') +
     (act.length ? `<div id="loanlist">${act.map(loanCard).join('')}</div>` : `<div class="card muted" style="margin-bottom:12px">${I('check')} Nothing owed. Every loan is paid off.</div>`) +
@@ -3321,7 +3322,7 @@ function Loans() {
       ${done.map(l => { const k = loanCalc(l); return `<button class="row" data-loan="${l.id}" onclick="go('#loan/${l.id}')"><div class="ic loan">${I('check')}</div>
         <div class="tx"><div class="t">${esc(l.from)}${l.note ? ` <span class="muted">· ${esc(l.note)}</span>` : ''}</div><div class="s">Paid off ${fmtW(k.doneDate)} · ${centsMoney(l.cents)} borrowed</div></div>${I('right')}</button>`; }).join('')}</details>` : '') +
     `<div class="btns" style="margin-top:12px"><button class="btn" onclick="loanForm()">${I('plus')} Add a loan</button></div>
-    <div class="foot">Interest free: what you owe only goes down when you record a payment.<br>Your information is saved on this phone only.</div>`;
+    <div class="foot">Interest free: what you owe only goes down when you record a payment.<br>${savedWhere()}</div>`;
 }
 const centsIn = c => c ? (c / 100).toFixed(2) : '';
 const moneyField = (label, name, cents, ph = '0.00', hint = '') => field(label, `<div class="moneyin"><span>$</span><input name="${name}" inputmode="decimal" placeholder="${ph}" autocomplete="off" value="${centsIn(cents)}" aria-label="${esc(label.replace(/<[^>]+>/g, ''))}"></div>`, hint);
@@ -3405,7 +3406,7 @@ function LoanDetail(id) {
       ${l.startPaid ? `<button class="row lpay start" onclick="loanForm('${l.id}')"><div class="tx"><div class="t">Paid back before tracking</div><div class="s">Set when the loan was added. Tap to change.</div></div><b class="lpa">${centsMoney(l.startPaid)}</b></button>` : ''}</div>`
     : `<div class="card muted" style="font-size:0.875rem">No payments yet. Tap “Record payment” each time you pay some back.</div>`}
   <div class="btns" style="margin-top:16px"><button class="btn danger" onclick="deleteLoan('${l.id}')">${I('trash')} Delete loan</button></div>
-  <div class="foot">Your information is saved on this phone only.</div>`;
+  <div class="foot">${savedWhere()}</div>`;
 }
 function payForm(loanId, pid) {
   const l = getLoan(loanId); if (!l) return;
@@ -3776,7 +3777,7 @@ function More() {
       ${order.slice(NAV_TABS).map(item).join('')}
       <button class="row" onclick="go('#settings')"><div class="ic set">${I('gear')}</div><div class="tx"><div class="t">Settings</div><div class="s">Reminders, calendars and backup</div></div>${I('right')}</button>
     </div>
-    <div class="foot">Your information is saved on this phone only.</div>`;
+    <div class="foot">${savedWhere()}</div>`;
 }
 /* 1.12.0: one list for the left strip and More. 1.51.0 lists every section on the strip (Home, then this order, then More).
    The More page still skips the first NAV_TABS, which already sit at the top of the strip.
@@ -5258,6 +5259,224 @@ function surpriseTop40() {
   requestAnimationFrame(step);
 }
 
+/* ================= SYNC (this phone and another device) ================= */
+/* The whole record is one blob. S.updatedAt is the only stamp, so the newer save replaces the older one.
+   A phone that still has only the starter records does not wipe a phone that already has real records.
+   The cloud copy is encrypted with the sync code. The relay stores the ciphertext in its existing KV. */
+function savedWhere() {
+  return syncCode()
+    ? 'Your information is saved on this phone and syncs to your other device.'
+    : 'Your information is saved on this phone only.';
+}
+function syncCode() {
+  try {
+    const ls = SyncLogic.normSyncCode(localStorage.getItem('syncCode') || '');
+    if (ls) return ls;
+  } catch (e) { }
+  const fromS = S && S.settings && SyncLogic.normSyncCode(S.settings.syncCode || '');
+  if (fromS) { try { localStorage.setItem('syncCode', SyncLogic.formatSyncCode(fromS)); } catch (e) { } return fromS; }
+  return '';
+}
+function setSyncCode(code) {
+  const n = SyncLogic.normSyncCode(code);
+  try { if (n) localStorage.setItem('syncCode', SyncLogic.formatSyncCode(n)); else localStorage.removeItem('syncCode'); } catch (e) { }
+  if (S && S.settings) { if (n) S.settings.syncCode = SyncLogic.formatSyncCode(n); else delete S.settings.syncCode; }
+  return n;
+}
+function syncBundle() {
+  let dailyQuote = null, theme = null, textSize = null;
+  try { dailyQuote = localStorage.getItem('dailyQuote'); theme = localStorage.getItem('theme'); textSize = localStorage.getItem('textSize'); } catch (e) { }
+  return { data: S, local: { dailyQuote, theme, textSize } };
+}
+function foldLocalPrefs(d, local) {
+  d.settings = Object.assign({}, d.settings || {});
+  if (!local) return d;
+  if (!d.settings.theme && local.theme) {
+    try { const t = JSON.parse(local.theme); if (t && typeof t.t === 'string') d.settings.theme = t.t; if (t && t.auto) d.settings.themeAuto = true; } catch (e) { }
+  }
+  if (!d.settings.textSize && local.textSize) d.settings.textSize = local.textSize;
+  if (typeof d.settings.dailyQuote !== 'boolean' && (local.dailyQuote === '0' || local.dailyQuote === '1')) d.settings.dailyQuote = local.dailyQuote === '1';
+  return d;
+}
+function mirrorSyncedPrefs() {
+  applyTheme();
+  applyTextSize();
+  try { if (S && S.settings && typeof S.settings.dailyQuote === 'boolean') localStorage.setItem('dailyQuote', S.settings.dailyQuote ? '1' : '0'); } catch (e) { }
+}
+function setSyncStatus(ok, msg) {
+  try { localStorage.setItem('syncStatus', JSON.stringify({ at: Date.now(), ok: !!ok, msg: msg || '' })); } catch (e) { }
+  const el = document.getElementById('syncstatus'); if (el) el.textContent = syncStatusLine();
+}
+function syncStatusLine() {
+  let st = null; try { st = JSON.parse(localStorage.getItem('syncStatus') || 'null'); } catch (e) { }
+  if (!st || !st.at) return 'Not synced yet.';
+  return (st.ok ? 'Last sync ' : 'Last try ') + ago(st.at) + (st.msg ? '. ' + st.msg : '.');
+}
+let phoneSyncMute = false, phoneSyncTimer = null, phoneSyncJob = null, phoneSyncPending = null, phoneSyncBigTold = false;
+function schedulePhoneSync() {
+  if (phoneSyncMute || !syncCode()) return;
+  clearTimeout(phoneSyncTimer);
+  phoneSyncTimer = setTimeout(() => queuePhoneSync('push'), 1200);
+}
+function queuePhoneSync(mode) {
+  if (phoneSyncMute || !syncCode() || !S) return Promise.resolve();
+  if (phoneSyncJob) { if (mode === 'open' || phoneSyncPending === 'open') phoneSyncPending = 'open'; else phoneSyncPending = 'push'; return phoneSyncJob; }
+  phoneSyncJob = (async () => {
+    try {
+      let m = mode;
+      while (m) {
+        phoneSyncPending = null;
+        if (m === 'open') await phoneSyncOpenOnce(); else await phoneSyncPushOnce();
+        m = phoneSyncPending;
+      }
+    } finally {
+      phoneSyncJob = null;
+      const again = phoneSyncPending;
+      phoneSyncPending = null;
+      if (again) queuePhoneSync(again);
+    }
+  })();
+  return phoneSyncJob;
+}
+async function syncPost(body) {
+  const res = await fetch(RELAY_URL + '/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let data = {}; try { data = await res.json(); } catch (e) { }
+  if (!res.ok) { const err = new Error((data && data.error) || 'sync_unavailable'); err.status = res.status; throw err; }
+  return data;
+}
+async function applyPhoneSync(pack) {
+  if (sheetOpen) return;
+  const remote = pack && pack.data && typeof pack.data === 'object' ? pack.data : pack;
+  const code = syncCode();
+  phoneSyncMute = true;
+  try {
+    const next = normalise(foldLocalPrefs(remote, pack && pack.local));
+    if (code) next.settings.syncCode = SyncLogic.formatSyncCode(code);
+    S = next;
+    await kvSet('data', S);
+    mirrorSyncedPrefs();
+    if (!sheetOpen) render();
+  } finally { phoneSyncMute = false; }
+}
+async function phoneSyncPushOnce() {
+  const code = syncCode();
+  if (!code || !S || sheetOpen && phoneSyncPending) return;
+  if (!S.updatedAt) {
+    phoneSyncMute = true;
+    try { S.updatedAt = new Date().toISOString(); await kvSet('data', S); } finally { phoneSyncMute = false; }
+  }
+  let enc;
+  try { enc = await SyncLogic.encryptSync(code, syncBundle()); }
+  catch (e) {
+    if (e && e.message === 'too_big') {
+      setSyncStatus(false, 'Too big to sync');
+      if (!phoneSyncBigTold) { phoneSyncBigTold = true; toast('Your data is too big to sync. Photos can make it large. A backup file still works.'); }
+      return;
+    }
+    throw e;
+  }
+  const res = await syncPost({ op: 'push', code, updatedAt: S.updatedAt, iv: enc.iv, ct: enc.ct });
+  if (res.stored) { setSyncStatus(true, 'Synced'); return; }
+  if (res.reason === 'older' && res.ct) {
+    const pack = await SyncLogic.decryptSync(code, res.iv, res.ct);
+    if (SyncLogic.decideSync(S, pack) === 'pull' && !sheetOpen) {
+      await applyPhoneSync(pack);
+      setSyncStatus(true, 'Updated from your other device');
+    }
+  }
+}
+async function phoneSyncOpenOnce() {
+  const code = syncCode();
+  if (!code || !S) return;
+  if (sheetOpen) return;
+  const res = await syncPost({ op: 'pull', code });
+  if (res.empty) { await phoneSyncPushOnce(); return; }
+  const pack = await SyncLogic.decryptSync(code, res.iv, res.ct);
+  const choice = SyncLogic.decideSync(S, pack);
+  if (choice === 'pull') {
+    await applyPhoneSync(pack);
+    setSyncStatus(true, 'Updated from your other device');
+  } else if (choice === 'push') await phoneSyncPushOnce();
+  else setSyncStatus(true, 'Synced');
+}
+function phoneSyncOpen() {
+  if (!syncCode() || !S) return Promise.resolve();
+  return Promise.resolve(queuePhoneSync('open')).catch(e => { syncFail(e, false); });
+}
+function syncFail(e, loud) {
+  const bad = e && (e.message === 'bad_code' || e.name === 'OperationError');
+  const msg = bad ? 'That code doesn’t match this sync.' : (e && e.message === 'sync_too_large' ? 'Your data is too big to sync.' : 'Couldn’t sync just now. Your data is still on this phone.');
+  setSyncStatus(false, msg);
+  if (loud) toast(msg);
+  return msg;
+}
+async function createSyncCode() {
+  const n = setSyncCode(SyncLogic.newSyncCode());
+  phoneSyncMute = true;
+  try { await save(); } finally { phoneSyncMute = false; }
+  render();
+  try { await queuePhoneSync('push'); toast('Sync is on. Enter this code on your other device.'); }
+  catch (e) { syncFail(e, true); }
+  render();
+}
+function enterSyncCode() {
+  openSheet('Enter a code', field('Sync code', inp('code', '', 'autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKLM-NPQR"'), 'The code from the other device. It looks like ABCD-EFGH-JKLM-NPQR.'), async v => {
+    const n = SyncLogic.normSyncCode(v.code);
+    if (!n) return 'Enter the 16-character code from your other device.';
+    const prev = syncCode();
+    setSyncCode(n);
+    phoneSyncMute = true;
+    try { if (S && S.settings) S.settings.syncCode = SyncLogic.formatSyncCode(n); await kvSet('data', S); }
+    finally { phoneSyncMute = false; }
+    try { await queuePhoneSync('open'); }
+    catch (e) {
+      if (e && (e.message === 'bad_code' || e.name === 'OperationError')) {
+        setSyncCode(prev);
+        phoneSyncMute = true;
+        try { await kvSet('data', S); } catch (e2) { } finally { phoneSyncMute = false; }
+      }
+      return syncFail(e, false);
+    }
+    return () => { render(); toast('Sync is on.'); };
+  }, 'Sync');
+}
+async function copySyncCode() {
+  const c = SyncLogic.formatSyncCode(syncCode());
+  if (!c) return;
+  let ok = false;
+  try { await navigator.clipboard.writeText(c); ok = true; } catch (e) {
+    try { const ta = document.createElement('textarea'); ta.value = c; ta.setAttribute('readonly', ''); document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (e2) { }
+  }
+  toast(ok ? 'Sync code copied.' : 'Couldn’t copy. The code is on the screen to copy by hand.');
+}
+function stopSync() {
+  confirmSheet('Stop syncing on this phone?', 'This phone keeps its information. It will stop sending and receiving changes. Your other device is not wiped.', 'Stop sync', async () => {
+    setSyncCode('');
+    phoneSyncMute = true;
+    try { await save(); } finally { phoneSyncMute = false; }
+    try { localStorage.removeItem('syncStatus'); } catch (e) { }
+    render();
+    toast('Sync is off on this phone.');
+  });
+}
+function syncSettingsRow() {
+  const code = syncCode();
+  const pretty = code ? SyncLogic.formatSyncCode(code) : '';
+  return `<div class="sec" id="syncsec">Sync</div>
+  <div class="list" id="syncrow"><div class="srow" style="flex-wrap:wrap">
+    <div class="tx" style="flex-basis:100%"><div class="t">Sync</div>
+      <div class="s">${code
+        ? 'On. Cars, to-dos, meals, bills, birthdays, reminders, settings and your other records sync to your other device. If both devices have changes, the newer save replaces the older one. A brand-new device does not replace a device that already has your records.'
+        : 'Off. Create a code here, then enter it on your other device. Or enter the code from that device. Nothing is synced until you do.'}</div></div>
+    ${pretty ? `<div class="tx" style="flex-basis:100%"><div class="t" id="synccode" style="font-family:ui-monospace,monospace;letter-spacing:.06em">${esc(pretty)}</div><div class="s" id="syncstatus">${esc(syncStatusLine())}</div></div>` : `<div class="s" id="syncstatus" style="flex-basis:100%">${esc(syncStatusLine())}</div>`}
+    <div class="btns" style="flex-basis:100%;margin:0">
+      ${code ? `<button type="button" class="btn small" id="synccopy" onclick="copySyncCode()">${I('copy')} Copy</button>` : `<button type="button" class="btn primary small" id="synccreate" onclick="createSyncCode()">Create a code</button>`}
+      <button type="button" class="btn small" id="syncenter" onclick="enterSyncCode()">Enter a code</button>
+      ${code ? `<button type="button" class="btn small" id="syncstop" onclick="stopSync()">Stop</button>` : ''}
+    </div>
+  </div></div>`;
+}
+
 /* ================= SETTINGS ================= */
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 function Settings() {
@@ -5277,7 +5496,8 @@ function Settings() {
   let canShare = false;
   try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] })); } catch (e) { }
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>
-  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Appearance, reminders, calendars and backup</div></div></div>
+  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Appearance, sync, reminders, calendars and backup</div></div></div>
+  ${syncSettingsRow()}
   <div class="sec" id="appearance">Appearance</div>
   ${themePicker()}
   ${textSizePicker()}
@@ -5319,7 +5539,7 @@ function Settings() {
 
   <div class="sec">Backup</div>
   <div class="list">
-   <div class="srow"><div class="tx"><div class="t">Your data stays on this phone</div><div class="s">Nothing is sent anywhere, apart from your calendar links when the app syncs them. If you lose or reset your phone it’s gone, so make a backup now and then and save it somewhere safe, like Google Drive or an email to yourself. ${last}.</div></div></div>
+   <div class="srow"><div class="tx"><div class="t">${syncCode() ? 'Your data syncs to your other device' : 'Your data stays on this phone'}</div><div class="s">${syncCode() ? 'Sync is on, so a copy also goes to your other device. A backup file is still worth keeping somewhere safe, like Google Drive or an email to yourself.' : 'Nothing is sent anywhere, apart from your calendar links when the app syncs them. If you lose or reset your phone it’s gone, so make a backup now and then and save it somewhere safe, like Google Drive or an email to yourself.'} ${last}.</div></div></div>
   </div>
   <div class="btns" style="margin-top:10px">
    <button class="btn" onclick="exportData()">${I('download')} Export backup</button>
@@ -5357,7 +5577,7 @@ function Settings() {
    <a class="srow" href="https://transact.nzta.govt.nz/v2/check-expiry" target="_blank" rel="noopener"><div class="tx"><div class="t">Check WOF and rego expiry dates</div><div class="s">transact.nzta.govt.nz</div></div>${I('ext')}</a>
    <a class="srow" href="https://transact.nzta.govt.nz/v2/vehicle-licence-renewal" target="_blank" rel="noopener"><div class="tx"><div class="t">Renew rego online</div><div class="s">transact.nzta.govt.nz</div></div>${I('ext')}</a>
   </div>
-  <div class="foot">Car &amp; Life Due Dates · version ${APP_VERSION}<br>Your information is saved on this phone only.</div>`;
+  <div class="foot">Car &amp; Life Due Dates · version ${APP_VERSION}<br>${savedWhere()}</div>`;
 }
 async function toggleSetting(k) { S.settings[k] = S.settings[k] === false; await save(); await setupBackground(); render(); }
 
@@ -5641,6 +5861,7 @@ async function start() {
   render();
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
+  phoneSyncOpen();
   syncFeeds(); refreshWx(); refreshEvents();
   if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
   checkBridgeLoc(true);
@@ -5661,6 +5882,7 @@ async function start() {
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
+    phoneSyncOpen();
     check();
     syncFeeds(); refreshWx(); refreshEvents();
     if (brMode() !== 'off') refreshClosures();

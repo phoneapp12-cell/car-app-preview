@@ -57,7 +57,14 @@ and in the app. KV keys: `push-subs-v1`, `push-alerts-v1`.
 
 `POST /push/reminders` stores reminders for that phone (`{subscription, reminders:[{id,title,date,time}]}`) and replaces its pending list. `date` is `YYYY-MM-DD` and `time` is `HH:MM` in Pacific/Auckland. A separate cron (`* * * * *`) sends the push in that minute, including evenings and weekends. It does not use the bridge quiet hours (a new bridge notice found overnight still waits until 7 am). A phone that only turns on reminders is saved with `bridge: false`, so it does not start receiving bridge alerts. Turning bridge alerts off keeps the subscription while reminders are still pending. KV key: `push-reminders-v1` (title, date and time only, tied to the existing push subscription).
 
-KV holds only those three public copies, plus the push subscriptions above. If you deploy your own copy, create a KV namespace
+KV holds those public copies, the push subscriptions above, and (when you turn on Sync in the app) one encrypted blob per sync code.
+
+## Sync between two devices
+
+`POST /sync` with `{"op":"pull","code":"..."}` or `{"op":"push","code":"...","updatedAt":"...","iv":"...","ct":"..."}`.
+App origin only. The code is a 16-character private code the person creates in Settings. The worker stores ciphertext only (AES-GCM, encrypted on the device) in the existing `EVENTS_KV` binding, under `sync-v1:` plus a SHA-256 of the code. It does not log the body. A newer `updatedAt` replaces an older copy. The first push fills an empty key. About 2 MB maximum. No per-record timestamps: the whole blob is last-write by `updatedAt`, except the app will not let a device that still has only the starter records replace a device that already has real records.
+
+The public copies and push subscriptions are unchanged aside from that sync blob. If you deploy your own copy, create a KV namespace
 (`npx wrangler kv namespace create due-dates-events-cache`) and put its id in `wrangler.jsonc`.
 
 ## Deploy (free Cloudflare Workers plan)

@@ -5,7 +5,8 @@
  * feed on request and hands it back with a CORS header for the app's origin only.
  *
  * Privacy: the feed link arrives in the POST body (never the query string, so it can't land in
- * access logs). Nothing is logged, cached or stored. No console.log anywhere in this file.
+ * access logs). /fetch is not logged, cached or stored. No console.log anywhere in this file.
+ * POST /sync stores one encrypted blob per sync code in the existing KV binding (see sync.js).
  *
  * Safety: https only, allowlisted calendar hosts only (checked again on every redirect),
  * GET upstream only, 5 MB cap, 15 s timeout, response must look like an iCalendar file.
@@ -22,6 +23,7 @@ import { getFeed } from './events.js';
 import { getClosures } from './closures.js';
 import { pushRoute } from './push.js';
 import { searchVideos } from './videos.js';
+import { syncRoute } from './sync.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -68,7 +70,10 @@ const MESSAGES = {
   weather_unavailable: 'The weather could not be loaded right now.',
   closures_unavailable: 'Planned closures could not be checked right now.',
   bad_query: 'Use a short English topic name.',
-  videos_unavailable: 'Videos could not be looked up just now.'
+  videos_unavailable: 'Videos could not be looked up just now.',
+  bad_code: 'That sync code is not valid.',
+  sync_unavailable: 'Sync is not available right now.',
+  sync_too_large: 'That sync data is too big to store.'
 };
 
 function allowedOrigins(env) {
@@ -187,6 +192,25 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     } catch (e) {
       const code = e.message === 'bad_query' ? 'bad_query' : 'videos_unavailable';
       return json(code === 'bad_query' ? 400 : 502, code, origin, env);
+    }
+  }
+  if (path === '/sync') {
+    if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    let body;
+    try {
+      const len = Number(request.headers.get('content-length') || 0);
+      if (len > 2500000) return json(413, 'sync_too_large', origin, env);
+      const raw = await request.text();
+      if (raw.length > 2500000) return json(413, 'sync_too_large', origin, env);
+      body = raw ? JSON.parse(raw) : {};
+    } catch (e) { return json(400, 'bad_request', origin, env); }
+    try {
+      const [status, data] = await syncRoute(body, env);
+      if (data && data.error) return json(status, data.error, origin, env);
+      return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (e) {
+      return json(502, 'sync_unavailable', origin, env);
     }
   }
   if (path.startsWith('/push/')) {
