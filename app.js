@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.47.0';
+const APP_VERSION = '1.48.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4953,8 +4953,11 @@ function videoRow(v, swipe) {
     <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div>${I('ext')}`;
     return `<a class="row vrow" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${body}</a>`;
   }
-  const link = `<div class="row vrow" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})">${videoThumbBox(v.id)}
-    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>${I('play')}</div>`;
+  // Same layout as Home: large picture on the left, bold title (and channel) on the right, description full width underneath.
+  // Tap still plays in that picture. The date and Open on YouTube stay under the description.
+  const link = `<div class="row vrow hvrow" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})"><div class="hvhead">${videoThumbBox(v.id)}
+    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div></div></div>
+    <div class="s hvwhy">${esc(videoReason(v))}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>`;
   return `<div class="vsw" data-vid="${esc(v.id)}" data-cat="${esc(v.category)}"><div class="vswbg" aria-hidden="true">Skip</div>${link}</div>`;
 }
 // Videos skipped on the Videos page, for today only. A refresh keeps them out; tomorrow they can come back.
@@ -5051,13 +5054,14 @@ function wireVideoSwipe() {
   list.addEventListener('pointerup', end);
   list.addEventListener('pointercancel', end);
 }
-// Home only. Same row as Videos and Top 40: thumbnail beside the title, channel and description,
-// publish date under the description, and Open on YouTube. Tap plays in that thumbnail box.
-// It does not play on its own while scrolling.
+// Home only. The box, title and description all come from this one video.
+// The box stays a still thumbnail. It does not play on its own.
 function homeVideoRow(v) {
   const id = v && v.id;
-  return `<div class="row vrow" data-yt="${esc(id)}" onclick="onVideoRowClick(event,${jsArg(id)},${jsArg(v.title)})">${videoThumbBox(id)}
-    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div>${videoDateLine(id)}${videoOpenLink(id)}</div>${I('play')}</div>`;
+  // Picture on the left, bold title (and channel) top-aligned on the right, description full width underneath.
+  return `<div class="row vrow hvrow" data-yt="${esc(id)}"><div class="hvhead">${videoThumbBox(id)}
+    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div></div></div>
+    <div class="s hvwhy">${esc(videoReason(v))}</div></div>`;
 }
 function homeVideosCard() {
   const list = videoSuggestions().slice(0, homeVideoCount());
@@ -5132,8 +5136,11 @@ const TOP40 = [
 ];
 function top40Row(v) {
   const reason = (v.reason || '').trim() || ('Official video for ' + v.title + ' by ' + v.artist + '.');
-  return `<div class="row vrow" data-rank="${v.rank}" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})">${videoThumbBox(v.id)}
-    <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div><div class="s">${esc(reason)}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>${I('play')}</div>`;
+  // Same layout as Home: large picture on the left, bold title on the right, description full width underneath.
+  // Tap still plays in that picture. The date and Open on YouTube stay under the description.
+  return `<div class="row vrow hvrow" data-rank="${v.rank}" data-yt="${esc(v.id)}" onclick="onVideoRowClick(event,${jsArg(v.id)},${jsArg(v.title)})"><div class="hvhead">${videoThumbBox(v.id)}
+    <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div></div></div>
+    <div class="s hvwhy">${esc(reason)}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>`;
 }
 function Top40() {
   return header('Top 40', 'Current chart music videos') +

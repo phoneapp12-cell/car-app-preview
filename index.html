@@ -136,10 +136,19 @@ html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transp
 .hsec[data-k="meals"] .mealpic{width:98px;height:98px;border-radius:20px}
 .hsec[data-k="meals"] .mealpic .mealplate{width:98px;height:98px}
 .hsec[data-k="meals"] .mealpic>svg.i{width:49px;height:49px;margin-top:-12px}
+.hsec[data-k="videos"] .vthumb{width:198px;height:111px;border-radius:12px}
+.hsec[data-k="videos"] .vthumbbox{width:198px;height:111px;border-radius:12px}
+.hsec[data-k="videos"] .vthumbbox .vthumb{width:100%;height:100%;border-radius:0}
 .hsec[data-k="events"] .evthumb{width:92px;height:52px;border-radius:12px;object-fit:cover;flex:none;background:var(--soft2)}
 .evcard .evhead{display:flex;align-items:center;gap:12px}
 .evcard .evhead .evt{flex:1;min-width:0}
 .evcard .evthumb{width:92px;height:52px;border-radius:12px;object-fit:cover;flex:none;background:var(--soft2)}
+/* Home videos only (1.39.0): still picture on the left, bold title beside it, description full width underneath. */
+.hsec[data-k="videos"] .row.hvrow{flex-wrap:wrap;align-items:flex-start;align-content:flex-start;row-gap:8px}
+.hsec[data-k="videos"] .hvhead{display:flex;align-items:flex-start;gap:12px;flex:1 0 100%;min-width:0}
+.hsec[data-k="videos"] .hvhead .tx{padding-top:1px}
+.hsec[data-k="videos"] .hvhead .t{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
+.hsec[data-k="videos"] .hvwhy{flex:1 0 100%;min-width:0;margin-top:0}
 .row .tx{flex:1;min-width:0}
 .row .t{font-weight:650;font-size:0.96875rem;line-height:1.25;overflow-wrap:anywhere}
 .row .s{font-size:0.8125rem;color:var(--ink2);margin-top:2px;line-height:1.3}
@@ -441,6 +450,15 @@ details.help ol{margin:0 0 12px}
 .ytopen{display:inline-flex;align-items:center;gap:4px;margin-top:4px;color:var(--brand);font-weight:700;font-size:0.8125rem;line-height:1.3}
 .ytopen svg.i{width:15px;height:15px}
 .row.vrow{align-items:center;cursor:pointer}
+/* Videos page and Top 40 (1.48.0): the Home video layout. Picture 198×111 on the left, title clamped to 3 lines on the right, description full width underneath. Date and Open on YouTube stay under the description. No scroll autoplay. */
+#videolist .vthumb,#top40list .vthumb{width:198px;height:111px;border-radius:12px}
+#videolist .vthumbbox,#top40list .vthumbbox{width:198px;height:111px;border-radius:12px}
+#videolist .vthumbbox .vthumb,#top40list .vthumbbox .vthumb{width:100%;height:100%;border-radius:0}
+#videolist .row.hvrow,#top40list .row.hvrow{flex-wrap:wrap;align-items:flex-start;align-content:flex-start;row-gap:8px}
+#videolist .hvhead,#top40list .hvhead{display:flex;align-items:flex-start;gap:12px;flex:1 0 100%;min-width:0}
+#videolist .hvhead .tx,#top40list .hvhead .tx{padding-top:1px}
+#videolist .hvhead .t,#top40list .hvhead .t{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
+#videolist .hvwhy,#top40list .hvwhy,#videolist .vdate,#top40list .vdate,#videolist .ytopen,#top40list .ytopen{flex:1 0 100%;min-width:0}
 .row.vrow.surprise{background:var(--brand2);box-shadow:inset 4px 0 0 var(--brand);transition:background .25s ease}
 .top40bar{position:sticky;top:0;z-index:6;background:var(--bg);padding:2px 0 10px;margin:0 0 2px}
 .top40bar .btn{width:100%}
