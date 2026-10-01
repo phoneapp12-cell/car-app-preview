@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.59.0';
+const APP_VERSION = '1.60.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -262,6 +262,7 @@ function rowFor(x) {
 const HOME = { // key: [icon, icon colour class, name, what it shows, on by default]
   bridge: ['bridge', 'br', 'Lifting bridge', 'Lift times and closures when you’re nearby or it matters', 1],
   weather: ['cloudsun', 'appt', 'Weather', 'Whangārei weather today', 1],
+  roadworks: ['wrench', 'rw', 'Roadworks', 'Upcoming roadworks near Whangārei', 1],
   holidays: ['flag', 'hol', 'Public holidays', 'The next public holiday when it’s close', 1],
   meals: ['meal', 'meal', 'Upcoming meals', 'Your planned cooking nights', 1],
   shopping: ['cart', 'shop', 'Shopping list', 'Things still to get, with a tick button', 1],
@@ -311,6 +312,7 @@ const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link :
 const HOME_CARD = {
   bridge: () => { const br = brOnHome(); return br === 'card' ? brCard() : br === 'line' ? brLine() : ''; },
   weather: () => wxCard(),
+  roadworks: () => homeRoadworks(),
   holidays: () => homeHolidays(),
   meals: () => homeMeal(),
   shopping: () => homeShop(),
@@ -4357,6 +4359,128 @@ function Weather() {
     <div class="foot">${wxUpdated()}<br>Weather data by <a href="${OPEN_METEO_URL}" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). For warnings, check MetService.</div>`;
 }
 
+/* ================= ROADWORKS (NZTA TREIS open data, near Whangārei) ================= */
+// NZ Transport Agency highway events, the public ArcGIS copy of the TREIS feed.
+// Browser-friendly (CORS). Fixed box around Whangārei. Nothing is invented: an empty list stays empty.
+const RW_LAT = -35.7251, RW_LON = 174.3237, RW_KM = 30;
+const RW_MAX_AGE = 20 * 60 * 1000;
+const RW_NZTA = 'https://www.journeys.nzta.govt.nz/';
+const RW_LAYER = 'https://services.arcgis.com/XTtANUDT8Va4DLwI/arcgis/rest/services/NZTA_Highway_Information_TREIS_Feature_Layer_View/FeatureServer/';
+let RW = null, rwBusy = false, rwFailed = false;
+function loadRoadworks() {
+  try {
+    const r = JSON.parse(localStorage.getItem('roadworks') || 'null');
+    RW = r && r.at && r.data && Array.isArray(r.data.items) ? r : null;
+  } catch (e) { RW = null; }
+}
+function rwIso(ms) {
+  if (ms == null || ms === '') return '';
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+  if (!p.year || !p.month || !p.day) return '';
+  return p.year + '-' + p.month + '-' + p.day;
+}
+function rwKm(lat, lon) {
+  const R = 6371, p1 = RW_LAT * Math.PI / 180, p2 = lat * Math.PI / 180;
+  const dp = (lat - RW_LAT) * Math.PI / 180, dl = (lon - RW_LON) * Math.PI / 180;
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function rwDist(geom) {
+  const pts = [];
+  if (geom && typeof geom.x === 'number' && typeof geom.y === 'number') pts.push([geom.y, geom.x]);
+  (geom && geom.paths || []).forEach(path => (path || []).forEach(xy => { if (xy && xy.length >= 2) pts.push([xy[1], xy[0]]); }));
+  if (!pts.length) return null;
+  let best = Infinity;
+  pts.forEach(([lat, lon]) => { const d = rwKm(lat, lon); if (d < best) best = d; });
+  return best;
+}
+function rwIsWork(a) {
+  const t = String(a.eventType || '').toLowerCase();
+  const d = String(a.eventDescription || '').toLowerCase();
+  if (t === 'road work' || t === 'scheduled road work') return true;
+  return /road ?work|maintenance|pavement|resurfac|construction|asphalt/.test(d);
+}
+function rwParse(features) {
+  const today = todayISO();
+  const out = [];
+  (features || []).forEach(f => {
+    const a = f && f.attributes; if (!a || !rwIsWork(a)) return;
+    const status = String(a.status || '');
+    if (status && status !== 'Active' && status !== 'Scheduled') return;
+    const start = rwIso(a.startDate), end = rwIso(a.endDate);
+    if (end && end < today) return;
+    const km = rwDist(f.geometry);
+    if (km == null || km > RW_KM) return;
+    const road = String(a.locationArea || a.eventDescription || '').replace(/\s+/g, ' ').trim();
+    if (!road) return;
+    const resolution = String(a.expectedResolution || '');
+    out.push({
+      id: a.eventId || road,
+      road,
+      start, end,
+      until: !end && /further notice/i.test(resolution),
+      near: String(a.directLineDistance1 || '').replace(/\s+/g, ' ').trim(),
+      km
+    });
+  });
+  const seen = new Set();
+  return out.filter(x => { const k = String(x.id); if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => a.km - b.km || (a.start || '').localeCompare(b.start || ''));
+}
+function rwQuery(layer) {
+  const lat = RW_KM / 111, lon = RW_KM / (111 * Math.cos(RW_LAT * Math.PI / 180));
+  const env = (RW_LON - lon) + ',' + (RW_LAT - lat) + ',' + (RW_LON + lon) + ',' + (RW_LAT + lat);
+  const q = new URLSearchParams({
+    f: 'json', where: '1=1', geometry: env, geometryType: 'esriGeometryEnvelope', inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects',
+    outFields: 'eventId,eventType,eventDescription,locationArea,startDate,endDate,status,expectedResolution,directLineDistance1',
+    returnGeometry: 'true', outSR: '4326'
+  });
+  return RW_LAYER + layer + '/query?' + q.toString();
+}
+async function refreshRoadworks(force = false) {
+  if (rwBusy || (!force && RW && Date.now() - RW.at < RW_MAX_AGE)) return;
+  rwBusy = true; if (force) updRoadworks();
+  let items = null;
+  try {
+    const [a, b] = await Promise.all([getJSON(rwQuery(0), 12000), getJSON(rwQuery(1), 12000)]);
+    items = rwParse([].concat(a && a.features || [], b && b.features || []));
+  } catch (e) { items = null; }
+  rwBusy = false;
+  if (items) { RW = { at: Date.now(), data: { items } }; rwFailed = false; try { localStorage.setItem('roadworks', JSON.stringify(RW)); } catch (e) { } }
+  else rwFailed = true;
+  updRoadworks();
+}
+function updRoadworks() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  if ((h === 'home' || h === '') && !homeEdit) {
+    const v = $('#view'), top = v ? v.scrollTop : 0;
+    render(); if (v) v.scrollTop = top;
+  }
+}
+function rwWhen(w) {
+  let dates = '';
+  if (w.start && w.end) dates = w.start === w.end ? fmt(w.start) : fmt(w.start) + ' – ' + fmt(w.end);
+  else if (w.start) dates = 'From ' + fmt(w.start) + (w.until ? ' · until further notice' : '');
+  else if (w.end) dates = 'Until ' + fmt(w.end);
+  return [dates, w.near].filter(Boolean).join(' · ');
+}
+function homeRoadworks() {
+  const link = `<a href="${RW_NZTA}" target="_blank" rel="noopener">NZTA</a>`;
+  const head = `<div class="sec">Roadworks near Whangārei ${link}</div>`;
+  const items = RW && RW.data && Array.isArray(RW.data.items) ? RW.data.items.slice(0, 3) : null;
+  if (!items) {
+    const loading = rwBusy || (!rwFailed && navigator.onLine !== false);
+    const msg = loading ? 'Checking NZTA…' : 'Couldn’t load roadworks. Tap to try again.';
+    return head + `<div class="list" id="homeroadworks"><button class="row" onclick="refreshRoadworks(true)"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${loading ? 'Roadworks' : 'Not available'}</div><div class="s">${msg}</div></div></button></div>`;
+  }
+  if (!items.length) {
+    return head + `<div class="list" id="homeroadworks"><div class="row"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">No roadworks nearby</div><div class="s">Nothing near Whangārei on the NZTA list right now.</div></div></div></div>`;
+  }
+  return head + `<div class="list" id="homeroadworks">${items.map(w => `<a class="row" href="${RW_NZTA}" target="_blank" rel="noopener"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(w.road)}</div><div class="s">${esc(rwWhen(w))}</div></div></a>`).join('')}</div>`;
+}
+
 /* ================= EVENTS (Whangārei District Council "What's On", via the app's service) ================= */
 const EV_MAX_AGE = 3 * 3600 * 1000;
 const WDC_WHATSON = 'https://www.wdc.govt.nz/Events/Whats-On';
@@ -5744,7 +5868,7 @@ function render() {
   if ((r === 'more' && moreEdit) || ((r === 'home' || r === '') && homeEdit)) wireReorder();
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
 }
-window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); } });
+window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
 window.addEventListener('hashchange', () => { setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
 
@@ -5887,12 +6011,12 @@ async function start() {
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
   await loadCal();
-  loadWx(); loadEvs(); loadCls();
+  loadWx(); loadEvs(); loadCls(); loadRoadworks();
   render();
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
-  syncFeeds(); refreshWx(); refreshEvents();
+  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks();
   if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
   checkBridgeLoc(true);
   if ('serviceWorker' in navigator) {
@@ -5914,7 +6038,7 @@ async function start() {
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     phoneSyncOpen();
     check();
-    syncFeeds(); refreshWx(); refreshEvents();
+    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks();
     if (brMode() !== 'off') refreshClosures();
     checkBridgeLoc(true);
     if (swReg) swReg.update().catch(() => { });
