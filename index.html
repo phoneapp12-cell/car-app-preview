@@ -93,7 +93,8 @@ body.kb #view{padding-bottom:28px}
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:6px 0 12px}
 .top h1{font-size:1.75rem;line-height:1.15;margin:0;letter-spacing:-.5px}
 .top .sub{color:var(--ink2);font-size:0.9375rem;margin-top:4px}
-.wxgreet{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin:-6px 0 10px;padding:2px 2px 4px;color:var(--ink2);font-size:0.9375rem;font-weight:650;line-height:1.35}
+.wxgreet{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin:-6px 0 10px;padding:6px 10px;color:var(--ink2);font-size:0.9375rem;font-weight:650;line-height:1.35;background:color-mix(in srgb,#e8a317 16%,transparent);border-radius:14px}
+html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transparent)}
 .wxgreet b{color:var(--ink);font-weight:800}
 .wxgreet .wxgico{width:28px;height:28px;display:grid;place-items:center;flex:none}
 .wxgreet .wxgico .wxsvg{width:26px;height:26px}
@@ -643,7 +644,27 @@ details.help ol{margin:0 0 12px}
 .plate.small{font-size:0.71875rem;padding:0 5px;border-width:1.5px;margin-left:4px;vertical-align:1px}
 #homeloans .lbar{margin:6px 0 4px}
 /* Recipes, shopping list, scanning, Home dividers (1.15.0) */
-.hsec{display:block}
+.hsec{display:block;--hsec:transparent;border-radius:22px;padding:4px 8px 12px;margin-left:-4px;margin-right:-4px;background:color-mix(in srgb,var(--hsec) 14%,transparent)}
+.hsec .card,.hsec .list{background:color-mix(in srgb,var(--hsec) 10%,var(--card))}
+html[data-theme="dark"] .hsec{background:color-mix(in srgb,var(--hsec) 22%,transparent)}
+html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{background:color-mix(in srgb,var(--hsec) 16%,var(--card))}
+.hsec[data-k="bridge"]{--hsec:#0ea5e9}
+.hsec[data-k="weather"]{--hsec:#e8a317}
+.hsec[data-k="holidays"]{--hsec:#ea580c}
+.hsec[data-k="meals"]{--hsec:#65a30d}
+.hsec[data-k="shopping"]{--hsec:#0d9488}
+.hsec[data-k="summary"]{--hsec:#6366f1}
+.hsec[data-k="attention"]{--hsec:#e11d48}
+.hsec[data-k="events"]{--hsec:#f97316}
+.hsec[data-k="videos"]{--hsec:#7c3aed}
+.hsec[data-k="todo"]{--hsec:#4f46e5}
+.hsec[data-k="loans"]{--hsec:#2563eb}
+.hsec[data-k="commission"]{--hsec:#16a34a}
+.hsec[data-k="birthdays"]{--hsec:#db2777}
+.hsec[data-k="pets"]{--hsec:#a16207}
+.hsec[data-k="bills"]{--hsec:#d97706}
+.hsec[data-k="cars"]{--hsec:#0f766e}
+.hsec[data-k="ideas"]{--hsec:#ca8a04}
 .hsec + .hsec{border-top:3px solid color-mix(in srgb,var(--ink3) 65%,transparent);margin-top:18px;padding-top:4px}
 .hsec > .sec:first-child{margin-top:12px}
 .hsec > .tiles:first-child,.hsec > .card:first-child,.hsec > .list:first-child,.hsec > .callout:first-child{margin-top:14px}
