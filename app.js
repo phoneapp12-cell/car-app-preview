@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.54.0';
+const APP_VERSION = '1.55.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2230,15 +2230,15 @@ function takeShopNote() { const n = S && S.shop && S.shop.movedNote; if (n) dele
 function takeMealNote() { const n = S && S.meals && S.meals.gfNote; if (n) delete S.meals.gfNote; return n || ''; }
 
 /* ---- Home: "Upcoming meals" card ---- */
-// Only nights with a meal entered (today's until it's ticked cooked), cooking nights within the planner's 4 weeks, up to 6.
-// Replaces the old "Tonight / Tomorrow" line, so a meal never shows twice on Home.
+// Nights with a meal entered, including today until that calendar day has passed. Cooking nights within the planner's 4 weeks, up to 6.
 const HOME_MEALS_MAX = 6;
 function upcomingMeals() {
   const T = todayISO();
-  return Object.keys(M().plan).filter(d => d >= T && dayGap(d, T) < MEAL_WEEKS * 7 && isCookNight(d) && !(d === T && M().plan[d].cooked)).sort();
+  // Today's meal stays on the list all of that calendar day, cooked or not, and drops off only once the day has passed.
+  return Object.keys(M().plan).filter(d => d >= T && dayGap(d, T) < MEAL_WEEKS * 7 && isCookNight(d) && M().plan[d] && M().plan[d].title).sort();
 }
 function homeMeal() {
-  const list = upcomingMeals().filter(d => d !== todayISO()); if (!list.length) return ''; // tonight's dinner is in Needs attention (1.7.0)
+  const list = upcomingMeals(); if (!list.length) return '';
   const T = todayISO(), when = d => { const n = dayGap(d, T); return n === 0 ? 'Tonight' : n === 1 ? 'Tomorrow' : 'In ' + n + ' days'; };
   const row = d => { const e = M().plan[d], idea = M().ideas.find(i => i.id === e.ideaId) || mealIdeaFor(e.title);
     const mark = idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
@@ -2333,8 +2333,8 @@ const ATT_SOURCES = {
   bday: T => S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 7).map(x => ({ days: x.d, rank: 2, sort: '',
     html: attRow({ kind: 'bday', cls: x.d === 0 ? 'bdtoday' : '', date: x.iso, go: `go('#birthdays')`, ic: 'bday', icon: 'cake', title: `${esc(x.b.name)}’s ${x.age > 0 ? ordinal(x.age) + ' ' : ''}birthday`,
       sub: `Birthday · ${fmtW(x.iso)}`, right: `<span class="pill ${x.d === 0 ? 'bdaypill' : 'bdaysoon'}">${x.d === 0 ? 'Today!' : attWhen(x.d)}</span>` }) })),
-  // Tonight's planned dinner (the Upcoming meals card then starts from the next night, so it isn't shown twice)
-  meal: T => { const d = todayISO(), e = M().plan[d]; if (!e || e.cooked || !isCookNight(d)) return [];
+  // Today's planned dinner, on the day it is scheduled (it also stays on the Upcoming meals card).
+  meal: T => { const d = todayISO(), e = M().plan[d]; if (!e || !e.title || !isCookNight(d)) return [];
     return [{ days: 0, rank: 3, sort: '', html: attRow({ kind: 'meal', date: d, go: `openNight('${d}')`, ic: 'meal', icon: 'meal', title: `Tonight: ${esc(e.title)}`, sub: 'Dinner · tap to see it or tick it cooked' }) }]; },
   // Health (1.8.0): check-ups due within 30 days or overdue (real due dates, like pets), and booked appointments today and tomorrow.
   // A booked check-up has no due row (core.js dueItems leaves it out), so it never shows twice.
