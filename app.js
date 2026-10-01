@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.40.0';
+const APP_VERSION = '1.41.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4402,10 +4402,45 @@ async function addEvent(id) {
   S.appts.push({ id: uid('appt'), title: e.title, date: e.date < todayISO() ? todayISO() : e.date, time: e.time || '', notes, evId: e.id, evUrl: e.url });
   await save(); updEvents(); toast('Added to your calendar.', 'Undo', undoTo(s));
 }
+function ytTrailerId(v) {
+  if (v && typeof v === 'object') v = v.id || v.youtube || v.youtubeId || v.url || v.src || '';
+  if (typeof v !== 'string') return '';
+  const s = v.trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/)|youtu\.be\/|i\.ytimg\.com\/vi\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : '';
+}
+function movieField(e, re) {
+  for (const k of Object.keys(e)) {
+    if (!re.test(k) || e[k] == null || e[k] === '') continue;
+    return e[k];
+  }
+  return '';
+}
+// Home only. A movie shows a trailer still when the event already has a YouTube id or an image URL. Nothing is looked up or invented.
+function movieTrailerPicture(e) {
+  if (!e || !Array.isArray(e.cats) || !e.cats.includes('Movies')) return '';
+  const id = ytTrailerId(movieField(e, /^(trailer|trailerId|trailerUrl|youtube|youtubeId|yt|ytId|videoId)$/i));
+  if (id) return 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
+  let raw = movieField(e, /^(image|imageUrl|img|poster|thumb|thumbnail|picture|photo)$/i);
+  const fromYt = ytTrailerId(raw);
+  if (fromYt) return 'https://i.ytimg.com/vi/' + fromYt + '/hqdefault.jpg';
+  if (raw && typeof raw === 'object') raw = raw.url || raw.src || raw.href || '';
+  if (typeof raw !== 'string') return '';
+  const url = raw.trim();
+  if (!/^https:\/\/\S+$/i.test(url) || url.length > 500 || url === e.url) return '';
+  return url;
+}
 function homeEvents() {
   const next = upcomingEvents().slice(0, homeEventCount());
-  const row = e => `<button class="row" onclick="go('#events')"><div class="ic ev">${I('ticket')}</div><div class="tx"><div class="t">${esc(e.title)}</div>
+  const row = e => {
+    const pic = movieTrailerPicture(e);
+    const mark = pic
+      ? `<img class="evthumb" src="${esc(pic)}" alt="" width="92" height="52" loading="lazy" decoding="async">`
+      : `<div class="ic ev">${I('ticket')}</div>`;
+    return `<button class="row" onclick="go('#events')">${mark}<div class="tx"><div class="t">${esc(e.title)}</div>
     <div class="s">${daysLeft(e.date) === 0 ? 'Today' : fmtW(e.date)}${e.time ? ' · ' + fmtTime(e.time) : ''}${e.venue ? ' · ' + esc(e.venue.split(',')[0]) : ''}</div></div>${evAppt(e.id) ? '<span class="pill fine">Added</span>' : ''}</button>`;
+  };
   return `<div class="sec">What’s on in Whangārei <a href="#events">All events</a></div>
     <div class="list">${next.length ? next.map(row).join('') : `<button class="row" onclick="go('#events')"><div class="ic ev">${I('ticket')}</div><div class="tx"><div class="t">See what’s on</div><div class="s">Local events for the next 60 days</div></div>${I('right')}</button>`}</div>`;
 }
