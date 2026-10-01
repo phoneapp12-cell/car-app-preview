@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.53.0';
+const APP_VERSION = '1.54.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -387,6 +387,61 @@ function HomeEdit() {
     <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetHome()">Reset to default</button><button class="btn primary" id="homedone" onclick="homeEdit=false;render();$('#view').scrollTop=0">Done</button></div>
     <div class="foot">The reminder and install prompts always show at the top when they’re needed.</div>`;
 }
+/* Daily quote (1.54.0). One real, attributed line per Pacific/Auckland calendar day.
+   The choice is S.settings.dailyQuote (missing means on, so it is in backups) and is copied to
+   localStorage under the key dailyQuote, the same way theme and text size are kept on this phone. */
+const DAILY_QUOTES = [
+  { t: 'Well done is better than well said.', w: 'Benjamin Franklin', img: 'images/quote-01.jpg' },
+  { t: 'Trust thyself: every heart vibrates to that iron string.', w: 'Ralph Waldo Emerson', img: 'images/quote-02.jpg' },
+  { t: 'Nothing can bring you peace but yourself.', w: 'Ralph Waldo Emerson', img: 'images/quote-03.jpg' },
+  { t: 'Insist on yourself; never imitate.', w: 'Ralph Waldo Emerson', img: 'images/quote-04.jpg' },
+  { t: 'Do your work, and you shall reinforce yourself.', w: 'Ralph Waldo Emerson', img: 'images/quote-05.jpg' },
+  { t: 'What I must do is all that concerns me, not what the people think.', w: 'Ralph Waldo Emerson', img: 'images/quote-06.jpg' },
+  { t: 'Life only avails, not the having lived.', w: 'Ralph Waldo Emerson', img: 'images/quote-07.jpg' },
+  { t: 'Resolve to perform what you ought. Perform without fail what you resolve.', w: 'Benjamin Franklin', img: 'images/quote-08.jpg' },
+  { t: 'Lose no time. Be always employed in something useful.', w: 'Benjamin Franklin', img: 'images/quote-09.jpg' },
+  { t: 'It is never too late to give up our prejudices.', w: 'Henry David Thoreau', img: 'images/quote-10.jpg' },
+  { t: 'I think that we may safely trust a good deal more than we do.', w: 'Henry David Thoreau', img: 'images/quote-11.jpg' },
+  { t: 'In the long run men hit only what they aim at.', w: 'Henry David Thoreau', img: 'images/quote-12.jpg' },
+  { t: 'Optimism is the faith that leads to achievement.', w: 'Helen Keller', img: 'images/quote-13.jpg' },
+  { t: "Do what you can, with what you've got, where you are.", w: 'Bill Widener', img: 'images/quote-14.jpg' },
+  { t: 'The only thing we have to fear is fear itself.', w: 'Franklin D. Roosevelt', img: 'images/quote-15.jpg' },
+  { t: 'This above all: to thine own self be true.', w: 'William Shakespeare', img: 'images/quote-16.jpg' },
+  { t: 'The fault, dear Brutus, is not in our stars, but in ourselves, that we are underlings.', w: 'William Shakespeare', img: 'images/quote-17.jpg' },
+  { t: 'How far that little candle throws his beams! So shines a good deed in a naughty world.', w: 'William Shakespeare', img: 'images/quote-18.jpg' },
+  { t: 'First say to yourself what you would be; and then do what you have to do.', w: 'Epictetus', img: 'images/quote-19.jpg' },
+  { t: 'Hope is the thing with feathers that perches in the soul.', w: 'Emily Dickinson', img: 'images/quote-20.jpg' }
+];
+function aklDayNumber(now) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now || new Date()).map(x => [x.type, x.value]));
+  return Math.floor(Date.UTC(+p.year, +p.month - 1, +p.day) / 86400000);
+}
+function showDailyQuote() {
+  if (S && S.settings && typeof S.settings.dailyQuote === 'boolean') return S.settings.dailyQuote;
+  try {
+    const v = localStorage.getItem('dailyQuote');
+    if (v === '0') return false;
+    if (v === '1') return true;
+  } catch (e) {}
+  return true;
+}
+function dailyQuoteFor(now) {
+  const n = DAILY_QUOTES.length;
+  const i = ((aklDayNumber(now) % n) + n) % n;
+  return DAILY_QUOTES[i];
+}
+function dailyQuoteCard() {
+  if (!showDailyQuote()) return '';
+  const q = dailyQuoteFor();
+  return `<div class="card quotecard" id="dailyquote"><img class="qphoto" src="${q.img}" alt=""><div class="qshade"><p class="qtext">${esc(q.t)}</p><div class="qwho">${esc(q.w)}</div></div></div>`;
+}
+async function toggleDailyQuote() {
+  const on = !showDailyQuote();
+  S.settings.dailyQuote = on;
+  try { localStorage.setItem('dailyQuote', on ? '1' : '0'); } catch (e) {}
+  await save();
+  render();
+}
 function Home() {
   if (homeEdit) return HomeEdit();
   const now = new Date();
@@ -409,7 +464,7 @@ function Home() {
   const groups = [];
   parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') g.h += h; else groups.push({ k, h }); });
   const feed = groups.map(g => `<section class="hsec" data-k="${g.k}">${g.h}</section>`).join('');
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
     feed + `${syncNote()}
     <div class="foot">Your information is saved on this phone only.</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -5228,6 +5283,10 @@ function Settings() {
   ${textSizePicker()}
   <div class="list" style="margin-top:10px">
    <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">Use Dark when the phone is in dark mode${themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t'}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
+  </div>
+  <div class="sec">Home</div>
+  <div class="list">
+   <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo under the greeting on Home. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
   </div>
   <div class="sec">Reminders</div>
   <div class="list">
