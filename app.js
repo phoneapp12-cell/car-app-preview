@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.46.0';
+const APP_VERSION = '1.47.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4947,7 +4947,7 @@ function onVideoRowClick(e, id, title) {
   playInlineVideo(id, title);
 }
 function videoRow(v, swipe) {
-  // Home keeps the old link that leaves for YouTube. The Videos page plays in the thumbnail box.
+  // Without swipe, the row is a link that leaves for YouTube. The Videos page plays in the thumbnail box.
   if (!swipe) {
     const body = `${videoThumb(v.id)}
     <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div></div>${I('ext')}`;
@@ -5051,14 +5051,13 @@ function wireVideoSwipe() {
   list.addEventListener('pointerup', end);
   list.addEventListener('pointercancel', end);
 }
-// Home only. The box, title and description all come from this one video.
-// The box stays a still thumbnail. It does not play on its own.
+// Home only. Same row as Videos and Top 40: thumbnail beside the title, channel and description,
+// publish date under the description, and Open on YouTube. Tap plays in that thumbnail box.
+// It does not play on its own while scrolling.
 function homeVideoRow(v) {
   const id = v && v.id;
-  // Picture on the left, bold title (and channel) top-aligned on the right, description full width underneath.
-  return `<div class="row vrow hvrow" data-yt="${esc(id)}"><div class="hvhead">${videoThumbBox(id)}
-    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div></div></div>
-    <div class="s hvwhy">${esc(videoReason(v))}</div></div>`;
+  return `<div class="row vrow" data-yt="${esc(id)}" onclick="onVideoRowClick(event,${jsArg(id)},${jsArg(v.title)})">${videoThumbBox(id)}
+    <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div><div class="s">${esc(videoReason(v))}</div>${videoDateLine(id)}${videoOpenLink(id)}</div>${I('play')}</div>`;
 }
 function homeVideosCard() {
   const list = videoSuggestions().slice(0, homeVideoCount());
