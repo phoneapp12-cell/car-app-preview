@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.42.0';
+const APP_VERSION = '1.43.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4417,10 +4417,22 @@ function movieField(e, re) {
   }
   return '';
 }
-// Home only. A movie shows a trailer still when the event already has a YouTube id or an image URL. Nothing is looked up or invented.
+// Confirmed trailers for current Event Cinemas titles that arrive without a YouTube id.
+// The key is the title with punctuation and extra spaces removed, so a different film cannot match.
+const MOVIE_TRAILERS = {
+  'verity': 'xdPMKhjMSFs',
+  'the social reckoning': '3RFFgrB9YlI',
+  'tad and the magic lamp': '8-Bjo_rXCkM',
+  'wildwood': 'dtr5JL1zkiM'
+};
+function movieTitleKey(title) {
+  return String(title || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// Home only. A movie shows a trailer still from a YouTube id or https image already on the event,
+// or from MOVIE_TRAILERS when the title matches a film above.
 function movieTrailerPicture(e) {
   if (!e || !Array.isArray(e.cats) || !e.cats.includes('Movies')) return '';
-  const id = ytTrailerId(movieField(e, /^(trailer|trailerId|trailerUrl|youtube|youtubeId|yt|ytId|videoId)$/i));
+  const id = ytTrailerId(movieField(e, /^(trailer|trailerId|trailerUrl|youtube|youtubeId|yt|ytId|videoId)$/i)) || MOVIE_TRAILERS[movieTitleKey(e.title)] || '';
   if (id) return 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
   let raw = movieField(e, /^(image|imageUrl|img|poster|thumb|thumbnail|picture|photo)$/i);
   const fromYt = ytTrailerId(raw);
