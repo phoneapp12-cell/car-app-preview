@@ -126,7 +126,7 @@ html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transp
 .row .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
 .row .ic svg.i{width:22px;height:22px}
 /* Home feed imagery (1.25.2): give Upcoming and its related cards room to match the writing.
-   Keep the Cars page and Meal planner at their existing sizes. */
+   Car photos get their own size treatment below so they stay prominent wherever shown. */
 .hsec[data-k="attention"] .row.att .ic,
 .hsec[data-k="events"] .row .ic,
 .hsec[data-k="videos"] .row .ic{width:52px;height:52px;border-radius:16px}
@@ -173,8 +173,8 @@ body.kb .tabbar{display:none}
 .carhead{display:flex;align-items:center;gap:12px}
 .carpic{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
 .carpic svg.i{width:30px;height:30px;stroke:var(--white)}
-.carpic.carshot{width:84px;height:84px;border-radius:20px}
-.carpic.carshot svg.i{width:48px;height:48px}
+.carpic.carshot{width:126px;height:126px;border-radius:24px}
+.carpic.carshot svg.i{width:60px;height:60px}
 .carname{font-weight:750;font-size:1.0625rem;overflow-wrap:anywhere}
 .carmodel{font-size:0.84375rem;color:var(--ink2);margin-top:2px}
 .triple{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
@@ -185,7 +185,7 @@ body.kb .tabbar{display:none}
 .triple .addsvc{color:var(--brand);font-weight:700;font-size:0.8125rem;display:block;margin-top:4px;line-height:1.25}
 .back{display:flex;align-items:center;gap:2px;color:var(--brand);font-weight:600;font-size:1rem;padding:8px 0;min-height:44px}
 .hero{display:flex;gap:14px;align-items:center;margin:4px 0 14px}
-.hero .carpic{width:64px;height:64px;border-radius:20px}
+.hero .carpic{width:96px;height:96px;border-radius:24px}
 .hero h2{margin:0 0 4px;font-size:1.5rem;letter-spacing:-.3px;overflow-wrap:anywhere}
 .callout{display:flex;gap:10px;background:var(--amberbg);color:var(--amberink);border-radius:14px;padding:11px 12px;font-size:0.875rem;line-height:1.4;margin-bottom:12px}
 .callout.red{background:var(--redbg);color:var(--redink)}
@@ -206,6 +206,7 @@ body.kb .tabbar{display:none}
 .btns.photobtns{margin-top:0;margin-bottom:12px}
 .carcard .btns.photobtns{margin-top:10px;margin-bottom:2px}
 .carpic.hasphoto,.mealpic.hasphoto,.ic.car.hasphoto{overflow:hidden;padding:0}
+.hsec[data-k="cars"] #homecars .ic.car.hasphoto{width:66px;height:66px;border-radius:20px}
 .carpic.hasphoto img,.mealpic.hasphoto img,.ic.car.hasphoto img{width:100%;height:100%;object-fit:cover;display:block}
 .btn:disabled{opacity:.5}
 select.sel{font:inherit;font-size:0.9375rem;font-weight:600;color:var(--brand);border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:7px 8px;min-height:40px}
