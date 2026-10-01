@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.50.0';
+const APP_VERSION = '1.51.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3708,8 +3708,8 @@ function More() {
   const order = navOrder();
   if (moreEdit) {
     return header('Reorder', 'Press and hold an item, then drag it up or down') +
-      `<div class="reordhelp">The top ${NAV_TABS} go in the left strip, between Home and More. The rest are in More. Swipe in from the left edge to open that strip.</div>
-      <div class="list reorder" id="reorderlist">${order.map((k, i) => { const d = R[k]; return `<div class="row mrow${i < NAV_TABS ? ' istab' : ''}" data-k="${k}" aria-label="${d.t}"><div class="ic ${d.cls}">${I(d.icon)}</div><div class="tx"><div class="t">${d.t}</div>${i < NAV_TABS ? '<div class="s tabnote">In the left strip</div>' : ''}</div><span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
+      `<div class="reordhelp">This order is the left strip, between Home and More. Every section is listed there. Swipe in from the left edge to open that strip.</div>
+      <div class="list reorder" id="reorderlist">${order.map(k => { const d = R[k]; return `<div class="row mrow" data-k="${k}" aria-label="${d.t}"><div class="ic ${d.cls}">${I(d.icon)}</div><div class="tx"><div class="t">${d.t}</div></div><span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
       </div>
       <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetNav()">Reset to default</button><button class="btn primary" id="moredone" onclick="moreEdit=false;render()">Done</button></div>
       <div class="foot">Home, More and Settings always stay where they are.</div>`;
@@ -3723,7 +3723,8 @@ function More() {
     </div>
     <div class="foot">Your information is saved on this phone only.</div>`;
 }
-/* 1.12.0: one list for the left strip and More. The first NAV_TABS items are tabs (between Home and More), the rest are in More.
+/* 1.12.0: one list for the left strip and More. 1.51.0 lists every section on the strip (Home, then this order, then More).
+   The More page still skips the first NAV_TABS, which already sit at the top of the strip.
    Press and hold a row on the Reorder screen, then drag. Saved as settings.navOrder, so it's in backups too. */
 const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
@@ -5396,18 +5397,18 @@ const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', re
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
-  const tabs = navOrder().slice(0, NAV_TABS);
-  const list = [['home', 'Home', 'home']].concat(tabs.map(k => [k, NAV[k][3], NAV[k][0]]), [['more', 'More', 'more']]);
+  const tabs = navOrder();
+  const list = [['home', 'Home', 'home']].concat(tabs.map(k => [k, NAV[k][2], NAV[k][0]]), [['settings', 'Settings', 'gear'], ['more', 'More', 'more']]);
   const inTabs = k => tabs.includes(k);
   const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge && !(inTabs('bills') && inTabs('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
   $('#tabbar').innerHTML = list.map(([k, l, ic]) =>
-    `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span>${l}</button>`).join('');
+    `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`).join('');
 }
 function activeTab(r) {
-  const item = ROUTE_ITEM[r] || r, tabs = navOrder().slice(0, NAV_TABS);
+  const item = ROUTE_ITEM[r] || r, tabs = navOrder();
+  if (r === 'settings') return 'settings';
   if (tabs.includes(item)) return item;
   if (r === 'home' || r === 'weather' || r === 'drivers' || !r) return 'home';
-  if (r === 'bridge') return 'home';
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
 }
 let renderedDay = todayISO();
