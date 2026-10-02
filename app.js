@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.68.0';
+const APP_VERSION = '1.69.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -308,7 +308,12 @@ const homeEventCount = () => { const n = Number(S.settings.homeEvents); return n
 async function setHomeEventCount(n) { S.settings.homeEvents = n; await save(); render(); }
 const homeVideoCount = () => { const n = Number(S.settings.homeVideoCount); return n >= 1 && n <= 4 ? n : 2; };
 async function setHomeVideoCount(n) { S.settings.homeVideoCount = n; await save(); render(); }
-async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; S.settings.homeVideos = false; delete S.settings.homeVideoCount; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
+async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; S.settings.homeVideos = false; delete S.settings.homeVideoCount; delete S.settings.homeSum; delete S.settings.homeSumAt; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
+// 1.69.0: the homepage summary can be hidden or moved. Missing means on, at the top.
+const showHomeSum = () => !(S.settings && S.settings.homeSum === false);
+const homeSumAt = () => (S.settings && S.settings.homeSumAt === 'bottom') ? 'bottom' : 'top';
+async function toggleHomeSum() { S.settings.homeSum = !showHomeSum(); await save(); render(); }
+async function setHomeSumAt(place) { S.settings.homeSumAt = place === 'bottom' ? 'bottom' : 'top'; await save(); render(); }
 const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
 const HOME_CARD = {
   bridge: () => { const br = brOnHome(); return br === 'card' ? brCard() : br === 'line' ? brLine() : ''; },
@@ -378,8 +383,12 @@ const HOME_CARD = {
 };
 function HomeEdit() {
   const order = homeOrder();
+  const sumOn = showHomeSum(), sumAt = homeSumAt();
   return header('Customise Home', 'Press and hold a card, then drag it up or down') +
     `<div class="reordhelp">Use the switches to show or hide cards. Cards with nothing to show stay hidden until there’s something in them.</div>
+    <div class="list" id="homesumopt" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">Summary</div><div class="s">A short summary of this page.</div></div><button class="switch ${sumOn ? 'on' : ''}" role="switch" aria-checked="${sumOn}" aria-label="Show the homepage summary" onclick="toggleHomeSum()"></button></div>
+    ${sumOn ? `<div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Where it sits</div><div class="s">Top is under the date and weather. Bottom is after the cards, above the line that says your information is saved on this phone.</div></div>
+      <div class="seg" id="sumplace" role="group" aria-label="Summary position" style="width:100%"><button type="button" class="${sumAt === 'top' ? 'on' : ''}" aria-pressed="${sumAt === 'top'}" onclick="setHomeSumAt('top')">Top</button><button type="button" class="${sumAt === 'bottom' ? 'on' : ''}" aria-pressed="${sumAt === 'bottom'}" onclick="setHomeSumAt('bottom')">Bottom</button></div></div>` : ''}</div>
     <div class="list reorder" id="reorderlist" data-save="home">${order.map(k => { const d = HOME[k], on = homeOn(k); return `<div class="row mrow${on ? '' : ' cardoff'}" data-k="${k}" aria-label="${d[2]}"><div class="ic ${d[1]}">${I(d[0])}</div>
       <div class="tx"><div class="t">${d[2]}</div><div class="s">${d[3]}</div></div>
       <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${d[2]} on Home" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>
@@ -545,8 +554,9 @@ function Home() {
   const feed = groups.map(g => `<section class="hsec" data-k="${g.k}">${g.h}</section>`).join('');
   const shown = new Set(parts.map(([k]) => k));
   if (top) shown.add('bridge');
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + homeOverview(shown) + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
-    feed + `${syncNote()}
+  const sum = showHomeSum() ? homeOverview(shown) : '';
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + (homeSumAt() === 'top' ? sum : '') + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
+    feed + `${syncNote()}${homeSumAt() === 'bottom' ? sum : ''}
     <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
 }
