@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.71.0';
+const APP_VERSION = '1.72.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -467,6 +467,9 @@ function engList(arr) {
 // 1.70.0: name the first four Upcoming items that fall today through 30 days ahead (Pacific/Auckland).
 // Car dates (WOF, rego, service) and every other Upcoming item use that same window. Overdue items
 // and anything further out are not named. Television is still not mentioned. Nothing is invented.
+// 1.72.0: also name up to two real What’s on events (Silver Festival is left out; if fewer than two
+// exist, name however many exist) and this fortnight’s commission when an amount is recorded.
+// Cars, pet care, bills, to-dos and other categories already inside Upcoming are not listed again.
 function homeOverview(shown) {
   const bits = [];
   if (shown.has('summary')) {
@@ -487,6 +490,16 @@ function homeOverview(shown) {
     const names = soon.slice(0, 4).map(x => x.name);
     if (names.length) bits.push(`Coming up in the next 30 days: ${engList(names)}.`);
     else bits.push('Nothing is coming up in the next 30 days.');
+  }
+  if (shown.has('events')) {
+    // First two real titles from the What’s on feed. upcomingEvents already drops Silver Festival and anything finished.
+    const names = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(Boolean).slice(0, 2);
+    if (names.length) bits.push(`Local events: ${engList(names)}.`);
+  }
+  if (shown.has('commission') && CM().anchor) {
+    const f = curFortnight();
+    const recorded = CM().entries.filter(e => e.date >= f.start && e.date <= f.end);
+    if (recorded.length) bits.push(`This fortnight’s commission is ${centsMoney(commSum(CM().entries, f.start, f.end))}.`);
   }
   if (shown.has('roadworks') && RW && RW.data && Array.isArray(RW.data.items) && RW.data.items.length) {
     const nzta = RW.data.items.filter(w => w.source !== 'wdc').map(w => w.road).filter(Boolean);
@@ -516,16 +529,9 @@ function homeOverview(shown) {
     const n = (S.shop && S.shop.items || []).filter(x => !x.done).length;
     if (n) other.push(plural(n, 'shopping item'));
   }
-  if (shown.has('events')) {
-    const n = upcomingEvents().slice(0, homeEventCount()).length;
-    other.push(n ? plural(n, 'local event') : 'local events');
-  }
-  if (shown.has('todo')) other.push('to-dos');
+  // Cars, pet care, bills, to-dos, events and commission are not repeated here.
+  // Those are already named above, or they already sit inside Upcoming.
   if (shown.has('loans')) other.push('loans');
-  if (shown.has('commission')) other.push('this fortnight’s commission');
-  if (shown.has('pets')) other.push('pet care');
-  if (shown.has('bills')) other.push('bills');
-  if (shown.has('cars')) other.push('the cars');
   if (shown.has('ideas')) other.push('starred ideas');
   if (shown.has('videos')) other.push('videos');
   if (other.length) bits.push(`Also on this page: ${engList(other)}.`);
