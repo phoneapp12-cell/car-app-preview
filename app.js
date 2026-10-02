@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.67.0';
+const APP_VERSION = '1.68.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -454,6 +454,7 @@ function engList(arr) {
   return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
 }
 // 1.64.0: a few sentences under the greeting, only for sections actually on Home. No invented items.
+// 1.68.0: the summary does not mention television. The TV card is unchanged.
 function homeOverview(shown) {
   const bits = [];
   if (shown.has('summary')) {
@@ -487,16 +488,6 @@ function homeOverview(shown) {
     const shownNames = names.slice(0, 4);
     const more = names.length - shownNames.length;
     bits.push(`${plural(names.length, 'roadwork')} within 40 km: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
-  }
-  if (shown.has('tv')) {
-    const on = TV_CHANNELS.map(ch => {
-      const item = tvOn(ch.id, Date.now());
-      return item ? `${ch.name} has ${item.title}` : '';
-    }).filter(Boolean);
-    if (on.length) {
-      const lead = on.slice(0, 3), more = on.length - lead.length;
-      bits.push(`On television now, ${engList(lead)}${more ? `, plus ${more} more on the TV card` : ''}.`);
-    }
   }
   if (shown.has('birthdays')) {
     const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((a, b) => a.d - b.d || a.b.name.localeCompare(b.b.name));
