@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.70.0';
+const APP_VERSION = '1.71.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -489,10 +489,16 @@ function homeOverview(shown) {
     else bits.push('Nothing is coming up in the next 30 days.');
   }
   if (shown.has('roadworks') && RW && RW.data && Array.isArray(RW.data.items) && RW.data.items.length) {
-    const names = RW.data.items.map(w => w.road).filter(Boolean);
-    const shownNames = names.slice(0, 4);
-    const more = names.length - shownNames.length;
-    bits.push(`${plural(names.length, 'roadwork')} within 40 km: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
+    const nzta = RW.data.items.filter(w => w.source !== 'wdc').map(w => w.road).filter(Boolean);
+    const wdc = RW.data.items.filter(w => w.source === 'wdc').map(w => w.road).filter(Boolean);
+    if (nzta.length) {
+      const shownNames = nzta.slice(0, 4), more = nzta.length - shownNames.length;
+      bits.push(`${plural(nzta.length, 'roadwork')} within 40 km: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
+    }
+    if (wdc.length) {
+      const shownNames = wdc.slice(0, 4), more = wdc.length - shownNames.length;
+      bits.push(`Council roadworks underway: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
+    }
   }
   if (shown.has('birthdays')) {
     const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((a, b) => a.d - b.d || a.b.name.localeCompare(b.b.name));
@@ -4494,9 +4500,12 @@ function Weather() {
 /* ================= ROADWORKS (NZTA TREIS open data, near Whangārei) ================= */
 // NZ Transport Agency highway events, the public ArcGIS copy of the TREIS feed.
 // Browser-friendly (CORS). Fixed box around Whangārei. Nothing is invented: an empty list stays empty.
+// 1.71.0: also council projects the roading-improvements page marks "Construction underway".
+// That page sends no CORS header, so it is read through the relay. Design and future rows are left out.
 const RW_LAT = -35.7251, RW_LON = 174.3237, RW_KM = 40;
 const RW_MAX_AGE = 20 * 60 * 1000;
 const RW_NZTA = 'https://www.journeys.nzta.govt.nz/';
+const RW_WDC = 'https://www.wdc.govt.nz/Council/Projects/Roading-improvements';
 const RW_LAYER = 'https://services.arcgis.com/XTtANUDT8Va4DLwI/arcgis/rest/services/NZTA_Highway_Information_TREIS_Feature_Layer_View/FeatureServer/';
 let RW = null, rwBusy = false, rwFailed = false;
 function loadRoadworks() {
@@ -4570,17 +4579,34 @@ function rwQuery(layer) {
   });
   return RW_LAYER + layer + '/query?' + q.toString();
 }
+function rwCouncilItems(data) {
+  const list = data && Array.isArray(data.projects) ? data.projects : null;
+  if (!list) return null;
+  return list.filter(p => p && p.name && /^construction underway$/i.test(String(p.status || ''))).map(p => ({
+    id: 'wdc-' + String(p.id || p.name),
+    road: String(p.name),
+    start: '', end: '', until: false,
+    near: [p.status, p.start ? 'Expected start ' + p.start : '', p.detail].filter(Boolean).join(' · '),
+    km: null,
+    url: typeof p.url === 'string' && p.url.startsWith('https://www.wdc.govt.nz/') ? p.url : RW_WDC,
+    source: 'wdc'
+  }));
+}
 async function refreshRoadworks(force = false) {
   if (rwBusy || (!force && RW && Date.now() - RW.at < RW_MAX_AGE)) return;
   rwBusy = true; if (force) updRoadworks();
-  let items = null;
+  let nzta = null, council = null;
   try {
     const [a, b] = await Promise.all([getJSON(rwQuery(0), 12000), getJSON(rwQuery(1), 12000)]);
-    items = rwParse([].concat(a && a.features || [], b && b.features || []));
-  } catch (e) { items = null; }
+    nzta = rwParse([].concat(a && a.features || [], b && b.features || []));
+  } catch (e) { nzta = null; }
+  if (RELAY_URL) { try { council = rwCouncilItems(await getJSON(RELAY_URL + '/roadworks', 12000)); } catch (e) { council = null; } }
   rwBusy = false;
-  if (items) { RW = { at: Date.now(), data: { items } }; rwFailed = false; try { localStorage.setItem('roadworks', JSON.stringify(RW)); } catch (e) { } }
-  else rwFailed = true;
+  if (nzta || council) {
+    RW = { at: Date.now(), data: { items: [].concat(nzta || [], council || []), nzta: !!nzta, council: !!council } };
+    rwFailed = false;
+    try { localStorage.setItem('roadworks', JSON.stringify(RW)); } catch (e) { }
+  } else rwFailed = true;
   updRoadworks();
 }
 function updRoadworks() {
@@ -4599,18 +4625,26 @@ function rwWhen(w) {
   return [dates, w.near].filter(Boolean).join(' · ');
 }
 function homeRoadworks() {
-  const link = `<a href="${RW_NZTA}" target="_blank" rel="noopener">NZTA</a>`;
+  const link = `<a href="${RW_NZTA}" target="_blank" rel="noopener">NZTA</a> · <a href="${RW_WDC}" target="_blank" rel="noopener">Council</a>`;
   const head = `<div class="sec">Roadworks near Whangārei ${link}</div>`;
   const items = RW && RW.data && Array.isArray(RW.data.items) ? RW.data.items : null;
   if (!items) {
     const loading = rwBusy || (!rwFailed && navigator.onLine !== false);
-    const msg = loading ? 'Checking NZTA…' : 'Couldn’t load roadworks. Tap to try again.';
+    const msg = loading ? 'Checking NZTA and the council…' : 'Couldn’t load roadworks. Tap to try again.';
     return head + `<div class="list" id="homeroadworks"><button class="row" onclick="refreshRoadworks(true)"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${loading ? 'Roadworks' : 'Not available'}</div><div class="s">${msg}</div></div></button></div>`;
   }
   if (!items.length) {
-    return head + `<div class="list" id="homeroadworks"><div class="row"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">No roadworks nearby</div><div class="s">Nothing within 40 km of Whangārei on the NZTA list right now.</div></div></div></div>`;
+    const d = RW.data || {};
+    const bits = [];
+    if (d.nzta !== false) bits.push('nothing within 40 km of Whangārei on the NZTA list');
+    if (d.council) bits.push('no council project is marked construction underway');
+    const msg = bits.length ? bits[0][0].toUpperCase() + bits[0].slice(1) + (bits[1] ? ', and ' + bits[1] : '') + '.' : 'Nothing to show right now.';
+    return head + `<div class="list" id="homeroadworks"><div class="row"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">No roadworks nearby</div><div class="s">${msg}</div></div></div></div>`;
   }
-  return head + `<div class="list" id="homeroadworks">${items.map(w => `<a class="row" href="${RW_NZTA}" target="_blank" rel="noopener"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(w.road)}</div><div class="s">${esc(rwWhen(w))}</div></div></a>`).join('')}</div>`;
+  return head + `<div class="list" id="homeroadworks">${items.map(w => {
+    const href = w.url || (w.source === 'wdc' ? RW_WDC : RW_NZTA);
+    return `<a class="row" href="${esc(href)}" target="_blank" rel="noopener"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(w.road)}</div><div class="s">${esc(rwWhen(w))}</div></div></a>`;
+  }).join('')}</div>`;
 }
 
 /* ================= TV (TVNZ 1, TVNZ 2, Three, plus Sky Starter) ================= */

@@ -100,6 +100,7 @@ Themes, the weather card and the calendar look are tested by `pwtest/visual.mjs`
 
 ## Weather and events sources
 - **Weather:** [Open-Meteo](https://open-meteo.com/) forecast API (no key, free for non-commercial use). Weather data by Open-Meteo.com, licensed CC BY 4.0; the credit is shown on the weather screen. Whangārei: lat -35.7251, lon 174.3237, Pacific/Auckland, °C, km/h. The last forecast is saved on the phone (`localStorage` key `wx`) and refreshed when the app opens if it's more than 30 minutes old. If Open-Meteo can't be reached, the app tries the relay's `/weather` copy. The full forecast screen links to [MetService Whangārei](https://www.metservice.com/towns-cities/regions/northland/locations/whangarei) for warnings.
+- **Roadworks:** NZTA TREIS highway events within 40 km of Whangārei (read in the browser), plus council projects marked “Construction underway” on [Roading improvements](https://www.wdc.govt.nz/Council/Projects/Roading-improvements). That page has no CORS header, so the app reads it from the relay’s `GET /roadworks`. Only those status rows are shown, each linking back to the council. Design, planning and future rows are left out.
 - **Events:** [Whangārei District Council – What's On](https://www.wdc.govt.nz/Events/Whats-On), read by the relay's `GET /events` (the council site has no feed and doesn't allow browser access). The council's copyright notice allows reproducing its content for personal, informational and non-commercial use, and robots.txt allows these pages. Each event links back to its council page. Saved on the phone as `events` and refreshed every 3 hours. **Add to calendar** creates a normal appointment in the app's own Calendar (Undo in the message, or delete it like any appointment).
 
 ## Files
@@ -109,7 +110,7 @@ Themes, the weather card and the calendar look are tested by `pwtest/visual.mjs`
 - `ical-import.js` – reads .ics calendars (time zones incl. Windows names, all-day, repeats, exceptions, cancellations)
 - `vendor/ical.min.js` – ical.js 2.2.1 (Mozilla, MPL-2.0), unmodified
 - `sw.js` – service worker: offline cache, background reminder checks, notification taps
-- `relay/` – the tiny calendar link service (Cloudflare Worker), plus the read-only `/events`, `/weather` and `/closures` endpoints. See `relay/README.md`
+- `relay/` – the tiny calendar link service (Cloudflare Worker), plus the read-only `/events`, `/weather`, `/closures` and `/roadworks` endpoints. See `relay/README.md`
 - `manifest.webmanifest`, `icons/` – install details and app icons
 
 ## Calendar link service

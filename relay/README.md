@@ -33,6 +33,10 @@ app is stored.
   Open-Meteo directly). One fixed URL, kept for 20 minutes in memory/KV (`weather-v1`, expires after 1 hour).
   Weather data by Open-Meteo.com (CC BY 4.0).
 
+- `GET /roadworks` – council roading projects the [Roading improvements](https://www.wdc.govt.nz/Council/Projects/Roading-improvements) page marks “Construction underway”, as JSON
+  (`{source, updated, count, projects:[{id,name,detail,full,start,status,url}]}`).
+  The phone cannot read that page (no CORS header). robots.txt allows it. Re-read at most every 3 hours and saved in KV (`wdc-roadworks-v1`). A failed refresh keeps the saved copy. On failure with nothing saved: `502 {"error":"roadworks_unavailable"}`.
+
 - `GET /closures` – planned closures that mention the lifting bridge (Te Matau ā Pohe) or Dave Culham Drive, as JSON
   (`{source, updated, count, closures:[{id,title,where,desc,url,dates:[{start,end,time,endTime}]}]}`; finished dates are dropped).
   Source: Whangārei District Council "Roadworks and closures"
@@ -85,6 +89,8 @@ Check it: open `https://…workers.dev/health` – it should say `{"ok":true,...
 - `local-server.mjs` – runs the same code under Node for local tests
 - `src/events.js` – the council events reader and `/events` feed (list + detail parsing, KV state, cron step)
 - `src/closures.js` – the council roadworks and closures reader and `/closures` feed
+- `src/roadworks.js` – council roading-improvements projects and `/roadworks`
+- `test/roadworks.test.mjs` – `node test/roadworks.test.mjs`
 - `test/relay.test.mjs` – `node test/relay.test.mjs`
 - `test/events.test.mjs` – `node test/events.test.mjs` (synthetic pages, no network)
 - `test/closures.test.mjs` – `node test/closures.test.mjs` (synthetic pages, no network)
