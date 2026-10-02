@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.64.0';
+const APP_VERSION = '1.65.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -263,7 +263,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   bridge: ['bridge', 'br', 'Lifting bridge', 'Lift times and closures when you’re nearby or it matters', 1],
   weather: ['cloudsun', 'appt', 'Weather', 'Whangārei weather today', 1],
   roadworks: ['wrench', 'rw', 'Roadworks', 'Upcoming roadworks near Whangārei', 1],
-  tv: ['tv', 'tv', 'What’s on TV', 'TVNZ 1, TVNZ 2 and Three, right now', 1],
+  tv: ['tv', 'tv', 'What’s on TV', 'TVNZ 1, TVNZ 2, Three and Sky Starter, right now', 1],
   holidays: ['flag', 'hol', 'Public holidays', 'The next public holiday when it’s close', 1],
   meals: ['meal', 'meal', 'Upcoming meals', 'Your planned cooking nights', 1],
   shopping: ['cart', 'shop', 'Shopping list', 'Things still to get, with a tick button', 1],
@@ -490,10 +490,13 @@ function homeOverview(shown) {
   }
   if (shown.has('tv')) {
     const on = TV_CHANNELS.map(ch => {
-      const item = TV && TV.data && TV.data.now && TV.data.now[ch.id];
-      return tvStillOn(item, Date.now()) ? `${ch.name} has ${item.title}` : '';
+      const item = tvOn(ch.id, Date.now());
+      return item ? `${ch.name} has ${item.title}` : '';
     }).filter(Boolean);
-    if (on.length) bits.push(`On television now, ${engList(on)}.`);
+    if (on.length) {
+      const lead = on.slice(0, 3), more = on.length - lead.length;
+      bits.push(`On television now, ${engList(lead)}${more ? `, plus ${more} more on the TV card` : ''}.`);
+    }
   }
   if (shown.has('birthdays')) {
     const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((a, b) => a.d - b.d || a.b.name.localeCompare(b.b.name));
@@ -4572,15 +4575,59 @@ function homeRoadworks() {
   return head + `<div class="list" id="homeroadworks">${items.map(w => `<a class="row" href="${RW_NZTA}" target="_blank" rel="noopener"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(w.road)}</div><div class="s">${esc(rwWhen(w))}</div></div></a>`).join('')}</div>`;
 }
 
-/* ================= TV (TVNZ 1, TVNZ 2, Three — NZ Freeview listings) ================= */
-// Public Freeview EPG (Matt Huisman, i.mjh.nz). CORS is open. Titles come only from that file.
+/* ================= TV (TVNZ 1, TVNZ 2, Three, plus Sky Starter) ================= */
+// Freeview titles: Matt Huisman’s public NZ EPG (GitHub raw copy of i.mjh.nz). CORS is open.
+// Sky Starter titles: NZXMLTV Sky, built from Sky’s own guide (sky.co.nz/tvguide) and published
+// in the same GitHub repo as SkyGo/epg.xml.gz. Titles come only from those files.
 // Nothing is invented: a channel with no current programme, or a failed fetch, says so.
 const TV_EPG = 'https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master/nz/epg.xml.gz';
+const TV_SKY_EPG = 'https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master/SkyGo/epg.xml.gz';
 const TV_GUIDE = 'https://freeviewnz.tv/whats-on/tv-guide/';
+const TV_SKY_GUIDE = 'https://www.sky.co.nz/tvguide';
+const TV_AHEAD = 6 * 3600 * 1000;
+const TV_SKY_MAX_AGE = 60 * 60 * 1000;
 const TV_CHANNELS = [
-  { id: 'mjh-tvnz-1', name: 'TVNZ 1' },
-  { id: 'mjh-tvnz-2', name: 'TVNZ 2' },
-  { id: 'mjh-three', name: 'Three' }
+  { id: 'mjh-tvnz-1', name: 'TVNZ 1', feed: 'freeview' },
+  { id: 'mjh-tvnz-2', name: 'TVNZ 2', feed: 'freeview' },
+  { id: 'mjh-three', name: 'Three', feed: 'freeview' },
+  // Sky Starter, from the channel logos on Sky’s help page (help.sky.co.nz, Sky Starter). 001–003 are the three above.
+  { id: 'sky.4', name: 'Sky Open', feed: 'sky' },
+  { id: 'sky.5', name: 'Sky 5', feed: 'sky' },
+  { id: 'sky.6', name: 'Vibe', feed: 'sky' },
+  { id: 'sky.11', name: 'Sky Comedy', feed: 'sky' },
+  { id: 'sky.12', name: 'Bravo', feed: 'sky' },
+  { id: 'sky.13', name: 'eden', feed: 'sky' },
+  { id: 'sky.16', name: 'TLC', feed: 'sky' },
+  { id: 'sky.19', name: 'Whakaata Māori', feed: 'sky' },
+  { id: 'sky.21', name: 'HGTV', feed: 'sky' },
+  { id: 'sky.23', name: 'TVNZ DUKE', feed: 'sky' },
+  { id: 'sky.24', name: 'Rush', feed: 'sky' },
+  { id: 'sky.25', name: 'Juice TV', feed: 'sky' },
+  { id: 'sky.26', name: 'J2', feed: 'sky' },
+  { id: 'sky.62', name: 'Trackside 1', feed: 'sky' },
+  { id: 'sky.63', name: 'Trackside 2', feed: 'sky' },
+  { id: 'sky.70', name: 'Discovery', feed: 'sky' },
+  { id: 'sky.83', name: 'Face TV', feed: 'sky' },
+  { id: 'sky.86', name: 'Parliament TV', feed: 'sky' },
+  { id: 'sky.90', name: 'Al Jazeera', feed: 'sky' },
+  { id: 'sky.101', name: 'Sky Kids', feed: 'sky' },
+  { id: 'sky.103', name: 'CBeebies', feed: 'sky' },
+  { id: 'sky.201', name: 'Shine', feed: 'sky' },
+  { id: 'sky.202', name: 'Daystar', feed: 'sky' },
+  { id: 'sky.204', name: 'Hope Channel', feed: 'sky' },
+  { id: 'sky.206', name: 'Firstlight', feed: 'sky' },
+  { id: 'sky.309', name: 'CGTN Documentary', feed: 'sky' },
+  { id: 'sky.310', name: 'CGTN', feed: 'sky' },
+  { id: 'sky.311', name: 'Real Good Life Chinese Radio', feed: 'sky' },
+  { id: 'sky.312', name: 'AM936', feed: 'sky' },
+  { id: 'sky.313', name: 'FM 104.2', feed: 'sky' },
+  { id: 'sky.421', name: 'RNZ National', feed: 'sky' },
+  { id: 'sky.422', name: 'RNZ Concert', feed: 'sky' },
+  { id: 'sky.423', name: 'Tahu FM', feed: 'sky' },
+  { id: 'sky.501', name: 'TVNZ 1 +1', feed: 'sky' },
+  { id: 'sky.502', name: 'TVNZ 2 +1', feed: 'sky' },
+  { id: 'sky.503', name: 'Three +1', feed: 'sky' },
+  { id: 'sky.504', name: 'TVNZ DUKE +1', feed: 'sky' }
 ];
 const TV_IDS = new Set(TV_CHANNELS.map(c => c.id));
 let TV = null, tvBusy = false, tvFailed = false, tvTimer = null;
@@ -4588,6 +4635,11 @@ function loadTv() {
   try {
     const r = JSON.parse(localStorage.getItem('tv') || 'null');
     TV = r && r.at && r.data && r.data.now && typeof r.data.now === 'object' ? r : null;
+    if (TV && TV.data) {
+      if (!TV.data.slots || typeof TV.data.slots !== 'object') TV.data.slots = {};
+      if (!TV.data.seen || typeof TV.data.seen !== 'object') TV.data.seen = {};
+      if (!TV.data.feeds || typeof TV.data.feeds !== 'object') TV.data.feeds = { freeview: !!TV.data.now['mjh-tvnz-1'], sky: false };
+    }
   } catch (e) { TV = null; }
 }
 function tvUnesc(s) {
@@ -4604,23 +4656,63 @@ function tvStamp(s) {
   const ms = utc - off;
   return Number.isFinite(ms) ? ms : null;
 }
-function tvParse(xml, now) {
-  const nowMap = {}, seen = {};
-  const re = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/g;
-  let m;
-  while ((m = re.exec(xml))) {
-    const ch = /\bchannel="([^"]+)"/.exec(m[1]);
-    if (!ch || !TV_IDS.has(ch[1])) continue;
-    seen[ch[1]] = true;
-    const start = tvStamp((/\bstart="([^"]+)"/.exec(m[1]) || [])[1]);
-    const until = tvStamp((/\bstop="([^"]+)"/.exec(m[1]) || [])[1]);
-    if (start == null || until == null || now < start || now >= until) continue;
-    const titleM = /<title\b[^>]*>([\s\S]*?)<\/title>/.exec(m[2]);
-    const title = titleM ? tvUnesc(titleM[1]).replace(/\s+/g, ' ').trim() : '';
-    if (!title) continue;
-    nowMap[ch[1]] = { title, start, until };
+function tvTake(attrs, body, now, acc) {
+  const ch = /\bchannel="([^"]+)"/.exec(attrs);
+  if (!ch || !TV_IDS.has(ch[1])) return;
+  acc.seen[ch[1]] = true;
+  const start = tvStamp((/\bstart="([^"]+)"/.exec(attrs) || [])[1]);
+  const until = tvStamp((/\bstop="([^"]+)"/.exec(attrs) || [])[1]);
+  if (start == null || until == null || until <= now || start >= now + TV_AHEAD) return;
+  const titleM = /<title\b[^>]*>([\s\S]*?)<\/title>/.exec(body);
+  const title = titleM ? tvUnesc(titleM[1]).replace(/\s+/g, ' ').trim() : '';
+  if (!title) return;
+  (acc.slots[ch[1]] || (acc.slots[ch[1]] = [])).push({ title, start, until });
+}
+function tvFinish(acc, now) {
+  const nowMap = {};
+  Object.keys(acc.slots).forEach(id => {
+    acc.slots[id].sort((a, b) => a.start - b.start);
+    const cur = acc.slots[id].find(p => p.start <= now && now < p.until);
+    if (cur) nowMap[id] = cur;
+  });
+  return { now: nowMap, seen: acc.seen, slots: acc.slots };
+}
+function tvEat(carry, now, acc) {
+  let cut;
+  while ((cut = carry.indexOf('</programme>')) !== -1) {
+    const end = cut + 12;
+    const start = carry.lastIndexOf('<programme', cut);
+    if (start !== -1) {
+      const open = carry.indexOf('>', start);
+      if (open !== -1 && open < cut) tvTake(carry.slice(start, open), carry.slice(open + 1, cut), now, acc);
+    }
+    carry = carry.slice(end);
   }
-  return { now: nowMap, seen };
+  if (carry.length > 500000) {
+    const keep = carry.lastIndexOf('<programme');
+    carry = keep > 0 ? carry.slice(keep) : '';
+  }
+  return carry;
+}
+async function tvReadFeed(url, timeout) {
+  if (typeof DecompressionStream !== 'function') throw new Error('gzip');
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), timeout);
+  let res;
+  try { res = await fetch(url, { signal: ctl.signal, cache: 'no-store' }); }
+  finally { clearTimeout(timer); }
+  if (!res.ok || !res.body) throw new Error('http ' + (res ? res.status : 0));
+  const reader = res.body.pipeThrough(new DecompressionStream('gzip')).getReader();
+  const dec = new TextDecoder();
+  const acc = { seen: {}, slots: {} };
+  const now = Date.now();
+  let carry = '';
+  while (true) {
+    const step = await reader.read();
+    carry += dec.decode(step.value || new Uint8Array(), { stream: !step.done });
+    carry = tvEat(carry, now, acc);
+    if (step.done) break;
+  }
+  return tvFinish(acc, now);
 }
 function tvClock(ms) {
   return new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
@@ -4628,43 +4720,83 @@ function tvClock(ms) {
 function tvStillOn(item, now) {
   return !!(item && item.title && item.until > now && item.start <= now);
 }
+function tvOn(id, now) {
+  const slots = TV && TV.data && TV.data.slots && TV.data.slots[id];
+  if (slots && slots.length) {
+    for (let i = 0; i < slots.length; i++) if (slots[i].start <= now && now < slots[i].until) return slots[i];
+    return null;
+  }
+  const item = TV && TV.data && TV.data.now && TV.data.now[id];
+  return tvStillOn(item, now) ? item : null;
+}
+function tvFeedFresh(feed, now) {
+  if (!TV || !TV.data || !TV.data.feeds || !TV.data.feeds[feed]) return false;
+  const at = feed === 'sky' ? (TV.data.skyAt || 0) : (TV.data.freeAt || TV.at || 0);
+  if (feed === 'sky') return now - at < TV_SKY_MAX_AGE && now < at + TV_AHEAD;
+  if (now - at >= 45000) return false;
+  return TV_CHANNELS.filter(c => c.feed === 'freeview').every(c => {
+    const item = tvOn(c.id, now);
+    const seen = TV.data.seen && TV.data.seen[c.id];
+    if (!seen) return false;
+    if (!item) return true;
+    return item.until - now > 45000;
+  });
+}
 function scheduleTvRefresh() {
   if (tvTimer) { clearTimeout(tvTimer); tvTimer = null; }
+  if (!TV || !TV.data) return;
   const now = Date.now();
-  const ends = TV_CHANNELS.map(c => TV && TV.data && TV.data.now && TV.data.now[c.id]).filter(x => tvStillOn(x, now)).map(x => x.until);
-  if (!ends.length) return;
-  const wait = Math.min(Math.max(1500, Math.min.apply(null, ends) - now + 1000), 6 * 3600 * 1000);
-  tvTimer = setTimeout(() => { tvTimer = null; refreshTv(true); }, wait);
+  let next = Infinity;
+  TV_CHANNELS.forEach(c => {
+    const slots = (TV.data.slots && TV.data.slots[c.id]) || [];
+    slots.forEach(p => {
+      if (p.until > now) next = Math.min(next, p.until);
+      if (p.start > now) next = Math.min(next, p.start);
+    });
+    const item = TV.data.now && TV.data.now[c.id];
+    if ((!slots.length) && item && item.until > now) next = Math.min(next, item.until);
+  });
+  if (TV.data.feeds && TV.data.feeds.freeview) next = Math.min(next, (TV.data.freeAt || TV.at) + 45000);
+  if (TV.data.feeds && TV.data.feeds.sky) next = Math.min(next, (TV.data.skyAt || TV.at) + TV_SKY_MAX_AGE);
+  if (!Number.isFinite(next)) return;
+  const wait = Math.min(Math.max(1500, next - now + 800), 6 * 3600 * 1000);
+  tvTimer = setTimeout(() => { tvTimer = null; refreshTv(false); }, wait);
 }
 async function refreshTv(force = false) {
   const now = Date.now();
-  const fresh = TV && TV.data && now - TV.at < 45000 && TV_CHANNELS.every(c => {
-    const item = TV.data.now && TV.data.now[c.id];
-    const seen = TV.data.seen && TV.data.seen[c.id];
-    if (!seen) return false;
-    if (!tvStillOn(item, now)) return !item;
-    return item.until - now > 45000;
-  });
-  if (tvBusy || (!force && fresh)) return;
+  const needFree = force || !tvFeedFresh('freeview', now);
+  const needSky = force || !tvFeedFresh('sky', now);
+  if (tvBusy || (!needFree && !needSky)) { scheduleTvRefresh(); return; }
   tvBusy = true; if (force) updTv();
-  let parsed = null;
-  try {
-    if (typeof DecompressionStream !== 'function') throw new Error('gzip');
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 20000);
-    let res;
-    try { res = await fetch(TV_EPG, { signal: ctl.signal, cache: 'no-store' }); }
-    finally { clearTimeout(timer); }
-    if (!res.ok) throw new Error('http ' + res.status);
-    const buf = await res.arrayBuffer();
-    const text = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
-    parsed = tvParse(text, Date.now());
-  } catch (e) { parsed = null; }
+  const jobs = [];
+  if (needFree) jobs.push(tvReadFeed(TV_EPG, 20000).then(d => ({ feed: 'freeview', d })).catch(() => ({ feed: 'freeview', d: null })));
+  if (needSky) jobs.push(tvReadFeed(TV_SKY_EPG, 45000).then(d => ({ feed: 'sky', d })).catch(() => ({ feed: 'sky', d: null })));
+  const results = await Promise.all(jobs);
   tvBusy = false;
-  if (parsed) {
-    TV = { at: Date.now(), data: parsed };
-    tvFailed = false;
+  if (!TV || !TV.data) TV = { at: 0, data: { now: {}, seen: {}, slots: {}, feeds: {} } };
+  const data = TV.data;
+  data.now = data.now || {}; data.seen = data.seen || {}; data.slots = data.slots || {}; data.feeds = Object.assign({}, data.feeds);
+  let ok = 0;
+  results.forEach(r => {
+    if (!r.d) {
+      if (!data.feeds[r.feed]) data.feeds[r.feed] = false;
+      return;
+    }
+    ok++;
+    data.feeds[r.feed] = true;
+    if (r.feed === 'sky') data.skyAt = Date.now(); else data.freeAt = Date.now();
+    TV_CHANNELS.filter(c => c.feed === r.feed).forEach(c => {
+      delete data.now[c.id]; delete data.seen[c.id]; delete data.slots[c.id];
+      if (r.d.seen[c.id]) data.seen[c.id] = true;
+      if (r.d.slots[c.id]) data.slots[c.id] = r.d.slots[c.id];
+      if (r.d.now[c.id]) data.now[c.id] = r.d.now[c.id];
+    });
+  });
+  tvFailed = ok === 0 && results.length > 0 && TV_CHANNELS.every(c => !(data.feeds && data.feeds[c.feed]));
+  if (ok) {
+    TV.at = Date.now();
     try { localStorage.setItem('tv', JSON.stringify(TV)); } catch (e) { }
-  } else tvFailed = true;
+  }
   scheduleTvRefresh();
   updTv();
 }
@@ -4677,20 +4809,22 @@ function updTv() {
   }
 }
 function homeTv() {
-  const link = `<a href="${TV_GUIDE}" target="_blank" rel="noopener">Freeview</a>`;
+  const link = `<a href="${TV_GUIDE}" target="_blank" rel="noopener">Freeview</a> · <a href="${TV_SKY_GUIDE}" target="_blank" rel="noopener">Sky</a>`;
   const head = `<div class="sec">What’s on TV ${link}</div>`;
   const now = Date.now();
   const rows = TV_CHANNELS.map(ch => {
     const data = TV && TV.data;
-    const item = data && data.now && data.now[ch.id];
-    if (tvStillOn(item, now)) {
+    const item = tvOn(ch.id, now);
+    if (item) {
       return `<div class="row"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${esc(ch.name)}</div><div class="s">${esc(item.title)} · until ${esc(tvClock(item.until))}</div></div></div>`;
     }
     const seen = data && data.seen && data.seen[ch.id];
-    const loading = tvBusy || (!tvFailed && !data && navigator.onLine !== false);
+    const feedOk = !!(data && data.feeds && data.feeds[ch.feed]);
+    const loading = (tvBusy && !feedOk) || (!data && !tvFailed && navigator.onLine !== false);
     let sub = 'Nothing listed right now.';
     if (loading) sub = 'Checking the guide…';
-    else if (tvFailed || !data || !seen) sub = 'Couldn’t load the listing.';
+    else if (!feedOk) sub = 'Couldn’t load the listing.';
+    else if (!seen) sub = ch.feed === 'sky' ? 'Not in the Sky guide.' : 'Couldn’t load the listing.';
     return `<button class="row" onclick="refreshTv(true)"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${esc(ch.name)}</div><div class="s">${esc(sub)}</div></div></button>`;
   });
   return head + `<div class="list" id="hometv">${rows.join('')}</div>`;
