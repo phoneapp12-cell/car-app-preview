@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.61.0';
+const APP_VERSION = '1.62.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4369,7 +4369,7 @@ function Weather() {
 /* ================= ROADWORKS (NZTA TREIS open data, near Whangārei) ================= */
 // NZ Transport Agency highway events, the public ArcGIS copy of the TREIS feed.
 // Browser-friendly (CORS). Fixed box around Whangārei. Nothing is invented: an empty list stays empty.
-const RW_LAT = -35.7251, RW_LON = 174.3237, RW_KM = 30;
+const RW_LAT = -35.7251, RW_LON = 174.3237, RW_KM = 40;
 const RW_MAX_AGE = 20 * 60 * 1000;
 const RW_NZTA = 'https://www.journeys.nzta.govt.nz/';
 const RW_LAYER = 'https://services.arcgis.com/XTtANUDT8Va4DLwI/arcgis/rest/services/NZTA_Highway_Information_TREIS_Feature_Layer_View/FeatureServer/';
@@ -4476,14 +4476,14 @@ function rwWhen(w) {
 function homeRoadworks() {
   const link = `<a href="${RW_NZTA}" target="_blank" rel="noopener">NZTA</a>`;
   const head = `<div class="sec">Roadworks near Whangārei ${link}</div>`;
-  const items = RW && RW.data && Array.isArray(RW.data.items) ? RW.data.items.slice(0, 3) : null;
+  const items = RW && RW.data && Array.isArray(RW.data.items) ? RW.data.items : null;
   if (!items) {
     const loading = rwBusy || (!rwFailed && navigator.onLine !== false);
     const msg = loading ? 'Checking NZTA…' : 'Couldn’t load roadworks. Tap to try again.';
     return head + `<div class="list" id="homeroadworks"><button class="row" onclick="refreshRoadworks(true)"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${loading ? 'Roadworks' : 'Not available'}</div><div class="s">${msg}</div></div></button></div>`;
   }
   if (!items.length) {
-    return head + `<div class="list" id="homeroadworks"><div class="row"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">No roadworks nearby</div><div class="s">Nothing near Whangārei on the NZTA list right now.</div></div></div></div>`;
+    return head + `<div class="list" id="homeroadworks"><div class="row"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">No roadworks nearby</div><div class="s">Nothing within 40 km of Whangārei on the NZTA list right now.</div></div></div></div>`;
   }
   return head + `<div class="list" id="homeroadworks">${items.map(w => `<a class="row" href="${RW_NZTA}" target="_blank" rel="noopener"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(w.road)}</div><div class="s">${esc(rwWhen(w))}</div></div></a>`).join('')}</div>`;
 }
