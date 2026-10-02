@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.63.0';
+const APP_VERSION = '1.64.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -447,6 +447,86 @@ async function toggleDailyQuote() {
   await save();
   render();
 }
+function engList(arr) {
+  const a = arr.filter(Boolean);
+  if (a.length <= 1) return a[0] || '';
+  if (a.length === 2) return a[0] + ' and ' + a[1];
+  return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+}
+// 1.64.0: a few sentences under the greeting, only for sections actually on Home. No invented items.
+function homeOverview(shown) {
+  const bits = [];
+  if (shown.has('summary')) {
+    const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length;
+    if (over && soon) bits.push(`You have ${plural(over, 'overdue item')} and ${plural(soon, 'thing')} due in the next 30 days.`);
+    else if (over) bits.push(`You have ${plural(over, 'overdue item')}, and nothing else due in the next 30 days.`);
+    else if (soon) bits.push(`Nothing is overdue. ${plural(soon, 'thing')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days.`);
+    else bits.push('Nothing is overdue or due in the next 30 days.');
+  }
+  if (shown.has('meals')) {
+    const today = todayISO(), meals = upcomingMeals();
+    if (meals.includes(today) && M().plan[today] && M().plan[today].title) bits.push(`Today’s meal is ${M().plan[today].title}.`);
+    else if (meals.length) bits.push(`${plural(meals.length, 'meal')} ${meals.length === 1 ? 'is' : 'are'} planned, and none is set for today.`);
+  }
+  if (shown.has('attention')) {
+    const list = homeAttention(), overN = list.filter(x => x.days < 0).length;
+    const nShow = attShowAll ? list.length : Math.max(ATT_MAX, overN);
+    const vis = list.slice(0, nShow);
+    let feeds = [];
+    try {
+      const T = todayT(), y0 = parseD(todayISO().slice(0, 4) + '-01-01');
+      feeds = gardenJobs(S, y0, T + 14 * DAY).filter(j => !j.done && gardenIsFeed(j) && j.days <= 14)
+        .filter(j => vis.some(x => x.html.includes('data-kind="garden"') && x.html.includes('>' + esc(j.title) + '<')));
+    } catch (e) { feeds = []; }
+    if (feeds.length) bits.push(`Garden ${feeds.length === 1 ? 'feed' : 'feeds'} showing: ${engList(feeds.map(j => j.title))}.`);
+    if (list.length) bits.push(`Upcoming shows ${plural(Math.min(nShow, list.length), 'item')}${list.length > nShow ? `, and ${list.length - nShow} more if you tap show all` : ''}.`);
+    else bits.push('Upcoming has nothing due or coming up.');
+  }
+  if (shown.has('roadworks') && RW && RW.data && Array.isArray(RW.data.items) && RW.data.items.length) {
+    const names = RW.data.items.map(w => w.road).filter(Boolean);
+    const shownNames = names.slice(0, 4);
+    const more = names.length - shownNames.length;
+    bits.push(`${plural(names.length, 'roadwork')} within 40 km: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
+  }
+  if (shown.has('tv')) {
+    const on = TV_CHANNELS.map(ch => {
+      const item = TV && TV.data && TV.data.now && TV.data.now[ch.id];
+      return tvStillOn(item, Date.now()) ? `${ch.name} has ${item.title}` : '';
+    }).filter(Boolean);
+    if (on.length) bits.push(`On television now, ${engList(on)}.`);
+  }
+  if (shown.has('birthdays')) {
+    const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((a, b) => a.d - b.d || a.b.name.localeCompare(b.b.name));
+    if (list.length && list.length <= 3) bits.push(`Birthdays in the next 30 days: ${engList(list.map(x => x.b.name))}.`);
+    else if (list.length) bits.push(`${plural(list.length, 'birthday')} in the next 30 days, the next being ${list[0].b.name}.`);
+  }
+  const other = [];
+  if (shown.has('bridge')) {
+    let label = '';
+    try { const st = brStatus(); label = (BR_TXT[st.state] || [])[1] || ''; } catch (e) { label = ''; }
+    other.push(label ? `the lifting bridge (${label.toLowerCase()})` : 'the lifting bridge');
+  }
+  if (shown.has('holidays')) other.push('public holidays');
+  if (shown.has('shopping')) {
+    const n = (S.shop && S.shop.items || []).filter(x => !x.done).length;
+    if (n) other.push(plural(n, 'shopping item'));
+  }
+  if (shown.has('events')) {
+    const n = upcomingEvents().slice(0, homeEventCount()).length;
+    other.push(n ? plural(n, 'local event') : 'local events');
+  }
+  if (shown.has('todo')) other.push('to-dos');
+  if (shown.has('loans')) other.push('loans');
+  if (shown.has('commission')) other.push('this fortnight’s commission');
+  if (shown.has('pets')) other.push('pet care');
+  if (shown.has('bills')) other.push('bills');
+  if (shown.has('cars')) other.push('the cars');
+  if (shown.has('ideas')) other.push('starred ideas');
+  if (shown.has('videos')) other.push('videos');
+  if (other.length) bits.push(`Also on this page: ${engList(other)}.`);
+  if (!bits.length) return '';
+  return `<div class="card homesum" id="homesum"><p>${esc(bits.join(' '))}</p></div>`;
+}
 function Home() {
   if (homeEdit) return HomeEdit();
   const now = new Date();
@@ -469,7 +549,9 @@ function Home() {
   const groups = [];
   parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') g.h += h; else groups.push({ k, h }); });
   const feed = groups.map(g => `<section class="hsec" data-k="${g.k}">${g.h}</section>`).join('');
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
+  const shown = new Set(parts.map(([k]) => k));
+  if (top) shown.add('bridge');
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + homeOverview(shown) + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
     feed + `${syncNote()}
     <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
