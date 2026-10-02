@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.66.0';
+const APP_VERSION = '1.67.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -333,7 +333,7 @@ const HOME_CARD = {
     const open = S.todos.filter(t => !t.done && !(att && t.due && daysLeft(t.due) <= 30)).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
     if (!open.length) return '';
     return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button class="tick" aria-label="Tick off ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}</div></div>${t.due ? pill(daysLeft(t.due)) : ''}</button></div>`).join('')}</div>` +
+      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? pill(daysLeft(t.due)) : ''}</button>${todoCalBtn(t)}</div>`).join('')}</div>` +
       (open.length > 5 ? `<div class="homemore"><a href="#todo">${plural(open.length - 5, 'more to-do')}</a></div>` : '');
   },
   loans: () => {
@@ -1088,8 +1088,8 @@ function Todo() {
   const open = vis.filter(t => !t.done).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const row = t => `<div class="row ${t.done ? 'done' : ''}"><button class="tick" aria-label="${t.done ? 'Untick' : 'Tick off'} ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}</div></div>
-    ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button></div>`;
+    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>
+    ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
   const openCount = S.todos.filter(t => !t.done).length;
   return header('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()')) +
     `<div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${esc(l)}</button>`).join('')}
@@ -1123,7 +1123,8 @@ function todoForm(id) {
   openSheet(id ? 'Edit to-do' : 'Add a to-do',
     field('To-do', inp('title', t.title, 'placeholder="e.g. Mow the lawns" required maxlength="120"')) +
     `<div class="two">${field('List', sel('list', S.lists.map(l => [l, l]), t.list))}${field('Due date', inp('due', t.due, 'type="date"'), 'Optional')}</div>` +
-    field('Notes', area('notes', t.notes)),
+    field('Notes', area('notes', t.notes)) +
+    (id && !t.done ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button></div>` : ''),
     async v => {
       if (!v.title) return 'Please type the to-do.';
       if (id) Object.assign(t, { title: v.title, list: v.list, due: v.due, notes: v.notes });
@@ -1134,6 +1135,46 @@ function todoForm(id) {
 }
 async function deleteTodo(id) {
   const s = snap(); S.todos = S.todos.filter(x => x.id !== id); await save(); await closeSheet(); render(); toast('To-do deleted.', 'Undo', undoTo(s));
+}
+// 1.67.0: a to-do can become an appointment in this app's calendar (S.appts). The to-do stays.
+const TODO_CAL_TIME = '09:00';
+function todoClock(t) {
+  const raw = t && (t.time || t.dueTime || '');
+  return /^\d{2}:\d{2}$/.test(String(raw)) ? String(raw) : '';
+}
+function todoAppt(t) { return t && t.apptId ? S.appts.find(a => a.id === t.apptId) || null : null; }
+function todoCalBtn(t) {
+  const on = !!todoAppt(t);
+  const label = on ? 'In your calendar' : 'Add to calendar';
+  return `<button class="paybtn" style="margin-top:0;align-self:center" onclick="addTodoCal('${t.id}')" aria-label="${label}: ${esc(t.title)}">${label}</button>`;
+}
+async function addTodoCal(id) {
+  const t = S.todos.find(x => x.id === id);
+  if (!t || t.done) return;
+  const f = document.getElementById('sf');
+  const fromForm = !!(sheetOpen && f && f.title && f.list && f.due);
+  let title = t.title, list = t.list, due = t.due, notes = t.notes || '';
+  if (fromForm) {
+    title = f.title.value.trim();
+    if (!title) { toast('Please type the to-do.'); return; }
+    list = f.list.value;
+    due = f.due.value;
+    if (f.notes) notes = f.notes.value.trim();
+  }
+  const have = todoAppt(t);
+  if (have) { if (sheetOpen) await closeSheet(); apptForm(have.id); return; }
+  if (!parseD(due)) { toast('Set a due date on this to-do first.'); return; }
+  const s = snap();
+  t.title = title; t.list = list; t.due = due; t.notes = notes;
+  const own = todoClock(t);
+  const time = own || TODO_CAL_TIME;
+  const appt = { id: uid('appt'), title: t.title, date: t.due, time, notes: t.notes || '', todoId: t.id };
+  S.appts.push(appt);
+  t.apptId = appt.id;
+  await save();
+  if (sheetOpen) await closeSheet();
+  render();
+  toast(own ? `Added to your calendar at ${fmtTime(time)}.` : `Added to your calendar at ${fmtTime(time)}. Change the time if you want.`, 'Change', () => apptForm(appt.id));
 }
 function listForm(name) {
   openSheet(name ? 'Rename list' : 'New list', field('List name', inp('name', name || '', 'placeholder="e.g. Garden" required maxlength="24"')), async v => {
