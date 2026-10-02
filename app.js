@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.73.0';
+const APP_VERSION = '1.74.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -548,7 +548,7 @@ function Home() {
   if (deferredPrompt && !isStandalone())
     cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
-  const keys = homeOrder().filter(homeOn), br = brOnHome();
+  const keys = homeOrder().filter(k => homeOn(k) || (k === 'videos' && currentSarahVideo())), br = brOnHome();
   let top = '';
   // As before 1.14.0: when the bridge is first, the full card (near the bridge, or a closure) goes right under the greeting,
   // and the compact line sits under the weather if the weather card comes next
@@ -5714,6 +5714,96 @@ function wireVideoSwipe() {
   list.addEventListener('pointerup', end);
   list.addEventListener('pointercancel', end);
 }
+// Sarah Jenkins, @sarahjenkins1510. Confirmed 2 Oct 2026 (oembed). A newer one from the channel replaces it.
+const SARAH_CHANNEL_ID = 'UC2sjJeoD0gLkf66iLbm28hg';
+const SARAH_KNOWN = { id: 'hyuecefG9Aw', title: '2 October 2026', channel: 'Sarah Jenkins', published: '2026-10-02T04:54:17+00:00' };
+let sarahMem = null;
+function sarahPick(a, b) {
+  if (!a || typeof a.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(a.id)) return b || null;
+  if (!b || typeof b.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(b.id)) return a;
+  const ap = a.published || '', bp = b.published || '';
+  if (ap && bp && ap !== bp) return ap > bp ? a : b;
+  return b;
+}
+function currentSarahVideo() {
+  let v = SARAH_KNOWN;
+  const saved = S && S.settings && S.settings.sarahLatest;
+  if (saved && typeof saved === 'object') v = sarahPick(v, saved) || v;
+  if (sarahMem) v = sarahPick(v, sarahMem) || v;
+  if (!v || v.channel !== 'Sarah Jenkins' || !v.title) return null;
+  return { id: v.id, title: v.title, channel: v.channel, published: v.published || '', category: 'sarah', url: 'https://www.youtube.com/watch?v=' + v.id, reason: 'A new video from Sarah Jenkins.' };
+}
+let sarahBusy = false;
+async function refreshSarah() {
+  if (!S) return;
+  let announced = '';
+  if (!sarahBusy && RELAY_URL) {
+    sarahBusy = true;
+    try {
+      const data = await getJSON(RELAY_URL + '/sarah', 12000);
+      if (data.channelId && data.channelId !== SARAH_CHANNEL_ID) return;
+      announced = typeof data.announced === 'string' ? data.announced : '';
+      const top = Array.isArray(data.videos) ? data.videos[0] : null;
+      if (top && typeof top.id === 'string' && /^[A-Za-z0-9_-]{11}$/.test(top.id)) {
+        let title = String(top.title || '').replace(/\s+/g, ' ').trim();
+        let channel = String(top.channel || '').replace(/\s+/g, ' ').trim();
+        const published = typeof top.published === 'string' ? top.published : '';
+        try {
+          const o = await fetch('https://www.youtube.com/oembed?url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + top.id) + '&format=json');
+          if (o.ok) {
+            const d = await o.json();
+            const ot = String(d.title || '').replace(/\s+/g, ' ').trim();
+            const oc = String(d.author_name || '').replace(/\s+/g, ' ').trim();
+            if (ot && oc) { title = ot; channel = oc; }
+          }
+        } catch (e) { /* the relay already confirmed this id */ }
+        if (title && channel === 'Sarah Jenkins') {
+          const next = { id: top.id, title: title.slice(0, 180), channel, published };
+          const cur = currentSarahVideo();
+          if (!cur || next.id !== cur.id || next.published > (cur.published || '') || next.title !== cur.title) {
+            const picked = sarahPick(cur, next);
+            if (picked && picked.id === next.id) {
+              sarahMem = next;
+              S.settings.sarahLatest = next;
+              save().catch(() => { });
+              const h = (location.hash || '#home').slice(1).split('/')[0];
+              if (!sheetOpen && (h === 'home' || h === '')) render();
+            }
+          }
+        }
+      }
+    } catch (e) { /* keep the video already confirmed */ }
+    finally { sarahBusy = false; }
+  }
+  await notifySarah(currentSarahVideo(), announced);
+}
+// Same notification as other reminders: the service worker shows it once per video id.
+async function notifySarah(video, announced) {
+  if (!video || !S) return;
+  const key = 'sarah|' + video.id;
+  let fired;
+  try { fired = (await kvGet('fired')) || {}; } catch (e) { return; }
+  if (fired[key]) return;
+  if (announced === video.id) {
+    fired[key] = Date.now();
+    try { await kvSet('fired', fired); } catch (e) { }
+    return;
+  }
+  if (S.settings.reminders === false) return;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const reg = await getReg();
+  const opts = { body: video.title, tag: 'sarah-' + video.id, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: '#home' } };
+  try {
+    if (reg) await reg.showNotification('New video from Sarah Jenkins', opts);
+    else new Notification('New video from Sarah Jenkins', opts);
+  } catch (e) { return; }
+  fired[key] = Date.now();
+  try { await kvSet('fired', fired); } catch (e) { }
+  if (RELAY_URL) {
+    try { await fetch(RELAY_URL + '/sarah/seen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: video.id }) }); } catch (e) { }
+  }
+}
+
 // Home only. The box, title and description all come from this one video.
 // The box stays a still thumbnail. It does not play on its own.
 function homeVideoRow(v) {
@@ -5724,7 +5814,12 @@ function homeVideoRow(v) {
     <div class="s hvwhy">${esc(videoReason(v))}</div></div>`;
 }
 function homeVideosCard() {
-  const list = videoSuggestions().slice(0, homeVideoCount());
+  const sarah = currentSarahVideo();
+  const on = homeOn('videos');
+  let list = on ? videoSuggestions() : [];
+  if (sarah) list = [sarah].concat(list.filter(v => v.id !== sarah.id));
+  // Sarah takes the top slot. The usual count still applies underneath when that card is on.
+  list = on ? list.slice(0, homeVideoCount() + (sarah ? 1 : 0)) : (sarah ? [sarah] : []);
   if (!list.length) return '';
   return `<div class="sec"><a class="sechead" href="#videos">Videos</a><a href="#videos">All videos</a></div>
     <div class="list" id="homevideos">${list.map(homeVideoRow).join('')}</div>`;
@@ -6473,7 +6568,7 @@ async function start() {
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
-  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv();
+  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshSarah();
   if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
   checkBridgeLoc(true);
   if ('serviceWorker' in navigator) {
@@ -6495,7 +6590,7 @@ async function start() {
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     phoneSyncOpen();
     check();
-    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv();
+    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshSarah();
     if (brMode() !== 'off') refreshClosures();
     checkBridgeLoc(true);
     if (swReg) swReg.update().catch(() => { });

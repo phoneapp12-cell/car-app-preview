@@ -19,6 +19,8 @@
  * GET /roadworks: council roading projects whose expected start is within the next 12 months (see roadworks.js). Fixed source, no input.
  * POST /videos: search YouTube for one short English topic and return oembed-confirmed videos
  * (see videos.js). The query is the topic only. No arbitrary links. Nothing is stored.
+ * GET /sarah: Sarah Jenkins's channel (one fixed RSS address). POST /sarah/seen marks the
+ * newest id so it is not pushed again. No other channel can be requested.
  */
 import { getFeed } from './events.js';
 import { getClosures } from './closures.js';
@@ -26,6 +28,7 @@ import { getCouncilRoadworks } from './roadworks.js';
 import { pushRoute } from './push.js';
 import { searchVideos } from './videos.js';
 import { syncRoute } from './sync.js';
+import { getSarah, markSarahSeen } from './sarah.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -74,6 +77,7 @@ const MESSAGES = {
   roadworks_unavailable: 'Council roadworks could not be loaded right now.',
   bad_query: 'Use a short English topic name.',
   videos_unavailable: 'Videos could not be looked up just now.',
+  sarah_unavailable: 'Sarah Jenkins’s videos could not be checked just now.',
   bad_code: 'That sync code is not valid.',
   sync_unavailable: 'Sync is not available right now.',
   sync_too_large: 'That sync data is too big to store.'
@@ -179,6 +183,32 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     } catch (e) {
       const code = path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : path === '/roadworks' ? 'roadworks_unavailable' : 'weather_unavailable';
       return json(502, code, origin, env);
+    }
+  }
+  if (path === '/sarah') {
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try {
+      const data = await getSarah(env, fetchImpl);
+      return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (e) {
+      return json(502, 'sarah_unavailable', origin, env);
+    }
+  }
+  if (path === '/sarah/seen') {
+    if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    let body = {};
+    try {
+      const raw = await request.text();
+      if (raw.length > 80) throw new Error('big');
+      body = raw ? JSON.parse(raw) : {};
+    } catch (e) { return json(400, 'bad_request', origin, env); }
+    try {
+      const data = await markSarahSeen(env, body && body.id);
+      return new Response(JSON.stringify({ ok: true, announced: data.announced || '' }), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (e) {
+      return json(400, 'bad_request', origin, env);
     }
   }
   if (path === '/videos') {
