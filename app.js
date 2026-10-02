@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.69.0';
+const APP_VERSION = '1.70.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -464,6 +464,9 @@ function engList(arr) {
 }
 // 1.64.0: a few sentences under the greeting, only for sections actually on Home. No invented items.
 // 1.68.0: the summary does not mention television. The TV card is unchanged.
+// 1.70.0: name the first four Upcoming items that fall today through 30 days ahead (Pacific/Auckland).
+// Car dates (WOF, rego, service) and every other Upcoming item use that same window. Overdue items
+// and anything further out are not named. Television is still not mentioned. Nothing is invented.
 function homeOverview(shown) {
   const bits = [];
   if (shown.has('summary')) {
@@ -479,18 +482,11 @@ function homeOverview(shown) {
     else if (meals.length) bits.push(`${plural(meals.length, 'meal')} ${meals.length === 1 ? 'is' : 'are'} planned, and none is set for today.`);
   }
   if (shown.has('attention')) {
-    const list = homeAttention(), overN = list.filter(x => x.days < 0).length;
-    const nShow = attShowAll ? list.length : Math.max(ATT_MAX, overN);
-    const vis = list.slice(0, nShow);
-    let feeds = [];
-    try {
-      const T = todayT(), y0 = parseD(todayISO().slice(0, 4) + '-01-01');
-      feeds = gardenJobs(S, y0, T + 14 * DAY).filter(j => !j.done && gardenIsFeed(j) && j.days <= 14)
-        .filter(j => vis.some(x => x.html.includes('data-kind="garden"') && x.html.includes('>' + esc(j.title) + '<')));
-    } catch (e) { feeds = []; }
-    if (feeds.length) bits.push(`Garden ${feeds.length === 1 ? 'feed' : 'feeds'} showing: ${engList(feeds.map(j => j.title))}.`);
-    if (list.length) bits.push(`Upcoming shows ${plural(Math.min(nShow, list.length), 'item')}${list.length > nShow ? `, and ${list.length - nShow} more if you tap show all` : ''}.`);
-    else bits.push('Upcoming has nothing due or coming up.');
+    // Same order as Upcoming. Car dates and everything else: today through 30 days only.
+    const soon = homeAttention().filter(x => x.kind !== 'tv' && x.days >= 0 && x.days <= 30 && x.name);
+    const names = soon.slice(0, 4).map(x => x.name);
+    if (names.length) bits.push(`Coming up in the next 30 days: ${engList(names)}.`);
+    else bits.push('Nothing is coming up in the next 30 days.');
   }
   if (shown.has('roadworks') && RW && RW.data && Array.isArray(RW.data.items) && RW.data.items.length) {
     const names = RW.data.items.map(w => w.road).filter(Boolean);
@@ -2450,45 +2446,45 @@ function attRow(o) {
 const gardenIsFeed = j => /feed/i.test(j.jobKey || '') || /^Feed\b/.test(j.title || '');
 const ATT_SOURCES = {
   // WOF / rego / service, AA and licence, bills, to-dos with a due date, pet care: within 30 days or overdue (as before)
-  due: T => dueItems(S).filter(x => x.days <= 30 && x.kind !== 'health').map(x => ({ days: x.days, rank: 0, sort: '', html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })),
+  due: T => dueItems(S).filter(x => x.days <= 30 && x.kind !== 'health').map(x => ({ days: x.days, rank: 0, sort: '', kind: x.kind, name: x.title, html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })),
   // My events (payday, rubbish day…), today and tomorrow. Skipped dates are left out and moved ones show on their new date.
-  mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).map(e => ({ days: d, rank: 1, sort: e.hm || '',
+  mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).map(e => ({ days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: `${attWhen(d)}: ${e.title}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
     html: attRow({ wx: 1, kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${T + d * DAY})`, ic: 'mine', icon: 'repeat', title: `${attWhen(d)}: ${esc(e.title)}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
       sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}` }) }))),
   // Appointments, including What's On events you added, today and the next 7 days
-  appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
+  appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: `${attDay(d, a.date)}: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`,
     html: attRow({ wx: 1, kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
       sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; }),
   // Connected Outlook / Google / iCloud calendars, today and the next 7 days (an event spanning several days shows once, on its first day here)
-  ext: T => { const seen = new Set(); return extEvents(T, T + ATT_WEEK * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '',
+  ext: T => { const seen = new Set(); return extEvents(T, T + ATT_WEEK * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '', kind: 'ext', name: `${attDay(d, e.date)}: ${e.title}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + e.time : ''}`,
     html: attRow({ wx: 1, kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal',
       title: `${attDay(d, e.date)}: ${esc(e.title)}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + esc(e.time) : ''}`, sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}${e.time === 'All day' ? ' · All day' : ''}` }) }; }); },
   // Birthdays, today and the next 7 days
-  bday: T => S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 7).map(x => ({ days: x.d, rank: 2, sort: '',
+  bday: T => S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 7).map(x => ({ days: x.d, rank: 2, sort: '', kind: 'bday', name: `${x.b.name}’s ${x.age > 0 ? ordinal(x.age) + ' ' : ''}birthday`,
     html: attRow({ kind: 'bday', cls: x.d === 0 ? 'bdtoday' : '', date: x.iso, go: `go('#birthdays')`, ic: 'bday', icon: 'cake', title: `${esc(x.b.name)}’s ${x.age > 0 ? ordinal(x.age) + ' ' : ''}birthday`,
       sub: `Birthday · ${fmtW(x.iso)}`, right: `<span class="pill ${x.d === 0 ? 'bdaypill' : 'bdaysoon'}">${x.d === 0 ? 'Today!' : attWhen(x.d)}</span>` }) })),
   // Today's planned dinner, on the day it is scheduled (it also stays on the Upcoming meals card).
   meal: T => { const d = todayISO(), e = M().plan[d]; if (!e || !e.title || !isCookNight(d)) return [];
-    return [{ days: 0, rank: 3, sort: '', html: attRow({ kind: 'meal', date: d, go: `openNight('${d}')`, ic: 'meal', icon: 'meal', title: `Tonight: ${esc(e.title)}`, sub: 'Dinner · tap to see it or tick it cooked' }) }]; },
+    return [{ days: 0, rank: 3, sort: '', kind: 'meal', name: e.title ? `Tonight: ${e.title}` : '', html: attRow({ kind: 'meal', date: d, go: `openNight('${d}')`, ic: 'meal', icon: 'meal', title: `Tonight: ${esc(e.title)}`, sub: 'Dinner · tap to see it or tick it cooked' }) }]; },
   // Health (1.8.0): check-ups due within 30 days or overdue (real due dates, like pets), and booked appointments today and tomorrow.
   // A booked check-up has no due row (core.js dueItems leaves it out), so it never shows twice.
-  health: T => dueItems({ health: S.health }).filter(x => x.days <= 30).map(x => ({ days: x.days, rank: 0, sort: '',
+  health: T => dueItems({ health: S.health }).filter(x => x.days <= 30).map(x => ({ days: x.days, rank: 0, sort: '', kind: 'health', name: x.title,
     html: attRow({ kind: 'health', cls: 'hdue', date: x.date, go: `go('${x.go}')`, ic: 'health', icon: HEALTH_ICON[x.item.kind] || 'medkit', title: esc(x.title),
       sub: `Health · ${x.item.clinic ? esc(x.item.clinic) + ' · ' : ''}Due ${fmtW(x.date)}`, right: pill(x.days) }) }))
     .concat(healthAppts(S, T, T + DAY).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
-      html: attRow({ wx: 1, kind: 'health', cls: 'happt', date: a.date, go: `go('#health/${a.person.id}/${a.item.id}')`, ic: 'health', icon: HEALTH_ICON[a.item.kind] || 'medkit',
+      kind: 'health', name: `${attWhen(d)}: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`, html: attRow({ wx: 1, kind: 'health', cls: 'happt', date: a.date, go: `go('#health/${a.person.id}/${a.item.id}')`, ic: 'health', icon: HEALTH_ICON[a.item.kind] || 'medkit',
         title: `${attWhen(d)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`, sub: `Health appointment · ${a.item.clinic ? esc(a.item.clinic) + ' · ' : ''}${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; })),
   // Gardening (1.20.0): other jobs for the next 14 days, not marked done, and not once the day has passed.
   // Feeding jobs (1.61.0) stay on Home and in Upcoming on the day they are due, and after that day, until marked done for the year.
   garden: T => {
     const y0 = parseD(todayISO().slice(0, 4) + '-01-01');
-    return gardenJobs(S, y0, T + 14 * DAY).filter(j => !j.done && (gardenIsFeed(j) ? j.days <= 14 : j.days >= 0 && j.days <= 14)).map(j => ({ days: j.days, rank: 0, sort: j.title,
+    return gardenJobs(S, y0, T + 14 * DAY).filter(j => !j.done && (gardenIsFeed(j) ? j.days <= 14 : j.days >= 0 && j.days <= 14)).map(j => ({ days: j.days, rank: 0, sort: j.title, kind: 'garden', name: j.title,
       html: attRow({ kind: 'garden', date: j.date, go: `go('#garden/${j.go}')`, ic: 'garden', icon: 'leaf', title: esc(j.title),
         sub: `Garden · ${fmtW(j.date)}`, right: pill(j.days) }) }));
   },
   // Commission tracker set up and nothing entered for yesterday
   comm: T => { if (!CM().anchor) return []; const y = yesterdayISO(); if (commDay(y).length) return [];
-    return [{ days: 0, rank: 0, sort: '', html: attRow({ kind: 'comm', go: `go('#commission/add')`, ic: 'comm', icon: 'cash', title: 'Enter yesterday’s commission', sub: `Commission · nothing entered for ${fmtW(y)} yet` }) }]; }
+    return [{ days: 0, rank: 0, sort: '', kind: 'comm', name: 'Enter yesterday’s commission', html: attRow({ kind: 'comm', go: `go('#commission/add')`, ic: 'comm', icon: 'cash', title: 'Enter yesterday’s commission', sub: `Commission · nothing entered for ${fmtW(y)} yet` }) }]; }
 };
 function homeAttention() {
   const T = todayT(), all = [];
