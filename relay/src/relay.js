@@ -16,7 +16,7 @@
  * itself. Fixed location, no input, kept for 20 minutes.
  * GET /closures: council roadworks/closure notices that mention the lifting bridge on Dave Culham Drive
  * (see closures.js). Fixed source, no input.
- * GET /roadworks: council roading projects marked construction underway (see roadworks.js). Fixed source, no input.
+ * GET /roadworks: council roading projects whose expected start is within the next 12 months (see roadworks.js). Fixed source, no input.
  * POST /videos: search YouTube for one short English topic and return oembed-confirmed videos
  * (see videos.js). The query is the topic only. No arbitrary links. Nothing is stored.
  */

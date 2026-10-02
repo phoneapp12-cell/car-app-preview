@@ -33,9 +33,9 @@ app is stored.
   Open-Meteo directly). One fixed URL, kept for 20 minutes in memory/KV (`weather-v1`, expires after 1 hour).
   Weather data by Open-Meteo.com (CC BY 4.0).
 
-- `GET /roadworks` – council roading projects the [Roading improvements](https://www.wdc.govt.nz/Council/Projects/Roading-improvements) page marks “Construction underway”, as JSON
+- `GET /roadworks` – council roading projects on [Roading improvements](https://www.wdc.govt.nz/Council/Projects/Roading-improvements) with an expected start in the next 12 months (Pacific/Auckland), as JSON
   (`{source, updated, count, projects:[{id,name,detail,full,start,status,url}]}`).
-  The phone cannot read that page (no CORS header). robots.txt allows it. Re-read at most every 3 hours and saved in KV (`wdc-roadworks-v1`). A failed refresh keeps the saved copy. On failure with nothing saved: `502 {"error":"roadworks_unavailable"}`.
+  The phone cannot read that page (no CORS header). robots.txt allows it. Re-read at most every 3 hours and saved in KV (`wdc-roadworks-v2`). A failed refresh keeps the saved copy. On failure with nothing saved: `502 {"error":"roadworks_unavailable"}`.
 
 - `GET /closures` – planned closures that mention the lifting bridge (Te Matau ā Pohe) or Dave Culham Drive, as JSON
   (`{source, updated, count, closures:[{id,title,where,desc,url,dates:[{start,end,time,endTime}]}]}`; finished dates are dropped).

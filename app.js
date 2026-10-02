@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.72.0';
+const APP_VERSION = '1.73.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -510,7 +510,7 @@ function homeOverview(shown) {
     }
     if (wdc.length) {
       const shownNames = wdc.slice(0, 4), more = wdc.length - shownNames.length;
-      bits.push(`Council roadworks underway: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
+      bits.push(`Council projects in the next year: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
     }
   }
   if (shown.has('birthdays')) {
@@ -4506,8 +4506,8 @@ function Weather() {
 /* ================= ROADWORKS (NZTA TREIS open data, near Whangārei) ================= */
 // NZ Transport Agency highway events, the public ArcGIS copy of the TREIS feed.
 // Browser-friendly (CORS). Fixed box around Whangārei. Nothing is invented: an empty list stays empty.
-// 1.71.0: also council projects the roading-improvements page marks "Construction underway".
-// That page sends no CORS header, so it is read through the relay. Design and future rows are left out.
+// 1.73.0: council projects on the roading-improvements page whose expected start is within the next 12 months.
+// That page sends no CORS header, so it is read through the relay. Past starts and anything further than a year out are left out.
 const RW_LAT = -35.7251, RW_LON = 174.3237, RW_KM = 40;
 const RW_MAX_AGE = 20 * 60 * 1000;
 const RW_NZTA = 'https://www.journeys.nzta.govt.nz/';
@@ -4585,10 +4585,31 @@ function rwQuery(layer) {
   });
   return RW_LAYER + layer + '/query?' + q.toString();
 }
+const RW_MONTHS = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+function rwCouncilInYear(start) {
+  const s = String(start || '').replace(/\s+/g, ' ').trim();
+  let day = 0, name, year;
+  let m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (m) { day = +m[1]; name = m[2]; year = +m[3]; }
+  else { m = s.match(/^([A-Za-z]+)\s+(\d{4})$/); if (!m) return false; name = m[1]; year = +m[2]; }
+  const month = RW_MONTHS[name.toLowerCase()];
+  if (!month || year < 1990 || year > 2100 || (day && (day < 1 || day > 31))) return false;
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  const ty = +parts.year, tm = +parts.month, td = +parts.day;
+  if (!ty || !tm || !td) return false;
+  if (day) {
+    const idx = ty * 12 + (tm - 1) + 12, ey = Math.floor(idx / 12), em = (idx % 12) + 1;
+    const dim = new Date(Date.UTC(ey, em, 0)).getUTCDate(), ed = Math.min(td, dim);
+    const key = year * 10000 + month * 100 + day, today = ty * 10000 + tm * 100 + td, end = ey * 10000 + em * 100 + ed;
+    return key >= today && key <= end;
+  }
+  const startIdx = year * 12 + (month - 1), nowIdx = ty * 12 + (tm - 1);
+  return startIdx >= nowIdx && startIdx <= nowIdx + 12;
+}
 function rwCouncilItems(data) {
   const list = data && Array.isArray(data.projects) ? data.projects : null;
   if (!list) return null;
-  return list.filter(p => p && p.name && /^construction underway$/i.test(String(p.status || ''))).map(p => ({
+  return list.filter(p => p && p.name && rwCouncilInYear(p.start)).map(p => ({
     id: 'wdc-' + String(p.id || p.name),
     road: String(p.name),
     start: '', end: '', until: false,
@@ -4643,7 +4664,7 @@ function homeRoadworks() {
     const d = RW.data || {};
     const bits = [];
     if (d.nzta !== false) bits.push('nothing within 40 km of Whangārei on the NZTA list');
-    if (d.council) bits.push('no council project is marked construction underway');
+    if (d.council) bits.push('no council project is due to start in the next 12 months');
     const msg = bits.length ? bits[0][0].toUpperCase() + bits[0].slice(1) + (bits[1] ? ', and ' + bits[1] : '') + '.' : 'Nothing to show right now.';
     return head + `<div class="list" id="homeroadworks"><div class="row"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">No roadworks nearby</div><div class="s">${msg}</div></div></div></div>`;
   }
