@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.65.0';
+const APP_VERSION = '1.66.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4630,6 +4630,9 @@ const TV_CHANNELS = [
   { id: 'sky.504', name: 'TVNZ DUKE +1', feed: 'sky' }
 ];
 const TV_IDS = new Set(TV_CHANNELS.map(c => c.id));
+// Collapsed homepage card: free-to-air plus the main Sky channels. Show more reveals the rest of Sky Starter.
+const TV_HOME_SHORT = new Set(['mjh-tvnz-1', 'mjh-tvnz-2', 'mjh-three', 'sky.4', 'sky.5', 'sky.6', 'sky.11', 'sky.12', 'sky.13']);
+let tvMore = false;
 let TV = null, tvBusy = false, tvFailed = false, tvTimer = null;
 function loadTv() {
   try {
@@ -4808,11 +4811,16 @@ function updTv() {
     render(); if (v) v.scrollTop = top;
   }
 }
+function toggleTvMore() {
+  tvMore = !tvMore;
+  updTv();
+}
 function homeTv() {
   const link = `<a href="${TV_GUIDE}" target="_blank" rel="noopener">Freeview</a> · <a href="${TV_SKY_GUIDE}" target="_blank" rel="noopener">Sky</a>`;
   const head = `<div class="sec">What’s on TV ${link}</div>`;
   const now = Date.now();
-  const rows = TV_CHANNELS.map(ch => {
+  const channels = tvMore ? TV_CHANNELS : TV_CHANNELS.filter(ch => TV_HOME_SHORT.has(ch.id));
+  const rows = channels.map(ch => {
     const data = TV && TV.data;
     const item = tvOn(ch.id, now);
     if (item) {
@@ -4827,7 +4835,8 @@ function homeTv() {
     else if (!seen) sub = ch.feed === 'sky' ? 'Not in the Sky guide.' : 'Couldn’t load the listing.';
     return `<button class="row" onclick="refreshTv(true)"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${esc(ch.name)}</div><div class="s">${esc(sub)}</div></div></button>`;
   });
-  return head + `<div class="list" id="hometv">${rows.join('')}</div>`;
+  const more = `<button class="row" id="tvmore" type="button" aria-expanded="${tvMore ? 'true' : 'false'}" onclick="toggleTvMore()"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${tvMore ? 'Show less' : 'Show more'}</div><div class="s">${tvMore ? 'Main channels only' : 'The rest of Sky Starter'}</div></div></button>`;
+  return head + `<div class="list" id="hometv">${rows.join('')}${more}</div>`;
 }
 
 /* ================= EVENTS (Whangārei District Council "What's On", via the app's service) ================= */
