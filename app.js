@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.75.0';
+const APP_VERSION = '1.76.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3914,7 +3914,7 @@ function More() {
     birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
     ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down',
     videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
-    top40: () => 'Official Top 40 · chart as of 30 Sep 2026'
+    top40: () => 'Official Top 40 · chart as of 3 Oct 2026'
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
     bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
@@ -5132,7 +5132,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-02'
+// VIDEO_LIST_UPDATED = '2026-10-03'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -5152,27 +5152,27 @@ const VIDEOS = [
   { id: 'ohqxP8EEumo', title: 'iPhone 18 Pro Review: All About that Chip', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=ohqxP8EEumo', reason: 'MKBHD’s review of the iPhone 18 Pro and what the new chip changes.' },
   { id: 'zt0JA5rxdfM', title: 'AI Trends 2026: Quantum, Agentic AI & Smarter Automation', channel: 'IBM Technology', category: 'tech', url: 'https://www.youtube.com/watch?v=zt0JA5rxdfM', reason: 'What IBM expects from AI, quantum computing and automation in 2026.' },
   { id: '9OQ5vaYbGV0', title: 'Google’s AI endgame is here… everything you missed at I/O 2026', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=9OQ5vaYbGV0', reason: 'A short recap of what Google showed at I/O 2026.' },
-  { id: 'TbkUKCm3CHQ', title: 'An ex-OpenAI researcher just deleted language from the LLM...', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=TbkUKCm3CHQ', reason: 'A short look at Jev, a new AI model built for fast decisions without chatty answers.' },
+  { id: 'No-JPdFvYWU', title: 'The one OpenAI announcement that can actually make you money...', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=No-JPdFvYWU', reason: 'A short recap of OpenAI DevDay 2026 and the one launch that could earn developers money.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
-  { id: '9LRozsApCWA', title: 'ASUS ZenPower 10050mAh Power Bank - PB Tech Expert Review (90AC00P0-BBT003)', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=9LRozsApCWA', reason: 'PB Tech’s review of a compact ASUS ZenPower power bank.' },
+  { id: 'l7814Pw_eMU', title: 'I Bought The CHEAPEST Gaming PC from Bunnings...', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=l7814Pw_eMU', reason: 'A full look at a budget gaming PC bought from Bunnings in New Zealand.' },
   { id: 'nvFEGPOXXi0', title: 'I Bought An EXPENSIVE Gaming PC from JB Hi-Fi…', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=nvFEGPOXXi0', reason: 'A full look at a high-end gaming PC bought from JB Hi-Fi in New Zealand.' },
   { id: '7xSWkBSLmEM', title: 'I BOUGHT THE CHEAPEST GAMING LAPTOP FROM JB HI-FI 😭🫣', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=7xSWkBSLmEM', reason: 'A hands-on look at a cheap gaming laptop from JB Hi-Fi in New Zealand.' },
   { id: 'jkAKY0Gic3E', title: 'How to plant citrus: The Ian Tolley Way', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=jkAKY0Gic3E', reason: 'How to plant citrus trees and pick the right rootstock for the soil.' },
-  { id: 'rlO4Zqw-6WQ', title: 'How to Fertilize Citrus Trees', channel: 'UC Santa Cruz Center for Agroecology', category: 'garden', url: 'https://www.youtube.com/watch?v=rlO4Zqw-6WQ', reason: 'How and when to fertilise citrus trees as spring growth starts.' },
+  { id: 'HBFNA-Evkag', title: 'How To Grow PERFECT Citrus In Containers', channel: 'Epic Gardening', category: 'garden', url: 'https://www.youtube.com/watch?v=HBFNA-Evkag', reason: 'How to grow citrus in containers, useful for a New Zealand spring garden.' },
   { id: 'stw9KEpSNEg', title: 'Growing Strawberries In Pots Or Containers!', channel: 'The Ripe Tomato Farms', category: 'garden', url: 'https://www.youtube.com/watch?v=stw9KEpSNEg', reason: 'How to grow strawberries in pots or containers.' },
-  { id: '9UhNYzdZNb8', title: 'Tomato growing tips and testing your tomato knowledge | Gardening 101 | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=9UhNYzdZNb8', reason: 'Tomato growing tips for spring planting, from Gardening Australia.' },
+  { id: '5XXwMdPRhbw', title: "21 Tomatoes We're Planting This Year", channel: 'Epic Gardening', category: 'garden', url: 'https://www.youtube.com/watch?v=5XXwMdPRhbw', reason: 'Twenty-one tomato varieties to plant this season, for spring planting.' },
   { id: 'jozNEpY8iik', title: 'How to Plan Your Week Effectively', channel: 'The Art of Improvement', category: 'time', url: 'https://www.youtube.com/watch?v=jozNEpY8iik', reason: 'A simple way to plan the week so the important jobs get a time.' },
   { id: 'n3kNlFMXslo', title: 'How to gain control of your free time | Laura Vanderkam | TED', channel: 'TED', category: 'time', url: 'https://www.youtube.com/watch?v=n3kNlFMXslo', reason: 'Laura Vanderkam on making room in a busy week for what matters.' },
   { id: 'NL2Vq32jyeo', title: '8 Simple Habits That Save Me 20+ Hours a Week', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=NL2Vq32jyeo', reason: 'Eight simple habits that free up more time in the week.' },
-  { id: 'iDbdXTMnOmE', title: 'How to manage your time more effectively (according to machines) - Brian Christian', channel: 'TED-Ed', category: 'time', url: 'https://www.youtube.com/watch?v=iDbdXTMnOmE', reason: 'A short lesson on managing time the way computers schedule work.' },
+  { id: 'WONRS7BLh4g', title: 'How To Actually Achieve Your Goals in 2026 (Evidence-Based)', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=WONRS7BLh4g', reason: 'Evidence-based ways to set and actually hit goals for the year.' },
   { id: 'MkfYM6oiLMo', title: 'Easy Gluten-Free Chicken Piccata In Just 20 Minutes!', channel: 'Matthew Augusta', category: 'cook', url: 'https://www.youtube.com/watch?v=MkfYM6oiLMo', reason: 'A gluten-free chicken piccata you can cook in about 20 minutes.' },
   { id: '20MqQoe8rtA', title: "Becky Excell's Air Fryer Creamy Cheesy Stuffed Chicken", channel: 'Coeliac UK', category: 'cook', url: 'https://www.youtube.com/watch?v=20MqQoe8rtA', reason: 'Becky Excell’s gluten-free air-fryer creamy cheesy stuffed chicken.' },
   { id: 'pXslUEvVXoc', title: 'One Pan Chicken Marsala (Dairy Free & Gluten Free) | Giada De Laurentiis', channel: 'Giada De Laurentiis', category: 'cook', url: 'https://www.youtube.com/watch?v=pXslUEvVXoc', reason: 'A one-pan gluten-free chicken marsala for a weeknight dinner.' },
-  { id: 'YK90uKtx8pQ', title: 'Gluten Free Sticky Coconut Chicken and Rice (dairy free)', channel: 'kayla cappiello', category: 'cook', url: 'https://www.youtube.com/watch?v=YK90uKtx8pQ', reason: 'A one-pot gluten-free sticky coconut chicken and rice for dinner.' },
+  { id: 'eMQ1LcUm-n4', title: '30 Days of Budget Meals 💕 Day 9 - Creamy Chicken Tomato Pasta - an easy gluten free recipe', channel: 'Becky Excell', category: 'cook', url: 'https://www.youtube.com/watch?v=eMQ1LcUm-n4', reason: 'Becky Excell’s creamy gluten-free chicken tomato pasta for a budget dinner.' },
   { id: 'LBpkMqVOJmk', title: 'Home Remodeling Tips For Beginners - The Family Room Remodel Part 1', channel: 'JFKreations', category: 'reno', url: 'https://www.youtube.com/watch?v=LBpkMqVOJmk', reason: 'Beginner tips for remodelling a family room, from the start of the job.' },
   { id: 'CRXCB_3gLok', title: 'How to Paint a Room - Basic Painting Tips', channel: 'Lowe\'s Home Improvement', category: 'reno', url: 'https://www.youtube.com/watch?v=CRXCB_3gLok', reason: 'The basic steps for painting a room.' },
   { id: 'ZcilSwuaHog', title: 'How to Renovate a Living Room - D.I.Y. At Bunnings', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=ZcilSwuaHog', reason: 'How to renovate a living room, shown with materials from Bunnings.' },
-  { id: 'xNEiUeGfOv0', title: 'How To Paint Concrete Floors - Bunnings Warehouse', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=xNEiUeGfOv0', reason: 'How to paint a concrete floor, shown with materials from Bunnings.' },
+  { id: 'kbocoSRrVOI', title: 'How To Install Plasterboard - Bunnings Warehouse', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=kbocoSRrVOI', reason: 'How to install plasterboard, shown with materials from Bunnings.' },
   { id: 'HJZXHfs0fgA', title: 'How To Maintain Your Car For Beginners | The Ultimate Guide to Making Your Car Last Longer', channel: 'The Car Care Nut', category: 'cars', url: 'https://www.youtube.com/watch?v=HJZXHfs0fgA', reason: 'A beginner’s guide to the checks that help a car last.' },
   { id: '25-HG471MIc', title: 'A Mechanics Guide To Maintaining Your Car', channel: 'EricTheCarGuy', category: 'cars', url: 'https://www.youtube.com/watch?v=25-HG471MIc', reason: 'A mechanic’s walk-through of routine car maintenance.' },
   { id: 'CY1MLjYOf1o', title: 'Top tips to passing your WoF', channel: 'VTNZ', category: 'cars', url: 'https://www.youtube.com/watch?v=CY1MLjYOf1o', reason: 'VTNZ’s tips for getting a car through its Warrant of Fitness.' },
@@ -5184,58 +5184,58 @@ const VIDEOS = [
   { id: 'nWjBe3P_JiA', title: 'NORTH ISLAND, NEW ZEALAND (2025) | 13 Beautiful Places to Visit on a North Island Road Trip (+ Tips)', channel: 'World Wild Hearts', category: 'travel', url: 'https://www.youtube.com/watch?v=nWjBe3P_JiA', reason: 'Thirteen places to visit on a North Island road trip, with travel tips.' },
   { id: 'XCsMvEMX11Y', title: 'New Zealand -  Watch BEFORE You Go! Essential Travel Tips NZ', channel: 'CJ Explores', category: 'travel', url: 'https://www.youtube.com/watch?v=XCsMvEMX11Y', reason: 'Essential travel tips to watch before a trip to New Zealand.' },
   { id: 'E47FGfv14Mc', title: 'How to Plan a Trip for Solo or Group Travel', channel: 'Brady Skye', category: 'travel', url: 'https://www.youtube.com/watch?v=E47FGfv14Mc', reason: 'How to plan a trip for solo or group travel.' },
-  { id: 'PxDB8a4swb4', title: '9 Things to Do to Plan the PERFECT Trip (Travel 101: Episode 1)', channel: 'Aly Smalls', category: 'travel', url: 'https://www.youtube.com/watch?v=PxDB8a4swb4', reason: 'Nine things to do to plan a trip.' },
+  { id: 'PR0iIva4Ues', title: "You're Planning Trips Wrong (Do This Instead)", channel: 'Away Together w/ Nik and Allie', category: 'travel', url: 'https://www.youtube.com/watch?v=PR0iIva4Ues', reason: 'A clearer way to plan trips than packing the schedule full.' },
   { id: 'zMH61Yabdj0', title: 'How to Repair a Leaking Faucet | This Old House', channel: 'This Old House', category: 'diy', url: 'https://www.youtube.com/watch?v=zMH61Yabdj0', reason: 'How to stop a tap from leaking.' },
   { id: 'PLGmTzEGSIY', title: 'How to Patch a Drywall Hole | Ask This Old House', channel: 'This Old House', category: 'diy', url: 'https://www.youtube.com/watch?v=PLGmTzEGSIY', reason: 'How to patch small, medium and large holes in a wall.' },
-  { id: 'qbupCzSPW9o', title: 'How to Patch Small Holes in Walls | Ask This Old House', channel: 'This Old House', category: 'diy', url: 'https://www.youtube.com/watch?v=qbupCzSPW9o', reason: 'A quick way to fill small holes left by nails and screws.' },
+  { id: '3-zmU6upbUo', title: 'How to Understand Two-Prong Outlets | Ask This Old House', channel: 'This Old House', category: 'diy', url: 'https://www.youtube.com/watch?v=3-zmU6upbUo', reason: 'What two-prong outlets mean and when they need updating.' },
   { id: 'cWmb1D4Wciw', title: 'DIY Floating Shelves | $15 Per Shelf', channel: 'Nathan Builds', category: 'diy', url: 'https://www.youtube.com/watch?v=cWmb1D4Wciw', reason: 'How to build simple floating shelves from a sheet of plywood.' },
   { id: '4PU336S-fA4', title: 'GREGGS-STYLE! Gluten-free Iced Buns Recipe 🤤 | Baking with Becky', channel: 'Becky Excell', category: 'gf', url: 'https://www.youtube.com/watch?v=4PU336S-fA4', reason: 'Becky Excell’s gluten-free iced buns, baked from scratch.' },
-  { id: 'zFkDZ1ljNC8', title: 'Gluten-Free Basics & Beyond | GF Tips, Ingredient Swaps, Guides, Recipes from America\'s Test Kitchen', channel: "America's Test Kitchen", category: 'gf', url: 'https://www.youtube.com/watch?v=zFkDZ1ljNC8', reason: 'Gluten-free baking and cooking basics from America\'s Test Kitchen.' },
+  { id: 'obvokggK0ag', title: 'The Softest Gluten-Free Sandwich Bread | Easy, Fluffy & Stays Fresh for Days!', channel: 'theloopywhisk', category: 'gf', url: 'https://www.youtube.com/watch?v=obvokggK0ag', reason: 'A soft gluten-free sandwich bread that stays fresh for days.' },
   { id: 'WQyK_jTLMsY', title: '3-Ingredient Gluten-Free Flatbread | Liv Baking', channel: 'Bigger Bolder Baking with Gemma Stafford', category: 'gf', url: 'https://www.youtube.com/watch?v=WQyK_jTLMsY', reason: 'A gluten-free flatbread made with almond flour and tapioca starch.' },
   { id: 'H5gZO37HX0E', title: 'How to Make Gluten Free Banana BREAD (ONE BOWL,  SUGAR FREE, DAIRY FREE OPTION) || How To Coeliac', channel: 'How To Coeliac', category: 'gf', url: 'https://www.youtube.com/watch?v=H5gZO37HX0E', reason: 'A one-bowl gluten-free banana bread.' },
   { id: '8vFGrNjT4P4', title: 'How to make a basic box. And why you need to know how | Woodworking BASICS | Power Tools', channel: 'Steve Ramsey - Woodworking for Mere Mortals', category: 'wood', url: 'https://www.youtube.com/watch?v=8vFGrNjT4P4', reason: 'Why a simple box is the first woodworking project to learn.' },
   { id: 'mvO6zaIUO18', title: 'Beginner\'s guide to pocket hole joinery | WOODWORKING BASICS', channel: 'Steve Ramsey - Woodworking for Mere Mortals', category: 'wood', url: 'https://www.youtube.com/watch?v=mvO6zaIUO18', reason: 'How pocket-hole joints work, for a beginner.' },
   { id: 'T5nt7f8tMXA', title: 'Make this simple patio table with just a miter saw', channel: 'Steve Ramsey - Woodworking for Mere Mortals', category: 'wood', url: 'https://www.youtube.com/watch?v=T5nt7f8tMXA', reason: 'A simple outdoor table you can build with a miter saw.' },
-  { id: 'ZKmtQiKgyFI', title: 'Storage Shelf - Cheap and Easy Build Plans', channel: 'Dave Wirth', category: 'wood', url: 'https://www.youtube.com/watch?v=ZKmtQiKgyFI', reason: 'A cheap storage shelf you can build for a garage or basement.' }
+  { id: 'QLSYADN_BzM', title: "2026 BEGINNERS' GUIDE to the TOOLS and SUPPLIES you need to start a woodworking hobby", channel: 'Steve Ramsey - Woodworking for Mere Mortals', category: 'wood', url: 'https://www.youtube.com/watch?v=QLSYADN_BzM', reason: 'Which tools and supplies a beginner needs to start woodworking in 2026.' }
 ];
 // Extra videos for each category. They stay off the list until a left swipe, then the next one takes that row's place.
 // Every id was confirmed with YouTube oembed. Titles and channels are the oembed text, not written by hand.
 const VIDEO_RESERVE = [
   {"id": "0Rp9KJCEIvg", "title": "The most interesting hack in history just got weirder...", "channel": "Fireship", "category": "tech", "reserve": true, "url": "https://www.youtube.com/watch?v=0Rp9KJCEIvg", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "83TiUbFY6fY", "title": "21 Coolest Tech at CES 2026", "channel": "Cybernews", "category": "tech", "reserve": true, "url": "https://www.youtube.com/watch?v=83TiUbFY6fY", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "TbkUKCm3CHQ", "title": "An ex-OpenAI researcher just deleted language from the LLM...", "channel": "Fireship", "category": "tech", "reserve": true, "url": "https://www.youtube.com/watch?v=TbkUKCm3CHQ", "reason": "Another video from this category, ready when you skip one."},
   {"id": "Fx0x3oI_ngo", "title": "How Expensive is the Fastest PC of 2026?", "channel": "Linus Tech Tips", "category": "tech", "reserve": true, "url": "https://www.youtube.com/watch?v=Fx0x3oI_ngo", "reason": "Another video from this category, ready when you skip one."},
   {"id": "B9UYbXqBnhk", "title": "I Bought The CHEAPEST Gaming PC from PB Tech…", "channel": "TechSauce", "category": "nz", "reserve": true, "url": "https://www.youtube.com/watch?v=B9UYbXqBnhk", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "DD_ECSPFL-A", "title": "Is it worth it? - Cheap 4K on a budget", "channel": "PB Tech", "category": "nz", "reserve": true, "url": "https://www.youtube.com/watch?v=DD_ECSPFL-A", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "N2iC1NpHuNQ", "title": "I Bought an Alienware for 50% Off... WHAT COULD GO WRONG?!", "channel": "TechSauce", "category": "nz", "reserve": true, "url": "https://www.youtube.com/watch?v=N2iC1NpHuNQ", "reason": "Another video from this category, ready when you skip one."},
   {"id": "9FRJbXQciDY", "title": "Is THIS the BEST Budget Gaming Laptop?! 🤔", "channel": "TechSauce", "category": "nz", "reserve": true, "url": "https://www.youtube.com/watch?v=9FRJbXQciDY", "reason": "Another video from this category, ready when you skip one."},
   {"id": "9seQurhbLPM", "title": "EVERYTHING I Wish I Knew When I Started Growing Tomatoes 🍅", "channel": "Epic Gardening", "category": "garden", "reserve": true, "url": "https://www.youtube.com/watch?v=9seQurhbLPM", "reason": "Another video from this category, ready when you skip one."},
   {"id": "LwDmsd-nOrg", "title": "How to Treat Leaf Curl in Peach and Nectarine Trees", "channel": "Urban Farmstead", "category": "garden", "reserve": true, "url": "https://www.youtube.com/watch?v=LwDmsd-nOrg", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "HBFNA-Evkag", "title": "How To Grow PERFECT Citrus In Containers", "channel": "Epic Gardening", "category": "garden", "reserve": true, "url": "https://www.youtube.com/watch?v=HBFNA-Evkag", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "sZyDy69JK6M", "title": "How to Plan for a Productive Week | Christian Productivity", "channel": "Redeeming Productivity", "category": "time", "reserve": true, "url": "https://www.youtube.com/watch?v=sZyDy69JK6M", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "vMG2FEQG8k0", "title": "How to get the most success from your spring gardening | Gardening 101 | Gardening Australia", "channel": "Gardening Australia", "category": "garden", "reserve": true, "url": "https://www.youtube.com/watch?v=vMG2FEQG8k0", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "iDbdXTMnOmE", "title": "How to manage your time more effectively (according to machines) - Brian Christian", "channel": "TED-Ed", "category": "time", "reserve": true, "url": "https://www.youtube.com/watch?v=iDbdXTMnOmE", "reason": "Another video from this category, ready when you skip one."},
   {"id": "VpN78TXMSUM", "title": "How I Manage My Time - The Triage System", "channel": "Ali Abdaal", "category": "time", "reserve": true, "url": "https://www.youtube.com/watch?v=VpN78TXMSUM", "reason": "Another video from this category, ready when you skip one."},
   {"id": "Y-jbe-je5XM", "title": "How to Actually Stick to Your Schedule (2 Simple Rules)", "channel": "Justin Sung", "category": "time", "reserve": true, "url": "https://www.youtube.com/watch?v=Y-jbe-je5XM", "reason": "Another video from this category, ready when you skip one."},
   {"id": "VrB-Te3PQnE", "title": "Gluten Free Italian Classics | Chicken Marsala & Chicken Parm", "channel": "Giada De Laurentiis", "category": "cook", "reserve": true, "url": "https://www.youtube.com/watch?v=VrB-Te3PQnE", "reason": "Another video from this category, ready when you skip one."},
   {"id": "ClLFs6CcGS0", "title": "Slow Cooker Tuscan Chicken Recipe - a delicious #glutenfree dinner #recipe made in the #slowcooker", "channel": "The Gluten Free Blogger", "category": "cook", "reserve": true, "url": "https://www.youtube.com/watch?v=ClLFs6CcGS0", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "lRH0jNgfkKs", "title": "30-Minute Garlic Sesame Ground Turkey Recipe (Gluten-Free)", "channel": "kayla cappiello", "category": "cook", "reserve": true, "url": "https://www.youtube.com/watch?v=lRH0jNgfkKs", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "RztbzEKrEvc", "title": "One pot dinner recipe (gluten free)", "channel": "kayla cappiello", "category": "cook", "reserve": true, "url": "https://www.youtube.com/watch?v=RztbzEKrEvc", "reason": "Another video from this category, ready when you skip one."},
   {"id": "bLbUIevOxzY", "title": "How To Paint A Room | DIY For Beginners", "channel": "Home RenoVision DIY", "category": "reno", "reserve": true, "url": "https://www.youtube.com/watch?v=bLbUIevOxzY", "reason": "Another video from this category, ready when you skip one."},
   {"id": "L2R0qKAxdzc", "title": "How to Paint a Room for Beginners", "channel": "MrsAshleyFrench", "category": "reno", "reserve": true, "url": "https://www.youtube.com/watch?v=L2R0qKAxdzc", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "pOZFn3kexsc", "title": "Bedroom Makeover - DIY Bedroom Renovation", "channel": "Workin' with Wolkon", "category": "reno", "reserve": true, "url": "https://www.youtube.com/watch?v=pOZFn3kexsc", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "xNEiUeGfOv0", "title": "How To Paint Concrete Floors - Bunnings Warehouse", "channel": "Bunnings Warehouse", "category": "reno", "reserve": true, "url": "https://www.youtube.com/watch?v=xNEiUeGfOv0", "reason": "Another video from this category, ready when you skip one."},
   {"id": "ScIazz59kwo", "title": "Top 5 Car Maintenance Checklist for Beginners | Tips and Tricks to Maintaining your Vehicle", "channel": "Driveology", "category": "cars", "reserve": true, "url": "https://www.youtube.com/watch?v=ScIazz59kwo", "reason": "Another video from this category, ready when you skip one."},
   {"id": "rXNJs4xPY5I", "title": "How To Learn To Fix Cars (Beginner’s Guide)", "channel": "Lucky Seven Flips", "category": "cars", "reserve": true, "url": "https://www.youtube.com/watch?v=rXNJs4xPY5I", "reason": "Another video from this category, ready when you skip one."},
   {"id": "u6FY_X12Bqo", "title": "Car Maintenance MOST People Ignore! Make Your Engine Last 200,000+ Miles!", "channel": "The Car Guy Online", "category": "cars", "reserve": true, "url": "https://www.youtube.com/watch?v=u6FY_X12Bqo", "reason": "Another video from this category, ready when you skip one."},
   {"id": "peUVLEUj-AM", "title": "OWNING A DOG | Things to Know Before Getting a Puppy! | Doctor Mike", "channel": "Doctor Mike", "category": "pets", "reserve": true, "url": "https://www.youtube.com/watch?v=peUVLEUj-AM", "reason": "Another video from this category, ready when you skip one."},
   {"id": "03XSrxEGPYs", "title": "YOU’RE DOING CAT LITTER WRONG & Here’s Why!", "channel": "Jackson Galaxy", "category": "pets", "reserve": true, "url": "https://www.youtube.com/watch?v=03XSrxEGPYs", "reason": "Another video from this category, ready when you skip one."},
   {"id": "sctuy_arPMg", "title": "10 Things I Wish I Knew Before Adopting A Cat", "channel": "Jackson Galaxy", "category": "pets", "reserve": true, "url": "https://www.youtube.com/watch?v=sctuy_arPMg", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "PR0iIva4Ues", "title": "You're Planning Trips Wrong (Do This Instead)", "channel": "Away Together w/ Nik and Allie", "category": "travel", "reserve": true, "url": "https://www.youtube.com/watch?v=PR0iIva4Ues", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "PxDB8a4swb4", "title": "9 Things to Do to Plan the PERFECT Trip (Travel 101: Episode 1)", "channel": "Aly Smalls", "category": "travel", "reserve": true, "url": "https://www.youtube.com/watch?v=PxDB8a4swb4", "reason": "Another video from this category, ready when you skip one."},
   {"id": "DS3qVi8p_e4", "title": "How to Make a Travel Budget", "channel": "Wolters World", "category": "travel", "reserve": true, "url": "https://www.youtube.com/watch?v=DS3qVi8p_e4", "reason": "Another video from this category, ready when you skip one."},
   {"id": "H0wGjEUDkQ4", "title": "Explore Paihia & Russell: Gateway to New Zealand’s Bay of Islands | New Zealand Travel Guide", "channel": "OziTraveler", "category": "travel", "reserve": true, "url": "https://www.youtube.com/watch?v=H0wGjEUDkQ4", "reason": "Another video from this category, ready when you skip one."},
   {"id": "taO2_XYX4M4", "title": "10 HOME RENOVATION TIPS for DIYers & Beginners *What I Wish I Knew Before* | XO, MaCenna", "channel": "XO, MaCenna", "category": "diy", "reserve": true, "url": "https://www.youtube.com/watch?v=taO2_XYX4M4", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "4GvI55Of41M", "title": "20 Commonly Forgotten Home Maintenance Tasks", "channel": "Specific Love Creations", "category": "diy", "reserve": true, "url": "https://www.youtube.com/watch?v=4GvI55Of41M", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "qbupCzSPW9o", "title": "How to Patch Small Holes in Walls | Ask This Old House", "channel": "This Old House", "category": "diy", "reserve": true, "url": "https://www.youtube.com/watch?v=qbupCzSPW9o", "reason": "Another video from this category, ready when you skip one."},
   {"id": "xOiXbP5QIrM", "title": "DIY Home Upgrades that You WON'T REGRET! ✨ BIG Impact on a SMALL Budget", "channel": "Living with LK", "category": "diy", "reserve": true, "url": "https://www.youtube.com/watch?v=xOiXbP5QIrM", "reason": "Another video from this category, ready when you skip one."},
   {"id": "LgR1OxUdbxg", "title": "BUTTERY GLUTEN FREE BREAD | King Arthur Gluten Free Bread Flour Recipe", "channel": "SavorySaver", "category": "gf", "reserve": true, "url": "https://www.youtube.com/watch?v=LgR1OxUdbxg", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "CZhMCVFTz6c", "title": "How to Make the Best Gluten-free Bread | Easy Gluten-free Sandwich Bread Recipe", "channel": "fitfoodieselma", "category": "gf", "reserve": true, "url": "https://www.youtube.com/watch?v=CZhMCVFTz6c", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "zFkDZ1ljNC8", "title": "Gluten-Free Basics & Beyond | GF Tips, Ingredient Swaps, Guides, Recipes from America's Test Kitchen", "channel": "America's Test Kitchen", "category": "gf", "reserve": true, "url": "https://www.youtube.com/watch?v=zFkDZ1ljNC8", "reason": "Another video from this category, ready when you skip one."},
   {"id": "9e4F2DXNYV8", "title": "NEVER FAILS! Gluten-free Scones Recipe ✅ | Baking with Becky", "channel": "Becky Excell", "category": "gf", "reserve": true, "url": "https://www.youtube.com/watch?v=9e4F2DXNYV8", "reason": "Another video from this category, ready when you skip one."},
   {"id": "GeH-QUwdeic", "title": "BEST First Woodworking Project for Beginners", "channel": "YouCanMakeThisToo", "category": "wood", "reserve": true, "url": "https://www.youtube.com/watch?v=GeH-QUwdeic", "reason": "Another video from this category, ready when you skip one."},
-  {"id": "RLaqxMZ3cEw", "title": "5 Easy Woodworking Projects With Real Demand You Can Sell This Month", "channel": "Artisan Workshop", "category": "wood", "reserve": true, "url": "https://www.youtube.com/watch?v=RLaqxMZ3cEw", "reason": "Another video from this category, ready when you skip one."},
+  {"id": "ZKmtQiKgyFI", "title": "Storage Shelf - Cheap and Easy Build Plans", "channel": "Dave Wirth", "category": "wood", "reserve": true, "url": "https://www.youtube.com/watch?v=ZKmtQiKgyFI", "reason": "Another video from this category, ready when you skip one."},
   {"id": "Xv_YNpLiODA", "title": "3 EASY Woodworking Projects That Sell Or Make AMAZING Gifts", "channel": "Knot Just Wood", "category": "wood", "reserve": true, "url": "https://www.youtube.com/watch?v=Xv_YNpLiODA", "reason": "Another video from this category, ready when you skip one."},
 ];
 
@@ -5437,7 +5437,26 @@ function videoReason(v) {
 // Publish dates read from each video's YouTube watch page (publishDate). oEmbed does not include a date.
 // Stored here so the phone shows a real date and does not look it up again on every tap.
 const VIDEO_DATES = {
-  // 2 Oct 2026 list. Dates are the publishDate on each video's YouTube watch page.
+  // 3 Oct 2026 list. Dates are the publishDate on each video's YouTube watch page.
+  '6Db-cEgbmC4': '2026-06-26',
+  '2f4gu97XWFg': '2026-04-23',
+  'lrS1LC2cu-U': '2025-09-25',
+  'kXOKQCtttbw': '2026-09-25',
+  'tZnNLoPKriU': '2026-09-25',
+  'jfVVXYTZykw': '2026-09-25',
+  'mw3kSNIxjqo': '2026-09-29',
+  'RztbzEKrEvc': '2024-09-29',
+  'vMG2FEQG8k0': '2021-09-04',
+  'N2iC1NpHuNQ': '2026-02-15',
+  'QLSYADN_BzM': '2026-04-15',
+  'obvokggK0ag': '2025-03-10',
+  '3-zmU6upbUo': '2021-10-06',
+  'kbocoSRrVOI': '2025-10-14',
+  'eMQ1LcUm-n4': '2025-01-22',
+  'WONRS7BLh4g': '2024-12-20',
+  '5XXwMdPRhbw': '2026-03-12',
+  'l7814Pw_eMU': '2026-01-31',
+  'No-JPdFvYWU': '2026-10-01',
   'ohqxP8EEumo': '2026-09-16',
   'TbkUKCm3CHQ': '2026-09-21',
   '9LRozsApCWA': '2015-09-08',
@@ -5871,45 +5890,50 @@ function Videos() {
 
 
 /* ================= TOP 40 ================= */
-// New Zealand Official Top 40 singles, chart week 25 September to 1 October 2026.
+// New Zealand Official Top 40 singles, chart week 2 October to 8 October 2026.
 // Listed as of this date. Only songs with an official video that resolved on YouTube.
-const TOP40_UPDATED = '2026-09-30';
+const TOP40_UPDATED = '2026-10-03';
 const TOP40 = [
-  { rank: 1, id: 'nUsrYVxrDwI', title: "Choosin' Texas", artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=nUsrYVxrDwI' },
-  { rank: 2, id: '3triLkS0nq4', title: 'Rein Me In', artist: 'Sam Fender feat. Olivia Dean', url: 'https://www.youtube.com/watch?v=3triLkS0nq4' },
+  { rank: 1, id: 'mw3kSNIxjqo', title: 'Patient Zero', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=mw3kSNIxjqo' },
+  { rank: 2, id: 'nUsrYVxrDwI', title: "Choosin' Texas", artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=nUsrYVxrDwI' },
   { rank: 3, id: 'oIv_Y2RPQ_A', title: 'Man I Need', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=oIv_Y2RPQ_A' },
-  { rank: 4, id: '3sB4Iv_tM7U', title: 'Nicole Kidman', artist: 'ADÉLA', url: 'https://www.youtube.com/watch?v=3sB4Iv_tM7U' },
-  { rank: 5, id: '0ijm2Xui5N8', title: "Ain't In LA", artist: 'ADÉLA', url: 'https://www.youtube.com/watch?v=0ijm2Xui5N8' },
-  { rank: 6, id: '3sur4BmjQt8', title: 'So Easy (To Fall In Love)', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=3sur4BmjQt8' },
-  { rank: 7, id: 'B452TVVco2Q', title: 'Great Expectation', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=B452TVVco2Q' },
-  { rank: 8, id: 'Xh0GyxWgKPs', title: 'Boston', artist: 'Stella Lefty', url: 'https://www.youtube.com/watch?v=Xh0GyxWgKPs' },
-  { rank: 10, id: 'VI0NDsh2b8k', title: 'Nice To Each Other', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=VI0NDsh2b8k' },
-  { rank: 11, id: 'mh4AQkw4Jjc', title: 'Self Aware', artist: 'Temper City', url: 'https://www.youtube.com/watch?v=mh4AQkw4Jjc' },
-  { rank: 12, id: 'B402rKl4bUg', title: 'The Cure', artist: 'Olivia Rodrigo', url: 'https://www.youtube.com/watch?v=B402rKl4bUg' },
-  { rank: 13, id: 'Rt9tW3cMLhI', title: 'stupid song', artist: 'Olivia Rodrigo', url: 'https://www.youtube.com/watch?v=Rt9tW3cMLhI' },
-  { rank: 14, id: 'SenovvZlWIA', title: 'No Broke Boys', artist: 'Tinashe and Disco Lines', url: 'https://www.youtube.com/watch?v=SenovvZlWIA' },
-  { rank: 15, id: 's3a4OQR-10M', title: 'Loser', artist: 'Tame Impala', url: 'https://www.youtube.com/watch?v=s3a4OQR-10M' },
-  { rank: 16, id: 'DLV8FpyxZPQ', title: 'Stop The Wedding!', artist: 'Ashe', url: 'https://www.youtube.com/watch?v=DLV8FpyxZPQ' },
-  { rank: 17, id: 'mrV8kK5t0V8', title: 'I Just Might', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=mrV8kK5t0V8' },
-  { rank: 18, id: 'n7QlUH0zrPg', title: "Movin' To The Sun", artist: 'HUGEL, Imael Angel and Ultra Naté', url: 'https://www.youtube.com/watch?v=n7QlUH0zrPg' },
-  { rank: 19, id: 'Dg47eNL_Usw', title: 'Be Her', artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=Dg47eNL_Usw' },
-  { rank: 20, id: 'lY5V4hSLWY8', title: 'Risk It All', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=lY5V4hSLWY8' },
-  { rank: 21, id: 'ofywN3NgGqY', title: "My Body Isn't Ready", artist: 'sombr', url: 'https://www.youtube.com/watch?v=ofywN3NgGqY' },
-  { rank: 22, id: 'EZOiy1-cnxM', title: 'Material Lover', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=EZOiy1-cnxM' },
-  { rank: 23, id: 'FOJ4A4wixDg', title: 'bloodstream', artist: 'Alyssa Grace', url: 'https://www.youtube.com/watch?v=FOJ4A4wixDg' },
-  { rank: 24, id: 'ko70cExuzZM', title: 'The Fate Of Ophelia', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=ko70cExuzZM' },
-  { rank: 25, id: 'rK5TyISxZ_M', title: 'WHERE IS MY HUSBAND!', artist: 'RAYE', url: 'https://www.youtube.com/watch?v=rK5TyISxZ_M' },
-  { rank: 26, id: 'mQezde_qeXw', title: 'Homewrecker', artist: 'sombr', url: 'https://www.youtube.com/watch?v=mQezde_qeXw' },
-  { rank: 27, id: 'c8zq4kAn_O0', title: 'back to friends', artist: 'sombr', url: 'https://www.youtube.com/watch?v=c8zq4kAn_O0' },
-  { rank: 28, id: 'Y4AgCABdZ3Y', title: 'iloveitiloveitiloveit', artist: 'Bella Kay', url: 'https://www.youtube.com/watch?v=Y4AgCABdZ3Y' },
+  { rank: 4, id: '3triLkS0nq4', title: 'Rein Me In', artist: 'Sam Fender feat. Olivia Dean', url: 'https://www.youtube.com/watch?v=3triLkS0nq4' },
+  { rank: 5, id: '3sB4Iv_tM7U', title: 'Nicole Kidman', artist: 'ADÉLA', url: 'https://www.youtube.com/watch?v=3sB4Iv_tM7U' },
+  { rank: 6, id: 'jfVVXYTZykw', title: 'Cleveland!', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=jfVVXYTZykw' },
+  { rank: 7, id: 'tZnNLoPKriU', title: 'Babylon', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=tZnNLoPKriU' },
+  { rank: 8, id: 'kXOKQCtttbw', title: 'Pink Clouding', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=kXOKQCtttbw' },
+  { rank: 9, id: '0ijm2Xui5N8', title: "Ain't In LA", artist: 'ADÉLA', url: 'https://www.youtube.com/watch?v=0ijm2Xui5N8' },
+  { rank: 10, id: 'B452TVVco2Q', title: 'Great Expectation', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=B452TVVco2Q' },
+  { rank: 11, id: '3sur4BmjQt8', title: 'So Easy (To Fall In Love)', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=3sur4BmjQt8' },
+  { rank: 12, id: 'Xh0GyxWgKPs', title: 'Boston', artist: 'Stella Lefty', url: 'https://www.youtube.com/watch?v=Xh0GyxWgKPs' },
+  { rank: 13, id: 'ko70cExuzZM', title: 'The Fate Of Ophelia', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=ko70cExuzZM' },
+  { rank: 14, id: 'lrS1LC2cu-U', title: 'A Couple Minutes', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=lrS1LC2cu-U' },
+  { rank: 15, id: 'B402rKl4bUg', title: 'The Cure', artist: 'Olivia Rodrigo', url: 'https://www.youtube.com/watch?v=B402rKl4bUg' },
+  { rank: 16, id: 'Rt9tW3cMLhI', title: 'stupid song', artist: 'Olivia Rodrigo', url: 'https://www.youtube.com/watch?v=Rt9tW3cMLhI' },
+  { rank: 17, id: 'mh4AQkw4Jjc', title: 'Self Aware', artist: 'Temper City', url: 'https://www.youtube.com/watch?v=mh4AQkw4Jjc' },
+  { rank: 18, id: 'VI0NDsh2b8k', title: 'Nice To Each Other', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=VI0NDsh2b8k' },
+  { rank: 19, id: 's3a4OQR-10M', title: 'Loser', artist: 'Tame Impala', url: 'https://www.youtube.com/watch?v=s3a4OQR-10M' },
+  { rank: 20, id: 'DLV8FpyxZPQ', title: 'Stop The Wedding!', artist: 'Ashe', url: 'https://www.youtube.com/watch?v=DLV8FpyxZPQ' },
+  { rank: 21, id: 'n7QlUH0zrPg', title: "Movin' To The Sun", artist: 'HUGEL, Imael Angel and Ultra Naté', url: 'https://www.youtube.com/watch?v=n7QlUH0zrPg' },
+  { rank: 22, id: 'ofywN3NgGqY', title: "My Body Isn't Ready", artist: 'sombr', url: 'https://www.youtube.com/watch?v=ofywN3NgGqY' },
+  { rank: 23, id: 'Dg47eNL_Usw', title: 'Be Her', artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=Dg47eNL_Usw' },
+  { rank: 24, id: 'rK5TyISxZ_M', title: 'WHERE IS MY HUSBAND!', artist: 'RAYE', url: 'https://www.youtube.com/watch?v=rK5TyISxZ_M' },
+  { rank: 25, id: 'EZOiy1-cnxM', title: 'Material Lover', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=EZOiy1-cnxM' },
+  { rank: 26, id: 'SenovvZlWIA', title: 'No Broke Boys', artist: 'Tinashe and Disco Lines', url: 'https://www.youtube.com/watch?v=SenovvZlWIA' },
+  { rank: 27, id: 'SOJpE1KMUbo', title: 'Raindance', artist: 'Dave feat. Tems', url: 'https://www.youtube.com/watch?v=SOJpE1KMUbo' },
+  { rank: 28, id: 'mQezde_qeXw', title: 'Homewrecker', artist: 'sombr', url: 'https://www.youtube.com/watch?v=mQezde_qeXw' },
   { rank: 29, id: '82-jTNka3uc', title: 'hate that i made you love me', artist: 'Ariana Grande', url: 'https://www.youtube.com/watch?v=82-jTNka3uc' },
-  { rank: 30, id: 'KFMYx1TibeQ', title: 'Folded', artist: 'Kehlani', url: 'https://www.youtube.com/watch?v=KFMYx1TibeQ' },
-  { rank: 31, id: 'hohuFW0zQUw', title: 'Golden', artist: 'KPop Demon Hunters Cast', url: 'https://www.youtube.com/watch?v=hohuFW0zQUw' },
-  { rank: 32, id: 'SOJpE1KMUbo', title: 'Raindance', artist: 'Dave feat. Tems', url: 'https://www.youtube.com/watch?v=SOJpE1KMUbo' },
-  { rank: 33, id: 'uvY8fdgezLQ', title: 'Midnight Sun', artist: 'Zara Larsson', url: 'https://www.youtube.com/watch?v=uvY8fdgezLQ' },
-  { rank: 35, id: '5RNy_1odv20', title: 'Die On This Hill', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=5RNy_1odv20' },
-  { rank: 36, id: 'cZgUiR31m-Y', title: '12 To 12', artist: 'sombr', url: 'https://www.youtube.com/watch?v=cZgUiR31m-Y' },
-  { rank: 38, id: 'Pz-SZlU4C10', title: 'Noble', artist: 'F3miii', url: 'https://www.youtube.com/watch?v=Pz-SZlU4C10' }
+  { rank: 30, id: 'uvY8fdgezLQ', title: 'Midnight Sun', artist: 'Zara Larsson', url: 'https://www.youtube.com/watch?v=uvY8fdgezLQ' },
+  { rank: 31, id: 'mrV8kK5t0V8', title: 'I Just Might', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=mrV8kK5t0V8' },
+  { rank: 32, id: 'c8zq4kAn_O0', title: 'back to friends', artist: 'sombr', url: 'https://www.youtube.com/watch?v=c8zq4kAn_O0' },
+  { rank: 33, id: '2f4gu97XWFg', title: 'Willing And Able', artist: 'Noah Kahan', url: 'https://www.youtube.com/watch?v=2f4gu97XWFg' },
+  { rank: 34, id: 'hohuFW0zQUw', title: 'Golden', artist: 'KPop Demon Hunters Cast', url: 'https://www.youtube.com/watch?v=hohuFW0zQUw' },
+  { rank: 35, id: 'FOJ4A4wixDg', title: 'bloodstream', artist: 'Alyssa Grace', url: 'https://www.youtube.com/watch?v=FOJ4A4wixDg' },
+  { rank: 36, id: '5RNy_1odv20', title: 'Die On This Hill', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=5RNy_1odv20' },
+  { rank: 37, id: '6Db-cEgbmC4', title: 'Mi Chico', artist: 'DJ Goja', url: 'https://www.youtube.com/watch?v=6Db-cEgbmC4' },
+  { rank: 38, id: 'KFMYx1TibeQ', title: 'Folded', artist: 'Kehlani', url: 'https://www.youtube.com/watch?v=KFMYx1TibeQ' },
+  { rank: 39, id: 'lY5V4hSLWY8', title: 'Risk It All', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=lY5V4hSLWY8' },
+  { rank: 40, id: 'Y4AgCABdZ3Y', title: 'iloveitiloveitiloveit', artist: 'Bella Kay', url: 'https://www.youtube.com/watch?v=Y4AgCABdZ3Y' }
 ];
 function top40Row(v) {
   const reason = (v.reason || '').trim() || ('Official video for ' + v.title + ' by ' + v.artist + '.');
@@ -5923,7 +5947,7 @@ function Top40() {
   return header('Top 40', 'Current chart music videos') +
     `<div class="top40bar" id="top40bar"><button type="button" class="btn primary" id="top40surprise" onclick="surpriseTop40()">${I('shuffle')} Surprise me</button></div>` +
     `<div class="list" id="top40list">${TOP40.map(top40Row).join('')}</div>` +
-    `<div class="foot">Chart as of 30 Sep 2026. New Zealand Official Top 40 singles, 25 September to 1 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it in that row. Tap a song to play it in the picture beside the description.</div>`;
+    `<div class="foot">Chart as of 3 Oct 2026. New Zealand Official Top 40 singles, 2 October to 8 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it in that row. Tap a song to play it in the picture beside the description.</div>`;
 }
 let top40SurpriseToken = 0;
 function surpriseTop40() {
