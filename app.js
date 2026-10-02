@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.62.0';
+const APP_VERSION = '1.63.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -263,6 +263,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   bridge: ['bridge', 'br', 'Lifting bridge', 'Lift times and closures when you’re nearby or it matters', 1],
   weather: ['cloudsun', 'appt', 'Weather', 'Whangārei weather today', 1],
   roadworks: ['wrench', 'rw', 'Roadworks', 'Upcoming roadworks near Whangārei', 1],
+  tv: ['tv', 'tv', 'What’s on TV', 'TVNZ 1, TVNZ 2 and Three, right now', 1],
   holidays: ['flag', 'hol', 'Public holidays', 'The next public holiday when it’s close', 1],
   meals: ['meal', 'meal', 'Upcoming meals', 'Your planned cooking nights', 1],
   shopping: ['cart', 'shop', 'Shopping list', 'Things still to get, with a tick button', 1],
@@ -313,6 +314,7 @@ const HOME_CARD = {
   bridge: () => { const br = brOnHome(); return br === 'card' ? brCard() : br === 'line' ? brLine() : ''; },
   weather: () => wxCard(),
   roadworks: () => homeRoadworks(),
+  tv: () => homeTv(),
   holidays: () => homeHolidays(),
   meals: () => homeMeal(),
   shopping: () => homeShop(),
@@ -4488,6 +4490,130 @@ function homeRoadworks() {
   return head + `<div class="list" id="homeroadworks">${items.map(w => `<a class="row" href="${RW_NZTA}" target="_blank" rel="noopener"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(w.road)}</div><div class="s">${esc(rwWhen(w))}</div></div></a>`).join('')}</div>`;
 }
 
+/* ================= TV (TVNZ 1, TVNZ 2, Three — NZ Freeview listings) ================= */
+// Public Freeview EPG (Matt Huisman, i.mjh.nz). CORS is open. Titles come only from that file.
+// Nothing is invented: a channel with no current programme, or a failed fetch, says so.
+const TV_EPG = 'https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master/nz/epg.xml.gz';
+const TV_GUIDE = 'https://freeviewnz.tv/whats-on/tv-guide/';
+const TV_CHANNELS = [
+  { id: 'mjh-tvnz-1', name: 'TVNZ 1' },
+  { id: 'mjh-tvnz-2', name: 'TVNZ 2' },
+  { id: 'mjh-three', name: 'Three' }
+];
+const TV_IDS = new Set(TV_CHANNELS.map(c => c.id));
+let TV = null, tvBusy = false, tvFailed = false, tvTimer = null;
+function loadTv() {
+  try {
+    const r = JSON.parse(localStorage.getItem('tv') || 'null');
+    TV = r && r.at && r.data && r.data.now && typeof r.data.now === 'object' ? r : null;
+  } catch (e) { TV = null; }
+}
+function tvUnesc(s) {
+  return String(s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch (e) { return ''; } })
+    .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(+n); } catch (e) { return ''; } })
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+function tvStamp(s) {
+  const d = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-])(\d{2})(\d{2})?/.exec(String(s || '').trim());
+  if (!d) return null;
+  const utc = Date.UTC(+d[1], +d[2] - 1, +d[3], +d[4], +d[5], +d[6]);
+  const off = (d[7] === '-' ? -1 : 1) * ((+d[8]) * 60 + (+d[9] || 0)) * 60000;
+  const ms = utc - off;
+  return Number.isFinite(ms) ? ms : null;
+}
+function tvParse(xml, now) {
+  const nowMap = {}, seen = {};
+  const re = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/g;
+  let m;
+  while ((m = re.exec(xml))) {
+    const ch = /\bchannel="([^"]+)"/.exec(m[1]);
+    if (!ch || !TV_IDS.has(ch[1])) continue;
+    seen[ch[1]] = true;
+    const start = tvStamp((/\bstart="([^"]+)"/.exec(m[1]) || [])[1]);
+    const until = tvStamp((/\bstop="([^"]+)"/.exec(m[1]) || [])[1]);
+    if (start == null || until == null || now < start || now >= until) continue;
+    const titleM = /<title\b[^>]*>([\s\S]*?)<\/title>/.exec(m[2]);
+    const title = titleM ? tvUnesc(titleM[1]).replace(/\s+/g, ' ').trim() : '';
+    if (!title) continue;
+    nowMap[ch[1]] = { title, start, until };
+  }
+  return { now: nowMap, seen };
+}
+function tvClock(ms) {
+  return new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
+}
+function tvStillOn(item, now) {
+  return !!(item && item.title && item.until > now && item.start <= now);
+}
+function scheduleTvRefresh() {
+  if (tvTimer) { clearTimeout(tvTimer); tvTimer = null; }
+  const now = Date.now();
+  const ends = TV_CHANNELS.map(c => TV && TV.data && TV.data.now && TV.data.now[c.id]).filter(x => tvStillOn(x, now)).map(x => x.until);
+  if (!ends.length) return;
+  const wait = Math.min(Math.max(1500, Math.min.apply(null, ends) - now + 1000), 6 * 3600 * 1000);
+  tvTimer = setTimeout(() => { tvTimer = null; refreshTv(true); }, wait);
+}
+async function refreshTv(force = false) {
+  const now = Date.now();
+  const fresh = TV && TV.data && now - TV.at < 45000 && TV_CHANNELS.every(c => {
+    const item = TV.data.now && TV.data.now[c.id];
+    const seen = TV.data.seen && TV.data.seen[c.id];
+    if (!seen) return false;
+    if (!tvStillOn(item, now)) return !item;
+    return item.until - now > 45000;
+  });
+  if (tvBusy || (!force && fresh)) return;
+  tvBusy = true; if (force) updTv();
+  let parsed = null;
+  try {
+    if (typeof DecompressionStream !== 'function') throw new Error('gzip');
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 20000);
+    let res;
+    try { res = await fetch(TV_EPG, { signal: ctl.signal, cache: 'no-store' }); }
+    finally { clearTimeout(timer); }
+    if (!res.ok) throw new Error('http ' + res.status);
+    const buf = await res.arrayBuffer();
+    const text = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    parsed = tvParse(text, Date.now());
+  } catch (e) { parsed = null; }
+  tvBusy = false;
+  if (parsed) {
+    TV = { at: Date.now(), data: parsed };
+    tvFailed = false;
+    try { localStorage.setItem('tv', JSON.stringify(TV)); } catch (e) { }
+  } else tvFailed = true;
+  scheduleTvRefresh();
+  updTv();
+}
+function updTv() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  if ((h === 'home' || h === '') && !homeEdit) {
+    const v = $('#view'), top = v ? v.scrollTop : 0;
+    render(); if (v) v.scrollTop = top;
+  }
+}
+function homeTv() {
+  const link = `<a href="${TV_GUIDE}" target="_blank" rel="noopener">Freeview</a>`;
+  const head = `<div class="sec">What’s on TV ${link}</div>`;
+  const now = Date.now();
+  const rows = TV_CHANNELS.map(ch => {
+    const data = TV && TV.data;
+    const item = data && data.now && data.now[ch.id];
+    if (tvStillOn(item, now)) {
+      return `<div class="row"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${esc(ch.name)}</div><div class="s">${esc(item.title)} · until ${esc(tvClock(item.until))}</div></div></div>`;
+    }
+    const seen = data && data.seen && data.seen[ch.id];
+    const loading = tvBusy || (!tvFailed && !data && navigator.onLine !== false);
+    let sub = 'Nothing listed right now.';
+    if (loading) sub = 'Checking the guide…';
+    else if (tvFailed || !data || !seen) sub = 'Couldn’t load the listing.';
+    return `<button class="row" onclick="refreshTv(true)"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${esc(ch.name)}</div><div class="s">${esc(sub)}</div></div></button>`;
+  });
+  return head + `<div class="list" id="hometv">${rows.join('')}</div>`;
+}
+
 /* ================= EVENTS (Whangārei District Council "What's On", via the app's service) ================= */
 const EV_MAX_AGE = 3 * 3600 * 1000;
 const WDC_WHATSON = 'https://www.wdc.govt.nz/Events/Whats-On';
@@ -5875,7 +6001,7 @@ function render() {
   if ((r === 'more' && moreEdit) || ((r === 'home' || r === '') && homeEdit)) wireReorder();
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
 }
-window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); } });
+window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
 window.addEventListener('hashchange', () => { setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
 
@@ -6018,12 +6144,12 @@ async function start() {
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
   await loadCal();
-  loadWx(); loadEvs(); loadCls(); loadRoadworks();
+  loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv();
   render();
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
-  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks();
+  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv();
   if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
   checkBridgeLoc(true);
   if ('serviceWorker' in navigator) {
@@ -6045,7 +6171,7 @@ async function start() {
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     phoneSyncOpen();
     check();
-    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks();
+    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv();
     if (brMode() !== 'off') refreshClosures();
     checkBridgeLoc(true);
     if (swReg) swReg.update().catch(() => { });
