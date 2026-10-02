@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.76.0';
+const APP_VERSION = '1.77.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -282,6 +282,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
 };
 const HOME_DEFAULT = Object.keys(HOME);
 let homeEdit = false;
+let homeShownNow = new Set();
 function homeOrder() {
   const src = Array.isArray(S.settings.homeOrder) ? S.settings.homeOrder : [];
   const o = src.filter((k, i, a) => HOME[k] && a.indexOf(k) === i);
@@ -470,36 +471,101 @@ function engList(arr) {
 // 1.72.0: also name up to two real What’s on events (Silver Festival is left out; if fewer than two
 // exist, name however many exist) and this fortnight’s commission when an amount is recorded.
 // Cars, pet care, bills, to-dos and other categories already inside Upcoming are not listed again.
+// 1.77.0: the same facts, as warm bullet points. Rain or sun only if Whangārei weather is already loaded
+// and the app’s own words say so. At most two real to-dos or ideas that fit that weather. One or two
+// real video titles from the list he already has, for the forecast or for early spring. No television.
+// English only. No gluten foods are suggested (he has coeliac disease).
+function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
+function homeGlutenFood(s) {
+  const t = String(s || '').toLowerCase();
+  if (/gluten[-\s]?free|\bcoeliac\b|\bceliac\b/.test(t)) return false;
+  return /\b(bread|cake|cakes|biscuit|biscuits|cookie|cookies|pastry|pastries|pie|pies|pizza|pasta|noodle|noodles|sandwich|sandwiches|muffin|muffins|scone|scones|doughnut|donut|donuts|bun|buns|flour|beer|toast|wrap|wraps|bagel|croissant|pancake|pancakes|waffle|waffles|dumpling|dumplings)\b/.test(t);
+}
+function homeWxRead() {
+  if (typeof WX === 'undefined' || !WX || !validWx(WX.data)) return { mood: '', line: '' };
+  const c = WX.data.current;
+  const nowW = wmo(c.weather_code, wxIsDay(), c.wind_speed_10m);
+  const today = wxDays().find(x => x.iso === todayISO());
+  const dayW = today ? wmo(today.code, true, today.wind) : null;
+  const saysRain = w => !!w && (['drizzle', 'rain', 'showers', 'storm', 'snow'].includes(w.kind) || /\b(rain|drizzle|showers|thunderstorm|snow)\b/i.test(w.words));
+  const saysSun = w => !!w && /^(Mostly sunny|Sunny|Mostly clear|Clear)\b/.test(w.words);
+  if (saysRain(nowW)) return { mood: 'wet', line: `It’s ${nowW.words.toLowerCase()} in Whangārei. A perfectly good excuse to take the indoors slowly.` };
+  if (saysSun(nowW)) return { mood: 'sun', line: `It’s ${nowW.words.toLowerCase()} in Whangārei. Early spring, and the light’s out if you fancy a step outside.` };
+  if (saysRain(dayW)) return { mood: 'wet', line: `Whangārei’s forecast today is ${dayW.words.toLowerCase()}. A handy reason to keep things easy.` };
+  if (saysSun(dayW)) return { mood: 'sun', line: `Whangārei’s forecast today is ${dayW.words.toLowerCase()}. Spring is being kind.` };
+  return { mood: '', line: '' };
+}
+// Indoor jobs for rain, outdoor jobs for sun. Title and category only, so a long note cannot invent a match.
+const HOME_WET_JOB = /\b(indoor|indoors|inside|laundry|ironing|declutter|paperwork|filing|vacuum|vacuuming|mop|mopping|dishwasher|wardrobe|cupboard|drawer|inbox|emails?|photo|photos|album|puzzle|reading|cook|cooking|recipe|bake|baking)\b/i;
+const HOME_SUN_JOB = /\b(garden|gardening|mow|mowing|lawn|lawns|weed|weeding|plant|planting|prune|pruning|outdoor|outdoors|outside|beach|picnic|walk|walking|compost|greenhouse|deck|wash the car|car wash)\b/i;
+function homeDayJobs(mood) {
+  if (mood !== 'wet' && mood !== 'sun') return [];
+  const re = mood === 'wet' ? HOME_WET_JOB : HOME_SUN_JOB;
+  const other = mood === 'wet' ? HOME_SUN_JOB : HOME_WET_JOB;
+  const todos = (S.todos || []).filter(t => t && !t.done && t.title);
+  const ideas = (S.ideas || []).filter(i => i && i.title);
+  const seen = new Set(), out = [];
+  todos.concat(ideas).forEach(item => {
+    if (out.length >= 2) return;
+    const title = String(item.title).replace(/\s+/g, ' ').trim();
+    const key = title.toLowerCase();
+    if (!title || seen.has(key)) return;
+    const blob = title + ' ' + (item.cat || '');
+    if (homeSaysTv(blob) || homeGlutenFood(blob)) return;
+    if (!re.test(blob) || other.test(blob)) return;
+    seen.add(key);
+    out.push(title);
+  });
+  return out;
+}
+function homeVideoPicks(mood) {
+  let list = [];
+  try { list = videoSuggestions(); } catch (e) { list = []; }
+  list = list.filter(v => v && v.title && !homeSaysTv(v.title) && !homeGlutenFood(v.title));
+  const foodOk = v => {
+    if (v.category === 'cook' || v.category === 'gf') return /gluten|coeliac|celiac/i.test((v.title || '') + ' ' + (v.reason || ''));
+    return true;
+  };
+  list = list.filter(foodOk);
+  const garden = list.filter(v => v.category === 'garden');
+  const indoorOrder = ['cook', 'gf', 'time', 'reno', 'pets', 'diy', 'wood', 'nz', 'tech'];
+  const indoor = indoorOrder.flatMap(cat => list.filter(v => v.category === cat));
+  if (mood === 'wet') {
+    const first = indoor[0];
+    const second = (first && garden.find(v => v !== first)) || indoor[1] || garden[0];
+    return [first, second].filter(Boolean).slice(0, 2);
+  }
+  // Sunny, or no rain/sun line: early October is spring in New Zealand, so garden titles only.
+  return garden.slice(0, 2);
+}
 function homeOverview(shown) {
   const bits = [];
-  if (shown.has('summary')) {
-    const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length;
-    if (over && soon) bits.push(`You have ${plural(over, 'overdue item')} and ${plural(soon, 'thing')} due in the next 30 days.`);
-    else if (over) bits.push(`You have ${plural(over, 'overdue item')}, and nothing else due in the next 30 days.`);
-    else if (soon) bits.push(`Nothing is overdue. ${plural(soon, 'thing')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days.`);
-    else bits.push('Nothing is overdue or due in the next 30 days.');
+  const wx = homeWxRead();
+  if (wx.line) bits.push(wx.line);
+  const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length;
+  if (over && soon) bits.push(`${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and ${plural(soon, 'more')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days. No fuss. They can wait their turn.`);
+  else if (over) bits.push(`${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and the next 30 days are clear. Whenever you get to ${over === 1 ? 'it' : 'them'} is absolutely fine.`);
+  else if (soon) bits.push(`Nothing is overdue. ${plural(soon, 'thing')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days, and there’s no rush.`);
+  else bits.push('Nothing is overdue, and nothing is due in the next 30 days. A nice open stretch.');
+  const soonItems = homeAttention().filter(x => x.kind !== 'tv' && x.days >= 0 && x.days <= 30 && x.name && !homeSaysTv(x.name));
+  const names = soonItems.slice(0, 4).map(x => x.name);
+  if (names.length) bits.push(`First up in the next 30 days: ${engList(names)}.`);
+  else bits.push('Nothing is coming up in the next 30 days.');
+  if (EVS) {
+    const evNames = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(t => t && !homeSaysTv(t)).slice(0, 2);
+    if (evNames.length) bits.push(`Out locally: ${engList(evNames)}.`);
+    else bits.push('No local events are listed right now.');
   }
+  if (CM().anchor) {
+    const f = curFortnight();
+    const recorded = CM().entries.filter(e => e.date >= f.start && e.date <= f.end);
+    if (recorded.length) bits.push(`This fortnight’s commission is ${centsMoney(commSum(CM().entries, f.start, f.end))}.`);
+    else bits.push('No commission amount is recorded for this fortnight.');
+  } else bits.push('No commission amount is recorded for this fortnight.');
   if (shown.has('meals')) {
     const today = todayISO(), meals = upcomingMeals();
     if (meals.includes(today) && M().plan[today] && M().plan[today].title) bits.push(`Today’s meal is ${M().plan[today].title}.`);
     else if (meals.length) bits.push(`${plural(meals.length, 'meal')} ${meals.length === 1 ? 'is' : 'are'} planned, and none is set for today.`);
-  }
-  if (shown.has('attention')) {
-    // Same order as Upcoming. Car dates and everything else: today through 30 days only.
-    const soon = homeAttention().filter(x => x.kind !== 'tv' && x.days >= 0 && x.days <= 30 && x.name);
-    const names = soon.slice(0, 4).map(x => x.name);
-    if (names.length) bits.push(`Coming up in the next 30 days: ${engList(names)}.`);
-    else bits.push('Nothing is coming up in the next 30 days.');
-  }
-  if (shown.has('events')) {
-    // First two real titles from the What’s on feed. upcomingEvents already drops Silver Festival and anything finished.
-    const names = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(Boolean).slice(0, 2);
-    if (names.length) bits.push(`Local events: ${engList(names)}.`);
-  }
-  if (shown.has('commission') && CM().anchor) {
-    const f = curFortnight();
-    const recorded = CM().entries.filter(e => e.date >= f.start && e.date <= f.end);
-    if (recorded.length) bits.push(`This fortnight’s commission is ${centsMoney(commSum(CM().entries, f.start, f.end))}.`);
   }
   if (shown.has('roadworks') && RW && RW.data && Array.isArray(RW.data.items) && RW.data.items.length) {
     const nzta = RW.data.items.filter(w => w.source !== 'wdc').map(w => w.road).filter(Boolean);
@@ -518,25 +584,23 @@ function homeOverview(shown) {
     if (list.length && list.length <= 3) bits.push(`Birthdays in the next 30 days: ${engList(list.map(x => x.b.name))}.`);
     else if (list.length) bits.push(`${plural(list.length, 'birthday')} in the next 30 days, the next being ${list[0].b.name}.`);
   }
-  const other = [];
-  if (shown.has('bridge')) {
-    let label = '';
-    try { const st = brStatus(); label = (BR_TXT[st.state] || [])[1] || ''; } catch (e) { label = ''; }
-    other.push(label ? `the lifting bridge (${label.toLowerCase()})` : 'the lifting bridge');
+  const jobs = homeDayJobs(wx.mood);
+  if (jobs.length) {
+    const quoted = engList(jobs.map(t => '“' + t + '”'));
+    if (wx.mood === 'wet') bits.push(`If you want something easy while it’s wet, your list already has ${quoted}. Only if you feel like it.`);
+    else bits.push(`If you want to use the sun, your list already has ${quoted}. Only if you feel like it.`);
   }
-  if (shown.has('holidays')) other.push('public holidays');
-  if (shown.has('shopping')) {
-    const n = (S.shop && S.shop.items || []).filter(x => !x.done).length;
-    if (n) other.push(plural(n, 'shopping item'));
+  const vids = homeVideoPicks(wx.mood);
+  if (vids.length) {
+    const q = v => '“' + v.title + '”';
+    if (wx.mood === 'wet' && vids.length === 2 && vids[0].category !== 'garden' && vids[1].category === 'garden')
+      bits.push(`From your video list: ${q(vids[0])} for a rainy day, and ${q(vids[1])} for this spring.`);
+    else if (wx.mood === 'wet') bits.push(`For a rainy day, your video list has ${engList(vids.map(q))}.`);
+    else if (wx.mood === 'sun') bits.push(`For a sunny spring day, your video list has ${engList(vids.map(q))}.`);
+    else bits.push(`For early spring, your video list has ${engList(vids.map(q))}.`);
   }
-  // Cars, pet care, bills, to-dos, events and commission are not repeated here.
-  // Those are already named above, or they already sit inside Upcoming.
-  if (shown.has('loans')) other.push('loans');
-  if (shown.has('ideas')) other.push('starred ideas');
-  if (shown.has('videos')) other.push('videos');
-  if (other.length) bits.push(`Also on this page: ${engList(other)}.`);
   if (!bits.length) return '';
-  return `<div class="card homesum" id="homesum"><p>${esc(bits.join(' '))}</p></div>`;
+  return `<div class="card homesum" id="homesum"><ul>${bits.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>`;
 }
 
 // 1.75.0: each Home section gets a neutral wash, light sand at the top and darker slate further down.
@@ -573,8 +637,9 @@ function Home() {
   const feed = groups.map((g, i) => `<section class="hsec" data-k="${g.k}" style="${homeTintStyle(i + (top ? 1 : 0), tintN)}">${g.h}</section>`).join('');
   const shown = new Set(parts.map(([k]) => k));
   if (top) shown.add('bridge');
+  homeShownNow = shown;
   const sum = showHomeSum() ? homeOverview(shown) : '';
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + (homeSumAt() === 'top' ? sum : '') + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge" style="${homeTintStyle(0, tintN)}">${top}</section>` : '') + cards +
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + (homeSumAt() === 'top' ? sum : '') + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge" style="${homeTintStyle(0, tintN)}">${top}</section>` : '') + cards +
     feed + `${syncNote()}${homeSumAt() === 'bottom' ? sum : ''}
     <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -4316,6 +4381,11 @@ function updWx() {
   const el = document.getElementById('wxcard'); if (el) el.outerHTML = wxCard();
   const greet = document.getElementById('wxgreet'); if (greet) greet.outerHTML = wxGreet();
   else if ((h === 'home' || h === '') && !homeEdit && wxInUp()) render();
+  const sum = document.getElementById('homesum');
+  if (sum && (h === 'home' || h === '') && !homeEdit) {
+    const next = homeOverview(homeShownNow);
+    if (next) sum.outerHTML = next;
+  }
 }
 // Open-Meteo weather codes → words (day, night) and the icon kind drawn by wxIcon() (v1.9.0: coloured inline SVG icons)
 const WMO = {
