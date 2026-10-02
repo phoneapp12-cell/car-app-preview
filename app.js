@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.74.0';
+const APP_VERSION = '1.75.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -538,6 +538,16 @@ function homeOverview(shown) {
   if (!bits.length) return '';
   return `<div class="card homesum" id="homesum"><p>${esc(bits.join(' '))}</p></div>`;
 }
+
+// 1.75.0: each Home section gets a neutral wash, light sand at the top and darker slate further down.
+const HOME_TINTS = ['#e4d7c2', '#d4c4a8', '#c9b89a', '#c2b4a4', '#b7aa96', '#b09a78', '#a89a88', '#a28d6a', '#9a9d96', '#978e87', '#8c9692', '#8b8177', '#89938f', '#829984', '#7b927a', '#7b8895', '#738091', '#71808d', '#667784', '#5a6a78'];
+function homeTintStyle(i, n) {
+  const last = HOME_TINTS.length - 1;
+  const t = n <= 1 ? 0 : Math.max(0, Math.min(1, i / (n - 1)));
+  const color = HOME_TINTS[Math.round(t * last)];
+  const mix = Math.round(16 + t * 12);
+  return '--hsec:' + color + ';--hmix:' + mix + '%';
+}
 function Home() {
   if (homeEdit) return HomeEdit();
   const now = new Date();
@@ -559,11 +569,12 @@ function Home() {
   const parts = keys.map(k => { try { return [k, HOME_CARD[k]()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
   const groups = [];
   parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') g.h += h; else groups.push({ k, h }); });
-  const feed = groups.map(g => `<section class="hsec" data-k="${g.k}">${g.h}</section>`).join('');
+  const tintN = groups.length + (top ? 1 : 0);
+  const feed = groups.map((g, i) => `<section class="hsec" data-k="${g.k}" style="${homeTintStyle(i + (top ? 1 : 0), tintN)}">${g.h}</section>`).join('');
   const shown = new Set(parts.map(([k]) => k));
   if (top) shown.add('bridge');
   const sum = showHomeSum() ? homeOverview(shown) : '';
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + (homeSumAt() === 'top' ? sum : '') + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge">${top}</section>` : '') + cards +
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + wxGreet() + (homeSumAt() === 'top' ? sum : '') + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge" style="${homeTintStyle(0, tintN)}">${top}</section>` : '') + cards +
     feed + `${syncNote()}${homeSumAt() === 'bottom' ? sum : ''}
     <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -4651,6 +4662,12 @@ function rwWhen(w) {
   else if (w.end) dates = 'Until ' + fmt(w.end);
   return [dates, w.near].filter(Boolean).join(' · ');
 }
+const RW_HOME_SHORT = 2;
+let rwMore = false;
+function toggleRwMore() {
+  rwMore = !rwMore;
+  updRoadworks();
+}
 function homeRoadworks() {
   const link = `<a href="${RW_NZTA}" target="_blank" rel="noopener">NZTA</a> · <a href="${RW_WDC}" target="_blank" rel="noopener">Council</a>`;
   const head = `<div class="sec">Roadworks near Whangārei ${link}</div>`;
@@ -4668,10 +4685,15 @@ function homeRoadworks() {
     const msg = bits.length ? bits[0][0].toUpperCase() + bits[0].slice(1) + (bits[1] ? ', and ' + bits[1] : '') + '.' : 'Nothing to show right now.';
     return head + `<div class="list" id="homeroadworks"><div class="row"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">No roadworks nearby</div><div class="s">${msg}</div></div></div></div>`;
   }
-  return head + `<div class="list" id="homeroadworks">${items.map(w => {
+  // Both NZTA and council rows stay in the list. Only the first two show until Show more.
+  const shown = rwMore ? items : items.slice(0, RW_HOME_SHORT);
+  const rows = shown.map(w => {
     const href = w.url || (w.source === 'wdc' ? RW_WDC : RW_NZTA);
     return `<a class="row" href="${esc(href)}" target="_blank" rel="noopener"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(w.road)}</div><div class="s">${esc(rwWhen(w))}</div></div></a>`;
-  }).join('')}</div>`;
+  }).join('');
+  const rest = items.length - RW_HOME_SHORT;
+  const more = rest > 0 ? `<button class="row" id="rwmore" type="button" aria-expanded="${rwMore ? 'true' : 'false'}" onclick="toggleRwMore()"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${rwMore ? 'Show less' : 'Show more'}</div><div class="s">${rwMore ? 'Just the first two' : plural(rest, 'more roadwork')}</div></div></button>` : '';
+  return head + `<div class="list" id="homeroadworks">${rows}${more}</div>`;
 }
 
 /* ================= TV (TVNZ 1, TVNZ 2, Three, plus Sky Starter) ================= */

@@ -672,28 +672,11 @@ details.help ol{margin:0 0 12px}
 .plate.small{font-size:0.71875rem;padding:0 5px;border-width:1.5px;margin-left:4px;vertical-align:1px}
 #homeloans .lbar{margin:6px 0 4px}
 /* Recipes, shopping list, scanning, Home dividers (1.15.0) */
-.hsec{display:block;--hsec:transparent;border-radius:22px;padding:4px 8px 12px;margin-left:-4px;margin-right:-4px;background:color-mix(in srgb,var(--hsec) 14%,transparent)}
-.hsec .card,.hsec .list{background:color-mix(in srgb,var(--hsec) 10%,var(--card))}
-html[data-theme="dark"] .hsec{background:color-mix(in srgb,var(--hsec) 22%,transparent)}
-html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{background:color-mix(in srgb,var(--hsec) 16%,var(--card))}
-/* Home section tints (v1.44.0): muted neutrals keep the feed calm in both themes. */
-.hsec[data-k="bridge"]{--hsec:#667784}     /* slate */
-.hsec[data-k="weather"]{--hsec:#a28d6a}    /* sand */
-.hsec[data-k="holidays"]{--hsec:#8b8177}   /* warm grey */
-.hsec[data-k="meals"]{--hsec:#7b927a}      /* sage */
-.hsec[data-k="shopping"]{--hsec:#89938f}   /* stone */
-.hsec[data-k="summary"]{--hsec:#738091}    /* slate */
-.hsec[data-k="attention"]{--hsec:#9a8f86}  /* warm grey */
-.hsec[data-k="events"]{--hsec:#b09a78}     /* sand */
-.hsec[data-k="videos"]{--hsec:#71808d}    /* slate */
-.hsec[data-k="todo"]{--hsec:#8c9692}       /* stone */
-.hsec[data-k="loans"]{--hsec:#7b8895}      /* slate */
-.hsec[data-k="commission"]{--hsec:#829984}  /* sage */
-.hsec[data-k="birthdays"]{--hsec:#978e87}  /* warm grey */
-.hsec[data-k="pets"]{--hsec:#a18b69}       /* sand */
-.hsec[data-k="bills"]{--hsec:#a1958a}       /* warm grey */
-.hsec[data-k="cars"]{--hsec:#718c80}       /* sage */
-.hsec[data-k="ideas"]{--hsec:#9a9d96}      /* stone */
+.hsec{display:block;--hsec:#c2b4a4;--hmix:18%;border-radius:22px;padding:4px 8px 12px;margin-left:-4px;margin-right:-4px;background:color-mix(in srgb,var(--hsec) var(--hmix),transparent)}
+.hsec .card,.hsec .list{background:color-mix(in srgb,var(--hsec) calc(var(--hmix) * .65),var(--card))}
+html[data-theme="dark"] .hsec{background:color-mix(in srgb,var(--hsec) calc(var(--hmix) + 10%),transparent)}
+html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{background:color-mix(in srgb,var(--hsec) calc(var(--hmix) * .85),var(--card))}
+/* Home section tints (v1.75.0): sand, stone, warm grey, sage and slate, light at the top and darker further down. No pink. */
 .hsec + .hsec{border-top:3px solid color-mix(in srgb,var(--ink3) 65%,transparent);margin-top:18px;padding-top:4px}
 .hsec > .sec:first-child{margin-top:12px}
 .hsec > .tiles:first-child,.hsec > .card:first-child,.hsec > .list:first-child,.hsec > .callout:first-child{margin-top:14px}
