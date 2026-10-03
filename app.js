@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.9.3';
+const APP_VERSION = '2.9.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2699,31 +2699,31 @@ function Podcasts() {
 /* ================= RADIO =================
    Stations that broadcast in Whangārei. Each frequency is copied from that station’s own site
    (RNZ’s frequency page, rova, NZME station sites, Rhema Media, Ngāti Hine FM, PMN, Beagle Radio, The Generator).
-   A stream is included only when that site publishes an https address and a check of it returned audio.
+   A stream is included only when the station site or a public stream directory publishes an https address and a check of it returned audio.
    Nothing is saved here. If a stream fails, the row says so. */
 const RADIO = [
   { name: 'Beagle Radio', freq: '88.1 FM', where: 'Whangārei', home: 'https://www.beagleradio.co.nz/', stream: 'https://stream.beagleradio.co.nz/stream' },
-  { name: 'The Hits', freq: '89.2 FM', where: 'Whangārei', home: 'https://www.thehits.co.nz/info/frequencies/' },
-  { name: 'The Rock', freq: '90.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-rock' },
-  { name: 'The Breeze', freq: '90.8 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-breeze' },
-  { name: 'More FM', freq: '91.6 FM', where: 'Northland', home: 'https://www.rova.nz/find-your-more-fm-frequency' },
-  { name: 'Breeze Classic', freq: '92.4 FM', where: 'Northland', home: 'https://www.rova.nz/breeze-breeze-classic-frequencies' },
-  { name: 'Radio Hauraki', freq: '93.2 FM', where: 'Northland', home: 'https://www.hauraki.co.nz/' },
-  { name: 'The Edge', freq: '94.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-edge' },
-  { name: 'ZM', freq: '94.8 FM', where: 'Whangārei', home: 'https://www.zmonline.com/listen/frequencies/' },
+  { name: 'The Hits', freq: '89.2 FM', where: 'Whangārei', home: 'https://www.thehits.co.nz/info/frequencies/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_74AAC.aac' },
+  { name: 'The Rock', freq: '90.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-rock', stream: 'https://digitalstreams.mediaworks.nz/rock_net_icy' },
+  { name: 'The Breeze', freq: '90.8 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-breeze', stream: 'https://mediaworks.streamguys1.com/breeze_net/playlist.m3u8' },
+  { name: 'More FM', freq: '91.6 FM', where: 'Northland', home: 'https://www.rova.nz/find-your-more-fm-frequency', stream: 'https://mediaworks.streamguys1.com/more-whg-high/playlist.m3u8' },
+  { name: 'Breeze Classic', freq: '92.4 FM', where: 'Northland', home: 'https://www.rova.nz/breeze-breeze-classic-frequencies', stream: 'https://mediaworks.streamguys1.com/breeze_classic_net/playlist.m3u8' },
+  { name: 'Radio Hauraki', freq: '93.2 FM', where: 'Northland', home: 'https://www.hauraki.co.nz/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_04AAC.aac' },
+  { name: 'The Edge', freq: '94.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-edge', stream: 'https://mediaworks.streamguys1.com/edge_net/playlist.m3u8' },
+  { name: 'ZM', freq: '94.8 FM', where: 'Whangārei', home: 'https://www.zmonline.com/listen/frequencies/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_03AAC.aac' },
   { name: 'iHeartCountry', freq: '95.6 FM', where: 'Northland', home: 'https://iheartcountrynz.iheart.com/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_09AAC.aac' },
-  { name: 'Coast', freq: '96.4 FM', where: 'Northland', home: 'https://www.thecoast.net.nz/info/frequencies/' },
-  { name: 'The Sound', freq: '98.0 FM', where: 'Whangārei', home: 'https://www.rova.nz/radio/the-sound' },
+  { name: 'Coast', freq: '96.4 FM', where: 'Northland', home: 'https://www.thecoast.net.nz/info/frequencies/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_07AAC.aac' },
+  { name: 'The Sound', freq: '98.0 FM', where: 'Whangārei', home: 'https://www.rova.nz/radio/the-sound', stream: 'https://digitalstreams.mediaworks.nz/sound_net_icy' },
   { name: 'Life FM', freq: '98.8 FM', where: 'Whangārei', home: 'https://www.lifefm.co.nz/frequencies', stream: 'https://rhema-radio.streamguys1.com/rhema-lifefm.aac' },
   { name: 'Ngāti Hine FM', freq: '99.1 FM and 99.6 FM', where: 'Whangārei', home: 'https://www.ngatihinefm.com/about', stream: 'https://icast1.streamcom.net/NgatiHine' },
   { name: 'RNZ Concert', freq: '100.4 FM and 105.2 FM', where: 'Whangārei', home: 'https://www.rnz.co.nz/listen/amfm', stream: 'https://stream-ice.radionz.co.nz/concert.mp3' },
   { name: 'RNZ National', freq: '837 AM, 101.2 FM and 104.4 FM', where: 'Whangārei', home: 'https://www.rnz.co.nz/listen/amfm', stream: 'https://stream-ice.radionz.co.nz/national.mp3' },
   { name: 'PMN 531pi', freq: '103.6 FM', where: 'Whangārei', home: 'https://pmn.co.nz/radio-stations/531-pi', stream: 'https://18243.live.streamtheworld.com/531PI_SC' },
-  { name: 'Flava', freq: '106 FM', where: 'Whangārei', home: 'https://www.flava.co.nz/' },
-  { name: 'Mai FM', freq: '107.3 FM', where: 'Whangārei', home: 'https://www.rova.nz/radio/mai-fm' },
-  { name: 'The Generator', freq: '108 FM', where: 'Whangārei', home: 'https://thegenerator.co.nz/' },
+  { name: 'Flava', freq: '106 FM', where: 'Whangārei', home: 'https://www.flava.co.nz/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_08AAC.aac' },
+  { name: 'Mai FM', freq: '107.3 FM', where: 'Whangārei', home: 'https://www.rova.nz/radio/mai-fm', stream: 'https://mediaworks.streamguys1.com/mai_net_icy' },
+  { name: 'The Generator', freq: '108 FM', where: 'Whangārei', home: 'https://thegenerator.co.nz/', stream: 'https://s1.myradiostream.com/14268/stream/1/' },
   { name: 'Rhema', freq: '621 AM', where: 'Whangārei', home: 'https://rhema.co.nz/frequencies', stream: 'https://rhema-radio.streamguys1.com/rhema.aac' },
-  { name: 'Newstalk ZB', freq: '729 AM, 1026 AM, 105.1 FM and 1215 AM', where: 'Northland', home: 'https://www.newstalkzb.co.nz/' },
+  { name: 'Newstalk ZB', freq: '729 AM, 1026 AM, 105.1 FM and 1215 AM', where: 'Northland', home: 'https://www.newstalkzb.co.nz/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_01AAC.aac' },
 ];
 function radioFail(el) {
   if (!el || el.dataset.failed) return;
