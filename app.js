@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.4.0';
+const APP_VERSION = '2.5.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -94,7 +94,8 @@ const P = {
   play: '<circle cx="12" cy="12" r="9"/><path d="M10.2 8.8v6.4L16.2 12z"/>',
   music: '<path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>',
   leaf: '<path d="M12 21V11"/><path d="M12 13C8 12 4 9.5 4 5c5 .2 8 3.2 8 8z"/><path d="M12 11c4-1 7.2-3.6 8-7-4.2.8-7 4-8 7z"/>',
-  pen: '<path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/>'
+  pen: '<path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/>',
+  podcast: '<path d="M3 14v-2a9 9 0 0 1 18 0v2"/><path d="M3 14v4a2 2 0 0 0 2 2h2v-8H5a2 2 0 0 0-2 2z"/><path d="M21 14v4a2 2 0 0 1-2 2h-2v-8h2a2 2 0 0 1 2 2z"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
 
@@ -288,6 +289,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   news: ['news', 'ln', 'Local news', 'Recent stories from around Whangārei', 1],
   videos: ['play', 'vid', 'Videos', 'A few suggestions from the video categories you leave on', 0],
   blogging: ['pen', 'blog', 'Blogging', 'Recent posts from other blogs', 0],
+  podcasts: ['podcast', 'pod', 'Podcasts', 'Recent episodes from other podcasts', 0],
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a Done button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
@@ -307,7 +309,7 @@ const HOME_GROUPS = [
   { id: 'cars', title: 'Cars', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'shopping', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['bridge', 'weather', 'roadworks', 'events', 'news'] },
-  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'blogging'] }
+  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'blogging', 'podcasts'] }
 ];
 const HOME_CAT = Object.fromEntries(HOME_GROUPS.flatMap(g => g.keys.map(k => [k, g.id])));
 let homeEdit = false;
@@ -485,6 +487,16 @@ const HOME_CARD = {
     const failed = blogFailures() || [];
     if (failed.length) return head + `<div class="list" id="homeblog">${failed.slice(0, 2).map(blogFailRow).join('')}</div>`;
     return head + blogNone('homeblog');
+  },
+  // Off until switched on in Customise Home. Shows episodes from public podcasts, not a recording made on this phone.
+  podcasts: () => {
+    const head = homeSec('Podcasts', '<a href="#podcasts">See all</a>');
+    const episodes = podEpisodes();
+    if (!episodes) return head + podEmpty('homepod');
+    if (episodes.length) return head + `<div class="list" id="homepod">${episodes.slice(0, 2).map(podRow).join('')}</div>`;
+    const failed = podFailures() || [];
+    if (failed.length) return head + `<div class="list" id="homepod">${failed.slice(0, 2).map(podFailRow).join('')}</div>`;
+    return head + podNone('homepod');
   }
 };
 function homeEditHtml() {
@@ -2246,6 +2258,137 @@ async function deletePost(id) {
   if (onIt) location.hash = '#blogging/mine';
   else render();
   toast('Post deleted.', 'Undo', undoTo(s));
+}
+
+/* ================= PODCASTS =================
+   The page reads a few public podcasts through the relay (GET /podcasts). Those feeds do not send CORS.
+   Nothing is invented: a feed that fails is an empty row, not a made-up episode.
+   An https mp3 or m4a plays in the page. Anything else opens the episode page. Episodes are not saved here. */
+const POD_MAX_AGE = 30 * 60 * 1000;
+let PODFEED = null, podBusy = false, podFailed = false, podTimer = null;
+function loadPodcasts() {
+  try {
+    const r = JSON.parse(localStorage.getItem('podfeeds') || 'null');
+    PODFEED = r && r.at && r.data && Array.isArray(r.data.podcasts) ? r : null;
+  } catch (e) { PODFEED = null; }
+}
+function podHttps(u) {
+  try {
+    const x = new URL(String(u || ''));
+    if (x.protocol === 'https:' && !x.username && !x.password) return x.toString();
+  } catch (e) { }
+  return '';
+}
+function podAudio(u) {
+  const url = podHttps(u);
+  if (!url) return '';
+  let path = '';
+  try { path = new URL(url).pathname.toLowerCase(); } catch (e) { return ''; }
+  if (!path.endsWith('.mp3') && !path.endsWith('.m4a')) return '';
+  return url;
+}
+function podEpisodes() {
+  const shows = PODFEED && PODFEED.data && Array.isArray(PODFEED.data.podcasts) ? PODFEED.data.podcasts : null;
+  if (!shows) return null;
+  const episodes = [];
+  for (const b of shows) {
+    if (!b || !b.ok || !Array.isArray(b.items)) continue;
+    const name = String(b.name || '').trim();
+    if (!name) continue;
+    for (const it of b.items) {
+      const url = podHttps(it && it.url);
+      const audio = podAudio(it && it.audio);
+      const title = it && String(it.title || '').trim();
+      const ms = Date.parse(it && it.published);
+      if (!title || !Number.isFinite(ms) || (!url && !audio)) continue;
+      const summary = it.summary ? String(it.summary).replace(/\s+/g, ' ').trim() : '';
+      episodes.push({ title, url, audio, published: new Date(ms).toISOString(), show: name, summary });
+    }
+  }
+  episodes.sort((a, b) => b.published.localeCompare(a.published));
+  return episodes;
+}
+function podFailures() {
+  const shows = PODFEED && PODFEED.data && Array.isArray(PODFEED.data.podcasts) ? PODFEED.data.podcasts : null;
+  if (!shows) return null;
+  return shows.filter(b => b && String(b.name || '').trim() && !b.ok);
+}
+function podWhen(iso) {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return '';
+  return new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(ms));
+}
+function schedulePodcastsRefresh() {
+  if (podTimer) { clearTimeout(podTimer); podTimer = null; }
+  const fresh = !!(PODFEED && PODFEED.at && Date.now() - PODFEED.at < POD_MAX_AGE);
+  const wait = (!fresh && podFailed) ? 2 * 60 * 1000 : (fresh ? Math.max(5000, PODFEED.at + POD_MAX_AGE - Date.now()) : POD_MAX_AGE);
+  podTimer = setTimeout(() => {
+    podTimer = null;
+    if (document.visibilityState === 'visible') refreshPodcasts(false);
+    else schedulePodcastsRefresh();
+  }, wait);
+}
+async function refreshPodcasts(force = false) {
+  if (podBusy) return;
+  if (!force && PODFEED && Date.now() - PODFEED.at < POD_MAX_AGE) { schedulePodcastsRefresh(); return; }
+  if (!RELAY_URL) { if (!PODFEED) podFailed = true; schedulePodcastsRefresh(); updPodcasts(); return; }
+  podBusy = true; if (force) updPodcasts();
+  let data = null;
+  try { data = await getJSON(RELAY_URL + '/podcasts', 20000); } catch (e) { data = null; }
+  podBusy = false;
+  if (data && Array.isArray(data.podcasts)) {
+    PODFEED = { at: Date.now(), data };
+    podFailed = false;
+    try { localStorage.setItem('podfeeds', JSON.stringify(PODFEED)); } catch (e) { }
+  } else podFailed = true;
+  schedulePodcastsRefresh();
+  updPodcasts();
+}
+function updPodcasts() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  const r = h.split('/')[0];
+  if (r === 'podcasts' || ((r === 'home' || r === '') && !homeEdit) || r === 'more') {
+    const v = $('#view'), top = v ? v.scrollTop : 0;
+    render(); if (v) v.scrollTop = top;
+  }
+}
+function podRow(p) {
+  const when = podWhen(p.published);
+  const sub = [p.show, when].filter(Boolean).join(' · ');
+  const summary = p.summary ? `<div class="s">${esc(p.summary)}</div>` : '';
+  const icon = `<div class="ic pod">${I('podcast')}</div>`;
+  if (p.audio) {
+    const title = p.url ? `<a class="t" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : `<div class="t">${esc(p.title)}</div>`;
+    return `<div class="row pod">${icon}<div class="tx">${title}<div class="s">${esc(sub)}</div>${summary}<audio controls preload="none" src="${esc(p.audio)}"></audio></div></div>`;
+  }
+  return `<a class="row" href="${esc(p.url)}" target="_blank" rel="noopener">${icon}<div class="tx"><div class="t">${esc(p.title)}</div><div class="s">${esc(sub)}</div>${summary}</div></a>`;
+}
+function podFailRow(b) {
+  return `<button class="row" onclick="refreshPodcasts(true)"><div class="ic pod">${I('podcast')}</div><div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Couldn’t load this podcast.</div></div></button>`;
+}
+function podEmpty(id) {
+  const loading = podBusy || (!podFailed && navigator.onLine !== false);
+  const title = loading ? 'Podcasts' : 'Not available';
+  const msg = loading ? 'Checking the podcasts…' : 'Couldn’t load the podcasts. Tap to try again.';
+  return `<div class="list" id="${id}"><button class="row" onclick="refreshPodcasts(true)"><div class="ic pod">${I('podcast')}</div><div class="tx"><div class="t">${title}</div><div class="s">${msg}</div></div></button></div>`;
+}
+function podNone(id) {
+  return `<div class="list" id="${id}"><div class="row"><div class="ic pod">${I('podcast')}</div><div class="tx"><div class="t">No episodes</div><div class="s">None of the podcasts had an episode to show.</div></div></div></div>`;
+}
+function Podcasts() {
+  const episodes = podEpisodes();
+  const failed = podFailures();
+  let body;
+  if (!episodes) body = podEmpty('podlist');
+  else if (!episodes.length && !(failed && failed.length)) body = podNone('podlist');
+  else body = `<div class="list" id="podlist">${episodes.map(podRow).join('')}${(failed || []).map(podFailRow).join('')}</div>`;
+  const src = (PODFEED && PODFEED.data && PODFEED.data.podcasts || []).filter(b => b && b.name && podHttps(b.home));
+  const links = src.map(b => `<a href="${esc(podHttps(b.home))}" target="_blank" rel="noopener">${esc(b.name)}</a>`).join(' · ');
+  return header('Podcasts', 'Episodes from other people’s podcasts') +
+    `<div class="sec">Recent episodes <button onclick="refreshPodcasts(true)">${podBusy ? 'Updating…' : 'Refresh'}</button></div>` +
+    body +
+    `<div class="foot">${links ? 'From ' + links + '. ' : ''}Tap play to listen here when the episode is an ordinary https recording. Otherwise tap the title to open the episode. This page refreshes when you open it, when you come back to the app, and about every 30 minutes while it stays open.</div>`;
 }
 
 /* ================= MEAL PLANNER ================= */
@@ -4898,6 +5041,7 @@ function More() {
     birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
     ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down',
     blogging: () => { const posts = blogPosts(); const first = posts && posts[0]; return first ? `${esc(first.blog)}: ${esc(first.title)}` : 'Posts from other blogs'; },
+    podcasts: () => { const episodes = podEpisodes(); const first = episodes && episodes[0]; return first ? `${esc(first.show)}: ${esc(first.title)}` : 'Episodes from other podcasts'; },
     videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
     top40: () => 'Official Top 40 · chart as of 3 Oct 2026'
   });
@@ -4925,7 +5069,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
-  blogging: ['pen', 'blog', 'Blogging', 'Blog']
+  blogging: ['pen', 'blog', 'Blogging', 'Blog'],
+  podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -4937,7 +5082,7 @@ const NAV_GROUPS = [
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge'] },
-  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging'] }
+  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts'] }
 ];
 function navOrder() {
   return NAV_DEFAULT.slice();
@@ -7955,7 +8100,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts };
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
@@ -7996,6 +8141,7 @@ window.addEventListener('hashchange', () => {
   setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0;
   const r = (location.hash || '').replace(/^#/, '').split('/')[0];
   if (r === 'blogging' || r === 'home' || r === '') refreshBlogs(false);
+  if (r === 'podcasts' || r === 'home' || r === '') refreshPodcasts(false);
 });
 
 /* ---------- on-screen keyboard (v1.6.1) ----------
@@ -8139,12 +8285,12 @@ async function start() {
   await loadCal();
   await loadMail();
   await finishMailSignIn();
-  loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv(); loadNews(); loadBlogs();
+  loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv(); loadNews(); loadBlogs(); loadPodcasts();
   render();
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
-  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshSarah();
+  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
   mailConfig().then(() => { if (!sheetOpen && location.hash === '#settings') render(); });
   refreshMail();
   if (brMode() !== 'off' || location.hash === '#bridge') { refreshClosures(); refreshBridgeTraffic(); }
@@ -8168,7 +8314,7 @@ async function start() {
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     phoneSyncOpen();
     check();
-    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshSarah();
+    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
     refreshMail();
     if (brMode() !== 'off') { refreshClosures(); refreshBridgeTraffic(); }
     checkBridgeLoc(true);

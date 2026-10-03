@@ -20,6 +20,7 @@
  * GET /bridge-traffic: NZTA Northland highway events (see bridge-traffic.js). Fixed source, no input. The phone decides if any event is the lifting bridge.
  * GET /news: RNZ Northland headlines about Whangārei and Northland (see news.js). Fixed source, no input. Headlines and links only.
  * GET /blogs: a few public blogs (see blogs.js). Fixed feeds, no input. Title, link, time and a short summary. A failed feed has no posts.
+ * GET /podcasts: a few public podcasts (see podcasts.js). Fixed feeds, no input. Title, link, time, a short summary and an https mp3 or m4a when the feed has one. A failed feed has no episodes.
  * POST /videos: search YouTube for one short English topic and return oembed-confirmed videos
  * (see videos.js). The query is the topic only. No arbitrary links. Nothing is stored.
  * GET /sarah: Sarah Jenkins's channel (one fixed RSS address). POST /sarah/seen marks the
@@ -34,6 +35,7 @@ import { getCouncilRoadworks } from './roadworks.js';
 import { getBridgeTraffic } from './bridge-traffic.js';
 import { getLocalNews } from './news.js';
 import { getBlogs } from './blogs.js';
+import { getPodcasts } from './podcasts.js';
 import { pushRoute } from './push.js';
 import { searchVideos } from './videos.js';
 import { syncRoute } from './sync.js';
@@ -88,6 +90,7 @@ const MESSAGES = {
   bridge_traffic_unavailable: 'Live traffic could not be checked right now.',
   news_unavailable: 'Local news could not be loaded right now.',
   blogs_unavailable: 'Blogs could not be loaded right now.',
+  podcasts_unavailable: 'Podcasts could not be loaded right now.',
   bad_query: 'Use a short English topic name.',
   videos_unavailable: 'Videos could not be looked up just now.',
   sarah_unavailable: 'Sarah Jenkins’s videos could not be checked just now.',
@@ -221,6 +224,16 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) {
       return json(502, 'blogs_unavailable', origin, env);
+    }
+  }
+  if (path === '/podcasts') {
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try {
+      const data = await getPodcasts(env, fetchImpl);
+      return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (e) {
+      return json(502, 'podcasts_unavailable', origin, env);
     }
   }
   if (path === '/sarah') {
