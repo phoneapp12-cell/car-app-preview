@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.11.3';
+const APP_VERSION = '2.12.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -842,10 +842,46 @@ function homeDayPart(now) {
 function homeAtHome() {
   try { return placeHere() === 'home'; } catch (e) { return false; }
 }
+// 2.12.0: the same time of day does not always use the same sentence. Stable for a short while, different across opens.
+let homeFlavorRoll = null;
+let homeSpinSeed = Math.floor(Math.random() * 9000) + 1;
+function homePick(salt, options) {
+  const list = (options || []).filter(s => s != null && String(typeof s === 'string' ? s : (s.line || s)).trim());
+  if (!list.length) return '';
+  let day = 1, slot = 0;
+  try {
+    const c = DD.nzClock(new Date());
+    if (c && c.iso) day = (+String(c.iso).slice(0, 4) * 372) + (+String(c.iso).slice(5, 7) * 31) + (+String(c.iso).slice(8, 10));
+    if (c && Number.isFinite(c.min)) slot = Math.floor(c.min / 20);
+  } catch (e) {}
+  const n = Math.abs((homeSpinSeed + day * 13 + slot * 5 + (salt || 0) * 17) | 0) % list.length;
+  return list[n];
+}
+// Fun fact about one open in three, or a bit under. A joke less often. Never both, and never on every open.
+function homeFlavorKind() {
+  if (homeFlavorRoll != null) return homeFlavorRoll;
+  const r = Math.random();
+  if (r < 0.16) homeFlavorRoll = 'joke';
+  else if (r < 0.46) homeFlavorRoll = 'fact';
+  else homeFlavorRoll = '';
+  return homeFlavorRoll;
+}
+function homeWhere() {
+  try {
+    const p = placeHere();
+    return p === 'home' || p === 'work' ? p : '';
+  } catch (e) { return ''; }
+}
 function homeGreetLine() {
   try {
     const part = homeDayPart();
-    const hello = part === 'morning' ? 'Good morning.' : part === 'evening' ? 'Good evening.' : part === 'afternoon' ? 'Good afternoon.' : '';
+    const hello = homePick(61, part === 'morning'
+      ? ['Good morning.', 'Morning.', 'Hope the morning’s easy.']
+      : part === 'evening'
+        ? ['Good evening.', 'Evening.', 'Hope the evening’s a good one.']
+        : part === 'afternoon'
+          ? ['Good afternoon.', 'Afternoon.', 'Hope the afternoon’s treating you well.']
+          : []);
     const where = homePlaceLine();
     return [hello, where].filter(Boolean).join(' ');
   } catch (e) { return ''; }
@@ -957,6 +993,40 @@ function homeCookAside(dow) {
   } catch (e) { return ''; }
   return (dow === 5 ? 'Friday' : 'Saturday') + ' is a good night for a gluten-free cook, if you feel like it.';
 }
+function homeAwakeLine() {
+  return homePick(21, [
+    'You’re up late. That’s alright.',
+    'Can’t sleep? No bother.',
+    'Still awake. Take your time.',
+    'Late one’s fine.',
+    'Up late. All good.',
+    'Still awake, and that’s allowed.'
+  ]);
+}
+const HOME_JOKES = [
+  'Why did the scarecrow win an award? He was outstanding in his field.',
+  'What do you call a fish with no eyes? A fsh.',
+  'Why don’t scientists trust atoms? They make up everything.',
+  'I only know 25 letters of the alphabet. I don’t know y.',
+  'What did the ocean say to the shore? Nothing, it just waved.',
+  'Why did the bicycle fall over? It was two tired.',
+  'How does a penguin build its house? Igloos it together.',
+  'I told my suitcase we weren’t going anywhere. Now I’m dealing with emotional baggage.'
+];
+const HOME_FACTS = [
+  'Whangārei’s name is often said to mean a cherished harbour.',
+  'Honey never really spoils. A sealed jar can sit for years.',
+  'Octopuses have three hearts, and two of them stop when they swim.',
+  'Bananas are berries. Strawberries are not.',
+  'A group of puffins is called a circus.',
+  'Hot water can freeze faster than cold water. That’s the Mpemba effect.',
+  'Gluten-free buckwheat isn’t wheat at all. It’s a seed.',
+  'Te Matau ā Pohe, the lifting bridge, is named for a fish hook.',
+  'A day on Venus is longer than a year on Venus.',
+  'Onerahi was an early flying-boat spot for Whangārei.'
+];
+// One light aside. From about 9pm, a soft “still awake” line. No hours, no lecture, no smart-home controls.
+// Friday and Saturday are days off. The 8:30 start is only a heads-up before that time, never once he’s late.
 function homeEaseLine() {
   try {
     const a = homeAklParts();
@@ -971,73 +1041,100 @@ function homeEaseLine() {
       wet = mood === 'wet';
       sunny = mood === 'sun';
     } catch (e) { wet = false; sunny = false; }
-    const atHome = homeAtHome();
-    let atWork = false;
-    try { atWork = placeHere() === 'work'; } catch (e) { atWork = false; }
-    let odd = false;
-    try {
-      const c = DD.nzClock(new Date());
-      const day = c && c.iso ? +String(c.iso).slice(8, 10) : NaN;
-      odd = Number.isFinite(day) && day % 2 === 1;
-    } catch (e) { odd = false; }
-    // Mon–Thu mornings only. Friday is a day off, so it does not get the work line.
-    if (a.dow >= 1 && a.dow <= 4 && morning) {
-      if (atWork) return '';
-      return 'Work usually starts at 8:30, whenever you head in.';
+    const atWork = homeWhere() === 'work';
+    if (a.hour >= 21) return homeAwakeLine();
+    if (a.dow >= 1 && a.dow <= 4 && a.min < 8 * 60 + 30 && !atWork) {
+      return homePick(31, [
+        'Work usually starts at 8:30, whenever you head in.',
+        '8:30 is the usual start, if you’re heading in.',
+        'When you head to work, 8:30 is the usual time.'
+      ]);
     }
-    if (a.hour >= 21) return 'Late one’s fine. Suno’s there if you want some music.';
     if (evening && (a.dow === 5 || a.dow === 6)) {
-      if (odd) {
-        const cook = homeCookAside(a.dow);
-        if (cook) return cook;
-      }
-      return 'A glass of merlot later, if you feel like one.';
+      const lines = [
+        'A glass of merlot later, if you feel like one.',
+        'Merlot’s there later, if you fancy a glass.'
+      ];
+      const cook = homeCookAside(a.dow);
+      if (cook) lines.push(cook);
+      return homePick(32, lines);
     }
-    if (evening) return 'If you want some music, Suno’s there.';
+    if (evening) return homePick(33, [
+      'If you want some music, Suno’s there.',
+      'Suno’s there if you want some music.',
+      'Music on Suno, if you feel like it.'
+    ]);
     if (weekend && afternoon) {
-      if (wet) return 'Turkish Delight, if you want a little something sweet.';
-      // 2.11.2: a movie is a daytime-at-home suggestion only. Location is read only
-      // from the already-allowed in-memory fix; unknown location stays time-only.
-      if (a.dow === 0 && a.hour >= 5 && a.hour < 21 && atHome) return 'After a long week, a movie or a book if you get a quiet patch.';
-      return 'The gym’s there if you feel like it.';
+      if (wet) return homePick(34, [
+        'Turkish Delight, if you want a little something sweet.',
+        'A bit of Turkish Delight, if you fancy something sweet.'
+      ]);
+      return homePick(35, [
+        'The gym’s there if you feel like it.',
+        'If you want to move, the gym’s there.',
+        'A gym session, if the mood’s there.'
+      ]);
     }
     if ((weekend || a.dow === 5) && morning) {
-      if (wet) return 'Turkish Delight, if you want a little something sweet.';
-      if (!atWork && sunny && a.dow === 6) return 'Onerahi’s close to the beach, if you feel like some sun.';
+      if (wet) return homePick(34, [
+        'Turkish Delight, if you want a little something sweet.',
+        'A bit of Turkish Delight, if you fancy something sweet.'
+      ]);
+      if (!atWork && sunny && a.dow === 6) return homePick(36, [
+        'Onerahi’s close to the beach, if you feel like some sun.',
+        'The beach at Onerahi is close, if you want some sun.'
+      ]);
       if (!atWork && sunny && (a.dow === 0 || a.dow === 5)) return homeWalkLine();
-      return 'The garden’s there if you feel like pottering.';
+      return homePick(37, [
+        'The garden’s there if you feel like pottering.',
+        'A potter in the garden, if you feel like it.'
+      ]);
     }
-    // Rainy Monday or Thursday afternoon: a short tidy idea, instead of the sweet line those afternoons used to share.
-    if (wet && afternoon && (a.dow === 1 || a.dow === 4)) return 'If you feel like a small tidy, one drawer or cupboard is enough.';
-    if (wet && afternoon) return 'Turkish Delight, if you want a little something sweet.';
-    if (a.dow === 3 && afternoon) return 'Blue’s a good colour if the day needs one.';
-    // Tuesday afternoon is otherwise empty. One light line, with nothing to tap or control.
-    if (a.dow === 2 && afternoon) return 'The Hue lights, the cameras and the smart plugs are a nice bit of kit.';
+    if (wet && afternoon && (a.dow === 1 || a.dow === 4)) return homePick(38, [
+      'If you feel like a small tidy, one drawer or cupboard is enough.',
+      'One drawer or cupboard is enough, if you fancy a small tidy.'
+    ]);
+    if (wet && afternoon) return homePick(34, [
+      'Turkish Delight, if you want a little something sweet.',
+      'A bit of Turkish Delight, if you fancy something sweet.'
+    ]);
+    if (a.dow === 3 && afternoon) return homePick(39, [
+      'Blue’s a good colour if the day needs one.',
+      'If the day needs a colour, blue’s a good one.'
+    ]);
     if (a.dow === 5 && afternoon && sunny && !atWork) return homeWalkLine();
     return '';
   } catch (e) { return ''; }
 }
 function homeCommLine() {
   try {
-    // 2.11.2: commission is a work aside, not a home aside. Keep it out when
-    // Shane is at the already-allowed home place, and never invent a $0 update.
-    if (placeHere() === 'home') return '';
+    // Commission only away from home, and only when an amount was actually entered. Never a made-up $0.
+    if (homeWhere() === 'home') return '';
     const cents = homeFortnightCents();
     if (cents == null) return '';
     const goal = homeGoalCents();
     const amt = centsMoney(cents);
+    const lead = homePick(51, [
+      'Your commission so far is ' + amt + '.',
+      'Commission this fortnight is ' + amt + '.',
+      'So far this fortnight: ' + amt + '.'
+    ]);
     if (!goal) {
-      return 'Your commission so far is ' + amt + '. What’s your goal?';
+      const ask = homePick(52, ['What’s your goal?', 'Got a target in mind?', 'Where do you want this fortnight to land?']);
+      return lead + ' ' + ask;
     }
     const p = cents / goal;
     let how;
-    if (cents >= goal) how = 'That’s your goal done, maybe a bit more. Nice. Want to push it a little?';
-    else if (p >= 0.85) how = 'You’re nearly at your goal. How’s that feeling?';
-    else if (p >= 0.6) how = 'You’re well on the way to your goal. Happy with that?';
-    else if (p >= 0.4) how = 'You’re about halfway to your goal. How’s that going?';
-    else if (p >= 0.15) how = 'You’re a bit of the way to your goal. How’s that feeling?';
-    else how = 'You’re just getting started on your goal. How’s that sitting?';
-    return 'Your commission so far is ' + amt + '. ' + how;
+    if (cents >= goal) how = homePick(53, [
+      'That’s your goal done, maybe a bit more. Nice. Want to push it a little?',
+      'Goal’s done, and then some. Want to nudge it up?'
+    ]);
+    else if (p >= 0.85) how = homePick(54, ['You’re nearly at your goal. How’s that feeling?', 'Almost at the goal. How’s that sitting?']);
+    else if (p >= 0.6) how = homePick(55, ['You’re well on the way to your goal. Happy with that?', 'A good way towards the goal. How’s that going?']);
+    else if (p >= 0.4) how = homePick(56, ['You’re about halfway to your goal. How’s that going?', 'About halfway there. Happy with that?']);
+    else if (p >= 0.15) how = homePick(57, ['You’re a bit of the way to your goal. How’s that feeling?', 'A start on the goal. How’s that sitting?']);
+    else how = homePick(58, ['You’re just getting started on your goal. How’s that sitting?', 'Early days on the goal. How’s that feeling?']);
+    return lead + ' ' + how;
   } catch (e) { return ''; }
 }
 // 2.9.5: one friendly note when a real timed item is within 30 minutes before or after now.
@@ -1179,7 +1276,6 @@ function homeNearLine(seen, now) {
   try {
     const picked = [];
     homeNearItems(now).forEach(x => {
-      if (picked.length >= 2) return;
       if (!x || !x.key || (seen && seen.has(x.key))) return;
       if (picked.some(y => y.key === x.key)) return;
       picked.push(x);
@@ -1191,204 +1287,338 @@ function homeNearLine(seen, now) {
     const recent = picked.every(x => x.delta < -60000);
     const ahead = picked.every(x => x.delta > 60000);
     if (names.length === 1) {
-      if (recent) return names[0] + ' was a little while ago, if you still want it.';
-      if (ahead) return names[0] + ' is a little while away, if you want a heads-up.';
-      return names[0] + ' is about now, if you want it.';
+      if (recent) return homePick(11, [
+        names[0] + ' was a little while ago, if you still want it.',
+        names[0] + ' was just now, if you still want it.',
+        'A little earlier: ' + names[0] + ', if you still want it.'
+      ]);
+      if (ahead) return homePick(12, [
+        names[0] + ' is a little while away, if you want a heads-up.',
+        names[0] + ' is coming up shortly, if you want a heads-up.',
+        'In a little while: ' + names[0] + '.'
+      ]);
+      return homePick(13, [
+        names[0] + ' is about now, if you want it.',
+        names[0] + ' is right about now.',
+        'About now: ' + names[0] + '.'
+      ]);
     }
-    if (recent) return list + ' were a little while ago, if you still want them.';
-    if (ahead) return list + ' are a little while away, if you want a heads-up.';
-    return list + ' are around now, if you want them.';
+    if (recent) return homePick(14, [
+      list + ' were a little while ago, if you still want them.',
+      'A little earlier: ' + list + ', if you still want them.'
+    ]);
+    if (ahead) return homePick(15, [
+      list + ' are a little while away, if you want a heads-up.',
+      'Coming up shortly: ' + list + '.'
+    ]);
+    return homePick(16, [
+      list + ' are around now, if you want them.',
+      'Around now: ' + list + '.'
+    ]);
   } catch (e) { return ''; }
 }
-function homeOverview(shown) {
-  try { return homeOverviewBody(shown); }
-  catch (e) { console.error('Home summary', e); return ''; }
+function homeSumFallback() {
+  return '<div class="card homesum" id="homesum"><ul><li class="due"><span class="tx">Nothing much to flag right now. Have a good one.</span></li></ul></div>';
 }
-function homeOverviewBody(shown) {
-  const bits = [];
-  const mentioned = new Set();
-  // Home-only suggestions use the already-allowed in-memory fix. Unknown and work are not home.
-  const atHome = homeAtHome();
-  const add = (kind, text, urgent) => {
-    if (bits.length >= 6) return;
-    const line = String(text || '').replace(/\s+/g, ' ').trim();
-    if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line)) return;
-    bits.push({ kind, text: line, urgent: !!urgent });
-  };
-  const takeTitles = (titles, limit) => homeTake(mentioned, titles, limit);
-  const pool = homeAttention().filter(x => {
+function homeSumCard(bits) {
+  const bars = ['#7DDECB', '#F9A8D4', '#FDE68A', '#A5B4FC', '#86EFAC', '#FDBA74', '#93C5FD', '#F0ABFC', '#FCD34D', '#99F6E4', '#C4B5FD', '#FDA4AF'];
+  const list = (bits || []).filter(b => b && b.text).slice(0, 4);
+  if (!list.length) return homeSumFallback();
+  return `<div class="card homesum" id="homesum"><ul>${list.map((b, i) => {
+    const overdue = !!b.overdue;
+    const style = overdue ? '' : ` style="--bar:${bars[i % bars.length]}"`;
+    return `<li class="${b.kind || 'note'}${overdue ? ' urgent' : ''}"${style}><span class="tx">${esc(b.text)}</span></li>`;
+  }).join('')}</ul></div>`;
+}
+function homeUrgentPool() {
+  return homeAttention().filter(x => {
     if (!x || !x.name) return false;
     if (x.kind === 'car' || x.kind === 'pet' || x.kind === 'tv' || x.kind === 'meal' || x.kind === 'comm') return false;
     if (homeSaysTv(x.name) || /\broadworks?\b/i.test(x.name)) return false;
+    if (!Number.isFinite(x.days) || x.days > 2) return false;
     return !!homePlainTitle(x.name);
   });
-  const uniqueByTitle = (list, limit) => {
-    const out = [];
-    list.forEach(x => {
-      if (out.length >= limit) return;
-      const plain = homePlainTitle(x.name);
-      const key = homeMentionKey(plain);
-      if (!plain || !key || mentioned.has(key) || out.some(y => homeMentionKey(y.plain) === key)) return;
-      out.push({ days: x.days, plain });
-    });
-    return out;
-  };
-  const nameLine = (items, late) => {
-    const names = items.map(x => homeQuote(x.plain));
-    const list = engList(names);
-    if (late) {
-      return names.length === 1
-        ? names[0] + ' is a bit late. No drama. Whenever you have a minute is fine.'
-        : list + ' are a bit late. They can wait until you feel like it.';
-    }
-    if (items.every(x => x.days === 0)) return 'Today you’ve got ' + list + '.';
-    if (items.every(x => x.days === 1)) return 'Tomorrow you’ve got ' + list + '.';
-    if (names.length === 1) return names[0] + ' is coming up soon.';
-    return 'Coming up soon: ' + list + '.';
-  };
-  const late = uniqueByTitle(pool.filter(x => x.days < 0), 2);
-  if (late.length) {
-    takeTitles(late.map(x => x.plain), 2);
-    add('late', nameLine(late, true), true);
+}
+function homeUniqueDue(pool, pred, mentioned) {
+  const out = [];
+  (pool || []).forEach(x => {
+    if (!pred(x)) return;
+    const plain = homePlainTitle(x.name);
+    const key = homeMentionKey(plain);
+    if (!plain || !key || (mentioned && mentioned.has(key)) || out.some(y => y.key === key)) return;
+    out.push({ days: x.days, plain, key });
+  });
+  return out;
+}
+function homeDuePhrase(items, mode) {
+  const names = items.map(x => homeQuote(x.plain));
+  const list = engList(names);
+  const one = names.length === 1;
+  if (mode === 'late') {
+    return homePick(1, one ? [
+      names[0] + ' is overdue. Whenever you have a minute is fine.',
+      names[0] + ' still needs a look. No rush.',
+      'Overdue: ' + names[0] + '. It can wait until you feel like it.'
+    ] : [
+      list + ' are overdue. They can wait until you feel like it.',
+      'Overdue: ' + list + '. No drama.',
+      list + ' are still open. Whenever you have a minute is fine.'
+    ]);
   }
-  const greet = homeGreetLine();
-  if (greet) add('hello', greet);
+  if (mode === 'today') {
+    return homePick(2, one ? [
+      'Today you’ve got ' + names[0] + '.',
+      names[0] + ' is due today.',
+      'On today: ' + names[0] + '.'
+    ] : [
+      'Today you’ve got ' + list + '.',
+      'Due today: ' + list + '.',
+      list + ' are due today.'
+    ]);
+  }
+  if (items.every(x => x.days === 1)) {
+    return homePick(3, one ? [
+      'Tomorrow you’ve got ' + names[0] + '.',
+      names[0] + ' is due tomorrow.',
+      'Coming tomorrow: ' + names[0] + '.'
+    ] : [
+      'Tomorrow you’ve got ' + list + '.',
+      'Due tomorrow: ' + list + '.',
+      list + ' are due tomorrow.'
+    ]);
+  }
+  if (items.every(x => x.days === 2)) {
+    return homePick(4, one ? [
+      names[0] + ' is due in a couple of days.',
+      names[0] + ' is coming up in two days.',
+      'In a couple of days: ' + names[0] + '.'
+    ] : [
+      list + ' are due in a couple of days.',
+      'In a couple of days: ' + list + '.',
+      list + ' are coming up in two days.'
+    ]);
+  }
+  return homePick(5, [
+    'Coming up in the next day or two: ' + list + '.',
+    list + ' are due in the next day or two.',
+    'Soon: ' + list + '.'
+  ]);
+}
+function homeAsideLine(mentioned) {
   let kin = null;
   try { kin = homeKinLine(); } catch (e) { kin = null; }
   if (kin && kin.text) {
-    try { if (kin.title) mentioned.add(homeMentionKey(kin.title)); } catch (e) {}
-    add('kin', kin.text, !!kin.urgent);
-  } else {
-    let ease = '';
-    try { ease = homeEaseLine(); } catch (e) { ease = ''; }
-    if (ease) add('ease', ease);
+    const key = kin.title ? homeMentionKey(kin.title) : '';
+    if (key && mentioned && mentioned.has(key)) return '';
+    if (key && mentioned) mentioned.add(key);
+    return kin.text;
   }
-  const commLine = homeCommLine();
-  if (commLine) add('comm', commLine);
-  const brBit = homeBridgeBit();
-  if (brBit) add('bridge', brBit.text, brBit.urgent);
-  const soon = uniqueByTitle(pool.filter(x => x.days >= 0 && x.days <= 7), 2);
-  if (soon.length) {
-    takeTitles(soon.map(x => x.plain), 2);
-    add('soon', nameLine(soon, false), soon.some(x => x.days === 0));
-  }
-  const comedy = atHome ? (homeComedyOnNow() || { kind: 'missing', hits: [] }) : { kind: 'missing', hits: [] };
-  if (atHome && comedy.kind === 'ready' && Array.isArray(comedy.hits) && comedy.hits.length) {
-    const picked = [];
-    comedy.hits.forEach(hit => {
-      if (picked.length >= 2) return;
-      const m = /^“(.+)” on (.+)$/.exec(hit);
-      const title = (m ? m[1] : hit).trim();
-      const where = m ? m[2].trim() : '';
-      if (!title || /\broadworks?\b/i.test(title)) return;
-      const got = takeTitles([title], 1);
-      if (!got.length) return;
-      picked.push(where ? homeQuote(got[0]) + ' on ' + where : homeQuote(got[0]));
-    });
-    if (picked.length === 1) add('comedy', picked[0] + ' is on right now, if you feel like a laugh.');
-    else if (picked.length) add('comedy', 'If you feel like a laugh, ' + engList(picked) + ' are on right now.');
-  }
-  const today = todayISO();
-  let meals = [];
-  try { meals = upcomingMeals() || []; } catch (e) { meals = []; }
-  // 2.9.1: once a meal is marked cooked (the same cooked flag as the planner tick), leave it out of the summary. It stays in the plan.
-  const todayMeal = meals.includes(today) && M() && M().plan ? M().plan[today] : null;
-  const mealTitle = todayMeal && !todayMeal.cooked && todayMeal.title ? String(todayMeal.title).replace(/\s+/g, ' ').trim() : '';
-  if (mealTitle && !homeSaysTv(mealTitle) && !/\broadworks?\b/i.test(mealTitle)) {
-    const got = takeTitles([mealTitle], 1);
-    if (got.length) {
-      const q = homeQuote(got[0]);
-      add('meal', /\bpizza\b/i.test(got[0])
-        ? 'Tonight’s dinner is ' + q + '. Gluten free, the way you like it.'
-        : 'Tonight’s dinner is ' + q + '. Should be a good one.');
-    }
-  }
-  let ev = null;
+  const flavor = homeFlavorKind();
+  if (flavor === 'joke') return homePick(91, HOME_JOKES);
+  if (flavor === 'fact') return homePick(92, HOME_FACTS);
+  try { return homeEaseLine(); } catch (e) { return ''; }
+}
+function homePlayLine(mentioned) {
+  if (homeWhere() !== 'home') return '';
+  const a = homeAklParts();
+  const hour = a ? a.hour : -1;
   try {
-    if (atHome) ev = EVS ? upcomingEvents().find(e => {
+    const comedy = homeComedyOnNow() || { kind: 'missing', hits: [] };
+    if (comedy.kind === 'ready' && Array.isArray(comedy.hits) && comedy.hits.length) {
+      const picked = [];
+      comedy.hits.forEach(hit => {
+        if (picked.length >= 2) return;
+        const m = /^“(.+)” on (.+)$/.exec(hit);
+        const title = (m ? m[1] : hit).trim();
+        const where = m ? m[2].trim() : '';
+        if (!title || /\broadworks?\b/i.test(title) || homeSaysTv(title)) return;
+        const key = homeMentionKey(title);
+        if (!key || (mentioned && mentioned.has(key)) || picked.some(p => p.key === key)) return;
+        picked.push({ key, label: where ? homeQuote(title) + ' on ' + where : homeQuote(title) });
+      });
+      if (picked.length) {
+        picked.forEach(p => { if (mentioned) mentioned.add(p.key); });
+        if (picked.length === 1) return homePick(71, [
+          picked[0].label + ' is on right now, if you feel like a laugh.',
+          'If you want a laugh, ' + picked[0].label + ' is on now.',
+          picked[0].label + ' is on right now.'
+        ]);
+        const list = engList(picked.map(p => p.label));
+        return homePick(72, [
+          'If you feel like a laugh, ' + list + ' are on right now.',
+          list + ' are on now, if you want something light.'
+        ]);
+      }
+    }
+  } catch (e) {}
+  const opts = [];
+  if (hour >= 5 && hour < 21) {
+    opts.push(homePick(73, [
+      'A movie could be nice, if you feel like one.',
+      'If you want a film, this is a fine time for it.',
+      'Room for a movie, if the mood strikes.'
+    ]));
+  }
+  try {
+    const ev = (typeof EVS !== 'undefined' && EVS) ? (upcomingEvents() || []).find(e => {
       if (!e || !e.title || /\broadworks?\b/i.test(e.title) || homeSaysTv(e.title)) return false;
       const d = daysLeft(e.date);
       return d >= 0 && d <= 14;
     }) : null;
-  } catch (e) { ev = null; }
-  if (ev && ev.title && ev.date) {
-    const got = takeTitles([String(ev.title).replace(/\s+/g, ' ').trim()], 1);
-    if (got.length) {
-      const d = daysLeft(ev.date);
-      const q = homeQuote(got[0]);
-      const line = d === 0 ? 'If you feel like heading out, ' + q + ' is on in town today.'
-        : d === 1 ? 'Tomorrow there’s ' + q + ' in town, if you fancy it.'
-        : q + ' is on in town soon, if you want a look.';
-      add('out', line);
-    }
-  }
-  const wx = homeWxRead();
-  if (wx.mood === 'wet' || wx.mood === 'sun') {
-    const jobs = takeTitles(homeDayJobs(wx.mood), 1);
-    if (jobs.length) {
-      const q = homeQuote(jobs[0]);
-      add('wx', wx.mood === 'wet'
-        ? 'It’s rainy in Whangārei. ' + q + ' is already on your list if you want something easy indoors.'
-        : 'It’s sunny in Whangārei. ' + q + ' could be a nice way to use the light, if you feel like it.');
-    } else {
-      const vid = atHome ? homeVideoPicks(wx.mood).find(v => v && v.title && homeMentionKey(v.title) && !mentioned.has(homeMentionKey(v.title))) : null;
-      if (vid) {
-        const got = takeTitles([vid.title], 1);
-        if (got.length) {
-          const q = homeQuote(got[0]);
-          add('vid', wx.mood === 'wet'
-            ? 'It’s rainy in Whangārei. ' + q + ' is on your video list if you’d rather stay in.'
-            : 'It’s sunny in Whangārei. ' + q + ' is on your video list if you want a spring idea.');
-        }
+    if (ev && ev.title) {
+      const plain = String(ev.title).replace(/\s+/g, ' ').trim();
+      const key = homeMentionKey(plain);
+      if (plain && key && (!mentioned || !mentioned.has(key))) {
+        const q = homeQuote(plain);
+        const d = daysLeft(ev.date);
+        const line = d === 0
+          ? homePick(74, ['If you feel like heading out, ' + q + ' is on in town today.', q + ' is on in town today, if you fancy it.'])
+          : d === 1
+            ? homePick(75, ['Tomorrow there’s ' + q + ' in town, if you fancy it.', q + ' is on in town tomorrow, if you want a look.'])
+            : homePick(76, [q + ' is on in town soon, if you want a look.', 'Coming up in town: ' + q + ', if you fancy it.']);
+        opts.push({ line, key });
       }
     }
-  }
-  const freshCut = Date.now() - 14 * DAY;
-  const reads = [];
-  let posts = null, episodes = null;
-  try { posts = blogPosts(); } catch (e) { posts = null; }
-  const postMs = posts && posts.length ? Date.parse(posts[0] && posts[0].published) : NaN;
-  if (posts && posts.length && posts[0].title && Number.isFinite(postMs) && postMs >= freshCut) {
-    reads.push({ at: posts[0].published, title: posts[0].title, kind: 'blog',
-      text: 'If you want a read, ' + posts[0].blog + ' has a new post: ' + homeQuote(posts[0].title) + '.' });
-  }
-  try { episodes = podEpisodes(); } catch (e) { episodes = null; }
-  const epMs = episodes && episodes.length ? Date.parse(episodes[0] && episodes[0].published) : NaN;
-  if (episodes && episodes.length && episodes[0].title && Number.isFinite(epMs) && epMs >= freshCut) {
-    reads.push({ at: episodes[0].published, title: episodes[0].title, kind: 'pod',
-      text: 'If you want something to listen to, ' + episodes[0].show + ' has a new episode: ' + homeQuote(episodes[0].title) + '.' });
-  }
-  reads.sort((a, b) => String(b.at).localeCompare(String(a.at)));
-  reads.some(r => {
-    if (!r.title || homeSaysTv(r.title) || /\broadworks?\b/i.test(r.title + ' ' + r.text)) return false;
-    const got = takeTitles([r.title], 1);
-    if (!got.length) return false;
-    add(r.kind, r.text);
-    return true;
-  });
-  let headlines = null;
-  try { headlines = newsItems(); } catch (e) { headlines = null; }
-  if (headlines && headlines.length) {
-    const story = headlines.find(x => x && x.title && !/\broadworks?\b/i.test(x.title) && !homeSaysTv(x.title));
-    if (story) {
-      const got = takeTitles([String(story.title).replace(/\s+/g, ' ').trim()], 1);
-      if (got.length) add('news', 'RNZ has this from around here: ' + homeQuote(got[0]) + '.');
-    }
-  }
+  } catch (e) {}
   try {
-    const near = homeNearLine(mentioned);
-    if (near && !/\broadworks?\b/i.test(near) && !/\bmore are due\b/i.test(near)) {
-      if (bits.length >= 6) bits.pop();
-      bits.push({ kind: 'near', text: near, urgent: false });
+    const mood = homeWxRead().mood === 'sun' ? 'sun' : 'wet';
+    const vid = (homeVideoPicks(mood) || []).find(v => v && v.title && homeMentionKey(v.title) && (!mentioned || !mentioned.has(homeMentionKey(v.title))));
+    if (vid) {
+      const key = homeMentionKey(vid.title);
+      const q = homeQuote(vid.title);
+      opts.push({ line: homePick(77, [
+        'If you want something to watch, ' + q + ' is on your list.',
+        q + ' is on your video list, if you’d rather stay in.'
+      ]), key });
     }
-  } catch (e) { /* a nearby note must not blank the summary */ }
-  if (!bits.length) return `<div class="card homesum" id="homesum"><ul><li class="due"><span class="tx">Nothing much to flag right now. Have a good one.</span></li></ul></div>`;
-  const bars = ['#0F766E', '#1D4ED8', '#6D28D9', '#047857', '#9A3412', '#BE185D', '#1E3A8A', '#0369A1', '#3F6212', '#155E75', '#5B21B6', '#134E4A'];
-  return `<div class="card homesum" id="homesum"><ul>${bits.map((b, i) => {
-    const urgent = !!(b.urgent || b.kind === 'late');
-    const style = urgent ? '' : ` style="--bar:${bars[i % bars.length]}"`;
-    return `<li class="${b.kind}${urgent ? ' urgent' : ''}"${style}><span class="tx">${esc(b.text)}</span></li>`;
-  }).join('')}</ul></div>`;
+  } catch (e) {}
+  const norm = opts.map(o => typeof o === 'string' ? { line: o, key: '' } : o).filter(o => o && o.line && !/\broadworks?\b/i.test(o.line));
+  if (!norm.length) return '';
+  const chosen = homePick(78, norm);
+  if (chosen && chosen.key && mentioned) mentioned.add(chosen.key);
+  return chosen && chosen.line ? chosen.line : '';
+}
+function homeMealLine(mentioned) {
+  try {
+    const meals = upcomingMeals() || [];
+    const today = todayISO();
+    const todayMeal = meals.includes(today) && M() && M().plan ? M().plan[today] : null;
+    if (!todayMeal || todayMeal.cooked || !todayMeal.title) return '';
+    const title = String(todayMeal.title).replace(/\s+/g, ' ').trim();
+    if (!title || homeSaysTv(title) || /\broadworks?\b/i.test(title)) return '';
+    const key = homeMentionKey(title);
+    if (!key || (mentioned && mentioned.has(key))) return '';
+    if (mentioned) mentioned.add(key);
+    const q = homeQuote(title);
+    if (homeGlutenFood(title) || /\bpizza\b/i.test(title)) {
+      return homePick(81, [
+        'Tonight’s dinner is ' + q + '. Gluten free, the way you like it.',
+        q + ' is the plan tonight. Keep it gluten free.',
+        'Dinner tonight: ' + q + '. Gluten free, of course.'
+      ]);
+    }
+    return homePick(82, [
+      'Tonight’s dinner is ' + q + '. Should be a good one.',
+      q + ' is on for tonight, if you’re cooking.',
+      'Dinner tonight is ' + q + '.'
+    ]);
+  } catch (e) { return ''; }
+}
+function homeReadLine(mentioned) {
+  try {
+    const freshCut = Date.now() - 14 * DAY;
+    const reads = [];
+    let posts = null, episodes = null;
+    try { posts = blogPosts(); } catch (e) { posts = null; }
+    const postMs = posts && posts.length ? Date.parse(posts[0] && posts[0].published) : NaN;
+    if (posts && posts.length && posts[0].title && Number.isFinite(postMs) && postMs >= freshCut) {
+      reads.push({ title: posts[0].title, text: homePick(85, [
+        'If you want a read, ' + posts[0].blog + ' has a new post: ' + homeQuote(posts[0].title) + '.',
+        posts[0].blog + ' has a new post, ' + homeQuote(posts[0].title) + ', if you want a read.'
+      ]) });
+    }
+    try { episodes = podEpisodes(); } catch (e) { episodes = null; }
+    const epMs = episodes && episodes.length ? Date.parse(episodes[0] && episodes[0].published) : NaN;
+    if (episodes && episodes.length && episodes[0].title && Number.isFinite(epMs) && epMs >= freshCut) {
+      reads.push({ title: episodes[0].title, text: homePick(86, [
+        'If you want something to listen to, ' + episodes[0].show + ' has a new episode: ' + homeQuote(episodes[0].title) + '.',
+        episodes[0].show + ' has a new episode, ' + homeQuote(episodes[0].title) + ', if you want a listen.'
+      ]) });
+    }
+    let headlines = null;
+    try { headlines = newsItems(); } catch (e) { headlines = null; }
+    if (headlines && headlines.length) {
+      const story = headlines.find(x => x && x.title && !/\broadworks?\b/i.test(x.title) && !homeSaysTv(x.title));
+      if (story) reads.push({ title: String(story.title), text: 'RNZ has this from around here: ' + homeQuote(String(story.title).replace(/\s+/g, ' ').trim()) + '.' });
+    }
+    for (let i = 0; i < reads.length; i++) {
+      const r = reads[i];
+      if (!r || !r.title || !r.text || homeSaysTv(r.title) || /\broadworks?\b/i.test(r.title + ' ' + r.text)) continue;
+      const key = homeMentionKey(r.title);
+      if (!key || (mentioned && mentioned.has(key))) continue;
+      if (mentioned) mentioned.add(key);
+      return r.text;
+    }
+    return '';
+  } catch (e) { return ''; }
+}
+function homeOverview(shown) {
+  const urgent = [];
+  try { return homeOverviewBody(shown, urgent); }
+  catch (e) {
+    console.error('Home summary', e);
+    try { if (urgent.length) return homeSumCard(urgent); } catch (e2) {}
+    return homeSumFallback();
+  }
+}
+// 2.12.0: at most four notes. Urgent first (overdue, due today, due in a day or two, or timed within 30 minutes).
+// One optional aside. A birthday in the next 14 days wins that slot. A joke or a fun fact only on some opens, never both.
+// Movie, TV, streaming, comedy and events only at home. A movie only from 5am to 9pm. Commission never at home.
+function homeOverviewBody(shown, urgentOut) {
+  const urgent = Array.isArray(urgentOut) ? urgentOut : [];
+  const mentioned = new Set();
+  const pool = homeUrgentPool();
+  const mark = items => { items.forEach(x => mentioned.add(x.key)); };
+  const late = homeUniqueDue(pool, x => x.days < 0, mentioned);
+  if (late.length) {
+    mark(late);
+    urgent.push({ kind: 'late', text: homeDuePhrase(late, 'late'), overdue: true });
+  }
+  let near = '';
+  try { near = homeNearLine(mentioned); } catch (e) { near = ''; }
+  if (near && !/\broadworks?\b/i.test(near) && !/\bmore are due\b/i.test(near)) urgent.push({ kind: 'near', text: near, overdue: false });
+  const todayItems = homeUniqueDue(pool, x => x.days === 0, mentioned);
+  if (todayItems.length) {
+    mark(todayItems);
+    urgent.push({ kind: 'today', text: homeDuePhrase(todayItems, 'today'), overdue: false });
+  }
+  const soon = homeUniqueDue(pool, x => x.days === 1 || x.days === 2, mentioned);
+  if (soon.length) {
+    mark(soon);
+    urgent.push({ kind: 'soon', text: homeDuePhrase(soon, 'soon'), overdue: false });
+  }
+  if (urgent.length > 4) urgent.splice(4);
+  const bits = urgent.slice();
+  try {
+    const add = (kind, text) => {
+      if (bits.length >= 4) return;
+      const line = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line) || /\b90[\s-]*hours?\b/i.test(line)) return;
+      bits.push({ kind, text: line, overdue: false });
+    };
+    add('aside', homeAsideLine(mentioned));
+    add('hello', homeGreetLine());
+    add('comm', homeCommLine());
+    add('play', homePlayLine(mentioned));
+    add('meal', homeMealLine(mentioned));
+    try {
+      const br = homeBridgeBit();
+      if (br && br.text) add('bridge', br.text);
+    } catch (e) {}
+    add('read', homeReadLine(mentioned));
+  } catch (e) { console.error('Home summary optional', e); }
+  if (!bits.length) return homeSumFallback();
+  return homeSumCard(bits);
 }
 
 // 1.95.0: every Home section uses one transparent darker grey-blue (rgba(48,62,80,.55)). Numbered summary bars are not these sections.
@@ -5807,8 +6037,8 @@ function placeHere() {
 function homePlaceLine() {
   try {
     const p = placeHere();
-    if (p === 'home') return 'Welcome home.';
-    if (p === 'work') return 'Back at work again.';
+    if (p === 'home') return homePick(62, ['Welcome home.', 'Good to be home.', 'Home again.', 'Nice to have you home.']);
+    if (p === 'work') return homePick(63, ['Back at work.', 'You’re at work.', 'Work it is.']);
     return '';
   } catch (e) { return ''; }
 }

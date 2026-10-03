@@ -96,12 +96,14 @@ body.kb #view{padding-bottom:28px}
 .wxgreet{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin:-6px 0 10px;padding:6px 10px;color:var(--ink2);font-size:0.9375rem;font-weight:600;line-height:1.35;background:color-mix(in srgb,#e8a317 16%,transparent);border-radius:14px}
 .card.homesum{margin:2px 0 12px;padding:0;background:transparent;box-shadow:none;overflow:visible}
 .homesum ul{margin:0;padding:6px 2px 8px;list-style:none;display:flex;flex-direction:column;gap:10px}
-.homesum li{display:block;margin:0;padding:13px 16px 14px;border:none;border-radius:16px;background:var(--bar,#0F766E);color:#fff;font-size:0.9375rem;line-height:1.45;font-weight:650;overflow:visible}
+.homesum li{display:block;margin:0;padding:13px 16px 14px;border:none;border-radius:16px;background:color-mix(in srgb,var(--bar,#7DDECB) 78%,transparent);color:#142033;font-size:0.9375rem;line-height:1.45;font-weight:650;overflow:visible}
 .homesum li .tx{display:block;transform:rotate(-1.2deg) skewX(-4deg);transform-origin:left center}
 @media (prefers-reduced-motion: reduce){
   .homesum li .tx{transform:rotate(-1.2deg) skewX(-4deg)}
 }
-.homesum li.urgent{background:#C62828;color:#fff}
+.homesum li.urgent{background:color-mix(in srgb,#FF8A80 82%,transparent);color:#7F1D1D;box-shadow:inset 0 0 0 2px color-mix(in srgb,#C62828 70%,transparent)}
+html[data-theme="dark"] .homesum li{background:color-mix(in srgb,var(--bar,#7DDECB) 86%,transparent);color:#142033}
+html[data-theme="dark"] .homesum li.urgent{background:color-mix(in srgb,#FF8A80 88%,transparent);color:#7F1D1D}
 html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transparent)}
 .wxgreet b{color:var(--ink);font-weight:800}
 .wxgreet .wxgico{width:28px;height:28px;display:grid;place-items:center;flex:none}
