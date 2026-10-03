@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.9.1';
+const APP_VERSION = '2.9.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -789,6 +789,7 @@ function homeComedyOnNow() {
 // a goal question only from a stored goal (or a plain “what’s your goal?” when none is stored),
 // and welcome home or back at work only when a location fix is already in memory and near a saved place.
 // 2.9.0: one light personal note when it fits. Not a biography, and not a lecture about hours, bedtime, or being late.
+// 2.9.2: a few more of those, still only one, and only when that part of the day fits. Birthday still wins.
 // Family ages come only from a stored birthday year, except Shane at 52 and Sarah at 51 on the day itself when no year is stored.
 // Time of day for the summary only. The header stays "Hi Shane". Morning is before noon,
 // afternoon until 5pm, evening from 5pm, all on the Pacific/Auckland clock.
@@ -897,6 +898,26 @@ function homeKinLine() {
 }
 // A single aside. Work start only on a weekday morning, and never as a telling-off.
 // Movies, books, the gym, the garden, music, chocolate, merlot, or blue, only when that part of the day fits.
+// 2.9.2 still returns one line. New notes only fill a fitting slot, and a slot that already has a line keeps it on the other days.
+// Friday and Saturday are days off. No street address. No offer to control the house, and no lecture about hours or bedtime.
+function homeWalkLine() {
+  let who = 'the dog';
+  try {
+    const dogs = (typeof S !== 'undefined' && S && Array.isArray(S.pets) ? S.pets : []).filter(p => p && p.type === 'dog');
+    const names = dogs.map(p => String(p.name || '').trim()).filter(n => n && n.toLowerCase() !== 'pet');
+    if (names.length === 1) who = names[0];
+  } catch (e) { who = 'the dog'; }
+  return 'A good day for a bushwalk, or a walk with ' + who + ', if you feel like it.';
+}
+function homeCookAside(dow) {
+  try {
+    const today = todayISO();
+    const plan = (typeof M === 'function' && M() && M().plan) ? M().plan : null;
+    const entry = plan ? plan[today] : null;
+    if (entry && entry.cooked) return '';
+  } catch (e) { return ''; }
+  return (dow === 5 ? 'Friday' : 'Saturday') + ' is a good night for a gluten-free cook, if you feel like it.';
+}
 function homeEaseLine() {
   try {
     const a = homeAklParts();
@@ -905,26 +926,52 @@ function homeEaseLine() {
     const morning = a.hour < 12;
     const afternoon = a.hour >= 12 && a.hour < 17;
     const evening = a.hour >= 17;
-    let wet = false;
-    try { wet = homeWxRead().mood === 'wet'; } catch (e) { wet = false; }
-    if (!weekend && morning) {
-      try { if (placeHere() === 'work') return ''; } catch (e) {}
+    let wet = false, sunny = false;
+    try {
+      const mood = homeWxRead().mood;
+      wet = mood === 'wet';
+      sunny = mood === 'sun';
+    } catch (e) { wet = false; sunny = false; }
+    let atWork = false;
+    try { atWork = placeHere() === 'work'; } catch (e) { atWork = false; }
+    let odd = false;
+    try {
+      const c = DD.nzClock(new Date());
+      const day = c && c.iso ? +String(c.iso).slice(8, 10) : NaN;
+      odd = Number.isFinite(day) && day % 2 === 1;
+    } catch (e) { odd = false; }
+    // Mon–Thu mornings only. Friday is a day off, so it does not get the work line.
+    if (a.dow >= 1 && a.dow <= 4 && morning) {
+      if (atWork) return '';
       return 'Work usually starts at 8:30, whenever you head in.';
     }
     if (a.hour >= 21) return 'Late one’s fine. Suno’s there if you want some music.';
-    if (evening && (a.dow === 5 || a.dow === 6)) return 'A glass of merlot later, if you feel like one.';
+    if (evening && (a.dow === 5 || a.dow === 6)) {
+      if (odd) {
+        const cook = homeCookAside(a.dow);
+        if (cook) return cook;
+      }
+      return 'A glass of merlot later, if you feel like one.';
+    }
     if (evening) return 'If you want some music, Suno’s there.';
     if (weekend && afternoon) {
       if (wet) return 'Turkish Delight, if you want a little something sweet.';
       if (a.dow === 0) return 'After a long week, a movie or a book if you get a quiet patch.';
       return 'The gym’s there if you feel like it.';
     }
-    if (weekend && morning) {
+    if ((weekend || a.dow === 5) && morning) {
       if (wet) return 'Turkish Delight, if you want a little something sweet.';
+      if (!atWork && sunny && a.dow === 6) return 'Onerahi’s close to the beach, if you feel like some sun.';
+      if (!atWork && sunny && (a.dow === 0 || a.dow === 5)) return homeWalkLine();
       return 'The garden’s there if you feel like pottering.';
     }
+    // Rainy Monday or Thursday afternoon: a short tidy idea, instead of the sweet line those afternoons used to share.
+    if (wet && afternoon && (a.dow === 1 || a.dow === 4)) return 'If you feel like a small tidy, one drawer or cupboard is enough.';
     if (wet && afternoon) return 'Turkish Delight, if you want a little something sweet.';
     if (a.dow === 3 && afternoon) return 'Blue’s a good colour if the day needs one.';
+    // Tuesday afternoon is otherwise empty. One light line, with nothing to tap or control.
+    if (a.dow === 2 && afternoon) return 'The Hue lights, the cameras and the smart plugs are a nice bit of kit.';
+    if (a.dow === 5 && afternoon && sunny && !atWork) return homeWalkLine();
     return '';
   } catch (e) { return ''; }
 }
