@@ -1,8 +1,8 @@
 /* Car & Life Due Dates – the app. Data lives on this device (IndexedDB). Settings can also sync it to another device. */
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
-  money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.9.6';
+  money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
+const APP_VERSION = '2.10.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -142,6 +142,7 @@ function normalise(d) {
   d.commission = normComm(d.commission); // 1.7.0: commission tracker (older data and backups have none)
   d.loans = normLoans(d.loans); // 1.10.0: loans (older data and backups have none)
   d.reminders = normReminders(d.reminders); // 1.27.0: reminders (older data and backups have none)
+  d.countdowns = normCountdowns(d.countdowns); // 2.10.0: named countdowns (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.health = normHealth(d.health); // 1.8.0: Health (older data and backups have none)
   d.garden = normGarden(d.garden); // 1.20.0: Gardening (older data and backups have none)
@@ -300,13 +301,14 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   bills: ['bill', 'bill', 'Bills', 'The next bills to pay', 0],
   cars: ['car', 'car', 'Cars at a glance', 'Each car’s next WOF and rego', 0],
   ideas: ['bulb', 'idea', 'Starred ideas', 'Ideas you’ve starred', 0],
-  diary: ['book', 'diary', 'Diary', 'Today’s page, from what’s already in the app', 0]
+  diary: ['book', 'diary', 'Diary', 'Today’s page, from what’s already in the app', 0],
+  countdown: ['clock', 'count', 'Countdown', 'Days left until a date you name', 0]
 };
 const HOME_DEFAULT = Object.keys(HOME);
 /* 1.99.0: Home cards stay in the same groups as the side panel. Order inside a group can change.
    A card cannot move into another group. Only real Home cards are listed. */
 const HOME_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['holidays', 'summary', 'attention', 'todo', 'diary'] },
+  { id: 'day', title: 'Everyday', keys: ['holidays', 'summary', 'attention', 'todo', 'diary', 'countdown'] },
   { id: 'money', title: 'Money', keys: ['loans', 'commission', 'bills'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] },
@@ -512,6 +514,13 @@ const HOME_CARD = {
     const a = lines[0] ? lines[0].text : DIARY_QUIET;
     const b = lines[1] ? lines[1].text : '';
     return homeSec('Diary', '<a href="#diary">Open</a>') + `<button class="row" onclick="go('#diary')"><div class="ic diary">${I('book')}</div><div class="tx"><div class="t">${esc(a)}</div>${b ? `<div class="s">${esc(b)}</div>` : ''}</div>${I('right')}</button>`;
+  },
+  // 2.10.0: off until Customise Home turns it on. Everyday only.
+  countdown: () => {
+    const list = countdownRows();
+    const head = homeSec('Countdown', '<a href="#countdown">See all</a>');
+    if (!list.length) return head + '<div class="card empty"><div class="t">Nothing counting down right now.</div></div>';
+    return head + `<div class="list" id="homecd">${list.slice(0, 3).map(x => cdRow(x, false)).join('')}</div>`;
   }
 };
 function homeEditHtml() {
@@ -5589,7 +5598,8 @@ function More() {
     videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
     top40: () => 'Official Top 40 · chart as of 3 Oct 2026',
     radio: () => 'Stations you can hear in Whangārei',
-    diary: () => { const lines = diaryFlat(diaryToday()); return lines.length ? esc(lines[0].text) : 'A quiet page today'; }
+    diary: () => { const lines = diaryFlat(diaryToday()); return lines.length ? esc(lines[0].text) : 'A quiet page today'; },
+    countdown: () => { const list = countdownRows(); if (!list.length) return 'Nothing counting down right now.'; const x = list[0]; return esc(x.name) + ' · ' + cdWords(cdDays(x.date)); }
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
     bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
@@ -5618,13 +5628,14 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
-  diary: ['book', 'diary', 'Diary', 'Diary']
+  diary: ['book', 'diary', 'Diary', 'Diary'],
+  countdown: ['clock', 'count', 'Countdown', 'Countdown']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'diary'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'diary', 'countdown'] },
   { id: 'money', title: 'Money', keys: ['bills', 'commission', 'loans'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health'] },
   { id: 'cars', title: '', keys: ['cars'] },
@@ -8915,6 +8926,98 @@ function Diary() {
     `<div class="foot">Appointments, to-dos, bills, meals, birthdays, reminders, commission, cars, pets, health, garden and local events already on this phone. Nothing new is fetched for this page.</div>`;
 }
 
+
+/* ================= COUNTDOWN (2.10.0) =================
+   A name and a date the user picks, plus the public holidays already built into the app.
+   Days left are worked out from today in Pacific/Auckland each time the page draws.
+   Nothing is copied into Reminders. The page is the daily reminder. */
+function normCountdowns(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [], seen = new Set();
+  for (const c of list) {
+    if (!c || typeof c !== 'object') continue;
+    const name = String(c.name || c.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    const date = String(c.date || '');
+    if (!name || !parseD(date)) continue;
+    let id = String(c.id || '');
+    if (!/^cd-[a-z0-9]{4,40}$/i.test(id)) id = uid('cd');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, name, date });
+  }
+  return out;
+}
+function nzTodayISO(now = new Date()) { return nzStampLocal(now).slice(0, 10); }
+function cdDays(iso, now = new Date()) {
+  const t = parseD(nzTodayISO(now)), d = parseD(iso);
+  if (t == null || d == null) return null;
+  return Math.round((d - t) / DAY);
+}
+function cdWords(d) {
+  if (d === 0) return 'Today';
+  if (d === 1) return '1 day to go';
+  return d + ' days to go';
+}
+function countdownHolidays(today) {
+  if (!showHolidays()) return [];
+  const y = +today.slice(0, 4), out = [];
+  [y, y + 1].forEach(yr => {
+    nzHolidays(yr).forEach(h => { if (h && h.date >= today) out.push({ kind: 'hol', name: h.name, date: h.date }); });
+  });
+  return out;
+}
+function countdownRows(now = new Date()) {
+  const today = nzTodayISO(now);
+  const mine = (S.countdowns || []).filter(c => c && c.date >= today).map(c => ({ kind: 'mine', id: c.id, name: c.name, date: c.date }));
+  return mine.concat(countdownHolidays(today)).filter(x => {
+    const d = cdDays(x.date, now);
+    return d != null && d >= 0;
+  }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.kind === 'mine' ? -1 : 1) || a.name.localeCompare(b.name));
+}
+function cdRow(x, del) {
+  const d = cdDays(x.date);
+  const ic = x.kind === 'hol' ? 'hol' : 'count';
+  const icon = x.kind === 'hol' ? 'flag' : 'clock';
+  const sub = x.kind === 'hol' ? 'Public holiday · ' + fmtW(x.date) : fmtW(x.date);
+  const body = `<div class="ic ${ic}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${esc(sub)}</div></div><span class="pill duepill ${dueTone(d)}">${esc(cdWords(d))}</span>`;
+  if (x.kind === 'mine' && del) return `<div class="row">${body}<button type="button" class="iconbtn" aria-label="Delete ${esc(x.name)}" onclick="deleteCountdown('${x.id}')">${I('trash')}</button></div>`;
+  if (x.kind === 'hol') return `<button class="row" onclick="showHol('${x.date}',${JSON.stringify(x.name).replace(/"/g, '&quot;')})">${body}</button>`;
+  return `<button class="row" onclick="go('#countdown')">${body}</button>`;
+}
+function Countdown() {
+  const list = countdownRows();
+  const form = `<form class="addbar cdadd" onsubmit="addCountdown(event)"><input id="cdname" name="name" placeholder="Name" maxlength="80" autocomplete="off" aria-label="Name" enterkeyhint="next"><input id="cddate" name="date" type="date" aria-label="Date" required><button type="submit" aria-label="Add countdown">${I('plus')}</button></form>`;
+  const body = list.length
+    ? `<div class="list" id="cdlist">${list.map(x => cdRow(x, true)).join('')}</div>`
+    : '<div class="card empty" id="cdempty"><div class="t">Nothing counting down right now.</div></div>';
+  return header('Countdown', 'How many days are left', addBtn('Add a countdown', "document.getElementById('cdname').focus()")) + form + body +
+    '<div class="foot">The number is worked out again from today’s date in New Zealand. Your own dates stay on this phone. Public holidays are the ones already built into the app.</div>';
+}
+async function addCountdown(e) {
+  e.preventDefault();
+  const nameEl = $('#cdname'), dateEl = $('#cddate');
+  const name = String(nameEl && nameEl.value || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const date = String(dateEl && dateEl.value || '');
+  if (!name) { toast('Please type a name.'); if (nameEl) nameEl.focus(); return; }
+  if (!parseD(date)) { toast('Please choose a date.'); return; }
+  const d = cdDays(date);
+  if (d == null || d < 0) { toast('That date has already passed.'); return; }
+  const snapS = snap();
+  if (!Array.isArray(S.countdowns)) S.countdowns = [];
+  S.countdowns.push({ id: uid('cd'), name, date });
+  await save();
+  render();
+  toast('Countdown added.', 'Undo', undoTo(snapS));
+}
+async function deleteCountdown(id) {
+  if (!(S.countdowns || []).some(c => c.id === id)) return;
+  const snapS = snap();
+  S.countdowns = S.countdowns.filter(c => c.id !== id);
+  await save();
+  render();
+  toast('Countdown deleted.', 'Undo', undoTo(snapS));
+}
+
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
@@ -8945,7 +9048,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown };
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
