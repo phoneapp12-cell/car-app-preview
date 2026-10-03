@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.9.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -788,6 +788,8 @@ function homeComedyOnNow() {
 // 2.8.0: also a time-of-day hello (Pacific/Auckland), this fortnight’s real commission when it is stored,
 // a goal question only from a stored goal (or a plain “what’s your goal?” when none is stored),
 // and welcome home or back at work only when a location fix is already in memory and near a saved place.
+// 2.9.0: one light personal note when it fits. Not a biography, and not a lecture about hours, bedtime, or being late.
+// Family ages come only from a stored birthday year, except Shane at 52 and Sarah at 51 on the day itself when no year is stored.
 // Time of day for the summary only. The header stays "Hi Shane". Morning is before noon,
 // afternoon until 5pm, evening from 5pm, all on the Pacific/Auckland clock.
 function homeDayPart(now) {
@@ -831,6 +833,100 @@ function homeGoalCents() {
     if (!Number.isFinite(+c.goalCents) || Math.round(+c.goalCents) <= 0) return null;
     return Math.round(+c.goalCents);
   } catch (e) { return null; }
+}
+function homeAklParts(now) {
+  try {
+    const c = DD.nzClock(now || new Date());
+    const hour = Math.floor(c.min / 60);
+    if (!Number.isFinite(hour) || !c.iso) return null;
+    const dow = new Date(c.iso + 'T12:00:00Z').getUTCDay();
+    if (!Number.isFinite(dow)) return null;
+    return { hour, dow, min: c.min };
+  } catch (e) { return null; }
+}
+// First name only. Relationship is for the summary line, never a street or a made-up age.
+function homeKinOf(name) {
+  const first = String(name || '').trim().toLowerCase().replace(/[^a-z].*$/, '');
+  if (first === 'millesha') return { call: 'Your daughter Millesha' };
+  if (first === 'cass') return { call: 'Your daughter Cass' };
+  if (first === 'aranea') return { call: 'Your granddaughter Aranea' };
+  if (first === 'monique') return { call: 'Your niece-in-law Monique' };
+  if (first === 'sarah') return { call: 'Sarah', wife: true };
+  if (first === 'shane') return { call: 'you', you: true };
+  return null;
+}
+// One real birthday within a fortnight, the soonest. Skip if that person is not on the list.
+function homeKinLine() {
+  try {
+    if (typeof S === 'undefined' || !S || !Array.isArray(S.birthdays) || typeof bdayInfo !== 'function') return null;
+    const hits = [];
+    S.birthdays.forEach(b => {
+      if (!b || !b.name) return;
+      const kin = homeKinOf(b.name);
+      if (!kin) return;
+      let info = null;
+      try { info = bdayInfo(b); } catch (e) { info = null; }
+      if (!info || !Number.isFinite(info.d) || info.d < 0 || info.d > 14) return;
+      const age = info.age > 0 ? Math.round(+info.age) : 0;
+      const title = b.name + '’s ' + (age && typeof ordinal === 'function' ? ordinal(age) + ' ' : '') + 'birthday';
+      hits.push({ kin, d: info.d, age, title });
+    });
+    if (!hits.length) return null;
+    hits.sort((a, b) => a.d - b.d);
+    const h = hits[0], kin = h.kin, d = h.d, age = h.age;
+    let text = '';
+    if (kin.you) {
+      if (d === 0) text = age ? 'Happy birthday. You’re ' + age + '.' : 'Happy birthday. You’re 52.';
+      else if (d === 1) text = age ? 'Your birthday’s tomorrow. You’ll be ' + age + '.' : 'Your birthday’s tomorrow.';
+      else text = 'Your birthday’s coming up.';
+    } else if (kin.wife && d === 0 && !age) {
+      text = 'It’s Sarah’s birthday. She’s 51.';
+    } else if (d === 0 && age) {
+      text = kin.call + ' is ' + age + ' today.';
+    } else if (d === 1 && age) {
+      text = kin.call + ' turns ' + age + ' tomorrow.';
+    } else if (d === 0) {
+      text = kin.call + '’s birthday is today.';
+    } else if (d === 1) {
+      text = kin.call + '’s birthday is tomorrow.';
+    } else {
+      text = kin.call + '’s birthday is coming up.';
+    }
+    return text ? { text, title: h.title, urgent: d === 0 } : null;
+  } catch (e) { return null; }
+}
+// A single aside. Work start only on a weekday morning, and never as a telling-off.
+// Movies, books, the gym, the garden, music, chocolate, merlot, or blue, only when that part of the day fits.
+function homeEaseLine() {
+  try {
+    const a = homeAklParts();
+    if (!a) return '';
+    const weekend = a.dow === 0 || a.dow === 6;
+    const morning = a.hour < 12;
+    const afternoon = a.hour >= 12 && a.hour < 17;
+    const evening = a.hour >= 17;
+    let wet = false;
+    try { wet = homeWxRead().mood === 'wet'; } catch (e) { wet = false; }
+    if (!weekend && morning) {
+      try { if (placeHere() === 'work') return ''; } catch (e) {}
+      return 'Work usually starts at 8:30, whenever you head in.';
+    }
+    if (a.hour >= 21) return 'Late one’s fine. Suno’s there if you want some music.';
+    if (evening && (a.dow === 5 || a.dow === 6)) return 'A glass of merlot later, if you feel like one.';
+    if (evening) return 'If you want some music, Suno’s there.';
+    if (weekend && afternoon) {
+      if (wet) return 'Turkish Delight, if you want a little something sweet.';
+      if (a.dow === 0) return 'After a long week, a movie or a book if you get a quiet patch.';
+      return 'The gym’s there if you feel like it.';
+    }
+    if (weekend && morning) {
+      if (wet) return 'Turkish Delight, if you want a little something sweet.';
+      return 'The garden’s there if you feel like pottering.';
+    }
+    if (wet && afternoon) return 'Turkish Delight, if you want a little something sweet.';
+    if (a.dow === 3 && afternoon) return 'Blue’s a good colour if the day needs one.';
+    return '';
+  } catch (e) { return ''; }
 }
 function homeCommLine() {
   try {
@@ -904,6 +1000,16 @@ function homeOverviewBody(shown) {
   }
   const greet = homeGreetLine();
   if (greet) add('hello', greet);
+  let kin = null;
+  try { kin = homeKinLine(); } catch (e) { kin = null; }
+  if (kin && kin.text) {
+    try { if (kin.title) mentioned.add(homeMentionKey(kin.title)); } catch (e) {}
+    add('kin', kin.text, !!kin.urgent);
+  } else {
+    let ease = '';
+    try { ease = homeEaseLine(); } catch (e) { ease = ''; }
+    if (ease) add('ease', ease);
+  }
   const commLine = homeCommLine();
   if (commLine) add('comm', commLine);
   const brBit = homeBridgeBit();
@@ -935,7 +1041,12 @@ function homeOverviewBody(shown) {
   const mealTitle = meals.includes(today) && M() && M().plan && M().plan[today] && M().plan[today].title ? String(M().plan[today].title).replace(/\s+/g, ' ').trim() : '';
   if (mealTitle && !homeSaysTv(mealTitle) && !/\broadworks?\b/i.test(mealTitle)) {
     const got = takeTitles([mealTitle], 1);
-    if (got.length) add('meal', 'Tonight’s dinner is ' + homeQuote(got[0]) + '. Should be a good one.');
+    if (got.length) {
+      const q = homeQuote(got[0]);
+      add('meal', /\bpizza\b/i.test(got[0])
+        ? 'Tonight’s dinner is ' + q + '. Gluten free, the way you like it.'
+        : 'Tonight’s dinner is ' + q + '. Should be a good one.');
+    }
   }
   let ev = null;
   try {
