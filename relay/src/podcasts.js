@@ -8,20 +8,24 @@
  * invented. Kept for 15 minutes. No logging.
  *
  * Checked live on 3 Oct 2026: each URL returned recent episodes.
- *   Checkpoint (RNZ) — https://www.rnz.co.nz/podcasts/checkpoint.rss
- *   This American Life — https://feeds.thisamericanlife.org/talpodcast
- *   99% Invisible — https://feeds.simplecast.com/BqbsxVfO
+ *   Accidental Tech Podcast (technology) — https://cdn.atp.fm/rss/public
+ *   The joe gardener Show (gardening) — https://thejoegardenershow.libsyn.com/rss
+ *   Focus on Politics (RNZ, New Zealand politics) — https://www.rnz.co.nz/podcasts/rss/focusonpolitics.rss
+ *   The Sporkful (food) — https://feeds.simplecast.com/n91GPFY5
+ *   Short Wave (science) — https://feeds.npr.org/510351/podcast.xml
  */
 import { decode, clip, get } from './events.js';
 import { httpsUrl } from './blogs.js';
 
 export const PODCASTS = [
-  { id: 'checkpoint', name: 'Checkpoint', home: 'https://www.rnz.co.nz/national/programmes/checkpoint', feed: 'https://www.rnz.co.nz/podcasts/checkpoint.rss' },
-  { id: 'thisamericanlife', name: 'This American Life', home: 'https://www.thisamericanlife.org/', feed: 'https://feeds.thisamericanlife.org/talpodcast' },
-  { id: '99pi', name: '99% Invisible', home: 'https://99percentinvisible.org/', feed: 'https://feeds.simplecast.com/BqbsxVfO' }
+  { id: 'atp', name: 'Accidental Tech Podcast', home: 'https://atp.fm/', feed: 'https://cdn.atp.fm/rss/public' },
+  { id: 'joegardener', name: 'The joe gardener Show', home: 'https://joegardener.com/', feed: 'https://thejoegardenershow.libsyn.com/rss' },
+  { id: 'focusonpolitics', name: 'Focus on Politics', home: 'https://www.rnz.co.nz/podcast/focusonpolitics', feed: 'https://www.rnz.co.nz/podcasts/rss/focusonpolitics.rss' },
+  { id: 'sporkful', name: 'The Sporkful', home: 'https://www.sporkful.com/', feed: 'https://feeds.simplecast.com/n91GPFY5' },
+  { id: 'shortwave', name: 'Short Wave', home: 'https://www.npr.org/podcasts/510351/short-wave', feed: 'https://feeds.npr.org/510351/podcast.xml' }
 ];
 
-const KV_KEY = 'public-podcasts-v1';
+const KV_KEY = 'public-podcasts-v2';
 const TTL = 15 * 60 * 1000;
 const MAX_ITEMS = 5;
 let mem = null;
