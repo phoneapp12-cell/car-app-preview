@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.15.2';
+const APP_VERSION = '2.15.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1412,7 +1412,7 @@ function homeRhetoricalLine() {
 function homeFlavorLine() {
   const kind = homeFlavorKind();
   if (kind === 'joke') return homePick(91, HOME_JOKES);
-  if (kind === 'fact') return homePick(92, HOME_FACTS);
+  if (kind === 'fact') return 'Did you know ' + homePick(92, HOME_FACTS);
   if (kind === 'question') return homeRhetoricalLine();
   return '';
 }
