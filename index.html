@@ -94,16 +94,28 @@ body.kb #view{padding-bottom:28px}
 .top h1{font-size:1.75rem;line-height:1.15;margin:0;letter-spacing:-.5px}
 .top .sub{color:var(--ink2);font-size:0.9375rem;margin-top:4px}
 .wxgreet{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin:-6px 0 10px;padding:6px 10px;color:var(--ink2);font-size:0.9375rem;font-weight:600;line-height:1.35;background:color-mix(in srgb,#e8a317 16%,transparent);border-radius:14px}
-.card.homesum{margin:2px 0 12px;padding:0;background:transparent;box-shadow:none;overflow:visible}
-.homesum ul{margin:0;padding:6px 2px 8px;list-style:none;display:flex;flex-direction:column;gap:10px}
-.homesum li{display:block;margin:0;padding:13px 16px 14px;border:none;border-radius:16px;background:color-mix(in srgb,var(--bar,#7DDECB) 78%,transparent);color:#142033;font-size:0.9375rem;line-height:1.45;font-weight:650;overflow:visible}
-.homesum li .tx{display:block;transform:rotate(-1.2deg) skewX(-4deg);transform-origin:left center}
-@media (prefers-reduced-motion: reduce){
-  .homesum li .tx{transform:rotate(-1.2deg) skewX(-4deg)}
-}
-.homesum li.urgent{background:color-mix(in srgb,#FF8A80 82%,transparent);color:#7F1D1D;box-shadow:inset 0 0 0 2px color-mix(in srgb,#C62828 70%,transparent)}
-html[data-theme="dark"] .homesum li{background:color-mix(in srgb,var(--bar,#7DDECB) 86%,transparent);color:#142033}
-html[data-theme="dark"] .homesum li.urgent{background:color-mix(in srgb,#FF8A80 88%,transparent);color:#7F1D1D}
+/* 2.15.0: one weather picture behind the summary. The grey-blue section cards are unchanged. */
+.card.homesum{position:relative;margin:2px 0 12px;padding:0;overflow:hidden;border-radius:22px;min-height:168px;background:#6f8ea3 url('images/wx-soft.svg') center/cover no-repeat;box-shadow:none}
+.homesum.wx-clear-day{background-image:url('images/wx-clear-day.svg')}
+.homesum.wx-clear-night{background-image:url('images/wx-clear-night.svg')}
+.homesum.wx-partly-day{background-image:url('images/wx-partly-day.svg')}
+.homesum.wx-partly-night{background-image:url('images/wx-partly-night.svg')}
+.homesum.wx-cloudy{background-image:url('images/wx-cloudy.svg')}
+.homesum.wx-fog{background-image:url('images/wx-fog.svg')}
+.homesum.wx-rain{background-image:url('images/wx-rain.svg')}
+.homesum.wx-rain-night{background-image:url('images/wx-rain-night.svg')}
+.homesum.wx-showers{background-image:url('images/wx-showers.svg')}
+.homesum.wx-showers-night{background-image:url('images/wx-showers-night.svg')}
+.homesum.wx-snow{background-image:url('images/wx-snow.svg')}
+.homesum.wx-storm{background-image:url('images/wx-storm.svg')}
+.homesum.wx-wind{background-image:url('images/wx-wind.svg')}
+.homesum.wx-wind-night{background-image:url('images/wx-wind-night.svg')}
+.homesum.wx-soft{background-image:url('images/wx-soft.svg')}
+.homesum .sumshade{position:relative;z-index:1;min-height:168px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:64px 16px 14px;background:linear-gradient(180deg,rgba(8,16,28,.08) 0%,rgba(8,16,28,.16) 40%,rgba(8,16,28,.78) 100%)}
+.homesum .sumnote{margin:0;color:#fff;font-size:1.02rem;line-height:1.45;font-weight:650;text-shadow:0 1px 2px rgba(0,0,0,.55)}
+.homesum .sumnote.late{color:#fff;background:rgba(127,29,29,.9);border-radius:12px;padding:8px 10px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.72);text-shadow:none}
+.homesum .sumlate{color:#fff;background:rgba(153,27,27,.94);border-radius:8px;padding:0 6px;box-shadow:0 0 0 2px rgba(255,255,255,.7);text-shadow:none;font-weight:750}
+.homesum .sumnote.late .sumlate{background:transparent;box-shadow:none;padding:0;font-weight:750}
 html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transparent)}
 .wxgreet b{color:var(--ink);font-weight:800}
 .wxgreet .wxgico{width:28px;height:28px;display:grid;place-items:center;flex:none}
@@ -655,7 +667,6 @@ html[data-theme="dark"] .ic.note{background:#1E3A5F;color:#BFDBFE}
 html[data-theme="dark"] .ic.about{background:#064E3B;color:#A7F3D0}
 .ic.roster{background:#FEF3C7;color:#B45309}
 html[data-theme="dark"] .ic.roster{background:#3A2A12;color:#FCD34D}
-.homesum .knowlead{margin:0 2px 8px;padding:12px 14px;border-radius:16px;background:color-mix(in srgb,#059669 18%,var(--card));color:var(--ink);font-size:0.9375rem;line-height:1.45;font-weight:650}
 #rosterlist input[type=time]{border:0;border-radius:12px;padding:8px 10px;font:inherit;background:var(--soft);color:var(--ink)}
 .noteadd{flex-wrap:wrap}
 .noteadd input{flex:1 1 140px}
@@ -753,7 +764,7 @@ html[data-theme="dark"] .ic.roster{background:#3A2A12;color:#FCD34D}
 .hsec .card,.hsec .list{background:color-mix(in srgb,#303e50 18%,var(--card))}
 html[data-theme="dark"] .hsec{background:rgba(48,62,80,.55)}
 html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{background:color-mix(in srgb,#303e50 26%,var(--card))}
-/* Home sections (v1.95.0): one transparent darker grey-blue. Summary notes are unnumbered. The writing is slanted a little. No pink. */
+/* Home sections (v1.95.0): one transparent darker grey-blue. The summary is a short note on a weather picture, not one of these sections. No pink. */
 .hsec + .hsec{border-top:3px solid color-mix(in srgb,var(--ink3) 65%,transparent);margin-top:18px;padding-top:4px}
 .hsec > .sec:first-child{margin-top:12px}
 .hsec > .tiles:first-child,.hsec > .card:first-child,.hsec > .list:first-child,.hsec > .callout:first-child{margin-top:14px}

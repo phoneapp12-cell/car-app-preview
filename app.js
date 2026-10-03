@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.14.1';
+const APP_VERSION = '2.15.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1324,18 +1324,101 @@ function homeNearLine(seen, now) {
     ]);
   } catch (e) { return ''; }
 }
-function homeSumFallback() {
-  return '<div class="card homesum" id="homesum"><ul><li class="due"><span class="tx">Nothing much to flag right now. Have a good one.</span></li></ul></div>';
+function homeStripEnd(s) {
+  return String(s || '').replace(/\s+/g, ' ').trim().replace(/[.!?]+$/g, '');
 }
+function homeCapClause(s) {
+  const t = String(s || '');
+  if (!t || /^[“"']/.test(t)) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+// 2.15.0: one picture behind the summary, chosen from the Whangārei forecast already loaded.
+// Soft is only for when that forecast is missing. It does not claim a condition.
+function homeWxScene() {
+  try {
+    if (typeof WX === 'undefined' || !WX || !validWx(WX.data)) return 'soft';
+    const c = WX.data.current;
+    const day = wxIsDay();
+    const nowW = wmo(c.weather_code, day, c.wind_speed_10m);
+    const kind = nowW && nowW.kind;
+    if (kind === 'clear') return day ? 'clear-day' : 'clear-night';
+    if (kind === 'pc') return day ? 'partly-day' : 'partly-night';
+    if (kind === 'cloud') return 'cloudy';
+    if (kind === 'fog') return 'fog';
+    if (kind === 'drizzle' || kind === 'rain') return day ? 'rain' : 'rain-night';
+    if (kind === 'showers') return day ? 'showers' : 'showers-night';
+    if (kind === 'snow') return 'snow';
+    if (kind === 'storm') return 'storm';
+    if (kind === 'wind') return day ? 'wind' : 'wind-night';
+    return 'soft';
+  } catch (e) { return 'soft'; }
+}
+function homeSceneCard(inner) {
+  let scene = 'soft';
+  try { scene = homeWxScene() || 'soft'; } catch (e) { scene = 'soft'; }
+  if (!/^[a-z-]+$/.test(scene)) scene = 'soft';
+  const body = inner || '<p class="sumnote">Nothing much to flag right now. Have a good one.</p>';
+  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}</div></div>`;
+}
+function homeSumFallback() {
+  try { return homeSceneCard('<p class="sumnote">Nothing much to flag right now. Have a good one.</p>'); }
+  catch (e) { return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade"><p class="sumnote">Nothing much to flag right now. Have a good one.</p></div></div>'; }
+}
+function homeJoinClauses(parts) {
+  const list = (parts || []).filter(Boolean);
+  if (!list.length) return '';
+  if (list.length === 1) return list[0];
+  if (list.length === 2) return list[0] + ', and ' + list[1];
+  return list.slice(0, -1).join(', ') + ', and ' + list[list.length - 1];
+}
+// One personal detail the app already has. About you first. Not a second greeting.
+function homePersonalClause() {
+  try {
+    if (typeof aboutAnswerRows === 'function' && aboutAnswerRows().length) {
+      let fit = homeStripEnd(aboutFitLine() || '');
+      fit = fit.replace(/^(Good morning|Morning|Good afternoon|Afternoon|Good evening|Evening)\.\s*/i, '');
+      fit = homeCapClause(fit);
+      if (fit) return fit;
+    }
+  } catch (e) {}
+  return '';
+}
+// 2.15.0: a short note, not a stack of coloured cards. Overdue stays in its own colour.
 function homeSumCard(bits) {
-  const bars = ['#7DDECB', '#F9A8D4', '#FDE68A', '#A5B4FC', '#86EFAC', '#FDBA74', '#93C5FD', '#F0ABFC', '#FCD34D', '#99F6E4', '#C4B5FD', '#FDA4AF'];
-  const list = (bits || []).filter(b => b && b.text).slice(0, 4);
-  if (!list.length) return homeSumFallback();
-  return `<div class="card homesum" id="homesum"><ul>${list.map((b, i) => {
-    const overdue = !!b.overdue;
-    const style = overdue ? '' : ` style="--bar:${bars[i % bars.length]}"`;
-    return `<li class="${b.kind || 'note'}${overdue ? ' urgent' : ''}"${style}><span class="tx">${esc(b.text)}</span></li>`;
-  }).join('')}</ul></div>`;
+  try {
+    const list = (bits || []).filter(b => b && b.text).slice(0, 4);
+    let hello = '';
+    try { hello = String(homeGreetLine() || '').replace(/\s+/g, ' ').trim(); } catch (e) { hello = ''; }
+    const extra = homePersonalClause();
+    const useExtra = !!(extra && (list.length === 0 || (list.length === 1 && extra.length <= 110)));
+    let lead = hello;
+    if (useExtra) lead = lead ? (lead.replace(/\s+$/, '') + ' ' + extra + '.') : (extra + '.');
+    const ps = [];
+    if (lead) ps.push('<p class="sumnote">' + esc(lead) + '</p>');
+    if (list.length) {
+      const late = list.filter(b => b.overdue);
+      const rest = list.filter(b => !b.overdue);
+      const clauses = [];
+      late.forEach((b, i) => {
+        const text = i === 0 && !clauses.length ? homeCapClause(homeStripEnd(b.text)) : homeStripEnd(b.text);
+        clauses.push('<span class="sumlate">' + esc(text) + '</span>');
+      });
+      rest.forEach(b => {
+        let text = homeStripEnd(b.text);
+        if (!clauses.length) text = homeCapClause(text);
+        else if (/^(Work|Traffic|About|With|Coming|Today|Tomorrow|There|The|It|In|Soon|A|If)\b/.test(text)) text = text.charAt(0).toLowerCase() + text.slice(1);
+        clauses.push(esc(text));
+      });
+      const onlyLate = late.length && !rest.length;
+      ps.push('<p class="sumnote' + (onlyLate ? ' late' : '') + '">' + homeJoinClauses(clauses) + '.</p>');
+    }
+    if (!ps.length) return homeSumFallback();
+    return homeSceneCard(ps.join(''));
+  } catch (e) {
+    try { return homeSumFallback(); } catch (e2) {
+      return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade"><p class="sumnote">Nothing much to flag right now. Have a good one.</p></div></div>';
+    }
+  }
 }
 function homeUrgentPool() {
   return homeAttention().filter(x => {
@@ -1356,6 +1439,16 @@ function homeUniqueDue(pool, pred, mentioned) {
     out.push({ days: x.days, plain, key });
   });
   return out;
+}
+function homeDueClause(items, mode) {
+  const names = items.map(x => homeQuote(x.plain));
+  const list = engList(names);
+  const one = names.length === 1;
+  if (mode === 'late') return one ? names[0] + ' is overdue' : list + ' are overdue';
+  if (mode === 'today') return one ? 'today you’ve got ' + names[0] : 'today you’ve got ' + list;
+  if (items.every(x => x.days === 1)) return one ? 'tomorrow you’ve got ' + names[0] : 'tomorrow you’ve got ' + list;
+  if (items.every(x => x.days === 2)) return one ? names[0] + ' is due in a couple of days' : list + ' are due in a couple of days';
+  return 'coming up in the next day or two: ' + list;
 }
 function homeDuePhrase(items, mode) {
   const names = items.map(x => homeQuote(x.plain));
@@ -1578,10 +1671,9 @@ function homeOverview(shown) {
     return homeSumFallback();
   }
 }
-// 2.14.0: at work, one short Noel Leeming line when Google actually has a busyness label. It never takes an urgent slot.
-// 2.12.0: at most four notes. Urgent first (overdue, due today, due in a day or two, or timed within 30 minutes).
-// One optional aside. A birthday in the next 14 days wins that slot. A joke or a fun fact only on some opens, never both.
-// Movie, TV, streaming, comedy and events only at home. A movie only from 5am to 9pm. Commission never at home.
+// 2.15.0: one short note on a weather picture, not coloured cards. Urgent items share a sentence.
+// Time, place, one About you line on a quiet day, and the roster when a start is coming up. Nothing invented.
+// 2.14.0: at work, Noel Leeming only when Google has a busyness label, and only if the note is not already full.
 function homeOverviewBody(shown, urgentOut) {
   const urgent = Array.isArray(urgentOut) ? urgentOut : [];
   const mentioned = new Set();
@@ -1590,54 +1682,37 @@ function homeOverviewBody(shown, urgentOut) {
   const late = homeUniqueDue(pool, x => x.days < 0, mentioned);
   if (late.length) {
     mark(late);
-    urgent.push({ kind: 'late', text: homeDuePhrase(late, 'late'), overdue: true });
+    urgent.push({ kind: 'late', text: homeDueClause(late, 'late'), overdue: true });
   }
   let near = '';
   try { near = homeNearLine(mentioned); } catch (e) { near = ''; }
-  if (near && !/\broadworks?\b/i.test(near) && !/\bmore are due\b/i.test(near)) urgent.push({ kind: 'near', text: near, overdue: false });
+  if (near && !/\broadworks?\b/i.test(near) && !/\bmore are due\b/i.test(near)) urgent.push({ kind: 'near', text: homeStripEnd(near), overdue: false });
   const todayItems = homeUniqueDue(pool, x => x.days === 0, mentioned);
   if (todayItems.length) {
     mark(todayItems);
-    urgent.push({ kind: 'today', text: homeDuePhrase(todayItems, 'today'), overdue: false });
+    urgent.push({ kind: 'today', text: homeDueClause(todayItems, 'today'), overdue: false });
   }
   const soon = homeUniqueDue(pool, x => x.days === 1 || x.days === 2, mentioned);
   if (soon.length) {
     mark(soon);
-    urgent.push({ kind: 'soon', text: homeDuePhrase(soon, 'soon'), overdue: false });
+    urgent.push({ kind: 'soon', text: homeDueClause(soon, 'soon'), overdue: false });
   }
   if (urgent.length > 4) urgent.splice(4);
-  let known = false;
-  try { known = aboutAnswerRows().length > 0; } catch (e) { known = false; }
-  if (known) {
-    try {
-      const shaped = homeKnownSummary(urgent, mentioned);
-      if (shaped) return shaped;
-    } catch (e) { console.error('About summary', e); }
-  }
-  const bits = urgent.slice();
+  const room = () => urgent.length < 4;
+  const pushBit = (kind, text) => {
+    if (!room()) return;
+    const line = homeStripEnd(text);
+    if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line) || /\b90[\s-]*hours?\b/i.test(line)) return;
+    urgent.push({ kind, text: line, overdue: false });
+  };
+  try { pushBit('roster', rosterHeadsUp(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
+  try { pushBit('drive', homeDriveLine()); } catch (e) {}
   try {
-    const add = (kind, text) => {
-      if (bits.length >= 4) return;
-      const line = String(text || '').replace(/\s+/g, ' ').trim();
-      if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line) || /\b90[\s-]*hours?\b/i.test(line)) return;
-      bits.push({ kind, text: line, overdue: false });
-    };
-    add('busy', homeBusyLine());
-    add('praise', homePraiseLine(mentioned));
-    add('drive', homeDriveLine());
-    add('aside', homeAsideLine(mentioned));
-    add('hello', homeGreetLine());
-    add('comm', homeCommLine());
-    add('play', homePlayLine(mentioned));
-    add('meal', homeMealLine(mentioned));
-    try {
-      const br = homeBridgeBit();
-      if (br && br.text) add('bridge', br.text);
-    } catch (e) {}
-    add('read', homeReadLine(mentioned));
-  } catch (e) { console.error('Home summary optional', e); }
-  if (!bits.length) return homeSumFallback();
-  return homeSumCard(bits);
+    const br = homeBridgeBit();
+    if (br && br.urgent && br.text) pushBit('bridge', br.text);
+  } catch (e) {}
+  try { if (urgent.length < 2) pushBit('busy', homeBusyLine()); } catch (e) {}
+  return homeSumCard(urgent);
 }
 
 // 1.95.0: every Home section uses one transparent darker grey-blue (rgba(48,62,80,.55)). Numbered summary bars are not these sections.
@@ -10100,7 +10175,16 @@ function render() {
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster };
   if (r !== 'home' && r !== '') homeEdit = false;
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
+  let page = '';
+  try {
+    page = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
+  } catch (e) {
+    console.error('Render', e);
+    return;
+  }
+  const view = document.getElementById('view');
+  if (!view || typeof page !== 'string' || !page) return;
+  view.innerHTML = page;
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
