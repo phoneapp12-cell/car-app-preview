@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.81.0';
+const APP_VERSION = '1.82.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -255,8 +255,10 @@ function rowFor(x) {
   else if (x.kind === 'health') { icon = HEALTH_ICON[x.item.kind] || 'medkit'; sub = 'Health · ' + (x.item.clinic ? esc(x.item.clinic) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
   else sub = 'To-do · ' + esc(x.todo.list || '') + ' · ' + fmtW(x.date);
-  return `<button class="row" onclick="go('${x.go}')"><div class="ic ${x.kind}">${I(icon)}</div>
-    <div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div>${pill(x.days)}</button>`;
+  const body = `<div class="ic ${x.kind}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div>${pill(x.days)}`;
+  // 1.82.0: a to-do in Upcoming or the overdue list can be marked done here. It stays on the to-do list.
+  if (x.kind === 'todo' && x.todo) return `<div class="row"><button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(x.title)}" onclick="tick('${x.todo.id}')"><span>${I('check')}</span><b>Done</b></button><button type="button" class="tapzone" onclick="go('${x.go}')">${body}</button></div>`;
+  return `<button class="row" onclick="go('${x.go}')">${body}</button>`;
 }
 /* 1.14.0: Home cards can be reordered and switched on or off (Home › Customise). Saved as settings.homeOrder / settings.homeHidden.
    Cards with nothing to show hide themselves. The reminder and install prompts always stay at the top. */
@@ -272,7 +274,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   attention: ['warn', 'bill', 'Upcoming', 'Everything due soon or overdue, plus this week’s appointments and calendar events', 1],
   events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
   videos: ['play', 'vid', 'Videos', 'A few suggestions from the video categories you leave on', 0],
-  todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a tick button (ones due soon are in Upcoming)', 1],
+  todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a Done button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
   birthdays: ['cake', 'bday', 'Birthdays', 'Tomorrow through 30 days away. They can also show in Upcoming.', 1],
@@ -375,7 +377,7 @@ const HOME_CARD = {
     const att = homeOn('attention'); // to-dos due within 30 days are already in Needs attention
     const open = S.todos.filter(t => !t.done && !(att && t.due && daysLeft(t.due) <= 30)).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
     if (!open.length) return '';
-    return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button class="tick" aria-label="Tick off ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
+    return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span><b>Done</b></button>
       <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? pill(daysLeft(t.due)) : ''}</button>${todoCalBtn(t)}</div>`).join('')}</div>` +
       (open.length > 5 ? `<div class="homemore"><a href="#todo">${plural(open.length - 5, 'more to-do')}</a></div>` : '');
   },
@@ -1234,7 +1236,7 @@ function Todo() {
   const vis = S.todos.filter(t => todoFilter === 'All' || t.list === todoFilter);
   const open = vis.filter(t => !t.done).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
-  const row = t => `<div class="row ${t.done ? 'done' : ''}"><button class="tick" aria-label="${t.done ? 'Untick' : 'Tick off'} ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
+  const row = t => `<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick${t.done ? '' : ' donelabel'}" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span>${t.done ? '' : '<b>Done</b>'}</button>
     <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>
     ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
   const openCount = S.todos.filter(t => !t.done).length;
@@ -1254,10 +1256,14 @@ async function quickAdd(e) {
   await save(); render(); $('#newtodo').focus(); toast('Added to your list.');
 }
 async function tick(id) {
-  const t = S.todos.find(x => x.id === id), s = snap();
-  t.done = !t.done; t.doneAt = t.done ? Date.now() : undefined;
-  await save(); render();
-  if (t.done) toast(`Ticked off: ${t.title}`, 'Undo', undoTo(s));
+  const t = S.todos.find(x => x.id === id); if (!t) return;
+  const s = snap();
+  t.done = !t.done;
+  if (t.done) t.doneAt = Date.now(); else delete t.doneAt;
+  await save();
+  if (sheetOpen) await closeSheet();
+  render();
+  toast(t.done ? `Marked done: ${t.title}` : `${t.title} marked not done.`, 'Undo', undoTo(s));
 }
 function clearDone() {
   const vis = S.todos.filter(t => t.done && (todoFilter === 'All' || t.list === todoFilter));
@@ -1271,7 +1277,7 @@ function todoForm(id) {
     field('To-do', inp('title', t.title, 'placeholder="e.g. Mow the lawns" required maxlength="120"')) +
     `<div class="two">${field('List', sel('list', S.lists.map(l => [l, l]), t.list))}${field('Due date', inp('due', t.due, 'type="date"'), 'Optional')}</div>` +
     field('Notes', area('notes', t.notes)) +
-    (id && !t.done ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button></div>` : ''),
+    (id ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="tick('${id}')">${I('check')} ${t.done ? 'Mark not done' : 'Mark complete'}</button>${t.done ? '' : `<button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button>`}</div>` : ''),
     async v => {
       if (!v.title) return 'Please type the to-do.';
       if (id) Object.assign(t, { title: v.title, list: v.list, due: v.due, notes: v.notes });
@@ -1427,8 +1433,15 @@ function Calendar() {
     cells += `<button class="${other ? 'other' : ''} ${t === T ? 'today' : ''} ${t === calSel ? 'sel' : ''} ${dow === 0 || dow === 6 ? 'we' : ''} ${hol ? 'holday' : ''}" aria-label="${fmtLong(iso)}" data-d="${iso}" data-n="${items.length}" onclick="pickDay(${t})">
       <span class="n">${d.getUTCDate()}</span><span class="dots">${shown.map(e => `<i class="cc" title="${esc(e.title)}" style="--c:${e.color ? esc(e.color) : `var(--${e.src})`}">${esc(chipLabel(e))}</i>`).join('')}${more ? `<b class="more">+${more}<span class="mw"> more</span></b>` : ''}</span></button>`;
   }
-  const evRow = (e, ic) => `<button class="ev${ic ? ' evi' : ''}" onclick="${e.go}"><span class="bar" style="background:${e.color || `var(--${e.src})`}"></span>${ic ? `<span class="evic" style="--c:${e.color ? esc(e.color) : `var(--${e.src})`}">${I(calIcon(e))}</span>` : ''}<span class="time">${esc(e.time)}</span>
-     <div style="flex:1;min-width:0"><div class="t">${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}" ${e.color ? `style="background:${e.color}"` : ''}>${esc(e.tag || (e.src === 'appt' ? 'Appt' : 'Due'))}</span></button>`;
+  const evRow = (e, ic) => {
+    const inner = `<span class="bar" style="background:${e.color || `var(--${e.src})`}"></span>${ic ? `<span class="evic" style="--c:${e.color ? esc(e.color) : `var(--${e.src})`}">${I(calIcon(e))}</span>` : ''}<span class="time">${esc(e.time)}</span>
+     <div style="flex:1;min-width:0"><div class="t">${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}" ${e.color ? `style="background:${e.color}"` : ''}>${esc(e.done ? 'Done' : (e.tag || (e.src === 'appt' ? 'Appt' : 'Due')))}</span>`;
+    if (e.src === 'mine' && e.id && e.orig) {
+      const act = e.done ? 'Mark not done' : 'Mark complete';
+      return `<div class="ev${ic ? ' evi' : ''}${e.done ? ' done' : ''}"><button type="button" class="tapzone" onclick="${e.go}">${inner}</button><button type="button" class="paybtn" aria-label="${act}: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})">${e.done ? 'Undo' : 'Done'}</button></div>`;
+    }
+    return `<button class="ev${ic ? ' evi' : ''}" onclick="${e.go}">${inner}</button>`;
+  };
   const dayLabel = s => { const d = daysLeft(s); return (d === 0 ? 'Today · ' : d === 1 ? 'Tomorrow · ' : '') + fmtW(s); };
   let agenda;
   if (calSel !== null) {
@@ -2549,6 +2562,7 @@ function mealCalItems(inR) {
 
 /* ================= MY EVENTS (Calendar › Add event), e.g. payday, rubbish day ================= */
 // S.myEvents: see core.js (repeatDates). Shown on the Calendar ("My events"), on Home as a Today / Tomorrow line, with optional reminders.
+// 1.82.0: Done keeps the event. That date leaves Upcoming and does not count as overdue. A repeating event marks one date, not the whole series.
 const REPEATS_ORDER = ['none', 'weekly', 'fortnightly', '4weekly', 'monthly', 'lastday', 'yearly'];
 const MINE_SUGGEST = [['Payday', 'fortnightly'], ['Rubbish day', 'weekly'], ['Recycling day', 'fortnightly']];
 const REMIND_TIMES = (() => { const o = []; for (let m = 7 * 60; m <= 20 * 60 + 30; m += 30) { const v = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); o.push([v, fmtTime(v)]); } return o; })();
@@ -2562,14 +2576,60 @@ function normMine(list) {
     if (!['off', 'day', 'before'].includes(e.remind)) e.remind = 'off';
     if (!Array.isArray(e.skips)) e.skips = [];
     if (!e.moves || typeof e.moves !== 'object' || Array.isArray(e.moves)) e.moves = {};
+    e.done = e.done === true;
+    const rawDates = Array.isArray(e.doneDates) ? e.doneDates : [];
+    const seen = new Set();
+    e.doneDates = [];
+    rawDates.forEach(d => {
+      if (typeof d !== 'string' || parseD(d) == null || seen.has(d)) return;
+      seen.add(d); e.doneDates.push(d);
+    });
+    e.doneDates.sort();
+    if (e.doneDates.length > 400) e.doneDates = e.doneDates.slice(-400);
     return e;
   });
+}
+function mineDoneSet(ev) {
+  return new Set((ev && Array.isArray(ev.doneDates) ? ev.doneDates : []).filter(d => typeof d === 'string' && parseD(d) != null));
+}
+function mineOccDone(ev, orig) {
+  return !!(ev && orig && (ev.done || mineDoneSet(ev).has(orig)));
+}
+function mineNextOrig(ev) {
+  if (!ev || !ev.repeat || ev.repeat === 'none') return ev && ev.start || '';
+  const T = todayT();
+  const hit = repeatDates(ev, T, T + 800 * DAY).find(o => !mineOccDone(ev, o.orig));
+  return hit ? hit.orig : '';
+}
+function mineCompleteLabel(ev) {
+  if (!ev) return '';
+  if (!ev.repeat || ev.repeat === 'none') return mineOccDone(ev, ev.start) ? 'Mark not done' : 'Mark complete';
+  return mineNextOrig(ev) ? 'Mark the next one done' : '';
+}
+async function completeMine(id, orig) {
+  const ev = getMine(id);
+  if (!ev || !orig || parseD(orig) == null) return;
+  const s = snap(), was = mineOccDone(ev, orig);
+  if (!ev.repeat || ev.repeat === 'none') {
+    ev.done = !was;
+    if (ev.done) ev.doneAt = Date.now(); else delete ev.doneAt;
+  } else {
+    const set = mineDoneSet(ev);
+    if (was) set.delete(orig); else set.add(orig);
+    ev.done = false;
+    ev.doneDates = [...set].sort();
+    if (ev.doneDates.length > 400) ev.doneDates = ev.doneDates.slice(-400);
+  }
+  await save();
+  if (sheetOpen) await closeSheet();
+  render();
+  toast(was ? `${ev.title} marked not done.` : `${ev.title} marked done.`, 'Undo', undoTo(s));
 }
 // Calendar entries for my events between two UTC-midnight times
 function mineItems(fromT, toT, all = false) {
   if (!all && !showMine()) return [];
   const out = [];
-  S.myEvents.forEach(ev => repeatDates(ev, fromT, toT).forEach(o => out.push({ src: 'mine', title: ev.title, date: o.date, time: ev.time ? fmtTime(ev.time) : 'All day', hm: ev.time, sort: ev.time || '00:00', tag: 'My event',
+  S.myEvents.forEach(ev => repeatDates(ev, fromT, toT).forEach(o => out.push({ src: 'mine', id: ev.id, orig: o.orig, done: mineOccDone(ev, o.orig), title: ev.title, date: o.date, time: ev.time ? fmtTime(ev.time) : 'All day', hm: ev.time, sort: ev.time || '00:00', tag: 'My event',
     notes: [ev.repeat === 'none' ? '' : repeatText(ev), o.moved ? 'Moved from ' + fmtW(o.orig) : '', ev.notes ? ev.notes.split('\n')[0].slice(0, 60) : ''].filter(Boolean).join(' · '),
     go: `mineSheet('${ev.id}','${o.orig}')` })));
   return out;
@@ -2589,8 +2649,11 @@ function attWxChip(iso) { return ''; }
 function attWxRow() { return ''; }
 function attRow(o) {
   if (o.wx) o = Object.assign({}, o, { sub: o.sub + attWxChip(o.date) });
-  return `<button class="row att ${o.cls || ''}" data-kind="${o.kind}"${o.date ? ` data-date="${o.date}"` : ''} onclick="${o.go}"><div class="ic ${o.ic}"${o.icStyle ? ` style="${o.icStyle}"` : ''}>${I(o.icon)}</div>
-    <div class="tx"><div class="t">${o.title}</div><div class="s">${o.sub}</div></div>${o.right || I('right')}</button>`;
+  const ico = `<div class="ic ${o.ic}"${o.icStyle ? ` style="${o.icStyle}"` : ''}>${I(o.icon)}</div>`;
+  const tx = `<div class="tx"><div class="t">${o.title}</div><div class="s">${o.sub}</div></div>`;
+  const attrs = `class="row att ${o.cls || ''}" data-kind="${o.kind}"${o.date ? ` data-date="${o.date}"` : ''}`;
+  if (o.complete) return `<div ${attrs}>${o.complete}<button type="button" class="tapzone" onclick="${o.go}">${ico}${tx}${o.right || ''}</button></div>`;
+  return `<button ${attrs} onclick="${o.go}">${ico}${tx}${o.right || I('right')}</button>`;
 }
 // A feeding job, not a spray, prune or planting reminder. Matched on the built-in job, not a new date.
 const gardenIsFeed = j => /feed/i.test(j.jobKey || '') || /^Feed\b/.test(j.title || '');
@@ -2598,9 +2661,11 @@ const ATT_SOURCES = {
   // WOF / rego / service, AA and licence, bills, to-dos with a due date, pet care: within 30 days or overdue (as before)
   due: T => dueItems(S).filter(x => x.days <= 30 && x.kind !== 'health').map(x => ({ days: x.days, rank: 0, sort: '', kind: x.kind, name: x.title, html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })),
   // My events (payday, rubbish day…), today and tomorrow. Skipped dates are left out and moved ones show on their new date.
-  mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).map(e => ({ days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: `${attWhen(d)}: ${e.title}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
+  // 1.82.0: a date marked done stays saved and is left out of Upcoming.
+  mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).filter(e => !e.done).map(e => ({ days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: `${attWhen(d)}: ${e.title}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
     html: attRow({ wx: 1, kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${T + d * DAY})`, ic: 'mine', icon: 'repeat', title: `${attWhen(d)}: ${esc(e.title)}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
-      sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}` }) }))),
+      sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}`,
+      complete: `<button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})"><span>${I('check')}</span><b>Done</b></button>` }) }))),
   // Appointments, including What's On events you added, today and the next 7 days
   appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: `${attDay(d, a.date)}: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`,
     html: attRow({ wx: 1, kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
@@ -2666,6 +2731,7 @@ function mineForm(id, date) {
     `<div id="untilbox">${field('End date (optional)', inp('until', ev.until, 'type="date"'), 'Leave blank to keep repeating.')}</div>` +
     `<div class="two">${field('Reminder', sel('remind', [['off', 'Off'], ['day', 'On the day'], ['before', 'The day before']], ev.remind))}<div id="rtimebox">${field('At', sel('remindAt', REMIND_TIMES, ev.remindAt || (ev.remind === 'before' ? '19:00' : '07:00')))}</div></div>` +
     field('Notes', area('notes', ev.notes, 'Optional')) +
+    (id && mineCompleteLabel(ev) ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="completeMine(${jsArg(id)},${jsArg((!ev.repeat || ev.repeat === 'none') ? ev.start : mineNextOrig(ev))})">${I('check')} ${esc(mineCompleteLabel(ev))}</button></div>` : '') +
     (changed.length ? `<div class="field"><span>Changed dates</span><div class="list changed">${changed.map(([d, k]) => `<div class="srow" data-changed="${d}"><div class="tx"><div class="t">${fmtW(d)}</div><div class="s">${k === 'skip' ? 'Skipped' : 'Moved to ' + fmtW(ev.moves[d])}</div></div><button type="button" class="btn small" onclick="putBack('${id}','${d}',this)">Put back</button></div>`).join('')}</div></div>` : ''),
     async v => {
       if (!v.title) return 'Please give the event a title.';
@@ -2675,7 +2741,7 @@ function mineForm(id, date) {
       const until = v.repeat === 'none' ? '' : v.until;
       if (until && (!parseD(until) || until < v.start)) return 'The end date can’t be before the start date.';
       const s = snap(), upd = { title: v.title, start: v.start, time, repeat: v.repeat, until, notes: v.notes, remind: v.remind, remindAt: v.remind === 'off' ? '' : v.remindAt };
-      if (id) Object.assign(ev, upd); else S.myEvents.push(Object.assign({ id: uid('myev'), skips: [], moves: {} }, upd));
+      if (id) Object.assign(ev, upd); else S.myEvents.push(Object.assign({ id: uid('myev'), skips: [], moves: {}, done: false, doneDates: [] }, upd));
       await save(); render();
       toast(id ? 'Event updated.' : `${v.title} added${v.repeat === 'none' ? '' : ' · ' + repeatText(upd).toLowerCase()}.`, 'Undo', undoTo(s));
     }, id ? 'Save' : 'Add event',
@@ -2708,6 +2774,7 @@ function mineSheet(id, orig) {
       <div class="muted" style="margin-top:4px">${ev.time ? fmtTime(ev.time) : 'All day'} · ${esc(repeatText(ev))}${moved ? `<br>Moved from ${fmtW(orig)}` : ''}${ev.remind !== 'off' ? `<br>Reminder ${ev.remind === 'day' ? 'on the day' : 'the day before'} at ${fmtTime(ev.remindAt)}` : ''}</div>
       ${ev.notes ? `<div class="muted notes" style="margin-top:6px">${esc(ev.notes)}</div>` : ''}</div>
     <div class="minebtns">
+      <button type="button" class="btn primary" onclick="completeMine(${jsArg(id)},${jsArg(orig)})">${I('check')} ${mineOccDone(ev, orig) ? 'Mark not done' : 'Done'}</button>
       ${rep ? `<button type="button" class="btn" onclick="skipDate('${id}','${orig}')">${I('x')} Skip this date</button><button type="button" class="btn" onclick="moveForm('${id}','${orig}')">${I('cal')} Move this date</button>` : ''}
       ${moved ? `<button type="button" class="btn" onclick="unmove('${id}','${orig}')">${I('refresh')} Put back on ${fmtW(orig)}</button>` : ''}
       <button type="button" class="btn" onclick="mineForm('${id}')">${I('edit')} Edit ${rep ? 'series' : 'event'}</button>

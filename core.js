@@ -278,7 +278,9 @@
 
   /* ---------- my events (Calendar › Add event), optionally repeating ----------
      { id, title, start: 'YYYY-MM-DD', time: 'HH:MM' | '', notes, repeat, until: 'YYYY-MM-DD' | '', skips: [date], moves: { date: newDate },
-       remind: 'off' | 'day' | 'before', remindAt: 'HH:MM' }
+       done: true | false, doneDates: ['YYYY-MM-DD'], remind: 'off' | 'day' | 'before', remindAt: 'HH:MM' }
+     done marks a one-off event complete. doneDates marks those occurrences of a repeating event complete (the series date, same as skips).
+     A completed event stays stored. It is left out of reminders.
      repeat: none | weekly | fortnightly | 4weekly | monthly (same date, last day of the month if it's short) | lastday | yearly */
   const REPEAT_STEP = { weekly: 7, fortnightly: 14, '4weekly': 28 };
   const dim = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate(); // days in month m (0-11)
@@ -589,9 +591,11 @@
     if (daytime) {
       const T = todayT(now);
       (data.myEvents || []).forEach(ev => {
-        if (!ev.remind || ev.remind === 'off') return;
+        if (!ev.remind || ev.remind === 'off' || ev.done) return;
+        const doneOn = new Set(Array.isArray(ev.doneDates) ? ev.doneDates : []);
         const [h, mi] = String(ev.remindAt || (ev.remind === 'before' ? '19:00' : '07:00')).split(':').map(Number);
         repeatDates(ev, T, T + 2 * DAY).forEach(o => {
+          if (doneOn.has(o.orig)) return;
           const r = ev.remind === 'before' ? addDays(o.date, -1) : o.date;
           const [y, mo, d] = r.split('-').map(Number), at = new Date(y, mo - 1, d, h, mi).getTime();
           const [y2, mo2, d2] = o.date.split('-').map(Number), end = new Date(y2, mo2 - 1, d2, 23, 59).getTime();

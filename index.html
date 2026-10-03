@@ -270,6 +270,11 @@ select.sel{font:inherit;font-size:0.9375rem;font-weight:600;color:var(--brand);b
 .done .tick span{background:var(--brand);border-color:var(--brand)}
 .done .tick svg.i{opacity:1}
 .done .t{text-decoration:line-through;color:var(--ink3)}
+/* 1.82.0: the word Done next to the circle, so complete is obvious */
+.tick.donelabel{width:auto;display:flex;align-items:center;justify-content:center;gap:2px;padding-right:2px}
+.tick.donelabel b{font-size:0.75rem;font-weight:800;color:var(--brand)}
+.ev.done .t{text-decoration:line-through;color:var(--ink3)}
+.ev>.paybtn{margin-top:0;align-self:center;flex:none}
 /* calendar */
 .monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .monthbar b{font-size:1.125rem}
