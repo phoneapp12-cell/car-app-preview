@@ -193,19 +193,19 @@ html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transp
 .tabbar span.w{position:relative;display:flex;flex:none}
 .tabbar span.lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tabbar button svg.i{width:20px;height:20px}
-/* 1.94.0: side panel groups. One tint per group. Neutral colours, readable on the strip. */
+/* 1.96.0: side panel groups. Saturated tints, one hue each. Labels use --ink so they stay readable on the colour. */
 .tabbar .tabgrp,.tabbar .tabend{flex-shrink:0}
 .tabbar .tabgrp{border-radius:12px;padding:3px 3px 2px;margin:0 0 7px}
-.tabbar .tabgh{font-size:0.625rem;font-weight:750;letter-spacing:.05em;text-transform:uppercase;color:color-mix(in srgb,var(--ink) 68%,var(--ink3));padding:3px 6px 1px;line-height:1.2}
-.tabbar .tabgrp button{border-radius:9px;background:transparent}
-.tabbar .tabgrp button.on{color:var(--brand);background:color-mix(in srgb,var(--brand) 16%,transparent)}
-.tabbar .g-day{background:color-mix(in srgb,#8aa4be 34%,var(--card))}
-.tabbar .g-money{background:color-mix(in srgb,#e0c48a 40%,var(--card))}
-.tabbar .g-people{background:color-mix(in srgb,#8eae96 36%,var(--card))}
-.tabbar .g-cars{background:color-mix(in srgb,#cfc6bc 42%,var(--card))}
-.tabbar .g-life{background:color-mix(in srgb,#d2b48c 34%,var(--card))}
-.tabbar .g-near{background:color-mix(in srgb,#7a96ae 36%,var(--card))}
-.tabbar .g-media{background:color-mix(in srgb,#8e9894 34%,var(--card))}
+.tabbar .tabgh{font-size:0.625rem;font-weight:750;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);padding:3px 6px 1px;line-height:1.2}
+.tabbar .tabgrp button{border-radius:9px;background:transparent;color:var(--ink)}
+.tabbar .tabgrp button.on{color:var(--ink);background:color-mix(in srgb,var(--brand) 26%,transparent);box-shadow:inset 3px 0 0 var(--brand)}
+.tabbar .g-day{background:color-mix(in srgb,#2563EB 50%,var(--card))}
+.tabbar .g-money{background:color-mix(in srgb,#EAB308 46%,var(--card))}
+.tabbar .g-people{background:color-mix(in srgb,#059669 48%,var(--card))}
+.tabbar .g-cars{background:color-mix(in srgb,#E85D04 48%,var(--card))}
+.tabbar .g-life{background:color-mix(in srgb,#65A30D 50%,var(--card))}
+.tabbar .g-near{background:color-mix(in srgb,#0891B2 50%,var(--card))}
+.tabbar .g-media{background:color-mix(in srgb,#6D28D9 44%,var(--card))}
 .tabbar .tabend{margin-top:2px;padding-top:4px;border-top:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
 
 .tabhint{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:22;display:flex;align-items:center;height:64px;pointer-events:none}
