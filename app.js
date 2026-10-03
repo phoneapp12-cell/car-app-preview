@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.9.5';
+const APP_VERSION = '2.9.6';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -299,13 +299,14 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   pets: ['paw', 'pet', 'Pets', 'Next flea treatment, grooming and vet dates', 0],
   bills: ['bill', 'bill', 'Bills', 'The next bills to pay', 0],
   cars: ['car', 'car', 'Cars at a glance', 'Each car’s next WOF and rego', 0],
-  ideas: ['bulb', 'idea', 'Starred ideas', 'Ideas you’ve starred', 0]
+  ideas: ['bulb', 'idea', 'Starred ideas', 'Ideas you’ve starred', 0],
+  diary: ['book', 'diary', 'Diary', 'Today’s page, from what’s already in the app', 0]
 };
 const HOME_DEFAULT = Object.keys(HOME);
 /* 1.99.0: Home cards stay in the same groups as the side panel. Order inside a group can change.
    A card cannot move into another group. Only real Home cards are listed. */
 const HOME_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['holidays', 'summary', 'attention', 'todo'] },
+  { id: 'day', title: 'Everyday', keys: ['holidays', 'summary', 'attention', 'todo', 'diary'] },
   { id: 'money', title: 'Money', keys: ['loans', 'commission', 'bills'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] },
@@ -504,6 +505,13 @@ const HOME_CARD = {
   radio: () => {
     const head = homeSec('Radio', '<a href="#radio">See all</a>');
     return head + `<div class="list" id="homeradio">${RADIO.slice(0, 3).map(radioRow).join('')}</div>`;
+  },
+  // 2.9.6: off until Customise Home turns it on. One or two lines from today, nothing fetched.
+  diary: () => {
+    const lines = diaryFlat(diaryToday());
+    const a = lines[0] ? lines[0].text : DIARY_QUIET;
+    const b = lines[1] ? lines[1].text : '';
+    return homeSec('Diary', '<a href="#diary">Open</a>') + `<button class="row" onclick="go('#diary')"><div class="ic diary">${I('book')}</div><div class="tx"><div class="t">${esc(a)}</div>${b ? `<div class="s">${esc(b)}</div>` : ''}</div>${I('right')}</button>`;
   }
 };
 function homeEditHtml() {
@@ -5580,7 +5588,8 @@ function More() {
     podcasts: () => { const episodes = podEpisodes(); const first = episodes && episodes[0]; return first ? `${esc(first.show)}: ${esc(first.title)}` : 'Episodes from other podcasts'; },
     videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
     top40: () => 'Official Top 40 · chart as of 3 Oct 2026',
-    radio: () => 'Stations you can hear in Whangārei'
+    radio: () => 'Stations you can hear in Whangārei',
+    diary: () => { const lines = diaryFlat(diaryToday()); return lines.length ? esc(lines[0].text) : 'A quiet page today'; }
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
     bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
@@ -5608,13 +5617,14 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
-  radio: ['radio', 'rad', 'Radio', 'Radio']
+  radio: ['radio', 'rad', 'Radio', 'Radio'],
+  diary: ['book', 'diary', 'Diary', 'Diary']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'diary'] },
   { id: 'money', title: 'Money', keys: ['bills', 'commission', 'loans'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health'] },
   { id: 'cars', title: '', keys: ['cars'] },
@@ -8680,6 +8690,231 @@ async function installApp() {
   deferredPrompt = null; render();
 }
 
+
+/* ================= DIARY (2.9.6) =================
+   A page for one day, or the Monday-to-Sunday week. It only reads what is already
+   on this phone: appointments, to-dos, bills, meals, birthdays, reminders,
+   commission, car dates, pet care, health, garden jobs, and local events if a
+   list is already loaded. It does not fetch anything. */
+const DIARY_QUIET = 'A quiet page. Nothing in the app for this day.';
+const DIARY_KINDS = [
+  ['appt', 'Appointments'], ['todo', 'To-dos'], ['bill', 'Bills'], ['meal', 'Meals'],
+  ['bday', 'Birthdays'], ['rem', 'Reminders'], ['comm', 'Commission'], ['car', 'Cars'],
+  ['pet', 'Pets'], ['health', 'Health'], ['garden', 'Garden'], ['event', 'Local events']
+];
+let diaryMode = 'day';
+let diaryAt = '';
+function diaryToday() {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  return p.year + '-' + p.month + '-' + p.day;
+}
+function diaryAnchor() {
+  return diaryAt && parseD(diaryAt) ? diaryAt : diaryToday();
+}
+function diaryMonday(iso) {
+  const t = parseD(iso);
+  return isoT(t - ((new Date(t).getUTCDay() + 6) % 7) * DAY);
+}
+function diaryShift(dir) {
+  const iso = diaryAnchor();
+  const step = diaryMode === 'week' ? 7 : 1;
+  const base = diaryMode === 'week' ? diaryMonday(iso) : iso;
+  diaryAt = addDays(base, dir * step);
+  render();
+}
+function diarySetMode(m) {
+  if ((m !== 'day' && m !== 'week') || m === diaryMode) return;
+  diaryMode = m;
+  render();
+}
+function diaryJumpToday() { diaryAt = ''; render(); }
+function diaryOnToday() {
+  const iso = diaryAnchor(), today = diaryToday();
+  if (diaryMode === 'week') { const mon = diaryMonday(iso); return today >= mon && today <= addDays(mon, 6); }
+  return iso === today;
+}
+function diaryRangeLabel() {
+  const iso = diaryAnchor(), today = diaryToday();
+  if (diaryMode === 'week') {
+    const mon = diaryMonday(iso), sun = addDays(mon, 6);
+    return (today >= mon && today <= sun ? 'This week · ' : '') + fmtW(mon) + ' – ' + fmtW(sun);
+  }
+  return (iso === today ? 'Today · ' : '') + fmtW(iso);
+}
+function diaryRemOn(r, iso) {
+  if (!r || parseD(r.date) == null || parseD(iso) == null || iso < r.date) return false;
+  const rep = remRepeat(r);
+  if (rep === 'none') return r.date === iso;
+  if (rep === 'daily') return true;
+  if (rep === 'weekly') return new Date(parseD(iso)).getUTCDay() === new Date(parseD(r.date)).getUTCDay();
+  const dom = +r.date.slice(8, 10);
+  let d = r.date;
+  for (let i = 0; i < 2400; i++) {
+    if (d === iso) return true;
+    if (d > iso) return false;
+    const n = addMonths(d, 1, dom);
+    if (!n || n <= d) return false;
+    d = n;
+  }
+  return false;
+}
+function diaryClock(t) { return /^\d{2}:\d{2}/.test(t || '') ? fmtTime(t.slice(0, 5)) : ''; }
+function diaryAppts(iso) {
+  const out = [];
+  (S.appts || []).filter(a => a && a.date === iso && String(a.title || '').trim()).forEach(a => {
+    const when = diaryClock(a.time);
+    out.push({ sort: a.time || '', text: (when ? when + ' · ' : '') + String(a.title).trim(), go: `apptForm('${a.id}')` });
+  });
+  const t = parseD(iso);
+  (S.feeds || []).forEach(f => {
+    const evs = CAL[f.id] && CAL[f.id].events;
+    if (!Array.isArray(evs)) return;
+    evs.forEach(e => {
+      if (!e || !String(e.title || '').trim() || parseD(e.date) == null) return;
+      if (e.birthday && bdayMatch(e)) return;
+      const start = parseD(e.date), en = parseD(e.endDate || e.date);
+      const end = en == null ? start : Math.max(start, en);
+      if (t < start || t > end) return;
+      const when = !e.allDay && iso === e.date ? diaryClock(e.time) : '';
+      const sort = when ? String(e.time).slice(0, 5) : '';
+      out.push({ sort, text: (when ? when + ' · ' : '') + String(e.title).trim() + (f.name ? ' · ' + f.name : ''), go: "go('#calendar')" });
+    });
+  });
+  return out.sort((a, b) => a.sort.localeCompare(b.sort) || a.text.localeCompare(b.text)).map(({ text, go }) => ({ text, go }));
+}
+function diaryTodos(iso) {
+  return (S.todos || []).filter(t => t && t.due === iso && String(t.title || '').trim()).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1) || String(a.title).localeCompare(String(b.title))).map(t => ({
+    text: String(t.title).trim() + (t.done ? ' · done' : '') + (t.list ? ' · ' + t.list : ''),
+    go: `todoForm('${t.id}')`
+  }));
+}
+function diaryBills(iso) {
+  const t = parseD(iso), out = [];
+  (S.bills || []).forEach(b => {
+    if (!b || !b.name) return;
+    if (!b.paid && billDates(b, t, t).includes(iso)) out.push({ text: b.name + ' · ' + money(b.amount) + ' due', go: "go('#bills')" });
+    else if (b.paid && (b.paidOn === iso || b.due === iso)) out.push({ text: b.name + ' · paid ' + money(b.amount), go: "go('#bills')" });
+  });
+  return out;
+}
+function diaryMeals(iso) {
+  const e = M().plan[iso];
+  if (!e || !String(e.title || '').trim()) return [];
+  return [{ text: String(e.title).trim() + (e.cooked ? ' · cooked' : ''), go: `mealNight('${iso}')` }];
+}
+function diaryBirthdays(iso) {
+  const t = parseD(iso), out = [];
+  (S.birthdays || []).forEach(b => {
+    if (!b || !bdayDates(b, t, t).length) return;
+    const age = bdayAge(b, iso);
+    out.push({ text: b.name + '’s birthday' + (age > 0 ? ' · turns ' + age : ''), go: `birthdayForm('${b.id}')` });
+  });
+  return out;
+}
+function diaryReminders(iso) {
+  return (S.reminders || []).filter(r => diaryRemOn(r, iso)).sort((a, b) => a.time.localeCompare(b.time) || a.title.localeCompare(b.title)).map(r => {
+    const tag = REM_REPEAT_LABEL[remRepeat(r)];
+    return { text: fmtTime(r.time) + ' · ' + r.title + (tag ? ' · ' + tag : ''), go: `remForm('${r.id}')` };
+  });
+}
+function diaryComm(iso) {
+  return (CM().entries || []).filter(e => e && e.date === iso).map(e => ({
+    text: (e.note || (e.cents < 0 ? 'Adjustment' : 'Commission')) + ' · ' + centsMoney(e.cents),
+    go: `commForm('${e.id}')`
+  }));
+}
+function diaryCars(iso) {
+  const out = [];
+  (S.cars || []).forEach(c => {
+    if (!c) return;
+    if (c.wof === iso) out.push({ text: c.name + ' WOF due', go: `go('#car/${c.id}')` });
+    if (c.rego === iso) out.push({ text: c.name + ' rego due', go: `go('#car/${c.id}')` });
+    if (c.svcDate === iso) out.push({ text: c.name + ' service due', go: `go('#car/${c.id}')` });
+  });
+  return out;
+}
+function diaryPets(iso) {
+  const out = [];
+  (S.pets || []).forEach(p => {
+    (p.care || []).forEach(it => {
+      if (careDue(it) === iso) out.push({ text: p.name + ': ' + it.name + ' due', go: `go('#pet/${p.id}')` });
+    });
+    (p.history || []).forEach(h => {
+      if (h.date === iso) out.push({ text: p.name + ': ' + (h.name || 'Care') + ' done', go: `go('#pet/${p.id}')` });
+    });
+  });
+  return out;
+}
+function diaryHealth(iso) {
+  const out = [];
+  (S.health || []).forEach(p => {
+    (p.items || []).forEach(it => {
+      if (it.apptDate === iso) out.push({ text: p.name + ' – ' + it.name + (diaryClock(it.apptTime) ? ', ' + diaryClock(it.apptTime) : ''), go: `go('#health/${p.id}/${it.id}')` });
+      else if (careDue(it) === iso) out.push({ text: p.name + ' – ' + it.name + ' due', go: `go('#health/${p.id}/${it.id}')` });
+    });
+    (p.history || []).forEach(h => {
+      if (h.date === iso) out.push({ text: p.name + ' – ' + (h.name || 'Check-up') + ' done', go: `go('#health/${p.id}')` });
+    });
+  });
+  return out;
+}
+function diaryGarden(iso) {
+  const t = parseD(iso);
+  return gardenJobs(S, t, t).map(j => ({ text: j.title + (j.done ? ' · done' : ''), go: `go('#garden/${j.go}')` }));
+}
+function diaryEvents(iso) {
+  if (!EVS || !EVS.data || !Array.isArray(EVS.data.events)) return [];
+  const out = [];
+  EVS.data.events.forEach(e => {
+    if (!e || !String(e.title || '').trim() || !e.date || isSilverFestival(e)) return;
+    if (e.id && evAppt(e.id)) return;
+    const end = e.end && e.end >= e.date ? e.end : e.date;
+    if (iso < e.date || iso > end) return;
+    const when = diaryClock(e.time);
+    out.push({ text: (when ? when + ' · ' : '') + String(e.title).trim() + (e.venue ? ' · ' + e.venue : ''), go: "go('#events')" });
+  });
+  return out;
+}
+function diaryGroups(iso) {
+  const by = {
+    appt: diaryAppts(iso), todo: diaryTodos(iso), bill: diaryBills(iso), meal: diaryMeals(iso),
+    bday: diaryBirthdays(iso), rem: diaryReminders(iso), comm: diaryComm(iso), car: diaryCars(iso),
+    pet: diaryPets(iso), health: diaryHealth(iso), garden: diaryGarden(iso), event: diaryEvents(iso)
+  };
+  return DIARY_KINDS.filter(([k]) => by[k] && by[k].length).map(([k, label]) => ({ label, items: by[k] }));
+}
+function diaryFlat(iso) {
+  const out = [];
+  diaryGroups(iso).forEach(g => g.items.forEach(it => out.push(it)));
+  return out;
+}
+function diaryPageInner(iso) {
+  const groups = diaryGroups(iso);
+  const head = `<div class="diarydate">${esc(fmtLong(iso))}${iso === diaryToday() ? ' <span class="diarytoday">Today</span>' : ''}</div>`;
+  if (!groups.length) return head + `<p class="diaryquiet">${esc(DIARY_QUIET)}</p>`;
+  return head + groups.map(g => `<div class="diarykind">${esc(g.label)}</div>` + g.items.map(it => {
+    const inner = esc(it.text);
+    return it.go ? `<button type="button" class="diaryline" onclick="${it.go}">${inner}</button>` : `<div class="diaryline">${inner}</div>`;
+  }).join('')).join('');
+}
+function diaryWeekHtml(iso) {
+  const mon = diaryMonday(iso);
+  let html = '';
+  for (let i = 0; i < 7; i++) html += `<section class="diaryday">${diaryPageInner(addDays(mon, i))}</section>`;
+  return html;
+}
+function Diary() {
+  const iso = diaryAnchor(), day = diaryMode !== 'week';
+  const inner = day ? `<div class="diaryday">${diaryPageInner(iso)}</div>` : diaryWeekHtml(iso);
+  const backToday = diaryOnToday() ? '' : `<button type="button" class="btn small diaryback" onclick="diaryJumpToday()">Back to today</button>`;
+  return header('Diary', 'Day by day, from what’s already in the app') +
+    `<div class="diarynav"><button type="button" class="iconbtn" aria-label="${day ? 'Previous day' : 'Previous week'}" onclick="diaryShift(-1)">${I('left')}</button><div class="when">${esc(diaryRangeLabel())}</div><button type="button" class="iconbtn" aria-label="${day ? 'Next day' : 'Next week'}" onclick="diaryShift(1)">${I('right')}</button></div>` +
+    `<div class="seg diaryseg" role="group" aria-label="Diary view"><button type="button" class="${day ? 'on' : ''}" aria-pressed="${day}" onclick="diarySetMode('day')">Day</button><button type="button" class="${day ? '' : 'on'}" aria-pressed="${!day}" onclick="diarySetMode('week')">Week</button></div>` +
+    backToday +
+    `<div class="diarybook"><div class="diaryspine" aria-hidden="true"><span></span><span></span><span></span></div><div class="diarypages">${inner}</div></div>` +
+    `<div class="foot">Appointments, to-dos, bills, meals, birthdays, reminders, commission, cars, pets, health, garden and local events already on this phone. Nothing new is fetched for this page.</div>`;
+}
+
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
@@ -8710,7 +8945,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary };
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
