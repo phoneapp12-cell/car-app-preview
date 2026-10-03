@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.9.2';
+const APP_VERSION = '2.9.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -95,7 +95,8 @@ const P = {
   music: '<path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>',
   leaf: '<path d="M12 21V11"/><path d="M12 13C8 12 4 9.5 4 5c5 .2 8 3.2 8 8z"/><path d="M12 11c4-1 7.2-3.6 8-7-4.2.8-7 4-8 7z"/>',
   pen: '<path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/>',
-  podcast: '<path d="M3 14v-2a9 9 0 0 1 18 0v2"/><path d="M3 14v4a2 2 0 0 0 2 2h2v-8H5a2 2 0 0 0-2 2z"/><path d="M21 14v4a2 2 0 0 1-2 2h-2v-8h2a2 2 0 0 1 2 2z"/>'
+  podcast: '<path d="M3 14v-2a9 9 0 0 1 18 0v2"/><path d="M3 14v4a2 2 0 0 0 2 2h2v-8H5a2 2 0 0 0-2 2z"/><path d="M21 14v4a2 2 0 0 1-2 2h-2v-8h2a2 2 0 0 1 2 2z"/>',
+  radio: '<path d="M5 10 12 4l7 6"/><rect x="4" y="10" width="16" height="9.5" rx="2"/><circle cx="9" cy="14.7" r="2"/><path d="M13.5 13.2h3.2M13.5 16.2h3.2"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
 
@@ -290,6 +291,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   videos: ['play', 'vid', 'Videos', 'A few suggestions from the video categories you leave on', 0],
   blogging: ['pen', 'blog', 'Blogging', 'Recent posts from other blogs', 0],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Recent episodes from other podcasts', 0],
+  radio: ['radio', 'rad', 'Radio', 'Local stations in Whangārei', 0],
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a Done button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
@@ -309,7 +311,7 @@ const HOME_GROUPS = [
   { id: 'cars', title: 'Cars', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'shopping', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['bridge', 'weather', 'roadworks', 'events', 'news'] },
-  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'blogging', 'podcasts'] }
+  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'blogging', 'podcasts', 'radio'] }
 ];
 const HOME_CAT = Object.fromEntries(HOME_GROUPS.flatMap(g => g.keys.map(k => [k, g.id])));
 let homeEdit = false;
@@ -497,6 +499,11 @@ const HOME_CARD = {
     const failed = podFailures() || [];
     if (failed.length) return head + `<div class="list" id="homepod">${failed.slice(0, 2).map(podFailRow).join('')}</div>`;
     return head + podNone('homepod');
+  },
+  // Off until switched on in Customise Home. Stations that broadcast in Whangārei. No made-up stream.
+  radio: () => {
+    const head = homeSec('Radio', '<a href="#radio">See all</a>');
+    return head + `<div class="list" id="homeradio">${RADIO.slice(0, 3).map(radioRow).join('')}</div>`;
   }
 };
 function homeEditHtml() {
@@ -2686,6 +2693,68 @@ function Podcasts() {
     `<div class="sec">Recent episodes <button onclick="refreshPodcasts(true)">${podBusy ? 'Updating…' : 'Refresh'}</button></div>` +
     body +
     `<div class="foot">${links ? 'From ' + links + '. ' : ''}Tap play to listen here when the episode is an ordinary https recording. Otherwise tap the title to open the episode. This page refreshes when you open it, when you come back to the app, and about every 30 minutes while it stays open.</div>`;
+}
+
+
+/* ================= RADIO =================
+   Stations that broadcast in Whangārei. Each frequency is copied from that station’s own site
+   (RNZ’s frequency page, rova, NZME station sites, Rhema Media, Ngāti Hine FM, PMN, Beagle Radio, The Generator).
+   A stream is included only when that site publishes an https address and a check of it returned audio.
+   Nothing is saved here. If a stream fails, the row says so. */
+const RADIO = [
+  { name: 'Beagle Radio', freq: '88.1 FM', where: 'Whangārei', home: 'https://www.beagleradio.co.nz/', stream: 'https://stream.beagleradio.co.nz/stream' },
+  { name: 'The Hits', freq: '89.2 FM', where: 'Whangārei', home: 'https://www.thehits.co.nz/info/frequencies/' },
+  { name: 'The Rock', freq: '90.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-rock' },
+  { name: 'The Breeze', freq: '90.8 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-breeze' },
+  { name: 'More FM', freq: '91.6 FM', where: 'Northland', home: 'https://www.rova.nz/find-your-more-fm-frequency' },
+  { name: 'Breeze Classic', freq: '92.4 FM', where: 'Northland', home: 'https://www.rova.nz/breeze-breeze-classic-frequencies' },
+  { name: 'Radio Hauraki', freq: '93.2 FM', where: 'Northland', home: 'https://www.hauraki.co.nz/' },
+  { name: 'The Edge', freq: '94.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-edge' },
+  { name: 'ZM', freq: '94.8 FM', where: 'Whangārei', home: 'https://www.zmonline.com/listen/frequencies/' },
+  { name: 'iHeartCountry', freq: '95.6 FM', where: 'Northland', home: 'https://iheartcountrynz.iheart.com/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_09AAC.aac' },
+  { name: 'Coast', freq: '96.4 FM', where: 'Northland', home: 'https://www.thecoast.net.nz/info/frequencies/' },
+  { name: 'The Sound', freq: '98.0 FM', where: 'Whangārei', home: 'https://www.rova.nz/radio/the-sound' },
+  { name: 'Life FM', freq: '98.8 FM', where: 'Whangārei', home: 'https://www.lifefm.co.nz/frequencies', stream: 'https://rhema-radio.streamguys1.com/rhema-lifefm.aac' },
+  { name: 'Ngāti Hine FM', freq: '99.1 FM and 99.6 FM', where: 'Whangārei', home: 'https://www.ngatihinefm.com/about', stream: 'https://icast1.streamcom.net/NgatiHine' },
+  { name: 'RNZ Concert', freq: '100.4 FM and 105.2 FM', where: 'Whangārei', home: 'https://www.rnz.co.nz/listen/amfm', stream: 'https://stream-ice.radionz.co.nz/concert.mp3' },
+  { name: 'RNZ National', freq: '837 AM, 101.2 FM and 104.4 FM', where: 'Whangārei', home: 'https://www.rnz.co.nz/listen/amfm', stream: 'https://stream-ice.radionz.co.nz/national.mp3' },
+  { name: 'PMN 531pi', freq: '103.6 FM', where: 'Whangārei', home: 'https://pmn.co.nz/radio-stations/531-pi', stream: 'https://18243.live.streamtheworld.com/531PI_SC' },
+  { name: 'Flava', freq: '106 FM', where: 'Whangārei', home: 'https://www.flava.co.nz/' },
+  { name: 'Mai FM', freq: '107.3 FM', where: 'Whangārei', home: 'https://www.rova.nz/radio/mai-fm' },
+  { name: 'The Generator', freq: '108 FM', where: 'Whangārei', home: 'https://thegenerator.co.nz/' },
+  { name: 'Rhema', freq: '621 AM', where: 'Whangārei', home: 'https://rhema.co.nz/frequencies', stream: 'https://rhema-radio.streamguys1.com/rhema.aac' },
+  { name: 'Newstalk ZB', freq: '729 AM, 1026 AM, 105.1 FM and 1215 AM', where: 'Northland', home: 'https://www.newstalkzb.co.nz/' },
+];
+function radioFail(el) {
+  if (!el || el.dataset.failed) return;
+  el.dataset.failed = '1';
+  try { el.pause(); } catch (e) { }
+  el.hidden = true;
+  el.removeAttribute('controls');
+  const note = el.parentElement && el.parentElement.querySelector('.radioerr');
+  if (note) note.hidden = false;
+}
+function wireRadio() {
+  document.querySelectorAll('audio.radioplay').forEach(a => {
+    if (a.dataset.wired) return;
+    a.dataset.wired = '1';
+    a.addEventListener('error', () => radioFail(a));
+    a.addEventListener('play', () => {
+      document.querySelectorAll('audio.radioplay').forEach(o => { if (o !== a) o.pause(); });
+    });
+  });
+}
+function radioRow(st) {
+  const freq = [st.freq, st.where].filter(Boolean).join(' · ');
+  const audio = st.stream
+    ? `<audio class="radioplay" controls preload="none" src="${esc(st.stream)}"></audio><div class="s radioerr" hidden>Couldn’t play this station.</div>`
+    : '';
+  return `<div class="row rad"><div class="ic rad">${I('radio')}</div><div class="tx"><a class="t" href="${esc(st.home)}" target="_blank" rel="noopener">${esc(st.name)}</a><div class="s">${esc(freq)}</div>${audio}</div></div>`;
+}
+function Radio() {
+  return header('Radio', 'Stations you can hear in Whangārei') +
+    `<div class="list" id="radiolist">${RADIO.map(radioRow).join('')}</div>` +
+    `<div class="foot">Frequencies are from each station’s own site. Tap play only where a real https stream is listed. If it cannot play, the row says so. A station without a player opens its website. Nothing is downloaded.</div>`;
 }
 
 /* ================= MEAL PLANNER ================= */
@@ -5343,7 +5412,8 @@ function More() {
     blogging: () => { const posts = blogPosts(); const first = posts && posts[0]; return first ? `${esc(first.blog)}: ${esc(first.title)}` : 'Posts from other blogs'; },
     podcasts: () => { const episodes = podEpisodes(); const first = episodes && episodes[0]; return first ? `${esc(first.show)}: ${esc(first.title)}` : 'Episodes from other podcasts'; },
     videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
-    top40: () => 'Official Top 40 · chart as of 3 Oct 2026'
+    top40: () => 'Official Top 40 · chart as of 3 Oct 2026',
+    radio: () => 'Stations you can hear in Whangārei'
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
     bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
@@ -5370,7 +5440,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
-  podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts']
+  podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
+  radio: ['radio', 'rad', 'Radio', 'Radio']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -5382,7 +5453,7 @@ const NAV_GROUPS = [
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge'] },
-  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts'] }
+  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts', 'radio'] }
 ];
 function navOrder() {
   return NAV_DEFAULT.slice();
@@ -8472,7 +8543,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio };
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
@@ -8481,6 +8552,7 @@ function render() {
   if ((r === 'home' || r === '') && homeEdit) wireReorder();
   if ((r === 'home' || r === '') && !homeEdit) wireHomeEnter();
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
+  wireRadio();
 }
 // 1.98.0: as Home scrolls, sections take turns sliding in from the left, from the right, and folding down.
 // prefers-reduced-motion: reduce leaves them still. Videos are not started by this.
