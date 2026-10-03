@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.16.0';
+const APP_VERSION = '2.17.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -446,10 +446,10 @@ const HOME_CARD = {
   videos: () => homeVideosCard(),
   todo: () => {
     const att = homeOn('attention'); // to-dos due within 30 days are already in Needs attention
-    const open = S.todos.filter(t => !t.done && !(att && t.due && daysLeft(t.due) <= 30)).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
+    const open = S.todos.filter(t => !t.done && !(att && t.due && daysLeft(t.due) <= 30)).sort(cmpOpenTodo);
     if (!open.length) return '';
     return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span><b>Done</b></button>
-      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? duePill(daysLeft(t.due)) : ''}</button>${todoCalBtn(t)}</div>`).join('')}</div>` +
+      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${todoPriMark(t)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? duePill(daysLeft(t.due)) : ''}</button>${todoCalBtn(t)}</div>`).join('')}</div>` +
       (open.length > 5 ? `<div class="homemore"><a href="#todo">${plural(open.length - 5, 'more to-do')}</a></div>` : '');
   },
   loans: () => {
@@ -2326,13 +2326,28 @@ function deleteBill(id) {
 /* ================= TO-DO ================= */
 let todoFilter = 'All';
 const jsArg = s => esc(JSON.stringify(s));
+// Missing or anything other than high/low is normal, so old to-dos stay Normal.
+function todoPriority(t) {
+  const p = t && t.priority;
+  return p === 'high' || p === 'low' ? p : 'normal';
+}
+function todoPriRank(t) { return todoPriority(t) === 'high' ? 0 : todoPriority(t) === 'low' ? 2 : 1; }
+function cmpOpenTodo(a, b) {
+  return todoPriRank(a) - todoPriRank(b)
+    || (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15)
+    || (b.created || 0) - (a.created || 0);
+}
+function todoPriMark(t) {
+  const p = todoPriority(t);
+  return p === 'high' ? ' · High' : p === 'low' ? ' · Low' : '';
+}
 function Todo() {
   if (todoFilter !== 'All' && !S.lists.includes(todoFilter)) todoFilter = 'All';
   const vis = S.todos.filter(t => todoFilter === 'All' || t.list === todoFilter);
-  const open = vis.filter(t => !t.done).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
+  const open = vis.filter(t => !t.done).sort(cmpOpenTodo);
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const row = t => `<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick${t.done ? '' : ' donelabel'}" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span>${t.done ? '' : '<b>Done</b>'}</button>
-    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>
+    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>
     ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
   const openCount = S.todos.filter(t => !t.done).length;
   return header('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()')) +
@@ -2347,7 +2362,7 @@ function setTodoFilter(l) { todoFilter = l; render(); }
 async function quickAdd(e) {
   e.preventDefault();
   const v = $('#newtodo').value.trim(); if (!v) return;
-  S.todos.push({ id: uid('todo'), title: v, list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', done: false, created: Date.now() });
+  S.todos.push({ id: uid('todo'), title: v, list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', priority: 'normal', done: false, created: Date.now() });
   await save(); render(); $('#newtodo').focus(); toast('Added to your list.');
 }
 async function tick(id) {
@@ -2367,16 +2382,18 @@ function clearDone() {
   });
 }
 function todoForm(id) {
-  const t = id ? S.todos.find(x => x.id === id) : { title: '', list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '' };
+  const t = id ? S.todos.find(x => x.id === id) : { title: '', list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', priority: 'normal' };
   openSheet(id ? 'Edit to-do' : 'Add a to-do',
     field('To-do', inp('title', t.title, 'placeholder="e.g. Mow the lawns" required maxlength="120"')) +
-    `<div class="two">${field('List', sel('list', S.lists.map(l => [l, l]), t.list))}${field('Due date', inp('due', t.due, 'type="date"'), 'Optional')}</div>` +
+    `<div class="two">${field('List', sel('list', S.lists.map(l => [l, l]), t.list))}${field('Priority', sel('priority', [['high', 'High'], ['normal', 'Normal'], ['low', 'Low']], todoPriority(t)))}</div>` +
+    field('Due date', inp('due', t.due, 'type="date"'), 'Optional') +
     field('Notes', area('notes', t.notes)) +
     (id ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="tick('${id}')">${I('check')} ${t.done ? 'Mark not done' : 'Mark complete'}</button>${t.done ? '' : `<button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button>`}</div>` : ''),
     async v => {
       if (!v.title) return 'Please type the to-do.';
-      if (id) Object.assign(t, { title: v.title, list: v.list, due: v.due, notes: v.notes });
-      else S.todos.push({ id: uid('todo'), title: v.title, list: v.list, due: v.due, notes: v.notes, done: false, created: Date.now() });
+      const priority = todoPriority({ priority: v.priority });
+      if (id) Object.assign(t, { title: v.title, list: v.list, due: v.due, notes: v.notes, priority });
+      else S.todos.push({ id: uid('todo'), title: v.title, list: v.list, due: v.due, notes: v.notes, priority, done: false, created: Date.now() });
       await save(); render(); toast(id ? 'To-do updated.' : 'Added to your list.');
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete to-do" onclick="deleteTodo('${id}')">${I('trash')}</button>` : '');
@@ -2402,18 +2419,21 @@ async function addTodoCal(id) {
   const f = document.getElementById('sf');
   const fromForm = !!(sheetOpen && f && f.title && f.list && f.due);
   let title = t.title, list = t.list, due = t.due, notes = t.notes || '';
+  let priority;
   if (fromForm) {
     title = f.title.value.trim();
     if (!title) { toast('Please type the to-do.'); return; }
     list = f.list.value;
     due = f.due.value;
     if (f.notes) notes = f.notes.value.trim();
+    if (f.priority) priority = todoPriority({ priority: f.priority.value });
   }
   const have = todoAppt(t);
   if (have) { if (sheetOpen) await closeSheet(); apptForm(have.id); return; }
   if (!parseD(due)) { toast('Set a due date on this to-do first.'); return; }
   const s = snap();
   t.title = title; t.list = list; t.due = due; t.notes = notes;
+  if (priority) t.priority = priority;
   const own = todoClock(t);
   const time = own || TODO_CAL_TIME;
   const appt = { id: uid('appt'), title: t.title, date: t.due, time, notes: t.notes || '', todoId: t.id };
@@ -2929,7 +2949,7 @@ function ideaForm(id) {
 async function ideaToTodo(id) {
   const i = S.ideas.find(x => x.id === id);
   const list = S.lists.includes(i.cat) ? i.cat : S.lists[0];
-  S.todos.push({ id: uid('todo'), title: i.title.slice(0, 120), list, due: '', notes: i.notes || '', done: false, created: Date.now(), fromIdea: id });
+  S.todos.push({ id: uid('todo'), title: i.title.slice(0, 120), list, due: '', notes: i.notes || '', priority: 'normal', done: false, created: Date.now(), fromIdea: id });
   await save(); await closeSheet(); render();
   toast(`Added to your ${list} to-do list.`, 'View', () => { todoFilter = 'All'; go('#todo'); });
 }
@@ -9226,8 +9246,8 @@ function diaryAppts(iso) {
   return out.sort((a, b) => a.sort.localeCompare(b.sort) || a.text.localeCompare(b.text)).map(({ text, go }) => ({ text, go }));
 }
 function diaryTodos(iso) {
-  return (S.todos || []).filter(t => t && t.due === iso && String(t.title || '').trim()).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1) || String(a.title).localeCompare(String(b.title))).map(t => ({
-    text: String(t.title).trim() + (t.done ? ' · done' : '') + (t.list ? ' · ' + t.list : ''),
+  return (S.todos || []).filter(t => t && t.due === iso && String(t.title || '').trim()).sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1) || todoPriRank(a) - todoPriRank(b) || String(a.title).localeCompare(String(b.title))).map(t => ({
+    text: String(t.title).trim() + (t.done ? ' · done' : '') + (t.list ? ' · ' + t.list : '') + (todoPriority(t) === 'high' ? ' · high' : ''),
     go: `todoForm('${t.id}')`
   }));
 }
