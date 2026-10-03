@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.98.0';
+const APP_VERSION = '1.99.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -296,13 +296,35 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   ideas: ['bulb', 'idea', 'Starred ideas', 'Ideas you’ve starred', 0]
 };
 const HOME_DEFAULT = Object.keys(HOME);
+/* 1.99.0: Home cards stay in the same groups as the side panel. Order inside a group can change.
+   A card cannot move into another group. Only real Home cards are listed. */
+const HOME_GROUPS = [
+  { id: 'day', title: 'Everyday', keys: ['holidays', 'summary', 'attention', 'todo'] },
+  { id: 'money', title: 'Money', keys: ['loans', 'commission', 'bills'] },
+  { id: 'people', title: 'People', keys: ['birthdays', 'pets'] },
+  { id: 'cars', title: 'Cars', keys: ['cars'] },
+  { id: 'life', title: 'Home life', keys: ['meals', 'shopping', 'ideas'] },
+  { id: 'near', title: 'Nearby', keys: ['bridge', 'weather', 'roadworks', 'events', 'news'] },
+  { id: 'media', title: 'Media', keys: ['tv', 'videos'] }
+];
+const HOME_CAT = Object.fromEntries(HOME_GROUPS.flatMap(g => g.keys.map(k => [k, g.id])));
 let homeEdit = false;
 let homeShownNow = new Set();
 function homeOrder() {
   const src = Array.isArray(S.settings.homeOrder) ? S.settings.homeOrder : [];
-  const o = src.filter((k, i, a) => HOME[k] && a.indexOf(k) === i);
-  HOME_DEFAULT.forEach(k => { if (!o.includes(k)) o.splice(Math.min(HOME_DEFAULT.indexOf(k), o.length), 0, k); });
-  return o;
+  const seen = new Set();
+  const by = Object.fromEntries(HOME_GROUPS.map(g => [g.id, []]));
+  src.forEach(k => {
+    const cat = HOME_CAT[k];
+    if (!HOME[k] || !cat || seen.has(k)) return;
+    seen.add(k);
+    by[cat].push(k);
+  });
+  HOME_GROUPS.forEach(g => {
+    const o = by[g.id];
+    g.keys.forEach((k, i) => { if (!o.includes(k)) o.splice(Math.min(i, o.length), 0, k); });
+  });
+  return HOME_GROUPS.flatMap(g => by[g.id]);
 }
 function homeOn(k) {
   // Videos uses its own switch (settings.homeVideos), off until turned on, so Home stays as it was.
@@ -356,6 +378,18 @@ async function moveHomeSum(dir) {
   delete S.settings.homeSumAt;
   await save();
   render();
+}
+async function moveHomeCard(k, dir) {
+  const cat = HOME_CAT[k];
+  if (!cat) return;
+  const order = homeOrder();
+  const mine = order.filter(x => HOME_CAT[x] === cat);
+  const p = mine.indexOf(k);
+  const n = p + (dir < 0 ? -1 : 1);
+  if (p < 0 || n < 0 || n >= mine.length) return;
+  const tmp = mine[p]; mine[p] = mine[n]; mine[n] = tmp;
+  let mi = 0;
+  await setHomeOrder(order.map(key => HOME_CAT[key] === cat ? mine[mi++] : key));
 }
 function homeEditRows() {
   const rows = homeOrder().map(k => ({ kind: 'card', k }));
@@ -441,23 +475,38 @@ const HOME_CARD = {
       <div class="tx"><div class="t">${esc(i.title)}</div>${i.cat ? `<div class="s">${esc(i.cat)}</div>` : ''}</div></button>`).join('')}</div>`;
   }
 };
-function HomeEdit() {
+function homeEditHtml() {
   const rows = homeEditRows();
-  const sumOn = showHomeSum();
   const last = rows.length - 1;
-  return header('Customise Home', 'Press and hold a row, then drag it up or down') +
-    `<div class="reordhelp">Use the switches to show or hide cards. Cards with nothing to show stay hidden until there’s something in them. Drag the summary between sections, or use Up and Down.</div>
-    <div class="list" id="homesumopt" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">Summary</div><div class="s">A short summary of this page. It starts under the date and weather. Up and Down move it one section at a time.</div></div><button class="switch ${sumOn ? 'on' : ''}" role="switch" aria-checked="${sumOn}" aria-label="Show the homepage summary" onclick="toggleHomeSum()"></button></div></div>
-    <div class="list reorder" id="reorderlist" data-save="home">${rows.map((r, i) => {
-      if (r.kind === 'sum') return `<div class="row mrow sumrow" data-k="homesum" aria-label="Summary"><div class="ic idea">${I('bulb')}</div>
-      <div class="tx"><div class="t">Summary</div><div class="s">Between the sections on Home.</div></div>
+  let html = '', prev = '';
+  rows.forEach((r, i) => {
+    if (r.kind === 'sum') {
+      html += `<div class="row mrow sumrow" data-k="homesum" aria-label="Summary"><div class="ic idea">${I('bulb')}</div>
+      <div class="tx"><div class="t">Summary</div><div class="s">Between the sections on Home. It can sit in any category.</div></div>
       <span class="summoves"><button type="button" class="summove" aria-label="Move the summary up one section" onclick="event.stopPropagation();moveHomeSum(-1)" ${i === 0 ? 'disabled' : ''}>Up</button><button type="button" class="summove" aria-label="Move the summary down one section" onclick="event.stopPropagation();moveHomeSum(1)" ${i === last ? 'disabled' : ''}>Down</button></span></div>`;
-      const k = r.k, d = HOME[k], on = homeOn(k);
-      return `<div class="row mrow${on ? '' : ' cardoff'}" data-k="${k}" aria-label="${esc(d[2])}"><div class="ic ${d[1]}">${I(d[0])}</div>
+      return;
+    }
+    const k = r.k, d = HOME[k], on = homeOn(k), cat = HOME_CAT[k];
+    if (cat !== prev) {
+      const g = HOME_GROUPS.find(x => x.id === cat);
+      html += `<div class="homecat" id="homecat-${cat}">${esc(g.title)}</div>`;
+      prev = cat;
+    }
+    const mates = rows.filter(x => x.kind === 'card' && HOME_CAT[x.k] === cat);
+    const pos = mates.findIndex(x => x.k === k);
+    html += `<div class="row mrow${on ? '' : ' cardoff'}" data-k="${k}" data-cat="${cat}" aria-label="${esc(d[2])}"><div class="ic ${d[1]}">${I(d[0])}</div>
       <div class="tx"><div class="t">${d[2]}</div><div class="s">${d[3]}</div></div>
       <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${esc(d[2])} on Home" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>
-      <span class="grip" aria-hidden="true">${I('grip')}</span></div>`;
-    }).join('')}
+      <span class="summoves"><button type="button" class="summove" aria-label="Move ${esc(d[2])} up" onclick="event.stopPropagation();moveHomeCard('${k}',-1)" ${pos <= 0 ? 'disabled' : ''}>Up</button><button type="button" class="summove" aria-label="Move ${esc(d[2])} down" onclick="event.stopPropagation();moveHomeCard('${k}',1)" ${pos < 0 || pos >= mates.length - 1 ? 'disabled' : ''}>Down</button></span></div>`;
+  });
+  return html;
+}
+function HomeEdit() {
+  const sumOn = showHomeSum();
+  return header('Customise Home', 'Press and hold a row, then drag it within its category') +
+    `<div class="reordhelp">Use the switches to show or hide cards. Cards with nothing to show stay hidden until there’s something in them. Up and Down, or a drag, move a card only inside its category. Drag the summary between sections, or use its Up and Down.</div>
+    <div class="list" id="homesumopt" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">Summary</div><div class="s">A short summary of this page. It starts under the date and weather. Up and Down move it one section at a time.</div></div><button class="switch ${sumOn ? 'on' : ''}" role="switch" aria-checked="${sumOn}" aria-label="Show the homepage summary" onclick="toggleHomeSum()"></button></div></div>
+    <div class="list reorder" id="reorderlist" data-save="home">${homeEditHtml()}
     </div>
     ${homeOn('events') ? `<div class="list" id="evcountopt" style="margin-top:12px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Events on Home</div><div class="s">How many to show under What’s on in Whangārei. The rest stay on the Events page.</div></div>
       <div class="seg" id="evcount" role="group" aria-label="How many events on Home" style="width:100%">${[1,2,3,4,5,6].map(n => `<button type="button" class="${homeEventCount() === n ? 'on' : ''}" aria-pressed="${homeEventCount() === n}" onclick="setHomeEventCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
@@ -4340,6 +4389,11 @@ function startDrag(st) {
   if (rd !== st) return;
   const list = $('#reorderlist'), rows = [...list.querySelectorAll('.mrow')], lr = list.getBoundingClientRect();
   st.on = true; st.rows = rows; st.from = rows.indexOf(st.row); st.to = st.from;
+  st.cat = st.row.dataset.cat || '';
+  st.catIdx = [];
+  if (st.cat) rows.forEach((r, i) => { if ((r.dataset.cat || '') === st.cat) st.catIdx.push(i); });
+  st.catFrom = st.cat ? st.catIdx.indexOf(st.from) : -1;
+  st.catPos = st.catFrom;
   st.mids = rows.map(r => { const b = r.getBoundingClientRect(); return b.top - lr.top + b.height / 2; });
   st.h = st.row.getBoundingClientRect().height; st.startTop = lr.top; st.startScroll = $('#view').scrollTop;
   list.classList.add('dragging'); st.row.classList.add('lifted');
@@ -4355,17 +4409,38 @@ function autoScroll() {
 function dragTo() {
   const st = rd, scrolled = $('#view').scrollTop - st.startScroll, dy = st.lastY - st.y + scrolled;
   const mid = st.mids[st.from] + dy;
-  let to = 0; st.mids.forEach((m, i) => { if (i !== st.from && m < mid) to++; });
+  let to = 0;
+  if (st.cat) {
+    let pos = 0;
+    st.catIdx.forEach(i => { if (i !== st.from && st.mids[i] < mid) pos++; });
+    st.catPos = pos;
+    to = st.catIdx[pos];
+  } else st.mids.forEach((m, i) => { if (i !== st.from && m < mid) to++; });
   st.to = to;
   st.row.style.transform = `translateY(${dy}px)`;
-  st.rows.forEach((r, i) => { if (i === st.from) return; const shift = st.from < to && i > st.from && i <= to ? -st.h : st.from > to && i >= to && i < st.from ? st.h : 0; r.style.transform = shift ? `translateY(${shift}px)` : ''; });
+  const a = st.cat ? st.catIdx[st.catFrom] : st.from, b = st.cat ? st.catIdx[st.catPos] : to;
+  st.rows.forEach((r, i) => {
+    if (i === st.from) return;
+    const shift = a < b && i > a && i <= b ? -st.h : a > b && i >= b && i < a ? st.h : 0;
+    r.style.transform = shift ? `translateY(${shift}px)` : '';
+  });
 }
 async function endDrag() {
   const st = rd; rd = null; cancelAnimationFrame(st.raf);
-  const o = st.rows.map(r => r.dataset.k), [k] = o.splice(st.from, 1); o.splice(st.to, 0, k);
-  if (st.to === st.from) { render(); return; }
   if ($('#reorderlist').dataset.save !== 'home') { render(); return; }
-  await setHomeOrder(o);
+  if (!st.cat) {
+    const o = st.rows.map(r => r.dataset.k), [k] = o.splice(st.from, 1); o.splice(st.to, 0, k);
+    if (st.to === st.from) { render(); return; }
+    await setHomeOrder(o);
+    return;
+  }
+  if (st.catPos === st.catFrom) { render(); return; }
+  const order = homeOrder();
+  const mine = order.filter(k => HOME_CAT[k] === st.cat);
+  const [k] = mine.splice(st.catFrom, 1);
+  mine.splice(st.catPos, 0, k);
+  let mi = 0;
+  await setHomeOrder(order.map(key => HOME_CAT[key] === st.cat ? mine[mi++] : key));
 }
 
 /* ================= LIFTING BRIDGE (Dave Culham Drive, Te Matau ā Pohe) ================= */
