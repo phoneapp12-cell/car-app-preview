@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2603,11 +2603,14 @@ function mealRow(iso, hist = false) {
   const past = iso <= todayISO();
   const mark = !e ? '' : idea ? (idea.gf ? gfTag(true) : '<span class="nogf">Not marked gluten free</span>') : '<span class="nogf">Check it’s gluten free</span>';
   const sub = [mark, hist ? fmtW(iso) : nightLabel(iso), idea && idea.tag ? idea.tag : '', e && e.notes ? esc(e.notes.split('\n')[0].slice(0, 60)) : '', hist && e ? (e.cooked ? 'Cooked' : 'Not ticked') : ''].filter(Boolean).join(' · ');
-  return `<div class="row meal ${e && e.cooked ? 'done' : ''}" data-date="${iso}">
-    ${e ? mealPic(idea) : `<div class="ic meal">${I('meal')}</div>`}
-    ${e && past ? `<button class="tick" aria-label="${e.cooked ? 'Untick' : 'Tick'} cooked: ${esc(e.title)}" onclick="toggleCooked('${iso}')"><span>${I('check')}</span></button>` : ''}
-    <button class="tapzone" onclick="mealNight('${iso}')"><div class="tx"><div class="t">${e ? esc(e.title) : '<span class="muted">Nothing planned</span>'}</div><div class="s">${sub}</div></div></button>
-    ${!e && !hist ? `<button class="btn small" onclick="suggestNight('${iso}')">Suggest</button>` : ''}</div>`;
+  if (!e) return `<div class="row meal" data-date="${iso}">
+    <div class="ic meal">${I('meal')}</div>
+    <button class="tapzone" onclick="mealNight('${iso}')"><div class="tx"><div class="t"><span class="muted">Nothing planned</span></div><div class="s">${sub}</div></div></button>
+    ${!hist ? `<button class="btn small" onclick="suggestNight('${iso}')">Suggest</button>` : ''}</div>`;
+  const tick = past ? `<button class="tick" aria-label="${e.cooked ? 'Untick' : 'Tick'} cooked: ${esc(e.title)}" onclick="toggleCooked('${iso}')"><span>${I('check')}</span></button>` : '';
+  return `<div class="row meal haspic ${e.cooked ? 'done' : ''}" data-date="${iso}">
+    <button class="tapzone mealcap" onclick="mealNight('${iso}')"><div class="t">${esc(e.title)}</div></button>
+    <div class="mealpair">${mealPic(idea)}${tick}<button class="tapzone" onclick="mealNight('${iso}')"><div class="s">${sub}</div></button></div></div>`;
 }
 const mealTabs = on => `<div class="chips mealtabs"><button class="chip ${on === 'plan' ? 'on' : ''}" id="tabplan" onclick="go('#meals')">Meal plan</button><button class="chip ${on === 'recipes' ? 'on' : ''}" id="tabrecipes" onclick="go('#recipes')">Recipes (${visibleIdeas().length})</button><button class="chip ${on === 'shop' ? 'on' : ''}" id="tabshop" onclick="go('#shopping')">Shopping${S.shop.items.some(x => !x.done) ? ` (${S.shop.items.filter(x => !x.done).length})` : ''}</button></div>`;
 function nightsText() {
@@ -2682,10 +2685,15 @@ function mealIdeaList() {
     (!q || (i.title + ' ' + i.ingr.join(' ') + ' ' + (i.tag || '') + ' ' + (i.notes || '') + ' ' + (i.method || '') + ' ' + (i.source || '')).toLowerCase().includes(q)))
     .sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || a.title.localeCompare(b.title));
   if (!vis.length) return `<div class="card empty"><div class="t">No recipes match</div><div class="s">${q ? 'Try a different word.' : mealFilter === 'Hidden' ? 'Nothing hidden.' : mealFilter === 'Mine' ? 'Recipes you add or scan show here.' : 'Nothing with this tag yet.'}</div></div>`;
-  return `<div class="list">${vis.map(i => `<div class="row idea mealidea" data-id="${i.id}">${mealPic(i)}<button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
-    <button class="tapzone" onclick="go('#recipe/${i.id}')"><div class="tx"><div class="t">${esc(i.title)}${i.method ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· method</span>` : i.link ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· link</span>` : ''}</div>
-    <div class="s">${i.gf ? gfTag(true) + ' ' : '<span class="nogf">Not marked gluten free</span> '}${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}</div></div></button>
-    ${i.hidden ? `<button class="btn small" onclick="toggleMealHidden('${i.id}')">Show</button>` : `<button class="btn small" onclick="planIdea('${i.id}')">Plan</button>`}</div>`).join('')}</div>`;
+  return `<div class="list">${vis.map(i => {
+    const desc = `${i.gf ? gfTag(true) + ' ' : '<span class="nogf">Not marked gluten free</span> '}${i.tag ? `<span class="cattag">${esc(i.tag)}</span> ` : ''}${esc(i.ingr.slice(0, 5).join(', ') + (i.ingr.length > 5 ? '…' : ''))}`;
+    const title = `${esc(i.title)}${i.method ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· method</span>` : i.link ? ` <span class="muted" style="font-weight:600;font-size:0.75rem">· link</span>` : ''}`;
+    return `<div class="row idea mealidea" data-id="${i.id}">
+    <div class="mealcap"><button class="star ${i.fav ? 'on' : ''}" aria-label="${i.fav ? 'Unfavourite' : 'Favourite'} ${esc(i.title)}" aria-pressed="${!!i.fav}" onclick="toggleMealFav('${i.id}')">${I('star')}</button>
+      <button class="tapzone" onclick="go('#recipe/${i.id}')"><div class="t">${title}</div></button>
+      ${i.hidden ? `<button class="btn small" onclick="toggleMealHidden('${i.id}')">Show</button>` : `<button class="btn small" onclick="planIdea('${i.id}')">Plan</button>`}</div>
+    <button class="tapzone mealpair" onclick="go('#recipe/${i.id}')">${mealPic(i)}<div class="s">${desc}</div></button></div>`;
+  }).join('')}</div>`;
 }
 function Recipes() {
   const hidden = M().ideas.filter(i => i.hidden).length, mine = M().ideas.some(i => !i.builtin && !i.hidden);
@@ -2707,11 +2715,19 @@ function RecipeDetail(id) {
   const steps = methodSteps(i.method);
   const picSrc = recipePhotoSrc(i);
   const onList = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
+  const blurb = i.notes ? esc(i.notes) : (i.ingr.length ? esc(i.ingr.slice(0, 8).join(', ') + (i.ingr.length > 8 ? '…' : '')) : '');
+  const pic = picSrc ? `<img class="recphoto" alt="" src="${esc(picSrc)}">` : mealPic(i);
   return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#recipes')">${I('left')} Recipes</button>
     <button class="btn small" id="recedit" aria-label="Edit recipe" onclick="mealIdeaForm('${i.id}')">${I('edit')} Edit</button></div>
-    <div class="rechead">${mealPic(i)}<div style="min-width:0"><h1 class="rectitle">${esc(i.title)}</h1><div class="sub recsub">${facts || (i.builtin ? 'Starter recipe' : 'Your recipe')}</div></div></div>
-    <div class="recmeta">${i.gf ? gfTag() : '<span class="nogf">Not marked gluten free</span>'}${i.fav ? ' <span class="cattag">★ Favourite</span>' : ''}${i.source ? ` <span class="muted">From ${esc(i.source)}</span>` : ''}</div>
-    ${picSrc ? `<img class="recphoto" alt="" src="${esc(picSrc)}">` : ''}
+    <div class="recblock">
+      <h1 class="rectitle">${esc(i.title)}</h1>
+      <div class="recpic">${pic}</div>
+      <div class="recdesc">
+        <div class="sub recsub">${facts || (i.builtin ? 'Starter recipe' : 'Your recipe')}</div>
+        <div class="recmeta">${i.gf ? gfTag() : '<span class="nogf">Not marked gluten free</span>'}${i.fav ? ' <span class="cattag">★ Favourite</span>' : ''}${i.source ? ` <span class="muted">From ${esc(i.source)}</span>` : ''}</div>
+        ${blurb ? `<div class="recnotes">${blurb}</div>` : ''}
+      </div>
+    </div>
     ${photoBtns('recipe', i.id)}
     <div class="btns recbtns"><button class="btn primary" id="recplan" onclick="planRecipeForm('${i.id}')">${I('cal')} Plan it</button><button class="btn" id="recshop" onclick="recipeToShop('${i.id}')">${I('cart')} Add to shopping list</button></div>
     ${planned.length || last ? `<div class="card recplanned">${planned.length ? `Planned for ${planned.map(d => `<button class="linkbtn" onclick="openNight('${d}')">${fmtW(d)}</button>`).join(', ')}.` : ''}${last ? ` Last cooked ${fmtW(last)}.` : ''}</div>` : ''}
@@ -2720,7 +2736,7 @@ function RecipeDetail(id) {
     <div class="sec">Method</div>
     ${steps.length ? `<div class="card recmethod" id="recmethod"><ol>${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>` : `<div class="card muted">No method saved.${i.link ? '' : ` <button class="linkbtn" onclick="mealIdeaForm('${i.id}')">Add one</button> or scan it from the book.`}</div>`}
     ${i.link ? `<div class="btns"><a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">${I('link')} Open the recipe link</a></div>` : ''}
-    ${i.notes ? `<div class="sec">Notes</div><div class="card" style="white-space:pre-wrap">${esc(i.notes)}</div>` : ''}
+    
     <div class="foot">${i.gf ? 'Written gluten free. Still check labels for “gluten free”, especially stock, sauces, sausages and seasonings.' : 'This recipe isn’t ticked gluten free, so the planner won’t suggest it. Swap anything marked “may have gluten” for a gluten-free version, then tick “Gluten free” in Edit.'}</div>`;
 }
 // Method text: numbered lines ("1.", "Step 2") or blank lines start a new step; other line breaks are joined (scanned text breaks lines mid-sentence)
