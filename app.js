@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.80.0';
+const APP_VERSION = '1.81.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -522,6 +522,8 @@ function engList(arr) {
 // 1.80.0: once Gmail or Outlook is connected, one line covers mail from the last 2 hours
 // (a count and up to two real subjects, or no new mail). Subjects are never invented.
 // Television is still not mentioned.
+// 1.81.0: those same lines sit in numbered coloured bars. A bar about something overdue,
+// or one that names something due today, is red.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -587,7 +589,7 @@ function homeVideoPicks(mood) {
 }
 function homeOverview(shown) {
   const bits = [];
-  const add = (kind, text) => { if (text) bits.push({ kind, text }); };
+  const add = (kind, text, urgent) => { if (text) bits.push({ kind, text, urgent: !!urgent }); };
   const wx = homeWxRead();
   if (wx.line) add('wx', wx.line);
   const mailLine = homeMailLine();
@@ -598,8 +600,9 @@ function homeOverview(shown) {
   else if (soon) add('due', `Nothing is overdue. ${plural(soon, 'thing')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days, and there’s no rush.`);
   else add('due', 'Nothing is overdue, and nothing is due in the next 30 days. A nice open stretch.');
   const soonItems = homeAttention().filter(x => x.kind !== 'tv' && x.days >= 0 && x.days <= 30 && x.name && !homeSaysTv(x.name));
-  const names = soonItems.slice(0, 4).map(x => x.name);
-  if (names.length) add('soon', `First up in the next 30 days: ${engList(names)}.`);
+  const named = soonItems.slice(0, 4);
+  const names = named.map(x => x.name);
+  if (names.length) add('soon', `First up in the next 30 days: ${engList(names)}.`, named.some(x => x.days === 0));
   else add('soon', 'Nothing is coming up in the next 30 days.');
   if (EVS) {
     const evNames = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(t => t && !homeSaysTv(t)).slice(0, 2);
@@ -638,7 +641,13 @@ function homeOverview(shown) {
     else add('vid', `For early spring, your video list has ${engList(vids.map(q))}.`);
   }
   if (!bits.length) return '';
-  return `<div class="card homesum" id="homesum"><ul>${bits.map(b => `<li class="${b.kind}">${esc(b.text)}</li>`).join('')}</ul></div>`;
+  const bars = ['#0F766E', '#1D4ED8', '#6D28D9', '#047857', '#9A3412', '#BE185D', '#1E3A8A', '#0369A1', '#3F6212', '#155E75', '#5B21B6', '#134E4A'];
+  return `<div class="card homesum" id="homesum"><ul>${bits.map((b, i) => {
+    const n = String(i + 1).padStart(2, '0');
+    const urgent = !!(b.urgent || b.kind === 'late');
+    const style = urgent ? '' : ` style="--bar:${bars[i % bars.length]}"`;
+    return `<li class="${b.kind}${urgent ? ' urgent' : ''}"${style}><span class="n">${n}</span><span class="tx">${esc(b.text)}</span></li>`;
+  }).join('')}</ul></div>`;
 }
 
 // 1.75.0: each Home section gets a neutral wash, light sand at the top and darker slate further down.
