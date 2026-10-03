@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.11.2';
+const APP_VERSION = '2.11.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -839,6 +839,9 @@ function homeDayPart(now) {
     return 'evening';
   } catch (e) { return ''; }
 }
+function homeAtHome() {
+  try { return placeHere() === 'home'; } catch (e) { return false; }
+}
 function homeGreetLine() {
   try {
     const part = homeDayPart();
@@ -968,6 +971,7 @@ function homeEaseLine() {
       wet = mood === 'wet';
       sunny = mood === 'sun';
     } catch (e) { wet = false; sunny = false; }
+    const atHome = homeAtHome();
     let atWork = false;
     try { atWork = placeHere() === 'work'; } catch (e) { atWork = false; }
     let odd = false;
@@ -994,7 +998,7 @@ function homeEaseLine() {
       if (wet) return 'Turkish Delight, if you want a little something sweet.';
       // 2.11.2: a movie is a daytime-at-home suggestion only. Location is read only
       // from the already-allowed in-memory fix; unknown location stays time-only.
-      if (a.dow === 0 && a.hour >= 5 && a.hour < 21 && !atWork) return 'After a long week, a movie or a book if you get a quiet patch.';
+      if (a.dow === 0 && a.hour >= 5 && a.hour < 21 && atHome) return 'After a long week, a movie or a book if you get a quiet patch.';
       return 'The gym’s there if you feel like it.';
     }
     if ((weekend || a.dow === 5) && morning) {
@@ -1203,6 +1207,8 @@ function homeOverview(shown) {
 function homeOverviewBody(shown) {
   const bits = [];
   const mentioned = new Set();
+  // Home-only suggestions use the already-allowed in-memory fix. Unknown and work are not home.
+  const atHome = homeAtHome();
   const add = (kind, text, urgent) => {
     if (bits.length >= 6) return;
     const line = String(text || '').replace(/\s+/g, ' ').trim();
@@ -1266,8 +1272,8 @@ function homeOverviewBody(shown) {
     takeTitles(soon.map(x => x.plain), 2);
     add('soon', nameLine(soon, false), soon.some(x => x.days === 0));
   }
-  const comedy = homeComedyOnNow() || { kind: 'missing', hits: [] };
-  if (comedy.kind === 'ready' && Array.isArray(comedy.hits) && comedy.hits.length) {
+  const comedy = atHome ? (homeComedyOnNow() || { kind: 'missing', hits: [] }) : { kind: 'missing', hits: [] };
+  if (atHome && comedy.kind === 'ready' && Array.isArray(comedy.hits) && comedy.hits.length) {
     const picked = [];
     comedy.hits.forEach(hit => {
       if (picked.length >= 2) return;
@@ -1299,7 +1305,7 @@ function homeOverviewBody(shown) {
   }
   let ev = null;
   try {
-    ev = EVS ? upcomingEvents().find(e => {
+    if (atHome) ev = EVS ? upcomingEvents().find(e => {
       if (!e || !e.title || /\broadworks?\b/i.test(e.title) || homeSaysTv(e.title)) return false;
       const d = daysLeft(e.date);
       return d >= 0 && d <= 14;
@@ -1325,7 +1331,7 @@ function homeOverviewBody(shown) {
         ? 'It’s rainy in Whangārei. ' + q + ' is already on your list if you want something easy indoors.'
         : 'It’s sunny in Whangārei. ' + q + ' could be a nice way to use the light, if you feel like it.');
     } else {
-      const vid = homeVideoPicks(wx.mood).find(v => v && v.title && homeMentionKey(v.title) && !mentioned.has(homeMentionKey(v.title)));
+      const vid = atHome ? homeVideoPicks(wx.mood).find(v => v && v.title && homeMentionKey(v.title) && !mentioned.has(homeMentionKey(v.title))) : null;
       if (vid) {
         const got = takeTitles([vid.title], 1);
         if (got.length) {
