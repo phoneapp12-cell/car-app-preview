@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.86.0';
+const APP_VERSION = '1.87.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -527,6 +527,7 @@ function engList(arr) {
 // 1.81.0: those same lines sit in numbered coloured bars. A bar about something overdue,
 // or one that names something due today, is red.
 // 1.84.0: the same title is named only once. “Tonight” and a clock time do not make it a different item.
+// 1.87.0: one summary line uses the lifting bridge status already on Home (the same short status and next change). No extra times.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -591,6 +592,16 @@ function homeVideoPicks(mood) {
   return garden.slice(0, 2);
 }
 // Same event, task or title, even if one line says Tonight or Today and another does not.
+// Words already on the Home bridge card or line. Times come only from that status.
+function homeBridgeBit(shown) {
+  if (!shown || !shown.has('bridge')) return null;
+  const st = brStatus();
+  const row = BR_TXT[st && st.state];
+  if (!row || !row[3]) return null;
+  const next = String(brNextText(st) || '').trim();
+  const text = next ? `Lifting bridge: ${row[3]}. ${next}.` : `Lifting bridge: ${row[3]}.`;
+  return { text, urgent: st.state === 'closed' || st.state === 'noon' };
+}
 function homeMentionKey(s) {
   let t = String(s || '').toLowerCase().replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').trim();
   t = t.replace(/^[“"']+|[”"']+$/g, '');
@@ -622,6 +633,8 @@ function homeOverview(shown) {
   if (wx.line) add('wx', wx.line);
   const mailLine = homeMailLine();
   if (mailLine) add('mail', mailLine);
+  const brBit = homeBridgeBit(shown);
+  if (brBit) add('bridge', brBit.text, brBit.urgent);
   const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length;
   if (over && soon) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and ${plural(soon, 'more')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days. No fuss. They can wait their turn.`);
   else if (over) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and the next 30 days are clear. Whenever you get to ${over === 1 ? 'it' : 'them'} is absolutely fine.`);
@@ -4419,6 +4432,7 @@ function updBridge(force = false) {
   if (want !== has) { const v = $('#view'), top = v.scrollTop; render(); v.scrollTop = top; return; }
   const c = document.getElementById('brcard'); if (c) c.outerHTML = brCard();
   const l = document.getElementById('brline'); if (l) l.outerHTML = brLine();
+  paintHomeSum();
 }
 function gotPos(pos) {
   brLocAt = Date.now(); brDist = DD.bridgeMetres(pos.coords.latitude, pos.coords.longitude);
