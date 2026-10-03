@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.12.0';
+const APP_VERSION = '2.13.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -147,6 +147,8 @@ function normalise(d) {
   d.reminders = normReminders(d.reminders); // 1.27.0: reminders (older data and backups have none)
   d.countdowns = normCountdowns(d.countdowns); // 2.10.0: named countdowns (older data and backups have none)
   d.notes = normNotes(d.notes); // 2.11.0: typed or spoken notes (older data and backups have none)
+  d.about = normAbout(d.about); // 2.13.0: About you (older data and backups have none)
+  d.roster = normRoster(d.roster); // 2.13.0: work roster (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.health = normHealth(d.health); // 1.8.0: Health (older data and backups have none)
   d.garden = normGarden(d.garden); // 1.20.0: Gardening (older data and backups have none)
@@ -302,6 +304,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
   birthdays: ['cake', 'bday', 'Birthdays', 'Tomorrow through 30 days away. They can also show in Upcoming.', 1],
   pets: ['paw', 'pet', 'Pets', 'Next flea treatment, grooming and vet dates', 0],
+  about: ['info', 'about', 'About you', 'A daily question, and what you’ve said', 0],
   bills: ['bill', 'bill', 'Bills', 'The next bills to pay', 0],
   cars: ['car', 'car', 'Cars at a glance', 'Each car’s next WOF and rego', 0],
   ideas: ['bulb', 'idea', 'Starred ideas', 'Ideas you’ve starred', 0],
@@ -315,7 +318,7 @@ const HOME_DEFAULT = Object.keys(HOME);
 const HOME_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['holidays', 'summary', 'attention', 'todo', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['loans', 'commission', 'bills'] },
-  { id: 'people', title: 'People', keys: ['birthdays', 'pets'] },
+  { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'about'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'shopping', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['bridge', 'weather', 'roadworks', 'events', 'news'] },
@@ -533,6 +536,15 @@ const HOME_CARD = {
     const head = homeSec('Notes', '<a href="#notes">See all</a>');
     if (!list.length) return head + '<div class="card empty"><div class="t">No notes yet.</div></div>';
     return head + `<div class="list" id="homenotes">${list.slice(0, 3).map(n => noteRow(n, false)).join('')}</div>`;
+  },
+  // 2.13.0: off until Customise Home. People only. The question, not an empty “nothing”.
+  about: () => {
+    const q = aboutEnsurePin();
+    const ask = aboutAsk(q);
+    const ans = aboutLatest(q.id);
+    const head = homeSec('About you', '<a href="#about">Open</a>');
+    const sub = ans ? aboutClip(ans.text) : 'Today’s question';
+    return head + `<button class="row" onclick="go('#about')"><div class="ic about">${I('info')}</div><div class="tx"><div class="t">${esc(ask)}</div><div class="s">${esc(sub)}</div></div>${I('right')}</button>`;
   }
 };
 function homeEditHtml() {
@@ -1026,7 +1038,7 @@ const HOME_FACTS = [
   'Onerahi was an early flying-boat spot for Whangārei.'
 ];
 // One light aside. From about 9pm, a soft “still awake” line. No hours, no lecture, no smart-home controls.
-// Friday and Saturday are days off. The 8:30 start is only a heads-up before that time, never once he’s late.
+// A work start comes only from the roster, and only before that time. Never a nag once it has passed.
 function homeEaseLine() {
   try {
     const a = homeAklParts();
@@ -1043,13 +1055,8 @@ function homeEaseLine() {
     } catch (e) { wet = false; sunny = false; }
     const atWork = homeWhere() === 'work';
     if (a.hour >= 21) return homeAwakeLine();
-    if (a.dow >= 1 && a.dow <= 4 && a.min < 8 * 60 + 30 && !atWork) {
-      return homePick(31, [
-        'Work usually starts at 8:30, whenever you head in.',
-        '8:30 is the usual start, if you’re heading in.',
-        'When you head to work, 8:30 is the usual time.'
-      ]);
-    }
+    const heads = rosterHeadsUp(a, atWork);
+    if (heads) return heads;
     if (evening && (a.dow === 5 || a.dow === 6)) {
       const lines = [
         'A glass of merlot later, if you feel like one.',
@@ -1598,6 +1605,14 @@ function homeOverviewBody(shown, urgentOut) {
     urgent.push({ kind: 'soon', text: homeDuePhrase(soon, 'soon'), overdue: false });
   }
   if (urgent.length > 4) urgent.splice(4);
+  let known = false;
+  try { known = aboutAnswerRows().length > 0; } catch (e) { known = false; }
+  if (known) {
+    try {
+      const shaped = homeKnownSummary(urgent, mentioned);
+      if (shaped) return shaped;
+    } catch (e) { console.error('About summary', e); }
+  }
   const bits = urgent.slice();
   try {
     const add = (kind, text) => {
@@ -1606,6 +1621,8 @@ function homeOverviewBody(shown, urgentOut) {
       if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line) || /\b90[\s-]*hours?\b/i.test(line)) return;
       bits.push({ kind, text: line, overdue: false });
     };
+    add('praise', homePraiseLine(mentioned));
+    add('drive', homeDriveLine());
     add('aside', homeAsideLine(mentioned));
     add('hello', homeGreetLine());
     add('comm', homeCommLine());
@@ -5852,7 +5869,9 @@ function More() {
     radio: () => 'Stations you can hear in Whangārei',
     diary: () => { const lines = diaryFlat(diaryToday()); return lines.length ? esc(lines[0].text) : 'A quiet page today'; },
     countdown: () => { const list = countdownRows(); if (!list.length) return 'Nothing counting down right now.'; const x = list[0]; return esc(x.name) + ' · ' + cdWords(cdDays(x.date)); },
-    notes: () => { const list = noteRows(); if (!list.length) return 'No notes yet.'; const n = list[0]; return esc(n.text || 'Spoken note'); }
+    notes: () => { const list = noteRows(); if (!list.length) return 'No notes yet.'; const n = list[0]; return esc(n.text || 'Spoken note'); },
+    about: () => { try { const list = aboutAnswerRows(); if (!list.length) return esc(aboutAsk(aboutEnsurePin())); const n = list[0]; return esc(aboutClip(n.text)); } catch (e) { return 'A daily question'; } },
+    roster: () => { try { const n = rosterNext(); return n ? 'Next start ' + esc(n) : 'Days and start times'; } catch (e) { return 'Days and start times'; } }
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
     bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
@@ -5874,13 +5893,14 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
   tv: ['tv', 'tv', 'TV guide', 'TV'],
-  meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'],
+  meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], about: ['info', 'about', 'About you', 'About'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
+  roster: ['clock', 'roster', 'Work roster', 'Roster'],
   diary: ['book', 'diary', 'Diary', 'Diary'],
   countdown: ['clock', 'count', 'Countdown', 'Countdown'],
   notes: ['note', 'note', 'Notes', 'Notes']
@@ -5889,9 +5909,9 @@ const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'diary', 'countdown', 'notes'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['bills', 'commission', 'loans'] },
-  { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health'] },
+  { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge'] },
@@ -6019,6 +6039,7 @@ function rememberFix(pos) {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     const acc = Number.isFinite(+pos.coords.accuracy) ? +pos.coords.accuracy : null;
     hereFix = { lat, lon, acc, at: Date.now() };
+    noteHomeArrival();
   } catch (e) {}
 }
 // Near home or near work, or nothing. A vague fix, or no fix, does not guess.
@@ -6036,11 +6057,55 @@ function placeHere() {
 }
 function homePlaceLine() {
   try {
+    noteHomeArrival();
     const p = placeHere();
-    if (p === 'home') return homePick(62, ['Welcome home.', 'Good to be home.', 'Home again.', 'Nice to have you home.']);
+    if (p === 'home') {
+      if (!homeWelcomeOpen()) return '';
+      return homePick(62, ['Welcome home.', 'Good to be home.', 'Home again.', 'Nice to have you home.']);
+    }
     if (p === 'work') return homePick(63, ['Back at work.', 'You’re at work.', 'Work it is.']);
     return '';
   } catch (e) { return ''; }
+}
+// 2.13.0: welcome home only for 60 minutes after an arrival we actually saw.
+// First sight of him already home does not count. No street, no permission prompt.
+const HOME_WELCOME_MS = 60 * 60 * 1000;
+const HOME_LEAVE_M = 700;
+function readHomeArrive() {
+  try {
+    const o = JSON.parse(localStorage.getItem('homeArrive') || 'null');
+    if (!o || typeof o !== 'object') return { state: '', at: 0 };
+    const state = o.state === 'home' || o.state === 'away' ? o.state : '';
+    const at = Number.isFinite(+o.at) && +o.at > 0 ? +o.at : 0;
+    return { state, at };
+  } catch (e) { return { state: '', at: 0 }; }
+}
+function writeHomeArrive(state, at) {
+  try { localStorage.setItem('homeArrive', JSON.stringify({ state: state || '', at: at || 0 })); } catch (e) {}
+}
+function noteHomeArrival() {
+  try {
+    if (!hereFix || Date.now() - hereFix.at > 15 * 60 * 1000) return;
+    if (hereFix.acc != null && hereFix.acc > 1000) return;
+    const home = SAVED_PLACES.find(p => p && p.id === 'home');
+    if (!home) return;
+    const m = metresBetween(hereFix.lat, hereFix.lon, home.lat, home.lon);
+    const prev = readHomeArrive();
+    if (m <= PLACE_NEAR_M) {
+      if (prev.state === 'away') writeHomeArrive('home', Date.now());
+      else if (prev.state !== 'home') writeHomeArrive('home', 0);
+    } else if (m > HOME_LEAVE_M) {
+      if (prev.state !== 'away') writeHomeArrive('away', 0);
+    }
+  } catch (e) {}
+}
+function homeWelcomeOpen() {
+  try {
+    const prev = readHomeArrive();
+    if (prev.state !== 'home' || !prev.at) return false;
+    const age = Date.now() - prev.at;
+    return age >= 0 && age <= HOME_WELCOME_MS;
+  } catch (e) { return false; }
 }
 // Reads location only when the browser already allows it. Never pops a permission prompt from Home.
 async function checkHere(force = false) {
@@ -8855,7 +8920,7 @@ function Settings() {
    <a class="srow" href="https://transact.nzta.govt.nz/v2/check-expiry" target="_blank" rel="noopener"><div class="tx"><div class="t">Check WOF and rego expiry dates</div><div class="s">transact.nzta.govt.nz</div></div>${I('ext')}</a>
    <a class="srow" href="https://transact.nzta.govt.nz/v2/vehicle-licence-renewal" target="_blank" rel="noopener"><div class="tx"><div class="t">Renew rego online</div><div class="s">transact.nzta.govt.nz</div></div>${I('ext')}</a>
   </div>
-  <div class="foot">Car &amp; Life Due Dates · version ${APP_VERSION}<br>${savedWhere()}</div>`;
+  <div class="foot">My App · version ${APP_VERSION}<br>${savedWhere()}</div>`;
 }
 async function toggleSetting(k) { S.settings[k] = S.settings[k] === false; await save(); await setupBackground(); render(); }
 
@@ -8888,7 +8953,7 @@ async function testNotification() {
   const reg = await getReg();
   const opts = { body: 'Reminders are working. This is what a WOF, rego or bill nudge will look like.', tag: 'test-' + Date.now(), icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: '#settings' } };
   try {
-    if (reg) await reg.showNotification('Test reminder from Due Dates', opts); else new Notification('Test reminder from Due Dates', opts);
+    if (reg) await reg.showNotification('Test reminder from My App', opts); else new Notification('Test reminder from My App', opts);
     toast('Test notification sent. Check the top of your screen.');
   } catch (e) { toast('Sorry, the test notification didn’t work on this browser.'); }
 }
@@ -8919,14 +8984,14 @@ function backupBlob() {
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(backupBlob()); a.download = `due-dates-backup-${todayISO()}.json`;
+  a.href = URL.createObjectURL(backupBlob()); a.download = `my-app-backup-${todayISO()}.json`;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
   markBackedUp(); toast('Backup saved to your Downloads folder.');
 }
 async function shareBackup() {
-  const f = new File([backupBlob()], `due-dates-backup-${todayISO()}.json`, { type: 'application/json' });
-  try { await navigator.share({ files: [f], title: 'Due Dates backup' }); markBackedUp(); } catch (e) { /* cancelled */ }
+  const f = new File([backupBlob()], `my-app-backup-${todayISO()}.json`, { type: 'application/json' });
+  try { await navigator.share({ files: [f], title: 'My App backup' }); markBackedUp(); } catch (e) { /* cancelled */ }
 }
 function importData() { $('#importfile').click(); }
 function importFile(input) {
@@ -8934,9 +8999,9 @@ function importFile(input) {
   if (!file) return;
   const r = new FileReader();
   r.onload = () => {
-    let obj; try { obj = JSON.parse(r.result); } catch (e) { toast('That file isn’t a Due Dates backup.'); return; }
+    let obj; try { obj = JSON.parse(r.result); } catch (e) { toast('That file isn’t a My App backup.'); return; }
     const d = obj && obj.data ? obj.data : obj;
-    if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a Due Dates backup.'); return; }
+    if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
       const s = snap(); S = normalise(d); const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
@@ -8947,7 +9012,7 @@ function importFile(input) {
 
 /* ---------- install prompt ---------- */
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; if (S && !sheetOpen) render(); });
-window.addEventListener('appinstalled', () => { deferredPrompt = null; if (S) { if (!sheetOpen) render(); toast('Installed. Look for “Due Dates” on your home screen.'); } });
+window.addEventListener('appinstalled', () => { deferredPrompt = null; if (S) { if (!sheetOpen) render(); toast('Installed. Look for “My App” on your home screen.'); } });
 async function installApp() {
   if (!deferredPrompt) { toast('In Chrome, tap ⋮ then “Add to Home screen”.'); return; }
   deferredPrompt.prompt();
@@ -9490,6 +9555,466 @@ async function deleteNote(id) {
   toast('Note deleted.', 'Undo', undoTo(snapS));
 }
 
+
+/* ================= ABOUT YOU, WORK ROSTER, PRAISE (2.13.0) =================
+   About you: one question a day in Pacific/Auckland. Answers are S.about.
+   Work roster: the days and start times he enters. The summary uses that time.
+   A drive line only inside the 40 minutes before that start, and only with a real duration. */
+
+const ABOUT_QS = [
+  { id: 'meal', ask: 'What’s a meal you never get tired of?' },
+  { id: 'morning', ask: 'How do you like to take a morning?' },
+  { id: 'place', ask: 'A place nearby you like?' },
+  { id: 'music', ask: 'What music do you put on?' },
+  { id: 'film', ask: 'A film you like?' },
+  { id: 'book', ask: 'A book you’d pick up again?' },
+  { id: 'dog', ask: 'What’s something the dog likes?' },
+  { id: 'garden', ask: 'What are you growing, or hoping to?' },
+  { id: 'weekend', ask: 'What would a good weekend look like?' }
+];
+const ROSTER_DAYS = [['1', 'Monday'], ['2', 'Tuesday'], ['3', 'Wednesday'], ['4', 'Thursday'], ['5', 'Friday'], ['6', 'Saturday'], ['0', 'Sunday']];
+let aboutSaveTimer = null;
+
+function normAbout(raw) {
+  const ids = new Set(ABOUT_QS.map(q => q.id));
+  const src = Array.isArray(raw) ? { answers: raw } : (raw && typeof raw === 'object' ? raw : {});
+  const answers = [], seen = new Set();
+  (Array.isArray(src.answers) ? src.answers : []).forEach(n => {
+    if (!n || typeof n !== 'object') return;
+    const qid = String(n.qid || '');
+    if (!ids.has(qid)) return;
+    const text = String(n.text || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+    if (!text) return;
+    let id = String(n.id || '');
+    if (!/^ab-[a-z0-9]{4,40}$/i.test(id) || seen.has(id)) id = uid('ab');
+    if (seen.has(id)) return;
+    seen.add(id);
+    let day = String(n.day || '');
+    if (!parseD(day)) day = nzTodayISO();
+    let at = String(n.at || '');
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) at = nzStampLocal();
+    answers.push({ id, qid, text, day, at });
+  });
+  const used = [];
+  (Array.isArray(src.used) ? src.used : []).forEach(id => {
+    const qid = String(id || '');
+    if (ids.has(qid) && !used.includes(qid)) used.push(qid);
+  });
+  let pin = null;
+  if (src.pin && typeof src.pin === 'object' && parseD(String(src.pin.day || '')) && ids.has(String(src.pin.qid || ''))) {
+    pin = { day: String(src.pin.day), qid: String(src.pin.qid) };
+  }
+  const skips = [];
+  (Array.isArray(src.skips) ? src.skips : []).forEach(sk => {
+    if (!sk || typeof sk !== 'object') return;
+    const day = String(sk.day || ''), qid = String(sk.qid || '');
+    if (!parseD(day) || !ids.has(qid) || skips.some(x => x.day === day && x.qid === qid)) return;
+    skips.push({ day, qid });
+  });
+  return { answers, used, pin, skips };
+}
+function normRoster(raw) {
+  const days = {};
+  const src = raw && typeof raw === 'object' && raw.days && typeof raw.days === 'object' ? raw.days : {};
+  ROSTER_DAYS.forEach(([k]) => {
+    const hm = String(src[k] || '');
+    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(hm)) days[k] = hm;
+  });
+  return { days };
+}
+function aboutState() {
+  if (!S.about || typeof S.about !== 'object' || !Array.isArray(S.about.answers)) S.about = normAbout(S.about);
+  return S.about;
+}
+function rosterState() {
+  if (!S.roster || typeof S.roster !== 'object' || !S.roster.days) S.roster = normRoster(S.roster);
+  return S.roster;
+}
+function aboutKnown(id) {
+  try {
+    if (id !== 'garden' || !S || !S.garden) return false;
+    const off = Array.isArray(S.garden.off) ? S.garden.off : [];
+    if (!off.length) return false;
+    return Object.keys(GARDEN_META).some(k => !off.includes(k));
+  } catch (e) { return false; }
+}
+function aboutPool() {
+  const pool = ABOUT_QS.filter(q => !aboutKnown(q.id));
+  return pool.length ? pool : ABOUT_QS.slice();
+}
+function aboutTouchSave() {
+  clearTimeout(aboutSaveTimer);
+  aboutSaveTimer = setTimeout(() => { aboutSaveTimer = null; if (S) save().catch(() => {}); }, 400);
+}
+function aboutEnsurePin(now) {
+  const day = nzTodayISO(now || new Date());
+  const a = aboutState();
+  const pinned = ABOUT_QS.find(q => q.id === (a.pin && a.pin.qid));
+  if (a.pin && a.pin.day === day && pinned) return pinned;
+  const pool = aboutPool();
+  let used = (Array.isArray(a.used) ? a.used : []).filter(id => pool.some(q => q.id === id));
+  let unused = pool.filter(q => !used.includes(q.id));
+  if (!unused.length) { a.used = []; unused = pool.slice(); }
+  const q = unused[0];
+  a.pin = { day, qid: q.id };
+  if (!a.used.includes(q.id)) a.used.push(q.id);
+  aboutTouchSave();
+  return q;
+}
+function aboutAnswerRows() {
+  return (aboutState().answers || []).slice().sort((a, b) => a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+}
+function aboutLatest(qid) {
+  return aboutAnswerRows().find(a => a.qid === qid && a.text) || null;
+}
+function aboutClip(s) {
+  let t = String(s || '').replace(/\s+/g, ' ').trim();
+  if (t.length > 80) t = t.slice(0, 77).replace(/\s+\S*$/, '').trim() + '…';
+  return t;
+}
+function aboutDogName() {
+  try {
+    const dogs = (S && Array.isArray(S.pets) ? S.pets : []).filter(p => p && p.type === 'dog');
+    const names = dogs.map(p => String(p.name || '').trim()).filter(n => n && n.toLowerCase() !== 'pet');
+    return names.length === 1 ? names[0] : '';
+  } catch (e) { return ''; }
+}
+function aboutAsk(q) {
+  if (!q) return '';
+  if (q.id === 'dog') {
+    const name = aboutDogName();
+    if (name) return 'What’s something ' + name + ' likes?';
+  }
+  return q.ask;
+}
+function aboutFitLine() {
+  try {
+    const a = homeAklParts();
+    if (!a) return '';
+    let where = '';
+    try { where = homeWhere() || ''; } catch (e) { where = ''; }
+    const morning = a.hour < 12;
+    const afternoon = a.hour >= 12 && a.hour < 17;
+    const evening = a.hour >= 17 && a.hour < 21;
+    const say = qid => { const row = aboutLatest(qid); return row ? aboutClip(row.text) : ''; };
+    const morningAns = say('morning');
+    if (morning && where !== 'work' && morningAns) {
+      return homePick(101, ['Good morning. ' + morningAns, morningAns + ' sounds right for this morning.', 'This morning: ' + morningAns]);
+    }
+    const weekendAns = say('weekend');
+    if (!morning && where !== 'work' && weekendAns && (a.dow === 0 || a.dow === 6 || (a.dow === 5 && a.hour >= 17))) {
+      return homePick(102, ['For the weekend: ' + weekendAns, weekendAns, 'A good weekend, the way you put it: ' + weekendAns]);
+    }
+    const place = say('place');
+    if (place && where !== 'work' && a.hour < 21 && (afternoon || a.dow === 0 || a.dow === 6)) {
+      return homePick(103, [place + ' is there if you feel like it.', 'If you want to head out, there’s ' + place + '.', 'You like ' + place + '. It’s there if you want it.']);
+    }
+    const meal = say('meal');
+    let gluten = false;
+    try { gluten = !!(meal && homeGlutenFood(meal)); } catch (e) { gluten = true; }
+    if (meal && !gluten && evening && where !== 'work') {
+      return homePick(104, [meal + ' would sit well tonight, if you feel like it.', 'If you’re eating later, ' + meal + ' is the one you never get tired of.', 'Tonight could be ' + meal + ', if you want it.']);
+    }
+    const music = say('music');
+    if (music && evening) return homePick(105, ['If you want music, ' + music + '.', music + ' would suit this evening.', 'Put on ' + music + ', if you feel like it.']);
+    const film = say('film');
+    if (film && where === 'home' && a.hour >= 17 && a.hour < 21) {
+      return homePick(106, [film + ' is a good one if you want a film.', 'If you want a film, ' + film + ' is the one you named.', film + ', if you feel like a film tonight.']);
+    }
+    const book = say('book');
+    let wet = false;
+    try { wet = homeWxRead().mood === 'wet'; } catch (e) { wet = false; }
+    if (book && where !== 'work' && (evening || (afternoon && wet))) {
+      return homePick(107, [book + ', if you want a read.', 'If you want a book, ' + book + ' is the one you named.', 'A good time for ' + book + ', if you feel like it.']);
+    }
+    const dog = say('dog');
+    if (dog && where !== 'work' && (a.dow === 0 || a.dow === 6) && a.hour >= 7 && a.hour < 17) {
+      const who = aboutDogName() || 'the dog';
+      return homePick(108, [who + ' likes ' + dog + '. A good day for that, if you feel like it.', 'If you and ' + who + ' head out, ' + dog + ' came to mind.']);
+    }
+    const garden = say('garden');
+    if (garden && where !== 'work' && morning && (a.dow === 0 || a.dow === 5 || a.dow === 6)) {
+      return homePick(109, ['The garden: ' + garden + ', if you feel like it.', garden + ', if you want time in the garden.']);
+    }
+    return '';
+  } catch (e) { return ''; }
+}
+function homeKnowCard(lead, bits) {
+  const bars = ['#7DDECB', '#F9A8D4', '#FDE68A', '#A5B4FC', '#86EFAC', '#FDBA74', '#93C5FD', '#F0ABFC', '#FCD34D', '#99F6E4', '#C4B5FD', '#FDA4AF'];
+  const list = (bits || []).filter(b => b && b.text).slice(0, 4);
+  const ul = list.length ? `<ul>${list.map((b, i) => {
+    const overdue = !!b.overdue;
+    const style = overdue ? '' : ` style="--bar:${bars[i % bars.length]}"`;
+    return `<li class="${b.kind || 'note'}${overdue ? ' urgent' : ''}"${style}><span class="tx">${esc(b.text)}</span></li>`;
+  }).join('')}</ul>` : '';
+  return `<div class="card homesum know" id="homesum"><p class="knowlead">${esc(lead)}</p>${ul}</div>`;
+}
+function homeKnownSummary(urgent, mentioned) {
+  let line = '';
+  try { line = aboutFitLine() || ''; } catch (e) { line = ''; }
+  if (!line) return '';
+  if (urgent.length >= 4) return '';
+  const bits = urgent.slice();
+  const push = text => {
+    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!t || bits.length >= 4 || /\broadworks?\b/i.test(t)) return;
+    bits.push({ kind: 'note', text: t, overdue: false });
+  };
+  try { push(homePraiseLine(mentioned)); } catch (e) {}
+  try { push(homeDriveLine()); } catch (e) {}
+  if (bits.length >= 4) return '';
+  let place = '';
+  try { place = homePlaceLine() || ''; } catch (e) { place = ''; }
+  const lead = [place, line].filter(Boolean).join(' ');
+  if (!lead) return '';
+  return homeKnowCard(lead, bits);
+}
+function homeUpKey(x) {
+  try {
+    if (!x || !x.name || !x.kind || x.kind === 'comm' || x.kind === 'tv') return '';
+    if (homeSaysTv(x.name) || /\broadworks?\b/i.test(x.name)) return '';
+    if (Number.isFinite(x.days) && x.days < 0) return '';
+    const plain = homePlainTitle(x.name);
+    const key = homeMentionKey(plain);
+    if (!plain || !key) return '';
+    return x.kind + '|' + key;
+  } catch (e) { return ''; }
+}
+function readHomeSeen() {
+  try {
+    const o = JSON.parse(localStorage.getItem('homeSeen') || 'null');
+    if (!o || o.ready !== true) return null;
+    return {
+      owing: Array.isArray(o.owing) ? o.owing.map(String) : [],
+      up: Array.isArray(o.up) ? o.up.map(String) : [],
+      notes: Array.isArray(o.notes) ? o.notes.filter(n => n && n.id && n.at) : []
+    };
+  } catch (e) { return null; }
+}
+function writeHomeSeen(bag) {
+  try { localStorage.setItem('homeSeen', JSON.stringify(bag)); } catch (e) {}
+}
+function homePraiseText(n) {
+  if (!n) return '';
+  if (n.kind === 'loan') {
+    const names = (n.names || []).filter(Boolean);
+    if (!names.length) return '';
+    const list = engList(names);
+    if (names.length === 1) return homePick(111, [names[0] + ' is paid off. Nice work.', 'That’s ' + names[0] + ' paid off. Well done.', names[0] + ' is cleared. Good on you.']);
+    return homePick(114, [list + ' are paid off. Nice work.', 'That’s ' + list + ' paid off. Well done.']);
+  }
+  const names = (n.names || []).filter(Boolean).map(homeQuote);
+  if (!names.length) return '';
+  const list = engList(names);
+  if (names.length === 1) return homePick(112, [names[0] + ' is new in Upcoming.', 'New in Upcoming: ' + names[0] + '.']);
+  return homePick(113, [list + ' are new in Upcoming.', 'New in Upcoming: ' + list + '.']);
+}
+function homePraiseLine(mentioned) {
+  try {
+    const now = Date.now(), keepFor = 12 * 60 * 60 * 1000;
+    let bag = readHomeSeen();
+    const loans = [];
+    (S.loans || []).forEach(l => {
+      if (!l || !l.id) return;
+      let done = false;
+      try { done = !!loanCalc(l).done; } catch (e) { return; }
+      loans.push({ id: String(l.id), from: String(l.from || 'That loan').replace(/\s+/g, ' ').trim().slice(0, 40), done });
+    });
+    const owing = loans.filter(l => !l.done).map(l => l.id);
+    const upItems = [];
+    try {
+      homeAttention().forEach(x => {
+        const k = homeUpKey(x);
+        if (!k) return;
+        const plain = homePlainTitle(x.name);
+        if (!plain || (mentioned && mentioned.has(homeMentionKey(plain)))) return;
+        if (!upItems.some(i => i.k === k)) upItems.push({ k, name: plain.slice(0, 80) });
+      });
+    } catch (e) {}
+    const upKeys = upItems.map(i => i.k);
+    if (!bag) { writeHomeSeen({ ready: true, owing, up: upKeys, notes: [] }); return ''; }
+    const notes = (bag.notes || []).filter(n => n && now - n.at < keepFor && now - n.at >= 0);
+    const cleared = loans.filter(l => l.done && (bag.owing || []).includes(l.id));
+    if (cleared.length) {
+      const id = 'loan:' + cleared.map(l => l.id).sort().join(',');
+      if (!notes.some(n => n.id === id)) notes.push({ id, at: now, kind: 'loan', names: cleared.map(l => l.from) });
+    }
+    const prevUp = new Set(bag.up || []);
+    const newcomers = upItems.filter(i => !prevUp.has(i.k)).slice(0, 2);
+    if (newcomers.length) {
+      const id = 'up:' + newcomers.map(i => i.k).sort().join(',');
+      if (!notes.some(n => n.id === id)) notes.push({ id, at: now, kind: 'up', names: newcomers.map(i => i.name) });
+    }
+    writeHomeSeen({ ready: true, owing, up: upKeys, notes: notes.slice(-6) });
+    const loan = notes.find(n => n.kind === 'loan');
+    const up = notes.find(n => n.kind === 'up');
+    const parts = [];
+    if (loan) parts.push(homePraiseText(loan));
+    if (up) {
+      const extra = homePraiseText(up);
+      if (extra && (parts.join(' ') + ' ' + extra).trim().length <= 180) parts.push(extra);
+      (up.names || []).forEach(name => { const key = homeMentionKey(name); if (key && mentioned) mentioned.add(key); });
+    }
+    const line = parts.filter(Boolean).join(' ');
+    return line && !/\broadworks?\b/i.test(line) ? line : '';
+  } catch (e) { return ''; }
+}
+function rosterSlot(a) {
+  try {
+    const parts = a || homeAklParts();
+    if (!parts) return null;
+    const hm = rosterState().days[String(parts.dow)];
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hm || '')) return null;
+    const start = (+hm.slice(0, 2)) * 60 + (+hm.slice(3));
+    const nowMin = parts.min;
+    return { hm, start, nowMin, inWindow: nowMin >= start - 40 && nowMin < start };
+  } catch (e) { return null; }
+}
+function rosterHeadsUp(a, atWork) {
+  try {
+    if (atWork) return '';
+    const slot = rosterSlot(a);
+    if (!slot || slot.nowMin >= slot.start) return '';
+    const ahead = slot.start - slot.nowMin;
+    if (ahead <= 40 || ahead > 180) return '';
+    const when = fmtTime(slot.hm);
+    if (!when) return '';
+    return homePick(31, [
+      'Work starts at ' + when + ', whenever you head in.',
+      when + ' is the start today, if you’re heading in.',
+      'When you head to work, ' + when + ' is today’s start.'
+    ]);
+  } catch (e) { return ''; }
+}
+function rosterNext() {
+  const slot = rosterSlot();
+  if (slot && slot.nowMin < slot.start) return fmtTime(slot.hm);
+  const days = rosterState().days;
+  const order = ['1', '2', '3', '4', '5', '6', '0'];
+  const parts = homeAklParts();
+  if (!parts) return '';
+  const today = String(parts.dow);
+  const idx = order.indexOf(today);
+  for (let i = 1; i <= 7; i++) {
+    const k = order[(idx + i) % 7];
+    if (days[k]) {
+      const name = (ROSTER_DAYS.find(d => d[0] === k) || [])[1] || '';
+      return name + ' ' + fmtTime(days[k]);
+    }
+  }
+  return '';
+}
+let DRIVE = null, driveBusy = false;
+function homeDriveLine() {
+  try {
+    const slot = rosterSlot();
+    if (!slot || !slot.inWindow) return '';
+    if (homeWhere() === 'work') return '';
+    if (!DRIVE || Date.now() - DRIVE.at > 10 * 60 * 1000) refreshDrive();
+    if (!DRIVE || DRIVE.fail || !Number.isFinite(DRIVE.seconds)) return '';
+    const n = Math.round(DRIVE.seconds / 60);
+    if (n < 1 || n > 180) return '';
+    const w = n + (n === 1 ? ' minute' : ' minutes');
+    return homePick(121, [
+      'About ' + w + ' to work, with the traffic just now.',
+      'Traffic says about ' + w + ' to get to work.',
+      'With the traffic just now, about ' + w + ' to work.'
+    ]);
+  } catch (e) { return ''; }
+}
+async function refreshDrive() {
+  if (driveBusy) return;
+  const slot = rosterSlot();
+  if (!slot || !slot.inWindow || homeWhere() === 'work') return;
+  driveBusy = true;
+  try {
+    let data = null;
+    if (RELAY_URL) { try { data = await getJSON(RELAY_URL + '/drive', 12000); } catch (e) { data = null; } }
+    const sec = data && Number(data.seconds);
+    DRIVE = Number.isFinite(sec) && sec >= 60 && sec <= 180 * 60 ? { at: Date.now(), seconds: sec } : { at: Date.now(), fail: true };
+  } catch (e) {
+    DRIVE = { at: Date.now(), fail: true };
+  } finally {
+    driveBusy = false;
+    try { paintHomeSum(); } catch (e) {}
+  }
+}
+function aboutRow(n) {
+  const q = ABOUT_QS.find(x => x.id === n.qid);
+  const label = q ? aboutAsk(q) : 'Answer';
+  return `<div class="row"><div class="ic about">${I('info')}</div><div class="tx"><div class="t">${esc(aboutClip(n.text))}</div><div class="s">${esc(label)}${n.day ? ' · ' + esc(fmtW(n.day)) : ''}</div></div><button type="button" class="iconbtn" aria-label="Delete this answer" onclick="deleteAbout('${n.id}')">${I('trash')}</button></div>`;
+}
+function About() {
+  const q = aboutEnsurePin();
+  const ask = aboutAsk(q);
+  const day = nzTodayISO();
+  const today = (aboutState().answers || []).find(a => a.qid === q.id && a.day === day);
+  const skipped = !today && (aboutState().skips || []).some(s => s.day === day && s.qid === q.id);
+  const past = aboutAnswerRows().filter(a => !(a.qid === q.id && a.day === day));
+  const form = `<form class="addbar aboutadd" onsubmit="saveAbout(event)"><input id="abouttext" name="text" placeholder="Your answer" maxlength="240" autocomplete="off" aria-label="Your answer" enterkeyhint="done" value="${esc(today ? today.text : '')}"><button type="submit" aria-label="Save answer">${I('check')}</button></form>` +
+    (today ? '' : `<div class="btns" style="margin-top:-4px"><button type="button" class="btn" onclick="skipAbout()">Skip</button></div>`) +
+    (skipped ? '<p class="muted" id="aboutskip">Skipped for today. You can still answer.</p>' : '');
+  const qcard = `<div class="card" id="aboutq"><div class="t" style="font-weight:750;font-size:1.0625rem">${esc(ask)}</div><div class="muted" style="margin-top:4px">Today’s question. The same one all day.</div></div>`;
+  const todayHtml = today ? `<div class="list" id="abouttoday" style="margin-bottom:12px">${aboutRow(today)}</div>` : '';
+  const pastHtml = past.length ? `<div class="sec" style="margin-top:8px">What you’ve said</div><div class="list" id="aboutlist">${past.map(aboutRow).join('')}</div>` : '';
+  return header('About you', 'One question a day') + qcard + form + todayHtml + pastHtml +
+    '<div class="foot">Saved on this phone. One question each day. It won’t ask the same one again until the others have had a turn.</div>';
+}
+async function saveAbout(e) {
+  e.preventDefault();
+  const q = aboutEnsurePin();
+  clearTimeout(aboutSaveTimer); aboutSaveTimer = null;
+  const text = String((document.getElementById('abouttext') || {}).value || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+  if (!text) { toast('Type an answer, or skip.'); const el = document.getElementById('abouttext'); if (el) el.focus(); return; }
+  const snapS = snap();
+  const a = aboutState();
+  const day = nzTodayISO();
+  const existing = (a.answers || []).find(x => x.qid === q.id && x.day === day);
+  if (existing) { existing.text = text; existing.at = nzStampLocal(); }
+  else a.answers.push({ id: uid('ab'), qid: q.id, text, day, at: nzStampLocal() });
+  a.skips = (a.skips || []).filter(s => !(s.day === day && s.qid === q.id));
+  await save();
+  render();
+  toast('Answer saved.', 'Undo', undoTo(snapS));
+}
+async function skipAbout() {
+  const q = aboutEnsurePin();
+  clearTimeout(aboutSaveTimer); aboutSaveTimer = null;
+  const day = nzTodayISO();
+  const a = aboutState();
+  if ((a.answers || []).some(x => x.qid === q.id && x.day === day)) return;
+  if (!(a.skips || []).some(s => s.day === day && s.qid === q.id)) a.skips.push({ day, qid: q.id });
+  await save();
+  render();
+  toast('Skipped for today.');
+}
+async function deleteAbout(id) {
+  const a = aboutState();
+  if (!(a.answers || []).some(n => n.id === id)) return;
+  const snapS = snap();
+  a.answers = a.answers.filter(n => n.id !== id);
+  await save();
+  render();
+  toast('Answer deleted.', 'Undo', undoTo(snapS));
+}
+function Roster() {
+  const days = rosterState().days;
+  const rows = ROSTER_DAYS.map(([k, name]) => `<div class="srow"><div class="tx"><div class="t">${name}</div><div class="s">${days[k] ? 'Starts ' + esc(fmtTime(days[k])) : 'Day off'}</div></div><input type="time" aria-label="${name} start" value="${esc(days[k] || '')}" onchange="setRosterDay('${k}', this.value)"></div>`).join('');
+  return header('Work roster', 'The days and times you start') +
+    `<div class="list" id="rosterlist">${rows}</div>` +
+    '<div class="foot">Only a day with a time counts. The home summary uses that start. It does not guess a time, and it does not chase you once the start has passed.</div>';
+}
+async function setRosterDay(day, value) {
+  if (!ROSTER_DAYS.some(d => d[0] === day)) return;
+  const snapS = snap();
+  const r = rosterState();
+  if (value && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)) r.days[day] = value;
+  else delete r.days[day];
+  await save();
+  render();
+  toast(value ? 'Start time saved.' : 'That day is off.', 'Undo', undoTo(snapS));
+}
+
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
@@ -9523,7 +10048,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster };
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;

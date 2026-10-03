@@ -33,6 +33,7 @@ import { getFeed } from './events.js';
 import { getClosures } from './closures.js';
 import { getCouncilRoadworks } from './roadworks.js';
 import { getBridgeTraffic } from './bridge-traffic.js';
+import { getDrive } from './drive.js';
 import { getLocalNews } from './news.js';
 import { getBlogs } from './blogs.js';
 import { getPodcasts } from './podcasts.js';
@@ -88,6 +89,7 @@ const MESSAGES = {
   closures_unavailable: 'Planned closures could not be checked right now.',
   roadworks_unavailable: 'Council roadworks could not be loaded right now.',
   bridge_traffic_unavailable: 'Live traffic could not be checked right now.',
+  drive_unavailable: 'The drive time could not be checked right now.',
   news_unavailable: 'Local news could not be loaded right now.',
   blogs_unavailable: 'Blogs could not be loaded right now.',
   podcasts_unavailable: 'Podcasts could not be loaded right now.',
@@ -205,6 +207,14 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       const code = path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : path === '/roadworks' ? 'roadworks_unavailable' : path === '/bridge-traffic' ? 'bridge_traffic_unavailable' : 'weather_unavailable';
       return json(502, code, origin, env);
     }
+  }
+  if (path === '/drive') {
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try {
+      const data = await getDrive(fetchImpl);
+      return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    } catch (e) { return json(502, 'drive_unavailable', origin, env); }
   }
   if (path === '/news') {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
