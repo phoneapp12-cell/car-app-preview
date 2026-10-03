@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.89.0';
+const APP_VERSION = '1.90.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -530,7 +530,8 @@ function engList(arr) {
 // 1.87.0: one summary line uses the lifting bridge status already on Home (the same short status and next change). No extra times.
 // 1.88.0: the same line adds NZTA live traffic when a queue is reported at this bridge. If that feed cannot be read, it says so and does not invent a closure.
 // 1.89.0: one line names comedy programmes on now, only when the TV guide’s own category says Comedy. Other lines still skip television.
-// Suggestions are two Netflix NZ titles checked on 3 Oct 2026 (The Good Place, comedy, /nz/title/80113701; Stranger Things, sci-fi, /nz/title/80057281). Not from a Prime or Netflix account. Prime is not claimed.
+// 1.90.0: the suggestion line picks two different titles once each time the app is opened. Not from a Netflix or Prime account.
+// JustWatch NZ on 3 Oct 2026 said these are streaming (not buy-only). The Good Place was buy-only that day, so it is not listed.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -632,7 +633,39 @@ function homeTake(seen, titles, limit) {
   return out;
 }
 
-// Comedy on now comes only from guide categories. Suggestions are fixed, labelled, and not an account.
+// Comedy on now comes only from guide categories. Suggestions are labelled, and not an account.
+// Streaming on Netflix NZ or Prime Video NZ, JustWatch NZ, 3 Oct 2026. English titles only.
+const HOME_STREAM_PICKS = [
+  { title: 'Brooklyn Nine-Nine', kind: 'comedy', service: 'Netflix' },
+  { title: 'Grace and Frankie', kind: 'comedy', service: 'Netflix' },
+  { title: 'Sex Education', kind: 'comedy', service: 'Netflix' },
+  { title: 'Derry Girls', kind: 'comedy', service: 'Netflix' },
+  { title: 'Stranger Things', kind: 'scifi', service: 'Netflix' },
+  { title: 'Black Mirror', kind: 'scifi', service: 'Netflix' },
+  { title: 'The Umbrella Academy', kind: 'scifi', service: 'Netflix' },
+  { title: 'The Marvelous Mrs. Maisel', kind: 'comedy', service: 'Prime Video' },
+  { title: 'Fleabag', kind: 'comedy', service: 'Prime Video' },
+  { title: 'The Boys', kind: 'both', service: 'Prime Video' },
+  { title: 'Upload', kind: 'both', service: 'Prime Video' },
+  { title: 'Good Omens', kind: 'both', service: 'Prime Video' },
+  { title: 'The Expanse', kind: 'scifi', service: 'Prime Video' },
+  { title: 'Fallout', kind: 'scifi', service: 'Prime Video' }
+];
+let homeStreamChosen = null;
+function homeStreamPair() {
+  if (homeStreamChosen) return homeStreamChosen;
+  const pool = HOME_STREAM_PICKS.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+  }
+  homeStreamChosen = [pool[0], pool[1]];
+  return homeStreamChosen;
+}
+function homeStreamBit(p) {
+  const kind = p.kind === 'comedy' ? 'a comedy' : p.kind === 'both' ? 'a comedy and science fiction series' : 'science fiction';
+  return '“' + p.title + '”, ' + kind + ' on ' + p.service;
+}
 function homeComedyOnNow() {
   if (typeof TV === 'undefined' || !TV || !TV.data || !TV.data.feeds) return { kind: 'missing', hits: [] };
   const now = Date.now();
@@ -664,7 +697,8 @@ function homeComedyLines() {
     const more = c.hits.length - named.length;
     if (more) first += ' ' + plural(more, 'more comedy programme') + (more === 1 ? ' is' : ' are') + ' on as well.';
   }
-  return [first, 'Suggestions, not from your account: “The Good Place”, a comedy on Netflix, and “Stranger Things”, science fiction on Netflix.'];
+  const pair = homeStreamPair();
+  return [first, 'Suggestions, not from your account: ' + homeStreamBit(pair[0]) + ', and ' + homeStreamBit(pair[1]) + '.'];
 }
 function homeOverview(shown) {
   const bits = [];
