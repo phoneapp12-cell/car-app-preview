@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.10.0';
+const APP_VERSION = '2.11.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -96,7 +96,10 @@ const P = {
   leaf: '<path d="M12 21V11"/><path d="M12 13C8 12 4 9.5 4 5c5 .2 8 3.2 8 8z"/><path d="M12 11c4-1 7.2-3.6 8-7-4.2.8-7 4-8 7z"/>',
   pen: '<path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/>',
   podcast: '<path d="M3 14v-2a9 9 0 0 1 18 0v2"/><path d="M3 14v4a2 2 0 0 0 2 2h2v-8H5a2 2 0 0 0-2 2z"/><path d="M21 14v4a2 2 0 0 1-2 2h-2v-8h2a2 2 0 0 1 2 2z"/>',
-  radio: '<path d="M5 10 12 4l7 6"/><rect x="4" y="10" width="16" height="9.5" rx="2"/><circle cx="9" cy="14.7" r="2"/><path d="M13.5 13.2h3.2M13.5 16.2h3.2"/>'
+  radio: '<path d="M5 10 12 4l7 6"/><rect x="4" y="10" width="16" height="9.5" rx="2"/><circle cx="9" cy="14.7" r="2"/><path d="M13.5 13.2h3.2M13.5 16.2h3.2"/>',
+  note: '<path d="M6 3.5h8.5L19 8v12.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1z"/><path d="M14.5 3.5V8H19M8.5 12h7M8.5 16h4.5"/>',
+  mic: '<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3M8 21h8"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
 
@@ -143,6 +146,7 @@ function normalise(d) {
   d.loans = normLoans(d.loans); // 1.10.0: loans (older data and backups have none)
   d.reminders = normReminders(d.reminders); // 1.27.0: reminders (older data and backups have none)
   d.countdowns = normCountdowns(d.countdowns); // 2.10.0: named countdowns (older data and backups have none)
+  d.notes = normNotes(d.notes); // 2.11.0: typed or spoken notes (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
   d.health = normHealth(d.health); // 1.8.0: Health (older data and backups have none)
   d.garden = normGarden(d.garden); // 1.20.0: Gardening (older data and backups have none)
@@ -302,13 +306,14 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   cars: ['car', 'car', 'Cars at a glance', 'Each car’s next WOF and rego', 0],
   ideas: ['bulb', 'idea', 'Starred ideas', 'Ideas you’ve starred', 0],
   diary: ['book', 'diary', 'Diary', 'Today’s page, from what’s already in the app', 0],
-  countdown: ['clock', 'count', 'Countdown', 'Days left until a date you name', 0]
+  countdown: ['clock', 'count', 'Countdown', 'Days left until a date you name', 0],
+  notes: ['note', 'note', 'Notes', 'Typed or spoken notes', 0]
 };
 const HOME_DEFAULT = Object.keys(HOME);
 /* 1.99.0: Home cards stay in the same groups as the side panel. Order inside a group can change.
    A card cannot move into another group. Only real Home cards are listed. */
 const HOME_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['holidays', 'summary', 'attention', 'todo', 'diary', 'countdown'] },
+  { id: 'day', title: 'Everyday', keys: ['holidays', 'summary', 'attention', 'todo', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['loans', 'commission', 'bills'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] },
@@ -521,6 +526,13 @@ const HOME_CARD = {
     const head = homeSec('Countdown', '<a href="#countdown">See all</a>');
     if (!list.length) return head + '<div class="card empty"><div class="t">Nothing counting down right now.</div></div>';
     return head + `<div class="list" id="homecd">${list.slice(0, 3).map(x => cdRow(x, false)).join('')}</div>`;
+  },
+  // 2.11.0: off until Customise Home turns it on. Everyday only.
+  notes: () => {
+    const list = noteRows();
+    const head = homeSec('Notes', '<a href="#notes">See all</a>');
+    if (!list.length) return head + '<div class="card empty"><div class="t">No notes yet.</div></div>';
+    return head + `<div class="list" id="homenotes">${list.slice(0, 3).map(n => noteRow(n, false)).join('')}</div>`;
   }
 };
 function homeEditHtml() {
@@ -5599,7 +5611,8 @@ function More() {
     top40: () => 'Official Top 40 · chart as of 3 Oct 2026',
     radio: () => 'Stations you can hear in Whangārei',
     diary: () => { const lines = diaryFlat(diaryToday()); return lines.length ? esc(lines[0].text) : 'A quiet page today'; },
-    countdown: () => { const list = countdownRows(); if (!list.length) return 'Nothing counting down right now.'; const x = list[0]; return esc(x.name) + ' · ' + cdWords(cdDays(x.date)); }
+    countdown: () => { const list = countdownRows(); if (!list.length) return 'Nothing counting down right now.'; const x = list[0]; return esc(x.name) + ' · ' + cdWords(cdDays(x.date)); },
+    notes: () => { const list = noteRows(); if (!list.length) return 'No notes yet.'; const n = list[0]; return esc(n.text || 'Spoken note'); }
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
     bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
@@ -5629,13 +5642,14 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
   diary: ['book', 'diary', 'Diary', 'Diary'],
-  countdown: ['clock', 'count', 'Countdown', 'Countdown']
+  countdown: ['clock', 'count', 'Countdown', 'Countdown'],
+  notes: ['note', 'note', 'Notes', 'Notes']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'diary', 'countdown'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['bills', 'commission', 'loans'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health'] },
   { id: 'cars', title: '', keys: ['cars'] },
@@ -9018,6 +9032,224 @@ async function deleteCountdown(id) {
   toast('Countdown deleted.', 'Undo', undoTo(snapS));
 }
 
+
+/* ================= NOTES (2.11.0) =================
+   A typed note, a spoken note from the phone microphone, or both.
+   Saved on this phone as S.notes, the same way countdowns are saved.
+   Nothing is copied into Reminders. The microphone is asked for only when Record is tapped. */
+const NOTE_AUDIO_LIMIT = 900000;
+let noteRec = null;
+let noteRecBusy = false;
+let noteHold = null;
+let noteMicNeed = false;
+let skipNoteCapture = false;
+const noteUrls = new Map();
+function noteAudioOk(s) {
+  return typeof s === 'string' && s.length > 30 && s.length <= NOTE_AUDIO_LIMIT && /^data:audio\/[a-z0-9.+-]+(?:;[a-z0-9.+-]+=[a-z0-9.+-]+)*;base64,[a-z0-9+/]+={0,2}$/i.test(s);
+}
+function normNotes(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [], seen = new Set();
+  for (const n of list) {
+    if (!n || typeof n !== 'object') continue;
+    const text = String(n.text || '').replace(/\s+/g, ' ').trim().slice(0, 2000);
+    const audio = noteAudioOk(n.audio) ? n.audio : '';
+    if (!text && !audio) continue;
+    let id = String(n.id || '');
+    if (!/^nt-[a-z0-9]{4,40}$/i.test(id)) id = uid('nt');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    let at = String(n.at || '');
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at) || !parseD(at.slice(0, 10))) at = nzStampLocal();
+    const row = { id, text, at };
+    if (audio) {
+      row.audio = audio;
+      const mime = String(n.mime || '').replace(/[^a-z0-9.+/=;-]/gi, '').slice(0, 80);
+      if (mime) row.mime = mime;
+    }
+    out.push(row);
+  }
+  return out;
+}
+function noteRows() {
+  return (S.notes || []).slice().sort((a, b) => a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+}
+function noteWhen(at) {
+  const date = String(at || '').slice(0, 10), time = String(at || '').slice(11, 16);
+  if (!parseD(date)) return '';
+  return fmtW(date) + (time ? ' · ' + fmtTime(time) : '');
+}
+function notePlayUrl(key, audio, mime) {
+  if (!audio) return '';
+  const hit = noteUrls.get(key);
+  if (hit && hit.audio === audio) return hit.url;
+  if (hit) URL.revokeObjectURL(hit.url);
+  try {
+    const comma = audio.indexOf(',');
+    const type = String(mime || audio.slice(5, audio.indexOf(';')) || 'audio/webm').split(';')[0];
+    const bin = atob(audio.slice(comma + 1));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: type || 'audio/webm' }));
+    noteUrls.set(key, { audio, url });
+    return url;
+  } catch (e) { return audio; }
+}
+function noteRow(n, del) {
+  const title = n.text || 'Spoken note';
+  const bits = [];
+  if (n.text && n.audio) bits.push('With a recording');
+  const when = noteWhen(n.at);
+  if (when) bits.push(when);
+  const sub = bits.join(' · ');
+  const play = del && n.audio ? `<audio class="noteplay" controls preload="none" src="${esc(notePlayUrl(n.id, n.audio, n.mime))}"></audio>` : '';
+  const body = `<div class="ic note">${I(n.audio && !n.text ? 'mic' : 'note')}</div><div class="tx"><div class="t">${esc(title)}</div>${sub ? `<div class="s">${esc(sub)}</div>` : ''}${play}</div>`;
+  if (!del) return `<button class="row" onclick="go('#notes')">${body}</button>`;
+  return `<div class="row noterow">${body}<button type="button" class="iconbtn" aria-label="Delete this note" onclick="deleteNote('${n.id}')">${I('trash')}</button></div>`;
+}
+function noteRecBtn() {
+  if (noteMicNeed && !noteRec) return '<button type="button" class="rec need" id="noterec" aria-label="This needs the microphone" onclick="toggleNoteRec()">This needs the microphone</button>';
+  if (noteRec) return `<button type="button" class="rec on" id="noterec" aria-pressed="true" aria-label="Stop recording" onclick="toggleNoteRec()">${I('stop')} Stop</button>`;
+  return `<button type="button" class="rec" id="noterec" aria-label="Record a spoken note" onclick="toggleNoteRec()">${I('mic')} Record</button>`;
+}
+function noteHoldHtml() {
+  if (!noteHold || !noteAudioOk(noteHold.audio)) return '';
+  return `<div class="card notehold" id="notehold"><div class="t">Spoken note, not saved yet</div><audio class="noteplay" controls preload="none" src="${esc(notePlayUrl('hold', noteHold.audio, noteHold.mime))}"></audio></div>`;
+}
+function captureNoteComposer() {
+  if (skipNoteCapture) return;
+  const el = document.getElementById('notetext');
+  if (!el) return;
+  if (!noteHold) noteHold = {};
+  noteHold.text = el.value;
+}
+function noteMime() {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
+  const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/ogg'];
+  return types.find(t => { try { return MediaRecorder.isTypeSupported(t); } catch (e) { return false; } }) || '';
+}
+function noteNeedsMic() {
+  noteMicNeed = true;
+  noteRec = null;
+  render();
+}
+function blobToDataUrl(blob) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result || ''));
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+async function toggleNoteRec() {
+  if (noteRec) { await finishNoteRec(true); return; }
+  if (noteRecBusy) return;
+  noteRecBusy = true;
+  try { await beginNoteRec(); }
+  finally { noteRecBusy = false; }
+}
+async function beginNoteRec() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') { noteNeedsMic(); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { noteNeedsMic(); return; }
+  const mime = noteMime();
+  let rec;
+  try { rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+  catch (e) { stream.getTracks().forEach(t => t.stop()); noteNeedsMic(); return; }
+  noteMicNeed = false;
+  const chunks = [];
+  rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+  noteRec = { rec, chunks, stream, mime: rec.mimeType || mime || 'audio/webm' };
+  try { rec.start(); }
+  catch (e) { stream.getTracks().forEach(t => t.stop()); noteRec = null; noteNeedsMic(); return; }
+  if ((location.hash || '#home').slice(1).split('/')[0] !== 'notes') { noteStopQuiet(); return; }
+  render();
+}
+async function finishNoteRec(doRender) {
+  const st = noteRec;
+  if (!st) return;
+  noteRec = null;
+  captureNoteComposer();
+  const blob = await new Promise(res => {
+    let done = false;
+    const finish = () => { if (done) return; done = true; res(new Blob(st.chunks, { type: st.mime || 'audio/webm' })); };
+    st.rec.onstop = finish;
+    try { if (st.rec.state !== 'inactive') st.rec.stop(); else finish(); }
+    catch (e) { finish(); }
+  });
+  st.stream.getTracks().forEach(t => t.stop());
+  if (!blob.size) { if (doRender !== false) render(); toast('Nothing was recorded.'); return; }
+  try {
+    const audio = await blobToDataUrl(blob);
+    if (noteAudioOk(audio)) noteHold = Object.assign({}, noteHold, { audio, mime: blob.type || st.mime });
+    else toast('That recording is too long to keep. Try a shorter one.');
+  } catch (e) { toast('That recording couldn’t be kept.'); }
+  if (doRender !== false) render();
+}
+function noteStopQuiet() {
+  const st = noteRec;
+  if (!st) return;
+  noteRec = null;
+  captureNoteComposer();
+  const chunks = st.chunks;
+  st.rec.onstop = async () => {
+    try {
+      const blob = new Blob(chunks, { type: st.mime || 'audio/webm' });
+      if (!blob.size) return;
+      const audio = await blobToDataUrl(blob);
+      if (noteAudioOk(audio)) noteHold = Object.assign({}, noteHold, { audio, mime: blob.type || st.mime });
+    } catch (e) { }
+  };
+  try { if (st.rec.state !== 'inactive') st.rec.stop(); } catch (e) { }
+  st.stream.getTracks().forEach(t => t.stop());
+}
+function Notes() {
+  const list = noteRows();
+  const form = `<form class="addbar noteadd" onsubmit="addNote(event)"><input id="notetext" name="text" placeholder="Type a note" maxlength="2000" autocomplete="off" aria-label="Note" enterkeyhint="done" value="${esc(noteHold && noteHold.text || '')}">${noteRecBtn()}<button type="submit" aria-label="Save note">${I('plus')}</button></form>`;
+  const body = list.length
+    ? `<div class="list" id="notelist">${list.map(n => noteRow(n, true)).join('')}</div>`
+    : '<div class="card empty" id="notesempty"><div class="t">No notes yet.</div></div>';
+  return header('Notes', 'Typed or spoken', addBtn('Add a note', "document.getElementById('notetext').focus()")) + form + noteHoldHtml() + body +
+    '<div class="foot">A note can be typed, spoken, or both. It stays on this phone. The date is when it was saved, in New Zealand.</div>';
+}
+async function addNote(e) {
+  e.preventDefault();
+  captureNoteComposer();
+  if (noteRec) await finishNoteRec(false);
+  const text = String(noteHold && noteHold.text || '').replace(/\s+/g, ' ').trim().slice(0, 2000);
+  const audio = noteHold && noteAudioOk(noteHold.audio) ? noteHold.audio : '';
+  const mime = audio ? String(noteHold && noteHold.mime || '').slice(0, 80) : '';
+  if (!text && !audio) {
+    toast('Type a note or record one.');
+    const el = document.getElementById('notetext'); if (el) el.focus();
+    render();
+    return;
+  }
+  const snapS = snap();
+  if (!Array.isArray(S.notes)) S.notes = [];
+  const row = { id: uid('nt'), text, at: nzStampLocal() };
+  if (audio) { row.audio = audio; if (mime) row.mime = mime; }
+  S.notes.push(row);
+  await save();
+  const field = document.getElementById('notetext');
+  if (field) field.value = '';
+  noteHold = null;
+  skipNoteCapture = true;
+  try { render(); } finally { skipNoteCapture = false; }
+  toast('Note saved.', 'Undo', undoTo(snapS));
+}
+async function deleteNote(id) {
+  if (!(S.notes || []).some(n => n.id === id)) return;
+  const snapS = snap();
+  S.notes = S.notes.filter(n => n.id !== id);
+  const hit = noteUrls.get(id);
+  if (hit) { URL.revokeObjectURL(hit.url); noteUrls.delete(id); }
+  await save();
+  render();
+  toast('Note deleted.', 'Undo', undoTo(snapS));
+}
+
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
@@ -9044,11 +9276,14 @@ function activeTab(r) {
 let renderedDay = todayISO();
 function render() {
   if (!S) return;
+  if (!skipNoteCapture) captureNoteComposer();
+  const noteRoute = (location.hash || '#home').slice(1).split('/')[0];
+  if (noteRoute !== 'notes' && noteRec) noteStopQuiet();
   applyTheme();
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes };
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
