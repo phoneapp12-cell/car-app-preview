@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.97.0';
+const APP_VERSION = '1.98.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -367,6 +367,13 @@ function homeEditRows() {
   return rows;
 }
 const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
+// 1.98.0: label a Home section only when it has no heading of its own.
+// The three counters name themselves. The bridge card and the compact line already say Lifting bridge.
+// Numbered summary bars are not these sections.
+function homeHasHeading(k, html) {
+  if (k === 'summary' || k === 'bridge') return true;
+  return /class="sec"|class="mealcardhead"/.test(html);
+}
 const HOME_CARD = {
   bridge: () => { const br = brOnHome(); return br === 'card' ? brCard() : br === 'line' ? brLine() : ''; },
   weather: () => wxCard(),
@@ -836,7 +843,10 @@ function Home() {
   const precede = new Set(homeOrder().slice(0, before));
   const sections = [];
   if (top) sections.push({ keys: ['bridge'], html: `<section class="hsec hsectop" data-k="bridge" style="${homeTintStyle(0, tintN)}">${top}</section>` });
-  groups.forEach((g, i) => sections.push({ keys: g.keys, html: `<section class="hsec" data-k="${g.k}" style="${homeTintStyle(i + (top ? 1 : 0), tintN)}">${g.h}</section>` }));
+  groups.forEach((g, i) => {
+    const body = homeHasHeading(g.k, g.h) ? g.h : homeSec(HOME[g.k][2]) + g.h;
+    sections.push({ keys: g.keys, html: `<section class="hsec" data-k="${g.k}" style="${homeTintStyle(i + (top ? 1 : 0), tintN)}">${body}</section>` });
+  });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
@@ -7288,7 +7298,33 @@ function render() {
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
   if ((r === 'home' || r === '') && homeEdit) wireReorder();
+  if ((r === 'home' || r === '') && !homeEdit) wireHomeEnter();
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
+}
+// 1.98.0: as Home scrolls, sections take turns sliding in from the left, from the right, and folding down.
+// prefers-reduced-motion: reduce leaves them still. Videos are not started by this.
+let homeEnterObs = null;
+function homeEnterKind(i) {
+  const m = i % 3;
+  if (m === 2) return 'fold';
+  return m === 0 ? 'left' : 'right';
+}
+function wireHomeEnter() {
+  if (homeEnterObs) { homeEnterObs.disconnect(); homeEnterObs = null; }
+  const secs = [...document.querySelectorAll('#view .hsec')];
+  if (!secs.length) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) return;
+  const root = document.getElementById('view');
+  secs.forEach((el, i) => el.classList.add('hpend', 'hfrom-' + homeEnterKind(i)));
+  homeEnterObs = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if (!en.isIntersecting) return;
+      en.target.classList.add('hin');
+      homeEnterObs.unobserve(en.target);
+    });
+  }, { root, threshold: 0.16, rootMargin: '0px 0px -6% 0px' });
+  secs.forEach(el => homeEnterObs.observe(el));
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });

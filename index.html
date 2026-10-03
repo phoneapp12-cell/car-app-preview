@@ -723,6 +723,19 @@ html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{backgrou
 .hsec > .tiles:first-child,.hsec > .card:first-child,.hsec > .list:first-child,.hsec > .callout:first-child{margin-top:14px}
 .hsec > :last-child{margin-bottom:0}
 .hsec .mealhome{margin-bottom:0}
+/* v1.98.0: section names sit on the grey-blue band, where the old grey ink disappeared. A label bar keeps them readable. The band colour is unchanged. */
+.hsec > .sec{color:#102033;background:rgba(255,255,255,.94);border-radius:12px;padding:8px 12px;margin:12px 2px 8px;font-size:1rem;letter-spacing:.01em}
+.hsec > .sec a.sechead{color:#102033;font-size:1rem}
+html[data-theme="dark"] .hsec > .sec,html[data-theme="dark"] .hsec > .sec a.sechead{color:#f4f7fb;background:rgba(8,14,20,.62)}
+@media (prefers-reduced-motion: no-preference){
+  #view .hsec.hpend:not(.hin){opacity:0}
+  #view .hsec.hpend.hin.hfrom-left{animation:homeInLeft .62s cubic-bezier(.22,.7,.2,1) both}
+  #view .hsec.hpend.hin.hfrom-right{animation:homeInRight .62s cubic-bezier(.22,.7,.2,1) both}
+  #view .hsec.hpend.hin.hfrom-fold{animation:homeInFold .7s cubic-bezier(.22,.7,.2,1) both;transform-origin:top center}
+}
+@keyframes homeInLeft{from{opacity:0;transform:translateX(-64px)}to{opacity:1;transform:none}}
+@keyframes homeInRight{from{opacity:0;transform:translateX(64px)}to{opacity:1;transform:none}}
+@keyframes homeInFold{from{opacity:0;transform:perspective(720px) rotateX(-62deg)}to{opacity:1;transform:perspective(720px) rotateX(0deg)}}
 /* Weather in Upcoming (1.17.0) */
 .attwx{display:inline-flex;align-items:center;gap:2px;margin-left:4px;vertical-align:middle;white-space:nowrap;font-weight:600;color:var(--ink2)}
 .attwx .wxsvg{width:18px;height:18px}
