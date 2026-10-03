@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.82.0';
+const APP_VERSION = '1.83.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4672,6 +4672,32 @@ function wxCompactIcon(w, day, phase) {
   const condition = ({ pc: 'cloud', cloud: 'cloud', fog: 'fog', drizzle: 'drizzle', rain: 'rain', showers: 'rain', snow: 'snow', storm: 'storm', wind: 'cloud' }[w.kind] || 'cloud');
   return `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${P[condition]}<g transform="translate(12 0) scale(.55)">${P[wxPhaseIcon(phase)]}</g></svg>`;
 }
+// 1.83.0: the banner names today's sunset after sunrise, and the next sunrise after sunset.
+// The clock and the times are both Pacific/Auckland, from the forecast already loaded. No time is invented.
+function wxSunMention(now = new Date()) {
+  const d = WX && WX.data && WX.data.daily;
+  if (!d || !Array.isArray(d.time) || !Array.isArray(d.sunrise) || !Array.isArray(d.sunset)) return '';
+  const local = wxLocalNow(now), nowKey = local.iso + 'T' + local.hm;
+  const events = [];
+  for (let i = 0; i < d.time.length; i++) {
+    const rise = d.sunrise[i], set = d.sunset[i];
+    if (typeof rise === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(rise)) events.push({ kind: 'sunrise', at: rise.slice(0, 16) });
+    if (typeof set === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(set)) events.push({ kind: 'sunset', at: set.slice(0, 16) });
+  }
+  events.sort((a, b) => a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+  const next = events.find(e => e.at > nowKey);
+  if (!next) return '';
+  const hm = fmtTime(next.at.slice(11, 16));
+  if (!/^\d{1,2}:\d{2} (am|pm)$/.test(hm)) return '';
+  const day = next.at.slice(0, 10);
+  let when = '';
+  if (day !== local.iso) {
+    if (parseD(local.iso) != null && day === addDays(local.iso, 1)) when = ' tomorrow';
+    else if (parseD(day) != null) when = ', ' + fmtW(day);
+    else return '';
+  }
+  return (next.kind === 'sunrise' ? 'Sunrise' : 'Sunset') + when + ', ' + hm;
+}
 function wxGreet() {
   const moon = moonPhaseName();
   if (!WX || !validWx(WX.data)) {
@@ -4681,9 +4707,11 @@ function wxGreet() {
   }
   const c = WX.data.current, day = wxIsDay(), nowW = wmo(c.weather_code, day, c.wind_speed_10m);
   const words = day ? nowW.words : nowW.kind === 'clear' ? moon : `${nowW.words} · ${moon}`;
-  const line = `${deg(c.temperature_2m)} ${words}`;
+  const sun = wxSunMention();
+  const shown = sun ? `${words} · ${sun}` : words;
+  const line = `${deg(c.temperature_2m)} ${shown}`;
   return `<button class="wxgreet" id="wxgreet" onclick="go('#weather')" aria-label="Whangārei weather: ${esc(line)}. Tap for the full forecast.">
-    <span class="wxgico">${wxCompactIcon(nowW, day, moon)}</span><span class="wxgtx"><b>${deg(c.temperature_2m)}</b> ${esc(words)}</span></button>`;
+    <span class="wxgico">${wxCompactIcon(nowW, day, moon)}</span><span class="wxgtx"><b>${deg(c.temperature_2m)}</b> ${esc(shown)}</span></button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
