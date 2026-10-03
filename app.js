@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.85.0';
+const APP_VERSION = '1.86.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -527,7 +527,6 @@ function engList(arr) {
 // 1.81.0: those same lines sit in numbered coloured bars. A bar about something overdue,
 // or one that names something due today, is red.
 // 1.84.0: the same title is named only once. “Tonight” and a clock time do not make it a different item.
-// 1.85.0: if more real Upcoming items sit inside 30 days, one line says when the next unnamed one is due.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -643,12 +642,6 @@ function homeOverview(shown) {
   const names = named.map(x => x.name);
   if (names.length) add('soon', `First up in the next 30 days: ${engList(names)}.`, named.some(x => x.days === 0));
   else add('soon', 'Nothing is coming up in the next 30 days.');
-  const later = soonUnique.slice(named.length);
-  if (later.length && Number.isFinite(later[0].days) && later[0].days >= 0) {
-    const d = later[0].days;
-    const when = d === 0 ? 'today' : d === 1 ? 'tomorrow' : 'in ' + d + ' days';
-    add('more', `More ${later.length === 1 ? 'is' : 'are'} due ${when}.`, d === 0);
-  }
   if (EVS) {
     const allEv = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(t => t && !homeSaysTv(t));
     const evNames = homeTake(mentioned, allEv, 2);
