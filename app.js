@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.15.3';
+const APP_VERSION = '2.16.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1422,10 +1422,11 @@ function homeSumCard(bits) {
     const list = (bits || []).filter(b => b && b.text).slice(0, 4);
     let hello = '';
     try { hello = String(homeGreetLine() || '').replace(/\s+/g, ' ').trim(); } catch (e) { hello = ''; }
-    // Keep urgent/overdue items first and intact. A joke, fact, or question only gets the quiet open.
+    // Keep urgent/overdue items first and intact. Mood is the one explicit personal note that may lead them.
+    const mood = homeMoodLine();
     const flavour = list.length ? '' : homeFlavorLine();
-    const extra = flavour || homePersonalClause();
-    const useExtra = !!(extra && (list.length === 0 || (list.length === 1 && !flavour && extra.length <= 110)));
+    const extra = mood || flavour || homePersonalClause();
+    const useExtra = !!(extra && (mood || list.length === 0 || (list.length === 1 && !flavour && extra.length <= 110)));
     let lead = hello;
     if (useExtra) lead = lead ? (lead.replace(/\s+$/, '') + ' ' + extra + (/[.!?]$/.test(extra) ? '' : '.')) : (extra + (/[.!?]$/.test(extra) ? '' : '.'));
     const ps = [];
@@ -9668,11 +9669,23 @@ async function deleteNote(id) {
 }
 
 
-/* ================= ABOUT YOU, WORK ROSTER, PRAISE (2.15.2) =================
+/* ================= ABOUT YOU, WORK ROSTER, PRAISE (2.16.0) =================
    About you: up to three useful questions per day in Pacific/Auckland, rotating after an answer or skip. Answers are S.about.
    Work roster: the days and start times he enters. The summary uses that time.
    A drive line only inside the 40 minutes before that start, and only with a real duration. */
 
+const ABOUT_MOODS = [
+  { id: 'glad', label: 'Glad', icon: '🙂' },
+  { id: 'calm', label: 'Calm', icon: '😌' },
+  { id: 'tired', label: 'Tired', icon: '😴' },
+  { id: 'flat', label: 'Flat', icon: '😐' },
+  { id: 'stressed', label: 'Stressed', icon: '😣' }
+];
+const ABOUT_MOOD_IDS = new Set(ABOUT_MOODS.map(m => m.id));
+function aboutMood(value) {
+  const id = String(value || '').trim().toLowerCase();
+  return ABOUT_MOODS.find(m => m.id === id) || null;
+}
 const ABOUT_QS = [
   { id: 'meal', ask: 'What’s a meal you never get tired of?' },
   { id: 'food', ask: 'What gluten-free food do you like keeping around?' },
@@ -9694,13 +9707,19 @@ let aboutSaveTimer = null;
 
 function normAbout(raw) {
   const ids = new Set(ABOUT_QS.map(q => q.id));
+  ids.add('mood');
   const src = Array.isArray(raw) ? { answers: raw } : (raw && typeof raw === 'object' ? raw : {});
   const answers = [], seen = new Set();
   (Array.isArray(src.answers) ? src.answers : []).forEach(n => {
     if (!n || typeof n !== 'object') return;
     const qid = String(n.qid || '');
     if (!ids.has(qid)) return;
-    const text = String(n.text || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+    let text = String(n.text || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+    if (qid === 'mood') {
+      const mood = aboutMood(text);
+      if (!mood) return;
+      text = mood.id;
+    }
     if (!text) return;
     let id = String(n.id || '');
     if (!/^ab-[a-z0-9]{4,40}$/i.test(id) || seen.has(id)) id = uid('ab');
@@ -9820,11 +9839,31 @@ function aboutDogName() {
 }
 function aboutAsk(q) {
   if (!q) return '';
+  if (q.id === 'mood') return 'How are you feeling today?';
   if (q.id === 'dog') {
     const name = aboutDogName();
     if (name) return 'What’s something ' + name + ' likes?';
   }
   return q.ask;
+}
+function aboutLatestMood(now) {
+  const day = nzTodayISO(now || new Date());
+  return aboutAnswerRows().find(a => a && a.qid === 'mood' && a.day === day && aboutMood(a.text)) || null;
+}
+function homeMoodLine() {
+  try {
+    const row = aboutLatestMood();
+    const mood = row && aboutMood(row.text);
+    if (!mood) return '';
+    const lines = {
+      glad: 'You’re feeling glad today—nice one.',
+      calm: 'You’re feeling calm today—take it at your pace.',
+      tired: 'You’re feeling tired today—keep the pace easy.',
+      flat: 'You’re feeling flat today—keep things gentle.',
+      stressed: 'You’re feeling stressed today—one thing at a time.'
+    };
+    return lines[mood.id] || '';
+  } catch (e) { return ''; }
 }
 function aboutFitLine() {
   try {
@@ -10132,24 +10171,47 @@ async function refreshDrive() {
 }
 function aboutRow(n) {
   const q = ABOUT_QS.find(x => x.id === n.qid);
-  const label = q ? aboutAsk(q) : 'Answer';
-  return `<div class="row"><div class="ic about">${I('info')}</div><div class="tx"><div class="t">${esc(aboutClip(n.text))}</div><div class="s">${esc(label)}${n.day ? ' · ' + esc(fmtW(n.day)) : ''}</div></div><button type="button" class="iconbtn" aria-label="Delete this answer" onclick="deleteAbout('${n.id}')">${I('trash')}</button></div>`;
+  const mood = n.qid === 'mood' ? aboutMood(n.text) : null;
+  const label = mood ? 'How you were feeling' : q ? aboutAsk(q) : 'Answer';
+  const text = mood ? mood.icon + ' ' + mood.label : aboutClip(n.text);
+  const at = n.at && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(n.at) ? ' · ' + n.at.slice(11) + ' Pacific/Auckland' : '';
+  return `<div class="row"><div class="ic about">${I('info')}</div><div class="tx"><div class="t">${esc(text)}</div><div class="s">${esc(label)}${n.day ? ' · ' + esc(fmtW(n.day)) : ''}${esc(at)}</div></div><button type="button" class="iconbtn" aria-label="Delete this answer" onclick="deleteAbout('${n.id}')">${I('trash')}</button></div>`;
+}
+function moodCard(today) {
+  const selected = today && aboutMood(today.text);
+  const saved = today && today.at && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(today.at) ? `<div class="muted moodsaved">Saved at ${esc(today.at.slice(11))} Pacific/Auckland</div>` : '';
+  return `<div class="card moodcard" id="aboutmood"><div class="t" style="font-weight:750;font-size:1.0625rem">How are you feeling today?</div><div class="muted" style="margin-top:4px">Tap an icon. You can change it any time.</div><div class="moodchoices" role="group" aria-label="Today’s mood">${ABOUT_MOODS.map(m => `<button type="button" class="moodchoice${selected && selected.id === m.id ? ' on' : ''}" aria-pressed="${!!(selected && selected.id === m.id)}" aria-label="${m.label}" onclick="saveMood('${m.id}')"><span class="moodicon" aria-hidden="true">${m.icon}</span><span>${m.label}</span></button>`).join('')}</div>${saved}</div>`;
 }
 function About() {
   const q = aboutEnsurePin();
   const ask = aboutAsk(q);
   const day = nzTodayISO();
+  const moodToday = aboutLatestMood();
   const today = (aboutState().answers || []).find(a => a.qid === q.id && a.day === day);
   const skipped = !today && (aboutState().skips || []).some(s => s.day === day && s.qid === q.id);
-  const past = aboutAnswerRows().filter(a => !(a.qid === q.id && a.day === day));
+  const past = aboutAnswerRows().filter(a => !(a.qid === q.id && a.day === day) && !(a.qid === 'mood' && a.day === day));
   const form = `<form class="addbar aboutadd" onsubmit="saveAbout(event)"><input id="abouttext" name="text" placeholder="Your answer" maxlength="240" autocomplete="off" aria-label="Your answer" enterkeyhint="done" value="${esc(today ? today.text : '')}"><button type="submit" aria-label="Save answer">${I('check')}</button></form>` +
     (today ? '' : `<div class="btns" style="margin-top:-4px"><button type="button" class="btn" onclick="skipAbout()">Skip</button></div>`) +
     (skipped ? '<p class="muted" id="aboutskip">Skipped for today. You can still answer.</p>' : '');
   const qcard = `<div class="card" id="aboutq"><div class="t" style="font-weight:750;font-size:1.0625rem">${esc(ask)}</div><div class="muted" style="margin-top:4px">Today’s question. The same one all day.</div></div>`;
   const todayHtml = today ? `<div class="list" id="abouttoday" style="margin-bottom:12px">${aboutRow(today)}</div>` : '';
   const pastHtml = past.length ? `<div class="sec" style="margin-top:8px">What you’ve said</div><div class="list" id="aboutlist">${past.map(aboutRow).join('')}</div>` : '';
-  return header('About you', 'One question a day') + qcard + form + todayHtml + pastHtml +
-    '<div class="foot">Saved on this phone. One question each day. It won’t ask the same one again until the others have had a turn.</div>';
+  return header('About you', 'One question a day') + moodCard(moodToday) + qcard + form + todayHtml + pastHtml +
+    '<div class="foot">Saved on this phone in Pacific/Auckland. Your mood is used on Home only for today. It won’t ask the same question again until the others have had a turn.</div>';
+}
+async function saveMood(id) {
+  const mood = aboutMood(id);
+  if (!mood) return;
+  const snapS = snap();
+  const a = aboutState();
+  const day = nzTodayISO();
+  const existing = aboutLatestMood();
+  if (existing) { existing.text = mood.id; existing.at = nzStampLocal(); }
+  else a.answers.push({ id: uid('ab'), qid: 'mood', text: mood.id, day, at: nzStampLocal() });
+  a.skips = (a.skips || []).filter(s => !(s.day === day && s.qid === 'mood'));
+  await save();
+  render();
+  toast('Mood saved.', 'Undo', undoTo(snapS));
 }
 async function saveAbout(e) {
   e.preventDefault();
