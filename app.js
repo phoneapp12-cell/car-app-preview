@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.7.1';
+const APP_VERSION = '2.8.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -785,6 +785,74 @@ function homeComedyOnNow() {
 // Weather only when it is already loaded and rainy or sunny, and only with a real task or a real video.
 // A blog or podcast only when that feed is loaded. A headline only when local news is loaded.
 // The same title is used once. Nothing is invented.
+// 2.8.0: also a time-of-day hello (Pacific/Auckland), this fortnight’s real commission when it is stored,
+// a goal question only from a stored goal (or a plain “what’s your goal?” when none is stored),
+// and welcome home or back at work only when a location fix is already in memory and near a saved place.
+// Time of day for the summary only. The header stays "Hi Shane". Morning is before noon,
+// afternoon until 5pm, evening from 5pm, all on the Pacific/Auckland clock.
+function homeDayPart(now) {
+  try {
+    const c = DD.nzClock(now || new Date());
+    const hour = Math.floor(c.min / 60);
+    if (!Number.isFinite(hour)) return '';
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    return 'evening';
+  } catch (e) { return ''; }
+}
+function homeGreetLine() {
+  try {
+    const part = homeDayPart();
+    const hello = part === 'morning' ? 'Good morning.' : part === 'evening' ? 'Good evening.' : part === 'afternoon' ? 'Good afternoon.' : '';
+    const where = homePlaceLine();
+    return [hello, where].filter(Boolean).join(' ');
+  } catch (e) { return ''; }
+}
+// This fortnight’s commission, only when an amount was actually entered. No anchor or no entries means skip, not $0.
+function homeFortnightCents() {
+  try {
+    if (typeof CM !== 'function' || typeof fortnightOf !== 'function' || typeof commSum !== 'function') return null;
+    const c = CM();
+    if (!c || !c.anchor) return null;
+    const entries = Array.isArray(c.entries) ? c.entries : [];
+    const f = fortnightOf(c.anchor, todayISO());
+    if (!f || !f.start || !f.end) return null;
+    const inF = entries.filter(e => e && e.date >= f.start && e.date <= f.end && Number.isFinite(+e.cents));
+    if (!inF.length) return null;
+    const tot = commSum(entries, f.start, f.end);
+    return Number.isFinite(tot) ? tot : null;
+  } catch (e) { return null; }
+}
+function homeGoalCents() {
+  try {
+    if (typeof CM !== 'function') return null;
+    const c = CM();
+    if (!c || !Object.prototype.hasOwnProperty.call(c, 'goalCents')) return null;
+    if (!Number.isFinite(+c.goalCents) || Math.round(+c.goalCents) <= 0) return null;
+    return Math.round(+c.goalCents);
+  } catch (e) { return null; }
+}
+function homeCommLine() {
+  try {
+    const cents = homeFortnightCents();
+    const goal = homeGoalCents();
+    const amt = cents == null ? '' : centsMoney(cents);
+    if (!goal) {
+      if (cents == null) return 'What’s your goal?';
+      return 'Your commission so far is ' + amt + '. What’s your goal?';
+    }
+    if (cents == null) return 'How’s your goal going this fortnight?';
+    const p = cents / goal;
+    let how;
+    if (cents >= goal) how = 'That’s your goal done, maybe a bit more. Nice. Want to push it a little?';
+    else if (p >= 0.85) how = 'You’re nearly at your goal. How’s that feeling?';
+    else if (p >= 0.6) how = 'You’re well on the way to your goal. Happy with that?';
+    else if (p >= 0.4) how = 'You’re about halfway to your goal. How’s that going?';
+    else if (p >= 0.15) how = 'You’re a bit of the way to your goal. How’s that feeling?';
+    else how = 'You’re just getting started on your goal. How’s that sitting?';
+    return 'Your commission so far is ' + amt + '. ' + how;
+  } catch (e) { return ''; }
+}
 function homeOverview(shown) {
   try { return homeOverviewBody(shown); }
   catch (e) { console.error('Home summary', e); return ''; }
@@ -793,7 +861,7 @@ function homeOverviewBody(shown) {
   const bits = [];
   const mentioned = new Set();
   const add = (kind, text, urgent) => {
-    if (bits.length >= 4) return;
+    if (bits.length >= 6) return;
     const line = String(text || '').replace(/\s+/g, ' ').trim();
     if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line)) return;
     bits.push({ kind, text: line, urgent: !!urgent });
@@ -834,6 +902,10 @@ function homeOverviewBody(shown) {
     takeTitles(late.map(x => x.plain), 2);
     add('late', nameLine(late, true), true);
   }
+  const greet = homeGreetLine();
+  if (greet) add('hello', greet);
+  const commLine = homeCommLine();
+  if (commLine) add('comm', commLine);
   const brBit = homeBridgeBit();
   if (brBit) add('bridge', brBit.text, brBit.urgent);
   const soon = uniqueByTitle(pool.filter(x => x.days >= 0 && x.days <= 7), 2);
@@ -4415,7 +4487,10 @@ function normComm(c) {
   c = c && typeof c === 'object' ? c : {};
   const entries = (Array.isArray(c.entries) ? c.entries : []).filter(e => e && parseD(e.date) != null && Number.isFinite(+e.cents) && Math.round(+e.cents) !== 0)
     .map(e => ({ id: e.id || uid('comm'), date: e.date, cents: Math.round(+e.cents), note: String(e.note || '').slice(0, 80) }));
-  return { anchor: isMonday(c.anchor) ? c.anchor : '', entries, remind: c.remind === true };
+  const out = { anchor: isMonday(c.anchor) ? c.anchor : '', entries, remind: c.remind === true };
+  // A goal is only kept when one was already stored. Nothing here invents a target.
+  if (Number.isFinite(+c.goalCents) && Math.round(+c.goalCents) > 0) out.goalCents = Math.min(Math.round(+c.goalCents), 100000000);
+  return out;
 }
 const CM = () => S.commission;
 const yesterdayISO = () => addDays(todayISO(), -1);
@@ -5251,6 +5326,69 @@ const WDC_CLOSURES_URL = 'https://www.wdc.govt.nz/Services/Roads-and-Transportat
 const BR_NEAR_M = 2000, CLS_MAX_AGE = 3 * 3600 * 1000;
 let CLS = null, clsBusy = false, clsFailed = false;
 let brNear = null, brDist = null, brLocBusy = false, brLocAt = 0; // location is only kept in memory while the app is open
+// Saved places Shane named. The summary says welcome home or back at work, never the street.
+// Home: 16 Sherwood Road, Onerahi. Work: 4 Port Road, Whangārei. House points from OpenStreetMap.
+const SAVED_PLACES = [
+  { id: 'home', lat: -35.7495414, lon: 174.3646323 },
+  { id: 'work', lat: -35.7300535, lon: 174.3273886 }
+];
+const PLACE_NEAR_M = 400;
+let hereFix = null, hereBusy = false; // { lat, lon, acc, at } while the app is open. Not saved.
+function metresBetween(aLat, aLon, bLat, bLon) {
+  const R = 6371000, r = x => x * Math.PI / 180, dLat = r(bLat - aLat), dLon = r(bLon - aLon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function rememberFix(pos) {
+  try {
+    if (!pos || !pos.coords) return;
+    const lat = +pos.coords.latitude, lon = +pos.coords.longitude;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const acc = Number.isFinite(+pos.coords.accuracy) ? +pos.coords.accuracy : null;
+    hereFix = { lat, lon, acc, at: Date.now() };
+  } catch (e) {}
+}
+// Near home or near work, or nothing. A vague fix, or no fix, does not guess.
+function placeHere() {
+  try {
+    if (!hereFix || Date.now() - hereFix.at > 15 * 60 * 1000) return '';
+    if (hereFix.acc != null && hereFix.acc > 1000) return '';
+    let best = '', bestM = PLACE_NEAR_M;
+    SAVED_PLACES.forEach(p => {
+      const m = metresBetween(hereFix.lat, hereFix.lon, p.lat, p.lon);
+      if (m <= bestM) { bestM = m; best = p.id; }
+    });
+    return best;
+  } catch (e) { return ''; }
+}
+function homePlaceLine() {
+  try {
+    const p = placeHere();
+    if (p === 'home') return 'Welcome home.';
+    if (p === 'work') return 'Back at work again.';
+    return '';
+  } catch (e) { return ''; }
+}
+// Reads location only when the browser already allows it. Never pops a permission prompt from Home.
+async function checkHere(force = false) {
+  try {
+    if (!navigator.geolocation || !(navigator.permissions && navigator.permissions.query)) return;
+    let granted = false;
+    try {
+      const perm = await navigator.permissions.query({ name: 'geolocation' });
+      granted = perm.state === 'granted';
+    } catch (e) { return; }
+    if (!granted) { hereFix = null; return; }
+    if (S && S.settings.bridgeLoc && brMode() === 'near') return;
+    if (!force && hereFix && Date.now() - hereFix.at < 4 * 60 * 1000) return;
+    if (hereBusy || brLocBusy) return;
+    hereBusy = true;
+    navigator.geolocation.getCurrentPosition(pos => {
+      hereBusy = false; rememberFix(pos); paintHomeSum();
+    }, () => { hereBusy = false; }, { enableHighAccuracy: false, maximumAge: force ? 0 : 2 * 60 * 1000, timeout: 15000 });
+  } catch (e) { hereBusy = false; }
+}
+
 function loadCls() { try { const c = JSON.parse(localStorage.getItem('closures') || 'null'); CLS = c && c.at && c.data && Array.isArray(c.data.closures) ? c : null; } catch (e) { CLS = null; } }
 async function refreshClosures(force = false) {
   if (!RELAY_URL || clsBusy || (!force && CLS && Date.now() - CLS.at < CLS_MAX_AGE)) return;
@@ -5430,6 +5568,7 @@ function updBridge(force = false) {
 function gotPos(pos) {
   brLocAt = Date.now(); brDist = DD.bridgeMetres(pos.coords.latitude, pos.coords.longitude);
   brNear = brDist <= BR_NEAR_M;
+  rememberFix(pos);
 }
 async function checkBridgeLoc(force = false) {
   if (!S || brMode() !== 'near' || !S.settings.bridgeLoc || brLocBusy || !navigator.geolocation) return;
@@ -8368,6 +8507,7 @@ async function start() {
   refreshMail();
   if (brMode() !== 'off' || location.hash === '#bridge') { refreshClosures(); refreshBridgeTraffic(); }
   checkBridgeLoc(true);
+  checkHere(true);
   if ('serviceWorker' in navigator) {
     let hadController = !!navigator.serviceWorker.controller, reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -8391,6 +8531,7 @@ async function start() {
     refreshMail();
     if (brMode() !== 'off') { refreshClosures(); refreshBridgeTraffic(); }
     checkBridgeLoc(true);
+    checkHere(true);
     if (swReg) swReg.update().catch(() => { });
     scheduleReminders().catch(() => { });
   });
@@ -8399,7 +8540,7 @@ async function start() {
     if (todayISO() !== renderedDay && !sheetOpen) render();
     check();
     syncFeeds(); refreshWx(); refreshMail();
-    updBridge(); checkBridgeLoc();
+    updBridge(); checkBridgeLoc(); checkHere();
   }, 60 * 1000);
 }
 start();
