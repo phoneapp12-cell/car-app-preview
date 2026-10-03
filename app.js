@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.94.0';
+const APP_VERSION = '1.95.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -798,14 +798,9 @@ function homeOverview(shown) {
   }).join('')}</ul></div>`;
 }
 
-// 1.75.0: each Home section gets a neutral wash, light sand at the top and darker slate further down.
-const HOME_TINTS = ['#e4d7c2', '#d4c4a8', '#c9b89a', '#c2b4a4', '#b7aa96', '#b09a78', '#a89a88', '#a28d6a', '#9a9d96', '#978e87', '#8c9692', '#8b8177', '#89938f', '#829984', '#7b927a', '#7b8895', '#738091', '#71808d', '#667784', '#5a6a78'];
-function homeTintStyle(i, n) {
-  const last = HOME_TINTS.length - 1;
-  const t = n <= 1 ? 0 : Math.max(0, Math.min(1, i / (n - 1)));
-  const color = HOME_TINTS[Math.round(t * last)];
-  const mix = Math.round(16 + t * 12);
-  return '--hsec:' + color + ';--hmix:' + mix + '%';
+// 1.95.0: every Home section uses one transparent darker grey-blue (rgba(48,62,80,.55)). Numbered summary bars are not these sections.
+function homeTintStyle() {
+  return '--hsec:#303e50;--hmix:55%';
 }
 function Home() {
   if (homeEdit) return HomeEdit();
