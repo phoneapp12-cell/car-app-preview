@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.15.0';
+const APP_VERSION = '2.15.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -869,12 +869,13 @@ function homePick(salt, options) {
   const n = Math.abs((homeSpinSeed + day * 13 + slot * 5 + (salt || 0) * 17) | 0) % list.length;
   return list[n];
 }
-// Fun fact about one open in three, or a bit under. A joke less often. Never both, and never on every open.
+// One light extra on roughly one open in three or less. It is exactly one kind: joke, fact, or question.
 function homeFlavorKind() {
   if (homeFlavorRoll != null) return homeFlavorRoll;
   const r = Math.random();
-  if (r < 0.16) homeFlavorRoll = 'joke';
-  else if (r < 0.46) homeFlavorRoll = 'fact';
+  if (r < 0.10) homeFlavorRoll = 'joke';
+  else if (r < 0.20) homeFlavorRoll = 'fact';
+  else if (r < 0.30) homeFlavorRoll = 'question';
   else homeFlavorRoll = '';
   return homeFlavorRoll;
 }
@@ -1383,16 +1384,50 @@ function homePersonalClause() {
   } catch (e) {}
   return '';
 }
+// A rhetorical question may only use something already stored for Shane. It never fills in a preference.
+function homeRhetoricalLine() {
+  try {
+    const answer = qid => {
+      try {
+        const row = typeof aboutLatest === 'function' ? aboutLatest(qid) : null;
+        return row && row.text ? aboutClip(row.text) : '';
+      } catch (e) { return ''; }
+    };
+    const meal = answer('meal');
+    if (meal && !homeGlutenFood(meal)) return 'Still not tired of ' + homeQuote(meal) + '?';
+    const place = answer('place');
+    if (place) return 'Wouldn’t ' + homeQuote(place) + ' be a good place to be?';
+    const slot = rosterSlot();
+    if (slot && slot.inWindow) return 'Is there really a better way to spend the time before ' + fmtTime(slot.hm) + '?';
+    try {
+      const plan = typeof M === 'function' && M() && M().plan ? M().plan : null;
+      const entry = plan && plan[todayISO()];
+      const title = entry && !entry.cooked && entry.title ? String(entry.title).replace(/\s+/g, ' ').trim() : '';
+      if (title && !homeGlutenFood(title)) return 'Is ' + homeQuote(title) + ' not a strong case for dinner tonight?';
+    } catch (e) {}
+    const part = homeDayPart();
+    return part ? 'Shane, is there really a better time to take the ' + part + ' at your own pace?' : '';
+  } catch (e) { return ''; }
+}
+function homeFlavorLine() {
+  const kind = homeFlavorKind();
+  if (kind === 'joke') return homePick(91, HOME_JOKES);
+  if (kind === 'fact') return homePick(92, HOME_FACTS);
+  if (kind === 'question') return homeRhetoricalLine();
+  return '';
+}
 // 2.15.0: a short note, not a stack of coloured cards. Overdue stays in its own colour.
 function homeSumCard(bits) {
   try {
     const list = (bits || []).filter(b => b && b.text).slice(0, 4);
     let hello = '';
     try { hello = String(homeGreetLine() || '').replace(/\s+/g, ' ').trim(); } catch (e) { hello = ''; }
-    const extra = homePersonalClause();
-    const useExtra = !!(extra && (list.length === 0 || (list.length === 1 && extra.length <= 110)));
+    // Keep urgent/overdue items first and intact. A joke, fact, or question only gets the quiet open.
+    const flavour = list.length ? '' : homeFlavorLine();
+    const extra = flavour || homePersonalClause();
+    const useExtra = !!(extra && (list.length === 0 || (list.length === 1 && !flavour && extra.length <= 110)));
     let lead = hello;
-    if (useExtra) lead = lead ? (lead.replace(/\s+$/, '') + ' ' + extra + '.') : (extra + '.');
+    if (useExtra) lead = lead ? (lead.replace(/\s+$/, '') + ' ' + extra + (/[.!?]$/.test(extra) ? '' : '.')) : (extra + (/[.!?]$/.test(extra) ? '' : '.'));
     const ps = [];
     if (lead) ps.push('<p class="sumnote">' + esc(lead) + '</p>');
     if (list.length) {
@@ -1513,9 +1548,8 @@ function homeAsideLine(mentioned) {
     if (key && mentioned) mentioned.add(key);
     return kin.text;
   }
-  const flavor = homeFlavorKind();
-  if (flavor === 'joke') return homePick(91, HOME_JOKES);
-  if (flavor === 'fact') return homePick(92, HOME_FACTS);
+  const line = homeFlavorLine();
+  if (line) return line;
   try { return homeEaseLine(); } catch (e) { return ''; }
 }
 function homePlayLine(mentioned) {
@@ -1671,7 +1705,8 @@ function homeOverview(shown) {
     return homeSumFallback();
   }
 }
-// 2.15.0: one short note on a weather picture, not coloured cards. Urgent items share a sentence.
+// 2.15.1: one short note on a weather picture, not coloured cards. Urgent items share a sentence.
+// Quiet opens may add one clean joke, real fun fact, or rhetorical question; never more than one.
 // Time, place, one About you line on a quiet day, and the roster when a start is coming up. Nothing invented.
 // 2.14.0: at work, Noel Leeming only when Google has a busyness label, and only if the note is not already full.
 function homeOverviewBody(shown, urgentOut) {
