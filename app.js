@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.83.0';
+const APP_VERSION = '1.84.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -526,6 +526,7 @@ function engList(arr) {
 // Television is still not mentioned.
 // 1.81.0: those same lines sit in numbered coloured bars. A bar about something overdue,
 // or one that names something due today, is red.
+// 1.84.0: the same title is named only once. “Tonight” and a clock time do not make it a different item.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -589,6 +590,31 @@ function homeVideoPicks(mood) {
   // Sunny, or no rain/sun line: early October is spring in New Zealand, so garden titles only.
   return garden.slice(0, 2);
 }
+// Same event, task or title, even if one line says Tonight or Today and another does not.
+function homeMentionKey(s) {
+  let t = String(s || '').toLowerCase().replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').trim();
+  t = t.replace(/^[“"']+|[”"']+$/g, '');
+  let prev = '';
+  while (t && t !== prev) {
+    prev = t;
+    t = t.replace(/^(tonight|today|tomorrow|yesterday|in \d+ days?)\s*[:\-–—]?\s*/, '');
+    t = t.replace(/\s+\d{1,2}:\d{2}\s*(am|pm)\s*$/, '');
+    t = t.replace(/\s+all day\s*$/, '');
+  }
+  return t.trim();
+}
+function homeTake(seen, titles, limit) {
+  const out = [];
+  (titles || []).forEach(title => {
+    if (limit && out.length >= limit) return;
+    const raw = String(title || '').replace(/\s+/g, ' ').trim();
+    const key = homeMentionKey(raw);
+    if (!raw || !key || seen.has(key)) return;
+    seen.add(key);
+    out.push(raw);
+  });
+  return out;
+}
 function homeOverview(shown) {
   const bits = [];
   const add = (kind, text, urgent) => { if (text) bits.push({ kind, text, urgent: !!urgent }); };
@@ -601,15 +627,26 @@ function homeOverview(shown) {
   else if (over) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and the next 30 days are clear. Whenever you get to ${over === 1 ? 'it' : 'them'} is absolutely fine.`);
   else if (soon) add('due', `Nothing is overdue. ${plural(soon, 'thing')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days, and there’s no rush.`);
   else add('due', 'Nothing is overdue, and nothing is due in the next 30 days. A nice open stretch.');
+  const mentioned = new Set();
   const soonItems = homeAttention().filter(x => x.kind !== 'tv' && x.days >= 0 && x.days <= 30 && x.name && !homeSaysTv(x.name));
-  const named = soonItems.slice(0, 4);
+  const soonUnique = [];
+  const soonKeys = new Set();
+  soonItems.forEach(x => {
+    const key = homeMentionKey(x.name);
+    if (!key || soonKeys.has(key)) return;
+    soonKeys.add(key);
+    soonUnique.push(x);
+  });
+  const named = soonUnique.slice(0, 4);
+  named.forEach(x => mentioned.add(homeMentionKey(x.name)));
   const names = named.map(x => x.name);
   if (names.length) add('soon', `First up in the next 30 days: ${engList(names)}.`, named.some(x => x.days === 0));
   else add('soon', 'Nothing is coming up in the next 30 days.');
   if (EVS) {
-    const evNames = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(t => t && !homeSaysTv(t)).slice(0, 2);
+    const allEv = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(t => t && !homeSaysTv(t));
+    const evNames = homeTake(mentioned, allEv, 2);
     if (evNames.length) add('out', `Out locally: ${engList(evNames)}.`);
-    else add('out', 'No local events are listed right now.');
+    else if (!allEv.length) add('out', 'No local events are listed right now.');
   }
   if (CM().anchor) {
     const f = curFortnight();
@@ -619,22 +656,33 @@ function homeOverview(shown) {
   } else add('pay', 'No commission amount is recorded for this fortnight.');
   if (shown.has('meals')) {
     const today = todayISO(), meals = upcomingMeals();
-    if (meals.includes(today) && M().plan[today] && M().plan[today].title) add('meal', `Today’s meal is ${M().plan[today].title}.`);
-    else if (meals.length) add('meal', `${plural(meals.length, 'meal')} ${meals.length === 1 ? 'is' : 'are'} planned, and none is set for today.`);
+    const mealTitle = meals.includes(today) && M().plan[today] && M().plan[today].title ? M().plan[today].title : '';
+    const freshMeal = mealTitle ? homeTake(mentioned, [mealTitle], 1) : [];
+    if (freshMeal.length) add('meal', `Today’s meal is ${freshMeal[0]}.`);
+    else if (meals.length && !mealTitle) add('meal', `${plural(meals.length, 'meal')} ${meals.length === 1 ? 'is' : 'are'} planned, and none is set for today.`);
   }
   if (shown.has('birthdays')) {
     const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((a, b) => a.d - b.d || a.b.name.localeCompare(b.b.name));
-    if (list.length && list.length <= 3) add('bday', `Birthdays in the next 30 days: ${engList(list.map(x => x.b.name))}.`);
-    else if (list.length) add('bday', `${plural(list.length, 'birthday')} in the next 30 days, the next being ${list[0].b.name}.`);
+    if (list.length && list.length <= 3) {
+      const bnames = homeTake(mentioned, list.map(x => x.b.name), 3);
+      if (bnames.length) add('bday', `Birthdays in the next 30 days: ${engList(bnames)}.`);
+    } else if (list.length) {
+      const bnames = homeTake(mentioned, list.map(x => x.b.name), 1);
+      if (bnames.length) add('bday', `${plural(list.length, 'birthday')} in the next 30 days, the next being ${bnames[0]}.`);
+    }
   }
-  const jobs = homeDayJobs(wx.mood);
+  const jobs = homeTake(mentioned, homeDayJobs(wx.mood), 2);
   if (jobs.length) {
     const quoted = engList(jobs.map(t => '“' + t + '”'));
     if (wx.mood === 'wet') add('job', `If you want something easy while it’s wet, your list already has ${quoted}. Only if you feel like it.`);
     else add('job', `If you want to use the sun, your list already has ${quoted}. Only if you feel like it.`);
   }
-  const vids = homeVideoPicks(wx.mood);
+  const vids = homeVideoPicks(wx.mood).filter(v => {
+    const key = homeMentionKey(v.title);
+    return key && !mentioned.has(key);
+  });
   if (vids.length) {
+    homeTake(mentioned, vids.map(v => v.title), 2);
     const q = v => '“' + v.title + '”';
     if (wx.mood === 'wet' && vids.length === 2 && vids[0].category !== 'garden' && vids[1].category === 'garden')
       add('vid', `From your video list: ${q(vids[0])} for a rainy day, and ${q(vids[1])} for this spring.`);
