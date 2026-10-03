@@ -94,10 +94,21 @@ body.kb #view{padding-bottom:28px}
 .top h1{font-size:1.75rem;line-height:1.15;margin:0;letter-spacing:-.5px}
 .top .sub{color:var(--ink2);font-size:0.9375rem;margin-top:4px}
 .wxgreet{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin:-6px 0 10px;padding:6px 10px;color:var(--ink2);font-size:0.9375rem;font-weight:600;line-height:1.35;background:color-mix(in srgb,#e8a317 16%,transparent);border-radius:14px}
-.homesum{margin:2px 0 12px;padding:12px 14px}
-.homesum p,.homesum li{margin:0;font-size:0.9375rem;line-height:1.45;font-weight:500}
-.homesum ul{margin:0;padding:0 0 0 1.15em}
+.homesum{margin:2px 0 12px;padding:12px 14px;background:linear-gradient(165deg,var(--wx-bg),var(--card) 58%,var(--idea-bg))}
+.homesum p,.homesum li{margin:0;font-size:0.9375rem;line-height:1.45;font-weight:550}
+.homesum ul{margin:0;padding:0;list-style:none}
+.homesum li{padding:7px 10px 7px 12px;border-radius:12px;border-left:4px solid var(--amber);background:color-mix(in srgb,var(--idea-bg) 62%,var(--card));color:var(--ink)}
 .homesum li+li{margin-top:6px}
+.homesum li.wx{background:var(--wx-bg);border-left-color:var(--wx-fg);color:var(--amberink);font-weight:700}
+.homesum li.late{background:color-mix(in srgb,var(--warn-bg) 82%,var(--card));border-left-color:var(--warn-fg);color:var(--warn-fg);font-weight:650}
+.homesum li.due{border-left-color:var(--garden);background:color-mix(in srgb,var(--garden-bg) 78%,var(--card))}
+.homesum li.soon{border-left-color:var(--hol);background:color-mix(in srgb,var(--hol-bg) 70%,var(--card))}
+.homesum li.out{border-left-color:var(--health);background:color-mix(in srgb,var(--health-bg) 76%,var(--card))}
+.homesum li.pay{border-left-color:var(--comm-fg);background:color-mix(in srgb,var(--comm-bg) 78%,var(--card))}
+.homesum li.meal{border-left-color:var(--meal);background:color-mix(in srgb,var(--meal-bg) 80%,var(--card))}
+.homesum li.bday{border-left-color:var(--hol);background:color-mix(in srgb,var(--ev-bg) 72%,var(--card))}
+.homesum li.job{border-left-color:var(--pet);background:color-mix(in srgb,var(--pet-bg) 80%,var(--card))}
+.homesum li.vid{border-left-color:var(--garden);background:color-mix(in srgb,var(--gf-bg) 72%,var(--card))}
 html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transparent)}
 .wxgreet b{color:var(--ink);font-weight:800}
 .wxgreet .wxgico{width:28px;height:28px;display:grid;place-items:center;flex:none}

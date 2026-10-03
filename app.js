@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.77.0';
+const APP_VERSION = '1.78.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -475,6 +475,9 @@ function engList(arr) {
 // and the app’s own words say so. At most two real to-dos or ideas that fit that weather. One or two
 // real video titles from the list he already has, for the forecast or for early spring. No television.
 // English only. No gluten foods are suggested (he has coeliac disease).
+// 1.78.0: roadworks stay on their own card and are not repeated in this summary. Each bullet has a warm
+// tint. The weather line and any overdue line are highlighted a little more. No mailbox is connected,
+// so this summary does not invent an email line.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -540,67 +543,56 @@ function homeVideoPicks(mood) {
 }
 function homeOverview(shown) {
   const bits = [];
+  const add = (kind, text) => { if (text) bits.push({ kind, text }); };
   const wx = homeWxRead();
-  if (wx.line) bits.push(wx.line);
+  if (wx.line) add('wx', wx.line);
   const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length;
-  if (over && soon) bits.push(`${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and ${plural(soon, 'more')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days. No fuss. They can wait their turn.`);
-  else if (over) bits.push(`${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and the next 30 days are clear. Whenever you get to ${over === 1 ? 'it' : 'them'} is absolutely fine.`);
-  else if (soon) bits.push(`Nothing is overdue. ${plural(soon, 'thing')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days, and there’s no rush.`);
-  else bits.push('Nothing is overdue, and nothing is due in the next 30 days. A nice open stretch.');
+  if (over && soon) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and ${plural(soon, 'more')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days. No fuss. They can wait their turn.`);
+  else if (over) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and the next 30 days are clear. Whenever you get to ${over === 1 ? 'it' : 'them'} is absolutely fine.`);
+  else if (soon) add('due', `Nothing is overdue. ${plural(soon, 'thing')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days, and there’s no rush.`);
+  else add('due', 'Nothing is overdue, and nothing is due in the next 30 days. A nice open stretch.');
   const soonItems = homeAttention().filter(x => x.kind !== 'tv' && x.days >= 0 && x.days <= 30 && x.name && !homeSaysTv(x.name));
   const names = soonItems.slice(0, 4).map(x => x.name);
-  if (names.length) bits.push(`First up in the next 30 days: ${engList(names)}.`);
-  else bits.push('Nothing is coming up in the next 30 days.');
+  if (names.length) add('soon', `First up in the next 30 days: ${engList(names)}.`);
+  else add('soon', 'Nothing is coming up in the next 30 days.');
   if (EVS) {
     const evNames = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(t => t && !homeSaysTv(t)).slice(0, 2);
-    if (evNames.length) bits.push(`Out locally: ${engList(evNames)}.`);
-    else bits.push('No local events are listed right now.');
+    if (evNames.length) add('out', `Out locally: ${engList(evNames)}.`);
+    else add('out', 'No local events are listed right now.');
   }
   if (CM().anchor) {
     const f = curFortnight();
     const recorded = CM().entries.filter(e => e.date >= f.start && e.date <= f.end);
-    if (recorded.length) bits.push(`This fortnight’s commission is ${centsMoney(commSum(CM().entries, f.start, f.end))}.`);
-    else bits.push('No commission amount is recorded for this fortnight.');
-  } else bits.push('No commission amount is recorded for this fortnight.');
+    if (recorded.length) add('pay', `This fortnight’s commission is ${centsMoney(commSum(CM().entries, f.start, f.end))}.`);
+    else add('pay', 'No commission amount is recorded for this fortnight.');
+  } else add('pay', 'No commission amount is recorded for this fortnight.');
   if (shown.has('meals')) {
     const today = todayISO(), meals = upcomingMeals();
-    if (meals.includes(today) && M().plan[today] && M().plan[today].title) bits.push(`Today’s meal is ${M().plan[today].title}.`);
-    else if (meals.length) bits.push(`${plural(meals.length, 'meal')} ${meals.length === 1 ? 'is' : 'are'} planned, and none is set for today.`);
-  }
-  if (shown.has('roadworks') && RW && RW.data && Array.isArray(RW.data.items) && RW.data.items.length) {
-    const nzta = RW.data.items.filter(w => w.source !== 'wdc').map(w => w.road).filter(Boolean);
-    const wdc = RW.data.items.filter(w => w.source === 'wdc').map(w => w.road).filter(Boolean);
-    if (nzta.length) {
-      const shownNames = nzta.slice(0, 4), more = nzta.length - shownNames.length;
-      bits.push(`${plural(nzta.length, 'roadwork')} within 40 km: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
-    }
-    if (wdc.length) {
-      const shownNames = wdc.slice(0, 4), more = wdc.length - shownNames.length;
-      bits.push(`Council projects in the next year: ${engList(shownNames)}${more ? `, and ${more} more` : ''}.`);
-    }
+    if (meals.includes(today) && M().plan[today] && M().plan[today].title) add('meal', `Today’s meal is ${M().plan[today].title}.`);
+    else if (meals.length) add('meal', `${plural(meals.length, 'meal')} ${meals.length === 1 ? 'is' : 'are'} planned, and none is set for today.`);
   }
   if (shown.has('birthdays')) {
     const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((a, b) => a.d - b.d || a.b.name.localeCompare(b.b.name));
-    if (list.length && list.length <= 3) bits.push(`Birthdays in the next 30 days: ${engList(list.map(x => x.b.name))}.`);
-    else if (list.length) bits.push(`${plural(list.length, 'birthday')} in the next 30 days, the next being ${list[0].b.name}.`);
+    if (list.length && list.length <= 3) add('bday', `Birthdays in the next 30 days: ${engList(list.map(x => x.b.name))}.`);
+    else if (list.length) add('bday', `${plural(list.length, 'birthday')} in the next 30 days, the next being ${list[0].b.name}.`);
   }
   const jobs = homeDayJobs(wx.mood);
   if (jobs.length) {
     const quoted = engList(jobs.map(t => '“' + t + '”'));
-    if (wx.mood === 'wet') bits.push(`If you want something easy while it’s wet, your list already has ${quoted}. Only if you feel like it.`);
-    else bits.push(`If you want to use the sun, your list already has ${quoted}. Only if you feel like it.`);
+    if (wx.mood === 'wet') add('job', `If you want something easy while it’s wet, your list already has ${quoted}. Only if you feel like it.`);
+    else add('job', `If you want to use the sun, your list already has ${quoted}. Only if you feel like it.`);
   }
   const vids = homeVideoPicks(wx.mood);
   if (vids.length) {
     const q = v => '“' + v.title + '”';
     if (wx.mood === 'wet' && vids.length === 2 && vids[0].category !== 'garden' && vids[1].category === 'garden')
-      bits.push(`From your video list: ${q(vids[0])} for a rainy day, and ${q(vids[1])} for this spring.`);
-    else if (wx.mood === 'wet') bits.push(`For a rainy day, your video list has ${engList(vids.map(q))}.`);
-    else if (wx.mood === 'sun') bits.push(`For a sunny spring day, your video list has ${engList(vids.map(q))}.`);
-    else bits.push(`For early spring, your video list has ${engList(vids.map(q))}.`);
+      add('vid', `From your video list: ${q(vids[0])} for a rainy day, and ${q(vids[1])} for this spring.`);
+    else if (wx.mood === 'wet') add('vid', `For a rainy day, your video list has ${engList(vids.map(q))}.`);
+    else if (wx.mood === 'sun') add('vid', `For a sunny spring day, your video list has ${engList(vids.map(q))}.`);
+    else add('vid', `For early spring, your video list has ${engList(vids.map(q))}.`);
   }
   if (!bits.length) return '';
-  return `<div class="card homesum" id="homesum"><ul>${bits.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>`;
+  return `<div class="card homesum" id="homesum"><ul>${bits.map(b => `<li class="${b.kind}">${esc(b.text)}</li>`).join('')}</ul></div>`;
 }
 
 // 1.75.0: each Home section gets a neutral wash, light sand at the top and darker slate further down.
