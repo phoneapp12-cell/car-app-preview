@@ -25,6 +25,7 @@
  * (see videos.js). The query is the topic only. No arbitrary links. Nothing is stored.
  * GET /sarah: Sarah Jenkins's channel (one fixed RSS address). POST /sarah/seen marks the
  * newest id so it is not pushed again. No other channel can be requested.
+ * GET /busy: how busy Noel Leeming Whangarei Supa is, from Google's public place payload. Fixed place, no input. A level word only, never a street. No reading means no level.
  * GET /mail/config: public OAuth client ids for Gmail and Outlook (empty if not set). No secrets.
  * POST /mail/token: exchange an authorization code (PKCE) or refresh token. A client secret is
  * read from the Worker env only and is never returned or logged. Mail subjects are not fetched here.
@@ -34,6 +35,7 @@ import { getClosures } from './closures.js';
 import { getCouncilRoadworks } from './roadworks.js';
 import { getBridgeTraffic } from './bridge-traffic.js';
 import { getDrive } from './drive.js';
+import { getStoreBusy } from './busy.js';
 import { getLocalNews } from './news.js';
 import { getBlogs } from './blogs.js';
 import { getPodcasts } from './podcasts.js';
@@ -90,6 +92,7 @@ const MESSAGES = {
   roadworks_unavailable: 'Council roadworks could not be loaded right now.',
   bridge_traffic_unavailable: 'Live traffic could not be checked right now.',
   drive_unavailable: 'The drive time could not be checked right now.',
+  busy_unavailable: 'Store busyness could not be checked right now.',
   news_unavailable: 'Local news could not be loaded right now.',
   blogs_unavailable: 'Blogs could not be loaded right now.',
   podcasts_unavailable: 'Podcasts could not be loaded right now.',
@@ -215,6 +218,15 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       const data = await getDrive(fetchImpl);
       return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     } catch (e) { return json(502, 'drive_unavailable', origin, env); }
+  }
+  if (path === '/busy') {
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try {
+      const data = await getStoreBusy(fetchImpl);
+      const body = data && data.level ? { basis: data.basis, level: data.level } : {};
+      return new Response(JSON.stringify(body), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    } catch (e) { return json(502, 'busy_unavailable', origin, env); }
   }
   if (path === '/news') {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);

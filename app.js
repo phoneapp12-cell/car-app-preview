@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.13.0';
+const APP_VERSION = '2.14.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1578,6 +1578,7 @@ function homeOverview(shown) {
     return homeSumFallback();
   }
 }
+// 2.14.0: at work, one short Noel Leeming line when Google actually has a busyness label. It never takes an urgent slot.
 // 2.12.0: at most four notes. Urgent first (overdue, due today, due in a day or two, or timed within 30 minutes).
 // One optional aside. A birthday in the next 14 days wins that slot. A joke or a fun fact only on some opens, never both.
 // Movie, TV, streaming, comedy and events only at home. A movie only from 5am to 9pm. Commission never at home.
@@ -1621,6 +1622,7 @@ function homeOverviewBody(shown, urgentOut) {
       if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line) || /\b90[\s-]*hours?\b/i.test(line)) return;
       bits.push({ kind, text: line, overdue: false });
     };
+    add('busy', homeBusyLine());
     add('praise', homePraiseLine(mentioned));
     add('drive', homeDriveLine());
     add('aside', homeAsideLine(mentioned));
@@ -9760,6 +9762,7 @@ function homeKnownSummary(urgent, mentioned) {
     if (!t || bits.length >= 4 || /\broadworks?\b/i.test(t)) return;
     bits.push({ kind: 'note', text: t, overdue: false });
   };
+  try { push(homeBusyLine()); } catch (e) {}
   try { push(homePraiseLine(mentioned)); } catch (e) {}
   try { push(homeDriveLine()); } catch (e) {}
   if (bits.length >= 4) return '';
@@ -9903,6 +9906,53 @@ function rosterNext() {
     }
   }
   return '';
+}
+let BUSY = null, busyBusy = false;
+const BUSY_LINES = {
+  live: {
+    quiet: ['Noel Leeming is quiet just now.', 'Not busy at Noel Leeming right now.', 'Noel Leeming’s quiet at the moment.'],
+    easy: ['Noel Leeming isn’t too busy just now.', 'It’s not too busy at Noel Leeming right now.', 'Noel Leeming’s not too busy at the moment.'],
+    little: ['Noel Leeming’s a little busy just now.', 'A little busy at Noel Leeming right now.', 'Noel Leeming is a little busy at the moment.'],
+    packed: ['Noel Leeming is as busy as it gets right now.', 'It’s as busy as it gets at Noel Leeming just now.', 'Noel Leeming’s as busy as it gets at the moment.'],
+    busier: ['Noel Leeming is busier than usual just now.', 'Busier than usual at Noel Leeming right now.'],
+    quieter: ['Noel Leeming is quieter than usual just now.', 'Quieter than usual at Noel Leeming right now.']
+  },
+  usual: {
+    quiet: ['Noel Leeming is usually quiet around now.', 'Around now, Noel Leeming is usually not busy.'],
+    easy: ['Noel Leeming usually isn’t too busy around now.', 'Around now, Noel Leeming is usually not too busy.'],
+    little: ['Noel Leeming is usually a little busy around now.', 'Around now, Noel Leeming is usually a little busy.'],
+    packed: ['Noel Leeming is usually as busy as it gets around now.', 'Around now, Noel Leeming is usually as busy as it gets.'],
+  }
+};
+function homeBusyLine() {
+  try {
+    if (homeWhere() !== 'work') return '';
+    if (!BUSY || Date.now() - BUSY.at > 10 * 60 * 1000) refreshBusy();
+    if (!BUSY || BUSY.fail || !BUSY.level || (BUSY.basis !== 'live' && BUSY.basis !== 'usual')) return '';
+    const bank = BUSY_LINES[BUSY.basis] && BUSY_LINES[BUSY.basis][BUSY.level];
+    if (!bank || !bank.length) return '';
+    const line = homePick(BUSY.basis === 'live' ? 131 : 132, bank);
+    if (!line || /\b(port|road|street|okara|kioreroa)\b/i.test(line)) return '';
+    return line;
+  } catch (e) { return ''; }
+}
+async function refreshBusy() {
+  if (busyBusy) return;
+  try {
+    if (homeWhere() !== 'work') return;
+    busyBusy = true;
+    let data = null;
+    if (RELAY_URL) { try { data = await getJSON(RELAY_URL + '/busy', 12000); } catch (e) { data = null; } }
+    const level = data && data.level;
+    const basis = data && data.basis;
+    const known = ['quiet', 'easy', 'little', 'packed', 'busier', 'quieter'];
+    BUSY = (basis === 'live' || basis === 'usual') && known.indexOf(level) >= 0 ? { at: Date.now(), level, basis } : { at: Date.now(), fail: true };
+  } catch (e) {
+    BUSY = { at: Date.now(), fail: true };
+  } finally {
+    busyBusy = false;
+    try { paintHomeSum(); } catch (e) {}
+  }
 }
 let DRIVE = null, driveBusy = false;
 function homeDriveLine() {
