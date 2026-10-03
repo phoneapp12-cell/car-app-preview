@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.7.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -731,12 +731,65 @@ function homeBridgeBit() {
   if (/\broadworks?\b/i.test(text)) return null;
   return { text, urgent };
 }
+// Same title, even if one line says Tonight or Today and another does not.
+function homeMentionKey(s) {
+  let t = String(s || '').toLowerCase().replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').trim();
+  t = t.replace(/^[“"']+|[”"']+$/g, '');
+  let prev = '';
+  while (t && t !== prev) {
+    prev = t;
+    t = t.replace(/^(tonight|today|tomorrow|yesterday|in \d+ days?)\s*[:\-–—]?\s*/, '');
+    t = t.replace(/\s+\d{1,2}:\d{2}\s*(am|pm)\s*$/, '');
+    t = t.replace(/\s+all day\s*$/, '');
+  }
+  return t.trim();
+}
+function homeTake(seen, titles, limit) {
+  const out = [];
+  (titles || []).forEach(title => {
+    if (limit && out.length >= limit) return;
+    const raw = String(title || '').replace(/\s+/g, ' ').trim();
+    const key = homeMentionKey(raw);
+    if (!raw || !key || !seen || seen.has(key)) return;
+    seen.add(key);
+    out.push(raw);
+  });
+  return out;
+}
+// Comedy on now comes only from guide categories. A missing guide is not a list of shows.
+function homeComedyOnNow() {
+  try {
+    if (typeof TV === 'undefined' || !TV || !TV.data || !TV.data.feeds || typeof TV_CHANNELS === 'undefined') return { kind: 'missing', hits: [] };
+    const now = Date.now();
+    const hits = [];
+    let feed = false, onAir = false, classified = false;
+    TV_CHANNELS.forEach(ch => {
+      if (!ch || !(TV.data.feeds && TV.data.feeds[ch.feed])) return;
+      feed = true;
+      const item = tvOn(ch.id, now);
+      if (!item || !item.title) return;
+      onAir = true;
+      if (!Array.isArray(item.cats)) return;
+      classified = true;
+      if (item.cats.some(c => /\bcomedy\b/i.test(String(c)))) hits.push('“' + String(item.title).trim() + '” on ' + ch.name);
+    });
+    if (!feed) return { kind: 'missing', hits: [] };
+    if (onAir && !classified) return { kind: 'checking', hits: [] };
+    return { kind: 'ready', hits };
+  } catch (e) {
+    return { kind: 'missing', hits: [] };
+  }
+}
 // 2.7.0: a few friend-style boxes, only for what is actually interesting. No counts, no numbered bars.
 // Cars and pet care are not their own lines. Comedy only if a guide category says it is on now.
 // Weather only when it is already loaded and rainy or sunny, and only with a real task or a real video.
 // A blog or podcast only when that feed is loaded. A headline only when local news is loaded.
 // The same title is used once. Nothing is invented.
 function homeOverview(shown) {
+  try { return homeOverviewBody(shown); }
+  catch (e) { console.error('Home summary', e); return ''; }
+}
+function homeOverviewBody(shown) {
   const bits = [];
   const mentioned = new Set();
   const add = (kind, text, urgent) => {
@@ -788,8 +841,8 @@ function homeOverview(shown) {
     takeTitles(soon.map(x => x.plain), 2);
     add('soon', nameLine(soon, false), soon.some(x => x.days === 0));
   }
-  const comedy = homeComedyOnNow();
-  if (comedy.kind === 'ready' && comedy.hits.length) {
+  const comedy = homeComedyOnNow() || { kind: 'missing', hits: [] };
+  if (comedy.kind === 'ready' && Array.isArray(comedy.hits) && comedy.hits.length) {
     const picked = [];
     comedy.hits.forEach(hit => {
       if (picked.length >= 2) return;
@@ -805,28 +858,30 @@ function homeOverview(shown) {
     else if (picked.length) add('comedy', 'If you feel like a laugh, ' + engList(picked) + ' are on right now.');
   }
   const today = todayISO();
-  const meals = upcomingMeals();
-  const mealTitle = meals.includes(today) && M().plan[today] && M().plan[today].title ? String(M().plan[today].title).replace(/\s+/g, ' ').trim() : '';
+  let meals = [];
+  try { meals = upcomingMeals() || []; } catch (e) { meals = []; }
+  const mealTitle = meals.includes(today) && M() && M().plan && M().plan[today] && M().plan[today].title ? String(M().plan[today].title).replace(/\s+/g, ' ').trim() : '';
   if (mealTitle && !homeSaysTv(mealTitle) && !/\broadworks?\b/i.test(mealTitle)) {
     const got = takeTitles([mealTitle], 1);
     if (got.length) add('meal', 'Tonight’s dinner is ' + homeQuote(got[0]) + '. Should be a good one.');
   }
-  if (EVS) {
-    const ev = upcomingEvents().find(e => {
+  let ev = null;
+  try {
+    ev = EVS ? upcomingEvents().find(e => {
       if (!e || !e.title || /\broadworks?\b/i.test(e.title) || homeSaysTv(e.title)) return false;
       const d = daysLeft(e.date);
       return d >= 0 && d <= 14;
-    });
-    if (ev) {
-      const got = takeTitles([String(ev.title).replace(/\s+/g, ' ').trim()], 1);
-      if (got.length) {
-        const d = daysLeft(ev.date);
-        const q = homeQuote(got[0]);
-        const line = d === 0 ? 'If you feel like heading out, ' + q + ' is on in town today.'
-          : d === 1 ? 'Tomorrow there’s ' + q + ' in town, if you fancy it.'
-          : q + ' is on in town soon, if you want a look.';
-        add('out', line);
-      }
+    }) : null;
+  } catch (e) { ev = null; }
+  if (ev && ev.title && ev.date) {
+    const got = takeTitles([String(ev.title).replace(/\s+/g, ' ').trim()], 1);
+    if (got.length) {
+      const d = daysLeft(ev.date);
+      const q = homeQuote(got[0]);
+      const line = d === 0 ? 'If you feel like heading out, ' + q + ' is on in town today.'
+        : d === 1 ? 'Tomorrow there’s ' + q + ' in town, if you fancy it.'
+        : q + ' is on in town soon, if you want a look.';
+      add('out', line);
     }
   }
   const wx = homeWxRead();
@@ -852,13 +907,16 @@ function homeOverview(shown) {
   }
   const freshCut = Date.now() - 14 * DAY;
   const reads = [];
-  const posts = blogPosts();
-  if (posts && posts.length && Date.parse(posts[0].published) >= freshCut) {
+  let posts = null, episodes = null;
+  try { posts = blogPosts(); } catch (e) { posts = null; }
+  const postMs = posts && posts.length ? Date.parse(posts[0] && posts[0].published) : NaN;
+  if (posts && posts.length && posts[0].title && Number.isFinite(postMs) && postMs >= freshCut) {
     reads.push({ at: posts[0].published, title: posts[0].title, kind: 'blog',
       text: 'If you want a read, ' + posts[0].blog + ' has a new post: ' + homeQuote(posts[0].title) + '.' });
   }
-  const episodes = podEpisodes();
-  if (episodes && episodes.length && Date.parse(episodes[0].published) >= freshCut) {
+  try { episodes = podEpisodes(); } catch (e) { episodes = null; }
+  const epMs = episodes && episodes.length ? Date.parse(episodes[0] && episodes[0].published) : NaN;
+  if (episodes && episodes.length && episodes[0].title && Number.isFinite(epMs) && epMs >= freshCut) {
     reads.push({ at: episodes[0].published, title: episodes[0].title, kind: 'pod',
       text: 'If you want something to listen to, ' + episodes[0].show + ' has a new episode: ' + homeQuote(episodes[0].title) + '.' });
   }
@@ -870,7 +928,8 @@ function homeOverview(shown) {
     add(r.kind, r.text);
     return true;
   });
-  const headlines = newsItems();
+  let headlines = null;
+  try { headlines = newsItems(); } catch (e) { headlines = null; }
   if (headlines && headlines.length) {
     const story = headlines.find(x => x && x.title && !/\broadworks?\b/i.test(x.title) && !homeSaysTv(x.title));
     if (story) {
@@ -878,7 +937,7 @@ function homeOverview(shown) {
       if (got.length) add('news', 'RNZ has this from around here: ' + homeQuote(got[0]) + '.');
     }
   }
-  if (!bits.length) return '';
+  if (!bits.length) return `<div class="card homesum" id="homesum"><ul><li class="due"><span class="tx">Nothing much to flag right now. Have a good one.</span></li></ul></div>`;
   const bars = ['#0F766E', '#1D4ED8', '#6D28D9', '#047857', '#9A3412', '#BE185D', '#1E3A8A', '#0369A1', '#3F6212', '#155E75', '#5B21B6', '#134E4A'];
   return `<div class="card homesum" id="homesum"><ul>${bits.map((b, i) => {
     const urgent = !!(b.urgent || b.kind === 'late');
