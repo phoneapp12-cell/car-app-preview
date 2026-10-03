@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.99.0';
+const APP_VERSION = '2.0.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2061,59 +2061,419 @@ function catsForm() {
 const MEAL_TAGS = ['Quick', 'BBQ', 'Slow cook', 'Oven bake', 'Budget', 'Takeaway-style'];
 const MEAL_WEEKS = 4, MEAL_GAP = 21; // plan shows about 4 weeks; Suggest avoids meals planned within 3 weeks either side
 // Shane has coeliac disease: every starter is written gluten free (explicit GF products, cornflour, rice noodles, corn tortillas).
-// [title, tag, ingredients, notes]. The id comes from the title, so keep titles stable (see MEAL_REPLACED for swapped dishes).
+// Each starter is { title, tag, ingr, notes, serves, time, image, method }. The id comes from the title, so keep titles stable (see MEAL_REPLACED). v2.0.0 adds a method (steps with °C and minutes or hours) and a photo in images/.
 const MEAL_STARTERS = [
-  ['Butter chicken', 'Takeaway-style', 'chicken thighs, gluten-free butter chicken sauce, onion, cream, rice, gluten-free naan bread'],
-  ['Spaghetti bolognese', 'Budget', 'beef mince, onion, garlic, tinned tomatoes, tomato paste, gluten-free Worcestershire sauce, gluten-free spaghetti, parmesan'],
-  ['Roast lamb with veges', 'Oven bake', 'leg of lamb, potatoes, pumpkin, carrots, frozen peas, gluten-free gravy, mint sauce'],
-  ['Fish and chips night', 'Takeaway-style', 'white fish fillets, potatoes, gluten-free flour, eggs, gluten-free breadcrumbs, lemons, tartare sauce, coleslaw', 'Crumbed at home with gluten-free crumbs – no beer batter. Chips cooked in clean oil.'],
-  ['Homemade burgers', 'Takeaway-style', 'beef mince, gluten-free burger buns, cheese slices, lettuce, tomatoes, sliced beetroot, onion, gluten-free burger sauce'],
-  ['Beef nachos', 'Quick', 'beef mince, kidney beans, gluten-free taco seasoning, corn chips, grated cheese, sour cream, avocado, salsa'],
-  ['Chicken stir fry', 'Quick', 'chicken breast, stir fry veges, garlic, ginger, gluten-free soy sauce (tamari), gluten-free oyster sauce, rice noodles'],
-  ['Sausage casserole', 'Slow cook', 'gluten-free sausages, onion, carrots, tinned tomatoes, baked beans, potatoes'],
-  ['Mince and cheese pies', 'Oven bake', 'beef mince, onion, gluten-free gravy, grated cheese, gluten-free pastry'],
-  ['Lasagne', 'Oven bake', 'beef mince, onion, tinned tomatoes, gluten-free lasagne sheets, milk, cornflour, butter, grated cheese'],
-  ['BBQ – sausages, steak and salads', 'BBQ', 'gluten-free sausages, steak, gluten-free bread, onions, coleslaw, potato salad, tomato sauce'],
-  ['Crispy pork belly', 'Oven bake', 'pork belly, salt, potatoes, apple sauce, broccoli'],
-  ['Fish tacos', 'Quick', 'white fish fillets, corn tortillas, red cabbage, limes, avocado, sour cream, coriander'],
-  ['Chicken curry', 'Slow cook', 'chicken thighs, gluten-free curry paste, coconut milk, onion, spinach, rice'],
-  ['Roast chicken', 'Oven bake', 'whole chicken, potatoes, pumpkin, carrots, gluten-free stuffing, gluten-free gravy'],
-  ['Shepherd’s pie', 'Budget', 'lamb mince, onion, carrots, frozen peas, gluten-free gravy, potatoes, grated cheese'],
-  ['Chilli con carne', 'Slow cook', 'beef mince, kidney beans, tinned tomatoes, onion, chilli powder, rice, sour cream'],
-  ['Beef and vege stew', 'Slow cook', 'gravy beef, onions, carrots, potatoes, gluten-free beef stock, cornflour, gluten-free bread rolls'],
-  ['Corned beef with white sauce', 'Slow cook', 'corned silverside, potatoes, carrots, cabbage, milk, butter, cornflour, mustard'],
-  ['Honey soy chicken drumsticks', 'Budget', 'chicken drumsticks, honey, gluten-free soy sauce (tamari), garlic, rice, broccoli'],
-  ['Homemade pizza', 'Takeaway-style', 'gluten-free pizza bases, pizza sauce, mozzarella, ham, pineapple, capsicum, mushrooms'],
-  ['Beef tacos', 'Quick', 'beef mince, corn taco shells, gluten-free taco seasoning, lettuce, tomatoes, grated cheese, sour cream'],
-  ['Bacon and egg pie', 'Budget', 'gluten-free pastry, bacon, eggs, frozen peas, onion, tomatoes'],
-  ['Steak, chips and salad', 'Quick', 'steaks, potatoes for home-made chips, salad greens, tomatoes, mushrooms', 'Bought oven chips often have a wheat coating, so home-made chips are the safe bet.'],
-  ['Lamb chops, mash and peas', 'Quick', 'lamb chops, potatoes, butter, milk, frozen peas, mint sauce'],
-  ['Pork chops with apple and mash', 'Quick', 'pork chops, apples, potatoes, green beans, butter'],
-  ['Pulled pork burgers', 'Slow cook', 'pork shoulder, gluten-free BBQ sauce, gluten-free burger buns, coleslaw'],
-  ['Chicken schnitzel with salad', 'Quick', 'chicken breasts, gluten-free breadcrumbs, eggs, gluten-free flour, potatoes, salad greens, lemons'],
-  ['Macaroni cheese', 'Budget', 'gluten-free macaroni, grated cheese, milk, butter, cornflour, bacon'],
-  ['Savoury mince on toast', 'Budget', 'beef mince, onion, carrots, frozen peas, gluten-free gravy, gluten-free bread'],
-  ['Fried rice', 'Budget', 'rice, eggs, bacon, frozen peas and corn, spring onions, gluten-free soy sauce (tamari)'],
-  ['Sweet and sour pork', 'Takeaway-style', 'pork pieces, cornflour, pineapple pieces, capsicum, onion, gluten-free sweet and sour sauce, rice', 'Toss the pork in cornflour instead of batter.'],
-  ['Beef and broccoli stir fry', 'Takeaway-style', 'beef strips, broccoli, garlic, ginger, gluten-free soy sauce (tamari), cornflour, rice'],
-  ['Chicken kebabs on the BBQ', 'BBQ', 'chicken thighs, capsicum, red onion, kebab skewers, gluten-free wraps, tzatziki'],
-  ['BBQ lamb steaks', 'BBQ', 'lamb leg steaks, rosemary, garlic, potatoes, salad greens'],
-  ['BBQ chicken thighs with corn', 'BBQ', 'chicken thighs, smoked paprika, garlic, lemons, corn cobs, potatoes, salad greens'],
-  ['Chicken pasta bake', 'Oven bake', 'gluten-free pasta, chicken breast, bacon, cream, spinach, grated cheese'],
-  ['Meatballs and spaghetti', 'Budget', 'beef mince, gluten-free breadcrumbs, egg, pasta sauce, gluten-free spaghetti, parmesan'],
-  ['Salmon with rice and greens', 'Quick', 'salmon fillets, rice, broccoli, bok choy, gluten-free soy sauce (tamari), lemon'],
-  ['Satay chicken', 'Quick', 'chicken thighs, peanut butter, coconut milk, gluten-free soy sauce (tamari), rice, green beans']
+  {
+    "title": "Butter chicken",
+    "tag": "Takeaway-style",
+    "ingr": "chicken thighs, gluten-free butter chicken sauce, onion, cream, rice, gluten-free naan bread",
+    "notes": "",
+    "serves": "4",
+    "time": "45 minutes",
+    "image": "images/recipe-butter-chicken.jpg",
+    "method": "1. Chop the onion. Heat a wide pan on the hob at 160°C and cook the onion for 5 minutes until soft.\n2. Add the chicken thighs and cook at 180°C for 6 minutes, turning once, until lightly browned.\n3. Stir in the gluten-free butter chicken sauce and the cream. Simmer at 95°C for 20 minutes until the chicken is cooked through.\n4. Boil the rice for 12 minutes, then drain. Warm the gluten-free naan in a 180°C oven for 4 minutes.\n5. Serve the curry with the rice and naan."
+  },
+  {
+    "title": "Spaghetti bolognese",
+    "tag": "Budget",
+    "ingr": "beef mince, onion, garlic, tinned tomatoes, tomato paste, gluten-free Worcestershire sauce, gluten-free spaghetti, parmesan",
+    "notes": "",
+    "serves": "4",
+    "time": "45 minutes",
+    "image": "images/recipe-spaghetti-bolognese.jpg",
+    "method": "1. Chop the onion and the garlic. Cook them in a pan on the hob at 160°C for 5 minutes until soft.\n2. Add the beef mince and cook at 180°C for 8 minutes, breaking it up, until browned.\n3. Stir in the tinned tomatoes, tomato paste and gluten-free Worcestershire sauce. Simmer at 95°C for 20 minutes.\n4. Boil the gluten-free spaghetti in water at 100°C for 10 minutes until tender, then drain.\n5. Serve the sauce over the spaghetti with parmesan."
+  },
+  {
+    "title": "Roast lamb with veges",
+    "tag": "Oven bake",
+    "ingr": "leg of lamb, potatoes, pumpkin, carrots, frozen peas, gluten-free gravy, mint sauce",
+    "notes": "",
+    "serves": "4",
+    "time": "2 hours",
+    "image": "images/recipe-roast-lamb-with-veges.jpg",
+    "method": "1. Heat the oven to 180°C. Put the leg of lamb in a roasting dish and roast for 1 hour 20 minutes.\n2. Add the potatoes, pumpkin and carrots around the lamb. Roast at 180°C for another 40 minutes, until the meat is cooked and the veges are tender.\n3. Rest the lamb for 15 minutes. Boil the frozen peas at 100°C for 4 minutes.\n4. Slice the lamb and serve with the veges, gluten-free gravy and mint sauce."
+  },
+  {
+    "title": "Fish and chips night",
+    "tag": "Takeaway-style",
+    "ingr": "white fish fillets, potatoes, gluten-free flour, eggs, gluten-free breadcrumbs, lemons, tartare sauce, coleslaw",
+    "notes": "Crumbed at home with gluten-free crumbs – no beer batter. Chips cooked in clean oil.",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-fish-and-chips-night.jpg",
+    "method": "1. Heat the oven to 200°C. Cut the potatoes into chips, toss them in a little oil and bake for 30 minutes, turning once, until golden.\n2. Pat the fish dry. Dust it with gluten-free flour, dip it in beaten egg, then coat it in gluten-free breadcrumbs.\n3. Heat clean oil on the hob to 180°C. Fry the fish for 4 minutes on each side until crisp and cooked through. Do not use beer batter.\n4. Serve with lemon, tartare sauce and coleslaw."
+  },
+  {
+    "title": "Homemade burgers",
+    "tag": "Takeaway-style",
+    "ingr": "beef mince, gluten-free burger buns, cheese slices, lettuce, tomatoes, sliced beetroot, onion, gluten-free burger sauce",
+    "notes": "",
+    "serves": "4",
+    "time": "30 minutes",
+    "image": "images/recipe-homemade-burgers.jpg",
+    "method": "1. Shape the beef mince into 4 patties. Cook them on the hob at 180°C for 5 minutes on each side until cooked through.\n2. Lay a cheese slice on each patty and cook at 180°C for 2 minutes more so it melts.\n3. Warm the gluten-free burger buns in a 160°C oven for 4 minutes.\n4. Build each burger with lettuce, tomato, beetroot, onion and gluten-free burger sauce."
+  },
+  {
+    "title": "Beef nachos",
+    "tag": "Quick",
+    "ingr": "beef mince, kidney beans, gluten-free taco seasoning, corn chips, grated cheese, sour cream, avocado, salsa",
+    "notes": "",
+    "serves": "4",
+    "time": "25 minutes",
+    "image": "images/recipe-beef-nachos.jpg",
+    "method": "1. Heat a pan on the hob at 180°C and cook the beef mince for 8 minutes until browned.\n2. Stir in the kidney beans and gluten-free taco seasoning with a splash of water. Simmer at 95°C for 5 minutes.\n3. Spread the corn chips on an oven tray, top with the mince and grated cheese, and bake at 180°C for 8 minutes until the cheese melts.\n4. Serve with sour cream, avocado and salsa."
+  },
+  {
+    "title": "Chicken stir fry",
+    "tag": "Quick",
+    "ingr": "chicken breast, stir fry veges, garlic, ginger, gluten-free soy sauce (tamari), gluten-free oyster sauce, rice noodles",
+    "notes": "",
+    "serves": "4",
+    "time": "25 minutes",
+    "image": "images/recipe-chicken-stir-fry.jpg",
+    "method": "1. Soak the rice noodles in boiling water, off the heat, for 8 minutes, then drain.\n2. Slice the chicken. Stir-fry it in a hot wok at 200°C for 5 minutes until cooked, then set it aside.\n3. Stir-fry the vegetables, garlic and ginger at 200°C for 4 minutes.\n4. Return the chicken, add the gluten-free soy sauce (tamari) and gluten-free oyster sauce, and toss for 2 minutes.\n5. Serve with the noodles."
+  },
+  {
+    "title": "Sausage casserole",
+    "tag": "Slow cook",
+    "ingr": "gluten-free sausages, onion, carrots, tinned tomatoes, baked beans, potatoes",
+    "notes": "",
+    "serves": "4",
+    "time": "4 hours 15 minutes",
+    "image": "images/recipe-sausage-casserole.jpg",
+    "method": "1. Brown the gluten-free sausages in a pan at 180°C for 6 minutes.\n2. Put them in the slow cooker with the onion, carrots, tinned tomatoes, baked beans and potatoes.\n3. Cook on low, about 90°C, for 4 hours until the potatoes are tender.\n4. Serve in bowls."
+  },
+  {
+    "title": "Mince and cheese pies",
+    "tag": "Oven bake",
+    "ingr": "beef mince, onion, gluten-free gravy, grated cheese, gluten-free pastry",
+    "notes": "",
+    "serves": "4",
+    "time": "50 minutes",
+    "image": "images/recipe-mince-and-cheese-pies.jpg",
+    "method": "1. Cook the onion and beef mince in a pan at 180°C for 8 minutes until browned.\n2. Stir in the gluten-free gravy and simmer at 95°C for 8 minutes. Let it cool for 10 minutes, then stir in the grated cheese.\n3. Line a pie dish with gluten-free pastry, add the filling and cover with a pastry lid.\n4. Bake at 200°C for 25 minutes until the pastry is golden."
+  },
+  {
+    "title": "Lasagne",
+    "tag": "Oven bake",
+    "ingr": "beef mince, onion, tinned tomatoes, gluten-free lasagne sheets, milk, cornflour, butter, grated cheese",
+    "notes": "",
+    "serves": "4",
+    "time": "1 hour 10 minutes",
+    "image": "images/recipe-lasagne.jpg",
+    "method": "1. Cook the onion and beef mince at 180°C for 8 minutes. Add the tinned tomatoes and simmer at 95°C for 15 minutes.\n2. Melt the butter in a pot at 160°C, stir in the cornflour and cook for 1 minute. Whisk in the milk and cook at 90°C for 5 minutes until thick.\n3. Layer the meat sauce, gluten-free lasagne sheets and white sauce in a dish. Finish with white sauce and grated cheese.\n4. Bake at 180°C for 35 minutes until bubbling and the pasta is tender."
+  },
+  {
+    "title": "BBQ – sausages, steak and salads",
+    "tag": "BBQ",
+    "ingr": "gluten-free sausages, steak, gluten-free bread, onions, coleslaw, potato salad, tomato sauce",
+    "notes": "",
+    "serves": "4",
+    "time": "35 minutes",
+    "image": "images/recipe-bbq-sausages-steak-and-salads.jpg",
+    "method": "1. Heat the barbecue to about 200°C. Cook the gluten-free sausages for 12 minutes, turning, until cooked through.\n2. Cook the steak on the barbecue at about 200°C for 4 minutes on each side, then rest it for 5 minutes.\n3. Warm the gluten-free bread at the side of the grill, about 150°C, for 2 minutes.\n4. Serve with coleslaw, potato salad and tomato sauce."
+  },
+  {
+    "title": "Crispy pork belly",
+    "tag": "Oven bake",
+    "ingr": "pork belly, salt, potatoes, apple sauce, broccoli",
+    "notes": "",
+    "serves": "4",
+    "time": "2 hours 30 minutes",
+    "image": "images/recipe-crispy-pork-belly.jpg",
+    "method": "1. Pat the pork belly dry and rub the skin with salt. Heat the oven to 220°C and roast the pork for 30 minutes.\n2. Turn the oven down to 170°C and roast for another 1 hour 30 minutes until the meat is tender and the crackling is crisp.\n3. Roast the potatoes at 200°C for 40 minutes while the pork finishes.\n4. Boil the broccoli at 100°C for 4 minutes. Rest the pork for 10 minutes, then slice and serve with apple sauce."
+  },
+  {
+    "title": "Fish tacos",
+    "tag": "Quick",
+    "ingr": "white fish fillets, corn tortillas, red cabbage, limes, avocado, sour cream, coriander",
+    "notes": "",
+    "serves": "4",
+    "time": "25 minutes",
+    "image": "images/recipe-fish-tacos.jpg",
+    "method": "1. Warm the corn tortillas in a dry pan at 160°C for 1 minute on each side.\n2. Cook the fish on the hob at 180°C for 3 minutes on each side until it flakes.\n3. Shred the red cabbage and toss it with lime juice.\n4. Fill the tortillas with fish, cabbage, avocado, sour cream and coriander, and add extra lime."
+  },
+  {
+    "title": "Chicken curry",
+    "tag": "Slow cook",
+    "ingr": "chicken thighs, gluten-free curry paste, coconut milk, onion, spinach, rice",
+    "notes": "",
+    "serves": "4",
+    "time": "4 hours 20 minutes",
+    "image": "images/recipe-chicken-curry.jpg",
+    "method": "1. Put the chicken thighs, onion, gluten-free curry paste and coconut milk in the slow cooker.\n2. Cook on low, about 90°C, for 4 hours until the chicken is tender.\n3. Stir in the spinach and leave it for 10 minutes until wilted.\n4. Boil the rice at 100°C for 12 minutes and serve it with the curry."
+  },
+  {
+    "title": "Roast chicken",
+    "tag": "Oven bake",
+    "ingr": "whole chicken, potatoes, pumpkin, carrots, gluten-free stuffing, gluten-free gravy",
+    "notes": "",
+    "serves": "4",
+    "time": "1 hour 40 minutes",
+    "image": "images/recipe-roast-chicken.jpg",
+    "method": "1. Heat the oven to 190°C. Put the whole chicken in a roasting dish and roast for 1 hour 20 minutes, until the juices run clear.\n2. After 30 minutes, add the potatoes, pumpkin and carrots so they roast at 190°C for 50 minutes.\n3. Rest the chicken for 15 minutes. Warm the gluten-free stuffing in the oven at 180°C for 15 minutes.\n4. Heat the gluten-free gravy on the hob at 90°C for 4 minutes and serve."
+  },
+  {
+    "title": "Shepherd’s pie",
+    "tag": "Budget",
+    "ingr": "lamb mince, onion, carrots, frozen peas, gluten-free gravy, potatoes, grated cheese",
+    "notes": "",
+    "serves": "4",
+    "time": "60 minutes",
+    "image": "images/recipe-shepherds-pie.jpg",
+    "method": "1. Cook the onion, lamb mince and carrots in a pan at 180°C for 8 minutes. Add the peas and gluten-free gravy and simmer at 95°C for 10 minutes.\n2. Boil the potatoes at 100°C for 15 minutes, drain and mash them. Stir the grated cheese through the mash.\n3. Spoon the mince into a dish, cover it with the mash and bake at 190°C for 25 minutes until the top is golden."
+  },
+  {
+    "title": "Chilli con carne",
+    "tag": "Slow cook",
+    "ingr": "beef mince, kidney beans, tinned tomatoes, onion, chilli powder, rice, sour cream",
+    "notes": "",
+    "serves": "4",
+    "time": "4 hours 20 minutes",
+    "image": "images/recipe-chilli-con-carne.jpg",
+    "method": "1. Cook the onion and beef mince in a pan at 180°C for 8 minutes, then tip them into the slow cooker with the kidney beans, tinned tomatoes and chilli powder.\n2. Cook on low, about 90°C, for 4 hours.\n3. Boil the rice at 100°C for 12 minutes.\n4. Serve the chilli with the rice and sour cream."
+  },
+  {
+    "title": "Beef and vege stew",
+    "tag": "Slow cook",
+    "ingr": "gravy beef, onions, carrots, potatoes, gluten-free beef stock, cornflour, gluten-free bread rolls",
+    "notes": "",
+    "serves": "4",
+    "time": "6 hours 20 minutes",
+    "image": "images/recipe-beef-and-vege-stew.jpg",
+    "method": "1. Put the gravy beef, onions, carrots, potatoes and gluten-free beef stock in the slow cooker.\n2. Cook on low, about 90°C, for 6 hours until the beef is tender.\n3. Mix the cornflour with a little cold water, stir it in and cook at 95°C for another 15 minutes until the gravy thickens.\n4. Warm the gluten-free bread rolls in a 160°C oven for 5 minutes and serve them with the stew."
+  },
+  {
+    "title": "Corned beef with white sauce",
+    "tag": "Slow cook",
+    "ingr": "corned silverside, potatoes, carrots, cabbage, milk, butter, cornflour, mustard",
+    "notes": "",
+    "serves": "4",
+    "time": "2 hours 30 minutes",
+    "image": "images/recipe-corned-beef-with-white-sauce.jpg",
+    "method": "1. Put the corned silverside in a large pot, cover it with water and simmer at 95°C for 2 hours until tender.\n2. Add the potatoes and carrots for the last 25 minutes, and the cabbage for the last 10 minutes.\n3. Melt the butter at 160°C, stir in the cornflour and cook for 1 minute. Whisk in the milk and a little mustard, then cook at 90°C for 4 minutes until thick.\n4. Slice the beef and serve with the vegetables and the white sauce."
+  },
+  {
+    "title": "Honey soy chicken drumsticks",
+    "tag": "Budget",
+    "ingr": "chicken drumsticks, honey, gluten-free soy sauce (tamari), garlic, rice, broccoli",
+    "notes": "",
+    "serves": "4",
+    "time": "45 minutes",
+    "image": "images/recipe-honey-soy-chicken-drumsticks.jpg",
+    "method": "1. Mix the honey, gluten-free soy sauce (tamari) and garlic, and coat the drumsticks.\n2. Bake at 190°C for 35 minutes, turning once, until the chicken is cooked and sticky.\n3. Boil the rice at 100°C for 12 minutes and the broccoli at 100°C for 4 minutes.\n4. Serve the drumsticks with the rice and broccoli."
+  },
+  {
+    "title": "Homemade pizza",
+    "tag": "Takeaway-style",
+    "ingr": "gluten-free pizza bases, pizza sauce, mozzarella, ham, pineapple, capsicum, mushrooms",
+    "notes": "",
+    "serves": "4",
+    "time": "20 minutes",
+    "image": "images/recipe-homemade-pizza.jpg",
+    "method": "1. Heat the oven to 220°C. Spread pizza sauce over the gluten-free pizza bases.\n2. Top with mozzarella, ham, pineapple, capsicum and mushrooms.\n3. Bake at 220°C for 12 minutes until the cheese is bubbling and the base is crisp."
+  },
+  {
+    "title": "Beef tacos",
+    "tag": "Quick",
+    "ingr": "beef mince, corn taco shells, gluten-free taco seasoning, lettuce, tomatoes, grated cheese, sour cream",
+    "notes": "",
+    "serves": "4",
+    "time": "20 minutes",
+    "image": "images/recipe-beef-tacos.jpg",
+    "method": "1. Cook the beef mince on the hob at 180°C for 8 minutes until browned.\n2. Stir in the gluten-free taco seasoning and a splash of water. Simmer at 95°C for 4 minutes.\n3. Warm the corn taco shells in a 160°C oven for 4 minutes.\n4. Fill the shells with mince, lettuce, tomato, grated cheese and sour cream."
+  },
+  {
+    "title": "Bacon and egg pie",
+    "tag": "Budget",
+    "ingr": "gluten-free pastry, bacon, eggs, frozen peas, onion, tomatoes",
+    "notes": "",
+    "serves": "4",
+    "time": "50 minutes",
+    "image": "images/recipe-bacon-and-egg-pie.jpg",
+    "method": "1. Heat the oven to 190°C. Line a pie dish with gluten-free pastry.\n2. Scatter in the bacon, onion, frozen peas and tomatoes, then pour over the beaten eggs.\n3. Cover with a pastry lid and bake at 190°C for 40 minutes until the pastry is golden and the egg is set."
+  },
+  {
+    "title": "Steak, chips and salad",
+    "tag": "Quick",
+    "ingr": "steaks, potatoes for home-made chips, salad greens, tomatoes, mushrooms",
+    "notes": "Bought oven chips often have a wheat coating, so home-made chips are the safe bet.",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-steak-chips-and-salad.jpg",
+    "method": "1. Cut the potatoes into chips and bake them at 200°C for 30 minutes, turning once. Skip bought oven chips if the coating has wheat.\n2. Cook the mushrooms in a pan at 180°C for 5 minutes.\n3. Cook the steaks on the hob at 200°C for 4 minutes on each side, then rest them for 5 minutes.\n4. Serve with the chips, mushrooms, salad greens and tomatoes."
+  },
+  {
+    "title": "Lamb chops, mash and peas",
+    "tag": "Quick",
+    "ingr": "lamb chops, potatoes, butter, milk, frozen peas, mint sauce",
+    "notes": "",
+    "serves": "4",
+    "time": "30 minutes",
+    "image": "images/recipe-lamb-chops-mash-and-peas.jpg",
+    "method": "1. Boil the potatoes at 100°C for 15 minutes, drain and mash them with butter and milk.\n2. Cook the lamb chops on the hob at 180°C for 4 minutes on each side.\n3. Boil the frozen peas at 100°C for 4 minutes.\n4. Serve the chops with the mash, peas and mint sauce."
+  },
+  {
+    "title": "Pork chops with apple and mash",
+    "tag": "Quick",
+    "ingr": "pork chops, apples, potatoes, green beans, butter",
+    "notes": "",
+    "serves": "4",
+    "time": "35 minutes",
+    "image": "images/recipe-pork-chops-with-apple-and-mash.jpg",
+    "method": "1. Boil the potatoes at 100°C for 15 minutes and mash them with butter.\n2. Cook the pork chops on the hob at 180°C for 5 minutes on each side until cooked through, then rest them for 3 minutes.\n3. Fry the apple slices in the same pan at 160°C for 4 minutes until soft.\n4. Boil the green beans at 100°C for 4 minutes and serve everything together."
+  },
+  {
+    "title": "Pulled pork burgers",
+    "tag": "Slow cook",
+    "ingr": "pork shoulder, gluten-free BBQ sauce, gluten-free burger buns, coleslaw",
+    "notes": "",
+    "serves": "4",
+    "time": "6 hours 15 minutes",
+    "image": "images/recipe-pulled-pork-burgers.jpg",
+    "method": "1. Put the pork shoulder and gluten-free BBQ sauce in the slow cooker.\n2. Cook on low, about 90°C, for 6 hours until the pork pulls apart with a fork.\n3. Shred the pork and stir it back through the sauce. Warm the gluten-free burger buns in a 160°C oven for 4 minutes.\n4. Serve in the buns with coleslaw."
+  },
+  {
+    "title": "Chicken schnitzel with salad",
+    "tag": "Quick",
+    "ingr": "chicken breasts, gluten-free breadcrumbs, eggs, gluten-free flour, potatoes, salad greens, lemons",
+    "notes": "",
+    "serves": "4",
+    "time": "35 minutes",
+    "image": "images/recipe-chicken-schnitzel-with-salad.jpg",
+    "method": "1. Flatten the chicken breasts. Dust them with gluten-free flour, dip them in beaten egg, then coat them in gluten-free breadcrumbs.\n2. Heat a little oil in a pan to 170°C and cook the chicken for 4 minutes on each side until golden and cooked through.\n3. Cut the potatoes into wedges and bake them at 200°C for 25 minutes.\n4. Serve with salad greens and lemon."
+  },
+  {
+    "title": "Macaroni cheese",
+    "tag": "Budget",
+    "ingr": "gluten-free macaroni, grated cheese, milk, butter, cornflour, bacon",
+    "notes": "",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-macaroni-cheese.jpg",
+    "method": "1. Cook the bacon in a pan at 180°C for 5 minutes, then set it aside.\n2. Boil the gluten-free macaroni at 100°C for 10 minutes, then drain.\n3. Melt the butter at 160°C, stir in the cornflour and cook for 1 minute. Whisk in the milk and cook at 90°C for 5 minutes until thick. Stir in most of the grated cheese.\n4. Mix the pasta and bacon through the sauce, top with the rest of the cheese and bake at 190°C for 15 minutes until golden."
+  },
+  {
+    "title": "Savoury mince on toast",
+    "tag": "Budget",
+    "ingr": "beef mince, onion, carrots, frozen peas, gluten-free gravy, gluten-free bread",
+    "notes": "",
+    "serves": "4",
+    "time": "30 minutes",
+    "image": "images/recipe-savoury-mince-on-toast.jpg",
+    "method": "1. Cook the onion, beef mince and carrots on the hob at 180°C for 8 minutes.\n2. Add the frozen peas and gluten-free gravy. Simmer at 95°C for 12 minutes until the carrots are tender.\n3. Toast the gluten-free bread.\n4. Spoon the mince over the toast."
+  },
+  {
+    "title": "Fried rice",
+    "tag": "Budget",
+    "ingr": "rice, eggs, bacon, frozen peas and corn, spring onions, gluten-free soy sauce (tamari)",
+    "notes": "",
+    "serves": "4",
+    "time": "25 minutes",
+    "image": "images/recipe-fried-rice.jpg",
+    "method": "1. Boil the rice at 100°C for 12 minutes, drain it and let it steam dry for 5 minutes.\n2. Scramble the eggs in a wok at 180°C for 1 minute and set them aside. Cook the bacon at 180°C for 4 minutes.\n3. Add the rice, peas and corn and stir-fry at 190°C for 4 minutes.\n4. Stir the egg and spring onions back in with gluten-free soy sauce (tamari) and cook at 180°C for 2 minutes."
+  },
+  {
+    "title": "Sweet and sour pork",
+    "tag": "Takeaway-style",
+    "ingr": "pork pieces, cornflour, pineapple pieces, capsicum, onion, gluten-free sweet and sour sauce, rice",
+    "notes": "Toss the pork in cornflour instead of batter.",
+    "serves": "4",
+    "time": "30 minutes",
+    "image": "images/recipe-sweet-and-sour-pork.jpg",
+    "method": "1. Toss the pork pieces in cornflour, not batter. Fry them in oil at 180°C for 4 minutes until golden, then set them aside.\n2. Boil the rice at 100°C for 12 minutes.\n3. Stir-fry the onion and capsicum at 180°C for 3 minutes. Add the pineapple pieces and gluten-free sweet and sour sauce and simmer at 95°C for 4 minutes.\n4. Return the pork and cook at 180°C for 2 minutes. Serve with the rice."
+  },
+  {
+    "title": "Beef and broccoli stir fry",
+    "tag": "Takeaway-style",
+    "ingr": "beef strips, broccoli, garlic, ginger, gluten-free soy sauce (tamari), cornflour, rice",
+    "notes": "",
+    "serves": "4",
+    "time": "25 minutes",
+    "image": "images/recipe-beef-and-broccoli-stir-fry.jpg",
+    "method": "1. Boil the rice at 100°C for 12 minutes.\n2. Mix the gluten-free soy sauce (tamari) with the cornflour and a splash of water. Toss the beef strips in half of it.\n3. Stir-fry the beef at 200°C for 3 minutes, then set it aside. Stir-fry the broccoli, garlic and ginger at 200°C for 4 minutes.\n4. Return the beef, add the rest of the sauce and cook at 200°C for 2 minutes. Serve with the rice."
+  },
+  {
+    "title": "Chicken kebabs on the BBQ",
+    "tag": "BBQ",
+    "ingr": "chicken thighs, capsicum, red onion, kebab skewers, gluten-free wraps, tzatziki",
+    "notes": "",
+    "serves": "4",
+    "time": "30 minutes",
+    "image": "images/recipe-chicken-kebabs-on-the-bbq.jpg",
+    "method": "1. Cut the chicken, capsicum and red onion and thread them onto skewers.\n2. Heat the barbecue to about 200°C and cook the kebabs for 12 minutes, turning, until the chicken is cooked through.\n3. Warm the gluten-free wraps on the grill at about 180°C for 2 minutes.\n4. Serve with tzatziki."
+  },
+  {
+    "title": "BBQ lamb steaks",
+    "tag": "BBQ",
+    "ingr": "lamb leg steaks, rosemary, garlic, potatoes, salad greens",
+    "notes": "",
+    "serves": "4",
+    "time": "35 minutes",
+    "image": "images/recipe-bbq-lamb-steaks.jpg",
+    "method": "1. Rub the lamb leg steaks with rosemary and garlic. Heat the oven to 200°C and bake the potatoes for 25 minutes.\n2. Heat the barbecue to about 200°C. Cook the lamb for 4 minutes on each side, then rest it for 5 minutes.\n3. Serve with the potatoes and salad greens."
+  },
+  {
+    "title": "BBQ chicken thighs with corn",
+    "tag": "BBQ",
+    "ingr": "chicken thighs, smoked paprika, garlic, lemons, corn cobs, potatoes, salad greens",
+    "notes": "",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-bbq-chicken-thighs-with-corn.jpg",
+    "method": "1. Rub the chicken thighs with smoked paprika and garlic. Heat the oven to 200°C and bake the potatoes for 25 minutes.\n2. Heat the barbecue to about 200°C. Cook the chicken for 8 minutes on each side until cooked through.\n3. Grill the corn cobs at about 200°C for 8 minutes, turning.\n4. Serve with lemon and salad greens."
+  },
+  {
+    "title": "Chicken pasta bake",
+    "tag": "Oven bake",
+    "ingr": "gluten-free pasta, chicken breast, bacon, cream, spinach, grated cheese",
+    "notes": "",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-chicken-pasta-bake.jpg",
+    "method": "1. Boil the gluten-free pasta at 100°C for 10 minutes, then drain.\n2. Cook the chicken and bacon in a pan at 180°C for 8 minutes until the chicken is cooked.\n3. Stir in the cream and spinach and simmer at 90°C for 4 minutes. Mix through the pasta and half the cheese.\n4. Tip it into a dish, top with the rest of the cheese and bake at 190°C for 15 minutes."
+  },
+  {
+    "title": "Meatballs and spaghetti",
+    "tag": "Budget",
+    "ingr": "beef mince, gluten-free breadcrumbs, egg, pasta sauce, gluten-free spaghetti, parmesan",
+    "notes": "",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-meatballs-and-spaghetti.jpg",
+    "method": "1. Mix the beef mince, gluten-free breadcrumbs and egg, and roll the mix into meatballs.\n2. Brown the meatballs in a pan at 180°C for 6 minutes, turning them.\n3. Pour in the pasta sauce and simmer at 95°C for 15 minutes until the meatballs are cooked through.\n4. Boil the gluten-free spaghetti at 100°C for 10 minutes. Serve with the meatballs and parmesan."
+  },
+  {
+    "title": "Salmon with rice and greens",
+    "tag": "Quick",
+    "ingr": "salmon fillets, rice, broccoli, bok choy, gluten-free soy sauce (tamari), lemon",
+    "notes": "",
+    "serves": "4",
+    "time": "25 minutes",
+    "image": "images/recipe-salmon-with-rice-and-greens.jpg",
+    "method": "1. Boil the rice at 100°C for 12 minutes.\n2. Heat a pan to 180°C and cook the salmon for 4 minutes, then turn it and cook for 3 minutes more.\n3. Boil the broccoli and bok choy at 100°C for 4 minutes.\n4. Serve with gluten-free soy sauce (tamari) and lemon."
+  },
+  {
+    "title": "Satay chicken",
+    "tag": "Quick",
+    "ingr": "chicken thighs, peanut butter, coconut milk, gluten-free soy sauce (tamari), rice, green beans",
+    "notes": "",
+    "serves": "4",
+    "time": "30 minutes",
+    "image": "images/recipe-satay-chicken.jpg",
+    "method": "1. Cook the chicken thighs in a pan at 180°C for 6 minutes until lightly browned.\n2. Stir in the peanut butter, coconut milk and gluten-free soy sauce (tamari). Simmer at 95°C for 12 minutes until the chicken is cooked and the sauce is thick.\n3. Boil the rice at 100°C for 12 minutes and the green beans at 100°C for 4 minutes.\n4. Serve the chicken with the rice and beans."
+  }
 ];
 // v1.4.1 swapped two v1.4.0 starters that don't work well gluten free (old id → new id)
 const MEAL_REPLACED = { 'meal-beef-and-black-bean': 'meal-beef-and-broccoli-stir-fry', 'meal-sausage-sizzle': 'meal-bbq-chicken-thighs-with-corn' };
 const MEAL_REPLACED_NAMES = { 'meal-beef-and-black-bean': 'Beef and black bean', 'meal-sausage-sizzle': 'Sausage sizzle' };
-const STARTER_VER = 2;
+const STARTER_VER = 3;
 // Ingredients where gluten often hides: shown with a "check label" hint on the shopping list
 const CHECK_LABEL = /stock|sauce|tamari|gravy|curry paste|salsa|mustard|tzatziki|sausage|seasoning|chilli powder|stuffing|bacon|\bham\b|corned|corn chips|baked beans|cornflour|coleslaw|potato salad|tortillas|taco shells|rice noodles|mayonnaise|marinade|spice/i;
 const needsCheck = g => CHECK_LABEL.test(g);
 const GF_NOTE = 'All ideas are written gluten free. Always check labels for “gluten free”, especially stock, sauces, sausages and seasonings.';
 const mealSlug = t => t.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-const starterMeals = () => MEAL_STARTERS.map(([title, tag, ingr, notes]) => ({ id: 'meal-' + mealSlug(title), title, tag, ingr: ingr.split(', '), link: '', notes: notes || '', fav: false, hidden: false, gf: true, builtin: true }));
+const starterMeals = () => MEAL_STARTERS.map(s => ({ id: 'meal-' + mealSlug(s.title), title: s.title, tag: s.tag, ingr: s.ingr.split(', '), link: '', notes: s.notes || '', method: s.method || '', serves: s.serves || '', time: s.time || '', image: s.image || '', fav: false, hidden: false, gf: true, builtin: true }));
 const newMeals = () => ({ nights: [5, 6], plan: {}, ideas: starterMeals(), list: '', starterVer: STARTER_VER });
 // Bring saved starter ideas up to date (v1.4.1: gluten-free ingredients) without touching Shane's own ideas or planned nights.
 // Starter ideas keep his favourite/hidden/notes/link; the two swapped dishes are replaced, and upcoming (not cooked) nights
@@ -2126,8 +2486,14 @@ function migrateStarters(m) {
     if (!i.builtin) { if (typeof i.gf !== 'boolean') i.gf = false; keep.push(i); return; }
     if (MEAL_REPLACED[i.id]) { const n = fresh.get(MEAL_REPLACED[i.id]); if (n && i.fav) n._fav = true; return; }
     const n = fresh.get(i.id);
-    if (n && !i.edited) Object.assign(i, { title: n.title, tag: n.tag, ingr: n.ingr.slice(), gf: true, notes: i.notes || n.notes });
-    else if (typeof i.gf !== 'boolean') i.gf = true;
+    if (n && !i.edited) Object.assign(i, { title: n.title, tag: n.tag, ingr: n.ingr.slice(), gf: true, notes: i.notes || n.notes, method: n.method || '', serves: n.serves || '', time: n.time || '', image: n.image || '' });
+    else if (n) {
+      if (!i.method && n.method) i.method = n.method;
+      if (!i.serves && n.serves) i.serves = n.serves;
+      if (!i.time && n.time) i.time = n.time;
+      if (!i.image && n.image) i.image = n.image;
+      if (typeof i.gf !== 'boolean') i.gf = true;
+    } else if (typeof i.gf !== 'boolean') i.gf = true;
     keep.push(i);
   });
   const have = new Set(keep.map(i => i.id)), titles = new Set(keep.map(i => mNorm(i.title)));
@@ -2145,7 +2511,8 @@ function migrateStarters(m) {
     const i = e.ideaId && m.ideas.find(x => x.id === e.ideaId); if (i) e.title = i.title;
   });
   m.starterVer = STARTER_VER;
-  m.gfNote = switched.length ? 'Updated for gluten free: ' + switched.map(x => `${x.from} → ${x.to} (${fmtW(x.d)})`).join(', ') + '.' : 'Meal ideas updated: all starter ideas are now written gluten free.';
+  const methodNote = 'Starter recipes now include a method and a photo. They stay gluten free.';
+  m.gfNote = switched.length ? 'Updated for gluten free: ' + switched.map(x => `${x.from} → ${x.to} (${fmtW(x.d)})`).join(', ') + '. ' + methodNote : methodNote;
 }
 function normMeals(m) {
   m = m && typeof m === 'object' && !Array.isArray(m) ? m : newMeals();
@@ -2155,7 +2522,7 @@ function normMeals(m) {
   Object.keys(m.plan).forEach(k => { const e = m.plan[k]; if (!/^\d{4}-\d\d-\d\d$/.test(k) || !e || typeof e !== 'object' || !String(e.title || '').trim()) delete m.plan[k]; });
   if (!Array.isArray(m.ideas)) m.ideas = starterMeals();
   m.ideas = m.ideas.filter(i => i && i.id && String(i.title || '').trim());
-  m.ideas.forEach(i => { if (!Array.isArray(i.ingr)) i.ingr = String(i.ingr || '').split(/\n|,/).map(s => s.trim()).filter(Boolean); if (!MEAL_TAGS.includes(i.tag)) i.tag = i.tag ? String(i.tag) : ''; if (!storedPhoto(i.photo)) delete i.photo; });
+  m.ideas.forEach(i => { if (!Array.isArray(i.ingr)) i.ingr = String(i.ingr || '').split(/\n|,/).map(s => s.trim()).filter(Boolean); if (!MEAL_TAGS.includes(i.tag)) i.tag = i.tag ? String(i.tag) : ''; if (!storedPhoto(i.photo)) delete i.photo; if (i.image && !/^images\/recipe-[a-z0-9-]+\.jpg$/.test(i.image)) delete i.image; });
   if (typeof m.list !== 'string') m.list = '';
   if ((m.starterVer || 1) < STARTER_VER) migrateStarters(m);
   m.ideas.forEach(i => { if (typeof i.gf !== 'boolean') i.gf = !!i.builtin; });
@@ -2218,8 +2585,15 @@ async function toggleNight(n) {
 async function toggleMealsCal() { S.settings.mealsCal = !showMealsCal(); await save(); render(); }
 let mealHistAll = false;
 // A recipe photo is optional: a small JPEG saved on this phone. If there isn’t one, keep the drawn meal icon. Never a web address.
+// A photo taken on this phone wins. Otherwise use the built-in file in images/ (never a web address).
+function recipePhotoSrc(idea) {
+  const own = idea && storedPhoto(idea.photo);
+  if (own) return own;
+  const p = idea && idea.image;
+  return typeof p === 'string' && /^images\/recipe-[a-z0-9-]+\.jpg$/.test(p) ? p : '';
+}
 function mealPic(idea) {
-  const src = idea && storedPhoto(idea.photo);
+  const src = recipePhotoSrc(idea);
   if (src) return `<div class="mealpic hasphoto"><img alt="" src="${esc(src)}"></div>`;
   const plate = `<svg class="mealplate" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="40" r="22" fill="var(--card)"/><circle cx="36" cy="40" r="16.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".4"/><ellipse cx="36" cy="38" rx="9" ry="5.5" fill="currentColor" opacity=".5"/><ellipse cx="29.5" cy="36.5" rx="4.2" ry="3" fill="currentColor" opacity=".32"/><circle cx="43" cy="37" r="3.2" fill="currentColor" opacity=".28"/></svg>`;
   return `<div class="mealpic" aria-hidden="true">${plate}${P.meal ? I('meal') : ''}</div>`;
@@ -2331,11 +2705,13 @@ function RecipeDetail(id) {
   const last = Object.keys(M().plan).filter(d => d < T && M().plan[d].cooked && (M().plan[d].ideaId === i.id || mNorm(M().plan[d].title) === mNorm(i.title))).sort().pop();
   const facts = [i.serves ? 'Serves ' + esc(i.serves) : '', i.time ? esc(i.time) : '', i.tag ? esc(i.tag) : ''].filter(Boolean).join(' · ');
   const steps = methodSteps(i.method);
+  const picSrc = recipePhotoSrc(i);
   const onList = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
   return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#recipes')">${I('left')} Recipes</button>
     <button class="btn small" id="recedit" aria-label="Edit recipe" onclick="mealIdeaForm('${i.id}')">${I('edit')} Edit</button></div>
     <div class="rechead">${mealPic(i)}<div style="min-width:0"><h1 class="rectitle">${esc(i.title)}</h1><div class="sub recsub">${facts || (i.builtin ? 'Starter recipe' : 'Your recipe')}</div></div></div>
     <div class="recmeta">${i.gf ? gfTag() : '<span class="nogf">Not marked gluten free</span>'}${i.fav ? ' <span class="cattag">★ Favourite</span>' : ''}${i.source ? ` <span class="muted">From ${esc(i.source)}</span>` : ''}</div>
+    ${picSrc ? `<img class="recphoto" alt="" src="${esc(picSrc)}">` : ''}
     ${photoBtns('recipe', i.id)}
     <div class="btns recbtns"><button class="btn primary" id="recplan" onclick="planRecipeForm('${i.id}')">${I('cal')} Plan it</button><button class="btn" id="recshop" onclick="recipeToShop('${i.id}')">${I('cart')} Add to shopping list</button></div>
     ${planned.length || last ? `<div class="card recplanned">${planned.length ? `Planned for ${planned.map(d => `<button class="linkbtn" onclick="openNight('${d}')">${fmtW(d)}</button>`).join(', ')}.` : ''}${last ? ` Last cooked ${fmtW(last)}.` : ''}</div>` : ''}
@@ -2409,7 +2785,7 @@ function mealIdeaForm(id, pre) {
   openSheet(id ? 'Edit recipe' : pre ? 'Check the scanned recipe' : 'Add a recipe',
     (pre ? `<p class="muted" style="margin:-4px 0 10px">Here’s what the app read from the page. Fix anything it got wrong, then save.</p>` : '') +
     field('Recipe name', inp('title', i.title, 'placeholder="e.g. Nana’s mince stew" required maxlength="80"')) +
-    `<div class="two">${field('Serves', inp('serves', i.serves || '', 'placeholder="e.g. 4" maxlength="20"'), 'Optional')}${field('Time', inp('time', i.time || '', 'placeholder="e.g. 45 min" maxlength="30"'), 'Optional')}</div>` +
+    `<div class="two">${field('Serves', inp('serves', i.serves || '', 'placeholder="e.g. 4" maxlength="20"'), 'Optional')}${field('Time', inp('time', i.time || '', 'placeholder="e.g. 45 minutes" maxlength="30"'), 'Optional')}</div>` +
     `<div class="two">${field('Type', sel('tag', [['', 'None'], ...MEAL_TAGS.map(t => [t, t])], i.tag || ''))}<div class="field"><span>Favourite</span>${segHtml('fav', [['0', 'No'], ['1', '★ Yes']], i.fav ? '1' : '0')}</div></div>` +
     (risky.length ? `<div class="gfwarn" id="gfwarn"><b>Check for gluten:</b> ${esc(risky.slice(0, 6).join(', '))}${risky.length > 6 ? '…' : ''}. Swap these for gluten-free versions (e.g. gluten-free flour, tamari), then tick “Gluten free”.</div>` : '') +
     `<label class="gfcheck"><input type="checkbox" name="gf" ${i.gf !== false ? 'checked' : ''}><span><b>Gluten free</b><small>Only recipes ticked here are suggested. Write ingredients as gluten-free versions, e.g. gluten-free soy sauce (tamari).</small></span></label>` +
