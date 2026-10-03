@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.96.0';
+const APP_VERSION = '1.97.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -90,6 +90,7 @@ const P = {
   spine: '<path d="M12 3v18M9 5h6M8.5 9h7M8.5 13h7M9 17h6"/>',
   medkit: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M12 10.5v6M9 13.5h6"/>',
   ticket: '<path d="M3 8.5V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2.5a2.5 2.5 0 0 0 0 5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2.5a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v12" stroke-dasharray="2 2.2"/>',
+  news: '<path d="M6 4.5h11a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2H7.5A2.5 2.5 0 0 1 5 18.5V6.5A2 2 0 0 1 7 4.5"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/>',
   play: '<circle cx="12" cy="12" r="9"/><path d="M10.2 8.8v6.4L16.2 12z"/>',
   music: '<path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>',
   leaf: '<path d="M12 21V11"/><path d="M12 13C8 12 4 9.5 4 5c5 .2 8 3.2 8 8z"/><path d="M12 11c4-1 7.2-3.6 8-7-4.2.8-7 4-8 7z"/>'
@@ -283,6 +284,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   summary: ['shield', 'car', 'Overdue, due soon, all good', 'The three counters', 1],
   attention: ['warn', 'bill', 'Upcoming', 'Everything due soon or overdue, plus this week’s appointments and calendar events', 1],
   events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
+  news: ['news', 'ln', 'Local news', 'Recent stories from around Whangārei', 1],
   videos: ['play', 'vid', 'Videos', 'A few suggestions from the video categories you leave on', 0],
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a Done button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
@@ -382,6 +384,7 @@ const HOME_CARD = {
   },
   attention: () => homeSec('Upcoming', '<a href="#calendar">See calendar</a>') + attentionHtml(),
   events: () => homeEvents(),
+  news: () => homeNews(),
   videos: () => homeVideosCard(),
   todo: () => {
     const att = homeOn('attention'); // to-dos due within 30 days are already in Needs attention
@@ -4236,6 +4239,7 @@ function More() {
     reminders: () => remindersMoreSub(),
     loans: () => loansMoreSub(),
     events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
+    news: () => newsMoreSub(),
     tv: () => 'TVNZ 1, TVNZ 2, Three and Sky Starter',
     meals: () => mealsMoreSub(),
     recipes: () => plural(visibleIdeas().length, 'recipe') + (M().ideas.some(i => i.fav && !i.hidden) ? ` · ${M().ideas.filter(i => i.fav && !i.hidden).length} favourites` : ''),
@@ -4268,7 +4272,7 @@ function More() {
 const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
-  reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'],
+  reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
   tv: ['tv', 'tv', 'TV guide', 'TV'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
@@ -4284,7 +4288,7 @@ const NAV_GROUPS = [
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
-  { id: 'near', title: 'Nearby', keys: ['events', 'bridge'] },
+  { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge'] },
   { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40'] }
 ];
 function navOrder() {
@@ -5373,6 +5377,112 @@ function TvGuide() {
   return header('TV guide', 'What’s on now') +
     `<div class="sec">What’s on TV ${link}</div>` + tvGuideBody() +
     `<div class="foot">TVNZ 1, TVNZ 2, Three and Sky Starter, from the Freeview and Sky guides. Show more lists the rest of Sky Starter. Nothing is added that isn’t in those listings.</div>`;
+}
+
+/* ================= LOCAL NEWS (RNZ Northland, via the app's service) ================= */
+// RNZ's Northland RSS sends no CORS header, so the phone reads it through the relay's /news.
+// The relay keeps stories whose text is about Whangārei or Northland and drops the rest.
+// Headlines are not stored in the app. A failed load stays empty. Nothing is made up.
+const NEWS_PAGE = 'https://www.rnz.co.nz/news/regions_northland';
+const NEWS_MAX_AGE = 15 * 60 * 1000;
+const NEWS_HOME = 3;
+let NEWS = null, newsBusy = false, newsFailed = false, newsTimer = null;
+function loadNews() {
+  try {
+    const r = JSON.parse(localStorage.getItem('localnews') || 'null');
+    NEWS = r && r.at && r.data && Array.isArray(r.data.items) ? r : null;
+  } catch (e) { NEWS = null; }
+}
+function newsUrl(u) {
+  try {
+    const x = new URL(String(u || ''));
+    if (x.protocol === 'https:' && x.hostname === 'www.rnz.co.nz') return x.toString();
+  } catch (e) { }
+  return '';
+}
+function newsItems() {
+  const list = NEWS && NEWS.data && Array.isArray(NEWS.data.items) ? NEWS.data.items : null;
+  if (!list) return null;
+  return list.filter(x => x && x.title && newsUrl(x.url) && Number.isFinite(Date.parse(x.published)));
+}
+function newsWhen(iso) {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return '';
+  const d = new Date(ms);
+  const date = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short' }).format(d);
+  const time = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).format(d);
+  return date + ', ' + time;
+}
+function scheduleNewsRefresh() {
+  if (newsTimer) { clearTimeout(newsTimer); newsTimer = null; }
+  const fresh = !!(NEWS && NEWS.at && Date.now() - NEWS.at < NEWS_MAX_AGE);
+  const wait = (!fresh && newsFailed) ? 2 * 60 * 1000 : (fresh ? Math.max(5000, NEWS.at + NEWS_MAX_AGE - Date.now()) : NEWS_MAX_AGE);
+  newsTimer = setTimeout(() => {
+    newsTimer = null;
+    if (document.visibilityState === 'visible') refreshNews(false);
+    else scheduleNewsRefresh();
+  }, wait);
+}
+async function refreshNews(force = false) {
+  if (newsBusy) return;
+  if (!force && NEWS && Date.now() - NEWS.at < NEWS_MAX_AGE) { scheduleNewsRefresh(); return; }
+  if (!RELAY_URL) { if (!NEWS) newsFailed = true; scheduleNewsRefresh(); updNews(); return; }
+  newsBusy = true; if (force) updNews();
+  let data = null;
+  try { data = await getJSON(RELAY_URL + '/news', 12000); } catch (e) { data = null; }
+  newsBusy = false;
+  if (data && Array.isArray(data.items)) {
+    NEWS = { at: Date.now(), data };
+    newsFailed = false;
+    try { localStorage.setItem('localnews', JSON.stringify(NEWS)); } catch (e) { }
+  } else newsFailed = true;
+  scheduleNewsRefresh();
+  updNews();
+}
+function updNews() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  if (h === 'news' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
+    const v = $('#view'), top = v ? v.scrollTop : 0;
+    render(); if (v) v.scrollTop = top;
+  }
+}
+function newsRows(list) {
+  return list.map(x => {
+    const when = newsWhen(x.published);
+    const sub = ['RNZ', when].filter(Boolean).join(' · ');
+    return `<a class="row" href="${esc(newsUrl(x.url))}" target="_blank" rel="noopener"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc(sub)}</div></div></a>`;
+  }).join('');
+}
+function newsEmpty(id) {
+  const loading = newsBusy || (!newsFailed && navigator.onLine !== false);
+  const title = loading ? 'Local news' : 'Not available';
+  const msg = loading ? 'Checking RNZ Northland…' : 'Couldn’t load local news. Tap to try again.';
+  return `<div class="list" id="${id}"><button class="row" onclick="refreshNews(true)"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">${title}</div><div class="s">${msg}</div></div></button></div>`;
+}
+function newsNone(id) {
+  return `<div class="list" id="${id}"><div class="row"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">No local stories</div><div class="s">Nothing about Whangārei or Northland in the latest RNZ list.</div></div></div></div>`;
+}
+function homeNews() {
+  const head = homeSec('Local news', '<a href="#news">See all</a>');
+  const items = newsItems();
+  if (!items) return head + newsEmpty('homenews');
+  if (!items.length) return head + newsNone('homenews');
+  return head + `<div class="list" id="homenews">${newsRows(items.slice(0, NEWS_HOME))}</div>`;
+}
+function LocalNews() {
+  const link = `<a href="${NEWS_PAGE}" target="_blank" rel="noopener">RNZ</a>`;
+  const items = newsItems();
+  const body = !items ? newsEmpty('localnews') : !items.length ? newsNone('localnews') : `<div class="list" id="localnews">${newsRows(items)}</div>`;
+  return header('Local news', 'Around Whangārei') +
+    `<div class="sec">Latest from RNZ ${link} <button onclick="refreshNews(true)">${newsBusy ? 'Updating…' : 'Refresh'}</button></div>` +
+    body +
+    `<div class="foot">Headlines from RNZ Northland. Tap a story to open it on RNZ. The list refreshes when you open the app, and about every 15 minutes while this page stays open.</div>`;
+}
+function newsMoreSub() {
+  const items = newsItems();
+  const first = items && items[0];
+  return first ? `Latest: ${esc(first.title)}` : 'Stories from around Whangārei';
 }
 
 /* ================= EVENTS (Whangārei District Council "What's On", via the app's service) ================= */
@@ -7171,7 +7281,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide };
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
@@ -7180,7 +7290,7 @@ function render() {
   if ((r === 'home' || r === '') && homeEdit) wireReorder();
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
 }
-window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); } });
+window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
 window.addEventListener('hashchange', () => { setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
 
@@ -7325,12 +7435,12 @@ async function start() {
   await loadCal();
   await loadMail();
   await finishMailSignIn();
-  loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv();
+  loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv(); loadNews();
   render();
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
-  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshSarah();
+  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshSarah();
   mailConfig().then(() => { if (!sheetOpen && location.hash === '#settings') render(); });
   refreshMail();
   if (brMode() !== 'off' || location.hash === '#bridge') { refreshClosures(); refreshBridgeTraffic(); }
@@ -7354,7 +7464,7 @@ async function start() {
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     phoneSyncOpen();
     check();
-    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshSarah();
+    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshSarah();
     refreshMail();
     if (brMode() !== 'off') { refreshClosures(); refreshBridgeTraffic(); }
     checkBridgeLoc(true);
