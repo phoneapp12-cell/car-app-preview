@@ -21,6 +21,9 @@
  * (see videos.js). The query is the topic only. No arbitrary links. Nothing is stored.
  * GET /sarah: Sarah Jenkins's channel (one fixed RSS address). POST /sarah/seen marks the
  * newest id so it is not pushed again. No other channel can be requested.
+ * GET /mail/config: public OAuth client ids for Gmail and Outlook (empty if not set). No secrets.
+ * POST /mail/token: exchange an authorization code (PKCE) or refresh token. A client secret is
+ * read from the Worker env only and is never returned or logged. Mail subjects are not fetched here.
  */
 import { getFeed } from './events.js';
 import { getClosures } from './closures.js';
@@ -29,6 +32,7 @@ import { pushRoute } from './push.js';
 import { searchVideos } from './videos.js';
 import { syncRoute } from './sync.js';
 import { getSarah, markSarahSeen } from './sarah.js';
+import { mailConfig, exchangeMail } from './mail.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -80,7 +84,12 @@ const MESSAGES = {
   sarah_unavailable: 'Sarah Jenkins’s videos could not be checked just now.',
   bad_code: 'That sync code is not valid.',
   sync_unavailable: 'Sync is not available right now.',
-  sync_too_large: 'That sync data is too big to store.'
+  sync_too_large: 'That sync data is too big to store.',
+  client_id_missing: 'That mailbox sign-in is not configured yet.',
+  client_secret_missing: 'That mailbox sign-in still needs a secret on the service.',
+  bad_provider: 'Choose Gmail or Outlook.',
+  bad_redirect: 'That sign-in return address is not allowed.',
+  mail_unavailable: 'The mailbox sign-in service could not be reached.'
 };
 
 function allowedOrigins(env) {
@@ -254,6 +263,23 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     try { const raw = await request.text(); const cap = path === '/push/reminders' ? 16384 : 4096; if (raw.length > cap) throw new Error('big'); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
     const [status, data] = await pushRoute(path, body, env, fetchImpl);
     return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+  }
+  if (path === '/mail/config') {
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    return new Response(JSON.stringify(mailConfig(env)), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+  }
+  if (path === '/mail/token') {
+    if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    let body;
+    try {
+      const raw = await request.text();
+      if (raw.length > 12000) throw new Error('big');
+      body = raw ? JSON.parse(raw) : {};
+    } catch (e) { return json(400, 'bad_request', origin, env); }
+    const out = await exchangeMail(env, body, fetchImpl);
+    return new Response(JSON.stringify(out.data), { status: out.status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
   }
   if (path !== '/fetch') return json(404, 'not_found_route', origin, env);
   if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);

@@ -71,6 +71,17 @@ App origin only. The code is a 16-character private code the person creates in S
 The public copies and push subscriptions are unchanged aside from that sync blob. If you deploy your own copy, create a KV namespace
 (`npx wrangler kv namespace create due-dates-events-cache`) and put its id in `wrangler.jsonc`.
 
+## Mail sign-in (Gmail and Outlook)
+
+`GET /mail/config` and `POST /mail/token` (app origin only). The phone uses an authorization-code flow with PKCE. The worker exchanges the code and returns tokens to the phone. It does not read mail and does not store tokens.
+
+Public client ids and any client secret are Worker bindings, never files in this repo:
+
+- `GOOGLE_CLIENT_ID` and, for a Google web client, `GOOGLE_CLIENT_SECRET`
+- `MICROSOFT_CLIENT_ID` and, only for a confidential Microsoft app, `MICROSOFT_CLIENT_SECRET`
+
+Set them with `npx wrangler secret put NAME` from this directory. Redirect URI: `https://phoneapp12-cell.github.io/car-app-preview/`.
+
 ## Deploy (free Cloudflare Workers plan)
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/phoneapp12-cell/car-app-preview/tree/main/relay)
@@ -83,7 +94,9 @@ Check it: open `https://…workers.dev/health` – it should say `{"ok":true,...
 
 ## Files
 
-- `src/relay.js` – all the logic (standard Request/Response, no dependencies)
+- `src/relay.js` – routing (standard Request/Response, no dependencies)
+- `src/mail.js` – Gmail and Outlook code exchange (PKCE). No mailbox contents.
+- `test/mail.test.mjs` – `node test/mail.test.mjs`
 - `src/worker.js` – Cloudflare Workers entry
 - `deno-main.js` – alternative entry for Deno Deploy
 - `local-server.mjs` – runs the same code under Node for local tests

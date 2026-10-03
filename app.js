@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.79.0';
+const APP_VERSION = '1.80.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -53,6 +53,7 @@ const P = {
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>',
   refresh: '<path d="M20 11a8 8 0 0 0-14.8-3.5M4 4v4h4M4 13a8 8 0 0 0 14.8 3.5M20 20v-4h-4"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 7 9-7"/>',
   phoneDown: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
@@ -517,8 +518,10 @@ function engList(arr) {
 // real video titles from the list he already has, for the forecast or for early spring. No television.
 // English only. No gluten foods are suggested (he has coeliac disease).
 // 1.78.0: roadworks stay on their own card and are not repeated in this summary. Each bullet has a warm
-// tint. The weather line and any overdue line are highlighted a little more. No mailbox is connected,
-// so this summary does not invent an email line.
+// tint. The weather line and any overdue line are highlighted a little more.
+// 1.80.0: once Gmail or Outlook is connected, one line covers mail from the last 2 hours
+// (a count and up to two real subjects, or no new mail). Subjects are never invented.
+// Television is still not mentioned.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -587,6 +590,8 @@ function homeOverview(shown) {
   const add = (kind, text) => { if (text) bits.push({ kind, text }); };
   const wx = homeWxRead();
   if (wx.line) add('wx', wx.line);
+  const mailLine = homeMailLine();
+  if (mailLine) add('mail', mailLine);
   const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length;
   if (over && soon) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and ${plural(soon, 'more')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days. No fuss. They can wait their turn.`);
   else if (over) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and the next 30 days are clear. Whenever you get to ${over === 1 ? 'it' : 'them'} is absolutely fine.`);
@@ -4429,11 +4434,16 @@ function updWx() {
   const el = document.getElementById('wxcard'); if (el) el.outerHTML = wxCard();
   const greet = document.getElementById('wxgreet'); if (greet) greet.outerHTML = wxGreet();
   else if ((h === 'home' || h === '') && !homeEdit && wxInUp()) render();
+  paintHomeSum();
+}
+function paintHomeSum() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  if ((h !== 'home' && h !== '') || homeEdit) return;
   const sum = document.getElementById('homesum');
-  if (sum && (h === 'home' || h === '') && !homeEdit) {
-    const next = homeOverview(homeShownNow);
-    if (next) sum.outerHTML = next;
-  }
+  if (!sum) return;
+  const next = homeOverview(homeShownNow);
+  if (next) sum.outerHTML = next;
 }
 // Open-Meteo weather codes → words (day, night) and the icon kind drawn by wxIcon() (v1.9.0: coloured inline SVG icons)
 const WMO = {
@@ -6346,6 +6356,285 @@ function syncSettingsRow() {
   </div></div>`;
 }
 
+/* ================= MAIL (Gmail and Outlook, last 2 hours) ================= */
+const MAIL_REDIRECT = 'https://phoneapp12-cell.github.io/car-app-preview/';
+const MAIL_WINDOW = 2 * 60 * 60 * 1000;
+let MAIL = { google: null, microsoft: null };
+let MAIL_CFG = null;
+let MAIL_VIEW = '';
+let MAIL_VIEW_AT = 0;
+let mailBusy = false;
+
+function mailSummaryLine(items, opts) {
+  opts = opts || {};
+  const connected = opts.connected | 0;
+  if (connected <= 0) return '';
+  const failed = opts.failed | 0;
+  const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const subjects = (Array.isArray(items) ? items : []).map(x => clean(x && x.subject)).filter(Boolean);
+  const count = typeof opts.count === 'number' && opts.count >= 0 ? opts.count : subjects.length;
+  const quote = (s) => '“' + s + '”';
+  if (count <= 0 && failed >= connected) return 'Couldn’t check mail just now.';
+  if (count <= 0 && failed > 0) return 'Couldn’t check every inbox just now.';
+  if (count <= 0) return 'No new mail in the last 2 hours.';
+  const shown = subjects.slice(0, 2).map(quote);
+  const head = opts.atLeast ? 'At least ' + count + ' new emails' : (count === 1 ? '1 new email' : count + ' new emails');
+  let line;
+  if (!shown.length) line = head + ' in the last 2 hours.';
+  else if (shown.length === 1 || count === 1) line = head + ' in the last 2 hours: ' + shown[0] + '.';
+  else if (count === 2) line = head + ' in the last 2 hours: ' + shown[0] + ' and ' + shown[1] + '.';
+  else line = head + ' in the last 2 hours, including ' + shown[0] + ' and ' + shown[1] + '.';
+  if (failed > 0) line = line.slice(0, -1) + ' (one inbox couldn’t be checked).';
+  return line;
+}
+
+async function loadMail() {
+  try {
+    const m = await kvGet('mailboxes');
+    if (m && typeof m === 'object') MAIL = { google: m.google || null, microsoft: m.microsoft || null };
+  } catch (e) { MAIL = { google: null, microsoft: null }; }
+}
+async function saveMail() {
+  const keep = {};
+  ['google', 'microsoft'].forEach(p => {
+    const b = MAIL[p];
+    if (!b || !b.refreshToken) return;
+    keep[p] = { refreshToken: b.refreshToken, accessToken: b.accessToken || '', expiresAt: b.expiresAt || 0, email: b.email || '' };
+  });
+  try { await kvSet('mailboxes', keep); } catch (e) { }
+}
+const mailConnected = p => !!(MAIL[p] && MAIL[p].refreshToken);
+const mailAnyConnected = () => mailConnected('google') || mailConnected('microsoft');
+function homeMailLine() {
+  if (!mailAnyConnected()) return '';
+  return MAIL_VIEW || 'Checking mail from the last 2 hours.';
+}
+function b64urlBytes(bytes) {
+  let s = '';
+  const a = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+async function makePkce() {
+  const raw = new Uint8Array(32);
+  crypto.getRandomValues(raw);
+  const verifier = b64urlBytes(raw);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return { verifier, challenge: b64urlBytes(digest) };
+}
+async function mailConfig() {
+  if (MAIL_CFG && !MAIL_CFG.offline) return MAIL_CFG;
+  const blank = { google: { clientId: '', secretSet: false, authorize: 'https://accounts.google.com/o/oauth2/v2/auth', scope: 'https://www.googleapis.com/auth/gmail.readonly', pkce: true }, microsoft: { clientId: '', secretSet: false, authorize: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize', scope: 'offline_access Mail.Read User.Read', pkce: true }, redirect: MAIL_REDIRECT };
+  if (!RELAY_URL) { MAIL_CFG = blank; return MAIL_CFG; }
+  try {
+    const c = await getJSON(RELAY_URL + '/mail/config', 12000);
+    if (c && c.google && c.microsoft) { MAIL_CFG = c; return MAIL_CFG; }
+  } catch (e) { }
+  MAIL_CFG = Object.assign({ offline: true }, blank);
+  return MAIL_CFG;
+}
+async function mailSignIn(provider) {
+  const cfg = await mailConfig();
+  const c = cfg[provider] || {};
+  if (!c.clientId) {
+    toast(provider === 'google' ? 'Gmail needs GOOGLE_CLIENT_ID on the calendar link service first.' : 'Outlook needs MICROSOFT_CLIENT_ID on the calendar link service first.');
+    return;
+  }
+  const pkce = await makePkce();
+  const state = b64urlBytes(crypto.getRandomValues(new Uint8Array(16))) + '.' + provider;
+  try { localStorage.setItem('ddMailPkce', JSON.stringify({ verifier: pkce.verifier, state, provider, at: Date.now() })); }
+  catch (e) { toast('This browser won’t keep the sign-in step. Try Chrome.'); return; }
+  const u = new URL(c.authorize);
+  u.searchParams.set('client_id', c.clientId);
+  u.searchParams.set('redirect_uri', MAIL_REDIRECT);
+  u.searchParams.set('response_type', 'code');
+  u.searchParams.set('scope', c.scope);
+  u.searchParams.set('state', state);
+  u.searchParams.set('code_challenge', pkce.challenge);
+  u.searchParams.set('code_challenge_method', 'S256');
+  if (provider === 'google') {
+    u.searchParams.set('access_type', 'offline');
+    u.searchParams.set('prompt', 'consent');
+    u.searchParams.set('include_granted_scopes', 'true');
+  } else {
+    u.searchParams.set('prompt', 'select_account');
+    u.searchParams.set('response_mode', 'query');
+  }
+  location.href = u.toString();
+}
+async function mailToken(body) {
+  const r = await fetch(RELAY_URL + '/mail/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(data.error || 'mail'), { data, status: r.status });
+  return data;
+}
+async function finishMailSignIn() {
+  let q;
+  try { q = new URLSearchParams(location.search); } catch (e) { return; }
+  const code = q.get('code');
+  const err = q.get('error');
+  const state = q.get('state') || '';
+  if (!code && !err) return;
+  try { history.replaceState(null, '', location.pathname + (location.hash || '')); } catch (e) { }
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('ddMailPkce') || 'null'); } catch (e) { saved = null; }
+  try { localStorage.removeItem('ddMailPkce'); } catch (e) { }
+  const provider = state.endsWith('.google') ? 'google' : state.endsWith('.microsoft') ? 'microsoft' : '';
+  if (!provider) { toast('That sign-in link was not recognised.'); return; }
+  if (location.hash !== '#settings') location.hash = '#settings';
+  if (err) { toast('Sign-in was cancelled.'); return; }
+  if (!saved || saved.state !== state || saved.provider !== provider || !saved.verifier || Date.now() - saved.at > 15 * 60 * 1000) {
+    toast('That sign-in step expired. Try again from Settings.');
+    return;
+  }
+  try {
+    const tok = await mailToken({ provider, code, codeVerifier: saved.verifier, redirectUri: MAIL_REDIRECT });
+    if (!tok.accessToken) throw new Error('mail');
+    if (!tok.refreshToken) { toast('Sign-in did not grant offline access, so it cannot be kept. Try again.'); return; }
+    const box = { refreshToken: tok.refreshToken, accessToken: tok.accessToken, expiresAt: Date.now() + (Number(tok.expiresIn) || 3600) * 1000 - 60000, email: '' };
+    MAIL[provider] = box;
+    try { box.email = await mailAddress(provider, box.accessToken); } catch (e) { }
+    await saveMail();
+    toast(provider === 'google' ? 'Gmail connected.' : 'Outlook connected.');
+    refreshMail(true);
+  } catch (e) {
+    const miss = e.data && e.data.missing;
+    toast(miss ? 'Sign-in needs ' + miss + ' on the calendar link service.' : 'Couldn’t finish sign-in.');
+  }
+}
+async function mailAccess(provider) {
+  const box = MAIL[provider];
+  if (!box || !box.refreshToken) return '';
+  if (box.accessToken && box.expiresAt > Date.now() + 30000) return box.accessToken;
+  const tok = await mailToken({ provider, refreshToken: box.refreshToken, redirectUri: MAIL_REDIRECT });
+  box.accessToken = tok.accessToken;
+  if (tok.refreshToken) box.refreshToken = tok.refreshToken;
+  box.expiresAt = Date.now() + (Number(tok.expiresIn) || 3600) * 1000 - 60000;
+  await saveMail();
+  return box.accessToken;
+}
+async function mailSignOut(provider) {
+  MAIL[provider] = null;
+  await saveMail();
+  if (!mailAnyConnected()) { MAIL_VIEW = ''; MAIL_VIEW_AT = 0; }
+  render();
+  toast(provider === 'google' ? 'Gmail signed out on this phone.' : 'Outlook signed out on this phone.');
+  if (mailAnyConnected()) refreshMail(true);
+}
+async function getJSONAuth(url, token) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const r = await fetch(url, { signal: ctl.signal, cache: 'no-store', headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+    if (r.status === 401) throw Object.assign(new Error('auth'), { status: 401 });
+    if (!r.ok) throw new Error('http ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+async function mailAddress(provider, token) {
+  if (provider === 'google') {
+    const p = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/profile', token);
+    return (p && p.emailAddress) || '';
+  }
+  const p = await getJSONAuth('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName', token);
+  return (p && (p.mail || p.userPrincipalName)) || '';
+}
+function cleanSubject(s) {
+  const t = String(s || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  return t.length > 80 ? t.slice(0, 79) + '…' : t;
+}
+async function gmailRecent(token) {
+  const after = Math.floor((Date.now() - MAIL_WINDOW) / 1000);
+  const list = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=' + encodeURIComponent('in:inbox after:' + after), token);
+  const ids = (list.messages || []).map(m => m && m.id).filter(Boolean);
+  const metas = await Promise.all(ids.slice(0, 10).map(id => getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(id) + '?format=metadata&metadataHeaders=Subject', token).catch(() => null)));
+  const since = Date.now() - MAIL_WINDOW;
+  const items = [];
+  let old = false;
+  metas.forEach(m => {
+    if (!m) return;
+    const at = Number(m.internalDate) || 0;
+    if (at && at < since) { old = true; return; }
+    const headers = (m.payload && m.payload.headers) || [];
+    const h = headers.find(x => x && /^subject$/i.test(x.name));
+    const subject = cleanSubject(h && h.value);
+    if (subject) items.push({ subject, at });
+  });
+  const more = !!list.nextPageToken && !old && ids.length >= 20;
+  return { items, count: more ? Math.max(20, items.length) : items.length, atLeast: more };
+}
+async function outlookRecent(token) {
+  const data = await getJSONAuth('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=25&$select=subject,receivedDateTime&$orderby=receivedDateTime%20desc', token);
+  const rows = Array.isArray(data.value) ? data.value : [];
+  const since = Date.now() - MAIL_WINDOW;
+  const items = [];
+  let old = false;
+  rows.forEach(m => {
+    const at = Date.parse(m && m.receivedDateTime || '') || 0;
+    if (at && at < since) { old = true; return; }
+    const subject = cleanSubject(m && m.subject);
+    if (subject) items.push({ subject, at });
+  });
+  const more = !!data['@odata.nextLink'] && !old && rows.length >= 25;
+  return { items, count: more ? Math.max(25, items.length) : items.length, atLeast: more };
+}
+async function refreshMail(force) {
+  if (!mailAnyConnected()) { MAIL_VIEW = ''; return; }
+  if (mailBusy) return;
+  if (!force && MAIL_VIEW_AT && Date.now() - MAIL_VIEW_AT < 3 * 60 * 1000) return;
+  mailBusy = true;
+  if (!MAIL_VIEW) MAIL_VIEW = 'Checking mail from the last 2 hours.';
+  const providers = ['google', 'microsoft'].filter(mailConnected);
+  let failed = 0;
+  const items = [];
+  let count = 0;
+  let atLeast = false;
+  for (const p of providers) {
+    try {
+      let token = await mailAccess(p);
+      let got;
+      try { got = p === 'google' ? await gmailRecent(token) : await outlookRecent(token); }
+      catch (e) {
+        if (e && e.status === 401) {
+          MAIL[p].expiresAt = 0;
+          token = await mailAccess(p);
+          got = p === 'google' ? await gmailRecent(token) : await outlookRecent(token);
+        } else throw e;
+      }
+      items.push.apply(items, got.items);
+      count += got.count;
+      if (got.atLeast) atLeast = true;
+    } catch (e) { failed++; }
+  }
+  items.sort((a, b) => (b.at || 0) - (a.at || 0));
+  MAIL_VIEW = mailSummaryLine(items, { connected: providers.length, failed, count, atLeast });
+  MAIL_VIEW_AT = Date.now();
+  mailBusy = false;
+  paintHomeSum();
+}
+function mailSettingsSection() {
+  const cfg = MAIL_CFG || { google: {}, microsoft: {}, offline: false };
+  const row = (p, title) => {
+    const on = mailConnected(p);
+    const c = cfg[p] || {};
+    let sub;
+    if (on) sub = (MAIL[p].email ? MAIL[p].email + '. ' : 'Signed in on this phone. ') + 'Recent mail from the last 2 hours can show on Home.';
+    else if (cfg.offline && !c.clientId) sub = 'Not connected. The calendar link service could not be reached, so sign-in cannot start yet.';
+    else if (!c.clientId) sub = p === 'google'
+      ? 'Not connected. Sign-in needs GOOGLE_CLIENT_ID on the calendar link service. A Google web client also needs GOOGLE_CLIENT_SECRET stored there, not in the app.'
+      : 'Not connected. Sign-in needs MICROSOFT_CLIENT_ID on the calendar link service. A public Outlook app using PKCE does not need a secret. A confidential app also needs MICROSOFT_CLIENT_SECRET stored there, not in the app.';
+    else if (p === 'google' && !c.secretSet) sub = 'GOOGLE_CLIENT_ID is set. GOOGLE_CLIENT_SECRET is not on the calendar link service yet, so a Google web client may refuse sign-in.';
+    else sub = 'Not connected. Sign in to show recent mail on Home.';
+    const btn = on
+      ? `<button class="btn small" type="button" onclick="mailSignOut('${p}')">Sign out</button>`
+      : (c.clientId ? `<button class="btn primary small" type="button" onclick="mailSignIn('${p}')">Sign in</button>` : '');
+    return `<div class="srow" id="mail-${p}"><div class="tx"><div class="t">${title}</div><div class="s">${esc(sub)}</div></div>${btn}</div>`;
+  };
+  return `<div class="sec" id="mailsec">Mail</div>
+  <div class="list">${row('google', 'Gmail')}${row('microsoft', 'Outlook')}</div>
+  <p class="muted" style="margin:8px 4px 0">One short line on Home once an inbox is connected: how many emails arrived in the last 2 hours, and a couple of real subjects. Nothing is invented. Sign-in uses a private code (PKCE). A client secret, if Google or Microsoft requires one, stays on the calendar link service.</p>`;
+}
+
 /* ================= SETTINGS ================= */
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 function Settings() {
@@ -6365,7 +6654,7 @@ function Settings() {
   let canShare = false;
   try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] })); } catch (e) { }
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>
-  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Appearance, sync, reminders, calendars and backup</div></div></div>
+  <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Appearance, sync, reminders, mail, calendars and backup</div></div></div>
   ${syncSettingsRow()}
   ${websiteSettingsRow()}
   <div class="sec" id="appearance">Appearance</div>
@@ -6425,6 +6714,8 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Use my location</div><div class="s">${S.settings.bridgeLoc ? 'On, only while the app is open. Your location isn’t saved.' : 'Off. Only used if you tap “Show when I’m near”.'}</div></div>
     ${S.settings.bridgeLoc ? `<button class="btn small" onclick="stopBridgeLoc()">Stop</button>` : `<button class="btn small" onclick="enableBridgeLoc()">${I('pin')} Show when I’m near</button>`}</div>
   </div>
+
+  ${mailSettingsSection()}
 
   <div class="sec">Calendar</div>
   <div class="list">
@@ -6727,12 +7018,16 @@ async function start() {
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
   await loadCal();
+  await loadMail();
+  await finishMailSignIn();
   loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv();
   render();
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
   syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshSarah();
+  mailConfig().then(() => { if (!sheetOpen && location.hash === '#settings') render(); });
+  refreshMail();
   if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
   checkBridgeLoc(true);
   if ('serviceWorker' in navigator) {
@@ -6755,6 +7050,7 @@ async function start() {
     phoneSyncOpen();
     check();
     syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshSarah();
+    refreshMail();
     if (brMode() !== 'off') refreshClosures();
     checkBridgeLoc(true);
     if (swReg) swReg.update().catch(() => { });
@@ -6764,7 +7060,7 @@ async function start() {
     if (document.visibilityState !== 'visible') return;
     if (todayISO() !== renderedDay && !sheetOpen) render();
     check();
-    syncFeeds(); refreshWx();
+    syncFeeds(); refreshWx(); refreshMail();
     updBridge(); checkBridgeLoc();
   }, 60 * 1000);
 }
