@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.9.0';
+const APP_VERSION = '2.9.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1038,7 +1038,9 @@ function homeOverviewBody(shown) {
   const today = todayISO();
   let meals = [];
   try { meals = upcomingMeals() || []; } catch (e) { meals = []; }
-  const mealTitle = meals.includes(today) && M() && M().plan && M().plan[today] && M().plan[today].title ? String(M().plan[today].title).replace(/\s+/g, ' ').trim() : '';
+  // 2.9.1: once a meal is marked cooked (the same cooked flag as the planner tick), leave it out of the summary. It stays in the plan.
+  const todayMeal = meals.includes(today) && M() && M().plan ? M().plan[today] : null;
+  const mealTitle = todayMeal && !todayMeal.cooked && todayMeal.title ? String(todayMeal.title).replace(/\s+/g, ' ').trim() : '';
   if (mealTitle && !homeSaysTv(mealTitle) && !/\broadworks?\b/i.test(mealTitle)) {
     const got = takeTitles([mealTitle], 1);
     if (got.length) {
