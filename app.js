@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.78.0';
+const APP_VERSION = '1.79.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -296,7 +296,16 @@ function homeOn(k) {
   if (h && typeof h === 'object' && k in h) return !h[k];
   return !!HOME[k][4];
 }
-async function setHomeOrder(o) { S.settings.homeOrder = o; await save(); render(); }
+async function setHomeOrder(o) {
+  const keys = o.filter(k => HOME[k]);
+  S.settings.homeOrder = keys;
+  // 1.79.0: the summary row shares this list. Its place is how many cards sit above it.
+  if (o.includes('homesum')) {
+    S.settings.homeSumIndex = o.slice(0, o.indexOf('homesum')).filter(k => HOME[k]).length;
+    delete S.settings.homeSumAt;
+  }
+  await save(); render();
+}
 async function toggleHomeCard(k) {
   const on = homeOn(k); S.settings.homeHidden = Object.assign({}, S.settings.homeHidden, { [k]: on });
   if (k === 'videos') S.settings.homeVideos = !on;
@@ -309,12 +318,39 @@ const homeEventCount = () => { const n = Number(S.settings.homeEvents); return n
 async function setHomeEventCount(n) { S.settings.homeEvents = n; await save(); render(); }
 const homeVideoCount = () => { const n = Number(S.settings.homeVideoCount); return n >= 1 && n <= 4 ? n : 2; };
 async function setHomeVideoCount(n) { S.settings.homeVideoCount = n; await save(); render(); }
-async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; S.settings.homeVideos = false; delete S.settings.homeVideoCount; delete S.settings.homeSum; delete S.settings.homeSumAt; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
-// 1.69.0: the homepage summary can be hidden or moved. Missing means on, at the top.
+async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; S.settings.homeVideos = false; delete S.settings.homeVideoCount; delete S.settings.homeSum; delete S.settings.homeSumAt; delete S.settings.homeSumIndex; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
+// 1.69.0: the homepage summary can be hidden. Missing means on.
+// 1.79.0: homeSumIndex is how many Home cards it sits after. Missing means 0, under the date and weather.
+// An older homeSumAt of bottom, with no index yet, still means after every section.
 const showHomeSum = () => !(S.settings && S.settings.homeSum === false);
-const homeSumAt = () => (S.settings && S.settings.homeSumAt === 'bottom') ? 'bottom' : 'top';
+function homeSumBefore() {
+  const st = (S && S.settings) || {};
+  if (st.homeSumAt === 'bottom' && !Number.isInteger(st.homeSumIndex)) return Infinity;
+  const n = st.homeSumIndex;
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
 async function toggleHomeSum() { S.settings.homeSum = !showHomeSum(); await save(); render(); }
-async function setHomeSumAt(place) { S.settings.homeSumAt = place === 'bottom' ? 'bottom' : 'top'; await save(); render(); }
+async function moveHomeSum(dir) {
+  const order = homeOrder();
+  let i = homeSumBefore();
+  if (!Number.isFinite(i)) i = order.length;
+  i = Math.max(0, Math.min(order.length, i));
+  const n = Math.max(0, Math.min(order.length, i + (dir < 0 ? -1 : 1)));
+  if (n === i) return;
+  S.settings.homeSumIndex = n;
+  delete S.settings.homeSumAt;
+  await save();
+  render();
+}
+function homeEditRows() {
+  const rows = homeOrder().map(k => ({ kind: 'card', k }));
+  if (!showHomeSum()) return rows;
+  let i = homeSumBefore();
+  if (!Number.isFinite(i)) i = rows.length;
+  i = Math.max(0, Math.min(rows.length, i));
+  rows.splice(i, 0, { kind: 'sum' });
+  return rows;
+}
 const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
 const HOME_CARD = {
   bridge: () => { const br = brOnHome(); return br === 'card' ? brCard() : br === 'line' ? brLine() : ''; },
@@ -383,17 +419,22 @@ const HOME_CARD = {
   }
 };
 function HomeEdit() {
-  const order = homeOrder();
-  const sumOn = showHomeSum(), sumAt = homeSumAt();
-  return header('Customise Home', 'Press and hold a card, then drag it up or down') +
-    `<div class="reordhelp">Use the switches to show or hide cards. Cards with nothing to show stay hidden until there’s something in them.</div>
-    <div class="list" id="homesumopt" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">Summary</div><div class="s">A short summary of this page.</div></div><button class="switch ${sumOn ? 'on' : ''}" role="switch" aria-checked="${sumOn}" aria-label="Show the homepage summary" onclick="toggleHomeSum()"></button></div>
-    ${sumOn ? `<div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Where it sits</div><div class="s">Top is under the date and weather. Bottom is after the cards, above the line that says your information is saved on this phone.</div></div>
-      <div class="seg" id="sumplace" role="group" aria-label="Summary position" style="width:100%"><button type="button" class="${sumAt === 'top' ? 'on' : ''}" aria-pressed="${sumAt === 'top'}" onclick="setHomeSumAt('top')">Top</button><button type="button" class="${sumAt === 'bottom' ? 'on' : ''}" aria-pressed="${sumAt === 'bottom'}" onclick="setHomeSumAt('bottom')">Bottom</button></div></div>` : ''}</div>
-    <div class="list reorder" id="reorderlist" data-save="home">${order.map(k => { const d = HOME[k], on = homeOn(k); return `<div class="row mrow${on ? '' : ' cardoff'}" data-k="${k}" aria-label="${d[2]}"><div class="ic ${d[1]}">${I(d[0])}</div>
+  const rows = homeEditRows();
+  const sumOn = showHomeSum();
+  const last = rows.length - 1;
+  return header('Customise Home', 'Press and hold a row, then drag it up or down') +
+    `<div class="reordhelp">Use the switches to show or hide cards. Cards with nothing to show stay hidden until there’s something in them. Drag the summary between sections, or use Up and Down.</div>
+    <div class="list" id="homesumopt" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">Summary</div><div class="s">A short summary of this page. It starts under the date and weather. Up and Down move it one section at a time.</div></div><button class="switch ${sumOn ? 'on' : ''}" role="switch" aria-checked="${sumOn}" aria-label="Show the homepage summary" onclick="toggleHomeSum()"></button></div></div>
+    <div class="list reorder" id="reorderlist" data-save="home">${rows.map((r, i) => {
+      if (r.kind === 'sum') return `<div class="row mrow sumrow" data-k="homesum" aria-label="Summary"><div class="ic idea">${I('bulb')}</div>
+      <div class="tx"><div class="t">Summary</div><div class="s">Between the sections on Home.</div></div>
+      <span class="summoves"><button type="button" class="summove" aria-label="Move the summary up one section" onclick="event.stopPropagation();moveHomeSum(-1)" ${i === 0 ? 'disabled' : ''}>Up</button><button type="button" class="summove" aria-label="Move the summary down one section" onclick="event.stopPropagation();moveHomeSum(1)" ${i === last ? 'disabled' : ''}>Down</button></span></div>`;
+      const k = r.k, d = HOME[k], on = homeOn(k);
+      return `<div class="row mrow${on ? '' : ' cardoff'}" data-k="${k}" aria-label="${esc(d[2])}"><div class="ic ${d[1]}">${I(d[0])}</div>
       <div class="tx"><div class="t">${d[2]}</div><div class="s">${d[3]}</div></div>
-      <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${d[2]} on Home" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>
-      <span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
+      <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${esc(d[2])} on Home" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>
+      <span class="grip" aria-hidden="true">${I('grip')}</span></div>`;
+    }).join('')}
     </div>
     ${homeOn('events') ? `<div class="list" id="evcountopt" style="margin-top:12px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Events on Home</div><div class="s">How many to show under What’s on in Whangārei. The rest stay on the Events page.</div></div>
       <div class="seg" id="evcount" role="group" aria-label="How many events on Home" style="width:100%">${[1,2,3,4,5,6].map(n => `<button type="button" class="${homeEventCount() === n ? 'on' : ''}" aria-pressed="${homeEventCount() === n}" onclick="setHomeEventCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
@@ -624,15 +665,30 @@ function Home() {
   // 1.15.0: each Home section sits in its own block with a divider line between them (the compact bridge line stays with the weather above it)
   const parts = keys.map(k => { try { return [k, HOME_CARD[k]()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
   const groups = [];
-  parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') g.h += h; else groups.push({ k, h }); });
+  parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') { g.h += h; g.keys.push(k); } else groups.push({ k, keys: [k], h }); });
   const tintN = groups.length + (top ? 1 : 0);
-  const feed = groups.map((g, i) => `<section class="hsec" data-k="${g.k}" style="${homeTintStyle(i + (top ? 1 : 0), tintN)}">${g.h}</section>`).join('');
   const shown = new Set(parts.map(([k]) => k));
   if (top) shown.add('bridge');
   homeShownNow = shown;
   const sum = showHomeSum() ? homeOverview(shown) : '';
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + (homeSumAt() === 'top' ? sum : '') + dailyQuoteCard() + (top ? `<section class="hsec hsectop" data-k="bridge" style="${homeTintStyle(0, tintN)}">${top}</section>` : '') + cards +
-    feed + `${syncNote()}${homeSumAt() === 'bottom' ? sum : ''}
+  let before = homeSumBefore();
+  if (!Number.isFinite(before)) before = homeOrder().length;
+  const precede = new Set(homeOrder().slice(0, before));
+  const sections = [];
+  if (top) sections.push({ keys: ['bridge'], html: `<section class="hsec hsectop" data-k="bridge" style="${homeTintStyle(0, tintN)}">${top}</section>` });
+  groups.forEach((g, i) => sections.push({ keys: g.keys, html: `<section class="hsec" data-k="${g.k}" style="${homeTintStyle(i + (top ? 1 : 0), tintN)}">${g.h}</section>` }));
+  let at = 0;
+  if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
+  const sumTop = sum && before === 0 ? sum : '';
+  const sumIn = sum && before > 0 ? sum : '';
+  let head = '', feed = '';
+  sections.forEach((sec, i) => {
+    const piece = (sumIn && i === at ? sumIn : '') + sec.html;
+    if (top && i === 0) head += piece; else feed += piece;
+  });
+  if (sumIn && at >= sections.length) feed += sumIn;
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + sumTop + dailyQuoteCard() + head + cards +
+    feed + `${syncNote()}
     <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
 }
@@ -4027,7 +4083,7 @@ function wireReorder() {
   const pt = e => e.touches ? e.touches[0] || e.changedTouches[0] : e;
   const down = e => {
     if (rd || (e.type === 'pointerdown' && e.pointerType !== 'mouse')) return;
-    const row = e.target.closest('.mrow'); if (!row) return;
+    const row = e.target.closest('.mrow'); if (!row || e.target.closest('.summove')) return;
     const p = pt(e), st = { row, x: p.clientX, y: p.clientY, lastY: p.clientY, on: false };
     st.timer = setTimeout(() => startDrag(st), e.type === 'pointerdown' ? 200 : HOLD_MS);
     rd = st;
