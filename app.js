@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.93.0';
+const APP_VERSION = '1.94.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4258,26 +4258,18 @@ function More() {
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
     bills: over ? `<span class="pill over">${over} overdue</span>` : '', birthdays: nb && nb.d === 0 ? '<span class="pill bdaypill">Today!</span>' : '' };
   const order = navOrder();
-  if (moreEdit) {
-    return header('Reorder', 'Press and hold an item, then drag it up or down') +
-      `<div class="reordhelp">This order is the left strip, between Home and More. Every section is listed there. Swipe in from the left edge to open that strip.</div>
-      <div class="list reorder" id="reorderlist">${order.map(k => { const d = R[k]; return `<div class="row mrow" data-k="${k}" aria-label="${d.t}"><div class="ic ${d.cls}">${I(d.icon)}</div><div class="tx"><div class="t">${d.t}</div></div><span class="grip" aria-hidden="true">${I('grip')}</span></div>`; }).join('')}
-      </div>
-      <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetNav()">Reset to default</button><button class="btn primary" id="moredone" onclick="moreEdit=false;render()">Done</button></div>
-      <div class="foot">Home, More and Settings always stay where they are.</div>`;
-  }
   const item = k => { const d = R[k]; return `<button class="row" onclick="go('#${k}')"><div class="ic ${d.cls}">${I(d.icon)}</div><div class="tx"><div class="t">${d.t}</div><div class="s">${d.sub()}</div></div>${pills[k] || ''}${I('right')}</button>`; };
   return header('More', 'Everything else in the app', '') +
-    `<button class="linkbtn" id="morereorderlink" style="display:block;margin:-4px 0 6px auto" onclick="moreEdit=true;render()">Reorder</button>
-    <div class="list">
+    `<div class="list">
       ${order.slice(NAV_TABS).map(item).join('')}
       <button class="row" onclick="go('#settings')"><div class="ic set">${I('gear')}</div><div class="tx"><div class="t">Settings</div><div class="s">Reminders, calendars and backup</div></div>${I('right')}</button>
     </div>
     <div class="foot">${savedWhere()}</div>`;
 }
-/* 1.12.0: one list for the left strip and More. 1.51.0 lists every section on the strip (Home, then this order, then More).
-   The More page still skips the first NAV_TABS, which already sit at the top of the strip.
-   Press and hold a row on the Reorder screen, then drag. Saved as settings.navOrder, so it's in backups too. */
+/* 1.12.0: one list for the left strip and More. 1.51.0 lists every section on the strip.
+   The More page still skips the first NAV_TABS.
+   1.94.0: the strip is grouped and colour-coded. The reorder screen is gone.
+   A saved settings.navOrder is left in backups and is not used. */
 const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
@@ -4290,18 +4282,21 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
-let moreEdit = false;
+/* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
+const NAV_GROUPS = [
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders'] },
+  { id: 'money', title: 'Money', keys: ['bills', 'commission', 'loans'] },
+  { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health'] },
+  { id: 'cars', title: '', keys: ['cars'] },
+  { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
+  { id: 'near', title: 'Nearby', keys: ['events', 'bridge'] },
+  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40'] }
+];
 function navOrder() {
-  const st = S.settings;
-  let src = Array.isArray(st.navOrder) ? st.navOrder : Array.isArray(st.moreOrder) ? ['cars', 'calendar', 'todo'].concat(st.moreOrder) : []; // 1.11.0 kept only the More order
-  const o = src.filter((k, i, a) => NAV[k] && a.indexOf(k) === i);
-  NAV_DEFAULT.forEach(k => { if (!o.includes(k)) o.splice(Math.min(NAV_DEFAULT.indexOf(k), o.length), 0, k); }); // new sections slot in near their usual place
-  return o;
+  return NAV_DEFAULT.slice();
 }
-async function setNavOrder(o) { S.settings.navOrder = o; delete S.settings.moreOrder; await save(); render(); }
-async function resetNav() { const s = snap(); delete S.settings.navOrder; delete S.settings.moreOrder; await save(); render(); toast('Back to the usual order.', 'Undo', undoTo(s)); }
 
-/* Press-and-hold drag on the Reorder screen. Works with touch (Android) and a mouse. */
+/* Press-and-hold drag on Customise Home. Works with touch (Android) and a mouse. */
 const HOLD_MS = 350;
 let rd = null; // the drag in progress
 function wireReorder() {
@@ -4360,7 +4355,8 @@ async function endDrag() {
   const st = rd; rd = null; cancelAnimationFrame(st.raf);
   const o = st.rows.map(r => r.dataset.k), [k] = o.splice(st.from, 1); o.splice(st.to, 0, k);
   if (st.to === st.from) { render(); return; }
-  await ($('#reorderlist').dataset.save === 'home' ? setHomeOrder : setNavOrder)(o);
+  if ($('#reorderlist').dataset.save !== 'home') { render(); return; }
+  await setHomeOrder(o);
 }
 
 /* ================= LIFTING BRIDGE (Dave Culham Drive, Te Matau ā Pohe) ================= */
@@ -7156,12 +7152,15 @@ const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', re
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
-  const tabs = navOrder();
-  const list = [['home', 'Home', 'home']].concat(tabs.map(k => [k, NAV[k][2], NAV[k][0]]), [['settings', 'Settings', 'gear'], ['more', 'More', 'more']]);
-  const inTabs = k => tabs.includes(k);
-  const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge && !(inTabs('bills') && inTabs('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
-  $('#tabbar').innerHTML = list.map(([k, l, ic]) =>
-    `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`).join('');
+  const listed = new Set(NAV_GROUPS.flatMap(g => g.keys));
+  const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge && !(listed.has('bills') && listed.has('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
+  const meta = k => k === 'home' ? ['Home', 'home'] : k === 'settings' ? ['Settings', 'gear'] : k === 'more' ? ['More', 'more'] : [NAV[k][2], NAV[k][0]];
+  const btn = k => {
+    const [l, ic] = meta(k);
+    return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
+  };
+  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
+  $('#tabbar').innerHTML = groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
   const item = ROUTE_ITEM[r] || r, tabs = navOrder();
@@ -7178,13 +7177,12 @@ function render() {
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide };
-  if (r !== 'more') moreEdit = false;
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
-  if ((r === 'more' && moreEdit) || ((r === 'home' || r === '') && homeEdit)) wireReorder();
+  if ((r === 'home' || r === '') && homeEdit) wireReorder();
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); } });
@@ -7222,7 +7220,7 @@ window.addEventListener('scroll', () => { if (!document.body.classList.contains(
 
 /* ---------- left tab strip (v1.50.0) ----------
    Hidden off the left edge. A swipe that starts on that edge pulls it open. A swipe back,
-   or a tap outside the strip, hides it. Press-and-hold reorder stays on the Reorder screen. */
+   or a tap outside the strip, hides it. 1.94.0 groups the items. Press-and-hold reorder stays on Customise Home. */
 let tabsOpen = false;
 const TABS_HIDDEN = 'translateX(calc(-100% - 16px))';
 function setTabsOpen(on, animate) {
