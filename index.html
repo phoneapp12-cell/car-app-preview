@@ -121,6 +121,15 @@ html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transp
 .pill.over{color:var(--red);background:var(--redbg)} .pill.soon{color:var(--amber);background:var(--amberbg)} .pill.fine{color:var(--green);background:var(--greenbg)}
 .pill.paid{color:var(--green);background:var(--greenbg)} .pill.none{color:var(--ink2);background:var(--soft2)}
 .pill.bdaypill{color:var(--tagtext);background:var(--bday)} .pill.bdaysoon{color:var(--bday-fg);background:var(--bday-bg)}
+/* v1.92.0: day-count pills and amount badges on Home, Bills and Upcoming */
+.duepill{color:#fff;font-size:0.8125rem;font-weight:800;letter-spacing:.01em;padding:5px 12px;border-radius:999px;box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.duepill.hot{background:linear-gradient(135deg,#E85D04,#C62828);color:#fff}
+.duepill.warm{background:linear-gradient(135deg,#FFE082,#F5C518);color:#3F2E04}
+.duepill.cool{background:linear-gradient(135deg,#1B7A3E,#1565C0);color:#fff}
+.badgestack{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+.moneybadge{display:flex;flex-direction:column;align-items:flex-end;line-height:1.05;text-align:right;max-width:9.5rem}
+.moneybadge b{font-size:1.1875rem;font-weight:800;letter-spacing:-.03em;color:var(--ink);font-variant-numeric:tabular-nums}
+.moneybadge small{display:block;margin-top:3px;font-size:0.75rem;font-weight:650;color:var(--ink2);max-width:9.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row.bdtoday{background:var(--bday-row)}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}

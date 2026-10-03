@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.91.0';
+const APP_VERSION = '1.92.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -181,6 +181,16 @@ function pill(d, prefix = '') {
   const w = d < 0 ? (-d) + (d === -1 ? ' day' : ' days') + ' overdue' : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d + ' days';
   return `<span class="pill ${status(d)}">${prefix}${w}</span>`;
 }
+// 1.92.0: day counts on Home, Bills and Upcoming are solid pills. 0–2 days (and overdue) red/orange, 3–5 yellow, 6+ green/blue.
+function dueTone(d) { return d <= 2 ? 'hot' : d <= 5 ? 'warm' : 'cool'; }
+function duePill(d, prefix = '') {
+  const w = d < 0 ? (-d) + (d === -1 ? ' day' : ' days') + ' overdue' : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d + ' days';
+  return `<span class="pill duepill ${dueTone(d)}">${prefix}${w}</span>`;
+}
+function moneyBadge(amount, label) {
+  const under = label ? `<small>${esc(label)}</small>` : '';
+  return `<span class="moneybadge"><b>${money(amount)}</b>${under}</span>`;
+}
 function header(title, sub, extra = '') {
   return `<div class="top"><div style="min-width:0"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
   <div class="iconrow">${extra}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
@@ -248,14 +258,14 @@ const area = (name, val, ph = '') => `<textarea name="${name}" placeholder="${es
 
 /* ================= HOME ================= */
 function rowFor(x) {
-  let icon = 'todo', sub;
+  let icon = 'todo', sub, cash = '';
   if (x.kind === 'car') { icon = { wof: 'shield', rego: 'doc', svc: 'wrench' }[x.part]; sub = (x.car.plate ? esc(x.car.plate) + ' · ' : '') + 'Due ' + fmtW(x.date); }
-  else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = money(x.bill.amount) + ' · ' + fmtW(x.date); }
+  else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = 'Due ' + fmtW(x.date); cash = moneyBadge(x.bill.amount, x.bill.name); }
   else if (x.kind === 'pet') { icon = 'paw'; sub = 'Pet · ' + esc(careEvery(x.care)) + ' · Due ' + fmtW(x.date); }
   else if (x.kind === 'health') { icon = HEALTH_ICON[x.item.kind] || 'medkit'; sub = 'Health · ' + (x.item.clinic ? esc(x.item.clinic) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
   else sub = 'To-do · ' + esc(x.todo.list || '') + ' · ' + fmtW(x.date);
-  const body = `<div class="ic ${x.kind}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div>${pill(x.days)}`;
+  const body = `<div class="ic ${x.kind}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div><div class="badgestack">${duePill(x.days)}${cash}</div>`;
   // 1.82.0: a to-do in Upcoming or the overdue list can be marked done here. It stays on the to-do list.
   if (x.kind === 'todo' && x.todo) return `<div class="row"><button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(x.title)}" onclick="tick('${x.todo.id}')"><span>${I('check')}</span><b>Done</b></button><button type="button" class="tapzone" onclick="go('${x.go}')">${body}</button></div>`;
   return `<button class="row" onclick="go('${x.go}')">${body}</button>`;
@@ -378,7 +388,7 @@ const HOME_CARD = {
     const open = S.todos.filter(t => !t.done && !(att && t.due && daysLeft(t.due) <= 30)).sort((a, b) => (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15) || (b.created || 0) - (a.created || 0));
     if (!open.length) return '';
     return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span><b>Done</b></button>
-      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? pill(daysLeft(t.due)) : ''}</button>${todoCalBtn(t)}</div>`).join('')}</div>` +
+      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? duePill(daysLeft(t.due)) : ''}</button>${todoCalBtn(t)}</div>`).join('')}</div>` +
       (open.length > 5 ? `<div class="homemore"><a href="#todo">${plural(open.length - 5, 'more to-do')}</a></div>` : '');
   },
   loans: () => {
@@ -406,12 +416,12 @@ const HOME_CARD = {
   bills: () => {
     const list = S.bills.filter(b => !b.paid && b.due).sort((a, b) => parseD(a.due) - parseD(b.due)).slice(0, 4); if (!list.length) return '';
     return homeSec('Bills', '<a href="#bills">See all</a>') + `<div class="list" id="homebills">${list.map(b => `<div class="row bill"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(b.name))}</div>
-      <div class="tx"><div class="t">${esc(b.name)} · ${money(b.amount)}</div><div class="s">Due ${fmtW(b.due)}</div></div>${pill(daysLeft(b.due))}</button>
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Due ${fmtW(b.due)}</div></div><div class="badgestack">${duePill(daysLeft(b.due))}${moneyBadge(b.amount, b.name)}</div></button>
       <button class="paybtn" onclick="markPaid('${b.id}')">Paid</button></div>`).join('')}</div>`;
   },
   cars: () => {
     if (!S.cars.length) return '';
-    const cell = (l, d) => d ? `<span class="cg"><small>${l}</small> ${fmt(d)} ${pill(daysLeft(d))}</span>` : '';
+    const cell = (l, d) => d ? `<span class="cg"><small>${l}</small> ${fmt(d)} ${duePill(daysLeft(d))}</span>` : '';
     return homeSec('Cars', '<a href="#cars">See all</a>') + `<div class="list" id="homecars">${S.cars.map(c => `<button class="row" onclick="go('#car/${c.id}')">${carMark(c)}
       <div class="tx"><div class="t">${esc(c.name)}${c.plate ? ` <span class="plate small">${esc(c.plate)}</span>` : ''}</div><div class="cgrow">${cell('WOF', c.wof)}${cell('Rego', c.rego)}</div></div></button>`).join('')}</div>`;
   },
@@ -1286,9 +1296,8 @@ function Bills() {
   const row = b => {
     const d = daysLeft(b.due);
     return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}"><div class="ic bill">${I(billIcon(b.name))}</div>
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}</div>
-      <div style="margin-top:5px">${b.paid ? '<span class="pill paid">Paid ✓</span>' : pill(d)}</div></div></button>
-      <div class="right"><div class="amt">${money(b.amount)}</div>
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}</div></div></button>
+      <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
       ${b.paid ? `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>` : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
   let pay = '';
@@ -1307,9 +1316,8 @@ function Bills() {
     const tot = items.reduce((t, x) => t + (Number(x.b.amount) || 0), 0), late = items.filter(x => x.late).length;
     const prow = x => { const cur = x.d === x.b.due, dl = daysLeft(x.d);
       return `<div class="row bill payrow"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}"><div class="ic bill">${I(billIcon(x.b.name))}</div>
-        <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.d)}</div>
-        ${pp.off <= 0 || dl <= 7 ? `<div style="margin-top:5px">${pill(dl)}</div>` : ''}</div></button>
-        <div class="right"><div class="amt">${money(x.b.amount)}</div>${cur ? `<button class="paybtn" onclick="markPaid('${x.b.id}')">Mark paid</button>` : ''}</div></div>`; };
+        <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.d)}</div></div></button>
+        <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.b.amount, x.b.name)}${cur ? `<button class="paybtn" onclick="markPaid('${x.b.id}')">Mark paid</button>` : ''}</div></div>`; };
     pay = `<div class="summary" id="paysum">
       <div class="paynav"><button class="paystep" id="payprev" aria-label="Previous pay" ${pp.canBack ? '' : 'disabled'} onclick="payShift(-1)">${I('left')}</button>
         <div class="paytitle"><b>${payLabel(pp.off)}</b><span>${fmtW(pp.start)} to ${fmtW(pp.end)}</span></div>
@@ -2821,7 +2829,7 @@ const ATT_SOURCES = {
   // A booked check-up has no due row (core.js dueItems leaves it out), so it never shows twice.
   health: T => dueItems({ health: S.health }).filter(x => x.days <= 30).map(x => ({ days: x.days, rank: 0, sort: '', kind: 'health', name: x.title,
     html: attRow({ kind: 'health', cls: 'hdue', date: x.date, go: `go('${x.go}')`, ic: 'health', icon: HEALTH_ICON[x.item.kind] || 'medkit', title: esc(x.title),
-      sub: `Health · ${x.item.clinic ? esc(x.item.clinic) + ' · ' : ''}Due ${fmtW(x.date)}`, right: pill(x.days) }) }))
+      sub: `Health · ${x.item.clinic ? esc(x.item.clinic) + ' · ' : ''}Due ${fmtW(x.date)}`, right: duePill(x.days) }) }))
     .concat(healthAppts(S, T, T + DAY).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '',
       kind: 'health', name: `${attWhen(d)}: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`, html: attRow({ wx: 1, kind: 'health', cls: 'happt', date: a.date, go: `go('#health/${a.person.id}/${a.item.id}')`, ic: 'health', icon: HEALTH_ICON[a.item.kind] || 'medkit',
         title: `${attWhen(d)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`, sub: `Health appointment · ${a.item.clinic ? esc(a.item.clinic) + ' · ' : ''}${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; })),
@@ -2831,7 +2839,7 @@ const ATT_SOURCES = {
     const y0 = parseD(todayISO().slice(0, 4) + '-01-01');
     return gardenJobs(S, y0, T + 14 * DAY).filter(j => !j.done && (gardenIsFeed(j) ? j.days <= 14 : j.days >= 0 && j.days <= 14)).map(j => ({ days: j.days, rank: 0, sort: j.title, kind: 'garden', name: j.title,
       html: attRow({ kind: 'garden', date: j.date, go: `go('#garden/${j.go}')`, ic: 'garden', icon: 'leaf', title: esc(j.title),
-        sub: `Garden · ${fmtW(j.date)}`, right: pill(j.days) }) }));
+        sub: `Garden · ${fmtW(j.date)}`, right: duePill(j.days) }) }));
   },
   // Commission tracker set up and nothing entered for yesterday
   comm: T => { if (!CM().anchor) return []; const y = yesterdayISO(); if (commDay(y).length) return [];
