@@ -715,6 +715,39 @@
     return { shown, badge };
   }
 
+
+  /* ---------- NZTA live traffic at the lifting bridge ----------
+     NZTA's public Traffic and Travel feed (no key) covers state highways.
+     A queue counts only when an active event names this bridge. Anything else,
+     including a feed that never mentions Dave Culham Drive, is not a closure. */
+  const BRIDGE_TRAFFIC_NONE = 'Live traffic was not available.';
+  const BRIDGE_TRAFFIC_QUEUE = 'Queued traffic is reported at the bridge, so it is likely closed.';
+  function bridgeTrafficText(ev) {
+    return [ev && ev.eventDescription, ev && ev.eventComments, ev && ev.locationArea, ev && ev.locations, ev && ev.impact, ev && ev.eventType].map(x => String(x || '')).join(' ');
+  }
+  function bridgeTrafficEvents(data) {
+    if (!data || typeof data !== 'object') return null;
+    if (Array.isArray(data.events)) return data.events;
+    const box = data.response && data.response.roadevent;
+    if (Array.isArray(box)) return box;
+    if (box && typeof box === 'object') return [box];
+    return null;
+  }
+  function judgeBridgeTraffic(data) {
+    const events = bridgeTrafficEvents(data);
+    if (!events) return { read: false, likelyClosed: false, line: BRIDGE_TRAFFIC_NONE };
+    const queued = events.some(ev => {
+      const status = String(ev && ev.status || '').toLowerCase();
+      if (status === 'resolved' || status === 'cancelled' || status === 'canceled') return false;
+      const text = bridgeTrafficText(ev);
+      const here = /\b(te matau|matau ā pohe|matau a pohe|dave culham|hātea river|hatea river)\b/i.test(text);
+      const queue = /\b(queue|queued|queuing|queueing|congestion|congested|heavy traffic|gridlock|stationary traffic|bumper to bumper|delays)\b/i.test(text);
+      return here && queue;
+    });
+    if (queued) return { read: true, likelyClosed: true, line: BRIDGE_TRAFFIC_QUEUE };
+    return { read: true, likelyClosed: false, line: BRIDGE_TRAFFIC_NONE };
+  }
+
   g.DD = { DAY, MON, MONL, WD, WDL, pad, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt0, fmt, fmtY, fmtW, fmtLong, fmtTime, inWords, money, GARDEN_IDS, gardenJobs,
-    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatNth, isSeriesDate, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, HEALTH_TYPES, healthAppts, isMonday, lastMonday, fortnightOf, commSum, taxYearOf, centsMoney, parseCents, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
+    nzHolidays, holidaysBetween, BRIDGE, bridgeSeason, bridgeHours, bridgeStateAt, bridgeNext, bridgeStatus, bridgeMetres, judgeBridgeTraffic, nzClock, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatNth, isSeriesDate, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, addInterval, regDueAfter, careDue, careNextAfter, careEvery, dueItems, status, badgeCount, HEALTH_TYPES, healthAppts, isMonday, lastMonday, fortnightOf, commSum, taxYearOf, centsMoney, parseCents, stage, pendingReminders, openDB, kvGet, kvSet, runCheck };
 })(typeof self !== 'undefined' ? self : this);

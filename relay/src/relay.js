@@ -17,6 +17,7 @@
  * GET /closures: council roadworks/closure notices that mention the lifting bridge on Dave Culham Drive
  * (see closures.js). Fixed source, no input.
  * GET /roadworks: council roading projects whose expected start is within the next 12 months (see roadworks.js). Fixed source, no input.
+ * GET /bridge-traffic: NZTA Northland highway events (see bridge-traffic.js). Fixed source, no input. The phone decides if any event is the lifting bridge.
  * POST /videos: search YouTube for one short English topic and return oembed-confirmed videos
  * (see videos.js). The query is the topic only. No arbitrary links. Nothing is stored.
  * GET /sarah: Sarah Jenkins's channel (one fixed RSS address). POST /sarah/seen marks the
@@ -28,6 +29,7 @@
 import { getFeed } from './events.js';
 import { getClosures } from './closures.js';
 import { getCouncilRoadworks } from './roadworks.js';
+import { getBridgeTraffic } from './bridge-traffic.js';
 import { pushRoute } from './push.js';
 import { searchVideos } from './videos.js';
 import { syncRoute } from './sync.js';
@@ -79,6 +81,7 @@ const MESSAGES = {
   weather_unavailable: 'The weather could not be loaded right now.',
   closures_unavailable: 'Planned closures could not be checked right now.',
   roadworks_unavailable: 'Council roadworks could not be loaded right now.',
+  bridge_traffic_unavailable: 'Live traffic could not be checked right now.',
   bad_query: 'Use a short English topic name.',
   videos_unavailable: 'Videos could not be looked up just now.',
   sarah_unavailable: 'Sarah Jenkins’s videos could not be checked just now.',
@@ -183,14 +186,14 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     }
     return new Response('Due Dates calendar link service is running. It only answers requests from the Due Dates app.\n', { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'text/plain; charset=utf-8' } });
   }
-  if (path === '/events' || path === '/weather' || path === '/closures' || path === '/roadworks') {
+  if (path === '/events' || path === '/weather' || path === '/closures' || path === '/roadworks' || path === '/bridge-traffic') {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     try {
-      const data = path === '/events' ? await getFeed(env, fetchImpl) : path === '/closures' ? await getClosures(env, fetchImpl) : path === '/roadworks' ? await getCouncilRoadworks(env, fetchImpl) : await getWeather(env, fetchImpl);
+      const data = path === '/events' ? await getFeed(env, fetchImpl) : path === '/closures' ? await getClosures(env, fetchImpl) : path === '/roadworks' ? await getCouncilRoadworks(env, fetchImpl) : path === '/bridge-traffic' ? await getBridgeTraffic(fetchImpl) : await getWeather(env, fetchImpl);
       return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) {
-      const code = path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : path === '/roadworks' ? 'roadworks_unavailable' : 'weather_unavailable';
+      const code = path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : path === '/roadworks' ? 'roadworks_unavailable' : path === '/bridge-traffic' ? 'bridge_traffic_unavailable' : 'weather_unavailable';
       return json(502, code, origin, env);
     }
   }

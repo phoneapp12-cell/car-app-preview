@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.87.0';
+const APP_VERSION = '1.88.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -528,6 +528,7 @@ function engList(arr) {
 // or one that names something due today, is red.
 // 1.84.0: the same title is named only once. “Tonight” and a clock time do not make it a different item.
 // 1.87.0: one summary line uses the lifting bridge status already on Home (the same short status and next change). No extra times.
+// 1.88.0: the same line adds NZTA live traffic when a queue is reported at this bridge. If that feed cannot be read, it says so and does not invent a closure.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -599,8 +600,10 @@ function homeBridgeBit(shown) {
   const row = BR_TXT[st && st.state];
   if (!row || !row[3]) return null;
   const next = String(brNextText(st) || '').trim();
-  const text = next ? `Lifting bridge: ${row[3]}. ${next}.` : `Lifting bridge: ${row[3]}.`;
-  return { text, urgent: st.state === 'closed' || st.state === 'noon' };
+  const traffic = bridgeTrafficSentence();
+  let text = next ? `Lifting bridge: ${row[3]}. ${next}.` : `Lifting bridge: ${row[3]}.`;
+  if (traffic) text += ' ' + traffic;
+  return { text, urgent: st.state === 'closed' || st.state === 'noon' || bridgeTrafficLikely() };
 }
 function homeMentionKey(s) {
   let t = String(s || '').toLowerCase().replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').trim();
@@ -4308,6 +4311,33 @@ function brWindToday() {
   const d = wxDays()[0]; return d && d.iso === todayISO() && typeof d.wind === 'number' ? d.wind : null;
 }
 const brStatus = () => DD.bridgeStatus(new Date(), { windKmh: brWind(), closures: CLS ? CLS.data.closures : [] });
+const NZTA_NORTHLAND_EVENTS = 'https://trafficnz.info/service/traffic/rest/4/events/byregion/1/-1';
+let BR_TR = null, brTrBusy = false;
+const BR_TR_MAX = 10 * 60 * 1000;
+function bridgeTrafficSentence() {
+  return BR_TR && BR_TR.settled && BR_TR.line ? BR_TR.line : '';
+}
+function bridgeTrafficLikely() { return !!(BR_TR && BR_TR.settled && BR_TR.likely); }
+function brTrafficHtml() {
+  const line = bridgeTrafficSentence();
+  if (!line) return '';
+  return `<div class="brtraffic${bridgeTrafficLikely() ? ' queued' : ''}">${esc(line)}</div>`;
+}
+async function refreshBridgeTraffic(force = false) {
+  if (brTrBusy || (!force && BR_TR && BR_TR.at && Date.now() - BR_TR.at < BR_TR_MAX)) return;
+  brTrBusy = true;
+  let data = null;
+  try { data = await getJSON(NZTA_NORTHLAND_EVENTS, 12000); } catch (e) { data = null; }
+  let judged = data ? DD.judgeBridgeTraffic(data) : null;
+  if ((!judged || !judged.read) && RELAY_URL) {
+    try { data = await getJSON(RELAY_URL + '/bridge-traffic', 12000); } catch (e) { data = null; }
+    judged = data ? DD.judgeBridgeTraffic(data) : null;
+  }
+  brTrBusy = false;
+  const line = judged && judged.line ? judged.line : 'Live traffic was not available.';
+  BR_TR = { at: Date.now(), settled: true, likely: !!(judged && judged.likelyClosed), line };
+  updBridge();
+}
 const brMode = () => (S && S.settings.bridgeHome) || 'near';
 const pad = n => String(n).padStart(2, '0');
 const hmStr = m => pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60);
@@ -4362,6 +4392,7 @@ function brCard(full = false) {
     <div class="brstate">${head}</div>
     ${full ? `<div class="brsub">${brDetail(st)}</div>` : ''}
     <div class="brnext">${brNextText(st)}</div>
+    ${brTrafficHtml()}
     ${up ? `<div class="brclose">${I('warn')} Planned closure: ${brClosureWhen(up)}</div>` : ''}
     ${brWindNote(st)}
     <div class="brnote">Not live – based on the council’s lift times</div>
@@ -4370,7 +4401,7 @@ function brCard(full = false) {
 function brLine() {
   const st = brStatus();
   return `<div class="list brlist" id="brline" data-state="${st.state}"><button class="row" onclick="go('#bridge')"><div class="ic br">${I('bridge')}</div>
-    <div class="tx"><div class="t">Lifting bridge: ${BR_TXT[st.state][3]}</div><div class="s">${brNextText(st)} · Not live – based on the council’s lift times</div></div>${I('right')}</button></div>`;
+    <div class="tx"><div class="t">Lifting bridge: ${BR_TXT[st.state][3]}</div><div class="s">${brNextText(st)}${bridgeTrafficSentence() ? ' · ' + bridgeTrafficSentence() : ''} · Not live – based on the council’s lift times</div></div>${I('right')}</button></div>`;
 }
 function brOnHome() {
   const m = brMode();
@@ -4387,6 +4418,7 @@ function brSeasonText(iso) {
 }
 function Bridge() {
   if (!CLS && !clsBusy && !clsFailed) setTimeout(() => refreshClosures(), 0);
+  if (!BR_TR && !brTrBusy) setTimeout(() => refreshBridgeTraffic(), 0);
   const st = brStatus(), T = st.iso, we = [0, 6].includes(new Date(parseD(T)).getUTCDay());
   const rng = ([a, b]) => `${fmtTime(hmStr(a))} – ${fmtTime(hmStr(b))}`;
   const hours = st.hours.map(rng).join(' and ');
@@ -4460,7 +4492,7 @@ function enableBridgeLoc() {
   }, { enableHighAccuracy: false, maximumAge: 60 * 1000, timeout: 20000 });
 }
 async function stopBridgeLoc() { S.settings.bridgeLoc = false; brNear = null; brDist = null; await save(); render(); toast('The app won’t use your location for the bridge.'); }
-async function setBridgeHome(v) { S.settings.bridgeHome = v; await save(); render(); if (v === 'near') checkBridgeLoc(true); if (v !== 'off') refreshClosures(); }
+async function setBridgeHome(v) { S.settings.bridgeHome = v; await save(); render(); if (v === 'near') checkBridgeLoc(true); if (v !== 'off') { refreshClosures(); refreshBridgeTraffic(); } }
 
 /* ---- Bridge closure alerts (push, v1.13.0) ----
    The relay checks the council's closures page every 10 minutes. When a new notice about the bridge or Dave Culham Drive
@@ -7194,7 +7226,7 @@ async function start() {
   syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshSarah();
   mailConfig().then(() => { if (!sheetOpen && location.hash === '#settings') render(); });
   refreshMail();
-  if (brMode() !== 'off' || location.hash === '#bridge') refreshClosures();
+  if (brMode() !== 'off' || location.hash === '#bridge') { refreshClosures(); refreshBridgeTraffic(); }
   checkBridgeLoc(true);
   if ('serviceWorker' in navigator) {
     let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -7217,7 +7249,7 @@ async function start() {
     check();
     syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshSarah();
     refreshMail();
-    if (brMode() !== 'off') refreshClosures();
+    if (brMode() !== 'off') { refreshClosures(); refreshBridgeTraffic(); }
     checkBridgeLoc(true);
     if (swReg) swReg.update().catch(() => { });
     scheduleReminders().catch(() => { });
