@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.15.1';
+const APP_VERSION = '2.15.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9668,21 +9668,26 @@ async function deleteNote(id) {
 }
 
 
-/* ================= ABOUT YOU, WORK ROSTER, PRAISE (2.13.0) =================
-   About you: one question a day in Pacific/Auckland. Answers are S.about.
+/* ================= ABOUT YOU, WORK ROSTER, PRAISE (2.15.2) =================
+   About you: up to three useful questions per day in Pacific/Auckland, rotating after an answer or skip. Answers are S.about.
    Work roster: the days and start times he enters. The summary uses that time.
    A drive line only inside the 40 minutes before that start, and only with a real duration. */
 
 const ABOUT_QS = [
   { id: 'meal', ask: 'What’s a meal you never get tired of?' },
+  { id: 'food', ask: 'What gluten-free food do you like keeping around?' },
   { id: 'morning', ask: 'How do you like to take a morning?' },
   { id: 'place', ask: 'A place nearby you like?' },
+  { id: 'walk', ask: 'Where do you like going for a walk?' },
   { id: 'music', ask: 'What music do you put on?' },
   { id: 'film', ask: 'A film you like?' },
+  { id: 'films', ask: 'What sort of films do you enjoy?' },
   { id: 'book', ask: 'A book you’d pick up again?' },
   { id: 'dog', ask: 'What’s something the dog likes?' },
   { id: 'garden', ask: 'What are you growing, or hoping to?' },
-  { id: 'weekend', ask: 'What would a good weekend look like?' }
+  { id: 'weekend', ask: 'What would a good weekend look like?' },
+  { id: 'summary', ask: 'How do you like the home summary to sound?' },
+  { id: 'app', ask: 'What would you like My App to do more of?' }
 ];
 const ROSTER_DAYS = [['1', 'Monday'], ['2', 'Tuesday'], ['3', 'Wednesday'], ['4', 'Thursday'], ['5', 'Friday'], ['6', 'Saturday'], ['0', 'Sunday']];
 let aboutSaveTimer = null;
@@ -9754,6 +9759,17 @@ function aboutPool() {
   const pool = ABOUT_QS.filter(q => !aboutKnown(q.id));
   return pool.length ? pool : ABOUT_QS.slice();
 }
+function aboutUnansweredPool() {
+  const answered = new Set();
+  try { aboutAnswerRows().forEach(a => { if (a && a.qid && a.text) answered.add(a.qid); }); } catch (e) {}
+  return aboutPool().filter(q => !answered.has(q.id));
+}
+function aboutQuestionDone(day, qid) {
+  try {
+    const a = aboutState();
+    return (a.answers || []).some(x => x && x.qid === qid && x.day === day) || (a.skips || []).some(x => x && x.qid === qid && x.day === day);
+  } catch (e) { return false; }
+}
 function aboutTouchSave() {
   clearTimeout(aboutSaveTimer);
   aboutSaveTimer = setTimeout(() => { aboutSaveTimer = null; if (S) save().catch(() => {}); }, 400);
@@ -9762,14 +9778,25 @@ function aboutEnsurePin(now) {
   const day = nzTodayISO(now || new Date());
   const a = aboutState();
   const pinned = ABOUT_QS.find(q => q.id === (a.pin && a.pin.qid));
-  if (a.pin && a.pin.day === day && pinned) return pinned;
-  const pool = aboutPool();
+  const sameDay = !!(a.pin && a.pin.day === day && pinned);
+  const done = sameDay && aboutQuestionDone(day, pinned.id);
+  const answeredEver = sameDay && !!aboutLatest(pinned.id);
+  const limit = 3; // A few useful prompts a day, without turning About you into a nag.
+  if (sameDay && !done && !answeredEver) return pinned;
+  if (sameDay && done && a.questionDay === day && Number(a.questionCount) >= limit) return pinned;
+
+  const pool = aboutUnansweredPool();
+  if (!pool.length) return pinned || ABOUT_QS[0];
+  if (a.questionDay !== day) { a.questionDay = day; a.questionCount = 0; a.used = []; }
   let used = (Array.isArray(a.used) ? a.used : []).filter(id => pool.some(q => q.id === id));
-  let unused = pool.filter(q => !used.includes(q.id));
-  if (!unused.length) { a.used = []; unused = pool.slice(); }
-  const q = unused[0];
+  let unused = pool.filter(q => !used.includes(q.id) && (!sameDay || q.id !== pinned.id));
+  // Skipped questions may have another turn once every currently unanswered question has been seen.
+  if (!unused.length) { used = []; unused = pool.filter(q => !sameDay || q.id !== pinned.id); }
+  const q = unused[0] || pool[0];
   a.pin = { day, qid: q.id };
-  if (!a.used.includes(q.id)) a.used.push(q.id);
+  a.used = used.concat(q.id).filter((id, i, xs) => xs.indexOf(id) === i);
+  a.questionDay = day;
+  a.questionCount = Number(a.questionCount) + 1;
   aboutTouchSave();
   return q;
 }
@@ -9821,7 +9848,11 @@ function aboutFitLine() {
     if (place && where !== 'work' && a.hour < 21 && (afternoon || a.dow === 0 || a.dow === 6)) {
       return homePick(103, [place + ' is there if you feel like it.', 'If you want to head out, there’s ' + place + '.', 'You like ' + place + '. It’s there if you want it.']);
     }
-    const meal = say('meal');
+    const walk = say('walk');
+    if (walk && where !== 'work' && a.hour < 21 && (a.dow === 0 || a.dow === 6 || afternoon)) {
+      return homePick(110, ['' + walk + ' could be a good walk if you feel like one.', 'If you fancy a walk, ' + walk + ' is one you named.']);
+    }
+    const meal = say('meal') || say('food');
     let gluten = false;
     try { gluten = !!(meal && homeGlutenFood(meal)); } catch (e) { gluten = true; }
     if (meal && !gluten && evening && where !== 'work') {
@@ -9829,7 +9860,7 @@ function aboutFitLine() {
     }
     const music = say('music');
     if (music && evening) return homePick(105, ['If you want music, ' + music + '.', music + ' would suit this evening.', 'Put on ' + music + ', if you feel like it.']);
-    const film = say('film');
+    const film = say('film') || say('films');
     if (film && where === 'home' && a.hour >= 17 && a.hour < 21) {
       return homePick(106, [film + ' is a good one if you want a film.', 'If you want a film, ' + film + ' is the one you named.', film + ', if you feel like a film tonight.']);
     }
