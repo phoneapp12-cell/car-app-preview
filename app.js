@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.92.0';
+const APP_VERSION = '1.93.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6270,13 +6270,29 @@ async function notifySarah(video, announced) {
 }
 
 // Home only. The box, title and description all come from this one video.
-// The box stays a still thumbnail. It does not play on its own.
+// The box stays a still thumbnail. It does not play on its own while scrolling.
+// Sarah Jenkins is pinned at the top. A tap plays that video in the picture, same as Videos and Top 40.
+// Open on YouTube is the only control that leaves the app.
+function sarahDateText(v) {
+  const t = Date.parse(v && v.published || '');
+  if (!Number.isFinite(t)) return '';
+  const parts = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short', year: 'numeric' }).formatToParts(new Date(t));
+  const day = (parts.find(p => p.type === 'day') || {}).value;
+  const mon = (parts.find(p => p.type === 'month') || {}).value;
+  const year = (parts.find(p => p.type === 'year') || {}).value;
+  return day && mon && year ? day + ' ' + mon + ' ' + year : '';
+}
 function homeVideoRow(v) {
   const id = v && v.id;
+  const sarah = !!(v && v.category === 'sarah');
+  const click = sarah ? ` onclick="onVideoRowClick(event,${jsArg(id)},${jsArg(v.title)})"` : '';
+  const when = sarah ? sarahDateText(v) : '';
+  const date = when ? `<div class="s vdate">${esc(when)}</div>` : '';
+  const open = sarah ? videoOpenLink(id) : '';
   // Picture on the left, bold title (and channel) top-aligned on the right, description full width underneath.
-  return `<div class="row vrow hvrow" data-yt="${esc(id)}"><div class="hvhead">${videoThumbBox(id)}
+  return `<div class="row vrow hvrow" data-yt="${esc(id)}"${click}><div class="hvhead">${videoThumbBox(id)}
     <div class="tx"><div class="t">${esc(v.title)}</div><div class="s">${esc(v.channel)}</div></div></div>
-    <div class="s hvwhy">${esc(videoReason(v))}</div></div>`;
+    <div class="s hvwhy">${esc(videoReason(v))}</div>${date}${open}</div>`;
 }
 function homeVideosCard() {
   const sarah = currentSarahVideo();
