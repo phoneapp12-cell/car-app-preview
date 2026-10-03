@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.17.0';
+const APP_VERSION = '2.18.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1697,6 +1697,25 @@ function homeReadLine(mentioned) {
     return '';
   } catch (e) { return ''; }
 }
+// 2.18.0: open high-priority to-dos are named even with no due date, at work, and late at night.
+// Several share one sentence. A title already in the summary is not said again.
+function homeHighPriLine(mentioned) {
+  try {
+    const picked = [];
+    (S.todos || []).filter(t => t && !t.done && todoPriority(t) === 'high').sort(cmpOpenTodo).forEach(t => {
+      const plain = homePlainTitle(t.title);
+      const key = homeMentionKey(plain);
+      if (!plain || !key || /\broadworks?\b/i.test(plain)) return;
+      if ((mentioned && mentioned.has(key)) || picked.some(p => p.key === key)) return;
+      picked.push({ plain, key });
+    });
+    if (!picked.length) return '';
+    picked.forEach(p => { if (mentioned) mentioned.add(p.key); });
+    const names = picked.map(p => homeQuote(p.plain));
+    const list = engList(names);
+    return names.length === 1 ? names[0] + ' is high priority' : list + ' are high priority';
+  } catch (e) { return ''; }
+}
 function homeOverview(shown) {
   const urgent = [];
   try { return homeOverviewBody(shown, urgent); }
@@ -1734,6 +1753,16 @@ function homeOverviewBody(shown, urgentOut) {
     urgent.push({ kind: 'soon', text: homeDueClause(soon, 'soon'), overdue: false });
   }
   if (urgent.length > 4) urgent.splice(4);
+  // One note for every open high-priority to-do not already named. If the four notes are full, say it in the last one.
+  let high = '';
+  try { high = homeStripEnd(homeHighPriLine(mentioned)); } catch (e) { high = ''; }
+  if (high && !/\bmore are due\b/i.test(high)) {
+    if (urgent.length < 4) urgent.push({ kind: 'high', text: high, overdue: false });
+    else {
+      const host = urgent.slice().reverse().find(b => b && !b.overdue && b.text);
+      if (host) host.text = homeStripEnd(host.text) + ', and ' + high;
+    }
+  }
   const room = () => urgent.length < 4;
   const pushBit = (kind, text) => {
     if (!room()) return;
