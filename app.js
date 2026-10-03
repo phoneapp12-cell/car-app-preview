@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.11.1';
+const APP_VERSION = '2.11.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -992,7 +992,9 @@ function homeEaseLine() {
     if (evening) return 'If you want some music, Suno’s there.';
     if (weekend && afternoon) {
       if (wet) return 'Turkish Delight, if you want a little something sweet.';
-      if (a.dow === 0) return 'After a long week, a movie or a book if you get a quiet patch.';
+      // 2.11.2: a movie is a daytime-at-home suggestion only. Location is read only
+      // from the already-allowed in-memory fix; unknown location stays time-only.
+      if (a.dow === 0 && a.hour >= 5 && a.hour < 21 && !atWork) return 'After a long week, a movie or a book if you get a quiet patch.';
       return 'The gym’s there if you feel like it.';
     }
     if ((weekend || a.dow === 5) && morning) {
@@ -1013,14 +1015,16 @@ function homeEaseLine() {
 }
 function homeCommLine() {
   try {
+    // 2.11.2: commission is a work aside, not a home aside. Keep it out when
+    // Shane is at the already-allowed home place, and never invent a $0 update.
+    if (placeHere() === 'home') return '';
     const cents = homeFortnightCents();
+    if (cents == null) return '';
     const goal = homeGoalCents();
-    const amt = cents == null ? '' : centsMoney(cents);
+    const amt = centsMoney(cents);
     if (!goal) {
-      if (cents == null) return 'What’s your goal?';
       return 'Your commission so far is ' + amt + '. What’s your goal?';
     }
-    if (cents == null) return 'How’s your goal going this fortnight?';
     const p = cents / goal;
     let how;
     if (cents >= goal) how = 'That’s your goal done, maybe a bit more. Nice. Want to push it a little?';
