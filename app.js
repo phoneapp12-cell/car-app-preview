@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.88.0';
+const APP_VERSION = '1.89.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -529,6 +529,8 @@ function engList(arr) {
 // 1.84.0: the same title is named only once. “Tonight” and a clock time do not make it a different item.
 // 1.87.0: one summary line uses the lifting bridge status already on Home (the same short status and next change). No extra times.
 // 1.88.0: the same line adds NZTA live traffic when a queue is reported at this bridge. If that feed cannot be read, it says so and does not invent a closure.
+// 1.89.0: one line names comedy programmes on now, only when the TV guide’s own category says Comedy. Other lines still skip television.
+// Suggestions are two Netflix NZ titles checked on 3 Oct 2026 (The Good Place, comedy, /nz/title/80113701; Stranger Things, sci-fi, /nz/title/80057281). Not from a Prime or Netflix account. Prime is not claimed.
 function homeSaysTv(s) { return /\b(tv|television)\b/i.test(String(s || '')); }
 function homeGlutenFood(s) {
   const t = String(s || '').toLowerCase();
@@ -629,6 +631,41 @@ function homeTake(seen, titles, limit) {
   });
   return out;
 }
+
+// Comedy on now comes only from guide categories. Suggestions are fixed, labelled, and not an account.
+function homeComedyOnNow() {
+  if (typeof TV === 'undefined' || !TV || !TV.data || !TV.data.feeds) return { kind: 'missing', hits: [] };
+  const now = Date.now();
+  const hits = [];
+  let feed = false, onAir = false, classified = false;
+  TV_CHANNELS.forEach(ch => {
+    if (!(TV.data.feeds && TV.data.feeds[ch.feed])) return;
+    feed = true;
+    const item = tvOn(ch.id, now);
+    if (!item || !item.title) return;
+    onAir = true;
+    if (!Array.isArray(item.cats)) return;
+    classified = true;
+    if (item.cats.some(c => /\bcomedy\b/i.test(String(c)))) hits.push('“' + item.title.trim() + '” on ' + ch.name);
+  });
+  if (!feed) return { kind: 'missing', hits: [] };
+  if (onAir && !classified) return { kind: 'checking', hits: [] };
+  return { kind: 'ready', hits };
+}
+function homeComedyLines() {
+  const c = homeComedyOnNow();
+  let first;
+  if (c.kind === 'missing') first = 'The TV guide isn’t available, so no comedy is listed.';
+  else if (c.kind === 'checking') first = 'Checking the TV guide for comedy.';
+  else if (!c.hits.length) first = 'No comedy is on TVNZ 1, TVNZ 2, Three or Sky Starter right now.';
+  else {
+    const named = c.hits.slice(0, 4);
+    first = 'Comedy on now: ' + engList(named) + '.';
+    const more = c.hits.length - named.length;
+    if (more) first += ' ' + plural(more, 'more comedy programme') + (more === 1 ? ' is' : ' are') + ' on as well.';
+  }
+  return [first, 'Suggestions, not from your account: “The Good Place”, a comedy on Netflix, and “Stranger Things”, science fiction on Netflix.'];
+}
 function homeOverview(shown) {
   const bits = [];
   const add = (kind, text, urgent) => { if (text) bits.push({ kind, text, urgent: !!urgent }); };
@@ -638,6 +675,7 @@ function homeOverview(shown) {
   if (mailLine) add('mail', mailLine);
   const brBit = homeBridgeBit(shown);
   if (brBit) add('bridge', brBit.text, brBit.urgent);
+  homeComedyLines().forEach(line => add('comedy', line));
   const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length;
   if (over && soon) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and ${plural(soon, 'more')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days. No fuss. They can wait their turn.`);
   else if (over) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and the next 30 days are clear. Whenever you get to ${over === 1 ? 'it' : 'them'} is absolutely fine.`);
@@ -5116,7 +5154,14 @@ function tvTake(attrs, body, now, acc) {
   const titleM = /<title\b[^>]*>([\s\S]*?)<\/title>/.exec(body);
   const title = titleM ? tvUnesc(titleM[1]).replace(/\s+/g, ' ').trim() : '';
   if (!title) return;
-  (acc.slots[ch[1]] || (acc.slots[ch[1]] = [])).push({ title, start, until });
+  const cats = [];
+  const catRe = /<category\b[^>]*>([\s\S]*?)<\/category>/g;
+  let catM;
+  while ((catM = catRe.exec(body))) {
+    const cat = tvUnesc(catM[1]).replace(/\s+/g, ' ').trim();
+    if (cat && cats.indexOf(cat) === -1) cats.push(cat);
+  }
+  (acc.slots[ch[1]] || (acc.slots[ch[1]] = [])).push({ title, start, until, cats });
 }
 function tvFinish(acc, now) {
   const nowMap = {};
