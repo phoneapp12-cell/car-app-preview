@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '1.90.0';
+const APP_VERSION = '1.91.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4233,6 +4233,7 @@ function More() {
     reminders: () => remindersMoreSub(),
     loans: () => loansMoreSub(),
     events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
+    tv: () => 'TVNZ 1, TVNZ 2, Three and Sky Starter',
     meals: () => mealsMoreSub(),
     recipes: () => plural(visibleIdeas().length, 'recipe') + (M().ideas.some(i => i.fav && !i.hidden) ? ` · ${M().ideas.filter(i => i.fav && !i.hidden).length} favourites` : ''),
     shopping: () => shopMoreSub(),
@@ -4273,6 +4274,7 @@ const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'],
+  tv: ['tv', 'tv', 'TV guide', 'TV'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
@@ -5332,7 +5334,7 @@ async function refreshTv(force = false) {
 function updTv() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if ((h === 'home' || h === '') && !homeEdit) {
+  if (((h === 'home' || h === '') && !homeEdit) || h === 'tv') {
     const v = $('#view'), top = v ? v.scrollTop : 0;
     render(); if (v) v.scrollTop = top;
   }
@@ -5341,9 +5343,7 @@ function toggleTvMore() {
   tvMore = !tvMore;
   updTv();
 }
-function homeTv() {
-  const link = `<a href="${TV_GUIDE}" target="_blank" rel="noopener">Freeview</a> · <a href="${TV_SKY_GUIDE}" target="_blank" rel="noopener">Sky</a>`;
-  const head = `<div class="sec">What’s on TV ${link}</div>`;
+function tvGuideBody() {
   const now = Date.now();
   const channels = tvMore ? TV_CHANNELS : TV_CHANNELS.filter(ch => TV_HOME_SHORT.has(ch.id));
   const rows = channels.map(ch => {
@@ -5362,7 +5362,18 @@ function homeTv() {
     return `<button class="row" onclick="refreshTv(true)"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${esc(ch.name)}</div><div class="s">${esc(sub)}</div></div></button>`;
   });
   const more = `<button class="row" id="tvmore" type="button" aria-expanded="${tvMore ? 'true' : 'false'}" onclick="toggleTvMore()"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${tvMore ? 'Show less' : 'Show more'}</div><div class="s">${tvMore ? 'Main channels only' : 'The rest of Sky Starter'}</div></div></button>`;
-  return head + `<div class="list" id="hometv">${rows.join('')}${more}</div>`;
+  return `<div class="list" id="hometv">${rows.join('')}${more}</div>`;
+}
+function homeTv() {
+  const link = `<a href="${TV_GUIDE}" target="_blank" rel="noopener">Freeview</a> · <a href="${TV_SKY_GUIDE}" target="_blank" rel="noopener">Sky</a>`;
+  return `<div class="sec">What’s on TV ${link}</div>` + tvGuideBody();
+}
+// 1.91.0: the same listings as the Home card, on their own tab. Titles come only from those guides.
+function TvGuide() {
+  const link = `<a href="${TV_GUIDE}" target="_blank" rel="noopener">Freeview</a> · <a href="${TV_SKY_GUIDE}" target="_blank" rel="noopener">Sky</a>`;
+  return header('TV guide', 'What’s on now') +
+    `<div class="sec">What’s on TV ${link}</div>` + tvGuideBody() +
+    `<div class="foot">TVNZ 1, TVNZ 2, Three and Sky Starter, from the Freeview and Sky guides. Show more lists the rest of Sky Starter. Nothing is added that isn’t in those listings.</div>`;
 }
 
 /* ================= EVENTS (Whangārei District Council "What's On", via the app's service) ================= */
@@ -7142,7 +7153,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide };
   if (r !== 'more') moreEdit = false;
   if (r !== 'home' && r !== '') homeEdit = false;
   $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : (map[r] || Home)();
