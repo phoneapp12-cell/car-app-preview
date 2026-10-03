@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -93,7 +93,8 @@ const P = {
   news: '<path d="M6 4.5h11a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2H7.5A2.5 2.5 0 0 1 5 18.5V6.5A2 2 0 0 1 7 4.5"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/>',
   play: '<circle cx="12" cy="12" r="9"/><path d="M10.2 8.8v6.4L16.2 12z"/>',
   music: '<path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>',
-  leaf: '<path d="M12 21V11"/><path d="M12 13C8 12 4 9.5 4 5c5 .2 8 3.2 8 8z"/><path d="M12 11c4-1 7.2-3.6 8-7-4.2.8-7 4-8 7z"/>'
+  leaf: '<path d="M12 21V11"/><path d="M12 13C8 12 4 9.5 4 5c5 .2 8 3.2 8 8z"/><path d="M12 11c4-1 7.2-3.6 8-7-4.2.8-7 4-8 7z"/>',
+  pen: '<path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/>'
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
 
@@ -114,7 +115,7 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), shop: newShop(), pets: [], myEvents: [], loans: [],
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), shop: newShop(), pets: [], myEvents: [], loans: [], posts: [],
     settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
@@ -123,7 +124,7 @@ const blankDriver = (id, name) => ({ id, name, aaNo: '', aaType: '', aaExpiry: '
 const seedDrivers = () => [blankDriver('drv-shane', 'Shane'), blankDriver('drv-sarah', 'Sarah'), blankDriver('drv-cass', 'Cass')];
 function normalise(d) {
   d = d && typeof d === 'object' ? d : {};
-  ['cars', 'bills', 'todos', 'appts', 'birthdays', 'ideas', 'feeds'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
+  ['cars', 'bills', 'todos', 'appts', 'birthdays', 'ideas', 'feeds', 'posts'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
   if (!Array.isArray(d.lists) || !d.lists.length) d.lists = ['Home', 'Cars', 'Shopping'];
   if (!Array.isArray(d.ideaCats)) d.ideaCats = IDEA_CATS.slice();
   if (!Array.isArray(d.drivers)) d.drivers = seedDrivers(); // first time on this version: Shane, Sarah and Cass
@@ -286,6 +287,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
   news: ['news', 'ln', 'Local news', 'Recent stories from around Whangārei', 1],
   videos: ['play', 'vid', 'Videos', 'A few suggestions from the video categories you leave on', 0],
+  blogging: ['pen', 'blog', 'Blogging', 'Your latest posts, kept on this phone', 0],
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a Done button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
@@ -305,7 +307,7 @@ const HOME_GROUPS = [
   { id: 'cars', title: 'Cars', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'shopping', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['bridge', 'weather', 'roadworks', 'events', 'news'] },
-  { id: 'media', title: 'Media', keys: ['tv', 'videos'] }
+  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'blogging'] }
 ];
 const HOME_CAT = Object.fromEntries(HOME_GROUPS.flatMap(g => g.keys.map(k => [k, g.id])));
 let homeEdit = false;
@@ -473,6 +475,13 @@ const HOME_CARD = {
     const list = S.ideas.filter(i => i.pinned).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 5); if (!list.length) return '';
     return homeSec('Starred ideas', '<a href="#ideas">See all</a>') + `<div class="list" id="homeideas">${list.map(i => `<button class="row" onclick="go('#ideas')"><div class="ic idea">${I('star')}</div>
       <div class="tx"><div class="t">${esc(i.title)}</div>${i.cat ? `<div class="s">${esc(i.cat)}</div>` : ''}</div></button>`).join('')}</div>`;
+  },
+  // Off until switched on in Customise Home. Nothing to show until there is a real post.
+  blogging: () => {
+    const list = postsSorted().slice(0, 2);
+    if (!list.length) return '';
+    return homeSec('Blogging', '<a href="#blogging">See all</a>') + `<div class="list" id="homeblog">${list.map(p => `<button class="row" onclick="go('#blogging/${p.id}')"><div class="ic blog">${I('pen')}</div>
+      <div class="tx"><div class="t">${esc(p.title)}</div><div class="s">${esc(postStamp(p))}</div></div></button>`).join('')}</div>`;
   }
 };
 function homeEditHtml() {
@@ -2053,6 +2062,73 @@ function catsForm() {
       S.ideas.forEach(i => { if (i.cat && i.cat in ren) i.cat = ren[i.cat]; });
       S.ideaCats = next; await save(); render(); toast('Categories saved.');
     }, 'Save');
+}
+
+
+/* ================= BLOGGING =================
+   Posts live in S.posts, the same store as the rest of the app, so a backup and the sync blob include them.
+   Nothing is published. The list starts empty. */
+function postsSorted() {
+  return (S.posts || []).slice().sort((a, b) => (b.created || 0) - (a.created || 0) || (b.updated || 0) - (a.updated || 0));
+}
+function postWhen(ms) {
+  const d = new Date(ms);
+  if (!ms || isNaN(d.getTime())) return '';
+  return WDL[d.getDay()] + ' ' + d.getDate() + ' ' + MONL[d.getMonth()] + ' ' + d.getFullYear();
+}
+function postStamp(p) {
+  const wrote = postWhen(p.created);
+  if (p.updated && p.created && p.updated - p.created > 60000) return wrote + ' · edited ' + postWhen(p.updated);
+  return wrote;
+}
+function postSnippet(p) {
+  const line = String(p.body || '').split('\n').map(s => s.trim()).filter(Boolean)[0] || '';
+  return line.length > 90 ? line.slice(0, 89) + '…' : line;
+}
+function getPost(id) { return (S.posts || []).find(p => p.id === id); }
+function Blogging() {
+  const list = postsSorted();
+  return header('Blogging', list.length ? plural(list.length, 'post') + ' · on this phone' : 'On this phone only', addBtn('Write a post', 'postForm()')) +
+    (list.length ? `<div class="list" id="bloglist">${list.map(p => {
+      const sn = postSnippet(p);
+      return `<button class="row" onclick="go('#blogging/${p.id}')"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">${esc(p.title)}</div><div class="s">${esc(postStamp(p))}${sn ? ' · ' + esc(sn) : ''}</div></div>${I('right')}</button>`;
+    }).join('')}</div>` : empty('No posts yet', 'Write a post and it stays with the rest of your data on this phone. Nothing is published.', 'Write a post', 'postForm()'));
+}
+function BlogPost(id) {
+  const p = getPost(id);
+  if (!p) return `<button class="back" onclick="go('#blogging')">${I('left')} Blogging</button>` + empty('That post isn’t here any more', 'It may have been deleted.', '', '');
+  const body = String(p.body || '').trim();
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#blogging')">${I('left')} Blogging</button>
+    <button class="btn small" onclick="postForm('${p.id}')">${I('edit')} Edit</button></div>
+    <h2 style="margin:6px 0 4px">${esc(p.title)}</h2>
+    <div class="muted" style="margin-bottom:12px">${esc(postStamp(p))}</div>
+    ${body ? `<div class="card notes" id="postbody">${esc(p.body)}</div>` : `<div class="card empty"><div class="t">No words yet</div><div class="s">This post has a title only. Edit it to add the rest.</div></div>`}
+    <div class="btns" style="margin-top:12px"><button class="btn danger" onclick="deletePost('${p.id}')">${I('trash')} Delete post</button></div>`;
+}
+function postForm(id) {
+  const p = id ? getPost(id) : { title: '', body: '' };
+  if (!p) return;
+  openSheet(id ? 'Edit post' : 'Write a post',
+    field('Title', inp('title', p.title || '', 'placeholder="Title" required maxlength="160"')) +
+    field('Post', `<textarea name="body" placeholder="Write the post…" maxlength="40000" style="min-height:180px">${esc(p.body || '')}</textarea>`),
+    async v => {
+      if (!v.title) return 'Please give the post a title.';
+      const now = Date.now();
+      if (id) Object.assign(p, { title: v.title, body: v.body, updated: now });
+      else S.posts.push({ id: uid('post'), title: v.title, body: v.body, created: now, updated: now });
+      await save(); render(); toast(id ? 'Post updated.' : 'Post saved.');
+    }, id ? 'Save' : 'Save post',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete post" onclick="deletePost('${id}')">${I('trash')}</button>` : '');
+}
+async function deletePost(id) {
+  const s = snap();
+  S.posts = S.posts.filter(x => x.id !== id);
+  await save();
+  if (sheetOpen) await closeSheet();
+  const onIt = (location.hash || '').replace(/^#/, '') === 'blogging/' + id;
+  if (onIt) location.hash = '#blogging';
+  else render();
+  toast('Post deleted.', 'Undo', undoTo(s));
 }
 
 /* ================= MEAL PLANNER ================= */
@@ -4704,6 +4780,7 @@ function More() {
     bills: () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…',
     birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
     ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down',
+    blogging: () => S.posts.length ? plural(S.posts.length, 'post') : 'Write on this phone',
     videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
     top40: () => 'Official Top 40 · chart as of 3 Oct 2026'
   });
@@ -4730,7 +4807,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
-  top40: ['music', 't40', 'Top 40', 'Top 40']
+  top40: ['music', 't40', 'Top 40', 'Top 40'],
+  blogging: ['pen', 'blog', 'Blogging', 'Blog']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -4742,7 +4820,7 @@ const NAV_GROUPS = [
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge'] },
-  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40'] }
+  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging'] }
 ];
 function navOrder() {
   return NAV_DEFAULT.slice();
@@ -7762,7 +7840,7 @@ function render() {
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide };
   if (r !== 'home' && r !== '') homeEdit = false;
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : (map[r] || Home)();
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
