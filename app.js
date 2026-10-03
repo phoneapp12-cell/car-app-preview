@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.6.0';
+const APP_VERSION = '2.7.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -689,195 +689,201 @@ function homeVideoPicks(mood) {
   return garden.slice(0, 2);
 }
 // Same event, task or title, even if one line says Tonight or Today and another does not.
-// Words already on the Home bridge card or line. Times come only from that status.
-function homeBridgeBit(shown) {
-  if (!shown || !shown.has('bridge')) return null;
-  const st = brStatus();
-  const row = BR_TXT[st && st.state];
-  if (!row || !row[3]) return null;
-  const next = String(brNextText(st) || '').trim();
-  const traffic = bridgeTrafficSentence();
-  let text = next ? `Lifting bridge: ${row[3]}. ${next}.` : `Lifting bridge: ${row[3]}.`;
-  if (traffic) text += ' ' + traffic;
-  return { text, urgent: st.state === 'closed' || st.state === 'noon' || bridgeTrafficLikely() };
-}
-function homeMentionKey(s) {
-  let t = String(s || '').toLowerCase().replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').trim();
+// Drop a leading day and a trailing clock time so a summary line does not repeat them.
+function homePlainTitle(name) {
+  let t = String(name || '').replace(/\s+/g, ' ').trim();
   t = t.replace(/^[“"']+|[”"']+$/g, '');
   let prev = '';
   while (t && t !== prev) {
     prev = t;
-    t = t.replace(/^(tonight|today|tomorrow|yesterday|in \d+ days?)\s*[:\-–—]?\s*/, '');
-    t = t.replace(/\s+\d{1,2}:\d{2}\s*(am|pm)\s*$/, '');
-    t = t.replace(/\s+all day\s*$/, '');
+    t = t.replace(/^(tonight|today|tomorrow|yesterday|in \d+ days?)\s*[:\-–—]?\s*/i, '');
+    t = t.replace(/\s+\d{1,2}:\d{2}\s*(am|pm)\s*$/i, '');
+    t = t.replace(/\s+all day\s*$/i, '');
   }
   return t.trim();
 }
-function homeTake(seen, titles, limit) {
-  const out = [];
-  (titles || []).forEach(title => {
-    if (limit && out.length >= limit) return;
-    const raw = String(title || '').replace(/\s+/g, ' ').trim();
-    const key = homeMentionKey(raw);
-    if (!raw || !key || seen.has(key)) return;
-    seen.add(key);
-    out.push(raw);
-  });
-  return out;
+function homeQuote(title) {
+  return '“' + title + '”';
 }
-
-// Comedy on now comes only from guide categories. Suggestions are labelled, and not an account.
-// Streaming on Netflix NZ or Prime Video NZ, JustWatch NZ, 3 Oct 2026. English titles only.
-const HOME_STREAM_PICKS = [
-  { title: 'Brooklyn Nine-Nine', kind: 'comedy', service: 'Netflix' },
-  { title: 'Grace and Frankie', kind: 'comedy', service: 'Netflix' },
-  { title: 'Sex Education', kind: 'comedy', service: 'Netflix' },
-  { title: 'Derry Girls', kind: 'comedy', service: 'Netflix' },
-  { title: 'Stranger Things', kind: 'scifi', service: 'Netflix' },
-  { title: 'Black Mirror', kind: 'scifi', service: 'Netflix' },
-  { title: 'The Umbrella Academy', kind: 'scifi', service: 'Netflix' },
-  { title: 'The Marvelous Mrs. Maisel', kind: 'comedy', service: 'Prime Video' },
-  { title: 'Fleabag', kind: 'comedy', service: 'Prime Video' },
-  { title: 'The Boys', kind: 'both', service: 'Prime Video' },
-  { title: 'Upload', kind: 'both', service: 'Prime Video' },
-  { title: 'Good Omens', kind: 'both', service: 'Prime Video' },
-  { title: 'The Expanse', kind: 'scifi', service: 'Prime Video' },
-  { title: 'Fallout', kind: 'scifi', service: 'Prime Video' }
-];
-let homeStreamChosen = null;
-function homeStreamPair() {
-  if (homeStreamChosen) return homeStreamChosen;
-  const pool = HOME_STREAM_PICKS.slice();
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+// Bridge copy only when the live status is actually worth saying. Quiet hours are skipped.
+// No roadworks wording, and no “live traffic was not available”.
+function homeBridgeBit() {
+  const st = brStatus();
+  if (!st || !st.state) return null;
+  const queued = bridgeTrafficLikely();
+  let text = '';
+  let urgent = !!queued;
+  if (st.state === 'closed') {
+    text = 'The lifting bridge is closed for a planned closure. The council’s notice has when it opens again.';
+    urgent = true;
+  } else if (st.state === 'noon') {
+    text = 'The lifting bridge is on its noon lift. You might wait a few minutes if you’re heading that way.';
+    urgent = true;
+  } else if (st.state === 'windy') {
+    text = 'It’s too windy for lifts on the bridge today. The road itself stays open.';
+  } else if (queued) {
+    text = 'There’s a queue at the lifting bridge, so it might be closed. Worth leaving a little extra time.';
+  } else return null;
+  if (queued && text.indexOf('queue') < 0) {
+    text += ' There’s a queue reported there as well.';
+    urgent = true;
   }
-  homeStreamChosen = [pool[0], pool[1]];
-  return homeStreamChosen;
+  if (/\broadworks?\b/i.test(text)) return null;
+  return { text, urgent };
 }
-function homeStreamBit(p) {
-  const kind = p.kind === 'comedy' ? 'a comedy' : p.kind === 'both' ? 'a comedy and science fiction series' : 'science fiction';
-  return '“' + p.title + '”, ' + kind + ' on ' + p.service;
-}
-function homeComedyOnNow() {
-  if (typeof TV === 'undefined' || !TV || !TV.data || !TV.data.feeds) return { kind: 'missing', hits: [] };
-  const now = Date.now();
-  const hits = [];
-  let feed = false, onAir = false, classified = false;
-  TV_CHANNELS.forEach(ch => {
-    if (!(TV.data.feeds && TV.data.feeds[ch.feed])) return;
-    feed = true;
-    const item = tvOn(ch.id, now);
-    if (!item || !item.title) return;
-    onAir = true;
-    if (!Array.isArray(item.cats)) return;
-    classified = true;
-    if (item.cats.some(c => /\bcomedy\b/i.test(String(c)))) hits.push('“' + item.title.trim() + '” on ' + ch.name);
-  });
-  if (!feed) return { kind: 'missing', hits: [] };
-  if (onAir && !classified) return { kind: 'checking', hits: [] };
-  return { kind: 'ready', hits };
-}
-function homeComedyLines() {
-  const c = homeComedyOnNow();
-  let first;
-  if (c.kind === 'missing') first = 'The TV guide isn’t available, so no comedy is listed.';
-  else if (c.kind === 'checking') first = 'Checking the TV guide for comedy.';
-  else if (!c.hits.length) first = 'No comedy is on TVNZ 1, TVNZ 2, Three or Sky Starter right now.';
-  else {
-    const named = c.hits.slice(0, 4);
-    first = 'Comedy on now: ' + engList(named) + '.';
-    const more = c.hits.length - named.length;
-    if (more) first += ' ' + plural(more, 'more comedy programme') + (more === 1 ? ' is' : ' are') + ' on as well.';
-  }
-  const pair = homeStreamPair();
-  return [first, 'Suggestions, not from your account: ' + homeStreamBit(pair[0]) + ', and ' + homeStreamBit(pair[1]) + '.'];
-}
+// 2.7.0: a few friend-style boxes, only for what is actually interesting. No counts, no numbered bars.
+// Cars and pet care are not their own lines. Comedy only if a guide category says it is on now.
+// Weather only when it is already loaded and rainy or sunny, and only with a real task or a real video.
+// A blog or podcast only when that feed is loaded. A headline only when local news is loaded.
+// The same title is used once. Nothing is invented.
 function homeOverview(shown) {
   const bits = [];
-  const add = (kind, text, urgent) => { if (text) bits.push({ kind, text, urgent: !!urgent }); };
-  const wx = homeWxRead();
-  if (wx.line) add('wx', wx.line);
-  const mailLine = homeMailLine();
-  if (mailLine) add('mail', mailLine);
-  const brBit = homeBridgeBit(shown);
-  if (brBit) add('bridge', brBit.text, brBit.urgent);
-  homeComedyLines().forEach(line => add('comedy', line));
-  const items = dueItems(S), over = items.filter(x => x.days < 0).length, soon = items.filter(x => x.days >= 0 && x.days <= 30).length;
-  if (over && soon) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and ${plural(soon, 'more')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days. No fuss. They can wait their turn.`);
-  else if (over) add('late', `${plural(over, 'thing')} ${over === 1 ? 'is' : 'are'} a little late, and the next 30 days are clear. Whenever you get to ${over === 1 ? 'it' : 'them'} is absolutely fine.`);
-  else if (soon) add('due', `Nothing is overdue. ${plural(soon, 'thing')} ${soon === 1 ? 'is' : 'are'} due in the next 30 days, and there’s no rush.`);
-  else add('due', 'Nothing is overdue, and nothing is due in the next 30 days. A nice open stretch.');
   const mentioned = new Set();
-  const soonItems = homeAttention().filter(x => x.kind !== 'tv' && x.days >= 0 && x.days <= 30 && x.name && !homeSaysTv(x.name));
-  const soonUnique = [];
-  const soonKeys = new Set();
-  soonItems.forEach(x => {
-    const key = homeMentionKey(x.name);
-    if (!key || soonKeys.has(key)) return;
-    soonKeys.add(key);
-    soonUnique.push(x);
+  const add = (kind, text, urgent) => {
+    if (bits.length >= 4) return;
+    const line = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line)) return;
+    bits.push({ kind, text: line, urgent: !!urgent });
+  };
+  const takeTitles = (titles, limit) => homeTake(mentioned, titles, limit);
+  const pool = homeAttention().filter(x => {
+    if (!x || !x.name) return false;
+    if (x.kind === 'car' || x.kind === 'pet' || x.kind === 'tv' || x.kind === 'meal' || x.kind === 'comm') return false;
+    if (homeSaysTv(x.name) || /\broadworks?\b/i.test(x.name)) return false;
+    return !!homePlainTitle(x.name);
   });
-  const named = soonUnique.slice(0, 4);
-  named.forEach(x => mentioned.add(homeMentionKey(x.name)));
-  const names = named.map(x => x.name);
-  if (names.length) add('soon', `First up in the next 30 days: ${engList(names)}.`, named.some(x => x.days === 0));
-  else add('soon', 'Nothing is coming up in the next 30 days.');
+  const uniqueByTitle = (list, limit) => {
+    const out = [];
+    list.forEach(x => {
+      if (out.length >= limit) return;
+      const plain = homePlainTitle(x.name);
+      const key = homeMentionKey(plain);
+      if (!plain || !key || mentioned.has(key) || out.some(y => homeMentionKey(y.plain) === key)) return;
+      out.push({ days: x.days, plain });
+    });
+    return out;
+  };
+  const nameLine = (items, late) => {
+    const names = items.map(x => homeQuote(x.plain));
+    const list = engList(names);
+    if (late) {
+      return names.length === 1
+        ? names[0] + ' is a bit late. No drama. Whenever you have a minute is fine.'
+        : list + ' are a bit late. They can wait until you feel like it.';
+    }
+    if (items.every(x => x.days === 0)) return 'Today you’ve got ' + list + '.';
+    if (items.every(x => x.days === 1)) return 'Tomorrow you’ve got ' + list + '.';
+    if (names.length === 1) return names[0] + ' is coming up soon.';
+    return 'Coming up soon: ' + list + '.';
+  };
+  const late = uniqueByTitle(pool.filter(x => x.days < 0), 2);
+  if (late.length) {
+    takeTitles(late.map(x => x.plain), 2);
+    add('late', nameLine(late, true), true);
+  }
+  const brBit = homeBridgeBit();
+  if (brBit) add('bridge', brBit.text, brBit.urgent);
+  const soon = uniqueByTitle(pool.filter(x => x.days >= 0 && x.days <= 7), 2);
+  if (soon.length) {
+    takeTitles(soon.map(x => x.plain), 2);
+    add('soon', nameLine(soon, false), soon.some(x => x.days === 0));
+  }
+  const comedy = homeComedyOnNow();
+  if (comedy.kind === 'ready' && comedy.hits.length) {
+    const picked = [];
+    comedy.hits.forEach(hit => {
+      if (picked.length >= 2) return;
+      const m = /^“(.+)” on (.+)$/.exec(hit);
+      const title = (m ? m[1] : hit).trim();
+      const where = m ? m[2].trim() : '';
+      if (!title || /\broadworks?\b/i.test(title)) return;
+      const got = takeTitles([title], 1);
+      if (!got.length) return;
+      picked.push(where ? homeQuote(got[0]) + ' on ' + where : homeQuote(got[0]));
+    });
+    if (picked.length === 1) add('comedy', picked[0] + ' is on right now, if you feel like a laugh.');
+    else if (picked.length) add('comedy', 'If you feel like a laugh, ' + engList(picked) + ' are on right now.');
+  }
+  const today = todayISO();
+  const meals = upcomingMeals();
+  const mealTitle = meals.includes(today) && M().plan[today] && M().plan[today].title ? String(M().plan[today].title).replace(/\s+/g, ' ').trim() : '';
+  if (mealTitle && !homeSaysTv(mealTitle) && !/\broadworks?\b/i.test(mealTitle)) {
+    const got = takeTitles([mealTitle], 1);
+    if (got.length) add('meal', 'Tonight’s dinner is ' + homeQuote(got[0]) + '. Should be a good one.');
+  }
   if (EVS) {
-    const allEv = upcomingEvents().map(e => e && typeof e.title === 'string' ? e.title.trim() : '').filter(t => t && !homeSaysTv(t));
-    const evNames = homeTake(mentioned, allEv, 2);
-    if (evNames.length) add('out', `Out locally: ${engList(evNames)}.`);
-    else if (!allEv.length) add('out', 'No local events are listed right now.');
-  }
-  if (CM().anchor) {
-    const f = curFortnight();
-    const recorded = CM().entries.filter(e => e.date >= f.start && e.date <= f.end);
-    if (recorded.length) add('pay', `This fortnight’s commission is ${centsMoney(commSum(CM().entries, f.start, f.end))}.`);
-    else add('pay', 'No commission amount is recorded for this fortnight.');
-  } else add('pay', 'No commission amount is recorded for this fortnight.');
-  if (shown.has('meals')) {
-    const today = todayISO(), meals = upcomingMeals();
-    const mealTitle = meals.includes(today) && M().plan[today] && M().plan[today].title ? M().plan[today].title : '';
-    const freshMeal = mealTitle ? homeTake(mentioned, [mealTitle], 1) : [];
-    if (freshMeal.length) add('meal', `Today’s meal is ${freshMeal[0]}.`);
-    else if (meals.length && !mealTitle) add('meal', `${plural(meals.length, 'meal')} ${meals.length === 1 ? 'is' : 'are'} planned, and none is set for today.`);
-  }
-  if (shown.has('birthdays')) {
-    const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((a, b) => a.d - b.d || a.b.name.localeCompare(b.b.name));
-    if (list.length && list.length <= 3) {
-      const bnames = homeTake(mentioned, list.map(x => x.b.name), 3);
-      if (bnames.length) add('bday', `Birthdays in the next 30 days: ${engList(bnames)}.`);
-    } else if (list.length) {
-      const bnames = homeTake(mentioned, list.map(x => x.b.name), 1);
-      if (bnames.length) add('bday', `${plural(list.length, 'birthday')} in the next 30 days, the next being ${bnames[0]}.`);
+    const ev = upcomingEvents().find(e => {
+      if (!e || !e.title || /\broadworks?\b/i.test(e.title) || homeSaysTv(e.title)) return false;
+      const d = daysLeft(e.date);
+      return d >= 0 && d <= 14;
+    });
+    if (ev) {
+      const got = takeTitles([String(ev.title).replace(/\s+/g, ' ').trim()], 1);
+      if (got.length) {
+        const d = daysLeft(ev.date);
+        const q = homeQuote(got[0]);
+        const line = d === 0 ? 'If you feel like heading out, ' + q + ' is on in town today.'
+          : d === 1 ? 'Tomorrow there’s ' + q + ' in town, if you fancy it.'
+          : q + ' is on in town soon, if you want a look.';
+        add('out', line);
+      }
     }
   }
-  const jobs = homeTake(mentioned, homeDayJobs(wx.mood), 2);
-  if (jobs.length) {
-    const quoted = engList(jobs.map(t => '“' + t + '”'));
-    if (wx.mood === 'wet') add('job', `If you want something easy while it’s wet, your list already has ${quoted}. Only if you feel like it.`);
-    else add('job', `If you want to use the sun, your list already has ${quoted}. Only if you feel like it.`);
+  const wx = homeWxRead();
+  if (wx.mood === 'wet' || wx.mood === 'sun') {
+    const jobs = takeTitles(homeDayJobs(wx.mood), 1);
+    if (jobs.length) {
+      const q = homeQuote(jobs[0]);
+      add('wx', wx.mood === 'wet'
+        ? 'It’s rainy in Whangārei. ' + q + ' is already on your list if you want something easy indoors.'
+        : 'It’s sunny in Whangārei. ' + q + ' could be a nice way to use the light, if you feel like it.');
+    } else {
+      const vid = homeVideoPicks(wx.mood).find(v => v && v.title && homeMentionKey(v.title) && !mentioned.has(homeMentionKey(v.title)));
+      if (vid) {
+        const got = takeTitles([vid.title], 1);
+        if (got.length) {
+          const q = homeQuote(got[0]);
+          add('vid', wx.mood === 'wet'
+            ? 'It’s rainy in Whangārei. ' + q + ' is on your video list if you’d rather stay in.'
+            : 'It’s sunny in Whangārei. ' + q + ' is on your video list if you want a spring idea.');
+        }
+      }
+    }
   }
-  const vids = homeVideoPicks(wx.mood).filter(v => {
-    const key = homeMentionKey(v.title);
-    return key && !mentioned.has(key);
+  const freshCut = Date.now() - 14 * DAY;
+  const reads = [];
+  const posts = blogPosts();
+  if (posts && posts.length && Date.parse(posts[0].published) >= freshCut) {
+    reads.push({ at: posts[0].published, title: posts[0].title, kind: 'blog',
+      text: 'If you want a read, ' + posts[0].blog + ' has a new post: ' + homeQuote(posts[0].title) + '.' });
+  }
+  const episodes = podEpisodes();
+  if (episodes && episodes.length && Date.parse(episodes[0].published) >= freshCut) {
+    reads.push({ at: episodes[0].published, title: episodes[0].title, kind: 'pod',
+      text: 'If you want something to listen to, ' + episodes[0].show + ' has a new episode: ' + homeQuote(episodes[0].title) + '.' });
+  }
+  reads.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  reads.some(r => {
+    if (!r.title || homeSaysTv(r.title) || /\broadworks?\b/i.test(r.title + ' ' + r.text)) return false;
+    const got = takeTitles([r.title], 1);
+    if (!got.length) return false;
+    add(r.kind, r.text);
+    return true;
   });
-  if (vids.length) {
-    homeTake(mentioned, vids.map(v => v.title), 2);
-    const q = v => '“' + v.title + '”';
-    if (wx.mood === 'wet' && vids.length === 2 && vids[0].category !== 'garden' && vids[1].category === 'garden')
-      add('vid', `From your video list: ${q(vids[0])} for a rainy day, and ${q(vids[1])} for this spring.`);
-    else if (wx.mood === 'wet') add('vid', `For a rainy day, your video list has ${engList(vids.map(q))}.`);
-    else if (wx.mood === 'sun') add('vid', `For a sunny spring day, your video list has ${engList(vids.map(q))}.`);
-    else add('vid', `For early spring, your video list has ${engList(vids.map(q))}.`);
+  const headlines = newsItems();
+  if (headlines && headlines.length) {
+    const story = headlines.find(x => x && x.title && !/\broadworks?\b/i.test(x.title) && !homeSaysTv(x.title));
+    if (story) {
+      const got = takeTitles([String(story.title).replace(/\s+/g, ' ').trim()], 1);
+      if (got.length) add('news', 'RNZ has this from around here: ' + homeQuote(got[0]) + '.');
+    }
   }
   if (!bits.length) return '';
   const bars = ['#0F766E', '#1D4ED8', '#6D28D9', '#047857', '#9A3412', '#BE185D', '#1E3A8A', '#0369A1', '#3F6212', '#155E75', '#5B21B6', '#134E4A'];
   return `<div class="card homesum" id="homesum"><ul>${bits.map((b, i) => {
-    const n = String(i + 1).padStart(2, '0');
     const urgent = !!(b.urgent || b.kind === 'late');
     const style = urgent ? '' : ` style="--bar:${bars[i % bars.length]}"`;
-    return `<li class="${b.kind}${urgent ? ' urgent' : ''}"${style}><span class="n">${n}</span><span class="tx">${esc(b.text)}</span></li>`;
+    return `<li class="${b.kind}${urgent ? ' urgent' : ''}"${style}><span class="tx">${esc(b.text)}</span></li>`;
   }).join('')}</ul></div>`;
 }
 
@@ -5505,11 +5511,19 @@ function updWx() {
 function paintHomeSum() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if ((h !== 'home' && h !== '') || homeEdit) return;
-  const sum = document.getElementById('homesum');
-  if (!sum) return;
+  if ((h !== 'home' && h !== '') || homeEdit || !showHomeSum()) return;
   const next = homeOverview(homeShownNow);
-  if (next) sum.outerHTML = next;
+  const sum = document.getElementById('homesum');
+  if (sum) {
+    if (next) sum.outerHTML = next;
+    else sum.remove();
+    return;
+  }
+  if (!next) return;
+  const v = document.getElementById('view');
+  const top = v ? v.scrollTop : 0;
+  render();
+  if (v) v.scrollTop = top;
 }
 // Open-Meteo weather codes → words (day, night) and the icon kind drawn by wxIcon() (v1.9.0: coloured inline SVG icons)
 const WMO = {

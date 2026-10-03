@@ -94,11 +94,13 @@ body.kb #view{padding-bottom:28px}
 .top h1{font-size:1.75rem;line-height:1.15;margin:0;letter-spacing:-.5px}
 .top .sub{color:var(--ink2);font-size:0.9375rem;margin-top:4px}
 .wxgreet{display:flex;align-items:center;gap:8px;width:100%;text-align:left;margin:-6px 0 10px;padding:6px 10px;color:var(--ink2);font-size:0.9375rem;font-weight:600;line-height:1.35;background:color-mix(in srgb,#e8a317 16%,transparent);border-radius:14px}
-.card.homesum{margin:2px 0 12px;padding:0;background:transparent;box-shadow:none}
-.homesum ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
-.homesum li{display:flex;align-items:flex-start;gap:12px;margin:0;padding:12px 14px;border:none;border-radius:16px;background:var(--bar,#0F766E);color:#fff;font-size:0.9375rem;line-height:1.45;font-weight:650}
-.homesum li .n{flex:none;min-width:2.1rem;font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:.03em;font-size:1.05rem;line-height:1.35}
-.homesum li .tx{flex:1;min-width:0}
+.card.homesum{margin:2px 0 12px;padding:0;background:transparent;box-shadow:none;overflow:visible}
+.homesum ul{margin:0;padding:6px 2px 8px;list-style:none;display:flex;flex-direction:column;gap:10px}
+.homesum li{display:block;margin:0;padding:13px 16px 14px;border:none;border-radius:16px;background:var(--bar,#0F766E);color:#fff;font-size:0.9375rem;line-height:1.45;font-weight:650;overflow:visible}
+.homesum li .tx{display:block;transform:rotate(-1.2deg) skewX(-4deg);transform-origin:left center}
+@media (prefers-reduced-motion: reduce){
+  .homesum li .tx{transform:rotate(-1.2deg) skewX(-4deg)}
+}
 .homesum li.urgent{background:#C62828;color:#fff}
 html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transparent)}
 .wxgreet b{color:var(--ink);font-weight:800}
@@ -722,7 +724,7 @@ details.help ol{margin:0 0 12px}
 .hsec .card,.hsec .list{background:color-mix(in srgb,#303e50 18%,var(--card))}
 html[data-theme="dark"] .hsec{background:rgba(48,62,80,.55)}
 html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{background:color-mix(in srgb,#303e50 26%,var(--card))}
-/* Home sections (v1.95.0): one transparent darker grey-blue. Numbered summary bars stay as they are. No pink. */
+/* Home sections (v1.95.0): one transparent darker grey-blue. Summary notes are unnumbered. The writing is slanted a little. No pink. */
 .hsec + .hsec{border-top:3px solid color-mix(in srgb,var(--ink3) 65%,transparent);margin-top:18px;padding-top:4px}
 .hsec > .sec:first-child{margin-top:12px}
 .hsec > .tiles:first-child,.hsec > .card:first-child,.hsec > .list:first-child,.hsec > .callout:first-child{margin-top:14px}
