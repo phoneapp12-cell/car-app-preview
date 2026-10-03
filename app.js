@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -287,7 +287,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
   news: ['news', 'ln', 'Local news', 'Recent stories from around Whangārei', 1],
   videos: ['play', 'vid', 'Videos', 'A few suggestions from the video categories you leave on', 0],
-  blogging: ['pen', 'blog', 'Blogging', 'Your latest posts, kept on this phone', 0],
+  blogging: ['pen', 'blog', 'Blogging', 'Recent posts from other blogs', 0],
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a Done button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
@@ -476,12 +476,15 @@ const HOME_CARD = {
     return homeSec('Starred ideas', '<a href="#ideas">See all</a>') + `<div class="list" id="homeideas">${list.map(i => `<button class="row" onclick="go('#ideas')"><div class="ic idea">${I('star')}</div>
       <div class="tx"><div class="t">${esc(i.title)}</div>${i.cat ? `<div class="s">${esc(i.cat)}</div>` : ''}</div></button>`).join('')}</div>`;
   },
-  // Off until switched on in Customise Home. Nothing to show until there is a real post.
+  // Off until switched on in Customise Home. Shows posts from the public blogs, not notes saved on this phone.
   blogging: () => {
-    const list = postsSorted().slice(0, 2);
-    if (!list.length) return '';
-    return homeSec('Blogging', '<a href="#blogging">See all</a>') + `<div class="list" id="homeblog">${list.map(p => `<button class="row" onclick="go('#blogging/${p.id}')"><div class="ic blog">${I('pen')}</div>
-      <div class="tx"><div class="t">${esc(p.title)}</div><div class="s">${esc(postStamp(p))}</div></div></button>`).join('')}</div>`;
+    const head = homeSec('Blogging', '<a href="#blogging">See all</a>');
+    const posts = blogPosts();
+    if (!posts) return head + blogEmpty('homeblog');
+    if (posts.length) return head + `<div class="list" id="homeblog">${posts.slice(0, 2).map(blogRow).join('')}</div>`;
+    const failed = blogFailures() || [];
+    if (failed.length) return head + `<div class="list" id="homeblog">${failed.slice(0, 2).map(blogFailRow).join('')}</div>`;
+    return head + blogNone('homeblog');
   }
 };
 function homeEditHtml() {
@@ -2066,8 +2069,121 @@ function catsForm() {
 
 
 /* ================= BLOGGING =================
-   Posts live in S.posts, the same store as the rest of the app, so a backup and the sync blob include them.
-   Nothing is published. The list starts empty. */
+   The page reads a few public blogs through the relay (GET /blogs). Those sites do not send CORS.
+   S.posts is left as it was, so anything already typed stays in backups. Writing is not the page.
+   Nothing is invented: a feed that fails is an empty row, not a made-up post. */
+const BLOG_MAX_AGE = 30 * 60 * 1000;
+let BLOGFEED = null, blogBusy = false, blogFailed = false, blogTimer = null;
+function loadBlogs() {
+  try {
+    const r = JSON.parse(localStorage.getItem('blogfeeds') || 'null');
+    BLOGFEED = r && r.at && r.data && Array.isArray(r.data.blogs) ? r : null;
+  } catch (e) { BLOGFEED = null; }
+}
+function blogHttps(u) {
+  try {
+    const x = new URL(String(u || ''));
+    if (x.protocol === 'https:' && !x.username && !x.password) return x.toString();
+  } catch (e) { }
+  return '';
+}
+function blogPosts() {
+  const blogs = BLOGFEED && BLOGFEED.data && Array.isArray(BLOGFEED.data.blogs) ? BLOGFEED.data.blogs : null;
+  if (!blogs) return null;
+  const posts = [];
+  for (const b of blogs) {
+    if (!b || !b.ok || !Array.isArray(b.items)) continue;
+    const name = String(b.name || '').trim();
+    if (!name) continue;
+    for (const it of b.items) {
+      const url = blogHttps(it && it.url);
+      const title = it && String(it.title || '').trim();
+      const ms = Date.parse(it && it.published);
+      if (!url || !title || !Number.isFinite(ms)) continue;
+      const summary = it.summary ? String(it.summary).replace(/\s+/g, ' ').trim() : '';
+      posts.push({ title, url, published: new Date(ms).toISOString(), blog: name, summary });
+    }
+  }
+  posts.sort((a, b) => b.published.localeCompare(a.published));
+  return posts;
+}
+function blogFailures() {
+  const blogs = BLOGFEED && BLOGFEED.data && Array.isArray(BLOGFEED.data.blogs) ? BLOGFEED.data.blogs : null;
+  if (!blogs) return null;
+  return blogs.filter(b => b && String(b.name || '').trim() && !b.ok);
+}
+function blogWhen(iso) {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return '';
+  return new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(ms));
+}
+function scheduleBlogsRefresh() {
+  if (blogTimer) { clearTimeout(blogTimer); blogTimer = null; }
+  const fresh = !!(BLOGFEED && BLOGFEED.at && Date.now() - BLOGFEED.at < BLOG_MAX_AGE);
+  const wait = (!fresh && blogFailed) ? 2 * 60 * 1000 : (fresh ? Math.max(5000, BLOGFEED.at + BLOG_MAX_AGE - Date.now()) : BLOG_MAX_AGE);
+  blogTimer = setTimeout(() => {
+    blogTimer = null;
+    if (document.visibilityState === 'visible') refreshBlogs(false);
+    else scheduleBlogsRefresh();
+  }, wait);
+}
+async function refreshBlogs(force = false) {
+  if (blogBusy) return;
+  if (!force && BLOGFEED && Date.now() - BLOGFEED.at < BLOG_MAX_AGE) { scheduleBlogsRefresh(); return; }
+  if (!RELAY_URL) { if (!BLOGFEED) blogFailed = true; scheduleBlogsRefresh(); updBlogs(); return; }
+  blogBusy = true; if (force) updBlogs();
+  let data = null;
+  try { data = await getJSON(RELAY_URL + '/blogs', 20000); } catch (e) { data = null; }
+  blogBusy = false;
+  if (data && Array.isArray(data.blogs)) {
+    BLOGFEED = { at: Date.now(), data };
+    blogFailed = false;
+    try { localStorage.setItem('blogfeeds', JSON.stringify(BLOGFEED)); } catch (e) { }
+  } else blogFailed = true;
+  scheduleBlogsRefresh();
+  updBlogs();
+}
+function updBlogs() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  const r = h.split('/')[0];
+  if (r === 'blogging' || ((r === 'home' || r === '') && !homeEdit) || r === 'more') {
+    const v = $('#view'), top = v ? v.scrollTop : 0;
+    render(); if (v) v.scrollTop = top;
+  }
+}
+function blogRow(p) {
+  const when = blogWhen(p.published);
+  const sub = [p.blog, when].filter(Boolean).join(' · ');
+  return `<a class="row" href="${esc(p.url)}" target="_blank" rel="noopener"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">${esc(p.title)}</div><div class="s">${esc(sub)}</div>${p.summary ? `<div class="s">${esc(p.summary)}</div>` : ''}</div></a>`;
+}
+function blogFailRow(b) {
+  return `<button class="row" onclick="refreshBlogs(true)"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Couldn’t load this blog.</div></div></button>`;
+}
+function blogEmpty(id) {
+  const loading = blogBusy || (!blogFailed && navigator.onLine !== false);
+  const title = loading ? 'Blogging' : 'Not available';
+  const msg = loading ? 'Checking the blogs…' : 'Couldn’t load the blogs. Tap to try again.';
+  return `<div class="list" id="${id}"><button class="row" onclick="refreshBlogs(true)"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">${title}</div><div class="s">${msg}</div></div></button></div>`;
+}
+function blogNone(id) {
+  return `<div class="list" id="${id}"><div class="row"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">No posts</div><div class="s">None of the blogs had a post to show.</div></div></div></div>`;
+}
+function Blogging() {
+  const posts = blogPosts();
+  const failed = blogFailures();
+  let body;
+  if (!posts) body = blogEmpty('bloglist');
+  else if (!posts.length && !(failed && failed.length)) body = blogNone('bloglist');
+  else body = `<div class="list" id="bloglist">${posts.map(blogRow).join('')}${(failed || []).map(blogFailRow).join('')}</div>`;
+  const src = (BLOGFEED && BLOGFEED.data && BLOGFEED.data.blogs || []).filter(b => b && b.name && blogHttps(b.home));
+  const links = src.map(b => `<a href="${esc(blogHttps(b.home))}" target="_blank" rel="noopener">${esc(b.name)}</a>`).join(' · ');
+  const n = (S.posts || []).length;
+  return header('Blogging', 'Posts from other blogs') +
+    `<div class="sec">Recent posts <button onclick="refreshBlogs(true)">${blogBusy ? 'Updating…' : 'Refresh'}</button></div>` +
+    body +
+    `<div class="foot">${links ? 'From ' + links + '. ' : ''}Tap a post to open it. This page refreshes when you open it, when you come back to the app, and about every 30 minutes while it stays open. <a href="#blogging/mine">Your posts</a>${n ? ' (' + n + ')' : ''} stay on this phone.</div>`;
+}
 function postsSorted() {
   return (S.posts || []).slice().sort((a, b) => (b.created || 0) - (a.created || 0) || (b.updated || 0) - (a.updated || 0));
 }
@@ -2086,19 +2202,20 @@ function postSnippet(p) {
   return line.length > 90 ? line.slice(0, 89) + '…' : line;
 }
 function getPost(id) { return (S.posts || []).find(p => p.id === id); }
-function Blogging() {
+function YourPosts() {
   const list = postsSorted();
-  return header('Blogging', list.length ? plural(list.length, 'post') + ' · on this phone' : 'On this phone only', addBtn('Write a post', 'postForm()')) +
-    (list.length ? `<div class="list" id="bloglist">${list.map(p => {
+  return `<button class="back" onclick="go('#blogging')">${I('left')} Blogging</button>` +
+    header('Your posts', list.length ? plural(list.length, 'post') + ' · on this phone' : 'On this phone only', addBtn('Write a post', 'postForm()')) +
+    (list.length ? `<div class="list" id="myposts">${list.map(p => {
       const sn = postSnippet(p);
       return `<button class="row" onclick="go('#blogging/${p.id}')"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">${esc(p.title)}</div><div class="s">${esc(postStamp(p))}${sn ? ' · ' + esc(sn) : ''}</div></div>${I('right')}</button>`;
-    }).join('')}</div>` : empty('No posts yet', 'Write a post and it stays with the rest of your data on this phone. Nothing is published.', 'Write a post', 'postForm()'));
+    }).join('')}</div>` : empty('No posts yet', 'A post you write stays on this phone. Nothing is published.', 'Write a post', 'postForm()'));
 }
 function BlogPost(id) {
   const p = getPost(id);
-  if (!p) return `<button class="back" onclick="go('#blogging')">${I('left')} Blogging</button>` + empty('That post isn’t here any more', 'It may have been deleted.', '', '');
+  if (!p) return `<button class="back" onclick="go('#blogging/mine')">${I('left')} Your posts</button>` + empty('That post isn’t here any more', 'It may have been deleted.', '', '');
   const body = String(p.body || '').trim();
-  return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#blogging')">${I('left')} Blogging</button>
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#blogging/mine')">${I('left')} Your posts</button>
     <button class="btn small" onclick="postForm('${p.id}')">${I('edit')} Edit</button></div>
     <h2 style="margin:6px 0 4px">${esc(p.title)}</h2>
     <div class="muted" style="margin-bottom:12px">${esc(postStamp(p))}</div>
@@ -2126,7 +2243,7 @@ async function deletePost(id) {
   await save();
   if (sheetOpen) await closeSheet();
   const onIt = (location.hash || '').replace(/^#/, '') === 'blogging/' + id;
-  if (onIt) location.hash = '#blogging';
+  if (onIt) location.hash = '#blogging/mine';
   else render();
   toast('Post deleted.', 'Undo', undoTo(s));
 }
@@ -4780,7 +4897,7 @@ function More() {
     bills: () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…',
     birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
     ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down',
-    blogging: () => S.posts.length ? plural(S.posts.length, 'post') : 'Write on this phone',
+    blogging: () => { const posts = blogPosts(); const first = posts && posts[0]; return first ? `${esc(first.blog)}: ${esc(first.title)}` : 'Posts from other blogs'; },
     videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category') + ' on' : 'All categories are off'; },
     top40: () => 'Official Top 40 · chart as of 3 Oct 2026'
   });
@@ -7840,7 +7957,7 @@ function render() {
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide };
   if (r !== 'home' && r !== '') homeEdit = false;
-  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
+  $('#view').innerHTML = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
@@ -7875,7 +7992,11 @@ function wireHomeEnter() {
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
-window.addEventListener('hashchange', () => { setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0; });
+window.addEventListener('hashchange', () => {
+  setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0;
+  const r = (location.hash || '').replace(/^#/, '').split('/')[0];
+  if (r === 'blogging' || r === 'home' || r === '') refreshBlogs(false);
+});
 
 /* ---------- on-screen keyboard (v1.6.1) ----------
    Only #view scrolls. When the Android keyboard opens (interactive-widget=resizes-content shrinks
@@ -8018,12 +8139,12 @@ async function start() {
   await loadCal();
   await loadMail();
   await finishMailSignIn();
-  loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv(); loadNews();
+  loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv(); loadNews(); loadBlogs();
   render();
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
-  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshSarah();
+  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshSarah();
   mailConfig().then(() => { if (!sheetOpen && location.hash === '#settings') render(); });
   refreshMail();
   if (brMode() !== 'off' || location.hash === '#bridge') { refreshClosures(); refreshBridgeTraffic(); }
@@ -8047,7 +8168,7 @@ async function start() {
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
     phoneSyncOpen();
     check();
-    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshSarah();
+    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshSarah();
     refreshMail();
     if (brMode() !== 'off') { refreshClosures(); refreshBridgeTraffic(); }
     checkBridgeLoc(true);
