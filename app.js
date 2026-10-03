@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.9.4';
+const APP_VERSION = '2.9.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1003,6 +1003,166 @@ function homeCommLine() {
     return 'Your commission so far is ' + amt + '. ' + how;
   } catch (e) { return ''; }
 }
+// 2.9.5: one friendly note when a real timed item is within 30 minutes before or after now.
+// Pacific/Auckland. Calendar appointments (including a loaded calendar feed), to-dos with a clock time,
+// bills only when they store a clock time, meals only when they store a clock time (not a cook duration,
+// and not the dinner card's display sort), and reminders from the reminder list, including the next repeat.
+// Nothing in that window means no line. A title already used in the summary is skipped. Not a nag.
+const HOME_NEAR_MS = 30 * 60 * 1000;
+function homeClockHM(raw) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(raw || '').trim());
+  if (!m) return '';
+  const h = +m[1], mi = +m[2];
+  if (h > 23 || mi > 59) return '';
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+function homeAklWallMs(date, hm) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ''));
+  const t = /^(\d{2}):(\d{2})$/.exec(String(hm || ''));
+  if (!m || !t) return NaN;
+  const want = Date.UTC(+m[1], +m[2] - 1, +m[3], +t[1], +t[2]);
+  let utc = want;
+  let fmt;
+  try {
+    fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  } catch (e) { return NaN; }
+  for (let i = 0; i < 3; i++) {
+    const p = Object.fromEntries(fmt.formatToParts(new Date(utc)).map(x => [x.type, x.value]));
+    let h = +p.hour; if (h === 24) h = 0;
+    const got = Date.UTC(+p.year, +p.month - 1, +p.day, h, +p.minute);
+    const next = utc + (want - got);
+    if (next === utc) break;
+    utc = next;
+  }
+  return utc;
+}
+function homeNearWhen(date, time, now) {
+  const hm = homeClockHM(time);
+  if (!hm) return null;
+  const ms = homeAklWallMs(date, hm);
+  if (!Number.isFinite(ms)) return null;
+  const delta = ms - now.getTime();
+  if (Math.abs(delta) > HOME_NEAR_MS) return null;
+  return { delta };
+}
+function homeNearItems(now) {
+  const nowD = now instanceof Date ? now : new Date();
+  const hits = [];
+  const push = (title, delta) => {
+    if (!Number.isFinite(delta) || Math.abs(delta) > HOME_NEAR_MS) return;
+    const plain = homePlainTitle(title);
+    if (!plain || homeSaysTv(plain) || /\broadworks?\b/i.test(plain)) return;
+    const key = homeMentionKey(plain);
+    if (!key) return;
+    const prev = hits.find(h => h.key === key);
+    if (prev) {
+      if (Math.abs(delta) < Math.abs(prev.delta)) { prev.delta = delta; prev.title = plain; }
+      return;
+    }
+    hits.push({ title: plain, key, delta });
+  };
+  const pushAt = (title, date, time) => {
+    const w = homeNearWhen(date, time, nowD);
+    if (w) push(title, w.delta);
+  };
+  try {
+    (S.reminders || []).forEach(r => {
+      if (!r || !r.title) return;
+      const hm = homeClockHM(r.time);
+      if (!hm) return;
+      const repeat = typeof remRepeat === 'function' ? remRepeat(r) : 'none';
+      const dates = [];
+      if (repeat === 'none') dates.push(r.date);
+      else {
+        let next = r.date;
+        try { next = remNextDate(r, new Date(nowD.getTime() - HOME_NEAR_MS - 60000)); } catch (e) { next = r.date; }
+        dates.push(next);
+        try {
+          if (repeat === 'daily') dates.push(addDays(next, -1));
+          else if (repeat === 'weekly') dates.push(addDays(next, -7));
+          else if (repeat === 'monthly') dates.push(addMonths(next, -1, Number(String(r.date).slice(8, 10))));
+        } catch (e) {}
+      }
+      dates.forEach(date => {
+        if (!date || (r.date && date < r.date)) return;
+        pushAt(r.title, date, hm);
+      });
+    });
+  } catch (e) {}
+  try {
+    (S.appts || []).forEach(a => { if (a && a.title) pushAt(a.title, a.date, a.time); });
+  } catch (e) {}
+  try {
+    if (typeof CAL !== 'undefined' && CAL && Array.isArray(S.feeds)) {
+      S.feeds.forEach(f => {
+        const c = f && CAL[f.id];
+        if (!c || !Array.isArray(c.events)) return;
+        c.events.forEach(e => {
+          if (!e || e.allDay || !e.title) return;
+          if (Number.isFinite(+e.start)) push(e.title, +e.start - nowD.getTime());
+          else pushAt(e.title, e.date, e.time);
+        });
+      });
+    }
+  } catch (e) {}
+  try {
+    (S.todos || []).forEach(t => {
+      if (!t || t.done || !t.title) return;
+      const hm = typeof todoClock === 'function' ? todoClock(t) : homeClockHM(t.time || t.dueTime);
+      if (hm) pushAt(t.title, t.due, hm);
+    });
+  } catch (e) {}
+  try {
+    (S.bills || []).forEach(b => {
+      if (!b || b.paid || !b.name) return;
+      const hm = homeClockHM(b.time || b.dueTime || '');
+      if (hm) pushAt(b.name, b.due, hm);
+    });
+  } catch (e) {}
+  try {
+    const meals = typeof M === 'function' ? M() : null;
+    const plan = meals && meals.plan;
+    if (plan && typeof plan === 'object') {
+      Object.keys(plan).forEach(d => {
+        const e = plan[d];
+        if (!e || e.cooked || !e.title) return;
+        let hm = homeClockHM(e.time || e.at || '');
+        if (!hm && Array.isArray(meals.ideas)) {
+          const idea = (e.ideaId && meals.ideas.find(i => i && i.id === e.ideaId)) || (typeof mealIdeaFor === 'function' ? mealIdeaFor(e.title) : null);
+          hm = homeClockHM(idea && idea.time);
+        }
+        if (hm) pushAt(e.title, d, hm);
+      });
+    }
+  } catch (e) {}
+  hits.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta) || a.title.localeCompare(b.title));
+  return hits;
+}
+function homeNearLine(seen, now) {
+  try {
+    const picked = [];
+    homeNearItems(now).forEach(x => {
+      if (picked.length >= 2) return;
+      if (!x || !x.key || (seen && seen.has(x.key))) return;
+      if (picked.some(y => y.key === x.key)) return;
+      picked.push(x);
+    });
+    if (!picked.length) return '';
+    picked.forEach(x => { if (seen) seen.add(x.key); });
+    const names = picked.map(x => homeQuote(x.title));
+    const list = engList(names);
+    const recent = picked.every(x => x.delta < -60000);
+    const ahead = picked.every(x => x.delta > 60000);
+    if (names.length === 1) {
+      if (recent) return names[0] + ' was a little while ago, if you still want it.';
+      if (ahead) return names[0] + ' is a little while away, if you want a heads-up.';
+      return names[0] + ' is about now, if you want it.';
+    }
+    if (recent) return list + ' were a little while ago, if you still want them.';
+    if (ahead) return list + ' are a little while away, if you want a heads-up.';
+    return list + ' are around now, if you want them.';
+  } catch (e) { return ''; }
+}
 function homeOverview(shown) {
   try { return homeOverviewBody(shown); }
   catch (e) { console.error('Home summary', e); return ''; }
@@ -1176,6 +1336,13 @@ function homeOverviewBody(shown) {
       if (got.length) add('news', 'RNZ has this from around here: ' + homeQuote(got[0]) + '.');
     }
   }
+  try {
+    const near = homeNearLine(mentioned);
+    if (near && !/\broadworks?\b/i.test(near) && !/\bmore are due\b/i.test(near)) {
+      if (bits.length >= 6) bits.pop();
+      bits.push({ kind: 'near', text: near, urgent: false });
+    }
+  } catch (e) { /* a nearby note must not blank the summary */ }
   if (!bits.length) return `<div class="card homesum" id="homesum"><ul><li class="due"><span class="tx">Nothing much to flag right now. Have a good one.</span></li></ul></div>`;
   const bars = ['#0F766E', '#1D4ED8', '#6D28D9', '#047857', '#9A3412', '#BE185D', '#1E3A8A', '#0369A1', '#3F6212', '#155E75', '#5B21B6', '#134E4A'];
   return `<div class="card homesum" id="homesum"><ul>${bits.map((b, i) => {
