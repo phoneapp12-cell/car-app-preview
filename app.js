@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2608,8 +2608,10 @@ function mealRow(iso, hist = false) {
     <button class="tapzone" onclick="mealNight('${iso}')"><div class="tx"><div class="t"><span class="muted">Nothing planned</span></div><div class="s">${sub}</div></div></button>
     ${!hist ? `<button class="btn small" onclick="suggestNight('${iso}')">Suggest</button>` : ''}</div>`;
   const tick = past ? `<button class="tick" aria-label="${e.cooked ? 'Untick' : 'Tick'} cooked: ${esc(e.title)}" onclick="toggleCooked('${iso}')"><span>${I('check')}</span></button>` : '';
+  // Only a built-in or saved recipe (matched by id, or by title) gets a link. A typed meal with no recipe stays as text.
+  const recipeLink = idea ? `<a class="btn small" href="#recipe/${idea.id}">See recipe</a>` : '';
   return `<div class="row meal haspic ${e.cooked ? 'done' : ''}" data-date="${iso}">
-    <button class="tapzone mealcap" onclick="mealNight('${iso}')"><div class="t">${esc(e.title)}</div></button>
+    <div class="mealcap"><button class="tapzone" onclick="mealNight('${iso}')"><div class="t">${esc(e.title)}</div></button>${recipeLink}</div>
     <div class="mealpair">${mealPic(idea)}${tick}<button class="tapzone" onclick="mealNight('${iso}')"><div class="s">${sub}</div></button></div></div>`;
 }
 const mealTabs = on => `<div class="chips mealtabs"><button class="chip ${on === 'plan' ? 'on' : ''}" id="tabplan" onclick="go('#meals')">Meal plan</button><button class="chip ${on === 'recipes' ? 'on' : ''}" id="tabrecipes" onclick="go('#recipes')">Recipes (${visibleIdeas().length})</button><button class="chip ${on === 'shop' ? 'on' : ''}" id="tabshop" onclick="go('#shopping')">Shopping${S.shop.items.some(x => !x.done) ? ` (${S.shop.items.filter(x => !x.done).length})` : ''}</button></div>`;
