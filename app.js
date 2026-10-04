@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.18.0';
+const APP_VERSION = '2.19.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -716,6 +716,41 @@ function homeDayJobs(mood) {
   });
   return out;
 }
+
+const ABOUT_FILM_STOP = new Set(['a', 'the', 'and', 'of', 'or', 'to', 'film', 'films', 'movie', 'movies']);
+function aboutFilmWords() {
+  const bits = [];
+  try {
+    ['film', 'films'].forEach(qid => {
+      const row = aboutLatest(qid);
+      if (row && row.text) bits.push(row.text);
+    });
+  } catch (e) {}
+  const words = [];
+  String(bits.join(' ')).toLowerCase().replace(/[’‘]/g, "'").split(/[^a-z0-9']+/).forEach(w => {
+    if (!w || ABOUT_FILM_STOP.has(w) || words.includes(w)) return;
+    words.push(w);
+  });
+  return words;
+}
+function videoTitleHitsFilm(title, words) {
+  if (!words || !words.length) return false;
+  const set = new Set();
+  String(title || '').toLowerCase().replace(/[’‘]/g, "'").split(/[^a-z0-9']+/).forEach(w => {
+    if (w && !ABOUT_FILM_STOP.has(w)) set.add(w);
+  });
+  return words.some(w => set.has(w));
+}
+function preferFilmVideoTitles(list) {
+  const words = aboutFilmWords();
+  if (!words.length || !list || !list.length) return list || [];
+  const hits = [], rest = [];
+  list.forEach(v => {
+    if (v && videoTitleHitsFilm(v.title, words)) hits.push(v);
+    else rest.push(v);
+  });
+  return hits.length ? hits.concat(rest) : list;
+}
 function homeVideoPicks(mood) {
   let list = [];
   try { list = videoSuggestions(); } catch (e) { list = []; }
@@ -728,13 +763,32 @@ function homeVideoPicks(mood) {
   const garden = list.filter(v => v.category === 'garden');
   const indoorOrder = ['cook', 'gf', 'time', 'reno', 'pets', 'diy', 'wood', 'nz', 'tech'];
   const indoor = indoorOrder.flatMap(cat => list.filter(v => v.category === cat));
+  let picks;
   if (mood === 'wet') {
     const first = indoor[0];
     const second = (first && garden.find(v => v !== first)) || indoor[1] || garden[0];
-    return [first, second].filter(Boolean).slice(0, 2);
+    picks = [first, second].filter(Boolean).slice(0, 2);
+  } else {
+    // Sunny, or no rain/sun line: early October is spring in New Zealand, so garden titles only.
+    picks = garden.slice(0, 2);
   }
-  // Sunny, or no rain/sun line: early October is spring in New Zealand, so garden titles only.
-  return garden.slice(0, 2);
+  // Prefer a title already in this list when his film answer shares a real word. No new titles.
+  try {
+    const words = aboutFilmWords();
+    if (words.length) {
+      const hits = list.filter(v => videoTitleHitsFilm(v.title, words));
+      if (hits.length) {
+        const out = [], seen = new Set();
+        hits.concat(picks).forEach(v => {
+          if (!v || out.length >= 2 || seen.has(v)) return;
+          seen.add(v);
+          out.push(v);
+        });
+        return out;
+      }
+    }
+  } catch (e) {}
+  return picks;
 }
 // Same event, task or title, even if one line says Tonight or Today and another does not.
 // Drop a leading day and a trailing clock time so a summary line does not repeat them.
@@ -885,18 +939,21 @@ function homeWhere() {
     return p === 'home' || p === 'work' ? p : '';
   } catch (e) { return ''; }
 }
-function homeGreetLine() {
+function homeTimeHello() {
   try {
     const part = homeDayPart();
-    const hello = homePick(61, part === 'morning'
+    return homePick(61, part === 'morning'
       ? ['Good morning.', 'Morning.', 'Hope the morning’s easy.']
       : part === 'evening'
         ? ['Good evening.', 'Evening.', 'Hope the evening’s a good one.']
         : part === 'afternoon'
           ? ['Good afternoon.', 'Afternoon.', 'Hope the afternoon’s treating you well.']
           : []);
-    const where = homePlaceLine();
-    return [hello, where].filter(Boolean).join(' ');
+  } catch (e) { return ''; }
+}
+function homeGreetLine() {
+  try {
+    return [homeTimeHello(), homePlaceLine()].filter(Boolean).join(' ');
   } catch (e) { return ''; }
 }
 // This fortnight’s commission, only when an amount was actually entered. No anchor or no entries means skip, not $0.
@@ -1416,38 +1473,245 @@ function homeFlavorLine() {
   if (kind === 'question') return homeRhetoricalLine();
   return '';
 }
-// 2.15.0: a short note, not a stack of coloured cards. Overdue stays in its own colour.
+// 2.19.0: one About you sentence, from a stored answer only. Tone words skip or keep the aside.
+function aboutSummaryTone() {
+  let text = '';
+  try {
+    const row = aboutLatest('summary');
+    text = row && row.text ? String(row.text).toLowerCase() : '';
+  } catch (e) { return ''; }
+  if (!text) return '';
+  if (/\b(short|brief|quiet|less)\b/.test(text)) return 'short';
+  if (/\b(joke|funny|fun|chatty)\b/.test(text)) return 'chatty';
+  return 'plain';
+}
+function homeLooksLikeAddress(s) {
+  return /\b\d{1,4}\s+\S+\s+(street|st|road|rd|avenue|ave|drive|lane|crescent|close|terrace)\b/i.test(String(s || ''));
+}
+function homeLineRepeats(text, mentioned) {
+  if (!mentioned || !mentioned.size) return false;
+  const low = String(text || '').toLowerCase();
+  for (const key of mentioned) {
+    if (!key || String(key).length < 3) continue;
+    if (low.includes(String(key).toLowerCase())) return true;
+  }
+  return false;
+}
+function homeMarkMentioned(text, mentioned) {
+  if (!mentioned || !text) return;
+  ['meal', 'food', 'morning', 'place', 'walk', 'music', 'film', 'films', 'book', 'dog', 'garden', 'weekend', 'summary', 'app'].forEach(qid => {
+    let clip = '';
+    try {
+      const row = aboutLatest(qid);
+      clip = row && row.text ? aboutClip(row.text) : '';
+    } catch (e) { clip = ''; }
+    if (!clip || !String(text).toLowerCase().includes(clip.toLowerCase())) return;
+    const key = homeMentionKey(clip);
+    if (key) mentioned.add(key);
+  });
+}
+function homeAppWishLine() {
+  let text = '';
+  try {
+    const row = aboutLatest('app');
+    text = row && row.text ? String(row.text) : '';
+  } catch (e) { return ''; }
+  if (!text) return '';
+  const rules = [
+    [/\brecipes?\b|\bfood\b|\bmeals?\b/i, 'Meal planner'],
+    [/\bradio\b|\bmusic\b/i, 'Radio'],
+    [/\bvideos?\b|\byoutube\b|\bfilms?\b/i, 'Videos'],
+    [/\bpodcasts?\b/i, 'Podcasts'],
+    [/\bnews\b/i, 'Local news'],
+    [/\bgardening\b|\bgardens?\b/i, 'Gardening'],
+    [/\bdiaries\b|\bdiary\b/i, 'Diary'],
+    [/\bto-?dos?\b/i, 'To-do'],
+    [/\bnotes?\b/i, 'Notes']
+  ];
+  let best = '', at = Infinity;
+  rules.forEach(([re, name]) => {
+    const m = re.exec(text);
+    if (m && m.index < at) { at = m.index; best = name; }
+  });
+  return best ? 'You wanted more from ' + best : '';
+}
+function homeSummaryQuote() {
+  try {
+    if (homeWhere() !== 'home') return '';
+    if (aboutSummaryTone() !== 'plain') return '';
+    const row = aboutLatest('summary');
+    const clip = row && row.text ? aboutClip(row.text) : '';
+    if (!clip || homeLooksLikeAddress(clip) || homeLooksLikeAddress(row.text)) return '';
+    return homeCapClause(homeStripEnd(clip));
+  } catch (e) { return ''; }
+}
+function homeAboutSentence(mentioned) {
+  try {
+    const fit = homeStripEnd(homePersonalClause() || '');
+    if (fit && !homeLineRepeats(fit, mentioned) && !homeLooksLikeAddress(fit)) return fit;
+    if (homeWhere() !== 'work') {
+      const wish = homeAppWishLine();
+      if (wish && !homeLineRepeats(wish, mentioned)) return wish;
+    }
+    const quote = homeSummaryQuote();
+    if (quote && !homeLineRepeats(quote, mentioned)) return quote;
+  } catch (e) {}
+  return '';
+}
+function homeKnownPeople() {
+  const names = ['Sarah', 'Millesha', 'Cass', 'Aranea', 'Monique'];
+  try {
+    (S.birthdays || []).forEach(b => { if (b && b.name) names.push(String(b.name)); });
+    (S.health || []).forEach(p => { if (p && p.name) names.push(String(p.name)); });
+    (S.pets || []).forEach(p => { if (p && p.name) names.push(String(p.name)); });
+  } catch (e) {}
+  const out = [], seen = new Set();
+  names.forEach(raw => {
+    const first = String(raw || '').trim().split(/\s+/)[0].replace(/[^A-Za-z'’-]/g, '');
+    if (!first || first.length < 3) return;
+    const low = first.toLowerCase();
+    if (low === 'shane' || low === 'pet' || low === 'person' || seen.has(low)) return;
+    seen.add(low);
+    out.push(first);
+  });
+  return out;
+}
+function homeNotePerson(text) {
+  let best = '', at = Infinity;
+  homeKnownPeople().forEach(name => {
+    let re;
+    try { re = new RegExp('\\b' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'); }
+    catch (e) { return; }
+    const m = re.exec(String(text || ''));
+    if (m && m.index < at) { at = m.index; best = name; }
+  });
+  return best;
+}
+function homeNoteIsOuting(text) {
+  return /\b(bushwalk|beach|picnic|outing|cinema|movies?|films?|hike|hiking|day trip|cafe|restaurant|head out|go out|going out)\b/i.test(String(text || ''));
+}
+function homeNotePersonal(text) {
+  if (homeNoteIsOuting(text)) return true;
+  return !!(homeNotePerson(text) && /\b(write to|letter to|email|e-mail)\b/i.test(String(text || '')));
+}
+function homeNoteNag(text) {
+  return /\b(bedtime|bed time|go to bed|lateness|you(?:'re| are) late|90[\s-]*hours?)\b/i.test(String(text || ''));
+}
+function homeNoteIsTask(text) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 80 || /\?/.test(t)) return false;
+  const verbs = new Set(['call', 'text', 'email', 'write', 'buy', 'get', 'pick', 'grab', 'book', 'pay', 'clean', 'wash', 'cook', 'make', 'fix', 'check', 'send', 'visit', 'walk', 'water', 'feed', 'mow', 'weed', 'plant', 'return', 'drop', 'collect', 'organise', 'organize', 'ask', 'tell', 'ring', 'phone', 'schedule', 'cancel', 'renew', 'order', 'put', 'take', 'do', 'finish', 'start', 'sort', 'file', 'post', 'pack', 'charge', 'defrost', 'message', 'reply', 'contact', 'meet', 'bring', 'leave', 'empty', 'fill', 'change', 'replace', 'update', 'add', 'tidy', 'vacuum', 'mop', 'iron', 'fold', 'shop', 'remember', 'remind', 'go']);
+  const first = (t.match(/^[A-Za-z’']+/) || [''])[0].toLowerCase().replace(/’/g, "'");
+  if (verbs.has(first)) return true;
+  if (/\b(is|are|was|were|am|been|being|like|likes|love|loved)\b/i.test(t)) return false;
+  return t.split(/\s+/).length <= 6 && !/^(i|i'm|im|we|it's|its|the|a|an|my|today|yesterday|this|that)\b/i.test(t);
+}
+function homeOpenTodoSame(text) {
+  const key = homeMentionKey(homePlainTitle(text));
+  if (!key) return false;
+  return (S.todos || []).some(t => t && !t.done && homeMentionKey(homePlainTitle(t.title)) === key);
+}
+function homeSavedNoteLine(mentioned) {
+  try {
+    const today = nzTodayISO();
+    const where = homeWhere();
+    const rows = noteRows();
+    for (let i = 0; i < rows.length; i++) {
+      const n = rows[i];
+      const text = n && String(n.text || '').replace(/\s+/g, ' ').trim();
+      if (!text || homeNoteNag(text)) continue;
+      const day = String(n.at || '').slice(0, 10);
+      if (!parseD(day)) continue;
+      const age = dayGap(today, day);
+      if (!Number.isFinite(age) || age < 0 || age > 6) continue;
+      const clip = aboutClip(text);
+      if (!clip || homeLooksLikeAddress(text)) continue;
+      const key = homeMentionKey(clip);
+      if ((key && mentioned && mentioned.has(key)) || homeLineRepeats(clip, mentioned)) continue;
+      if (where === 'work' && homeNotePersonal(text)) continue;
+      const person = homeNotePerson(text);
+      const outing = homeNoteIsOuting(text);
+      const task = homeNoteIsTask(text) && !homeOpenTodoSame(text);
+      const writing = /^(write|email)\b/i.test(text);
+      let line = '';
+      if (person && where !== 'work' && (!task || writing)) line = 'You could write to ' + person + ' about ' + homeQuote(clip);
+      else if (task && !(where === 'work' && outing)) line = 'You could do ' + homeQuote(clip) + ' next';
+      else if (age >= 1) line = 'Still worth catching up on ' + homeQuote(clip);
+      else line = 'You noted ' + homeQuote(clip);
+      if (!line || homeLineRepeats(line, mentioned)) continue;
+      if (key && mentioned) mentioned.add(key);
+      return line;
+    }
+  } catch (e) {}
+  return '';
+}
+function mealLikedLine() {
+  const rows = [];
+  try {
+    ['meal', 'food'].forEach(qid => {
+      const row = aboutLatest(qid);
+      if (row && row.text) rows.push(row);
+    });
+  } catch (e) { return ''; }
+  rows.sort((a, b) => a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const clip = aboutClip(row.text);
+    if (!clip || homeLooksLikeAddress(row.text)) continue;
+    let bad = true;
+    try { bad = !!(homeGlutenFood(row.text) || homeGlutenFood(clip)); } catch (e) { bad = true; }
+    if (bad) continue;
+    return 'You like ' + clip + '.';
+  }
+  return '';
+}
+function mealLikedHtml() {
+  const line = mealLikedLine();
+  if (!line) return '';
+  return '<div class="card" id="mealliked"><div class="s">' + esc(line) + '</div></div>';
+}
+
+
+// 2.19.0: things to do, then mood, then where he is, then the time of day. Four notes still cap the list.
 function homeSumCard(bits) {
   try {
     const list = (bits || []).filter(b => b && b.text).slice(0, 4);
-    let hello = '';
-    try { hello = String(homeGreetLine() || '').replace(/\s+/g, ' ').trim(); } catch (e) { hello = ''; }
-    // Keep urgent/overdue items first and intact. Mood is the one explicit personal note that may lead them.
-    const mood = homeMoodLine();
-    const flavour = list.length ? '' : homeFlavorLine();
-    const extra = mood || flavour || homePersonalClause();
-    const useExtra = !!(extra && (mood || list.length === 0 || (list.length === 1 && !flavour && extra.length <= 110)));
-    let lead = hello;
-    if (useExtra) lead = lead ? (lead.replace(/\s+$/, '') + ' ' + extra + (/[.!?]$/.test(extra) ? '' : '.')) : (extra + (/[.!?]$/.test(extra) ? '' : '.'));
-    const ps = [];
-    if (lead) ps.push('<p class="sumnote">' + esc(lead) + '</p>');
-    if (list.length) {
-      const late = list.filter(b => b.overdue);
-      const rest = list.filter(b => !b.overdue);
+    const mustKind = { late: 1, near: 1, today: 1, soon: 1, high: 1 };
+    const must = list.filter(b => mustKind[b.kind]);
+    const later = list.filter(b => !mustKind[b.kind]);
+    let mood = '', where = '', hello = '';
+    try { mood = String(homeMoodLine() || '').replace(/\s+/g, ' ').trim(); } catch (e) { mood = ''; }
+    try { where = String(homePlaceLine() || '').replace(/\s+/g, ' ').trim(); } catch (e) { where = ''; }
+    try { hello = String(homeTimeHello() || '').replace(/\s+/g, ' ').trim(); } catch (e) { hello = ''; }
+    const blocksAside = must.length > 0 || later.some(b => b.kind !== 'about');
+    let flavour = '';
+    try { if (aboutSummaryTone() !== 'short' && !blocksAside) flavour = homeFlavorLine(); } catch (e) { flavour = ''; }
+    const soften = /^(Work|Traffic|About|With|Coming|Today|Tomorrow|There|The|It|In|Soon|A|If|You|Still|Did|Why|What|How|Good|Morning|Afternoon|Evening|Hope)\b/;
+    const clausesOf = items => {
       const clauses = [];
-      late.forEach((b, i) => {
-        const text = i === 0 && !clauses.length ? homeCapClause(homeStripEnd(b.text)) : homeStripEnd(b.text);
-        clauses.push('<span class="sumlate">' + esc(text) + '</span>');
+      items.forEach(b => {
+        let bit = homeStripEnd(b && b.text);
+        if (!bit) return;
+        if (!clauses.length) bit = homeCapClause(bit);
+        else if (soften.test(bit)) bit = bit.charAt(0).toLowerCase() + bit.slice(1);
+        clauses.push(b.overdue ? '<span class="sumlate">' + esc(bit) + '</span>' : esc(bit));
       });
-      rest.forEach(b => {
-        let text = homeStripEnd(b.text);
-        if (!clauses.length) text = homeCapClause(text);
-        else if (/^(Work|Traffic|About|With|Coming|Today|Tomorrow|There|The|It|In|Soon|A|If)\b/.test(text)) text = text.charAt(0).toLowerCase() + text.slice(1);
-        clauses.push(esc(text));
-      });
-      const onlyLate = late.length && !rest.length;
-      ps.push('<p class="sumnote' + (onlyLate ? ' late' : '') + '">' + homeJoinClauses(clauses) + '.</p>');
+      return clauses;
+    };
+    const ps = [];
+    const mustC = clausesOf(must);
+    if (mustC.length) {
+      const onlyLate = must.length && must.every(b => b.overdue);
+      ps.push('<p class="sumnote' + (onlyLate ? ' late' : '') + '">' + homeJoinClauses(mustC) + '.</p>');
     }
+    if (mood) ps.push('<p class="sumnote">' + esc(mood) + (/[.!?]$/.test(mood) ? '' : '.') + '</p>');
+    if (where) ps.push('<p class="sumnote">' + esc(where) + (/[.!?]$/.test(where) ? '' : '.') + '</p>');
+    const timeItems = [];
+    if (hello) timeItems.push({ text: hello, overdue: false });
+    if (flavour) timeItems.push({ text: flavour, overdue: false });
+    later.forEach(b => timeItems.push(b));
+    const timeC = clausesOf(timeItems);
+    if (timeC.length) ps.push('<p class="sumnote">' + homeJoinClauses(timeC) + '.</p>');
     if (!ps.length) return homeSumFallback();
     return homeSceneCard(ps.join(''));
   } catch (e) {
@@ -1456,6 +1720,7 @@ function homeSumCard(bits) {
     }
   }
 }
+
 function homeUrgentPool() {
   return homeAttention().filter(x => {
     if (!x || !x.name) return false;
@@ -1770,6 +2035,14 @@ function homeOverviewBody(shown, urgentOut) {
     if (!line || /\broadworks?\b/i.test(line) || /\bmore are due\b/i.test(line) || /\b90[\s-]*hours?\b/i.test(line)) return;
     urgent.push({ kind, text: line, overdue: false });
   };
+  try {
+    const aboutLine = homeStripEnd(homeAboutSentence(mentioned));
+    if (aboutLine) {
+      homeMarkMentioned(aboutLine, mentioned);
+      pushBit('about', aboutLine);
+    }
+  } catch (e) {}
+  try { pushBit('savednote', homeSavedNoteLine(mentioned)); } catch (e) {}
   try { pushBit('roster', rosterHeadsUp(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
   try { pushBit('drive', homeDriveLine()); } catch (e) {}
   try {
@@ -1784,6 +2057,75 @@ function homeOverviewBody(shown, urgentOut) {
 function homeTintStyle() {
   return '--hsec:#303e50;--hmix:55%';
 }
+// 2.19.0: within each Home category, must-do cards first, then mood, place, and time of day.
+// Cards stay in their category. Nothing is dropped.
+function homeCardMustDo(key) {
+  try {
+    if (key === 'attention' || key === 'summary') {
+      if (homeUrgentPool().length) return true;
+      return homeNearItems(new Date()).length > 0;
+    }
+    if (key === 'todo') {
+      return (S.todos || []).some(t => {
+        if (!t || t.done) return false;
+        if (todoPriority(t) === 'high') return true;
+        if (t.due && daysLeft(t.due) <= 2) return true;
+        const hm = todoClock(t);
+        return !!(hm && homeNearWhen(t.due, hm, new Date()));
+      });
+    }
+    if (key === 'bills') return (S.bills || []).some(b => b && !b.paid && b.due && daysLeft(b.due) <= 2);
+  } catch (e) { return false; }
+  return false;
+}
+function homeFeedBias(key) {
+  let score = 0;
+  const where = homeWhere();
+  const a = homeAklParts();
+  const hour = a ? a.hour : -1;
+  const known = hour >= 0 && hour <= 23;
+  const morning = known && hour >= 5 && hour < 12;
+  const eveningHome = where === 'home' && known && hour >= 17 && hour < 21;
+  const movieWindow = where === 'home' && known && hour >= 5 && hour < 21;
+  let mood = '';
+  try {
+    const row = aboutLatestMood();
+    const m = row && aboutMood(row.text);
+    mood = m ? m.id : '';
+  } catch (e) { mood = ''; }
+  const low = mood === 'tired' || mood === 'flat' || mood === 'stressed';
+  const bright = mood === 'glad' || mood === 'calm';
+  if (homeCardMustDo(key)) score -= 100;
+  if (where === 'work' && key === 'commission') score -= 30;
+  if (where === 'work' && (key === 'tv' || key === 'videos' || key === 'events' || key === 'meals')) score += 40;
+  if (where !== 'home' && (key === 'tv' || key === 'videos' || key === 'events')) score += 25;
+  if (eveningHome && (key === 'meals' || key === 'notes')) score -= 20;
+  if (eveningHome && key === 'videos') score -= 20;
+  if (known && !movieWindow && (key === 'videos' || key === 'tv')) score += 15;
+  if (morning && key === 'todo') score -= 20;
+  if (low && key === 'events') score += 30;
+  if (low && (key === 'notes' || key === 'diary' || key === 'meals' || key === 'radio' || key === 'podcasts' || key === 'shopping')) score -= 10;
+  if (bright && where !== 'work' && known && hour >= 5 && hour < 21 && key === 'events') score -= 20;
+  if (bright && movieWindow && key === 'videos') score -= 20;
+  if (known && (hour >= 21 || hour < 5) && (key === 'videos' || key === 'tv')) score += 20;
+  return score;
+}
+function homeFeedKeys(keys) {
+  const out = [];
+  const list = keys || [];
+  let i = 0;
+  while (i < list.length) {
+    const cat = HOME_CAT[list[i]] || '';
+    let j = i + 1;
+    while (j < list.length && (HOME_CAT[list[j]] || '') === cat) j++;
+    const slice = list.slice(i, j).map((k, n) => ({ k, n }));
+    slice.sort((a, b) => homeFeedBias(a.k) - homeFeedBias(b.k) || a.n - b.n);
+    slice.forEach(x => out.push(x.k));
+    i = j;
+  }
+  return out;
+}
+
 function Home() {
   if (homeEdit) return HomeEdit();
   const now = new Date();
@@ -1794,7 +2136,7 @@ function Home() {
   if (deferredPrompt && !isStandalone())
     cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
-  const keys = homeOrder().filter(k => homeOn(k) || (k === 'videos' && currentSarahVideo())), br = brOnHome();
+  const keys = homeFeedKeys(homeOrder().filter(k => homeOn(k) || (k === 'videos' && currentSarahVideo()))), br = brOnHome();
   let top = '';
   // As before 1.14.0: when the bridge is first, the full card (near the bridge, or a closure) goes right under the greeting,
   // and the compact line sits under the weather if the weather card comes next
@@ -3949,6 +4291,7 @@ function Meals(arg) {
       <div class="daychips" role="group" aria-label="Cooking nights">${days.map(n => `<button class="${M().nights.includes(n) ? 'on' : ''}" aria-pressed="${M().nights.includes(n)}" aria-label="${WDL[n]}" onclick="toggleNight(${n})">${WDL[n].slice(0, 3)}</button>`).join('')}</div>
       <div class="s">The plan shows only these nights, for the next ${MEAL_WEEKS} weeks.</div></div>
     <div class="gfnote" id="gfnote">${gfTag()}<span>${GF_NOTE}</span></div>
+    ${mealLikedHtml()}
     ${nights.length ? `<div class="btns mealbtns"><button class="btn primary" id="surprise" onclick="surpriseAll()">${I('shuffle')} Surprise me for all</button><button class="btn" id="shopbtn" onclick="shopForm()">${I('cart')} Shopping list</button></div>
     <div class="sec">Next ${MEAL_WEEKS} weeks <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">${planned} of ${nights.length} planned</span></div>
     <div class="list" id="mealplan">${nights.map(d => mealRow(d)).join('')}</div>`
@@ -8329,7 +8672,7 @@ function homeVideoRow(v) {
 function homeVideosCard() {
   const sarah = currentSarahVideo();
   const on = homeOn('videos');
-  let list = on ? videoSuggestions() : [];
+  let list = on ? preferFilmVideoTitles(videoSuggestions()) : [];
   if (sarah) list = [sarah].concat(list.filter(v => v.id !== sarah.id));
   // Sarah takes the top slot. The usual count still applies underneath when that card is on.
   list = on ? list.slice(0, homeVideoCount() + (sarah ? 1 : 0)) : (sarah ? [sarah] : []);
