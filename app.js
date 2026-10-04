@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.19.0';
+const APP_VERSION = '2.20.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -147,6 +147,7 @@ function normalise(d) {
   d.reminders = normReminders(d.reminders); // 1.27.0: reminders (older data and backups have none)
   d.countdowns = normCountdowns(d.countdowns); // 2.10.0: named countdowns (older data and backups have none)
   d.notes = normNotes(d.notes); // 2.11.0: typed or spoken notes (older data and backups have none)
+  d.summaryFeedback = normSummaryFeedback(d.summaryFeedback); // 2.20.0: home summary votes (older data and backups have none)
   d.about = normAbout(d.about); // 2.13.0: About you (older data and backups have none)
   d.roster = normRoster(d.roster); // 2.13.0: work roster (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
@@ -1411,16 +1412,166 @@ function homeWxScene() {
     return 'soft';
   } catch (e) { return 'soft'; }
 }
+
+// 2.20.0: Like, Love, and Dislike for the summary on screen. Stored on this phone only.
+const SUM_FB_MAX = 400;
+function sumClip(s) {
+  let t = String(s || '');
+  if (t.indexOf('<') >= 0) {
+    t = t.replace(/<br\s*\/?>/gi, ' ').replace(/<\/p>/gi, ' ').replace(/<[^>]+>/g, '');
+    t = t.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  }
+  t = t.replace(/\s+/g, ' ').trim();
+  if (t.length > SUM_FB_MAX) {
+    const cut = t.slice(0, SUM_FB_MAX - 1).replace(/\s+\S*$/, '').trim();
+    t = (cut || t.slice(0, SUM_FB_MAX - 1).trim()) + '…';
+  }
+  return t;
+}
+function sumFeedbackId(text) {
+  let h = 2166136261;
+  const src = String(text || '');
+  for (let i = 0; i < src.length; i++) {
+    h ^= src.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return 'sf-' + (h >>> 0).toString(36);
+}
+function normSummaryFeedback(list) {
+  if (!Array.isArray(list)) return [];
+  const rows = [];
+  list.forEach(n => {
+    if (!n || typeof n !== 'object') return;
+    const vote = n.vote === 'like' || n.vote === 'love' || n.vote === 'dislike' ? n.vote : '';
+    if (!vote) return;
+    const snapshot = sumClip(n.snapshot);
+    if (!snapshot) return;
+    let at = String(n.at || '');
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) at = '';
+    rows.push({ id: sumFeedbackId(snapshot), at, vote, snapshot });
+  });
+  rows.sort((a, b) => a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+  const out = [], seen = new Set();
+  rows.forEach(r => {
+    if (seen.has(r.id) || out.length >= 40) return;
+    if (!r.at) r.at = nzStampLocal();
+    seen.add(r.id);
+    out.push({ id: r.id, at: r.at, vote: r.vote, snapshot: r.snapshot });
+  });
+  return out;
+}
+function sumFeedbackHit(text, kind) {
+  const t = String(text || '').toLowerCase();
+  if (!t || !kind) return false;
+  if (kind === 'joke') {
+    if (/\bjoke\b/.test(t)) return true;
+    try {
+      return HOME_JOKES.some(j => {
+        const q = String(j || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        return q.length > 16 && t.includes(q.slice(0, 40));
+      });
+    } catch (e) { return false; }
+  }
+  if (kind === 'fact') return /\bdid you know\b/.test(t);
+  if (kind === 'question') return /\bstill not tired of\b|\bbe a good place to be\b|\bbetter way to spend\b|\bstrong case for\b|\bbetter time to take\b/.test(t);
+  if (kind === 'about') return /\byou wanted more from\b|\bsounds right for this morning\b|\bthis morning:|\bfor the weekend\b|\bthe way you put it\b|\bif you want to head out\b|\bcould be a good walk\b|\bif you fancy a walk\b|\bif you want music\b|\bwould suit this evening\b|\bput on\b|\bif you want a read\b|\bif you want a book\b|\ba good time for\b|\bcame to mind\b|\bthe garden\b|\byou like (?!it\b)/.test(t);
+  if (kind === 'note') return /\byou noted\b|\bwrite to\b|\byou could write\b|\byou could do\b|\bstill worth catching up\b/.test(t);
+  if (kind === 'film') return /\bfilms?\b|\bmovies?\b|\bfeel like a laugh\b|\bvideo list\b|\bin town\b|\bfeel like heading out\b/.test(t);
+  if (kind === 'meal') return /\bdinner\b|\bmeals?\b|\bif you.?re cooking\b|\bwould sit well tonight\b|\bnever get tired of\b|\btonight could be\b/.test(t);
+  return false;
+}
+function sumFeedbackRecent() {
+  const today = nzTodayISO();
+  return (S && Array.isArray(S.summaryFeedback) ? S.summaryFeedback : []).filter(r => {
+    if (!r || !r.snapshot) return false;
+    const day = String(r.at || '').slice(0, 10);
+    if (!parseD(day)) return false;
+    const age = dayGap(today, day);
+    return Number.isFinite(age) && age >= 0 && age <= 14;
+  });
+}
+function sumKindOff(kind) {
+  try {
+    const rows = sumFeedbackRecent();
+    if (!rows.length) return false;
+    let down = 0, up = 0;
+    rows.forEach(r => {
+      if (!sumFeedbackHit(r.snapshot, kind)) return;
+      if (r.vote === 'dislike') down++;
+      else if (r.vote === 'like' || r.vote === 'love') up++;
+    });
+    return down > up;
+  } catch (e) { return false; }
+}
+function sumLineOff(line, kinds) {
+  try {
+    return (kinds || []).some(k => sumFeedbackHit(line, k) && sumKindOff(k));
+  } catch (e) { return false; }
+}
+function homeSumFeedbackBar(plain) {
+  try {
+    const snapshot = sumClip(plain);
+    if (!snapshot) return '';
+    const id = sumFeedbackId(snapshot);
+    let vote = '';
+    const rows = S && Array.isArray(S.summaryFeedback) ? S.summaryFeedback : [];
+    const row = rows.find(r => r && r.id === id);
+    if (row) vote = row.vote;
+    const btn = (v, label) => {
+      const on = vote === v;
+      return `<button type="button" class="${on ? 'on' : ''}" data-vote="${v}" aria-pressed="${on ? 'true' : 'false'}" onclick="sumVote('${v}')">${label}</button>`;
+    };
+    return `<div class="sumfb" role="group" aria-label="Summary feedback">${btn('like', 'Like')}${btn('love', 'Love')}${btn('dislike', 'Dislike')}</div>`;
+  } catch (e) { return ''; }
+}
+function homeSumBareCard() {
+  const note = '<p class="sumnote">Nothing much to flag right now. Have a good one.</p>';
+  let bar = '';
+  try { bar = homeSumFeedbackBar(note); } catch (e) { bar = ''; }
+  return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade">' + note + bar + '</div></div>';
+}
+async function sumVote(vote) {
+  try {
+    if (!S || (vote !== 'like' && vote !== 'love' && vote !== 'dislike')) return;
+    const card = document.getElementById('homesum');
+    if (!card) return;
+    const snapshot = sumClip([...card.querySelectorAll('.sumnote')].map(n => n.textContent || '').join(' '));
+    if (!snapshot) return;
+    const id = sumFeedbackId(snapshot);
+    const list = Array.isArray(S.summaryFeedback) ? S.summaryFeedback.slice() : [];
+    const cur = list.find(r => r && r.id === id);
+    const next = cur && cur.vote === vote
+      ? list.filter(r => r && r.id !== id)
+      : [{ id, at: nzStampLocal(), vote, snapshot }].concat(list.filter(r => r && r.id !== id));
+    S.summaryFeedback = normSummaryFeedback(next);
+    await save();
+    const kept = (S.summaryFeedback || []).find(r => r && r.id === id);
+    const now = kept ? kept.vote : '';
+    const live = document.getElementById('homesum') || card;
+    live.querySelectorAll('.sumfb button').forEach(b => {
+      const on = b.getAttribute('data-vote') === now;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  } catch (e) {}
+}
+
 function homeSceneCard(inner) {
   let scene = 'soft';
   try { scene = homeWxScene() || 'soft'; } catch (e) { scene = 'soft'; }
   if (!/^[a-z-]+$/.test(scene)) scene = 'soft';
   const body = inner || '<p class="sumnote">Nothing much to flag right now. Have a good one.</p>';
-  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}</div></div>`;
+  let bar = '';
+  try { bar = homeSumFeedbackBar(body); } catch (e) { bar = ''; }
+  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${bar}</div></div>`;
 }
 function homeSumFallback() {
   try { return homeSceneCard('<p class="sumnote">Nothing much to flag right now. Have a good one.</p>'); }
-  catch (e) { return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade"><p class="sumnote">Nothing much to flag right now. Have a good one.</p></div></div>'; }
+  catch (e) {
+    try { return homeSumBareCard(); } catch (e2) {
+      return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade"><p class="sumnote">Nothing much to flag right now. Have a good one.</p></div></div>';
+    }
+  }
 }
 function homeJoinClauses(parts) {
   const list = (parts || []).filter(Boolean);
@@ -1468,9 +1619,22 @@ function homeRhetoricalLine() {
 }
 function homeFlavorLine() {
   const kind = homeFlavorKind();
-  if (kind === 'joke') return homePick(91, HOME_JOKES);
-  if (kind === 'fact') return 'Did you know ' + homePick(92, HOME_FACTS);
-  if (kind === 'question') return homeRhetoricalLine();
+  try {
+    if (kind === 'joke') {
+      if (sumKindOff('joke')) return '';
+      return homePick(91, HOME_JOKES);
+    }
+    if (kind === 'fact') {
+      if (sumKindOff('fact')) return '';
+      return 'Did you know ' + homePick(92, HOME_FACTS);
+    }
+    if (kind === 'question') {
+      if (sumKindOff('question')) return '';
+      const line = homeRhetoricalLine();
+      if (sumLineOff(line, ['film', 'meal'])) return '';
+      return line;
+    }
+  } catch (e) { return ''; }
   return '';
 }
 // 2.19.0: one About you sentence, from a stored answer only. Tone words skip or keep the aside.
@@ -1547,14 +1711,21 @@ function homeSummaryQuote() {
 }
 function homeAboutSentence(mentioned) {
   try {
+    if (sumKindOff('about')) return '';
+    const candidates = [];
     const fit = homeStripEnd(homePersonalClause() || '');
-    if (fit && !homeLineRepeats(fit, mentioned) && !homeLooksLikeAddress(fit)) return fit;
+    if (fit && !homeLineRepeats(fit, mentioned) && !homeLooksLikeAddress(fit)) candidates.push(fit);
     if (homeWhere() !== 'work') {
       const wish = homeAppWishLine();
-      if (wish && !homeLineRepeats(wish, mentioned)) return wish;
+      if (wish && !homeLineRepeats(wish, mentioned)) candidates.push(wish);
     }
     const quote = homeSummaryQuote();
-    if (quote && !homeLineRepeats(quote, mentioned)) return quote;
+    if (quote && !homeLineRepeats(quote, mentioned)) candidates.push(quote);
+    for (let i = 0; i < candidates.length; i++) {
+      const line = candidates[i];
+      if (sumLineOff(line, ['film', 'meal'])) continue;
+      return line;
+    }
   } catch (e) {}
   return '';
 }
@@ -1613,6 +1784,7 @@ function homeOpenTodoSame(text) {
 }
 function homeSavedNoteLine(mentioned) {
   try {
+    if (sumKindOff('note')) return '';
     const today = nzTodayISO();
     const where = homeWhere();
     const rows = noteRows();
@@ -1716,7 +1888,9 @@ function homeSumCard(bits) {
     return homeSceneCard(ps.join(''));
   } catch (e) {
     try { return homeSumFallback(); } catch (e2) {
-      return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade"><p class="sumnote">Nothing much to flag right now. Have a good one.</p></div></div>';
+      try { return homeSumBareCard(); } catch (e3) {
+        return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade"><p class="sumnote">Nothing much to flag right now. Have a good one.</p></div></div>';
+      }
     }
   }
 }
@@ -1820,6 +1994,7 @@ function homeAsideLine(mentioned) {
 }
 function homePlayLine(mentioned) {
   if (homeWhere() !== 'home') return '';
+  if (sumKindOff('film')) return '';
   const a = homeAklParts();
   const hour = a ? a.hour : -1;
   try {
@@ -1900,6 +2075,7 @@ function homePlayLine(mentioned) {
 }
 function homeMealLine(mentioned) {
   try {
+    if (sumKindOff('meal')) return '';
     const meals = upcomingMeals() || [];
     const today = todayISO();
     const todayMeal = meals.includes(today) && M() && M().plan ? M().plan[today] : null;
@@ -8838,7 +9014,9 @@ function setSyncCode(code) {
 function syncBundle() {
   let dailyQuote = null, theme = null, textSize = null;
   try { dailyQuote = localStorage.getItem('dailyQuote'); theme = localStorage.getItem('theme'); textSize = localStorage.getItem('textSize'); } catch (e) { }
-  return { data: S, local: { dailyQuote, theme, textSize } };
+  const data = Object.assign({}, S);
+  delete data.summaryFeedback; // votes stay on this phone
+  return { data, local: { dailyQuote, theme, textSize } };
 }
 function foldLocalPrefs(d, local) {
   d.settings = Object.assign({}, d.settings || {});
@@ -8900,9 +9078,11 @@ async function applyPhoneSync(pack) {
   if (sheetOpen) return;
   const remote = pack && pack.data && typeof pack.data === 'object' ? pack.data : pack;
   const code = syncCode();
+  const keptFeedback = S && S.summaryFeedback;
   phoneSyncMute = true;
   try {
     const next = normalise(foldLocalPrefs(remote, pack && pack.local));
+    next.summaryFeedback = normSummaryFeedback(keptFeedback);
     if (code) next.settings.syncCode = SyncLogic.formatSyncCode(code);
     S = next;
     await kvSet('data', S);
