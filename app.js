@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.21.0';
+const APP_VERSION = '2.22.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1135,11 +1135,8 @@ function homeEaseLine() {
         'Turkish Delight, if you want a little something sweet.',
         'A bit of Turkish Delight, if you fancy something sweet.'
       ]);
-      return homePick(35, [
-        'The gym’s there if you feel like it.',
-        'If you want to move, the gym’s there.',
-        'A gym session, if the mood’s there.'
-      ]);
+      // Gym is only Tuesday and Wednesday after 6pm, from homeRoutineLine. Not a weekend prompt.
+      return '';
     }
     if ((weekend || a.dow === 5) && morning) {
       if (wet) return homePick(34, [
@@ -1810,39 +1807,8 @@ function homeOpenTodoSame(text) {
   if (!key) return false;
   return (S.todos || []).some(t => t && !t.done && homeMentionKey(homePlainTitle(t.title)) === key);
 }
+// 2.22.0: notes stay in their own section. The homepage summary does not mention them.
 function homeSavedNoteLine(mentioned) {
-  try {
-    if (sumKindOff('note')) return '';
-    const today = nzTodayISO();
-    const where = homeWhere();
-    const rows = noteRows();
-    for (let i = 0; i < rows.length; i++) {
-      const n = rows[i];
-      const text = n && String(n.text || '').replace(/\s+/g, ' ').trim();
-      if (!text || homeNoteNag(text)) continue;
-      const day = String(n.at || '').slice(0, 10);
-      if (!parseD(day)) continue;
-      const age = dayGap(today, day);
-      if (!Number.isFinite(age) || age < 0 || age > 6) continue;
-      const clip = aboutClip(text);
-      if (!clip || homeLooksLikeAddress(text)) continue;
-      const key = homeMentionKey(clip);
-      if ((key && mentioned && mentioned.has(key)) || homeLineRepeats(clip, mentioned)) continue;
-      if (where === 'work' && homeNotePersonal(text)) continue;
-      const person = homeNotePerson(text);
-      const outing = homeNoteIsOuting(text);
-      const task = homeNoteIsTask(text) && !homeOpenTodoSame(text);
-      const writing = /^(write|email)\b/i.test(text);
-      let line = '';
-      if (person && where !== 'work' && (!task || writing)) line = 'You could write to ' + person + ' about ' + homeQuote(clip);
-      else if (task && !(where === 'work' && outing)) line = 'You could do ' + homeQuote(clip) + ' next';
-      else if (age >= 1) line = 'Still worth catching up on ' + homeQuote(clip);
-      else line = 'You noted ' + homeQuote(clip);
-      if (!line || homeLineRepeats(line, mentioned)) continue;
-      if (key && mentioned) mentioned.add(key);
-      return line;
-    }
-  } catch (e) {}
   return '';
 }
 function mealLikedLine() {
@@ -2189,6 +2155,78 @@ function homeHighPriLine(mentioned) {
     return names.length === 1 ? names[0] + ' is high priority' : list + ' are high priority';
   } catch (e) { return ''; }
 }
+// 2.22.0: one personal line at most, and not on every open. Only when the Auckland clock fits.
+// Usual retail finish is 6:00pm Monday to Wednesday, and 7:15pm on Thursday (the day starts at 8:30am).
+// Friday and Saturday are days off. Sunday cleaning runs until 7pm and is not this shift.
+// A start typed in the Work roster still wins for the drive-time window. These finishes are not written there.
+let homeRoutineRoll = null;
+function homeRoutineWanted() {
+  if (homeRoutineRoll != null) return homeRoutineRoll;
+  homeRoutineRoll = Math.random() < 0.34;
+  return homeRoutineRoll;
+}
+function homeRoutineLine() {
+  try {
+    if (!homeRoutineWanted()) return '';
+    const a = homeAklParts();
+    if (!a || !Number.isFinite(a.min) || !Number.isFinite(a.dow)) return '';
+    const min = a.min, dow = a.dow, hour = a.hour;
+    let atHome = false;
+    try { atHome = homeAtHome(); } catch (e) { atHome = false; }
+    if (atHome && min >= 120 && min < 240) return homePick(201, [
+      'The couch is a rough bed',
+      'The couch makes a rough bed'
+    ]);
+    if (atHome && min >= 22 * 60 && min < 23 * 60) return homePick(202, [
+      'The spa’s there around now, if you feel like it',
+      'Spa time, if you want it'
+    ]);
+    // Dinner is usually 8 to 9pm on Monday to Wednesday only, and only at home. Not Thursday, and not the weekend.
+    if (atHome && (dow === 1 || dow === 2 || dow === 3) && min >= 19 * 60 + 45 && min < 21 * 60 + 15) return homePick(203, [
+      'Dinner’s usually around now, gluten free',
+      'Around dinner time. Keep it gluten free'
+    ]);
+    // Night only, after the spa window. Not a telling-off, and no drug name.
+    if (atHome && (min >= 23 * 60 || min < 120)) return homePick(204, [
+      'Restless legs can play up if the medication is late',
+      'If the medication was a bit late, restless legs can play up'
+    ]);
+    // Tuesday and Wednesday only, after the 6pm finish. Not during the work day, and not Thursday.
+    if ((dow === 2 || dow === 3) && min >= 18 * 60 && min < 21 * 60) return homePick(205, [
+      'Gym tonight, if you feel like it',
+      'The gym’s there tonight, if you want it'
+    ]);
+    // Thursday afternoon up to the 7:15pm finish. No gym, no 8pm dinner, and no nudge to leave.
+    if (dow === 4 && min >= 12 * 60 && min < 19 * 60 + 15) return homePick(206, [
+      'A long day today. The finish is 7:15',
+      'Thursday’s a long one. Usual finish is 7:15'
+    ]);
+    if (dow === 0 && min >= 7 * 60 && min < 19 * 60) return homePick(207, [
+      'Cleaning today until 7, if you’re on it',
+      'Sunday cleaning runs until 7'
+    ]);
+    if (dow === 1 && min >= 8 * 60 && min < 17 * 60) return homePick(208, [
+      'Mum’s today, if you’re heading over',
+      'Monday is Mum’s, if you feel like going'
+    ]);
+    if (atHome && (dow === 5 || dow === 6) && hour >= 17 && hour < 22) {
+      const night = dow === 5 ? 'Friday' : 'Saturday';
+      const lines = [
+        night + ' is a cooking night, if you feel like it. Gluten free',
+        'A gluten-free cook tonight, if you want one',
+        'AI music, if you want some'
+      ];
+      if (hour < 21) lines.push('A movie at home, if you feel like one');
+      return homePick(209, lines);
+    }
+    if (atHome && hour >= 17) {
+      const lines = ['AI music, if you want some', 'Some AI music, if you feel like it'];
+      if (hour >= 5 && hour < 21) lines.push('Some TV, if you feel like it', 'The TV’s there, if you want it');
+      return homePick(210, lines);
+    }
+    return '';
+  } catch (e) { return ''; }
+}
 function homeOverview(shown) {
   const urgent = [];
   try { return homeOverviewBody(shown, urgent); }
@@ -2201,6 +2239,7 @@ function homeOverview(shown) {
 // 2.15.1: one short note on a weather picture, not coloured cards. Urgent items share a sentence.
 // Quiet opens may add one clean joke, real fun fact, or rhetorical question; never more than one.
 // Time, place, one About you line on a quiet day, and the roster when a start is coming up. Nothing invented.
+// 2.22.0: notes are not used here. One routine line, only sometimes, and only when the clock fits.
 // 2.14.0: at work, Noel Leeming only when Google has a busyness label, and only if the note is not already full.
 function homeOverviewBody(shown, urgentOut) {
   const urgent = Array.isArray(urgentOut) ? urgentOut : [];
@@ -2250,7 +2289,7 @@ function homeOverviewBody(shown, urgentOut) {
       pushBit('about', aboutLine);
     }
   } catch (e) {}
-  try { pushBit('savednote', homeSavedNoteLine(mentioned)); } catch (e) {}
+  try { pushBit('routine', homeRoutineLine()); } catch (e) {}
   try { pushBit('roster', rosterHeadsUp(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
   try { pushBit('drive', homeDriveLine()); } catch (e) {}
   try {
@@ -10002,19 +10041,48 @@ function countdownHolidays(today) {
   });
   return out;
 }
+// New Zealand clocks go forward at 2am on the last Sunday in September, and back at 3am on the first Sunday in April.
+// The nearer change only. Worked out again each time. Not copied into Reminders.
+function nzDstSunday(y, month, which) {
+  let day;
+  if (which === 1) {
+    const t = Date.UTC(y, month - 1, 1);
+    day = 1 + ((7 - new Date(t).getUTCDay()) % 7);
+  } else {
+    const t = Date.UTC(y, month, 0);
+    day = new Date(t).getUTCDate() - new Date(t).getUTCDay();
+  }
+  return y + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+}
+function countdownDaylight(today) {
+  const y = +String(today || '').slice(0, 4);
+  if (!Number.isFinite(y)) return [];
+  const events = [];
+  for (let i = 0; i < 4; i++) {
+    const yr = y + i;
+    events.push({ date: nzDstSunday(yr, 4, 1), name: 'Clocks go back', when: '3:00 am' });
+    events.push({ date: nzDstSunday(yr, 9, -1), name: 'Clocks go forward', when: '2:00 am' });
+  }
+  const next = events.filter(e => e.date && e.date >= today).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0)[0];
+  if (!next) return [];
+  return [{ kind: 'dst', name: next.name, date: next.date, when: next.when }];
+}
 function countdownRows(now = new Date()) {
   const today = nzTodayISO(now);
   const mine = (S.countdowns || []).filter(c => c && c.date >= today).map(c => ({ kind: 'mine', id: c.id, name: c.name, date: c.date }));
-  return mine.concat(countdownHolidays(today)).filter(x => {
+  const rank = { mine: 0, hol: 1, dst: 2 };
+  return mine.concat(countdownHolidays(today), countdownDaylight(today)).filter(x => {
     const d = cdDays(x.date, now);
     return d != null && d >= 0;
-  }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.kind === 'mine' ? -1 : 1) || a.name.localeCompare(b.name));
+  }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : ((rank[a.kind] || 9) - (rank[b.kind] || 9)) || a.name.localeCompare(b.name));
 }
 function cdRow(x, del) {
   const d = cdDays(x.date);
   const ic = x.kind === 'hol' ? 'hol' : 'count';
   const icon = x.kind === 'hol' ? 'flag' : 'clock';
-  const sub = x.kind === 'hol' ? 'Public holiday · ' + fmtW(x.date) : fmtW(x.date);
+  const sub = x.kind === 'hol' ? 'Public holiday · ' + fmtW(x.date)
+    : x.kind === 'dst' ? 'New Zealand clocks · ' + fmtW(x.date) + (x.when ? ' · ' + x.when : '')
+    : fmtW(x.date);
   const body = `<div class="ic ${ic}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${esc(sub)}</div></div><span class="pill duepill ${dueTone(d)}">${esc(cdWords(d))}</span>`;
   if (x.kind === 'mine' && del) return `<div class="row">${body}<button type="button" class="iconbtn" aria-label="Delete ${esc(x.name)}" onclick="deleteCountdown('${x.id}')">${I('trash')}</button></div>`;
   if (x.kind === 'hol') return `<button class="row" onclick="showHol('${x.date}',${JSON.stringify(x.name).replace(/"/g, '&quot;')})">${body}</button>`;
@@ -10027,7 +10095,7 @@ function Countdown() {
     ? `<div class="list" id="cdlist">${list.map(x => cdRow(x, true)).join('')}</div>`
     : '<div class="card empty" id="cdempty"><div class="t">Nothing counting down right now.</div></div>';
   return header('Countdown', 'How many days are left', addBtn('Add a countdown', "document.getElementById('cdname').focus()")) + form + body +
-    '<div class="foot">The number is worked out again from today’s date in New Zealand. Your own dates stay on this phone. Public holidays are the ones already built into the app.</div>';
+    '<div class="foot">The number is worked out again from today’s date in New Zealand. Your own dates stay on this phone. Public holidays are the ones already built into the app. The next daylight saving change is worked out the same way, and it is not copied into Reminders.</div>';
 }
 async function addCountdown(e) {
   e.preventDefault();
