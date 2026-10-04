@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.20.0';
+const APP_VERSION = '2.21.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1490,17 +1490,18 @@ function sumFeedbackRecent() {
     return Number.isFinite(age) && age >= 0 && age <= 14;
   });
 }
+// 2.21.0: Love is the only positive vote (on the right track). Like means acceptable: it stays stored and selected, but it does not keep or boost a kind and it does not cancel a dislike. Skip an optional kind only when dislikes in the last 14 days outnumber loves. This never applies to urgent lines.
 function sumKindOff(kind) {
   try {
     const rows = sumFeedbackRecent();
     if (!rows.length) return false;
-    let down = 0, up = 0;
+    let dislikes = 0, loves = 0;
     rows.forEach(r => {
       if (!sumFeedbackHit(r.snapshot, kind)) return;
-      if (r.vote === 'dislike') down++;
-      else if (r.vote === 'like' || r.vote === 'love') up++;
+      if (r.vote === 'dislike') dislikes++;
+      else if (r.vote === 'love') loves++;
     });
-    return down > up;
+    return dislikes > loves;
   } catch (e) { return false; }
 }
 function sumLineOff(line, kinds) {
@@ -1617,16 +1618,43 @@ function homeRhetoricalLine() {
     return part ? 'Shane, is there really a better time to take the ' + part + ' at your own pace?' : '';
   } catch (e) { return ''; }
 }
+// A stored summary answer turns jokes or facts off only when it clearly says they are not wanted. Short, brief, quiet, or less is not that.
+function homeSummaryDeclines(kind) {
+  let text = '';
+  try {
+    const row = typeof aboutLatest === 'function' ? aboutLatest('summary') : null;
+    text = row && row.text ? String(row.text).toLowerCase() : '';
+  } catch (e) { return false; }
+  if (!text) return false;
+  const noWord = '(?:no|without|hate|hates|skip|stop)';
+  const dont = "(?:don'?t|do not)\\s+(?:want|like|need|include|show|give(?:\\s+me)?)?\\s*";
+  if (kind === 'joke') {
+    return new RegExp('\\b' + noWord + '\\s+(?:the\\s+|any\\s+|more\\s+)?jokes?\\b').test(text)
+      || /\bnot\s+(?:the\s+|any\s+)?jokes?\b/.test(text)
+      || new RegExp('\\b' + dont + '(?:any\\s+|the\\s+|more\\s+)?jokes?\\b').test(text)
+      || /\bjokes?\s+(?:off|away)\b/.test(text)
+      || /\bno more jokes?\b/.test(text);
+  }
+  if (kind === 'fact') {
+    return new RegExp('\\b' + noWord + '\\s+(?:the\\s+|any\\s+|more\\s+)?(?:fun\\s+)?facts?\\b').test(text)
+      || /\bnot\s+(?:the\s+|any\s+)?(?:fun\s+)?facts?\b/.test(text)
+      || new RegExp('\\b' + dont + '(?:any\\s+|the\\s+|more\\s+)?(?:fun\\s+)?facts?\\b').test(text)
+      || /\b(?:fun\s+)?facts?\s+(?:off|away)\b/.test(text)
+      || /\bno more (?:fun\s+)?facts?\b/.test(text);
+  }
+  return false;
+}
 function homeFlavorLine() {
   const kind = homeFlavorKind();
   try {
     if (kind === 'joke') {
-      if (sumKindOff('joke')) return '';
+      if (sumKindOff('joke') || homeSummaryDeclines('joke')) return '';
       return homePick(91, HOME_JOKES);
     }
     if (kind === 'fact') {
-      if (sumKindOff('fact')) return '';
-      return 'Did you know ' + homePick(92, HOME_FACTS);
+      if (sumKindOff('fact') || homeSummaryDeclines('fact')) return '';
+      const fact = homePick(92, HOME_FACTS);
+      return fact ? 'Did you know ' + fact : '';
     }
     if (kind === 'question') {
       if (sumKindOff('question')) return '';
@@ -1845,6 +1873,7 @@ function mealLikedHtml() {
 
 
 // 2.19.0: things to do, then mood, then where he is, then the time of day. Four notes still cap the list.
+// 2.21.0: the cap does not drop the optional joke or fun fact. Love keeps a kind. Like does not. Dislikes skip a kind only when they outnumber loves.
 function homeSumCard(bits) {
   try {
     const list = (bits || []).filter(b => b && b.text).slice(0, 4);
@@ -1855,9 +1884,9 @@ function homeSumCard(bits) {
     try { mood = String(homeMoodLine() || '').replace(/\s+/g, ' ').trim(); } catch (e) { mood = ''; }
     try { where = String(homePlaceLine() || '').replace(/\s+/g, ' ').trim(); } catch (e) { where = ''; }
     try { hello = String(homeTimeHello() || '').replace(/\s+/g, ' ').trim(); } catch (e) { hello = ''; }
-    const blocksAside = must.length > 0 || later.some(b => b.kind !== 'about');
+    // 2.21.0: one joke or one fun fact can still sit beside other notes. Not every open, and never both at once. A short summary answer does not remove them.
     let flavour = '';
-    try { if (aboutSummaryTone() !== 'short' && !blocksAside) flavour = homeFlavorLine(); } catch (e) { flavour = ''; }
+    try { flavour = homeFlavorLine(); } catch (e) { flavour = ''; }
     const soften = /^(Work|Traffic|About|With|Coming|Today|Tomorrow|There|The|It|In|Soon|A|If|You|Still|Did|Why|What|How|Good|Morning|Afternoon|Evening|Hope)\b/;
     const clausesOf = items => {
       const clauses = [];
@@ -1880,10 +1909,13 @@ function homeSumCard(bits) {
     if (where) ps.push('<p class="sumnote">' + esc(where) + (/[.!?]$/.test(where) ? '' : '.') + '</p>');
     const timeItems = [];
     if (hello) timeItems.push({ text: hello, overdue: false });
-    if (flavour) timeItems.push({ text: flavour, overdue: false });
     later.forEach(b => timeItems.push(b));
     const timeC = clausesOf(timeItems);
     if (timeC.length) ps.push('<p class="sumnote">' + homeJoinClauses(timeC) + '.</p>');
+    if (flavour) {
+      const aside = homeCapClause(homeStripEnd(flavour));
+      if (aside) ps.push('<p class="sumnote">' + esc(aside) + (/[.!?]$/.test(aside) ? '' : '.') + '</p>');
+    }
     if (!ps.length) return homeSumFallback();
     return homeSceneCard(ps.join(''));
   } catch (e) {
