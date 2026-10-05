@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.20';
+const APP_VERSION = '2.22.21';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2413,6 +2413,10 @@ function homeFeedKeys(keys) {
   return out;
 }
 
+// 2.22.21: one bad Home piece logs and drops out instead of blanking the whole app.
+function homeTry(label, fn, fb = '') {
+  try { const v = fn(); return v == null ? fb : v; } catch (e) { console.error('Home ' + label, e); return fb; }
+}
 function Home() {
   if (homeEdit) return HomeEdit();
   const now = new Date();
@@ -2423,11 +2427,12 @@ function Home() {
   if (deferredPrompt && !isStandalone())
     cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
-  const keys = homeFeedKeys(homeOrder().filter(k => homeOn(k) || (k === 'videos' && currentSarahVideo()))), br = brOnHome();
+  const order = homeTry('order', () => homeOrder(), []);
+  const keys = homeTry('keys', () => homeFeedKeys(order.filter(k => homeTry('on ' + k, () => homeOn(k) || (k === 'videos' && currentSarahVideo()), false))), []).slice(), br = homeTry('bridge mode', () => brOnHome(), '');
   let top = '';
   // As before 1.14.0: when the bridge is first, the full card (near the bridge, or a closure) goes right under the greeting,
   // and the compact line sits under the weather if the weather card comes next
-  if (keys[0] === 'bridge' && br === 'card') { top = brCard(); keys.shift(); }
+  if (keys[0] === 'bridge' && br === 'card') { top = homeTry('bridge card', () => brCard()); keys.shift(); }
   const bi = keys.indexOf('bridge');
   if (br === 'line' && bi >= 0 && keys[bi + 1] === 'weather') { keys[bi] = 'weather'; keys[bi + 1] = 'bridge'; }
   // 1.15.0: each Home section sits in its own block with a divider line between them (the compact bridge line stays with the weather above it)
@@ -2438,15 +2443,17 @@ function Home() {
   const shown = new Set(parts.map(([k]) => k));
   if (top) shown.add('bridge');
   homeShownNow = shown;
-  const sum = showHomeSum() ? homeOverview(shown) : '';
-  let before = homeSumBefore();
-  if (!Number.isFinite(before)) before = homeOrder().length;
-  const precede = new Set(homeOrder().slice(0, before));
+  const sum = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
+  let before = homeTry('sum position', () => homeSumBefore(), NaN);
+  if (!Number.isFinite(before)) before = order.length;
+  const precede = new Set(order.slice(0, before));
   const sections = [];
-  if (top) sections.push({ keys: ['bridge'], html: `<section class="hsec hsectop" data-k="bridge" style="${homeTintStyle(0, tintN)}">${top}</section>` });
+  if (top) sections.push({ keys: ['bridge'], html: `<section class="hsec hsectop" data-k="bridge" style="${homeTry('tint', () => homeTintStyle(0, tintN))}">${top}</section>` });
   groups.forEach((g, i) => {
-    const body = homeHasHeading(g.k, g.h) ? g.h : homeSec(HOME[g.k][2]) + g.h;
-    sections.push({ keys: g.keys, html: `<section class="hsec" data-k="${g.k}" style="${homeTintStyle(i + (top ? 1 : 0), tintN)}">${body}</section>` });
+    try {
+      const body = homeHasHeading(g.k, g.h) ? g.h : homeSec(HOME[g.k][2]) + g.h;
+      sections.push({ keys: g.keys, html: `<section class="hsec" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i + (top ? 1 : 0), tintN))}">${body}</section>` });
+    } catch (e) { console.error('Home section', g.k, e); }
   });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
@@ -2474,9 +2481,10 @@ function Home() {
   const feed = homeFeedMode === 'list' ? listFeed : carousel;
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts)
   const sumForCar = homeFeedMode === 'list' ? '' : (sumMid || '');
-  return commuteBanner() + header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + sumTop + dailyQuoteCard() + cards +
-    sumForCar + feed + `${syncNote()}
-    <div class="foot">${savedWhere()}</div>
+  const name = homeTry('name', () => S.settings.name) || 'Shane';
+  return homeTry('commute', () => commuteBanner()) + header('Hi ' + esc(name), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + homeTry('weather greeting', () => wxGreet()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + cards +
+    sumForCar + feed + `${homeTry('sync note', () => syncNote())}
+    <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
 }
 
@@ -11627,21 +11635,32 @@ function render() {
     page = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   } catch (e) {
     console.error('Render', e);
-    return;
+    page = renderFallback(r, e);
   }
   const view = document.getElementById('view');
-  if (!view || typeof page !== 'string' || !page) return;
+  if (!view) return;
+  if (typeof page !== 'string' || !page) { if (view.children.length) return; page = renderFallback(r, null); }
   view.innerHTML = page;
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
-  if ((r === 'home' || r === '') && homeEdit) wireReorder();
-  if ((r === 'home' || r === '') && !homeEdit) {
-    if (homeFeedMode === 'list') wireHomeFeedList();
-    else wireHomeCarousel();
-  }
-  if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
-  wireRadio();
+  try {
+    if ((r === 'home' || r === '') && homeEdit) wireReorder();
+    if ((r === 'home' || r === '') && !homeEdit) {
+      if (homeFeedMode === 'list') wireHomeFeedList();
+      else wireHomeCarousel();
+    }
+  } catch (e) { console.error('Wire home', e); }
+  try { if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } } catch (e) { console.error('Wire videos', e); }
+  try { wireRadio(); } catch (e) { console.error('Wire radio', e); }
+}
+// 2.22.21: if a page throws, show a short note with a way out instead of a blank screen.
+function renderFallback(r, err) {
+  const home = r === 'home' || r === '';
+  let msg = '';
+  try { msg = err ? String(err && err.message || err).slice(0, 160) : ''; } catch (e) { msg = ''; }
+  return `<div class="callout red" id="renderfail" role="alert"><div style="flex:1"><b>${home ? 'Home' : 'This page'} couldn’t load just now</b><br>Your things are still saved.${msg ? '<br><small class="muted">' + esc(msg) + '</small>' : ''}
+    <div class="btns" style="margin-top:8px">${home ? '' : '<button class="btn primary small" onclick="go(\'#home\')">Go to Home</button> '}<button class="btn small" onclick="location.reload()">Reload</button></div></div></div>`;
 }
 // 2.22.18: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
 // Vertical pan is native (touch-action:pan-y on the whole carousel): the card body scrolls and then
@@ -12004,11 +12023,12 @@ async function start() {
     S = normalise(seed());
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
-  await loadCal();
-  await loadMail();
-  await finishMailSignIn();
-  loadWx(); loadEvs(); loadCls(); loadRoadworks(); loadTv(); loadNews(); loadBlogs(); loadPodcasts();
-  render();
+  // 2.22.21: a failure here must not leave a blank screen or skip service worker registration (updates).
+  try { await loadCal(); } catch (e) { console.error('loadCal', e); }
+  try { await loadMail(); } catch (e) { console.error('loadMail', e); }
+  try { await finishMailSignIn(); } catch (e) { console.error('finishMailSignIn', e); }
+  for (const f of [loadWx, loadEvs, loadCls, loadRoadworks, loadTv, loadNews, loadBlogs, loadPodcasts]) { try { f(); } catch (e) { console.error('load', e); } }
+  try { render(); } catch (e) { console.error('First render', e); }
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
