@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.7';
+const APP_VERSION = '2.22.8';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6511,7 +6511,7 @@ function loansMoreSub() {
   return `You owe <b>${centsMoney(act.reduce((n, l) => n + loanCalc(l).owed, 0))}</b>${act.length > 1 ? ' · ' + plural(act.length, 'loan') : ' to ' + esc(act[0].from)}`;
 }
 /* ================= BUDGET (2.22.5, Money › Budget) ================= */
-// Fortnight budget with Shane's pay (varies), three mortgages, his Bills (fortnight share), and extra spending.
+// Fortnight budget with Shane's pay (varies), three mortgages, Bills due in that payday range, and extra spending.
 // No made-up amounts: pay and mortgages stay blank until he types them; bills come from Bills he already saved.
 const BUDGET_MORTGAGE_DEFAULTS = ['Mortgage 1', 'Mortgage 2', 'Mortgage 3'];
 const budgetAmt = v => Number.isFinite(+v) && +v > 0 ? Math.min(Math.round(+v * 100) / 100, 1000000) : 0;
@@ -6525,15 +6525,14 @@ function budgetMortgagesOf(b) {
   });
 }
 function normBudgets(list) {
-  const cur = typeof payPeriod === 'function' ? payPeriod(0) : null;
+  // Do not call payPeriod here: normalise runs before S is set, and paydays() reads S.
   return (Array.isArray(list) ? list : []).filter(b => b && typeof b === 'object' && b.id).map(b => {
     // Older 2.22.4 budgets used amount as the pot. Treat that as this fortnight's pay.
     const pay = budgetAmt(b.pay != null ? b.pay : b.amount);
-    let start = b.start && parseD(b.start) != null ? b.start : '';
-    let end = b.end && parseD(b.end) != null ? b.end : '';
-    let next = b.next && parseD(b.next) != null ? b.next : '';
-    if ((!start || !end) && cur) { start = cur.start; end = cur.end; next = cur.next || ''; }
-    const range = budgetRangeLabel(start, end);
+    const start = b.start && parseD(b.start) != null ? b.start : '';
+    const end = b.end && parseD(b.end) != null ? b.end : '';
+    const next = b.next && parseD(b.next) != null ? b.next : '';
+    const range = start && end ? budgetRangeLabel(start, end) : '';
     return {
       id: String(b.id),
       name: range || String(b.name || 'This fortnight').slice(0, 40) || 'This fortnight',
