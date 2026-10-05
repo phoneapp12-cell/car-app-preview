@@ -66,7 +66,7 @@
   /* True when this copy has personal records, not just the starter cars, drivers and meal ideas. */
   function hasPersonal(d) {
     if (!d || typeof d !== 'object') return false;
-    var keys = ['bills', 'todos', 'appts', 'birthdays', 'ideas', 'feeds', 'pets', 'health', 'myEvents', 'loans', 'reminders', 'countdowns', 'notes'];
+    var keys = ['bills', 'todos', 'appts', 'birthdays', 'ideas', 'feeds', 'pets', 'health', 'myEvents', 'loans', 'budgets', 'reminders', 'countdowns', 'notes'];
     if (keys.some(function (k) { return Array.isArray(d[k]) && d[k].length; })) return true;
     if (d.commission && (d.commission.anchor || (Array.isArray(d.commission.entries) && d.commission.entries.length))) return true;
     if (d.shop && Array.isArray(d.shop.items) && d.shop.items.length) return true;

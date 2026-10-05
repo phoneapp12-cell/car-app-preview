@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.3';
+const APP_VERSION = '2.22.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -120,7 +120,7 @@ function seed() {
       car('car-kbz234', "Cass's car", 'KBZ234', '2007', 'Honda Fit', 'Blue', 'Hatch · petrol', '#3C7DD9', '2026-11-24', '2026-11-15')
     ],
     bills: [], todos: [], appts: [], lists: ['Home', 'Cars', 'Shopping'],
-    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), shop: newShop(), pets: [], myEvents: [], loans: [], posts: [],
+    birthdays: [], ideas: [], ideaCats: IDEA_CATS.slice(), feeds: [], drivers: seedDrivers(), meals: newMeals(), shop: newShop(), pets: [], myEvents: [], loans: [], budgets: [], posts: [],
     settings: { name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }
   };
 }
@@ -131,7 +131,8 @@ function normalise(d) {
   d = d && typeof d === 'object' ? d : {};
   ['cars', 'bills', 'todos', 'appts', 'birthdays', 'ideas', 'feeds', 'posts'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
   // Ideas keep any extra fields (including steps). Sync and backups store the whole object.
-  if (Array.isArray(d.ideas)) d.ideas.forEach(ensureIdeaSteps);
+  // 2.22.4: step checklists live on open to-dos now. Old idea.steps are kept as they are, just not shown.
+  if (Array.isArray(d.todos)) d.todos.forEach(ensureTodoSteps);
   if (!Array.isArray(d.lists) || !d.lists.length) d.lists = ['Home', 'Cars', 'Shopping'];
   if (!Array.isArray(d.ideaCats)) d.ideaCats = IDEA_CATS.slice();
   if (!Array.isArray(d.drivers)) d.drivers = seedDrivers(); // first time on this version: Shane, Sarah and Cass
@@ -146,6 +147,7 @@ function normalise(d) {
   d.myEvents = normMine(d.myEvents); // 1.6.0: my events (repeating), older data has none
   d.commission = normComm(d.commission); // 1.7.0: commission tracker (older data and backups have none)
   d.loans = normLoans(d.loans); // 1.10.0: loans (older data and backups have none)
+  d.budgets = normBudgets(d.budgets); // 2.22.4: budgets (older data and backups have none)
   d.reminders = normReminders(d.reminders); // 1.27.0: reminders (older data and backups have none)
   d.countdowns = normCountdowns(d.countdowns); // 2.10.0: named countdowns (older data and backups have none)
   d.notes = normNotes(d.notes); // 2.11.0: typed or spoken notes (older data and backups have none)
@@ -2963,26 +2965,30 @@ function todoPriMark(t) {
 }
 function Todo() {
   if (todoFilter !== 'All' && !S.lists.includes(todoFilter)) todoFilter = 'All';
+  sweepIdeaSteps(); // 2.22.4: open to-dos that match get their checklist
   const vis = S.todos.filter(t => todoFilter === 'All' || t.list === todoFilter);
   const open = vis.filter(t => !t.done).sort(cmpOpenTodo);
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const row = t => `<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick${t.done ? '' : ' donelabel'}" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span>${t.done ? '' : '<b>Done</b>'}</button>
-    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>
+    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
     ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
+  const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
   return header('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()')) +
     `<div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${esc(l)}</button>`).join('')}
       <button class="chip plus" onclick="listForm()">+ New list</button></div>
     ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
     <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="Add a to-do${todoFilter !== 'All' ? ' to ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
-    ${open.length ? `<div class="list">${open.map(row).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">All done. Good as gold!</div></div>' : empty('Nothing on your list', 'Type a to-do above and tap +, or add one with a due date.', 'Add a to-do', 'todoForm()'))}
+    ${open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">All done. Good as gold!</div></div>' : empty('Nothing on your list', 'Type a to-do above and tap +, or add one with a due date.', 'Add a to-do', 'todoForm()'))}
     ${done.length ? `<div class="sec">Done <button onclick="clearDone()">Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}`;
 }
 function setTodoFilter(l) { todoFilter = l; render(); }
 async function quickAdd(e) {
   e.preventDefault();
   const v = $('#newtodo').value.trim(); if (!v) return;
-  S.todos.push({ id: uid('todo'), title: v, list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', priority: 'normal', done: false, created: Date.now() });
+  const td = { id: uid('todo'), title: v, list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', priority: 'normal', done: false, created: Date.now() };
+  refreshIdeaSteps(td);
+  S.todos.push(td);
   await save(); render(); $('#newtodo').focus(); toast('Added to your list.');
 }
 async function tick(id) {
@@ -3003,17 +3009,21 @@ function clearDone() {
 }
 function todoForm(id) {
   const t = id ? S.todos.find(x => x.id === id) : { title: '', list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', priority: 'normal' };
+  if (!t) return;
+  if (id) ensureTodoSteps(t);
+  if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
   openSheet(id ? 'Edit to-do' : 'Add a to-do',
     field('To-do', inp('title', t.title, 'placeholder="e.g. Mow the lawns" required maxlength="120"')) +
     `<div class="two">${field('List', sel('list', S.lists.map(l => [l, l]), t.list))}${field('Priority', sel('priority', [['high', 'High'], ['normal', 'Normal'], ['low', 'Low']], todoPriority(t)))}</div>` +
     field('Due date', inp('due', t.due, 'type="date"'), 'Optional') +
     field('Notes', area('notes', t.notes)) +
+    (id ? todoStepsBlock(t, 'sheet') : '') +
     (id ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="tick('${id}')">${I('check')} ${t.done ? 'Mark not done' : 'Mark complete'}</button>${t.done ? '' : `<button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button>`}</div>` : ''),
     async v => {
       if (!v.title) return 'Please type the to-do.';
       const priority = todoPriority({ priority: v.priority });
-      if (id) Object.assign(t, { title: v.title, list: v.list, due: v.due, notes: v.notes, priority });
-      else S.todos.push({ id: uid('todo'), title: v.title, list: v.list, due: v.due, notes: v.notes, priority, done: false, created: Date.now() });
+      if (id) { Object.assign(t, { title: v.title, list: v.list, due: v.due, notes: v.notes, priority }); if (!t.done) refreshIdeaSteps(t); }
+      else { const td = { id: uid('todo'), title: v.title, list: v.list, due: v.due, notes: v.notes, priority, done: false, created: Date.now() }; refreshIdeaSteps(td); S.todos.push(td); }
       await save(); render(); toast(id ? 'To-do updated.' : 'Added to your list.');
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete to-do" onclick="deleteTodo('${id}')">${I('trash')}</button>` : '');
@@ -3690,8 +3700,47 @@ function refreshIdeaSteps(i) {
   if (Array.isArray(i.steps) && i.steps.length === lines.length && i.steps.every((s, n) => s && s.text === lines[n])) return;
   i.steps = lines.map(text => ({ id: uid('step'), text: text, done: false }));
 }
+/* 2.22.4: the step checklists belong on open to-dos (same keyword rules as before). */
+function ensureTodoSteps(t) {
+  if (!t || typeof t !== 'object' || t.done) return;
+  ensureIdeaSteps(t);
+}
+function copyStepsFrom(src) {
+  if (!src || !Array.isArray(src.steps) || !src.steps.length) return null;
+  const out = src.steps.filter(x => x && String(x.text || '').trim()).map(x => ({ id: uid('step'), text: String(x.text).trim(), done: !!x.done }));
+  return out.length ? out : null;
+}
+function todoStepsBlock(t, where) {
+  if (!t || t.done || !Array.isArray(t.steps) || !t.steps.length) return '';
+  const rows = t.steps.map(s => {
+    const done = !!s.done;
+    const tick = 'todoStepTick(' + jsArg(t.id) + ',' + jsArg(s.id) + ')';
+    return '<div class="row step' + (done ? ' done' : '') + '"><button type="button" class="tick" aria-label="' + (done ? 'Untick' : 'Tick') + ' ' + esc(s.text) + '" onclick="' + tick + '"><span>' + I('check') + '</span></button><button type="button" class="tapzone" onclick="' + tick + '"><div class="tx"><div class="t">' + esc(s.text) + '</div></div></button></div>';
+  }).join('');
+  return '<div class="ideasteps todosteps" data-todosteps="' + esc(t.id) + '" data-todowhere="' + where + '"><div class="stepcap">A simple way to do this</div>' + rows + '</div>';
+}
+function todoStepProg(t) {
+  const lab = ideaProgressLabel(t);
+  return lab ? ' · ' + esc(lab) : '';
+}
+async function todoStepTick(todoId, stepId) {
+  const t = (S.todos || []).find(x => x && x.id === todoId);
+  if (!t || !Array.isArray(t.steps)) return;
+  const st = t.steps.find(s => s && s.id === stepId);
+  if (!st) return;
+  st.done = !st.done;
+  await save();
+  document.querySelectorAll('[data-todosteps]').forEach(el => {
+    if (el.getAttribute('data-todosteps') !== todoId) return;
+    el.outerHTML = todoStepsBlock(t, el.getAttribute('data-todowhere') || 'list');
+  });
+  document.querySelectorAll('[data-todoprog]').forEach(el => {
+    if (el.getAttribute('data-todoprog') !== todoId) return;
+    el.innerHTML = todoStepProg(t);
+  });
+}
 function sweepIdeaSteps() {
-  (S.ideas || []).forEach(ensureIdeaSteps);
+  (S.todos || []).forEach(ensureTodoSteps);
   if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
 }
 function ideaProgressLabel(i) {
@@ -3704,8 +3753,6 @@ function ideaSubBits(i) {
   if (i.cat) bits.push('<span class="cattag">' + esc(i.cat) + '</span>');
   const note = String(i.notes || '').split('\n')[0].slice(0, 90);
   if (note) bits.push(esc(note));
-  const prog = ideaProgressLabel(i);
-  if (prog) bits.push(esc(prog));
   return bits.join(' ');
 }
 function ideaSubHtml(i) {
@@ -3751,11 +3798,10 @@ function ideaList() {
     : empty('Nothing jotted down yet', 'Type an idea above and tap +. Gift ideas, things to do around the house, trips – anything.', '', '');
   return `<div class="list">${vis.map(i => `<div class="ideawrap"><div class="row idea"><button class="star ${i.pinned ? 'on' : ''}" aria-label="${i.pinned ? 'Unstar' : 'Star'} ${esc(i.title)}" aria-pressed="${!!i.pinned}" onclick="toggleStar('${i.id}')">${I('star')}</button>
     <button class="tapzone" onclick="ideaForm('${i.id}')"><div class="tx"><div class="t">${esc(i.title)}</div>
-    ${ideaSubHtml(i)}</div></button></div>${ideaStepsBlock(i, 'list')}</div>`).join('')}</div>`;
+    ${ideaSubHtml(i)}</div></button></div></div>`).join('')}</div>`;
 }
 function Ideas() {
   if (ideaFilter !== 'All' && ideaFilter !== '★' && !S.ideaCats.includes(ideaFilter)) ideaFilter = 'All';
-  sweepIdeaSteps();
   return header('Ideas', S.ideas.length ? plural(S.ideas.length, 'idea') : 'Jot things down', addBtn('Add an idea', 'ideaForm()')) +
     `<form class="addbar" onsubmit="quickIdea(event)"><input id="newidea" placeholder="Jot down an idea…" autocomplete="off" enterkeyhint="done" maxlength="140" aria-label="New idea"><button aria-label="Add idea">${I('plus')}</button></form>
     ${S.ideas.length ? `<label class="search">${I('search')}<input id="ideaq" type="search" placeholder="Search ideas" value="${esc(ideaQuery)}" aria-label="Search ideas" oninput="ideaQuery=this.value;document.getElementById('idealist').innerHTML=ideaList()"></label>` : ''}
@@ -3768,7 +3814,6 @@ async function quickIdea(e) {
   const v = $('#newidea').value.trim(); if (!v) return;
   const id = uid('idea');
   const idea = { id, title: v, notes: '', cat: S.ideaCats.includes(ideaFilter) ? ideaFilter : '', pinned: ideaFilter === '★', created: Date.now() };
-  refreshIdeaSteps(idea);
   S.ideas.push(idea);
   await save(); render(); $('#newidea').focus();
   toast('Idea saved.', 'Add notes', () => ideaForm(id));
@@ -3777,19 +3822,16 @@ async function toggleStar(id) { const i = S.ideas.find(x => x.id === id); i.pinn
 function ideaForm(id) {
   const i = id ? S.ideas.find(x => x.id === id) : { title: '', notes: '', cat: S.ideaCats.includes(ideaFilter) ? ideaFilter : '', pinned: false };
   if (!i) return;
-  if (id) ensureIdeaSteps(i);
-  if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
   openSheet(id ? 'Edit idea' : 'Add an idea',
     field('Idea', inp('title', i.title, 'placeholder="e.g. Kayak trip to Tutukaka" required maxlength="140"')) +
     field('Notes', area('notes', i.notes, 'Optional: links, prices, who it’s for…')) +
     `<div class="two">${field('Category', sel('cat', [['', 'None'], ...S.ideaCats.map(c => [c, c])], i.cat || ''))}<div class="field"><span>Starred</span>${segHtml('pinned', [['0', 'No'], ['1', '★ Yes']], i.pinned ? '1' : '0')}</div></div>` +
-    ideaStepsBlock(i, 'sheet') +
     (id ? `<button type="button" class="btn" style="width:100%;margin-bottom:4px" onclick="ideaToTodo('${id}')">${I('todo')} Turn into to-do</button>` : ''),
     async v => {
       if (!v.title) return 'Please type the idea.';
       const upd = { title: v.title, notes: v.notes, cat: v.cat, pinned: v.pinned === '1', updated: Date.now() };
-      if (id) { Object.assign(i, upd); refreshIdeaSteps(i); }
-      else { const idea = Object.assign({ id: uid('idea'), created: Date.now() }, upd); refreshIdeaSteps(idea); S.ideas.push(idea); }
+      if (id) Object.assign(i, upd);
+      else S.ideas.push(Object.assign({ id: uid('idea'), created: Date.now() }, upd));
       await save(); render(); toast(id ? 'Idea updated.' : 'Idea saved.');
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete idea" onclick="deleteIdea('${id}')">${I('trash')}</button>` : '');
@@ -3798,10 +3840,10 @@ function ideaForm(id) {
 async function ideaToTodo(id) {
   const i = S.ideas.find(x => x.id === id);
   const list = S.lists.includes(i.cat) ? i.cat : S.lists[0];
-  const extra = ideaStepsNote(i);
-  let notes = i.notes || '';
-  if (extra) notes = notes ? String(notes).replace(/\s*$/, '\n') + extra : extra;
-  S.todos.push({ id: uid('todo'), title: i.title.slice(0, 120), list, due: '', notes, priority: 'normal', done: false, created: Date.now(), fromIdea: id });
+  const td = { id: uid('todo'), title: i.title.slice(0, 120), list, due: '', notes: i.notes || '', priority: 'normal', done: false, created: Date.now(), fromIdea: id };
+  const steps = copyStepsFrom(i); // the idea's own steps (with ticks) if it has them, otherwise made from the title
+  if (steps) td.steps = steps; else refreshIdeaSteps(td);
+  S.todos.push(td);
   await save(); await closeSheet(); render();
   toast(`Added to your ${list} to-do list.`, 'View', () => { todoFilter = 'All'; go('#todo'); });
 }
@@ -6468,6 +6510,101 @@ function loansMoreSub() {
   if (!act.length) return 'All paid off';
   return `You owe <b>${centsMoney(act.reduce((n, l) => n + loanCalc(l).owed, 0))}</b>${act.length > 1 ? ' · ' + plural(act.length, 'loan') : ' to ' + esc(act[0].from)}`;
 }
+/* ================= BUDGET (2.22.4, Money › Budget) ================= */
+// S.budgets = [{ id, name, amount, period: 'fortnight'|'week', lines: [{ id, name, amount }] }]. Amounts are dollars (numbers).
+// Nothing is made up: with no budget the page says so, it never shows a $0 budget.
+const BUDGET_PERIODS = [['fortnight', 'Fortnight'], ['week', 'Week']];
+const budgetAmt = v => Number.isFinite(+v) && +v > 0 ? Math.min(Math.round(+v * 100) / 100, 1000000) : 0;
+function normBudgets(list) {
+  return (Array.isArray(list) ? list : []).filter(b => b && typeof b === 'object' && b.id && budgetAmt(b.amount) > 0).map(b => ({
+    id: String(b.id), name: String(b.name || 'Fortnight').slice(0, 40) || 'Fortnight', amount: budgetAmt(b.amount),
+    period: b.period === 'week' ? 'week' : 'fortnight',
+    lines: (Array.isArray(b.lines) ? b.lines : []).filter(x => x && typeof x === 'object' && budgetAmt(x.amount) > 0)
+      .map(x => ({ id: String(x.id || uid('bl')), name: String(x.name || 'Spending').slice(0, 60), amount: budgetAmt(x.amount) }))
+  }));
+}
+const getBudget = id => (S.budgets || []).find(b => b.id === id);
+function budgetCalc(b) {
+  const spent = Math.round(b.lines.reduce((n, x) => n + x.amount, 0) * 100) / 100;
+  return { spent, left: Math.round((b.amount - spent) * 100) / 100 };
+}
+const budgetPeriodLabel = b => b.period === 'week' ? 'Each week' : 'Each fortnight';
+function budgetCard(b) {
+  const k = budgetCalc(b);
+  const lines = b.lines.map(x => `<div class="row" data-bline="${esc(x.id)}"><div class="tx"><div class="t">${esc(x.name)}</div></div><b>${money(x.amount)}</b>
+      <button type="button" class="iconbtn" aria-label="Delete ${esc(x.name)}" onclick="budgetLineDelete(${jsArg(b.id)},${jsArg(x.id)})">${I('trash')}</button></div>`).join('');
+  return `<div class="carcard loancard budgetcard" data-budget="${esc(b.id)}">
+    <div class="carhead"><div class="carpic loanpic">${I('cash')}</div>
+      <div style="flex:1;min-width:0"><div class="carname">${esc(b.name)}</div><div class="carmodel">${budgetPeriodLabel(b)}</div></div>
+      <button type="button" class="iconbtn" aria-label="Edit ${esc(b.name)}" onclick="budgetForm(${jsArg(b.id)})">${I('pen')}</button></div>
+    <div class="lowed"><small>${k.left < 0 ? 'Over budget' : 'Left to spend'}</small><b class="lamt">${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></div>
+    <div class="lstats"><span>Budget <b>${money(b.amount)}</b></span><span>Spent <b>${money(k.spent)}</b></span><span>Remaining <b>${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></span></div>
+    ${lines ? `<div class="list" style="margin-top:10px">${lines}</div>` : `<p class="muted" style="margin:10px 2px 0">No spending added yet.</p>`}
+    <form class="addbar" style="margin-top:10px" onsubmit="budgetLineAdd(event,${jsArg(b.id)})">
+      <input name="bname" placeholder="What you spent on" autocomplete="off" maxlength="60" aria-label="Spending name">
+      <input name="bamt" inputmode="decimal" placeholder="$0.00" autocomplete="off" style="max-width:110px" aria-label="Spending amount">
+      <button aria-label="Add spending">${I('plus')}</button></form></div>`;
+}
+function Budget() {
+  const list = S.budgets || [];
+  const sub = list.length ? plural(list.length, 'budget') : 'What’s left to spend';
+  if (!list.length) return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) +
+    empty('No budget yet', 'Add one to see what’s left each fortnight.', 'Add', 'budgetForm()') +
+    `<div class="foot">${savedWhere()}</div>`;
+  return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) +
+    `<div id="budgetlist">${list.map(budgetCard).join('')}</div>
+    <div class="btns" style="margin-top:12px"><button class="btn" onclick="budgetForm()">${I('plus')} Add a budget</button></div>
+    <div class="foot">${savedWhere()}</div>`;
+}
+function budgetForm(id) {
+  const b = id ? getBudget(id) : { name: '', amount: 0, period: 'fortnight', lines: [] };
+  if (!b) return;
+  openSheet(id ? 'Edit budget' : 'Add a budget',
+    field('Name', inp('name', b.name, 'placeholder="Fortnight" maxlength="40" autocapitalize="sentences"'), 'Optional') +
+    moneyField('Amount (NZD)', 'amount', Math.round((b.amount || 0) * 100)) +
+    `<div class="field"><span>Period</span>${segHtml('period', BUDGET_PERIODS, b.period)}</div>`,
+    async v => {
+      const cents = parseCents(v.amount);
+      if (cents == null || !v.amount) return 'Please type the budget amount in dollars and cents, like 500 or 450.50.';
+      if (cents <= 0) return 'The budget amount has to be more than $0.00.';
+      if (cents > MAX_CENTS) return 'That amount looks too big. Please check it.';
+      const s = snap(), upd = { name: (v.name || '').trim().slice(0, 40) || 'Fortnight', amount: cents / 100, period: v.period === 'week' ? 'week' : 'fortnight' };
+      if (id) { Object.assign(b, upd); await save(); render(); toast('Budget updated.', 'Undo', undoTo(s)); return; }
+      if (!Array.isArray(S.budgets)) S.budgets = [];
+      S.budgets.push(Object.assign({ id: uid('budget'), lines: [] }, upd)); await save(); render();
+      toast('Budget added.', 'Undo', undoTo(s));
+    }, id ? 'Save' : 'Add',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete budget" onclick="deleteBudget(${jsArg(id)})">${I('trash')}</button>` : '');
+  wireSeg('period');
+}
+function deleteBudget(id) {
+  const b = getBudget(id); if (!b) return;
+  confirmSheet(`Delete the ${esc(b.name)} budget?`, `The budget and ${plural(b.lines.length, 'spending line')} will be removed from this phone.`, 'Delete budget', async () => {
+    const s = snap(); S.budgets = S.budgets.filter(x => x.id !== id); await save();
+    return () => { render(); toast('Budget deleted.', 'Undo', undoTo(s)); };
+  });
+}
+async function budgetLineAdd(e, id) {
+  e.preventDefault();
+  const b = getBudget(id); if (!b) return;
+  const f = e.target, name = (f.bname.value || '').trim(), cents = parseCents((f.bamt.value || '').trim());
+  if (!name) { toast('Please type what you spent it on.'); f.bname.focus(); return; }
+  if (cents == null || cents <= 0) { toast('Please type the amount, like 25 or 12.50.'); f.bamt.focus(); return; }
+  b.lines.push({ id: uid('bl'), name: name.slice(0, 60), amount: Math.min(cents, MAX_CENTS) / 100 });
+  await save(); render();
+}
+async function budgetLineDelete(id, lineId) {
+  const b = getBudget(id); if (!b) return;
+  const x = b.lines.find(l => l.id === lineId); if (!x) return;
+  const s = snap(); b.lines = b.lines.filter(l => l.id !== lineId); await save(); render();
+  toast(`${x.name} removed.`, 'Undo', undoTo(s));
+}
+function budgetMoreSub() {
+  const list = S.budgets || [];
+  if (!list.length) return 'What’s left to spend each fortnight';
+  const b = list[0], k = budgetCalc(b);
+  return `${esc(b.name)}: ${k.left < 0 ? 'Over by <b>' + money(-k.left) + '</b>' : '<b>' + money(k.left) + '</b> left'}`;
+}
 function LoanDetail(id) {
   const l = getLoan(id);
   if (!l) return `<button class="back" onclick="go('#loans')">${I('left')} Loans</button>` + empty('That loan isn’t here any more', 'It may have been deleted.', '', '');
@@ -6836,6 +6973,7 @@ function More() {
     commission: () => commMoreSub(),
     reminders: () => remindersMoreSub(),
     loans: () => loansMoreSub(),
+    budget: () => budgetMoreSub(),
     events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
     news: () => newsMoreSub(),
     tv: () => 'TVNZ 1, TVNZ 2, Three and Sky Starter',
@@ -6881,7 +7019,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
   tv: ['tv', 'tv', 'TV guide', 'TV'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], about: ['info', 'about', 'About you', 'About'],
-  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
+  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
@@ -6897,7 +7035,7 @@ const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'diary', 'countdown', 'notes'] },
-  { id: 'money', title: 'Money', keys: ['bills', 'commission', 'loans'] },
+  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
@@ -11208,7 +11346,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
