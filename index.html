@@ -801,23 +801,24 @@ html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{backgrou
 .hsec > .sec{color:#102033;background:rgba(255,255,255,.94);border-radius:12px;padding:8px 12px;margin:12px 2px 8px;font-size:1rem;letter-spacing:.01em}
 .hsec > .sec a.sechead{color:#102033;font-size:1rem}
 html[data-theme="dark"] .hsec > .sec,html[data-theme="dark"] .hsec > .sec a.sechead{color:#f4f7fb;background:rgba(8,14,20,.62)}
-/* 2.22.16: Full-page home feed carousel — pan-x on stage so finger swipe changes cards; pan-y on #view / card body */
+/* 2.22.17: Full-page home feed carousel — pan-y everywhere so a finger can scroll the card / page vertically; horizontal card swipe is JS (direction lock) */
 .hcar{position:relative;margin:4px 0 10px}
 .hcar-stage{
   position:relative;height:calc(100dvh - 7.25rem);min-height:min(70vh,520px);
-  overflow:hidden;border-radius:22px;touch-action:pan-x;background:transparent;
+  overflow:hidden;border-radius:22px;touch-action:pan-y;background:transparent;
   -webkit-user-select:none;user-select:none;
 }
 .hcar-track{
-  display:flex;height:100%;width:100%;will-change:transform;touch-action:pan-x;
+  display:flex;height:100%;width:100%;will-change:transform;touch-action:pan-y;
 }
 .hcar-item{
   flex:0 0 100%;width:100%;height:100%;min-width:0;
   border-radius:22px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.14);
-  background:transparent;touch-action:pan-x;
+  background:transparent;touch-action:pan-y;
 }
 .hcar-item .hsec{
-  height:100%;margin:0;overflow:auto;overscroll-behavior:contain;
+  height:100%;margin:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior-x:contain;overscroll-behavior-y:auto;
+  -webkit-overflow-scrolling:touch;
   border-top:0!important;padding-top:4px;scrollbar-width:thin;
   touch-action:pan-y;-webkit-user-select:text;user-select:text;
 }

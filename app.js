@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.16';
+const APP_VERSION = '2.22.17';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11587,7 +11587,10 @@ function render() {
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   wireRadio();
 }
-// 2.22.16: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
+// 2.22.17: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
+// Vertical pan is native (touch-action:pan-y on the whole carousel): the card body scrolls and then
+// chains to #view. Horizontal swipe is JS with a direction lock — the browser never pans x here, so
+// sideways moves keep delivering pointermove; vertical moves get native scroll (pointercancel).
 // prefers-reduced-motion: reduce keeps swipe but skips slide transition.
 // Swipe may start on links/buttons (most of each card); form fields and dots are excluded.
 let homeCarDrag = null;
@@ -11612,10 +11615,6 @@ function wireHomeCarousel() {
   let suppressClick = 0;
   let lastTapAt = 0;
 
-  function frontHsec() {
-    const it = items[idx];
-    return it ? (it.querySelector('.hsec') || it) : null;
-  }
   function apply(spin) {
     homeCarIdx = idx;
     root.dataset.i = String(idx);
@@ -11675,14 +11674,10 @@ function wireHomeCarousel() {
     // Ignore secondary pointers / multi-touch while dragging
     if (homeCarDrag) return;
     const p = pt(e);
-    const hsec = frontHsec();
     homeCarDrag = {
       pid: e.pointerId != null ? e.pointerId : 'touch',
       x: p.clientX, y: p.clientY, dx: 0, dy: 0,
-      drag: false, axis: null,
-      scrollEl: hsec,
-      scrollTop0: hsec ? hsec.scrollTop : 0,
-      fromTouch: e.type === 'touchstart'
+      drag: false, axis: null
     };
   };
   const onMove = e => {
@@ -11695,10 +11690,10 @@ function wireHomeCarousel() {
     if (!st.axis) {
       const adx = Math.abs(dx), ady = Math.abs(dy);
       if (adx < 8 && ady < 8) return;
-      // Prefer horizontal when clearly sideways; allow slight diagonal (0.85 ratio)
-      if (adx >= 8 && adx >= ady * 0.85) st.axis = 'x';
-      else if (ady >= 8 && ady > adx) st.axis = 'y';
-      else return;
+      // Direction lock mirrors the browser's pan-y decision: more sideways = card swipe,
+      // otherwise vertical = hand the gesture to native scrolling and stop tracking.
+      if (adx > ady) st.axis = 'x';
+      else { st.axis = 'y'; homeCarDrag = null; return; }
       if (st.axis === 'x') {
         st.drag = true;
         try { if (e.pointerId != null) stage.setPointerCapture(e.pointerId); } catch (err) {}
@@ -11710,12 +11705,6 @@ function wireHomeCarousel() {
       const w = Math.max(1, stage.clientWidth || 300);
       const dragPct = (dx / w) * 100;
       track.style.transform = `translate3d(${(-idx * 100 + dragPct).toFixed(3)}%,0,0)`;
-      return;
-    }
-    if (st.axis === 'y' && st.scrollEl) {
-      // With stage touch-action pan-x, vertical native scroll may be blocked — drive it.
-      st.scrollEl.scrollTop = st.scrollTop0 - dy;
-      if (e.cancelable) e.preventDefault();
     }
   };
   const onUp = e => {
@@ -11724,6 +11713,12 @@ function wireHomeCarousel() {
     if (e.pointerId != null && e.pointerId !== st.pid && st.pid !== 'touch') return;
     homeCarDrag = null;
     try { if (e.pointerId != null) stage.releasePointerCapture(e.pointerId); } catch (err) {}
+    const cancelled = e.type === 'pointercancel' || e.type === 'touchcancel';
+    if (cancelled) {
+      // Browser took the gesture (e.g. native vertical scroll): snap back, never count as a tap.
+      if (st.drag) apply(true);
+      return;
+    }
     if (st.drag && st.axis === 'x') {
       suppressClick = Date.now() + 400;
       lastTapAt = 0;
@@ -11749,6 +11744,10 @@ function wireHomeCarousel() {
   stage.addEventListener('pointermove', onMove, { passive: false });
   stage.addEventListener('pointerup', onUp);
   stage.addEventListener('pointercancel', onUp);
+  // iOS guard: once a horizontal card swipe is locked, keep Safari from starting any scroll.
+  stage.addEventListener('touchmove', e => {
+    if (homeCarDrag && homeCarDrag.axis === 'x' && e.cancelable) e.preventDefault();
+  }, { passive: false });
   // Touch fallback when Pointer Events are missing (older WebViews)
   if (typeof window.PointerEvent !== 'function') {
     stage.addEventListener('touchstart', onDown, { passive: true });
