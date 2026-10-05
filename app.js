@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.11';
+const APP_VERSION = '2.22.12';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11548,11 +11548,11 @@ function render() {
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   wireRadio();
 }
-// 2.22.11: first three Home feed cards open from a centre dot, to an eye, then the full card.
-// Everything after that is a normal scroll (no slide/fold). prefers-reduced-motion: reduce leaves them still.
+// 2.22.12: every Home feed card opens from a centre dot, to an eye, then the full card as it scrolls into view.
+// prefers-reduced-motion: reduce leaves them still.
 let homeEnterObs = null;
 function homeEnterKind(i) {
-  return i < 3 ? 'eye' : null;
+  return 'eye';
 }
 function wireHomeEnter() {
   if (homeEnterObs) { homeEnterObs.disconnect(); homeEnterObs = null; }
