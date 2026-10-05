@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.22';
+const APP_VERSION = '2.22.23';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -151,7 +151,7 @@ function normalise(d) {
   d.reminders = normReminders(d.reminders); // 1.27.0: reminders (older data and backups have none)
   d.countdowns = normCountdowns(d.countdowns); // 2.10.0: named countdowns (older data and backups have none)
   d.notes = normNotes(d.notes); // 2.11.0: typed or spoken notes (older data and backups have none)
-  d.summaryFeedback = normSummaryFeedback(d.summaryFeedback); // 2.20.0: home summary votes (older data and backups have none)
+  delete d.summaryFeedback; // 2.22.23: summary votes removed
   d.about = normAbout(d.about); // 2.13.0: About you (older data and backups have none)
   d.roster = normRoster(d.roster); // 2.13.0: work roster (older data and backups have none)
   d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
@@ -1450,158 +1450,175 @@ function homeWxScene() {
   } catch (e) { return 'soft'; }
 }
 
-// 2.20.0: Like, Love, and Dislike for the summary on screen. Stored on this phone only.
-const SUM_FB_MAX = 400;
-function sumClip(s) {
-  let t = String(s || '');
-  if (t.indexOf('<') >= 0) {
-    t = t.replace(/<br\s*\/?>/gi, ' ').replace(/<\/p>/gi, ' ').replace(/<[^>]+>/g, '');
-    t = t.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-  }
-  t = t.replace(/\s+/g, ' ').trim();
-  if (t.length > SUM_FB_MAX) {
-    const cut = t.slice(0, SUM_FB_MAX - 1).replace(/\s+\S*$/, '').trim();
-    t = (cut || t.slice(0, SUM_FB_MAX - 1).trim()) + '…';
-  }
-  return t;
-}
-function sumFeedbackId(text) {
-  let h = 2166136261;
-  const src = String(text || '');
-  for (let i = 0; i < src.length; i++) {
-    h ^= src.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return 'sf-' + (h >>> 0).toString(36);
-}
-function normSummaryFeedback(list) {
-  if (!Array.isArray(list)) return [];
-  const rows = [];
-  list.forEach(n => {
-    if (!n || typeof n !== 'object') return;
-    const vote = n.vote === 'like' || n.vote === 'love' || n.vote === 'dislike' ? n.vote : '';
-    if (!vote) return;
-    const snapshot = sumClip(n.snapshot);
-    if (!snapshot) return;
-    let at = String(n.at || '');
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) at = '';
-    rows.push({ id: sumFeedbackId(snapshot), at, vote, snapshot });
-  });
-  rows.sort((a, b) => a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
-  const out = [], seen = new Set();
-  rows.forEach(r => {
-    if (seen.has(r.id) || out.length >= 40) return;
-    if (!r.at) r.at = nzStampLocal();
-    seen.add(r.id);
-    out.push({ id: r.id, at: r.at, vote: r.vote, snapshot: r.snapshot });
-  });
-  return out;
-}
-function sumFeedbackHit(text, kind) {
-  const t = String(text || '').toLowerCase();
-  if (!t || !kind) return false;
-  if (kind === 'joke') {
-    if (/\bjoke\b/.test(t)) return true;
-    try {
-      return HOME_JOKES.some(j => {
-        const q = String(j || '').toLowerCase().replace(/\s+/g, ' ').trim();
-        return q.length > 16 && t.includes(q.slice(0, 40));
-      });
-    } catch (e) { return false; }
-  }
-  if (kind === 'fact') return /\bdid you know\b/.test(t);
-  if (kind === 'question') return /\bstill not tired of\b|\bbe a good place to be\b|\bbetter way to spend\b|\bstrong case for\b|\bbetter time to take\b/.test(t);
-  if (kind === 'about') return /\byou wanted more from\b|\bsounds right for this morning\b|\bthis morning:|\bfor the weekend\b|\bthe way you put it\b|\bif you want to head out\b|\bcould be a good walk\b|\bif you fancy a walk\b|\bif you want music\b|\bwould suit this evening\b|\bput on\b|\bif you want a read\b|\bif you want a book\b|\ba good time for\b|\bcame to mind\b|\bthe garden\b|\byou like (?!it\b)/.test(t);
-  if (kind === 'note') return /\byou noted\b|\bwrite to\b|\byou could write\b|\byou could do\b|\bstill worth catching up\b/.test(t);
-  if (kind === 'film') return /\bfilms?\b|\bmovies?\b|\bfeel like a laugh\b|\bvideo list\b|\bin town\b|\bfeel like heading out\b/.test(t);
-  if (kind === 'meal') return /\bdinner\b|\bmeals?\b|\bif you.?re cooking\b|\bwould sit well tonight\b|\bnever get tired of\b|\btonight could be\b/.test(t);
-  return false;
-}
-function sumFeedbackRecent() {
-  const today = nzTodayISO();
-  return (S && Array.isArray(S.summaryFeedback) ? S.summaryFeedback : []).filter(r => {
-    if (!r || !r.snapshot) return false;
-    const day = String(r.at || '').slice(0, 10);
-    if (!parseD(day)) return false;
-    const age = dayGap(today, day);
-    return Number.isFinite(age) && age >= 0 && age <= 14;
-  });
-}
-// 2.21.0: Love is the only positive vote (on the right track). Like means acceptable: it stays stored and selected, but it does not keep or boost a kind and it does not cancel a dislike. Skip an optional kind only when dislikes in the last 14 days outnumber loves. This never applies to urgent lines.
-function sumKindOff(kind) {
-  try {
-    const rows = sumFeedbackRecent();
-    if (!rows.length) return false;
-    let dislikes = 0, loves = 0;
-    rows.forEach(r => {
-      if (!sumFeedbackHit(r.snapshot, kind)) return;
-      if (r.vote === 'dislike') dislikes++;
-      else if (r.vote === 'love') loves++;
-    });
-    return dislikes > loves;
-  } catch (e) { return false; }
-}
-function sumLineOff(line, kinds) {
-  try {
-    return (kinds || []).some(k => sumFeedbackHit(line, k) && sumKindOff(k));
-  } catch (e) { return false; }
-}
-function homeSumFeedbackBar(plain) {
-  try {
-    const snapshot = sumClip(plain);
-    if (!snapshot) return '';
-    const id = sumFeedbackId(snapshot);
-    let vote = '';
-    const rows = S && Array.isArray(S.summaryFeedback) ? S.summaryFeedback : [];
-    const row = rows.find(r => r && r.id === id);
-    if (row) vote = row.vote;
-    const btn = (v, label) => {
-      const on = vote === v;
-      return `<button type="button" class="${on ? 'on' : ''}" data-vote="${v}" aria-pressed="${on ? 'true' : 'false'}" onclick="sumVote('${v}')">${label}</button>`;
-    };
-    return `<div class="sumfb" role="group" aria-label="Summary feedback">${btn('like', 'Like')}${btn('love', 'Love')}${btn('dislike', 'Dislike')}</div>`;
-  } catch (e) { return ''; }
-}
+// 2.22.23: Like, Love, and Dislike are gone from the summary. Old stored votes are dropped on load.
 function homeSumBareCard() {
-  const note = '<p class="sumnote">Nothing much to flag right now. Have a good one.</p>';
-  let bar = '';
-  try { bar = homeSumFeedbackBar(note); } catch (e) { bar = ''; }
-  return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade">' + note + bar + '</div></div>';
-}
-async function sumVote(vote) {
-  try {
-    if (!S || (vote !== 'like' && vote !== 'love' && vote !== 'dislike')) return;
-    const card = document.getElementById('homesum');
-    if (!card) return;
-    const snapshot = sumClip([...card.querySelectorAll('.sumnote')].map(n => n.textContent || '').join(' '));
-    if (!snapshot) return;
-    const id = sumFeedbackId(snapshot);
-    const list = Array.isArray(S.summaryFeedback) ? S.summaryFeedback.slice() : [];
-    const cur = list.find(r => r && r.id === id);
-    const next = cur && cur.vote === vote
-      ? list.filter(r => r && r.id !== id)
-      : [{ id, at: nzStampLocal(), vote, snapshot }].concat(list.filter(r => r && r.id !== id));
-    S.summaryFeedback = normSummaryFeedback(next);
-    await save();
-    const kept = (S.summaryFeedback || []).find(r => r && r.id === id);
-    const now = kept ? kept.vote : '';
-    const live = document.getElementById('homesum') || card;
-    live.querySelectorAll('.sumfb button').forEach(b => {
-      const on = b.getAttribute('data-vote') === now;
-      b.classList.toggle('on', on);
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
-  } catch (e) {}
+  return '<div class="card homesum wx-soft" id="homesum"><div class="sumshade"><p class="sumnote">Nothing much to flag right now. Have a good one.</p></div></div>';
 }
 
+// 2.22.23: up to three "might be next" suggestions under the summary, each with an Add button.
+// Only from data already in the app: birthdays, car dates, garden jobs, the events and movies feed, the calendar, About you.
+// A suggestion is a question, never a pretend booking. Anything already on the calendar, to-do list, or notes is skipped. No money.
+let homeSugNow = [];
+function homeSugKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+function homeSugCal(fromDays, toDays) {
+  try {
+    const T = todayT();
+    return calItems(T + fromDays * DAY, T + toDays * DAY) || [];
+  } catch (e) { return []; }
+}
+function homeSugHas(re, fromDays, toDays) {
+  try {
+    if (homeSugCal(fromDays, toDays).some(x => x && re.test(String(x.title || '') + ' ' + String(x.notes || '')))) return true;
+    if ((S.todos || []).some(t => t && !t.done && re.test(String(t.title || '') + ' ' + String(t.notes || '')))) return true;
+    if ((S.appts || []).some(a => { if (!a || !re.test(String(a.title || ''))) return false; const d = daysLeft(a.date); return d >= fromDays && d <= toDays; })) return true;
+  } catch (e) { return false; }
+  return false;
+}
+function homeSugNoted(re) {
+  try { return (S.notes || []).some(n => n && re.test(String(n.text || ''))); } catch (e) { return false; }
+}
+function homeSugDay(iso) {
+  const d = daysLeft(iso);
+  return d === 0 ? 'today' : d === 1 ? 'tomorrow' : d < 7 ? 'on ' + WDL[new Date(parseD(iso)).getUTCDay()] : 'on ' + fmtW(iso);
+}
+function homeSugEsc(s) { return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function homeSugBirthday() {
+  try {
+    const T = todayT();
+    let best = null;
+    (S.birthdays || []).forEach(b => {
+      if (!b || !b.name) return;
+      (bdayDates(b, T + 3 * DAY, T + 14 * DAY) || []).forEach(d => { if (!best || d < best.d) best = { b, d }; });
+    });
+    if (!best) return null;
+    const first = String(best.b.name).trim().split(/\s+/)[0];
+    if (homeSugHas(new RegExp('\\b' + homeSugEsc(first) + '\\b.*\\b(card|gift|present|birthday)|\\b(card|gift|present)\\b.*\\b' + homeSugEsc(first) + '\\b', 'i'), -30, 30)) return null;
+    let due = addDays(best.d, -2);
+    if (due < todayISO()) due = todayISO();
+    return { id: 'bday', type: 'todo', text: first + '’s birthday is ' + homeSugDay(best.d) + '. A card or gift worth sorting?',
+      pre: { title: 'Card or gift for ' + first, due, priority: 'normal', list: 'Shopping' } };
+  } catch (e) { return null; }
+}
+function homeSugCar() {
+  try {
+    let best = null;
+    (S.cars || []).forEach(c => {
+      if (!c || !c.name) return;
+      [['wof', 'WOF'], ['svcDate', 'service']].forEach(([k, l]) => {
+        if (!c[k]) return;
+        const d = daysLeft(c[k]);
+        if (d < 3 || d > 21) return;
+        if (!best || d < best.d) best = { c, k, l, d, date: c[k] };
+      });
+    });
+    if (!best) return null;
+    const re = new RegExp(best.k === 'wof' ? '\\bw\\.?o\\.?f\\b|warrant' : '\\bservice\\b', 'i');
+    if (homeSugCal(-30, 30).some(x => x && x.src !== 'due' && re.test(String(x.title || '')))) return null;
+    if ((S.todos || []).some(t => t && !t.done && re.test(String(t.title || '')))) return null;
+    const date = addDays(best.date, -2) < todayISO() ? todayISO() : addDays(best.date, -2);
+    return { id: 'car', type: 'appt', text: (/^[A-Z]/.test(best.c.name) ? '' : 'The ') + best.c.name + ' ' + best.l + ' is due ' + homeSugDay(best.date) + '. Worth booking it in?',
+      pre: { title: best.c.name + ' ' + best.l, date, time: '', notes: best.l === 'WOF' ? 'WOF due ' + fmtLong(best.date) : 'Service due ' + fmtLong(best.date) } };
+  } catch (e) { return null; }
+}
+function homeSugEvent() {
+  try {
+    if (typeof upcomingEvents !== 'function' || !EVS) return null;
+    const list = upcomingEvents().filter(e => e && e.title && !evAppt(e.id) && daysLeft(e.date) >= 0 && daysLeft(e.date) <= 7 && !isWhangareiGrowersMarket(e));
+    if (!list.length) return null;
+    const likes = /\b(tech|technology|gadget|garden|gardening|plant|music|food|gluten|cooking|science|ai)\b/i;
+    const a = homeAklParts();
+    const weekend = a && (a.dow === 5 || a.dow === 6);
+    const score = e => {
+      let s = daysLeft(e.date);
+      if ((e.cats || []).includes('Movies')) s -= 4;
+      if (likes.test([e.title, e.desc, (e.cats || []).join(' ')].join(' '))) s -= 3;
+      if (weekend && daysLeft(e.date) <= 2) s -= 1;
+      return s;
+    };
+    const pick = list.slice().sort((x, y) => score(x) - score(y))[0];
+    if (!pick) return null;
+    const re = new RegExp('^' + homeSugEsc(homeSugKey(pick.title).slice(0, 24)), 'i');
+    if ((S.appts || []).some(x => x && re.test(homeSugKey(x.title)))) return null;
+    const movie = (pick.cats || []).includes('Movies');
+    const title = String(pick.title).replace(/\s+/g, ' ').trim();
+    const when = homeSugDay(pick.date) + (pick.time ? ' at ' + fmtTime(pick.time) : '');
+    const text = movie ? title + ' is showing ' + when + '. Fancy a movie night?' : title + ' is on ' + when + (pick.venue ? ' at ' + pick.venue : '') + '. Want it in the calendar?';
+    const notes = [pick.venue, pick.time && pick.endTime ? evWhen(pick) : (!pick.time && pick.timeKnown === false ? 'Check the time on the event page' : '')].filter(Boolean).join(' · ');
+    return { id: 'event', type: 'appt', text, pre: { title, date: pick.date < todayISO() ? todayISO() : pick.date, time: pick.time || '', notes, evId: pick.id, evUrl: pick.url } };
+  } catch (e) { return null; }
+}
+function homeSugHaircut() {
+  try {
+    const re = /\b(hair ?cut|haircut|barber|hairdresser|trim)\b/i;
+    if (homeSugHas(re, -35, 45)) return null;
+    // Last one on the calendar, if any, so the line can say how long it has been.
+    let last = '';
+    (S.appts || []).forEach(a => { if (a && re.test(String(a.title || '')) && a.date && daysLeft(a.date) < 0 && a.date > last) last = a.date; });
+    const weeks = last ? Math.floor(-daysLeft(last) / 7) : 0;
+    // Friday or Saturday are his days off. Suggest the next one at least two days out.
+    let date = todayISO();
+    for (let i = 2; i < 10; i++) { const d = addDays(todayISO(), i), w = new Date(parseD(d)).getUTCDay(); if (w === 5 || w === 6) { date = d; break; } }
+    const text = last ? 'It’s been about ' + weeks + ' weeks since the last haircut. Worth booking one?' : 'No haircut on the calendar. Worth booking one in?';
+    return { id: 'hair', type: 'appt', text, pre: { title: 'Haircut', date, time: '', notes: '' } };
+  } catch (e) { return null; }
+}
+const HOME_SUG_IDEAS = [
+  { re: /\bgluten|recipe|cook/i, text: 'Idea: a new gluten-free recipe to try on the weekend. Save it as a note?', note: 'Gluten-free recipe to try this weekend: ' },
+  { re: /\bai music|song\b/i, text: 'Idea: an AI music track about Onerahi or the harbour. Jot it in your notes?', note: 'AI music idea: a track about Onerahi and the harbour' },
+  { re: /\bmovie|film\b/i, text: 'Idea: a movie night list for the weekend. Start one in your notes?', note: 'Movie night list: ' },
+  { re: /\bgarden|seed|plant/i, text: 'Idea: a spring planting plan for the garden. Note it down?', note: 'Spring garden plan: ' },
+  { re: /\btech|gadget\b/i, text: 'Idea: a list of tech worth a look at work this week. Keep it in your notes?', note: 'Tech to check out at Noel Leeming: ' }
+];
+function homeSugIdea() {
+  try {
+    const open = HOME_SUG_IDEAS.filter(x => !homeSugNoted(x.re));
+    if (!open.length) return null;
+    const pick = homePick(231, open.map((x, i) => i));
+    const idea = open[Number(pick) || 0] || open[0];
+    return { id: 'idea', type: 'note', text: idea.text, pre: { text: idea.note } };
+  } catch (e) { return null; }
+}
+function homeSuggestions() {
+  const out = [];
+  const add = fn => { if (out.length >= 3) return; let s = null; try { s = fn(); } catch (e) { s = null; } if (s && s.text) out.push(s); };
+  [homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugIdea].forEach(add);
+  return out.slice(0, 3);
+}
+function homeSugHtml() {
+  let list = [];
+  try { list = homeSuggestions(); } catch (e) { list = []; }
+  homeSugNow = list;
+  if (!list.length) return '';
+  const label = { todo: 'to your to-do list', note: 'as a note', appt: 'to your calendar' };
+  return '<div class="sumsugs" role="list" aria-label="Might be next">' + list.map((s, i) =>
+    `<div class="sumsug" role="listitem"><span class="tx">${esc(s.text)}</span><button type="button" class="sumadd" onclick="homeSugAdd(${i})" aria-label="Add ${esc(label[s.type] || '')}: ${esc(s.pre && (s.pre.title || s.pre.text) || s.text)}">${I('plus')} Add</button></div>`).join('') + '</div>';
+}
+function homeSugAdd(i) {
+  const s = homeSugNow[i];
+  if (!s) return;
+  if (s.type === 'todo') return todoForm(null, s.pre);
+  if (s.type === 'appt') return apptForm(null, s.pre && s.pre.date, s.pre);
+  if (s.type === 'note') return noteForm(s.pre && s.pre.text);
+}
+function noteForm(text) {
+  openSheet('Add a note', field('Note', area('text', text || '', 'Type a note')),
+    async v => {
+      const t = String(v.text || '').replace(/\s+/g, ' ').trim().slice(0, 2000);
+      if (!t) return 'Please type the note.';
+      const s = snap();
+      if (!Array.isArray(S.notes)) S.notes = [];
+      S.notes.push({ id: uid('nt'), text: t, at: nzStampLocal() });
+      await save(); render(); toast('Note saved.', 'Undo', undoTo(s));
+    }, 'Add');
+}
 function homeSceneCard(inner) {
   let scene = 'soft';
   try { scene = homeWxScene() || 'soft'; } catch (e) { scene = 'soft'; }
   if (!/^[a-z-]+$/.test(scene)) scene = 'soft';
   const body = inner || '<p class="sumnote">Nothing much to flag right now. Have a good one.</p>';
-  let bar = '';
-  try { bar = homeSumFeedbackBar(body); } catch (e) { bar = ''; }
-  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${bar}</div></div>`;
+  let sugs = '';
+  try { sugs = homeSugHtml(); } catch (e) { sugs = ''; }
+  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${sugs}</div></div>`;
 }
 function homeSumFallback() {
   try { return homeSceneCard('<p class="sumnote">Nothing much to flag right now. Have a good one.</p>'); }
@@ -1685,18 +1702,16 @@ function homeFlavorLine() {
   const kind = homeFlavorKind();
   try {
     if (kind === 'joke') {
-      if (sumKindOff('joke') || homeSummaryDeclines('joke')) return '';
+      if (homeSummaryDeclines('joke')) return '';
       return homePick(91, HOME_JOKES);
     }
     if (kind === 'fact') {
-      if (sumKindOff('fact') || homeSummaryDeclines('fact')) return '';
+      if (homeSummaryDeclines('fact')) return '';
       const fact = homePick(92, HOME_FACTS);
       return fact ? 'Did you know ' + fact : '';
     }
     if (kind === 'question') {
-      if (sumKindOff('question')) return '';
       const line = homeRhetoricalLine();
-      if (sumLineOff(line, ['film', 'meal'])) return '';
       return line;
     }
   } catch (e) { return ''; }
@@ -1776,7 +1791,6 @@ function homeSummaryQuote() {
 }
 function homeAboutSentence(mentioned) {
   try {
-    if (sumKindOff('about')) return '';
     const candidates = [];
     const fit = homeStripEnd(homePersonalClause() || '');
     if (fit && !homeLineRepeats(fit, mentioned) && !homeLooksLikeAddress(fit)) candidates.push(fit);
@@ -1788,7 +1802,6 @@ function homeAboutSentence(mentioned) {
     if (quote && !homeLineRepeats(quote, mentioned)) candidates.push(quote);
     for (let i = 0; i < candidates.length; i++) {
       const line = candidates[i];
-      if (sumLineOff(line, ['film', 'meal'])) continue;
       return line;
     }
   } catch (e) {}
@@ -1879,7 +1892,7 @@ function mealLikedHtml() {
 
 
 // 2.19.0: things to do, then mood, then where he is, then the time of day. Four notes still cap the list.
-// 2.21.0: the cap does not drop the optional joke or fun fact. Love keeps a kind. Like does not. Dislikes skip a kind only when they outnumber loves.
+// 2.21.0: the cap does not drop the optional joke or fun fact.
 function homeSumCard(bits) {
   try {
     const list = (bits || []).filter(b => b && b.text).slice(0, 4);
@@ -2032,7 +2045,6 @@ function homeAsideLine(mentioned) {
 }
 function homePlayLine(mentioned) {
   if (homeWhere() !== 'home') return '';
-  if (sumKindOff('film')) return '';
   const a = homeAklParts();
   const hour = a ? a.hour : -1;
   try {
@@ -2113,7 +2125,6 @@ function homePlayLine(mentioned) {
 }
 function homeMealLine(mentioned) {
   try {
-    if (sumKindOff('meal')) return '';
     const meals = upcomingMeals() || [];
     const today = todayISO();
     const todayMeal = meals.includes(today) && M() && M().plan ? M().plan[today] : null;
@@ -3090,8 +3101,12 @@ function clearDone() {
     const s = snap(), ids = new Set(vis.map(t => t.id)); S.todos = S.todos.filter(t => !ids.has(t.id)); await save(); render(); toast('Cleared.', 'Undo', undoTo(s));
   });
 }
-function todoForm(id) {
+function todoForm(id, pre) {
   const t = id ? S.todos.find(x => x.id === id) : { title: '', list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', priority: 'normal' };
+  if (!id && pre && t) {
+    ['title', 'due', 'notes', 'priority'].forEach(k => { if (pre[k]) t[k] = String(pre[k]); });
+    if (pre.list && (S.lists || []).includes(pre.list)) t.list = pre.list;
+  }
   if (!t) return;
   if (id) ensureTodoSteps(t);
   if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
@@ -3329,8 +3344,9 @@ function dayIntoView() {
   const r = el.getBoundingClientRect(); if (r.top > innerHeight - 200) v.scrollBy({ top: r.top - innerHeight + 260, behavior: 'smooth' });
 }
 function shiftMonth(n) { let { y, m } = calMonth; m += n; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } calMonth = { y, m }; calSel = null; render(); }
-function apptForm(id, date) {
+function apptForm(id, date, pre) {
   const a = id ? S.appts.find(x => x.id === id) : { title: '', date: date || (calSel != null ? isoT(calSel) : todayISO()), time: '', notes: '' };
+  if (!id && pre && a) ['title', 'time', 'notes', 'evId', 'evUrl'].forEach(k => { if (pre[k]) a[k] = String(pre[k]); });
   openSheet(id ? 'Edit appointment' : 'Add an appointment',
     field('What is it?', inp('title', a.title, 'placeholder="e.g. Haircut" required maxlength="80"')) +
     `<div class="two">${field('Date', inp('date', a.date, 'type="date" required'))}${field('Time', inp('time', a.time, 'type="time"'), 'Leave blank for all day')}</div>` +
@@ -3340,7 +3356,11 @@ function apptForm(id, date) {
       if (!v.title) return 'Please say what the appointment is.';
       if (!parseD(v.date)) return 'Please choose a date.';
       if (id) Object.assign(a, { title: v.title, date: v.date, time: v.time, notes: v.notes });
-      else S.appts.push({ id: uid('appt'), title: v.title, date: v.date, time: v.time, notes: v.notes });
+      else {
+        const row = { id: uid('appt'), title: v.title, date: v.date, time: v.time, notes: v.notes };
+        if (a.evId && !evAppt(a.evId)) { row.evId = a.evId; if (a.evUrl) row.evUrl = a.evUrl; }
+        S.appts.push(row);
+      }
       await save(); render(); toast(id ? 'Appointment updated.' : 'Appointment added.');
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete appointment" onclick="deleteAppt('${id}')">${I('trash')}</button>` : '');
@@ -9691,7 +9711,6 @@ function syncBundle() {
   let dailyQuote = null, theme = null, textSize = null;
   try { dailyQuote = localStorage.getItem('dailyQuote'); theme = localStorage.getItem('theme'); textSize = localStorage.getItem('textSize'); } catch (e) { }
   const data = Object.assign({}, S);
-  delete data.summaryFeedback; // votes stay on this phone
   return { data, local: { dailyQuote, theme, textSize } };
 }
 function foldLocalPrefs(d, local) {
@@ -9754,11 +9773,9 @@ async function applyPhoneSync(pack) {
   if (sheetOpen) return;
   const remote = pack && pack.data && typeof pack.data === 'object' ? pack.data : pack;
   const code = syncCode();
-  const keptFeedback = S && S.summaryFeedback;
   phoneSyncMute = true;
   try {
     const next = normalise(foldLocalPrefs(remote, pack && pack.local));
-    next.summaryFeedback = normSummaryFeedback(keptFeedback);
     if (code) next.settings.syncCode = SyncLogic.formatSyncCode(code);
     S = next;
     await kvSet('data', S);
