@@ -803,12 +803,13 @@ html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{backgrou
 html[data-theme="dark"] .hsec > .sec,html[data-theme="dark"] .hsec > .sec a.sechead{color:#f4f7fb;background:rgba(8,14,20,.62)}
 @media (prefers-reduced-motion: no-preference){
   #view .hsec.hpend:not(.hin){opacity:0}
-  /* 2.22.10: first three Home feed cards open like an eye; the rest scroll in as normal. */
-  #view .hsec.hpend.hin.hfrom-eye{animation:homeInEye .78s cubic-bezier(.22,.7,.2,1) both}
+  /* 2.22.11: first three Home cards: centre dot → eye shape → full card. Rest scroll normally. */
+  #view .hsec.hpend.hin.hfrom-eye{animation:homeInEye .95s cubic-bezier(.22,.7,.2,1) both}
 }
 @keyframes homeInEye{
-  from{opacity:.4;clip-path:ellipse(55% 0% at 50% 50%)}
-  to{opacity:1;clip-path:ellipse(120% 120% at 50% 50%)}
+  0%{opacity:.55;clip-path:circle(0% at 50% 50%)}
+  38%{opacity:1;clip-path:ellipse(58% 22% at 50% 50%)}
+  100%{opacity:1;clip-path:inset(0)}
 }
 /* Weather in Upcoming (1.17.0) */
 .attwx{display:inline-flex;align-items:center;gap:2px;margin-left:4px;vertical-align:middle;white-space:nowrap;font-weight:600;color:var(--ink2)}
