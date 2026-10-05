@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.17';
+const APP_VERSION = '2.22.18';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11587,13 +11587,25 @@ function render() {
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   wireRadio();
 }
-// 2.22.17: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
+// 2.22.18: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
 // Vertical pan is native (touch-action:pan-y on the whole carousel): the card body scrolls and then
 // chains to #view. Horizontal swipe is JS with a direction lock — the browser never pans x here, so
 // sideways moves keep delivering pointermove; vertical moves get native scroll (pointercancel).
 // prefers-reduced-motion: reduce keeps swipe but skips slide transition.
 // Swipe may start on links/buttons (most of each card); form fields and dots are excluded.
+// Double-tap must ONLY toggle carousel ↔ list. The second tap's synthetic click is swallowed
+// (module-level flag survives render()) so it cannot open links, expand rows, or navigate.
 let homeCarDrag = null;
+let homeFeedSuppressClickUntil = 0;
+function armHomeFeedClickSuppress(ms) {
+  homeFeedSuppressClickUntil = Math.max(homeFeedSuppressClickUntil, Date.now() + (ms == null ? 450 : ms));
+}
+document.addEventListener('click', e => {
+  if (Date.now() >= homeFeedSuppressClickUntil) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+}, true);
 function homeFeedInteractiveTarget(t) {
   return !!(t && t.closest && t.closest('a,button,input,select,textarea,label,[role="button"],.btns,.photobtns,.switch,.tick,.star,.hcar-dot'));
 }
@@ -11612,7 +11624,6 @@ function wireHomeCarousel() {
   if (!stage || !track || !n) return;
   const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   let idx = Math.max(0, Math.min(n - 1, parseInt(root.dataset.i || String(homeCarIdx || 0), 10) || 0));
-  let suppressClick = 0;
   let lastTapAt = 0;
 
   function apply(spin) {
@@ -11650,14 +11661,22 @@ function wireHomeCarousel() {
   });
 
   const noteDoubleTap = e => {
-    if (homeFeedInteractiveTarget(e.target)) return;
-    if (Date.now() < suppressClick) return;
+    if (homeCarSwipeSkipTarget(e.target)) return;
+    if (Date.now() < homeFeedSuppressClickUntil) return;
     const now = Date.now();
+    // Second tap of a double-tap: always toggle + swallow the synthetic click, even if this
+    // tap landed on a link/button (otherwise the click would open / navigate after render).
     if (now - lastTapAt > 0 && now - lastTapAt < 300) {
       lastTapAt = 0;
+      armHomeFeedClickSuppress(450);
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
       setHomeFeedMode('list');
       return;
     }
+    // First tap: only start the double-tap window on non-interactive chrome so a normal
+    // single tap on buttons/links still opens them without being paired into a toggle.
+    if (homeFeedInteractiveTarget(e.target)) return;
     lastTapAt = now;
   };
 
@@ -11667,7 +11686,6 @@ function wireHomeCarousel() {
     return e;
   };
   const onDown = e => {
-    if (n <= 1) return;
     if (e.pointerType === 'mouse' && e.button != null && e.button !== 0) return;
     if (e.button != null && e.button !== 0 && e.type === 'pointerdown') return;
     if (homeCarSwipeSkipTarget(e.target)) return;
@@ -11677,7 +11695,8 @@ function wireHomeCarousel() {
     homeCarDrag = {
       pid: e.pointerId != null ? e.pointerId : 'touch',
       x: p.clientX, y: p.clientY, dx: 0, dy: 0,
-      drag: false, axis: null
+      drag: false, axis: null,
+      canSwipe: n > 1
     };
   };
   const onMove = e => {
@@ -11692,7 +11711,7 @@ function wireHomeCarousel() {
       if (adx < 8 && ady < 8) return;
       // Direction lock mirrors the browser's pan-y decision: more sideways = card swipe,
       // otherwise vertical = hand the gesture to native scrolling and stop tracking.
-      if (adx > ady) st.axis = 'x';
+      if (adx > ady && st.canSwipe) st.axis = 'x';
       else { st.axis = 'y'; homeCarDrag = null; return; }
       if (st.axis === 'x') {
         st.drag = true;
@@ -11720,7 +11739,7 @@ function wireHomeCarousel() {
       return;
     }
     if (st.drag && st.axis === 'x') {
-      suppressClick = Date.now() + 400;
+      armHomeFeedClickSuppress(400);
       lastTapAt = 0;
       const thresh = Math.max(36, (stage.clientWidth || 300) * 0.15);
       if (st.dx <= -thresh) go(1);
@@ -11731,14 +11750,6 @@ function wireHomeCarousel() {
     // Treat as a tap for double-tap detection (ignore tiny jitter)
     if (Math.abs(st.dx) < 10 && Math.abs(st.dy) < 10) noteDoubleTap(e);
   };
-
-  // Swallow click after a horizontal swipe so links/buttons under the finger don't fire.
-  stage.addEventListener('click', e => {
-    if (Date.now() < suppressClick) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }, true);
 
   stage.addEventListener('pointerdown', onDown);
   stage.addEventListener('pointermove', onMove, { passive: false });
@@ -11763,21 +11774,27 @@ function wireHomeFeedList() {
   let down = null;
   feed.addEventListener('pointerdown', e => {
     if (e.button != null && e.button !== 0) return;
-    if (homeFeedInteractiveTarget(e.target)) { down = null; return; }
-    down = { x: e.clientX, y: e.clientY, pid: e.pointerId };
+    if (e.target && e.target.closest && e.target.closest('input,select,textarea')) { down = null; return; }
+    down = { x: e.clientX, y: e.clientY, pid: e.pointerId, interactive: homeFeedInteractiveTarget(e.target) };
   });
   feed.addEventListener('pointerup', e => {
     const st = down;
     down = null;
     if (!st || e.pointerId !== st.pid) return;
-    if (homeFeedInteractiveTarget(e.target)) return;
+    if (e.target && e.target.closest && e.target.closest('input,select,textarea')) return;
     if (Math.abs(e.clientX - st.x) > 12 || Math.abs(e.clientY - st.y) > 12) return;
     const now = Date.now();
+    // Second tap: toggle only; swallow synthetic click so it cannot open the new view.
     if (now - lastTapAt > 0 && now - lastTapAt < 300) {
       lastTapAt = 0;
+      armHomeFeedClickSuppress(450);
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
       setHomeFeedMode('carousel');
       return;
     }
+    // First tap: start double-tap window only on non-interactive chrome.
+    if (st.interactive || homeFeedInteractiveTarget(e.target)) return;
     lastTapAt = now;
   });
   feed.addEventListener('pointercancel', () => { down = null; });
