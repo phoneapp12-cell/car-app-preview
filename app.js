@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.1';
+const APP_VERSION = '2.22.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -130,6 +130,8 @@ const seedDrivers = () => [blankDriver('drv-shane', 'Shane'), blankDriver('drv-s
 function normalise(d) {
   d = d && typeof d === 'object' ? d : {};
   ['cars', 'bills', 'todos', 'appts', 'birthdays', 'ideas', 'feeds', 'posts'].forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
+  // Ideas keep any extra fields (including steps). Sync and backups store the whole object.
+  if (Array.isArray(d.ideas)) d.ideas.forEach(ensureIdeaSteps);
   if (!Array.isArray(d.lists) || !d.lists.length) d.lists = ['Home', 'Cars', 'Shopping'];
   if (!Array.isArray(d.ideaCats)) d.ideaCats = IDEA_CATS.slice();
   if (!Array.isArray(d.drivers)) d.drivers = seedDrivers(); // first time on this version: Shane, Sarah and Cass
@@ -3518,6 +3520,228 @@ async function deleteBirthday(id) {
 
 /* ================= IDEAS ================= */
 let ideaFilter = 'All', ideaQuery = '';
+let ideaStepsDirty = false;
+
+/* Household chore steps live on the idea as steps: [{ id, text, done }].
+   Phone sync and backups store the whole idea object. Nothing in that path
+   whitelists idea fields, so steps round-trip. Most specific kind wins. */
+const IDEA_CHORE_RULES = [
+  ['drawer', /\bdrawers?\b/i],
+  ['cupboard', /\bcupboards?\b/i],
+  ['wardrobe', /\bwardrobes?\b/i],
+  ['closet', /\bclosets?\b/i],
+  ['pantry', /\bpantr(?:y|ies)\b/i],
+  ['laundry', /\blaundry\b/i],
+  ['fridge', /\bfridges?\b/i],
+  ['dishes', /\bdishes\b/i],
+  ['garage', /\bgarages?\b/i],
+  ['shed', /\bsheds?\b/i],
+  ['paper', /\b(?:filing|paperwork)\b/i],
+  ['declutter', /\b(?:declutter(?:ing)?|unpack(?:ing)?)\b/i],
+  ['sort', /\b(?:sort|sorting|organise|organize|organising|organizing)\b/i],
+  ['clutter', /\bclutter\b/i],
+  ['clean', /\b(?:clean|cleaning|tidy|tidying|vacuum|mop|dust|dusting|rubbish|trash|recycle|recycling|mess)\b/i]
+];
+/* IDEA_STEP_FNS */
+function ideaChoreKind(text) {
+  const t = String(text || '');
+  for (let n = 0; n < IDEA_CHORE_RULES.length; n++) if (IDEA_CHORE_RULES[n][1].test(t)) return IDEA_CHORE_RULES[n][0];
+  return '';
+}
+function ideaStepLines(title, notes) {
+  const text = String(title || '') + '\n' + String(notes || '');
+  const kind = ideaChoreKind(text);
+  if (!kind) return null;
+  const has = re => re.test(text);
+  const roomOf = () => {
+    const rooms = [['living room', 'the living room'], ['dining room', 'the dining room'], ['lounge', 'the lounge'], ['kitchen', 'the kitchen'], ['bedroom', 'the bedroom'], ['bathroom', 'the bathroom'], ['toilet', 'the toilet'], ['hallway', 'the hallway'], ['hall', 'the hall'], ['office', 'the office']];
+    for (let n = 0; n < rooms.length; n++) if (new RegExp('\\b' + rooms[n][0] + '\\b', 'i').test(text)) return rooms[n][1];
+    return '';
+  };
+  const dishLines = withFridge => {
+    const lines = [
+      'Clear the bench.',
+      'Scrape the plates, then wash up or load the dishwasher.',
+      'Wipe the benches and the hob.',
+      'Put the clean things away.'
+    ];
+    if (withFridge) {
+      lines.push('Take the food out of the fridge.');
+      lines.push('Wipe the fridge shelves.');
+      lines.push('Put the food that’s still good back.');
+    } else if (has(/\bmop\b/i)) lines.push('Sweep the hard floor, then mop it.');
+    else if (has(/\bvacuum\b/i)) lines.push('Vacuum the floor.');
+    else lines.push('Rinse the sink when the washing up is done.');
+    return lines.slice(0, 8);
+  };
+  if (kind === 'drawer' || kind === 'cupboard' || kind === 'wardrobe' || kind === 'closet' || kind === 'pantry' || kind === 'sort') {
+    let spot = 'this spot';
+    if (kind === 'drawer') spot = has(/\bdrawers\b/i) ? 'the drawers' : 'the drawer';
+    else if (kind === 'cupboard') spot = has(/\bcupboards\b/i) ? 'the cupboards' : 'the cupboard';
+    else if (kind === 'wardrobe') spot = 'the wardrobe';
+    else if (kind === 'closet') spot = 'the closet';
+    else if (kind === 'pantry') spot = 'the pantry';
+    const lines = [
+      'Take everything out of ' + spot + '.',
+      'Wipe ' + spot + ' out.',
+      'Bin the rubbish before you sort the rest.',
+      'Sort what’s left into keep, donate, or bin.',
+      'Group like with like.',
+      'Put the keepers back.',
+      'Give anything that doesn’t belong one home.'
+    ];
+    if (kind === 'pantry') lines.splice(4, 0, 'Bin food that’s clearly off.');
+    if (kind === 'sort') {
+      lines[0] = 'Empty the spot you’re sorting.';
+      lines[1] = 'Wipe it if it needs a wipe.';
+    }
+    return lines.slice(0, 8);
+  }
+  if (kind === 'laundry') {
+    return [
+      'Sort the lights and the darks.',
+      'Check the pockets.',
+      'Wash the load.',
+      'Dry it.',
+      'Fold it and put it away the same day.'
+    ];
+  }
+  if (kind === 'fridge') return dishLines(true);
+  if (kind === 'dishes') return dishLines(false);
+  if (kind === 'garage' || kind === 'shed') {
+    const spot = kind === 'shed' ? 'the shed' : 'the garage';
+    return [
+      'Pull out what you can reach in ' + spot + '.',
+      'Bin the obvious rubbish.',
+      'Group the tools together.',
+      'Group the garden things together.',
+      'Group what you’re keeping.',
+      'Sweep the floor.',
+      'Put it back so the floor has a path.'
+    ];
+  }
+  if (kind === 'paper') {
+    return [
+      'Gather the pile into one spot.',
+      'Bin the junk mail.',
+      'Bin papers that are out of date.',
+      'Keep the bills together.',
+      'Keep the other important papers together.',
+      'Put them in one folder or one box.',
+      'Put that box in one place.'
+    ];
+  }
+  if (kind === 'declutter' || kind === 'clutter') {
+    if (has(/\bunpack/i)) {
+      return [
+        'Take everything out of the box or bag.',
+        'Decide what to keep.',
+        'Decide what to let go.',
+        'Bag the things you’re letting go.',
+        'Put the keepers away before you unpack another spot.'
+      ];
+    }
+    return [
+      'Take everything out.',
+      'Decide what to keep.',
+      'Decide what to let go.',
+      'Bag the things you’re letting go.',
+      'Put the keepers away before you start another spot.'
+    ];
+  }
+  if (has(/\bkitchen\b/i)) return dishLines(has(/\bfridges?\b/i));
+  const where = roomOf();
+  let floor = 'Vacuum or sweep, then mop if the floor is hard.';
+  if (has(/\bmop\b/i) && !has(/\bvacuum\b/i)) floor = 'Sweep the hard floor, then mop it.';
+  else if (has(/\bvacuum\b/i)) floor = 'Vacuum the floor. If it’s a hard floor, sweep it, then mop.';
+  const lines = [
+    where ? 'Pick up anything that doesn’t live in ' + where + '.' : 'Pick up anything that doesn’t live here.',
+    'Bin the rubbish.',
+    'Dust from the top down.',
+    floor,
+    'Put the things you’re keeping back.'
+  ];
+  if (has(/\brecycl/i)) lines.splice(2, 0, 'Put recycling in the recycling bin.');
+  return lines.slice(0, 8);
+}
+/* END_IDEA_STEP_FNS */
+function ensureIdeaSteps(i) {
+  if (!i || typeof i !== 'object') return;
+  if (Array.isArray(i.steps)) {
+    i.steps.forEach(s => { if (s && typeof s === 'object') s.done = !!s.done; });
+    return;
+  }
+  const lines = ideaStepLines(i.title, i.notes);
+  if (!lines || !lines.length) return;
+  i.steps = lines.map(text => ({ id: uid('step'), text: text, done: false }));
+  ideaStepsDirty = true;
+}
+function ideaStepsTicked(i) {
+  return !!(i && Array.isArray(i.steps) && i.steps.some(s => s && s.done));
+}
+function refreshIdeaSteps(i) {
+  if (!i || typeof i !== 'object') return;
+  const lines = ideaStepLines(i.title, i.notes);
+  if (!lines) {
+    if (!ideaStepsTicked(i)) delete i.steps;
+    return;
+  }
+  if (ideaStepsTicked(i)) return;
+  if (Array.isArray(i.steps) && i.steps.length === lines.length && i.steps.every((s, n) => s && s.text === lines[n])) return;
+  i.steps = lines.map(text => ({ id: uid('step'), text: text, done: false }));
+}
+function sweepIdeaSteps() {
+  (S.ideas || []).forEach(ensureIdeaSteps);
+  if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
+}
+function ideaProgressLabel(i) {
+  if (!i || !Array.isArray(i.steps) || !i.steps.length) return '';
+  const n = i.steps.filter(s => s && s.done).length;
+  return n + ' of ' + i.steps.length + ' done';
+}
+function ideaSubBits(i) {
+  const bits = [];
+  if (i.cat) bits.push('<span class="cattag">' + esc(i.cat) + '</span>');
+  const note = String(i.notes || '').split('\n')[0].slice(0, 90);
+  if (note) bits.push(esc(note));
+  const prog = ideaProgressLabel(i);
+  if (prog) bits.push(esc(prog));
+  return bits.join(' ');
+}
+function ideaSubHtml(i) {
+  const inner = ideaSubBits(i);
+  if (!inner) return '';
+  return '<div class="s" data-ideasub="' + esc(i.id) + '">' + inner + '</div>';
+}
+function ideaStepsNote(i) {
+  if (!i || !Array.isArray(i.steps) || !i.steps.length) return '';
+  return i.steps.map(s => String(s && s.text || '').trim()).filter(Boolean).join('\n');
+}
+function ideaStepsBlock(i, where) {
+  if (!i || !Array.isArray(i.steps) || !i.steps.length) return '';
+  const rows = i.steps.map(s => {
+    const done = !!s.done;
+    const tick = 'ideaStepTick(' + jsArg(i.id) + ',' + jsArg(s.id) + ')';
+    return '<div class="row step' + (done ? ' done' : '') + '"><button type="button" class="tick" aria-label="' + (done ? 'Untick' : 'Tick') + ' ' + esc(s.text) + '" onclick="' + tick + '"><span>' + I('check') + '</span></button><button type="button" class="tapzone" onclick="' + tick + '"><div class="tx"><div class="t">' + esc(s.text) + '</div></div></button></div>';
+  }).join('');
+  return '<div class="ideasteps" data-ideasteps="' + esc(i.id) + '" data-ideawhere="' + where + '"><div class="stepcap">A simple way to do this</div>' + rows + '</div>';
+}
+async function ideaStepTick(ideaId, stepId) {
+  const i = (S.ideas || []).find(x => x && x.id === ideaId);
+  if (!i || !Array.isArray(i.steps)) return;
+  const st = i.steps.find(s => s && s.id === stepId);
+  if (!st) return;
+  st.done = !st.done;
+  await save();
+  document.querySelectorAll('[data-ideasteps]').forEach(el => {
+    if (el.getAttribute('data-ideasteps') !== ideaId) return;
+    el.outerHTML = ideaStepsBlock(i, el.getAttribute('data-ideawhere') || 'list');
+  });
+  document.querySelectorAll('[data-ideasub]').forEach(el => {
+    if (el.getAttribute('data-ideasub') !== ideaId) return;
+    el.innerHTML = ideaSubBits(i);
+  });
+}
 function ideaList() {
   const q = ideaQuery.trim().toLowerCase();
   const vis = S.ideas.filter(i => (ideaFilter === 'All' || (ideaFilter === '★' ? i.pinned : i.cat === ideaFilter)) &&
@@ -3525,12 +3749,13 @@ function ideaList() {
     .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.created || 0) - (a.created || 0));
   if (!vis.length) return S.ideas.length ? `<div class="card empty"><div class="t">No ideas match</div><div class="s">${q ? 'Try a different word.' : 'Nothing in this category yet.'}</div></div>`
     : empty('Nothing jotted down yet', 'Type an idea above and tap +. Gift ideas, things to do around the house, trips – anything.', '', '');
-  return `<div class="list">${vis.map(i => `<div class="row idea"><button class="star ${i.pinned ? 'on' : ''}" aria-label="${i.pinned ? 'Unstar' : 'Star'} ${esc(i.title)}" aria-pressed="${!!i.pinned}" onclick="toggleStar('${i.id}')">${I('star')}</button>
+  return `<div class="list">${vis.map(i => `<div class="ideawrap"><div class="row idea"><button class="star ${i.pinned ? 'on' : ''}" aria-label="${i.pinned ? 'Unstar' : 'Star'} ${esc(i.title)}" aria-pressed="${!!i.pinned}" onclick="toggleStar('${i.id}')">${I('star')}</button>
     <button class="tapzone" onclick="ideaForm('${i.id}')"><div class="tx"><div class="t">${esc(i.title)}</div>
-    ${i.notes || i.cat ? `<div class="s">${i.cat ? `<span class="cattag">${esc(i.cat)}</span> ` : ''}${esc((i.notes || '').split('\n')[0].slice(0, 90))}</div>` : ''}</div></button></div>`).join('')}</div>`;
+    ${ideaSubHtml(i)}</div></button></div>${ideaStepsBlock(i, 'list')}</div>`).join('')}</div>`;
 }
 function Ideas() {
   if (ideaFilter !== 'All' && ideaFilter !== '★' && !S.ideaCats.includes(ideaFilter)) ideaFilter = 'All';
+  sweepIdeaSteps();
   return header('Ideas', S.ideas.length ? plural(S.ideas.length, 'idea') : 'Jot things down', addBtn('Add an idea', 'ideaForm()')) +
     `<form class="addbar" onsubmit="quickIdea(event)"><input id="newidea" placeholder="Jot down an idea…" autocomplete="off" enterkeyhint="done" maxlength="140" aria-label="New idea"><button aria-label="Add idea">${I('plus')}</button></form>
     ${S.ideas.length ? `<label class="search">${I('search')}<input id="ideaq" type="search" placeholder="Search ideas" value="${esc(ideaQuery)}" aria-label="Search ideas" oninput="ideaQuery=this.value;document.getElementById('idealist').innerHTML=ideaList()"></label>` : ''}
@@ -3542,7 +3767,9 @@ async function quickIdea(e) {
   e.preventDefault();
   const v = $('#newidea').value.trim(); if (!v) return;
   const id = uid('idea');
-  S.ideas.push({ id, title: v, notes: '', cat: S.ideaCats.includes(ideaFilter) ? ideaFilter : '', pinned: ideaFilter === '★', created: Date.now() });
+  const idea = { id, title: v, notes: '', cat: S.ideaCats.includes(ideaFilter) ? ideaFilter : '', pinned: ideaFilter === '★', created: Date.now() };
+  refreshIdeaSteps(idea);
+  S.ideas.push(idea);
   await save(); render(); $('#newidea').focus();
   toast('Idea saved.', 'Add notes', () => ideaForm(id));
 }
@@ -3550,15 +3777,19 @@ async function toggleStar(id) { const i = S.ideas.find(x => x.id === id); i.pinn
 function ideaForm(id) {
   const i = id ? S.ideas.find(x => x.id === id) : { title: '', notes: '', cat: S.ideaCats.includes(ideaFilter) ? ideaFilter : '', pinned: false };
   if (!i) return;
+  if (id) ensureIdeaSteps(i);
+  if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
   openSheet(id ? 'Edit idea' : 'Add an idea',
     field('Idea', inp('title', i.title, 'placeholder="e.g. Kayak trip to Tutukaka" required maxlength="140"')) +
     field('Notes', area('notes', i.notes, 'Optional: links, prices, who it’s for…')) +
     `<div class="two">${field('Category', sel('cat', [['', 'None'], ...S.ideaCats.map(c => [c, c])], i.cat || ''))}<div class="field"><span>Starred</span>${segHtml('pinned', [['0', 'No'], ['1', '★ Yes']], i.pinned ? '1' : '0')}</div></div>` +
+    ideaStepsBlock(i, 'sheet') +
     (id ? `<button type="button" class="btn" style="width:100%;margin-bottom:4px" onclick="ideaToTodo('${id}')">${I('todo')} Turn into to-do</button>` : ''),
     async v => {
       if (!v.title) return 'Please type the idea.';
       const upd = { title: v.title, notes: v.notes, cat: v.cat, pinned: v.pinned === '1', updated: Date.now() };
-      if (id) Object.assign(i, upd); else S.ideas.push(Object.assign({ id: uid('idea'), created: Date.now() }, upd));
+      if (id) { Object.assign(i, upd); refreshIdeaSteps(i); }
+      else { const idea = Object.assign({ id: uid('idea'), created: Date.now() }, upd); refreshIdeaSteps(idea); S.ideas.push(idea); }
       await save(); render(); toast(id ? 'Idea updated.' : 'Idea saved.');
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete idea" onclick="deleteIdea('${id}')">${I('trash')}</button>` : '');
@@ -3567,13 +3798,17 @@ function ideaForm(id) {
 async function ideaToTodo(id) {
   const i = S.ideas.find(x => x.id === id);
   const list = S.lists.includes(i.cat) ? i.cat : S.lists[0];
-  S.todos.push({ id: uid('todo'), title: i.title.slice(0, 120), list, due: '', notes: i.notes || '', priority: 'normal', done: false, created: Date.now(), fromIdea: id });
+  const extra = ideaStepsNote(i);
+  let notes = i.notes || '';
+  if (extra) notes = notes ? String(notes).replace(/\s*$/, '\n') + extra : extra;
+  S.todos.push({ id: uid('todo'), title: i.title.slice(0, 120), list, due: '', notes, priority: 'normal', done: false, created: Date.now(), fromIdea: id });
   await save(); await closeSheet(); render();
   toast(`Added to your ${list} to-do list.`, 'View', () => { todoFilter = 'All'; go('#todo'); });
 }
 async function deleteIdea(id) {
   const s = snap(); S.ideas = S.ideas.filter(x => x.id !== id); await save(); await closeSheet(); render(); toast('Idea deleted.', 'Undo', undoTo(s));
 }
+
 function catsForm() {
   openSheet('Idea categories', `<p class="muted" style="margin:-4px 0 12px">Rename a category by typing over it. Clear one to remove it (its ideas stay, with no category).</p>` +
     S.ideaCats.map((c, n) => field('Category ' + (n + 1), inp('c' + n, c, 'maxlength="20"'))).join('') +
@@ -11161,6 +11396,7 @@ async function start() {
     let d = await kvGet('data');
     if (!d) { d = seed(); await kvSet('data', d); }
     S = normalise(d);
+    if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
   } catch (e) {
     S = normalise(seed());
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
@@ -11195,7 +11431,7 @@ async function start() {
   check();
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
-    if (!sheetOpen) { try { const d = await kvGet('data'); if (d) S = normalise(d); } catch (e) { } render(); }
+    if (!sheetOpen) { try { const d = await kvGet('data'); if (d) { ideaStepsDirty = false; S = normalise(d); if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); } } } catch (e) { } render(); }
     phoneSyncOpen();
     check();
     syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
