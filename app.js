@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.18';
+const APP_VERSION = '2.22.19';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2474,7 +2474,7 @@ function Home() {
   const feed = homeFeedMode === 'list' ? listFeed : carousel;
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts)
   const sumForCar = homeFeedMode === 'list' ? '' : (sumMid || '');
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + sumTop + dailyQuoteCard() + cards +
+  return commuteBanner() + header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + sumTop + dailyQuoteCard() + cards +
     sumForCar + feed + `${syncNote()}
     <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -10935,7 +10935,8 @@ async function deleteNote(id) {
 /* ================= ABOUT YOU, WORK ROSTER, PRAISE (2.16.0) =================
    About you: up to three useful questions per day in Pacific/Auckland, rotating after an answer or skip. Answers are S.about.
    Work roster: the days and start times he enters. The summary uses that time.
-   A drive line only inside the 40 minutes before that start, and only with a real duration. */
+   A drive line only inside the 30 minutes before that start, and only with a real duration.
+   2.22.19: the same 30-minute window shows a commute banner at the very top of Home (leave by, travel, arrive). */
 
 const ABOUT_MOODS = [
   { id: 'glad', label: 'Glad', icon: '🙂' },
@@ -11313,7 +11314,8 @@ function rosterSlot(a) {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hm || '')) return null;
     const start = (+hm.slice(0, 2)) * 60 + (+hm.slice(3));
     const nowMin = parts.min;
-    return { hm, start, nowMin, inWindow: nowMin >= start - 40 && nowMin < start };
+    // 2.22.19: 30 minutes before the roster start (was 40). The summary drive line and the Home commute banner share this.
+    return { hm, start, nowMin, inWindow: nowMin >= start - 30 && nowMin < start };
   } catch (e) { return null; }
 }
 function rosterHeadsUp(a, atWork) {
@@ -11322,7 +11324,7 @@ function rosterHeadsUp(a, atWork) {
     const slot = rosterSlot(a);
     if (!slot || slot.nowMin >= slot.start) return '';
     const ahead = slot.start - slot.nowMin;
-    if (ahead <= 40 || ahead > 180) return '';
+    if (ahead <= 30 || ahead > 180) return ''; // inside 30 minutes the commute banner takes over
     const when = fmtTime(slot.hm);
     if (!when) return '';
     return homePick(31, [
@@ -11430,7 +11432,55 @@ async function refreshDrive() {
   } finally {
     driveBusy = false;
     try { paintHomeSum(); } catch (e) {}
+    try { paintCommute(); } catch (e) {}
   }
+}
+// 2.22.19: Home commute banner. Only in the 30 minutes before the roster start, not at work.
+// Travel minutes come only from the relay (DRIVE.seconds); nothing is guessed.
+function hmFromMin(m) {
+  const t = ((Math.round(m) % 1440) + 1440) % 1440;
+  return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+}
+function commuteBanner() {
+  try {
+    const slot = rosterSlot();
+    if (!slot || !slot.inWindow) return '';
+    if (homeWhere() === 'work') return '';
+    if (!DRIVE || Date.now() - DRIVE.at > 10 * 60 * 1000) refreshDrive();
+    const start = fmtTime(slot.hm);
+    if (!start) return '';
+    let line, sub;
+    const ok = DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds);
+    const n = ok ? Math.round(DRIVE.seconds / 60) : 0;
+    if (ok && n >= 1 && n <= 180) {
+      const w = 'about ' + n + (n === 1 ? ' minute' : ' minutes');
+      const leave = slot.start - n;
+      if (leave >= slot.nowMin) {
+        line = 'Leave by ' + fmtTime(hmFromMin(leave)) + ' · ' + w + ' · arrive about ' + start;
+      } else {
+        line = 'Leave now · ' + w + ' · arrive about ' + fmtTime(hmFromMin(slot.nowMin + n));
+      }
+      sub = 'Work starts at ' + start + ' · traffic just now';
+    } else if (!DRIVE || driveBusy) {
+      line = 'Work starts at ' + start;
+      sub = 'Checking traffic…';
+    } else {
+      line = 'Work starts at ' + start;
+      sub = 'Travel time isn’t available yet.';
+    }
+    return `<div class="callout blue commute" id="homecommute" role="status">${I('car')}<div style="flex:1"><b>${esc(line)}</b><br>${esc(sub)}</div></div>`;
+  } catch (e) { return ''; }
+}
+function paintCommute() {
+  if (sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  if ((h !== 'home' && h !== '') || homeEdit) return;
+  const v = document.getElementById('view');
+  if (!v) return;
+  const next = commuteBanner();
+  const cur = document.getElementById('homecommute');
+  if (cur) { if (next) { if (cur.outerHTML !== next) cur.outerHTML = next; } else cur.remove(); return; }
+  if (next) v.insertAdjacentHTML('afterbegin', next);
 }
 function aboutRow(n) {
   const q = ABOUT_QS.find(x => x.id === n.qid);
@@ -11992,6 +12042,7 @@ async function start() {
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
     if (todayISO() !== renderedDay && !sheetOpen) render();
+    try { paintCommute(); } catch (e) {}
     check();
     syncFeeds(); refreshWx(); refreshMail();
     updBridge(); checkBridgeLoc(); checkHere();
