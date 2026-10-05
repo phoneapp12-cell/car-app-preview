@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.15';
+const APP_VERSION = '2.22.16';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11587,11 +11587,16 @@ function render() {
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   wireRadio();
 }
-// 2.22.15: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
+// 2.22.16: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
 // prefers-reduced-motion: reduce keeps swipe but skips slide transition.
+// Swipe may start on links/buttons (most of each card); form fields and dots are excluded.
 let homeCarDrag = null;
 function homeFeedInteractiveTarget(t) {
   return !!(t && t.closest && t.closest('a,button,input,select,textarea,label,[role="button"],.btns,.photobtns,.switch,.tick,.star,.hcar-dot'));
+}
+function homeCarSwipeSkipTarget(t) {
+  // Only skip targets where a drag would break typing / dedicated dot taps.
+  return !!(t && t.closest && t.closest('input,select,textarea,.hcar-dot'));
 }
 function wireHomeCarousel() {
   const root = document.getElementById('homecarousel');
@@ -11607,6 +11612,10 @@ function wireHomeCarousel() {
   let suppressClick = 0;
   let lastTapAt = 0;
 
+  function frontHsec() {
+    const it = items[idx];
+    return it ? (it.querySelector('.hsec') || it) : null;
+  }
   function apply(spin) {
     homeCarIdx = idx;
     root.dataset.i = String(idx);
@@ -11653,38 +11662,72 @@ function wireHomeCarousel() {
     lastTapAt = now;
   };
 
+  const pt = e => {
+    if (e.touches && e.touches[0]) return e.touches[0];
+    if (e.changedTouches && e.changedTouches[0]) return e.changedTouches[0];
+    return e;
+  };
   const onDown = e => {
     if (n <= 1) return;
-    if (e.button != null && e.button !== 0) return;
-    if (homeFeedInteractiveTarget(e.target)) return;
-    homeCarDrag = { pid: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0, drag: false, moved: false };
+    if (e.pointerType === 'mouse' && e.button != null && e.button !== 0) return;
+    if (e.button != null && e.button !== 0 && e.type === 'pointerdown') return;
+    if (homeCarSwipeSkipTarget(e.target)) return;
+    // Ignore secondary pointers / multi-touch while dragging
+    if (homeCarDrag) return;
+    const p = pt(e);
+    const hsec = frontHsec();
+    homeCarDrag = {
+      pid: e.pointerId != null ? e.pointerId : 'touch',
+      x: p.clientX, y: p.clientY, dx: 0, dy: 0,
+      drag: false, axis: null,
+      scrollEl: hsec,
+      scrollTop0: hsec ? hsec.scrollTop : 0,
+      fromTouch: e.type === 'touchstart'
+    };
   };
   const onMove = e => {
     const st = homeCarDrag;
-    if (!st || e.pointerId !== st.pid) return;
-    const dx = e.clientX - st.x, dy = e.clientY - st.y;
+    if (!st) return;
+    if (e.pointerId != null && e.pointerId !== st.pid && st.pid !== 'touch') return;
+    const p = pt(e);
+    const dx = p.clientX - st.x, dy = p.clientY - st.y;
     st.dx = dx; st.dy = dy;
-    if (!st.drag) {
-      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { homeCarDrag = null; return; }
-      if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy)) return;
-      st.drag = true;
-      st.moved = true;
-      try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-      track.style.transition = 'none';
+    if (!st.axis) {
+      const adx = Math.abs(dx), ady = Math.abs(dy);
+      if (adx < 8 && ady < 8) return;
+      // Prefer horizontal when clearly sideways; allow slight diagonal (0.85 ratio)
+      if (adx >= 8 && adx >= ady * 0.85) st.axis = 'x';
+      else if (ady >= 8 && ady > adx) st.axis = 'y';
+      else return;
+      if (st.axis === 'x') {
+        st.drag = true;
+        try { if (e.pointerId != null) stage.setPointerCapture(e.pointerId); } catch (err) {}
+        track.style.transition = 'none';
+      }
     }
-    if (e.cancelable) e.preventDefault();
-    const w = Math.max(1, stage.clientWidth || 300);
-    const dragPct = (dx / w) * 100;
-    track.style.transform = `translate3d(${(-idx * 100 + dragPct).toFixed(3)}%,0,0)`;
+    if (st.axis === 'x') {
+      if (e.cancelable) e.preventDefault();
+      const w = Math.max(1, stage.clientWidth || 300);
+      const dragPct = (dx / w) * 100;
+      track.style.transform = `translate3d(${(-idx * 100 + dragPct).toFixed(3)}%,0,0)`;
+      return;
+    }
+    if (st.axis === 'y' && st.scrollEl) {
+      // With stage touch-action pan-x, vertical native scroll may be blocked — drive it.
+      st.scrollEl.scrollTop = st.scrollTop0 - dy;
+      if (e.cancelable) e.preventDefault();
+    }
   };
   const onUp = e => {
     const st = homeCarDrag;
-    if (!st || e.pointerId !== st.pid) return;
+    if (!st) return;
+    if (e.pointerId != null && e.pointerId !== st.pid && st.pid !== 'touch') return;
     homeCarDrag = null;
-    if (st.drag) {
-      suppressClick = Date.now() + 350;
+    try { if (e.pointerId != null) stage.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (st.drag && st.axis === 'x') {
+      suppressClick = Date.now() + 400;
       lastTapAt = 0;
-      const thresh = Math.max(40, (stage.clientWidth || 300) * 0.18);
+      const thresh = Math.max(36, (stage.clientWidth || 300) * 0.15);
       if (st.dx <= -thresh) go(1);
       else if (st.dx >= thresh) go(-1);
       else apply(true);
@@ -11693,10 +11736,26 @@ function wireHomeCarousel() {
     // Treat as a tap for double-tap detection (ignore tiny jitter)
     if (Math.abs(st.dx) < 10 && Math.abs(st.dy) < 10) noteDoubleTap(e);
   };
+
+  // Swallow click after a horizontal swipe so links/buttons under the finger don't fire.
+  stage.addEventListener('click', e => {
+    if (Date.now() < suppressClick) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
   stage.addEventListener('pointerdown', onDown);
   stage.addEventListener('pointermove', onMove, { passive: false });
   stage.addEventListener('pointerup', onUp);
   stage.addEventListener('pointercancel', onUp);
+  // Touch fallback when Pointer Events are missing (older WebViews)
+  if (typeof window.PointerEvent !== 'function') {
+    stage.addEventListener('touchstart', onDown, { passive: true });
+    stage.addEventListener('touchmove', onMove, { passive: false });
+    stage.addEventListener('touchend', onUp);
+    stage.addEventListener('touchcancel', onUp);
+  }
 }
 function wireHomeFeedList() {
   const feed = document.getElementById('homefeed');
