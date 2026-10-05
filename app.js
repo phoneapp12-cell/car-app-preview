@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.23';
+const APP_VERSION = '2.22.24';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1456,8 +1456,10 @@ function homeSumBareCard() {
 }
 
 // 2.22.23: up to three "might be next" suggestions under the summary, each with an Add button.
-// Only from data already in the app: birthdays, car dates, garden jobs, the events and movies feed, the calendar, About you.
-// A suggestion is a question, never a pretend booking. Anything already on the calendar, to-do list, or notes is skipped. No money.
+// 2.22.24: which three rotate over time (day + few-hour slot + app open); variety across types when several are available.
+// Also grounded in notes/dates: tyres, plant feeding, lawns, dog walks, vet — chores only in weekend / non-work slots.
+// Only from data already in the app: birthdays, car dates, garden jobs, pets, the events and movies feed, the calendar, notes, About you.
+// A suggestion is a question, never a pretend booking. Anything already on the calendar, to-do list, or notes is skipped. No money. No bedtime nag.
 let homeSugNow = [];
 function homeSugKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
 function homeSugCal(fromDays, toDays) {
@@ -1535,7 +1537,10 @@ function homeSugEvent() {
       if (weekend && daysLeft(e.date) <= 2) s -= 1;
       return s;
     };
-    const pick = list.slice().sort((x, y) => score(x) - score(y))[0];
+    const ranked = list.slice().sort((x, y) => score(x) - score(y));
+    // 2.22.24: rotate among the better options so the same event is not always first.
+    const top = ranked.slice(0, Math.min(5, ranked.length));
+    const pick = homePick(241, top) || top[0];
     if (!pick) return null;
     const re = new RegExp('^' + homeSugEsc(homeSugKey(pick.title).slice(0, 24)), 'i');
     if ((S.appts || []).some(x => x && re.test(homeSugKey(x.title)))) return null;
@@ -1578,11 +1583,206 @@ function homeSugIdea() {
     return { id: 'idea', type: 'note', text: idea.text, pre: { text: idea.note } };
   } catch (e) { return null; }
 }
+// Non-work chore window: Fri–Sun, or evenings outside Mon–Thu work hours. Never while at work. No bedtime nag.
+function homeSugChoreOk() {
+  try {
+    const a = homeAklParts();
+    if (!a) return false;
+    if (homeWhere() === 'work') return false;
+    if (a.dow === 0 || a.dow === 5 || a.dow === 6) return true;
+    // Mon–Thu: only after usual work hours (not during the day).
+    if (a.dow >= 1 && a.dow <= 4 && a.hour >= 8 && a.hour < 17) return false;
+    return true;
+  } catch (e) { return false; }
+}
+// Prefer a Fri/Sat (days off) for outdoor chores. Fall back to Sunday.
+function homeSugWeekendDate(minOut) {
+  const start = Math.max(0, minOut == null ? 0 : minOut);
+  for (let i = start; i < 14; i++) {
+    const d = addDays(todayISO(), i), w = new Date(parseD(d)).getUTCDay();
+    if (w === 5 || w === 6) return d;
+  }
+  for (let i = start; i < 14; i++) {
+    const d = addDays(todayISO(), i), w = new Date(parseD(d)).getUTCDay();
+    if (w === 0) return d;
+  }
+  return addDays(todayISO(), Math.max(start, 1));
+}
+// Latest past date from appointments, done to-dos, or notes matching a pattern.
+function homeSugLastPast(re) {
+  let last = '';
+  try {
+    (S.appts || []).forEach(a => {
+      if (!a || !a.date || daysLeft(a.date) >= 0) return;
+      if (!re.test(String(a.title || '') + ' ' + String(a.notes || ''))) return;
+      if (a.date > last) last = a.date;
+    });
+    (S.todos || []).forEach(t => {
+      if (!t || !re.test(String(t.title || '') + ' ' + String(t.notes || ''))) return;
+      let iso = '';
+      if (t.done && t.doneAt) {
+        try { iso = nzStampLocal(new Date(t.doneAt)).slice(0, 10); } catch (e) { iso = ''; }
+      }
+      if (!iso && t.due && daysLeft(t.due) < 0) iso = t.due;
+      if (iso && iso > last) last = iso;
+    });
+    (S.notes || []).forEach(n => {
+      if (!n || !re.test(String(n.text || ''))) return;
+      const iso = String(n.at || '').slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && daysLeft(iso) < 0 && iso > last) last = iso;
+    });
+  } catch (e) {}
+  return last;
+}
+function homeSugTyres() {
+  try {
+    if (!homeSugChoreOk()) return null;
+    const re = /\b(tyre|tyres|tire|tires|inflate|air (in |the )?(tyre|tire)|pump(ed)? (the )?(tyre|tire))\b/i;
+    if (homeSugHas(re, -14, 45)) return null;
+    const last = homeSugLastPast(re);
+    const days = last ? -daysLeft(last) : 999;
+    // Every few months: suggest when ~90+ days since last note/date, or never recorded.
+    if (days < 80) return null;
+    const date = homeSugWeekendDate(1);
+    const who = (S.cars || []).filter(c => c && c.name).map(c => c.name);
+    const carBit = who.length === 1 ? (/^[A-Z]/.test(who[0]) ? who[0] : 'the ' + who[0]) : 'the car';
+    const text = last
+      ? 'It’s been about ' + Math.max(1, Math.round(days / 30)) + ' months since the tyres were last mentioned. Worth a top-up of air?'
+      : 'No tyre top-up on the calendar lately. Worth checking the air in ' + carBit + '?';
+    return { id: 'tyres', type: 'todo', text, pre: { title: 'Inflate car tyres', due: date, priority: 'normal', list: 'Home' } };
+  } catch (e) { return null; }
+}
+function homeSugGardenFeed() {
+  try {
+    if (!homeSugChoreOk()) return null;
+    const re = /\b(feed(ing)? (the )?(citrus|plant|plants|garden|tomato|strawberr|lemon|orange|mandarin|plum|peach)|fertilis|fertiliz|plant food|garden feed)\b/i;
+    if (homeSugHas(re, -14, 30)) return null;
+    // Prefer a real upcoming garden feed job from the app’s own calendar maths.
+    let job = null;
+    try {
+      const T = todayT();
+      const jobs = (typeof gardenJobs === 'function' ? gardenJobs(S, T, T + 21 * DAY) : []) || [];
+      job = jobs.find(j => j && !j.done && /feed/i.test(String(j.title || '') + ' ' + String(j.kind || ''))) || null;
+    } catch (e) { job = null; }
+    if (job) {
+      const reTitle = new RegExp(homeSugEsc(homeSugKey(job.title).slice(0, 20)), 'i');
+      if ((S.appts || []).some(x => x && reTitle.test(homeSugKey(x.title)))) return null;
+      if ((S.todos || []).some(t => t && !t.done && reTitle.test(homeSugKey(t.title)))) return null;
+      return { id: 'gfeed', type: 'todo', text: job.title + ' is due ' + homeSugDay(job.date) + '. Want it on your to-do list?',
+        pre: { title: job.title, due: job.date < todayISO() ? todayISO() : job.date, priority: 'normal', list: 'Home', notes: job.body || '' } };
+    }
+    // Otherwise: if anything is growing, nudge to add feeding times (a note), not invent a booking.
+    let growing = false;
+    try {
+      growing = (typeof GARDEN_IDS !== 'undefined' ? GARDEN_IDS : []).some(id => {
+        try { return typeof gardenGrowing === 'function' ? gardenGrowing(id) : true; } catch (e) { return false; }
+      });
+    } catch (e) { growing = false; }
+    if (!growing) return null;
+    if (homeSugNoted(re)) return null;
+    const last = homeSugLastPast(re);
+    if (last && -daysLeft(last) < 40) return null;
+    return { id: 'gfeed', type: 'note', text: 'Worth adding plant feeding times to your notes or calendar?',
+      pre: { text: 'Plant / garden feeding times: ' } };
+  } catch (e) { return null; }
+}
+function homeSugLawns() {
+  try {
+    if (!homeSugChoreOk()) return null;
+    const a = homeAklParts();
+    // Prefer weekends for lawns (Fri–Sun). Skip mid-week evenings.
+    if (a && a.dow >= 1 && a.dow <= 4) return null;
+    const re = /\b(mow|mowing|lawn|lawns|grass)\b/i;
+    if (homeSugHas(re, -7, 21)) return null;
+    const last = homeSugLastPast(re);
+    const days = last ? -daysLeft(last) : 999;
+    // Roughly every fortnight in the growing months; less often otherwise.
+    const month = +(todayISO().slice(5, 7) || 0);
+    const growing = month >= 9 || month <= 4; // NZ spring–autumn
+    if (days < (growing ? 12 : 28)) return null;
+    const date = homeSugWeekendDate(0);
+    const text = last
+      ? 'It’s been about ' + days + ' days since the lawns were last mentioned. Worth a mow this weekend?'
+      : 'No lawn mow on the list lately. Worth doing the lawns this weekend?';
+    return { id: 'lawns', type: 'todo', text, pre: { title: 'Mow the lawns', due: date, priority: 'normal', list: 'Home' } };
+  } catch (e) { return null; }
+}
+function homeSugDogWalk() {
+  try {
+    if (!homeSugChoreOk()) return null;
+    const dogs = (S.pets || []).filter(p => p && p.type === 'dog');
+    if (!dogs.length) return null;
+    const names = dogs.map(p => String(p.name || '').trim()).filter(n => n && n.toLowerCase() !== 'pet');
+    const who = names.length === 1 ? names[0] : (names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : 'the dog');
+    const whoRe = (names.map(homeSugEsc).concat(['dog', 'dogs'])).join('|');
+    const re = new RegExp('\\b(walk|walking)\\b.*\\b(' + whoRe + ')\\b|\\b(' + whoRe + ')\\b.*\\b(walk|walking)\\b|\\bdog walk\\b', 'i');
+    if (homeSugHas(re, -1, 2)) return null;
+    const date = todayISO();
+    return { id: 'walk', type: 'todo', text: 'A walk with ' + who + ', if you feel like it?',
+      pre: { title: 'Walk ' + (names.length === 1 ? names[0] : 'the dog'), due: date, priority: 'normal', list: 'Home' } };
+  } catch (e) { return null; }
+}
+function homeSugVet() {
+  try {
+    const pets = S.pets || [];
+    if (!pets.length) return null;
+    let best = null;
+    pets.forEach(p => {
+      if (!p) return;
+      (p.care || []).forEach(it => {
+        if (!it) return;
+        const isVet = it.kind === 'check' || it.kind === 'vacc' || /\bvet\b|check-?up|vaccin/i.test(String(it.name || ''));
+        if (!isVet) return;
+        const due = careDue(it);
+        if (!due) return;
+        const d = daysLeft(due);
+        // Due within 3 weeks, or up to 2 weeks overdue — a gentle booking nudge.
+        if (d < -14 || d > 21) return;
+        if (!best || d < best.d) best = { p, it, due, d };
+      });
+    });
+    if (!best) return null;
+    const name = String(best.p.name || 'the pet').trim() || 'the pet';
+    const careName = String(best.it.name || 'vet check-up').trim();
+    const re = new RegExp('\\b' + homeSugEsc(name) + '\\b.*\\b(vet|check-?up|vaccin)|\\b(vet|check-?up|vaccin)\\b.*\\b' + homeSugEsc(name) + '\\b|\\bvet\\b', 'i');
+    if (homeSugHas(re, -30, 45)) return null;
+    if ((S.appts || []).some(a => a && /\bvet\b/i.test(String(a.title || '')) && daysLeft(a.date) >= -7 && daysLeft(a.date) <= 45)) return null;
+    const when = best.d < 0 ? 'was due ' + homeSugDay(best.due) : 'is due ' + homeSugDay(best.due);
+    const date = best.due < todayISO() ? todayISO() : best.due;
+    return { id: 'vet', type: 'appt', text: name + '’s ' + careName.toLowerCase() + ' ' + when + '. Worth booking the vet?',
+      pre: { title: name + ' – ' + careName, date, time: '', notes: best.p.vet ? 'Vet: ' + best.p.vet : '' } };
+  } catch (e) { return null; }
+}
+// 2.22.24: rotate which suggestions show (day + ~3-hour slot + this open). Prefer type variety.
+function homeSugShuffle(list, salt) {
+  const arr = (list || []).slice();
+  if (arr.length <= 1) return arr;
+  let day = 1, slot = 0;
+  try {
+    const c = DD.nzClock(new Date());
+    if (c && c.iso) day = (+String(c.iso).slice(0, 4) * 372) + (+String(c.iso).slice(5, 7) * 31) + (+String(c.iso).slice(8, 10));
+    if (c && Number.isFinite(c.min)) slot = Math.floor(c.min / 180);
+  } catch (e) {}
+  let seed = Math.abs((homeSpinSeed + day * 13 + slot * 5 + (salt || 250) * 17) | 0) || 1;
+  const next = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed; };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = next() % (i + 1);
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
 function homeSuggestions() {
-  const out = [];
-  const add = fn => { if (out.length >= 3) return; let s = null; try { s = fn(); } catch (e) { s = null; } if (s && s.text) out.push(s); };
-  [homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugIdea].forEach(add);
-  return out.slice(0, 3);
+  // Gather every available type first. Duplicate skips stay inside each maker; Add buttons unchanged.
+  const makers = [homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugGardenFeed, homeSugLawns, homeSugDogWalk, homeSugVet, homeSugIdea];
+  const avail = [];
+  makers.forEach(fn => {
+    let s = null;
+    try { s = fn(); } catch (e) { s = null; }
+    if (s && s.text) avail.push(s);
+  });
+  if (!avail.length) return [];
+  // Each maker is a different type. Shuffle then take up to three for variety across birthday/car/event/chore/pet/idea.
+  return homeSugShuffle(avail, 250).slice(0, 3);
 }
 function homeSugHtml() {
   let list = [];
