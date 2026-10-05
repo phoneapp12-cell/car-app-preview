@@ -801,17 +801,17 @@ html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{backgrou
 .hsec > .sec{color:#102033;background:rgba(255,255,255,.94);border-radius:12px;padding:8px 12px;margin:12px 2px 8px;font-size:1rem;letter-spacing:.01em}
 .hsec > .sec a.sechead{color:#102033;font-size:1rem}
 html[data-theme="dark"] .hsec > .sec,html[data-theme="dark"] .hsec > .sec a.sechead{color:#f4f7fb;background:rgba(8,14,20,.62)}
-/* 2.22.13: Home feed as a circular rotating carousel (normal view only). */
+/* 2.22.14: Home feed circular carousel — swipe/drag only; larger front card. */
 .hcar{position:relative;margin:4px 0 14px}
 .hcar-stage{
-  position:relative;height:min(58vh,480px);perspective:920px;perspective-origin:50% 45%;
+  position:relative;height:min(70vh,560px);perspective:1100px;perspective-origin:50% 42%;
   touch-action:pan-y;overflow:visible;border-radius:22px;
 }
 .hcar-ring{position:relative;width:100%;height:100%;transform-style:preserve-3d;will-change:transform}
 .hcar-item{
   position:absolute;inset:0;width:100%;height:100%;transform-style:preserve-3d;
   backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  border-radius:22px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.14);
+  border-radius:22px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.16);
   background:transparent;
 }
 .hcar-item .hsec{
@@ -820,7 +820,6 @@ html[data-theme="dark"] .hsec > .sec,html[data-theme="dark"] .hsec > .sec a.sech
 }
 .hcar-item:not(.hcar-front) .hsec{pointer-events:none}
 .hcar-bar{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0 6px}
-.hcar-bar .btn.small{min-width:44px}
 .hcar-bar .hcar-tog{min-width:9.5rem}
 .hcar-dots{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;min-height:10px;margin-bottom:2px}
 .hcar-dot{width:7px;height:7px;border-radius:50%;background:var(--ink3);opacity:.45}
@@ -841,8 +840,7 @@ html[data-theme="dark"] .hsec > .sec,html[data-theme="dark"] .hsec > .sec a.sech
 .hcar.hcar-full .hcar-item.hcar-front{overflow:auto}
 .hcar.hcar-full .hcar-item:not(.hcar-front){display:none}
 .hcar.hcar-full .hcar-dots{display:none}
-.hcar.hcar-full .hcar-bar{order:-1;margin:0 0 10px;justify-content:space-between}
-.hcar.hcar-full .hcar-prev,.hcar.hcar-full .hcar-next{visibility:hidden;pointer-events:none}
+.hcar.hcar-full .hcar-bar{order:-1;margin:0 0 10px;justify-content:center}
 @media (prefers-reduced-motion: reduce){
   .hcar-ring,.hcar-item{transition:none!important}
 }

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.13';
+const APP_VERSION = '2.22.14';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2432,7 +2432,7 @@ function Home() {
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
   const sumIn = sum && before > 0 ? sum : '';
-  // 2.22.13: feed .hsec cards sit in a circular carousel (normal Home only). Summary / callouts stay outside.
+  // 2.22.14: feed .hsec cards in a circular carousel (normal Home only). Swipe/drag only — no arrow buttons.
   const sumMid = sumIn || '';
   const sumBeforeCar = sumMid && at < sections.length ? sumMid : '';
   const sumAfterCar = sumMid && at >= sections.length ? sumMid : '';
@@ -2443,9 +2443,7 @@ function Home() {
       <div class="hcar-ring" id="hcarring">${carItems}</div>
     </div>
     <div class="hcar-bar">
-      <button type="button" class="btn small hcar-prev" aria-label="Previous card">${I('left')}</button>
       <button type="button" class="btn small primary hcar-tog" aria-label="Open card full screen">Open</button>
-      <button type="button" class="btn small hcar-next" aria-label="Next card">${I('right')}</button>
     </div>
     <div class="hcar-dots" aria-hidden="true">${carDots}</div>
   </div>` : '';
@@ -11559,7 +11557,7 @@ function render() {
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   wireRadio();
 }
-// 2.22.13: Home feed cards sit on a circular carousel. Swipe / drag rotates; Open expands the front card.
+// 2.22.14: Home feed circular carousel. Finger swipe / mouse drag rotates; Open expands. No arrow buttons.
 // prefers-reduced-motion: reduce keeps swipe/expand but skips the spin transition.
 let homeCarDrag = null;
 function wireHomeCarousel() {
@@ -11570,8 +11568,6 @@ function wireHomeCarousel() {
   const items = [...root.querySelectorAll('.hcar-item')];
   const dots = [...root.querySelectorAll('.hcar-dot')];
   const tog = root.querySelector('.hcar-tog');
-  const prevBtn = root.querySelector('.hcar-prev');
-  const nextBtn = root.querySelector('.hcar-next');
   const n = items.length;
   if (!stage || !ring || !n) return;
   const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -11579,11 +11575,12 @@ function wireHomeCarousel() {
   let expanded = root.classList.contains('hcar-full');
   let suppressClick = 0;
 
+  // Larger ring radius → front card closer to full content width; side peeks stay slim.
   function radiusPx() {
     const w = stage.clientWidth || 300;
     if (n <= 1) return 0;
     const step = Math.PI / n;
-    return Math.max(140, Math.min(280, (w * 0.72) / (2 * Math.tan(step))));
+    return Math.max(160, Math.min(420, (w * 0.92) / (2 * Math.tan(step))));
   }
   function interactiveTarget(t) {
     return !!(t && t.closest && t.closest('a,button,input,select,textarea,label,[role="button"],.btns,.photobtns,.switch,.tick,.star'));
@@ -11612,9 +11609,11 @@ function wireHomeCarousel() {
         el.style.visibility = front ? 'visible' : 'hidden';
       } else {
         const a = i * step;
-        el.style.transition = reduce ? 'none' : `opacity ${ms} ease`;
-        el.style.transform = `rotateY(${a.toFixed(3)}deg) translateZ(${R}px)`;
-        el.style.opacity = front ? '1' : '0.72';
+        el.style.transition = reduce ? 'none' : `opacity ${ms} ease, transform ${ms} cubic-bezier(.22,.7,.2,1)`;
+        // Side cards slightly smaller so the front card dominates readability.
+        const scale = front ? 1 : 0.88;
+        el.style.transform = `rotateY(${a.toFixed(3)}deg) translateZ(${R}px) scale(${scale})`;
+        el.style.opacity = front ? '1' : '0.58';
         el.style.pointerEvents = front ? 'auto' : 'none';
         el.style.visibility = 'visible';
       }
@@ -11624,8 +11623,6 @@ function wireHomeCarousel() {
       tog.textContent = expanded ? 'Back to circle' : 'Open';
       tog.setAttribute('aria-label', expanded ? 'Back to circle' : 'Open card full screen');
     }
-    if (prevBtn) prevBtn.disabled = expanded || n <= 1;
-    if (nextBtn) nextBtn.disabled = expanded || n <= 1;
     stage.classList.toggle('hcar-spinning', !expanded && n > 1);
   }
   function go(delta, spin) {
@@ -11645,8 +11642,6 @@ function wireHomeCarousel() {
 
   apply(false);
 
-  if (prevBtn) prevBtn.onclick = e => { e.preventDefault(); go(-1); };
-  if (nextBtn) nextBtn.onclick = e => { e.preventDefault(); go(1); };
   if (tog) tog.onclick = e => { e.preventDefault(); setExpanded(!expanded); };
   dots.forEach(d => {
     d.onclick = e => {
