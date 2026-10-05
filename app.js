@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.8';
+const APP_VERSION = '2.22.9';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -480,10 +480,26 @@ const HOME_CARD = {
     return homeSec('Pets', '<a href="#pets">See all</a>') + `<div class="list" id="homepets">${list.map(rowFor).join('')}</div>`;
   },
   bills: () => {
-    const list = S.bills.filter(b => !b.paid && b.due).sort((a, b) => parseD(a.due) - parseD(b.due)).slice(0, 4); if (!list.length) return '';
-    return homeSec('Bills', '<a href="#bills">See all</a>') + `<div class="list" id="homebills">${list.map(b => `<div class="row bill"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(b.name))}</div>
+    const billRows = S.bills.filter(b => !b.paid && b.due).map(b => ({ kind: 'bill', b, d: b.due, sort: b.due }));
+    const loanRows = [];
+    (S.loans || []).forEach(l => {
+      const p = loanPlan(l); if (!p) return;
+      loanRows.push({ kind: 'loan', l, d: p.next, cents: Math.min(l.planCents, loanCalc(l).owed), sort: p.next });
+    });
+    const list = [...billRows, ...loanRows].sort((a, b) => a.sort.localeCompare(b.sort)).slice(0, 4);
+    if (!list.length) return '';
+    return homeSec('Bills', '<a href="#bills">See all</a>') + `<div class="list" id="homebills">${list.map(x => {
+      if (x.kind === 'loan') {
+        const name = 'Loan · ' + x.l.from;
+        return `<div class="row bill"><button class="tapzone" onclick="go('#loan/${x.l.id}')"><div class="ic bill">${I('coins')}</div>
+      <div class="tx"><div class="t">${esc(name)}</div><div class="s">Plan · due ${fmtW(x.d)}</div></div><div class="badgestack">${duePill(daysLeft(x.d))}${moneyBadge(x.cents / 100, name)}</div></button>
+      <button class="paybtn" onclick="payForm('${x.l.id}')">Record</button></div>`;
+      }
+      const b = x.b;
+      return `<div class="row bill"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(b.name))}</div>
       <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Due ${fmtW(b.due)}</div></div><div class="badgestack">${duePill(daysLeft(b.due))}${moneyBadge(b.amount, b.name)}</div></button>
-      <button class="paybtn" onclick="markPaid('${b.id}')">Paid</button></div>`).join('')}</div>`;
+      <button class="paybtn" onclick="markPaid('${b.id}')">Paid</button></div>`;
+    }).join('')}</div>`;
   },
   cars: () => {
     if (!S.cars.length) return '';
@@ -2866,6 +2882,8 @@ function Bills() {
   const paid = S.bills.filter(b => b.paid);
   const reg = unpaid.filter(b => BILL_PER_YEAR[b.repeat]);
   const avg = reg.reduce((t, b) => t + (Number(b.amount) || 0) * BILL_PER_YEAR[b.repeat] / 26, 0);
+  const hasLoanPlans = (S.loans || []).some(l => !!loanPlan(l));
+  const showPay = S.bills.length > 0 || hasLoanPlans;
   const row = b => {
     const d = daysLeft(b.due);
     return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}"><div class="ic bill">${I(billIcon(b.name))}</div>
@@ -2874,39 +2892,60 @@ function Bills() {
       ${b.paid ? `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>` : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
   let pay = '';
-  const pp = S.bills.length ? payPeriod(payOff) : null;
-  if (S.bills.length && !pp) {
-    pay = `<div class="callout green" id="paysetup">${I('cal')}<div style="flex:1"><b>Line your bills up with your pay</b><br>Set your payday and we’ll show what’s due from each payday up to the next one.
+  const pp = showPay ? payPeriod(payOff) : null;
+  if (showPay && !pp) {
+    pay = `<div class="callout green" id="paysetup">${I('cal')}<div style="flex:1"><b>Line your bills up with your pay</b><br>Set your payday and we’ll show what’s due from each payday up to the next one, including loan repayments.
       <div style="margin-top:10px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
   } else if (pp) {
     payOff = pp.off;
     const sT = parseD(pp.start), eT = parseD(pp.end), items = [];
     unpaid.forEach(b => {
-      billDates(b, sT, eT).forEach(d => items.push({ b, d }));
-      if (pp.off === 0 && parseD(b.due) < sT) items.push({ b, d: b.due, late: 1 });
+      billDates(b, sT, eT).forEach(d => items.push({ kind: 'bill', b, d }));
+      if (pp.off === 0 && parseD(b.due) < sT) items.push({ kind: 'bill', b, d: b.due, late: 1 });
     });
+    loanPlanInRange(sT, eT).forEach(x => items.push({ kind: 'loan', l: x.l, d: x.d, cents: x.cents }));
     items.sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : 0);
-    const tot = items.reduce((t, x) => t + (Number(x.b.amount) || 0), 0), late = items.filter(x => x.late).length;
-    const prow = x => { const cur = x.d === x.b.due, dl = daysLeft(x.d);
+    const tot = items.reduce((t, x) => t + (x.kind === 'loan' ? x.cents / 100 : (Number(x.b.amount) || 0)), 0);
+    const late = items.filter(x => x.late).length;
+    const loanN = items.filter(x => x.kind === 'loan').length;
+    const billN = items.length - loanN;
+    const countLabel = (() => {
+      if (!items.length) return 'Nothing due';
+      const parts = [];
+      if (billN) parts.push(plural(billN, 'bill'));
+      if (loanN) parts.push(plural(loanN, 'loan repayment'));
+      return parts.join(' · ');
+    })();
+    const prow = x => {
+      const dl = daysLeft(x.d);
+      if (x.kind === 'loan') {
+        const name = 'Loan · ' + x.l.from;
+        return `<div class="row bill payrow"><button class="tapzone" onclick="go('#loan/${x.l.id}')" aria-label="Open loan from ${esc(x.l.from)}"><div class="ic bill">${I('coins')}</div>
+          <div class="tx"><div class="t">${esc(name)}</div><div class="s">Repayment plan · due ${fmtW(x.d)}</div></div></button>
+          <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.cents / 100, name)}<button class="paybtn" onclick="payForm('${x.l.id}')">Record</button></div></div>`;
+      }
+      const cur = x.d === x.b.due;
       return `<div class="row bill payrow"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}"><div class="ic bill">${I(billIcon(x.b.name))}</div>
         <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.d)}</div></div></button>
-        <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.b.amount, x.b.name)}${cur ? `<button class="paybtn" onclick="markPaid('${x.b.id}')">Mark paid</button>` : ''}</div></div>`; };
+        <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.b.amount, x.b.name)}${cur ? `<button class="paybtn" onclick="markPaid('${x.b.id}')">Mark paid</button>` : ''}</div></div>`;
+    };
     pay = `<div class="summary" id="paysum">
       <div class="paynav"><button class="paystep" id="payprev" aria-label="Previous pay" ${pp.canBack ? '' : 'disabled'} onclick="payShift(-1)">${I('left')}</button>
         <div class="paytitle"><b>${payLabel(pp.off)}</b><span>${fmtW(pp.start)} to ${fmtW(pp.end)}</span></div>
         <button class="paystep" id="paynext" aria-label="Next pay" ${pp.canFwd ? '' : 'disabled'} onclick="payShift(1)">${I('right')}</button></div>
       <div class="muted">${pp.off < 0 ? 'Bills that were due' : 'To pay before the next payday'}</div><div class="amt" id="paytotal">${money(tot)}</div>
-      <div class="muted">${items.length ? plural(items.length, 'bill') : 'Nothing due'}${late ? ` · <b style="color:var(--onbrand)">${late} overdue</b>` : ''} · next payday ${fmtW(pp.next)}</div>
-      <div class="muted billsub">${reg.length ? `Your regular bills average ${money(avg)} a fortnight. ` : ''}<button class="linkbtn" id="paychange" onclick="paydayForm()">Change payday</button></div></div>
+      <div class="muted">${countLabel}${late ? ` · <b style="color:var(--onbrand)">${late} overdue</b>` : ''} · next payday ${fmtW(pp.next)}</div>
+      <div class="muted billsub">${reg.length ? `Your regular bills average ${money(avg)} a fortnight. ` : ''}${hasLoanPlans ? 'Loan repayment plans are included. ' : ''}<button class="linkbtn" id="paychange" onclick="paydayForm()">Change payday</button></div></div>
       <div class="sec">Due ${pp.off === 0 ? 'this pay' : pp.off === 1 ? 'next pay' : pp.off === -1 ? 'last pay' : fmtW(pp.start) + ' to ' + fmtW(pp.end)}</div>
       ${items.length ? `<div class="list" id="paylist">${items.map(prow).join('')}</div>` : `<div class="card muted" id="paylist">No bills due ${pp.off < 0 ? 'in that pay' : 'in this pay'}.</div>`}`;
   }
-  return header('Bills', 'Regular bills and due dates', addBtn('Add a bill', 'billForm()')) +
-    (S.bills.length ? `${pay}
+  const body = showPay
+    ? `${pay}
       <div class="sec">All bills${over && !pp ? ` · ${over} overdue` : ''}</div>
-      ${sorted.length ? `<div class="list">${sorted.map(row).join('')}</div>` : '<div class="card muted">All paid up. Good as gold!</div>'}
+      ${sorted.length ? `<div class="list">${sorted.map(row).join('')}</div>` : (hasLoanPlans && !S.bills.length ? '<div class="card muted">No other bills yet. Loan repayments are in the pay list above.</div>' : '<div class="card muted">All paid up. Good as gold!</div>')}
       ${paid.length ? `<div class="sec">Paid</div><div class="list">${paid.map(row).join('')}</div>` : ''}`
-      : empty('No bills yet', 'Add your regular bills, like power, phone or insurance, and we’ll remind you 3 days before each one is due.', 'Add a bill', 'billForm()'));
+    : empty('No bills yet', 'Add your regular bills, like power, phone or insurance, and we’ll remind you 3 days before each one is due. Loan repayment plans also show here once you’ve set a payday.', 'Add a bill', 'billForm()');
+  return header('Bills', 'Regular bills, loan plans, and due dates', addBtn('Add a bill', 'billForm()')) + body;
 }
 async function markPaid(id) {
   const b = S.bills.find(x => x.id === id), s = snap();
@@ -3103,6 +3142,7 @@ function calItems(fromT, toT) {
     [['wof', 'WOF', 'WOF'], ['rego', 'rego', 'Rego'], ['svcDate', 'service', 'Service']].forEach(([k, l, L]) => { if (c[k] && inR(c[k])) ev.push({ src: 'due', title: `${c.name} ${l} due`, date: c[k], time: L, go: `go('#car/${c.id}')` }); });
   });
   S.bills.forEach(b => billDates(b, fromT, toT).forEach(d => ev.push({ src: 'due', title: `${b.name} · ${money(b.amount)}`, date: d, time: 'Bill', go: `go('#bills')` })));
+  loanPlanInRange(fromT, toT).forEach(x => ev.push({ src: 'due', title: `Loan · ${x.l.from} · ${centsMoney(x.cents)}`, date: x.d, time: 'Loan', go: `go('#loan/${x.l.id}')` }));
   S.drivers.forEach(d => [['aaExpiry', 'AA membership expires', 'AA'], ['licExpiry', 'driver licence expires', 'Licence']].forEach(([k, l, L]) => { if (d[k] && inR(d[k])) ev.push({ src: 'due', title: `${d.name}’s ${l}`, date: d[k], time: L, go: `go('#driver/${d.id}')` }); }));
   S.todos.filter(t => !t.done && t.due && inR(t.due)).forEach(t => ev.push({ src: 'due', title: t.title, date: t.due, time: 'To-do', go: `go('#todo')` }));
   S.appts.filter(a => inR(a.date)).forEach(a => ev.push({ src: 'appt', title: a.title, date: a.date, time: a.time ? fmtTime(a.time) : 'All day', sort: a.time || '00:00', go: `apptForm('${a.id}')`, notes: a.notes, tag: a.evId ? 'Event' : undefined }));
@@ -6426,6 +6466,21 @@ function loanPlan(l) {
   return { n, lastAmt, next, end: loanStep(next, l.planFreq, n - 1), per: LOAN_FREQ.find(f => f[0] === l.planFreq)[2] };
 }
 const loanPlanText = (l, p) => `At ${centsMoney(l.planCents)} ${p.per}, paid off around ${fmtW(p.end)}`;
+// Planned repayments that land in [fromT, toT] (same maths as the loan plan card).
+function loanPlanInRange(fromT, toT) {
+  const out = [];
+  (S.loans || []).forEach(l => {
+    const p = loanPlan(l); if (!p) return;
+    for (let i = 0; i < p.n; i++) {
+      const d = loanStep(p.next, l.planFreq, i);
+      const t = parseD(d);
+      if (t == null || t < fromT || t > toT) continue;
+      const cents = i === p.n - 1 ? p.lastAmt : l.planCents;
+      out.push({ l, d, cents, amount: cents / 100 });
+    }
+  });
+  return out;
+}
 const loanBar = (pct, label) => `<div class="lbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="${esc(label)}"><i style="width:${pct}%"></i></div>`;
 const loanActive = () => S.loans.filter(l => !loanCalc(l).done);
 function loanCard(l) {
@@ -6574,6 +6629,9 @@ function budgetBillRows(b) {
         items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: budgetAmt(bill.amount), due: bill.due, late: 1 });
       });
   }
+  loanPlanInRange(sT, eT).forEach(x => {
+    items.push({ id: 'loan-' + x.l.id + '-' + x.d, name: 'Loan · ' + x.l.from, amount: x.amount, due: x.d, late: 0, loanId: x.l.id });
+  });
   items.sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : a.name.localeCompare(b.name));
   return items;
 }
@@ -6592,7 +6650,7 @@ function budgetCard(b) {
   const mortRows = k.mortgages.map((x, n) => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">Type this fortnight’s amount</div></div>
       <div class="moneyin" style="max-width:120px;margin:0"><span>$</span><input inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((x.amount || 0) * 100))}" aria-label="${esc(x.name)} amount" onchange="budgetMortgageSet(${jsArg(b.id)},${n},this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"></div></div>`).join('');
   const billRows = k.bills.length
-    ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(x.name))}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.due)}</div></div></button><b>${money(x.amount)}</b></div>`).join('')
+    ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="${x.loanId ? `go('#loan/${x.loanId}')` : `go('#bills')`}"><div class="ic bill">${I(x.loanId ? 'coins' : billIcon(x.name))}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.due)}</div></div></button><b>${money(x.amount)}</b></div>`).join('')
     : `<div class="card muted" style="margin:0">${payPeriod(0) ? 'No bills due in this fortnight.' : 'Set your payday in Bills so this fortnight’s bills can show here.'}</div>`;
   const lines = (b.lines || []).map(x => `<div class="row" data-bline="${esc(x.id)}"><div class="tx"><div class="t">${esc(x.name)}</div></div><b>${money(x.amount)}</b>
       <button type="button" class="iconbtn" aria-label="Delete ${esc(x.name)}" onclick="budgetLineDelete(${jsArg(b.id)},${jsArg(x.id)})">${I('trash')}</button></div>`).join('');
@@ -6798,7 +6856,7 @@ async function deletePayment(loanId, pid) {
 function planForm(loanId) {
   const l = getLoan(loanId); if (!l) return;
   openSheet('Repayment plan',
-    `<p class="muted" style="margin:-4px 2px 12px">How much you plan to pay back, and how often. It’s just for working out when the loan will be paid off – there are no reminders.</p>` +
+    `<p class="muted" style="margin:-4px 2px 12px">How much you plan to pay back, and how often. Those amounts show in Bills for each payday fortnight.</p>` +
     moneyField('Regular amount (NZD)', 'plan', l.planCents, 'e.g. 50') +
     `<div class="field"><span>How often</span>${segHtml('freq', LOAN_FREQ.map(f => [f[0], f[1]]), l.planFreq)}</div>
     <p class="muted" id="planhint" style="margin:0 2px 4px;font-size:0.875rem;min-height:20px"></p>`,
