@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.14';
+const APP_VERSION = '2.22.15';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -331,6 +331,26 @@ const HOME_GROUPS = [
 ];
 const HOME_CAT = Object.fromEntries(HOME_GROUPS.flatMap(g => g.keys.map(k => [k, g.id])));
 let homeEdit = false;
+let homeFeedMode = 'carousel'; // 'carousel' | 'list' — session + localStorage
+let homeCarIdx = 0;
+try {
+  const m = localStorage.getItem('homeFeedMode');
+  if (m === 'list' || m === 'carousel') homeFeedMode = m;
+} catch (e) {}
+function setHomeFeedMode(mode) {
+  homeFeedMode = mode === 'list' ? 'list' : 'carousel';
+  try { localStorage.setItem('homeFeedMode', homeFeedMode); } catch (e) {}
+  const v = document.getElementById('view');
+  const top = v ? v.scrollTop : 0;
+  render();
+  if (!v) return;
+  if (homeFeedMode === 'list') v.scrollTop = top;
+  else {
+    const car = document.getElementById('homecarousel');
+    if (car) try { car.scrollIntoView({ block: 'nearest' }); } catch (err) {}
+    else v.scrollTop = 0;
+  }
+}
 let homeShownNow = new Set();
 function homeOrder() {
   const src = Array.isArray(S.settings.homeOrder) ? S.settings.homeOrder : [];
@@ -2432,23 +2452,30 @@ function Home() {
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
   const sumIn = sum && before > 0 ? sum : '';
-  // 2.22.14: feed .hsec cards in a circular carousel (normal Home only). Swipe/drag only — no arrow buttons.
+  // 2.22.15: full-page carousel (one card at a time) or classic stacked .hsec list. Double-tap toggles.
   const sumMid = sumIn || '';
-  const sumBeforeCar = sumMid && at < sections.length ? sumMid : '';
-  const sumAfterCar = sumMid && at >= sections.length ? sumMid : '';
-  const carItems = sections.map((sec, i) => `<div class="hcar-item" data-i="${i}">${sec.html}</div>`).join('');
-  const carDots = sections.map((_, i) => `<span class="hcar-dot${i === 0 ? ' on' : ''}" data-i="${i}"></span>`).join('');
-  const carousel = sections.length ? `<div class="hcar" id="homecarousel" aria-roledescription="carousel" aria-label="Home cards">
+  const feedParts = sections.map(sec => sec.html);
+  if (sumMid) feedParts.splice(Math.max(0, Math.min(at, feedParts.length)), 0, sumMid);
+  const listBody = feedParts.join('');
+  const startI = Math.max(0, Math.min(Math.max(sections.length - 1, 0), homeCarIdx | 0));
+  const carItems = sections.map((sec, i) => `<div class="hcar-item${i === startI ? ' hcar-front' : ''}" data-i="${i}"${i === startI ? '' : ' aria-hidden="true"'}>${sec.html}</div>`).join('');
+  const carDots = sections.map((_, i) => `<button type="button" class="hcar-dot${i === startI ? ' on' : ''}" data-i="${i}" aria-label="Card ${i + 1}"></button>`).join('');
+  const carousel = sections.length ? `<div class="hcar" id="homecarousel" aria-roledescription="carousel" aria-label="Home cards" data-i="${startI}">
     <div class="hcar-stage" id="hcarstage">
-      <div class="hcar-ring" id="hcarring">${carItems}</div>
+      <div class="hcar-track" id="hcartrack">${carItems}</div>
+      <div class="hcar-dots">${carDots}</div>
     </div>
-    <div class="hcar-bar">
-      <button type="button" class="btn small primary hcar-tog" aria-label="Open card full screen">Open</button>
-    </div>
-    <div class="hcar-dots" aria-hidden="true">${carDots}</div>
+    <p class="hcar-hint muted">Swipe for next · double-tap for list</p>
   </div>` : '';
+  const listFeed = sections.length ? `<div class="hfeed" id="homefeed" data-mode="list">
+    <p class="hcar-hint muted">Double-tap for carousel</p>
+    ${listBody}
+  </div>` : '';
+  const feed = homeFeedMode === 'list' ? listFeed : carousel;
+  // Overview summary sits above the carousel (list mode already splices sumMid into feedParts)
+  const sumForCar = homeFeedMode === 'list' ? '' : (sumMid || '');
   return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + sumTop + dailyQuoteCard() + cards +
-    sumBeforeCar + carousel + sumAfterCar + `${syncNote()}
+    sumForCar + feed + `${syncNote()}
     <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
 }
@@ -11553,100 +11580,60 @@ function render() {
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
   if ((r === 'home' || r === '') && homeEdit) wireReorder();
-  if ((r === 'home' || r === '') && !homeEdit) wireHomeCarousel();
+  if ((r === 'home' || r === '') && !homeEdit) {
+    if (homeFeedMode === 'list') wireHomeFeedList();
+    else wireHomeCarousel();
+  }
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   wireRadio();
 }
-// 2.22.14: Home feed circular carousel. Finger swipe / mouse drag rotates; Open expands. No arrow buttons.
-// prefers-reduced-motion: reduce keeps swipe/expand but skips the spin transition.
+// 2.22.15: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
+// prefers-reduced-motion: reduce keeps swipe but skips slide transition.
 let homeCarDrag = null;
+function homeFeedInteractiveTarget(t) {
+  return !!(t && t.closest && t.closest('a,button,input,select,textarea,label,[role="button"],.btns,.photobtns,.switch,.tick,.star,.hcar-dot'));
+}
 function wireHomeCarousel() {
   const root = document.getElementById('homecarousel');
   if (!root) return;
   const stage = root.querySelector('#hcarstage') || root.querySelector('.hcar-stage');
-  const ring = root.querySelector('#hcarring') || root.querySelector('.hcar-ring');
+  const track = root.querySelector('#hcartrack') || root.querySelector('.hcar-track');
   const items = [...root.querySelectorAll('.hcar-item')];
   const dots = [...root.querySelectorAll('.hcar-dot')];
-  const tog = root.querySelector('.hcar-tog');
   const n = items.length;
-  if (!stage || !ring || !n) return;
+  if (!stage || !track || !n) return;
   const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  let idx = Math.max(0, Math.min(n - 1, parseInt(root.dataset.i || '0', 10) || 0));
-  let expanded = root.classList.contains('hcar-full');
+  let idx = Math.max(0, Math.min(n - 1, parseInt(root.dataset.i || String(homeCarIdx || 0), 10) || 0));
   let suppressClick = 0;
+  let lastTapAt = 0;
 
-  // Larger ring radius → front card closer to full content width; side peeks stay slim.
-  function radiusPx() {
-    const w = stage.clientWidth || 300;
-    if (n <= 1) return 0;
-    const step = Math.PI / n;
-    return Math.max(160, Math.min(420, (w * 0.92) / (2 * Math.tan(step))));
-  }
-  function interactiveTarget(t) {
-    return !!(t && t.closest && t.closest('a,button,input,select,textarea,label,[role="button"],.btns,.photobtns,.switch,.tick,.star'));
-  }
   function apply(spin) {
+    homeCarIdx = idx;
     root.dataset.i = String(idx);
-    root.classList.toggle('hcar-full', expanded);
-    const step = n ? 360 / n : 0;
-    const R = radiusPx();
-    const ms = (!spin || reduce) ? '0s' : '.48s';
-    ring.style.transition = expanded ? 'none' : `transform ${ms} cubic-bezier(.22,.7,.2,1)`;
-    if (expanded || n <= 1) {
-      ring.style.transform = 'none';
-    } else {
-      ring.style.transform = `translateZ(${-R}px) rotateY(${(-idx * step).toFixed(3)}deg)`;
-    }
+    const ms = (!spin || reduce) ? '0s' : '.32s';
+    track.style.transition = `transform ${ms} cubic-bezier(.22,.7,.2,1)`;
+    track.style.transform = `translate3d(${(-idx * 100).toFixed(3)}%,0,0)`;
     items.forEach((el, i) => {
       const front = i === idx;
       el.classList.toggle('hcar-front', front);
       el.setAttribute('aria-hidden', front ? 'false' : 'true');
-      if (expanded || n <= 1) {
-        el.style.transition = 'none';
-        el.style.transform = 'none';
-        el.style.opacity = front ? '1' : '0';
-        el.style.pointerEvents = front ? 'auto' : 'none';
-        el.style.visibility = front ? 'visible' : 'hidden';
-      } else {
-        const a = i * step;
-        el.style.transition = reduce ? 'none' : `opacity ${ms} ease, transform ${ms} cubic-bezier(.22,.7,.2,1)`;
-        // Side cards slightly smaller so the front card dominates readability.
-        const scale = front ? 1 : 0.88;
-        el.style.transform = `rotateY(${a.toFixed(3)}deg) translateZ(${R}px) scale(${scale})`;
-        el.style.opacity = front ? '1' : '0.58';
-        el.style.pointerEvents = front ? 'auto' : 'none';
-        el.style.visibility = 'visible';
-      }
+      el.style.pointerEvents = front ? 'auto' : 'none';
     });
     dots.forEach((d, i) => d.classList.toggle('on', i === idx));
-    if (tog) {
-      tog.textContent = expanded ? 'Back to circle' : 'Open';
-      tog.setAttribute('aria-label', expanded ? 'Back to circle' : 'Open card full screen');
-    }
-    stage.classList.toggle('hcar-spinning', !expanded && n > 1);
   }
   function go(delta, spin) {
-    if (expanded || n <= 1) return;
+    if (n <= 1) return;
     idx = ((idx + delta) % n + n) % n;
     apply(spin !== false);
-  }
-  function setExpanded(on) {
-    expanded = !!on;
-    apply(false);
-    if (expanded) {
-      try { root.scrollIntoView({ block: 'nearest' }); } catch (e) {}
-      const front = items[idx];
-      if (front) front.scrollTop = 0;
-    }
   }
 
   apply(false);
 
-  if (tog) tog.onclick = e => { e.preventDefault(); setExpanded(!expanded); };
   dots.forEach(d => {
     d.onclick = e => {
       e.preventDefault();
-      if (expanded || n <= 1) return;
+      e.stopPropagation();
+      if (n <= 1) return;
       const i = parseInt(d.dataset.i || '0', 10);
       if (!Number.isFinite(i) || i === idx) return;
       idx = i;
@@ -11654,21 +11641,23 @@ function wireHomeCarousel() {
     };
   });
 
-  // Tap empty chrome on the front card to expand / collapse (ignore buttons and links).
-  items.forEach(el => {
-    el.addEventListener('click', e => {
-      if (!el.classList.contains('hcar-front')) return;
-      if (interactiveTarget(e.target)) return;
-      if (Date.now() < suppressClick) return;
-      setExpanded(!expanded);
-    });
-  });
+  const noteDoubleTap = e => {
+    if (homeFeedInteractiveTarget(e.target)) return;
+    if (Date.now() < suppressClick) return;
+    const now = Date.now();
+    if (now - lastTapAt > 0 && now - lastTapAt < 300) {
+      lastTapAt = 0;
+      setHomeFeedMode('list');
+      return;
+    }
+    lastTapAt = now;
+  };
 
   const onDown = e => {
-    if (expanded || n <= 1) return;
+    if (n <= 1) return;
     if (e.button != null && e.button !== 0) return;
-    if (interactiveTarget(e.target)) return;
-    homeCarDrag = { pid: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0, drag: false };
+    if (homeFeedInteractiveTarget(e.target)) return;
+    homeCarDrag = { pid: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0, drag: false, moved: false };
   };
   const onMove = e => {
     const st = homeCarDrag;
@@ -11679,32 +11668,63 @@ function wireHomeCarousel() {
       if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { homeCarDrag = null; return; }
       if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy)) return;
       st.drag = true;
+      st.moved = true;
       try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-      ring.style.transition = 'none';
+      track.style.transition = 'none';
     }
     if (e.cancelable) e.preventDefault();
-    const R = radiusPx();
-    const step = 360 / n;
-    const base = -idx * step;
-    const dragDeg = (dx / Math.max(160, stage.clientWidth * 0.55)) * step;
-    ring.style.transform = `translateZ(${-R}px) rotateY(${(base + dragDeg).toFixed(3)}deg)`;
+    const w = Math.max(1, stage.clientWidth || 300);
+    const dragPct = (dx / w) * 100;
+    track.style.transform = `translate3d(${(-idx * 100 + dragPct).toFixed(3)}%,0,0)`;
   };
   const onUp = e => {
     const st = homeCarDrag;
     if (!st || e.pointerId !== st.pid) return;
     homeCarDrag = null;
-    if (!st.drag) return;
-    suppressClick = Date.now() + 350;
-    const thresh = Math.max(40, (stage.clientWidth || 300) * 0.14);
-    if (st.dx <= -thresh) go(1);
-    else if (st.dx >= thresh) go(-1);
-    else apply(true);
+    if (st.drag) {
+      suppressClick = Date.now() + 350;
+      lastTapAt = 0;
+      const thresh = Math.max(40, (stage.clientWidth || 300) * 0.18);
+      if (st.dx <= -thresh) go(1);
+      else if (st.dx >= thresh) go(-1);
+      else apply(true);
+      return;
+    }
+    // Treat as a tap for double-tap detection (ignore tiny jitter)
+    if (Math.abs(st.dx) < 10 && Math.abs(st.dy) < 10) noteDoubleTap(e);
   };
   stage.addEventListener('pointerdown', onDown);
   stage.addEventListener('pointermove', onMove, { passive: false });
   stage.addEventListener('pointerup', onUp);
   stage.addEventListener('pointercancel', onUp);
 }
+function wireHomeFeedList() {
+  const feed = document.getElementById('homefeed');
+  if (!feed) return;
+  let lastTapAt = 0;
+  let down = null;
+  feed.addEventListener('pointerdown', e => {
+    if (e.button != null && e.button !== 0) return;
+    if (homeFeedInteractiveTarget(e.target)) { down = null; return; }
+    down = { x: e.clientX, y: e.clientY, pid: e.pointerId };
+  });
+  feed.addEventListener('pointerup', e => {
+    const st = down;
+    down = null;
+    if (!st || e.pointerId !== st.pid) return;
+    if (homeFeedInteractiveTarget(e.target)) return;
+    if (Math.abs(e.clientX - st.x) > 12 || Math.abs(e.clientY - st.y) > 12) return;
+    const now = Date.now();
+    if (now - lastTapAt > 0 && now - lastTapAt < 300) {
+      lastTapAt = 0;
+      setHomeFeedMode('carousel');
+      return;
+    }
+    lastTapAt = now;
+  });
+  feed.addEventListener('pointercancel', () => { down = null; });
+}
+
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
 window.addEventListener('hashchange', () => {
