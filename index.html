@@ -801,15 +801,50 @@ html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{backgrou
 .hsec > .sec{color:#102033;background:rgba(255,255,255,.94);border-radius:12px;padding:8px 12px;margin:12px 2px 8px;font-size:1rem;letter-spacing:.01em}
 .hsec > .sec a.sechead{color:#102033;font-size:1rem}
 html[data-theme="dark"] .hsec > .sec,html[data-theme="dark"] .hsec > .sec a.sechead{color:#f4f7fb;background:rgba(8,14,20,.62)}
-@media (prefers-reduced-motion: no-preference){
-  #view .hsec.hpend:not(.hin){opacity:0}
-  /* 2.22.12: every Home feed card: centre dot → eye shape → full card. */
-  #view .hsec.hpend.hin.hfrom-eye{animation:homeInEye .95s cubic-bezier(.22,.7,.2,1) both}
+/* 2.22.13: Home feed as a circular rotating carousel (normal view only). */
+.hcar{position:relative;margin:4px 0 14px}
+.hcar-stage{
+  position:relative;height:min(58vh,480px);perspective:920px;perspective-origin:50% 45%;
+  touch-action:pan-y;overflow:visible;border-radius:22px;
 }
-@keyframes homeInEye{
-  0%{opacity:.55;clip-path:circle(0% at 50% 50%)}
-  38%{opacity:1;clip-path:ellipse(58% 22% at 50% 50%)}
-  100%{opacity:1;clip-path:inset(0)}
+.hcar-ring{position:relative;width:100%;height:100%;transform-style:preserve-3d;will-change:transform}
+.hcar-item{
+  position:absolute;inset:0;width:100%;height:100%;transform-style:preserve-3d;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  border-radius:22px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.14);
+  background:transparent;
+}
+.hcar-item .hsec{
+  height:100%;margin:0;overflow:auto;overscroll-behavior:contain;
+  border-top:0!important;padding-top:4px;scrollbar-width:thin;
+}
+.hcar-item:not(.hcar-front) .hsec{pointer-events:none}
+.hcar-bar{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0 6px}
+.hcar-bar .btn.small{min-width:44px}
+.hcar-bar .hcar-tog{min-width:9.5rem}
+.hcar-dots{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;min-height:10px;margin-bottom:2px}
+.hcar-dot{width:7px;height:7px;border-radius:50%;background:var(--ink3);opacity:.45}
+.hcar-dot.on{background:var(--brand);opacity:1;transform:scale(1.15)}
+/* Full-screen (near viewport within #app): one card fills usable space */
+.hcar.hcar-full{
+  position:fixed;left:0;right:0;top:0;bottom:0;width:100%;max-width:560px;margin:0 auto;z-index:45;
+  background:var(--bg);padding:calc(var(--sat) + 8px) calc(12px + var(--sar)) calc(12px + var(--sab)) calc(12px + var(--sal));
+  display:flex;flex-direction:column;box-sizing:border-box;
+}
+.hcar.hcar-full .hcar-stage{
+  flex:1 1 auto;height:auto;min-height:0;perspective:none;overflow:hidden;border-radius:18px;
+}
+.hcar.hcar-full .hcar-ring{height:100%;transform:none!important}
+.hcar.hcar-full .hcar-item{
+  position:relative;inset:auto;height:100%;box-shadow:none;border-radius:18px;
+}
+.hcar.hcar-full .hcar-item.hcar-front{overflow:auto}
+.hcar.hcar-full .hcar-item:not(.hcar-front){display:none}
+.hcar.hcar-full .hcar-dots{display:none}
+.hcar.hcar-full .hcar-bar{order:-1;margin:0 0 10px;justify-content:space-between}
+.hcar.hcar-full .hcar-prev,.hcar.hcar-full .hcar-next{visibility:hidden;pointer-events:none}
+@media (prefers-reduced-motion: reduce){
+  .hcar-ring,.hcar-item{transition:none!important}
 }
 /* Weather in Upcoming (1.17.0) */
 .attwx{display:inline-flex;align-items:center;gap:2px;margin-left:4px;vertical-align:middle;white-space:nowrap;font-weight:600;color:var(--ink2)}

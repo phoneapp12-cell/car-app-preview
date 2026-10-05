@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.12';
+const APP_VERSION = '2.22.13';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2432,14 +2432,25 @@ function Home() {
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
   const sumIn = sum && before > 0 ? sum : '';
-  let head = '', feed = '';
-  sections.forEach((sec, i) => {
-    const piece = (sumIn && i === at ? sumIn : '') + sec.html;
-    if (top && i === 0) head += piece; else feed += piece;
-  });
-  if (sumIn && at >= sections.length) feed += sumIn;
-  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + sumTop + dailyQuoteCard() + head + cards +
-    feed + `${syncNote()}
+  // 2.22.13: feed .hsec cards sit in a circular carousel (normal Home only). Summary / callouts stay outside.
+  const sumMid = sumIn || '';
+  const sumBeforeCar = sumMid && at < sections.length ? sumMid : '';
+  const sumAfterCar = sumMid && at >= sections.length ? sumMid : '';
+  const carItems = sections.map((sec, i) => `<div class="hcar-item" data-i="${i}">${sec.html}</div>`).join('');
+  const carDots = sections.map((_, i) => `<span class="hcar-dot${i === 0 ? ' on' : ''}" data-i="${i}"></span>`).join('');
+  const carousel = sections.length ? `<div class="hcar" id="homecarousel" aria-roledescription="carousel" aria-label="Home cards">
+    <div class="hcar-stage" id="hcarstage">
+      <div class="hcar-ring" id="hcarring">${carItems}</div>
+    </div>
+    <div class="hcar-bar">
+      <button type="button" class="btn small hcar-prev" aria-label="Previous card">${I('left')}</button>
+      <button type="button" class="btn small primary hcar-tog" aria-label="Open card full screen">Open</button>
+      <button type="button" class="btn small hcar-next" aria-label="Next card">${I('right')}</button>
+    </div>
+    <div class="hcar-dots" aria-hidden="true">${carDots}</div>
+  </div>` : '';
+  return header('Hi ' + esc(S.settings.name || 'Shane'), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + wxGreet() + sumTop + dailyQuoteCard() + cards +
+    sumBeforeCar + carousel + sumAfterCar + `${syncNote()}
     <div class="foot">${savedWhere()}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
 }
@@ -11544,39 +11555,160 @@ function render() {
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
   if ((r === 'home' || r === '') && homeEdit) wireReorder();
-  if ((r === 'home' || r === '') && !homeEdit) wireHomeEnter();
+  if ((r === 'home' || r === '') && !homeEdit) wireHomeCarousel();
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   wireRadio();
 }
-// 2.22.12: every Home feed card opens from a centre dot, to an eye, then the full card as it scrolls into view.
-// prefers-reduced-motion: reduce leaves them still.
-let homeEnterObs = null;
-function homeEnterKind(i) {
-  return 'eye';
-}
-function wireHomeEnter() {
-  if (homeEnterObs) { homeEnterObs.disconnect(); homeEnterObs = null; }
-  const secs = [...document.querySelectorAll('#view .hsec')];
-  if (!secs.length) return;
-  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (reduce) return;
-  const root = document.getElementById('view');
-  const pend = [];
-  secs.forEach((el, i) => {
-    const kind = homeEnterKind(i);
-    if (!kind) return;
-    el.classList.add('hpend', 'hfrom-' + kind);
-    pend.push(el);
-  });
-  if (!pend.length) return;
-  homeEnterObs = new IntersectionObserver(entries => {
-    entries.forEach(en => {
-      if (!en.isIntersecting) return;
-      en.target.classList.add('hin');
-      homeEnterObs.unobserve(en.target);
+// 2.22.13: Home feed cards sit on a circular carousel. Swipe / drag rotates; Open expands the front card.
+// prefers-reduced-motion: reduce keeps swipe/expand but skips the spin transition.
+let homeCarDrag = null;
+function wireHomeCarousel() {
+  const root = document.getElementById('homecarousel');
+  if (!root) return;
+  const stage = root.querySelector('#hcarstage') || root.querySelector('.hcar-stage');
+  const ring = root.querySelector('#hcarring') || root.querySelector('.hcar-ring');
+  const items = [...root.querySelectorAll('.hcar-item')];
+  const dots = [...root.querySelectorAll('.hcar-dot')];
+  const tog = root.querySelector('.hcar-tog');
+  const prevBtn = root.querySelector('.hcar-prev');
+  const nextBtn = root.querySelector('.hcar-next');
+  const n = items.length;
+  if (!stage || !ring || !n) return;
+  const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  let idx = Math.max(0, Math.min(n - 1, parseInt(root.dataset.i || '0', 10) || 0));
+  let expanded = root.classList.contains('hcar-full');
+  let suppressClick = 0;
+
+  function radiusPx() {
+    const w = stage.clientWidth || 300;
+    if (n <= 1) return 0;
+    const step = Math.PI / n;
+    return Math.max(140, Math.min(280, (w * 0.72) / (2 * Math.tan(step))));
+  }
+  function interactiveTarget(t) {
+    return !!(t && t.closest && t.closest('a,button,input,select,textarea,label,[role="button"],.btns,.photobtns,.switch,.tick,.star'));
+  }
+  function apply(spin) {
+    root.dataset.i = String(idx);
+    root.classList.toggle('hcar-full', expanded);
+    const step = n ? 360 / n : 0;
+    const R = radiusPx();
+    const ms = (!spin || reduce) ? '0s' : '.48s';
+    ring.style.transition = expanded ? 'none' : `transform ${ms} cubic-bezier(.22,.7,.2,1)`;
+    if (expanded || n <= 1) {
+      ring.style.transform = 'none';
+    } else {
+      ring.style.transform = `translateZ(${-R}px) rotateY(${(-idx * step).toFixed(3)}deg)`;
+    }
+    items.forEach((el, i) => {
+      const front = i === idx;
+      el.classList.toggle('hcar-front', front);
+      el.setAttribute('aria-hidden', front ? 'false' : 'true');
+      if (expanded || n <= 1) {
+        el.style.transition = 'none';
+        el.style.transform = 'none';
+        el.style.opacity = front ? '1' : '0';
+        el.style.pointerEvents = front ? 'auto' : 'none';
+        el.style.visibility = front ? 'visible' : 'hidden';
+      } else {
+        const a = i * step;
+        el.style.transition = reduce ? 'none' : `opacity ${ms} ease`;
+        el.style.transform = `rotateY(${a.toFixed(3)}deg) translateZ(${R}px)`;
+        el.style.opacity = front ? '1' : '0.72';
+        el.style.pointerEvents = front ? 'auto' : 'none';
+        el.style.visibility = 'visible';
+      }
     });
-  }, { root, threshold: 0.16, rootMargin: '0px 0px -6% 0px' });
-  pend.forEach(el => homeEnterObs.observe(el));
+    dots.forEach((d, i) => d.classList.toggle('on', i === idx));
+    if (tog) {
+      tog.textContent = expanded ? 'Back to circle' : 'Open';
+      tog.setAttribute('aria-label', expanded ? 'Back to circle' : 'Open card full screen');
+    }
+    if (prevBtn) prevBtn.disabled = expanded || n <= 1;
+    if (nextBtn) nextBtn.disabled = expanded || n <= 1;
+    stage.classList.toggle('hcar-spinning', !expanded && n > 1);
+  }
+  function go(delta, spin) {
+    if (expanded || n <= 1) return;
+    idx = ((idx + delta) % n + n) % n;
+    apply(spin !== false);
+  }
+  function setExpanded(on) {
+    expanded = !!on;
+    apply(false);
+    if (expanded) {
+      try { root.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+      const front = items[idx];
+      if (front) front.scrollTop = 0;
+    }
+  }
+
+  apply(false);
+
+  if (prevBtn) prevBtn.onclick = e => { e.preventDefault(); go(-1); };
+  if (nextBtn) nextBtn.onclick = e => { e.preventDefault(); go(1); };
+  if (tog) tog.onclick = e => { e.preventDefault(); setExpanded(!expanded); };
+  dots.forEach(d => {
+    d.onclick = e => {
+      e.preventDefault();
+      if (expanded || n <= 1) return;
+      const i = parseInt(d.dataset.i || '0', 10);
+      if (!Number.isFinite(i) || i === idx) return;
+      idx = i;
+      apply(true);
+    };
+  });
+
+  // Tap empty chrome on the front card to expand / collapse (ignore buttons and links).
+  items.forEach(el => {
+    el.addEventListener('click', e => {
+      if (!el.classList.contains('hcar-front')) return;
+      if (interactiveTarget(e.target)) return;
+      if (Date.now() < suppressClick) return;
+      setExpanded(!expanded);
+    });
+  });
+
+  const onDown = e => {
+    if (expanded || n <= 1) return;
+    if (e.button != null && e.button !== 0) return;
+    if (interactiveTarget(e.target)) return;
+    homeCarDrag = { pid: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0, drag: false };
+  };
+  const onMove = e => {
+    const st = homeCarDrag;
+    if (!st || e.pointerId !== st.pid) return;
+    const dx = e.clientX - st.x, dy = e.clientY - st.y;
+    st.dx = dx; st.dy = dy;
+    if (!st.drag) {
+      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { homeCarDrag = null; return; }
+      if (Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy)) return;
+      st.drag = true;
+      try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+      ring.style.transition = 'none';
+    }
+    if (e.cancelable) e.preventDefault();
+    const R = radiusPx();
+    const step = 360 / n;
+    const base = -idx * step;
+    const dragDeg = (dx / Math.max(160, stage.clientWidth * 0.55)) * step;
+    ring.style.transform = `translateZ(${-R}px) rotateY(${(base + dragDeg).toFixed(3)}deg)`;
+  };
+  const onUp = e => {
+    const st = homeCarDrag;
+    if (!st || e.pointerId !== st.pid) return;
+    homeCarDrag = null;
+    if (!st.drag) return;
+    suppressClick = Date.now() + 350;
+    const thresh = Math.max(40, (stage.clientWidth || 300) * 0.14);
+    if (st.dx <= -thresh) go(1);
+    else if (st.dx >= thresh) go(-1);
+    else apply(true);
+  };
+  stage.addEventListener('pointerdown', onDown);
+  stage.addEventListener('pointermove', onMove, { passive: false });
+  stage.addEventListener('pointerup', onUp);
+  stage.addEventListener('pointercancel', onUp);
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
