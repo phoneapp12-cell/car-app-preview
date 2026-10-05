@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.19';
+const APP_VERSION = '2.22.20';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8769,7 +8769,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-05'
+// VIDEO_LIST_UPDATED = '2026-10-06'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -8786,14 +8786,14 @@ const VIDEO_CATS = [
   { id: 'wood', name: 'Woodworking', sub: 'Beginner projects with basic tools', extra: true }
 ];
 const VIDEOS = [
-  { id: 'Od6M0AXpcxQ', title: 'iPhone 18 Pro/Duo Impressions: Mogged', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=Od6M0AXpcxQ', reason: 'MKBHD’s first look at the iPhone 18 Pro and Duo.' },
-  { id: 'nfHRMqqO578', title: 'Samsung Galaxy S26 Ultra Review: There\'s a Catch', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=nfHRMqqO578', reason: 'MKBHD’s full review of the Galaxy S26 Ultra and where it falls short.' },
-  { id: '9OQ5vaYbGV0', title: 'Google’s AI endgame is here… everything you missed at I/O 2026', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=9OQ5vaYbGV0', reason: 'A short recap of what Google showed at I/O 2026.' },
-  { id: 'o4SSoURPODY', title: 'Google Pixel 11/Pro/Fold Impressions: It Is What It Is', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=o4SSoURPODY', reason: 'MKBHD’s first impressions of the Pixel 11, Pro and Fold.' },
+  { id: 'ohqxP8EEumo', title: 'iPhone 18 Pro Review: All About that Chip', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=ohqxP8EEumo', reason: 'MKBHD’s full review of the iPhone 18 Pro.' },
+  { id: 'DLOQOUWmRpI', title: 'The Apple Product I Still Fanboy Over - AirPods 5 Review', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=DLOQOUWmRpI', reason: 'Linus Tech Tips reviews the AirPods 5.' },
+  { id: 'c1rPlzxSZ8E', title: 'Meta is pivoting again... everything you missed from Connect 2026', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=c1rPlzxSZ8E', reason: 'A short recap of what Meta showed at Connect 2026.' },
+  { id: 'ANmTVYkEtLw', title: 'Google Pixel 11/Pro Review: Poker Face', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=ANmTVYkEtLw', reason: 'MKBHD’s full review of the Pixel 11 and Pixel 11 Pro.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
-  { id: 'iitBZXT9BUM', title: 'This hub lets you hide your stuff!', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=iitBZXT9BUM', reason: 'PB Tech looks at a hub that tidies cables and gear on the desk.' },
-  { id: 'PuHDLaLEYq0', title: 'There\'s no way it\'s this easy...', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=PuHDLaLEYq0', reason: 'PB Tech shows a product that is simpler to set up than it looks.' },
-  { id: 'nvFEGPOXXi0', title: 'I Bought An EXPENSIVE Gaming PC from JB Hi-Fi…', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=nvFEGPOXXi0', reason: 'A full look at a high-end gaming PC bought from JB Hi-Fi in New Zealand.' },
+  { id: 'CH4gb9UDM_M', title: 'Travelling? Get your devices charged the right way:  Valore 365 Sling Organizer Power Travel Kit', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=CH4gb9UDM_M', reason: 'PB Tech shows the Valore 365 Sling Organizer power travel kit for charging devices on the go.' },
+  { id: 'IyhCKPotZkk', title: 'PB Live: iPhone 18 Accessories Showcase & Save', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=IyhCKPotZkk', reason: 'A PB Tech live showcase of iPhone 18 accessories.' },
+  { id: 'nvFEGPOXXi0', title: 'I Bought An EXPENSIVE Gaming PC from JB Hi-Fi…', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=nvFEGPOXXi0', reason: 'TechSauce takes a full look at a high-end gaming PC bought from JB Hi-Fi.' },
   { id: 'hbGkK4VgU60', title: 'Spring Jobs for Root Crops, Fruit Trees and Tomatoes | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=hbGkK4VgU60', reason: 'Spring jobs for root crops, fruit trees and tomatoes, well timed for a New Zealand spring.' },
   { id: 'CkAg3RLv1-E', title: 'Top Tips for Citrus Success! | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=CkAg3RLv1-E', reason: 'Gardening Australia’s top tips for healthier citrus trees.' },
   { id: '5XXwMdPRhbw', title: "21 Tomatoes We're Planting This Year", channel: 'Epic Gardening', category: 'garden', url: 'https://www.youtube.com/watch?v=5XXwMdPRhbw', reason: 'Twenty-one tomato varieties to plant this season, for spring planting.' },
@@ -9075,6 +9075,12 @@ function videoReason(v) {
 // Stored here so the phone shows a real date and does not look it up again on every tap.
 const VIDEO_DATES = {
   // 4 Oct 2026 list. Dates are the publishDate on each video's YouTube watch page.
+  // 6 Oct 2026 additions.
+  'DLOQOUWmRpI': '2026-09-24',
+  'c1rPlzxSZ8E': '2026-09-25',
+  'ANmTVYkEtLw': '2026-09-05',
+  'CH4gb9UDM_M': '2026-09-28',
+  'IyhCKPotZkk': '2026-09-23',
   '6Db-cEgbmC4': '2026-06-26',
   '2f4gu97XWFg': '2026-04-23',
   'lrS1LC2cu-U': '2025-09-25',
@@ -9538,7 +9544,7 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 4 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
+    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 6 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
 }
 
 
