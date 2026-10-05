@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.4';
+const APP_VERSION = '2.22.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6510,46 +6510,88 @@ function loansMoreSub() {
   if (!act.length) return 'All paid off';
   return `You owe <b>${centsMoney(act.reduce((n, l) => n + loanCalc(l).owed, 0))}</b>${act.length > 1 ? ' · ' + plural(act.length, 'loan') : ' to ' + esc(act[0].from)}`;
 }
-/* ================= BUDGET (2.22.4, Money › Budget) ================= */
-// S.budgets = [{ id, name, amount, period: 'fortnight'|'week', lines: [{ id, name, amount }] }]. Amounts are dollars (numbers).
-// Nothing is made up: with no budget the page says so, it never shows a $0 budget.
-const BUDGET_PERIODS = [['fortnight', 'Fortnight'], ['week', 'Week']];
+/* ================= BUDGET (2.22.5, Money › Budget) ================= */
+// Fortnight budget with Shane's pay (varies), three mortgages, his Bills (fortnight share), and extra spending.
+// No made-up amounts: pay and mortgages stay blank until he types them; bills come from Bills he already saved.
+const BUDGET_MORTGAGE_DEFAULTS = ['Mortgage 1', 'Mortgage 2', 'Mortgage 3'];
 const budgetAmt = v => Number.isFinite(+v) && +v > 0 ? Math.min(Math.round(+v * 100) / 100, 1000000) : 0;
+const budgetAmtOr0 = v => Number.isFinite(+v) && +v >= 0 ? Math.min(Math.round(+v * 100) / 100, 1000000) : 0;
+function budgetMortgagesOf(b) {
+  const raw = Array.isArray(b && b.mortgages) ? b.mortgages : [];
+  return BUDGET_MORTGAGE_DEFAULTS.map((label, n) => {
+    const x = raw[n] && typeof raw[n] === 'object' ? raw[n] : {};
+    const name = String(x.name || label).trim().slice(0, 40) || label;
+    return { id: String(x.id || ('bm' + (n + 1))), name, amount: budgetAmtOr0(x.amount) };
+  });
+}
 function normBudgets(list) {
-  return (Array.isArray(list) ? list : []).filter(b => b && typeof b === 'object' && b.id && budgetAmt(b.amount) > 0).map(b => ({
-    id: String(b.id), name: String(b.name || 'Fortnight').slice(0, 40) || 'Fortnight', amount: budgetAmt(b.amount),
-    period: b.period === 'week' ? 'week' : 'fortnight',
-    lines: (Array.isArray(b.lines) ? b.lines : []).filter(x => x && typeof x === 'object' && budgetAmt(x.amount) > 0)
-      .map(x => ({ id: String(x.id || uid('bl')), name: String(x.name || 'Spending').slice(0, 60), amount: budgetAmt(x.amount) }))
-  }));
+  return (Array.isArray(list) ? list : []).filter(b => b && typeof b === 'object' && b.id).map(b => {
+    // Older 2.22.4 budgets used amount as the pot. Treat that as this fortnight's pay.
+    const pay = budgetAmt(b.pay != null ? b.pay : b.amount);
+    return {
+      id: String(b.id),
+      name: String(b.name || 'This fortnight').slice(0, 40) || 'This fortnight',
+      period: 'fortnight',
+      pay,
+      mortgages: budgetMortgagesOf(b),
+      lines: (Array.isArray(b.lines) ? b.lines : []).filter(x => x && typeof x === 'object' && budgetAmt(x.amount) > 0)
+        .map(x => ({ id: String(x.id || uid('bl')), name: String(x.name || 'Spending').slice(0, 60), amount: budgetAmt(x.amount) }))
+    };
+  }).filter(b => b.pay > 0 || b.mortgages.some(m => m.amount > 0) || b.lines.length);
 }
 const getBudget = id => (S.budgets || []).find(b => b.id === id);
-function budgetCalc(b) {
-  const spent = Math.round(b.lines.reduce((n, x) => n + x.amount, 0) * 100) / 100;
-  return { spent, left: Math.round((b.amount - spent) * 100) / 100 };
+// Bills already on the phone, turned into a fortnight cost (same maths as the Bills average). Mortgages are separate slots.
+function budgetBillRows() {
+  return (S.bills || []).filter(b => b && !b.paid && BILL_PER_YEAR[b.repeat] && budgetAmt(b.amount) > 0 && !/\bmortgage\b/i.test(String(b.name || '')))
+    .map(b => {
+      const amt = Math.round(budgetAmt(b.amount) * BILL_PER_YEAR[b.repeat] / 26 * 100) / 100;
+      return { id: b.id, name: String(b.name || 'Bill').slice(0, 60), amount: amt, repeat: b.repeat };
+    })
+    .filter(x => x.amount > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
-const budgetPeriodLabel = b => b.period === 'week' ? 'Each week' : 'Each fortnight';
+function budgetCalc(b) {
+  const mortgages = budgetMortgagesOf(b);
+  const mort = Math.round(mortgages.reduce((n, x) => n + x.amount, 0) * 100) / 100;
+  const bills = budgetBillRows();
+  const billTot = Math.round(bills.reduce((n, x) => n + x.amount, 0) * 100) / 100;
+  const spend = Math.round((b.lines || []).reduce((n, x) => n + x.amount, 0) * 100) / 100;
+  const out = Math.round((mort + billTot + spend) * 100) / 100;
+  const pay = budgetAmtOr0(b.pay);
+  return { pay, mort, billTot, spend, out, left: Math.round((pay - out) * 100) / 100, mortgages, bills };
+}
 function budgetCard(b) {
   const k = budgetCalc(b);
-  const lines = b.lines.map(x => `<div class="row" data-bline="${esc(x.id)}"><div class="tx"><div class="t">${esc(x.name)}</div></div><b>${money(x.amount)}</b>
+  const mortRows = k.mortgages.map(x => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">Fortnightly mortgage</div></div><b>${x.amount ? money(x.amount) : '—'}</b></div>`).join('');
+  const billRows = k.bills.length
+    ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(x.name))}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">From Bills · ${esc(REPEATS[x.repeat] || x.repeat)} (fortnight share)</div></div></button><b>${money(x.amount)}</b></div>`).join('')
+    : `<div class="card muted" style="margin:0">No other regular bills yet. Add them in Bills and they’ll show here.</div>`;
+  const lines = (b.lines || []).map(x => `<div class="row" data-bline="${esc(x.id)}"><div class="tx"><div class="t">${esc(x.name)}</div></div><b>${money(x.amount)}</b>
       <button type="button" class="iconbtn" aria-label="Delete ${esc(x.name)}" onclick="budgetLineDelete(${jsArg(b.id)},${jsArg(x.id)})">${I('trash')}</button></div>`).join('');
   return `<div class="carcard loancard budgetcard" data-budget="${esc(b.id)}">
     <div class="carhead"><div class="carpic loanpic">${I('cash')}</div>
-      <div style="flex:1;min-width:0"><div class="carname">${esc(b.name)}</div><div class="carmodel">${budgetPeriodLabel(b)}</div></div>
+      <div style="flex:1;min-width:0"><div class="carname">${esc(b.name)}</div><div class="carmodel">This fortnight</div></div>
       <button type="button" class="iconbtn" aria-label="Edit ${esc(b.name)}" onclick="budgetForm(${jsArg(b.id)})">${I('pen')}</button></div>
-    <div class="lowed"><small>${k.left < 0 ? 'Over budget' : 'Left to spend'}</small><b class="lamt">${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></div>
-    <div class="lstats"><span>Budget <b>${money(b.amount)}</b></span><span>Spent <b>${money(k.spent)}</b></span><span>Remaining <b>${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></span></div>
-    ${lines ? `<div class="list" style="margin-top:10px">${lines}</div>` : `<p class="muted" style="margin:10px 2px 0">No spending added yet.</p>`}
-    <form class="addbar" style="margin-top:10px" onsubmit="budgetLineAdd(event,${jsArg(b.id)})">
+    <div class="lowed"><small>${k.left < 0 ? 'Over budget' : 'Left after bills'}</small><b class="lamt">${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></div>
+    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span><span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b></span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
+    <div class="sec" style="margin-top:12px">This fortnight's pay</div>
+    <div class="list"><div class="row"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wages</div><div class="s">Changes each pay · tap edit to update</div></div><b>${k.pay ? money(k.pay) : '—'}</b></div></div>
+    <div class="sec">Three mortgages</div>
+    <div class="list">${mortRows}</div>
+    <div class="sec">Fortnightly bills <a href="#bills" style="font-weight:650">Open Bills</a></div>
+    <div class="list">${billRows}</div>
+    <div class="sec">Other spending</div>
+    ${lines ? `<div class="list">${lines}</div>` : `<p class="muted" style="margin:0 2px 8px">Nothing else added yet.</p>`}
+    <form class="addbar" style="margin-top:4px" onsubmit="budgetLineAdd(event,${jsArg(b.id)})">
       <input name="bname" placeholder="What you spent on" autocomplete="off" maxlength="60" aria-label="Spending name">
       <input name="bamt" inputmode="decimal" placeholder="$0.00" autocomplete="off" style="max-width:110px" aria-label="Spending amount">
       <button aria-label="Add spending">${I('plus')}</button></form></div>`;
 }
 function Budget() {
   const list = S.budgets || [];
-  const sub = list.length ? plural(list.length, 'budget') : 'What’s left to spend';
+  const sub = list.length ? 'Pay, mortgages, and bills this fortnight' : 'What’s left after pay day';
   if (!list.length) return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) +
-    empty('No budget yet', 'Add one to see what’s left each fortnight.', 'Add', 'budgetForm()') +
+    empty('No budget yet', 'Add this fortnight’s pay and your three mortgages. Your Bills will sit with them so you can see what’s left.', 'Add', 'budgetForm()') +
     `<div class="foot">${savedWhere()}</div>`;
   return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) +
     `<div id="budgetlist">${list.map(budgetCard).join('')}</div>
@@ -6557,29 +6599,41 @@ function Budget() {
     <div class="foot">${savedWhere()}</div>`;
 }
 function budgetForm(id) {
-  const b = id ? getBudget(id) : { name: '', amount: 0, period: 'fortnight', lines: [] };
+  const b = id ? getBudget(id) : { name: '', pay: 0, mortgages: [], lines: [] };
   if (!b) return;
+  const morts = budgetMortgagesOf(b);
   openSheet(id ? 'Edit budget' : 'Add a budget',
-    field('Name', inp('name', b.name, 'placeholder="Fortnight" maxlength="40" autocapitalize="sentences"'), 'Optional') +
-    moneyField('Amount (NZD)', 'amount', Math.round((b.amount || 0) * 100)) +
-    `<div class="field"><span>Period</span>${segHtml('period', BUDGET_PERIODS, b.period)}</div>`,
+    field('Name', inp('name', b.name, 'placeholder="This fortnight" maxlength="40" autocapitalize="sentences"'), 'Optional') +
+    moneyField('This fortnight’s pay', 'pay', Math.round((b.pay || 0) * 100), '0.00', 'Wages change each pay, so type this fortnight’s amount.') +
+    morts.map((m, n) => field(m.name || ('Mortgage ' + (n + 1)),
+      `<div class="two" style="gap:8px">${inp('mname' + n, m.name, 'placeholder="Mortgage ' + (n + 1) + '" maxlength="40" aria-label="Mortgage ' + (n + 1) + ' name')}<div class="moneyin"><span>$</span><input name="mamt${n}" inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((m.amount || 0) * 100))}" aria-label="Mortgage ${n + 1} amount"></div></div>`,
+      n === 0 ? 'Three fortnightly mortgages. Leave an amount blank until you know it.' : '')).join(''),
     async v => {
-      const cents = parseCents(v.amount);
-      if (cents == null || !v.amount) return 'Please type the budget amount in dollars and cents, like 500 or 450.50.';
-      if (cents <= 0) return 'The budget amount has to be more than $0.00.';
+      const cents = parseCents(v.pay);
+      if (cents == null || !String(v.pay || '').trim()) return 'Please type this fortnight’s pay, like 1800 or 1750.50.';
+      if (cents <= 0) return 'Pay has to be more than $0.00.';
       if (cents > MAX_CENTS) return 'That amount looks too big. Please check it.';
-      const s = snap(), upd = { name: (v.name || '').trim().slice(0, 40) || 'Fortnight', amount: cents / 100, period: v.period === 'week' ? 'week' : 'fortnight' };
-      if (id) { Object.assign(b, upd); await save(); render(); toast('Budget updated.', 'Undo', undoTo(s)); return; }
+      const mortgages = BUDGET_MORTGAGE_DEFAULTS.map((label, n) => {
+        const mc = parseCents(v['mamt' + n]);
+        const amount = mc == null || !String(v['mamt' + n] || '').trim() ? 0 : Math.min(Math.max(mc, 0), MAX_CENTS) / 100;
+        return { id: morts[n].id, name: String(v['mname' + n] || label).trim().slice(0, 40) || label, amount };
+      });
+      const s = snap(), upd = {
+        name: (v.name || '').trim().slice(0, 40) || 'This fortnight',
+        pay: cents / 100,
+        period: 'fortnight',
+        mortgages
+      };
+      if (id) { Object.assign(b, upd); delete b.amount; await save(); render(); toast('Budget updated.', 'Undo', undoTo(s)); return; }
       if (!Array.isArray(S.budgets)) S.budgets = [];
       S.budgets.push(Object.assign({ id: uid('budget'), lines: [] }, upd)); await save(); render();
       toast('Budget added.', 'Undo', undoTo(s));
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete budget" onclick="deleteBudget(${jsArg(id)})">${I('trash')}</button>` : '');
-  wireSeg('period');
 }
 function deleteBudget(id) {
   const b = getBudget(id); if (!b) return;
-  confirmSheet(`Delete the ${esc(b.name)} budget?`, `The budget and ${plural(b.lines.length, 'spending line')} will be removed from this phone.`, 'Delete budget', async () => {
+  confirmSheet(`Delete the ${esc(b.name)} budget?`, `The budget and ${plural((b.lines || []).length, 'spending line')} will be removed from this phone.`, 'Delete budget', async () => {
     const s = snap(); S.budgets = S.budgets.filter(x => x.id !== id); await save();
     return () => { render(); toast('Budget deleted.', 'Undo', undoTo(s)); };
   });
@@ -6590,20 +6644,22 @@ async function budgetLineAdd(e, id) {
   const f = e.target, name = (f.bname.value || '').trim(), cents = parseCents((f.bamt.value || '').trim());
   if (!name) { toast('Please type what you spent it on.'); f.bname.focus(); return; }
   if (cents == null || cents <= 0) { toast('Please type the amount, like 25 or 12.50.'); f.bamt.focus(); return; }
+  if (!Array.isArray(b.lines)) b.lines = [];
   b.lines.push({ id: uid('bl'), name: name.slice(0, 60), amount: Math.min(cents, MAX_CENTS) / 100 });
   await save(); render();
 }
 async function budgetLineDelete(id, lineId) {
   const b = getBudget(id); if (!b) return;
-  const x = b.lines.find(l => l.id === lineId); if (!x) return;
+  const x = (b.lines || []).find(l => l.id === lineId); if (!x) return;
   const s = snap(); b.lines = b.lines.filter(l => l.id !== lineId); await save(); render();
   toast(`${x.name} removed.`, 'Undo', undoTo(s));
 }
 function budgetMoreSub() {
   const list = S.budgets || [];
-  if (!list.length) return 'What’s left to spend each fortnight';
-  const b = list[0], k = budgetCalc(b);
-  return `${esc(b.name)}: ${k.left < 0 ? 'Over by <b>' + money(-k.left) + '</b>' : '<b>' + money(k.left) + '</b> left'}`;
+  if (!list.length) return 'Pay, mortgages, and bills this fortnight';
+  const k = budgetCalc(list[0]);
+  if (!k.pay) return 'Add this fortnight’s pay';
+  return `${k.left < 0 ? 'Over by <b>' + money(-k.left) + '</b>' : '<b>' + money(k.left) + '</b> left'} this fortnight`;
 }
 function LoanDetail(id) {
   const l = getLoan(id);
