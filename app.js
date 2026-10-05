@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.9';
+const APP_VERSION = '2.22.10';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11548,13 +11548,11 @@ function render() {
   if (r === 'videos') { wireVideoSwipe(); const tab = document.querySelector('#videotabs .chip.on'); if (tab) tab.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }
   wireRadio();
 }
-// 1.98.0: as Home scrolls, sections take turns sliding in from the left, from the right, and folding down.
-// prefers-reduced-motion: reduce leaves them still. Videos are not started by this.
+// 2.22.10: the first three Home feed cards open like an eye as they come into view.
+// Everything after that is a normal scroll (no slide/fold). prefers-reduced-motion: reduce leaves them still.
 let homeEnterObs = null;
 function homeEnterKind(i) {
-  const m = i % 3;
-  if (m === 2) return 'fold';
-  return m === 0 ? 'left' : 'right';
+  return i < 3 ? 'eye' : null;
 }
 function wireHomeEnter() {
   if (homeEnterObs) { homeEnterObs.disconnect(); homeEnterObs = null; }
@@ -11563,7 +11561,14 @@ function wireHomeEnter() {
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduce) return;
   const root = document.getElementById('view');
-  secs.forEach((el, i) => el.classList.add('hpend', 'hfrom-' + homeEnterKind(i)));
+  const pend = [];
+  secs.forEach((el, i) => {
+    const kind = homeEnterKind(i);
+    if (!kind) return;
+    el.classList.add('hpend', 'hfrom-' + kind);
+    pend.push(el);
+  });
+  if (!pend.length) return;
   homeEnterObs = new IntersectionObserver(entries => {
     entries.forEach(en => {
       if (!en.isIntersecting) return;
@@ -11571,7 +11576,7 @@ function wireHomeEnter() {
       homeEnterObs.unobserve(en.target);
     });
   }, { root, threshold: 0.16, rootMargin: '0px 0px -6% 0px' });
-  secs.forEach(el => homeEnterObs.observe(el));
+  pend.forEach(el => homeEnterObs.observe(el));
 }
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
