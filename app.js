@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.5';
+const APP_VERSION = '2.22.6';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6518,10 +6518,10 @@ const budgetAmt = v => Number.isFinite(+v) && +v > 0 ? Math.min(Math.round(+v * 
 const budgetAmtOr0 = v => Number.isFinite(+v) && +v >= 0 ? Math.min(Math.round(+v * 100) / 100, 1000000) : 0;
 function budgetMortgagesOf(b) {
   const raw = Array.isArray(b && b.mortgages) ? b.mortgages : [];
+  // Labels stay Mortgage 1 / 2 / 3. Only the amount changes each fortnight.
   return BUDGET_MORTGAGE_DEFAULTS.map((label, n) => {
     const x = raw[n] && typeof raw[n] === 'object' ? raw[n] : {};
-    const name = String(x.name || label).trim().slice(0, 40) || label;
-    return { id: String(x.id || ('bm' + (n + 1))), name, amount: budgetAmtOr0(x.amount) };
+    return { id: String(x.id || ('bm' + (n + 1))), name: label, amount: budgetAmtOr0(x.amount) };
   });
 }
 function normBudgets(list) {
@@ -6562,7 +6562,8 @@ function budgetCalc(b) {
 }
 function budgetCard(b) {
   const k = budgetCalc(b);
-  const mortRows = k.mortgages.map(x => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">Fortnightly mortgage</div></div><b>${x.amount ? money(x.amount) : '—'}</b></div>`).join('');
+  const mortRows = k.mortgages.map((x, n) => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">Type this fortnight’s amount</div></div>
+      <div class="moneyin" style="max-width:120px;margin:0"><span>$</span><input inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((x.amount || 0) * 100))}" aria-label="${esc(x.name)} amount" onchange="budgetMortgageSet(${jsArg(b.id)},${n},this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"></div></div>`).join('');
   const billRows = k.bills.length
     ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(x.name))}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">From Bills · ${esc(REPEATS[x.repeat] || x.repeat)} (fortnight share)</div></div></button><b>${money(x.amount)}</b></div>`).join('')
     : `<div class="card muted" style="margin:0">No other regular bills yet. Add them in Bills and they’ll show here.</div>`;
@@ -6577,6 +6578,7 @@ function budgetCard(b) {
     <div class="sec" style="margin-top:12px">This fortnight's pay</div>
     <div class="list"><div class="row"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wages</div><div class="s">Changes each pay · tap edit to update</div></div><b>${k.pay ? money(k.pay) : '—'}</b></div></div>
     <div class="sec">Three mortgages</div>
+    <p class="muted" style="margin:-4px 2px 8px">Type each amount for this fortnight. The names stay Mortgage 1, 2 and 3.</p>
     <div class="list">${mortRows}</div>
     <div class="sec">Fortnightly bills <a href="#bills" style="font-weight:650">Open Bills</a></div>
     <div class="list">${billRows}</div>
@@ -6605,9 +6607,7 @@ function budgetForm(id) {
   openSheet(id ? 'Edit budget' : 'Add a budget',
     field('Name', inp('name', b.name, 'placeholder="This fortnight" maxlength="40" autocapitalize="sentences"'), 'Optional') +
     moneyField('This fortnight’s pay', 'pay', Math.round((b.pay || 0) * 100), '0.00', 'Wages change each pay, so type this fortnight’s amount.') +
-    morts.map((m, n) => field(m.name || ('Mortgage ' + (n + 1)),
-      `<div class="two" style="gap:8px">${inp('mname' + n, m.name, 'placeholder="Mortgage ' + (n + 1) + '" maxlength="40" aria-label="Mortgage ' + (n + 1) + ' name')}<div class="moneyin"><span>$</span><input name="mamt${n}" inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((m.amount || 0) * 100))}" aria-label="Mortgage ${n + 1} amount"></div></div>`,
-      n === 0 ? 'Three fortnightly mortgages. Leave an amount blank until you know it.' : '')).join(''),
+    morts.map((m, n) => moneyField(m.name, 'mamt' + n, Math.round((m.amount || 0) * 100), '0.00', n === 0 ? 'Type each mortgage for this fortnight. Leave blank if you don’t know it yet.' : '')).join(''),
     async v => {
       const cents = parseCents(v.pay);
       if (cents == null || !String(v.pay || '').trim()) return 'Please type this fortnight’s pay, like 1800 or 1750.50.';
@@ -6616,7 +6616,7 @@ function budgetForm(id) {
       const mortgages = BUDGET_MORTGAGE_DEFAULTS.map((label, n) => {
         const mc = parseCents(v['mamt' + n]);
         const amount = mc == null || !String(v['mamt' + n] || '').trim() ? 0 : Math.min(Math.max(mc, 0), MAX_CENTS) / 100;
-        return { id: morts[n].id, name: String(v['mname' + n] || label).trim().slice(0, 40) || label, amount };
+        return { id: morts[n].id, name: label, amount };
       });
       const s = snap(), upd = {
         name: (v.name || '').trim().slice(0, 40) || 'This fortnight',
@@ -6637,6 +6637,16 @@ function deleteBudget(id) {
     const s = snap(); S.budgets = S.budgets.filter(x => x.id !== id); await save();
     return () => { render(); toast('Budget deleted.', 'Undo', undoTo(s)); };
   });
+}
+async function budgetMortgageSet(id, index, raw) {
+  const b = getBudget(id); if (!b) return;
+  const n = Number(index);
+  if (n < 0 || n > 2) return;
+  const morts = budgetMortgagesOf(b);
+  const mc = parseCents(String(raw || '').trim());
+  morts[n].amount = mc == null || !String(raw || '').trim() ? 0 : Math.min(Math.max(mc, 0), MAX_CENTS) / 100;
+  b.mortgages = morts;
+  await save(); render();
 }
 async function budgetLineAdd(e, id) {
   e.preventDefault();
