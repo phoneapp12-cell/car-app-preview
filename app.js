@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.25';
+const APP_VERSION = '2.22.26';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1771,6 +1771,15 @@ function homeSugShuffle(list, salt) {
   }
   return arr;
 }
+// 2.22.26: a fresh set of ideas on every app open (cold start or coming back to the app).
+// The pick is fixed for that open so re-renders do not shuffle it, and it avoids repeating last open's ideas when it can.
+let homeSugOpenN = 0, homeSugPickN = -1, homeSugPickIds = [];
+function homeSugNewOpen() {
+  let n = 0;
+  try { n = (parseInt(localStorage.getItem('sugOpen') || '0', 10) || 0) + 1; localStorage.setItem('sugOpen', String(n)); } catch (e) { n = homeSugOpenN + 1; }
+  homeSugOpenN = n;
+}
+homeSugNewOpen();
 function homeSuggestions() {
   // Gather every available type first. Duplicate skips stay inside each maker; Add buttons unchanged.
   const makers = [homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugGardenFeed, homeSugLawns, homeSugDogWalk, homeSugVet, homeSugIdea];
@@ -1781,8 +1790,25 @@ function homeSuggestions() {
     if (s && s.text) avail.push(s);
   });
   if (!avail.length) return [];
-  // Each maker is a different type. Shuffle then take up to three for variety across birthday/car/event/chore/pet/idea.
-  return homeSugShuffle(avail, 250).slice(0, 3);
+  const key = x => String(x.id || x.text);
+  if (homeSugPickN === homeSugOpenN) {
+    // Same open: keep the same ideas (drop any that were just added or no longer apply).
+    const kept = homeSugPickIds.map(k => avail.find(x => key(x) === k)).filter(Boolean);
+    if (kept.length) return kept;
+  }
+  let last = [];
+  try { last = JSON.parse(localStorage.getItem('sugLast') || '[]') || []; } catch (e) { last = []; }
+  let seed = Math.abs((homeSugOpenN * 7919 + Math.floor(Math.random() * 100000)) | 0) || 1;
+  const next = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed; };
+  const arr = avail.slice();
+  for (let i = arr.length - 1; i > 0; i--) { const j = next() % (i + 1); const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+  // Fresh ones first, then last open's ones only if there are not enough others.
+  const fresh = arr.filter(x => last.indexOf(key(x)) < 0), seen = arr.filter(x => last.indexOf(key(x)) >= 0);
+  const pick = fresh.concat(seen).slice(0, 3);
+  homeSugPickN = homeSugOpenN;
+  homeSugPickIds = pick.map(key);
+  try { localStorage.setItem('sugLast', JSON.stringify(homeSugPickIds)); } catch (e) {}
+  return pick;
 }
 function homeSugHtml() {
   let list = [];
@@ -12271,6 +12297,7 @@ async function start() {
   check();
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
+    try { homeSugNewOpen(); } catch (e) {}
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) { ideaStepsDirty = false; S = normalise(d); if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); } } } catch (e) { } render(); }
     phoneSyncOpen();
     check();
