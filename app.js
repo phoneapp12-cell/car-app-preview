@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.28';
+const APP_VERSION = '2.22.29';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -712,68 +712,69 @@ function dailyQuoteCard() {
   const q = dailyQuoteFor();
   return `<div class="card quotecard" id="dailyquote"><img class="qphoto" src="${q.img}" alt=""><div class="qshade"><p class="qtext">${esc(q.t)}</p><div class="qwho">${esc(q.w)}</div></div></div>`;
 }
-/* 2.22.27: Daily joke card. One clean joke per Pacific/Auckland day, shown under the quote. */
+/* 2.22.27: Daily joke card. One joke per Pacific/Auckland day, shown under the quote. */
+// 2.22.29: grown-up jokes. Dry and cheeky, not crude, nobody punched down.
 const DAILY_JOKES = [
-  ['Why did the scarecrow win an award?', 'He was outstanding in his field.'],
-  ['What do you call a fish with no eyes?', 'A fsh.'],
-  ['Why don’t scientists trust atoms?', 'They make up everything.'],
-  ['What did the ocean say to the shore?', 'Nothing, it just waved.'],
-  ['Why did the bicycle fall over?', 'It was two tired.'],
-  ['How does a penguin build its house?', 'Igloos it together.'],
-  ['Why can’t a nose be 12 inches long?', 'Because then it would be a foot.'],
-  ['What do you call a fake noodle?', 'An impasta.'],
-  ['Why did the coffee file a police report?', 'It got mugged.'],
-  ['What do you call a sleeping dinosaur?', 'A dino-snore.'],
-  ['Why don’t eggs tell jokes?', 'They’d crack each other up.'],
-  ['What did one wall say to the other?', 'I’ll meet you at the corner.'],
-  ['Why did the golfer bring two pairs of trousers?', 'In case he got a hole in one.'],
-  ['What do you call a bear with no teeth?', 'A gummy bear.'],
-  ['Why was the maths book sad?', 'It had too many problems.'],
-  ['What do you call a dog that does magic?', 'A labracadabrador.'],
-  ['Why did the tomato blush?', 'It saw the salad dressing.'],
-  ['What’s orange and sounds like a parrot?', 'A carrot.'],
-  ['Why did the cow cross the road?', 'To get to the udder side.'],
-  ['What do you call cheese that isn’t yours?', 'Nacho cheese.'],
-  ['Why do bees have sticky hair?', 'Because they use honeycombs.'],
-  ['What did the grape do when it got stepped on?', 'Let out a little wine.'],
-  ['Why couldn’t the leopard play hide and seek?', 'He was always spotted.'],
-  ['What do you call a pig that does karate?', 'A pork chop.'],
-  ['Why did the computer go to the doctor?', 'It had a virus.'],
-  ['Why was the computer cold?', 'It left its Windows open.'],
-  ['What do you call a boomerang that won’t come back?', 'A stick.'],
-  ['Why did the kiwi cross the road?', 'To prove it wasn’t chicken.'],
-  ['What do sheep do on sunny days?', 'Have a baa-baa-cue.'],
-  ['Where do sheep get their hair cut?', 'At the baa-baa shop.'],
-  ['Why did the man put his money in the freezer?', 'He wanted cold hard cash.'],
-  ['What did the big flower say to the little flower?', 'Hi, bud.'],
-  ['Why are ghosts bad liars?', 'You can see right through them.'],
-  ['What do you call a lazy kangaroo?', 'A pouch potato.'],
-  ['Why did the picture go to jail?', 'It was framed.'],
-  ['What do you call a train carrying bubblegum?', 'A chew-chew train.'],
-  ['Why did the gardener plant light bulbs?', 'She wanted to grow a power plant.'],
-  ['What did the left eye say to the right eye?', 'Between you and me, something smells.'],
-  ['Why don’t skeletons fight each other?', 'They don’t have the guts.'],
-  ['What do you call a snowman with a six-pack?', 'An abdominal snowman.'],
-  ['Why did the stadium get hot after the game?', 'All the fans left.'],
-  ['What do you call a dinosaur with an extensive vocabulary?', 'A thesaurus.'],
-  ['Why did the banana go to the doctor?', 'It wasn’t peeling well.'],
-  ['How do you organise a space party?', 'You planet.'],
-  ['What did the zero say to the eight?', 'Nice belt.'],
-  ['Why do cows wear bells?', 'Because their horns don’t work.'],
-  ['What do you call an alligator in a vest?', 'An investigator.'],
-  ['Why did the music teacher need a ladder?', 'To reach the high notes.'],
-  ['What did the fish say when it hit the wall?', 'Dam.'],
-  ['Why did the cookie go to the hospital?', 'It felt crummy.'],
-  ['What do you get when you cross a snowman and a vampire?', 'Frostbite.'],
-  ['Why can’t you trust stairs?', 'They’re always up to something.'],
-  ['What do you call a fly without wings?', 'A walk.'],
-  ['Why did the dog sit in the shade?', 'He didn’t want to be a hot dog.'],
-  ['What do you call a belt made of watches?', 'A waist of time.'],
-  ['Why did the car get a flat tyre?', 'There was a fork in the road.'],
-  ['What kind of car does a sheep drive?', 'A Lamborghini.'],
-  ['Why did the smartphone need glasses?', 'It lost all its contacts.'],
-  ['What did the spa say to the swimmer?', 'Long time, no sea.'],
-  ['Why did the pizza maker go broke?', 'He just couldn’t make enough dough.']
+  ['I asked my wife what she wanted for our anniversary.', '“Nothing would make me happier than a diamond necklace,” she said. So I got her nothing.'],
+  ['My wife and I go out twice a week: candlelit dinner, soft music, a slow walk home.', 'She goes Tuesdays, I go Fridays.'],
+  ['Why do they call it a mortgage?', 'Because “lifelong financial hostage situation” wouldn’t fit on the form.'],
+  ['I joined a gym a year ago.', 'Still no results. Apparently you have to actually go.'],
+  ['I told my wife she was drawing her eyebrows too high.', 'She looked surprised.'],
+  ['My doctor told me to watch my drinking.', 'Now I do it in front of a mirror.'],
+  ['I changed the Wi-Fi password to “incorrect”.', 'Now when the grandkids ask, I just tell them, “The password is incorrect.”'],
+  ['My boss said, “Dress for the job you want, not the job you have.”', 'Now I’m in a disciplinary meeting dressed as Batman.'],
+  ['I told my boss three companies were after me, so I needed a raise.', 'He asked which ones. I said power, phone and water.'],
+  ['My wife asked me to put the cat out.', 'I didn’t even know it was on fire.'],
+  ['I went to the gym today.', 'Well, I drove past it. Good to know it’s still there.'],
+  ['Marriage is all about compromise.', 'I admit I’m wrong, and she agrees with me.'],
+  ['My wife and I were happy for twenty years.', 'Then we met.'],
+  ['I haven’t spoken to my wife in three days.', 'I didn’t want to interrupt her.'],
+  ['Before you criticise someone, walk a mile in their shoes.', 'That way you’re a mile away, and you’ve got their shoes.'],
+  ['At my age, “getting lucky” means something different.', 'It means finding the car in the car park on the first go.'],
+  ['My doctor said I need more exercise.', 'So now I take the long way round to the fridge.'],
+  ['I bought a smart fridge.', 'Now it judges me every time I open it after 10 pm.'],
+  ['I asked Siri why I’m still single.', 'She switched on the front camera.'],
+  ['What’s the best thing about the kids moving out?', 'The Wi-Fi works again, and the milk lasts the whole week.'],
+  ['I retiled the bathroom myself.', 'The plumber says it’s the best laugh he’s had all year.'],
+  ['What ruins a good Friday feeling?', 'Realising it’s only Tuesday.'],
+  ['I asked the librarian if they had any books on paranoia.', 'She whispered, “They’re right behind you.”'],
+  ['My memory’s got so bad it nearly cost me my job.', 'I’ve still got it. I just can’t remember where.'],
+  ['I’m brilliant at multitasking.', 'I can waste time, avoid work and procrastinate all at once.'],
+  ['The early bird gets the worm.', 'But the second mouse gets the cheese.'],
+  ['Light travels faster than sound.', 'That’s why some people seem bright until they open their mouths.'],
+  ['I used to think I was indecisive.', 'Now I’m not so sure.'],
+  ['Why is it called rush hour?', 'Because “sit-perfectly-still-and-swear hour” was too long for the radio.'],
+  ['My bathroom scales and I had a falling-out.', 'We’re seeing other people now.'],
+  ['Is the glass half empty or half full?', 'If it’s wine, the real question is who’s been at it.'],
+  ['Why do grandparents and grandkids get on so well?', 'They’ve got a common enemy.'],
+  ['My wife asked me to stop singing “Wonderwall”.', 'I said maybe.'],
+  ['My wife says I’ve only got two faults.', 'I don’t listen, and something else.'],
+  ['I asked my mechanic to fix my brakes.', 'He said he couldn’t, but he could make the horn louder.'],
+  ['The rego, the WOF and the insurance all came due in the same week.', 'It’s not a car. It’s a subscription.'],
+  ['How do you know you’re a proper grown-up?', 'A new set of tea towels genuinely makes your day.'],
+  ['What does “As per my last email” really mean?', '“Did you even read it, or are we doing this again?”'],
+  ['My boss told me to have a good day.', 'So I went home.'],
+  ['How do you make a teenager vanish?', 'Ask for a hand with the dishes.'],
+  ['I asked my wife if she’d noticed I’ve been working out.', 'She said, “Working out what?”'],
+  ['Talk is cheap.', 'Right up until you hire a lawyer.'],
+  ['I finally did a budget.', 'Now I know exactly where my money goes. I just can’t make it stop.'],
+  ['I’ve reached the age where my train of thought', 'often leaves the station without me.'],
+  ['What’s the secret to a long marriage?', 'Two TVs, two remotes and very selective hearing.'],
+  ['My wife says she wants more spontaneity in our life.', 'So I’ve pencilled some in for Thursday.'],
+  ['I bought my wife a fridge for her birthday.', 'You should have seen her face light up when she opened it.'],
+  ['Money talks.', 'Mine just says goodbye.'],
+  ['I love my job.', 'It’s the work I can’t stand.'],
+  ['I cook with wine.', 'Sometimes I even add it to the food.'],
+  ['My wine glass has a crack in it.', 'Not a problem. I just have to drink faster.'],
+  ['My granddaughter asked what I wanted to be when I grew up.', 'I said, “Honestly, love, I’m still deciding.”'],
+  ['I was going to give up procrastinating.', 'I’ll start next week.'],
+  ['My fitness watch says I hit a new personal best.', 'Longest time sitting perfectly still.'],
+  ['Why don’t I do my own electrical work any more?', 'Let’s just say the toaster and I are no longer speaking.'],
+  ['DIY stands for “Do It Yourself”.', 'In our house it means “Destroy It Yourself, then ring someone.”'],
+  ['My phone battery lasts longer than my patience.', 'Which is saying something, because the battery’s rubbish.'],
+  ['I got a reply-all email from the whole company.', 'Forty people replying “please remove me from this list”. Peak teamwork.'],
+  ['My dad’s advice on getting older?', '“Never pass up a chance to sit down, or a chance to say nothing.”'],
+  ['What’s the difference between a hobby and a mid-life crisis?', 'About three receipts and a very quiet conversation with your wife.']
 ];
 function dailyJokeFor(now) {
   const n = DAILY_JOKES.length;
@@ -1224,14 +1225,14 @@ function homeAwakeLine() {
   ]);
 }
 const HOME_JOKES = [
-  'Why did the scarecrow win an award? He was outstanding in his field.',
-  'What do you call a fish with no eyes? A fsh.',
-  'Why don’t scientists trust atoms? They make up everything.',
-  'I only know 25 letters of the alphabet. I don’t know y.',
-  'What did the ocean say to the shore? Nothing, it just waved.',
-  'Why did the bicycle fall over? It was two tired.',
-  'How does a penguin build its house? Igloos it together.',
-  'I told my suitcase we weren’t going anywhere. Now I’m dealing with emotional baggage.'
+  'My wife and I were happy for twenty years. Then we met.',
+  'Money talks. Mine just says goodbye.',
+  'I went to the gym today. Well, I drove past it. Good to know it’s still there.',
+  'At my age, getting lucky means finding the car in the car park on the first go.',
+  'Marriage is all about compromise. I admit I’m wrong, and she agrees with me.',
+  'I cook with wine. Sometimes I even add it to the food.',
+  'The rego, the WOF and the insurance all came due in the same week. It’s not a car, it’s a subscription.',
+  'I used to think I was indecisive. Now I’m not so sure.'
 ];
 const HOME_FACTS = [
   'Whangārei’s name is often said to mean a cherished harbour.',
@@ -2817,7 +2818,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -8136,6 +8137,7 @@ function updWx() {
   if (h === 'weather') { render(); return; }
   const el = document.getElementById('wxcard'); if (el) el.outerHTML = wxCard();
   const greet = document.getElementById('wxgreet'); if (greet) greet.outerHTML = wxGreet();
+  const nwx = document.getElementById('notifwx'); if (nwx) nwx.outerHTML = homeTry('weather strip', () => notifWxStrip()); // 2.22.29
   else if ((h === 'home' || h === '') && !homeEdit && wxInUp()) render();
   paintHomeSum();
 }
@@ -8347,6 +8349,68 @@ function wxGreet() {
   const line = `${deg(c.temperature_2m)} ${shown}`;
   return `<button class="wxgreet" id="wxgreet" onclick="go('#weather')" aria-label="Whangārei weather: ${esc(line)}. Tap for the full forecast.">
     <span class="wxgico">${wxCompactIcon(nowW, day, moon)}</span><span class="wxgtx"><b>${deg(c.temperature_2m)}</b> ${esc(shown)}</span></button>`;
+}
+/* 2.22.29: short weather strip, the first line on Notifications under "Hi Shane" and the date.
+   Current icon and temperature, then the next 2 hours from the hourly forecast already fetched (Open-Meteo,
+   Pacific/Auckland times). Nothing is invented: if the forecast isn't loaded, it says so; an hour with no data is left out. */
+const NWX_WET = { drizzle: 1, rain: 1, showers: 1, snow: 1, storm: 1 };
+const NWX_STALE = 3 * 60 * 60 * 1000; // older than this, the "current" reading isn't shown as current
+function nwxHourWord(hr) { return (hr % 12 || 12) + (hr < 12 ? ' am' : ' pm'); }
+function notifWxNext() {
+  const h = WX && WX.data && WX.data.hourly;
+  if (!h || !Array.isArray(h.time)) return [];
+  const local = wxLocalNow(), key = local.iso + 'T' + local.hm.slice(0, 2);
+  const out = [];
+  for (let i = 0; i < h.time.length && out.length < 2; i++) {
+    const t = h.time[i];
+    if (typeof t !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}/.test(t) || t.slice(0, 13) <= key) continue;
+    const code = arr(h, 'weather_code', i), temp = arr(h, 'temperature_2m', i);
+    if (!num(code) && !num(temp)) continue;
+    const hr = +t.slice(11, 13), isDay = num(arr(h, 'is_day', i)) ? arr(h, 'is_day', i) !== 0 : hr >= 6 && hr < 19;
+    out.push({ hr, temp: num(temp) ? temp : null, rain: num(arr(h, 'precipitation_probability', i)) ? arr(h, 'precipitation_probability', i) : null,
+      w: num(code) ? wmo(code, isDay, arr(h, 'wind_speed_10m', i)) : null });
+  }
+  return out;
+}
+function notifWxOutlook(nowW, next) {
+  if (!next.length) return '';
+  const low = w => w.words.charAt(0).toLowerCase() + w.words.slice(1);
+  const coded = next.filter(x => x.w);
+  let what = '';
+  if (coded.length) {
+    const wet = coded.find(x => NWX_WET[x.w.kind]);
+    if (wet && !NWX_WET[nowW.kind]) what = low(wet.w) + ' from ' + nwxHourWord(wet.hr);
+    else if (wet) what = low(wet.w) + ' continuing';
+    else if (NWX_WET[nowW.kind]) what = 'drying out by ' + nwxHourWord(coded[0].hr);
+    else {
+      const change = coded.find(x => x.w.kind !== nowW.kind);
+      what = change ? low(change.w) + ' from ' + nwxHourWord(change.hr) : 'staying ' + low(coded[coded.length - 1].w);
+    }
+  }
+  const temps = next.map(x => x.temp).filter(num).map(Math.round);
+  let tt = '';
+  if (temps.length) {
+    const a = temps[0], b = temps[temps.length - 1];
+    tt = a === b ? a + '°' : a + '–' + b + '°';
+  }
+  const rains = next.map(x => x.rain).filter(num);
+  const rain = rains.length ? Math.max(...rains) : null;
+  const bits = [what, tt, rain != null && rain >= 20 ? rain + '% chance of rain' : ''].filter(Boolean);
+  return bits.length ? 'Next 2 hrs: ' + bits.join(', ') : '';
+}
+function notifWxStrip() {
+  const fresh = WX && validWx(WX.data) && Date.now() - (WX.at || 0) < NWX_STALE;
+  if (!fresh) {
+    const loading = wxBusy || (!wxFailed && navigator.onLine !== false);
+    return `<button type="button" class="notifwx nwxwait" id="notifwx" onclick="refreshWx(true)">${I('cloudsun')}<span class="nwxtx"><span class="nwxnext">${loading ? 'Weather loading…' : 'Weather isn’t available right now. Tap to try again.'}</span></span></button>`;
+  }
+  const c = WX.data.current, day = wxIsDay(), nowW = wmo(c.weather_code, day, c.wind_speed_10m);
+  const next = homeTry('weather next', () => notifWxNext(), []);
+  const outlook = homeTry('weather outlook', () => notifWxOutlook(nowW, next), '');
+  const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '';
+  const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${outlook ? ' ' + outlook + '.' : ''} Tap for the full forecast.`;
+  return `<button type="button" class="notifwx" id="notifwx" onclick="go('#weather')" aria-label="${esc(label)}">
+    <span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp">${temp}</b>` : ''}<span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}</span>${I('right')}</button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Notifications</button>`;
