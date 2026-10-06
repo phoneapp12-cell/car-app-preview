@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.29';
+const APP_VERSION = '2.22.30';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -667,27 +667,28 @@ function HomeEdit() {
 /* Daily quote (1.54.0). One real, attributed line per Pacific/Auckland calendar day.
    The choice is S.settings.dailyQuote (missing means on, so it is in backups) and is copied to
    localStorage under the key dailyQuote, the same way theme and text size are kept on this phone. */
+// 2.22.30: upbeat, warm lines. Real quotes with well-documented sources only.
 const DAILY_QUOTES = [
-  { t: 'Well done is better than well said.', w: 'Benjamin Franklin', img: 'images/quote-01.jpg' },
-  { t: 'Trust thyself: every heart vibrates to that iron string.', w: 'Ralph Waldo Emerson', img: 'images/quote-02.jpg' },
-  { t: 'Nothing can bring you peace but yourself.', w: 'Ralph Waldo Emerson', img: 'images/quote-03.jpg' },
-  { t: 'Insist on yourself; never imitate.', w: 'Ralph Waldo Emerson', img: 'images/quote-04.jpg' },
-  { t: 'Do your work, and you shall reinforce yourself.', w: 'Ralph Waldo Emerson', img: 'images/quote-05.jpg' },
-  { t: 'What I must do is all that concerns me, not what the people think.', w: 'Ralph Waldo Emerson', img: 'images/quote-06.jpg' },
-  { t: 'Life only avails, not the having lived.', w: 'Ralph Waldo Emerson', img: 'images/quote-07.jpg' },
-  { t: 'Resolve to perform what you ought. Perform without fail what you resolve.', w: 'Benjamin Franklin', img: 'images/quote-08.jpg' },
-  { t: 'Lose no time. Be always employed in something useful.', w: 'Benjamin Franklin', img: 'images/quote-09.jpg' },
-  { t: 'It is never too late to give up our prejudices.', w: 'Henry David Thoreau', img: 'images/quote-10.jpg' },
-  { t: 'I think that we may safely trust a good deal more than we do.', w: 'Henry David Thoreau', img: 'images/quote-11.jpg' },
-  { t: 'In the long run men hit only what they aim at.', w: 'Henry David Thoreau', img: 'images/quote-12.jpg' },
-  { t: 'Optimism is the faith that leads to achievement.', w: 'Helen Keller', img: 'images/quote-13.jpg' },
-  { t: "Do what you can, with what you've got, where you are.", w: 'Bill Widener', img: 'images/quote-14.jpg' },
-  { t: 'The only thing we have to fear is fear itself.', w: 'Franklin D. Roosevelt', img: 'images/quote-15.jpg' },
-  { t: 'This above all: to thine own self be true.', w: 'William Shakespeare', img: 'images/quote-16.jpg' },
-  { t: 'The fault, dear Brutus, is not in our stars, but in ourselves, that we are underlings.', w: 'William Shakespeare', img: 'images/quote-17.jpg' },
-  { t: 'How far that little candle throws his beams! So shines a good deed in a naughty world.', w: 'William Shakespeare', img: 'images/quote-18.jpg' },
-  { t: 'First say to yourself what you would be; and then do what you have to do.', w: 'Epictetus', img: 'images/quote-19.jpg' },
-  { t: 'Hope is the thing with feathers that perches in the soul.', w: 'Emily Dickinson', img: 'images/quote-20.jpg' }
+  { t: 'Optimism is the faith that leads to achievement.', w: 'Helen Keller', img: 'images/quote-01.jpg' },
+  { t: 'Life is either a daring adventure or nothing.', w: 'Helen Keller', img: 'images/quote-02.jpg' },
+  { t: 'The best way to cheer yourself up is to try to cheer somebody else up.', w: 'Mark Twain', img: 'images/quote-03.jpg' },
+  { t: 'Hope is the thing with feathers that perches in the soul.', w: 'Emily Dickinson', img: 'images/quote-04.jpg' },
+  { t: 'Do what you can, with what you\'ve got, where you are.', w: 'Bill Widener', img: 'images/quote-05.jpg' },
+  { t: 'We know what we are, but know not what we may be.', w: 'William Shakespeare', img: 'images/quote-06.jpg' },
+  { t: 'There is no charm equal to tenderness of heart.', w: 'Jane Austen', img: 'images/quote-07.jpg' },
+  { t: 'The journey of a thousand miles begins with a single step.', w: 'Lao Tzu', img: 'images/quote-08.jpg' },
+  { t: 'I\'m not afraid of storms, for I\'m learning how to sail my ship.', w: 'Louisa May Alcott', img: 'images/quote-09.jpg' },
+  { t: 'The most wasted of all days is one without laughter.', w: 'Nicolas Chamfort', img: 'images/quote-10.jpg' },
+  { t: 'Ever tried. Ever failed. No matter. Try again. Fail again. Fail better.', w: 'Samuel Beckett', img: 'images/quote-11.jpg' },
+  { t: 'Grow old along with me! The best is yet to be.', w: 'Robert Browning', img: 'images/quote-12.jpg' },
+  { t: 'Very little is needed to make a happy life.', w: 'Marcus Aurelius', img: 'images/quote-13.jpg' },
+  { t: 'Fall seven times, stand up eight.', w: 'Japanese proverb', img: 'images/quote-14.jpg' },
+  { t: 'Laughter is the closest distance between two people.', w: 'Victor Borge', img: 'images/quote-15.jpg' },
+  { t: 'Happiness is a warm puppy.', w: 'Charles M. Schulz', img: 'images/quote-16.jpg' },
+  { t: 'The sun himself is weak when he first rises, and gathers strength and courage as the day gets on.', w: 'Charles Dickens', img: 'images/quote-17.jpg' },
+  { t: 'How wonderful it is that nobody need wait a single moment before starting to improve the world.', w: 'Anne Frank', img: 'images/quote-18.jpg' },
+  { t: 'The only way to have a friend is to be one.', w: 'Ralph Waldo Emerson', img: 'images/quote-19.jpg' },
+  { t: 'No act of kindness, no matter how small, is ever wasted.', w: 'Aesop', img: 'images/quote-20.jpg' }
 ];
 function aklDayNumber(now) {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now || new Date()).map(x => [x.type, x.value]));
@@ -2269,7 +2270,8 @@ function homeSumCard(bits) {
     if (timeC.length) ps.push('<p class="sumnote">' + homeJoinClauses(timeC) + '.</p>');
     if (flavour) {
       const aside = homeCapClause(homeStripEnd(flavour));
-      if (aside) ps.push('<p class="sumnote">' + esc(aside) + (/[.!?]$/.test(aside) ? '' : '.') + '</p>');
+      const asks = /\?\s*$/.test(String(flavour)); // 2.22.30: a question keeps its question mark
+      if (aside) ps.push('<p class="sumnote">' + esc(aside) + (/[.!?]$/.test(aside) ? '' : asks ? '?' : '.') + '</p>');
     }
     if (!ps.length) return homeSumFallback();
     return homeSceneCard(ps.join(''));
@@ -2677,8 +2679,12 @@ function homeOverviewBody(shown, urgentOut) {
     }
   } catch (e) {}
   // 2.22.28: Notifications keeps this to due things. No routine, bridge or shop-busyness lines.
-  try { pushBit('roster', rosterHeadsUp(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
-  try { pushBit('drive', homeDriveLine()); } catch (e) {}
+  // 2.22.30: at the gym, the work-start and commute lines wait.
+  const atGym = homeTry('gym place', () => placeHere() === 'gym', false);
+  if (!atGym) {
+    try { pushBit('roster', rosterHeadsUp(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
+    try { pushBit('drive', homeDriveLine()); } catch (e) {}
+  }
   return homeSumCard(urgent);
 }
 
@@ -2818,7 +2824,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('gym ask', () => gymAskHtml()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -7722,6 +7728,49 @@ const SAVED_PLACES = [
   { id: 'work', lat: -35.7300535, lon: 174.3273886 }
 ];
 const PLACE_NEAR_M = 400;
+/* 2.22.30: a gym spot, saved from the phone's own location when he taps "Save this spot as your gym".
+   Kept in S.settings.gym { lat, lon, acc, at } so it's in backups. Within 150 m counts as at the gym. */
+const GYM_NEAR_M = 150;
+const GYM_MAX_ACC = 250; // a rougher fix than this isn't saved
+function gymSpot() {
+  const g = S && S.settings && S.settings.gym;
+  if (!g || typeof g !== 'object') return null;
+  const lat = +g.lat, lon = +g.lon;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { id: 'gym', lat, lon };
+}
+let gymBusy = false;
+function saveGymHere() {
+  if (gymBusy) return;
+  if (!navigator.geolocation) { toast('This phone or browser can’t share your location.'); return; }
+  gymBusy = true;
+  const b = document.getElementById('gymsave'); if (b) { b.disabled = true; b.textContent = 'Saving…'; }
+  navigator.geolocation.getCurrentPosition(async pos => {
+    gymBusy = false;
+    try {
+      const lat = +pos.coords.latitude, lon = +pos.coords.longitude, acc = Number.isFinite(+pos.coords.accuracy) ? Math.round(+pos.coords.accuracy) : null;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('no fix');
+      if (acc != null && acc > GYM_MAX_ACC) { render(); toast('Your location is too rough just now (about ' + acc + ' m). Try again in a moment.'); return; }
+      const s0 = snap();
+      S.settings.gym = { lat: Math.round(lat * 1e6) / 1e6, lon: Math.round(lon * 1e6) / 1e6, acc, at: Date.now() };
+      rememberFix(pos);
+      await save(); render();
+      toast('Saved as your gym.', 'Undo', undoTo(s0));
+    } catch (e) { render(); toast('Couldn’t get your location just now. Try again in a moment.'); }
+  }, err => {
+    gymBusy = false; render();
+    toast(err && err.code === 1 ? 'Location wasn’t allowed, so the gym wasn’t saved.' : 'Couldn’t get your location just now. Try again in a moment.');
+  }, { enableHighAccuracy: true, maximumAge: 30 * 1000, timeout: 20000 });
+}
+async function clearGym() { const s0 = snap(); delete S.settings.gym; await save(); render(); toast('Gym location cleared.', 'Undo', undoTo(s0)); }
+async function hideGymAsk() { S.settings.gymAsk = false; await save(); render(); toast('Hidden. You can save the gym any time in Settings.'); }
+// The one-tap prompt on Notifications: only with no gym saved, not hidden, and not at home or work.
+function gymAskHtml() {
+  if (!S || !S.settings || gymSpot() || S.settings.gymAsk === false || !navigator.geolocation) return '';
+  const p = placeHere();
+  if (p === 'home' || p === 'work') return '';
+  return `<div class="gymask" id="gymask">${I('pin')}<button type="button" class="gymsave" id="gymsave" onclick="saveGymHere()">Save this spot as your gym</button><button type="button" class="gymx" aria-label="Hide this" onclick="hideGymAsk()">${I('x')}</button></div>`;
+}
 let hereFix = null, hereBusy = false; // { lat, lon, acc, at } while the app is open. Not saved.
 function metresBetween(aLat, aLon, bLat, bLon) {
   const R = 6371000, r = x => x * Math.PI / 180, dLat = r(bLat - aLat), dLon = r(bLon - aLon);
@@ -7743,10 +7792,11 @@ function placeHere() {
   try {
     if (!hereFix || Date.now() - hereFix.at > 15 * 60 * 1000) return '';
     if (hereFix.acc != null && hereFix.acc > 1000) return '';
-    let best = '', bestM = PLACE_NEAR_M;
-    SAVED_PLACES.forEach(p => {
+    let best = '', bestM = Infinity;
+    const gym = gymSpot();
+    SAVED_PLACES.concat(gym ? [gym] : []).forEach(p => {
       const m = metresBetween(hereFix.lat, hereFix.lon, p.lat, p.lon);
-      if (m <= bestM) { bestM = m; best = p.id; }
+      if (m <= (p.id === 'gym' ? GYM_NEAR_M : PLACE_NEAR_M) && m < bestM) { bestM = m; best = p.id; }
     });
     return best;
   } catch (e) { return ''; }
@@ -7760,6 +7810,8 @@ function homePlaceLine() {
       return homePick(62, ['Welcome home.', 'Good to be home.', 'Home again.', 'Nice to have you home.']);
     }
     if (p === 'work') return homePick(63, ['Back at work.', 'You’re at work.', 'Work it is.']);
+    // 2.22.30: at the gym. Upbeat, never a nudge to go.
+    if (p === 'gym') return homePick(64, ['Gym time. Have a good session.', 'At the gym. Enjoy the workout.', 'Good on you, gym time. Have a great session.', 'Gym session on. Have a good one.', 'At the gym. Hope it’s a good one.']);
     return '';
   } catch (e) { return ''; }
 }
@@ -8144,7 +8196,9 @@ function updWx() {
 function paintHomeSum() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if ((h !== 'home' && h !== '') || homeEdit || !showHomeSum()) return;
+  if ((h !== 'home' && h !== '') || homeEdit) return;
+  try { const ga = document.getElementById('gymask'); if (ga && !gymAskHtml()) ga.remove(); } catch (e) {} // 2.22.30: hide once we know he's home or at work
+  if (!showHomeSum()) return;
   const next = homeOverview(homeShownNow);
   const sum = document.getElementById('homesum');
   if (sum) {
@@ -10614,6 +10668,12 @@ function Settings() {
   <div class="sec">Notifications page</div>
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
+  </div>
+  <div class="sec">Places</div>
+  <div class="list" id="placesopt">
+   <div class="srow"><div class="tx"><div class="t">Home and work</div><div class="s">Already set. The summary says welcome home or back at work, never the street.</div></div></div>
+   <div class="srow"><div class="tx"><div class="t">Gym location</div><div class="s">${gymSpot() ? 'Saved' + (S.settings.gym.at ? ' ' + fmtW(isoT(todayT(new Date(S.settings.gym.at)))) : '') + '. Within about 150 m counts as at the gym.' : 'Not saved. Tap Save current spot while you’re at the gym.'}</div></div>
+    <span style="display:flex;gap:6px;flex:none"><button class="btn small" id="gymsave" onclick="saveGymHere()">${I('pin')} Save current spot</button>${gymSpot() ? '<button class="btn small" onclick="clearGym()">Clear</button>' : ''}</span></div>
   </div>
   <div class="sec">Reminders</div>
   <div class="list">
