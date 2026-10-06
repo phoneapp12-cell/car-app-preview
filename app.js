@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.26';
+const APP_VERSION = '2.22.27';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -675,6 +675,79 @@ function dailyQuoteCard() {
   if (!showDailyQuote()) return '';
   const q = dailyQuoteFor();
   return `<div class="card quotecard" id="dailyquote"><img class="qphoto" src="${q.img}" alt=""><div class="qshade"><p class="qtext">${esc(q.t)}</p><div class="qwho">${esc(q.w)}</div></div></div>`;
+}
+/* 2.22.27: Daily joke card. One clean joke per Pacific/Auckland day, shown under the quote. */
+const DAILY_JOKES = [
+  ['Why did the scarecrow win an award?', 'He was outstanding in his field.'],
+  ['What do you call a fish with no eyes?', 'A fsh.'],
+  ['Why don’t scientists trust atoms?', 'They make up everything.'],
+  ['What did the ocean say to the shore?', 'Nothing, it just waved.'],
+  ['Why did the bicycle fall over?', 'It was two tired.'],
+  ['How does a penguin build its house?', 'Igloos it together.'],
+  ['Why can’t a nose be 12 inches long?', 'Because then it would be a foot.'],
+  ['What do you call a fake noodle?', 'An impasta.'],
+  ['Why did the coffee file a police report?', 'It got mugged.'],
+  ['What do you call a sleeping dinosaur?', 'A dino-snore.'],
+  ['Why don’t eggs tell jokes?', 'They’d crack each other up.'],
+  ['What did one wall say to the other?', 'I’ll meet you at the corner.'],
+  ['Why did the golfer bring two pairs of trousers?', 'In case he got a hole in one.'],
+  ['What do you call a bear with no teeth?', 'A gummy bear.'],
+  ['Why was the maths book sad?', 'It had too many problems.'],
+  ['What do you call a dog that does magic?', 'A labracadabrador.'],
+  ['Why did the tomato blush?', 'It saw the salad dressing.'],
+  ['What’s orange and sounds like a parrot?', 'A carrot.'],
+  ['Why did the cow cross the road?', 'To get to the udder side.'],
+  ['What do you call cheese that isn’t yours?', 'Nacho cheese.'],
+  ['Why do bees have sticky hair?', 'Because they use honeycombs.'],
+  ['What did the grape do when it got stepped on?', 'Let out a little wine.'],
+  ['Why couldn’t the leopard play hide and seek?', 'He was always spotted.'],
+  ['What do you call a pig that does karate?', 'A pork chop.'],
+  ['Why did the computer go to the doctor?', 'It had a virus.'],
+  ['Why was the computer cold?', 'It left its Windows open.'],
+  ['What do you call a boomerang that won’t come back?', 'A stick.'],
+  ['Why did the kiwi cross the road?', 'To prove it wasn’t chicken.'],
+  ['What do sheep do on sunny days?', 'Have a baa-baa-cue.'],
+  ['Where do sheep get their hair cut?', 'At the baa-baa shop.'],
+  ['Why did the man put his money in the freezer?', 'He wanted cold hard cash.'],
+  ['What did the big flower say to the little flower?', 'Hi, bud.'],
+  ['Why are ghosts bad liars?', 'You can see right through them.'],
+  ['What do you call a lazy kangaroo?', 'A pouch potato.'],
+  ['Why did the picture go to jail?', 'It was framed.'],
+  ['What do you call a train carrying bubblegum?', 'A chew-chew train.'],
+  ['Why did the gardener plant light bulbs?', 'She wanted to grow a power plant.'],
+  ['What did the left eye say to the right eye?', 'Between you and me, something smells.'],
+  ['Why don’t skeletons fight each other?', 'They don’t have the guts.'],
+  ['What do you call a snowman with a six-pack?', 'An abdominal snowman.'],
+  ['Why did the stadium get hot after the game?', 'All the fans left.'],
+  ['What do you call a dinosaur with an extensive vocabulary?', 'A thesaurus.'],
+  ['Why did the banana go to the doctor?', 'It wasn’t peeling well.'],
+  ['How do you organise a space party?', 'You planet.'],
+  ['What did the zero say to the eight?', 'Nice belt.'],
+  ['Why do cows wear bells?', 'Because their horns don’t work.'],
+  ['What do you call an alligator in a vest?', 'An investigator.'],
+  ['Why did the music teacher need a ladder?', 'To reach the high notes.'],
+  ['What did the fish say when it hit the wall?', 'Dam.'],
+  ['Why did the cookie go to the hospital?', 'It felt crummy.'],
+  ['What do you get when you cross a snowman and a vampire?', 'Frostbite.'],
+  ['Why can’t you trust stairs?', 'They’re always up to something.'],
+  ['What do you call a fly without wings?', 'A walk.'],
+  ['Why did the dog sit in the shade?', 'He didn’t want to be a hot dog.'],
+  ['What do you call a belt made of watches?', 'A waist of time.'],
+  ['Why did the car get a flat tyre?', 'There was a fork in the road.'],
+  ['What kind of car does a sheep drive?', 'A Lamborghini.'],
+  ['Why did the smartphone need glasses?', 'It lost all its contacts.'],
+  ['What did the spa say to the swimmer?', 'Long time, no sea.'],
+  ['Why did the pizza maker go broke?', 'He just couldn’t make enough dough.']
+];
+function dailyJokeFor(now) {
+  const n = DAILY_JOKES.length;
+  const i = (((aklDayNumber(now) * 7 + 3) % n) + n) % n;
+  return DAILY_JOKES[i];
+}
+function dailyJokeCard() {
+  const j = dailyJokeFor();
+  if (!j) return '';
+  return `<div class="card jokecard" id="dailyjoke"><div class="jhead"><span class="jemo" aria-hidden="true">😄</span><span>Joke of the day</span></div><p class="jq">${esc(j[0])}</p><details class="jans"><summary>Tap for the answer</summary><p class="ja">${esc(j[1])}</p></details></div>`;
 }
 async function toggleDailyQuote() {
   const on = !showDailyQuote();
@@ -2719,7 +2792,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts)
   const sumForCar = homeFeedMode === 'list' ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Hi ' + esc(name), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + homeTry('weather greeting', () => wxGreet()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Hi ' + esc(name), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + homeTry('weather greeting', () => wxGreet()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
