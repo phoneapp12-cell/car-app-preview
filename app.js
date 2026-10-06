@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.27';
+const APP_VERSION = '2.22.28';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -330,6 +330,27 @@ const HOME_GROUPS = [
   { id: 'media', title: 'Media', keys: ['tv', 'videos', 'blogging', 'podcasts', 'radio'] }
 ];
 const HOME_CAT = Object.fromEntries(HOME_GROUPS.flatMap(g => g.keys.map(k => [k, g.id])));
+/* 2.22.28: Home is now the Notifications page. Only things that are due, to-dos and notes show there.
+   The saved homeOrder / homeHidden settings are left exactly as they were. Other cards are only filtered
+   out when the page is drawn, and every section still has its own page. */
+const NOTIF_KEYS = ['summary', 'attention', 'todo', 'countdown', 'notes'];
+const notifAllowed = k => NOTIF_KEYS.includes(k);
+function notifOn(k) {
+  if (!notifAllowed(k)) return false;
+  if (k === 'notes') return true; // always on here
+  if (k === 'countdown') { const h = S.settings && S.settings.homeHidden; return !(h && typeof h === 'object' && h.countdown === true); }
+  return homeOn(k);
+}
+const NOTIF_DESC = { countdown: 'Countdowns you’ve added, while one is coming up', notes: 'Your latest notes. Always on this page.' };
+// Cards that look different on Notifications: hidden when there is nothing in them.
+const NOTIF_CARD = {
+  countdown: () => {
+    const list = countdownRows().filter(x => x.kind === 'mine');
+    if (!list.length) return '';
+    return homeSec('Countdown', '<a href="#countdown">See all</a>') + `<div class="list" id="homecd">${list.slice(0, 3).map(x => cdRow(x, false)).join('')}</div>`;
+  },
+  notes: () => (noteRows().length ? HOME_CARD.notes() : '')
+};
 let homeEdit = false;
 let homeFeedMode = 'carousel'; // 'carousel' | 'list' — session + localStorage
 let homeCarIdx = 0;
@@ -376,28 +397,42 @@ function homeOn(k) {
   return !!HOME[k][4];
 }
 async function setHomeOrder(o) {
-  const keys = o.filter(k => HOME[k]);
+  let keys = o.filter(k => HOME[k]);
+  let sumIdx = o.includes('homesum') ? o.slice(0, o.indexOf('homesum')).filter(k => HOME[k]).length : -1;
+  // 2.22.28: Customise only lists Notifications cards. Keep every other saved card exactly where it was.
+  const full = homeOrder();
+  if (keys.length < full.length && keys.every(notifAllowed)) {
+    let vi = 0;
+    const merged = full.map(k => notifAllowed(k) ? (keys[vi++] || k) : k);
+    if (sumIdx >= 0) {
+      const prevK = keys[sumIdx - 1];
+      sumIdx = prevK ? merged.indexOf(prevK) + 1 : 0;
+    }
+    keys = merged;
+  }
   S.settings.homeOrder = keys;
   // 1.79.0: the summary row shares this list. Its place is how many cards sit above it.
-  if (o.includes('homesum')) {
-    S.settings.homeSumIndex = o.slice(0, o.indexOf('homesum')).filter(k => HOME[k]).length;
+  if (sumIdx >= 0) {
+    S.settings.homeSumIndex = sumIdx;
     delete S.settings.homeSumAt;
   }
   await save(); render();
 }
 async function toggleHomeCard(k) {
-  const on = homeOn(k); S.settings.homeHidden = Object.assign({}, S.settings.homeHidden, { [k]: on });
+  if (k === 'notes') return; // 2.22.28: always on Notifications
+  const on = notifAllowed(k) ? notifOn(k) : homeOn(k); S.settings.homeHidden = Object.assign({}, S.settings.homeHidden, { [k]: on });
   if (k === 'videos') S.settings.homeVideos = !on;
   await save(); render();
 }
 // 1.17.0: when the Weather card is switched off, Upcoming can show the weather instead (on unless turned off)
-const wxInUp = () => !homeOn('weather') && homeOn('attention') && S.settings.wxUpcoming !== false;
+// 2.22.28: weather is no longer on the Notifications page, so it never stands in for the Weather card.
+const wxInUp = () => false;
 async function toggleWxUpcoming() { S.settings.wxUpcoming = S.settings.wxUpcoming === false; await save(); render(); }
 const homeEventCount = () => { const n = Number(S.settings.homeEvents); return n >= 1 && n <= 6 ? n : 2; };
 async function setHomeEventCount(n) { S.settings.homeEvents = n; await save(); render(); }
 const homeVideoCount = () => { const n = Number(S.settings.homeVideoCount); return n >= 1 && n <= 4 ? n : 2; };
 async function setHomeVideoCount(n) { S.settings.homeVideoCount = n; await save(); render(); }
-async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; S.settings.homeVideos = false; delete S.settings.homeVideoCount; delete S.settings.homeSum; delete S.settings.homeSumAt; delete S.settings.homeSumIndex; await save(); render(); toast('Home is back to the usual layout.', 'Undo', undoTo(s)); }
+async function resetHome() { const s = snap(); delete S.settings.homeOrder; delete S.settings.homeHidden; S.settings.homeVideos = false; delete S.settings.homeVideoCount; delete S.settings.homeSum; delete S.settings.homeSumAt; delete S.settings.homeSumIndex; await save(); render(); toast('Notifications is back to the usual layout.', 'Undo', undoTo(s)); }
 // 1.69.0: the homepage summary can be hidden. Missing means on.
 // 1.79.0: homeSumIndex is how many Home cards it sits after. Missing means 0, under the date and weather.
 // An older homeSumAt of bottom, with no index yet, still means after every section.
@@ -414,8 +449,12 @@ async function moveHomeSum(dir) {
   let i = homeSumBefore();
   if (!Number.isFinite(i)) i = order.length;
   i = Math.max(0, Math.min(order.length, i));
-  const n = Math.max(0, Math.min(order.length, i + (dir < 0 ? -1 : 1)));
-  if (n === i) return;
+  // 2.22.28: only Notifications cards are listed, so step past the hidden ones to the next listed card.
+  const vis = x => order.slice(0, x).filter(notifAllowed).length;
+  const start = vis(i), step = dir < 0 ? -1 : 1;
+  let n = i;
+  while (n >= 0 && n <= order.length && vis(n) === start) n += step;
+  if (n < 0 || n > order.length) return;
   S.settings.homeSumIndex = n;
   delete S.settings.homeSumAt;
   await save();
@@ -425,22 +464,23 @@ async function moveHomeCard(k, dir) {
   const cat = HOME_CAT[k];
   if (!cat) return;
   const order = homeOrder();
-  const mine = order.filter(x => HOME_CAT[x] === cat);
+  const mine = order.filter(x => HOME_CAT[x] === cat && notifAllowed(x));
   const p = mine.indexOf(k);
   const n = p + (dir < 0 ? -1 : 1);
   if (p < 0 || n < 0 || n >= mine.length) return;
   const tmp = mine[p]; mine[p] = mine[n]; mine[n] = tmp;
   let mi = 0;
-  await setHomeOrder(order.map(key => HOME_CAT[key] === cat ? mine[mi++] : key));
+  await setHomeOrder(order.map(key => HOME_CAT[key] === cat && notifAllowed(key) ? mine[mi++] : key));
 }
 function homeEditRows() {
   const rows = homeOrder().map(k => ({ kind: 'card', k }));
-  if (!showHomeSum()) return rows;
+  const keep = r => r.kind === 'sum' || notifAllowed(r.k); // 2.22.28: Notifications cards only
+  if (!showHomeSum()) return rows.filter(keep);
   let i = homeSumBefore();
   if (!Number.isFinite(i)) i = rows.length;
   i = Math.max(0, Math.min(rows.length, i));
   rows.splice(i, 0, { kind: 'sum' });
-  return rows;
+  return rows.filter(keep);
 }
 const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
 // 1.98.0: label a Home section only when it has no heading of its own.
@@ -595,11 +635,11 @@ function homeEditHtml() {
   rows.forEach((r, i) => {
     if (r.kind === 'sum') {
       html += `<div class="row mrow sumrow" data-k="homesum" aria-label="Summary"><div class="ic idea">${I('bulb')}</div>
-      <div class="tx"><div class="t">Summary</div><div class="s">Between the sections on Home. It can sit in any category.</div></div>
+      <div class="tx"><div class="t">Summary</div><div class="s">Between the sections on Notifications.</div></div>
       <span class="summoves"><button type="button" class="summove" aria-label="Move the summary up one section" onclick="event.stopPropagation();moveHomeSum(-1)" ${i === 0 ? 'disabled' : ''}>Up</button><button type="button" class="summove" aria-label="Move the summary down one section" onclick="event.stopPropagation();moveHomeSum(1)" ${i === last ? 'disabled' : ''}>Down</button></span></div>`;
       return;
     }
-    const k = r.k, d = HOME[k], on = homeOn(k), cat = HOME_CAT[k];
+    const k = r.k, d = HOME[k], on = notifOn(k), cat = HOME_CAT[k];
     if (cat !== prev) {
       const g = HOME_GROUPS.find(x => x.id === cat);
       html += `<div class="homecat" id="homecat-${cat}">${esc(g.title)}</div>`;
@@ -608,23 +648,19 @@ function homeEditHtml() {
     const mates = rows.filter(x => x.kind === 'card' && HOME_CAT[x.k] === cat);
     const pos = mates.findIndex(x => x.k === k);
     html += `<div class="row mrow${on ? '' : ' cardoff'}" data-k="${k}" data-cat="${cat}" aria-label="${esc(d[2])}"><div class="ic ${d[1]}">${I(d[0])}</div>
-      <div class="tx"><div class="t">${d[2]}</div><div class="s">${d[3]}</div></div>
-      <button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${esc(d[2])} on Home" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>
+      <div class="tx"><div class="t">${d[2]}</div><div class="s">${NOTIF_DESC[k] || d[3]}</div></div>
+      ${k === 'notes' ? '' : `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show ${esc(d[2])} on Notifications" onclick="event.stopPropagation();toggleHomeCard('${k}')"></button>`}
       <span class="summoves"><button type="button" class="summove" aria-label="Move ${esc(d[2])} up" onclick="event.stopPropagation();moveHomeCard('${k}',-1)" ${pos <= 0 ? 'disabled' : ''}>Up</button><button type="button" class="summove" aria-label="Move ${esc(d[2])} down" onclick="event.stopPropagation();moveHomeCard('${k}',1)" ${pos < 0 || pos >= mates.length - 1 ? 'disabled' : ''}>Down</button></span></div>`;
   });
   return html;
 }
 function HomeEdit() {
   const sumOn = showHomeSum();
-  return header('Customise Home', 'Press and hold a row, then drag it within its category') +
-    `<div class="reordhelp">Use the switches to show or hide cards. Cards with nothing to show stay hidden until there’s something in them. Up and Down, or a drag, move a card only inside its category. Drag the summary between sections, or use its Up and Down.</div>
-    <div class="list" id="homesumopt" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">Summary</div><div class="s">A short summary of this page. It starts under the date and weather. Up and Down move it one section at a time.</div></div><button class="switch ${sumOn ? 'on' : ''}" role="switch" aria-checked="${sumOn}" aria-label="Show the homepage summary" onclick="toggleHomeSum()"></button></div></div>
+  return header('Customise Notifications', 'Press and hold a row, then drag it') +
+    `<div class="reordhelp">Notifications shows what’s due, your to-dos and your notes. Everything else is still on its own page. Use the switches to show or hide cards. Cards with nothing to show stay hidden until there’s something in them. Up and Down, or a drag, move a card. Drag the summary between sections, or use its Up and Down.</div>
+    <div class="list" id="homesumopt" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">Summary</div><div class="s">A short summary of this page. It starts under the date. Up and Down move it one section at a time.</div></div><button class="switch ${sumOn ? 'on' : ''}" role="switch" aria-checked="${sumOn}" aria-label="Show the homepage summary" onclick="toggleHomeSum()"></button></div></div>
     <div class="list reorder" id="reorderlist" data-save="home">${homeEditHtml()}
     </div>
-    ${homeOn('events') ? `<div class="list" id="evcountopt" style="margin-top:12px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Events on Home</div><div class="s">How many to show under What’s on in Whangārei. The rest stay on the Events page.</div></div>
-      <div class="seg" id="evcount" role="group" aria-label="How many events on Home" style="width:100%">${[1,2,3,4,5,6].map(n => `<button type="button" class="${homeEventCount() === n ? 'on' : ''}" aria-pressed="${homeEventCount() === n}" onclick="setHomeEventCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
-    ${homeOn('videos') ? `<div class="list" id="vidcountopt" style="margin-top:12px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Videos on Home</div><div class="s">How many to show under Videos. The rest stay on the Videos page.</div></div>
-      <div class="seg" id="vidcount" role="group" aria-label="How many videos on Home" style="width:100%">${[1,2,3,4].map(n => `<button type="button" class="${homeVideoCount() === n ? 'on' : ''}" aria-pressed="${homeVideoCount() === n}" onclick="setHomeVideoCount(${n})">${n}</button>`).join('')}</div></div></div>` : ''}
     <div style="display:flex;gap:10px;margin-top:14px"><button class="btn" onclick="resetHome()">Reset to default</button><button class="btn primary" id="homedone" onclick="homeEdit=false;render();$('#view').scrollTop=0">Done</button></div>
     <div class="foot">The reminder and install prompts always show at the top when they’re needed.</div>`;
 }
@@ -2639,14 +2675,9 @@ function homeOverviewBody(shown, urgentOut) {
       pushBit('about', aboutLine);
     }
   } catch (e) {}
-  try { pushBit('routine', homeRoutineLine()); } catch (e) {}
+  // 2.22.28: Notifications keeps this to due things. No routine, bridge or shop-busyness lines.
   try { pushBit('roster', rosterHeadsUp(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
   try { pushBit('drive', homeDriveLine()); } catch (e) {}
-  try {
-    const br = homeBridgeBit();
-    if (br && br.urgent && br.text) pushBit('bridge', br.text);
-  } catch (e) {}
-  try { if (urgent.length < 2) pushBit('busy', homeBusyLine()); } catch (e) {}
   return homeSumCard(urgent);
 }
 
@@ -2738,31 +2769,23 @@ function Home() {
     cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
   const order = homeTry('order', () => homeOrder(), []);
-  const keys = homeTry('keys', () => homeFeedKeys(order.filter(k => homeTry('on ' + k, () => homeOn(k) || (k === 'videos' && currentSarahVideo()), false))), []).slice(), br = homeTry('bridge mode', () => brOnHome(), '');
-  let top = '';
-  // As before 1.14.0: when the bridge is first, the full card (near the bridge, or a closure) goes right under the greeting,
-  // and the compact line sits under the weather if the weather card comes next
-  if (keys[0] === 'bridge' && br === 'card') { top = homeTry('bridge card', () => brCard()); keys.shift(); }
-  const bi = keys.indexOf('bridge');
-  if (br === 'line' && bi >= 0 && keys[bi + 1] === 'weather') { keys[bi] = 'weather'; keys[bi + 1] = 'bridge'; }
-  // 1.15.0: each Home section sits in its own block with a divider line between them (the compact bridge line stays with the weather above it)
-  const parts = keys.map(k => { try { return [k, HOME_CARD[k]()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
-  const groups = [];
-  parts.forEach(([k, h]) => { const g = groups[groups.length - 1]; if (k === 'bridge' && br === 'line' && g && g.k === 'weather') { g.h += h; g.keys.push(k); } else groups.push({ k, keys: [k], h }); });
-  const tintN = groups.length + (top ? 1 : 0);
+  // 2.22.28: Notifications. Only due things, to-dos and notes (NOTIF_KEYS). Saved settings for other cards are untouched.
+  const keys = homeTry('keys', () => homeFeedKeys(order.filter(k => homeTry('on ' + k, () => notifOn(k), false))), []).slice();
+  // 1.15.0: each section sits in its own block with a divider line between them
+  const parts = keys.map(k => { try { return [k, (NOTIF_CARD[k] || HOME_CARD[k])()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
+  const groups = parts.map(([k, h]) => ({ k, keys: [k], h }));
+  const tintN = groups.length;
   const shown = new Set(parts.map(([k]) => k));
-  if (top) shown.add('bridge');
   homeShownNow = shown;
   const sum = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
   const precede = new Set(order.slice(0, before));
   const sections = [];
-  if (top) sections.push({ keys: ['bridge'], html: `<section class="hsec hsectop" data-k="bridge" style="${homeTry('tint', () => homeTintStyle(0, tintN))}">${top}</section>` });
   groups.forEach((g, i) => {
     try {
       const body = homeHasHeading(g.k, g.h) ? g.h : homeSec(HOME[g.k][2]) + g.h;
-      sections.push({ keys: g.keys, html: `<section class="hsec" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i + (top ? 1 : 0), tintN))}">${body}</section>` });
+      sections.push({ keys: g.keys, html: `<section class="hsec" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${body}</section>` });
     } catch (e) { console.error('Home section', g.k, e); }
   });
   let at = 0;
@@ -2777,7 +2800,7 @@ function Home() {
   const startI = Math.max(0, Math.min(Math.max(sections.length - 1, 0), homeCarIdx | 0));
   const carItems = sections.map((sec, i) => `<div class="hcar-item${i === startI ? ' hcar-front' : ''}" data-i="${i}"${i === startI ? '' : ' aria-hidden="true"'}>${sec.html}</div>`).join('');
   const carDots = sections.map((_, i) => `<button type="button" class="hcar-dot${i === startI ? ' on' : ''}" data-i="${i}" aria-label="Card ${i + 1}"></button>`).join('');
-  const carousel = sections.length ? `<div class="hcar" id="homecarousel" aria-roledescription="carousel" aria-label="Home cards" data-i="${startI}">
+  const carousel = sections.length ? `<div class="hcar" id="homecarousel" aria-roledescription="carousel" aria-label="Notifications cards" data-i="${startI}">
     <div class="hcar-stage" id="hcarstage">
       <div class="hcar-track" id="hcartrack">${carItems}</div>
       <div class="hcar-dots">${carDots}</div>
@@ -2788,11 +2811,13 @@ function Home() {
     <p class="hcar-hint muted">Double-tap for carousel</p>
     ${listBody}
   </div>` : '';
-  const feed = homeFeedMode === 'list' ? listFeed : carousel;
-  // Overview summary sits above the carousel (list mode already splices sumMid into feedParts)
-  const sumForCar = homeFeedMode === 'list' ? '' : (sumMid || '');
+  // 2.22.28: nothing to show, so say so instead of leaving a gap
+  const emptyNote = sections.length ? '' : '<div class="card empty" id="homeempty"><div class="t">Nothing due right now.</div><div class="s">Things that are due, your to-dos and your notes show up here.</div></div>';
+  const feed = (homeFeedMode === 'list' ? listFeed : carousel) || emptyNote;
+  // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
+  const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Hi ' + esc(name), `${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]} · good to see you`) + homeTry('weather greeting', () => wxGreet()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -7673,11 +7698,11 @@ async function endDrag() {
   }
   if (st.catPos === st.catFrom) { render(); return; }
   const order = homeOrder();
-  const mine = order.filter(k => HOME_CAT[k] === st.cat);
+  const mine = order.filter(k => HOME_CAT[k] === st.cat && notifAllowed(k));
   const [k] = mine.splice(st.catFrom, 1);
   mine.splice(st.catPos, 0, k);
   let mi = 0;
-  await setHomeOrder(order.map(key => HOME_CAT[key] === st.cat ? mine[mi++] : key));
+  await setHomeOrder(order.map(key => HOME_CAT[key] === st.cat && notifAllowed(key) ? mine[mi++] : key));
 }
 
 /* ================= LIFTING BRIDGE (Dave Culham Drive, Te Matau ā Pohe) ================= */
@@ -7938,7 +7963,7 @@ function Bridge() {
       <div class="s"><a href="${esc(c.url)}" target="_blank" rel="noopener">Council notice</a></div></div></div>`;
   }).join('');
   const locOn = !!S.settings.bridgeLoc;
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+  return `<button class="back" onclick="go('#home')">${I('left')} Notifications</button>` +
     header('Lifting bridge', 'Dave Culham Drive · Te Matau ā Pohe') + brCard(true) +
     `<div class="sec">Lift times today</div>
     <div class="list"><div class="srow"><div class="tx"><div class="t">${brSeasonText(T)}</div>
@@ -8324,7 +8349,7 @@ function wxGreet() {
     <span class="wxgico">${wxCompactIcon(nowW, day, moon)}</span><span class="wxgtx"><b>${deg(c.temperature_2m)}</b> ${esc(shown)}</span></button>`;
 }
 function Weather() {
-  const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
+  const back = `<button class="back" onclick="go('#home')">${I('left')} Notifications</button>`;
   const days = wxDays();
   if (!WX || !days.length) return back + header('Weather', 'Whangārei') +
     `<div class="card empty"><div class="t">${wxBusy ? 'Getting the weather…' : 'The weather isn’t available right now'}</div><div class="s">Check your internet connection, then try again.</div>
@@ -10522,9 +10547,9 @@ function Settings() {
   <div class="list" style="margin-top:10px">
    <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">Use Dark when the phone is in dark mode${themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t'}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
   </div>
-  <div class="sec">Home</div>
+  <div class="sec">Notifications page</div>
   <div class="list">
-   <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo under the greeting on Home. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
   </div>
   <div class="sec">Reminders</div>
   <div class="list">
@@ -11919,7 +11944,7 @@ function tabbar(active) {
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
   const listed = new Set(NAV_GROUPS.flatMap(g => g.keys));
   const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge && !(listed.has('bills') && listed.has('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
-  const meta = k => k === 'home' ? ['Home', 'home'] : k === 'settings' ? ['Settings', 'gear'] : k === 'more' ? ['More', 'more'] : [NAV[k][2], NAV[k][0]];
+  const meta = k => k === 'home' ? ['Notifications', 'home'] : k === 'settings' ? ['Settings', 'gear'] : k === 'more' ? ['More', 'more'] : [NAV[k][2], NAV[k][0]];
   const btn = k => {
     const [l, ic] = meta(k);
     return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
@@ -11975,8 +12000,8 @@ function renderFallback(r, err) {
   const home = r === 'home' || r === '';
   let msg = '';
   try { msg = err ? String(err && err.message || err).slice(0, 160) : ''; } catch (e) { msg = ''; }
-  return `<div class="callout red" id="renderfail" role="alert"><div style="flex:1"><b>${home ? 'Home' : 'This page'} couldn’t load just now</b><br>Your things are still saved.${msg ? '<br><small class="muted">' + esc(msg) + '</small>' : ''}
-    <div class="btns" style="margin-top:8px">${home ? '' : '<button class="btn primary small" onclick="go(\'#home\')">Go to Home</button> '}<button class="btn small" onclick="location.reload()">Reload</button></div></div></div>`;
+  return `<div class="callout red" id="renderfail" role="alert"><div style="flex:1"><b>${home ? 'Notifications' : 'This page'} couldn’t load just now</b><br>Your things are still saved.${msg ? '<br><small class="muted">' + esc(msg) + '</small>' : ''}
+    <div class="btns" style="margin-top:8px">${home ? '' : '<button class="btn primary small" onclick="go(\'#home\')">Go to Notifications</button> '}<button class="btn small" onclick="location.reload()">Reload</button></div></div></div>`;
 }
 // 2.22.18: Full-page home carousel. Swipe left/right for cards; double-tap toggles vertical list.
 // Vertical pan is native (touch-action:pan-y on the whole carousel): the card body scrolls and then
