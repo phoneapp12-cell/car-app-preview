@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.34';
+const APP_VERSION = '2.22.35';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -285,7 +285,7 @@ function rowFor(x) {
   else sub = 'To-do · ' + esc(x.todo.list || '') + ' · ' + fmtW(x.date);
   const body = `<div class="ic ${x.kind}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div><div class="badgestack">${duePill(x.days)}${cash}</div>`;
   // 1.82.0: a to-do in Upcoming or the overdue list can be marked done here. It stays on the to-do list.
-  if (x.kind === 'todo' && x.todo) return `<div class="row"><button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(x.title)}" onclick="tick('${x.todo.id}')"><span>${I('check')}</span><b>Done</b></button><button type="button" class="tapzone" onclick="go('${x.go}')">${body}</button></div>`;
+  if (x.kind === 'todo' && x.todo) return `<div class="row"><button type="button" class="tick" aria-label="Mark complete: ${esc(x.title)}" onclick="tick('${x.todo.id}')"><span>${I('check')}</span></button><button type="button" class="tapzone" onclick="go('${x.go}')">${body}</button></div>`;
   return `<button class="row" onclick="go('${x.go}')">${body}</button>`;
 }
 /* 1.14.0: Home cards can be reordered and switched on or off (Home › Customise). Saved as settings.homeOrder / settings.homeHidden.
@@ -515,7 +515,7 @@ const HOME_CARD = {
     const att = homeOn('attention'); // to-dos due within 30 days are already in Needs attention
     const open = S.todos.filter(t => !t.done && !(att && t.due && daysLeft(t.due) <= 30)).sort(cmpOpenTodo);
     if (!open.length) return '';
-    return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span><b>Done</b></button>
+    return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button type="button" class="tick" aria-label="Mark complete: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
       <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${todoPriMark(t)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? duePill(daysLeft(t.due)) : ''}</button>${todoCalBtn(t)}</div>`).join('')}</div>` +
       (open.length > 5 ? `<div class="homemore"><a href="#todo">${plural(open.length - 5, 'more to-do')}</a></div>` : '');
   },
