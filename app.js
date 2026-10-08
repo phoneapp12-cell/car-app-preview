@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.76';
+const APP_VERSION = '2.22.77';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1962,6 +1962,25 @@ function lawnAutoTodo() {
     S.settings.lawnAuto = T;
     save().catch(() => {}).finally(() => { lawnAutoBusy = false; try { render(); } catch (e) {} });
   } catch (e) { lawnAutoBusy = false; }
+}
+
+// 2.22.77: a plant-feeding to-do comes off the list while it's above 10 degrees now or in the next 5 hours.
+let feedWarmBusy = false;
+function todoIsPlantFeed(t) {
+  const title = String(t && t.title || '');
+  if (/^Feed the (strawberries|tomatoes|citrus|plum|lemon|orange|mandarin|peach)/i.test(title)) return true;
+  if (/^Feed the Golden Queen/i.test(title)) return true;
+  return /\bfeed/i.test(title) && /\b(strawberr|tomato|citrus|lemon|orange|mandarin|plum|peach|garden|plants?)\b/i.test(title);
+}
+function feedWarmTodo() {
+  try {
+    if (feedWarmBusy || !S || !Array.isArray(S.todos) || !feedTooWarm()) return;
+    const open = t => t && !t.done && todoIsPlantFeed(t);
+    if (!S.todos.some(open)) return;
+    feedWarmBusy = true;
+    S.todos = S.todos.filter(t => !open(t));
+    save().catch(() => {}).finally(() => { feedWarmBusy = false; try { render(); } catch (e) {} });
+  } catch (e) { feedWarmBusy = false; }
 }
 /* 2.22.49: Wet day at home: suggest a movie or comedy that's on free-to-air TV, from the free NZ TV guide
    (i.mjh.nz, which allows the app to read it). Fetched only when it's wet and Shane is at home, once a day
@@ -8786,6 +8805,7 @@ function updWx() {
 }
 function paintHomeSum() {
   try { lawnAutoTodo(); } catch (e) {}
+  try { feedWarmTodo(); } catch (e) {}
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
   if ((h !== 'home' && h !== '') || homeEdit) return;
