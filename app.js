@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.42';
+const APP_VERSION = '2.22.43';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8704,9 +8704,10 @@ function notifWxStrip() {
   const next = homeTry('weather next', () => notifWxNext(), []);
   const outlook = homeTry('weather outlook', () => notifWxOutlook(nowW, next), '');
   const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '';
-  const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${outlook ? ' ' + outlook + '.' : ''}${warn ? ' ' + warn.replace(/^⚠\s*/, 'MetService ') + '.' : ''} Tap for the full forecast.`;
+  const sun = homeTry('weather sun', () => wxSunMention(), ''); // 2.22.43: next sunrise or sunset
+  const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${outlook ? ' ' + outlook + '.' : ''}${sun ? ' ' + sun + '.' : ''}${warn ? ' ' + warn.replace(/^⚠\s*/, 'MetService ') + '.' : ''} Tap for the full forecast.`;
   return `<button type="button" class="notifwx" id="notifwx" onclick="go('#weather')" aria-label="${esc(label)}">
-    <span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp">${temp}</b>` : ''}<span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${warnHtml}</span>${I('right')}</button>`;
+    <span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp">${temp}</b>` : ''}<span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${sun ? `<span class="nwxnext nwxsun">${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}${warnHtml}</span>${I('right')}</button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Notifications</button>`;
