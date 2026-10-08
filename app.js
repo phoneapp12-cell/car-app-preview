@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.51';
+const APP_VERSION = '2.22.52';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -336,6 +336,14 @@ const HOME_CAT = Object.fromEntries(HOME_GROUPS.flatMap(g => g.keys.map(k => [k,
    The saved homeOrder / homeHidden settings are left exactly as they were. Other cards are only filtered
    out when the page is drawn, and every section still has its own page. */
 const NOTIF_KEYS = ['summary', 'attention', 'todo', 'countdown', 'notes'];
+// 2.22.52: Upcoming items of these kinds show as their own section card in the feed when due within 14 days
+const NOTIF_DUE_CARD = { car: 'cars', driver: 'cars', bill: 'bills', pet: 'pets', bday: 'birthdays', comm: 'commission' };
+let homeDueCards = new Set();
+function notifDueCards() {
+  const out = new Set();
+  homeAttention().forEach(x => { const k = NOTIF_DUE_CARD[x.kind]; if (k && x.days <= 14 && HOME_CARD[k]) out.add(k); });
+  return out;
+}
 const notifAllowed = k => NOTIF_KEYS.includes(k);
 function notifOn(k) {
   if (!notifAllowed(k)) return false;
@@ -2986,6 +2994,9 @@ function Home() {
   const order = homeTry('order', () => homeOrder(), []);
   // 2.22.28: Notifications. Only due things, to-dos and notes (NOTIF_KEYS). Saved settings for other cards are untouched.
   const keys = homeTry('keys', () => homeFeedKeys(order.filter(k => homeTry('on ' + k, () => notifOn(k), false))), []).slice();
+  // 2.22.52: anything due within 14 days (or overdue) brings its own section card into the feed, after Upcoming
+  homeDueCards = homeTry('due cards', () => notifDueCards(), new Set());
+  { const add = [...homeDueCards].filter(k => !keys.includes(k)); const at = keys.indexOf('attention'); keys.splice(at < 0 ? Math.min(1, keys.length) : at + 1, 0, ...add); }
   // 1.15.0: each section sits in its own block with a divider line between them
   const parts = keys.map(k => { try { return [k, (NOTIF_CARD[k] || HOME_CARD[k])()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
   const groups = parts.map(([k, h]) => ({ k, keys: [k], h }));
@@ -6151,6 +6162,7 @@ function homeAttention() {
 function attentionHtml() {
   let list = homeAttention(); const wx = attWxRow();
   try { if (homeOn('todo')) list = list.filter(x => x.kind !== 'todo'); } catch (e) {} // 2.22.51: to-dos live in the To-do section
+  try { if (homeDueCards.size) list = list.filter(x => !homeDueCards.has(NOTIF_DUE_CARD[x.kind])); if (!list.length && homeDueCards.size) return wx ? `<div class="list" id="attention">${wx}</div>` : ''; } catch (e) {} // 2.22.52: shown as their own cards
   if (!list.length && wx) return `<div class="list" id="attention">${wx}</div><div class="card empty"><div class="t">All good for the next 30 days</div><div class="s">Nothing is overdue or due soon. Sweet as.</div></div>`;
   if (!list.length) return `<div class="card empty"><div class="t">All good for the next 30 days</div><div class="s">Nothing is overdue or due soon. Sweet as.</div></div>`;
   const over = list.filter(x => x.days < 0).length, n = attShowAll ? list.length : Math.max(ATT_MAX, over);
