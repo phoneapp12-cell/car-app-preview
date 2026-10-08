@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.48';
+const APP_VERSION = '2.22.49';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1831,6 +1831,75 @@ function homeSugLawns() {
     return { id: 'lawns', type: 'todo', text: 'Sunny and you’re off today, so it’s a good day to mow the lawns.', pre: { title: 'Mow the lawns', due: T, priority: 'normal', list: 'Home' } };
   } catch (e) { return null; }
 }
+/* 2.22.49: Wet day at home: suggest a movie or comedy that's on free-to-air TV, from the free NZ TV guide
+   (i.mjh.nz, which allows the app to read it). Fetched only when it's wet and Shane is at home, once a day
+   (about 1MB), and only the picks are kept. */
+const TVW_EPG = 'https://i.mjh.nz/nz/epg.xml';
+const TVW_FTA = { 'mjh-tvnz-1': 'TVNZ 1', 'mjh-tvnz-2': 'TVNZ 2', 'mjh-three': 'Three', 'mjh-bravo': 'Bravo', 'mjh-prime': 'Sky Open', 'mjh-maori-tv': 'Whakaata Māori', 'mjh-tvnz-duke': 'DUKE', 'mjh-rush-nz': 'RUSH', 'mjh-eden': 'eden' };
+let TVWP = null, tvwBusy = false;
+try { TVWP = JSON.parse(localStorage.getItem('tvPicks') || 'null'); } catch (e) { TVWP = null; }
+function tvwWet() {
+  try {
+    if (!WX) return false;
+    const c = WX.data.current || {}, d = wxDays().find(x => x.iso === todayISO());
+    if (num(c.precipitation) && c.precipitation > 0.2) return true;
+    if (num(c.weather_code) && c.weather_code >= 51 && c.weather_code !== 45 && c.weather_code !== 48) return true;
+    return !!(d && ((d.rain != null && d.rain >= 70) || (d.precip != null && d.precip >= 3)));
+  } catch (e) { return false; }
+}
+function tvwStamp(t) { const m = /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d) ([+-])(\d\d)(\d\d)$/.exec(t || ''); if (!m) return 0; const off = (m[7] === '-' ? -1 : 1) * (+m[8] * 60 + +m[9]); return Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) - off * 60000; }
+async function loadTvwPicks() {
+  const T = todayISO();
+  if (tvwBusy || (TVWP && TVWP.day === T && Date.now() - (TVWP.at || 0) < 6 * 3600000)) return;
+  tvwBusy = true;
+  try {
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 30000);
+    let x = ''; try { const r = await fetch(TVW_EPG, { signal: ctl.signal }); if (!r.ok) throw new Error('http'); x = await r.text(); } finally { clearTimeout(tm); }
+    const now = Date.now(), end = now + 30 * 3600000, out = [];
+    const re = /<programme start="([^"]+)" stop="([^"]+)" channel="([^"]+)">([\s\S]*?)<\/programme>/g; let m;
+    const unx = v => String(v).replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, '’').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    while ((m = re.exec(x))) {
+      const ch = TVW_FTA[m[3]]; if (!ch) continue;
+      const a = tvwStamp(m[1]), b = tvwStamp(m[2]); if (!a || b <= now + 20 * 60000 || a > end) continue;
+      const body = m[4], cats = (body.match(/<category[^>]*>[^<]+/g) || []).map(c => c.replace(/<category[^>]*>/, ''));
+      const title = unx(((/<title[^>]*>([^<]+)/.exec(body)) || [])[1] || '').trim();
+      if (!title || /infomercial|paid programming|teleshopping|close/i.test(title)) continue;
+      const movie = cats.includes('Movie') && b - a >= 75 * 60000, comedy = cats.some(c => /comedy/i.test(c));
+      if (!movie && !comedy) continue;
+      const desc = unx(((/<desc[^>]*>([^<]+)/.exec(body)) || [])[1] || '').trim().slice(0, 160);
+      out.push({ t: title, ch, a, b, k: movie ? 'movie' : 'comedy', d: desc });
+    }
+    out.sort((p, q) => p.a - q.a);
+    TVWP = { day: T, at: Date.now(), list: out.slice(0, 40) };
+    try { localStorage.setItem('tvPicks', JSON.stringify(TVWP)); } catch (e) {}
+    if (/^#?(home)?$/.test(location.hash.replace('#', '')) || location.hash === '#home') render();
+  } catch (e) { /* no guide today */ } finally { tvwBusy = false; }
+}
+function homeSugTv() {
+  try {
+    if (homeWhere() !== 'home' || !tvwWet()) return null;
+    if (!TVWP || TVWP.day !== todayISO()) { loadTvwPicks(); return null; }
+    const now = Date.now(), hr = (homeAklParts() || {}).hour || 0;
+    // Daytime: anything from now on today; evening: from 7pm. Movies first, comedy if no movie.
+    const soon = (TVWP.list || []).filter(p => p.b > now + 20 * 60000 && nzStampLocal(new Date(p.a)).slice(0, 10) === todayISO() && (hr >= 17 ? nzStampLocal(new Date(p.a)).slice(11, 13) >= '18' || p.a <= now : true));
+    const pick = soon.find(p => p.k === 'movie') || soon.find(p => p.k === 'comedy');
+    if (!pick) return null;
+    const hm = nzStampLocal(new Date(pick.a)).slice(11, 16), on = pick.a <= now;
+    const text = 'Wet out, so how about ' + (pick.k === 'movie' ? 'a movie' : 'a laugh') + '? ' + pick.t + (on ? ' is on ' + pick.ch + ' now.' : ' is on ' + pick.ch + ' at ' + fmtTime(hm) + '.') + (pick.d ? ' ' + pick.d : '');
+    return { id: 'tv', type: 'appt', text, pre: { title: 'Watch ' + pick.t + ' (' + pick.ch + ')', date: todayISO(), time: on ? '' : hm, notes: pick.d || '' } };
+  } catch (e) { return null; }
+}
+/* 2.22.49: Dinner planned tonight and something still on the shopping list: suggest a look, with an Open button. */
+function homeSugShop() {
+  try {
+    const plan = M() && M().plan && M().plan[todayISO()];
+    if (!plan) return null;
+    const left = ((S.shop && S.shop.items) || []).filter(x => x && !x.done);
+    if (!left.length) return null;
+    const a = homeAklParts(); if (a && a.hour >= 21) return null;
+    return { id: 'shop', type: 'open', go: '#shopping', text: 'Dinner’s planned for tonight. Check the shopping list, there ' + (left.length === 1 ? 'is 1 thing' : 'are ' + left.length + ' things') + ' still to get.' };
+  } catch (e) { return null; }
+}
 function homeSugDogWalk() {
   try {
     // 2.22.34: Shane walks Zeus on his weekends, which are his days off in the Work roster tab.
@@ -1918,7 +1987,7 @@ function homeSugNewOpen() {
 homeSugNewOpen();
 function homeSuggestions() {
   // Gather every available type first. Duplicate skips stay inside each maker; Add buttons unchanged.
-  const makers = [homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugGardenFeed, homeSugLawns, homeSugDogWalk, homeSugVet, homeSugIdea];
+  const makers = [homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugGardenFeed, homeSugLawns, homeSugTv, homeSugShop, homeSugDogWalk, homeSugVet, homeSugIdea];
   const avail = [];
   makers.forEach(fn => {
     let s = null;
@@ -1941,7 +2010,7 @@ function homeSuggestions() {
   // Fresh ones first, then last open's ones only if there are not enough others.
   const fresh = arr.filter(x => last.indexOf(key(x)) < 0), seen = arr.filter(x => last.indexOf(key(x)) >= 0);
   let pool = fresh.concat(seen);
-  const lawn = pool.find(x => x.id === 'lawns'); if (lawn) pool = [lawn].concat(pool.filter(x => x !== lawn)); // 2.22.48: lawns day always shows
+  ['tv', 'lawns', 'shop'].forEach(id => { const it = pool.find(x => x.id === id); if (it) pool = [it].concat(pool.filter(x => x !== it)); }); // 2.22.48/49: lawns day and wet-day TV always show
   const pick = pool.slice(0, 3);
   homeSugPickN = homeSugOpenN;
   homeSugPickIds = pick.map(key);
@@ -2023,7 +2092,8 @@ function aiSugList() {
     const pre = type === 'note' ? { text: String(x.text || title) } : type === 'appt' ? { title, date: today, time: '', notes: '' } : { title, due: today, priority: 'normal', list: 'Home' };
     return { id: 'ai' + i, type, text: String(x.text || title), pre };
   }).filter(x => x.text);
-  return lawn ? [lawn].concat(out) : out;
+  let tv = null, shop = null; try { tv = homeSugTv(); } catch (e) {} try { shop = homeSugShop(); } catch (e) {}
+  return [shop, lawn, tv].filter(Boolean).concat(out);
 }
 function homeSugHtml() {
   let list = [];
@@ -2032,6 +2102,7 @@ function homeSugHtml() {
   if (!list.length) return '';
   const label = { todo: 'to your to-do list', note: 'as a note', appt: 'to your calendar' };
   return '<div class="sumsugs" role="list" aria-label="Might be next">' + list.map((s, i) =>
+    s.type === 'open' ? `<div class="sumsug" role="listitem"><span class="tx">${esc(s.text)}</span><button type="button" class="sumadd" onclick="go(${jsArg(s.go)})" aria-label="Open">${I('right')} Open</button></div>` :
     `<div class="sumsug" role="listitem"><span class="tx">${esc(s.text)}</span><button type="button" class="sumadd" onclick="homeSugAdd(${i})" aria-label="Add ${esc(label[s.type] || '')}: ${esc(s.pre && (s.pre.title || s.pre.text) || s.text)}">${I('plus')} Add</button></div>`).join('') + '</div>';
 }
 function homeSugAdd(i) {
