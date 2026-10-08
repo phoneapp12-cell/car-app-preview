@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.62';
+const APP_VERSION = '2.22.63';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2106,18 +2106,22 @@ async function aiSumFetch() {
   try {
     // 2.22.54: give the weather a few seconds to arrive first, so the one summary drawn has it
     for (let i = 0; i < 10 && !WX && wxBusy; i++) await new Promise(r => setTimeout(r, 500));
-    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const tm = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} }, 20000);
-    const r = await fetch(RELAY_URL + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ctx: aiSumCtx() }), signal: ctl ? ctl.signal : undefined });
-    clearTimeout(tm);
-    if (!r.ok) throw new Error('http ' + r.status);
-    const d = await r.json();
+    // 2.22.63: 30s timeout and one retry, so a slow AI moment doesn't drop the summary
+    const once = async () => {
+      const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const tm = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} }, 30000);
+      try { const r = await fetch(RELAY_URL + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ctx: aiSumCtx() }), signal: ctl ? ctl.signal : undefined });
+        if (!r.ok) throw new Error('http ' + r.status); return await r.json(); } finally { clearTimeout(tm); }
+    };
+    let d; try { d = await once(); if (!d || !Array.isArray(d.lines) || !d.lines.length) throw new Error('empty'); } catch (e1) { d = await once(); }
     if (!d || !Array.isArray(d.lines) || !d.lines.length) throw new Error('empty');
     AI_SUM = { lines: d.lines.slice(0, 5).map(x => String(x).slice(0, 220)), sugs: (d.sugs || []).slice(0, 3), open: openN, at: Date.now() };
     aiSumOpen = openN;
+    try { localStorage.setItem('aiSumLast', JSON.stringify(AI_SUM)); } catch (e) {}
     const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
   } catch (e) {
-    aiSumOpen = openN; // no AI this open: swap the placeholder for the usual summary
+    aiSumOpen = openN; // no AI this open: reuse the last AI summary if it's under 3 hours old, else the usual summary
+    try { const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null'); if (last && Array.isArray(last.lines) && Date.now() - last.at < 3 * 3600 * 1000) AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: openN, at: last.at }; } catch (e3) {}
     try { const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; } } catch (e2) {}
   } finally { aiSumBusy = false; }
 }
@@ -10049,7 +10053,7 @@ function sugPushes() {
    questions never repeat (every one asked is kept and sent back so the AI avoids it, and checked here too).
    After an answer the AI replies: points to a tab, gives a useful tip, or just chats. Answers go into the summary. */
 function knowState() { S.settings = S.settings || {}; const k = S.settings.knowMe && typeof S.settings.knowMe === 'object' ? S.settings.knowMe : (S.settings.knowMe = {}); if (!Array.isArray(k.asked)) k.asked = []; return k; }
-let knowBusy = false, knowTried = -1;
+let knowBusy = false, knowTried = -1, knowWait = 0;
 const knowNorm = q => String(q || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
 function knowTabs() { try { return Object.keys(NAV).filter(k => NAV[k] && NAV[k][2]).map(k => ({ key: k, name: NAV[k][2] })); } catch (e) { return []; } }
 function knowKnown() { const out = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-30).map(x => ({ q: x.q, a: x.a })); try { (aboutState().answers || []).slice(-10).forEach(x => { if (x && x.text) out.push({ q: aboutAsk(ABOUT_QS.find(q => q.id === x.qid)) || x.qid, a: String(x.text).slice(0, 80) }); }); } catch (e) {} return out; }
@@ -10059,6 +10063,7 @@ async function knowPost(path, body) {
 }
 async function knowFetch() {
   const k = knowState(), T = todayISO();
+  if ((aiSumBusy || aiSumOpen !== homeSugOpenN) && (knowWait = (knowWait || 0) + 1) < 16) { setTimeout(knowFetch, 2500); return; } knowWait = 0; // wait for the summary first
   if (knowBusy || knowTried === homeSugOpenN || navigator.onLine === false) return;
   knowBusy = true; knowTried = homeSugOpenN;
   try {
