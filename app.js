@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.35';
+const APP_VERSION = '2.22.36';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2280,26 +2280,29 @@ function homeSumCard(bits) {
       });
       return clauses;
     };
+    // 2.22.36: bullet points, one thing per line. Overdue items keep their highlight.
     const ps = [];
-    const mustC = clausesOf(must);
-    if (mustC.length) {
-      const onlyLate = must.length && must.every(b => b.overdue);
-      ps.push('<p class="sumnote' + (onlyLate ? ' late' : '') + '">' + homeJoinClauses(mustC) + '.</p>');
-    }
-    if (mood) ps.push('<p class="sumnote">' + esc(mood) + (/[.!?]$/.test(mood) ? '' : '.') + '</p>');
-    if (where) ps.push('<p class="sumnote">' + esc(where) + (/[.!?]$/.test(where) ? '' : '.') + '</p>');
-    const timeItems = [];
-    if (hello) timeItems.push({ text: hello, overdue: false });
-    later.forEach(b => timeItems.push(b));
-    const timeC = clausesOf(timeItems);
-    if (timeC.length) ps.push('<p class="sumnote">' + homeJoinClauses(timeC) + '.</p>');
+    const dot = t => { const x = String(t || '').trim(); return x && !/[.!?]$/.test(x) ? x + '.' : x; };
+    const li = (html, late) => '<li class="sumli' + (late ? ' late' : '') + '">' + html + '</li>';
+    must.forEach(b => {
+      const bit = homeCapClause(homeStripEnd(b && b.text));
+      if (bit) ps.push(li(esc(dot(bit)), !!b.overdue));
+    });
+    if (hello) ps.push(li(esc(dot(homeCapClause(homeStripEnd(hello))))));
+    if (where) ps.push(li(esc(dot(where))));
+    if (mood) ps.push(li(esc(dot(mood))));
+    later.forEach(b => {
+      const bit = homeCapClause(homeStripEnd(b && b.text));
+      if (bit) ps.push(li(esc(dot(bit)), !!b.overdue));
+    });
     if (flavour) {
       const aside = homeCapClause(homeStripEnd(flavour));
-      const asks = /\?\s*$/.test(String(flavour)); // 2.22.30: a question keeps its question mark
-      if (aside) ps.push('<p class="sumnote">' + esc(aside) + (/[.!?]$/.test(aside) ? '' : asks ? '?' : '.') + '</p>');
+      const asks = /\?\s*$/.test(String(flavour));
+      if (aside) ps.push(li(esc(aside) + (/[.!?]$/.test(aside) ? '' : asks ? '?' : '.')));
     }
+    void clausesOf;
     if (!ps.length) return homeSumFallback();
-    return homeSceneCard(ps.join(''));
+    return homeSceneCard('<ul class="sumbul">' + ps.join('') + '</ul>');
   } catch (e) {
     try { return homeSumFallback(); } catch (e2) {
       try { return homeSumBareCard(); } catch (e3) {
