@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.71';
+const APP_VERSION = '2.22.72';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1777,6 +1777,44 @@ function feedTooWarm() {
     return wxHours(6).slice(0, 6).some(h => Number.isFinite(+h.temp) && +h.temp > 10);
   } catch (e) { return false; }
 }
+function waterCoolNow() {
+  try {
+    if (typeof WX === 'undefined' || !WX || !validWx(WX.data) || Date.now() - WX.at > 6 * 3600 * 1000) return false;
+    const now = WX.data.current && +WX.data.current.temperature_2m;
+    const hrs = wxHours(6);
+    if (!Number.isFinite(now) || hrs.length < 6) return false;
+    return now <= 10 && hrs.every(h => Number.isFinite(+h.temp) && +h.temp <= 10);
+  } catch (e) { return false; }
+}
+// First time in the next day and a half when it's 10 degrees or under for the following 5 hours, between 6am and 8pm.
+function waterRemindAt() {
+  try {
+    if (typeof WX === 'undefined' || !WX || !validWx(WX.data) || Date.now() - WX.at > 6 * 3600 * 1000) return null;
+    const hours = wxHours(36), now = nzStampLocal().slice(0, 16);
+    for (let i = 0; i + 5 < hours.length; i++) {
+      const win = hours.slice(i, i + 6);
+      if (!win.every(h => Number.isFinite(+h.temp) && +h.temp <= 10)) continue;
+      const date = win[0].t.slice(0, 10);
+      let hh = win[0].hr, mm = 5;
+      if (win[0].now) {
+        const p = now.slice(11).split(':'), m2 = (+p[1] || 0) + 20;
+        hh = (+p[0] || 0) + Math.floor(m2 / 60); mm = m2 % 60;
+      }
+      if (hh < 6 || hh > 20) continue;
+      const time = pad2(hh) + ':' + pad2(mm);
+      if (date + 'T' + time <= now) continue;
+      return { date, time };
+    }
+    return null;
+  } catch (e) { return null; }
+}
+function homeSugWater() {
+  try {
+    if (!waterCoolNow() || !homeSugChoreOk()) return null;
+    if (homeSugHas(/\bwater(ing)? (the )?(plant|plants|garden|pot)/i, -1, 1)) return null;
+    return { id: 'water', type: 'todo', text: "It's 10° or under for the next 5 hours, so it's a good time to water the plants.", pre: { title: 'Water the plants', due: todayISO(), priority: 'normal', list: 'Home' } };
+  } catch (e) { return null; }
+}
 function homeSugGardenFeed() {
   try {
     if (feedTooWarm()) return null;
@@ -2005,7 +2043,7 @@ function homeSugNewOpen() {
 homeSugNewOpen();
 function homeSuggestions() {
   // Gather every available type first. Duplicate skips stay inside each maker; Add buttons unchanged.
-  const makers = [homeSugUse, homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugGardenFeed, homeSugLawns, homeSugTv, homeSugShop, homeSugDogWalk, homeSugVet, homeSugIdea];
+  const makers = [homeSugUse, homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugWater, homeSugGardenFeed, homeSugLawns, homeSugTv, homeSugShop, homeSugDogWalk, homeSugVet, homeSugIdea];
   const avail = [];
   makers.forEach(fn => {
     let s = null;
@@ -2028,7 +2066,7 @@ function homeSuggestions() {
   // Fresh ones first, then last open's ones only if there are not enough others.
   const fresh = arr.filter(x => last.indexOf(key(x)) < 0), seen = arr.filter(x => last.indexOf(key(x)) >= 0);
   let pool = fresh.concat(seen);
-  ['use', 'tv', 'lawns', 'shop'].forEach(id => { const it = pool.find(x => x.id === id); if (it) pool = [it].concat(pool.filter(x => x !== it)); }); // 2.22.48/49: lawns day and wet-day TV always show
+  ['use', 'tv', 'lawns', 'shop', 'water'].forEach(id => { const it = pool.find(x => x.id === id); if (it) pool = [it].concat(pool.filter(x => x !== it)); }); // 2.22.48/49: lawns day and wet-day TV always show
   const pick = pool.slice(0, 3);
   homeSugPickN = homeSugOpenN;
   homeSugPickIds = pick.map(key);
@@ -7784,6 +7822,10 @@ async function scheduleReminders() {
           reminders.push({ id: 'sug-gymbag-' + tag, title: '🏋️ Gym tomorrow: pack your gym bag, and don’t forget a towel', date: addDays(T, add), time: '21:30', repeat: 'weekly' });
         });
       }
+    } catch (e) {}
+    try { // 2.22.72: water the plants only while it's 10 degrees or under for the next 5 hours
+      const w = waterRemindAt();
+      if (w && (S.settings || {}).waterPlants !== false) reminders.push({ id: 'sug-water', title: "💧 Water the plants. It's 10° or under for the next 5 hours.", date: w.date, time: w.time, repeat: 'none' });
     } catch (e) {}
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay) return '';
