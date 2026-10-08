@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.61';
+const APP_VERSION = '2.22.62';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7729,6 +7729,16 @@ async function scheduleReminders() {
     const k = nzStampLocal();
     const reminders = (S.reminders || []).filter(r => remRepeat(r) !== 'none' || remKey(r) >= k).map(r => ({ id: r.id, title: r.title, date: r.date, time: r.time, repeat: remRepeat(r) }));
     try { medReminders().forEach(r => reminders.push(r)); } catch (e) {} // 2.22.47
+    try { // 2.22.62: due dates as pushes even when the app is closed: 3 days before, on the day, and the day after if still not done (8am)
+      const k8 = nzStampLocal(), out = [];
+      dueItems(S).filter(x => x && x.kind !== 'todo' && x.date && x.days >= -1 && x.days <= 14).forEach(x => {
+        const key = (x.kind + '-' + x.title + '-' + x.date).replace(/[^\w-]/g, '').slice(0, 60);
+        [[addDays(x.date, -3), '🔔 ' + x.title + ' is due in 3 days', 'b'], [x.date, '🔔 ' + x.title + ' is due today', 'd'], [addDays(x.date, 1), '⚠️ ' + x.title + ' was due yesterday', 'o']]
+          .forEach(([d, t, s2]) => { if (d + 'T08:00' > k8) out.push({ id: 'due-' + s2 + '-' + key, title: t, date: d, time: '08:00', repeat: 'none' }); });
+      });
+      out.sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 30).forEach(r => reminders.push(r));
+    } catch (e) {}
+    try { sugPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.22.62
     try { if ((S.settings || {}).zeusCrate !== false) { const T = todayISO(), now = nzStampLocal().slice(11, 16); reminders.push({ id: 'zeus-crate', title: '🐕 Let Zeus out of his crate', date: now >= '07:00' ? addDays(T, 1) : T, time: '07:00', repeat: 'daily' }); } } catch (e) {} // 2.22.61
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay) return '';
@@ -10012,6 +10022,28 @@ async function bookSet(key, v) {
   const keep = {}; Object.entries(S.settings.bookAsk).forEach(([k, x]) => { if (k.split('|')[3] >= addDays(todayISO(), -90)) keep[k] = x; }); S.settings.bookAsk = keep;
   await save(); const el = document.getElementById('bookask'); if (el) { const h = homeTry('book ask', () => bookAskCard(), ''); if (h) el.outerHTML = h; else el.remove(); }
   if (v !== 'booked') toast('I’ll ask again in 3 days.');
+}
+/* 2.22.62: up to two suggestion pushes a day, picked from the current suggestions each time the app opens.
+   Work days: 30 minutes after finishing, and 9pm. Days off: 11:15am and 4:45pm. Never repeats a suggestion already pushed. */
+function sugPushes() {
+  const st = S.settings.sugPush && typeof S.settings.sugPush === 'object' ? S.settings.sugPush : (S.settings.sugPush = { day: '', slots: [], sent: [] });
+  if (!Array.isArray(st.sent)) st.sent = [];
+  const T = todayISO(), now = nzStampLocal().slice(11, 16), a = homeAklParts() || {};
+  if (st.day !== T) { (st.slots || []).forEach(x => { if (x.text) st.sent.push(x.text); }); st.day = T; st.slots = []; }
+  (st.slots || []).forEach(x => { if (x.text && x.time <= now && !st.sent.includes(x.text)) st.sent.push(x.text); });
+  st.sent = st.sent.slice(-80);
+  let times = ['11:15', '16:45'];
+  try { const r = rosterState(), k = String(a.dow); if (r.days[k]) { const fin = ((r.ends || {})[k]) || '18:00'; const m = (+fin.slice(0, 2)) * 60 + (+fin.slice(3)) + 30; const t1 = hmFromMin(Math.min(m, 23 * 60)); times = t1 < '20:30' ? [t1, '21:00'] : [t1]; } } catch (e) {}
+  let list = []; try { list = (aiSugList() || homeSuggestions() || []).map(x => String(x.text || '').trim()).filter(Boolean); } catch (e) {}
+  const used = new Set(st.sent.map(x => x.toLowerCase()));
+  const out = [];
+  times.forEach((t, i) => {
+    let slot = (st.slots || []).find(x => x.time === t);
+    if (t > now) { const pick = list.find(x => !used.has(x.toLowerCase())); if (pick) { used.add(pick.toLowerCase()); slot = { time: t, text: pick }; } }
+    if (slot && slot.text) { st.slots = (st.slots || []).filter(x => x.time !== t).concat([slot]); if (t > now) out.push({ id: 'sug-' + (i + 1), title: '💡 ' + slot.text.slice(0, 76), date: T, time: t, repeat: 'none' }); }
+  });
+  save().catch(() => {});
+  return out;
 }
 /* 2.22.57: Getting to know you. Now and then (one a day at most) the AI asks a new multiple-choice question;
    questions never repeat (every one asked is kept and sent back so the AI avoids it, and checked here too).

@@ -226,7 +226,7 @@ export async function runAlerts(env, closuresState, fetchImpl = fetch, now = Dat
 // repeat none fires once and leaves the pending list. daily / weekly / monthly stay scheduled
 // for the next Auckland occurrence (monthly: the same date, or the last day of a shorter month).
 const REM_KEY = 'push-reminders-v1';
-const MAX_REMS = 40;
+const MAX_REMS = 80;
 const REM_GRACE = 36 * 3600 * 1000;
 const REM_SLOP = 90 * 1000; // the minute just gone still counts, so a save during that minute is not skipped
 const REM_REPEATS = new Set(['daily', 'weekly', 'monthly']);
@@ -338,7 +338,7 @@ function scheduleNext(item, now) {
 export function cleanReminder(r, now = Date.now()) {
   if (!r || typeof r !== 'object') return null;
   const id = String(r.id || '');
-  if (!/^rem-[a-z0-9]{4,32}$/i.test(id)) return null;
+  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
   const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
   if (!title) return null;
   const date = String(r.date || ''), time = String(r.time || '');
