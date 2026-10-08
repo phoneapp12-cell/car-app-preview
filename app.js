@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.63';
+const APP_VERSION = '2.22.64';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1995,7 +1995,7 @@ function homeSugNewOpen() {
 homeSugNewOpen();
 function homeSuggestions() {
   // Gather every available type first. Duplicate skips stay inside each maker; Add buttons unchanged.
-  const makers = [homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugGardenFeed, homeSugLawns, homeSugTv, homeSugShop, homeSugDogWalk, homeSugVet, homeSugIdea];
+  const makers = [homeSugUse, homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugGardenFeed, homeSugLawns, homeSugTv, homeSugShop, homeSugDogWalk, homeSugVet, homeSugIdea];
   const avail = [];
   makers.forEach(fn => {
     let s = null;
@@ -2018,7 +2018,7 @@ function homeSuggestions() {
   // Fresh ones first, then last open's ones only if there are not enough others.
   const fresh = arr.filter(x => last.indexOf(key(x)) < 0), seen = arr.filter(x => last.indexOf(key(x)) >= 0);
   let pool = fresh.concat(seen);
-  ['tv', 'lawns', 'shop'].forEach(id => { const it = pool.find(x => x.id === id); if (it) pool = [it].concat(pool.filter(x => x !== it)); }); // 2.22.48/49: lawns day and wet-day TV always show
+  ['use', 'tv', 'lawns', 'shop'].forEach(id => { const it = pool.find(x => x.id === id); if (it) pool = [it].concat(pool.filter(x => x !== it)); }); // 2.22.48/49: lawns day and wet-day TV always show
   const pick = pool.slice(0, 3);
   homeSugPickN = homeSugOpenN;
   homeSugPickIds = pick.map(key);
@@ -2095,6 +2095,7 @@ function aiSumCtx() {
       ctx.tip = { topic: topics[Math.floor(Math.random() * topics.length)], area: areas[Math.floor(Math.random() * areas.length)] };
     }
   } catch (e) {}
+  try { const hb = useHabits(); if (hb.length) ctx.habits = hb; } catch (e) {}
   try { ctx.knowMe = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-12).map(x => x.q + ' ' + x.a); } catch (e) {}
   ctx.facts = AI_FACTS;
   return ctx;
@@ -2144,7 +2145,8 @@ function aiSugList() {
     return { id: 'ai' + i, type, text: String(x.text || title), pre };
   }).filter(x => x.text);
   let tv = null, shop = null; try { tv = homeSugTv(); } catch (e) {} try { shop = homeSugShop(); } catch (e) {}
-  return [shop, lawn, tv].filter(Boolean).concat(out);
+  let use = null; try { use = homeSugUse(); } catch (e) {}
+  return [shop, lawn, tv, use].filter(Boolean).concat(out);
 }
 function homeSugHtml() {
   let list = [];
@@ -10026,6 +10028,38 @@ async function bookSet(key, v) {
   const keep = {}; Object.entries(S.settings.bookAsk).forEach(([k, x]) => { if (k.split('|')[3] >= addDays(todayISO(), -90)) keep[k] = x; }); S.settings.bookAsk = keep;
   await save(); const el = document.getElementById('bookask'); if (el) { const h = homeTry('book ask', () => bookAskCard(), ''); if (h) el.outerHTML = h; else el.remove(); }
   if (v !== 'booked') toast('I’ll ask again in 3 days.');
+}
+/* 2.22.64: learn from how he uses the app. Every tab opened and button pressed is logged on this phone only
+   (localStorage 'useLog', last 35 days), then patterns (same weekday and time on 2+ different weeks) become
+   an "Open" suggestion and a short habits list for the AI summary. Nothing leaves the phone except that short list. */
+let USELOG = []; try { USELOG = JSON.parse(localStorage.getItem('useLog') || '[]'); if (!Array.isArray(USELOG)) USELOG = []; } catch (e) { USELOG = []; }
+let useSaveT = 0;
+function useMark(key) {
+  try { const a = homeAklParts() || {}; if (!key) return;
+    USELOG.push([todayISO(), a.dow, Math.floor((a.min || 0) / 60), String(key).slice(0, 40)]);
+    const cut = addDays(todayISO(), -35); if (USELOG.length > 4000 || (USELOG[0] && USELOG[0][0] < cut)) USELOG = USELOG.filter(x => x[0] >= cut).slice(-4000);
+    clearTimeout(useSaveT); useSaveT = setTimeout(() => { try { localStorage.setItem('useLog', JSON.stringify(USELOG)); } catch (e) {} }, 1500);
+  } catch (e) {}
+}
+try {
+  window.addEventListener('hashchange', () => { const h = (location.hash || '#home').slice(1).split(/[?\/]/)[0]; if (h && h !== 'home') useMark('tab:' + h); });
+  document.addEventListener('click', e => { try { const b = e.target && e.target.closest && e.target.closest('button,a'); if (!b) return; const t = String(b.getAttribute('aria-label') || b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30); if (t) useMark('btn:' + ((location.hash || '#home').slice(1).split(/[?\/]/)[0] || 'home') + ':' + t); } catch (e2) {} }, true);
+} catch (e) {}
+const USE_WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const useTod = h => h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
+function useTabName(k) { try { return (NAV[k] && NAV[k][2]) || ''; } catch (e) { return ''; } }
+function homeSugUse() {
+  const a = homeAklParts() || {}, h = Math.floor((a.min || 0) / 60), T = todayISO(), cur = (location.hash || '#home').slice(1);
+  const days = {}, today = new Set();
+  USELOG.forEach(([d, dw, hr, k]) => { if (!/^tab:/.test(k) || dw !== a.dow || Math.abs(hr - h) > 1) return; const tab = k.slice(4); if (d === T) { today.add(tab); return; } (days[tab] = days[tab] || new Set()).add(d); });
+  const best = Object.keys(days).filter(t => days[t].size >= 2 && !today.has(t) && t !== cur && useTabName(t)).sort((x, y) => days[y].size - days[x].size)[0];
+  if (!best) return null;
+  return { id: 'use', type: 'open', go: '#' + best, text: 'You often open ' + useTabName(best) + ' around now on ' + USE_WD[a.dow] + 's.' };
+}
+function useHabits() {
+  const c = {};
+  USELOG.forEach(([d, dw, hr, k]) => { let lab = ''; if (/^tab:/.test(k)) lab = useTabName(k.slice(4)); else if (/^btn:/.test(k)) { const p = k.split(':'); lab = (useTabName(p[1]) || p[1]) + ' "' + p.slice(2).join(':') + '"'; } if (!lab) return; const key = lab + '|' + (dw === 0 || dw === 6 ? 'weekend' : 'weekday') + ' ' + useTod(hr); (c[key] = c[key] || new Set()).add(d); });
+  return Object.keys(c).filter(k => c[k].size >= 3).sort((x, y) => c[y].size - c[x].size).slice(0, 8).map(k => { const [lab, when] = k.split('|'); return 'uses ' + lab + ' on ' + when + 's (' + c[k].size + ' days)'; });
 }
 /* 2.22.62: up to two suggestion pushes a day, picked from the current suggestions each time the app opens.
    Work days: 30 minutes after finishing, and 9pm. Days off: 11:15am and 4:45pm. Never repeats a suggestion already pushed. */
