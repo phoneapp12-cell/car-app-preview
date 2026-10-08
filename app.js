@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.79';
+const APP_VERSION = '2.22.80';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2030,6 +2030,31 @@ function eveCareTodo() {
     eveCareBusy = true;
     save().catch(() => {}).finally(() => { eveCareBusy = false; try { render(); } catch (e) {} });
   } catch (e) { eveCareBusy = false; }
+}
+
+// 2.22.80: Dishwasher and Washing go on today's list on a roster day off, once that day.
+let offChoreBusy = false;
+function offChoreTodo() {
+  try {
+    if (offChoreBusy || !S || !Array.isArray(S.todos)) return;
+    const T = todayISO();
+    if (!lawnOffDay(T)) return;
+    S.settings = S.settings || {};
+    if (S.settings.offChore === T) return;
+    const list = (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home');
+    let added = false;
+    ['Dishwasher', 'Washing'].forEach(title => {
+      const same = t => t && String(t.title || '').trim().toLowerCase() === title.toLowerCase();
+      if (S.todos.some(t => same(t) && t.due === T)) return;
+      if (S.todos.some(t => same(t) && !t.done)) return;
+      S.todos.push({ id: uid('todo'), title, list, due: T, notes: '', priority: 'normal', done: false, created: Date.now() });
+      added = true;
+    });
+    S.settings.offChore = T;
+    if (!added) return;
+    offChoreBusy = true;
+    save().catch(() => {}).finally(() => { offChoreBusy = false; try { render(); } catch (e) {} });
+  } catch (e) { offChoreBusy = false; }
 }
 /* 2.22.49: Wet day at home: suggest a movie or comedy that's on free-to-air TV, from the free NZ TV guide
    (i.mjh.nz, which allows the app to read it). Fetched only when it's wet and Shane is at home, once a day
@@ -8857,6 +8882,7 @@ function paintHomeSum() {
   try { feedWarmTodo(); } catch (e) {}
   try { waterAutoTodo(); } catch (e) {}
   try { eveCareTodo(); } catch (e) {}
+  try { offChoreTodo(); } catch (e) {}
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
   if ((h !== 'home' && h !== '') || homeEdit) return;
