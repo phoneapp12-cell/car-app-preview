@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.33';
+const APP_VERSION = '2.22.34';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1817,10 +1817,16 @@ function homeSugLawns() {
 }
 function homeSugDogWalk() {
   try {
-    // 2.22.33: Shane walks Zeus on weekends, so only suggest it Saturday/Sunday daytime.
+    // 2.22.34: Shane walks Zeus on his weekends, which are his days off in the Work roster tab.
+    // If the roster has no days set, fall back to Saturday and Sunday. Daytime only.
     let wd = new Date().getDay(), hr = new Date().getHours();
-    try { const c = DD.nzClock(new Date()); if (c && Number.isFinite(c.min)) hr = Math.floor(c.min / 60); if (c && c.iso) wd = new Date(c.iso + 'T12:00:00').getDay(); } catch (e) {}
-    if (wd !== 0 && wd !== 6) return null;
+    try { const parts = homeAklParts(); if (parts) { wd = parts.dow; hr = Math.floor(parts.min / 60); } } catch (e) {}
+    let off = wd === 0 || wd === 6;
+    try {
+      const days = rosterState().days || {};
+      if (Object.keys(days).length) off = !days[String(wd)];
+    } catch (e) {}
+    if (!off) return null;
     if (hr < 8 || hr >= 18) return null;
     const dogs = (S.pets || []).filter(p => p && p.type === 'dog');
     let names = dogs.map(p => String(p.name || '').trim()).filter(n => n && n.toLowerCase() !== 'pet');
@@ -1830,7 +1836,7 @@ function homeSugDogWalk() {
     const re = new RegExp('\\b(walk|walking)\\b.*\\b(' + whoRe + ')\\b|\\b(' + whoRe + ')\\b.*\\b(walk|walking)\\b|\\bdog walk\\b', 'i');
     if (homeSugHas(re, -1, 2)) return null;
     const date = todayISO();
-    const lines = ['A walk with ' + who + (hr < 12 ? ' this morning?' : ' this afternoon?'), 'A beach walk with ' + who + ' today?', 'Bushwalk with ' + who + ' this weekend?', 'Good day for a walk with ' + who + '?'];
+    const lines = ['A walk with ' + who + (hr < 12 ? ' this morning?' : ' this afternoon?'), 'A beach walk with ' + who + ' today?', 'Bushwalk with ' + who + ' today?', 'Good day for a walk with ' + who + '?'];
     const line = lines[Math.abs((homeSugOpenN || 0) + new Date().getDate()) % lines.length];
     return { id: 'walk', type: 'todo', text: line,
       pre: { title: 'Walk ' + (names.length === 1 ? names[0] : 'the dog'), due: date, priority: 'normal', list: 'Home' } };
@@ -2712,6 +2718,7 @@ function homeOverviewBody(shown, urgentOut) {
   const atGym = homeTry('named place', () => { const p = placeHere(); return !!p && p !== 'home' && p !== 'work'; }, false);
   if (!atGym) {
     try { pushBit('roster', rosterHeadsUp(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
+    try { pushBit('finish', rosterFinishLine(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
     try { pushBit('drive', homeDriveLine()); } catch (e) {}
   }
   return homeSumCard(urgent);
@@ -11791,14 +11798,21 @@ function normRoster(raw) {
     const hm = String(src[k] || '');
     if (/^([01]\d|2[0-3]):[0-5]\d$/.test(hm)) days[k] = hm;
   });
-  return { days };
+  // 2.22.34: optional finish time per day.
+  const ends = {};
+  const esrc = raw && typeof raw === 'object' && raw.ends && typeof raw.ends === 'object' ? raw.ends : {};
+  ROSTER_DAYS.forEach(([k]) => {
+    const hm = String(esrc[k] || '');
+    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(hm)) ends[k] = hm;
+  });
+  return { days, ends };
 }
 function aboutState() {
   if (!S.about || typeof S.about !== 'object' || !Array.isArray(S.about.answers)) S.about = normAbout(S.about);
   return S.about;
 }
 function rosterState() {
-  if (!S.roster || typeof S.roster !== 'object' || !S.roster.days) S.roster = normRoster(S.roster);
+  if (!S.roster || typeof S.roster !== 'object' || !S.roster.days || !S.roster.ends) S.roster = normRoster(S.roster);
   return S.roster;
 }
 function aboutKnown(id) {
@@ -12105,6 +12119,22 @@ function rosterHeadsUp(a, atWork) {
     ]);
   } catch (e) { return ''; }
 }
+// 2.22.34: at work, in the last 90 minutes before the roster finish, one calm line.
+function rosterFinishLine(a, atWork) {
+  try {
+    if (!atWork) return '';
+    const parts = a || homeAklParts();
+    if (!parts) return '';
+    const r = rosterState();
+    const hm = (r.ends || {})[String(parts.dow)];
+    if (!r.days[String(parts.dow)] || !/^([01]\d|2[0-3]):[0-5]\d$/.test(hm || '')) return '';
+    const end = (+hm.slice(0, 2)) * 60 + (+hm.slice(3));
+    const left = end - parts.min;
+    if (left <= 0 || left > 90) return '';
+    const when = fmtTime(hm);
+    return homePick(33, ['You finish at ' + when + ' today.', 'Knock-off is ' + when + ' today.', when + ' finish today.']);
+  } catch (e) { return ''; }
+}
 function rosterNext() {
   const slot = rosterSlot();
   if (slot && slot.nowMin < slot.start) return fmtTime(slot.hm);
@@ -12335,11 +12365,27 @@ async function deleteAbout(id) {
   toast('Answer deleted.', 'Undo', undoTo(snapS));
 }
 function Roster() {
-  const days = rosterState().days;
-  const rows = ROSTER_DAYS.map(([k, name]) => `<div class="srow"><div class="tx"><div class="t">${name}</div><div class="s">${days[k] ? 'Starts ' + esc(fmtTime(days[k])) : 'Day off'}</div></div><input type="time" aria-label="${name} start" value="${esc(days[k] || '')}" onchange="setRosterDay('${k}', this.value)"></div>`).join('');
-  return header('Work roster', 'The days and times you start') +
+  const r = rosterState(), days = r.days, ends = r.ends || {};
+  const rows = ROSTER_DAYS.map(([k, name]) => {
+    const sub = days[k] ? 'Starts ' + esc(fmtTime(days[k])) + (ends[k] ? ' · Finishes ' + esc(fmtTime(ends[k])) : '') : 'Day off';
+    return `<div class="srow rosterrow"><div class="tx"><div class="t">${name}</div><div class="s">${sub}</div></div>` +
+      `<div class="rostertimes"><label class="rt"><span>Start</span><input type="time" aria-label="${name} start" value="${esc(days[k] || '')}" onchange="setRosterDay('${k}', this.value)"></label>` +
+      `<label class="rt"><span>Finish</span><input type="time" aria-label="${name} finish" value="${esc(ends[k] || '')}" onchange="setRosterEnd('${k}', this.value)"${days[k] ? '' : ' disabled'}></label></div></div>`;
+  }).join('');
+  return header('Work roster', 'The days and times you start and finish') +
     `<div class="list" id="rosterlist">${rows}</div>` +
-    '<div class="foot">Only a day with a time counts. The home summary uses that start. It does not guess a time, and it does not chase you once the start has passed.</div>';
+    '<div class="foot">Only a day with a start time counts as a work day. Days with no start are your days off. The summary uses the start for drive time and the finish to tell you when you knock off.</div>';
+}
+async function setRosterEnd(day, value) {
+  if (!ROSTER_DAYS.some(d => d[0] === day)) return;
+  const snapS = snap();
+  const r = rosterState();
+  if (!r.ends) r.ends = {};
+  if (value && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)) r.ends[day] = value;
+  else delete r.ends[day];
+  await save();
+  render();
+  toast(value ? 'Finish time saved.' : 'Finish time cleared.', 'Undo', undoTo(snapS));
 }
 async function setRosterDay(day, value) {
   if (!ROSTER_DAYS.some(d => d[0] === day)) return;
