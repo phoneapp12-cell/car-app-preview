@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.49';
+const APP_VERSION = '2.22.50';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3655,7 +3655,7 @@ function todoForm(id, pre) {
     field('Due date', inp('due', t.due, 'type="date"'), 'Optional') +
     field('Notes', area('notes', t.notes)) +
     (id ? todoStepsBlock(t, 'sheet') : '') +
-    (id ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="tick('${id}')">${I('check')} ${t.done ? 'Mark not done' : 'Mark complete'}</button>${t.done ? '' : `<button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button>`}</div>` : ''),
+    (id ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="tick('${id}')">${I('check')} ${t.done ? 'Mark not done' : 'Mark complete'}</button>${t.done ? '' : `<button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button>${todoAppt(t) ? `<button type="button" class="btn" onclick="apptToTodo('${todoAppt(t).id}')">${I('check')} Take off calendar</button>` : ''}`}</div>` : ''),
     async v => {
       if (!v.title) return 'Please type the to-do.';
       const priority = todoPriority({ priority: v.priority });
@@ -3902,7 +3902,26 @@ function apptForm(id, date, pre) {
       }
       await save(); render(); toast(id ? 'Appointment updated.' : 'Appointment added.');
     }, id ? 'Save' : 'Add',
-    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete appointment" onclick="deleteAppt('${id}')">${I('trash')}</button>` : '');
+    id ? `<button type="button" class="btn" style="flex:0 0 auto" aria-label="Move to your to-do list" onclick="apptToTodo('${id}')">${I('check')} To-do</button><button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete appointment" onclick="deleteAppt('${id}')">${I('trash')}</button>` : '');
+}
+/* 2.22.50: move a calendar entry back to the to-do list. A to-do that was added to the calendar just comes off
+   the calendar (the to-do stays, with the time kept in its notes only if it already had one); any other
+   appointment becomes a to-do due that day and leaves the calendar. Undo is offered. */
+async function apptToTodo(id) {
+  const a = S.appts.find(x => x.id === id); if (!a) return;
+  const s = snap();
+  const t = a.todoId ? S.todos.find(x => x.id === a.todoId) : (S.todos || []).find(x => x && x.apptId === id);
+  S.appts = S.appts.filter(x => x.id !== id);
+  if (t) { delete t.apptId; t.done = false; if (a.date && parseD(a.date)) t.due = a.date; }
+  else {
+    const list = (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home');
+    const td = { id: uid('todo'), title: a.title, list, due: a.date || '', notes: [a.time ? 'At ' + fmtTime(a.time) + '.' : '', a.notes || ''].filter(Boolean).join(' '), priority: 'normal', done: false, created: Date.now() };
+    S.todos.push(td);
+  }
+  await save();
+  if (sheetOpen) await closeSheet();
+  render();
+  toast('Moved to your to-do list.', 'Undo', undoTo(s));
 }
 async function deleteAppt(id) {
   const s = snap(); S.appts = S.appts.filter(x => x.id !== id); await save(); await closeSheet(); render(); toast('Appointment deleted.', 'Undo', undoTo(s));
