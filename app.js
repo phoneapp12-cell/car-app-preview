@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.54';
+const APP_VERSION = '2.22.55';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3050,7 +3050,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -9918,6 +9918,66 @@ async function routineAdd(key) {
 }
 async function routineNo(key) { S.settings.routineAsk = Object.assign({}, S.settings.routineAsk, { [key]: 'no' }); await save(); routineSwap(); }
 function routineSwap() { const el = document.getElementById('routineask'); if (el) { const h = homeTry('routine ask', () => routineAskCard(), ''); if (h) el.outerHTML = h; else el.remove(); } }
+/* 2.22.55: Ask to book. Things that need an appointment (car WOF and service, licence renewal, pet vaccinations,
+   vet check-ups and grooming, health check-ups and immunisations) are offered for booking from 10 days before
+   they're due (or once overdue), one at a time, unless a matching appointment is already in the calendar from
+   today on. Rego, flea, worming, registration and AA renewals are left out (no appointment needed).
+   Answers kept in S.settings.bookAsk: 'booked' for that due date, or a snooze date. */
+function bookWords(x) {
+  const low = v => String(v || '').toLowerCase();
+  if (x.kind === 'car') return { must: [low(x.car && x.car.name), low(x.car && x.car.plate)].filter(Boolean), any: x.part === 'wof' ? ['wof', 'warrant'] : ['service', 'mechanic', 'servicing'] };
+  if (x.kind === 'driver') return { must: [], any: ['licence', 'license'] };
+  if (x.kind === 'pet') return { must: [low(x.pet && x.pet.name)].filter(Boolean).concat(['vet', 'groom']), any: ['vet', 'vacc', 'groom', 'check', 'jab', 'booster', low(x.care && x.care.name)] , pet: true };
+  if (x.kind === 'health') return { must: [], any: [low(x.item && x.item.name)].concat(/immun|vacc|jab|flu|covid/i.test(x.item && x.item.name) ? ['immun', 'vacc', 'jab', 'flu'] : []).filter(Boolean) };
+  return null;
+}
+function bookNeeds(x) {
+  if (x.kind === 'car') return x.part === 'wof' || x.part === 'svc';
+  if (x.kind === 'driver') return x.part === 'lic';
+  if (x.kind === 'pet') return /vacc|vet|check|groom|booster|desex|dental/i.test(String(x.care && x.care.name || ''));
+  if (x.kind === 'health') return true;
+  return false;
+}
+function bookHas(x) {
+  const w = bookWords(x); if (!w) return false;
+  const T = todayISO(), until = addDays(x.date > T ? x.date : T, 30);
+  const rows = [];
+  try { (S.appts || []).forEach(a => { if (a && a.date >= T && a.date <= until) rows.push(String(a.title || '') + ' ' + String(a.notes || '')); }); } catch (e) {}
+  try { const t0 = todayT(); extEvents(t0, t0 + 40 * DAY).forEach(e => rows.push(String(e.title || ''))); } catch (e) {}
+  try { (S.myEvents || []).forEach(e => { if (e && !e.done && e.start >= T && e.start <= until) rows.push(String(e.title || '')); }); } catch (e) {}
+  return rows.some(r => { const t = r.toLowerCase(); const anyHit = w.any.some(k => k && t.includes(k)); if (!anyHit) return false; if (w.pet) return w.must.some(k => k && t.includes(k));
+    if (x.kind === 'car') { if (w.must.some(k => k && t.includes(k))) return true; const others = (S.cars || []).filter(c => c && c.id !== x.id).map(c => String(c.name || '').toLowerCase()).filter(Boolean); return !others.some(n => t.includes(n)); }
+    return true; });
+}
+function bookCands() {
+  const st = (S.settings && S.settings.bookAsk) || {}, T = todayISO();
+  return dueItems(S).filter(x => x.days <= 10 && x.days >= -60 && bookNeeds(x)).filter(x => {
+    const k = x.kind + '|' + x.id + '|' + x.part + '|' + x.date, v = st[k];
+    if (v === 'booked' || (v && v > T)) return false;
+    return !bookHas(x);
+  }).map(x => Object.assign({ key: x.kind + '|' + x.id + '|' + x.part + '|' + x.date }, x));
+}
+function bookAskCard() {
+  const c = bookCands()[0]; if (!c) return '';
+  const when = c.days < 0 ? 'was due ' + fmtW(c.date) : c.days === 0 ? 'is due today' : 'is due ' + homeSugDay(c.date);
+  const who = c.kind === 'pet' ? 'Book the vet or groomer for it?' : c.kind === 'car' ? 'Book it in?' : 'Book an appointment?';
+  return `<div class="card" id="bookask"><div class="t" style="font-weight:800;margin-bottom:4px">Time to book?</div>
+    <div class="s">${esc(c.title)} ${esc(when)}. ${esc(who)}</div>
+    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn primary small" onclick="bookIt(${jsArg(c.key)})">${I('cal')} Book it</button><button type="button" class="btn small" onclick="bookSet(${jsArg(c.key)},'booked')">Already booked</button><button type="button" class="btn small" onclick="bookSet(${jsArg(c.key)},'later')">Not now</button></div></div>`;
+}
+function bookIt(key) {
+  const c = bookCands().find(x => x.key === key); if (!c) return;
+  // Suggest the first roster day off from tomorrow, before the due date if possible.
+  const T = todayISO(); let d = addDays(T, 1);
+  for (let i = 1; i <= 10; i++) { const x = addDays(T, i); if (lawnOffDay(x)) { d = x; break; } }
+  apptForm(null, d, { title: c.title.replace(/\s+–\s+/, ' ') + (c.kind === 'car' ? '' : ' appointment'), time: '', notes: 'Due ' + fmtW(c.date) + '.' });
+}
+async function bookSet(key, v) {
+  S.settings.bookAsk = Object.assign({}, S.settings.bookAsk, { [key]: v === 'booked' ? 'booked' : addDays(todayISO(), 3) });
+  const keep = {}; Object.entries(S.settings.bookAsk).forEach(([k, x]) => { if (k.split('|')[3] >= addDays(todayISO(), -90)) keep[k] = x; }); S.settings.bookAsk = keep;
+  await save(); const el = document.getElementById('bookask'); if (el) { const h = homeTry('book ask', () => bookAskCard(), ''); if (h) el.outerHTML = h; else el.remove(); }
+  if (v !== 'booked') toast('I’ll ask again in 3 days.');
+}
 /* 2.22.47: Medications. Each pill has a name, optional dose and a usual time. Tick it off each day (the tick
    records the time). A reminder goes out at the pill's time through the same push reminders as the Reminders
    page, scheduled for today if it's still to come and not ticked, otherwise tomorrow; ticking re-schedules it,
