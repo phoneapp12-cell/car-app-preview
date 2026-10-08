@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.75';
+const APP_VERSION = '2.22.76';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1925,7 +1925,7 @@ function lawnNext() {
 function homeSugLawns() {
   try {
     const a = homeAklParts();
-    if (!a || a.hour < 7 || a.hour >= 18) return null;
+    if (!a || a.hour < 9 || a.hour >= 18) return null;
     if (homeWhere() === 'work') return null;
     const T = todayISO();
     if (lawnDue() > T || !lawnOffDay(T) || lawnSunny(T) !== true) return null;
@@ -1939,12 +1939,13 @@ function lawnAutoTodo() {
   try {
     if (lawnAutoBusy || !S || !Array.isArray(S.todos)) return;
     const a = homeAklParts();
-    if (!a || a.hour < 6 || a.hour >= 18) return;
+    if (!a) return;
     const T = todayISO();
     S.settings = S.settings || {};
     const re = /\b(mow|mowing|lawn|lawns)\b/i;
     const open = t => t && !t.done && re.test(String(t.title || '')) && (!t.due || t.due === T);
-    if (lawnRainClose() === true) {
+    const daytime = a.hour >= 9 && a.hour < 18;
+    if (!daytime || lawnRainClose() === true) {
       if (!S.todos.some(open)) return;
       lawnAutoBusy = true;
       S.todos = S.todos.filter(t => !open(t));
