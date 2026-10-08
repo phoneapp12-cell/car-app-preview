@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.39';
+const APP_VERSION = '2.22.40';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2933,7 +2933,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -7712,6 +7712,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
   roster: ['clock', 'roster', 'Work roster', 'Roster'],
+  sleep: ['moon', 'roster', 'Sleep', 'Sleep'],
   diary: ['book', 'diary', 'Diary', 'Diary'],
   countdown: ['clock', 'count', 'Countdown', 'Countdown'],
   notes: ['note', 'note', 'Notes', 'Notes']
@@ -7720,7 +7721,7 @@ const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'diary', 'countdown', 'notes'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'sleep', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
@@ -9545,6 +9546,71 @@ async function addAklConcert(title, date, venue) {
   S.appts.push({ id: uid('appt'), title, date, time: '', notes: venue + ', Auckland' });
   await save(); const el = document.getElementById('aklcard'); if (el) el.outerHTML = aklConcertsCard();
   toast('Added to your calendar.', 'Undo', undoTo(s));
+}
+/* 2.22.40: Sleep. My App can only see its own use, so it logs when the app is open or put away (and every
+   5 minutes while it's in front of you), kept on this phone for 28 days. A night is read from 6pm to 2pm the
+   next day: the longest quiet stretch of 3 hours or more is the main sleep, and any other quiet stretch of 90
+   minutes or more (falling asleep on the couch, then bed at 2 or 3am) counts towards the total. A one-tap
+   morning check-in rates the night. Plain numbers only, no advice or nagging. */
+const SLEEP_RATES = [['great', 'Great', '😴'], ['ok', 'OK', '🙂'], ['rough', 'Rough', '😕'], ['bad', 'Barely slept', '😩']];
+function sleepAct() { try { const a = JSON.parse(localStorage.getItem('sleepAct') || '[]'); return Array.isArray(a) ? a.filter(Number.isFinite) : []; } catch (e) { return []; } }
+function sleepMark() {
+  try {
+    const now = Date.now(), a = sleepAct(), last = a[a.length - 1];
+    if (last && now - last < 60000) return;
+    a.push(now);
+    const cut = now - 28 * 86400000;
+    localStorage.setItem('sleepAct', JSON.stringify(a.filter(t => t > cut).slice(-4000)));
+  } catch (e) {}
+}
+function sleepRates() { try { return JSON.parse(localStorage.getItem('sleepRate') || '{}') || {}; } catch (e) { return {}; } }
+function nzISO(ms) { try { return DD.nzClock(new Date(ms)).iso; } catch (e) { return ''; } }
+function nzMin(ms) { try { return DD.nzClock(new Date(ms)).min; } catch (e) { return NaN; } }
+function nzHM(ms) { const m = nzMin(ms); if (!Number.isFinite(m)) return ''; const h = Math.floor(m / 60), mm = m % 60; return (h % 12 || 12) + ':' + String(mm).padStart(2, '0') + (h < 12 ? 'am' : 'pm'); }
+function durTxt(ms) { const m = Math.round(ms / 60000), h = Math.floor(m / 60); return h + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : ''); }
+// nights keyed by the morning's date (Pacific/Auckland)
+function sleepNights() {
+  const a = sleepAct(); if (a.length < 2) return [];
+  const byMorning = {};
+  for (let i = 1; i < a.length; i++) {
+    const s0 = a[i - 1], s1 = a[i], gap = s1 - s0;
+    if (gap < 90 * 60000 || gap > 20 * 3600000) continue;
+    const mid = s0 + gap / 2, mm = nzMin(mid);
+    if (!Number.isFinite(mm) || (mm >= 14 * 60 && mm < 18 * 60)) continue;
+    const key = mm >= 18 * 60 ? nzISO(mid + 12 * 3600000) : nzISO(mid);
+    (byMorning[key] = byMorning[key] || []).push({ s0, s1, gap });
+  }
+  const rates = sleepRates();
+  return Object.keys(byMorning).sort().reverse().map(k => {
+    const g = byMorning[k], main = g.reduce((x, y) => y.gap > x.gap ? y : x);
+    if (main.gap < 3 * 3600000) return null;
+    return { day: k, start: main.s0, end: main.s1, main: main.gap, total: g.reduce((t, x) => t + x.gap, 0), parts: g.length, rate: rates[k] || '' };
+  }).filter(Boolean);
+}
+function sleepCheckCard() {
+  const a = homeAklParts(); if (!a || a.hour < 5 || a.hour >= 14) return '';
+  const today = nzISO(Date.now()), r = sleepRates();
+  if (r[today]) return '';
+  return `<div class="card" id="sleepask"><div class="t" style="font-weight:800;margin-bottom:8px">How did you sleep?</div><div class="chips">${SLEEP_RATES.map(x => `<button class="chip" onclick="sleepRate(${jsArg(x[0])})">${x[2]} ${x[1]}</button>`).join('')}</div></div>`;
+}
+function sleepRate(v) {
+  try { const r = sleepRates(); r[nzISO(Date.now())] = v; localStorage.setItem('sleepRate', JSON.stringify(r)); } catch (e) {}
+  const el = document.getElementById('sleepask'); if (el) el.remove();
+  toast('Saved. See it in Sleep.');
+}
+function Sleep() {
+  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
+  const head = back + header('Sleep', 'Worked out from when you use My App');
+  const n = sleepNights(), rl = Object.fromEntries(SLEEP_RATES.map(x => [x[0], x[2] + ' ' + x[1]]));
+  if (!n.length) return head + `<div class="card empty"><div class="t">Learning your nights</div><div class="s">From now on My App notes when you open it and put it away. After a night or two, your sleep shows here. The morning check-in on Notifications adds how it felt.</div></div>`;
+  const wk = n.slice(0, 7), avg = ms => durTxt(ms.reduce((t, x) => t + x, 0) / ms.length);
+  const avgMin = list => { const v = list.map(x => { const m = nzMin(x); return m < 12 * 60 ? m + 1440 : m; }); const m = Math.round(v.reduce((t, x) => t + x, 0) / v.length) % 1440; return (Math.floor(m / 60) % 12 || 12) + ':' + String(m % 60).padStart(2, '0') + (Math.floor(m / 60) < 12 ? 'am' : 'pm'); };
+  const avgWake = list => { const v = list.map(nzMin); const m = Math.round(v.reduce((t, x) => t + x, 0) / v.length); return (Math.floor(m / 60) % 12 || 12) + ':' + String(m % 60).padStart(2, '0') + (Math.floor(m / 60) < 12 ? 'am' : 'pm'); };
+  const top = `<div class="card"><div class="t" style="font-weight:800;margin-bottom:6px">Last ${wk.length} night${wk.length === 1 ? '' : 's'}</div>
+    <div class="s">Average ${avg(wk.map(x => x.total))} a night. Usually down around ${avgMin(wk.map(x => x.start))} and up around ${avgWake(wk.map(x => x.end))}.</div></div>`;
+  const rows = n.slice(0, 14).map(x => `<div class="row" style="padding:8px 0;align-items:center"><div style="flex:1"><div class="t" style="font-weight:700">${esc(fmtW ? fmtW(x.day) : x.day)}</div>
+    <div class="s">${nzHM(x.start)} to ${nzHM(x.end)} · ${durTxt(x.main)}${x.parts > 1 ? ' (' + durTxt(x.total) + ' total, in ' + x.parts + ' goes)' : ''}</div></div><div class="s">${esc(rl[x.rate] || '')}</div></div>`).join('');
+  return head + top + `<div class="card">${rows}</div><div class="foot">Only uses times My App was open, so a late scroll in another app won’t show. Kept on this phone only.</div>`;
 }
 function Events() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
@@ -12543,7 +12609,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, sleep: Sleep };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -12967,6 +13033,9 @@ async function start() {
   await setupBackground();
   if (!sheetOpen && location.hash === '#settings') render();
   check();
+  try { sleepMark(); setInterval(() => { if (document.visibilityState === 'visible') sleepMark(); }, 5 * 60000); } catch (e) {}
+  document.addEventListener('visibilitychange', () => { try { sleepMark(); } catch (e) {} });
+  window.addEventListener('pagehide', () => { try { sleepMark(); } catch (e) {} });
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
     try { homeSugNewOpen(); } catch (e) {}
