@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.59';
+const APP_VERSION = '2.22.60';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2086,6 +2086,13 @@ function aiSumCtx() {
       if (sl) { const n = DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds) ? Math.round(DRIVE.seconds / 60) : 15; const leave = sl.start - n;
         if (leave < 540) b += '; he needs to leave for work about ' + fmtTime(hmFromMin(leave)) + ', so he can watch until then'; }
       ctx.breakfastTv = b;
+    }
+  } catch (e) {}
+  try { // 2.22.60: now and then (about 1 in 3 opens) a time, cleaning or sorting tip, rotating topic and area so it varies
+    if (Math.random() < 0.35) {
+      const topics = ['time organisation', 'cleaning', 'sorting and tidying'];
+      const areas = ['kitchen', 'pantry', 'fridge', 'garage', 'shed', 'wardrobe', 'bathroom', 'car interior', 'spa area', 'garden tools', 'phone photos', 'email inbox', 'paperwork and bills', 'lounge', 'bedside table', 'laundry', 'dog gear for Zeus', 'gym bag', 'week ahead planning', 'mornings before work'];
+      ctx.tip = { topic: topics[Math.floor(Math.random() * topics.length)], area: areas[Math.floor(Math.random() * areas.length)] };
     }
   } catch (e) {}
   try { ctx.knowMe = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-12).map(x => x.q + ' ' + x.a); } catch (e) {}
