@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.32';
+const APP_VERSION = '2.22.33';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1817,16 +1817,22 @@ function homeSugLawns() {
 }
 function homeSugDogWalk() {
   try {
-    if (!homeSugChoreOk()) return null;
+    // 2.22.33: Shane walks Zeus on weekends, so only suggest it Saturday/Sunday daytime.
+    let wd = new Date().getDay(), hr = new Date().getHours();
+    try { const c = DD.nzClock(new Date()); if (c && Number.isFinite(c.min)) hr = Math.floor(c.min / 60); if (c && c.iso) wd = new Date(c.iso + 'T12:00:00').getDay(); } catch (e) {}
+    if (wd !== 0 && wd !== 6) return null;
+    if (hr < 8 || hr >= 18) return null;
     const dogs = (S.pets || []).filter(p => p && p.type === 'dog');
-    if (!dogs.length) return null;
-    const names = dogs.map(p => String(p.name || '').trim()).filter(n => n && n.toLowerCase() !== 'pet');
+    let names = dogs.map(p => String(p.name || '').trim()).filter(n => n && n.toLowerCase() !== 'pet');
+    if (!names.length) names = ['Zeus'];
     const who = names.length === 1 ? names[0] : (names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : 'the dog');
     const whoRe = (names.map(homeSugEsc).concat(['dog', 'dogs'])).join('|');
     const re = new RegExp('\\b(walk|walking)\\b.*\\b(' + whoRe + ')\\b|\\b(' + whoRe + ')\\b.*\\b(walk|walking)\\b|\\bdog walk\\b', 'i');
     if (homeSugHas(re, -1, 2)) return null;
     const date = todayISO();
-    return { id: 'walk', type: 'todo', text: 'A walk with ' + who + ', if you feel like it?',
+    const lines = ['A walk with ' + who + (hr < 12 ? ' this morning?' : ' this afternoon?'), 'A beach walk with ' + who + ' today?', 'Bushwalk with ' + who + ' this weekend?', 'Good day for a walk with ' + who + '?'];
+    const line = lines[Math.abs((homeSugOpenN || 0) + new Date().getDate()) % lines.length];
+    return { id: 'walk', type: 'todo', text: line,
       pre: { title: 'Walk ' + (names.length === 1 ? names[0] : 'the dog'), due: date, priority: 'normal', list: 'Home' } };
   } catch (e) { return null; }
 }
