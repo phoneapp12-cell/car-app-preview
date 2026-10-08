@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.47';
+const APP_VERSION = '2.22.48';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1794,25 +1794,41 @@ function homeSugGardenFeed() {
       pre: { text: 'Plant / garden feeding times: ' } };
   } catch (e) { return null; }
 }
+/* 2.22.48: Lawns every two weeks from 9 Oct 2026 (Shane's ask). The cycle restarts from the last time the lawns
+   were done (a ticked lawn to-do or a past lawn appointment). Once due, it is suggested on the first day that is
+   a roster day off and sunny (forecast mostly clear, rain chance under 40%). Daytime only, never at work. */
+function lawnOffDay(iso) {
+  const wd = new Date(parseD(iso)).getUTCDay();
+  try { const days = rosterState().days || {}; if (Object.keys(days).length) return !days[String(wd)]; } catch (e) {}
+  return wd === 0 || wd === 6;
+}
+function lawnSunny(iso) {
+  const d = wxDays().find(x => x.iso === iso);
+  if (!d) return null; // no forecast for that day
+  return num(d.code) && d.code <= 2 && (d.rain == null || d.rain < 40);
+}
+function lawnDue() {
+  S.settings = S.settings || {};
+  if (!S.settings.lawnStart) S.settings.lawnStart = '2026-10-09';
+  const re = /\b(mow|mowing|lawn|lawns)\b/i;
+  const last = homeSugLastPast(re);
+  return last && last >= S.settings.lawnStart ? addDays(last, 14) : S.settings.lawnStart;
+}
+function lawnNext() {
+  // First sunny day off on or after the due date, within the 7-day forecast; '' if none is known yet.
+  const T = todayISO(), due = lawnDue(), from = due > T ? due : T;
+  for (let i = 0; i < 7; i++) { const d = addDays(T, i); if (d < from) continue; if (lawnOffDay(d) && lawnSunny(d) === true) return d; }
+  return '';
+}
 function homeSugLawns() {
   try {
-    if (!homeSugChoreOk()) return null;
     const a = homeAklParts();
-    // Prefer weekends for lawns (Fri–Sun). Skip mid-week evenings.
-    if (a && a.dow >= 1 && a.dow <= 4) return null;
-    const re = /\b(mow|mowing|lawn|lawns|grass)\b/i;
-    if (homeSugHas(re, -7, 21)) return null;
-    const last = homeSugLastPast(re);
-    const days = last ? -daysLeft(last) : 999;
-    // Roughly every fortnight in the growing months; less often otherwise.
-    const month = +(todayISO().slice(5, 7) || 0);
-    const growing = month >= 9 || month <= 4; // NZ spring–autumn
-    if (days < (growing ? 12 : 28)) return null;
-    const date = homeSugWeekendDate(0);
-    const text = last
-      ? 'It’s been about ' + days + ' days since the lawns were last mentioned. Worth a mow this weekend?'
-      : 'No lawn mow on the list lately. Worth doing the lawns this weekend?';
-    return { id: 'lawns', type: 'todo', text, pre: { title: 'Mow the lawns', due: date, priority: 'normal', list: 'Home' } };
+    if (!a || a.hour < 7 || a.hour >= 18) return null;
+    if (homeWhere() === 'work') return null;
+    const T = todayISO();
+    if (lawnDue() > T || !lawnOffDay(T) || lawnSunny(T) !== true) return null;
+    if (homeSugHas(/\b(mow|mowing|lawn|lawns)\b/i, -1, 1)) return null;
+    return { id: 'lawns', type: 'todo', text: 'Sunny and you’re off today, so it’s a good day to mow the lawns.', pre: { title: 'Mow the lawns', due: T, priority: 'normal', list: 'Home' } };
   } catch (e) { return null; }
 }
 function homeSugDogWalk() {
@@ -1924,7 +1940,9 @@ function homeSuggestions() {
   for (let i = arr.length - 1; i > 0; i--) { const j = next() % (i + 1); const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
   // Fresh ones first, then last open's ones only if there are not enough others.
   const fresh = arr.filter(x => last.indexOf(key(x)) < 0), seen = arr.filter(x => last.indexOf(key(x)) >= 0);
-  const pick = fresh.concat(seen).slice(0, 3);
+  let pool = fresh.concat(seen);
+  const lawn = pool.find(x => x.id === 'lawns'); if (lawn) pool = [lawn].concat(pool.filter(x => x !== lawn)); // 2.22.48: lawns day always shows
+  const pick = pool.slice(0, 3);
   homeSugPickN = homeSugOpenN;
   homeSugPickIds = pick.map(key);
   try { localStorage.setItem('sugLast', JSON.stringify(homeSugPickIds)); } catch (e) {}
@@ -1998,12 +2016,14 @@ function aiSugList() {
   let today = ''; try { today = DD.nzClock().iso || ''; } catch (e) {}
   let planned = false; try { planned = !!(M() && M().plan && M().plan[todayISO()]); } catch (e) {}
   const foodRe = /\b(dinner|tea tonight|pizza|meal|cook|recipe|takeaway|supper)\b/i;
-  return AI_SUM.sugs.filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
+  const lawnRe = /\b(mow|mowing|lawn|lawns)\b/i; let lawn = null; try { lawn = homeSugLawns(); } catch (e) {} // 2.22.48: lawns follow the fortnightly rule only
+  const out = AI_SUM.sugs.filter(x => !lawnRe.test(String(x.text || '') + ' ' + String(x.title || ''))).filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
     const title = String(x.title || x.text || '').slice(0, 80);
     const type = ['todo', 'note', 'appt'].includes(x.type) ? x.type : 'todo';
     const pre = type === 'note' ? { text: String(x.text || title) } : type === 'appt' ? { title, date: today, time: '', notes: '' } : { title, due: today, priority: 'normal', list: 'Home' };
     return { id: 'ai' + i, type, text: String(x.text || title), pre };
   }).filter(x => x.text);
+  return lawn ? [lawn].concat(out) : out;
 }
 function homeSugHtml() {
   let list = [];
