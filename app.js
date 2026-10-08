@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.72';
+const APP_VERSION = '2.22.73';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6246,7 +6246,8 @@ const ATT_SOURCES = {
   // Feeding jobs (1.61.0) stay on Home and in Upcoming on the day they are due, and after that day, until marked done for the year.
   garden: T => {
     const y0 = parseD(todayISO().slice(0, 4) + '-01-01');
-    return gardenJobs(S, y0, T + 14 * DAY).filter(j => !j.done && (gardenIsFeed(j) ? j.days <= 14 : j.days >= 0 && j.days <= 14)).map(j => ({ days: j.days, rank: 0, sort: j.title, kind: 'garden', name: j.title,
+    let warm = false; try { warm = feedTooWarm(); if (S.settings) S.settings.feedWarmUntil = warm ? Date.now() + 5 * 3600 * 1000 : 0; } catch (e) {} // 2.22.73: no feeding while it's above 10 degrees
+    return gardenJobs(S, y0, T + 14 * DAY).filter(j => !j.done && !(warm && gardenIsFeed(j)) && (gardenIsFeed(j) ? j.days <= 14 : j.days >= 0 && j.days <= 14)).map(j => ({ days: j.days, rank: 0, sort: j.title, kind: 'garden', name: j.title,
       html: attRow({ kind: 'garden', date: j.date, go: `go('#garden/${j.go}')`, ic: 'garden', icon: 'leaf', title: esc(j.title),
         sub: `Garden · ${fmtW(j.date)}`, right: duePill(j.days) }) }));
   },

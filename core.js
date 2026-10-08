@@ -630,6 +630,7 @@
       const gT = todayT(now), gIso = todayISO(now);
       gardenJobs(data, gT, gT, now).forEach(j => {
         if (j.done || j.date !== gIso || fired[j.notifyId]) return;
+        if (/feed/i.test(j.jobKey || '') && data.settings && +data.settings.feedWarmUntil > now.getTime()) return; // 2.22.73: too warm to feed
         out.push({ key: j.notifyId, title: j.title, body: j.body, url: '#garden/' + j.go, days: 0 });
       });
     }
