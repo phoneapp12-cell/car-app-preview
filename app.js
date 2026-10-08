@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.69';
+const APP_VERSION = '2.22.70';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3090,7 +3090,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -8083,7 +8083,7 @@ function saveGymHere() {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('no fix');
       if (acc != null && acc > GYM_MAX_ACC) { render(); toast('Your location is too rough just now (about ' + acc + ' m). Try again in a moment.'); return; }
       const s0 = snap();
-      S.settings.gym = { lat: Math.round(lat * 1e6) / 1e6, lon: Math.round(lon * 1e6) / 1e6, acc, at: Date.now() };
+      S.settings.gym = Object.assign(S.settings.gym && typeof S.settings.gym === 'object' ? S.settings.gym : {}, { lat: Math.round(lat * 1e6) / 1e6, lon: Math.round(lon * 1e6) / 1e6, acc, at: Date.now() });
       rememberFix(pos);
       await save(); render();
       toast('Saved as your gym.', 'Undo', undoTo(s0));
@@ -8093,7 +8093,7 @@ function saveGymHere() {
     toast(err && err.code === 1 ? 'Location wasn’t allowed, so the gym wasn’t saved.' : 'Couldn’t get your location just now. Try again in a moment.');
   }, { enableHighAccuracy: true, maximumAge: 30 * 1000, timeout: 20000 });
 }
-async function clearGym() { const s0 = snap(); delete S.settings.gym; await save(); render(); toast('Gym location cleared.', 'Undo', undoTo(s0)); }
+async function clearGym() { const s0 = snap(); if (S.settings.gym) ['lat', 'lon', 'acc', 'at'].forEach(k => delete S.settings.gym[k]); await save(); render(); toast('Gym location cleared.', 'Undo', undoTo(s0)); }
 /* 2.22.31: named places. Anywhere new (not home, work, the gym or a saved place) can be named from Notifications.
    Saved in S.settings.places [{ id, name, lat, lon, at }] so they're in backups. Within 150 m counts as there.
    The prompt waits until the same new spot shows up in two readings at least 3 minutes apart, never while
@@ -8150,6 +8150,14 @@ function newSpotReady() {
   if (metresBetween(hereFix.lat, hereFix.lon, +o.lat, +o.lon) > PLACE_CUSTOM_M) return null;
   if (placeSkipped(+o.lat, +o.lon)) return null;
   return o;
+}
+// 2.22.70: at the gym (saved gym spot, or a place named Gym), offer to open My program
+function atGym() {
+  try { const id = placeHere(); if (!id) return false; if (id === 'gym') return true; const c = customPlace(id); return !!(c && /\bgym\b/i.test(c.name)); } catch (e) { return false; }
+}
+function gymNowHtml() {
+  if (!atGym()) return '';
+  return `<div class="gymask" id="gymnow">${I('heart')}<button type="button" class="gymsave" onclick="gymFilter='program';go('#gym')">At the gym? Open your program</button></div>`;
 }
 function placeAskHtml() {
   if (!newSpotReady()) return '';
@@ -8656,6 +8664,11 @@ function paintHomeSum() {
     const ga = document.getElementById('placeask'), html = placeAskHtml();
     if (ga && !html) ga.remove();
     else if (!ga && html) { const wx = document.getElementById('notifwx'); if (wx) wx.insertAdjacentHTML('afterend', html); }
+  } catch (e) {}
+  try {
+    const go0 = document.getElementById('gymnow'), gh = gymNowHtml();
+    if (go0 && !gh) go0.remove();
+    else if (!go0 && gh) { const wx = document.getElementById('notifmail') || document.getElementById('notifwx'); if (wx) wx.insertAdjacentHTML('afterend', gh); }
   } catch (e) {}
   try {
     const mo = document.getElementById('notifmail'), mh = mailStrip();
