@@ -25,6 +25,7 @@
  * (see videos.js). The query is the topic only. No arbitrary links. Nothing is stored.
  * GET /sarah: Sarah Jenkins's channel (one fixed RSS address). POST /sarah/seen marks the
  * newest id so it is not pushed again. No other channel can be requested.
+ * GET /alerts: MetService severe weather watches and warnings that cover Whangārei (see metservice.js). Fixed source, no input.
  * GET /busy: how busy Noel Leeming Whangarei Supa is, from Google's public place payload. Fixed place, no input. A level word only, never a street. No reading means no level.
  * GET /mail/config: public OAuth client ids for Gmail and Outlook (empty if not set). No secrets.
  * POST /mail/token: exchange an authorization code (PKCE) or refresh token. A client secret is
@@ -44,6 +45,7 @@ import { searchVideos } from './videos.js';
 import { syncRoute } from './sync.js';
 import { getSarah, markSarahSeen } from './sarah.js';
 import { mailConfig, exchangeMail } from './mail.js';
+import { getMetAlerts } from './metservice.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -93,6 +95,7 @@ const MESSAGES = {
   bridge_traffic_unavailable: 'Live traffic could not be checked right now.',
   drive_unavailable: 'The drive time could not be checked right now.',
   busy_unavailable: 'Store busyness could not be checked right now.',
+  alerts_unavailable: 'Weather warnings could not be checked right now.',
   news_unavailable: 'Local news could not be loaded right now.',
   blogs_unavailable: 'Blogs could not be loaded right now.',
   podcasts_unavailable: 'Podcasts could not be loaded right now.',
@@ -210,6 +213,14 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       const code = path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : path === '/roadworks' ? 'roadworks_unavailable' : path === '/bridge-traffic' ? 'bridge_traffic_unavailable' : 'weather_unavailable';
       return json(502, code, origin, env);
     }
+  }
+  if (path === '/alerts') {
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try {
+      const data = await getMetAlerts(env, fetchImpl);
+      return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    } catch (e) { return json(502, 'alerts_unavailable', origin, env); }
   }
   if (path === '/drive') {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
@@ -375,14 +386,14 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
 export const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-35.7251&longitude=174.3237' +
   '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation' +
   '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,is_day' +
-  '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset' +
+  '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,precipitation_sum,wind_gusts_10m_max,sunrise,sunset' +
   '&timezone=Pacific%2FAuckland&forecast_days=7&forecast_hours=48&wind_speed_unit=kmh'; // same fields as the app (v1.9.0 adds hourly)
 const WEATHER_TTL = 20 * 60 * 1000;
 let wxMem = null;
 export async function getWeather(env = {}, fetchImpl = fetch, now = Date.now()) {
   if (wxMem && now - wxMem.at < WEATHER_TTL) return wxMem.data;
   if (env.EVENTS_KV) {
-    try { const c = await env.EVENTS_KV.get('weather-v2', { type: 'json' }); if (c && now - c.at < WEATHER_TTL) { wxMem = c; return c.data; } } catch (e) { }
+    try { const c = await env.EVENTS_KV.get('weather-v3', { type: 'json' }); if (c && now - c.at < WEATHER_TTL) { wxMem = c; return c.data; } } catch (e) { }
   }
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 10000);
   let data;
@@ -393,7 +404,7 @@ export async function getWeather(env = {}, fetchImpl = fetch, now = Date.now()) 
   } finally { clearTimeout(t); }
   if (!data || !data.current || !data.daily || !Array.isArray(data.daily.time)) throw new Error('bad_weather');
   wxMem = { at: now, data };
-  if (env.EVENTS_KV) { try { await env.EVENTS_KV.put('weather-v2', JSON.stringify(wxMem), { expirationTtl: 3600 }); } catch (e) { } }
+  if (env.EVENTS_KV) { try { await env.EVENTS_KV.put('weather-v3', JSON.stringify(wxMem), { expirationTtl: 3600 }); } catch (e) { } }
   return data;
 }
 export function resetWeather() { wxMem = null; }

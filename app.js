@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.31';
+const APP_VERSION = '2.22.32';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -99,7 +99,9 @@ const P = {
   radio: '<path d="M5 10 12 4l7 6"/><rect x="4" y="10" width="16" height="9.5" rx="2"/><circle cx="9" cy="14.7" r="2"/><path d="M13.5 13.2h3.2M13.5 16.2h3.2"/>',
   note: '<path d="M6 3.5h8.5L19 8v12.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1z"/><path d="M14.5 3.5V8H19M8.5 12h7M8.5 16h4.5"/>',
   mic: '<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3M8 21h8"/>',
-  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>'
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  tideup: '<path d="M2 19c2.5 0 2.5-1.5 5-1.5s2.5 1.5 5 1.5 2.5-1.5 5-1.5 2.5 1.5 5 1.5"/><path d="M12 14V3M7.5 7.5L12 3l4.5 4.5"/>', // 2.22.32
+  tidedown: '<path d="M2 19c2.5 0 2.5-1.5 5-1.5s2.5 1.5 5 1.5 2.5-1.5 5-1.5 2.5 1.5 5 1.5"/><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5"/>',
 };
 const I = (n, a = '') => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${a}>${P[n]}</svg>`;
 
@@ -1932,16 +1934,32 @@ function homeSugAdd(i) {
   if (s.type === 'appt') return apptForm(null, s.pre && s.pre.date, s.pre);
   if (s.type === 'note') return noteForm(s.pre && s.pre.text);
 }
-function noteForm(text) {
-  openSheet('Add a note', field('Note', area('text', text || '', 'Type a note')),
+// 2.22.32: noteForm(text) adds a note; noteForm('', id) edits that note in place (same id and created date, plus an edited date).
+function noteForm(text, id) {
+  const n = id ? (S.notes || []).find(x => x.id === id) : null;
+  if (id && !n) { toast('That note isn’t here any more.'); return; }
+  const hint = n && n.audio ? 'The recording stays with this note.' : '';
+  openSheet(n ? 'Edit note' : 'Add a note', field('Note', area('text', n ? (n.text || '') : (text || ''), n && n.audio && !n.text ? 'Add words to go with the recording' : 'Type a note'), hint),
     async v => {
       const t = String(v.text || '').replace(/\s+/g, ' ').trim().slice(0, 2000);
+      if (n) {
+        const cur = (S.notes || []).find(x => x.id === id);
+        if (!cur) return 'That note isn’t here any more.';
+        if (!t && !cur.audio) return 'Please type the note, or delete it instead.';
+        if (t === (cur.text || '')) return;
+        const s = snap();
+        const row = S.notes.find(x => x.id === id);
+        row.text = t;
+        row.edited = nzStampLocal();
+        await save(); render(); toast('Note updated.', 'Undo', undoTo(s));
+        return;
+      }
       if (!t) return 'Please type the note.';
       const s = snap();
       if (!Array.isArray(S.notes)) S.notes = [];
       S.notes.push({ id: uid('nt'), text: t, at: nzStampLocal() });
       await save(); render(); toast('Note saved.', 'Undo', undoTo(s));
-    }, 'Add');
+    }, n ? 'Save' : 'Add');
 }
 function homeSceneCard(inner) {
   let scene = 'soft';
@@ -8286,7 +8304,7 @@ async function testBridgePush() {
 const WX_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-35.7251&longitude=174.3237' +
   '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation' +
   '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,is_day' + // v1.9.0: hourly strip
-  '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset' +
+  '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,precipitation_sum,wind_gusts_10m_max,sunrise,sunset' +
   '&timezone=Pacific%2FAuckland&forecast_days=7&forecast_hours=48&wind_speed_unit=kmh';
 const WX_MAX_AGE = 30 * 60 * 1000;
 const METSERVICE_URL = 'https://www.metservice.com/towns-cities/regions/northland/locations/whangarei';
@@ -8396,7 +8414,7 @@ function wxDays() {
   if (!WX) return [];
   const d = WX.data.daily, T = todayISO();
   return d.time.map((iso, i) => ({ iso, code: arr(d, 'weather_code', i), hi: arr(d, 'temperature_2m_max', i), lo: arr(d, 'temperature_2m_min', i), rain: num(arr(d, 'precipitation_probability_max', i)) ? arr(d, 'precipitation_probability_max', i) : null,
-    wind: num(arr(d, 'wind_speed_10m_max', i)) ? arr(d, 'wind_speed_10m_max', i) : null, sunrise: arr(d, 'sunrise', i) || '', sunset: arr(d, 'sunset', i) || '' })).filter(x => x.iso >= T);
+    wind: num(arr(d, 'wind_speed_10m_max', i)) ? arr(d, 'wind_speed_10m_max', i) : null, precip: num(arr(d, 'precipitation_sum', i)) ? arr(d, 'precipitation_sum', i) : null, gust: num(arr(d, 'wind_gusts_10m_max', i)) ? arr(d, 'wind_gusts_10m_max', i) : null, sunrise: arr(d, 'sunrise', i) || '', sunset: arr(d, 'sunset', i) || '' })).filter(x => x.iso >= T);
 }
 // Hourly forecast from this hour on (older saved forecasts just drop the hours that have passed). Empty if the data has no hourly part.
 function wxHours(n) {
@@ -8587,25 +8605,29 @@ function notifWxOutlook(nowW, next) {
 }
 function notifWxStrip() {
   const fresh = WX && validWx(WX.data) && Date.now() - (WX.at || 0) < NWX_STALE;
+  const warn = homeTry('weather warning line', () => alertStripLine(), ''); // 2.22.32: official orange/red only
+  const warnHtml = warn ? `<span class="nwxwarn">${esc(warn)}</span>` : '';
   if (!fresh) {
     const loading = wxBusy || (!wxFailed && navigator.onLine !== false);
-    return `<button type="button" class="notifwx nwxwait" id="notifwx" onclick="refreshWx(true)">${I('cloudsun')}<span class="nwxtx"><span class="nwxnext">${loading ? 'Weather loading…' : 'Weather isn’t available right now. Tap to try again.'}</span></span></button>`;
+    return `<button type="button" class="notifwx nwxwait" id="notifwx" onclick="${warn ? "go('#weather')" : 'refreshWx(true)'}">${I('cloudsun')}<span class="nwxtx">${warnHtml}<span class="nwxnext">${loading ? 'Weather loading…' : 'Weather isn’t available right now. Tap to try again.'}</span></span></button>`;
   }
   const c = WX.data.current, day = wxIsDay(), nowW = wmo(c.weather_code, day, c.wind_speed_10m);
   const next = homeTry('weather next', () => notifWxNext(), []);
   const outlook = homeTry('weather outlook', () => notifWxOutlook(nowW, next), '');
   const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '';
-  const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${outlook ? ' ' + outlook + '.' : ''} Tap for the full forecast.`;
+  const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${outlook ? ' ' + outlook + '.' : ''}${warn ? ' ' + warn.replace(/^⚠\s*/, 'MetService ') + '.' : ''} Tap for the full forecast.`;
   return `<button type="button" class="notifwx" id="notifwx" onclick="go('#weather')" aria-label="${esc(label)}">
-    <span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp">${temp}</b>` : ''}<span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}</span>${I('right')}</button>`;
+    <span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp">${temp}</b>` : ''}<span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${warnHtml}</span>${I('right')}</button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Notifications</button>`;
   const days = wxDays();
-  if (!WX || !days.length) return back + header('Weather', 'Whangārei') +
+  setTimeout(() => { try { loadTides(); refreshAlerts(); } catch (e) { } }, 0); // 2.22.32
+  const hu = homeTry('heads up', () => headsUp(), ''), tides = homeTry('tides', () => tideCard(), '');
+  if (!WX || !days.length) return back + header('Weather', 'Whangārei') + hu +
     `<div class="card empty"><div class="t">${wxBusy ? 'Getting the weather…' : 'The weather isn’t available right now'}</div><div class="s">Check your internet connection, then try again.</div>
      <button class="btn primary" style="flex:none;padding:12px 22px" onclick="refreshWx(true)">${I('refresh')} Try again</button></div>
-     <div class="btns"><a class="btn" href="${METSERVICE_URL}" target="_blank" rel="noopener">MetService forecast ${I('ext')}</a></div>`;
+     <div class="btns"><a class="btn" href="${METSERVICE_URL}" target="_blank" rel="noopener">MetService forecast ${I('ext')}</a></div>` + tides;
   const c = WX.data.current, now = wmo(c.weather_code, c.is_day !== 0, c.wind_speed_10m), t = days[0].iso === todayISO() ? days[0] : null;
   const hm = s => s ? fmtTime(String(s).slice(11, 16)) : '';
   const hours = wxHours(24);
@@ -8614,7 +8636,7 @@ function Weather() {
     return `<div class="row wxrow"><div class="wxri">${wxIcon(w)}</div><div class="tx"><div class="t">${label}</div><div class="s">${esc(w.words)}${x.rain != null ? ` · ${x.rain}% rain` : ''}${x.wind != null ? ` · wind ${Math.round(x.wind)} km/h` : ''}</div></div>
       <div class="wxhl"><b>${deg(x.hi)}</b><span>${deg(x.lo)}</span></div></div>`;
   }).join('');
-  return back + header('Weather', 'Whangārei') +
+  return back + header('Weather', 'Whangārei') + hu +
     `<div class="card wxbig"><div class="wxnow"><span class="wxic">${wxIcon(now, 'big')}</span><div class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></div></div>
       <div class="wxfacts">
         <div><small>Moon</small><b>${esc(moonPhaseName())}</b></div>
@@ -8625,11 +8647,134 @@ function Weather() {
         ${t && t.sunrise ? `<div><small>Sunrise</small><b>${hm(t.sunrise)}</b></div><div><small>Sunset</small><b>${hm(t.sunset)}</b></div>` : ''}
       </div></div>
     ${hours.length ? `<div class="sec">Next 24 hours</div><div class="card wxhcard">${hoursStrip(hours)}</div>` : ''}
+    ${tides}
     <div class="sec">Next 7 days <button onclick="refreshWx(true)">${wxBusy ? 'Updating…' : 'Refresh'}</button></div>
     <div class="card wxweekcard"><div class="wxweek">${weekRows(days)}</div></div>
     <div class="list" style="margin-top:10px">${rows}</div>
     <div class="btns"><a class="btn" href="${METSERVICE_URL}" target="_blank" rel="noopener">MetService forecast for Whangārei ${I('ext')}</a></div>
-    <div class="foot">${wxUpdated()}<br>Weather data by <a href="${OPEN_METEO_URL}" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). For warnings, check MetService.</div>`;
+    <div class="foot">${wxUpdated()}<br>Weather data by <a href="${OPEN_METEO_URL}" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). Warnings from <a href="${METSERVICE_WARN_URL}" target="_blank" rel="noopener">MetService</a> (CC BY 4.0)${MA ? ', checked ' + ago(MA.at) : ''}. Tide predictions from <a href="${LINZ_TIDES_URL}" target="_blank" rel="noopener">LINZ</a> (CC BY 4.0).</div>`;
+}
+
+/* ================= TIDES + HEADS UP (2.22.32) ================= */
+// Tides: LINZ official predictions for Marsden Point (standard port), with the LINZ secondary-port correction for
+// Whangārei (No. 6395): high water +21 min, low water +14 min, heights scaled about mean sea level.
+// Built by tools/build-tides.mjs into data/tides-whangarei.json (2026–2027). Times are stored in UTC and shown in NZ time.
+// Nothing is guessed: outside the data, or if the file can't load, the section is hidden.
+const TIDE_URL = 'data/tides-whangarei.json';
+const LINZ_TIDES_URL = 'https://www.linz.govt.nz/products-services/tides-and-tidal-streams/tide-predictions';
+let TIDES = null, tideBusy = false, tideFailed = false;
+function validTides(d) { return !!(d && Array.isArray(d.t) && Array.isArray(d.h) && typeof d.k === 'string' && d.t.length && d.t.length === d.h.length && d.k.length === d.t.length); }
+async function loadTides() {
+  if (TIDES || tideBusy || tideFailed) return;
+  tideBusy = true;
+  try { const r = await fetch(TIDE_URL); if (!r.ok) throw new Error('http ' + r.status); const d = await r.json(); if (validTides(d)) TIDES = d; else tideFailed = true; }
+  catch (e) { tideFailed = true; }
+  tideBusy = false;
+  if (TIDES && !sheetOpen && (location.hash || '').slice(1) === 'weather') render();
+}
+const AKL_HM = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const aklTime = ms => { try { return fmtTime(AKL_HM.format(new Date(ms))); } catch (e) { return ''; } };
+const aklDayWord = (iso, today) => iso === today ? 'today' : iso === addDays(today, 1) ? 'tomorrow' : WDL[new Date(parseD(iso)).getUTCDay()];
+// Tides from the start of today (NZ) to the end of the day `days` after today
+function tideRange(days) {
+  if (!validTides(TIDES)) return [];
+  const today = rwIso(Date.now()), last = addDays(today, days), out = [];
+  const from = Date.now() / 60000 - 26 * 60;
+  for (let i = 0; i < TIDES.t.length; i++) {
+    const m = TIDES.t[i];
+    if (m < from) continue;
+    const ms = m * 60000, iso = rwIso(ms);
+    if (iso > last) break;
+    if (iso < today) continue;
+    out.push({ ms, iso, high: TIDES.k[i] === 'H', m: TIDES.h[i] / 10 });
+  }
+  return out;
+}
+const tideM = x => x.m.toFixed(1) + ' m';
+function tideCard() {
+  const list = tideRange(3), now = Date.now();
+  const next = list.find(x => x.ms > now);
+  if (!next) return '';
+  const today = rwIso(now);
+  const mins = Math.round((next.ms - now) / 60000);
+  const inTxt = mins < 60 ? `in ${Math.max(1, mins)} min` : `in ${Math.floor(mins / 60)} h${mins % 60 ? ' ' + (mins % 60) + ' min' : ''}`;
+  const after = list.find(x => x.ms > next.ms);
+  const dayWord = next.iso === today ? '' : ' ' + aklDayWord(next.iso, today);
+  const head = `<div class="tidenext"><span class="tideic ${next.high ? 'hi' : 'lo'}">${I(next.high ? 'tideup' : 'tidedown')}</span><div><b>${next.high ? 'High' : 'Low'} tide ${aklTime(next.ms)}${dayWord} · ${tideM(next)}</b>
+    <small>${inTxt}${after ? ` · then ${after.high ? 'high' : 'low'} ${aklTime(after.ms)}${after.iso !== next.iso ? ' ' + aklDayWord(after.iso, today) : ''} · ${tideM(after)}` : ''}</small></div></div>`;
+  const days = [];
+  list.forEach(x => { let d = days.find(y => y.iso === x.iso); if (!d) days.push(d = { iso: x.iso, list: [] }); d.list.push(x); });
+  const rows = days.map(d => {
+    const label = d.iso === today ? 'Today' : d.iso === addDays(today, 1) ? 'Tomorrow' : WDL[new Date(parseD(d.iso)).getUTCDay()].slice(0, 3) + ' ' + new Date(parseD(d.iso)).getUTCDate();
+    return `<div class="tided"><span class="d">${label}</span><span class="tl">${d.list.map(x => `<span class="tt${x.ms < now ? ' past' : ''}${x === next ? ' next' : ''}"><i>${x.high ? 'High' : 'Low'}</i> ${aklTime(x.ms)} <em>${tideM(x)}</em></span>`).join('')}</span></div>`;
+  }).join('');
+  return `<div class="sec">Tides · Whangārei Harbour</div><div class="card tidecard" id="tidecard">${head}<div class="tidedays">${rows}</div>
+    <div class="tidesrc">LINZ predictions for Marsden Point, adjusted for Whangārei (secondary port 6395: highs +21 min, lows +14 min). NZ time. Not for navigation.</div></div>`;
+}
+
+// MetService severe weather watches and warnings for Northland / Whangārei, read through the relay (MetService's feed doesn't allow browsers).
+const ALERTS_MAX_AGE = 15 * 60 * 1000;
+const METSERVICE_WARN_URL = 'https://www.metservice.com/warnings/home';
+let MA = null, maBusy = false, maFailed = false;
+function loadAlerts() { try { const a = JSON.parse(localStorage.getItem('metAlerts') || 'null'); MA = a && a.at && a.data && Array.isArray(a.data.alerts) ? a : null; } catch (e) { MA = null; } }
+async function refreshAlerts(force = false) {
+  if (!RELAY_URL || maBusy || (!force && MA && Date.now() - MA.at < ALERTS_MAX_AGE)) return;
+  maBusy = true;
+  let d = null;
+  try { d = await getJSON(RELAY_URL + '/alerts', 15000); } catch (e) { }
+  maBusy = false;
+  if (d && Array.isArray(d.alerts)) { MA = { at: Date.now(), data: d }; maFailed = false; try { localStorage.setItem('metAlerts', JSON.stringify(MA)); } catch (e) { } }
+  else maFailed = true;
+  try { updWx(); } catch (e) { }
+}
+function liveAlerts() {
+  if (!MA || !MA.data || !Array.isArray(MA.data.alerts)) return [];
+  const now = Date.now();
+  return MA.data.alerts.filter(a => a && typeof a === 'object' && (a.headline || a.event) && !(Date.parse(a.expires) < now));
+}
+const alertName = a => String(a.headline || a.event || 'Weather warning').replace(/\s*[-–]\s*(orange|red|yellow)\s*$/i, '').trim();
+const alertPlace = a => /northland/i.test(a.area || '') ? 'Northland' : 'Whangārei';
+function aklWhen(s) {
+  const ms = Date.parse(s);
+  if (!Number.isFinite(ms)) return '';
+  return aklTime(ms) + ' ' + aklDayWord(rwIso(ms), rwIso(Date.now()));
+}
+// One short line for the Notifications weather strip: official orange or red only
+function alertStripLine() {
+  const big = liveAlerts().filter(a => /^(orange|red)$/i.test(a.colour || ''));
+  if (!big.length) return '';
+  return `⚠ ${alertName(big[0])}: ${alertPlace(big[0])}${big.length > 1 ? ` (+${big.length - 1} more)` : ''}`;
+}
+// Forecast flags from Open-Meteo for the next 7 days. Real forecast numbers only.
+const WX_FLAG = { rain: 25, gust: 70, hot: 28, cold: 2 };
+function wxFlags() {
+  const days = wxDays(), out = [], T = todayISO();
+  const dn = iso => iso === T ? 'today' : daysLeft(iso) === 1 ? 'tomorrow' : WDL[new Date(parseD(iso)).getUTCDay()];
+  const group = (pick, make) => { const hit = days.filter(pick); if (hit.length) out.push(make(hit)); };
+  const list = (hit, f) => hit.map(x => dn(x.iso) + (f ? ' (' + f(x) + ')' : '')).join(', ');
+  group(x => num(x.precip) && x.precip >= WX_FLAG.rain, h => ({ icon: 'rain', t: 'Heavy rain', s: list(h, x => Math.round(x.precip) + ' mm') }));
+  group(x => num(x.gust) && x.gust >= WX_FLAG.gust, h => ({ icon: 'wind', t: 'Strong wind gusts', s: list(h, x => 'up to ' + Math.round(x.gust) + ' km/h') }));
+  group(x => num(x.code) && x.code >= 95 && x.code <= 99, h => ({ icon: 'storm', t: 'Thunderstorms', s: list(h) }));
+  group(x => num(x.hi) && x.hi >= WX_FLAG.hot, h => ({ icon: 'clear', t: 'Hot', s: list(h, x => 'high ' + deg(x.hi)) }));
+  group(x => num(x.lo) && x.lo <= WX_FLAG.cold, h => ({ icon: 'cold', t: 'Very cold night', s: list(h, x => 'low ' + deg(x.lo)) }));
+  return out.map(f => Object.assign(f, { s: f.s.charAt(0).toUpperCase() + f.s.slice(1) }));
+}
+function headsUp() {
+  const off = liveAlerts().map(a => {
+    const c = /^(red|orange|yellow)$/i.test(a.colour || '') ? a.colour.toLowerCase() : 'none';
+    const started = !(Date.parse(a.onset) > Date.now());
+    const when = [a.onset && !started ? 'From ' + aklWhen(a.onset) : a.onset ? 'Now' : '', a.expires ? 'until ' + aklWhen(a.expires) : ''].filter(Boolean).join(' ');
+    const link = /^https:\/\/([a-z0-9-]+\.)*metservice\.com\//i.test(a.web || '') ? a.web : METSERVICE_WARN_URL;
+    return `<a class="row hurow official c-${c}" href="${esc(link)}" target="_blank" rel="noopener"><div class="ic">${I('warn')}</div><div class="tx">
+      <div class="hutag">MetService${c !== 'none' ? ' · ' + esc(a.colour) : ''}</div><div class="t">${esc(alertName(a))}</div>
+      <div class="s">${esc([when, a.area].filter(Boolean).join(' · '))}</div>${a.desc ? `<div class="s hudesc">${esc(a.desc)}</div>` : ''}</div></a>`;
+  });
+  const fc = homeTry('weather flags', () => wxFlags(), []).map(f => {
+    const w = f.icon === 'cold' ? { kind: 'snow', day: true, words: f.t } : { kind: f.icon, day: true, words: f.t };
+    return `<div class="row hurow fc"><div class="ic">${wxIcon(w)}</div><div class="tx"><div class="hutag">Forecast</div><div class="t">${esc(f.t)}</div><div class="s">${esc(f.s)}</div></div></div>`;
+  });
+  if (!off.length && !fc.length) return '';
+  return `<div class="sec">Heads up</div><div class="list headsup" id="headsup">${off.join('')}${fc.join('')}</div>`;
 }
 
 /* ================= ROADWORKS (NZTA TREIS open data, near Whangārei) ================= */
@@ -11396,11 +11541,17 @@ function noteRow(n, del) {
   if (n.text && n.audio) bits.push('With a recording');
   const when = noteWhen(n.at);
   if (when) bits.push(when);
+  if (del && n.edited) { const ew = noteWhen(n.edited); if (ew) bits.push('Edited ' + ew); }
   const sub = bits.join(' · ');
+  const id = esc(String(n.id || ''));
   const play = del && n.audio ? `<audio class="noteplay" controls preload="none" src="${esc(notePlayUrl(n.id, n.audio, n.mime))}"></audio>` : '';
-  const body = `<div class="ic note">${I(n.audio && !n.text ? 'mic' : 'note')}</div><div class="tx"><div class="t">${esc(title)}</div>${sub ? `<div class="s">${esc(sub)}</div>` : ''}${play}</div>`;
-  if (!del) return `<button class="row" onclick="go('#notes')">${body}</button>`;
-  return `<div class="row noterow">${body}<button type="button" class="iconbtn" aria-label="Delete this note" onclick="deleteNote('${n.id}')">${I('trash')}</button></div>`;
+  const ic = `<span class="ic note">${I(n.audio && !n.text ? 'mic' : 'note')}</span>`;
+  const words = `<span class="t">${esc(title)}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}`;
+  const edit = `<button type="button" class="iconbtn" aria-label="Edit this note" onclick="noteForm('', '${id}')">${I('edit')}</button>`;
+  // 2.22.32: Notifications card: tapping the note still opens Notes (a first-tap action would clash with the card double-tap); Edit is its own button
+  if (!del) return `<div class="row noterow notehome"><button type="button" class="noteopen" onclick="go('#notes')">${ic}<span class="tx">${words}</span></button>${edit}</div>`;
+  // Notes page: tapping the words opens the editor; the recording player is left alone
+  return `<div class="row noterow">${ic}<div class="tx"><button type="button" class="noteedit" aria-label="Edit note: ${esc(title.slice(0, 80))}" onclick="noteForm('', '${id}')">${words}</button>${play}</div>${edit}<button type="button" class="iconbtn" aria-label="Delete this note" onclick="deleteNote('${id}')">${I('trash')}</button></div>`;
 }
 function noteRecBtn() {
   if (noteMicNeed && !noteRec) return '<button type="button" class="rec need" id="noterec" aria-label="This needs the microphone" onclick="toggleNoteRec()">This needs the microphone</button>';
@@ -12475,7 +12626,7 @@ function wireHomeFeedList() {
   feed.addEventListener('pointercancel', () => { down = null; });
 }
 
-window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
+window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
 window.addEventListener('hashchange', () => {
   setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0;
@@ -12627,12 +12778,12 @@ async function start() {
   try { await loadCal(); } catch (e) { console.error('loadCal', e); }
   try { await loadMail(); } catch (e) { console.error('loadMail', e); }
   try { await finishMailSignIn(); } catch (e) { console.error('finishMailSignIn', e); }
-  for (const f of [loadWx, loadEvs, loadCls, loadRoadworks, loadTv, loadNews, loadBlogs, loadPodcasts]) { try { f(); } catch (e) { console.error('load', e); } }
+  for (const f of [loadWx, loadAlerts, loadEvs, loadCls, loadRoadworks, loadTv, loadNews, loadBlogs, loadPodcasts]) { try { f(); } catch (e) { console.error('load', e); } }
   try { render(); } catch (e) { console.error('First render', e); }
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
-  syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
+  syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
   mailConfig().then(() => { if (!sheetOpen && location.hash === '#settings') render(); });
   refreshMail();
   if (brMode() !== 'off' || location.hash === '#bridge') { refreshClosures(); refreshBridgeTraffic(); }
@@ -12658,7 +12809,7 @@ async function start() {
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) { ideaStepsDirty = false; S = normalise(d); if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); } } } catch (e) { } render(); }
     phoneSyncOpen();
     check();
-    syncFeeds(); refreshWx(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
+    syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
     refreshMail();
     if (brMode() !== 'off') { refreshClosures(); refreshBridgeTraffic(); }
     checkBridgeLoc(true);
@@ -12671,7 +12822,7 @@ async function start() {
     if (todayISO() !== renderedDay && !sheetOpen) render();
     try { paintCommute(); } catch (e) {}
     check();
-    syncFeeds(); refreshWx(); refreshMail();
+    syncFeeds(); refreshWx(); refreshAlerts(); refreshMail();
     updBridge(); checkBridgeLoc(); checkHere();
   }, 60 * 1000);
 }
