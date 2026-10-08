@@ -32,6 +32,7 @@
  * read from the Worker env only and is never returned or logged. Mail subjects are not fetched here.
  */
 import { getFeed } from './events.js';
+import { getConcerts } from './concerts.js';
 import { getClosures } from './closures.js';
 import { getCouncilRoadworks } from './roadworks.js';
 import { getBridgeTraffic } from './bridge-traffic.js';
@@ -204,14 +205,14 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     }
     return new Response('Due Dates calendar link service is running. It only answers requests from the Due Dates app.\n', { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'text/plain; charset=utf-8' } });
   }
-  if (path === '/events' || path === '/weather' || path === '/closures' || path === '/roadworks' || path === '/bridge-traffic') {
+  if (path === '/events' || path === '/concerts' || path === '/weather' || path === '/closures' || path === '/roadworks' || path === '/bridge-traffic') {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     try {
-      const data = path === '/events' ? await getFeed(env, fetchImpl) : path === '/closures' ? await getClosures(env, fetchImpl) : path === '/roadworks' ? await getCouncilRoadworks(env, fetchImpl) : path === '/bridge-traffic' ? await getBridgeTraffic(fetchImpl) : await getWeather(env, fetchImpl);
+      const data = path === '/events' ? await getFeed(env, fetchImpl) : path === '/concerts' ? await getConcerts(env, fetchImpl) : path === '/closures' ? await getClosures(env, fetchImpl) : path === '/roadworks' ? await getCouncilRoadworks(env, fetchImpl) : path === '/bridge-traffic' ? await getBridgeTraffic(fetchImpl) : await getWeather(env, fetchImpl);
       return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) {
-      const code = path === '/events' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : path === '/roadworks' ? 'roadworks_unavailable' : path === '/bridge-traffic' ? 'bridge_traffic_unavailable' : 'weather_unavailable';
+      const code = path === '/events' || path === '/concerts' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : path === '/roadworks' ? 'roadworks_unavailable' : path === '/bridge-traffic' ? 'bridge_traffic_unavailable' : 'weather_unavailable';
       return json(502, code, origin, env);
     }
   }

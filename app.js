@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.38';
+const APP_VERSION = '2.22.39';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9508,13 +9508,52 @@ function evList() {
   return Object.keys(groups).map(k => `<div class="agday">${dayLabel(k)}</div>${groups[k].map(evCard).join('')}`).join('');
 }
 function setEvCat(c) { evCat = c; render(); }
+/* 2.22.39: big Auckland shows (Eden Park and Auckland Stadiums concerts with dates, plus acts coming to
+   Spark Arena) from the relay's /concerts, saved on the phone for 12 hours. */
+let AKLC = null, aklcBusy = false;
+try { AKLC = JSON.parse(localStorage.getItem('aklConcerts') || 'null'); } catch (e) { AKLC = null; }
+async function loadAklConcerts(force) {
+  if (aklcBusy || (!force && AKLC && Date.now() - AKLC.at < 12 * 3600 * 1000)) return;
+  aklcBusy = true;
+  try {
+    const d = await getJSON(RELAY_URL + '/concerts', 25000);
+    if (d && (Array.isArray(d.dated) || Array.isArray(d.spark))) {
+      AKLC = { at: Date.now(), dated: d.dated || [], spark: d.spark || [] };
+      try { localStorage.setItem('aklConcerts', JSON.stringify(AKLC)); } catch (e) {}
+      const el = document.getElementById('aklcard'); if (el) el.outerHTML = aklConcertsCard();
+    }
+  } catch (e) {} finally { aklcBusy = false; }
+}
+function aklConcertsCard() {
+  let today = ''; try { today = DD.nzClock().iso || ''; } catch (e) {}
+  const head = '<div class="t" style="font-weight:800;margin-bottom:6px">Big Auckland shows</div>';
+  if (!AKLC) return `<div class="card" id="aklcard">${head}<div class="s">Loading concerts from Eden Park, Go Media Stadium, Western Springs and Spark Arena…</div></div>`;
+  const dated = (AKLC.dated || []).filter(x => x && x.date >= today);
+  const rows = dated.map((x, i) => {
+    const inCal = (S.appts || []).some(a => a.title === x.title && a.date === x.date);
+    return `<div class="row" style="align-items:center;gap:10px;padding:6px 0"><div style="flex:1;min-width:0"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="font-weight:700;color:inherit">${esc(x.title)}</a><div class="s">${esc(fmtLong(x.date))} · ${esc(x.venue)}</div></div>
+      ${inCal ? '<span class="s">In calendar</span>' : `<button type="button" class="sumadd" onclick="addAklConcert(${jsArg(x.title)},${jsArg(x.date)},${jsArg(x.venue)})">${I('plus')} Add</button>`}</div>`;
+  }).join('');
+  const spark = (AKLC.spark || []).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(x.title)}</a>`).join(', ');
+  return `<div class="card" id="aklcard">${head}${rows || '<div class="s">No dated concerts listed at Eden Park or the Auckland stadiums right now.</div>'}
+    ${spark ? `<div class="s" style="margin-top:8px"><b>Coming to Spark Arena:</b> ${spark}. Tap a name for dates and tickets.</div>` : ''}
+    <div class="s" style="margin-top:6px;opacity:.75">From the venues’ own websites. Updated ${ago(AKLC.at)}.</div></div>`;
+}
+async function addAklConcert(title, date, venue) {
+  if ((S.appts || []).some(a => a.title === title && a.date === date)) return;
+  const s = snap();
+  S.appts.push({ id: uid('appt'), title, date, time: '', notes: venue + ', Auckland' });
+  await save(); const el = document.getElementById('aklcard'); if (el) el.outerHTML = aklConcertsCard();
+  toast('Added to your calendar.', 'Undo', undoTo(s));
+}
 function Events() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
   const head = back + header('Events', 'What’s on in Whangārei · next 60 days');
   const src = `<a href="${WDC_WHATSON}" target="_blank" rel="noopener">Whangārei District Council’s What’s On</a>, <a href="https://www.eventcinemas.co.nz/Cinema/Whangarei" target="_blank" rel="noopener">Event Cinemas</a> and local markets`;
   const town = `<div class="card" id="towncard"><div class="t" style="font-weight:800;margin-bottom:6px">Around town</div>
     <div class="s">Movies are at Event Cinemas, 18 James Street. CineNexus has been mentioned for Bank Street, but there’s no opening date, so the sessions here are Event’s.</div>
-    <div class="s" style="margin-top:6px">Worth a look when something’s on: the Butter Factory at 8 Butter Factory Lane and 1905 for live music, Octagon Theatre and Forum North for shows, Quarry Arts Centre and Reyburn House for art, and McKay Stadium for expos. The Canopy Night Market is Friday evenings at the Town Basin in season.</div></div>`;
+    <div class="s" style="margin-top:6px">Worth a look when something’s on: the Butter Factory at 8 Butter Factory Lane and 1905 for live music, Octagon Theatre and Forum North for shows, Quarry Arts Centre and Reyburn House for art, and McKay Stadium for expos. The Canopy Night Market is Friday evenings at the Town Basin in season.</div></div>` + homeTry('akl concerts', () => aklConcertsCard(), '');
+  try { setTimeout(() => { loadAklConcerts(); }, 0); } catch (e) {}
   if (!EVS) {
     if (evBusy || (!evFailed && navigator.onLine !== false)) return head + town + `<div class="card empty"><div class="t">Loading events…</div><div class="s">Getting what’s on from the council’s events page, plus movies and markets.</div></div>`;
     return head + town + `<div class="card empty" id="everr"><div class="t">Couldn’t load events</div><div class="s">Check your internet connection and try again. You can also look at ${src}.</div>
