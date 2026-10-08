@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.68';
+const APP_VERSION = '2.22.69';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7765,6 +7765,16 @@ async function scheduleReminders() {
     } catch (e) {}
     try { sugPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.22.62
     try { if ((S.settings || {}).zeusCrate !== false) { const T = todayISO(), now = nzStampLocal().slice(11, 16); reminders.push({ id: 'zeus-crate', title: '🐕 Let Zeus out of his crate', date: now >= '07:00' ? addDays(T, 1) : T, time: '07:00', repeat: 'daily' }); } } catch (e) {} // 2.22.61
+    try { // 2.22.69: the night before gym (Tue and Wed), pack the gym bag and a towel
+      if ((S.settings || {}).gymBag !== false) {
+        const T = todayISO(), now = nzStampLocal().slice(11, 16), dow = (homeAklParts() || {}).dow;
+        [[1, 'mon'], [2, 'tue']].forEach(([wd, tag]) => {
+          let add = ((wd - (dow == null ? new Date().getDay() : dow)) + 7) % 7;
+          if (add === 0 && now >= '21:30') add = 7;
+          reminders.push({ id: 'sug-gymbag-' + tag, title: '🏋️ Gym tomorrow: pack your gym bag, and don’t forget a towel', date: addDays(T, add), time: '21:30', repeat: 'weekly' });
+        });
+      }
+    } catch (e) {}
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay) return '';
       if (!reminders.length) { /* still clear the relay below once we have a subscription */ }
