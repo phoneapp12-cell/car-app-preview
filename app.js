@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.53';
+const APP_VERSION = '2.22.54';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2070,6 +2070,8 @@ async function aiSumFetch() {
   aiSumBusy = true;
   const openN = homeSugOpenN;
   try {
+    // 2.22.54: give the weather a few seconds to arrive first, so the one summary drawn has it
+    for (let i = 0; i < 10 && !WX && wxBusy; i++) await new Promise(r => setTimeout(r, 500));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const tm = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} }, 20000);
     const r = await fetch(RELAY_URL + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ctx: aiSumCtx() }), signal: ctl ? ctl.signal : undefined });
@@ -2080,7 +2082,10 @@ async function aiSumFetch() {
     AI_SUM = { lines: d.lines.slice(0, 5).map(x => String(x).slice(0, 220)), sugs: (d.sugs || []).slice(0, 3), open: openN, at: Date.now() };
     aiSumOpen = openN;
     const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
-  } catch (e) { aiSumOpen = openN; } finally { aiSumBusy = false; }
+  } catch (e) {
+    aiSumOpen = openN; // no AI this open: swap the placeholder for the usual summary
+    try { const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; } } catch (e2) {}
+  } finally { aiSumBusy = false; }
 }
 function aiSumFresh() { return !!(AI_SUM && AI_SUM.open === homeSugOpenN && Date.now() - AI_SUM.at < 3 * 3600 * 1000); }
 function aiSumBullets() {
@@ -2147,13 +2152,13 @@ function noteForm(text, id) {
       await save(); render(); toast('Note saved.', 'Undo', undoTo(s));
     }, n ? 'Save' : 'Add');
 }
-function homeSceneCard(inner) {
+function homeSceneCard(inner, noSugs) {
   let scene = 'soft';
   try { scene = homeWxScene() || 'soft'; } catch (e) { scene = 'soft'; }
   if (!/^[a-z-]+$/.test(scene)) scene = 'soft';
   const body = inner || '<p class="sumnote">Nothing much to flag right now. Have a good one.</p>';
   let sugs = '';
-  try { sugs = homeSugHtml(); } catch (e) { sugs = ''; }
+  try { sugs = noSugs ? '' : homeSugHtml(); } catch (e) { sugs = ''; }
   return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${sugs}</div></div>`;
 }
 function homeSumFallback() {
@@ -2478,6 +2483,8 @@ function homeSumCard(bits) {
     const aiB = homeTry('ai summary', () => aiSumBullets(), '');
     if (aiB) return homeSceneCard(aiB);
     try { setTimeout(() => { aiSumFetch(); }, 0); } catch (e) {}
+    // 2.22.54: while the AI summary is on its way, hold a short placeholder instead of drawing interim versions
+    if (aiSumOpen !== homeSugOpenN && navigator.onLine !== false) return homeSceneCard('<p class="sumnote muted" style="opacity:.75">Putting your summary together…</p>', true);
     if (!ps.length) return homeSumFallback();
     return homeSceneCard('<ul class="sumbul">' + ps.join('') + '</ul>');
   } catch (e) {
