@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.78';
+const APP_VERSION = '2.22.79';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2004,6 +2004,32 @@ function waterAutoTodo() {
     S.settings.waterAuto = T;
     save().catch(() => {}).finally(() => { waterAutoBusy = false; try { render(); } catch (e) {} });
   } catch (e) { waterAutoBusy = false; }
+}
+
+// 2.22.79: Clean teeth and Face wash go on today's list after 8:30pm, once a day.
+let eveCareBusy = false;
+function eveCareTodo() {
+  try {
+    if (eveCareBusy || !S || !Array.isArray(S.todos)) return;
+    const a = homeAklParts();
+    if (!a || a.min < 20 * 60 + 30) return;
+    const T = todayISO();
+    S.settings = S.settings || {};
+    if (S.settings.eveCare === T) return;
+    const list = (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home');
+    let added = false;
+    ['Clean teeth', 'Face wash'].forEach(title => {
+      const same = t => t && String(t.title || '').trim().toLowerCase() === title.toLowerCase();
+      if (S.todos.some(t => same(t) && t.due === T)) return;
+      if (S.todos.some(t => same(t) && !t.done)) return;
+      S.todos.push({ id: uid('todo'), title, list, due: T, notes: '', priority: 'normal', done: false, created: Date.now() });
+      added = true;
+    });
+    S.settings.eveCare = T;
+    if (!added) return;
+    eveCareBusy = true;
+    save().catch(() => {}).finally(() => { eveCareBusy = false; try { render(); } catch (e) {} });
+  } catch (e) { eveCareBusy = false; }
 }
 /* 2.22.49: Wet day at home: suggest a movie or comedy that's on free-to-air TV, from the free NZ TV guide
    (i.mjh.nz, which allows the app to read it). Fetched only when it's wet and Shane is at home, once a day
@@ -8830,6 +8856,7 @@ function paintHomeSum() {
   try { lawnAutoTodo(); } catch (e) {}
   try { feedWarmTodo(); } catch (e) {}
   try { waterAutoTodo(); } catch (e) {}
+  try { eveCareTodo(); } catch (e) {}
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
   if ((h !== 'home' && h !== '') || homeEdit) return;
