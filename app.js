@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.74';
+const APP_VERSION = '2.22.75';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1858,10 +1858,56 @@ function lawnOffDay(iso) {
   try { const days = rosterState().days || {}; if (Object.keys(days).length) return !days[String(wd)]; } catch (e) {}
   return wd === 0 || wd === 6;
 }
+function lawnWetCode(code) {
+  // Drizzle, rain, showers and thunder. Cloud and fog are dry enough to mow.
+  return num(code) && code >= 51 && code !== 45 && code !== 48;
+}
+function lawnHours(iso) {
+  const h = WX && WX.data && WX.data.hourly;
+  if (!h || !Array.isArray(h.time)) return [];
+  const out = [];
+  h.time.forEach((t, i) => {
+    if (typeof t !== 'string' || t.slice(0, 10) !== iso) return;
+    const code = arr(h, 'weather_code', i);
+    out.push({ t, hr: +t.slice(11, 13), code });
+  });
+  return out;
+}
+function lawnRainClose() {
+  // True when showers or rain are falling, due within 3 hours, or were here in the last 3 hours.
+  try {
+    if (!WX || !WX.data) return null;
+    const now = Date.now(), gap = 3 * 3600000;
+    const cur = WX.data.current || {};
+    if (lawnWetCode(cur.weather_code)) return true;
+    if (num(cur.precipitation) && cur.precipitation >= 0.2) return true;
+    let close = false;
+    [addDays(todayISO(), -1), todayISO(), addDays(todayISO(), 1)].forEach(iso => {
+      lawnHours(iso).forEach(x => {
+        if (!lawnWetCode(x.code)) return;
+        const start = new Date(x.t).getTime();
+        if (!start) return;
+        const end = start + 3600000;
+        if (end > now - gap && start < now + gap) close = true;
+      });
+    });
+    return close;
+  } catch (e) { return null; }
+}
 function lawnSunny(iso) {
+  // Clear or cloudy is fine. Showers and rain are fine too, as long as they are at least 3 hours away and 3 hours past.
+  if (iso === todayISO()) {
+    const close = lawnRainClose();
+    if (close == null) return null;
+    return !close;
+  }
+  const hours = lawnHours(iso).filter(x => x.hr >= 7 && x.hr < 19);
+  if (hours.length) return hours.some(x => !lawnWetCode(x.code));
   const d = wxDays().find(x => x.iso === iso);
-  if (!d) return null; // no forecast for that day
-  return num(d.code) && d.code <= 2 && (d.rain == null || d.rain < 40);
+  if (!d || !num(d.code)) return null;
+  if (d.code >= 61 && d.code < 80) return false;
+  if (num(d.precip) && d.precip >= 5) return false;
+  return true;
 }
 function lawnDue() {
   S.settings = S.settings || {};
@@ -1884,10 +1930,10 @@ function homeSugLawns() {
     const T = todayISO();
     if (lawnDue() > T || !lawnOffDay(T) || lawnSunny(T) !== true) return null;
     if (homeSugHas(/\b(mow|mowing|lawn|lawns)\b/i, -1, 1)) return null;
-    return { id: 'lawns', type: 'todo', text: 'Sunny and you’re off today, so it’s a good day to mow the lawns.', pre: { title: 'Mow the lawns', due: T, priority: 'normal', list: 'Home' } };
+    return { id: 'lawns', type: 'todo', text: 'It’s dry for the next few hours and you’re off, so it’s a good time to mow the lawns.', pre: { title: 'Mow the lawns', due: T, priority: 'normal', list: 'Home' } };
   } catch (e) { return null; }
 }
-// 2.22.74: on a mowing day (due, roster day off, sunny, daytime) put "Mow the lawns" on today's to-do list by itself, once
+// 2.22.75: mow goes on today's list while it's dry. A shower or rain within 3 hours takes it off, and it can come back once that's 3 hours past.
 let lawnAutoBusy = false;
 function lawnAutoTodo() {
   try {
@@ -1896,12 +1942,22 @@ function lawnAutoTodo() {
     if (!a || a.hour < 6 || a.hour >= 18) return;
     const T = todayISO();
     S.settings = S.settings || {};
+    const re = /\b(mow|mowing|lawn|lawns)\b/i;
+    const open = t => t && !t.done && re.test(String(t.title || '')) && (!t.due || t.due === T);
+    if (lawnRainClose() === true) {
+      if (!S.todos.some(open)) return;
+      lawnAutoBusy = true;
+      S.todos = S.todos.filter(t => !open(t));
+      S.settings.lawnAuto = '';
+      save().catch(() => {}).finally(() => { lawnAutoBusy = false; try { render(); } catch (e) {} });
+      return;
+    }
     if (S.settings.lawnAuto === T) return;
     if (lawnDue() > T || !lawnOffDay(T) || lawnSunny(T) !== true) return;
-    const re = /\b(mow|mowing|lawn|lawns)\b/i;
-    if (S.todos.some(t => t && !t.done && re.test(String(t.title || '')))) { S.settings.lawnAuto = T; return; }
+    if (S.todos.some(t => t && t.done && t.due === T && re.test(String(t.title || '')))) { S.settings.lawnAuto = T; return; }
+    if (S.todos.some(open)) { S.settings.lawnAuto = T; return; }
     lawnAutoBusy = true;
-    S.todos.push({ id: uid('todo'), title: 'Mow the lawns', list: (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home'), due: T, notes: 'Sunny day off, and the lawns are due.', priority: 'normal', done: false, created: Date.now() });
+    S.todos.push({ id: uid('todo'), title: 'Mow the lawns', list: (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home'), due: T, notes: 'Dry for now. This comes off the list if a shower is due.', priority: 'normal', done: false, created: Date.now() });
     S.settings.lawnAuto = T;
     save().catch(() => {}).finally(() => { lawnAutoBusy = false; try { render(); } catch (e) {} });
   } catch (e) { lawnAutoBusy = false; }
