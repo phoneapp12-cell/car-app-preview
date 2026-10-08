@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.70';
+const APP_VERSION = '2.22.71';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1768,8 +1768,18 @@ function homeSugTyres() {
     return { id: 'tyres', type: 'todo', text, pre: { title: 'Inflate car tyres', due: date, priority: 'normal', list: 'Home' } };
   } catch (e) { return null; }
 }
+// 2.22.71: Shane's rule. Don't suggest feeding plants when it's above 10 degrees now or in the next 5 hours.
+function feedTooWarm() {
+  try {
+    if (typeof WX === 'undefined' || !WX || !validWx(WX.data) || Date.now() - WX.at > 6 * 3600 * 1000) return false;
+    const now = WX.data.current && +WX.data.current.temperature_2m;
+    if (Number.isFinite(now) && now > 10) return true;
+    return wxHours(6).slice(0, 6).some(h => Number.isFinite(+h.temp) && +h.temp > 10);
+  } catch (e) { return false; }
+}
 function homeSugGardenFeed() {
   try {
+    if (feedTooWarm()) return null;
     if (!homeSugChoreOk()) return null;
     const re = /\b(feed(ing)? (the )?(citrus|plant|plants|garden|tomato|strawberr|lemon|orange|mandarin|plum|peach)|fertilis|fertiliz|plant food|garden feed)\b/i;
     if (homeSugHas(re, -14, 30)) return null;
