@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.65';
+const APP_VERSION = '2.22.66';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11424,12 +11424,32 @@ function syncSettingsRow() {
 /* ================= MAIL (Gmail and Outlook, last 2 hours) ================= */
 const MAIL_REDIRECT = 'https://phoneapp12-cell.github.io/car-app-preview/';
 const MAIL_WINDOW = 2 * 60 * 60 * 1000;
+// 2.22.66: Home only mentions important unread mail from the last day, never ads or newsletters
+const MAIL_IMP_WINDOW = 24 * 60 * 60 * 1000;
+const MAIL_AD_RE = /(%\s*off|\bsale\b|\bdeals?\b|\boffers?\b|save \$|free (shipping|delivery)|newsletter|webinar|black friday|cyber monday|limited time|discount|shop now|new arrivals|\bwin\b|giveaway|exclusive|last chance|ends (today|tonight|soon)|don.t miss|unsubscribe|promo|coupon|voucher|clearance|just for you|recommended for you|top picks|weekly digest|trending|% cashback|points boost)/i;
+const MAIL_BULK_RE = /(newsletter|marketing|promo|offers|deals|mailer|campaign|news@|hello@|info@|digest|bulk|mailchimp|sendgrid|e\.|em\.|email\.|mail\.|edm|crm)/i;
+const MAIL_KEY_RE = /(invoice|\bbill\b|payment|overdue|\bdue\b|statement|receipt|refund|\border\b|delivery|deliver|courier|parcel|appointment|booking|confirm|security|password|sign.?in|verify|verification|\bcode\b|account|rego|registration|\bwof\b|insurance|\bird\b|\btax\b|council|reminder|urgent|action required|important|roster|shift|interview|contract|mortgage|loan|bank|vet|doctor|dentist|school|court|\bfine\b|ticket)/i;
+function mailIsImportant(it) {
+  const subj = it.subject || '';
+  if (MAIL_AD_RE.test(subj)) return false;
+  if (it.high || MAIL_KEY_RE.test(subj)) return true;
+  if (MAIL_BULK_RE.test(it.addr || '') || /no-?reply|do-?not-?reply/.test(it.addr || '')) return false;
+  return !!it.focused;
+}
 let MAIL = { google: null, microsoft: null };
 let MAIL_CFG = null;
 let MAIL_VIEW = '';
 let MAIL_VIEW_AT = 0;
 let mailBusy = false;
 
+function mailImportantLine(items, opts) {
+  const list = (Array.isArray(items) ? items : []).filter(x => x && x.subject);
+  if (!list.length) return ''; // nothing important: keep Home quiet
+  const who = x => { const n = String(x.from || '').split(/[,(|]/)[0].trim(); return n && n.length <= 30 ? n : ''; };
+  const one = x => '“' + String(x.subject).slice(0, 60) + '”' + (who(x) ? ' from ' + who(x) : '');
+  if (list.length === 1) return '1 important email: ' + one(list[0]) + '.';
+  return list.length + ' important emails, including ' + one(list[0]) + (list.length > 2 ? '.' : ' and ' + one(list[1]) + '.');
+}
 function mailSummaryLine(items, opts) {
   opts = opts || {};
   const connected = opts.connected | 0;
@@ -11474,7 +11494,7 @@ const mailAnyConnected = () => mailConnected('google') || mailConnected('microso
 function mailStrip() {
   const t = homeMailLine();
   if (!t) return '';
-  return `<button type="button" class="notifwx notifmail" id="notifmail" onclick="mailOpenInbox()"><span class="nwxic" style="font-size:1.5rem">✉️</span><span class="nwxtx"><span class="nwxnow">Mail</span><span class="nwxnext">${esc(t)}</span></span>${I('right')}</button>`;
+  return `<button type="button" class="notifwx notifmail" id="notifmail" onclick="mailOpenInbox()"><span class="nwxic" style="font-size:1.5rem">✉️</span><span class="nwxtx"><span class="nwxnow">Important mail</span><span class="nwxnext">${esc(t)}</span></span>${I('right')}</button>`;
 }
 function mailOpenInbox() {
   const url = mailConnected('microsoft') ? 'https://outlook.live.com/mail/' : 'https://mail.google.com/';
@@ -11482,7 +11502,7 @@ function mailOpenInbox() {
 }
 function homeMailLine() {
   if (!mailAnyConnected()) return '';
-  return MAIL_VIEW || 'Checking mail from the last 2 hours.';
+  return MAIL_VIEW || '';
 }
 function b64urlBytes(bytes) {
   let s = '';
@@ -11619,46 +11639,52 @@ function cleanSubject(s) {
   return t.length > 80 ? t.slice(0, 79) + '…' : t;
 }
 async function gmailRecent(token) {
-  const after = Math.floor((Date.now() - MAIL_WINDOW) / 1000);
-  const list = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=' + encodeURIComponent('in:inbox after:' + after), token);
+  // 2.22.66: unread Primary mail from the last day, skipping Promotions, Social, Updates and Forums
+  const since = Date.now() - MAIL_IMP_WINDOW;
+  const after = Math.floor(since / 1000);
+  const q = 'in:inbox is:unread after:' + after + ' -category:promotions -category:social -category:forums -category:updates';
+  const list = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=' + encodeURIComponent(q), token);
   const ids = (list.messages || []).map(m => m && m.id).filter(Boolean);
-  const metas = await Promise.all(ids.slice(0, 10).map(id => getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(id) + '?format=metadata&metadataHeaders=Subject', token).catch(() => null)));
-  const since = Date.now() - MAIL_WINDOW;
+  const metas = await Promise.all(ids.slice(0, 12).map(id => getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(id) + '?format=metadata&metadataHeaders=Subject&metadataHeaders=From', token).catch(() => null)));
   const items = [];
-  let old = false;
   metas.forEach(m => {
     if (!m) return;
     const at = Number(m.internalDate) || 0;
-    if (at && at < since) { old = true; return; }
+    if (at && at < since) return;
     const headers = (m.payload && m.payload.headers) || [];
-    const h = headers.find(x => x && /^subject$/i.test(x.name));
-    const subject = cleanSubject(h && h.value);
-    if (subject) items.push({ subject, at });
+    const hv = n => { const h = headers.find(x => x && x.name && x.name.toLowerCase() === n); return h ? String(h.value || '') : ''; };
+    const subject = cleanSubject(hv('subject'));
+    const fromRaw = hv('from');
+    const addr = ((fromRaw.match(/<([^>]+)>/) || [])[1] || fromRaw).trim().toLowerCase();
+    const from = fromRaw.replace(/<[^>]*>/, '').replace(/"/g, '').trim();
+    const it = { subject, at, from, addr, high: (m.labelIds || []).includes('IMPORTANT'), focused: true };
+    if (subject && mailIsImportant(it)) items.push(it);
   });
-  const more = !!list.nextPageToken && !old && ids.length >= 20;
-  return { items, count: more ? Math.max(20, items.length) : items.length, atLeast: more };
+  return { items, count: items.length, atLeast: false };
 }
 async function outlookRecent(token) {
-  const data = await getJSONAuth('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=25&$select=subject,receivedDateTime&$orderby=receivedDateTime%20desc', token);
+  // 2.22.66: unread inbox mail from the last day, with sender, importance and Focused/Other
+  const since = Date.now() - MAIL_IMP_WINDOW;
+  const iso = new Date(since).toISOString();
+  const url = 'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=40&$select=subject,receivedDateTime,from,importance,inferenceClassification,isRead&$filter=' + encodeURIComponent('receivedDateTime ge ' + iso + ' and isRead eq false') + '&$orderby=receivedDateTime%20desc';
+  const data = await getJSONAuth(url, token);
   const rows = Array.isArray(data.value) ? data.value : [];
-  const since = Date.now() - MAIL_WINDOW;
   const items = [];
-  let old = false;
   rows.forEach(m => {
     const at = Date.parse(m && m.receivedDateTime || '') || 0;
-    if (at && at < since) { old = true; return; }
+    if (at && at < since) return;
     const subject = cleanSubject(m && m.subject);
-    if (subject) items.push({ subject, at });
+    const fa = (m && m.from && m.from.emailAddress) || {};
+    const it = { subject, at, from: String(fa.name || '').trim(), addr: String(fa.address || '').toLowerCase(), high: m.importance === 'high', focused: m.inferenceClassification !== 'other' };
+    if (subject && mailIsImportant(it)) items.push(it);
   });
-  const more = !!data['@odata.nextLink'] && !old && rows.length >= 25;
-  return { items, count: more ? Math.max(25, items.length) : items.length, atLeast: more };
+  return { items, count: items.length, atLeast: false };
 }
 async function refreshMail(force) {
   if (!mailAnyConnected()) { MAIL_VIEW = ''; return; }
   if (mailBusy) return;
   if (!force && MAIL_VIEW_AT && Date.now() - MAIL_VIEW_AT < 3 * 60 * 1000) return;
   mailBusy = true;
-  if (!MAIL_VIEW) MAIL_VIEW = 'Checking mail from the last 2 hours.';
   const providers = ['google', 'microsoft'].filter(mailConnected);
   let failed = 0;
   const items = [];
@@ -11682,7 +11708,7 @@ async function refreshMail(force) {
     } catch (e) { failed++; }
   }
   items.sort((a, b) => (b.at || 0) - (a.at || 0));
-  MAIL_VIEW = mailSummaryLine(items, { connected: providers.length, failed, count, atLeast });
+  MAIL_VIEW = mailImportantLine(items, { connected: providers.length, failed });
   MAIL_VIEW_AT = Date.now();
   mailBusy = false;
   paintHomeSum();
