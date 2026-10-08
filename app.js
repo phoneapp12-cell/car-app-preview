@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.58';
+const APP_VERSION = '2.22.59';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2078,6 +2078,15 @@ function aiSumCtx() {
     if (AKLC) { const T = todayISO(), lim = addDays(T, 90);
       ctx.concerts = (AKLC.dated || []).filter(x => x && x.date >= T && x.date <= lim).slice(0, 4).map(x => x.title + ', ' + fmtW(x.date) + ', ' + x.venue);
       ctx.sparkArenaComing = (AKLC.spark || []).slice(0, 5).map(x => x.title); }
+  } catch (e) {}
+  try { // 2.22.59: Breakfast on TVNZ 1, weekdays 6:30 to 9am (from the i.mjh.nz TV guide). He likes watching it when he can.
+    const a = homeAklParts(); if (a && a.dow >= 1 && a.dow <= 5 && a.min >= 360 && a.min < 540 && homeWhere() !== 'work') {
+      let b = a.min < 390 ? 'Breakfast starts on TVNZ 1 at 6:30am and runs to 9am' : 'Breakfast is on TVNZ 1 now until 9am';
+      const sl = rosterSlot(a);
+      if (sl) { const n = DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds) ? Math.round(DRIVE.seconds / 60) : 15; const leave = sl.start - n;
+        if (leave < 540) b += '; he needs to leave for work about ' + fmtTime(hmFromMin(leave)) + ', so he can watch until then'; }
+      ctx.breakfastTv = b;
+    }
   } catch (e) {}
   try { ctx.knowMe = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-12).map(x => x.q + ' ' + x.a); } catch (e) {}
   ctx.facts = AI_FACTS;
