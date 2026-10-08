@@ -48,6 +48,7 @@ import { getSarah, markSarahSeen } from './sarah.js';
 import { mailConfig, exchangeMail } from './mail.js';
 import { getMetAlerts } from './metservice.js';
 import { aiSummary } from './ai.js';
+import { aiAsk, aiReply } from './ask.js';
 
 export const ALLOWED_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 export const ALLOWED_SUFFIXES = ['.icloud.com']; // iCloud public calendars: pNN-caldav.icloud.com / pNN-calendars.icloud.com
@@ -215,6 +216,17 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       const code = path === '/events' || path === '/concerts' ? 'events_unavailable' : path === '/closures' ? 'closures_unavailable' : path === '/roadworks' ? 'roadworks_unavailable' : path === '/bridge-traffic' ? 'bridge_traffic_unavailable' : 'weather_unavailable';
       return json(502, code, origin, env);
     }
+  }
+  if (path === '/ai/ask' || path === '/ai/reply') {
+    if (request.method !== 'POST') return json(405, 'post_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try {
+      const len = +(request.headers.get('content-length') || 0);
+      if (len > 20000) return json(413, 'too_large', origin, env);
+      const body = await request.json();
+      const data = path === '/ai/ask' ? await aiAsk(env, body) : await aiReply(env, body);
+      return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    } catch (e) { return json(502, 'ai_unavailable', origin, env, { detail: String(e && e.message || e).slice(0, 160) }); }
   }
   if (path === '/ai') {
     if (request.method !== 'POST') return json(405, 'post_only', origin, env);

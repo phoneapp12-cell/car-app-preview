@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.56';
+const APP_VERSION = '2.22.57';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2064,6 +2064,7 @@ function aiSumCtx() {
     const tn = plan[t]; ctx.dinnerTonight = tn ? String(tn.title || 'planned').slice(0, 80) : '';
     ctx.mealsPlanned = [1, 2, 3].map(n => { const d = addDays(t, n), m = plan[d]; return m && m.title ? fmtW(d) + ': ' + String(m.title).slice(0, 60) : ''; }).filter(Boolean);
   } catch (e) {}
+  try { ctx.knowMe = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-12).map(x => x.q + ' ' + x.a); } catch (e) {}
   ctx.facts = AI_FACTS;
   return ctx;
 }
@@ -3052,7 +3053,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -9980,6 +9981,66 @@ async function bookSet(key, v) {
   await save(); const el = document.getElementById('bookask'); if (el) { const h = homeTry('book ask', () => bookAskCard(), ''); if (h) el.outerHTML = h; else el.remove(); }
   if (v !== 'booked') toast('I’ll ask again in 3 days.');
 }
+/* 2.22.57: Getting to know you. Now and then (one a day at most) the AI asks a new multiple-choice question;
+   questions never repeat (every one asked is kept and sent back so the AI avoids it, and checked here too).
+   After an answer the AI replies: points to a tab, gives a useful tip, or just chats. Answers go into the summary. */
+function knowState() { S.settings = S.settings || {}; const k = S.settings.knowMe && typeof S.settings.knowMe === 'object' ? S.settings.knowMe : (S.settings.knowMe = {}); if (!Array.isArray(k.asked)) k.asked = []; return k; }
+let knowBusy = false, knowTried = -1;
+const knowNorm = q => String(q || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+function knowTabs() { try { return Object.keys(NAV).filter(k => NAV[k] && NAV[k][2]).map(k => ({ key: k, name: NAV[k][2] })); } catch (e) { return []; } }
+function knowKnown() { const out = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-30).map(x => ({ q: x.q, a: x.a })); try { (aboutState().answers || []).slice(-10).forEach(x => { if (x && x.text) out.push({ q: aboutAsk(ABOUT_QS.find(q => q.id === x.qid)) || x.qid, a: String(x.text).slice(0, 80) }); }); } catch (e) {} return out; }
+async function knowPost(path, body) {
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 20000);
+  try { const r = await fetch(RELAY_URL + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal }); if (!r.ok) throw new Error('http'); return await r.json(); } finally { clearTimeout(tm); }
+}
+async function knowFetch() {
+  const k = knowState(), T = todayISO();
+  if (knowBusy || knowTried === homeSugOpenN || navigator.onLine === false) return;
+  knowBusy = true; knowTried = homeSugOpenN;
+  try {
+    const d = await knowPost('/ai/ask', { facts: AI_FACTS, known: knowKnown(), asked: k.asked.map(x => x.q) });
+    const seen = new Set(k.asked.map(x => knowNorm(x.q)));
+    if (!d || !d.q || !Array.isArray(d.choices) || d.choices.length < 2 || seen.has(knowNorm(d.q))) return;
+    k.pending = { q: String(d.q).slice(0, 140), choices: d.choices.slice(0, 5).map(x => String(x).slice(0, 40)), day: T };
+    await save(); knowSwap();
+  } catch (e) {} finally { knowBusy = false; }
+}
+function knowCard() {
+  const k = knowState(), T = todayISO();
+  if (k.reply && k.reply.day === T && !k.reply.closed) {
+    return `<div class="card" id="knowcard"><div class="t" style="font-weight:800;margin-bottom:4px">Getting to know you</div><div class="s">${esc(k.reply.say)}</div>
+      <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">${k.reply.tab && NAV[k.reply.tab] ? `<button type="button" class="btn primary small" onclick="knowClose();go('#${esc(k.reply.tab)}')">${I('right')} Open ${esc(k.reply.tabLabel || NAV[k.reply.tab][2])}</button>` : ''}<button type="button" class="btn small" onclick="knowClose()">Thanks</button></div></div>`;
+  }
+  if (k.asked.some(x => x.day === T)) return ''; // one a day
+  const a = homeAklParts() || {}; if (homeWhere() === 'work' || a.hour < 7) return '';
+  if (!k.pending || k.pending.day !== T) { setTimeout(knowFetch, 1200); return ''; }
+  const p = k.pending;
+  return `<div class="card" id="knowcard"><div class="t" style="font-weight:800;margin-bottom:4px">Getting to know you</div><div class="s" style="margin-bottom:8px">${esc(p.q)}</div>
+    <div class="chips" style="flex-wrap:wrap">${p.choices.map((c, i) => `<button type="button" class="chip" onclick="knowPick(${i})">${esc(c)}</button>`).join('')}</div>
+    <div style="margin-top:6px"><button type="button" class="linkbtn" onclick="knowPick(-1)">Skip this one</button></div></div>`;
+}
+function knowSwap() { const el = document.getElementById('knowcard'); const h = homeTry('know', () => knowCard(), ''); if (el) { if (h) el.outerHTML = h; else el.remove(); } else if (h) { const after = document.getElementById('bookask') || document.getElementById('routineask') || document.getElementById('notifwx'); if (after) after.insertAdjacentHTML('afterend', h); } }
+async function knowPick(i) {
+  const k = knowState(), p = k.pending; if (!p) return;
+  const c = i >= 0 ? p.choices[i] : '';
+  if (i >= 0 && /something else|other/i.test(c)) {
+    return openSheet('Getting to know you', field(p.q, inp('a', '', 'maxlength="120" required placeholder="Type your answer"')), async v => { const t = String(v.a || '').trim(); if (!t) return 'Please type an answer.'; setTimeout(() => knowAnswer(t), 0); }, 'Send');
+  }
+  return knowAnswer(i < 0 ? '(skipped)' : c);
+}
+async function knowAnswer(ans) {
+  const k = knowState(), p = k.pending, T = todayISO(); if (!p) return;
+  k.asked.push({ q: p.q, a: ans, day: T, at: Date.now() }); if (k.asked.length > 300) k.asked = k.asked.slice(-300);
+  k.pending = null; await save();
+  if (ans === '(skipped)') { knowSwap(); return; }
+  const el = document.getElementById('knowcard'); if (el) el.innerHTML = `<div class="t" style="font-weight:800;margin-bottom:4px">Getting to know you</div><div class="s muted">Thinking…</div>`;
+  try {
+    const d = await knowPost('/ai/reply', { q: p.q, a: ans, facts: AI_FACTS, known: knowKnown(), tabs: knowTabs() });
+    k.reply = { say: String(d.say || '').slice(0, 400), tab: d.tab || '', tabLabel: d.tabLabel || '', day: T };
+  } catch (e) { k.reply = { say: 'Thanks, noted. That’ll help shape your summary and suggestions.', tab: '', day: T }; }
+  await save(); knowSwap();
+}
+async function knowClose() { const k = knowState(); if (k.reply) k.reply.closed = true; await save(); const el = document.getElementById('knowcard'); if (el) el.remove(); }
 /* 2.22.47: Medications. Each pill has a name, optional dose and a usual time. Tick it off each day (the tick
    records the time). A reminder goes out at the pill's time through the same push reminders as the Reminders
    page, scheduled for today if it's still to come and not ticked, otherwise tomorrow; ticking re-schedules it,
