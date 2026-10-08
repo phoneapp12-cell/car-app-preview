@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.57';
+const APP_VERSION = '2.22.58';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2063,6 +2063,21 @@ function aiSumCtx() {
     const plan = (M() && M().plan) || {}, t = todayISO();
     const tn = plan[t]; ctx.dinnerTonight = tn ? String(tn.title || 'planned').slice(0, 80) : '';
     ctx.mealsPlanned = [1, 2, 3].map(n => { const d = addDays(t, n), m = plan[d]; return m && m.title ? fmtW(d) + ': ' + String(m.title).slice(0, 60) : ''; }).filter(Boolean);
+  } catch (e) {}
+  try { // 2.22.58: today's and this week's events (calendar feeds and his own appointments) plus big Auckland concerts
+    const t0 = todayT(), T = todayISO(), ev = [];
+    (S.appts || []).forEach(a => { if (a && a.title && a.date >= T && a.date <= addDays(T, 7)) ev.push({ date: a.date, title: a.title, time: a.time ? fmtTime(a.time) : '' }); });
+    extEvents(t0, t0 + 7 * DAY).forEach(e => { if (e.time !== 'Cont.') ev.push({ date: e.date, title: e.title, time: e.time && e.time !== 'All day' ? e.time : '' }); });
+    const seen = new Set(), line = e => e.title + (e.time ? ' ' + e.time : '');
+    const uniq = ev.filter(e => { const k = e.date + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).sort((x, y) => x.date < y.date ? -1 : 1);
+    ctx.eventsToday = uniq.filter(e => e.date === T).slice(0, 6).map(line);
+    ctx.eventsThisWeek = uniq.filter(e => e.date > T).slice(0, 6).map(e => fmtW(e.date) + ': ' + line(e));
+  } catch (e) {}
+  try {
+    if (!AKLC || Date.now() - AKLC.at > 12 * 3600 * 1000) loadAklConcerts();
+    if (AKLC) { const T = todayISO(), lim = addDays(T, 90);
+      ctx.concerts = (AKLC.dated || []).filter(x => x && x.date >= T && x.date <= lim).slice(0, 4).map(x => x.title + ', ' + fmtW(x.date) + ', ' + x.venue);
+      ctx.sparkArenaComing = (AKLC.spark || []).slice(0, 5).map(x => x.title); }
   } catch (e) {}
   try { ctx.knowMe = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-12).map(x => x.q + ' ' + x.a); } catch (e) {}
   ctx.facts = AI_FACTS;
