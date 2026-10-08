@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.66';
+const APP_VERSION = '2.22.67';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3601,13 +3601,19 @@ function Bills() {
 }
 async function markPaid(id) {
   const b = S.bills.find(x => x.id === id), s = snap();
+  // 2.22.67: remember which due date was paid so Budget keeps showing it as paid
+  try {
+    b.paidDues = (Array.isArray(b.paidDues) ? b.paidDues : []).filter(x => x && x.due !== b.due);
+    b.paidDues.push({ due: b.due || todayISO(), on: todayISO(), amount: budgetAmt(b.amount) });
+    b.paidDues = b.paidDues.slice(-30);
+  } catch (e) {}
   b.lastPaid = todayISO();
   const n = nextDue(b);
   if (n) b.due = n; else { b.paid = true; b.paidOn = todayISO(); }
   await save(); render();
   toast(n ? `${b.name} paid. Next due ${fmt(n)}.` : `${b.name} marked paid.`, 'Undo', undoTo(s));
 }
-async function unpay(id) { const b = S.bills.find(x => x.id === id); b.paid = false; delete b.paidOn; await save(); render(); }
+async function unpay(id) { const b = S.bills.find(x => x.id === id); b.paid = false; if (Array.isArray(b.paidDues)) b.paidDues = b.paidDues.filter(x => x && x.due !== b.due); delete b.paidOn; await save(); render(); }
 function billForm(id) {
   const b = id ? S.bills.find(x => x.id === id) : { name: '', amount: '', due: '', repeat: 'monthly', notes: '' };
   openSheet(id ? 'Edit bill' : 'Add a bill',
@@ -7311,6 +7317,19 @@ function budgetBillRows(b) {
         items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: budgetAmt(bill.amount), due: bill.due, late: 1 });
       });
   }
+  // 2.22.67: bills already paid for this fortnight stay on the budget, shown as paid
+  (S.bills || []).filter(x => x && !/\bmortgage\b/i.test(String(x.name || ''))).forEach(bill => {
+    let hits = (Array.isArray(bill.paidDues) ? bill.paidDues : []).filter(p => p && parseD(p.due) != null && parseD(p.due) >= sT && parseD(p.due) <= eT);
+    if (!hits.length && !Array.isArray(bill.paidDues) && bill.lastPaid && parseD(bill.lastPaid) != null && parseD(bill.lastPaid) >= sT && parseD(bill.lastPaid) <= eT)
+      hits = [{ due: bill.lastPaid, on: bill.lastPaid, amount: budgetAmt(bill.amount) }];
+    hits.forEach(p => {
+      const amt = budgetAmt(p.amount != null ? p.amount : bill.amount);
+      if (!(amt > 0)) return;
+      const i = items.findIndex(it => it.id === bill.id && it.due === p.due);
+      if (i >= 0) items.splice(i, 1);
+      items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: amt, due: p.due, late: 0, paid: 1, paidOn: p.on || p.due });
+    });
+  });
   loanPlanInRange(sT, eT).forEach(x => {
     items.push({ id: 'loan-' + x.l.id + '-' + x.d, name: 'Loan · ' + x.l.from, amount: x.amount, due: x.d, late: 0, loanId: x.l.id });
   });
@@ -7332,7 +7351,7 @@ function budgetCard(b) {
   const mortRows = k.mortgages.map((x, n) => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">Type this fortnight’s amount</div></div>
       <div class="moneyin" style="max-width:120px;margin:0"><span>$</span><input inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((x.amount || 0) * 100))}" aria-label="${esc(x.name)} amount" onchange="budgetMortgageSet(${jsArg(b.id)},${n},this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"></div></div>`).join('');
   const billRows = k.bills.length
-    ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="${x.loanId ? `go('#loan/${x.loanId}')` : `go('#bills')`}"><div class="ic bill">${I(x.loanId ? 'coins' : billIcon(x.name))}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.due)}</div></div></button><b>${money(x.amount)}</b></div>`).join('')
+    ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="${x.loanId ? `go('#loan/${x.loanId}')` : `go('#bills')`}"><div class="ic bill">${I(x.loanId ? 'coins' : billIcon(x.name))}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.paid ? '<span class="ok">✓ Paid</span> ' + fmtW(x.paidOn || x.due) : (x.late ? 'Overdue, was due ' : 'Due ') + fmtW(x.due)}</div></div></button><b>${money(x.amount)}</b></div>`).join('')
     : `<div class="card muted" style="margin:0">${payPeriod(0) ? 'No bills due in this fortnight.' : 'Set your payday in Bills so this fortnight’s bills can show here.'}</div>`;
   const lines = (b.lines || []).map(x => `<div class="row" data-bline="${esc(x.id)}"><div class="tx"><div class="t">${esc(x.name)}</div></div><b>${money(x.amount)}</b>
       <button type="button" class="iconbtn" aria-label="Delete ${esc(x.name)}" onclick="budgetLineDelete(${jsArg(b.id)},${jsArg(x.id)})">${I('trash')}</button></div>`).join('');
