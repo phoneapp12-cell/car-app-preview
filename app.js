@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.73';
+const APP_VERSION = '2.22.74';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1886,6 +1886,25 @@ function homeSugLawns() {
     if (homeSugHas(/\b(mow|mowing|lawn|lawns)\b/i, -1, 1)) return null;
     return { id: 'lawns', type: 'todo', text: 'Sunny and you’re off today, so it’s a good day to mow the lawns.', pre: { title: 'Mow the lawns', due: T, priority: 'normal', list: 'Home' } };
   } catch (e) { return null; }
+}
+// 2.22.74: on a mowing day (due, roster day off, sunny, daytime) put "Mow the lawns" on today's to-do list by itself, once
+let lawnAutoBusy = false;
+function lawnAutoTodo() {
+  try {
+    if (lawnAutoBusy || !S || !Array.isArray(S.todos)) return;
+    const a = homeAklParts();
+    if (!a || a.hour < 6 || a.hour >= 18) return;
+    const T = todayISO();
+    S.settings = S.settings || {};
+    if (S.settings.lawnAuto === T) return;
+    if (lawnDue() > T || !lawnOffDay(T) || lawnSunny(T) !== true) return;
+    const re = /\b(mow|mowing|lawn|lawns)\b/i;
+    if (S.todos.some(t => t && !t.done && re.test(String(t.title || '')))) { S.settings.lawnAuto = T; return; }
+    lawnAutoBusy = true;
+    S.todos.push({ id: uid('todo'), title: 'Mow the lawns', list: (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home'), due: T, notes: 'Sunny day off, and the lawns are due.', priority: 'normal', done: false, created: Date.now() });
+    S.settings.lawnAuto = T;
+    save().catch(() => {}).finally(() => { lawnAutoBusy = false; try { render(); } catch (e) {} });
+  } catch (e) { lawnAutoBusy = false; }
 }
 /* 2.22.49: Wet day at home: suggest a movie or comedy that's on free-to-air TV, from the free NZ TV guide
    (i.mjh.nz, which allows the app to read it). Fetched only when it's wet and Shane is at home, once a day
@@ -8709,6 +8728,7 @@ function updWx() {
   paintHomeSum();
 }
 function paintHomeSum() {
+  try { lawnAutoTodo(); } catch (e) {}
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
   if ((h !== 'home' && h !== '') || homeEdit) return;
