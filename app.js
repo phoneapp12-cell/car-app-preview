@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.46';
+const APP_VERSION = '2.22.47';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7564,6 +7564,7 @@ async function scheduleReminders() {
     let sub = await reg.pushManager.getSubscription();
     const k = nzStampLocal();
     const reminders = (S.reminders || []).filter(r => remRepeat(r) !== 'none' || remKey(r) >= k).map(r => ({ id: r.id, title: r.title, date: r.date, time: r.time, repeat: remRepeat(r) }));
+    try { medReminders().forEach(r => reminders.push(r)); } catch (e) {} // 2.22.47
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay) return '';
       if (!reminders.length) { /* still clear the relay below once we have a subscription */ }
@@ -7722,6 +7723,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   roster: ['clock', 'roster', 'Work roster', 'Roster'],
   sleep: ['moon', 'roster', 'Sleep', 'Sleep'],
   gym: ['heart', 'health', 'Gym', 'Gym'],
+  meds: ['medkit', 'health', 'Medications', 'Meds'],
   diary: ['book', 'diary', 'Diary', 'Diary'],
   countdown: ['clock', 'count', 'Countdown', 'Countdown'],
   notes: ['note', 'note', 'Notes', 'Notes']
@@ -7730,7 +7732,7 @@ const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
@@ -9786,6 +9788,62 @@ async function routineAdd(key) {
 }
 async function routineNo(key) { S.settings.routineAsk = Object.assign({}, S.settings.routineAsk, { [key]: 'no' }); await save(); routineSwap(); }
 function routineSwap() { const el = document.getElementById('routineask'); if (el) { const h = homeTry('routine ask', () => routineAskCard(), ''); if (h) el.outerHTML = h; else el.remove(); } }
+/* 2.22.47: Medications. Each pill has a name, optional dose and a usual time. Tick it off each day (the tick
+   records the time). A reminder goes out at the pill's time through the same push reminders as the Reminders
+   page, scheduled for today if it's still to come and not ticked, otherwise tomorrow; ticking re-schedules it,
+   so a pill already taken doesn't buzz. Kept in S.settings.meds; ticks kept for 60 days. */
+function medsState() { S.settings = S.settings || {}; const m = S.settings.meds && typeof S.settings.meds === 'object' ? S.settings.meds : (S.settings.meds = {}); if (!Array.isArray(m.list)) m.list = []; if (!m.taken || typeof m.taken !== 'object') m.taken = {}; return m; }
+function medTakenAt(id, iso) { const t = medsState().taken[iso || todayISO()]; return t && t[id] ? t[id] : ''; }
+function medReminders() {
+  const m = medsState(), today = todayISO(), now = nzStampLocal().slice(11, 16), tmr = addDays(today, 1);
+  return m.list.filter(x => x && x.remind !== false && /^\d{2}:\d{2}$/.test(x.time || '')).map(x => ({ id: 'med-' + x.id, title: '💊 Time for ' + x.name + (x.dose ? ' (' + x.dose + ')' : ''), date: (medTakenAt(x.id, today) || now >= x.time) ? tmr : today, time: x.time, repeat: 'daily' }));
+}
+async function medTick(id) {
+  const m = medsState(), d = todayISO(); m.taken[d] = m.taken[d] || {};
+  if (m.taken[d][id]) delete m.taken[d][id]; else m.taken[d][id] = nzStampLocal().slice(11, 16);
+  const cut = addDays(d, -60); Object.keys(m.taken).forEach(k => { if (k < cut) delete m.taken[k]; });
+  await save(); const el = document.getElementById('medlist'); if (el) el.innerHTML = medList(); scheduleReminders().catch(() => {});
+}
+function medList() {
+  const m = medsState(), today = todayISO();
+  if (!m.list.length) return `<div class="card empty"><div class="t">No pills added yet</div><div class="s">Add each one with the time you usually take it.</div></div>`;
+  const days = [6, 5, 4, 3, 2, 1, 0].map(n => addDays(today, -n));
+  return `<div class="list">` + m.list.slice().sort((a, b) => String(a.time || '99').localeCompare(String(b.time || '99'))).map(x => {
+    const at = medTakenAt(x.id, today);
+    const week = days.map(d => `<i title="${esc(fmtW(d))}" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;background:${medTakenAt(x.id, d) ? 'var(--ok,#2e7d32)' : '#8884'}"></i>`).join('');
+    return `<div class="row ${at ? 'done' : ''}"><button type="button" class="tick" aria-label="${at ? 'Mark not taken' : 'Mark taken'}: ${esc(x.name)}" onclick="medTick(${jsArg(x.id)})"><span>${I('check')}</span></button>
+      <button type="button" class="tx" style="text-align:left;flex:1;background:none;border:0;color:inherit;padding:0" onclick="medForm(${jsArg(x.id)})"><div class="t">${esc(x.name)}${x.dose ? ' · ' + esc(x.dose) : ''}</div>
+      <div class="s">${x.time ? fmtTime(x.time) : 'Any time'}${x.remind !== false && x.time ? ' · reminder on' : ''}${at ? ' · taken at ' + fmtTime(at) : ''}</div><div style="margin-top:4px">${week}</div></button></div>`;
+  }).join('') + `</div>`;
+}
+function medForm(id) {
+  const m = medsState(), x = id ? m.list.find(y => y.id === id) : { name: '', dose: '', time: '21:00', remind: true };
+  if (!x) return;
+  openSheet(id ? 'Edit pill' : 'Add a pill', field('Name', inp('name', x.name, 'required maxlength="40" placeholder="e.g. Ropinirole"')) + field('Dose (optional)', inp('dose', x.dose || '', 'maxlength="30" placeholder="e.g. 1 tablet"')) +
+    field('Usual time', inp('time', x.time || '', 'type="time"')) + field('Reminder', sel('remind', [['on', 'Remind me at this time'], ['off', 'No reminder']], x.remind === false ? 'off' : 'on')),
+    async v => {
+      const name = String(v.name || '').replace(/\s+/g, ' ').trim().slice(0, 40); if (!name) return 'Please type the pill’s name.';
+      const time = /^\d{2}:\d{2}$/.test(v.time || '') ? v.time : '', remind = v.remind !== 'off';
+      if (remind && !time) return 'Please choose a time for the reminder, or turn it off.';
+      if (remind && pushOK() && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) {} }
+      const upd = { name, dose: String(v.dose || '').trim().slice(0, 30), time, remind };
+      if (id) Object.assign(x, upd); else m.list.push(Object.assign({ id: uid('med') }, upd));
+      await save(); const r = await scheduleReminders(); render();
+      if (remind && r === 'need') toast('Saved. Allow notifications for My App to get the reminder.'); else toast('Saved.');
+    }, 'Save', id ? `<button type="button" class="btn danger" onclick="medDelete(${jsArg(id)})">Delete</button>` : '');
+}
+function medDelete(id) {
+  confirmSheet('Delete this pill?', 'Its ticks and reminder will be removed.', 'Delete', async () => {
+    const m = medsState(); m.list = m.list.filter(x => x.id !== id); await save(); await scheduleReminders(); render();
+  });
+}
+function Meds() {
+  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
+  const m = medsState(), left = m.list.filter(x => !medTakenAt(x.id)).length;
+  return back + header('Medications', m.list.length ? (left ? left + ' still to take today' : 'All taken today') : 'Tick them off as you take them') +
+    `<div id="medlist">${medList()}</div><div class="btns"><button class="btn primary" onclick="medForm()">${I('plus')} Add a pill</button></div>
+    <div class="foot">Ticks and pills stay with your My App data. The dots show the last 7 days.</div>`;
+}
 function Events() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
   const head = back + header('Events', 'What’s on in Whangārei · next 60 days');
@@ -12783,7 +12841,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, sleep: Sleep, gym: Gym };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, sleep: Sleep, gym: Gym, meds: Meds };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
