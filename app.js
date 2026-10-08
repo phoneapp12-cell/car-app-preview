@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.30';
+const APP_VERSION = '2.22.31';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1232,7 +1232,7 @@ const HOME_JOKES = [
   'At my age, getting lucky means finding the car in the car park on the first go.',
   'Marriage is all about compromise. I admit I’m wrong, and she agrees with me.',
   'I cook with wine. Sometimes I even add it to the food.',
-  'The rego, the WOF and the insurance all came due in the same week. It’s not a car, it’s a subscription.',
+  'My wife says I’ve only got two faults. I don’t listen, and something else.',
   'I used to think I was indecisive. Now I’m not so sure.'
 ];
 const HOME_FACTS = [
@@ -1400,6 +1400,7 @@ function homeNearItems(now) {
     if (!Number.isFinite(delta) || Math.abs(delta) > HOME_NEAR_MS) return;
     const plain = homePlainTitle(title);
     if (!plain || homeSaysTv(plain) || /\broadworks?\b/i.test(plain)) return;
+    if (homeMoneyItem('', plain)) return; // 2.22.31: payments only in the summary once overdue
     const key = homeMentionKey(plain);
     if (!key) return;
     const prev = hits.find(h => h.key === key);
@@ -1460,13 +1461,7 @@ function homeNearItems(now) {
       if (hm) pushAt(t.title, t.due, hm);
     });
   } catch (e) {}
-  try {
-    (S.bills || []).forEach(b => {
-      if (!b || b.paid || !b.name) return;
-      const hm = homeClockHM(b.time || b.dueTime || '');
-      if (hm) pushAt(b.name, b.due, hm);
-    });
-  } catch (e) {}
+  // 2.22.31: bills are left out here. The summary names a bill only when it is overdue.
   try {
     const meals = typeof M === 'function' ? M() : null;
     const plan = meals && meals.plan;
@@ -2284,9 +2279,17 @@ function homeSumCard(bits) {
   }
 }
 
+// 2.22.31: the written summary names a bill, loan, mortgage or other payment only once it is overdue.
+// Upcoming and the counters still list them as before. Matched on the kind, or on words in the title.
+const HOME_MONEY_RE = /\b(bills?|invoices?|mortgages?|loans?|repayments?|payments?|pay|rent|rates|insurance|premiums?|budget|direct debits?|instal?ments?|subscriptions?|owed?|owing|debts?|fees?)\b/i;
+function homeMoneyItem(kind, name) {
+  if (kind === 'bill' || kind === 'loan' || kind === 'budget') return true;
+  return HOME_MONEY_RE.test(String(name || ''));
+}
 function homeUrgentPool() {
   return homeAttention().filter(x => {
     if (!x || !x.name) return false;
+    if (homeMoneyItem(x.kind, x.name) && !(x.days < 0)) return false;
     if (x.kind === 'car' || x.kind === 'pet' || x.kind === 'tv' || x.kind === 'meal' || x.kind === 'comm') return false;
     if (homeSaysTv(x.name) || /\broadworks?\b/i.test(x.name)) return false;
     if (!Number.isFinite(x.days) || x.days > 2) return false;
@@ -2534,6 +2537,7 @@ function homeHighPriLine(mentioned) {
       const plain = homePlainTitle(t.title);
       const key = homeMentionKey(plain);
       if (!plain || !key || /\broadworks?\b/i.test(plain)) return;
+      if (homeMoneyItem('', plain) && !(t.due && daysLeft(t.due) < 0)) return; // 2.22.31: payments only once overdue
       if ((mentioned && mentioned.has(key)) || picked.some(p => p.key === key)) return;
       picked.push({ plain, key });
     });
@@ -2680,7 +2684,8 @@ function homeOverviewBody(shown, urgentOut) {
   } catch (e) {}
   // 2.22.28: Notifications keeps this to due things. No routine, bridge or shop-busyness lines.
   // 2.22.30: at the gym, the work-start and commute lines wait.
-  const atGym = homeTry('gym place', () => placeHere() === 'gym', false);
+  // 2.22.31: the same at any named place (not home or work).
+  const atGym = homeTry('named place', () => { const p = placeHere(); return !!p && p !== 'home' && p !== 'work'; }, false);
   if (!atGym) {
     try { pushBit('roster', rosterHeadsUp(homeAklParts(), homeWhere() === 'work')); } catch (e) {}
     try { pushBit('drive', homeDriveLine()); } catch (e) {}
@@ -2824,7 +2829,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('gym ask', () => gymAskHtml()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -7763,13 +7768,124 @@ function saveGymHere() {
   }, { enableHighAccuracy: true, maximumAge: 30 * 1000, timeout: 20000 });
 }
 async function clearGym() { const s0 = snap(); delete S.settings.gym; await save(); render(); toast('Gym location cleared.', 'Undo', undoTo(s0)); }
-async function hideGymAsk() { S.settings.gymAsk = false; await save(); render(); toast('Hidden. You can save the gym any time in Settings.'); }
-// The one-tap prompt on Notifications: only with no gym saved, not hidden, and not at home or work.
-function gymAskHtml() {
-  if (!S || !S.settings || gymSpot() || S.settings.gymAsk === false || !navigator.geolocation) return '';
-  const p = placeHere();
-  if (p === 'home' || p === 'work') return '';
-  return `<div class="gymask" id="gymask">${I('pin')}<button type="button" class="gymsave" id="gymsave" onclick="saveGymHere()">Save this spot as your gym</button><button type="button" class="gymx" aria-label="Hide this" onclick="hideGymAsk()">${I('x')}</button></div>`;
+/* 2.22.31: named places. Anywhere new (not home, work, the gym or a saved place) can be named from Notifications.
+   Saved in S.settings.places [{ id, name, lat, lon, at }] so they're in backups. Within 150 m counts as there.
+   The prompt waits until the same new spot shows up in two readings at least 3 minutes apart, never while
+   the phone reports driving speed, and never for a spot he dismissed (S.settings.placeSkips). */
+const PLACE_CUSTOM_M = 150;
+const NEWSPOT_GAP_MS = 3 * 60 * 1000;
+const NEWSPOT_MAX_MS = 6 * 60 * 60 * 1000;
+const NEWSPOT_DRIVE_MS = 15 / 3.6; // 15 km/h in m/s
+const PLACE_PICKS = ['Gym', 'Mum’s', 'Supermarket', 'Beach', 'Friend’s place', 'Cleaning job'];
+const validLL = (lat, lon) => Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+function customPlaces() {
+  const list = S && S.settings && Array.isArray(S.settings.places) ? S.settings.places : [];
+  return list.filter(x => x && typeof x === 'object' && x.id && String(x.name || '').trim() && validLL(+x.lat, +x.lon))
+    .map(x => ({ id: String(x.id), name: String(x.name).trim(), lat: +x.lat, lon: +x.lon, at: +x.at || 0 }));
+}
+const customPlace = id => customPlaces().find(x => x.id === id) || null;
+// Every place he has, with the distance that counts as being there.
+function knownPlaces() {
+  const gym = gymSpot();
+  return SAVED_PLACES.map(p => Object.assign({ r: PLACE_NEAR_M }, p))
+    .concat(gym ? [Object.assign({ r: GYM_NEAR_M }, gym)] : [])
+    .concat(customPlaces().map(p => Object.assign({ r: PLACE_CUSTOM_M }, p)));
+}
+function readNewSpot() {
+  try { const o = JSON.parse(localStorage.getItem('newSpot') || 'null'); return o && validLL(+o.lat, +o.lon) && +o.first && +o.last ? o : null; } catch (e) { return null; }
+}
+function writeNewSpot(o) { try { if (o) localStorage.setItem('newSpot', JSON.stringify(o)); else localStorage.removeItem('newSpot'); } catch (e) {} }
+function placeSkipped(lat, lon) {
+  const list = S && S.settings && Array.isArray(S.settings.placeSkips) ? S.settings.placeSkips : [];
+  return list.some(x => x && validLL(+x.lat, +x.lon) && metresBetween(lat, lon, +x.lat, +x.lon) <= PLACE_CUSTOM_M);
+}
+// Called with every location reading. Keeps track of one unnamed spot while he stays there.
+function noteNewSpot(fix, speed) {
+  try {
+    if (!fix || !S || !S.settings) return;
+    if (fix.acc == null || fix.acc > GYM_MAX_ACC) return; // too rough to name
+    if (Number.isFinite(speed) && speed > NEWSPOT_DRIVE_MS) { writeNewSpot(null); return; } // driving
+    const now = fix.at || Date.now();
+    if (knownPlaces().some(p => metresBetween(fix.lat, fix.lon, p.lat, p.lon) <= p.r)) { writeNewSpot(null); return; }
+    const prev = readNewSpot();
+    if (prev && now - prev.last < NEWSPOT_MAX_MS && metresBetween(fix.lat, fix.lon, +prev.lat, +prev.lon) <= PLACE_CUSTOM_M) {
+      writeNewSpot({ lat: fix.lat, lon: fix.lon, acc: fix.acc, first: prev.first, last: now });
+    } else writeNewSpot({ lat: fix.lat, lon: fix.lon, acc: fix.acc, first: now, last: now });
+  } catch (e) {}
+}
+// The spot to offer, or null. Only while he is still there (latest reading), seen twice 3+ minutes apart.
+function newSpotReady() {
+  if (!S || !S.settings || !hereFix || Date.now() - hereFix.at > 15 * 60 * 1000) return null;
+  if (hereFix.acc == null || hereFix.acc > GYM_MAX_ACC) return null;
+  if (Number.isFinite(hereFix.speed) && hereFix.speed > NEWSPOT_DRIVE_MS) return null;
+  if (placeHere()) return null;
+  const o = readNewSpot();
+  if (!o || o.last - o.first < NEWSPOT_GAP_MS) return null;
+  if (metresBetween(hereFix.lat, hereFix.lon, +o.lat, +o.lon) > PLACE_CUSTOM_M) return null;
+  if (placeSkipped(+o.lat, +o.lon)) return null;
+  return o;
+}
+function placeAskHtml() {
+  if (!newSpotReady()) return '';
+  return `<div class="gymask" id="placeask">${I('pin')}<button type="button" class="gymsave" onclick="namePlaceForm()">Somewhere new? Name this place</button><button type="button" class="gymx" aria-label="Don’t ask about this spot" onclick="skipNewSpot()">${I('x')}</button></div>`;
+}
+async function skipNewSpot() {
+  const o = readNewSpot() || (hereFix ? { lat: hereFix.lat, lon: hereFix.lon } : null);
+  if (!o) return;
+  const list = Array.isArray(S.settings.placeSkips) ? S.settings.placeSkips.slice() : [];
+  list.push({ lat: Math.round(+o.lat * 1e5) / 1e5, lon: Math.round(+o.lon * 1e5) / 1e5, at: Date.now() });
+  S.settings.placeSkips = list.slice(-40);
+  writeNewSpot(null);
+  await save(); render();
+  toast('Okay, it won’t ask about this spot again.');
+}
+function placeNameClean(v) { return String(v || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40); }
+function namePlaceForm() {
+  const o = newSpotReady();
+  if (!o) { render(); return; }
+  openSheet('Name this place',
+    `<div class="chips placepicks">${PLACE_PICKS.map(t => `<button type="button" class="chip" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div>` +
+    field('Name', inp('name', '', 'placeholder="e.g. Mum’s" maxlength="40" required'), 'Saved on this phone and in backups. Within about 150 m counts as being there.'),
+    async v => {
+      const name = placeNameClean(v.name);
+      if (!name) return 'Please type a name, or tap one above.';
+      const lat = Math.round(+o.lat * 1e6) / 1e6, lon = Math.round(+o.lon * 1e6) / 1e6;
+      if (!validLL(lat, lon)) return 'Couldn’t read the location. Try again in a moment.';
+      const s0 = snap();
+      if (/^gym$/i.test(name)) S.settings.gym = { lat, lon, acc: o.acc != null ? Math.round(o.acc) : null, at: Date.now() };
+      else {
+        const list = Array.isArray(S.settings.places) ? S.settings.places.slice() : [];
+        list.push({ id: uid('pl'), name, lat, lon, at: Date.now() });
+        S.settings.places = list;
+      }
+      writeNewSpot(null);
+      await save(); render();
+      return () => toast((/^gym$/i.test(name) ? 'Saved as your gym.' : 'Saved as ' + name + '.'), 'Undo', undoTo(s0));
+    }, 'Save');
+  const f = document.getElementById('sf');
+  if (f) { const nf = f.querySelector('[name=name]'); f.querySelectorAll('.placepicks .chip').forEach(b => b.onclick = () => { if (nf) { nf.value = b.dataset.t; nf.focus(); } }); }
+}
+function renamePlaceForm(id) {
+  const pl = customPlace(id); if (!pl) return;
+  openSheet('Rename place', field('Name', inp('name', pl.name, 'maxlength="40" required')), async v => {
+    const name = placeNameClean(v.name);
+    if (!name) return 'Please type a name.';
+    const s0 = snap();
+    S.settings.places = (S.settings.places || []).map(x => x && x.id === id ? Object.assign({}, x, { name }) : x);
+    await save(); render();
+    return () => toast('Renamed to ' + name + '.', 'Undo', undoTo(s0));
+  }, 'Save');
+}
+async function deletePlace(id) {
+  const pl = customPlace(id); if (!pl) return;
+  const s0 = snap();
+  S.settings.places = (S.settings.places || []).filter(x => !(x && x.id === id));
+  await save(); render();
+  toast(pl.name + ' deleted.', 'Undo', undoTo(s0));
+}
+function placesSettingsRows() {
+  return customPlaces().map(pl => `<div class="srow" data-place="${esc(pl.id)}"><div class="tx"><div class="t">${esc(pl.name)}</div><div class="s">${pl.at ? 'Saved ' + fmtW(isoT(todayT(new Date(pl.at)))) + '. ' : ''}Within about 150 m counts as there.</div></div>
+    <span style="display:flex;gap:6px;flex:none"><button class="btn small" onclick="renamePlaceForm('${esc(pl.id)}')">Rename</button><button class="btn small" onclick="deletePlace('${esc(pl.id)}')">Delete</button></span></div>`).join('');
 }
 let hereFix = null, hereBusy = false; // { lat, lon, acc, at } while the app is open. Not saved.
 function metresBetween(aLat, aLon, bLat, bLon) {
@@ -7783,20 +7899,21 @@ function rememberFix(pos) {
     const lat = +pos.coords.latitude, lon = +pos.coords.longitude;
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     const acc = Number.isFinite(+pos.coords.accuracy) ? +pos.coords.accuracy : null;
-    hereFix = { lat, lon, acc, at: Date.now() };
+    const speed = pos.coords.speed != null && Number.isFinite(+pos.coords.speed) ? +pos.coords.speed : null; // m/s, when the phone gives it
+    hereFix = { lat, lon, acc, speed, at: Date.now() };
     noteHomeArrival();
+    noteNewSpot(hereFix, speed); // 2.22.31
   } catch (e) {}
 }
-// Near home or near work, or nothing. A vague fix, or no fix, does not guess.
+// Near home, work, the gym or a named place (its id), or nothing. A vague fix, or no fix, does not guess.
 function placeHere() {
   try {
     if (!hereFix || Date.now() - hereFix.at > 15 * 60 * 1000) return '';
     if (hereFix.acc != null && hereFix.acc > 1000) return '';
     let best = '', bestM = Infinity;
-    const gym = gymSpot();
-    SAVED_PLACES.concat(gym ? [gym] : []).forEach(p => {
+    knownPlaces().forEach(p => {
       const m = metresBetween(hereFix.lat, hereFix.lon, p.lat, p.lon);
-      if (m <= (p.id === 'gym' ? GYM_NEAR_M : PLACE_NEAR_M) && m < bestM) { bestM = m; best = p.id; }
+      if (m <= p.r && m < bestM) { bestM = m; best = p.id; }
     });
     return best;
   } catch (e) { return ''; }
@@ -7812,6 +7929,17 @@ function homePlaceLine() {
     if (p === 'work') return homePick(63, ['Back at work.', 'You’re at work.', 'Work it is.']);
     // 2.22.30: at the gym. Upbeat, never a nudge to go.
     if (p === 'gym') return homePick(64, ['Gym time. Have a good session.', 'At the gym. Enjoy the workout.', 'Good on you, gym time. Have a great session.', 'Gym session on. Have a good one.', 'At the gym. Hope it’s a good one.']);
+    // 2.22.31: a named place. Short and natural, using his own name for it.
+    const pl = p ? customPlace(p) : null;
+    if (pl) {
+      const n = pl.name.replace(/[.!?]+$/, '');
+      const mum = /\b(mum|mom|mother)\b|\bmum[’']s\b/i.test(n);
+      let dow = -1;
+      try { const a = homeAklParts(); dow = a ? a.dow : -1; } catch (e) { dow = -1; }
+      if (mum && dow === 1) return homePick(66, ['Monday at ' + n + '. Enjoy the catch-up.', 'At ' + n + '. Nice way to start the week.', 'Monday at ' + n + '. Have a lovely visit.']);
+      if (mum) return homePick(67, ['At ' + n + '.', 'At ' + n + '. Enjoy the visit.', 'You’re at ' + n + '.']);
+      return homePick(65, ['At ' + n + '.', 'You’re at ' + n + '.', 'At ' + n + ' for now.']);
+    }
     return '';
   } catch (e) { return ''; }
 }
@@ -8197,7 +8325,12 @@ function paintHomeSum() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
   if ((h !== 'home' && h !== '') || homeEdit) return;
-  try { const ga = document.getElementById('gymask'); if (ga && !gymAskHtml()) ga.remove(); } catch (e) {} // 2.22.30: hide once we know he's home or at work
+  // 2.22.31: show or hide the "Name this place" row as readings come in, without a full redraw
+  try {
+    const ga = document.getElementById('placeask'), html = placeAskHtml();
+    if (ga && !html) ga.remove();
+    else if (!ga && html) { const wx = document.getElementById('notifwx'); if (wx) wx.insertAdjacentHTML('afterend', html); }
+  } catch (e) {}
   if (!showHomeSum()) return;
   const next = homeOverview(homeShownNow);
   const sum = document.getElementById('homesum');
@@ -10674,6 +10807,8 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Home and work</div><div class="s">Already set. The summary says welcome home or back at work, never the street.</div></div></div>
    <div class="srow"><div class="tx"><div class="t">Gym location</div><div class="s">${gymSpot() ? 'Saved' + (S.settings.gym.at ? ' ' + fmtW(isoT(todayT(new Date(S.settings.gym.at)))) : '') + '. Within about 150 m counts as at the gym.' : 'Not saved. Tap Save current spot while you’re at the gym.'}</div></div>
     <span style="display:flex;gap:6px;flex:none"><button class="btn small" id="gymsave" onclick="saveGymHere()">${I('pin')} Save current spot</button>${gymSpot() ? '<button class="btn small" onclick="clearGym()">Clear</button>' : ''}</span></div>
+   ${homeTry('places list', () => placesSettingsRows())}
+   <div class="srow"><div class="tx"><div class="s">${customPlaces().length ? 'Places you’ve named. ' : ''}When you’re somewhere new for a few minutes, Notifications offers to name it.</div></div></div>
   </div>
   <div class="sec">Reminders</div>
   <div class="list">
