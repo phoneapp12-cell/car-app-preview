@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.43';
+const APP_VERSION = '2.22.44';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1962,6 +1962,11 @@ function aiSumCtx() {
   try { ctx.about = (aboutState().answers || []).slice(-6).map(x => x.qid + ': ' + String(x.text || '').slice(0, 80)); } catch (e) {}
   try { ctx.soon = homeAttention().filter(x => x && x.name && Number.isFinite(x.days) && x.days > 2 && x.days <= 10 && !homeMoneyItem(x.kind, x.name)).slice(0, 5).map(x => x.name + ' in ' + x.days + ' days'); } catch (e) {}
   try { ctx.routines = routineLearned().map(c => c.why); } catch (e) {}
+  try { // 2.22.44: planned meals, so the AI never offers to plan a dinner that's already sorted
+    const plan = (M() && M().plan) || {}, t = todayISO();
+    const tn = plan[t]; ctx.dinnerTonight = tn ? String(tn.title || 'planned').slice(0, 80) : '';
+    ctx.mealsPlanned = [1, 2, 3].map(n => { const d = addDays(t, n), m = plan[d]; return m && m.title ? fmtW(d) + ': ' + String(m.title).slice(0, 60) : ''; }).filter(Boolean);
+  } catch (e) {}
   ctx.facts = AI_FACTS;
   return ctx;
 }
@@ -1991,7 +1996,9 @@ function aiSumBullets() {
 function aiSugList() {
   if (!aiSumFresh() || !AI_SUM.sugs.length) return null;
   let today = ''; try { today = DD.nzClock().iso || ''; } catch (e) {}
-  return AI_SUM.sugs.map((x, i) => {
+  let planned = false; try { planned = !!(M() && M().plan && M().plan[todayISO()]); } catch (e) {}
+  const foodRe = /\b(dinner|tea tonight|pizza|meal|cook|recipe|takeaway|supper)\b/i;
+  return AI_SUM.sugs.filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
     const title = String(x.title || x.text || '').slice(0, 80);
     const type = ['todo', 'note', 'appt'].includes(x.type) ? x.type : 'todo';
     const pre = type === 'note' ? { text: String(x.text || title) } : type === 'appt' ? { title, date: today, time: '', notes: '' } : { title, due: today, priority: 'normal', list: 'Home' };
