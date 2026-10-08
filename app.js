@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.60';
+const APP_VERSION = '2.22.61';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7729,6 +7729,7 @@ async function scheduleReminders() {
     const k = nzStampLocal();
     const reminders = (S.reminders || []).filter(r => remRepeat(r) !== 'none' || remKey(r) >= k).map(r => ({ id: r.id, title: r.title, date: r.date, time: r.time, repeat: remRepeat(r) }));
     try { medReminders().forEach(r => reminders.push(r)); } catch (e) {} // 2.22.47
+    try { if ((S.settings || {}).zeusCrate !== false) { const T = todayISO(), now = nzStampLocal().slice(11, 16); reminders.push({ id: 'zeus-crate', title: '🐕 Let Zeus out of his crate', date: now >= '07:00' ? addDays(T, 1) : T, time: '07:00', repeat: 'daily' }); } } catch (e) {} // 2.22.61
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay) return '';
       if (!reminders.length) { /* still clear the relay below once we have a subscription */ }
