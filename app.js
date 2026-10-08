@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.41';
+const APP_VERSION = '2.22.42';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1961,6 +1961,7 @@ function aiSumCtx() {
   try { ctx.notes = (S.notes || []).slice(-4).map(n => String(n.text || '').slice(0, 120)).filter(Boolean); } catch (e) {}
   try { ctx.about = (aboutState().answers || []).slice(-6).map(x => x.qid + ': ' + String(x.text || '').slice(0, 80)); } catch (e) {}
   try { ctx.soon = homeAttention().filter(x => x && x.name && Number.isFinite(x.days) && x.days > 2 && x.days <= 10 && !homeMoneyItem(x.kind, x.name)).slice(0, 5).map(x => x.name + ' in ' + x.days + ' days'); } catch (e) {}
+  try { ctx.routines = routineLearned().map(c => c.why); } catch (e) {}
   ctx.facts = AI_FACTS;
   return ctx;
 }
@@ -2933,7 +2934,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -9560,6 +9561,7 @@ function sleepMark() {
     const now = Date.now(), a = sleepAct(), last = a[a.length - 1];
     if (last && now - last < 60000) return;
     a.push(now);
+    try { placeLogMark(); } catch (e) {}
     const cut = now - 28 * 86400000;
     localStorage.setItem('sleepAct', JSON.stringify(a.filter(t => t > cut).slice(-4000)));
   } catch (e) {}
@@ -9652,6 +9654,70 @@ function Gym() {
     <div class="chips scroll">${GYM_GROUPS.map(x => `<button class="chip ${x[0] === f ? 'on' : ''}" onclick="setGymFilter(${jsArg(x[0])})">${x[1]}</button>`).join('')}</div>
     <div id="gymlist">${gymList()}</div><div class="foot">Photos from the free, public-domain Free Exercise DB. Machines differ between gyms, so check the picture on the machine itself too.</div>`;
 }
+/* 2.22.42: Routines. While My App is open it notes which saved place you're at (not home or work, which the
+   roster already covers) by day of week, kept on this phone for 60 days. Seen at the same place on the same
+   weekday in 3 or more different weeks out of the last 6 counts as a routine. Shane's own routines (gym Tue and
+   Wed after work, Monday at Mum's, Sunday cleaning job until 7pm) are offered too. Each one not already in the
+   calendar gets one "add it every week?" card on Notifications; Add makes a weekly My event, No thanks is final. */
+const WD_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function placeLog() { try { const a = JSON.parse(localStorage.getItem('placeLog') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function placeLogMark() {
+  try {
+    const p = placeHere(); if (!p || p === 'home' || p === 'work') return;
+    const a = homeAklParts(); if (!a) return;
+    const d = nzISO(Date.now()), log = placeLog(), last = log[log.length - 1];
+    if (log.some(x => x.d === d && x.p === p)) return;
+    log.push({ d, w: a.dow, m: a.min, p });
+    const cut = addDays(d, -60);
+    localStorage.setItem('placeLog', JSON.stringify(log.filter(x => x.d >= cut).slice(-600)));
+  } catch (e) {}
+}
+function hmTxt(m) { const h = Math.floor(m / 60) % 24; return (h % 12 || 12) + ':' + String(m % 60).padStart(2, '0') + (h < 12 ? 'am' : 'pm'); }
+function placeTitle(id) { if (id === 'gym') return 'Gym'; const p = knownPlaces().find(x => x.id === id); return (p && p.name) || ''; }
+function routineLearned() {
+  const today = nzISO(Date.now()), cut = addDays(today, -42), groups = {};
+  placeLog().filter(x => x && x.d >= cut).forEach(x => { const k = x.p + ':' + x.w; (groups[k] = groups[k] || []).push(x); });
+  return Object.keys(groups).map(k => {
+    const g = groups[k]; if (new Set(g.map(x => x.d)).size < 3) return null;
+    const title = placeTitle(g[0].p); if (!title) return null;
+    const ms = g.map(x => x.m).sort((a, b) => a - b), med = Math.round(ms[Math.floor(ms.length / 2)] / 15) * 15;
+    return { key: k, title, dow: g[0].w, time: String(Math.floor(med / 60)).padStart(2, '0') + ':' + String(med % 60).padStart(2, '0'), notes: '', why: `You’ve been at ${title === 'Gym' ? 'the gym' : title} on ${WD_NAMES[g[0].w]}s around ${hmTxt(med)}` };
+  }).filter(Boolean);
+}
+function routineKnown() {
+  let fin = {}; try { fin = rosterState().ends || {}; } catch (e) {}
+  const after = (dow, dflt) => { const e = fin[String(dow)]; if (!/^\d{2}:\d{2}$/.test(e || '')) return dflt; const m = +e.slice(0, 2) * 60 + +e.slice(3) + 15; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(Math.round(m % 60 / 15) * 15 % 60).padStart(2, '0'); };
+  return [
+    { key: 'gym:2', title: 'Gym', dow: 2, time: after(2, '18:15'), notes: 'After work', why: 'You go to the gym on Tuesdays after work' },
+    { key: 'gym:3', title: 'Gym', dow: 3, time: after(3, '18:15'), notes: 'After work', why: 'You go to the gym on Wednesdays after work' },
+    { key: 'mum:1', title: 'Mum’s', dow: 1, time: after(1, '18:30'), notes: '', why: 'You’re at your mum’s on Mondays' },
+    { key: 'clean:0', title: 'Cleaning job', dow: 0, time: '', notes: 'Until 7pm', why: 'You’ve got the cleaning job on Sundays until 7pm' }
+  ];
+}
+function routineCands() {
+  const asked = (S.settings && S.settings.routineAsk) || {}, seen = new Set(), out = [];
+  const inCal = c => (S.myEvents || []).some(ev => ev && ev.repeat === 'weekly' && !ev.until && (() => { try { return new Date(ev.start + 'T12:00:00Z').getUTCDay() === c.dow; } catch (e) { return false; } })() && String(ev.title || '').toLowerCase().includes(c.title.toLowerCase().replace(/’s$/, '').slice(0, 4)));
+  [...routineKnown(), ...routineLearned()].forEach(c => { if (seen.has(c.key) || asked[c.key] || inCal(c)) return; seen.add(c.key); out.push(c); });
+  return out;
+}
+function routineAskCard() {
+  const c = routineCands()[0]; if (!c) return '';
+  const when = WD_NAMES[c.dow] + (c.time ? ' at ' + hmTxt(+c.time.slice(0, 2) * 60 + +c.time.slice(3)) : '');
+  return `<div class="card" id="routineask"><div class="t" style="font-weight:800;margin-bottom:4px">Add to your calendar?</div>
+    <div class="s">${esc(c.why)}. Add “${esc(c.title)}” every ${esc(when)}${c.notes ? ' (' + esc(c.notes.toLowerCase()) + ')' : ''}?</div>
+    <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="btn primary small" onclick="routineAdd(${jsArg(c.key)})">${I('plus')} Add every week</button><button type="button" class="btn small" onclick="routineNo(${jsArg(c.key)})">No thanks</button></div></div>`;
+}
+async function routineAdd(key) {
+  const c = routineCands().find(x => x.key === key); if (!c) return;
+  const s = snap(), a = homeAklParts() || { dow: 0 }, today = todayISO();
+  let start = addDays(today, (c.dow - a.dow + 7) % 7);
+  S.myEvents = S.myEvents || [];
+  S.myEvents.push({ id: uid('myev'), skips: [], moves: {}, done: false, doneDates: [], title: c.title, start, time: c.time, repeat: 'weekly', until: '', notes: c.notes, remind: 'off', remindAt: '' });
+  S.settings.routineAsk = Object.assign({}, S.settings.routineAsk, { [key]: 'added' });
+  await save(); routineSwap(); toast('Added every ' + WD_NAMES[c.dow] + '.', 'Undo', undoTo(s));
+}
+async function routineNo(key) { S.settings.routineAsk = Object.assign({}, S.settings.routineAsk, { [key]: 'no' }); await save(); routineSwap(); }
+function routineSwap() { const el = document.getElementById('routineask'); if (el) { const h = homeTry('routine ask', () => routineAskCard(), ''); if (h) el.outerHTML = h; else el.remove(); } }
 function Events() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
   const head = back + header('Events', 'What’s on in Whangārei · next 60 days');
