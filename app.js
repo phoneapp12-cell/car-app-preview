@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.45';
+const APP_VERSION = '2.22.46';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3511,7 +3511,7 @@ function Todo() {
   const vis = S.todos.filter(t => todoFilter === 'All' || t.list === todoFilter);
   const open = vis.filter(t => !t.done).sort(cmpOpenTodo);
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
-  const row = t => `<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick${t.done ? '' : ' donelabel'}" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span>${t.done ? '' : '<b>Done</b>'}</button>
+  const row = t => `<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
     <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
     ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
@@ -5996,7 +5996,7 @@ const ATT_SOURCES = {
   mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).filter(e => !e.done).map(e => ({ days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: `${attWhen(d)}: ${e.title}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
     html: attRow({ wx: 1, kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${T + d * DAY})`, ic: 'mine', icon: 'repeat', title: `${attWhen(d)}: ${esc(e.title)}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
       sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}`,
-      complete: `<button type="button" class="tick donelabel" aria-label="Mark complete: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})"><span>${I('check')}</span><b>Done</b></button>` }) }))),
+      complete: `<button type="button" class="tick" aria-label="Mark complete: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})"><span>${I('check')}</span></button>` }) }))),
   // Appointments, including What's On events you added, today and the next 7 days
   appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: `${attDay(d, a.date)}: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`,
     html: attRow({ wx: 1, kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,

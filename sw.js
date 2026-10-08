@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '2.22.45';
+const VERSION = '2.22.46';
 const CACHE = 'due-dates-' + VERSION;
 const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['./', './index.html', './app.js', './sync-logic.js', './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest', './data/tides-whangarei.json',
