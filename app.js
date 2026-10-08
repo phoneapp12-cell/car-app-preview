@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.80';
+const APP_VERSION = '2.22.81';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2319,6 +2319,16 @@ function aiSumCtx() {
 }
 async function aiSumFetch() {
   if (aiSumBusy || aiSumOpen === homeSugOpenN || navigator.onLine === false) return;
+  // 2.22.81: reuse the last summary for 3 hours instead of writing a new one on every open.
+  try {
+    const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null');
+    if (last && Array.isArray(last.lines) && last.lines.length && Date.now() - last.at < 3 * 3600 * 1000) {
+      AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: homeSugOpenN, at: last.at };
+      aiSumOpen = homeSugOpenN;
+      const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
+      return;
+    }
+  } catch (e) {}
   aiSumBusy = true;
   const openN = homeSugOpenN;
   try {
