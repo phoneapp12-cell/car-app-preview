@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.83';
+const APP_VERSION = '2.22.84';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1218,7 +1218,7 @@ function homeWalkLine() {
     const names = dogs.map(p => String(p.name || '').trim()).filter(n => n && n.toLowerCase() !== 'pet');
     if (names.length === 1) who = names[0];
   } catch (e) { who = 'the dog'; }
-  return 'A good day for a bushwalk, or a walk with ' + who + ', if you feel like it.';
+  return 'A good day for a bushwalk, if you feel like it.'; // 2.22.84: don't suggest walking Zeus
 }
 function homeCookAside(dow) {
   try {
@@ -2130,6 +2130,7 @@ function homeSugShop() {
   } catch (e) { return null; }
 }
 function homeSugDogWalk() {
+  return null; // 2.22.84: walking Zeus is already on the to-do list, so don't suggest it
   try {
     // 2.22.34: Shane walks Zeus on his weekends, which are his days off in the Work roster tab.
     // If the roster has no days set, fall back to Saturday and Sunday. Daytime only.
@@ -2216,7 +2217,7 @@ function homeSugNewOpen() {
 homeSugNewOpen();
 function homeSuggestions() {
   // Gather every available type first. Duplicate skips stay inside each maker; Add buttons unchanged.
-  const makers = [homeSugUse, homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugWater, homeSugGardenFeed, homeSugLawns, homeSugTv, homeSugShop, homeSugDogWalk, homeSugVet, homeSugIdea];
+  const makers = [homeSugUse, homeSugBirthday, homeSugCar, homeSugEvent, homeSugHaircut, homeSugTyres, homeSugWater, homeSugGardenFeed, homeSugLawns, homeSugTv, homeSugShop, homeSugVet, homeSugIdea];
   const avail = [];
   makers.forEach(fn => {
     let s = null;
@@ -2251,7 +2252,7 @@ function homeSuggestions() {
    answers and standing facts) and use the returned bullets and suggestions. The rule-based summary stays as the
    fallback whenever the AI is slow, offline or fails. Nothing is stored on the relay. */
 let AI_SUM = null, aiSumOpen = -1, aiSumBusy = false;
-const AI_FACTS = ['52, wife Sarah, daughters Millesha and Cass, granddaughter Aranea', 'Dog Zeus, walks him on days off',
+const AI_FACTS = ['52, wife Sarah, daughters Millesha and Cass, granddaughter Aranea', 'Dog Zeus. Walking him is already on the to-do list, so never suggest a walk with him',
   'Coeliac: food ideas must be gluten free', 'Loves pizza, Turkish Delight, merlot now and then, cooking on Fri and Sat nights',
   'Likes gym (Tue and Wed after work), gardening, bushwalks, beaches, movies, books, AI music like Suno, tech',
   'Monday evenings at his mum\u2019s; Sunday cleaning job until 7pm; spa around 10 to 11pm; dinner 8 to 9pm on weekdays',
@@ -2360,7 +2361,8 @@ async function aiSumFetch() {
 function aiSumFresh() { return !!(AI_SUM && AI_SUM.open === homeSugOpenN && Date.now() - AI_SUM.at < 3600 * 1000); }
 function aiSumBullets() {
   if (!aiSumFresh()) return '';
-  const lis = AI_SUM.lines.map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
+  const walkDog = /\b(walk|walking)\b/i; const dog = /\b(zeus|dog|dogs)\b/i;
+  const lis = AI_SUM.lines.filter(t => { const x = String(t); return !(walkDog.test(x) && dog.test(x)); }).map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
   return lis ? '<ul class="sumbul">' + lis + '</ul>' : '';
 }
 function aiSugList() {
@@ -2369,7 +2371,8 @@ function aiSugList() {
   let planned = false; try { planned = !!(M() && M().plan && M().plan[todayISO()]); } catch (e) {}
   const foodRe = /\b(dinner|tea tonight|pizza|meal|cook|recipe|takeaway|supper)\b/i;
   const lawnRe = /\b(mow|mowing|lawn|lawns)\b/i; let lawn = null; try { lawn = homeSugLawns(); } catch (e) {} // 2.22.48: lawns follow the fortnightly rule only
-  const out = AI_SUM.sugs.filter(x => !lawnRe.test(String(x.text || '') + ' ' + String(x.title || ''))).filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
+  const walkDogRe = /\b(walk|walking)\b/i, dogRe = /\b(zeus|dog|dogs)\b/i; // 2.22.84: walk is already a to-do
+  const out = AI_SUM.sugs.filter(x => { const blob = String(x.text || '') + ' ' + String(x.title || ''); return !lawnRe.test(blob) && !(walkDogRe.test(blob) && dogRe.test(blob)); }).filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
     const title = String(x.title || x.text || '').slice(0, 80);
     const type = ['todo', 'note', 'appt'].includes(x.type) ? x.type : 'todo';
     const pre = type === 'note' ? { text: String(x.text || title) } : type === 'appt' ? { title, date: today, time: '', notes: '' } : { title, due: today, priority: 'normal', list: 'Home' };
