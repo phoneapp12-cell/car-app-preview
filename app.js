@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.82';
+const APP_VERSION = '2.22.83';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -309,7 +309,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   todo: ['todo', 'todo', 'To-do', 'Your next to-dos, with a Done button (ones due soon are in Upcoming)', 1],
   loans: ['coins', 'loan', 'Loans', 'How much is still owed', 1],
   commission: ['cash', 'comm', 'Commission', 'This fortnight’s total', 1],
-  birthdays: ['cake', 'bday', 'Birthdays', 'Tomorrow through 30 days away. They can also show in Upcoming.', 1],
+  birthdays: ['cake', 'bday', 'Birthdays', 'Today through 30 days away.', 1],
   pets: ['paw', 'pet', 'Pets', 'Next flea treatment, grooming and vet dates', 0],
   about: ['info', 'about', 'About you', 'A daily question, and what you’ve said', 0],
   bills: ['bill', 'bill', 'Bills', 'The next bills to pay', 0],
@@ -341,7 +341,11 @@ const NOTIF_DUE_CARD = { car: 'cars', driver: 'cars', bill: 'bills', pet: 'pets'
 let homeDueCards = new Set();
 function notifDueCards() {
   const out = new Set();
-  homeAttention().forEach(x => { const k = NOTIF_DUE_CARD[x.kind]; if (k && x.days <= 14 && HOME_CARD[k]) out.add(k); });
+  homeAttention().forEach(x => {
+    const k = NOTIF_DUE_CARD[x.kind];
+    const within = x.kind === 'bday' ? 30 : 14; // 2.22.83: birthdays from 30 days out
+    if (k && x.days <= within && HOME_CARD[k]) out.add(k);
+  });
   return out;
 }
 const notifAllowed = k => NOTIF_KEYS.includes(k);
@@ -538,8 +542,8 @@ const HOME_CARD = {
       <button class="paybtn" onclick="go('#commission/add')">Add</button></div></div>`;
   },
   birthdays: () => {
-    // Tomorrow through 30 days. Today stays off this list. The same birthdays can still show in Upcoming. No cap.
-    const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 1 && x.d <= 30).sort((x, y) => x.d - y.d || x.b.name.localeCompare(y.b.name));
+    // 2.22.83: today through 30 days. No cap. Upcoming drops these once this card is showing.
+    const list = S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 30).sort((x, y) => x.d - y.d || x.b.name.localeCompare(y.b.name));
     if (!list.length) return '';
     return homeSec('Birthdays', '<a href="#birthdays">See all</a>') + `<div class="list" id="homebdays">${list.map(x => `<button class="row" onclick="birthdayForm('${x.b.id}')"><div class="ic bday">${I('cake')}</div>
       <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${fmtW(x.iso)}${x.age > 0 ? ` · turns ${x.age}` : ''}</div></div>
@@ -6406,8 +6410,8 @@ const ATT_SOURCES = {
   ext: T => { const seen = new Set(); return extEvents(T, T + ATT_WEEK * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '', kind: 'ext', name: `${attDay(d, e.date)}: ${e.title}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + e.time : ''}`,
     html: attRow({ wx: 1, kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal',
       title: `${attDay(d, e.date)}: ${esc(e.title)}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + esc(e.time) : ''}`, sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}${e.time === 'All day' ? ' · All day' : ''}` }) }; }); },
-  // Birthdays, today and the next 7 days
-  bday: T => S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 7).map(x => ({ days: x.d, rank: 2, sort: '', kind: 'bday', name: `${x.b.name}’s ${x.age > 0 ? ordinal(x.age) + ' ' : ''}birthday`,
+  // Birthdays, today and the next 30 days (2.22.83)
+  bday: T => S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 30).map(x => ({ days: x.d, rank: 2, sort: '', kind: 'bday', name: `${x.b.name}’s ${x.age > 0 ? ordinal(x.age) + ' ' : ''}birthday`,
     html: attRow({ kind: 'bday', cls: x.d === 0 ? 'bdtoday' : '', date: x.iso, go: `go('#birthdays')`, ic: 'bday', icon: 'cake', title: `${esc(x.b.name)}’s ${x.age > 0 ? ordinal(x.age) + ' ' : ''}birthday`,
       sub: `Birthday · ${fmtW(x.iso)}`, right: `<span class="pill ${x.d === 0 ? 'bdaypill' : 'bdaysoon'}">${x.d === 0 ? 'Today!' : attWhen(x.d)}</span>` }) })),
   // Today's planned dinner, on the day it is scheduled (it also stays on the Upcoming meals card).
