@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.64';
+const APP_VERSION = '2.22.65';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3090,7 +3090,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -8628,6 +8628,12 @@ function paintHomeSum() {
     if (ga && !html) ga.remove();
     else if (!ga && html) { const wx = document.getElementById('notifwx'); if (wx) wx.insertAdjacentHTML('afterend', html); }
   } catch (e) {}
+  try {
+    const mo = document.getElementById('notifmail'), mh = mailStrip();
+    if (mo && !mh) mo.remove();
+    else if (mo && mh) mo.outerHTML = mh;
+    else if (!mo && mh) { const wx = document.getElementById('notifwx'); if (wx) wx.insertAdjacentHTML('afterend', mh); }
+  } catch (e) {}
   if (!showHomeSum()) return;
   const next = homeOverview(homeShownNow);
   const sum = document.getElementById('homesum');
@@ -11464,6 +11470,16 @@ async function saveMail() {
 }
 const mailConnected = p => !!(MAIL[p] && MAIL[p].refreshToken);
 const mailAnyConnected = () => mailConnected('google') || mailConnected('microsoft');
+// 2.22.65: show the mail line on Home under the weather
+function mailStrip() {
+  const t = homeMailLine();
+  if (!t) return '';
+  return `<button type="button" class="notifwx notifmail" id="notifmail" onclick="mailOpenInbox()"><span class="nwxic" style="font-size:1.5rem">✉️</span><span class="nwxtx"><span class="nwxnow">Mail</span><span class="nwxnext">${esc(t)}</span></span>${I('right')}</button>`;
+}
+function mailOpenInbox() {
+  const url = mailConnected('microsoft') ? 'https://outlook.live.com/mail/' : 'https://mail.google.com/';
+  try { window.open(url, '_blank'); } catch (e) { location.href = url; }
+}
 function homeMailLine() {
   if (!mailAnyConnected()) return '';
   return MAIL_VIEW || 'Checking mail from the last 2 hours.';
