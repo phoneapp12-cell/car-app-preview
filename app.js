@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.37';
+const APP_VERSION = '2.22.38';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1930,9 +1930,76 @@ function homeSuggestions() {
   try { localStorage.setItem('sugLast', JSON.stringify(homeSugPickIds)); } catch (e) {}
   return pick;
 }
+/* 2.22.38: AI-written Notifications summary (Cloudflare Workers AI through the relay, free allowance).
+   Once per app open: send a small context (time, place, weather, due items, to-dos, notes, roster, about-you
+   answers and standing facts) and use the returned bullets and suggestions. The rule-based summary stays as the
+   fallback whenever the AI is slow, offline or fails. Nothing is stored on the relay. */
+let AI_SUM = null, aiSumOpen = -1, aiSumBusy = false;
+const AI_FACTS = ['52, wife Sarah, daughters Millesha and Cass, granddaughter Aranea', 'Dog Zeus, walks him on days off',
+  'Coeliac: food ideas must be gluten free', 'Loves pizza, Turkish Delight, merlot now and then, cooking on Fri and Sat nights',
+  'Likes gym (Tue and Wed after work), gardening, bushwalks, beaches, movies, books, AI music like Suno, tech',
+  'Monday evenings at his mum\u2019s; Sunday cleaning job until 7pm; spa around 10 to 11pm; dinner 8 to 9pm on weekdays',
+  'Works at Noel Leeming Superstore, Whang\u0101rei; night owl', 'Likes tips on tidying, sorting and organising'];
+function aiSumCtx() {
+  const a = homeAklParts() || {};
+  const WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const ctx = { day: WD[a.dow] || '', time: Number.isFinite(a.min) ? String(Math.floor(a.min / 60)).padStart(2, '0') + ':' + String(a.min % 60).padStart(2, '0') : '' };
+  try { const p = placeHere(); ctx.place = p ? (p === 'home' || p === 'work' || p === 'gym' ? p : ((S.settings.places || []).find(x => x.id === p) || {}).name || 'a saved place') : 'out and about'; } catch (e) {}
+  try {
+    const r = rosterState(), k = String(a.dow);
+    ctx.work = r.days[k] ? 'work day, starts ' + r.days[k] + ((r.ends || {})[k] ? ', finishes ' + r.ends[k] : '') : 'day off';
+  } catch (e) {}
+  try {
+    if (WX && validWx(WX.data)) {
+      const c = WX.data.current, w = wmo(c.weather_code, wxIsDay(), c.wind_speed_10m);
+      ctx.weather = Math.round(c.temperature_2m) + '\u00b0C, ' + w.words;
+      const nx = notifWxOutlook(w, notifWxNext()); if (nx) ctx.weather += '. ' + nx;
+    }
+  } catch (e) {}
+  try { ctx.due = homeUrgentPool().slice(0, 6).map(x => x.name + (x.days < 0 ? ' (overdue)' : x.days === 0 ? ' (today)' : x.days === 1 ? ' (tomorrow)' : ' (in ' + x.days + ' days)')); } catch (e) {}
+  try { ctx.todos = (S.todos || []).filter(t => t && !t.done).sort((x, y) => (x.priority === 'high' ? 0 : 1) - (y.priority === 'high' ? 0 : 1)).slice(0, 6).map(t => t.title + (t.priority === 'high' ? ' (high priority)' : '')); } catch (e) {}
+  try { ctx.notes = (S.notes || []).slice(-4).map(n => String(n.text || '').slice(0, 120)).filter(Boolean); } catch (e) {}
+  try { ctx.about = (aboutState().answers || []).slice(-6).map(x => x.qid + ': ' + String(x.text || '').slice(0, 80)); } catch (e) {}
+  try { ctx.soon = homeAttention().filter(x => x && x.name && Number.isFinite(x.days) && x.days > 2 && x.days <= 10 && !homeMoneyItem(x.kind, x.name)).slice(0, 5).map(x => x.name + ' in ' + x.days + ' days'); } catch (e) {}
+  ctx.facts = AI_FACTS;
+  return ctx;
+}
+async function aiSumFetch() {
+  if (aiSumBusy || aiSumOpen === homeSugOpenN || navigator.onLine === false) return;
+  aiSumBusy = true;
+  const openN = homeSugOpenN;
+  try {
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const tm = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} }, 20000);
+    const r = await fetch(RELAY_URL + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ctx: aiSumCtx() }), signal: ctl ? ctl.signal : undefined });
+    clearTimeout(tm);
+    if (!r.ok) throw new Error('http ' + r.status);
+    const d = await r.json();
+    if (!d || !Array.isArray(d.lines) || !d.lines.length) throw new Error('empty');
+    AI_SUM = { lines: d.lines.slice(0, 5).map(x => String(x).slice(0, 220)), sugs: (d.sugs || []).slice(0, 3), open: openN, at: Date.now() };
+    aiSumOpen = openN;
+    const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
+  } catch (e) { aiSumOpen = openN; } finally { aiSumBusy = false; }
+}
+function aiSumFresh() { return !!(AI_SUM && AI_SUM.open === homeSugOpenN && Date.now() - AI_SUM.at < 3 * 3600 * 1000); }
+function aiSumBullets() {
+  if (!aiSumFresh()) return '';
+  const lis = AI_SUM.lines.map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
+  return lis ? '<ul class="sumbul">' + lis + '</ul>' : '';
+}
+function aiSugList() {
+  if (!aiSumFresh() || !AI_SUM.sugs.length) return null;
+  let today = ''; try { today = DD.nzClock().iso || ''; } catch (e) {}
+  return AI_SUM.sugs.map((x, i) => {
+    const title = String(x.title || x.text || '').slice(0, 80);
+    const type = ['todo', 'note', 'appt'].includes(x.type) ? x.type : 'todo';
+    const pre = type === 'note' ? { text: String(x.text || title) } : type === 'appt' ? { title, date: today, time: '', notes: '' } : { title, due: today, priority: 'normal', list: 'Home' };
+    return { id: 'ai' + i, type, text: String(x.text || title), pre };
+  }).filter(x => x.text);
+}
 function homeSugHtml() {
   let list = [];
-  try { list = homeSuggestions(); } catch (e) { list = []; }
+  try { list = aiSugList() || homeSuggestions(); } catch (e) { list = []; }
   homeSugNow = list;
   if (!list.length) return '';
   const label = { todo: 'to your to-do list', note: 'as a note', appt: 'to your calendar' };
@@ -2301,6 +2368,9 @@ function homeSumCard(bits) {
       if (aside) ps.push(li(esc(aside) + (/[.!?]$/.test(aside) ? '' : asks ? '?' : '.')));
     }
     void clausesOf;
+    const aiB = homeTry('ai summary', () => aiSumBullets(), '');
+    if (aiB) return homeSceneCard(aiB);
+    try { setTimeout(() => { aiSumFetch(); }, 0); } catch (e) {}
     if (!ps.length) return homeSumFallback();
     return homeSceneCard('<ul class="sumbul">' + ps.join('') + '</ul>');
   } catch (e) {

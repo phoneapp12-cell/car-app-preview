@@ -4,6 +4,8 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-09-25",
   "workers_dev": true,
+  // 2.22.38: Workers AI (free daily allowance) writes the Notifications summary. Nothing is stored.
+  "ai": { "binding": "AI" },
   // No request logs, traces or analytics are kept for this Worker.
   "observability": { "enabled": false, "logs": { "enabled": false, "invocation_logs": false } },
   "vars": {
