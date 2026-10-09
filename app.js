@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.86';
+const APP_VERSION = '2.22.87';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2433,7 +2433,8 @@ function homeSceneCard(inner, noSugs) {
   const body = inner || '<p class="sumnote">Nothing much to flag right now. Have a good one.</p>';
   let sugs = '';
   try { sugs = noSugs ? '' : homeSugHtml(); } catch (e) { sugs = ''; }
-  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${sugs}</div></div>`;
+  let nf = ''; try { nf = nfHtml(); } catch (e) { nf = ''; } // 2.22.87: New on Netflix, at the very bottom
+  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${sugs}${nf}</div></div>`;
 }
 function homeSumFallback() {
   try { return homeSceneCard('<p class="sumnote">Nothing much to flag right now. Have a good one.</p>'); }
@@ -11722,6 +11723,7 @@ const MAIL_BULK_RE = /(newsletter|marketing|promo|offers|deals|mailer|campaign|n
 const MAIL_KEY_RE = /(invoice|\bbill\b|payment|overdue|\bdue\b|statement|receipt|refund|\border\b|delivery|deliver|courier|parcel|appointment|booking|confirm|security|password|sign.?in|verify|verification|\bcode\b|account|rego|registration|\bwof\b|insurance|\bird\b|\btax\b|council|reminder|urgent|action required|important|roster|shift|interview|contract|mortgage|loan|bank|vet|doctor|dentist|school|court|\bfine\b|ticket)/i;
 function mailIsImportant(it) {
   const subj = it.subject || '';
+  if (/@members\.netflix\.com$/i.test(it.addr || '')) return false; // 2.22.87: Netflix promos go to the summary, never the mail strip
   if (MAIL_AD_RE.test(subj)) return false;
   if (it.high || MAIL_KEY_RE.test(subj)) return true;
   if (MAIL_BULK_RE.test(it.addr || '') || /no-?reply|do-?not-?reply/.test(it.addr || '')) return false;
@@ -12004,6 +12006,7 @@ async function refreshMail(force) {
   mailBusy = false;
   paintHomeSum();
   refreshLawnInvoice(false);
+  refreshNf(false);
 }
 function mailSettingsSection() {
   const cfg = MAIL_CFG || { google: {}, microsoft: {}, offline: false };
@@ -12298,6 +12301,137 @@ async function refreshLawnInvoice(force) {
     if (!sheetOpen && (h === 'bills' || h === 'budget' || h === 'home' || h === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
   } catch (e) { }
   finally { lawnInvBusy = false; }
+}
+
+/* ================= NEW ON NETFLIX (2.22.87) =================
+   Netflix's own promo emails in Shane's Outlook (sender @members.netflix.com) list what is new. Account mail
+   (@account.netflix.com: sign-in codes, new devices, billing) is never used. The phone reads them with its Outlook
+   sign-in; no AI. Titles come only from the emails: the “New on Netflix” list of the newest email that has one,
+   “we just added” and “now on Netflix” titles, and “Coming <day>, <date> ... <title>” subjects whose date is still ahead. */
+const NF_MAX_AGE = 3 * 3600 * 1000;
+const NF_WINDOW = 14 * 24 * 3600 * 1000;
+const NF_SKIP_SUBJ = /(code|sign.?in|password|payment|billing|invoice|receipt|device|account|household|membership|price|plan\b|update your|verify|top 10|watching in your area)/i;
+const NF_JUNK = /^(netflix|hero image|content block image|play|remind me|more info|play trailer|\+ my list)$/i;
+let NF = null, nfBusy = false;
+async function loadNf() { try { const c = await kvGet('netflixNew'); NF = c && Array.isArray(c.fresh) ? c : null; } catch (e) { NF = null; } }
+function nfTitle(s) {
+  const t = String(s || '').replace(/[\u2007\u034f\u200b-\u200d\u00ad]/g, '').replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 70 || NF_JUNK.test(t) || /^https?:|\.(jpe?g|png|gif)\b|^\W+$/i.test(t) || !/[A-Za-z0-9]/.test(t)) return '';
+  return t;
+}
+// Pure: one email's text in, its titles out. Nothing is added that the email doesn't name.
+function nfParseBody(raw) {
+  const lines = String(raw || '').replace(/\r/g, '').replace(/<(https?|mailto):[^>\s]*>/gi, '').replace(/[\u2007\u034f\u200b-\u200d\u00ad]/g, '')
+    .split('\n').map(l => l.replace(/[ \t]+/g, ' ').trim());
+  const out = { list: [], added: '' };
+  const i = lines.findIndex(l => /^new on netflix$/i.test(l));
+  if (i >= 0) {
+    for (let k = i + 1; k < lines.length; k++) {
+      const l = lines[k];
+      if (!l) continue;
+      const m = l.match(/^\[(.+)\]$/);
+      if (!m) break;
+      const t = nfTitle(m[1]);
+      if (t && !out.list.includes(t)) out.list.push(t);
+    }
+  }
+  const p = lines.findIndex(l => /^\+ ?my list$/i.test(l));
+  if (p >= 0) { let k = p + 1; while (k < lines.length && !lines[k]) k++; out.added = nfTitle(lines[k]); }
+  return out;
+}
+const NF_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+// Pure: subject (and when it arrived) in, a featured title out, if the subject names one.
+function nfParseSubject(subject, at) {
+  const s = String(subject || '').replace(/\s+/g, ' ').trim();
+  let m = s.match(/^Coming (?:\w+day, )?(\d{1,2}) ([A-Za-z]+)\s*(?:\.\.\.|…)\s*(.+)$/i);
+  if (m) {
+    const mo = NF_MONTHS.indexOf(m[2].toLowerCase());
+    const t = nfTitle(m[3]);
+    if (mo < 0 || !t) return null;
+    const got = new Date(at || Date.now());
+    let y = got.getFullYear();
+    if (mo < got.getMonth() - 6) y++;
+    const iso = y + '-' + String(mo + 1).padStart(2, '0') + '-' + String(+m[1]).padStart(2, '0');
+    return { title: t, coming: iso };
+  }
+  m = s.match(/Season (\d+) of (.+?) is now on Netflix/i);
+  if (m && nfTitle(m[2])) return { title: nfTitle(m[2]) + ' (Season ' + m[1] + ')', added: true };
+  m = s.match(/^(.+?) is now on Netflix$/i);
+  if (m && !/,/.test(m[1]) && nfTitle(m[1])) return { title: nfTitle(m[1]), added: true };
+  return null;
+}
+async function nfFetch(token) {
+  const url = 'https://graph.microsoft.com/v1.0/me/messages?$search=' + encodeURIComponent('"from:netflix.com"') + '&$top=30&$select=id,subject,from,receivedDateTime,webLink';
+  const data = await rwmGet(url, token, false);
+  const since = Date.now() - NF_WINDOW;
+  const mails = (Array.isArray(data.value) ? data.value : []).filter(m => {
+    const addr = String((m && m.from && m.from.emailAddress && m.from.emailAddress.address) || '').toLowerCase();
+    return /@members\.netflix\.com$/.test(addr) && !NF_SKIP_SUBJ.test(m.subject || '') && (Date.parse(m.receivedDateTime || '') || 0) >= since;
+  }).map(m => ({ id: m.id, at: Date.parse(m.receivedDateTime) || 0, subject: String(m.subject || ''), link: /^https:\/\/outlook\.(live|office|office365)\.com\//.test(m.webLink || '') ? m.webLink : '' }))
+    .sort((a, b) => b.at - a.at);
+  const today = todayISO();
+  const fresh = [], coming = [];
+  const seen = new Set();
+  const add = (arr, title, x, extra) => { const k = title.toLowerCase(); if (seen.has(k)) return; seen.add(k); arr.push(Object.assign({ title, link: x.link, at: x.at }, extra || {})); };
+  // Coming soon: dated subjects still ahead, soonest first
+  mails.map(x => Object.assign({ f: nfParseSubject(x.subject, x.at) }, x)).filter(x => x.f && x.f.coming && x.f.coming >= today)
+    .sort((a, b) => a.f.coming < b.f.coming ? -1 : 1).forEach(x => { if (coming.length < 3) add(coming, x.f.title, x, { date: x.f.coming }); });
+  // New: the “New on Netflix” list from the newest email that has one, plus newer “just added” titles
+  let gotList = false;
+  for (const x of mails.slice(0, 6)) {
+    if (gotList && fresh.length >= 5) break;
+    const f = nfParseSubject(x.subject, x.at);
+    if (f && f.added) add(fresh, f.title, x);
+    let body = null;
+    try { body = nfParseBody(await rwmBody(x.id, token)); } catch (e) { if (e && e.status === 401) throw e; }
+    if (!body) continue;
+    if (body.added && /just added|added something/i.test(x.subject)) add(fresh, body.added, x);
+    if (!gotList && body.list.length) { gotList = true; body.list.forEach(t => add(fresh, t, x)); }
+  }
+  return { at: Date.now(), fresh: fresh.slice(0, 5), coming, newest: mails[0] ? mails[0].at : 0, count: mails.length };
+}
+async function refreshNf(force) {
+  if (nfBusy || !mailConnected('microsoft')) return;
+  if (!force && NF && Date.now() - NF.at < NF_MAX_AGE) return;
+  nfBusy = true;
+  try {
+    let token = await mailAccess('microsoft'), got;
+    try { got = await nfFetch(token); }
+    catch (e) {
+      if (e && e.status === 401) { MAIL.microsoft.expiresAt = 0; token = await mailAccess('microsoft'); got = await nfFetch(token); }
+      else throw e;
+    }
+    NF = got;
+    try { await kvSet('netflixNew', NF); } catch (e) { }
+    nfPaint();
+  } catch (e) { }
+  finally { nfBusy = false; }
+}
+function nfHtml() {
+  if (!NF || !mailConnected('microsoft')) return '';
+  const today = todayISO();
+  const link = x => x.link ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a>` : esc(x.title);
+  const list = arr => arr.length <= 1 ? arr.map(link).join('') : arr.slice(0, -1).map(link).join(', ') + ' and ' + link(arr[arr.length - 1]);
+  const fresh = (NF.fresh || []).slice(0, 5);
+  const coming = (NF.coming || []).filter(x => x.date && x.date >= today).slice(0, 3);
+  if (!fresh.length && !coming.length) return '';
+  const day = iso => { try { return iso === today ? 'today' : new Date(iso + 'T12:00:00').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' }); } catch (e) { return iso; } };
+  const comingTxt = coming.map(x => link(x) + ' (' + esc(day(x.date)) + ')');
+  return `<div class="sumnf" id="nfnew"><span class="nflbl">New on Netflix</span>${fresh.length ? `<span class="nfline">${list(fresh)}.</span>` : ''}${comingTxt.length ? `<span class="nfline">Coming: ${comingTxt.length <= 1 ? comingTxt.join('') : comingTxt.slice(0, -1).join(', ') + ' and ' + comingTxt[comingTxt.length - 1]}.</span>` : ''}</div>`;
+}
+// Swap just the Netflix block at the bottom of the summary, without redrawing the page.
+function nfPaint() {
+  try {
+    const h = (location.hash || '#home').slice(1);
+    if ((h !== 'home' && h !== '') || homeEdit) return;
+    const html = nfHtml(), cur = document.getElementById('nfnew');
+    if (cur) { if (html) cur.outerHTML = html; else cur.remove(); return; }
+    if (!html) return;
+    const sum = document.getElementById('homesum');
+    if (!sum) return;
+    const shade = sum.querySelector('.sumshade') || sum;
+    shade.insertAdjacentHTML('beforeend', html);
+  } catch (e) { }
 }
 
 /* ================= SETTINGS ================= */
@@ -13350,7 +13484,8 @@ function homeKnowCard(lead, bits) {
     const style = overdue ? '' : ` style="--bar:${bars[i % bars.length]}"`;
     return `<li class="${b.kind || 'note'}${overdue ? ' urgent' : ''}"${style}><span class="tx">${esc(b.text)}</span></li>`;
   }).join('')}</ul>` : '';
-  return `<div class="card homesum know" id="homesum"><p class="knowlead">${esc(lead)}</p>${ul}</div>`;
+  let nf = ''; try { nf = nfHtml(); } catch (e) { nf = ''; }
+  return `<div class="card homesum know" id="homesum"><p class="knowlead">${esc(lead)}</p>${ul}${nf}</div>`;
 }
 function homeKnownSummary(urgent, mentioned) {
   let line = '';
@@ -14202,6 +14337,7 @@ async function start() {
   try { await loadCal(); } catch (e) { console.error('loadCal', e); }
   try { await loadMail(); } catch (e) { console.error('loadMail', e); }
   try { await loadRwm(); } catch (e) { console.error('loadRwm', e); }
+  try { await loadNf(); } catch (e) { console.error('loadNf', e); }
   try { await finishMailSignIn(); } catch (e) { console.error('finishMailSignIn', e); }
   for (const f of [loadWx, loadAlerts, loadEvs, loadCls, loadRoadworks, loadTv, loadNews, loadBlogs, loadPodcasts]) { try { f(); } catch (e) { console.error('load', e); } }
   try { render(); } catch (e) { console.error('First render', e); }
