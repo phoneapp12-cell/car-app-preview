@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.92';
+const APP_VERSION = '2.22.93';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8224,7 +8224,7 @@ function More() {
     blogging: () => { const posts = blogPosts(); const first = posts && posts[0]; return first ? `${esc(first.blog)}: ${esc(first.title)}` : 'Posts from other blogs'; },
     podcasts: () => { const episodes = podEpisodes(); const first = episodes && episodes[0]; return first ? `${esc(first.show)}: ${esc(first.title)}` : 'Episodes from other podcasts'; },
     videos: () => { const n = enabledVideoCats().length; return n ? plural(n, 'category', 'categories') + ' on' : 'All categories are off'; },
-    top40: () => 'Official Top 40 · chart as of 3 Oct 2026',
+    top40: () => 'Official Top 40 · chart as of 10 Oct 2026',
     radio: () => 'Stations you can hear in Whangārei',
     diary: () => { const lines = diaryFlat(diaryToday()); return lines.length ? esc(lines[0].text) : 'A quiet page today'; },
     countdown: () => { const list = countdownRows(); if (!list.length) return 'Nothing counting down right now.'; const x = list[0]; return esc(x.name) + ' · ' + cdWords(cdDays(x.date)); },
@@ -10736,7 +10736,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-06'
+// VIDEO_LIST_UPDATED = '2026-10-10'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -10755,7 +10755,7 @@ const VIDEO_CATS = [
 const VIDEOS = [
   { id: 'ohqxP8EEumo', title: 'iPhone 18 Pro Review: All About that Chip', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=ohqxP8EEumo', reason: 'MKBHD’s full review of the iPhone 18 Pro.' },
   { id: 'DLOQOUWmRpI', title: 'The Apple Product I Still Fanboy Over - AirPods 5 Review', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=DLOQOUWmRpI', reason: 'Linus Tech Tips reviews the AirPods 5.' },
-  { id: 'c1rPlzxSZ8E', title: 'Meta is pivoting again... everything you missed from Connect 2026', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=c1rPlzxSZ8E', reason: 'A short recap of what Meta showed at Connect 2026.' },
+  { id: '_0G4OG39XjI', title: 'WTF is a Googlebook?', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=_0G4OG39XjI', reason: 'MKBHD on what a Googlebook is.' },
   { id: 'ANmTVYkEtLw', title: 'Google Pixel 11/Pro Review: Poker Face', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=ANmTVYkEtLw', reason: 'MKBHD’s full review of the Pixel 11 and Pixel 11 Pro.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
   { id: 'CH4gb9UDM_M', title: 'Travelling? Get your devices charged the right way:  Valore 365 Sling Organizer Power Travel Kit', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=CH4gb9UDM_M', reason: 'PB Tech shows the Valore 365 Sling Organizer power travel kit for charging devices on the go.' },
@@ -11511,55 +11511,55 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 6 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
+    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 10 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
 }
 
 
 /* ================= TOP 40 ================= */
-// New Zealand Official Top 40 singles, chart week 2 October to 8 October 2026.
+// New Zealand Official Top 40 singles, chart week 9 October to 15 October 2026.
 // Listed as of this date. Only songs with an official video that resolved on YouTube.
-const TOP40_UPDATED = '2026-10-03';
+const TOP40_UPDATED = '2026-10-10';
 const TOP40 = [
-  { rank: 1, id: 'mw3kSNIxjqo', title: 'Patient Zero', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=mw3kSNIxjqo' },
-  { rank: 2, id: 'nUsrYVxrDwI', title: "Choosin' Texas", artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=nUsrYVxrDwI' },
-  { rank: 3, id: 'oIv_Y2RPQ_A', title: 'Man I Need', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=oIv_Y2RPQ_A' },
-  { rank: 4, id: '3triLkS0nq4', title: 'Rein Me In', artist: 'Sam Fender feat. Olivia Dean', url: 'https://www.youtube.com/watch?v=3triLkS0nq4' },
-  { rank: 5, id: '3sB4Iv_tM7U', title: 'Nicole Kidman', artist: 'ADÉLA', url: 'https://www.youtube.com/watch?v=3sB4Iv_tM7U' },
-  { rank: 6, id: 'jfVVXYTZykw', title: 'Cleveland!', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=jfVVXYTZykw' },
-  { rank: 7, id: 'tZnNLoPKriU', title: 'Babylon', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=tZnNLoPKriU' },
-  { rank: 8, id: 'kXOKQCtttbw', title: 'Pink Clouding', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=kXOKQCtttbw' },
-  { rank: 9, id: '0ijm2Xui5N8', title: "Ain't In LA", artist: 'ADÉLA', url: 'https://www.youtube.com/watch?v=0ijm2Xui5N8' },
-  { rank: 10, id: 'B452TVVco2Q', title: 'Great Expectation', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=B452TVVco2Q' },
-  { rank: 11, id: '3sur4BmjQt8', title: 'So Easy (To Fall In Love)', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=3sur4BmjQt8' },
-  { rank: 12, id: 'Xh0GyxWgKPs', title: 'Boston', artist: 'Stella Lefty', url: 'https://www.youtube.com/watch?v=Xh0GyxWgKPs' },
-  { rank: 13, id: 'ko70cExuzZM', title: 'The Fate Of Ophelia', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=ko70cExuzZM' },
-  { rank: 14, id: 'lrS1LC2cu-U', title: 'A Couple Minutes', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=lrS1LC2cu-U' },
-  { rank: 15, id: 'B402rKl4bUg', title: 'The Cure', artist: 'Olivia Rodrigo', url: 'https://www.youtube.com/watch?v=B402rKl4bUg' },
-  { rank: 16, id: 'Rt9tW3cMLhI', title: 'stupid song', artist: 'Olivia Rodrigo', url: 'https://www.youtube.com/watch?v=Rt9tW3cMLhI' },
+  { rank: 1, id: 'nUsrYVxrDwI', title: "Choosin' Texas", artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=nUsrYVxrDwI' },
+  { rank: 2, id: 'oIv_Y2RPQ_A', title: 'Man I Need', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=oIv_Y2RPQ_A' },
+  { rank: 3, id: '3triLkS0nq4', title: 'Rein Me In', artist: 'Sam Fender feat. Olivia Dean', url: 'https://www.youtube.com/watch?v=3triLkS0nq4' },
+  { rank: 4, id: '3sB4Iv_tM7U', title: 'Nicole Kidman', artist: 'ADÉLA', url: 'https://www.youtube.com/watch?v=3sB4Iv_tM7U' },
+  { rank: 5, id: 'mw3kSNIxjqo', title: 'Patient Zero', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=mw3kSNIxjqo' },
+  { rank: 6, id: 'B452TVVco2Q', title: 'Great Expectation', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=B452TVVco2Q' },
+  { rank: 7, id: '0ijm2Xui5N8', title: "Ain't In LA", artist: 'ADÉLA', url: 'https://www.youtube.com/watch?v=0ijm2Xui5N8' },
+  { rank: 8, id: '3sur4BmjQt8', title: 'So Easy (To Fall In Love)', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=3sur4BmjQt8' },
+  { rank: 9, id: 'Xh0GyxWgKPs', title: 'Boston', artist: 'Stella Lefty', url: 'https://www.youtube.com/watch?v=Xh0GyxWgKPs' },
+  { rank: 10, id: 'DLV8FpyxZPQ', title: 'Stop The Wedding!', artist: 'Ashe', url: 'https://www.youtube.com/watch?v=DLV8FpyxZPQ' },
+  { rank: 11, id: 'lrS1LC2cu-U', title: 'A Couple Minutes', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=lrS1LC2cu-U' },
+  { rank: 12, id: 'VI0NDsh2b8k', title: 'Nice To Each Other', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=VI0NDsh2b8k' },
+  { rank: 13, id: 'Rt9tW3cMLhI', title: 'stupid song', artist: 'Olivia Rodrigo', url: 'https://www.youtube.com/watch?v=Rt9tW3cMLhI' },
+  { rank: 14, id: 'B402rKl4bUg', title: 'The Cure', artist: 'Olivia Rodrigo', url: 'https://www.youtube.com/watch?v=B402rKl4bUg' },
+  { rank: 15, id: 'OSdQnT_FhAs', title: 'Draw You Out', artist: 'Noah Kahan', url: 'https://www.youtube.com/watch?v=OSdQnT_FhAs' },
+  { rank: 16, id: 'ofywN3NgGqY', title: "My Body Isn't Ready", artist: 'sombr', url: 'https://www.youtube.com/watch?v=ofywN3NgGqY' },
   { rank: 17, id: 'mh4AQkw4Jjc', title: 'Self Aware', artist: 'Temper City', url: 'https://www.youtube.com/watch?v=mh4AQkw4Jjc' },
-  { rank: 18, id: 'VI0NDsh2b8k', title: 'Nice To Each Other', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=VI0NDsh2b8k' },
+  { rank: 18, id: 'EZOiy1-cnxM', title: 'Material Lover', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=EZOiy1-cnxM' },
   { rank: 19, id: 's3a4OQR-10M', title: 'Loser', artist: 'Tame Impala', url: 'https://www.youtube.com/watch?v=s3a4OQR-10M' },
-  { rank: 20, id: 'DLV8FpyxZPQ', title: 'Stop The Wedding!', artist: 'Ashe', url: 'https://www.youtube.com/watch?v=DLV8FpyxZPQ' },
-  { rank: 21, id: 'n7QlUH0zrPg', title: "Movin' To The Sun", artist: 'HUGEL, Imael Angel and Ultra Naté', url: 'https://www.youtube.com/watch?v=n7QlUH0zrPg' },
-  { rank: 22, id: 'ofywN3NgGqY', title: "My Body Isn't Ready", artist: 'sombr', url: 'https://www.youtube.com/watch?v=ofywN3NgGqY' },
-  { rank: 23, id: 'Dg47eNL_Usw', title: 'Be Her', artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=Dg47eNL_Usw' },
-  { rank: 24, id: 'rK5TyISxZ_M', title: 'WHERE IS MY HUSBAND!', artist: 'RAYE', url: 'https://www.youtube.com/watch?v=rK5TyISxZ_M' },
-  { rank: 25, id: 'EZOiy1-cnxM', title: 'Material Lover', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=EZOiy1-cnxM' },
-  { rank: 26, id: 'SenovvZlWIA', title: 'No Broke Boys', artist: 'Tinashe and Disco Lines', url: 'https://www.youtube.com/watch?v=SenovvZlWIA' },
-  { rank: 27, id: 'SOJpE1KMUbo', title: 'Raindance', artist: 'Dave feat. Tems', url: 'https://www.youtube.com/watch?v=SOJpE1KMUbo' },
+  { rank: 20, id: 'rK5TyISxZ_M', title: 'WHERE IS MY HUSBAND!', artist: 'RAYE', url: 'https://www.youtube.com/watch?v=rK5TyISxZ_M' },
+  { rank: 21, id: 'Dg47eNL_Usw', title: 'Be Her', artist: 'Ella Langley', url: 'https://www.youtube.com/watch?v=Dg47eNL_Usw' },
+  { rank: 22, id: '2f4gu97XWFg', title: 'Willing And Able', artist: 'Noah Kahan', url: 'https://www.youtube.com/watch?v=2f4gu97XWFg' },
+  { rank: 23, id: 'SenovvZlWIA', title: 'No Broke Boys', artist: 'Tinashe and Disco Lines', url: 'https://www.youtube.com/watch?v=SenovvZlWIA' },
+  { rank: 24, id: 'SOJpE1KMUbo', title: 'Raindance', artist: 'Dave feat. Tems', url: 'https://www.youtube.com/watch?v=SOJpE1KMUbo' },
+  { rank: 25, id: '6Db-cEgbmC4', title: 'Mi Chico', artist: 'DJ Goja', url: 'https://www.youtube.com/watch?v=6Db-cEgbmC4' },
+  { rank: 26, id: 'uvY8fdgezLQ', title: 'Midnight Sun', artist: 'Zara Larsson', url: 'https://www.youtube.com/watch?v=uvY8fdgezLQ' },
+  { rank: 27, id: 'ko70cExuzZM', title: 'The Fate Of Ophelia', artist: 'Taylor Swift', url: 'https://www.youtube.com/watch?v=ko70cExuzZM' },
   { rank: 28, id: 'mQezde_qeXw', title: 'Homewrecker', artist: 'sombr', url: 'https://www.youtube.com/watch?v=mQezde_qeXw' },
-  { rank: 29, id: '82-jTNka3uc', title: 'hate that i made you love me', artist: 'Ariana Grande', url: 'https://www.youtube.com/watch?v=82-jTNka3uc' },
-  { rank: 30, id: 'uvY8fdgezLQ', title: 'Midnight Sun', artist: 'Zara Larsson', url: 'https://www.youtube.com/watch?v=uvY8fdgezLQ' },
-  { rank: 31, id: 'mrV8kK5t0V8', title: 'I Just Might', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=mrV8kK5t0V8' },
-  { rank: 32, id: 'c8zq4kAn_O0', title: 'back to friends', artist: 'sombr', url: 'https://www.youtube.com/watch?v=c8zq4kAn_O0' },
-  { rank: 33, id: '2f4gu97XWFg', title: 'Willing And Able', artist: 'Noah Kahan', url: 'https://www.youtube.com/watch?v=2f4gu97XWFg' },
-  { rank: 34, id: 'hohuFW0zQUw', title: 'Golden', artist: 'KPop Demon Hunters Cast', url: 'https://www.youtube.com/watch?v=hohuFW0zQUw' },
-  { rank: 35, id: 'FOJ4A4wixDg', title: 'bloodstream', artist: 'Alyssa Grace', url: 'https://www.youtube.com/watch?v=FOJ4A4wixDg' },
-  { rank: 36, id: '5RNy_1odv20', title: 'Die On This Hill', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=5RNy_1odv20' },
-  { rank: 37, id: '6Db-cEgbmC4', title: 'Mi Chico', artist: 'DJ Goja', url: 'https://www.youtube.com/watch?v=6Db-cEgbmC4' },
-  { rank: 38, id: 'KFMYx1TibeQ', title: 'Folded', artist: 'Kehlani', url: 'https://www.youtube.com/watch?v=KFMYx1TibeQ' },
-  { rank: 39, id: 'lY5V4hSLWY8', title: 'Risk It All', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=lY5V4hSLWY8' },
-  { rank: 40, id: 'Y4AgCABdZ3Y', title: 'iloveitiloveitiloveit', artist: 'Bella Kay', url: 'https://www.youtube.com/watch?v=Y4AgCABdZ3Y' }
+  { rank: 29, id: 'mrV8kK5t0V8', title: 'I Just Might', artist: 'Bruno Mars', url: 'https://www.youtube.com/watch?v=mrV8kK5t0V8' },
+  { rank: 30, id: '5RNy_1odv20', title: 'Die On This Hill', artist: 'Sienna Spiro', url: 'https://www.youtube.com/watch?v=5RNy_1odv20' },
+  { rank: 31, id: '6kLEQi0u5rA', title: 'Baby Steps', artist: 'Olivia Dean', url: 'https://www.youtube.com/watch?v=6kLEQi0u5rA' },
+  { rank: 32, id: 'hohuFW0zQUw', title: 'Golden', artist: 'KPop Demon Hunters Cast', url: 'https://www.youtube.com/watch?v=hohuFW0zQUw' },
+  { rank: 33, id: 'OFcKm-5jSQE', title: 'Orbiter', artist: 'Noah Kahan', url: 'https://www.youtube.com/watch?v=OFcKm-5jSQE' },
+  { rank: 34, id: 'n7QlUH0zrPg', title: "Movin' To The Sun", artist: 'HUGEL, Imael Angel and Ultra Naté', url: 'https://www.youtube.com/watch?v=n7QlUH0zrPg' },
+  { rank: 35, id: 'cZgUiR31m-Y', title: '12 To 12', artist: 'sombr', url: 'https://www.youtube.com/watch?v=cZgUiR31m-Y' },
+  { rank: 36, id: 'vBk30V8AukM', title: 'Solar Eclipse', artist: 'Drake feat. Don Toliver', url: 'https://www.youtube.com/watch?v=vBk30V8AukM' },
+  { rank: 37, id: 'Y4AgCABdZ3Y', title: 'iloveitiloveitiloveit', artist: 'Bella Kay', url: 'https://www.youtube.com/watch?v=Y4AgCABdZ3Y' },
+  { rank: 38, id: 'FOJ4A4wixDg', title: 'bloodstream', artist: 'Alyssa Grace', url: 'https://www.youtube.com/watch?v=FOJ4A4wixDg' },
+  { rank: 39, id: 'KFMYx1TibeQ', title: 'Folded', artist: 'Kehlani', url: 'https://www.youtube.com/watch?v=KFMYx1TibeQ' },
+  { rank: 40, id: '82-jTNka3uc', title: 'hate that i made you love me', artist: 'Ariana Grande', url: 'https://www.youtube.com/watch?v=82-jTNka3uc' }
 ];
 function top40Row(v) {
   const reason = (v.reason || '').trim() || ('Official video for ' + v.title + ' by ' + v.artist + '.');
@@ -11573,7 +11573,7 @@ function Top40() {
   return header('Top 40', 'Current chart music videos') +
     `<div class="top40bar" id="top40bar"><button type="button" class="btn primary" id="top40surprise" onclick="surpriseTop40()">${I('shuffle')} Surprise me</button></div>` +
     `<div class="list" id="top40list">${TOP40.map(top40Row).join('')}</div>` +
-    `<div class="foot">Chart as of 3 Oct 2026. New Zealand Official Top 40 singles, 2 October to 8 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it in that row. Tap a song to play it in the picture beside the description.</div>`;
+    `<div class="foot">Chart as of 10 Oct 2026. New Zealand Official Top 40 singles, 9 October to 15 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it in that row. Tap a song to play it in the picture beside the description.</div>`;
 }
 let top40SurpriseToken = 0;
 function surpriseTop40() {
