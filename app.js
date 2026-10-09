@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.85';
+const APP_VERSION = '2.22.86';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -278,7 +278,7 @@ const area = (name, val, ph = '') => `<textarea name="${name}" placeholder="${es
 function rowFor(x) {
   let icon = 'todo', sub, cash = '';
   if (x.kind === 'car') { icon = { wof: 'shield', rego: 'doc', svc: 'wrench' }[x.part]; sub = (x.car.plate ? esc(x.car.plate) + ' · ' : '') + 'Due ' + fmtW(x.date); }
-  else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = 'Due ' + fmtW(x.date); cash = moneyBadge(x.bill.amount, x.bill.name); }
+  else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = 'Due ' + fmtW(x.date) + (x.date === x.bill.due && billInvoice(x.bill) ? ' · ' + billInvoiceText(x.bill) : ''); cash = moneyBadge(x.bill.amount, x.bill.name); }
   else if (x.kind === 'pet') { icon = 'paw'; sub = 'Pet · ' + esc(careEvery(x.care)) + ' · Due ' + fmtW(x.date); }
   else if (x.kind === 'health') { icon = HEALTH_ICON[x.item.kind] || 'medkit'; sub = 'Health · ' + (x.item.clinic ? esc(x.item.clinic) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
@@ -3773,7 +3773,7 @@ function Bills() {
   const row = b => {
     const d = daysLeft(b.due);
     return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}"><div class="ic bill">${I(billIcon(b.name))}</div>
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}</div></div></button>
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div></div></button>
       <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
       ${b.paid ? `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>` : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
@@ -3812,7 +3812,7 @@ function Bills() {
       }
       const cur = x.d === x.b.due;
       return `<div class="row bill payrow"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}"><div class="ic bill">${I(billIcon(x.b.name))}</div>
-        <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.d)}</div></div></button>
+        <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.d)}${x.d === x.b.due && billInvoice(x.b) ? ' · ' + billInvoiceText(x.b) : ''}</div></div></button>
         <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.b.amount, x.b.name)}${cur ? `<button class="paybtn" onclick="markPaid('${x.b.id}')">Mark paid</button>` : ''}</div></div>`;
     };
     pay = `<div class="summary" id="paysum">
@@ -3838,7 +3838,8 @@ async function markPaid(id) {
   // 2.22.67: remember which due date was paid so Budget keeps showing it as paid
   try {
     b.paidDues = (Array.isArray(b.paidDues) ? b.paidDues : []).filter(x => x && x.due !== b.due);
-    b.paidDues.push({ due: b.due || todayISO(), on: todayISO(), amount: budgetAmt(b.amount) });
+    const inv = billInvoice(b);
+    b.paidDues.push(Object.assign({ due: b.due || todayISO(), on: todayISO(), amount: budgetAmt(b.amount) }, inv ? { invoice: inv.no } : {}));
     b.paidDues = b.paidDues.slice(-30);
   } catch (e) {}
   b.lastPaid = todayISO();
@@ -3854,7 +3855,8 @@ function billForm(id) {
     field('What’s the bill?', inp('name', b.name, 'placeholder="e.g. Power, phone, insurance" required maxlength="50"')) +
     `<div class="two">${field('Amount ($)', inp('amount', b.amount === '' ? '' : Number(b.amount).toFixed(2), 'inputmode="decimal" placeholder="0.00"'))}${field('Next due', inp('due', b.due, 'type="date" required'))}</div>` +
     field('Repeats', sel('repeat', Object.entries(REPEATS).map(([k, v]) => [k, k === 'none' ? 'Doesn’t repeat' : v]), b.repeat || 'none')) +
-    field('Notes', area('notes', b.notes, 'e.g. account number, paid by direct debit')),
+    field('Notes', area('notes', b.notes, 'e.g. account number, paid by direct debit')) +
+    (id && billInvoice(b) ? `<p class="muted" id="billinv" style="margin:4px 2px 0">Invoice ${esc(billInvoice(b).no)} from ${esc(billInvoice(b).from || 'the email')}${billInvoice(b).amount != null ? ', ' + money(billInvoice(b).amount) : ''}${billInvoice(b).invDue ? ', due ' + esc(billInvoice(b).invDue) : ''}. Taken from the email in Outlook.</p>` : ''),
     async v => {
       if (!v.name) return 'Please give the bill a name.';
       if (!parseD(v.due)) return 'Please choose when it’s next due.';
@@ -12001,6 +12003,7 @@ async function refreshMail(force) {
   MAIL_VIEW_AT = Date.now();
   mailBusy = false;
   paintHomeSum();
+  refreshLawnInvoice(false);
 }
 function mailSettingsSection() {
   const cfg = MAIL_CFG || { google: {}, microsoft: {}, offline: false };
@@ -12225,6 +12228,76 @@ function RoadworksMail() {
 function rwmMoreSub() {
   const x = RWM && RWM.items && RWM.items.slice().sort((a, b) => b.at - a.at)[0];
   return x ? 'Latest: ' + esc(rwmTitle(x)) : 'NZTA planned roadworks emails';
+}
+
+/* ================= LAWNS INVOICE (2.22.86) =================
+   Emails from Jesse Terry (Express Lawn Mowing, sent through Xero) carry the invoice number, e.g. “Invoice #: INV-2761”.
+   The newest invoice email's number is put on the soonest unpaid lawns bill, as bill.invoice. Nothing is made up:
+   no number in the email, or no lawns bill, means nothing changes. A number already marked paid is not reused. */
+const LAWN_BILL_RE = /\b(lawns?|mow|mowing|lawn ?mowing)\b/i;
+const LAWN_INV_MAX_AGE = 30 * 60 * 1000;
+let lawnInvAt = 0, lawnInvBusy = false;
+// Pure: Graph messages in, the newest Jesse Terry invoice out (or null).
+function lawnInvoiceFrom(rows) {
+  const found = [];
+  (Array.isArray(rows) ? rows : []).forEach(m => {
+    const fa = (m && m.from && m.from.emailAddress) || {};
+    if (!/^jesse terry\b/i.test(String(fa.name || '').trim())) return;
+    const subject = String(m.subject || ''), text = String(m.bodyPreview || '');
+    const no = ((text.match(/Invoice\s*#:\s*(INV-\d{1,8})\b/i) || [])[1] || (subject.match(/\b(INV-\d{1,8})\b/i) || [])[1] || '').toUpperCase();
+    if (!no) return;
+    const amount = ((text.match(/\$\s?(\d{1,6}(?:\.\d{2})?)\s*NZD/i) || [])[1]) || '';
+    const due = ((text.match(/\bDue (\d{1,2} [A-Z][a-z]{2} \d{4})\b/) || [])[1]) || '';
+    found.push({ no, amount: amount ? Number(amount) : null, due, at: Date.parse(m.receivedDateTime || '') || 0, isNew: /^invoice\b/i.test(subject.trim()) });
+  });
+  // a new invoice email beats a payment reminder about an older one; then newest first
+  found.sort((a, b) => (b.isNew - a.isNew) || (b.at - a.at));
+  const x = found[0];
+  return x ? { no: x.no, amount: x.amount, due: x.due, at: x.at } : null;
+}
+function lawnBillNext() {
+  return (S.bills || []).filter(b => !b.paid && b.due && LAWN_BILL_RE.test(String(b.name || '')))
+    .sort((a, b) => parseD(a.due) - parseD(b.due))[0] || null;
+}
+function lawnInvoiceUsed(no) {
+  return (S.bills || []).some(b => Array.isArray(b.paidDues) && b.paidDues.some(p => p && p.invoice === no));
+}
+// The invoice line for a bill, only while it still belongs to this due date.
+function billInvoice(b) {
+  const v = b && b.invoice;
+  return v && v.no && v.billDue === b.due ? v : null;
+}
+function billInvoiceText(b) {
+  const v = billInvoice(b);
+  return v ? 'Invoice ' + esc(v.no) : '';
+}
+async function refreshLawnInvoice(force) {
+  if (lawnInvBusy || !S || !mailConnected('microsoft')) return;
+  if (!force && lawnInvAt && Date.now() - lawnInvAt < LAWN_INV_MAX_AGE) return;
+  const bill = lawnBillNext();
+  if (!bill) { lawnInvAt = Date.now(); return; }
+  lawnInvBusy = true;
+  try {
+    const url = 'https://graph.microsoft.com/v1.0/me/messages?$search=' + encodeURIComponent('"Jesse Terry"') + '&$top=25&$select=subject,from,receivedDateTime,bodyPreview';
+    let token = await mailAccess('microsoft'), data;
+    try { data = await getJSONAuth(url, token); }
+    catch (e) {
+      if (e && e.status === 401) { MAIL.microsoft.expiresAt = 0; token = await mailAccess('microsoft'); data = await getJSONAuth(url, token); }
+      else throw e;
+    }
+    lawnInvAt = Date.now();
+    const inv = lawnInvoiceFrom(data && data.value);
+    if (!inv || lawnInvoiceUsed(inv.no)) return;
+    const b = lawnBillNext();
+    if (!b) return;
+    const cur = billInvoice(b);
+    if (cur && cur.no === inv.no) return;
+    b.invoice = { no: inv.no, amount: inv.amount, invDue: inv.due, at: inv.at, from: 'Jesse Terry', billDue: b.due };
+    await save();
+    const h = (location.hash || '#home').slice(1);
+    if (!sheetOpen && (h === 'bills' || h === 'budget' || h === 'home' || h === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
+  } catch (e) { }
+  finally { lawnInvBusy = false; }
 }
 
 /* ================= SETTINGS ================= */
