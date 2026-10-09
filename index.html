@@ -1037,6 +1037,13 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 .homesum.know .sumnf{color:inherit;text-shadow:none;border-top-color:var(--line)} .homesum.know .sumnf a{color:var(--brand)}
 .homesum .sumbul .sumli.late{background:rgba(153,27,27,.92);border-radius:8px;padding:2px 8px;margin-left:-4px;text-shadow:none;font-weight:750}
 .gymimg{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:12px;background:#0002;display:block;cursor:pointer}
+/* 2.22.89: New World Onerahi shopping list question */
+.nwask{position:fixed;left:10px;right:10px;top:calc(10px + var(--sat,0px));z-index:200;max-width:520px;margin:0 auto;display:flex;gap:12px;align-items:flex-start;background:var(--card);color:var(--ink);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.28);border:2px solid var(--brand);animation:nwin .25s ease-out}
+.nwask .nwaskic{flex:none;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--shop-bg,color-mix(in srgb,var(--brand) 18%,transparent));color:var(--brand)}
+.nwask .nwasktx{flex:1;min-width:0} .nwask .t{font-weight:750;font-size:1.0625rem} .nwask .s{font-size:0.9375rem;color:var(--ink2);margin-top:2px}
+.nwask .nwaskbtns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap} .nwask .nwaskbtns .btn{flex:0 0 auto}
+@keyframes nwin{from{transform:translateY(-12px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.nwask{animation:none}}
 </style>
 </head>
 <body>

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.88';
+const APP_VERSION = '2.22.89';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8484,7 +8484,8 @@ function rememberFix(pos) {
     nwCheck(hereFix); // 2.22.88
   } catch (e) {}
 }
-// 2.22.88: at New World Onerahi (128 Onerahi Rd), one notification per visit offering the shopping list.
+// 2.22.88: at New World Onerahi (128 Onerahi Rd), once per visit, offer the shopping list.
+// 2.22.89: asked inside the app (a banner at the top), not as a phone notification.
 // Store point from OpenStreetMap (way 286239900, the New World building, and the 128 Onerahi Road address point).
 // Location is only read while the app is open or brought back to the front; a closed web app can't check it.
 const NW_ONERAHI = { lat: -35.75596, lon: 174.36805, r: 130 };
@@ -8506,23 +8507,30 @@ function nwShouldFire(st, now) {
   if (now - st.firedAt >= NW_RESET_MS) return true;
   return !!(st.leftAt && st.leftAt > st.firedAt && now - st.firedAt >= 20 * 60 * 1000);
 }
+// 2.22.89: the in-app question. Sits at the top over every page until he answers or leaves the store.
+function nwAsk() {
+  try {
+    nwClose();
+    const n = (S.shop && Array.isArray(S.shop.items)) ? S.shop.items.filter(x => !x.done).length : 0;
+    const d = document.createElement('div');
+    d.id = 'nwask'; d.className = 'nwask'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-labelledby', 'nwaskt');
+    d.innerHTML = `<div class="nwaskic">${I('cart')}</div><div class="nwasktx"><div class="t" id="nwaskt">At New World Onerahi</div><div class="s">Want to see your shopping list?${n ? ' ' + esc(plural(n, 'thing')) + ' to get.' : ''}</div>
+      <div class="nwaskbtns"><button type="button" class="btn primary small" onclick="nwClose();go('#shopping')">${I('cart')} Open shopping list</button><button type="button" class="btn small" onclick="nwClose()">No thanks</button></div></div>`;
+    document.body.appendChild(d);
+  } catch (e) { }
+}
+function nwClose() { const d = document.getElementById('nwask'); if (d) d.remove(); }
 async function nwCheck(fix) {
   try {
     if (!S) return;
     const where = nwWhere(fix);
     if (!where) return;
     const now = Date.now(), st = nwState();
-    if (where === 'out') { if (st.firedAt && !(st.leftAt > st.firedAt)) { st.leftAt = now; nwSave(st); } return; }
+    if (where === 'out') { nwClose(); if (st.firedAt && !(st.leftAt > st.firedAt)) { st.leftAt = now; nwSave(st); } return; }
     if (!nwShouldFire(st, now)) return;
+    if (document.visibilityState !== 'visible') return; // only ask while he can see it
     nwSave({ firedAt: now, leftAt: 0 });
-    const n = (S.shop && Array.isArray(S.shop.items)) ? S.shop.items.filter(x => !x.done).length : 0;
-    const body = 'Want to see your shopping list?' + (n ? ' ' + plural(n, 'thing') + ' to get.' : '');
-    if (document.visibilityState === 'visible') toast('At New World Onerahi. ' + body, 'Open list', () => go('#shopping'));
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    const opts = { body, tag: 'nw-onerahi', renotify: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: '#shopping' } };
-    const reg = await getReg();
-    if (reg) await reg.showNotification('At New World Onerahi', opts);
-    else { const nt = new Notification('At New World Onerahi', opts); nt.onclick = () => { try { window.focus(); } catch (e) { } go('#shopping'); nt.close(); }; }
+    nwAsk();
   } catch (e) { }
 }
 // Near home, work, the gym or a named place (its id), or nothing. A vague fix, or no fix, does not guess.
