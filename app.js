@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.93';
+const APP_VERSION = '2.22.94';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -166,13 +166,15 @@ function normalise(d) {
 }
 async function save() {
   S.updatedAt = new Date().toISOString();
+  try { sharedNote(); } catch (e) { }
   try { await kvSet('data', S); } catch (e) { toast('Sorry, that couldn’t be saved on this phone.'); throw e; }
   queueCheck();
   schedulePhoneSync();
+  if (!sharedApplying) { try { sharedSoon(); } catch (e) { } }
 }
 // Take a copy so an action can be undone
 const snap = () => JSON.stringify(S);
-const undoTo = s => async () => { S = JSON.parse(s); await save(); render(); };
+const undoTo = s => async () => { S = keepShared(JSON.parse(s)); await save(); render(); };
 
 const COLOURS = { silver: '#9AA3A8', grey: '#6B7280', gray: '#6B7280', white: '#B6C0C8', black: '#1F2937', blue: '#2F5DA8', navy: '#1E3A8A', red: '#C0392B',
   maroon: '#7F1D1D', green: '#2E7D4F', yellow: '#D4A017', gold: '#B8860B', orange: '#E67E22', brown: '#8B5A2B', purple: '#7C3AED', pink: '#DB2777', beige: '#B8A07E', champagne: '#C2A878' };
@@ -529,7 +531,7 @@ const HOME_CARD = {
     const open = S.todos.filter(t => !t.done).sort(cmpOpenTodo);
     if (!open.length) return '';
     return homeSec('To-do', '<a href="#todo">See all</a>') + `<div class="list" id="hometodo">${open.slice(0, 5).map(t => `<div class="row"><button type="button" class="tick" aria-label="Mark complete: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${todoPriMark(t)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? duePill(daysLeft(t.due)) : ''}</button></div>`).join('')}</div>` +
+      <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div class="s">${esc(t.list)}${todoPriMark(t)}${t.due ? ' · ' + fmtW(t.due) : ' · no date'}${todoAppt(t) ? ' · in your calendar' : ''}</div></div>${t.due ? duePill(daysLeft(t.due)) : ''}</button></div>`).join('')}</div>` +
       (open.length > 5 ? `<div class="homemore"><a href="#todo">${plural(open.length - 5, 'more to-do')}</a></div>` : '');
   },
   loans: () => {
@@ -1950,7 +1952,7 @@ function lawnAutoTodo() {
     const T = todayISO();
     S.settings = S.settings || {};
     const re = /\b(mow|mowing|lawn|lawns)\b/i;
-    const open = t => t && !t.done && re.test(String(t.title || '')) && (!t.due || t.due === T);
+    const open = t => t && !t.done && !isSarahTodo(t) && re.test(String(t.title || '')) && (!t.due || t.due === T);
     const daytime = a.hour >= 9 && a.hour < 18;
     if (!daytime || lawnRainClose() === true) {
       if (!S.todos.some(open)) return;
@@ -1982,7 +1984,7 @@ function todoIsPlantFeed(t) {
 function feedWarmTodo() {
   try {
     if (feedWarmBusy || !S || !Array.isArray(S.todos) || !feedTooWarm()) return;
-    const open = t => t && !t.done && todoIsPlantFeed(t);
+    const open = t => t && !t.done && !isSarahTodo(t) && todoIsPlantFeed(t);
     if (!S.todos.some(open)) return;
     feedWarmBusy = true;
     S.todos = S.todos.filter(t => !open(t));
@@ -3967,6 +3969,93 @@ function deleteBill(id) {
 }
 
 /* ================= TO-DO ================= */
+// 2.22.94: Sarah's To-do app. Her to-dos come onto this list with a pink S. Ticks, edits and deletes here go back to her.
+// Only her to-dos are shared; your own to-dos stay on this phone.
+let sharedApplying = false;
+const isSarahTodo = t => !!(t && t.from === 'sarah');
+const sarahBadge = t => isSarahTodo(t) ? '<span class="sbadge" title="Added by Sarah" aria-label="Added by Sarah">S</span>' : '';
+const SH = {
+  state: () => { S.settings.shared = S.settings.shared && typeof S.settings.shared === 'object' ? S.settings.shared : {}; return S.settings.shared; },
+  items: () => (S.todos || []).filter(isSarahTodo),
+  by: () => 'sarah',
+  want: () => true,
+  add: x => { S.todos.push({ id: x.id, title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), from: 'sarah' }); },
+  update: (t, x) => { Object.assign(t, { title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) t.doneAt = x.doneAt || Date.now(); else delete t.doneAt; },
+  remove: id => { S.todos = S.todos.filter(t => !(t.id === id && isSarahTodo(t))); },
+  persist: async changed => {
+    sharedApplying = true;
+    try { await save(); } finally { sharedApplying = false; }
+    if (changed && !sheetOpen) render();
+  }
+};
+// An undo puts the to-dos back, but keeps the sync note as it is now, so the undo itself is sent to Sarah.
+const keepShared = old => { if (S && S.settings && old && old.settings) old.settings.shared = S.settings.shared; return old; };
+/* ---- Shared to-do sync (Sarah's To-do <-> My App) ----
+   Each phone keeps its own copy and a note of the last version both sides agreed on. Changes made here
+   (add, tick, edit, delete, undo) are spotted by comparing with that note and queued, so they work offline
+   and are sent when there's signal. Each item merges on its own time stamp; nothing is duplicated. */
+const SHARED_URL = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/shared-todo';
+const SHARED_KEY = 'sArgfZGJrHxJN9I319FJeFLhFshrHsRU2xDFnnLL'; // only opens this one shared list
+const SHARED_FIELDS = ['title', 'list', 'due', 'notes', 'priority', 'done'];
+const sharedHash = t => JSON.stringify(SHARED_FIELDS.map(k => k === 'done' ? !!t[k] : String(t[k] == null ? '' : t[k])));
+let sharedBusy = false, sharedTimer = null, sharedLastOk = 0, sharedErr = '';
+function sharedState() { const s = SH.state(); if (!s.snap || typeof s.snap !== 'object') s.snap = {}; if (!s.pend || typeof s.pend !== 'object') s.pend = {}; return s; }
+// Spot local changes since the last agreed version and queue them (called on every save)
+function sharedNote() {
+  const st = sharedState(), now = Date.now(), seen = new Set();
+  SH.items().forEach(t => {
+    seen.add(t.id);
+    const h = sharedHash(t);
+    if (st.snap[t.id] === h) { delete st.pend[t.id]; return; }
+    const p = st.pend[t.id];
+    if (p && !p.deleted && sharedHash(p) === h) return; // already queued
+    st.pend[t.id] = Object.assign({ id: t.id, created: t.created || now, by: SH.by(t), doneAt: t.done ? t.doneAt || now : 0, updated: now }, Object.fromEntries(SHARED_FIELDS.map(k => [k, k === 'done' ? !!t[k] : (t[k] || '')])));
+  });
+  Object.keys(st.snap).forEach(id => { if (!seen.has(id) && !(st.pend[id] && st.pend[id].deleted)) st.pend[id] = { id, deleted: true, updated: now }; });
+}
+function sharedSoon(ms = 1500) { clearTimeout(sharedTimer); sharedTimer = setTimeout(() => sharedSync(), ms); }
+async function sharedSync() {
+  if (sharedBusy || !S) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) { sharedErr = 'offline'; return; }
+  sharedBusy = true;
+  try {
+    sharedNote();
+    const st = sharedState(), sent = Object.values(st.pend);
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 15000);
+    let d;
+    try {
+      const r = await fetch(SHARED_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, items: sent }), signal: ctl.signal });
+      if (!r.ok) throw new Error('http ' + r.status);
+      d = await r.json();
+    } finally { clearTimeout(to); }
+    if (!d || !Array.isArray(d.items)) throw new Error('bad reply');
+    sharedNote(); // anything changed while we were waiting stays queued
+    let changed = false;
+    d.items.forEach(s => {
+      const p = st.pend[s.id];
+      if (p && p.updated > s.updated) return; // newer change here, send it next time
+      if (p) delete st.pend[s.id];
+      const local = SH.items().find(t => t.id === s.id);
+      if (s.deleted) { if (local) { SH.remove(s.id); changed = true; } delete st.snap[s.id]; return; }
+      if (!SH.want(s)) return;
+      if (!local) { SH.add(s); changed = true; }
+      else if (sharedHash(local) !== sharedHash(s)) { SH.update(local, s); changed = true; }
+      st.snap[s.id] = sharedHash(s);
+    });
+    // queued deletes the list no longer holds: done
+    Object.keys(st.pend).forEach(id => { if (st.pend[id].deleted && !d.items.some(s => s.id === id)) { delete st.pend[id]; delete st.snap[id]; } });
+    sharedLastOk = Date.now(); sharedErr = '';
+    await SH.persist(changed);
+  } catch (e) { sharedErr = 'offline'; }
+  finally { sharedBusy = false; }
+}
+function sharedStart() {
+  sharedSync();
+  setInterval(() => { if (document.visibilityState === 'visible') sharedSync(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sharedSync(); });
+  window.addEventListener('online', () => sharedSync());
+}
+
 let todoFilter = 'All';
 const jsArg = s => esc(JSON.stringify(s));
 // Missing or anything other than high/low is normal, so old to-dos stay Normal.
@@ -3991,7 +4080,7 @@ function Todo() {
   const open = vis.filter(t => !t.done).sort(cmpOpenTodo);
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const row = t => `<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
+    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
     ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
@@ -4039,9 +4128,10 @@ function todoForm(id, pre) {
   if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
   openSheet(id ? 'Edit to-do' : 'Add a to-do',
     field('To-do', inp('title', t.title, 'placeholder="e.g. Mow the lawns" required maxlength="120"')) +
-    `<div class="two">${field('List', sel('list', S.lists.map(l => [l, l]), t.list))}${field('Priority', sel('priority', [['high', 'High'], ['normal', 'Normal'], ['low', 'Low']], todoPriority(t)))}</div>` +
+    `<div class="two">${field('List', sel('list', (S.lists.includes(t.list) || !t.list ? S.lists : S.lists.concat(t.list)).map(l => [l, l]), t.list))}${field('Priority', sel('priority', [['high', 'High'], ['normal', 'Normal'], ['low', 'Low']], todoPriority(t)))}</div>` +
     field('Due date', inp('due', t.due, 'type="date"'), 'Optional') +
     field('Notes', area('notes', t.notes)) +
+    (isSarahTodo(t) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 0">${sarahBadge(t)} Sarah added this in her app. Changes and ticks here go back to her.</p>` : '') +
     (id ? todoStepsBlock(t, 'sheet') : '') +
     (id ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="tick('${id}')">${I('check')} ${t.done ? 'Mark not done' : 'Mark complete'}</button>${t.done ? '' : `<button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button>${todoAppt(t) ? `<button type="button" class="btn" onclick="apptToTodo('${todoAppt(t).id}')">${I('check')} Take off calendar</button>` : ''}`}</div>` : ''),
     async v => {
@@ -8065,7 +8155,7 @@ function Reminders() {
 function undoRem(s) {
   return async () => {
     const had = !!S.settings.remOnRelay;
-    S = JSON.parse(s);
+    S = keepShared(JSON.parse(s));
     if (had) S.settings.remOnRelay = true; // so a cancelled add or edit is cleared on the relay too
     await save(); await scheduleReminders(); render();
   };
@@ -14937,6 +15027,7 @@ async function start() {
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   phoneSyncOpen();
+  try { sharedStart(); } catch (e) { }
   syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
   mailConfig().then(() => { if (!sheetOpen && location.hash === '#settings') render(); });
   refreshMail();
