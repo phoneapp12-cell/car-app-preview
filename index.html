@@ -1044,6 +1044,23 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 .nwask .nwaskbtns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap} .nwask .nwaskbtns .btn{flex:0 0 auto}
 @keyframes nwin{from{transform:translateY(-12px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.nwask{animation:none}}
+/* 2.22.92 Travel */
+.trcard{padding:0;overflow:hidden}
+.trcard>*:not(.trphoto){margin-left:16px;margin-right:16px}
+.trphoto{position:relative;aspect-ratio:4/3;background:linear-gradient(135deg,var(--brand2),var(--soft2));overflow:hidden}
+.trphoto img{width:100%;height:100%;object-fit:cover;display:block}
+.trphoto .trnoimg{display:none;position:absolute;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--brand);font-weight:750}
+.trphoto .trnoimg svg.i{width:42px;height:42px}
+.trphoto.noimg img{display:none}.trphoto.noimg .trnoimg{display:flex}
+.trcredit{font-size:0.6875rem;margin-top:6px;line-height:1.3;overflow-wrap:anywhere}
+.trname{margin:10px 0 0;font-size:1.375rem;line-height:1.2}
+.trcountry{margin-top:2px;font-weight:650}
+.trfacts{display:flex;gap:10px;margin-top:12px}
+.trfact{flex:1;display:flex;flex-direction:column;gap:2px;background:var(--soft);border-radius:14px;padding:10px 12px;min-width:0}
+.trfact b{font-size:1.125rem}.trfact .muted{font-size:0.75rem}
+.trtext p{margin:10px 0 0;line-height:1.5}
+.trcard .btns{margin-bottom:16px}
+.trcard .btns a.btn{text-decoration:none}
 </style>
 </head>
 <body>
