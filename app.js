@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.94';
+const APP_VERSION = '2.22.95';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3976,12 +3976,15 @@ const isSarahTodo = t => !!(t && t.from === 'sarah');
 const sarahBadge = t => isSarahTodo(t) ? '<span class="sbadge" title="Added by Sarah" aria-label="Added by Sarah">S</span>' : '';
 const SH = {
   state: () => { S.settings.shared = S.settings.shared && typeof S.settings.shared === 'object' ? S.settings.shared : {}; return S.settings.shared; },
-  items: () => (S.todos || []).filter(isSarahTodo),
+  items: () => [...(S.todos || []).filter(isSarahTodo), ...((S.shop && S.shop.items) || []).filter(isSarahShop).map(sarahShopView)],
   by: () => 'sarah',
   want: () => true,
-  add: x => { S.todos.push({ id: x.id, title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), from: 'sarah' }); },
-  update: (t, x) => { Object.assign(t, { title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) t.doneAt = x.doneAt || Date.now(); else delete t.doneAt; },
-  remove: id => { S.todos = S.todos.filter(t => !(t.id === id && isSarahTodo(t))); },
+  add: x => { if (isSarahShopList(x.list)) { S.shop.items.push(sarahShopItem(x)); return; } S.todos.push({ id: x.id, title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), from: 'sarah' }); },
+  update: (t, x) => {
+    if (!!t._shop !== isSarahShopList(x.list)) { SH.remove(t.id); SH.add(Object.assign({}, x, { created: t.created || x.created })); return; } // moved to or from her Shopping list
+    if (t._shop) { const it = t._shop; Object.assign(it, { name: String(x.title || '').slice(0, 120), list: x.list, due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done }); if (x.done) it.doneAt = it.doneAt || x.doneAt || Date.now(); else delete it.doneAt; return; }
+    Object.assign(t, { title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) t.doneAt = x.doneAt || Date.now(); else delete t.doneAt; },
+  remove: id => { S.todos = S.todos.filter(t => !(t.id === id && isSarahTodo(t))); S.shop.items = S.shop.items.filter(x => !(x.id === id && isSarahShop(x))); },
   persist: async changed => {
     sharedApplying = true;
     try { await save(); } finally { sharedApplying = false; }
@@ -6317,8 +6320,22 @@ function normShop(sh, d) {
     }
     sh.moved = true;
   }
+  // 2.22.95: Sarah's Shopping to-dos live on this shopping list (with her pink S), not in To-do. Same id, so sync carries on.
+  if (d && Array.isArray(d.todos)) {
+    const hers = d.todos.filter(t => isSarahTodo(t) && isSarahShopList(t.list));
+    if (hers.length) {
+      const ids = new Set(hers.map(t => t.id)), have = new Set(sh.items.map(x => x.id));
+      hers.forEach(t => { if (!have.has(t.id)) sh.items.push(sarahShopItem(t)); });
+      d.todos = d.todos.filter(t => !ids.has(t.id));
+    }
+  }
   return sh;
 }
+const isSarahShopList = l => /^shopping$/i.test(String(l || '').trim());
+const isSarahShop = x => !!(x && x.from === 'sarah');
+const sarahShopItem = x => { const it = { id: x.id, name: String(x.title || '').slice(0, 120), list: x.list || 'Shopping', due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done, created: x.created || Date.now(), meals: [], from: 'sarah' }; if (it.done) it.doneAt = x.doneAt || Date.now(); return it; };
+// How one of her shopping items looks to the sync (the same fields as a to-do)
+const sarahShopView = x => ({ id: x.id, title: x.name, list: x.list || 'Shopping', due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done, doneAt: x.doneAt, created: x.created, _shop: x });
 const shopName = g => String(g || '').replace(/\s*\(check label\)\s*$/i, '').trim();
 // Add ingredients, skipping any already on the list (not yet ticked). Returns how many were added.
 function addToShop(names, meal) {
@@ -6335,7 +6352,7 @@ function shopRow(x) {
   const hint = needsCheck(x.name) ? ' <span class="chk">check label</span>' : '';
   const sub = x.meals.length ? 'For ' + esc(x.meals.slice(0, 3).join(', ')) + (x.meals.length > 3 ? '…' : '') : '';
   return `<div class="row shopitem ${x.done ? 'done' : ''}" data-id="${x.id}"><button class="tick" aria-label="${x.done ? 'Untick' : 'Tick off'} ${esc(x.name)}" onclick="shopTick('${x.id}')"><span>${I('check')}</span></button>
-    <button class="tapzone" onclick="shopEdit('${x.id}')"><div class="tx"><div class="t">${esc(x.name)}${hint}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div></button></div>`;
+    <button class="tapzone" onclick="shopEdit('${x.id}')"><div class="tx"><div class="t">${isSarahShop(x) ? sarahBadge({ from: 'sarah' }) : ''}${esc(x.name)}${hint}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div></button></div>`;
 }
 function Shopping() {
   const open = S.shop.items.filter(x => !x.done).sort((a, b) => (a.created || 0) - (b.created || 0));
@@ -6366,7 +6383,8 @@ function clearGot() {
 }
 function shopEdit(id) {
   const x = S.shop.items.find(i => i.id === id); if (!x) return;
-  openSheet('Edit item', field('Item', inp('name', x.name, 'required maxlength="120"')) + (x.meals.length ? `<p class="muted" style="margin:-4px 0 8px">For ${esc(x.meals.join(', '))}</p>` : ''),
+  openSheet('Edit item', field('Item', inp('name', x.name, 'required maxlength="120"')) +
+    (isSarahShop(x) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 8px">${sarahBadge({ from: 'sarah' })} Sarah added this in her app. Changes, ticks and deletes here go back to her.</p>` : '') + (x.meals.length ? `<p class="muted" style="margin:-4px 0 8px">For ${esc(x.meals.join(', '))}</p>` : ''),
     async v => { if (!v.name) return 'Please type the item.'; x.name = v.name; await save(); render(); }, 'Save',
     `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete item" onclick="shopDelete('${id}')">${I('trash')}</button>`);
 }
