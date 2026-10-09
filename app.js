@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.90';
+const APP_VERSION = '2.22.91';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -635,10 +635,10 @@ const HOME_CARD = {
   // 2.13.0: off until Customise Home. People only. The question, not an empty “nothing”.
   about: () => {
     const q = aboutEnsurePin();
-    const ask = aboutAsk(q);
-    const ans = aboutLatest(q.id);
+    const ask = aboutAsk(q) || 'You’ve answered every question';
+    const ans = q ? aboutLatest(q.id) : null;
     const head = homeSec('About you', '<a href="#about">Open</a>');
-    const sub = ans ? aboutClip(ans.text) : 'Today’s question';
+    const sub = ans ? aboutClip(ans.text) : q ? aboutAnsweredN() + ' answered · tap to answer' : aboutAnsweredN() + ' answered';
     return head + `<button class="row" onclick="go('#about')"><div class="ic about">${I('info')}</div><div class="tx"><div class="t">${esc(ask)}</div><div class="s">${esc(sub)}</div></div>${I('right')}</button>`;
   }
 };
@@ -2367,7 +2367,7 @@ function aiSumCtx() {
   try { ctx.due = homeUrgentPool().slice(0, 6).map(x => x.name + (x.days < 0 ? ' (overdue)' : x.days === 0 ? ' (today)' : x.days === 1 ? ' (tomorrow)' : ' (in ' + x.days + ' days)')); } catch (e) {}
   try { ctx.todos = (S.todos || []).filter(t => t && !t.done).sort((x, y) => (x.priority === 'high' ? 0 : 1) - (y.priority === 'high' ? 0 : 1)).slice(0, 6).map(t => t.title + (t.priority === 'high' ? ' (high priority)' : '')); } catch (e) {}
   try { ctx.notes = (S.notes || []).slice(-4).map(n => String(n.text || '').slice(0, 120)).filter(Boolean); } catch (e) {}
-  try { ctx.about = (aboutState().answers || []).slice(-6).map(x => x.qid + ': ' + String(x.text || '').slice(0, 80)); } catch (e) {}
+  try { ctx.about = (aboutState().answers || []).filter(x => x && x.qid !== 'mood').slice(-12).map(x => (aboutAsk(aboutQ(x.qid)) || x.qid) + ' ' + String(x.text || '').slice(0, 80)); } catch (e) {} // 2.22.91: question + answer
   try { ctx.soon = homeAttention().filter(x => x && x.name && Number.isFinite(x.days) && x.days > 2 && x.days <= 10 && !homeMoneyItem(x.kind, x.name)).slice(0, 5).map(x => x.name + ' in ' + x.days + ' days'); } catch (e) {}
   try { ctx.routines = routineLearned().map(c => c.why); } catch (e) {}
   try { // 2.22.44: planned meals, so the AI never offers to plan a dinner that's already sorted
@@ -8228,7 +8228,7 @@ function More() {
     diary: () => { const lines = diaryFlat(diaryToday()); return lines.length ? esc(lines[0].text) : 'A quiet page today'; },
     countdown: () => { const list = countdownRows(); if (!list.length) return 'Nothing counting down right now.'; const x = list[0]; return esc(x.name) + ' · ' + cdWords(cdDays(x.date)); },
     notes: () => { const list = noteRows(); if (!list.length) return 'No notes yet.'; const n = list[0]; return esc(n.text || 'Spoken note'); },
-    about: () => { try { const list = aboutAnswerRows(); if (!list.length) return esc(aboutAsk(aboutEnsurePin())); const n = list[0]; return esc(aboutClip(n.text)); } catch (e) { return 'A daily question'; } },
+    about: () => { try { const list = aboutAnswerRows(); if (!list.length) return esc(aboutAsk(aboutEnsurePin()) || 'Questions to get to know you'); const n = list[0]; return esc(aboutClip(n.text)); } catch (e) { return 'A daily question'; } },
     roadworks: () => rwmMoreSub(),
     roster: () => { try { const n = rosterNext(); return n ? 'Next start ' + esc(n) : 'Days and start times'; } catch (e) { return 'Days and start times'; } }
   });
@@ -10524,7 +10524,7 @@ function knowState() { S.settings = S.settings || {}; const k = S.settings.knowM
 let knowBusy = false, knowTried = -1, knowWait = 0;
 const knowNorm = q => String(q || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
 function knowTabs() { try { return Object.keys(NAV).filter(k => NAV[k] && NAV[k][2]).map(k => ({ key: k, name: NAV[k][2] })); } catch (e) { return []; } }
-function knowKnown() { const out = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-30).map(x => ({ q: x.q, a: x.a })); try { (aboutState().answers || []).slice(-10).forEach(x => { if (x && x.text) out.push({ q: aboutAsk(ABOUT_QS.find(q => q.id === x.qid)) || x.qid, a: String(x.text).slice(0, 80) }); }); } catch (e) {} return out; }
+function knowKnown() { const out = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-30).map(x => ({ q: x.q, a: x.a })); try { (aboutState().answers || []).slice(-10).forEach(x => { if (x && x.text) out.push({ q: aboutAsk(aboutQ(x.qid)) || x.qid, a: String(x.text).slice(0, 80) }); }); } catch (e) {} return out; }
 async function knowPost(path, body) {
   const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 20000);
   try { const r = await fetch(RELAY_URL + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal }); if (!r.ok) throw new Error('http'); return await r.json(); } finally { clearTimeout(tm); }
@@ -13386,11 +13386,244 @@ const ABOUT_QS = [
   { id: 'summary', ask: 'How do you like the home summary to sound?' },
   { id: 'app', ask: 'What would you like My App to do more of?' }
 ];
+/* 2.22.91: About you keeps the questions coming. A built-in bank of multiple-choice questions (no AI cost),
+   one after another: answer or skip and the next one shows straight away. Answered ones never come back; skipped
+   ones only come back once everything else has had a turn. Answers save like the other About you answers. */
+const KNOW_BANK = {
+  food: [
+    ["What’s your go-to quick dinner after work?", "Stir-fry", "Steak and veg", "Something on the barbecue", "Leftovers", "Gluten-free takeaway"],
+    ["How spicy do you like your food?", "Mild", "A bit of heat", "Hot", "The hotter the better"],
+    ["Sweet or savoury snacks?", "Sweet", "Savoury", "Both", "Depends on the day"],
+    ["Favourite pizza topping?", "Pepperoni", "Ham and pineapple", "Meat lovers", "Margherita", "BBQ chicken"],
+    ["What’s your ideal weekend breakfast?", "Bacon and eggs", "Gluten-free pancakes", "Just a coffee", "A smoothie", "Brunch out"],
+    ["Coffee or tea?", "Coffee", "Tea", "Both", "Neither"],
+    ["How do you take your coffee?", "Flat white", "Long black", "Latte", "Cappuccino", "Instant at home"],
+    ["Favourite kind of roast?", "Lamb", "Beef", "Pork with crackling", "Chicken", "Not a roast person"],
+    ["Which dessert wins?", "Chocolate anything", "Pavlova", "Ice cream", "Cheesecake", "Fruit"],
+    ["How do you feel about seafood?", "Love it", "Fish only", "Some shellfish", "Not for me"],
+    ["New recipes or old favourites?", "New ones often", "Now and then", "Mostly favourites"],
+    ["Which cuisine would you like more ideas for?", "Italian", "Mexican", "Asian", "Middle Eastern", "Kiwi classics"],
+    ["Fish and chips: which fish?", "Snapper", "Gurnard", "Hoki", "Tarakihi", "Whatever’s fresh"],
+    ["How do you feel about leftovers?", "Love them", "Good for lunch next day", "Not really"],
+    ["Barbecue: what goes on first?", "Sausages", "Steak", "Lamb chops", "Chicken", "Veg and corn"],
+    ["Favourite cheese?", "Cheddar", "Brie", "Blue", "Smoked", "Feta"]
+  ],
+  gf: [
+    ["Which gluten-free bread do you rate?", "Supermarket brand", "Bakery GF loaf", "I make my own", "I rarely eat bread"],
+    ["What gluten-free baking would you like to try?", "Bread", "Pizza bases", "Muffins", "Biscuits", "Cakes"],
+    ["Which gluten-free pasta do you prefer?", "Rice pasta", "Corn pasta", "Legume pasta", "Rice noodles instead"],
+    ["When eating out, how do you check it’s gluten free?", "Ask the staff", "Stick to places I know", "Check the menu online", "Mostly eat at home"],
+    ["Which gluten-free swap do you use most?", "Rice", "Potatoes", "GF wraps", "Corn chips", "Cauliflower rice"],
+    ["Gluten-free recipe ideas for…?", "Quick weeknights", "Weekend cooking", "Baking", "Lunches"],
+    ["How careful do you need to be with cross-contamination?", "Very strict", "Careful", "Fairly relaxed"],
+    ["Gluten-free flour: shop-bought or homemade mix?", "Shop-bought", "Homemade mix", "I don’t bake much"],
+    ["Best gluten-free treat you’ve found?", "Brownies", "Macarons", "Chips", "Chocolate", "Something else"],
+    ["Do you cook from a recipe or by feel?", "From a recipe", "By feel", "A bit of both"],
+    ["What do you like cooking on a Friday or Saturday night?", "Pizza", "Curry", "Steak", "Something slow-cooked", "Something new"],
+    ["How long do you like cooking on a weeknight?", "Under 20 minutes", "About 30 minutes", "Up to an hour", "Happy to take longer"]
+  ],
+  music: [
+    ["Which era of music is your favourite?", "70s", "80s", "90s", "2000s", "Today’s music"],
+    ["What do you play in the car?", "Radio", "Playlists", "My Suno songs", "Podcasts", "Nothing"],
+    ["Which genre do you put on most?", "Rock", "Pop", "Country", "Hip hop and R&B", "Reggae"],
+    ["What do you make most with Suno?", "Rock", "Pop", "Country", "Funny songs", "Songs about family"],
+    ["What do you do with your AI songs?", "Keep them for me", "Share with family", "Post them online", "Use them for occasions"],
+    ["Song lyrics: yours or the AI’s?", "I write my own", "The AI writes them", "A mix of both"],
+    ["Which Kiwi music do you rate?", "Six60", "Crowded House", "L.A.B.", "Fat Freddy’s Drop", "Someone else"],
+    ["How often do you go to live music?", "Whenever I can", "A few times a year", "Rarely", "I prefer music at home"],
+    ["Best place to listen to music?", "In the car", "In the spa", "While cooking", "At the gym"],
+    ["Song ideas for an occasion?", "Birthdays", "Anniversaries", "Christmas", "Just for fun"],
+    ["Music at the gym?", "Fast and loud", "Rock", "Podcasts", "Nothing"],
+    ["Streaming, radio or vinyl?", "Streaming", "Radio", "Vinyl", "Still on CDs"],
+    ["What makes a song great for you?", "The lyrics", "The beat", "The voice", "The memories"],
+    ["Other AI tools you enjoy?", "Chat assistants", "Image makers", "Video makers", "Just Suno"]
+  ],
+  screen: [
+    ["Favourite movie genre?", "Action", "Comedy", "Thriller", "Sci-fi", "Drama"],
+    ["Movie night: home or cinema?", "Home", "Cinema", "Both"],
+    ["What kind of series do you binge?", "Crime", "Comedy", "Reality", "Documentaries", "Sci-fi and fantasy"],
+    ["Which streaming service do you use most?", "Netflix", "Neon", "Disney+", "TVNZ+ or ThreeNow", "YouTube"],
+    ["Old favourites or new releases?", "Old favourites", "New releases", "Both"],
+    ["Subtitles on or off?", "On", "Off", "Only when needed"],
+    ["What kind of books do you like?", "Thrillers", "Biographies", "Sci-fi and fantasy", "Non-fiction", "I don’t read much"],
+    ["Paper, e-reader or audiobook?", "Paper", "E-reader", "Audiobook", "A mix"],
+    ["Documentaries: which topics?", "Nature", "True crime", "History", "Science and tech", "Sport"],
+    ["How do you pick what to watch?", "Recommendations", "Trailers", "Scroll till something grabs me", "Reviews"],
+    ["Which comedy style?", "Dry Kiwi humour", "Slapstick", "Stand-up", "Sitcoms"],
+    ["Sport on TV?", "Rugby", "League", "Cricket", "Motorsport", "Not much"],
+    ["Favourite kind of movie snack?", "Popcorn", "Chocolate", "Chips", "Lollies", "Nothing"],
+    ["Who’s a favourite actor?", "Denzel Washington", "Tom Hanks", "Keanu Reeves", "A Kiwi actor", "Someone else"]
+  ],
+  garden: [
+    ["What do you most enjoy growing?", "Vegetables", "Fruit trees", "Flowers", "Herbs", "A good lawn"],
+    ["Which vege would you like to grow?", "Tomatoes", "Lettuce", "Beans", "Potatoes", "Courgettes"],
+    ["Your gardening style?", "Neat and tidy", "Wild and natural", "Productive vege patch", "Low maintenance"],
+    ["Pots or garden beds?", "Pots", "Raised beds", "In the ground", "A mix"],
+    ["Biggest garden challenge?", "Weeds", "Pests", "Time", "Watering", "Knowing what to plant"],
+    ["Do you compost?", "Yes", "Want to start", "No"],
+    ["Which fruit tree would you love?", "Lemon", "Feijoa", "Avocado", "Apple", "Mandarin"],
+    ["Which garden tips would help most?", "What to plant this month", "Pest control", "Soil", "Pruning"],
+    ["Gardening: morning or afternoon?", "Morning", "Afternoon", "Evening", "Whenever"],
+    ["Which herb do you use most?", "Basil", "Parsley", "Mint", "Coriander", "Rosemary"],
+    ["Which flowers do you like?", "Roses", "Natives", "Bright annuals", "Succulents"],
+    ["Garden jobs on a day off?", "Love them", "Sometimes", "No thanks"]
+  ],
+  fit: [
+    ["What do you do most at the gym?", "Weights", "Cardio", "Classes", "A mix"],
+    ["Favourite workout?", "Legs", "Upper body", "Full body", "Running or cycling"],
+    ["Your gym goal right now?", "Strength", "Fitness", "Feeling good", "Keeping the routine"],
+    ["Gym alone or with someone?", "Alone", "With a mate", "Classes"],
+    ["How long is a good gym session?", "30 minutes", "45 minutes", "An hour", "Longer"],
+    ["After the gym you like…?", "A shower and relax", "A protein snack", "Dinner straight away", "The spa"],
+    ["Outdoor activity you’d like more of?", "Bushwalks", "Swimming", "Cycling", "Fishing", "Kayaking"],
+    ["Do you track your workouts?", "Yes, with an app", "Sometimes", "No"],
+    ["A sport you play or used to play?", "Rugby", "Touch", "Cricket", "Golf", "None"]
+  ],
+  tech: [
+    ["Which phone do you use?", "Samsung", "Google Pixel", "iPhone", "Another Android"],
+    ["Smart home gear you have?", "Smart lights", "Smart speakers", "Cameras", "Smart plugs", "None yet"],
+    ["Smart home gear you’d like next?", "Smart lights", "Robot vacuum", "Cameras", "Smart thermostat", "Smart lock"],
+    ["Which voice assistant?", "Google", "Alexa", "Siri", "None"],
+    ["Tech you get most excited about?", "AI", "Phones", "Gaming", "Home gadgets", "Cars"],
+    ["Tinkering or plug and play?", "Tinkering", "Plug and play", "Both"],
+    ["Do you game?", "Console", "PC", "Phone games", "Not really"],
+    ["Your TV setup?", "Smart TV apps", "Google TV or Chromecast", "Apple TV", "Sky box"],
+    ["More tech tips on…?", "AI tools", "Phone tricks", "Smart home", "Passwords and security"],
+    ["Which gear do you like most at work?", "TVs", "Laptops", "Phones", "Smart home", "Appliances"],
+    ["How do you back up your photos?", "Google Photos", "iCloud", "On a computer", "Not yet"],
+    ["Laptop, desktop or phone?", "Laptop", "Desktop", "Tablet", "My phone does it all"],
+    ["Headphones?", "Earbuds", "Over-ear", "A speaker instead"],
+    ["What’s on your gadget wish list?", "A new phone", "A big TV", "A smartwatch", "A drone", "Something else"]
+  ],
+  dog: [
+    ["What’s {dog}’s favourite treat?", "Chew sticks", "Meat", "Biscuits", "Cheese", "Anything at all"],
+    ["{dog}’s favourite toy?", "A ball", "Rope toy", "Squeaky toy", "Sticks"],
+    ["What breed is {dog}?", "Labrador", "Staffy", "Huntaway", "A cross", "Something else"],
+    ["Where does {dog} sleep?", "Inside on his bed", "On our bed", "Outside kennel", "Wherever he likes"],
+    ["{dog}’s best trick?", "Sit", "Shake", "Roll over", "Fetch", "Still learning"],
+    ["Does {dog} like the beach?", "Loves it", "A bit", "Not really", "Haven’t tried"],
+    ["How old is {dog}?", "A puppy", "1 to 3", "4 to 7", "8 or older"],
+    ["Grooming {dog}: groomer or at home?", "Groomer", "At home", "Both"],
+    ["What does {dog} do when you get home?", "Goes crazy", "Brings a toy", "A lazy wag", "Ignores me"],
+    ["Ideas for dog-friendly places?", "Yes please", "Sometimes", "No thanks"]
+  ],
+  family: [
+    ["Best way to spend time with family?", "Dinner together", "Day trips", "Movies", "Barbecue", "Games"],
+    ["Family tradition you love?", "Christmas", "Birthdays", "Sunday dinners", "Holidays away"],
+    ["What do you like doing with your granddaughter?", "The park", "Reading", "Baking", "The beach", "Movies"],
+    ["Gift ideas you’d like help with?", "Birthdays", "Christmas", "Anniversaries", "Just because"],
+    ["A date night with Sarah looks like…?", "Dinner out", "A movie", "Cooking together", "A drive", "Spa night"],
+    ["How do you keep in touch with family?", "Messenger", "Phone calls", "Visits", "A family group chat"],
+    ["Family holiday style?", "Beach", "Camping", "City break", "Road trip", "Overseas"],
+    ["Board games or cards?", "Board games", "Cards", "Both", "Not really"],
+    ["Who cooks most at your place?", "Me", "Sarah", "We share it"],
+    ["Favourite family meal?", "A roast", "Pizza night", "Barbecue", "Curry", "Something else"],
+    ["Celebrations: big party or small?", "Big party", "Small family thing", "Dinner out"],
+    ["Birthday reminders: how early?", "A week before", "A few days before", "The day before"]
+  ],
+  outdoors: [
+    ["Favourite Northland beach?", "Ocean Beach", "Whale Bay", "Matapōuri", "Ngunguru", "Another one"],
+    ["Favourite bush walk around Whangārei?", "Mount Manaia", "Whangārei Falls", "A.H. Reed Memorial Park", "Mount Parihaka", "Another one"],
+    ["What do you like doing at the beach?", "Swimming", "Walking", "Fishing", "Just relaxing", "Surfing"],
+    ["Walk length you enjoy?", "Under an hour", "1 to 2 hours", "Half a day", "All day"],
+    ["Hills or flat?", "Love a climb", "A bit of both", "Flat please"],
+    ["Sunrise or sunset?", "Sunrise", "Sunset", "Both"],
+    ["Waterfalls, lookouts or coast?", "Waterfalls", "Lookouts", "Coast"],
+    ["How do you feel about fishing?", "Love it", "Now and then", "Not my thing"],
+    ["Camping style?", "Tent", "Campervan", "Bach or cabin", "Not for me"],
+    ["Weekend walk ideas when it’s fine?", "Yes please", "Sometimes", "No thanks"],
+    ["Rock pools and snorkelling?", "Love it", "Maybe", "No"],
+    ["Picnic or café after a walk?", "Picnic", "Café", "Straight home"]
+  ],
+  money: [
+    ["How do you like to budget?", "Every pay", "Monthly", "Loosely", "Not really"],
+    ["Saving for something?", "A holiday", "House or renovations", "A car", "A rainy day fund", "Not right now"],
+    ["Bills: direct debit or pay yourself?", "Direct debit", "I pay them myself", "A mix"],
+    ["Which space needs sorting most?", "Garage", "Kitchen", "Wardrobe", "Shed", "Spare room"],
+    ["Your organising style?", "Everything labelled", "Tidy enough", "Organised chaos"],
+    ["Decluttering: how do you like to do it?", "Little and often", "A big weekend blitz", "One room at a time"],
+    ["Lists: paper or digital?", "Digital", "Paper", "Both"],
+    ["Grocery shopping: list or wing it?", "Always a list", "A rough list", "Wing it"],
+    ["Where do you shop most for groceries?", "New World", "Pak’nSave", "Woolworths", "A mix"],
+    ["Deals and specials alerts?", "Yes please", "Only big ones", "No thanks"],
+    ["How do you plan your week?", "Plan it on Sunday", "Day by day", "Go with the flow"],
+    ["Tidying soundtrack?", "Music", "A podcast", "Silence", "TV in the background"],
+    ["Which chore do you mind least?", "Dishes", "Vacuuming", "Laundry", "Gardening", "Cooking"],
+    ["Which chore do you like least?", "Dishes", "Vacuuming", "Laundry", "Bathroom", "Ironing"]
+  ],
+  weekend: [
+    ["A perfect day off starts with…?", "A sleep in", "An early start", "Coffee out", "The garden"],
+    ["Day off: home or out?", "Home", "Out", "A bit of both"],
+    ["Weekend road trips?", "Love one", "Now and then", "Rather stay home"],
+    ["Where would you go on a day trip?", "Bay of Islands", "Auckland", "Tutukaka Coast", "Kerikeri", "Kai Iwi Lakes"],
+    ["Rainy day off?", "Movies", "Cooking", "Tidying", "Gaming", "A nap"],
+    ["Cafés: what’s your style?", "A local favourite", "Whatever’s handy", "I’d rather make my own"],
+    ["Markets?", "Love them", "Sometimes", "Not really"],
+    ["Long weekend plans?", "Away somewhere", "Projects at home", "Family time", "Just relax"],
+    ["Sunday evening vibe?", "Spa", "A movie", "Early dinner", "Getting set for the week"],
+    ["DIY projects?", "Love them", "Small jobs", "Rather pay someone"],
+    ["A DIY project you’d like to do?", "A deck", "A shed", "Garden beds", "Painting", "Something else"],
+    ["Dream holiday?", "Australia", "A Pacific island", "Europe", "Japan", "Around NZ"]
+  ],
+  routine: [
+    ["How do you start your mornings?", "Coffee first", "Check my phone", "Breakfast", "Straight into it"],
+    ["After work, the first thing you do?", "Change and relax", "Cook", "Gym", "Spa", "Garden"],
+    ["Spa time goes best with…?", "Music", "A drink", "Quiet", "A chat with Sarah"],
+    ["Evening wind-down?", "TV", "Spa", "Music", "My phone", "Reading"],
+    ["Lunch on work days?", "Bring from home", "Buy something", "Leftovers"],
+    ["A weekly routine you’d like?", "Meal plan night", "Garden day", "Clean-up day", "Date night"],
+    ["How do you like reminders?", "Early", "Just in time", "Only important ones"],
+    ["Friday night?", "Cook something nice", "Takeaway", "Out", "Movie night"],
+    ["What helps you switch off?", "Music", "Spa", "Garden", "TV", "A walk"],
+    ["Merlot goes best with…?", "Steak", "Cheese", "Pizza", "On its own"]
+  ],
+  app: [
+    ["How long should the summary be?", "Short", "Medium", "Detailed"],
+    ["Summary tone?", "Friendly", "Straight to the point", "Funny", "Encouraging"],
+    ["Jokes in the summary?", "Yes please", "Now and then", "No thanks"],
+    ["What should the summary lead with?", "What’s due", "The weather", "Today’s plan", "Something fun"],
+    ["Which tab do you use most?", "Bills", "Calendar", "Shopping", "Recipes", "Notifications"],
+    ["Remind you more about…?", "Bills", "Birthdays", "Car stuff", "Garden", "Events"],
+    ["Tips in the summary?", "Cooking", "Garden", "Tech", "Organising", "None"],
+    ["Event suggestions?", "Concerts", "Local events", "Markets", "Sports", "Not needed"],
+    ["Recipe ideas how often?", "Daily", "A few a week", "Weekly", "Only when I ask"],
+    ["Weather detail?", "Just the basics", "Rain and wind", "Full detail"],
+    ["How many notifications a day?", "Just the important ones", "A few", "As many as are useful"],
+    ["Favourite colour theme?", "Teal", "Blue", "Green", "Purple", "Dark"],
+    ["A weekly recap?", "Yes", "Maybe", "No"]
+  ],
+  misc: [
+    ["Favourite season?", "Summer", "Autumn", "Winter", "Spring"],
+    ["Favourite holiday of the year?", "Christmas", "Easter", "Matariki", "Labour Weekend", "My birthday"],
+    ["Favourite car brand?", "Toyota", "Ford", "Holden", "Mazda", "Something else"],
+    ["Dream car?", "A ute", "A classic", "Electric", "A sports car", "Something else"],
+    ["Do you collect anything?", "Music", "Tools", "Gadgets", "No"],
+    ["Favourite drink apart from merlot?", "Beer", "Spirits", "Soft drink", "Coffee"],
+    ["Podcasts?", "True crime", "Comedy", "Tech", "Sport", "I don’t listen"],
+    ["How do you get your news?", "TV news", "Phone apps", "Radio", "Social media", "I don’t follow it"],
+    ["Favourite time of day?", "Early morning", "Afternoon", "Evening", "Late night"],
+    ["A new skill you’d like to learn?", "Cooking", "Music", "A language", "Tech", "Woodwork"],
+    ["Community or volunteering?", "Yes", "Would like to", "Not right now"],
+    ["Beach bach or mountain cabin?", "Beach bach", "Mountain cabin", "Either"]
+  ]
+};
+const knowHash = t => { let h = 5381; for (const c of String(t)) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
+const KNOW_QS = (() => {
+  // Interleave the topics so it never runs a long streak on one subject.
+  const cats = Object.keys(KNOW_BANK), out = [];
+  for (let i = 0, more = true; more; i++) {
+    more = false;
+    cats.forEach(c => { const p = KNOW_BANK[c][i]; if (p) { more = true; out.push({ id: 'k' + knowHash(p[0]), cat: c, ask: p[0], opts: p.slice(1) }); } });
+  }
+  return out;
+})();
+const ABOUT_ALL = () => ABOUT_QS.concat(KNOW_QS);
+const aboutQ = qid => ABOUT_QS.find(q => q.id === qid) || KNOW_QS.find(q => q.id === qid) || null;
 const ROSTER_DAYS = [['1', 'Monday'], ['2', 'Tuesday'], ['3', 'Wednesday'], ['4', 'Thursday'], ['5', 'Friday'], ['6', 'Saturday'], ['0', 'Sunday']];
 let aboutSaveTimer = null;
 
 function normAbout(raw) {
-  const ids = new Set(ABOUT_QS.map(q => q.id));
+  const ids = new Set(ABOUT_ALL().map(q => q.id));
   ids.add('mood');
   const src = Array.isArray(raw) ? { answers: raw } : (raw && typeof raw === 'object' ? raw : {});
   const answers = [], seen = new Set();
@@ -13431,7 +13664,9 @@ function normAbout(raw) {
     if (!parseD(day) || !ids.has(qid) || skips.some(x => x.day === day && x.qid === qid)) return;
     skips.push({ day, qid });
   });
-  return { answers, used, pin, skips };
+  const skipped = (Array.isArray(src.skipped) ? src.skipped : []).map(String).filter((id, i, xs) => ids.has(id) && xs.indexOf(id) === i);
+  const cur = ids.has(String(src.cur || '')) ? String(src.cur) : '';
+  return { answers, used, pin, skips, skipped, cur };
 }
 function normRoster(raw) {
   const days = {};
@@ -13484,32 +13719,28 @@ function aboutTouchSave() {
   clearTimeout(aboutSaveTimer);
   aboutSaveTimer = setTimeout(() => { aboutSaveTimer = null; if (S) save().catch(() => {}); }, 400);
 }
-function aboutEnsurePin(now) {
-  const day = nzTodayISO(now || new Date());
+// The current question: stays the same until it's answered or skipped, then the next one comes straight away.
+function aboutEnsurePin() {
   const a = aboutState();
-  const pinned = ABOUT_QS.find(q => q.id === (a.pin && a.pin.qid));
-  const sameDay = !!(a.pin && a.pin.day === day && pinned);
-  const done = sameDay && aboutQuestionDone(day, pinned.id);
-  const answeredEver = sameDay && !!aboutLatest(pinned.id);
-  const limit = 3; // A few useful prompts a day, without turning About you into a nag.
-  if (sameDay && !done && !answeredEver) return pinned;
-  if (sameDay && done && a.questionDay === day && Number(a.questionCount) >= limit) return pinned;
-
-  const pool = aboutUnansweredPool();
-  if (!pool.length) return pinned || ABOUT_QS[0];
-  if (a.questionDay !== day) { a.questionDay = day; a.questionCount = 0; a.used = []; }
-  let used = (Array.isArray(a.used) ? a.used : []).filter(id => pool.some(q => q.id === id));
-  let unused = pool.filter(q => !used.includes(q.id) && (!sameDay || q.id !== pinned.id));
-  // Skipped questions may have another turn once every currently unanswered question has been seen.
-  if (!unused.length) { used = []; unused = pool.filter(q => !sameDay || q.id !== pinned.id); }
-  const q = unused[0] || pool[0];
-  a.pin = { day, qid: q.id };
-  a.used = used.concat(q.id).filter((id, i, xs) => xs.indexOf(id) === i);
-  a.questionDay = day;
-  a.questionCount = Number(a.questionCount) + 1;
+  if (!Array.isArray(a.skipped)) a.skipped = [];
+  const answered = new Set((a.answers || []).filter(x => x && x.text).map(x => x.qid));
+  let aiAsked = new Set(); try { aiAsked = new Set(knowState().asked.map(x => knowNorm(x.q))); } catch (e) {}
+  const open = q => !answered.has(q.id) && !aiAsked.has(knowNorm(q.ask)) && !aboutKnown(q.id);
+  const cur = aboutQ(a.cur);
+  if (cur && open(cur) && !a.skipped.includes(cur.id)) return cur;
+  let pool = ABOUT_ALL().filter(q => open(q) && !a.skipped.includes(q.id));
+  if (!pool.length && a.skipped.length) { // everything else has had a turn: skipped ones come round again
+    const last = a.skipped[a.skipped.length - 1];
+    pool = a.skipped.map(aboutQ).filter(q => q && open(q) && q.id !== last);
+    if (!pool.length) pool = a.skipped.map(aboutQ).filter(q => q && open(q));
+    a.skipped = [];
+  }
+  const q = pool[0] || null;
+  a.cur = q ? q.id : '';
   aboutTouchSave();
   return q;
 }
+const aboutAnsweredN = () => new Set((aboutState().answers || []).filter(x => x && x.text && x.qid !== 'mood').map(x => x.qid)).size;
 function aboutAnswerRows() {
   return (aboutState().answers || []).slice().sort((a, b) => a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
 }
@@ -13530,6 +13761,7 @@ function aboutDogName() {
 }
 function aboutAsk(q) {
   if (!q) return '';
+  if (/\{dog\}/.test(q.ask || '')) { const nm = aboutDogName() || 'your dog'; return q.ask.replace(/\{dog\}/g, nm).replace(/^your dog/, 'Your dog'); }
   if (q.id === 'mood') return 'How are you feeling today?';
   if (q.id === 'dog') {
     const name = aboutDogName();
@@ -13927,7 +14159,7 @@ function paintCommute() {
   if (next) v.insertAdjacentHTML('afterbegin', next);
 }
 function aboutRow(n) {
-  const q = ABOUT_QS.find(x => x.id === n.qid);
+  const q = aboutQ(n.qid);
   const mood = n.qid === 'mood' ? aboutMood(n.text) : null;
   const label = mood ? 'How you were feeling' : q ? aboutAsk(q) : 'Answer';
   const text = mood ? mood.icon + ' ' + mood.label : aboutClip(n.text);
@@ -13941,20 +14173,35 @@ function moodCard(today) {
 }
 function About() {
   const q = aboutEnsurePin();
-  const ask = aboutAsk(q);
-  const day = nzTodayISO();
   const moodToday = aboutLatestMood();
-  const today = (aboutState().answers || []).find(a => a.qid === q.id && a.day === day);
-  const skipped = !today && (aboutState().skips || []).some(s => s.day === day && s.qid === q.id);
-  const past = aboutAnswerRows().filter(a => !(a.qid === q.id && a.day === day) && !(a.qid === 'mood' && a.day === day));
-  const form = `<form class="addbar aboutadd" onsubmit="saveAbout(event)"><input id="abouttext" name="text" placeholder="Your answer" maxlength="240" autocomplete="off" aria-label="Your answer" enterkeyhint="done" value="${esc(today ? today.text : '')}"><button type="submit" aria-label="Save answer">${I('check')}</button></form>` +
-    (today ? '' : `<div class="btns" style="margin-top:-4px"><button type="button" class="btn" onclick="skipAbout()">Skip</button></div>`) +
-    (skipped ? '<p class="muted" id="aboutskip">Skipped for today. You can still answer.</p>' : '');
-  const qcard = `<div class="card" id="aboutq"><div class="t" style="font-weight:750;font-size:1.0625rem">${esc(ask)}</div><div class="muted" style="margin-top:4px">Today’s question. The same one all day.</div></div>`;
-  const todayHtml = today ? `<div class="list" id="abouttoday" style="margin-bottom:12px">${aboutRow(today)}</div>` : '';
-  const pastHtml = past.length ? `<div class="sec" style="margin-top:8px">What you’ve said</div><div class="list" id="aboutlist">${past.map(aboutRow).join('')}</div>` : '';
-  return header('About you', 'One question a day') + moodCard(moodToday) + qcard + form + todayHtml + pastHtml +
-    '<div class="foot">Saved on this phone in Pacific/Auckland. Your mood is used on Home only for today. It won’t ask the same question again until the others have had a turn.</div>';
+  const n = aboutAnsweredN();
+  const past = aboutAnswerRows().filter(a => !(a.qid === 'mood' && a.day === nzTodayISO()));
+  let bonus = ''; try { bonus = knowCard() || ''; } catch (e) { bonus = ''; } // the once-a-day AI question, if there is one
+  const qcard = q ? `<div class="card" id="aboutq"><div class="row" style="justify-content:space-between;align-items:baseline;gap:8px;padding:0;border:0"><div class="t" style="font-weight:750;font-size:1.0625rem">${esc(aboutAsk(q))}</div><span class="muted" id="aboutcount" style="flex:none;font-size:0.8125rem">${n} answered</span></div>
+      ${q.opts ? `<div class="chips" id="aboutopts" style="flex-wrap:wrap;margin-top:10px">${q.opts.map((o, i) => `<button type="button" class="chip" onclick="pickAbout(${i})">${esc(o)}</button>`).join('')}</div>` : ''}
+      <form class="addbar aboutadd" style="margin:10px 0 0" onsubmit="saveAbout(event)"><input id="abouttext" name="text" placeholder="${q.opts ? 'Or type your own answer' : 'Your answer'}" maxlength="240" autocomplete="off" aria-label="Your answer" enterkeyhint="done"><button type="submit" aria-label="Save answer">${I('check')}</button></form>
+      <div class="btns" style="margin-top:8px"><button type="button" class="btn" id="aboutskipbtn" onclick="skipAbout()">Skip</button></div></div>`
+    : `<div class="card" id="aboutq"><div class="t" style="font-weight:750">You’ve answered every question. Nice one!</div><div class="muted" style="margin-top:4px">${n} answered. New ones will turn up in updates, and now and then on Notifications.</div></div>`;
+  const pastHtml = past.length ? `<div class="sec" style="margin-top:8px">What you’ve said</div><div class="list" id="aboutlist">${past.slice(0, 60).map(aboutRow).join('')}</div>${past.length > 60 ? `<p class="muted">And ${past.length - 60} more.</p>` : ''}` : '';
+  return header('About you', 'Answer as many as you like') + moodCard(moodToday) + bonus + qcard + pastHtml +
+    '<div class="foot">Saved on this phone in Pacific/Auckland. Answer or skip and the next question comes straight away. Answered questions never come back; skipped ones only come round again after the rest. Your answers help shape the summary and suggestions.</div>';
+}
+async function pickAbout(i) {
+  const q = aboutEnsurePin(); if (!q || !q.opts || !q.opts[i]) return;
+  return aboutSaveText(q, q.opts[i]);
+}
+async function aboutSaveText(q, text) {
+  clearTimeout(aboutSaveTimer); aboutSaveTimer = null;
+  const snapS = snap();
+  const a = aboutState();
+  const day = nzTodayISO();
+  a.answers.push({ id: uid('ab'), qid: q.id, text, day, at: nzStampLocal() });
+  a.skipped = (a.skipped || []).filter(id => id !== q.id);
+  a.skips = (a.skips || []).filter(s => !(s.day === day && s.qid === q.id));
+  a.cur = '';
+  await save();
+  render();
+  toast('Saved. Here’s the next one.', 'Undo', undoTo(snapS));
 }
 async function saveMood(id) {
   const mood = aboutMood(id);
@@ -13972,31 +14219,21 @@ async function saveMood(id) {
 }
 async function saveAbout(e) {
   e.preventDefault();
-  const q = aboutEnsurePin();
-  clearTimeout(aboutSaveTimer); aboutSaveTimer = null;
+  const q = aboutEnsurePin(); if (!q) return;
   const text = String((document.getElementById('abouttext') || {}).value || '').replace(/\s+/g, ' ').trim().slice(0, 240);
-  if (!text) { toast('Type an answer, or skip.'); const el = document.getElementById('abouttext'); if (el) el.focus(); return; }
-  const snapS = snap();
-  const a = aboutState();
-  const day = nzTodayISO();
-  const existing = (a.answers || []).find(x => x.qid === q.id && x.day === day);
-  if (existing) { existing.text = text; existing.at = nzStampLocal(); }
-  else a.answers.push({ id: uid('ab'), qid: q.id, text, day, at: nzStampLocal() });
-  a.skips = (a.skips || []).filter(s => !(s.day === day && s.qid === q.id));
-  await save();
-  render();
-  toast('Answer saved.', 'Undo', undoTo(snapS));
+  if (!text) { toast(q.opts ? 'Tap an answer, type your own, or skip.' : 'Type an answer, or skip.'); const el = document.getElementById('abouttext'); if (el) el.focus(); return; }
+  return aboutSaveText(q, text);
 }
 async function skipAbout() {
-  const q = aboutEnsurePin();
+  const q = aboutEnsurePin(); if (!q) return;
   clearTimeout(aboutSaveTimer); aboutSaveTimer = null;
-  const day = nzTodayISO();
+  const snapS = snap();
   const a = aboutState();
-  if ((a.answers || []).some(x => x.qid === q.id && x.day === day)) return;
-  if (!(a.skips || []).some(s => s.day === day && s.qid === q.id)) a.skips.push({ day, qid: q.id });
+  a.skipped = (a.skipped || []).filter(id => id !== q.id).concat(q.id);
+  a.cur = '';
   await save();
   render();
-  toast('Skipped for today.');
+  toast('Skipped. Here’s another.', 'Undo', undoTo(snapS));
 }
 async function deleteAbout(id) {
   const a = aboutState();
