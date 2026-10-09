@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.89';
+const APP_VERSION = '2.22.90';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2063,7 +2063,7 @@ function offChoreTodo() {
 /* 2.22.49: Wet day at home: suggest a movie or comedy that's on free-to-air TV, from the free NZ TV guide
    (i.mjh.nz, which allows the app to read it). Fetched only when it's wet and Shane is at home, once a day
    (about 1MB), and only the picks are kept. */
-const TVW_EPG = 'https://i.mjh.nz/nz/epg.xml';
+const TVW_EPG = 'https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master/nz/epg.xml'; // 2.22.90: direct GitHub copy (i.mjh.nz redirects via github.com, which blocks the browser read). Sent gzipped, about 1.3MB.
 const TVW_FTA = { 'mjh-tvnz-1': 'TVNZ 1', 'mjh-tvnz-2': 'TVNZ 2', 'mjh-three': 'Three', 'mjh-bravo': 'Bravo', 'mjh-prime': 'Sky Open', 'mjh-maori-tv': 'Whakaata Māori', 'mjh-tvnz-duke': 'DUKE', 'mjh-rush-nz': 'RUSH', 'mjh-eden': 'eden' };
 let TVWP = null, tvwBusy = false;
 try { TVWP = JSON.parse(localStorage.getItem('tvPicks') || 'null'); } catch (e) { TVWP = null; }
@@ -2118,6 +2118,95 @@ function homeSugTv() {
     return { id: 'tv', type: 'appt', text, pre: { title: 'Watch ' + pick.t + ' (' + pick.ch + ')', date: todayISO(), time: on ? '' : hm, notes: pick.d || '' } };
   } catch (e) { return null; }
 }
+/* 2.22.90: Breakfast on TVNZ 1, only when the real TV guide (i.mjh.nz, same free guide as above) lists it today.
+   The guide's Breakfast slots for the coming days are kept (a few small entries), refreshed every 6 hours.
+   No guide = Breakfast is never mentioned. Watching time uses the Work roster: day off = no rush; work day =
+   leave time (roster start, 8:30am if none set) minus the drive to work (relay traffic estimate, 15 minutes until it arrives). */
+let BFTV = null, bftvBusy = false;
+try { BFTV = JSON.parse(localStorage.getItem('bfastTv') || 'null'); } catch (e) { BFTV = null; }
+async function loadBfastTv(force) {
+  if (bftvBusy || navigator.onLine === false) return;
+  if (!force && BFTV && !BFTV.fail && Date.now() - (BFTV.at || 0) < 6 * 3600000) return;
+  if (!force && BFTV && BFTV.fail && Date.now() - (BFTV.at || 0) < 30 * 60000) return;
+  if (!force && BFTV && BFTV.failAt && Date.now() - BFTV.failAt < 30 * 60000) return;
+  bftvBusy = true;
+  try {
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 30000);
+    let x = ''; try { const r = await fetch(TVW_EPG, { signal: ctl.signal }); if (!r.ok) throw new Error('http'); x = await r.text(); } finally { clearTimeout(tm); }
+    const re = /<programme start="([^"]+)" stop="([^"]+)" channel="mjh-tvnz-1">([\s\S]*?)<\/programme>/g; let m;
+    const now = Date.now(), slots = [];
+    let first = 0, last = 0;
+    while ((m = re.exec(x))) {
+      const a = tvwStamp(m[1]), b = tvwStamp(m[2]); if (!a || !b) continue;
+      if (!first || a < first) first = a;
+      if (b > last) last = b;
+      const title = (((/<title[^>]*>([^<]+)/.exec(m[3])) || [])[1] || '').trim();
+      if (!/^breakfast$/i.test(title) || b < now - 86400000) continue;
+      slots.push({ a, b, day: nzStampLocal(new Date(a)).slice(0, 10) });
+    }
+    if (!first) throw new Error('no TVNZ 1 listings');
+    // from/to = NZ days the guide fully covers, so a covered day with no Breakfast slot really has none
+    const fs = nzStampLocal(new Date(first)), ls = nzStampLocal(new Date(last));
+    const from = fs.slice(11) <= '05:00' ? fs.slice(0, 10) : nzStampLocal(new Date(first + 86400000)).slice(0, 10);
+    const to = ls.slice(11) >= '10:00' ? ls.slice(0, 10) : nzStampLocal(new Date(last - 86400000)).slice(0, 10);
+    BFTV = { at: Date.now(), from, to, slots: slots.sort((p, q) => p.a - q.a).slice(0, 30) };
+  } catch (e) { BFTV = Object.assign({}, BFTV && !BFTV.fail ? BFTV : {}, { failAt: Date.now() }); if (!BFTV.slots) BFTV = { at: Date.now(), fail: true }; }
+  finally {
+    bftvBusy = false;
+    try { localStorage.setItem('bfastTv', JSON.stringify(BFTV)); } catch (e) {}
+    try { paintHomeSum(); } catch (e) {}
+  }
+}
+// Today's Breakfast from the guide: { a, b } (ms), or null when it's not listed or the guide isn't available.
+function bfastToday(now) {
+  const T = (() => { try { return DD.nzClock(now || new Date()).iso; } catch (e) { return todayISO(); } })();
+  loadBfastTv(); // self-throttled: every 6 hours, or 30 minutes after a failed try
+  if (!BFTV || BFTV.fail || !Array.isArray(BFTV.slots) || Date.now() - (BFTV.at || 0) > 48 * 3600000) return null;
+  if (!(BFTV.from <= T && T <= BFTV.to)) return null;
+  return BFTV.slots.find(x => x.day === T) || null;
+}
+// Work start today in minutes (roster start, 8:30am if the day is worked without a time), or null on a day off.
+function bfastWorkStart(a) {
+  try {
+    const days = rosterState().days || {}, v = days[String(a.dow)];
+    if (Object.keys(days).length) {
+      if (!v) return null;
+      return /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? (+v.slice(0, 2)) * 60 + (+v.slice(3)) : 510;
+    }
+  } catch (e) {}
+  return a.dow >= 1 && a.dow <= 5 ? 510 : null;
+}
+let bfDriveBusy = false;
+function bfastDriveMins() {
+  if ((!DRIVE || Date.now() - DRIVE.at > 20 * 60000) && !bfDriveBusy && RELAY_URL && navigator.onLine !== false) {
+    bfDriveBusy = true;
+    getJSON(RELAY_URL + '/drive', 12000).then(d => { const sec = d && Number(d.seconds); if (Number.isFinite(sec) && sec >= 60 && sec <= 180 * 60) { DRIVE = { at: Date.now(), seconds: sec }; try { paintHomeSum(); } catch (e) {} } }).catch(() => {}).finally(() => { bfDriveBusy = false; });
+  }
+  return DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds) ? Math.max(1, Math.round(DRIVE.seconds / 60)) : 15;
+}
+const bfastDur = n => n >= 60 ? Math.floor(n / 60) + (Math.floor(n / 60) === 1 ? ' hour' : ' hours') + (n % 60 ? ' ' + (n % 60) + ' minutes' : '') : n + ' minutes';
+// The one summary line about Breakfast, or '' (not listed today, already over, at work, or no time before leaving).
+function bfastLine(now) {
+  try {
+    const a = homeAklParts(now); if (!a) return '';
+    const sl = bfastToday(now); if (!sl) return '';
+    const minOf = t => { const h = nzStampLocal(new Date(t)).slice(11, 16); return (+h.slice(0, 2)) * 60 + (+h.slice(3)); };
+    const bs = minOf(sl.a), be = minOf(sl.b), t = a.min;
+    if (t >= be || t < bs - 60) return '';
+    try { if (homeWhere() === 'work') return ''; } catch (e) {}
+    const on = t >= bs, st = fmtTime(hmFromMin(bs)), en = fmtTime(hmFromMin(be));
+    const work = bfastWorkStart(a);
+    if (work == null) return on ? `Breakfast is on TVNZ 1 now until ${en}. It’s your day off, so no rush, you can watch the rest of it` : `Breakfast is on TVNZ 1 at ${st} until ${en}. It’s your day off, so no rush, you can watch the whole thing`;
+    const leave = work - bfastDriveMins();
+    const from = Math.max(t, bs), to = Math.min(be, leave), n = to - from;
+    if (n < 5) return '';
+    const lv = fmtTime(hmFromMin(leave));
+    if (leave >= be) return on ? `Breakfast is on TVNZ 1 now until ${en}, and you can watch the rest of it before you leave for work at about ${lv}` : `Breakfast is on TVNZ 1 at ${st} until ${en}, and you can watch the whole thing before you leave for work at about ${lv}`;
+    return on ? `Breakfast is on TVNZ 1 now until ${en}. You can watch about ${bfastDur(n)} of it before you leave for work at about ${lv}` : `Breakfast is on TVNZ 1 at ${st}. You can catch about ${bfastDur(n)} of it before you leave for work at about ${lv}`;
+  } catch (e) { return ''; }
+}
+// AI lines about the Breakfast TV show (not breakfast the meal) are dropped; bfastLine() is shown instead.
+const BFAST_TV_RE = /\bTVNZ\b|\bBreakfast\b(?=[^.]*\b(TV|telly|show|on now|starts|watch|catch|9(?::00)?\s?am|6:30))|\b(watch|catch)(ing)?\b[^.]*\bBreakfast\b/i;
 /* 2.22.49: Dinner planned tonight and something still on the shopping list: suggest a look, with an Open button. */
 function homeSugShop() {
   try {
@@ -2301,15 +2390,9 @@ function aiSumCtx() {
       ctx.concerts = (AKLC.dated || []).filter(x => x && x.date >= T && x.date <= lim).slice(0, 4).map(x => x.title + ', ' + fmtW(x.date) + ', ' + x.venue);
       ctx.sparkArenaComing = (AKLC.spark || []).slice(0, 5).map(x => x.title); }
   } catch (e) {}
-  try { // 2.22.59: Breakfast on TVNZ 1, weekdays 6:30 to 9am (from the i.mjh.nz TV guide). He likes watching it when he can.
-    const a = homeAklParts(); if (a && a.dow >= 1 && a.dow <= 5 && a.min >= 360 && a.min < 540 && homeWhere() !== 'work') {
-      let b = a.min < 390 ? 'Breakfast starts on TVNZ 1 at 6:30am and runs to 9am' : 'Breakfast is on TVNZ 1 now until 9am';
-      const sl = rosterSlot(a);
-      if (sl) { const n = DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds) ? Math.round(DRIVE.seconds / 60) : 15; const leave = sl.start - n;
-        if (leave < 540) b += '; he needs to leave for work about ' + fmtTime(hmFromMin(leave)) + ', so he can watch until then'; }
-      ctx.breakfastTv = b;
-    }
-  } catch (e) {}
+  // 2.22.90: Breakfast TV is no longer sent to the AI. The app adds its own line (bfastLine) only when the TV guide
+  // lists Breakfast today, worked out from the roster, and drops any AI line about Breakfast or TVNZ.
+  ctx.breakfastTvRule = 'Do not mention the Breakfast TV show or TVNZ at all; the app adds that line itself when it is on.';
   try { // 2.22.60: now and then (about 1 in 3 opens) a time, cleaning or sorting tip, rotating topic and area so it varies
     if (Math.random() < 0.35) {
       const topics = ['time organisation', 'cleaning', 'sorting and tidying'];
@@ -2362,7 +2445,9 @@ function aiSumFresh() { return !!(AI_SUM && AI_SUM.open === homeSugOpenN && Date
 function aiSumBullets() {
   if (!aiSumFresh()) return '';
   const walkDog = /\b(walk|walking)\b/i; const dog = /\b(zeus|dog|dogs)\b/i;
-  const lis = AI_SUM.lines.filter(t => { const x = String(t); return !(walkDog.test(x) && dog.test(x)); }).map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
+  const bf = bfastLine();
+  const lines = AI_SUM.lines.filter(t => { const x = String(t); return !(walkDog.test(x) && dog.test(x)) && !BFAST_TV_RE.test(x); }).concat(bf ? [bf] : []);
+  const lis = lines.map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
   return lis ? '<ul class="sumbul">' + lis + '</ul>' : '';
 }
 function aiSugList() {
@@ -2372,7 +2457,7 @@ function aiSugList() {
   const foodRe = /\b(dinner|tea tonight|pizza|meal|cook|recipe|takeaway|supper)\b/i;
   const lawnRe = /\b(mow|mowing|lawn|lawns)\b/i; let lawn = null; try { lawn = homeSugLawns(); } catch (e) {} // 2.22.48: lawns follow the fortnightly rule only
   const walkDogRe = /\b(walk|walking)\b/i, dogRe = /\b(zeus|dog|dogs)\b/i; // 2.22.84: walk is already a to-do
-  const out = AI_SUM.sugs.filter(x => { const blob = String(x.text || '') + ' ' + String(x.title || ''); return !lawnRe.test(blob) && !(walkDogRe.test(blob) && dogRe.test(blob)); }).filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
+  const out = AI_SUM.sugs.filter(x => { const blob = String(x.text || '') + ' ' + String(x.title || ''); return !BFAST_TV_RE.test(blob) && !lawnRe.test(blob) && !(walkDogRe.test(blob) && dogRe.test(blob)); }).filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
     const title = String(x.title || x.text || '').slice(0, 80);
     const type = ['todo', 'note', 'appt'].includes(x.type) ? x.type : 'todo';
     const pre = type === 'note' ? { text: String(x.text || title) } : type === 'appt' ? { title, date: today, time: '', notes: '' } : { title, due: today, priority: 'normal', list: 'Home' };
@@ -2743,6 +2828,7 @@ function homeSumCard(bits) {
       if (bit) ps.push(li(esc(dot(bit)), !!b.overdue));
     });
     if (hello) ps.push(li(esc(dot(homeCapClause(homeStripEnd(hello))))));
+    try { const bf = bfastLine(); if (bf) ps.push(li(esc(dot(bf)))); } catch (e) {} // 2.22.90
     if (where) ps.push(li(esc(dot(where))));
     if (mood) ps.push(li(esc(dot(mood))));
     later.forEach(b => {
