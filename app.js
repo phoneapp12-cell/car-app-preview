@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.84';
+const APP_VERSION = '2.22.85';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8140,6 +8140,7 @@ function More() {
     countdown: () => { const list = countdownRows(); if (!list.length) return 'Nothing counting down right now.'; const x = list[0]; return esc(x.name) + ' · ' + cdWords(cdDays(x.date)); },
     notes: () => { const list = noteRows(); if (!list.length) return 'No notes yet.'; const n = list[0]; return esc(n.text || 'Spoken note'); },
     about: () => { try { const list = aboutAnswerRows(); if (!list.length) return esc(aboutAsk(aboutEnsurePin())); const n = list[0]; return esc(aboutClip(n.text)); } catch (e) { return 'A daily question'; } },
+    roadworks: () => rwmMoreSub(),
     roster: () => { try { const n = rosterNext(); return n ? 'Next start ' + esc(n) : 'Days and start times'; } catch (e) { return 'Days and start times'; } }
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
@@ -8170,6 +8171,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
   roster: ['clock', 'roster', 'Work roster', 'Roster'],
+  roadworks: ['wrench', 'rw', 'Roadworks', 'Roadworks'],
   sleep: ['moon', 'roster', 'Sleep', 'Sleep'],
   gym: ['heart', 'health', 'Gym', 'Gym'],
   meds: ['medkit', 'health', 'Medications', 'Meds'],
@@ -8186,7 +8188,7 @@ const NAV_GROUPS = [
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
-  { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge'] },
+  { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge', 'roadworks'] },
   { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts', 'radio'] }
 ];
 function navOrder() {
@@ -12023,6 +12025,208 @@ function mailSettingsSection() {
   <p class="muted" style="margin:8px 4px 0">One short line on Home once an inbox is connected: how many emails arrived in the last 2 hours, and a couple of real subjects. Nothing is invented. Sign-in uses a private code (PKCE). A client secret, if Google or Microsoft requires one, stays on the calendar link service.</p>`;
 }
 
+/* ================= ROADWORKS TAB (2.22.85) =================
+   The NZTA "Northland state highway planned roadworks" emails in Shane's Outlook inbox. The label is the
+   email subject (no Outlook category or folder is used). The phone reads them with its own Outlook sign-in
+   (Mail.Read); nothing goes through the relay. Only text that is in each email is shown. Newest first. */
+const RWM_SUBJECT = 'Northland state highway planned roadworks';
+const RWM_MAX_AGE = 30 * 60 * 1000;
+const RWM_BODIES = 30; // read the full text of the newest 30; older ones list with subject and date only
+let RWM = null, rwmBusy = false, rwmFailed = '';
+async function loadRwm() {
+  try { const c = await kvGet('roadworksMail'); RWM = c && Array.isArray(c.items) ? c : null; } catch (e) { RWM = null; }
+}
+async function saveRwm() { try { await kvSet('roadworksMail', RWM); } catch (e) { } }
+function rwmSubjectMatch(s) { return String(s || '').toLowerCase().replace(/\s+/g, ' ').includes(RWM_SUBJECT.toLowerCase()); }
+function rwmHtmlText(html) {
+  const s = String(html || '')
+    .replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n*   ')
+    .replace(/<\/(p|div|tr|li|h[1-6]|table|ul|ol)>/gi, '\n')
+    .replace(/<img[^>]*alt="([^"]*)"[^>]*>/gi, '\n[$1]\n')
+    .replace(/<[^>]+>/g, '');
+  const ta = document.createElement('textarea');
+  ta.innerHTML = s;
+  return ta.value;
+}
+// Pure: email text in, the parts the tab shows out. Nothing is added that is not in the text.
+function rwmParse(raw) {
+  const text = String(raw || '').replace(/\r/g, '').replace(/<(https?|mailto):[^>\s]*>/gi, '').replace(/\u00a0/g, ' ');
+  const lines = text.split('\n').map(l => l.replace(/[ \t]+/g, ' ').trim())
+    .filter(l => !/^\[[^\]]*\]$/.test(l)); // image placeholders and photo captions in brackets
+  const isBullet = l => /^[*•·]\s+/.test(l);
+  const unBullet = l => l.replace(/^[*•·]\s+/, '').trim();
+  const out = { week: '', highways: [], noWorks: '', asAt: '', blocks: [], fallback: false };
+  const wk = lines.find(l => /^(mon|tues|wednes|thurs|fri|satur|sun)day \d{1,2} [a-z]+( \d{4})? to (mon|tues|wednes|thurs|fri|satur|sun)day \d{1,2} [a-z]+/i.test(l));
+  if (wk) out.week = wk;
+  const endAt = (() => { const i = lines.findIndex(l => /^(more information|for more information\b|you received this message)/i.test(l)); return i < 0 ? lines.length : i; })();
+  let start = -1;
+  const hi = lines.findIndex(l => /^state highways with scheduled works/i.test(l));
+  if (hi >= 0) {
+    let j = hi + 1;
+    for (; j < endAt; j++) {
+      const l = lines[j];
+      if (!l) continue;
+      if (isBullet(l)) { out.highways.push(unBullet(l)); continue; }
+      break;
+    }
+    start = j;
+  }
+  const nw = lines.find(l => /^no (significant )?works are scheduled/i.test(l));
+  if (nw) out.noWorks = nw;
+  const ai = lines.findIndex(l => /^information current as at/i.test(l));
+  if (ai >= 0) { out.asAt = lines[ai]; start = Math.max(start, ai + 1); }
+  if (start >= 0) {
+    for (let i = start; i < endAt; i++) {
+      const l = lines[i];
+      if (!l || /^detour maps? (is |are )?below\.?$/i.test(l)) continue;
+      if (/^(please note|note:|if you.re travelling|check the nzta journey planner|no (significant )?works are scheduled)/i.test(l)) continue;
+      if (isBullet(l)) out.blocks.push({ li: unBullet(l) });
+      else {
+        let k = i + 1; while (k < endAt && !lines[k]) k++;
+        const head = (k < endAt && isBullet(lines[k]) && l.length <= 120) || (l.length <= 70 && !/[.:;!?,]$/.test(l) && !/:\s/.test(l));
+        out.blocks.push(head ? { h: l } : { p: l });
+      }
+    }
+    // a heading with nothing under it before the next heading (or the end) is dropped
+    out.blocks = out.blocks.filter((b, i, a) => !b.h || (a[i + 1] && !a[i + 1].h));
+  }
+  if (!out.blocks.length) {
+    // No works list in this one: keep the email's own paragraphs (not the header or footer).
+    out.fallback = true;
+    const from = Math.max(0, lines.findIndex(l => /^kia ora/i.test(l)));
+    for (let i = from; i < endAt && out.blocks.length < 40; i++) {
+      const l = lines[i];
+      if (!l || /^view online$/i.test(l)) continue;
+      out.blocks.push(isBullet(l) ? { li: unBullet(l) } : { p: l });
+    }
+  }
+  return out;
+}
+async function rwmGet(url, token, preferText) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const headers = { Authorization: 'Bearer ' + token, Accept: 'application/json' };
+    if (preferText) headers.Prefer = 'outlook.body-content-type="text"';
+    const r = await fetch(url, { signal: ctl.signal, cache: 'no-store', headers });
+    if (r.status === 401) throw Object.assign(new Error('auth'), { status: 401 });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+async function rwmBody(id, token) {
+  const url = 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(id) + '?$select=body';
+  let m;
+  try { m = await rwmGet(url, token, true); }
+  catch (e) { if (e && e.status) throw e; m = await rwmGet(url, token, false); } // if the text header is refused, read HTML
+  const b = (m && m.body) || {};
+  return b.contentType === 'html' ? rwmHtmlText(b.content) : String(b.content || '');
+}
+async function rwmFetch(token) {
+  const q = encodeURIComponent('"' + RWM_SUBJECT + '"');
+  let url = 'https://graph.microsoft.com/v1.0/me/messages?$search=' + q + '&$top=50&$select=id,subject,receivedDateTime,webLink';
+  const rows = [];
+  for (let page = 0; url && page < 4; page++) {
+    const data = await rwmGet(url, token, false);
+    (Array.isArray(data.value) ? data.value : []).forEach(m => { if (m && m.id && rwmSubjectMatch(m.subject)) rows.push(m); });
+    url = data['@odata.nextLink'] || '';
+  }
+  const seen = new Set();
+  const list = rows.filter(m => !seen.has(m.id) && seen.add(m.id))
+    .map(m => ({ id: m.id, at: Date.parse(m.receivedDateTime || '') || 0, subject: String(m.subject || '').replace(/\s+/g, ' ').trim(), link: /^https:\/\/outlook\.(live|office|office365)\.com\//.test(m.webLink || '') ? m.webLink : '' }))
+    .sort((a, b) => b.at - a.at);
+  const old = new Map(((RWM && RWM.items) || []).map(x => [x.id, x]));
+  const need = list.slice(0, RWM_BODIES).filter(x => !(old.get(x.id) || {}).parsed);
+  let i = 0;
+  const worker = async () => {
+    while (i < need.length) {
+      const x = need[i++];
+      try { x.parsed = rwmParse(await rwmBody(x.id, token)); } catch (e) { if (e && e.status === 401) throw e; }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  return list.map(x => x.parsed ? x : Object.assign(x, { parsed: (old.get(x.id) || {}).parsed || null }));
+}
+async function refreshRwm(force) {
+  if (rwmBusy) return;
+  if (!mailConnected('microsoft')) { rwmFailed = 'outlook'; updRwm(); return; }
+  if (!force && RWM && Date.now() - RWM.at < RWM_MAX_AGE) return;
+  rwmBusy = true; updRwm();
+  try {
+    let token = await mailAccess('microsoft');
+    let items;
+    try { items = await rwmFetch(token); }
+    catch (e) {
+      if (e && e.status === 401) { MAIL.microsoft.expiresAt = 0; token = await mailAccess('microsoft'); items = await rwmFetch(token); }
+      else throw e;
+    }
+    RWM = { at: Date.now(), items };
+    rwmFailed = '';
+    await saveRwm();
+  } catch (e) { rwmFailed = 'fetch'; }
+  rwmBusy = false;
+  updRwm();
+}
+function updRwm() {
+  if (typeof sheetOpen !== 'undefined' && sheetOpen) return;
+  const h = (location.hash || '#home').slice(1);
+  if (h !== 'roadworks') return;
+  const v = $('#view'), top = v ? v.scrollTop : 0;
+  const open = [...document.querySelectorAll('#rwmlist details[open]')].map(d => d.dataset.id);
+  render();
+  open.forEach(id => { const d = document.querySelector('#rwmlist details[data-id="' + CSS.escape(id) + '"]'); if (d) d.open = true; });
+  if (v) v.scrollTop = top;
+}
+function rwmWhen(at) {
+  if (!at) return '';
+  const d = new Date(at);
+  const day = d.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+  const time = d.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
+  return day + ', ' + time;
+}
+function rwmTitle(x) {
+  const s = String(x.subject || '');
+  const i = s.toLowerCase().indexOf(RWM_SUBJECT.toLowerCase());
+  let rest = i >= 0 ? s.slice(i + RWM_SUBJECT.length).replace(/^[\s:–—-]+/, '').trim() : '';
+  if (!rest) return s;
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+function rwmRow(x, first) {
+  const p = x.parsed;
+  const hw = p && p.highways && p.highways.length ? p.highways.join(' · ') : '';
+  const sub = 'Received ' + esc(rwmWhen(x.at)) + (hw ? '<br>' + esc(hw) : '');
+  const blocks = p ? p.blocks.map(b => b.h ? `<div class="rwmh">${esc(b.h)}</div>` : b.li ? `<div class="rwmli">${esc(b.li)}</div>` : `<p>${esc(b.p)}</p>`).join('') : '';
+  const body = `<div class="rwmbody">
+      <div class="s"><b>${esc(x.subject)}</b></div>
+      ${p && p.week ? `<div class="s">${esc(p.week)}</div>` : ''}
+      ${p && p.noWorks ? `<p>${esc(p.noWorks)}</p>` : ''}
+      ${blocks || `<p class="muted">The text of this email hasn’t been read yet. ${x.link ? 'Open it in Outlook.' : ''}</p>`}
+      ${p && p.asAt ? `<p class="muted">${esc(p.asAt)}</p>` : ''}
+      ${x.link ? `<div class="btns"><a class="btn small" href="${esc(x.link)}" target="_blank" rel="noopener">Open in Outlook ${I('ext')}</a></div>` : ''}
+    </div>`;
+  return `<details class="rwm" data-id="${esc(x.id)}"><summary class="row"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(rwmTitle(x))}</div><div class="s">${sub}</div></div>${first ? '<span class="pill rwmnew">Latest</span>' : ''}</summary>${body}</details>`;
+}
+function RoadworksMail() {
+  const fresh = !RWM || Date.now() - RWM.at > RWM_MAX_AGE;
+  if (fresh && !rwmBusy && mailConnected('microsoft') && rwmFailed !== 'fetch') setTimeout(() => refreshRwm(false), 0);
+  const items = RWM ? RWM.items.slice().sort((a, b) => b.at - a.at) : null;
+  let body;
+  if (!mailConnected('microsoft')) body = `<div class="card empty"><div class="t">Outlook isn’t connected</div><div class="s">These come from the NZTA roadworks emails in your Outlook inbox. Sign in to Outlook in Settings, Mail.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="go('#settings')">Open Settings</button></div>`;
+  else if (!items) body = `<div class="card muted">${rwmBusy ? 'Reading the roadworks emails…' : rwmFailed ? 'Couldn’t read the roadworks emails just now. Tap Refresh to try again.' : 'Reading the roadworks emails…'}</div>`;
+  else if (!items.length) body = `<div class="card empty"><div class="t">No roadworks emails</div><div class="s">No emails titled “${RWM_SUBJECT}” were found in Outlook.</div></div>`;
+  else body = `<div class="list" id="rwmlist">${items.map((x, i) => rwmRow(x, i === 0)).join('')}</div>`;
+  const note = items && rwmFailed === 'fetch' ? `<div class="card muted" style="margin-bottom:8px">Couldn’t check for new emails just now. Showing the last copy.</div>` : '';
+  return header('Roadworks', 'Northland state highway planned roadworks') +
+    `<div class="sec">From your Outlook${items && items.length ? ' · ' + items.length : ''} <button onclick="refreshRwm(true)">${rwmBusy ? 'Updating…' : 'Refresh'}</button></div>` +
+    note + body +
+    `<div class="foot">Emails from NZ Transport Agency Waka Kotahi titled “${RWM_SUBJECT}”, newest at the top. Tap one for the planned works in that email. Only what the email says is shown.</div>`;
+}
+function rwmMoreSub() {
+  const x = RWM && RWM.items && RWM.items.slice().sort((a, b) => b.at - a.at)[0];
+  return x ? 'Latest: ' + esc(rwmTitle(x)) : 'NZTA planned roadworks emails';
+}
+
 /* ================= SETTINGS ================= */
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 function Settings() {
@@ -13526,7 +13730,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, sleep: Sleep, gym: Gym, meds: Meds };
+  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, sleep: Sleep, gym: Gym, meds: Meds };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -13924,6 +14128,7 @@ async function start() {
   // 2.22.21: a failure here must not leave a blank screen or skip service worker registration (updates).
   try { await loadCal(); } catch (e) { console.error('loadCal', e); }
   try { await loadMail(); } catch (e) { console.error('loadMail', e); }
+  try { await loadRwm(); } catch (e) { console.error('loadRwm', e); }
   try { await finishMailSignIn(); } catch (e) { console.error('finishMailSignIn', e); }
   for (const f of [loadWx, loadAlerts, loadEvs, loadCls, loadRoadworks, loadTv, loadNews, loadBlogs, loadPodcasts]) { try { f(); } catch (e) { console.error('load', e); } }
   try { render(); } catch (e) { console.error('First render', e); }

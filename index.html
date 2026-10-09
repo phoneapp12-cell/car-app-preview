@@ -562,6 +562,15 @@ details.help ol{margin:0 0 12px}
 .foot a{color:inherit;text-decoration:underline}
 /* events */
 .ic.rw{background:var(--amberbg);color:var(--amber)} .ic.ev{background:var(--ev-bg);color:var(--ev-fg)} .ic.vid{background:var(--ext-bg);color:var(--ext)} .ic.t40{background:var(--ext-bg);color:var(--ext)} .ic.tv{background:var(--ext-bg);color:var(--ext)} .ic.blog{background:var(--ext-bg);color:var(--ext)} .ic.pod{background:var(--ext-bg);color:var(--ext)} .ic.rad{background:var(--ext-bg);color:var(--ext)} .ic.ln{background:var(--health-bg);color:var(--health)}
+/* 2.22.85: Roadworks tab (NZTA emails) */
+details.rwm{border-top:1px solid var(--line)} details.rwm:first-child{border-top:0}
+details.rwm>summary{list-style:none;cursor:pointer;border-top:0} details.rwm>summary::-webkit-details-marker{display:none}
+details.rwm .pill.rwmnew{background:var(--amberbg);color:var(--amber);flex:none}
+.rwmbody{padding:2px 14px 14px 64px;font-size:0.875rem;line-height:1.4;color:var(--ink)}
+.rwmbody p{margin:6px 0} .rwmbody .rwmh{font-weight:700;margin:12px 0 4px}
+.rwmbody .rwmli{position:relative;padding-left:14px;margin:3px 0} .rwmbody .rwmli:before{content:'•';position:absolute;left:2px;color:var(--ink3)}
+.rwmbody .btns{margin-top:10px}
+@media (max-width:370px){ .rwmbody{padding-left:14px} }
 .row.pod{align-items:flex-start} .row.pod audio{display:block;width:100%;margin-top:8px;height:40px}
 .row.rad{align-items:flex-start} .row.rad audio{display:block;width:100%;margin-top:8px;height:40px}
 .vthumb{width:112px;height:63px;border-radius:10px;object-fit:cover;flex:none;background:var(--soft2)}
