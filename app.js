@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.87';
+const APP_VERSION = '2.22.88';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8481,7 +8481,49 @@ function rememberFix(pos) {
     hereFix = { lat, lon, acc, speed, at: Date.now() };
     noteHomeArrival();
     noteNewSpot(hereFix, speed); // 2.22.31
+    nwCheck(hereFix); // 2.22.88
   } catch (e) {}
+}
+// 2.22.88: at New World Onerahi (128 Onerahi Rd), one notification per visit offering the shopping list.
+// Store point from OpenStreetMap (way 286239900, the New World building, and the 128 Onerahi Road address point).
+// Location is only read while the app is open or brought back to the front; a closed web app can't check it.
+const NW_ONERAHI = { lat: -35.75596, lon: 174.36805, r: 130 };
+const NW_RESET_MS = 3 * 3600 * 1000;
+function nwState() { try { return JSON.parse(localStorage.getItem('nwVisit') || '{}') || {}; } catch (e) { return {}; } }
+function nwSave(o) { try { localStorage.setItem('nwVisit', JSON.stringify(o)); } catch (e) { } }
+// Pure: where the fix is relative to the store. 'in', 'out' (clearly left), or '' (vague or in between).
+function nwWhere(fix) {
+  if (!fix || !Number.isFinite(fix.lat) || !Number.isFinite(fix.lon)) return '';
+  const acc = fix.acc != null && Number.isFinite(+fix.acc) ? +fix.acc : 50;
+  const m = metresBetween(fix.lat, fix.lon, NW_ONERAHI.lat, NW_ONERAHI.lon);
+  if (acc <= 300 && m <= NW_ONERAHI.r + Math.min(acc, 60)) return 'in';
+  if (m > NW_ONERAHI.r + 150 + Math.min(acc, 150)) return 'out';
+  return '';
+}
+// Pure: should this 'in' fire, given the saved visit state?
+function nwShouldFire(st, now) {
+  if (!st || !st.firedAt) return true;
+  if (now - st.firedAt >= NW_RESET_MS) return true;
+  return !!(st.leftAt && st.leftAt > st.firedAt && now - st.firedAt >= 20 * 60 * 1000);
+}
+async function nwCheck(fix) {
+  try {
+    if (!S) return;
+    const where = nwWhere(fix);
+    if (!where) return;
+    const now = Date.now(), st = nwState();
+    if (where === 'out') { if (st.firedAt && !(st.leftAt > st.firedAt)) { st.leftAt = now; nwSave(st); } return; }
+    if (!nwShouldFire(st, now)) return;
+    nwSave({ firedAt: now, leftAt: 0 });
+    const n = (S.shop && Array.isArray(S.shop.items)) ? S.shop.items.filter(x => !x.done).length : 0;
+    const body = 'Want to see your shopping list?' + (n ? ' ' + plural(n, 'thing') + ' to get.' : '');
+    if (document.visibilityState === 'visible') toast('At New World Onerahi. ' + body, 'Open list', () => go('#shopping'));
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const opts = { body, tag: 'nw-onerahi', renotify: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: '#shopping' } };
+    const reg = await getReg();
+    if (reg) await reg.showNotification('At New World Onerahi', opts);
+    else { const nt = new Notification('At New World Onerahi', opts); nt.onclick = () => { try { window.focus(); } catch (e) { } go('#shopping'); nt.close(); }; }
+  } catch (e) { }
 }
 // Near home, work, the gym or a named place (its id), or nothing. A vague fix, or no fix, does not guess.
 function placeHere() {
