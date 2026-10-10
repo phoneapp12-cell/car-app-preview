@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.95';
+const APP_VERSION = '2.22.96';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3974,17 +3974,28 @@ function deleteBill(id) {
 let sharedApplying = false;
 const isSarahTodo = t => !!(t && t.from === 'sarah');
 const sarahBadge = t => isSarahTodo(t) ? '<span class="sbadge" title="Added by Sarah" aria-label="Added by Sarah">S</span>' : '';
+// 2.22.96: you can share one of your own to-dos or shopping items with Sarah (t.sharedS). It stays yours here
+// (no pink S, just "shared with Sarah"); on her list it has a blue S. Nothing else of yours is sent.
+const isMineShared = t => !!(t && t.sharedS && t.from !== 'sarah');
+const sharedMark = t => isMineShared(t) ? ' · shared with Sarah' : '';
+const mineTodoView = t => ({ id: t.id, title: t.title, list: t.sharedList || 'Home', due: t.due || '', notes: t.notes || '', priority: todoPriority(t), done: !!t.done, doneAt: t.doneAt, created: t.created, by: 'shane', _todo: t });
 const SH = {
   state: () => { S.settings.shared = S.settings.shared && typeof S.settings.shared === 'object' ? S.settings.shared : {}; return S.settings.shared; },
-  items: () => [...(S.todos || []).filter(isSarahTodo), ...((S.shop && S.shop.items) || []).filter(isSarahShop).map(sarahShopView)],
-  by: () => 'sarah',
+  items: () => [...(S.todos || []).filter(isSarahTodo), ...(S.todos || []).filter(isMineShared).map(mineTodoView),
+    ...((S.shop && S.shop.items) || []).filter(x => isSarahShop(x) || isMineShared(x)).map(sarahShopView)],
+  by: t => (t && t.by) || (isSarahTodo(t) ? 'sarah' : 'shane'),
   want: () => true,
-  add: x => { if (isSarahShopList(x.list)) { S.shop.items.push(sarahShopItem(x)); return; } S.todos.push({ id: x.id, title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), from: 'sarah' }); },
+  add: x => {
+    const mine = x.by === 'shane';
+    if (isSarahShopList(x.list)) { const it = sarahShopItem(x); if (mine) { delete it.from; it.sharedS = true; } S.shop.items.push(it); return; }
+    if (mine) { S.todos.push({ id: x.id, title: x.title, list: (S.lists && S.lists[0]) || 'To-do', sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), sharedS: true }); return; }
+    S.todos.push({ id: x.id, title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), from: 'sarah' }); },
   update: (t, x) => {
-    if (!!t._shop !== isSarahShopList(x.list)) { SH.remove(t.id); SH.add(Object.assign({}, x, { created: t.created || x.created })); return; } // moved to or from her Shopping list
+    if (!!t._shop !== isSarahShopList(x.list)) { SH.remove(t.id); SH.add(Object.assign({}, x, { created: t.created || x.created, by: SH.by(t) })); return; } // moved to or from her Shopping list
+    if (t._todo) { const o = t._todo; Object.assign(o, { title: x.title, sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) o.doneAt = o.doneAt || x.doneAt || Date.now(); else delete o.doneAt; return; } // your own: stays on your list
     if (t._shop) { const it = t._shop; Object.assign(it, { name: String(x.title || '').slice(0, 120), list: x.list, due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done }); if (x.done) it.doneAt = it.doneAt || x.doneAt || Date.now(); else delete it.doneAt; return; }
     Object.assign(t, { title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) t.doneAt = x.doneAt || Date.now(); else delete t.doneAt; },
-  remove: id => { S.todos = S.todos.filter(t => !(t.id === id && isSarahTodo(t))); S.shop.items = S.shop.items.filter(x => !(x.id === id && isSarahShop(x))); },
+  remove: id => { S.todos = S.todos.filter(t => !(t.id === id && (isSarahTodo(t) || isMineShared(t)))); S.shop.items = S.shop.items.filter(x => !(x.id === id && (isSarahShop(x) || isMineShared(x)))); },
   persist: async changed => {
     sharedApplying = true;
     try { await save(); } finally { sharedApplying = false; }
@@ -4083,7 +4094,7 @@ function Todo() {
   const open = vis.filter(t => !t.done).sort(cmpOpenTodo);
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const row = t => `<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
+    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${sharedMark(t)}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
     ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
@@ -4092,6 +4103,7 @@ function Todo() {
       <button class="chip plus" onclick="listForm()">+ New list</button></div>
     ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
     <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="Add a to-do${todoFilter !== 'All' ? ' to ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
+    <label class="sharechk"><input type="checkbox" id="todoshare"> Also add to Sarah’s list</label>
     ${open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">All done. Good as gold!</div></div>' : empty('Nothing on your list', 'Type a to-do above and tap +, or add one with a due date.', 'Add a to-do', 'todoForm()'))}
     ${done.length ? `<div class="sec">Done <button onclick="clearDone()">Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}`;
 }
@@ -4100,9 +4112,11 @@ async function quickAdd(e) {
   e.preventDefault();
   const v = $('#newtodo').value.trim(); if (!v) return;
   const td = { id: uid('todo'), title: v, list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', priority: 'normal', done: false, created: Date.now() };
+  const share = !!($('#todoshare') && $('#todoshare').checked);
+  if (share) { td.sharedS = true; td.sharedList = 'Home'; }
   refreshIdeaSteps(td);
   S.todos.push(td);
-  await save(); render(); $('#newtodo').focus(); toast('Added to your list.');
+  await save(); render(); $('#newtodo').focus(); toast(share ? 'Added to your list and Sarah’s.' : 'Added to your list.');
 }
 async function tick(id) {
   const t = S.todos.find(x => x.id === id); if (!t) return;
@@ -4134,15 +4148,18 @@ function todoForm(id, pre) {
     `<div class="two">${field('List', sel('list', (S.lists.includes(t.list) || !t.list ? S.lists : S.lists.concat(t.list)).map(l => [l, l]), t.list))}${field('Priority', sel('priority', [['high', 'High'], ['normal', 'Normal'], ['low', 'Low']], todoPriority(t)))}</div>` +
     field('Due date', inp('due', t.due, 'type="date"'), 'Optional') +
     field('Notes', area('notes', t.notes)) +
-    (isSarahTodo(t) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 0">${sarahBadge(t)} Sarah added this in her app. Changes and ticks here go back to her.</p>` : '') +
+    (isSarahTodo(t) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 0">${sarahBadge(t)} Sarah added this in her app. Changes and ticks here go back to her.</p>` :
+      isMineShared(t) ? `<p class="muted" id="sharednote" style="margin:4px 2px 0">Shared with Sarah. Changes and ticks here go to her list too.</p>` :
+      `<label class="gfcheck sharebox"><input type="checkbox" name="share"><span><b>${id ? 'Share with Sarah' : 'Also add to Sarah’s list'}</b><small>It shows on her list with a blue S. She can tick it off too.</small></span></label>`) +
     (id ? todoStepsBlock(t, 'sheet') : '') +
     (id ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="tick('${id}')">${I('check')} ${t.done ? 'Mark not done' : 'Mark complete'}</button>${t.done ? '' : `<button type="button" class="btn" onclick="addTodoCal('${id}')">${I('cal')} ${todoAppt(t) ? 'In your calendar' : 'Add to calendar'}</button>${todoAppt(t) ? `<button type="button" class="btn" onclick="apptToTodo('${todoAppt(t).id}')">${I('check')} Take off calendar</button>` : ''}`}</div>` : ''),
     async v => {
       if (!v.title) return 'Please type the to-do.';
       const priority = todoPriority({ priority: v.priority });
-      if (id) { Object.assign(t, { title: v.title, list: v.list, due: v.due, notes: v.notes, priority }); if (!t.done) refreshIdeaSteps(t); }
-      else { const td = { id: uid('todo'), title: v.title, list: v.list, due: v.due, notes: v.notes, priority, done: false, created: Date.now() }; refreshIdeaSteps(td); S.todos.push(td); }
-      await save(); render(); toast(id ? 'To-do updated.' : 'Added to your list.');
+      const share = v.share === 'on' && !isSarahTodo(t) && !isMineShared(t);
+      if (id) { Object.assign(t, { title: v.title, list: v.list, due: v.due, notes: v.notes, priority }); if (share) { t.sharedS = true; t.sharedList = 'Home'; } if (!t.done) refreshIdeaSteps(t); }
+      else { const td = { id: uid('todo'), title: v.title, list: v.list, due: v.due, notes: v.notes, priority, done: false, created: Date.now() }; if (share) { td.sharedS = true; td.sharedList = 'Home'; } refreshIdeaSteps(td); S.todos.push(td); }
+      await save(); render(); toast(share ? (id ? 'Shared with Sarah.' : 'Added to your list and Sarah’s.') : id ? 'To-do updated.' : 'Added to your list.');
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete to-do" onclick="deleteTodo('${id}')">${I('trash')}</button>` : '');
 }
@@ -6335,7 +6352,7 @@ const isSarahShopList = l => /^shopping$/i.test(String(l || '').trim());
 const isSarahShop = x => !!(x && x.from === 'sarah');
 const sarahShopItem = x => { const it = { id: x.id, name: String(x.title || '').slice(0, 120), list: x.list || 'Shopping', due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done, created: x.created || Date.now(), meals: [], from: 'sarah' }; if (it.done) it.doneAt = x.doneAt || Date.now(); return it; };
 // How one of her shopping items looks to the sync (the same fields as a to-do)
-const sarahShopView = x => ({ id: x.id, title: x.name, list: x.list || 'Shopping', due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done, doneAt: x.doneAt, created: x.created, _shop: x });
+const sarahShopView = x => ({ id: x.id, title: x.name, list: x.list || 'Shopping', due: x.due || '', notes: x.notes || '', priority: x.priority || 'normal', done: !!x.done, doneAt: x.doneAt, created: x.created, by: isSarahShop(x) ? 'sarah' : 'shane', _shop: x });
 const shopName = g => String(g || '').replace(/\s*\(check label\)\s*$/i, '').trim();
 // Add ingredients, skipping any already on the list (not yet ticked). Returns how many were added.
 function addToShop(names, meal) {
@@ -6350,7 +6367,7 @@ function addToShop(names, meal) {
 }
 function shopRow(x) {
   const hint = needsCheck(x.name) ? ' <span class="chk">check label</span>' : '';
-  const sub = x.meals.length ? 'For ' + esc(x.meals.slice(0, 3).join(', ')) + (x.meals.length > 3 ? '…' : '') : '';
+  const sub = [x.meals.length ? 'For ' + esc(x.meals.slice(0, 3).join(', ')) + (x.meals.length > 3 ? '…' : '') : '', isMineShared(x) ? 'Shared with Sarah' : ''].filter(Boolean).join(' · ');
   return `<div class="row shopitem ${x.done ? 'done' : ''}" data-id="${x.id}"><button class="tick" aria-label="${x.done ? 'Untick' : 'Tick off'} ${esc(x.name)}" onclick="shopTick('${x.id}')"><span>${I('check')}</span></button>
     <button class="tapzone" onclick="shopEdit('${x.id}')"><div class="tx"><div class="t">${isSarahShop(x) ? sarahBadge({ from: 'sarah' }) : ''}${esc(x.name)}${hint}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div></button></div>`;
 }
@@ -6360,6 +6377,7 @@ function Shopping() {
   const nights = shopNights().length;
   return header('Shopping list', open.length ? plural(open.length, 'thing') + ' to get' : 'Nothing to get') + mealTabs('shop') +
     `<form class="addbar" onsubmit="shopQuickAdd(event)"><input id="newshop" placeholder="Add an item…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New shopping item"><button aria-label="Add">${I('plus')}</button></form>
+    <label class="sharechk"><input type="checkbox" id="shopshare"> Also add to Sarah’s list</label>
     <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button>` : ''}</div>
     ${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
     ${got.length ? `<div class="sec">Got <button onclick="clearGot()">Clear</button></div><div class="list" id="shopgot">${got.map(shopRow).join('')}</div>` : ''}
@@ -6368,8 +6386,14 @@ function Shopping() {
 async function shopQuickAdd(e) {
   e.preventDefault();
   const v = $('#newshop').value.trim(); if (!v) return;
-  const n = addToShop(v.split(/\s*,\s*/), '');
-  await save(); render(); $('#newshop').focus(); toast(n ? (n === 1 ? 'Added.' : `Added ${n} items.`) : 'That’s already on the list.');
+  const names = v.split(/\s*,\s*/), n = addToShop(names, '');
+  let shared = 0;
+  if ($('#shopshare') && $('#shopshare').checked) { // share the matching open items of yours (Sarah's own are already on her list)
+    const want = new Set(names.map(shopName).filter(Boolean).map(mNorm));
+    S.shop.items.forEach(x => { if (!x.done && want.has(mNorm(x.name)) && !isSarahShop(x) && !x.sharedS) { x.sharedS = true; shared++; } });
+  }
+  await save(); render(); $('#newshop').focus();
+  toast(shared ? (n ? `Added${n > 1 ? ' ' + n + ' items' : ''} to your list and Sarah’s.` : 'Already on your list. Now on Sarah’s too.') : n ? (n === 1 ? 'Added.' : `Added ${n} items.`) : 'That’s already on the list.');
 }
 async function shopTick(id) {
   const x = S.shop.items.find(i => i.id === id); if (!x) return;
@@ -6384,8 +6408,10 @@ function clearGot() {
 function shopEdit(id) {
   const x = S.shop.items.find(i => i.id === id); if (!x) return;
   openSheet('Edit item', field('Item', inp('name', x.name, 'required maxlength="120"')) +
-    (isSarahShop(x) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 8px">${sarahBadge({ from: 'sarah' })} Sarah added this in her app. Changes, ticks and deletes here go back to her.</p>` : '') + (x.meals.length ? `<p class="muted" style="margin:-4px 0 8px">For ${esc(x.meals.join(', '))}</p>` : ''),
-    async v => { if (!v.name) return 'Please type the item.'; x.name = v.name; await save(); render(); }, 'Save',
+    (isSarahShop(x) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 8px">${sarahBadge({ from: 'sarah' })} Sarah added this in her app. Changes, ticks and deletes here go back to her.</p>` :
+      isMineShared(x) ? `<p class="muted" id="sharednote" style="margin:4px 2px 8px">Shared with Sarah. Changes and ticks here go to her list too.</p>` :
+      `<label class="gfcheck sharebox"><input type="checkbox" name="share"><span><b>Share with Sarah</b><small>It goes on her Shopping list with a blue S.</small></span></label>`) + (x.meals.length ? `<p class="muted" style="margin:-4px 0 8px">For ${esc(x.meals.join(', '))}</p>` : ''),
+    async v => { if (!v.name) return 'Please type the item.'; x.name = v.name; const sh = v.share === 'on' && !isSarahShop(x) && !x.sharedS; if (sh) x.sharedS = true; await save(); render(); if (sh) toast('Shared with Sarah.'); }, 'Save',
     `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete item" onclick="shopDelete('${id}')">${I('trash')}</button>`);
 }
 async function shopDelete(id) { const s = snap(); S.shop.items = S.shop.items.filter(i => i.id !== id); await save(); await closeSheet(); render(); toast('Item deleted.', 'Undo', undoTo(s)); }
