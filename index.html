@@ -1144,6 +1144,22 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 @keyframes catZ{0%{opacity:0;transform:translate(0,4px) scale(.7)}25%{opacity:1}100%{opacity:0;transform:translate(4px,-6px) scale(1.1)}}
 @keyframes catStretch{0%,100%{transform:none}35%{transform:scale(1.12,.86) translateY(2px)}65%{transform:scale(.94,1.08) translateY(-2px)}}
 @keyframes catStir{0%,100%{transform:none}40%{transform:scale(1.06,.94)}}
+.hcat .ctapaw{opacity:0;transform-box:view-box;transform-origin:28.5px 37.5px;pointer-events:none}
+.hcat .cbean{fill:#F9A8C4}
+.hcat .ctrip{position:absolute;left:52px;top:73px;width:34px;height:34px;border-radius:50%;border:2.5px solid var(--brand,#0f766e);opacity:0;transform:scale(.2);pointer-events:none;z-index:2}
+.hcat.tapping .cpaw{opacity:0}
+.hcat.tapping .cbub{opacity:1;transform:none;transition-delay:.25s;left:auto;right:84px;top:58px}
+.hcat.tapping.cat-energetic .ctapaw{animation:catTap .55s ease-in-out 2}
+.hcat.tapping.cat-energetic .ctrip{animation:catRipple .5s ease-out .3s 2}
+.hcat.tapping.cat-alert .ctapaw{animation:catTap .85s ease-in-out}
+.hcat.tapping.cat-alert .ctrip{animation:catRipple .6s ease-out .48s}
+.hcat.tapping.cat-tired .ctapaw{animation:catTapLazy 1.35s ease-in-out}
+.hcat.tapping.cat-tired .ctrip{animation:catRipple .8s ease-out .8s}
+.hcat.tapping.cat-drowsy .ctapaw{animation:catTapLazy 2.1s ease-in-out}
+.hcat.tapping.cat-drowsy .ctrip{animation:catRipple 1s ease-out 1.25s}
+@keyframes catTap{0%{opacity:1;transform:none}35%{opacity:1;transform:translate(-1px,-6px) rotate(-14deg) scale(1.35)}60%{opacity:1;transform:translate(0,1px) scale(2.4)}75%{opacity:1;transform:translate(0,0) scale(2.1)}100%{opacity:1;transform:none}}
+@keyframes catTapLazy{0%{opacity:1;transform:none}40%{opacity:1;transform:translate(0,-3px) rotate(-8deg) scale(1.2)}62%{opacity:1;transform:translate(0,1px) scale(1.9)}80%{opacity:1;transform:translate(0,1px) scale(1.75)}100%{opacity:1;transform:none}}
+@keyframes catRipple{0%{opacity:.85;transform:scale(.2)}100%{opacity:0;transform:scale(1.5)}}
 @media (prefers-reduced-motion:reduce){.hcat *,.hcat svg{animation:none!important;transition:none!important}}
 /* 2.23.3 temperature colour */
 .tcol[style*="--tcl"]{color:var(--tcl);text-shadow:0 0 1px rgba(255,255,255,.55)}

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.10';
+const APP_VERSION = '2.23.11';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13429,6 +13429,7 @@ function catHtml() {
   <ellipse class="cbelly" cx="24" cy="32" rx="5.5" ry="5"/>
   <ellipse class="cfur cpawl" cx="19.5" cy="37.6" rx="3" ry="1.9"/>
   <ellipse class="cfur cpaw" cx="28.5" cy="37.6" rx="3" ry="1.9"/>
+  <g class="ctapaw"><ellipse class="cfur" cx="28.5" cy="37.4" rx="3.3" ry="2.5"/><ellipse class="cbean" cx="28.5" cy="38.1" rx="1.3" ry="1"/><circle class="cbean" cx="26.6" cy="36.4" r=".55"/><circle class="cbean" cx="28.5" cy="35.8" r=".55"/><circle class="cbean" cx="30.4" cy="36.4" r=".55"/></g>
   <g class="chead">
     ${ears('M15.5 13 L16.5 3.5 L23 9 Z', 'M17.2 10.5 L17.6 6.4 L20.6 9 Z')}${ears('M32.5 13 L31.5 3.5 L25 9 Z', 'M30.8 10.5 L30.4 6.4 L27.4 9 Z')}
     <circle class="cfur" cx="24" cy="15.5" r="9"/>
@@ -13452,7 +13453,7 @@ function catHtml() {
   </g>
   <text class="cz cz1" x="30" y="18">z</text><text class="cz cz2" x="35" y="12">z</text><text class="cz cz3" x="40" y="6">Z</text>
 </g>
-</svg><span class="cbub" aria-hidden="true"></span></button>`;
+</svg><span class="ctrip" aria-hidden="true"></span><span class="cbub" aria-hidden="true"></span></button>`;
 }
 function catTick() {
   const el = document.getElementById('hcat');
@@ -13475,6 +13476,39 @@ function catPoke(e) {
   el.classList.remove('react'); void el.offsetWidth; el.classList.add('react');
   clearTimeout(catPokeT); catPokeT = setTimeout(() => el.classList.remove('react'), 1600);
 }
+
+/* 2.23.11: when awake, the cat taps the screen if nothing has scrolled or been touched for 20 seconds.
+   Morning: a quick double tap. Late morning: one tap. Afternoon: one lazy tap. Evening: a slow sleepy paw.
+   Up to 3 taps, 20 s apart, then it waits for the next scroll/touch. Never while asleep, hidden, or a sheet is open. */
+const CAT_IDLE_MS = 20000, CAT_TAP_MAX = 3;
+const CAT_TAP = { energetic: { ms: 1150, say: 'tap tap' }, alert: { ms: 850, say: 'tap!' }, tired: { ms: 1350, say: 'tap…' }, drowsy: { ms: 2100, say: '…tap?' } };
+let catIdleAt = Date.now(), catTaps = 0, catTapT = null;
+function catAwake() { catIdleAt = Date.now(); catTaps = 0; }
+['touchstart', 'pointerdown', 'keydown', 'wheel'].forEach(ev => document.addEventListener(ev, catAwake, { capture: true, passive: true }));
+document.addEventListener('scroll', e => { const t = e.target; if (t === document || t === document.scrollingElement || (t && t.id === 'view')) catAwake(); }, { capture: true, passive: true });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) catIdleAt = Date.now(); });
+function catTapNow() {
+  const el = document.getElementById('hcat'); if (!el) return false;
+  catTick();
+  const st = catState(), cfg = CAT_TAP[st];
+  if (!cfg || el.classList.contains('react') || el.classList.contains('tapping')) return false;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches, bub = el.querySelector('.cbub');
+  if (bub) bub.textContent = still ? '🐾' : cfg.say;
+  el.classList.add('tapping');
+  clearTimeout(catTapT); catTapT = setTimeout(() => el.classList.remove('tapping'), still ? 1600 : cfg.ms + 500);
+  return true;
+}
+function catIdleCheck() {
+  if (document.hidden || sheetOpen || catTaps >= CAT_TAP_MAX) return;
+  if (Date.now() - catIdleAt < CAT_IDLE_MS) return;
+  const el = document.getElementById('hcat');
+  if (!el || catState() === 'sleep') { catIdleAt = Date.now(); return; }
+  const r = el.getBoundingClientRect();
+  if (r.bottom <= 0 || r.top >= innerHeight || !r.width) { catIdleAt = Date.now(); return; }
+  catIdleAt = Date.now();
+  if (catTapNow()) catTaps++;
+}
+setInterval(catIdleCheck, 1000);
 
 /* ================= SETTINGS ================= */
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
