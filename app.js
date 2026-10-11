@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.9';
+const APP_VERSION = '2.23.10';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4110,7 +4110,7 @@ function billForm(id) {
     `<div class="two">${field('Amount ($)', inp('amount', b.amount === '' ? '' : Number(b.amount).toFixed(2), 'inputmode="decimal" placeholder="0.00"'))}${field('Next due', inp('due', b.due, 'type="date" required'))}</div>` +
     field('Repeats', sel('repeat', Object.entries(REPEATS).map(([k, v]) => [k, k === 'none' ? 'Doesn’t repeat' : v]), b.repeat || 'none')) +
     field('Notes', area('notes', b.notes, 'e.g. account number, paid by direct debit')) +
-    (id && billInvoice(b) ? `<p class="muted" id="billinv" style="margin:4px 2px 0">Invoice ${esc(billInvoice(b).no)} from ${esc(billInvoice(b).from || 'the email')}${billInvoice(b).amount != null ? ', ' + money(billInvoice(b).amount) : ''}${billInvoice(b).invDue ? ', due ' + esc(billInvoice(b).invDue) : ''}. Taken from the email in Outlook.</p>` : ''),
+    (id && billInvoice(b) ? `<p class="muted" id="billinv" style="margin:4px 2px 0">${billInvoice(b).label ? esc(billInvoice(b).label) : 'Invoice ' + esc(billInvoice(b).no)} from ${esc(billInvoice(b).from || 'the email')}${billInvoice(b).amount != null ? ', ' + money(billInvoice(b).amount) : ''}${billInvoice(b).invDue ? ', due ' + esc(billInvoice(b).invDue) : ''}. Taken from the email in Outlook.</p>` : ''),
     async v => {
       if (!v.name) return 'Please give the bill a name.';
       if (!parseD(v.due)) return 'Please choose when it’s next due.';
@@ -12664,6 +12664,7 @@ async function refreshMail(force) {
   mailBusy = false;
   paintHomeSum();
   refreshLawnInvoice(false);
+  refreshKora(false);
   refreshNf(false);
 }
 function mailSettingsSection() {
@@ -12930,7 +12931,7 @@ function billInvoice(b) {
 }
 function billInvoiceText(b) {
   const v = billInvoice(b);
-  return v ? 'Invoice ' + esc(v.no) : '';
+  return v ? (v.label ? esc(v.label) : 'Invoice ' + esc(v.no)) : '';
 }
 async function refreshLawnInvoice(force) {
   if (lawnInvBusy || !S || !mailConnected('microsoft')) return;
@@ -12959,6 +12960,89 @@ async function refreshLawnInvoice(force) {
     if (!sheetOpen && (h === 'bills' || h === 'budget' || h === 'home' || h === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
   } catch (e) { }
   finally { lawnInvBusy = false; }
+}
+
+/* ================= KORA FUEL CARD (2.23.10) =================
+   Kora Fuel Card (accounts@kora.co.nz) emails an invoice every fortnight, e.g.
+   subject “[49095] Kora Fuel Card - your invoice for the period ending 11 October 2026” and in the body
+   “The amount of $2.00 will be direct debited from your nominated bank account on Friday, 16 October 2026.”
+   The newest one becomes the Kora bill: an unpaid bill named like “Kora” gets that amount and due date, or a
+   fortnightly “Kora Fuel Card” bill is made. The statement is keyed by its period-ending date, so it's never added
+   twice, and Mark paid stores it so the next email makes the next bill. No amount or date in the email: nothing changes. */
+const KORA_BILL_RE = /\bkora\b/i;
+const KORA_MAX_AGE = 30 * 60 * 1000;
+const KORA_MON = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+let koraAt = 0, koraBusy = false;
+function koraISO(txt) {
+  const m = String(txt || '').trim().match(/^(\d{1,2}) ([A-Za-z]+) (\d{4})$/);
+  const mo = m && KORA_MON[m[2].toLowerCase()];
+  if (!mo) return '';
+  const d = +m[1]; if (d < 1 || d > 31) return '';
+  return m[3] + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+// Pure: Graph messages in, the newest Kora invoice out (or null). Marketing or anything without both an amount and a date is ignored.
+function koraStatementFrom(rows) {
+  const found = [];
+  (Array.isArray(rows) ? rows : []).forEach(m => {
+    const fa = (m && m.from && m.from.emailAddress) || {};
+    if (!/@kora\.co\.nz$/i.test(String(fa.address || '').trim())) return;
+    const subject = String(m.subject || ''), text = String(m.bodyPreview || m.body && m.body.content || '').replace(/\s+/g, ' ');
+    const per = subject.match(/Kora Fuel Card\s*-\s*your invoice for the period ending (\d{1,2} [A-Za-z]+ \d{4})/i);
+    if (!per) return;
+    const am = text.match(/amount of \$\s?([\d,]{1,9}\.\d{2}) will be direct debited\b[^.]*?\bon (?:[A-Za-z]+,? )?(\d{1,2} [A-Za-z]+ \d{4})/i);
+    if (!am) return;
+    const amount = Number(am[1].replace(/,/g, '')), due = koraISO(am[2]), period = koraISO(per[1]);
+    if (!Number.isFinite(amount) || amount < 0 || !due || !period) return;
+    found.push({ id: 'kora-' + period, period, amount, due, at: Date.parse(m.receivedDateTime || '') || 0 });
+  });
+  found.sort((a, b) => b.at - a.at || b.period.localeCompare(a.period));
+  return found[0] || null;
+}
+function koraBill() {
+  return (S.bills || []).filter(b => !b.paid && KORA_BILL_RE.test(String(b.name || ''))).sort((a, b) => (parseD(a.due) || 0) - (parseD(b.due) || 0))[0] || null;
+}
+function koraPaid(st) {
+  return (S.bills || []).some(b => KORA_BILL_RE.test(String(b.name || '')) && Array.isArray(b.paidDues) && b.paidDues.some(p => p && (p.invoice === st.id || p.due === st.due)));
+}
+const koraNote = st => 'From Kora email, received ' + new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(st.at || Date.now()));
+// Pure-ish: puts one statement on the bills. Returns 'added', 'updated' or ''.
+function koraApply(st) {
+  if (!st || koraPaid(st)) return '';
+  if (!Array.isArray(S.bills)) S.bills = [];
+  const label = 'Statement to ' + fmtW(st.period);
+  const inv = { no: st.id, label, amount: st.amount, invDue: fmtW(st.due), at: st.at, from: 'Kora', billDue: st.due };
+  const note = koraNote(st), withNote = n => { const rest = String(n || '').split('\n').filter(l => l && !/^From Kora email, received /.test(l)); return [note].concat(rest).join('\n'); };
+  const b = koraBill();
+  if (b) {
+    const cur = b.invoice;
+    if (cur && cur.no === st.id && b.due === st.due && Number(b.amount) === st.amount) return '';
+    if (cur && cur.no && cur.no > st.id) return ''; // already on a newer statement
+    b.amount = st.amount; b.due = st.due; b.anchor = new Date(parseD(st.due)).getUTCDate(); b.invoice = inv; b.notes = withNote(b.notes);
+    return 'updated';
+  }
+  S.bills.push({ id: uid('bill'), name: 'Kora Fuel Card', amount: st.amount, due: st.due, repeat: 'fortnightly', anchor: new Date(parseD(st.due)).getUTCDate(), notes: withNote('Direct debit, fuel card invoice every fortnight'), paid: false, invoice: inv });
+  return 'added';
+}
+async function refreshKora(force) {
+  if (koraBusy || !S || !mailConnected('microsoft')) return;
+  if (!force && koraAt && Date.now() - koraAt < KORA_MAX_AGE) return;
+  koraBusy = true;
+  try {
+    const url = 'https://graph.microsoft.com/v1.0/me/messages?$search=' + encodeURIComponent('"accounts@kora.co.nz"') + '&$top=10&$select=subject,from,receivedDateTime,bodyPreview';
+    let token = await mailAccess('microsoft'), data;
+    try { data = await getJSONAuth(url, token); }
+    catch (e) {
+      if (e && e.status === 401) { MAIL.microsoft.expiresAt = 0; token = await mailAccess('microsoft'); data = await getJSONAuth(url, token); }
+      else throw e;
+    }
+    koraAt = Date.now();
+    const what = koraApply(koraStatementFrom(data && data.value));
+    if (!what) return;
+    await save();
+    const h = (location.hash || '#home').slice(1);
+    if (!sheetOpen && (h === 'bills' || h === 'budget' || h === 'home' || h === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
+  } catch (e) { }
+  finally { koraBusy = false; }
 }
 
 /* ================= NEW ON NETFLIX (2.22.87) =================
