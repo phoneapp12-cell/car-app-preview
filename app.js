@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.7';
+const APP_VERSION = '2.23.8';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1062,13 +1062,14 @@ function homeComedyOnNow() {
 // 2.9.0: one light personal note when it fits. Not a biography, and not a lecture about hours, bedtime, or being late.
 // 2.9.2: a few more of those, still only one, and only when that part of the day fits. Birthday still wins.
 // Family ages come only from a stored birthday year, except Shane at 52 and Sarah at 51 on the day itself when no year is stored.
-// Time of day for the summary only. The header stays "Hi Shane". Morning is before noon,
+// Time of day for the summary only. The header stays "Hi Shane". Night is 9pm to 4:59am (2.23.8), morning 5am to noon,
 // afternoon until 5pm, evening from 5pm, all on the Pacific/Auckland clock.
 function homeDayPart(now) {
   try {
     const c = DD.nzClock(now || new Date());
     const hour = Math.floor(c.min / 60);
     if (!Number.isFinite(hour)) return '';
+    if (hour < 5 || hour >= 21) return 'night'; // 2.23.8: 9pm to 4:59am is night; morning starts at 5
     if (hour < 12) return 'morning';
     if (hour < 17) return 'afternoon';
     return 'evening';
@@ -1113,6 +1114,8 @@ function homeTimeHello() {
     const part = homeDayPart();
     return homePick(61, part === 'morning'
       ? ['Good morning.', 'Morning.', 'Hope the morning’s easy.']
+      : part === 'night'
+        ? ['Still up? Here’s what’s worth a look tonight.', 'Night owl hours. A few good things below.', 'Quiet hours, good company. Here’s what’s on.']
       : part === 'evening'
         ? ['Good evening.', 'Evening.', 'Hope the evening’s a good one.']
         : part === 'afternoon'
@@ -1235,7 +1238,7 @@ function homeCookAside(dow) {
 function homeAwakeLine() {
   return homePick(21, [
     'You’re up late. That’s alright.',
-    'Can’t sleep? No bother.',
+    'Night owl hours. Good ones.',
     'Still awake. Take your time.',
     'Late one’s fine.',
     'Up late. All good.',
@@ -1271,7 +1274,7 @@ function homeEaseLine() {
     const a = homeAklParts();
     if (!a) return '';
     const weekend = a.dow === 0 || a.dow === 6;
-    const morning = a.hour < 12;
+    const morning = a.hour >= 5 && a.hour < 12;
     const afternoon = a.hour >= 12 && a.hour < 17;
     const evening = a.hour >= 17;
     let wet = false, sunny = false;
@@ -1281,7 +1284,7 @@ function homeEaseLine() {
       sunny = mood === 'sun';
     } catch (e) { wet = false; sunny = false; }
     const atWork = homeWhere() === 'work';
-    if (a.hour >= 21) return homeAwakeLine();
+    if (a.hour >= 21 || a.hour < 5) return homeAwakeLine();
     const heads = rosterHeadsUp(a, atWork);
     if (heads) return heads;
     if (evening && (a.dow === 5 || a.dow === 6)) {
@@ -2217,7 +2220,7 @@ function homeSugShop() {
     if (!plan) return null;
     const left = ((S.shop && S.shop.items) || []).filter(x => x && !x.done);
     if (!left.length) return null;
-    const a = homeAklParts(); if (a && a.hour >= 21) return null;
+    const a = homeAklParts(); if (a && (a.hour >= 21 || a.hour < 5)) return null;
     return { id: 'shop', type: 'open', go: '#shopping', text: 'Dinner’s planned for tonight. Check the shopping list, there ' + (left.length === 1 ? 'is 1 thing' : 'are ' + left.length + ' things') + ' still to get.' };
   } catch (e) { return null; }
 }
@@ -2243,7 +2246,7 @@ function homeSugDogWalk() {
     const re = new RegExp('\\b(walk|walking)\\b.*\\b(' + whoRe + ')\\b|\\b(' + whoRe + ')\\b.*\\b(walk|walking)\\b|\\bdog walk\\b', 'i');
     if (homeSugHas(re, -1, 2)) return null;
     const date = todayISO();
-    const lines = ['A walk with ' + who + (hr < 12 ? ' this morning?' : ' this afternoon?'), 'A beach walk with ' + who + ' today?', 'Bushwalk with ' + who + ' today?', 'Good day for a walk with ' + who + '?'];
+    const lines = ['A walk with ' + who + (hr >= 5 && hr < 12 ? ' this morning?' : ' this afternoon?'), 'A beach walk with ' + who + ' today?', 'Bushwalk with ' + who + ' today?', 'Good day for a walk with ' + who + '?'];
     const line = lines[Math.abs((homeSugOpenN || 0) + new Date().getDate()) % lines.length];
     return { id: 'walk', type: 'todo', text: line,
       pre: { title: 'Walk ' + (names.length === 1 ? names[0] : 'the dog'), due: date, priority: 'normal', list: 'Home' } };
@@ -2349,9 +2352,9 @@ const AI_FACTS = ['52, wife Sarah, daughters Millesha and Cass, granddaughter Ar
   'Likes gym (Tue and Wed after work), gardening, bushwalks, beaches, movies, books, AI music like Suno, tech',
   'Monday evenings at his mum\u2019s; Sunday cleaning job until 7pm; spa around 10 to 11pm; dinner 8 to 9pm on weekdays',
   'Works at Noel Leeming Superstore, Whang\u0101rei; night owl', 'Likes tips on tidying, sorting and organising'];
-// 2.22.97: the summary is written for right now. Part of day: morning before 12, afternoon 12 to 4:59 pm,
-// evening 5 to 8:59 pm, night from 9 pm. Work and the Sunday cleaning job are described as still to come, on now or done.
-const sumPod = min => min < 720 ? 'morning' : min < 1020 ? 'afternoon' : min < 1260 ? 'evening' : 'night';
+// 2.22.97: the summary is written for right now. Part of day (2.23.8): night 9 pm to 4:59 am, morning 5 am to 11:59, afternoon 12 to 4:59 pm,
+// evening 5 to 8:59 pm. Work and the Sunday cleaning job are described as still to come, on now or done.
+const sumPod = min => min < 300 ? 'night' : min < 720 ? 'morning' : min < 1020 ? 'afternoon' : min < 1260 ? 'evening' : 'night'; // 2.23.8: midnight to 4:59am is night
 const hmMin = hm => /^([01]\d|2[0-3]):[0-5]\d$/.test(hm || '') ? (+hm.slice(0, 2)) * 60 + (+hm.slice(3)) : null;
 const CLEAN_END = 19 * 60; // Sunday cleaning job until 7 pm
 function sumToday(a) {
@@ -2413,9 +2416,11 @@ const timesIn = txt => { const out = new Set(), x = String(txt || '');
 function aiLineOk(line, t, allowed) {
   const x = String(line || ''), pod = t.pod, pi = POD_ORDER.indexOf(pod);
   if (/\b(court case|in court|murder\w*|homicide|manslaughter|sentenced|jailed|stabb\w*|shooting|assault\w*|sexual|rape\w*|indecent|gang\w*|fatal crash)\b/i.test(x)) return false; // 2.23.5: no crime news
-  const ok = w => { w = w.toLowerCase(); return w === pod || (w === 'evening' && pod === 'night') || (w === 'night' && pod === 'evening' && t.min >= 20 * 60); };
+  const ok = w => { w = w.toLowerCase(); return w === pod || (w === 'evening' && pod === 'night' && t.min >= 1260) || (w === 'night' && pod === 'evening' && t.min >= 20 * 60); };
   for (const m of x.matchAll(/\b(?:now that it'?s|it'?s now|as it'?s|since it'?s|it'?s|on this|good)\s+(?:a\s+|an\s+|the\s+)?(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|lovely|quiet|wet|sunny|fine|cold|warm)\s+)?(morning|afternoon|evening|night)\b/gi)) if (!ok(m[1])) return false;
   for (const m of x.matchAll(/\bthis (morning|afternoon|evening)\b/gi)) if (POD_ORDER.indexOf(m[1].toLowerCase()) < pi) return false; // already gone
+  if (pod === 'night' && /\b(morning|mornings|brekkie|breakfast)\b/i.test(x.replace(/\b(tomorrow|tomorrow's|tomorrow’s) (morning|breakfast|brekkie)\b/gi, ''))) return false; // 2.23.8: no "morning" at night, only tomorrow morning
+  if (/\b(go(ing)? to bed|get some sleep|bed ?time|early night|hit the (hay|sack)|turn in|get some rest|sleep well|sweet dreams)\b/i.test(x)) return false; // never a bedtime nudge
   const pastAfter = ev => new RegExp("\\b(?:you'?ve|you have|now that|having)\\b[^.]*\\bafter (?:the |your )?(?:" + ev + ")|\\b(?:" + ev + ")[^.]*\\b(?:is |'s |are )?(?:done|over|finished|wrapped up|behind you)\\b", 'i');
   if (t.clean && t.clean.phase !== 'done' && pastAfter('cleaning(?: job)?').test(x)) return false;
   if (t.work && t.work.phase !== 'done' && pastAfter('work|your shift|the shift|noel leeming').test(x)) return false;
@@ -2430,7 +2435,7 @@ function aiSumCtx() {
   const ctx = { day: WD[a.dow] || '', time: Number.isFinite(a.min) ? String(Math.floor(a.min / 60)).padStart(2, '0') + ':' + String(a.min % 60).padStart(2, '0') : '' };
   const tt = sumToday(a); // 2.22.97
   ctx.now = ctx.time ? fmtTime(ctx.time) : ''; ctx.partOfDay = tt.pod;
-  ctx.timeRule = 'It is ' + ctx.now + ' on ' + ctx.day + ', the ' + tt.pod + '. Write for right now: never call it any other part of the day (no "this evening" vibe in the afternoon). Things later today are still to come; only say something is done or "after" it once it has finished. Use work times exactly as given in work; never invent or change a time.';
+  ctx.timeRule = 'It is ' + ctx.now + ' on ' + ctx.day + ', the ' + tt.pod + (tt.pod === 'night' && tt.min < 300 ? ' (the small hours: still night, NOT morning; never say morning except "tomorrow morning"; he is a night owl, never mention bed or sleep)' : '') + '. Write for right now: never call it any other part of the day (no "this evening" vibe in the afternoon). Things later today are still to come; only say something is done or "after" it once it has finished. Use work times exactly as given in work; never invent or change a time.';
   try { const p = placeHere(); ctx.place = p ? (p === 'home' || p === 'work' || p === 'gym' ? p : ((S.settings.places || []).find(x => x.id === p) || {}).name || 'a saved place') : 'out and about'; } catch (e) {}
   try {
     const r = rosterState(), k = String(a.dow);
@@ -10939,7 +10944,7 @@ try {
   document.addEventListener('click', e => { try { const b = e.target && e.target.closest && e.target.closest('button,a'); if (!b) return; const t = String(b.getAttribute('aria-label') || b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30); if (t) useMark('btn:' + ((location.hash || '#home').slice(1).split(/[?\/]/)[0] || 'home') + ':' + t); } catch (e2) {} }, true);
 } catch (e) {}
 const USE_WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const useTod = h => h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
+const useTod = h => h < 5 ? 'night' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
 function useTabName(k) { try { return (NAV[k] && NAV[k][2]) || ''; } catch (e) { return ''; } }
 function homeSugUse() {
   const a = homeAklParts() || {}, h = Math.floor((a.min || 0) / 60), T = todayISO(), cur = (location.hash || '#home').slice(1);
@@ -14554,7 +14559,7 @@ function aboutFitLine() {
     if (!a) return '';
     let where = '';
     try { where = homeWhere() || ''; } catch (e) { where = ''; }
-    const morning = a.hour < 12;
+    const morning = a.hour >= 5 && a.hour < 12;
     const afternoon = a.hour >= 12 && a.hour < 17;
     const evening = a.hour >= 17 && a.hour < 21;
     const say = qid => { const row = aboutLatest(qid); return row ? aboutClip(row.text) : ''; };
@@ -14567,11 +14572,11 @@ function aboutFitLine() {
       return homePick(102, ['For the weekend: ' + weekendAns, weekendAns, 'A good weekend, the way you put it: ' + weekendAns]);
     }
     const place = say('place');
-    if (place && where !== 'work' && a.hour < 21 && (afternoon || a.dow === 0 || a.dow === 6)) {
+    if (place && where !== 'work' && a.hour >= 5 && a.hour < 21 && (afternoon || a.dow === 0 || a.dow === 6)) {
       return homePick(103, [place + ' is there if you feel like it.', 'If you want to head out, there’s ' + place + '.', 'You like ' + place + '. It’s there if you want it.']);
     }
     const walk = say('walk');
-    if (walk && where !== 'work' && a.hour < 21 && (a.dow === 0 || a.dow === 6 || afternoon)) {
+    if (walk && where !== 'work' && a.hour >= 5 && a.hour < 21 && (a.dow === 0 || a.dow === 6 || afternoon)) {
       return homePick(110, ['' + walk + ' could be a good walk if you feel like one.', 'If you fancy a walk, ' + walk + ' is one you named.']);
     }
     const meal = say('meal') || say('food');
