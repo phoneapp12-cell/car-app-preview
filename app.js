@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.6';
+const APP_VERSION = '2.23.7';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8197,6 +8197,103 @@ async function removePlan(loanId) {
   const l = getLoan(loanId), s = snap(); l.planCents = 0; await save(); await closeSheet(); render(); toast('Repayment plan removed.', 'Undo', undoTo(s));
 }
 
+/* 2.23.7: graphical themes (Sunshine, Beach, Night sky, Bush walk). Drawn here as inline SVG, no image files.
+   The picture sits in #themeart, fixed behind #view; cards go slightly see-through over it. */
+const GFX_THEMES = ['sun', 'beach', 'night', 'bush'];
+const taRand = seed => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+const taN = v => Math.round(v * 10) / 10;
+// A fern frond: a curved stem with leaflets on both sides, shorter towards the tip. One path, filled.
+function taFrond(x, y, len, ang, bend, col, op, cls) {
+  const a = ang * Math.PI / 180, ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len;
+  const nx = -Math.sin(a), ny = Math.cos(a), cx = (x + ex) / 2 + nx * bend, cy = (y + ey) / 2 + ny * bend;
+  const pt = t => [(1 - t) * (1 - t) * x + 2 * (1 - t) * t * cx + t * t * ex, (1 - t) * (1 - t) * y + 2 * (1 - t) * t * cy + t * t * ey];
+  let d = `M${taN(x)} ${taN(y)}Q${taN(cx)} ${taN(cy)} ${taN(ex)} ${taN(ey)}`, leaves = '';
+  const n = Math.max(10, Math.round(len / 7));
+  for (let i = 1; i < n; i++) {
+    const t = i / n, [px, py] = pt(t), [qx, qy] = pt(Math.min(1, t + 0.01));
+    const tx = qx - px, ty = qy - py, tl = Math.hypot(tx, ty) || 1, ux = tx / tl, uy = ty / tl;
+    const L = len * 0.3 * Math.sin(Math.PI * (0.15 + 0.85 * (1 - t))) * (1 - t * 0.35), w = Math.max(1.4, L * 0.16);
+    for (const s of [1, -1]) {
+      const vx = -uy * s, vy = ux * s, tipx = px + (vx * 0.9 + ux * 0.45) * L, tipy = py + (vy * 0.9 + uy * 0.45) * L;
+      leaves += `M${taN(px)} ${taN(py)}L${taN(px + ux * w + vx * w * .6)} ${taN(py + uy * w + vy * w * .6)}L${taN(tipx)} ${taN(tipy)}L${taN(px - ux * w * .3 + vx * w * .5)} ${taN(py - uy * w * .3 + vy * w * .5)}Z`;
+    }
+  }
+  return `<g${cls ? ` class="${cls}"` : ''} opacity="${op}"><path d="${d}" fill="none" stroke="${col}" stroke-width="${taN(Math.max(1.2, len / 70))}" stroke-linecap="round"/><path d="${leaves}" fill="${col}"/></g>`;
+}
+// A koru: an unfurling fern spiral.
+function taKoru(x, y, r, col, op, w) {
+  let d = '';
+  for (let i = 0; i <= 80; i++) { const th = i / 80 * 3.6 * Math.PI, rr = r * (1 - i / 92); const px = x + Math.cos(th + Math.PI) * rr, py = y + Math.sin(th + Math.PI) * rr; d += (i ? 'L' : 'M') + taN(px) + ' ' + taN(py); }
+  return `<path d="M${taN(x - r)} ${taN(y + r * 3.2)}Q${taN(x - r * 1.1)} ${taN(y + r * 1.4)} ${taN(x - r)} ${taN(y)}${d.replace(/^M[^L]*/, '')}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`;
+}
+// A wave strip that repeats every 400 units, drawn 800 wide so it can slide left forever.
+function taWave(y, amp, col, op, cls) {
+  let d = `M0 ${y}`;
+  for (let i = 0; i < 8; i++) { const x0 = i * 100; d += `Q${x0 + 25} ${y - amp} ${x0 + 50} ${y}T${x0 + 100} ${y}`; }
+  return `<g class="${cls}"><path d="${d}V260H0Z" fill="${col}" opacity="${op}"/></g>`;
+}
+const TA_SVG = (cls, vb, body, par) => `<svg class="${cls}" viewBox="${vb}" preserveAspectRatio="${par || 'xMidYMin slice'}" aria-hidden="true" focusable="false">${body}</svg>`;
+const TA_ART = {};
+function themeArt(k) {
+  if (TA_ART[k]) return TA_ART[k];
+  let h = '';
+  if (k === 'sun') {
+    let rays = '';
+    for (let i = 0; i < 16; i++) { const a = i / 16 * 2 * Math.PI, b = 0.07; rays += `M${taN(30 + Math.cos(a - b) * 70)} ${taN(10 + Math.sin(a - b) * 70)}L${taN(30 + Math.cos(a) * (i % 2 ? 175 : 230))} ${taN(10 + Math.sin(a) * (i % 2 ? 175 : 230))}L${taN(30 + Math.cos(a + b) * 70)} ${taN(10 + Math.sin(a + b) * 70)}Z`; }
+    h = TA_SVG('ta-top', '0 0 400 300', `<defs><radialGradient id="taSunG"><stop offset="0" stop-color="#FFE27A" stop-opacity=".95"/><stop offset=".45" stop-color="#FFC94D" stop-opacity=".45"/><stop offset="1" stop-color="#FFC94D" stop-opacity="0"/></radialGradient><radialGradient id="taSunD" cx=".4" cy=".4"><stop offset="0" stop-color="#FFF4B8"/><stop offset=".7" stop-color="#FFD54A"/><stop offset="1" stop-color="#FDB022"/></radialGradient></defs>
+      <circle class="ta-glow" cx="30" cy="10" r="210" fill="url(#taSunG)"/><path class="ta-rays" d="${rays}" fill="#FFC43D" opacity=".28"/><circle cx="30" cy="10" r="58" fill="url(#taSunD)" opacity=".9"/>
+      <g fill="#FFFFFF" opacity=".7"><circle class="ta-tw" cx="330" cy="60" r="2"/><circle class="ta-tw" style="animation-delay:-1.2s" cx="250" cy="130" r="1.6"/><circle class="ta-tw" style="animation-delay:-2.4s" cx="365" cy="170" r="1.4"/></g>`) +
+      TA_SVG('ta-bot', '0 0 400 200', `<path d="M0 120Q90 70 190 110T400 95V200H0Z" fill="#FFD48A" opacity=".55"/><path d="M0 150Q110 105 230 140T400 130V200H0Z" fill="#FBBA63" opacity=".45"/><path d="M0 178Q130 150 260 172T400 165V200H0Z" fill="#F59E42" opacity=".35"/>`, 'xMidYMax slice');
+  } else if (k === 'beach') {
+    // Pōhutukawa: a leaning trunk, dark leaf clusters and crimson flowers
+    const r = taRand(7); let leaves = '', flowers = '';
+    [[62, 70, 34], [100, 52, 30], [30, 60, 28], [128, 78, 24], [78, 96, 26], [14, 92, 20]].forEach(([cx, cy, s]) => {
+      leaves += `<ellipse cx="${cx}" cy="${cy}" rx="${s}" ry="${taN(s * .62)}"/>`;
+      for (let i = 0; i < 9; i++) { const a = r() * 6.283, d = r() * s * .8; flowers += `<circle cx="${taN(cx + Math.cos(a) * d)}" cy="${taN(cy - Math.abs(Math.sin(a)) * d * .6 - 4)}" r="${taN(2 + r() * 2.4)}"/>`; }
+    });
+    h = TA_SVG('ta-top', '0 0 400 260', `<g fill="#FFFFFF" opacity=".75"><g class="ta-drift"><ellipse cx="300" cy="48" rx="46" ry="12"/><ellipse cx="320" cy="40" rx="28" ry="14"/><ellipse cx="286" cy="42" rx="18" ry="10"/></g><g class="ta-drift" style="animation-duration:70s;animation-delay:-20s"><ellipse cx="120" cy="120" rx="38" ry="9"/><ellipse cx="134" cy="113" rx="20" ry="10"/></g></g>
+      <g fill="none" stroke="#3B6E8A" stroke-width="1.6" stroke-linecap="round" opacity=".45"><path d="M230 92q6-5 12 0q6-5 12 0"/><path d="M262 110q4-3 8 0q4-3 8 0"/></g>`) +
+      TA_SVG('ta-bot', '0 0 400 260', `${taWave(118, 7, '#8ED3E8', .6, 'ta-wave ta-w3')}${taWave(140, 8, '#47AFD0', .55, 'ta-wave ta-w2')}${taWave(162, 9, '#1F8DB5', .5, 'ta-wave ta-w1')}
+      <path d="M0 196Q100 178 210 190T400 184V260H0Z" fill="#F3DDAF"/><path d="M0 196Q100 178 210 190T400 184" fill="none" stroke="#FFFFFF" stroke-width="3" opacity=".8"/><path d="M0 222Q120 210 240 220T400 214V260H0Z" fill="#EBCD93" opacity=".7"/>
+      <g transform="translate(250 92) scale(1)"><path d="M70 150C66 120 72 104 62 86C54 72 40 66 30 60M66 112C80 96 96 86 112 80M60 92C70 78 88 66 100 54" fill="none" stroke="#6B4A33" stroke-width="7" stroke-linecap="round"/><g fill="#2F5D3A" opacity=".92">${leaves}</g><g fill="#D7263D">${flowers}</g></g>`, 'xMidYMax slice');
+  } else if (k === 'night') {
+    const r = taRand(11); let stars = '';
+    for (let i = 0; i < 70; i++) { const x = taN(r() * 400), y = taN(r() * 520), s = taN(.5 + r() * (i % 9 ? 1.1 : 2)); stars += `<circle class="ta-tw" style="animation-delay:-${taN(r() * 4)}s;animation-duration:${taN(2.5 + r() * 3)}s" cx="${x}" cy="${y}" r="${s}"/>`; }
+    h = TA_SVG('ta-full', '0 0 400 800', `<defs><radialGradient id="taMoonG"><stop offset="0" stop-color="#F7EFC8" stop-opacity=".5"/><stop offset="1" stop-color="#F7EFC8" stop-opacity="0"/></radialGradient><mask id="taMoonM"><rect width="400" height="800" fill="#fff"/><circle cx="236" cy="38" r="17" fill="#000"/></mask></defs>
+      <g fill="#FFFFFF">${stars}</g><path class="ta-shoot" d="M60 120l70 30" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round" opacity="0"/>
+      <circle class="ta-glow" cx="228" cy="44" r="70" fill="url(#taMoonG)"/><circle cx="228" cy="44" r="19" fill="#F4EBC4" mask="url(#taMoonM)"/>`, 'xMidYMin slice') +
+      TA_SVG('ta-bot', '0 0 400 160', `<path d="M0 100Q60 70 120 92T240 80T400 88V160H0Z" fill="#1A2560" opacity=".8"/><path d="M0 128Q80 104 170 124T330 112T400 118V160H0Z" fill="#0B1236"/>`, 'xMidYMax slice');
+  } else if (k === 'bush') {
+    let ferns = '';
+    [[18, 322, 190, -60, -26, '#3F6F3B', .75], [62, 322, 220, -82, 14, '#355F33', .82], [112, 322, 150, -112, 24, '#4B7E45', .7], [292, 322, 200, -100, -18, '#355F33', .82], [346, 322, 230, -74, 20, '#2E5530', .86], [392, 322, 170, -124, 14, '#4B7E45', .7], [204, 324, 130, -94, -12, '#5F8F55', .55]]
+      .forEach(f => { ferns += taFrond(...f, 'ta-sway'); });
+    h = TA_SVG('ta-top', '0 0 400 260', `${taFrond(-10, -10, 130, 40, 20, '#2F5A2E', .22)}${taFrond(410, -10, 140, 140, -24, '#2F5A2E', .2)}
+      <g class="ta-mist"><ellipse cx="120" cy="210" rx="190" ry="26" fill="#FFFFFF" opacity=".45"/></g>`) +
+      TA_SVG('ta-bot ta-tall', '0 0 400 320', `<defs><linearGradient id="taTrunk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7A5A3C" stop-opacity="0"/><stop offset=".35" stop-color="#7A5A3C" stop-opacity=".85"/><stop offset="1" stop-color="#6E5034" stop-opacity=".95"/></linearGradient></defs>
+      <path d="M0 170Q30 130 70 150Q100 110 150 142Q190 116 230 146Q280 114 320 148Q360 126 400 150V320H0Z" fill="#A9C49B" opacity=".65"/>
+      <path d="M24 0L40 0L47 320H15Z" fill="url(#taTrunk)"/><path d="M360 0L378 0L387 320H352Z" fill="url(#taTrunk)"/>
+      <g class="ta-mist" style="animation-duration:55s"><ellipse cx="260" cy="200" rx="220" ry="26" fill="#FFFFFF" opacity=".5"/></g>${ferns}${taKoru(176, 290, 10, '#2E5530', .8, 3.5)}`, 'xMidYMax slice');
+  }
+  return (TA_ART[k] = h);
+}
+function themeArtApply(t) {
+  const app = document.getElementById('app'); if (!app) return;
+  let el = document.getElementById('themeart');
+  const gfx = GFX_THEMES.includes(t);
+  document.documentElement.classList.toggle('gfx', gfx);
+  if (!gfx) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'themeart'; el.setAttribute('aria-hidden', 'true'); app.insertBefore(el, app.firstChild); }
+  if (el.dataset.k !== t) { el.dataset.k = t; el.innerHTML = themeArt(t); }
+}
+// Small picture for the theme picker.
+const TA_PREV = {
+  sun: '<svg viewBox="0 0 100 62" aria-hidden="true"><circle cx="16" cy="10" r="30" fill="#FFD54A" opacity=".35"/><circle cx="16" cy="10" r="15" fill="#FDB022"/><path d="M0 50Q40 38 100 46V62H0Z" fill="#FBBA63" opacity=".6"/></svg>',
+  beach: '<svg viewBox="0 0 100 62" aria-hidden="true"><path d="M0 36q12-4 25 0t25 0t25 0t25 0V62H0Z" fill="#47AFD0"/><path d="M0 48q12-3 25 0t25 0t25 0t25 0V62H0Z" fill="#F3DDAF"/><ellipse cx="80" cy="24" rx="12" ry="8" fill="#2F5D3A"/><g fill="#D7263D"><circle cx="76" cy="21" r="2"/><circle cx="83" cy="19" r="2"/><circle cx="85" cy="26" r="2"/></g></svg>',
+  night: '<svg viewBox="0 0 100 62" aria-hidden="true"><g fill="#fff"><circle cx="12" cy="12" r="1"/><circle cx="40" cy="22" r="1.2"/><circle cx="88" cy="40" r="1"/><circle cx="62" cy="8" r="1"/><circle cx="24" cy="38" r="1"/></g><circle cx="74" cy="18" r="9" fill="#F4EBC4"/><circle cx="79" cy="14" r="8" fill="#0B1438"/><path d="M0 52Q40 40 100 50V62H0Z" fill="#0B1236"/></svg>',
+  bush: () => '<svg viewBox="0 0 100 62" aria-hidden="true"><ellipse cx="50" cy="30" rx="60" ry="8" fill="#fff" opacity=".5"/><rect x="8" width="7" height="62" fill="#7A5A3C"/>' + taFrond(62, 64, 58, -96, 8, '#355F33', 1) + taFrond(36, 64, 44, -62, -8, '#4B7E45', 1) + taFrond(88, 64, 40, -118, 6, '#2E5530', 1) + '</svg>'
+};
+const taPrev = k => typeof TA_PREV[k] === 'function' ? TA_PREV[k]() : TA_PREV[k] || '';
+
 /* ================= APPEARANCE: colour themes (v1.9.0, Settings › Appearance) ================= */
 // The colours live in CSS variables (index.html); a theme just sets html[data-theme]. The choice is in S.settings
 // (so it's in backups) and copied to localStorage so the inline script in index.html can apply it before first paint.
@@ -8207,7 +8304,12 @@ const THEMES = [
   ['green', 'Green', '', '#2E7D32', '#F3F6F2', '#FFFFFF', '#15201D', '#2E7D32'],
   ['purple', 'Purple', '', '#6D3FC4', '#F6F4FA', '#FFFFFF', '#15201D', '#6D3FC4'],
   ['orange', 'Orange', '', '#B4530A', '#F8F5F2', '#FFFFFF', '#15201D', '#B4530A'],
-  ['dark', 'Dark', 'Easy on the eyes at night', '#3CC4B3', '#0E1412', '#18201E', '#E8EEEC', '#0E1412']
+  ['dark', 'Dark', 'Easy on the eyes at night', '#3CC4B3', '#0E1412', '#18201E', '#E8EEEC', '#0E1412'],
+  // 2.23.7: graphical themes
+  ['sun', 'Sunshine', 'Warm sun and soft rays', '#B8500A', '#FFF4DA', '#FFFBF2', '#2A1C0E', '#FFE7A3'],
+  ['beach', 'Beach', 'Sand, sea and pōhutukawa', '#0E6E8C', '#E6F5F9', '#FFFDF7', '#122A33', '#BFE6F4'],
+  ['night', 'Night sky', 'Stars and a crescent moon', '#A5B8FF', '#0B1438', '#141D47', '#E9ECFF', '#050A1F'],
+  ['bush', 'Bush walk', 'Ferns, kauri and mist', '#2F6B3A', '#EAF1E4', '#FBFCF8', '#16231A', '#DCE8D2']
 ];
 const themeKey = () => { const t = S && S.settings && S.settings.theme; return THEMES.some(x => x[0] === t) ? t : 'teal'; };
 const phoneDark = () => { try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; } };
@@ -8215,6 +8317,7 @@ const phoneDark = () => { try { return matchMedia('(prefers-color-scheme: dark)'
 function effectiveTheme() {
   const t = themeKey();
   if (!S || !S.settings || !S.settings.themeAuto) return t;
+  if (t === 'night') return 'night'; // already dark
   return phoneDark() ? 'dark' : t === 'dark' ? 'teal' : t;
 }
 function applyTheme() {
@@ -8222,6 +8325,7 @@ function applyTheme() {
   if (t === 'teal') root.removeAttribute('data-theme'); else if (root.getAttribute('data-theme') !== t) root.setAttribute('data-theme', t);
   const th = THEMES.find(x => x[0] === t), m = document.querySelector('meta[name="theme-color"]');
   if (m && m.content !== th[7]) m.content = th[7];
+  try { themeArtApply(t); } catch (e) { }
   try { localStorage.setItem('theme', JSON.stringify({ t: themeKey(), auto: !!(S.settings && S.settings.themeAuto) })); } catch (e) { }
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S && S.settings.themeAuto) { applyTheme(); render(); } }); } catch (e) { }
@@ -8235,8 +8339,8 @@ async function toggleThemeAuto() { S.settings.themeAuto = !S.settings.themeAuto;
 function themePicker() {
   const cur = themeKey();
   return `<div class="themes" id="themepicker" role="radiogroup" aria-label="Colour theme">${THEMES.map(([k, name, note, brand, bg, card, ink]) =>
-    `<button class="theme ${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-theme-key="${k}" aria-label="${name} theme${note ? ' (' + note.toLowerCase() + ')' : ''}" onclick="setTheme('${k}')">
-      <span class="tprev" style="background:${bg}"><span class="tbar" style="background:${k === 'dark' ? card : brand}"></span><span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span><span class="tbtn" style="background:${brand}"></span></span>
+    `<button class="theme ${k === cur ? 'on' : ''}${GFX_THEMES.includes(k) ? ' tgfx' : ''}" role="radio" aria-checked="${k === cur}" data-theme-key="${k}" aria-label="${name} theme${note ? ' (' + note.toLowerCase() + ')' : ''}" onclick="setTheme('${k}')">
+      ${GFX_THEMES.includes(k) ? `<span class="tprev tp-${k}">${taPrev(k)}<span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span></span>` : `<span class="tprev" style="background:${bg}"><span class="tbar" style="background:${k === 'dark' ? card : brand}"></span><span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span><span class="tbtn" style="background:${brand}"></span></span>`}
       <span class="tname">${k === cur ? I('check') : ''}${name}</span></button>`).join('')}</div>`;
 }
 
@@ -13252,7 +13356,7 @@ function Settings() {
   ${themePicker()}
   ${textSizePicker()}
   <div class="list" style="margin-top:10px">
-   <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">Use Dark when the phone is in dark mode${themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t'}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">${themeKey() === 'night' ? 'Night sky is already dark, so it stays on either way' : 'Use Dark when the phone is in dark mode' + (themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t')}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
   </div>
   <div class="sec">Notifications page</div>
   <div class="list">

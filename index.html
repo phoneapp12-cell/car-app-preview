@@ -21,9 +21,11 @@
     if (t) {
       var k = t.t;
       if (t.auto) k = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : (k === 'dark' ? 'teal' : k);
-      var bar = { teal: '#0F766E', blue: '#1D5FBF', green: '#2E7D32', purple: '#6D3FC4', orange: '#B4530A', dark: '#0E1412' }[k];
+      if (t.auto && t.t === 'night') k = 'night';
+      var bar = { teal: '#0F766E', blue: '#1D5FBF', green: '#2E7D32', purple: '#6D3FC4', orange: '#B4530A', dark: '#0E1412', sun: '#FFE7A3', beach: '#BFE6F4', night: '#050A1F', bush: '#DCE8D2' }[k];
       if (bar) {
         if (k !== 'teal') document.documentElement.setAttribute('data-theme', k);
+        if (/^(sun|beach|night|bush)$/.test(k)) document.documentElement.classList.add('gfx');
         document.querySelector('meta[name="theme-color"]').setAttribute('content', bar);
       }
     }
@@ -60,7 +62,7 @@ html[data-theme="blue"]{--bg:#F3F5F9;--desk:#DCE2EC;--line:#E2E7EF;--brand:#1D5F
 html[data-theme="green"]{--bg:#F3F6F2;--desk:#DCE4DA;--line:#E2E9E0;--brand:#2E7D32;--brand2:#E7F4E8;--branddk:#23612A;--focus:rgba(46,125,50,.2);--chart:#B2D8B4;--toastbtn:#9FE3A3;--soft:#F5F8F4;--soft2:#EDF2EC;--soft3:#EFF3EE;--btn:#E6EEE5}
 html[data-theme="purple"]{--bg:#F6F4FA;--desk:#E3DEEE;--line:#E8E3F1;--brand:#6D3FC4;--brand2:#EFE9FB;--branddk:#56309E;--focus:rgba(109,63,196,.2);--chart:#CDB9F1;--toastbtn:#C9B2FF;--soft:#F8F6FB;--soft2:#F0ECF7;--soft3:#F2EFF8;--btn:#ECE7F5}
 html[data-theme="orange"]{--bg:#F8F5F2;--desk:#EAE1D9;--line:#EDE5DE;--brand:#B4530A;--brand2:#FCEEE2;--branddk:#8F4208;--focus:rgba(180,83,10,.2);--chart:#F2C9A6;--toastbtn:#FFC08A;--soft:#FAF7F4;--soft2:#F3EEE9;--soft3:#F5F0EB;--btn:#F1E9E2}
-html[data-theme="dark"]{color-scheme:dark;
+html:is([data-theme="dark"],[data-theme="night"]){color-scheme:dark;
   --bg:#0E1412;--card:#18201E;--ink:#E8EEEC;--ink2:#AEBBB6;--ink3:#84928D;--line:#2A3532;--desk:#070B0A;
   --brand:#3CC4B3;--brand2:#173833;--branddk:#1F8F82;--onbrand:#04211D;--focus:rgba(60,196,179,.3);--chart:#2F8C80;--toastbtn:#0B6B60;
   --soft:#1E2826;--soft2:#24302D;--soft3:#222C2A;--btn:#26322F;--field:#111917;--fieldline:#34423E;--switchoff:#3A4845;--knob:#E8EEEC;--tick:#5A6A66;--faint:#55635F;--grab:#3A4845;
@@ -121,11 +123,11 @@ body.kb #view{padding-bottom:28px}
 .homesum .sumnote.late{color:#fff;background:rgba(127,29,29,.9);border-radius:12px;padding:8px 10px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.72);text-shadow:none}
 .homesum .sumlate{color:#fff;background:rgba(153,27,27,.94);border-radius:8px;padding:0 6px;box-shadow:0 0 0 2px rgba(255,255,255,.7);text-shadow:none;font-weight:750}
 .homesum .sumnote.late .sumlate{background:transparent;box-shadow:none;padding:0;font-weight:750}
-html[data-theme="dark"] .wxgreet{background:color-mix(in srgb,#e8a317 22%,transparent)}
+html:is([data-theme="dark"],[data-theme="night"]) .wxgreet{background:color-mix(in srgb,#e8a317 22%,transparent)}
 .wxgreet b{color:var(--ink);font-weight:800}
 /* 2.22.29: weather strip, first line on Notifications */
 .notifwx{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin:-4px 0 12px;padding:8px 12px;color:var(--ink2);font-size:0.875rem;line-height:1.3;background:color-mix(in srgb,#2563EB 13%,transparent);border:1px solid color-mix(in srgb,#2563EB 22%,transparent);border-radius:16px}
-html[data-theme="dark"] .notifwx{background:color-mix(in srgb,#2563EB 22%,transparent)}
+html:is([data-theme="dark"],[data-theme="night"]) .notifwx{background:color-mix(in srgb,#2563EB 22%,transparent)}
 .notifwx .nwxic{flex:none;display:grid;place-items:center}
 .notifwx .nwxic .wxsvg{width:34px;height:34px}
 .notifwx .nwxtemp{flex:none;font-size:1.625rem;font-weight:800;color:var(--ink);letter-spacing:-.02em}
@@ -720,15 +722,15 @@ details.rwm .pill.rwmnew{background:var(--amberbg);color:var(--amber);flex:none}
 .ic.comm{background:var(--comm-bg);color:var(--comm-fg)}
 .ic.rem{background:var(--amberbg);color:var(--amber)}
 .ic.diary{background:#EFE6D6;color:#5C4636}
-html[data-theme="dark"] .ic.diary{background:#3A3228;color:#E6D3BC}
+html:is([data-theme="dark"],[data-theme="night"]) .ic.diary{background:#3A3228;color:#E6D3BC}
 .ic.count{background:#DBEAFE;color:#2563EB}
-html[data-theme="dark"] .ic.count{background:#1E3A5F;color:#BFDBFE}
+html:is([data-theme="dark"],[data-theme="night"]) .ic.count{background:#1E3A5F;color:#BFDBFE}
 .ic.note{background:#DBEAFE;color:#2563EB}
-html[data-theme="dark"] .ic.note{background:#1E3A5F;color:#BFDBFE}
+html:is([data-theme="dark"],[data-theme="night"]) .ic.note{background:#1E3A5F;color:#BFDBFE}
 .ic.about{background:#D1FAE5;color:#059669}
-html[data-theme="dark"] .ic.about{background:#064E3B;color:#A7F3D0}
+html:is([data-theme="dark"],[data-theme="night"]) .ic.about{background:#064E3B;color:#A7F3D0}
 .ic.roster{background:#FEF3C7;color:#B45309}
-html[data-theme="dark"] .ic.roster{background:#3A2A12;color:#FCD34D}
+html:is([data-theme="dark"],[data-theme="night"]) .ic.roster{background:#3A2A12;color:#FCD34D}
 #rosterlist input[type=time]{border:0;border-radius:12px;padding:8px 10px;font:inherit;background:var(--soft);color:var(--ink)}
 .noteadd{flex-wrap:wrap}
 .noteadd input{flex:1 1 140px}
@@ -857,8 +859,8 @@ html[data-theme="dark"] .ic.roster{background:#3A2A12;color:#FCD34D}
 /* Recipes, shopping list, scanning, Home dividers (1.15.0) */
 .hsec{display:block;--hsec:#303e50;--hmix:55%;border-radius:22px;padding:4px 8px 12px;margin-left:-4px;margin-right:-4px;background:rgba(48,62,80,.55)}
 .hsec .card,.hsec .list{background:color-mix(in srgb,#303e50 18%,var(--card))}
-html[data-theme="dark"] .hsec{background:rgba(48,62,80,.55)}
-html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{background:color-mix(in srgb,#303e50 26%,var(--card))}
+html:is([data-theme="dark"],[data-theme="night"]) .hsec{background:rgba(48,62,80,.55)}
+html:is([data-theme="dark"],[data-theme="night"]) .hsec .card,html:is([data-theme="dark"],[data-theme="night"]) .hsec .list{background:color-mix(in srgb,#303e50 26%,var(--card))}
 /* Home sections (v1.95.0): one transparent darker grey-blue. The summary is a short note on a weather picture, not one of these sections. No pink. */
 .hsec + .hsec{border-top:3px solid color-mix(in srgb,var(--ink3) 65%,transparent);margin-top:18px;padding-top:4px}
 .hsec > .sec:first-child{margin-top:12px}
@@ -868,7 +870,7 @@ html[data-theme="dark"] .hsec .card,html[data-theme="dark"] .hsec .list{backgrou
 /* v1.98.0: section names sit on the grey-blue band, where the old grey ink disappeared. A label bar keeps them readable. The band colour is unchanged. */
 .hsec > .sec{color:#102033;background:rgba(255,255,255,.94);border-radius:12px;padding:8px 12px;margin:12px 2px 8px;font-size:1rem;letter-spacing:.01em}
 .hsec > .sec a.sechead{color:#102033;font-size:1rem}
-html[data-theme="dark"] .hsec > .sec,html[data-theme="dark"] .hsec > .sec a.sechead{color:#f4f7fb;background:rgba(8,14,20,.62)}
+html:is([data-theme="dark"],[data-theme="night"]) .hsec > .sec,html:is([data-theme="dark"],[data-theme="night"]) .hsec > .sec a.sechead{color:#f4f7fb;background:rgba(8,14,20,.62)}
 /* 2.22.18: Full-page home feed carousel — pan-y everywhere so a finger can scroll the card / page vertically; horizontal card swipe is JS (direction lock) */
 .hcar{position:relative;margin:4px 0 10px}
 .hcar-stage{
@@ -1144,7 +1146,7 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 @media (prefers-reduced-motion:reduce){.hcat *,.hcat svg{animation:none!important;transition:none!important}}
 /* 2.23.3 temperature colour */
 .tcol[style*="--tcl"]{color:var(--tcl);text-shadow:0 0 1px rgba(255,255,255,.55)}
-html[data-theme="dark"] .tcol[style*="--tcd"]{color:var(--tcd);text-shadow:0 0 1px rgba(0,0,0,.6)}
+html:is([data-theme="dark"],[data-theme="night"]) .tcol[style*="--tcd"]{color:var(--tcd);text-shadow:0 0 1px rgba(0,0,0,.6)}
 /* 2.23.4 night feed */
 .hsec.hnew{position:relative}
 .hsec .newtag{position:absolute;top:10px;right:12px;z-index:2;background:var(--brand);color:var(--onbrand,#fff);font-size:0.6875rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:3px 8px}
@@ -1153,6 +1155,67 @@ html[data-theme="dark"] .tcol[style*="--tcd"]{color:var(--tcd);text-shadow:0 0 1
 .newsupd{font-size:12px;margin:-4px 4px 6px}
 .newstabs{display:flex;gap:8px;margin:2px 0 10px}
 .newstabs a{flex:1;text-align:center;padding:8px 10px;border-radius:999px;background:var(--card);color:inherit;text-decoration:none;font-weight:600;font-size:14px;border:1px solid var(--line)}
+
+/* ---- 2.23.7 graphical themes: Sunshine, Beach, Night sky, Bush walk. The picture is #themeart (app.js),
+   fixed behind #view. Cards are slightly see-through (--glass) with a light blur so text stays readable. ---- */
+html[data-theme="sun"]{--bg:#FFF4DA;--card:#FFFBF2;--glass:rgba(255,251,242,.84);--ink:#2A1C0E;--ink2:#6A5236;--ink3:#957A5A;--line:#F1DFC0;--desk:#F3DDB4;
+  --brand:#B8500A;--brand2:#FFE9CC;--branddk:#8F3E06;--focus:rgba(184,80,10,.22);--chart:#F9C98A;--toastbtn:#FFC07A;--soft:#FFF7E6;--soft2:#FCEFD6;--soft3:#FDF2DD;--btn:#FBE8C8;
+  --tabbg:rgba(255,248,232,.97);--fieldline:#E8D3B0;--hsecbg:rgba(176,98,24,.30)}
+html[data-theme="beach"]{--bg:#E6F5F9;--card:#FFFDF7;--glass:rgba(255,253,247,.84);--ink:#122A33;--ink2:#41606B;--ink3:#6F8C96;--line:#D9E8EA;--desk:#CFE7EE;
+  --brand:#0E6E8C;--brand2:#DCF0F6;--branddk:#0A5670;--focus:rgba(14,110,140,.22);--chart:#9FD5E6;--toastbtn:#8FDDF4;--soft:#F4FAFB;--soft2:#E9F4F6;--soft3:#EEF7F8;--btn:#E0EFF2;
+  --tabbg:rgba(250,252,250,.97);--fieldline:#C9DCE0;--hsecbg:rgba(14,96,128,.30)}
+html[data-theme="night"]{--bg:#0B1438;--card:#141D47;--glass:rgba(20,29,71,.80);--ink:#E9ECFF;--ink2:#B7BEE6;--ink3:#8C94C2;--line:#283368;--desk:#050A1F;
+  --brand:#A5B8FF;--brand2:#202B62;--branddk:#7E95F0;--onbrand:#0B1438;--focus:rgba(165,184,255,.3);--chart:#5A6FC8;--toastbtn:#3C4FA8;
+  --soft:#18224F;--soft2:#1E2958;--soft3:#1B2553;--btn:#222D60;--field:#0F1840;--fieldline:#323E78;--switchoff:#38447E;--tick:#5B66A0;--faint:#4F5A92;--grab:#38447E;
+  --tabbg:rgba(16,24,62,.97);--toast:#E9ECFF;--ontoast:#0B1438;--weekend:rgba(255,255,255,.04);--hsecbg:rgba(70,90,180,.30)}
+html[data-theme="bush"]{--bg:#EAF1E4;--card:#FBFCF8;--glass:rgba(251,252,248,.84);--ink:#16231A;--ink2:#46584A;--ink3:#748676;--line:#DAE4D3;--desk:#D3E0CA;
+  --brand:#2F6B3A;--brand2:#E0EDDA;--branddk:#23542C;--focus:rgba(47,107,58,.22);--chart:#A9CBA0;--toastbtn:#9FE0A6;--soft:#F4F8F1;--soft2:#EAF1E6;--soft3:#EEF4EA;--btn:#E2ECDD;
+  --tabbg:rgba(248,251,245,.97);--fieldline:#CBD8C4;--hsecbg:rgba(40,84,46,.32)}
+html[data-theme="sun"] #app{background:linear-gradient(180deg,#FFE7A3 0%,#FFF4DA 34%,#FFF7E8 70%,#FFE6C2 100%)}
+html[data-theme="beach"] #app{background:linear-gradient(180deg,#BFE6F4 0%,#DDF2F8 36%,#EEF8F6 66%,#F6EBD3 100%)}
+html[data-theme="night"] #app{background:linear-gradient(180deg,#050A1F 0%,#0B1438 46%,#18215A 100%)}
+html[data-theme="bush"] #app{background:linear-gradient(180deg,#DCE8D2 0%,#EAF1E4 36%,#E6EEDF 66%,#C9DABF 100%)}
+#themeart{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+#themeart svg{position:absolute;left:0;width:100%;display:block}
+#themeart .ta-top{top:0;height:300px}
+#themeart .ta-bot{bottom:0;height:240px}
+#themeart .ta-bot.ta-tall{height:320px}
+#themeart .ta-full{top:0;height:100%}
+html.gfx #view{z-index:1}
+html.gfx :is(.card:not(.homesum),.list,.dcard,.carcard,.ev,.dayhead,.search,details.help,.iconbtn,.theme,.newstabs a,.chip:not(.on),.addbar input){background:var(--glass);-webkit-backdrop-filter:blur(8px) saturate(1.15);backdrop-filter:blur(8px) saturate(1.15)}
+html.gfx .hsec{background:var(--hsecbg)}
+html.gfx .hsec :is(.card:not(.homesum),.list){background:var(--glass)}
+html.gfx .top h1{text-shadow:0 1px 0 rgba(255,255,255,.55)}
+html[data-theme="night"] .top h1{text-shadow:0 1px 8px rgba(5,10,31,.8)}
+html.gfx .top .sub{text-shadow:0 1px 0 rgba(255,255,255,.5)}
+html[data-theme="night"] .top .sub{text-shadow:0 1px 6px rgba(5,10,31,.9)}
+html[data-theme="night"] .hcat{filter:drop-shadow(0 0 6px rgba(200,210,255,.25))}
+@keyframes taSpin{to{transform:rotate(360deg)}}
+@keyframes taPulse{from{opacity:.75}to{opacity:1}}
+@keyframes taTw{0%{opacity:.25}100%{opacity:1}}
+@keyframes taWaveK{from{transform:translateX(0)}to{transform:translateX(-400px)}}
+@keyframes taDrift{from{transform:translateX(-30px)}to{transform:translateX(30px)}}
+@keyframes taMistK{from{transform:translateX(-50px)}to{transform:translateX(50px)}}
+@keyframes taSwayK{from{transform:rotate(-1.2deg)}to{transform:rotate(1.2deg)}}
+@keyframes taShoot{0%,92%{opacity:0;transform:translate(0,0)}94%{opacity:.9}100%{opacity:0;transform:translate(160px,70px)}}
+#themeart .ta-rays{transform-box:view-box;transform-origin:30px 10px;animation:taSpin 120s linear infinite}
+#themeart .ta-glow{animation:taPulse 5s ease-in-out infinite alternate}
+#themeart .ta-tw{animation:taTw 3.5s ease-in-out infinite alternate}
+#themeart .ta-wave{animation:taWaveK 26s linear infinite}
+#themeart .ta-w2{animation-duration:19s}
+#themeart .ta-w1{animation-duration:14s}
+#themeart .ta-drift{animation:taDrift 50s ease-in-out infinite alternate}
+#themeart .ta-mist{animation:taMistK 38s ease-in-out infinite alternate}
+#themeart .ta-sway{transform-box:fill-box;transform-origin:50% 100%;animation:taSwayK 7s ease-in-out infinite alternate}
+#themeart .ta-shoot{animation:taShoot 14s linear infinite}
+@media (prefers-reduced-motion:reduce){#themeart *{animation:none!important}#themeart .ta-tw{opacity:.8}}
+.theme.tgfx .tprev{background:none}
+.tprev.tp-sun{background:linear-gradient(180deg,#FFE7A3,#FFF4DA)}
+.tprev.tp-beach{background:linear-gradient(180deg,#BFE6F4,#E6F5F9)}
+.tprev.tp-night{background:linear-gradient(180deg,#050A1F,#18215A)}
+.tprev.tp-bush{background:linear-gradient(180deg,#DCE8D2,#C9DABF)}
+.tprev svg{position:absolute;inset:0;width:100%;height:100%}
+.tprev.tp-sun .tcard,.tprev.tp-beach .tcard,.tprev.tp-night .tcard,.tprev.tp-bush .tcard{top:auto;bottom:6px;left:30%;right:7px;opacity:.92}
 </style>
 </head>
 <body>
