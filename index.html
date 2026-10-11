@@ -1072,8 +1072,11 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 .sharebox{background:var(--soft2);border-color:var(--line)}
 .sharebox input{accent-color:#2563EB}
 /* 2.22.99 header cat */
-.hcat{display:inline-block;position:relative;top:-4px;width:58px;height:48px;margin:-12px 0 -6px 2px;padding:0;border:0;background:none;vertical-align:middle;cursor:pointer;-webkit-tap-highlight-color:transparent;color:inherit}
-.hcat svg{width:58px;height:48px;overflow:visible;display:block}
+.top:has(.hcat){position:relative;min-height:94px}
+.top:has(.hcat)>div:first-child{flex:1}
+.top:has(.hcat) .sub{max-width:calc(100% - 78px)}
+.hcat{display:block;position:absolute;right:40px;top:-8px;width:116px;height:96px;margin:0;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;color:inherit}
+.hcat svg{width:116px;height:96px;overflow:visible;display:block}
 .hcat svg *{transform-box:fill-box;transform-origin:center}
 .hcat .cfur{fill:#B9BFC8;stroke:#4B5563;stroke-width:1.1}
 .hcat .cbelly{fill:#E8EBEF}
@@ -1095,7 +1098,7 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 .hcat .csleep{opacity:0}
 .hcat .cz{font:800 7px/1 system-ui,sans-serif;fill:#7C8DB5;opacity:0}
 .hcat .cbreath{transform-box:view-box;transform-origin:26px 37px}
-.hcat .cbub{position:absolute;left:54px;top:4px;white-space:nowrap;background:var(--card,#fff);color:var(--ink,#111);font-size:0.75rem;font-weight:750;letter-spacing:0;line-height:1;padding:5px 8px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.18);opacity:0;transform:translateY(4px) scale(.9);pointer-events:none;transition:opacity .2s,transform .2s;z-index:3}
+.hcat .cbub{position:absolute;left:66px;top:62px;white-space:nowrap;background:var(--card,#fff);color:var(--ink,#111);font-size:0.875rem;font-weight:750;letter-spacing:0;line-height:1;padding:6px 10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.18);opacity:0;transform:translateY(4px) scale(.9);pointer-events:none;transition:opacity .2s,transform .2s;z-index:3}
 .hcat.react .cbub{opacity:1;transform:none}
 .hcat.cat-energetic svg{animation:catBounce .7s ease-in-out infinite}
 .hcat.cat-energetic .ctail{animation:catSwish .5s ease-in-out infinite alternate}
@@ -1121,7 +1124,7 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 .hcat.cat-sleep .cz3{animation-delay:2.4s}
 .hcat.react:not(.cat-sleep) svg{animation:catStretch 1.1s ease-in-out}
 .hcat.react.cat-sleep .cbreath{animation:catStir 1.1s ease-in-out}
-@keyframes catBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+@keyframes catBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 @keyframes catSwish{from{transform:rotate(-20deg)}to{transform:rotate(16deg)}}
 @keyframes catSwishSoft{from{transform:rotate(-7deg)}to{transform:rotate(6deg)}}
 @keyframes catBlink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
