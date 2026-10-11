@@ -1142,6 +1142,9 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 @keyframes catStretch{0%,100%{transform:none}35%{transform:scale(1.12,.86) translateY(2px)}65%{transform:scale(.94,1.08) translateY(-2px)}}
 @keyframes catStir{0%,100%{transform:none}40%{transform:scale(1.06,.94)}}
 @media (prefers-reduced-motion:reduce){.hcat *,.hcat svg{animation:none!important;transition:none!important}}
+/* 2.23.3 temperature colour */
+.tcol[style*="--tcl"]{color:var(--tcl);text-shadow:0 0 1px rgba(255,255,255,.55)}
+html[data-theme="dark"] .tcol[style*="--tcd"]{color:var(--tcd);text-shadow:0 0 1px rgba(0,0,0,.6)}
 </style>
 </head>
 <body>

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.2';
+const APP_VERSION = '2.23.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9304,6 +9304,31 @@ function wxIcon(w, cls = '') {
   return `<svg class="wxsvg ${cls}" data-kind="${k}" viewBox="0 0 32 32" role="img" aria-label="${esc(w.words)}">${parts}</svg>`;
 }
 const deg = n => typeof n === 'number' && isFinite(n) ? Math.round(n) + '°' : '–';
+/* 2.23.3: temperature colour, -2°C icy blue to 38°C deep red, blended smoothly in OKLab. Two sets of stops:
+   deeper shades for light themes, brighter ones for dark, so the number stays easy to read on the weather card. */
+const TEMP_STOPS = [ // °C, light-theme colour, dark-theme colour
+  [-2, '#1E3A8A', '#8FB0FF'], [5, '#1D4ED8', '#60A5FA'], [10, '#0369A1', '#5FDCF5'], [15, '#0F766E', '#2DD4BF'],
+  [20, '#4D7C0F', '#A3E635'], [23, '#A16207', '#FACC15'], [25, '#C2410C', '#FB923C'], [30, '#DC2626', '#F87171'], [38, '#991B1B', '#FF4D4D']
+];
+function hexLab(h) {
+  const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const l = Math.cbrt(0.4122214708 * c[0] + 0.5363325363 * c[1] + 0.0514459929 * c[2]), m = Math.cbrt(0.2119034982 * c[0] + 0.6806995451 * c[1] + 0.1073969566 * c[2]), q = Math.cbrt(0.0883024619 * c[0] + 0.2817188376 * c[1] + 0.6299787005 * c[2]);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * q, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * q, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * q];
+}
+function labHex([L, A, B]) {
+  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3, m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3, q = (L - 0.0894841775 * A - 1.2914855480 * B) ** 3;
+  const rgb = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * q];
+  return '#' + rgb.map(v => { v = v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055; return Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0'); }).join('');
+}
+function tempColour(t, dark) {
+  if (typeof t !== 'number' || !isFinite(t)) return '';
+  const k = dark ? 2 : 1, x = Math.min(38, Math.max(-2, t));
+  let i = 0; while (i < TEMP_STOPS.length - 2 && x > TEMP_STOPS[i + 1][0]) i++;
+  const a = TEMP_STOPS[i], b = TEMP_STOPS[i + 1], f = (x - a[0]) / (b[0] - a[0]);
+  const la = hexLab(a[k]), lb = hexLab(b[k]);
+  return labHex(la.map((v, j) => v + (lb[j] - v) * f));
+}
+const tempStyle = t => { const l = tempColour(t, false); return l ? ` style="--tcl:${l};--tcd:${tempColour(t, true)}"` : ''; };
 const num = n => typeof n === 'number' && isFinite(n);
 const compass = d => num(d) ? ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((d % 360) + 360) % 360 / 45) % 8] : '';
 const arr = (o, k, i) => o && Array.isArray(o[k]) ? o[k][i] : null;
@@ -9365,7 +9390,7 @@ function wxCard() {
   return `<div class="card wx" id="wxcard">
     <button class="wxnow" onclick="go('#weather')" aria-label="Whangārei weather: ${deg(c.temperature_2m)}, ${esc(now.words)}. Tap for the full forecast.">
       <span class="wxic">${wxIcon(now, 'big')}</span>
-      <span class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></span>
+      <span class="wxmain"><b class="wxtemp tcol"${tempStyle(c.temperature_2m)}>${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></span>
       ${t ? `<span class="wxmeta"><span>H ${deg(t.hi)} · L ${deg(t.lo)}</span>${t.rain != null ? `<span>${I('drop')} ${t.rain}% rain</span>` : ''}</span>` : ''}</button>
     ${facts.length ? `<div class="wxfacts2">${facts.map(f => f.startsWith('<span') ? f : `<span>${f}</span>`).join('')}</div>` : ''}
     ${hoursStrip(wxHours(12))}
@@ -9515,7 +9540,7 @@ function notifWxStrip() {
   const sun = homeTry('weather sun', () => wxSunMention(), ''); // 2.22.43: next sunrise or sunset
   const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${outlook ? ' ' + outlook + '.' : ''}${sun ? ' ' + sun + '.' : ''}${warn ? ' ' + warn.replace(/^⚠\s*/, 'MetService ') + '.' : ''} Tap for the full forecast.`;
   return `<button type="button" class="notifwx" id="notifwx" onclick="go('#weather')" aria-label="${esc(label)}">
-    <span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp">${temp}</b>` : ''}<span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${sun ? `<span class="nwxnext nwxsun">${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}${warnHtml}</span>${I('right')}</button>`;
+    <span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp tcol"${tempStyle(c.temperature_2m)}>${temp}</b>` : ''}<span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${sun ? `<span class="nwxnext nwxsun">${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}${warnHtml}</span>${I('right')}</button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Notifications</button>`;
@@ -9535,7 +9560,7 @@ function Weather() {
       <div class="wxhl"><b>${deg(x.hi)}</b><span>${deg(x.lo)}</span></div></div>`;
   }).join('');
   return back + header('Weather', 'Whangārei') + hu +
-    `<div class="card wxbig"><div class="wxnow"><span class="wxic">${wxIcon(now, 'big')}</span><div class="wxmain"><b class="wxtemp">${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></div></div>
+    `<div class="card wxbig"><div class="wxnow"><span class="wxic">${wxIcon(now, 'big')}</span><div class="wxmain"><b class="wxtemp tcol"${tempStyle(c.temperature_2m)}>${deg(c.temperature_2m)}</b><span class="wxwords">${esc(now.words)}</span></div></div>
       <div class="wxfacts">
         <div><small>Moon</small><b>${esc(moonPhaseName())}</b></div>
         ${num(c.apparent_temperature) ? `<div><small>Feels like</small><b>${deg(c.apparent_temperature)}</b></div>` : ''}
