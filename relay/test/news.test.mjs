@@ -58,7 +58,7 @@ const O = 'https://phoneapp12-cell.github.io';
 resetNews();
 let r = await handle(new Request('https://relay.example/news', { headers: { Origin: O } }), env, fetchImpl);
 const body = await r.json();
-ok(r.status === 200 && r.headers.get('access-control-allow-origin') === O && body.items.length === 2 && body.items[0].url.startsWith('https://www.rnz.co.nz/'), 'GET /news from the app');
+ok(r.status === 200 && r.headers.get('access-control-allow-origin') === O && Array.isArray(body.local.items) && Array.isArray(body.nz.items) && body.local.days === 7 && body.nz.days === 3, 'GET /news from the app (two sections)');
 r = await handle(new Request('https://relay.example/news', { headers: { Origin: 'https://evil.example' } }), env, fetchImpl);
 ok(r.status === 403, 'GET /news from another site refused');
 resetNews();
@@ -75,5 +75,15 @@ const pr = parseRss(rss, NEWS_FEEDS[1]);
 ok(pr.items.length === 3 && pr.items.every(x => x.src === 'RNZ Politics'), 'non-local feeds keep every RNZ story, tagged with the source');
 const mg = mergeFeeds([parseNorthlandRss(rss), pr], Date.parse('2026-10-04T00:00:00Z'));
 ok(mg.items.length === 3 && new Set(mg.items.map(x => x.url)).size === 3, 'merging drops the same story from two feeds');
+// 2.23.6: local and NZ sections, with age limits
+const NOW = Date.parse('2026-10-11T09:00:00Z'), ago = d => new Date(NOW - d * 864e5).toISOString();
+const sec = mergeFeeds([
+  { local: true, items: [{ title: 'Whangārei pool reopens', url: 'https://www.rnz.co.nz/a', published: ago(5), src: 'RNZ Northland' }, { title: 'Old Northland story', url: 'https://www.rnz.co.nz/b', published: ago(9), src: 'RNZ Northland' }] },
+  { items: [{ title: 'Kerikeri growers celebrate', url: 'https://www.rnz.co.nz/c', published: ago(1), src: 'RNZ New Zealand' }, { title: 'Imperial study on sleep', url: 'https://www.rnz.co.nz/d', published: ago(1), src: 'RNZ New Zealand' }, { title: 'Budget talks', url: 'https://www.rnz.co.nz/e', published: ago(4), src: 'RNZ Politics' }] }
+], NOW);
+ok(sec.local.items.map(x => x.url).join() === 'https://www.rnz.co.nz/c,https://www.rnz.co.nz/a', 'local: Northland feed + NZ stories naming a Northland place, 7 days max');
+ok(sec.nz.items.map(x => x.url).join() === 'https://www.rnz.co.nz/d', 'NZ: other stories, 3 days max (no false place match)');
+const kept = mergeFeeds([{ items: [{ title: 'New', url: 'https://www.rnz.co.nz/f', published: ago(0.1), src: 'RNZ Politics' }] }], NOW, { local: { checked: 'X', items: [{ title: 'Whangārei', url: 'https://www.rnz.co.nz/g', published: ago(2) }, { title: 'Stale', url: 'https://www.rnz.co.nz/h', published: ago(8) }] } });
+ok(kept.local.checked === 'X' && kept.local.items.length === 1 && kept.nz.items.length === 1, 'a section whose feeds failed keeps its last copy, trimmed by age');
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
 process.exit(fails ? 1 : 0);

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.5';
+const APP_VERSION = '2.23.6';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2365,7 +2365,45 @@ function sumToday(a) {
   return out;
 }
 // Changes when the part of day changes, or work / the cleaning job moves from to-come to done: a saved summary isn't reused across it.
-function sumPhaseKey() { const t = sumToday(); return [todayISO(), t.pod, t.work ? t.work.phase : '-', t.clean ? t.clean.phase : '-'].join('|'); }
+function sumPhaseKey() { const t = sumToday(); let n = 'D'; try { n = homeNight() ? 'N' : 'D'; } catch (e) {} return [todayISO(), t.pod, t.work ? t.work.phase : '-', t.clean ? t.clean.phase : '-', n].join('|'); } // 2.23.6: 8pm and 5am start a new summary
+/* 2.23.6: night summary (8pm–5am NZ, same window as the night feed). No bills, overdue, due dates, budget or money:
+   none of it is sent to the AI, any line or suggestion that mentions it is dropped, and the summary is built
+   around a few interesting things instead (news headlines, videos, New on Netflix, the Top 40, the travel spot, events). */
+const NIGHT_MONEY_RE = /\b(bills?|overdue|over-due|payments?|pay|paying|paid|due|invoices?|mortgages?|budget\w*|loans?|repayments?|rates|rent|debts?|owe|owed|owing|insurance|premiums?|direct debits?|money|spend\w*|savings?|bank\w*|fees?|fines?|instal?ments?|subscriptions?|wof|rego|registration)\b/i;
+const nightOk = txt => !NIGHT_MONEY_RE.test(String(txt || ''));
+function nightPicks() {
+  const out = [];
+  try {
+    const l = (newsSec('local') || []).filter(x => nightOk(x.title)), n = (newsSec('nz') || []).filter(x => nightOk(x.title));
+    const add = (lbl, x) => x && out.push({ kind: 'news', text: lbl + ' news: “' + x.title + '” (' + (x.src || 'RNZ') + ')', title: x.title });
+    add('Local', l[0]); add('NZ', n[0]); if (!l[0]) add('NZ', n[1]);
+  } catch (e) {}
+  try {
+    const seed = +todayISO().replace(/-/g, '') + (homeSugOpenN || 0);
+    const v = preferFilmVideoTitles(videoSuggestions() || []).filter(x => x && x.title);
+    for (let i = 0; i < Math.min(2, v.length); i++) { const x = v[(seed + i * 3) % v.length]; if (x && !out.some(o => o.title === x.title)) out.push({ kind: 'video', text: 'On the Videos tab: “' + x.title + '”' + (x.channel ? ' from ' + x.channel : ''), title: x.title }); }
+  } catch (e) {}
+  try { if (NF && mailConnected('microsoft')) { const f = (NF.fresh || []).slice(0, 3).map(x => x.title).filter(Boolean); if (f.length) out.push({ kind: 'netflix', text: 'New on Netflix: ' + engList(f), title: f[0] }); } } catch (e) {}
+  try { const t = TOP40[0]; if (t) out.push({ kind: 'top40', text: 'Number 1 on the NZ Top 40 this week: “' + t.title + '” by ' + t.artist, title: t.title }); } catch (e) {}
+  try { const t = travelToday(); if (t) out.push({ kind: 'travel', text: 'Today’s travel spot: ' + t.name + ', ' + t.country, title: t.name }); } catch (e) {}
+  try {
+    const T = todayISO(), lim = addDays(T, 3);
+    upcomingEvents().filter(e => e && e.title && e.date <= lim && nightOk(e.title)).slice(0, 2)
+      .forEach(e => out.push({ kind: 'event', text: 'On locally ' + (e.date === T ? 'today' : e.date === addDays(T, 1) ? 'tomorrow' : fmtW(e.date)) + ': ' + e.title, title: e.title }));
+  } catch (e) {}
+  return out.filter(x => nightOk(x.title));
+}
+// The app's own night lines, when the AI isn't there: a headline, a video and the Top 40, said plainly.
+function nightSumLines() {
+  const p = nightPicks(), pick = k => p.find(x => x.kind === k);
+  const out = [], news = p.filter(x => x.kind === 'news'), vid = pick('video'), top = pick('top40'), ev = pick('event');
+  if (news[0]) out.push(homePick(95, ['Tonight’s reading: ' + news[0].text.replace(/^(Local|NZ) news: /, '') , 'Worth a look on the News page: ' + news[0].text.replace(/^(Local|NZ) news: /, '')]));
+  if (news[1]) out.push('And from around the country: ' + news[1].text.replace(/^(Local|NZ) news: /, ''));
+  if (vid) out.push(vid.text + ', if you fancy something to watch');
+  if (top) out.push(top.text + ', in case the spa needs a soundtrack');
+  else if (ev) out.push(ev.text);
+  return out.slice(0, 4);
+}
 const POD_ORDER = ['morning', 'afternoon', 'evening', 'night'];
 const timesIn = txt => { const out = new Set(), x = String(txt || '');
   for (const m of x.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi)) { let h = +m[1] % 12; if (/pm/i.test(m[3])) h += 12; out.add(h * 60 + (+m[2] || 0)); }
@@ -2448,6 +2486,17 @@ function aiSumCtx() {
   try { const hb = useHabits(); if (hb.length) ctx.habits = hb; } catch (e) {}
   try { ctx.knowMe = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-12).map(x => x.q + ' ' + x.a); } catch (e) {}
   ctx.facts = AI_FACTS;
+  try { if (homeNight()) nightCtx(ctx); } catch (e) {}
+  return ctx;
+}
+function nightCtx(ctx) {
+  delete ctx.due; delete ctx.soon; delete ctx.routines; delete ctx.habits;
+  if (ctx.tip) delete ctx.tip;
+  ['todos', 'notes', 'eventsToday', 'eventsThisWeek', 'about', 'knowMe', 'mealsPlanned'].forEach(k => { if (Array.isArray(ctx[k])) ctx[k] = ctx[k].filter(nightOk); });
+  delete ctx.todos; // no jobs at night
+  ctx.night = true;
+  ctx.interesting = nightPicks().map(x => x.text);
+  ctx.nightRule = 'It is night (after 8pm). Write a relaxed evening summary for you, built around 2 to 4 of the items in interesting (news headlines, videos, New on Netflix, the Top 40, the travel spot, local events): say what each is and why it might be worth a look tonight. Dry, cheeky jokes are fine. Never mention bills, overdue or due items, payments, invoices, the mortgage, budget, money or chores. The travel spot and New on Netflix are also shown under the summary, so only mention them in passing. Suggestions: relaxed things only (watch, read, listen, plan something fun), never a payment or a chore.';
   return ctx;
 }
 async function aiSumFetch() {
@@ -2477,9 +2526,10 @@ async function aiSumFetch() {
     };
     let d; try { d = await once(); if (!d || !Array.isArray(d.lines) || !d.lines.length) throw new Error('empty'); } catch (e1) { d = await once(); }
     if (!d || !Array.isArray(d.lines) || !d.lines.length) throw new Error('empty');
-    const kept = d.lines.slice(0, 5).map(x => String(x).slice(0, 220)).filter(x => aiLineOk(x, tNow, allowed)); // 2.22.97
+    const nightNow = !!ctxNow.night;
+    const kept = d.lines.slice(0, 5).map(x => String(x).slice(0, 220)).filter(x => aiLineOk(x, tNow, allowed) && (!nightNow || nightOk(x))); // 2.22.97, 2.23.6
     if (!kept.length) throw new Error('all_lines_dropped');
-    AI_SUM = { lines: kept, sugs: (d.sugs || []).slice(0, 3).filter(x => aiLineOk(String((x && x.text) || ''), tNow, allowed)), open: openN, at: Date.now(), phase };
+    AI_SUM = { lines: kept, sugs: (d.sugs || []).slice(0, 3).filter(x => aiLineOk(String((x && x.text) || ''), tNow, allowed) && (!nightNow || nightOk(String((x && x.text) || '') + ' ' + String((x && x.title) || '')))), open: openN, at: Date.now(), phase };
     aiSumOpen = openN;
     try { localStorage.setItem('aiSumLast', JSON.stringify(AI_SUM)); } catch (e) {}
     const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
@@ -2494,7 +2544,8 @@ function aiSumBullets() {
   if (!aiSumFresh()) return '';
   const walkDog = /\b(walk|walking)\b/i; const dog = /\b(zeus|dog|dogs)\b/i;
   const bf = bfastLine();
-  const lines = AI_SUM.lines.filter(t => { const x = String(t); return !(walkDog.test(x) && dog.test(x)) && !BFAST_TV_RE.test(x); }).concat(bf ? [bf] : []);
+  let night = false; try { night = homeNight(); } catch (e) {}
+  const lines = AI_SUM.lines.filter(t => { const x = String(t); return !(walkDog.test(x) && dog.test(x)) && !BFAST_TV_RE.test(x) && (!night || nightOk(x)); }).concat(bf && (!night || nightOk(bf)) ? [bf] : []);
   const lis = lines.map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
   return lis ? '<ul class="sumbul">' + lis + '</ul>' : '';
 }
@@ -2518,6 +2569,7 @@ function aiSugList() {
 function homeSugHtml() {
   let list = [];
   try { list = aiSugList() || homeSuggestions(); } catch (e) { list = []; }
+  try { if (homeNight()) list = list.filter(x => x && nightOk(String(x.text || '') + ' ' + String((x.pre && (x.pre.title || x.pre.text)) || ''))); } catch (e) {} // 2.23.6
   homeSugNow = list;
   if (!list.length) return '';
   const label = { todo: 'to your to-do list', note: 'as a note', appt: 'to your calendar' };
@@ -2845,7 +2897,9 @@ function mealLikedHtml() {
 // 2.21.0: the cap does not drop the optional joke or fun fact.
 function homeSumCard(bits) {
   try {
-    const list = (bits || []).filter(b => b && b.text).slice(0, 4);
+    let night = false; try { night = homeNight(); } catch (e) {}
+    const NIGHT_SKIP = { late: 1, near: 1, today: 1, soon: 1, high: 1 }; // due, overdue and to-do items wait for the morning
+    const list = (bits || []).filter(b => b && b.text && (!night || (!b.overdue && !NIGHT_SKIP[b.kind] && nightOk(b.text)))).slice(0, night ? 2 : 4);
     const mustKind = { late: 1, near: 1, today: 1, soon: 1, high: 1 };
     const must = list.filter(b => mustKind[b.kind]);
     const later = list.filter(b => !mustKind[b.kind]);
@@ -2884,6 +2938,7 @@ function homeSumCard(bits) {
       const bit = homeCapClause(homeStripEnd(b && b.text));
       if (bit) ps.push(li(esc(dot(bit)), !!b.overdue));
     });
+    if (night) { try { nightSumLines().forEach(t => ps.push(li(esc(dot(homeCapClause(homeStripEnd(t))))))); } catch (e) {} } // 2.23.6
     if (flavour) {
       const aside = homeCapClause(homeStripEnd(flavour));
       const asks = /\?\s*$/.test(String(flavour));
@@ -10246,10 +10301,31 @@ function newsUrl(u) {
 const NEWS_BLOCK = /\b(courts?|courtroom|trials?|retrial|jury|sentenc\w*|judges?|jail\w*|prisons?|prisoners?|inmates?|charged|charges? laid|facing charges|accused|guilty|convict\w*|acquit\w*|plead\w*|bail|parole|murder\w*|homicides?|manslaughter|kill\w*|death of|deaths?|died|dies|dead|bod(y|ies) found|remains found|coroner\w*|inquest|stab\w*|shooting|shootings|shooters?|shot dead|shot|gunm[ae]n|guns?|firearms?|armed|weapons?|assault\w*|attack\w*|violen\w*|brawl\w*|abus\w*|rap(e|ed|es|ist|ists)|sexual\w*|sex|sexually|indecen\w*|porn\w*|exploit\w*|grooming|molest\w*|paedophil\w*|pedophil\w*|harass\w*|stalk(ing|er|ed)|gangs?|gang\w+|police hunt|manhunt|arrest\w*|offend\w*|offender\w*|kidnap\w*|abduct\w*|hostage\w*|terror\w*|bomb(s|ed|er|ers|ing|ings)?|explosi\w*|fatal\w*|crash victims?|drown\w*|suicid\w*|execut(e|ed|es|ion|ions)|war|wars|warfare|massacre\w*|genocide|riot\w*|robber\w*|burglar\w*|ram raid\w*|stolen|injur(ed|ies|y)|hit[ -]and[ -]run|crash(es|ed)?|collisions?|police (are )?(appeal\w*|investigat\w*|seek\w*)|sought|missing (man|woman|person|teen|boy|girl|child))\b/i;
 const NEWS_SAFE = /\b(ticking time bomb|time bomb|bombshell|green shoots|price wars?|war of words|heart attacks?|panic attacks?|shot in the arm|long shot|big shots?|death of the high street)\b/gi;
 const newsOk = x => !NEWS_BLOCK.test(String(x.title || '').replace(NEWS_SAFE, ' '));
+// 2.23.6: two sections. Local (Northland) stories go after 7 days, New Zealand ones after 3.
+const NEWS_SECS = { local: { title: 'Local — Northland', days: 7 }, nz: { title: 'New Zealand', days: 3 } };
+function newsSec(key) {
+  const d = NEWS && NEWS.data;
+  if (!d || !Array.isArray(d.items)) return null;
+  const sec = d[key] && Array.isArray(d[key].items) ? d[key].items : d.items.filter(x => !!x.local === (key === 'local'));
+  const max = NEWS_SECS[key].days * 864e5, now = Date.now();
+  return sec.filter(x => x && x.title && newsUrl(x.url) && Number.isFinite(Date.parse(x.published)) && now - Date.parse(x.published) <= max && newsOk(x))
+    .sort((a, b) => String(b.published).localeCompare(String(a.published)));
+}
+function newsChecked(key) {
+  const d = NEWS && NEWS.data, c = d && d[key] && Date.parse(d[key].checked);
+  return Number.isFinite(c) ? Math.min(c, NEWS.at) : (NEWS ? NEWS.at : 0);
+}
+function newsUpdated(key) {
+  const ms = newsChecked(key);
+  if (!ms) return '';
+  const fmt = o => new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', ...o }).format(new Date(ms));
+  const today = fmt({ year: 'numeric', month: 'numeric', day: 'numeric' }) === new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', year: 'numeric', month: 'numeric', day: 'numeric' }).format(new Date());
+  return 'Updated ' + (today ? '' : fmt({ weekday: 'short', day: 'numeric', month: 'short' }) + ', ') + fmt({ hour: 'numeric', minute: '2-digit' });
+}
 function newsItems() {
-  const list = NEWS && NEWS.data && Array.isArray(NEWS.data.items) ? NEWS.data.items : null;
-  if (!list) return null;
-  return list.filter(x => x && x.title && newsUrl(x.url) && Number.isFinite(Date.parse(x.published)) && newsOk(x));
+  const l = newsSec('local'), n = newsSec('nz');
+  if (!l && !n) return null;
+  return [...(l || []), ...(n || [])].sort((a, b) => String(b.published).localeCompare(String(a.published)));
 }
 function newsWhen(iso) {
   const ms = Date.parse(iso);
@@ -10306,24 +10382,30 @@ function newsEmpty(id) {
   const msg = loading ? 'Checking the news…' : 'Couldn’t load the news. Tap to try again.';
   return `<div class="list" id="${id}"><button class="row" onclick="refreshNews(true)"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">${title}</div><div class="s">${msg}</div></div></button></div>`;
 }
-function newsNone(id) {
-  return `<div class="list" id="${id}"><div class="row"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">No stories right now</div><div class="s">Nothing new from RNZ or the NZ Herald right now.</div></div></div></div>`;
+function newsNone(id, key) {
+  const msg = key === 'local' ? 'Nothing from Northland in the last week.' : key === 'nz' ? 'Nothing new from around NZ in the last few days.' : 'Nothing new from RNZ or the NZ Herald right now.';
+  return `<div class="list" id="${id}"><div class="row"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">No stories right now</div><div class="s">${msg}</div></div></div></div>`;
 }
 function homeNews() {
   const head = homeSec('News', '<a href="#news">See all</a>');
-  const items = newsItems();
-  if (!items) return head + newsEmpty('homenews');
-  if (!items.length) return head + newsNone('homenews');
-  return head + `<div class="list" id="homenews">${newsRows(items.slice(0, NEWS_HOME))}</div>`;
+  const l = newsSec('local'), n = newsSec('nz');
+  if (!l && !n) return head + newsEmpty('homenews');
+  if (!(l || []).length && !(n || []).length) return head + newsNone('homenews');
+  const nl = Math.min((l || []).length, 2), nn = Math.min((n || []).length, NEWS_HOME + 1 - nl);
+  const grp = (key, list) => list.length ? `<div class="newsgrp">${esc(NEWS_SECS[key].title)}</div><div class="list">${newsRows(list)}</div>` : '';
+  return head + `<div id="homenews">${grp('local', (l || []).slice(0, nl))}${grp('nz', (n || []).slice(0, nn))}</div>`;
 }
 function LocalNews() {
-  const link = `<a href="${NEWS_PAGE}" target="_blank" rel="noopener">RNZ</a>`;
-  const items = newsItems();
-  const body = !items ? newsEmpty('localnews') : !items.length ? newsNone('localnews') : `<div class="list" id="localnews">${newsRows(items)}</div>`;
-  return header('News', 'Northland, politics and news from around NZ') +
-    `<div class="sec">Latest from RNZ ${link} <button onclick="refreshNews(true)">${newsBusy ? 'Updating…' : 'Refresh'}</button></div>` +
-    body +
-    `<div class="foot">Headlines from RNZ (Northland, New Zealand, Politics, In Depth and Country) and the NZ Herald’s New Zealand section. Stories about courts, crime, violence, crashes, deaths or sexual matters are left out. Tap a story to open it on the source’s website. The list refreshes when you open the app, and about every 15 minutes while this page stays open.</div>`;
+  const part = (key, first) => {
+    const items = newsSec(key), id = 'news-' + key;
+    const body = !items ? newsEmpty(id) : !items.length ? newsNone(id, key) : `<div class="list" id="${id}">${newsRows(items)}</div>`;
+    const btn = first ? ` <button onclick="refreshNews(true)">${newsBusy ? 'Updating…' : 'Refresh'}</button>` : '';
+    return `<div class="sec">${esc(NEWS_SECS[key].title)}${btn}</div><div class="muted newsupd">${newsBusy ? 'Updating…' : esc(newsUpdated(key))}</div>` + body;
+  };
+  return header('News', 'Northland, and news from around NZ') +
+    `<div class="newstabs"><a href="#news-local" onclick="event.preventDefault();document.getElementById('news-local')?.scrollIntoView({behavior:'smooth',block:'center'})">Local — Northland</a><a href="#news-nz" onclick="event.preventDefault();document.getElementById('news-nz')?.scrollIntoView({behavior:'smooth',block:'center'})">New Zealand</a></div>` +
+    part('local', true) + part('nz', false) +
+    `<div class="foot">Local — Northland: RNZ Northland, plus any NZ-wide story that names a Northland place; stories drop off after 7 days. New Zealand: RNZ New Zealand, RNZ Politics, RNZ In Depth, RNZ Country and the NZ Herald’s New Zealand section; stories drop off after 3 days. Stories about courts, crime, violence, crashes, deaths or sexual matters are left out. Tap a story to open it on the source’s website. Both lists refresh when you open the app if they’re more than 15 minutes old, and about every 15 minutes while it stays open.</div>`;
 }
 function newsMoreSub() {
   const items = newsItems();
@@ -10780,6 +10862,7 @@ function sugPushes() {
   let times = ['11:15', '16:45'];
   try { const r = rosterState(), k = String(a.dow); if (r.days[k]) { const fin = ((r.ends || {})[k]) || '18:00'; const m = (+fin.slice(0, 2)) * 60 + (+fin.slice(3)) + 30; const t1 = hmFromMin(Math.min(m, 23 * 60)); times = t1 < '20:30' ? [t1, '21:00'] : [t1]; } } catch (e) {}
   let list = []; try { list = (aiSugList() || homeSuggestions() || []).map(x => String(x.text || '').trim()).filter(Boolean); } catch (e) {}
+  try { if (homeNight()) list = list.filter(nightOk); } catch (e) {} // 2.23.6: no bill pushes at night
   const used = new Set(st.sent.map(x => x.toLowerCase()));
   const out = [];
   times.forEach((t, i) => {

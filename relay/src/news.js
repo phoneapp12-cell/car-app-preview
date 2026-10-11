@@ -9,7 +9,8 @@
  *   NZ Herald (NZ section) https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/nz/?outputType=xml
  * Any story whose headline or summary is about courts, crime, violence, deaths or sexual matters is dropped
  * (BLOCK below). Headline, link, time and source name only. No article body, nothing invented, no AI.
- * Kept for 10 minutes. No logging.
+ * Two sections (2.23.6): local (Northland, up to 7 days old) and New Zealand (up to 3 days old).
+ * Kept for 10 minutes, so every request is at most 10 minutes behind the feeds. No logging.
  */
 import { decode, get } from './events.js';
 
@@ -23,7 +24,7 @@ export const NEWS_FEEDS = [
   { id: 'national', name: 'RNZ New Zealand', url: 'https://www.rnz.co.nz/rss/national.xml' },
   { id: 'herald', name: 'NZ Herald', url: 'https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/nz/?outputType=xml', host: 'www.nzherald.co.nz' }
 ];
-const KV_KEY = 'rnz-news-v3';
+const KV_KEY = 'rnz-news-v4';
 const TTL = 10 * 60 * 1000;
 const MAX_ITEMS = 12;
 const MAX_ALL = 24;
@@ -114,17 +115,14 @@ export function parseRss(xml, feed) {
     items: items.slice(0, MAX_ITEMS)
   };
 }
-// All feeds together: newest first, same story only once, at most 6 from any one feed.
-export function mergeFeeds(parts, now = Date.now()) {
-  const all = [], urls = new Set(), titles = new Set();
-  parts.forEach(p => (p.items || []).slice(0, 6).forEach(x => {
-    if (now - Date.parse(x.published) > 21 * 864e5) return; // three weeks old at most
-    const t = x.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    if (urls.has(x.url) || titles.has(t)) return;
-    urls.add(x.url); titles.add(t); all.push(x);
-  }));
-  all.sort((a, b) => b.published.localeCompare(a.published));
-  // Mix the sources: newest first, but no more than two in a row from the same feed while others are waiting.
+// 2.23.6: two sections. Local = RNZ Northland plus any NZ-wide story that names a Northland place (whole word).
+// New Zealand = everything else. Newest first in each, same story only once. Old stories don't linger:
+// local stories go after 7 days (Northland is a quiet feed), NZ-wide ones after 3 days.
+export const LOCAL_DAYS = 7, NZ_DAYS = 3, MAX_LOCAL = 12;
+const PLACE_RE = new RegExp('(^|[^a-z\u0101])(' + PLACES.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?![a-z\u0101])', 'i');
+export function namesNorthland(title) { return PLACE_RE.test(String(title || '').toLowerCase()); }
+function mixSources(all) {
+  // Newest first, but no more than two in a row from the same feed while others are waiting.
   const mixed = [];
   while (all.length) {
     const last2 = mixed.slice(-2).map(x => x.src);
@@ -132,10 +130,34 @@ export function mergeFeeds(parts, now = Date.now()) {
     if (i < 0) i = 0;
     mixed.push(all.splice(i, 1)[0]);
   }
-  all.push(...mixed);
-  return { source: 'RNZ', sourceName: 'RNZ', page: NEWS_PAGE, feed: NEWS_URL, feeds: NEWS_FEEDS.map(f => ({ name: f.name, feed: f.url })), items: all.slice(0, MAX_ALL) };
+  return mixed;
 }
-
+export function mergeFeeds(parts, now = Date.now(), prev = null) {
+  const local = [], nz = [], urls = new Set(), titles = new Set();
+  let localOk = false, nzOk = false;
+  parts.forEach(p => {
+    if (p.local) localOk = true; else nzOk = true;
+    (p.items || []).forEach((x, n) => {
+      const isLocal = p.local || x.local || namesNorthland(x.title);
+      if (!isLocal && n >= 6) return; // at most 6 NZ-wide stories from any one feed
+      const age = now - Date.parse(x.published);
+      if (!(age <= (isLocal ? LOCAL_DAYS : NZ_DAYS) * 864e5)) return;
+      const t = x.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (urls.has(x.url) || titles.has(t)) return;
+      urls.add(x.url); titles.add(t);
+      (isLocal ? local : nz).push({ ...x, local: isLocal });
+    });
+  });
+  const byDate = (a, b) => b.published.localeCompare(a.published);
+  local.sort(byDate); nz.sort(byDate);
+  const fresh = (list, days) => list.filter(x => now - Date.parse(x.published) <= days * 864e5);
+  // A section whose feeds all failed keeps its last good copy (still trimmed by age), with its old time.
+  const L = localOk || !prev || !prev.local ? { checked: new Date(now).toISOString(), items: local.slice(0, MAX_LOCAL) } : { checked: prev.local.checked, items: fresh(prev.local.items || [], LOCAL_DAYS) };
+  const N = nzOk || !prev || !prev.nz ? { checked: new Date(now).toISOString(), items: mixSources(nz).slice(0, MAX_ALL) } : { checked: prev.nz.checked, items: fresh(prev.nz.items || [], NZ_DAYS) };
+  L.days = LOCAL_DAYS; N.days = NZ_DAYS;
+  // items: both together, for older copies of the app.
+  return { source: 'RNZ', sourceName: 'RNZ', page: NEWS_PAGE, feed: NEWS_URL, feeds: NEWS_FEEDS.map(f => ({ name: f.name, feed: f.url, local: !!f.local })), local: L, nz: N, items: [...L.items, ...N.items].sort(byDate).slice(0, MAX_ALL) };
+}
 export async function getLocalNews(env = {}, fetchImpl = fetch, now = Date.now()) {
   if (mem && mem.data && Array.isArray(mem.data.items) && now - mem.at < TTL) return mem.data;
   if (env.EVENTS_KV) {
@@ -147,9 +169,9 @@ export async function getLocalNews(env = {}, fetchImpl = fetch, now = Date.now()
   }
   try {
     const res = await Promise.allSettled(NEWS_FEEDS.map(async f => parseRss(await get(f.url, fetchImpl, { headers: { Accept: 'application/rss+xml, application/xml, text/xml, */*;q=0.1' } }), f)));
-    const parts = res.filter(r => r.status === 'fulfilled').map(r => r.value);
+    const parts = res.map((r, i) => r.status === 'fulfilled' ? { ...r.value, local: !!NEWS_FEEDS[i].local } : null).filter(Boolean);
     if (!parts.length) throw (res[0] && res[0].reason) || new Error('news_unavailable');
-    const data = mergeFeeds(parts, now);
+    const data = mergeFeeds(parts, now, mem && mem.data);
     mem = { at: now, data };
     if (env.EVENTS_KV) { try { await env.EVENTS_KV.put(KV_KEY, JSON.stringify(mem)); } catch (e) { } }
     return data;

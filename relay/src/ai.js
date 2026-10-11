@@ -17,6 +17,16 @@ SUGGESTIONS: up to 3 short, specific actions he can add, each different from the
 Return ONLY JSON: {"lines":["..."],"sugs":[{"text":"...","type":"todo|note|appt","title":"..."}]}
 EXAMPLE (style only, different facts): {"lines":["Wednesday's starting at 9 degrees and drizzly, but the sun is due out by lunchtime, so leave the jacket in the car.","Sarah's Haval is due its WOF on Friday, so a quick call to book it this morning saves a scramble later.","Work runs 8:30 to 6, then it's the gym, and the spa will feel well earned after leg day.","Millesha's birthday is next Tuesday, and Saturday morning is free for sorting a present.","Hump day: the week is officially more done than not, which is the best kind of maths."],"sugs":[{"text":"Book the Haval's WOF for Friday morning?","type":"appt","title":"Haval WOF"},{"text":"Pick up a present for Millesha on Saturday?","type":"todo","title":"Millesha's present"}]}`;
 
+// 2.23.6: night (8pm to 5am NZ, ctx.night): the same voice, but a relaxed evening summary about interesting things, no money.
+const NIGHT_WRITE = `WRITE 3 or 4 bullet lines (NIGHT MODE), each one full sentence of 10 to 24 words, relaxed and evening-paced:
+1. A short read on the night: the weather now and overnight, tomorrow (work or day off, as given), nothing heavy.
+2 to 4. Built around 2 to 4 different items from interesting (news headlines, videos, New on Netflix, the Top 40, the travel spot, local events): name the real headline, title or song exactly as given, and say in a dry, cheeky way why it might be worth a look tonight. Include at least one news headline when interesting has one, and at least one video, show or song. Never invent a story's details beyond the headline.
+NIGHT RULES (strict, override everything else): never mention bills, overdue or due items, payments, invoices, the mortgage, budget, money, chores or to-dos that are jobs. No nagging. Suggestions are relaxed only: watch, read, listen, or plan something fun.
+`;
+export const SYSTEM_NIGHT = (() => {
+  const a = SYSTEM.indexOf('WRITE 4 or 5'), b = SYSTEM.indexOf('Always speak TO him');
+  return a > 0 && b > a ? SYSTEM.slice(0, a) + NIGHT_WRITE + SYSTEM.slice(b) : SYSTEM + '\n' + NIGHT_WRITE;
+})();
 function clip(v, n) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, n); }
 function parseOut(txt) {
   if (txt && typeof txt === 'object') return txt;
@@ -34,7 +44,7 @@ export async function aiSummary(env, body) {
   for (const m of MODELS) {
     try {
       r = await env.AI.run(m, {
-        messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: 'Context: ' + ctxText }],
+        messages: [{ role: 'system', content: ctx.night === true ? SYSTEM_NIGHT : SYSTEM }, { role: 'user', content: 'Context: ' + ctxText }],
         max_tokens: 700, temperature: 0.7
       });
       used = m; break;
