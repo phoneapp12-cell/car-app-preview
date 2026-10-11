@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.8';
+const APP_VERSION = '2.23.9';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8314,14 +8314,68 @@ const THEMES = [
   ['sun', 'Sunshine', 'Warm sun and soft rays', '#B8500A', '#FFF4DA', '#FFFBF2', '#2A1C0E', '#FFE7A3'],
   ['beach', 'Beach', 'Sand, sea and pōhutukawa', '#0E6E8C', '#E6F5F9', '#FFFDF7', '#122A33', '#BFE6F4'],
   ['night', 'Night sky', 'Stars and a crescent moon', '#A5B8FF', '#0B1438', '#141D47', '#E9ECFF', '#050A1F'],
-  ['bush', 'Bush walk', 'Ferns, kauri and mist', '#2F6B3A', '#EAF1E4', '#FBFCF8', '#16231A', '#DCE8D2']
+  ['bush', 'Bush walk', 'Ferns, kauri and mist', '#2F6B3A', '#EAF1E4', '#FBFCF8', '#16231A', '#DCE8D2'],
+  ['auto', 'Auto (weather)', 'Picks one of the four from the forecast', '#0E6E8C', '#E6F5F9', '#FFFDF7', '#122A33', '#BFE6F4']
 ];
+/* 2.23.9: Auto (weather). After sunset until sunrise: Night sky. In daylight, from the current Open-Meteo weather:
+   clear or mostly clear and warm (18° or more) -> Sunshine; clear, mostly clear or partly cloudy and cooler, or a
+   dry windy day (40 km/h or more) -> Beach; cloudy, fog, drizzle, rain, showers, snow or storms -> Bush walk.
+   Clear/mostly clear at 18–24° and partly cloudy at 25°+ fit both Sunshine and Beach: the pick between them is
+   seeded by the date and weather band, so it stays put for the day. No weather yet: Sunshine by day, Night sky at night. */
+function autoHash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function autoSunTimes() {
+  try {
+    const local = wxLocalNow(), d = WX && WX.data && WX.data.daily, i = d && Array.isArray(d.time) ? d.time.indexOf(local.iso) : -1;
+    if (i < 0) return null;
+    const rise = String((d.sunrise || [])[i] || '').slice(11, 16), set = String((d.sunset || [])[i] || '').slice(11, 16);
+    return rise && set ? { rise, set, now: local.hm } : null;
+  } catch (e) { return null; }
+}
+function autoThemePick() {
+  const hasWx = !!(WX && validWx(WX.data));
+  const st = hasWx ? autoSunTimes() : null;
+  let day;
+  try { day = hasWx ? wxIsDay() : null; } catch (e) { day = null; }
+  if (day == null) { const a = homeAklParts() || {}; day = a.hour >= 7 && a.hour < 19; }
+  if (!day) return { key: 'night', why: st ? (st.now >= st.set ? 'after sunset ' + fmtTime(st.set) : 'before sunrise ' + fmtTime(st.rise)) : 'night time, no forecast yet' };
+  if (!hasWx) return { key: 'sun', why: 'daytime, no forecast yet' };
+  const c = WX.data.current, code = +c.weather_code, temp = c.temperature_2m, wind = c.wind_speed_10m;
+  const w = wmo(code, true, wind), t = Math.round(temp);
+  const why = w.words.toLowerCase() + ', ' + t + '°';
+  let cands, band;
+  if (code === 3 || code >= 45) { cands = ['bush']; band = 'grey'; }
+  else if (typeof wind === 'number' && wind >= WX_WINDY) { cands = ['beach']; band = 'windy'; }
+  else if (code <= 1) { cands = temp >= 25 ? ['sun'] : temp >= 18 ? ['sun', 'beach'] : ['beach']; band = 'clear' + (temp >= 25 ? 'hot' : temp >= 18 ? 'warm' : 'cool'); }
+  else { cands = temp >= 25 ? ['sun', 'beach'] : ['beach']; band = 'pc' + (temp >= 25 ? 'hot' : 'mild'); }
+  const key = cands.length > 1 ? cands[autoHash(todayISO() + '|' + band) % cands.length] : cands[0];
+  return { key, why };
+}
+let autoLastKey = '';
+function autoThemeTick() {
+  if (!S || !S.settings || themeKey() !== 'auto') return;
+  const k = autoThemePick().key;
+  if (k === autoLastKey) return;
+  const first = !autoLastKey;
+  let reduce = false; try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (!first && !reduce && document.startViewTransition && document.visibilityState === 'visible') { try { document.startViewTransition(() => applyTheme()); } catch (e) { applyTheme(); } }
+  else applyTheme();
+  if ((location.hash || '').slice(1) === 'settings') { try { const n = document.getElementById('themenow'); if (n) n.outerHTML = themeNowNote(); } catch (e) {} }
+}
+setInterval(() => { try { autoThemeTick(); } catch (e) {} }, 10 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { try { autoThemeTick(); } catch (e) {} } });
+function themeNowNote() {
+  if (themeKey() !== 'auto') return '';
+  const p = autoThemePick(), th = THEMES.find(x => x[0] === p.key);
+  return `<div class="muted themenow" id="themenow">Now: ${esc(th ? th[1] : p.key)} (${esc(p.why)})</div>`;
+}
 const themeKey = () => { const t = S && S.settings && S.settings.theme; return THEMES.some(x => x[0] === t) ? t : 'teal'; };
 const phoneDark = () => { try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; } };
 // Match phone: Dark when the phone is in dark mode, otherwise the chosen light theme (Teal if Dark was chosen)
 function effectiveTheme() {
   const t = themeKey();
+  if (t === 'auto') return autoThemePick().key;
   if (!S || !S.settings || !S.settings.themeAuto) return t;
+  if (t === 'auto') return autoThemePick().key; // 2.23.9: Auto (weather) looks after night itself
   if (t === 'night') return 'night'; // already dark
   return phoneDark() ? 'dark' : t === 'dark' ? 'teal' : t;
 }
@@ -8331,21 +8385,23 @@ function applyTheme() {
   const th = THEMES.find(x => x[0] === t), m = document.querySelector('meta[name="theme-color"]');
   if (m && m.content !== th[7]) m.content = th[7];
   try { themeArtApply(t); } catch (e) { }
-  try { localStorage.setItem('theme', JSON.stringify({ t: themeKey(), auto: !!(S.settings && S.settings.themeAuto) })); } catch (e) { }
+  if (themeKey() === 'auto') autoLastKey = t;
+  try { localStorage.setItem('theme', JSON.stringify({ t: themeKey(), auto: !!(S.settings && S.settings.themeAuto), e: t })); } catch (e) { }
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S && S.settings.themeAuto) { applyTheme(); render(); } }); } catch (e) { }
 async function setTheme(k) {
   if (!THEMES.some(x => x[0] === k)) return;
   const s = snap(); S.settings.theme = k; applyTheme(); await save(); render();
   const th = THEMES.find(x => x[0] === k);
+  if (k === 'auto') { const p = autoThemePick(), n = THEMES.find(x => x[0] === p.key); toast(`Auto (weather) on. Now: ${n ? n[1] : p.key}.`, 'Undo', undoTo(s)); return; }
   toast(`${th[1]} theme on.${S.settings.themeAuto && (k === 'dark' ? !phoneDark() : phoneDark()) ? ' Match phone is on, so you’ll see it when the phone is in ' + (k === 'dark' ? 'dark' : 'light') + ' mode.' : ''}`, 'Undo', undoTo(s));
 }
 async function toggleThemeAuto() { S.settings.themeAuto = !S.settings.themeAuto; applyTheme(); await save(); render(); }
 function themePicker() {
   const cur = themeKey();
   return `<div class="themes" id="themepicker" role="radiogroup" aria-label="Colour theme">${THEMES.map(([k, name, note, brand, bg, card, ink]) =>
-    `<button class="theme ${k === cur ? 'on' : ''}${GFX_THEMES.includes(k) ? ' tgfx' : ''}" role="radio" aria-checked="${k === cur}" data-theme-key="${k}" aria-label="${name} theme${note ? ' (' + note.toLowerCase() + ')' : ''}" onclick="setTheme('${k}')">
-      ${GFX_THEMES.includes(k) ? `<span class="tprev tp-${k}">${taPrev(k)}<span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span></span>` : `<span class="tprev" style="background:${bg}"><span class="tbar" style="background:${k === 'dark' ? card : brand}"></span><span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span><span class="tbtn" style="background:${brand}"></span></span>`}
+    `<button class="theme ${k === cur ? 'on' : ''}${GFX_THEMES.includes(k) || k === 'auto' ? ' tgfx' : ''}" role="radio" aria-checked="${k === cur}" data-theme-key="${k}" aria-label="${name} theme${note ? ' (' + note.toLowerCase() + ')' : ''}" onclick="setTheme('${k}')">
+      ${k === 'auto' ? `<span class="tprev tp-auto">${GFX_THEMES.map(g => `<span class="tq tp-${g}">${taPrev(g)}</span>`).join('')}</span>` : GFX_THEMES.includes(k) ? `<span class="tprev tp-${k}">${taPrev(k)}<span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span></span>` : `<span class="tprev" style="background:${bg}"><span class="tbar" style="background:${k === 'dark' ? card : brand}"></span><span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span><span class="tbtn" style="background:${brand}"></span></span>`}
       <span class="tname">${k === cur ? I('check') : ''}${name}</span></button>`).join('')}</div>`;
 }
 
@@ -9442,6 +9498,7 @@ function updWx() {
   const nwx = document.getElementById('notifwx'); if (nwx) nwx.outerHTML = homeTry('weather strip', () => notifWxStrip()); // 2.22.29
   else if ((h === 'home' || h === '') && !homeEdit && wxInUp()) render();
   paintHomeSum();
+  try { autoThemeTick(); } catch (e) { } // 2.23.9
 }
 function paintHomeSum() {
   try { lawnAutoTodo(); } catch (e) {}
@@ -13359,9 +13416,10 @@ function Settings() {
   ${websiteSettingsRow()}
   <div class="sec" id="appearance">Appearance</div>
   ${themePicker()}
+  ${themeNowNote()}
   ${textSizePicker()}
   <div class="list" style="margin-top:10px">
-   <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">${themeKey() === 'night' ? 'Night sky is already dark, so it stays on either way' : 'Use Dark when the phone is in dark mode' + (themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t')}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">${themeKey() === 'auto' ? 'Auto (weather) switches to Night sky after sunset by itself, so this has no effect' : themeKey() === 'night' ? 'Night sky is already dark, so it stays on either way' : 'Use Dark when the phone is in dark mode' + (themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t')}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
   </div>
   <div class="sec">Notifications page</div>
   <div class="list">

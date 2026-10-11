@@ -20,6 +20,7 @@
     var t = JSON.parse(localStorage.getItem('theme') || 'null');
     if (t) {
       var k = t.t;
+      if (k === 'auto') { k = t.e || 'sun'; t.auto = false; }
       if (t.auto) k = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : (k === 'dark' ? 'teal' : k);
       if (t.auto && t.t === 'night') k = 'night';
       var bar = { teal: '#0F766E', blue: '#1D5FBF', green: '#2E7D32', purple: '#6D3FC4', orange: '#B4530A', dark: '#0E1412', sun: '#FFE7A3', beach: '#BFE6F4', night: '#050A1F', bush: '#DCE8D2' }[k];
@@ -1216,6 +1217,11 @@ html[data-theme="night"] .hcat{filter:drop-shadow(0 0 6px rgba(200,210,255,.25))
 .tprev.tp-bush{background:linear-gradient(180deg,#DCE8D2,#C9DABF)}
 .tprev svg{position:absolute;inset:0;width:100%;height:100%}
 .tprev.tp-sun .tcard,.tprev.tp-beach .tcard,.tprev.tp-night .tcard,.tprev.tp-bush .tcard{top:auto;bottom:6px;left:30%;right:7px;opacity:.92}
+.tprev.tp-auto{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;background:rgba(128,128,128,.25)}
+.tprev.tp-auto .tq{position:relative;display:block;overflow:hidden}
+.tq.tp-sun{background:linear-gradient(180deg,#FFE7A3,#FFF4DA)}.tq.tp-beach{background:linear-gradient(180deg,#BFE6F4,#E6F5F9)}.tq.tp-night{background:linear-gradient(180deg,#050A1F,#18215A)}.tq.tp-bush{background:linear-gradient(180deg,#DCE8D2,#C9DABF)}
+.tq svg{position:absolute;inset:0;width:100%;height:100%}
+.themenow{font-size:.875rem;margin:8px 4px 0}
 </style>
 </head>
 <body>
