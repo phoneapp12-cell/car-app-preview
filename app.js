@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.96';
+const APP_VERSION = '2.22.97';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2349,14 +2349,55 @@ const AI_FACTS = ['52, wife Sarah, daughters Millesha and Cass, granddaughter Ar
   'Likes gym (Tue and Wed after work), gardening, bushwalks, beaches, movies, books, AI music like Suno, tech',
   'Monday evenings at his mum\u2019s; Sunday cleaning job until 7pm; spa around 10 to 11pm; dinner 8 to 9pm on weekdays',
   'Works at Noel Leeming Superstore, Whang\u0101rei; night owl', 'Likes tips on tidying, sorting and organising'];
+// 2.22.97: the summary is written for right now. Part of day: morning before 12, afternoon 12 to 4:59 pm,
+// evening 5 to 8:59 pm, night from 9 pm. Work and the Sunday cleaning job are described as still to come, on now or done.
+const sumPod = min => min < 720 ? 'morning' : min < 1020 ? 'afternoon' : min < 1260 ? 'evening' : 'night';
+const hmMin = hm => /^([01]\d|2[0-3]):[0-5]\d$/.test(hm || '') ? (+hm.slice(0, 2)) * 60 + (+hm.slice(3)) : null;
+const CLEAN_END = 19 * 60; // Sunday cleaning job until 7 pm
+function sumToday(a) {
+  a = a || homeAklParts() || {};
+  const min = Number.isFinite(a.min) ? a.min : 0, out = { min, dow: a.dow, pod: sumPod(min), work: null, clean: null };
+  try {
+    const r = rosterState(), k = String(a.dow), st = hmMin(r.days[k]), en = hmMin((r.ends || {})[k]);
+    if (st != null) out.work = { start: r.days[k], end: (r.ends || {})[k] || '', phase: min < st ? 'later' : en != null && min >= en ? 'done' : 'now' };
+  } catch (e) {}
+  if (a.dow === 0) out.clean = { phase: min >= CLEAN_END ? 'done' : 'later' };
+  return out;
+}
+// Changes when the part of day changes, or work / the cleaning job moves from to-come to done: a saved summary isn't reused across it.
+function sumPhaseKey() { const t = sumToday(); return [todayISO(), t.pod, t.work ? t.work.phase : '-', t.clean ? t.clean.phase : '-'].join('|'); }
+const POD_ORDER = ['morning', 'afternoon', 'evening', 'night'];
+const timesIn = txt => { const out = new Set(), x = String(txt || '');
+  for (const m of x.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi)) { let h = +m[1] % 12; if (/pm/i.test(m[3])) h += 12; out.add(h * 60 + (+m[2] || 0)); }
+  for (const m of x.matchAll(/\b([01]\d|2[0-3]):([0-5]\d)\b/g)) out.add(+m[1] * 60 + +m[2]);
+  return out; };
+// Drop AI lines that would be wrong right now: another part of the day, something still to come said as done, or a made-up work time.
+function aiLineOk(line, t, allowed) {
+  const x = String(line || ''), pod = t.pod, pi = POD_ORDER.indexOf(pod);
+  const ok = w => { w = w.toLowerCase(); return w === pod || (w === 'evening' && pod === 'night') || (w === 'night' && pod === 'evening' && t.min >= 20 * 60); };
+  for (const m of x.matchAll(/\b(?:now that it'?s|it'?s now|as it'?s|since it'?s|it'?s|on this|good)\s+(?:a\s+|an\s+|the\s+)?(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|lovely|quiet|wet|sunny|fine|cold|warm)\s+)?(morning|afternoon|evening|night)\b/gi)) if (!ok(m[1])) return false;
+  for (const m of x.matchAll(/\bthis (morning|afternoon|evening)\b/gi)) if (POD_ORDER.indexOf(m[1].toLowerCase()) < pi) return false; // already gone
+  const pastAfter = ev => new RegExp("\\b(?:you'?ve|you have|now that|having)\\b[^.]*\\bafter (?:the |your )?(?:" + ev + ")|\\b(?:" + ev + ")[^.]*\\b(?:is |'s |are )?(?:done|over|finished|wrapped up|behind you)\\b", 'i');
+  if (t.clean && t.clean.phase !== 'done' && pastAfter('cleaning(?: job)?').test(x)) return false;
+  if (t.work && t.work.phase !== 'done' && pastAfter('work|your shift|the shift|noel leeming').test(x)) return false;
+  const aboutWork = /\b(noel leeming|your shift|work day|workday|at work|work (?:starts|finishes|runs|ends)|knock off)\b/i.test(x) && !/\btomorrow\b/i.test(x);
+  if (aboutWork && !t.work) return false; // not a work day
+  if (aboutWork) for (const v of timesIn(x)) if (!allowed.has(v)) return false; // a time that isn't in the roster or context
+  return true;
+}
 function aiSumCtx() {
   const a = homeAklParts() || {};
   const WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const ctx = { day: WD[a.dow] || '', time: Number.isFinite(a.min) ? String(Math.floor(a.min / 60)).padStart(2, '0') + ':' + String(a.min % 60).padStart(2, '0') : '' };
+  const tt = sumToday(a); // 2.22.97
+  ctx.now = ctx.time ? fmtTime(ctx.time) : ''; ctx.partOfDay = tt.pod;
+  ctx.timeRule = 'It is ' + ctx.now + ' on ' + ctx.day + ', the ' + tt.pod + '. Write for right now: never call it any other part of the day (no "this evening" vibe in the afternoon). Things later today are still to come; only say something is done or "after" it once it has finished. Use work times exactly as given in work; never invent or change a time.';
   try { const p = placeHere(); ctx.place = p ? (p === 'home' || p === 'work' || p === 'gym' ? p : ((S.settings.places || []).find(x => x.id === p) || {}).name || 'a saved place') : 'out and about'; } catch (e) {}
   try {
     const r = rosterState(), k = String(a.dow);
-    ctx.work = r.days[k] ? 'work day, starts ' + r.days[k] + ((r.ends || {})[k] ? ', finishes ' + r.ends[k] : '') : 'day off';
+    const ph = tt.work ? { later: 'not started yet', now: 'on now', done: 'finished for today' }[tt.work.phase] : '';
+    ctx.work = r.days[k] ? 'Noel Leeming shift today from ' + fmtTime(r.days[k]) + ((r.ends || {})[k] ? ' to ' + fmtTime(r.ends[k]) : ' (finish time not set: do not give one)') + ', ' + ph : 'day off: no Noel Leeming shift today, do not mention work today';
+    if (tt.clean) ctx.cleaningJob = 'Sunday cleaning job, finishes 7:00 pm: ' + (tt.clean.phase === 'done' ? 'done for today' : 'still to come today');
     const k2 = String((a.dow + 1) % 7); ctx.tomorrow = r.days[k2] ? 'work day, starts ' + r.days[k2] : 'day off'; // 2.22.56
     const WDn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; ctx.daysOff = Object.keys(r.days || {}).length ? WDn.filter((_, i) => !r.days[String(i)]) : ['Saturday', 'Sunday'];
   } catch (e) {}
@@ -2409,12 +2450,12 @@ function aiSumCtx() {
   return ctx;
 }
 async function aiSumFetch() {
-  if (aiSumBusy || aiSumOpen === homeSugOpenN || navigator.onLine === false) return;
+  if (aiSumBusy || (aiSumOpen === homeSugOpenN && (!AI_SUM || AI_SUM.phase === sumPhaseKey())) || navigator.onLine === false) return; // 2.22.97: a new part of day gets a fresh summary
   // 2.22.82: reuse the last summary for 1 hour, then write a new one.
   try {
     const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null');
-    if (last && Array.isArray(last.lines) && last.lines.length && Date.now() - last.at < 3600 * 1000) {
-      AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: homeSugOpenN, at: last.at };
+    if (last && Array.isArray(last.lines) && last.lines.length && Date.now() - last.at < 3600 * 1000 && last.phase === sumPhaseKey()) {
+      AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: homeSugOpenN, at: last.at, phase: last.phase };
       aiSumOpen = homeSugOpenN;
       const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
       return;
@@ -2426,25 +2467,28 @@ async function aiSumFetch() {
     // 2.22.54: give the weather a few seconds to arrive first, so the one summary drawn has it
     for (let i = 0; i < 10 && !WX && wxBusy; i++) await new Promise(r => setTimeout(r, 500));
     // 2.22.63: 30s timeout and one retry, so a slow AI moment doesn't drop the summary
+    const ctxNow = aiSumCtx(), phase = sumPhaseKey(), tNow = sumToday(), allowed = timesIn(JSON.stringify(ctxNow));
     const once = async () => {
       const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const tm = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} }, 30000);
-      try { const r = await fetch(RELAY_URL + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ctx: aiSumCtx() }), signal: ctl ? ctl.signal : undefined });
+      try { const r = await fetch(RELAY_URL + '/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ctx: ctxNow }), signal: ctl ? ctl.signal : undefined });
         if (!r.ok) throw new Error('http ' + r.status); return await r.json(); } finally { clearTimeout(tm); }
     };
     let d; try { d = await once(); if (!d || !Array.isArray(d.lines) || !d.lines.length) throw new Error('empty'); } catch (e1) { d = await once(); }
     if (!d || !Array.isArray(d.lines) || !d.lines.length) throw new Error('empty');
-    AI_SUM = { lines: d.lines.slice(0, 5).map(x => String(x).slice(0, 220)), sugs: (d.sugs || []).slice(0, 3), open: openN, at: Date.now() };
+    const kept = d.lines.slice(0, 5).map(x => String(x).slice(0, 220)).filter(x => aiLineOk(x, tNow, allowed)); // 2.22.97
+    if (!kept.length) throw new Error('all_lines_dropped');
+    AI_SUM = { lines: kept, sugs: (d.sugs || []).slice(0, 3).filter(x => aiLineOk(String((x && x.text) || ''), tNow, allowed)), open: openN, at: Date.now(), phase };
     aiSumOpen = openN;
     try { localStorage.setItem('aiSumLast', JSON.stringify(AI_SUM)); } catch (e) {}
     const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
   } catch (e) {
     aiSumOpen = openN; // no AI this open: reuse the last AI summary if it's under 1 hour old, else the usual summary
-    try { const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null'); if (last && Array.isArray(last.lines) && Date.now() - last.at < 3600 * 1000) AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: openN, at: last.at }; } catch (e3) {}
+    try { const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null'); if (last && Array.isArray(last.lines) && Date.now() - last.at < 3600 * 1000 && last.phase === sumPhaseKey()) AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: openN, at: last.at, phase: last.phase }; } catch (e3) {}
     try { const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; } } catch (e2) {}
   } finally { aiSumBusy = false; }
 }
-function aiSumFresh() { return !!(AI_SUM && AI_SUM.open === homeSugOpenN && Date.now() - AI_SUM.at < 3600 * 1000); }
+function aiSumFresh() { return !!(AI_SUM && AI_SUM.open === homeSugOpenN && Date.now() - AI_SUM.at < 3600 * 1000 && AI_SUM.phase === sumPhaseKey()); }
 function aiSumBullets() {
   if (!aiSumFresh()) return '';
   const walkDog = /\b(walk|walking)\b/i; const dog = /\b(zeus|dog|dogs)\b/i;
