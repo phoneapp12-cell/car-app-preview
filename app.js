@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.3';
+const APP_VERSION = '2.23.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3393,6 +3393,60 @@ function homeFeedKeys(keys) {
   return out;
 }
 
+
+/* 2.23.4: at night (8pm–5am NZ) the Notifications feed opens with the interesting things: news, blogs, videos,
+   local events, TV, Top 40, the travel spot and starred ideas. Bills, Upcoming, due cards, to-dos and notes
+   follow underneath. A small "New" tag marks a card whose top items changed since it was last on screen. */
+function homeNight(now = new Date()) {
+  const h = +new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', hourCycle: 'h23' }).format(now) % 24;
+  return h >= 20 || h < 5;
+}
+const NIGHT_KEYS = ['news', 'blogging', 'videos', 'events', 'tv', 'top40', 'travel', 'ideas'];
+const NIGHT_CARD = {
+  videos: () => {
+    if (homeOn('videos')) return HOME_CARD.videos();
+    const sarah = currentSarahVideo();
+    let list = preferFilmVideoTitles(videoSuggestions() || []);
+    if (sarah) list = [sarah].concat(list.filter(v => v.id !== sarah.id));
+    list = list.slice(0, 3);
+    if (!list.length) return '';
+    return `<div class="sec"><a class="sechead" href="#videos">Videos</a><a href="#videos">All videos</a></div><div class="list" id="homevideos">${list.map(homeVideoRow).join('')}</div>`;
+  },
+  top40: () => {
+    const top = (typeof TOP40 !== 'undefined' ? TOP40 : []).slice(0, 3);
+    if (!top.length) return '';
+    return homeSec('Top 40 this week', '<a href="#top40">See all</a>') + `<div class="list" id="hometop40">${top.map(v => `<button class="row" onclick="go('#top40')"><div class="ic vid">${I('play')}</div>
+      <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div></div></button>`).join('')}</div>`;
+  },
+  travel: () => {
+    const p = travelToday(); if (!p || !p.name) return '';
+    const first = String((p.paras && p.paras[0]) || '').split(/(?<=\.)\s/)[0];
+    return homeSec('Today’s travel spot', '<a href="#travel">Open</a>') + `<div class="list" id="hometravel"><button class="row" onclick="go('#travel')"><div class="ic ev">${I('globe')}</div>
+      <div class="tx"><div class="t">${esc(p.name)}, ${esc(p.country)}</div><div class="s">${esc(travelKmText(travelKm(p.lat, p.lon)))} away${first ? ' · ' + esc(first) : ''}</div></div></button></div>`;
+  }
+};
+const NIGHT_SEEN_KEY = 'nightSeen.v1';
+let nightSeenPend = {};
+function nightSig(html) { // the titles inside a card, so changing times or counts don't count as new
+  const t = []; String(html).replace(/class="t">([\s\S]*?)<\/div>/g, (_, x) => { t.push(x.replace(/<[^>]+>/g, '').trim()); return ''; });
+  const str = t.slice(0, 5).join('|'); let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return str ? String(h) : '';
+}
+function nightIsNew(k, html) {
+  const sig = nightSig(html); if (!sig) return false;
+  let seen = {}; try { seen = JSON.parse(localStorage.getItem(NIGHT_SEEN_KEY) || '{}') || {}; } catch (e) { }
+  nightSeenPend[k] = sig;
+  return seen[k] !== undefined && seen[k] !== sig; // first time a card shows, it just gets remembered
+}
+function nightSeenCommit() {
+  if (!Object.keys(nightSeenPend).length) return;
+  let seen = {}; try { seen = JSON.parse(localStorage.getItem(NIGHT_SEEN_KEY) || '{}') || {}; } catch (e) { }
+  Object.assign(seen, nightSeenPend); nightSeenPend = {};
+  try { localStorage.setItem(NIGHT_SEEN_KEY, JSON.stringify(seen)); } catch (e) { }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) nightSeenCommit(); });
+window.addEventListener('hashchange', () => { if (!/^#?(home)?$/.test(location.hash)) nightSeenCommit(); });
+
 // 2.22.21: one bad Home piece logs and drops out instead of blanking the whole app.
 function homeTry(label, fn, fb = '') {
   try { const v = fn(); return v == null ? fb : v; } catch (e) { console.error('Home ' + label, e); return fb; }
@@ -3413,8 +3467,11 @@ function Home() {
   // 2.22.52: anything due within 14 days (or overdue) brings its own section card into the feed, after Upcoming
   homeDueCards = homeTry('due cards', () => notifDueCards(), new Set());
   { const add = [...homeDueCards].filter(k => !keys.includes(k)); const at = keys.indexOf('attention'); keys.splice(at < 0 ? Math.min(1, keys.length) : at + 1, 0, ...add); }
+  // 2.23.4: night order. Interesting things first, everything else (due, bills, to-dos, notes) still there underneath.
+  const night = homeTry('night', () => homeNight(), false);
+  if (night) { const fun = NIGHT_KEYS.filter(k => !keys.includes(k)); keys.splice(0, keys.length, ...fun, ...keys.filter(k => !NIGHT_KEYS.includes(k))); }
   // 1.15.0: each section sits in its own block with a divider line between them
-  const parts = keys.map(k => { try { return [k, (NOTIF_CARD[k] || HOME_CARD[k])()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
+  const parts = keys.map(k => { try { return [k, ((night && NIGHT_CARD[k]) || NOTIF_CARD[k] || HOME_CARD[k])()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
   const groups = parts.map(([k, h]) => ({ k, keys: [k], h }));
   const tintN = groups.length;
   const shown = new Set(parts.map(([k]) => k));
@@ -3427,7 +3484,8 @@ function Home() {
   groups.forEach((g, i) => {
     try {
       const body = homeHasHeading(g.k, g.h) ? g.h : homeSec(HOME[g.k][2]) + g.h;
-      sections.push({ keys: g.keys, html: `<section class="hsec" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${body}</section>` });
+      const fresh = night && NIGHT_KEYS.includes(g.k) && homeTry('new', () => nightIsNew(g.k, g.h), false);
+      sections.push({ keys: g.keys, html: `<section class="hsec${fresh ? ' hnew' : ''}" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${fresh ? '<span class="newtag">New</span>' : ''}${body}</section>` });
     } catch (e) { console.error('Home section', g.k, e); }
   });
   let at = 0;
@@ -3459,8 +3517,8 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
-    sumForCar + feed + `${homeTry('sync note', () => syncNote())}
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + (night ? '' : homeTry('book ask', () => bookAskCard())) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+    sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
 }
