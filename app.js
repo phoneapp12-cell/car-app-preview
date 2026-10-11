@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.99';
+const APP_VERSION = '2.23.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12990,7 +12990,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) sumT
 function travelMoreSub() { try { const p = travelToday(); return esc(p.name) + ' · ' + esc(p.country); } catch (e) { return 'A new place every day'; } }
 
 
-/* ================= HEADER CAT (2.22.99) =================
+/* ================= HEADER CAT (2.22.99; grey and bigger 2.23.0) =================
    A little cat next to the Notifications title. Its mood follows NZ time: lively in the early morning, getting
    sleepier through the day, curled up asleep at night. Inline SVG + CSS only; checks the time once a minute. */
 function catState(now = new Date()) {
@@ -13003,7 +13003,7 @@ function catHtml() {
   const ears = (a, b) => `<path class="cear" d="${a}"/><path class="cearin" d="${b}"/>`;
   return `<button type="button" class="hcat cat-${st}" id="hcat" aria-label="The cat is ${CAT_WORDS[st]}" onclick="catPoke(event)"><svg viewBox="0 0 48 40" aria-hidden="true">
 <g class="csit">
-  <path class="ctail" d="M33 35 C42 35 46 27 42 17"/>
+  <path class="ctail" d="M33 35 C42 35 46 27 42 17"/><path class="ctail ctip" pathLength="100" d="M33 35 C42 35 46 27 42 17"/>
   <ellipse class="cfur" cx="24" cy="30" rx="11" ry="8.5"/>
   <ellipse class="cbelly" cx="24" cy="32" rx="5.5" ry="5"/>
   <ellipse class="cfur cpawl" cx="19.5" cy="37.6" rx="3" ry="1.9"/>
@@ -13021,7 +13021,7 @@ function catHtml() {
 </g>
 <g class="csleep">
   <g class="cbreath">
-    <path class="ctail2" d="M38 33 C38 39 22 40 13 37"/>
+    <path class="ctail2" d="M38 33 C38 39 22 40 13 37"/><path class="ctail2 ctip" pathLength="100" d="M38 33 C38 39 22 40 13 37"/>
     <ellipse class="cfur" cx="26" cy="30" rx="13.5" ry="7.5"/>
     ${ears('M8.5 26 L8.8 18.5 L13.5 22.5 Z', 'M9.6 23.8 L9.8 20.7 L12 22.4 Z')}${ears('M19 24.5 L17.5 17.8 L13.8 22 Z', 'M17.6 22.8 L17 20 L15.2 22.1 Z')}
     <circle class="cfur" cx="13.5" cy="29" r="6.6"/>
