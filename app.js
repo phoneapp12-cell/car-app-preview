@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.97';
+const APP_VERSION = '2.22.98';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2566,7 +2566,8 @@ function homeSceneCard(inner, noSugs) {
   let sugs = '';
   try { sugs = noSugs ? '' : homeSugHtml(); } catch (e) { sugs = ''; }
   let nf = ''; try { nf = nfHtml(); } catch (e) { nf = ''; } // 2.22.87: New on Netflix, at the very bottom
-  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${sugs}${nf}</div></div>`;
+  let tr = ''; try { tr = sumTravelHtml(); } catch (e) { tr = ''; } // 2.22.98: today's travel spot, above Netflix
+  return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${sugs}${tr}${nf}</div></div>`;
 }
 function homeSumFallback() {
   try { return homeSceneCard('<p class="sumnote">Nothing much to flag right now. Have a good one.</p>'); }
@@ -12966,6 +12967,26 @@ function Travel() {
     </div>
     <div class="foot">A new place each day at midnight NZ time, ${TRAVEL.length} places before any repeat. Tomorrow: somewhere in ${esc(tmr.country)}. Distances are straight-line from 16 Sherwood Road, Onerahi.</div>`;
 }
+// 2.22.98: one app-written line in the Home summary (no AI), same daily pick as the Travel tab. The place opens Travel.
+function sumTravelTime(tz, now = new Date()) {
+  return new Intl.DateTimeFormat('en-NZ', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(now).replace(/\s+/g, ' ').toLowerCase();
+}
+function sumTravelHtml() {
+  const p = travelToday();
+  if (!p || !p.name) return '';
+  return `<div class="sumtr" id="sumtr">Today’s travel spot: <a class="sumplace" href="#travel">${esc(p.name)}, ${esc(p.country)}</a> — ${esc(travelKmText(travelKm(p.lat, p.lon)))} away, where it’s <span class="sumtrt" data-tz="${esc(p.tz)}">${esc(sumTravelTime(p.tz))}</span>.</div>`;
+}
+function sumTravelTick() {
+  try {
+    const el = document.querySelector('#sumtr .sumtrt');
+    if (!el) return;
+    const p = travelToday();
+    if (el.dataset.tz !== p.tz) { document.getElementById('sumtr').outerHTML = sumTravelHtml(); return; } // new day, new place
+    const t = sumTravelTime(p.tz); if (el.textContent !== t) el.textContent = t;
+  } catch (e) { }
+}
+setInterval(sumTravelTick, 20000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) sumTravelTick(); });
 function travelMoreSub() { try { const p = travelToday(); return esc(p.name) + ' · ' + esc(p.country); } catch (e) { return 'A new place every day'; } }
 
 /* ================= SETTINGS ================= */
