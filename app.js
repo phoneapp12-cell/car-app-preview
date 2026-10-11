@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.22.98';
+const APP_VERSION = '2.22.99';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3459,7 +3459,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications' + homeTry('cat', () => catHtml(), ''), `Hi ${esc(name)} · ${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}`) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('book ask', () => bookAskCard()) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
     sumForCar + feed + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -12988,6 +12988,72 @@ function sumTravelTick() {
 setInterval(sumTravelTick, 20000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) sumTravelTick(); });
 function travelMoreSub() { try { const p = travelToday(); return esc(p.name) + ' · ' + esc(p.country); } catch (e) { return 'A new place every day'; } }
+
+
+/* ================= HEADER CAT (2.22.99) =================
+   A little cat next to the Notifications title. Its mood follows NZ time: lively in the early morning, getting
+   sleepier through the day, curled up asleep at night. Inline SVG + CSS only; checks the time once a minute. */
+function catState(now = new Date()) {
+  const h = +new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', hourCycle: 'h23' }).format(now) % 24;
+  return h >= 5 && h < 9 ? 'energetic' : h >= 9 && h < 13 ? 'alert' : h >= 13 && h < 17 ? 'tired' : h >= 17 && h < 21 ? 'drowsy' : 'sleep';
+}
+const CAT_WORDS = { energetic: 'wide awake', alert: 'alert', tired: 'a bit tired', drowsy: 'drowsy', sleep: 'asleep' };
+function catHtml() {
+  const st = catState();
+  const ears = (a, b) => `<path class="cear" d="${a}"/><path class="cearin" d="${b}"/>`;
+  return `<button type="button" class="hcat cat-${st}" id="hcat" aria-label="The cat is ${CAT_WORDS[st]}" onclick="catPoke(event)"><svg viewBox="0 0 48 40" aria-hidden="true">
+<g class="csit">
+  <path class="ctail" d="M33 35 C42 35 46 27 42 17"/>
+  <ellipse class="cfur" cx="24" cy="30" rx="11" ry="8.5"/>
+  <ellipse class="cbelly" cx="24" cy="32" rx="5.5" ry="5"/>
+  <ellipse class="cfur cpawl" cx="19.5" cy="37.6" rx="3" ry="1.9"/>
+  <ellipse class="cfur cpaw" cx="28.5" cy="37.6" rx="3" ry="1.9"/>
+  <g class="chead">
+    ${ears('M15.5 13 L16.5 3.5 L23 9 Z', 'M17.2 10.5 L17.6 6.4 L20.6 9 Z')}${ears('M32.5 13 L31.5 3.5 L25 9 Z', 'M30.8 10.5 L30.4 6.4 L27.4 9 Z')}
+    <circle class="cfur" cx="24" cy="15.5" r="9"/>
+    <path class="cstripe" d="M21.5 7.4 L22.4 10.2 M24 7 L24 10 M26.5 7.4 L25.6 10.2"/>
+    <ellipse class="ceye" cx="20.3" cy="15.4" rx="1.7" ry="2.3"/><ellipse class="ceye" cx="27.7" cy="15.4" rx="1.7" ry="2.3"/>
+    <path class="clid" d="M18.4 13.6 Q20.3 12.2 22.2 13.6 M25.8 13.6 Q27.7 12.2 29.6 13.6"/>
+    <path class="cnose" d="M22.9 18.6 L25.1 18.6 L24 19.8 Z"/>
+    <ellipse class="cmouth" cx="24" cy="21.6" rx="1.7" ry="1.9"/>
+    <path class="cwhisk" d="M14 18 L19 18.8 M14.4 20.6 L19 19.8 M34 18 L29 18.8 M33.6 20.6 L29 19.8"/>
+  </g>
+</g>
+<g class="csleep">
+  <g class="cbreath">
+    <path class="ctail2" d="M38 33 C38 39 22 40 13 37"/>
+    <ellipse class="cfur" cx="26" cy="30" rx="13.5" ry="7.5"/>
+    ${ears('M8.5 26 L8.8 18.5 L13.5 22.5 Z', 'M9.6 23.8 L9.8 20.7 L12 22.4 Z')}${ears('M19 24.5 L17.5 17.8 L13.8 22 Z', 'M17.6 22.8 L17 20 L15.2 22.1 Z')}
+    <circle class="cfur" cx="13.5" cy="29" r="6.6"/>
+    <path class="cshut" d="M9.6 29 Q11 30.4 12.4 29 M14.6 29 Q16 30.4 17.4 29"/>
+    <path class="cnose" d="M12.5 31.3 L14.5 31.3 L13.5 32.3 Z"/>
+    <ellipse class="cfur" cx="17.5" cy="35.6" rx="3.2" ry="1.8"/>
+  </g>
+  <text class="cz cz1" x="30" y="18">z</text><text class="cz cz2" x="35" y="12">z</text><text class="cz cz3" x="40" y="6">Z</text>
+</g>
+</svg><span class="cbub" aria-hidden="true"></span></button>`;
+}
+function catTick() {
+  const el = document.getElementById('hcat');
+  if (!el) return;
+  const st = catState();
+  if (el.classList.contains('cat-' + st)) return;
+  el.className = el.className.replace(/\bcat-(energetic|alert|tired|drowsy|sleep)\b/, 'cat-' + st);
+  el.setAttribute('aria-label', 'The cat is ' + CAT_WORDS[st]);
+}
+setInterval(catTick, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) catTick(); });
+let catPokeT = null;
+function catPoke(e) {
+  try { if (e) e.stopPropagation(); } catch (x) { }
+  const el = document.getElementById('hcat'); if (!el) return;
+  catTick();
+  const st = catState(), bub = el.querySelector('.cbub');
+  const says = { energetic: ['Meow!', 'Mrrp!', 'Play?'], alert: ['Meow!', 'Mrrp?', 'Hi!'], tired: ['Mew…', 'Meow.', 'Nap soon?'], drowsy: ['mew…', '*yawn*', 'Bedtime?'], sleep: ['purr…', 'zzz…', 'mrrr…'] }[st];
+  if (bub) bub.textContent = says[Math.floor(Math.random() * says.length)];
+  el.classList.remove('react'); void el.offsetWidth; el.classList.add('react');
+  clearTimeout(catPokeT); catPokeT = setTimeout(() => el.classList.remove('react'), 1600);
+}
 
 /* ================= SETTINGS ================= */
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
