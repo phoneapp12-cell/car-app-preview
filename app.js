@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.4';
+const APP_VERSION = '2.23.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -304,7 +304,7 @@ const HOME = { // key: [icon, icon colour class, name, what it shows, on by defa
   summary: ['shield', 'car', 'Overdue, due soon, all good', 'The three counters', 1],
   attention: ['warn', 'bill', 'Upcoming', 'Everything due soon or overdue, plus this week’s appointments and calendar events', 1],
   events: ['ticket', 'ev', 'What’s on in Whangārei', 'Local events coming up', 1],
-  news: ['news', 'ln', 'Local news', 'Recent stories from around Whangārei', 1],
+  news: ['news', 'ln', 'News', 'Northland, politics and human-interest stories from RNZ', 1],
   videos: ['play', 'vid', 'Videos', 'A few suggestions from the video categories you leave on', 0],
   blogging: ['pen', 'blog', 'Blogging', 'Recent posts from other blogs', 0],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Recent episodes from other podcasts', 0],
@@ -2374,6 +2374,7 @@ const timesIn = txt => { const out = new Set(), x = String(txt || '');
 // Drop AI lines that would be wrong right now: another part of the day, something still to come said as done, or a made-up work time.
 function aiLineOk(line, t, allowed) {
   const x = String(line || ''), pod = t.pod, pi = POD_ORDER.indexOf(pod);
+  if (/\b(court case|in court|murder\w*|homicide|manslaughter|sentenced|jailed|stabb\w*|shooting|assault\w*|sexual|rape\w*|indecent|gang\w*|fatal crash)\b/i.test(x)) return false; // 2.23.5: no crime news
   const ok = w => { w = w.toLowerCase(); return w === pod || (w === 'evening' && pod === 'night') || (w === 'night' && pod === 'evening' && t.min >= 20 * 60); };
   for (const m of x.matchAll(/\b(?:now that it'?s|it'?s now|as it'?s|since it'?s|it'?s|on this|good)\s+(?:a\s+|an\s+|the\s+)?(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|lovely|quiet|wet|sunny|fine|cold|warm)\s+)?(morning|afternoon|evening|night)\b/gi)) if (!ok(m[1])) return false;
   for (const m of x.matchAll(/\bthis (morning|afternoon|evening)\b/gi)) if (POD_ORDER.indexOf(m[1].toLowerCase()) < pi) return false; // already gone
@@ -3141,7 +3142,7 @@ function homeReadLine(mentioned) {
     try { headlines = newsItems(); } catch (e) { headlines = null; }
     if (headlines && headlines.length) {
       const story = headlines.find(x => x && x.title && !/\broadworks?\b/i.test(x.title) && !homeSaysTv(x.title));
-      if (story) reads.push({ title: String(story.title), text: 'RNZ has this from around here: ' + homeQuote(String(story.title).replace(/\s+/g, ' ').trim()) + '.' });
+      if (story) reads.push({ title: String(story.title), text: (story.local === false ? 'RNZ has this: ' : 'RNZ has this from around here: ') + homeQuote(String(story.title).replace(/\s+/g, ' ').trim()) + '.' });
     }
     for (let i = 0; i < reads.length; i++) {
       const r = reads[i];
@@ -10237,14 +10238,18 @@ function loadNews() {
 function newsUrl(u) {
   try {
     const x = new URL(String(u || ''));
-    if (x.protocol === 'https:' && x.hostname === 'www.rnz.co.nz') return x.toString();
+    if (x.protocol === 'https:' && (x.hostname === 'www.rnz.co.nz' || x.hostname === 'www.nzherald.co.nz')) return x.toString();
   } catch (e) { }
   return '';
 }
+// 2.23.5: human interest and politics only. The relay already drops these; this catches anything saved earlier.
+const NEWS_BLOCK = /\b(courts?|courtroom|trials?|retrial|jury|sentenc\w*|judges?|jail\w*|prisons?|prisoners?|inmates?|charged|charges? laid|facing charges|accused|guilty|convict\w*|acquit\w*|plead\w*|bail|parole|murder\w*|homicides?|manslaughter|kill\w*|death of|deaths?|died|dies|dead|bod(y|ies) found|remains found|coroner\w*|inquest|stab\w*|shooting|shootings|shooters?|shot dead|shot|gunm[ae]n|guns?|firearms?|armed|weapons?|assault\w*|attack\w*|violen\w*|brawl\w*|abus\w*|rap(e|ed|es|ist|ists)|sexual\w*|sex|sexually|indecen\w*|porn\w*|exploit\w*|grooming|molest\w*|paedophil\w*|pedophil\w*|harass\w*|stalk(ing|er|ed)|gangs?|gang\w+|police hunt|manhunt|arrest\w*|offend\w*|offender\w*|kidnap\w*|abduct\w*|hostage\w*|terror\w*|bomb(s|ed|er|ers|ing|ings)?|explosi\w*|fatal\w*|crash victims?|drown\w*|suicid\w*|execut(e|ed|es|ion|ions)|war|wars|warfare|massacre\w*|genocide|riot\w*|robber\w*|burglar\w*|ram raid\w*|stolen|injur(ed|ies|y)|hit[ -]and[ -]run|crash(es|ed)?|collisions?|police (are )?(appeal\w*|investigat\w*|seek\w*)|sought|missing (man|woman|person|teen|boy|girl|child))\b/i;
+const NEWS_SAFE = /\b(ticking time bomb|time bomb|bombshell|green shoots|price wars?|war of words|heart attacks?|panic attacks?|shot in the arm|long shot|big shots?|death of the high street)\b/gi;
+const newsOk = x => !NEWS_BLOCK.test(String(x.title || '').replace(NEWS_SAFE, ' '));
 function newsItems() {
   const list = NEWS && NEWS.data && Array.isArray(NEWS.data.items) ? NEWS.data.items : null;
   if (!list) return null;
-  return list.filter(x => x && x.title && newsUrl(x.url) && Number.isFinite(Date.parse(x.published)));
+  return list.filter(x => x && x.title && newsUrl(x.url) && Number.isFinite(Date.parse(x.published)) && newsOk(x));
 }
 function newsWhen(iso) {
   const ms = Date.parse(iso);
@@ -10291,21 +10296,21 @@ function updNews() {
 function newsRows(list) {
   return list.map(x => {
     const when = newsWhen(x.published);
-    const sub = ['RNZ', when].filter(Boolean).join(' · ');
+    const sub = [x.src || 'RNZ', when].filter(Boolean).join(' · ');
     return `<a class="row" href="${esc(newsUrl(x.url))}" target="_blank" rel="noopener"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc(sub)}</div></div></a>`;
   }).join('');
 }
 function newsEmpty(id) {
   const loading = newsBusy || (!newsFailed && navigator.onLine !== false);
-  const title = loading ? 'Local news' : 'Not available';
-  const msg = loading ? 'Checking RNZ Northland…' : 'Couldn’t load local news. Tap to try again.';
+  const title = loading ? 'News' : 'Not available';
+  const msg = loading ? 'Checking the news…' : 'Couldn’t load the news. Tap to try again.';
   return `<div class="list" id="${id}"><button class="row" onclick="refreshNews(true)"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">${title}</div><div class="s">${msg}</div></div></button></div>`;
 }
 function newsNone(id) {
-  return `<div class="list" id="${id}"><div class="row"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">No local stories</div><div class="s">Nothing about Whangārei or Northland in the latest RNZ list.</div></div></div></div>`;
+  return `<div class="list" id="${id}"><div class="row"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">No stories right now</div><div class="s">Nothing new from RNZ or the NZ Herald right now.</div></div></div></div>`;
 }
 function homeNews() {
-  const head = homeSec('Local news', '<a href="#news">See all</a>');
+  const head = homeSec('News', '<a href="#news">See all</a>');
   const items = newsItems();
   if (!items) return head + newsEmpty('homenews');
   if (!items.length) return head + newsNone('homenews');
@@ -10315,10 +10320,10 @@ function LocalNews() {
   const link = `<a href="${NEWS_PAGE}" target="_blank" rel="noopener">RNZ</a>`;
   const items = newsItems();
   const body = !items ? newsEmpty('localnews') : !items.length ? newsNone('localnews') : `<div class="list" id="localnews">${newsRows(items)}</div>`;
-  return header('Local news', 'Around Whangārei') +
+  return header('News', 'Northland, politics and news from around NZ') +
     `<div class="sec">Latest from RNZ ${link} <button onclick="refreshNews(true)">${newsBusy ? 'Updating…' : 'Refresh'}</button></div>` +
     body +
-    `<div class="foot">Headlines from RNZ Northland. Tap a story to open it on RNZ. The list refreshes when you open the app, and about every 15 minutes while this page stays open.</div>`;
+    `<div class="foot">Headlines from RNZ (Northland, New Zealand, Politics, In Depth and Country) and the NZ Herald’s New Zealand section. Stories about courts, crime, violence, crashes, deaths or sexual matters are left out. Tap a story to open it on the source’s website. The list refreshes when you open the app, and about every 15 minutes while this page stays open.</div>`;
 }
 function newsMoreSub() {
   const items = newsItems();
