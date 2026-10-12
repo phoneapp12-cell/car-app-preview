@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.15';
+const APP_VERSION = '2.23.16';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13759,6 +13759,7 @@ function Settings() {
   ${themeNowNote()}
   ${textSizePicker()}
   ${mascotPicker()}
+  ${bottomTabsSetting()}
   <div class="list" style="margin-top:10px">
    <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">${themeKey() === 'auto' ? 'Auto (weather) switches to Night sky after sunset by itself, so this has no effect' : themeKey() === 'night' ? 'Night sky is already dark, so it stays on either way' : 'Use Dark when the phone is in dark mode' + (themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t')}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
   </div>
@@ -15442,6 +15443,96 @@ async function setRosterDay(day, value) {
   toast(value ? 'Start time saved.' : 'That day is off.', 'Undo', undoTo(snapS));
 }
 
+
+/* ---------- bottom tabs (2.23.16) ----------
+   Optional, off by default: the side strip stays exactly as it is. Settings › Appearance › Bottom tabs turns on a bar
+   along the bottom with 3 to 6 tabs he picks from every section (plus Notifications, Weather, Settings and More,
+   which opens the side strip). Order by press-and-hold drag or the up/down buttons. Long-press a tab to customise.
+   Saved in S.settings.bottomTabs, so it goes with sync and backup like other settings. Hidden while typing. */
+const BT_MIN = 3, BT_MAX = 6;
+const BT_DEFAULT = ['home', 'todo', 'shopping', 'bills', 'more'];
+function btMeta(k) {
+  if (k === 'home') return ['Notifications', 'Home', 'home'];
+  if (k === 'weather') return ['Weather', 'Weather', 'cloudsun'];
+  if (k === 'settings') return ['Settings', 'Settings', 'gear'];
+  if (k === 'more') return ['More (opens the side menu)', 'More', 'more'];
+  const n = NAV[k]; return n ? [n[2].replace('&amp;', '&'), n[3], n[0]] : null;
+}
+const BT_ALL = () => ['home', ...NAV_DEFAULT, 'weather', 'settings', 'more'].filter((k, i, a) => btMeta(k) && a.indexOf(k) === i);
+function btState() {
+  S.settings = S.settings || {};
+  const b = S.settings.bottomTabs && typeof S.settings.bottomTabs === 'object' ? S.settings.bottomTabs : (S.settings.bottomTabs = { on: false, keys: BT_DEFAULT.slice() });
+  const ok = new Set(BT_ALL());
+  b.keys = (Array.isArray(b.keys) ? b.keys : BT_DEFAULT.slice()).filter((k, i, a) => ok.has(k) && a.indexOf(k) === i).slice(0, BT_MAX);
+  if (b.keys.length < BT_MIN) b.keys = BT_DEFAULT.slice();
+  b.on = !!b.on;
+  return b;
+}
+let btPress = null, btLong = false;
+function bottomTabs(route) {
+  let nav = document.getElementById('btabs');
+  const b = btState();
+  document.body.classList.toggle('btabs-on', b.on);
+  if (!b.on) { if (nav) nav.remove(); return; }
+  if (!nav) {
+    nav = document.createElement('nav'); nav.id = 'btabs'; nav.className = 'btabs'; nav.setAttribute('aria-label', 'Bottom tabs');
+    document.getElementById('app').appendChild(nav);
+    nav.addEventListener('contextmenu', e => e.preventDefault());
+    nav.addEventListener('pointerdown', e => { const t = e.target.closest('button'); if (!t) return; btLong = false; clearTimeout(btPress); btPress = setTimeout(() => { btLong = true; if (navigator.vibrate) try { navigator.vibrate(15); } catch (x) {} btCustomise(); }, 550); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => nav.addEventListener(ev, () => clearTimeout(btPress)));
+  }
+  const item = ROUTE_ITEM[route] || route || 'home';
+  const cur = item === '' ? 'home' : item;
+  const over = (() => { try { return dueItems(S).filter(x => x.days < 0).length; } catch (e) { return 0; } })();
+  nav.innerHTML = b.keys.map(k => { const [full, short, ic] = btMeta(k); const on = k === cur || (k === 'more' && route === 'more');
+    return `<button type="button" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} aria-label="${esc(full)}" data-bt="${k}" onclick="btGo('${k}')"><span class="w">${I(ic)}${k === 'home' && over ? `<span class="badge">${over}</span>` : ''}</span><span class="lbl">${esc(short)}</span></button>`; }).join('');
+  nav.style.setProperty('--btn', b.keys.length);
+}
+function btGo(k) {
+  if (btLong) { btLong = false; return; } // the long press opened the customiser
+  if (k === 'more') { setTabsOpen(!tabsOpen); return; }
+  setTabsOpen(false); go('#' + k);
+}
+let btDraft = null;
+function btListHtml() {
+  const rows = btDraft.map((k, i) => { const [full, , ic] = btMeta(k);
+    return `<div class="srow btrow" data-k="${k}"><span class="bthandle" aria-hidden="true">⋮⋮</span><div class="ic">${I(ic)}</div><div class="tx"><div class="t">${esc(full)}</div></div>
+      <button type="button" class="iconbtn" aria-label="Move ${esc(full)} up" ${i === 0 ? 'disabled' : ''} onclick="btMove(${i},-1)">▲</button><button type="button" class="iconbtn" aria-label="Move ${esc(full)} down" ${i === btDraft.length - 1 ? 'disabled' : ''} onclick="btMove(${i},1)">▼</button>
+      <button type="button" class="iconbtn" aria-label="Remove ${esc(full)}" ${btDraft.length <= BT_MIN ? 'disabled' : ''} onclick="btRemove(${i})">${I('x')}</button></div>`; }).join('');
+  const rest = BT_ALL().filter(k => !btDraft.includes(k));
+  return `<p class="muted" style="margin:-4px 2px 8px">${btDraft.length} of ${BT_MAX} tabs. Press and hold ⋮⋮ to drag, or use the arrows.</p><div class="list" id="btlist">${rows}</div>
+    <div class="sec" style="margin-top:14px">Add a tab</div>${btDraft.length >= BT_MAX ? '<p class="muted" style="margin:0 2px">Six is the most. Remove one to add another.</p>' : ''}
+    <div class="chips btadd">${rest.map(k => `<button type="button" class="chip" ${btDraft.length >= BT_MAX ? 'disabled' : ''} onclick="btAdd('${k}')">${I('plus')} ${esc(btMeta(k)[0])}</button>`).join('')}</div>`;
+}
+function btRedraw() { const el = document.getElementById('btedit'); if (el) { el.innerHTML = btListHtml(); btWireDrag(); } }
+function btMove(i, d) { const j = i + d; if (j < 0 || j >= btDraft.length) return; [btDraft[i], btDraft[j]] = [btDraft[j], btDraft[i]]; btRedraw(); }
+function btRemove(i) { if (btDraft.length <= BT_MIN) return; btDraft.splice(i, 1); btRedraw(); }
+function btAdd(k) { if (btDraft.length >= BT_MAX || btDraft.includes(k)) return; btDraft.push(k); btRedraw(); }
+function btWireDrag() {
+  const list = document.getElementById('btlist'); if (!list) return;
+  let d = null;
+  list.querySelectorAll('.bthandle').forEach(h => h.addEventListener('pointerdown', e => {
+    const row = h.closest('.btrow'); e.preventDefault();
+    d = { row, k: row.dataset.k, y0: e.clientY, h: row.offsetHeight };
+    row.classList.add('dragging'); h.setPointerCapture(e.pointerId);
+    h.onpointermove = ev => { if (!d) return; const dy = ev.clientY - d.y0; d.row.style.transform = `translateY(${dy}px)`; const i = btDraft.indexOf(d.k), steps = Math.round(dy / d.h), j = Math.max(0, Math.min(btDraft.length - 1, i + steps)); d.to = j; };
+    h.onpointerup = h.onpointercancel = () => { if (!d) return; const i = btDraft.indexOf(d.k), j = d.to == null ? i : d.to; d = null; if (j !== i) { btDraft.splice(j, 0, btDraft.splice(i, 1)[0]); } btRedraw(); };
+  }));
+}
+function btCustomise() {
+  btDraft = btState().keys.slice();
+  openSheet('Bottom tabs', `<div id="btedit">${btListHtml()}</div>`, async () => {
+    if (btDraft.length < BT_MIN) return 'Pick at least three tabs.';
+    const s = snap(), b = btState(); b.keys = btDraft.slice(0, BT_MAX); b.on = true; await save(); render(); toast('Bottom tabs saved.', 'Undo', undoTo(s));
+  }, 'Save');
+  btWireDrag();
+}
+async function toggleBottomTabs() { const s = snap(), b = btState(); b.on = !b.on; await save(); render(); toast(b.on ? 'Bottom tabs on. Long-press one to change them.' : 'Bottom tabs off.', 'Undo', undoTo(s)); }
+function bottomTabsSetting() {
+  const b = btState();
+  return `<div class="list" id="btset" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Bottom tabs</div><div class="s">${b.on ? esc(b.keys.map(k => btMeta(k)[1]).join(' · ')) : 'Off. The side menu stays either way.'}</div></div><button class="switch ${b.on ? 'on' : ''}" role="switch" aria-checked="${b.on}" aria-label="Bottom tabs" onclick="toggleBottomTabs()"></button></div>
+    <button class="row" id="btcustom" onclick="btCustomise()"><div class="tx"><div class="t">Choose bottom tabs</div><div class="s">Pick 3 to 6 and put them in order</div></div>${I('right')}</button></div>`;
+}
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
@@ -15491,6 +15582,7 @@ function render() {
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
+  try { bottomTabs(r); } catch (e) { console.error('Bottom tabs', e); }
   try {
     if ((r === 'home' || r === '') && homeEdit) wireReorder();
     if ((r === 'home' || r === '') && !homeEdit) {
