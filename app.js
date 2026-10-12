@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.28';
+const APP_VERSION = '2.23.29';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9068,13 +9068,13 @@ function mascotPicker() {
   const cur = mascotKey();
   return `<div class="list" id="mascotpick" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Mascot</div><div class="s">The ${cur} next to Notifications. Its mood follows the time of day.</div></div>
     <div class="seg mascotseg" role="radiogroup" aria-label="Mascot" style="width:100%">${Object.keys(MASCOTS).map(k => `<button type="button" class="${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-mascot="${k}" onclick="setMascot('${k}')">${mascotMini(k)}<span>${MASCOTS[k].name}</span></button>`).join('')}</div>
-    <div class="tx" style="flex-basis:100%;margin-top:10px"><div class="t">Style</div><div class="s">${mascotArt() === 'krea' ? 'Krea art: a picture made with Krea' : 'Drawn: the original moving drawing'}</div></div>
-    <div class="seg mascotseg" id="mascotart" role="radiogroup" aria-label="Mascot style" style="width:100%">${[['svg', 'Drawn'], ['krea', 'Krea art']].map(([a, l]) => `<button type="button" class="${a === mascotArt() ? 'on' : ''}" role="radio" aria-checked="${a === mascotArt()}" data-art="${a}" onclick="setMascotArt('${a}')">${mascotMini(mascotKey(), a)}<span>${l}</span></button>`).join('')}</div></div></div>`;
+    <div class="tx" style="flex-basis:100%;margin-top:10px"><div class="t">Style</div><div class="s">${MASCOT_ARTS.find(x => x[0] === mascotArt())[2]}</div></div>
+    <div class="seg mascotseg" id="mascotart" role="radiogroup" aria-label="Mascot style" style="width:100%">${MASCOT_ARTS.map(([a, l]) => `<button type="button" class="${a === mascotArt() ? 'on' : ''}" role="radio" aria-checked="${a === mascotArt()}" data-art="${a}" onclick="setMascotArt('${a}')">${mascotMini(mascotKey(), a)}<span>${l}</span></button>`).join('')}</div></div></div>`;
 }
 async function setMascotArt(a) {
-  if (a !== 'svg' && a !== 'krea' || a === mascotArt()) return;
+  if (!MASCOT_ARTS.some(x => x[0] === a) || a === mascotArt()) return;
   const s = snap(); S.settings.mascotArt = a; await save(); render();
-  toast(a === 'krea' ? 'Krea art mascot on.' : 'Drawn mascot on.', 'Undo', undoTo(s));
+  toast(MASCOT_ARTS.find(x => x[0] === a)[1] + ' mascot on.', 'Undo', undoTo(s));
 }
 async function setMascot(k) {
   if (!MASCOTS[k] || k === mascotKey()) return;
@@ -14122,15 +14122,17 @@ const MASCOTS = {
 const mascotKey = () => { const k = S && S.settings && S.settings.mascot; return MASCOTS[k] ? k : 'cat'; };
 // 2.23.28: art style. 'svg' (default, drawn) or 'krea' (Krea-made picture, mascot/<cat|dog>-krea.webp). Moods, sleep and taps
 // are CSS on the picture; if it fails to load, the SVG shows instead.
-const mascotArt = () => S && S.settings && S.settings.mascotArt === 'krea' ? 'krea' : 'svg';
-const kreaImg = k => `<img class="kimg" alt="" src="mascot/${k}-krea.webp" onerror="this.parentNode.classList.remove('hkrea');this.remove()">`;
+// 2.23.29: 'life' = lifelike photo (mascot/<k>-life.webp, Krea 2 Large, background removed)
+const MASCOT_ARTS = [['svg', 'Drawn', 'Drawn: the original moving drawing'], ['krea', 'Krea art', 'Krea art: a cartoon picture made with Krea'], ['life', 'Lifelike', 'Lifelike: a photo-style picture made with Krea']];
+const mascotArt = () => { const a = S && S.settings && S.settings.mascotArt; return a === 'krea' || a === 'life' ? a : 'svg'; };
+const kreaImg = (k, a) => `<img class="kimg${(a || mascotArt()) === 'life' ? ' klife' : ''}" alt="" src="mascot/${k}-${(a || mascotArt()) === 'life' ? 'life' : 'krea'}.webp" onerror="this.parentNode.classList.remove('hkrea');this.remove()">`;
 function catHtml() {
   const st = catState(), k = mascotKey(), m = MASCOTS[k];
   const img = m.img ? `<img class="mimg" alt="" src="${m.img}${st}.webp" onload="this.parentNode.classList.add('hasimg')" onerror="this.parentNode.classList.remove('hasimg');this.remove()">` : '';
-  const kr = mascotArt() === 'krea';
+  const kr = mascotArt() !== 'svg';
   return `<button type="button" class="hcat cat-${st}${k === 'dog' ? ' hdog' : ''}${kr ? ' hkrea' : ''}" id="hcat" aria-label="The ${k} is ${CAT_WORDS[st]}" onclick="catPoke(event)">${k === 'dog' ? dogSvg() : catSvg()}${kr ? kreaImg(k) + '<span class="kz" aria-hidden="true"><i>z</i><i>z</i><i>Z</i></span>' : img}<span class="ctrip" aria-hidden="true"></span><span class="cbub" aria-hidden="true"></span></button>`;
 }
-function mascotMini(k, art) { const kr = (art || mascotArt()) === 'krea'; return `<span class="hcat mprev cat-alert${k === 'dog' ? ' hdog' : ''}${kr ? ' hkrea' : ''}" aria-hidden="true">${k === 'dog' ? dogSvg() : catSvg()}${kr ? kreaImg(k) : ''}</span>`; }
+function mascotMini(k, art) { const kr = (art || mascotArt()) !== 'svg'; return `<span class="hcat mprev cat-alert${k === 'dog' ? ' hdog' : ''}${kr ? ' hkrea' : ''}" aria-hidden="true">${k === 'dog' ? dogSvg() : catSvg()}${kr ? kreaImg(k, art) : ''}</span>`; }
 function dogSvg() {
   return `<svg viewBox="0 0 48 40" aria-hidden="true">
 <g class="csit">
@@ -16498,6 +16500,7 @@ async function start() {
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
   // 2.22.21: a failure here must not leave a blank screen or skip service worker registration (updates).
+  try { if (S && S.settings && !S.settings.lifeMig29) { if (S.settings.mascotArt === 'krea') S.settings.mascotArt = 'life'; S.settings.lifeMig29 = true; await save(); } } catch (e) { } // 2.23.29: Krea art → Lifelike, once
   try { if (S && S.settings && !S.settings.jaRestore25) { delete S.settings.justSeenAt; S.settings.jaRestore25 = true; await save(); } } catch (e) { } // 2.23.25: bring back a Just added list cleared by accident
   try { await loadCal(); } catch (e) { console.error('loadCal', e); }
   try { await loadMail(); } catch (e) { console.error('loadMail', e); }
