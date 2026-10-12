@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.42';
+const APP_VERSION = '2.23.43';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3758,10 +3758,10 @@ function Home() {
       <div class="hcar-track" id="hcartrack">${carItems}</div>
       <div class="hcar-dots">${carDots}</div>
     </div>
-    <p class="hcar-hint muted">Swipe for next · double-tap for list</p>${feedPill('feedpillcar')}
+    ${feedPill('feedpillcar')}
   </div>` : '';
   const listFeed = sections.length ? `<div class="hfeed" id="homefeed" data-mode="list">
-    <p class="hcar-hint muted">Double-tap for carousel</p>
+    
     ${listBody}
   </div>` : '';
   // 2.22.28: nothing to show, so say so instead of leaving a gap
