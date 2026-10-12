@@ -1,4 +1,4 @@
-import { sharedTodoRoute } from './shared-todo.js';
+import { sharedTodoRoute, sharedCarRoute } from './shared-todo.js';
 import { brandsRoute } from './brands.js';
 /* Calendar link relay for the Due Dates app (plus three fixed, read-only extras: /events, /weather and /closures).
  *
@@ -350,6 +350,17 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       if (data && data.error) return json(status, data.error, origin, env);
       return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) { return json(502, 'brands_unavailable', origin, env); }
+  }
+  if (path === '/shared-car') {
+    if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    let body;
+    try { const raw = await request.text(); if (raw.length > 2048) return json(413, 'too_large', origin, env); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
+    try {
+      const [status, data] = await sharedCarRoute(body, env);
+      if (data && data.error) return json(status, data.error, origin, env);
+      return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (e) { return json(502, 'shared_unavailable', origin, env); }
   }
   if (path === '/shared-todo') {
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);

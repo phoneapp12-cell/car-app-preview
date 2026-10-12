@@ -28,3 +28,17 @@ test2('brand travels on an item and is cleaned', () => {
   assert2.equal(ci2({ id: 'abcd2', title: 'Milk', updated: 5, brand: { price: 3 } }, 10).brand, undefined);
   assert2.equal(ci2({ id: 'abcd3', title: 'Milk', updated: 5, brand: { any: true } }, 10).brand.any, true);
 });
+
+import { cleanItem as ci3, cleanCar, sharedCarRoute } from '../src/shared-todo.js';
+test2('appointment details ride only on Appointments items; car is cleaned and stored', async () => {
+  const a = ci3({ id: 'appt1', title: 'Dentist', list: 'Appointments', due: '2026-10-20', updated: 5, appt: { type: 'dentist', time: '09:30', place: 'Onerahi Dental', x: 1 } }, 10);
+  assert2.deepEqual(a.appt, { type: 'dentist', time: '09:30', place: 'Onerahi Dental' });
+  assert2.equal(ci3({ id: 'appt2', title: 'Milk', list: 'Shopping', updated: 5, appt: { type: 'dentist' } }, 10).appt, undefined);
+  assert2.equal(cleanCar({ plate: 'pnu312', wof: '2026-10-16', rego: 'bad', svcKm: '45,000' }).plate, 'PNU312');
+  assert2.equal(cleanCar({ plate: 'pnu312', rego: 'bad' }).rego, '');
+  const kv = new Map(), env = { EVENTS_KV: { get: async k => kv.has(k) ? JSON.parse(kv.get(k)) : null, put: async (k, v) => kv.set(k, v) } };
+  const key = 'k'.repeat(40);
+  assert2.equal((await sharedCarRoute({ key }, env))[1].car, null);
+  await sharedCarRoute({ key, car: { plate: 'PNU312', wof: '2026-10-16' } }, env);
+  assert2.equal((await sharedCarRoute({ key }, env))[1].car.wof, '2026-10-16');
+});

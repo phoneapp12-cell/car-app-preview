@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.16';
+const APP_VERSION = '2.23.17';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2465,7 +2465,7 @@ function aiSumCtx() {
   } catch (e) {}
   try { // 2.22.58: today's and this week's events (calendar feeds and his own appointments) plus big Auckland concerts
     const t0 = todayT(), T = todayISO(), ev = [];
-    (S.appts || []).forEach(a => { if (a && a.title && a.date >= T && a.date <= addDays(T, 7)) ev.push({ date: a.date, title: a.title, time: a.time ? fmtTime(a.time) : '' }); });
+    (S.appts || []).forEach(a => { if (a && a.title && a.from !== 'sarah' && a.date >= T && a.date <= addDays(T, 7)) ev.push({ date: a.date, title: a.title, time: a.time ? fmtTime(a.time) : '' }); });
     extEvents(t0, t0 + 7 * DAY).forEach(e => { if (e.time !== 'Cont.') ev.push({ date: e.date, title: e.title, time: e.time && e.time !== 'All day' ? e.time : '' }); });
     const seen = new Set(), line = e => e.title + (e.time ? ' ' + e.time : '');
     const uniq = ev.filter(e => { const k = e.date + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).sort((x, y) => x.date < y.date ? -1 : 1);
@@ -3547,8 +3547,8 @@ const CU_EXTRA = {
   // My events, appointments and calendars beyond the Upcoming window, out to 30 days
   mineLater: T => mineItems(T + 2 * DAY, T + CU_DAYS * DAY, true).filter(e => !e.done).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: e.title,
     html: attRow({ kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'mine', icon: 'repeat', title: esc(e.title) + (e.hm ? ' ' + fmtTime(e.hm) : ''), sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}` }) }; }),
-  apptLater: T => S.appts.filter(a => { const d = daysLeft(a.date); return d > ATT_WEEK && d <= CU_DAYS; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: a.title,
-    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: esc(a.title) + (a.time ? ' ' + fmtTime(a.time) : ''), sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) }; }),
+  apptLater: T => S.appts.filter(a => { const d = daysLeft(a.date); return d > ATT_WEEK && d <= CU_DAYS && !(a.from === 'sarah' && a.done); }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: a.title,
+    html: attRow({ kind: 'appt', date: a.date, go: a.from === 'sarah' ? `apptForm('${a.id}')` : `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: (a.from === 'sarah' ? sarahBadge({ from: 'sarah' }) : '') + esc(a.title) + (a.time ? ' ' + fmtTime(a.time) : ''), sub: `${a.from === 'sarah' ? 'Sarah’s ' + esc((SARAH_APPT_TYPE[a.kind] || 'appointment').toLowerCase()) + (a.place ? ' · ' + esc(a.place) : '') : a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) }; }),
   extLater: T => { const seen = new Set(); return extEvents(T + (ATT_WEEK + 1) * DAY, T + CU_DAYS * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '', kind: 'ext', name: e.title,
     html: attRow({ kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal', title: esc(e.title), sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}` }) }; }); },
   // Pills still to take today
@@ -3606,7 +3606,8 @@ function justAddedList(now = Date.now()) {
   (S.bills || []).forEach(b => { if (b.paid) return; const inv = b.invoice; const at = inv && inv.at ? (Number(inv.at) || Date.parse(inv.at) || 0) : 0;
     if (at) add(at, { who: 'auto', ic: 'bill', icon: billIcon(b.name), title: esc(b.name), sub: `Added from ${esc(inv.from || 'an')} email · ${money(b.amount)} due ${fmtW(b.due)}`, go: `go('#bills')` });
     else add(uidTime(b.id), { ic: 'bill', icon: billIcon(b.name), title: esc(b.name), sub: `Bill · ${money(b.amount)} due ${fmtW(b.due)}`, go: `go('#bills')` }); });
-  (S.appts || []).forEach(a => add(uidTime(a.id), { ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: esc(a.title), sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? ' ' + fmtTime(a.time) : ''}`, go: `calOpenDay(${parseD(a.date)})` }));
+  (S.appts || []).filter(a => a.from === 'sarah').forEach(a => add(Number(a.created) || 0, { who: 'sarah', ic: 'appt', icon: 'cal', title: sarahBadge({ from: 'sarah' }) + esc(a.title), sub: `Sarah’s ${esc((SARAH_APPT_TYPE[a.kind] || 'appointment').toLowerCase())} · ${fmtW(a.date)}${a.time ? ' ' + fmtTime(a.time) : ''}`, go: `apptForm('${a.id}')` }));
+  (S.appts || []).filter(a => a.from !== 'sarah').forEach(a => add(uidTime(a.id), { ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: esc(a.title), sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? ' ' + fmtTime(a.time) : ''}`, go: `calOpenDay(${parseD(a.date)})` }));
   (S.myEvents || []).forEach(e => add(uidTime(e.id), { ic: 'mine', icon: 'repeat', title: esc(e.title), sub: `My event · from ${fmtW(e.start)}`, go: `mineForm('${e.id}')` }));
   (S.birthdays || []).forEach(b => add(uidTime(b.id), { ic: 'bday', icon: 'cake', title: esc(b.name) + '’s birthday', sub: 'Birthday', go: `go('#birthdays')` }));
   (S.countdowns || []).forEach(c => add(uidTime(c.id), { ic: 'count', icon: 'clock', title: esc(c.name), sub: 'Countdown · ' + fmtW(c.date), go: `go('#countdown')` }));
@@ -4264,26 +4265,65 @@ const mineTodoView = t => ({ id: t.id, title: t.title, list: t.sharedList || 'Ho
 const SH = {
   state: () => { S.settings.shared = S.settings.shared && typeof S.settings.shared === 'object' ? S.settings.shared : {}; return S.settings.shared; },
   items: () => [...(S.todos || []).filter(isSarahTodo), ...(S.todos || []).filter(isMineShared).map(mineTodoView),
-    ...((S.shop && S.shop.items) || []).filter(x => isSarahShop(x) || isMineShared(x)).map(sarahShopView)],
+    ...((S.shop && S.shop.items) || []).filter(x => isSarahShop(x) || isMineShared(x)).map(sarahShopView),
+    ...(S.appts || []).filter(a => a && a.from === 'sarah').map(sarahApptView)],
   by: t => (t && t.by) || (isSarahTodo(t) ? 'sarah' : 'shane'),
   want: () => true,
   add: x => {
     const mine = x.by === 'shane';
+    if (x.list === 'Appointments' && !mine) { S.appts.push(sarahApptFrom(x)); return; } // 2.23.17: her doctor/dentist appointments go in the calendar
     if (isSarahShopList(x.list)) { const it = sarahShopItem(x); if (mine) { delete it.from; it.sharedS = true; } S.shop.items.push(it); return; }
     if (mine) { S.todos.push({ id: x.id, title: x.title, list: (S.lists && S.lists[0]) || 'To-do', sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), sharedS: true }); return; }
     S.todos.push({ id: x.id, title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), from: 'sarah' }); },
   update: (t, x) => {
+    if (t._appt) { Object.assign(t._appt, sarahApptFrom(x), { id: t._appt.id }); return; }
     if (!!t._shop !== isSarahShopList(x.list)) { SH.remove(t.id); SH.add(Object.assign({}, x, { created: t.created || x.created, by: SH.by(t) })); return; } // moved to or from her Shopping list
     if (t._todo) { const o = t._todo; Object.assign(o, { title: x.title, sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) o.doneAt = o.doneAt || x.doneAt || Date.now(); else delete o.doneAt; return; } // your own: stays on your list
     if (t._shop) { const it = t._shop; Object.assign(it, { name: String(x.title || '').slice(0, 120), list: x.list, due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done }); if (x.brand) it.brand = x.brand; else delete it.brand; if (x.done) it.doneAt = it.doneAt || x.doneAt || Date.now(); else delete it.doneAt; return; }
     Object.assign(t, { title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) t.doneAt = x.doneAt || Date.now(); else delete t.doneAt; },
-  remove: id => { S.todos = S.todos.filter(t => !(t.id === id && (isSarahTodo(t) || isMineShared(t)))); S.shop.items = S.shop.items.filter(x => !(x.id === id && (isSarahShop(x) || isMineShared(x)))); },
+  remove: id => { S.appts = (S.appts || []).filter(a => !(a.id === id && a.from === 'sarah')); S.todos = S.todos.filter(t => !(t.id === id && (isSarahTodo(t) || isMineShared(t)))); S.shop.items = S.shop.items.filter(x => !(x.id === id && (isSarahShop(x) || isMineShared(x)))); },
   persist: async changed => {
     sharedApplying = true;
     try { await save(); } finally { sharedApplying = false; }
     if (changed && !sheetOpen) render();
   }
 };
+
+/* 2.23.17: Sarah's appointments (doctor, dentist, other). She shares them by default; they arrive as shared items on the
+   Appointments list and live here in S.appts with from: 'sarah', so they show in Calendar and Coming up with her pink S.
+   Read-only here: details only, changes are made in her app. */
+const SARAH_APPT_TYPE = { doctor: 'Doctor', dentist: 'Dentist', other: 'Appointment' };
+function sarahApptFrom(x) {
+  const a = x.appt || {};
+  return { id: x.id, title: String(x.title || '').slice(0, 80), date: x.due || '', time: a.time || '', place: a.place || '', kind: SARAH_APPT_TYPE[a.type] ? a.type : 'other', notes: x.notes || '', from: 'sarah', created: x.created || Date.now(), done: !!x.done };
+}
+const sarahApptView = a => ({ id: a.id, title: a.title, list: 'Appointments', due: a.date, notes: a.notes || '', priority: 'normal', done: !!a.done, created: a.created, by: 'sarah', appt: { type: a.kind || 'other', time: a.time || '', place: a.place || '' }, _appt: a });
+function sarahApptSheet(a) {
+  const maps = a.place ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.place)}` : '';
+  openSheet(`${sarahBadge({ from: 'sarah' })}${esc(a.title)}`, `<div class="dcard" id="sarahappt"><div class="h"><i class="dot" style="background:#DB2777"></i> Sarah’s ${esc((SARAH_APPT_TYPE[a.kind] || 'Appointment').toLowerCase())} appointment</div>
+    <div class="big" style="font-size:1.125rem">${fmtLong(a.date)}</div>
+    <div class="muted" style="margin-top:4px">${a.time ? fmtTime(a.time) : 'All day'}${a.place ? ' · ' + esc(a.place) : ''}</div>
+    ${a.notes ? `<div class="muted notes" style="margin-top:6px">${esc(a.notes)}</div>` : ''}</div>
+    ${maps ? `<div class="btns"><a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a></div>` : ''}
+    <p class="muted" style="margin:8px 2px 0">Sarah added this in her app. She keeps it up to date there.</p>`, null);
+}
+/* Sarah's car due dates for her app. Only the Haval (PNU312): WOF, rego, service date, service km and odometer.
+   Sent to the relay's /shared-car when they change (checked on open and with each shared sync). Nothing else. */
+const SARAH_CAR_PLATE = 'PNU312';
+const sarahCar = () => (S.cars || []).find(c => c && String(c.plate || '').replace(/\s+/g, '').toUpperCase() === SARAH_CAR_PLATE) || null;
+let sarahCarBusy = false;
+async function publishSarahCar() {
+  const c = sarahCar(); if (!c || sarahCarBusy || navigator.onLine === false) return;
+  const car = { name: String(c.name || "Sarah's car"), plate: SARAH_CAR_PLATE, model: [c.model].filter(Boolean).join(' '), year: String(c.year || ''), wof: c.wof || '', rego: c.rego || '', svc: c.svcDate || '', svcKm: c.svcKm || '', odo: c.odo || '' };
+  const sig = JSON.stringify(car);
+  let last = ''; try { last = localStorage.getItem('sarahCarSent') || ''; } catch (e) { }
+  if (sig === last) return;
+  sarahCarBusy = true;
+  try {
+    const r = await fetch(SHARED_URL.replace(/\/shared-todo$/, '/shared-car'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, car: Object.assign({ updated: Date.now() }, car) }) });
+    if (r.ok) try { localStorage.setItem('sarahCarSent', sig); } catch (e) { }
+  } catch (e) { } finally { sarahCarBusy = false; }
+}
 // An undo puts the to-dos back, but keeps the sync note as it is now, so the undo itself is sent to Sarah.
 const keepShared = old => { if (S && S.settings && old && old.settings) old.settings.shared = S.settings.shared; return old; };
 /* ---- Shared to-do sync (Sarah's To-do <-> My App) ----
@@ -4293,7 +4333,8 @@ const keepShared = old => { if (S && S.settings && old && old.settings) old.sett
 const SHARED_URL = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/shared-todo';
 const SHARED_KEY = 'sArgfZGJrHxJN9I319FJeFLhFshrHsRU2xDFnnLL'; // only opens this one shared list
 const SHARED_FIELDS = ['title', 'list', 'due', 'notes', 'priority', 'done'];
-const sharedHash = t => JSON.stringify(SHARED_FIELDS.map(k => k === 'done' ? !!t[k] : String(t[k] == null ? '' : t[k])).concat(t.brand ? [brandKey(t.brand)] : []));
+const sharedHash = t => JSON.stringify(SHARED_FIELDS.map(k => k === 'done' ? !!t[k] : String(t[k] == null ? '' : t[k])).concat(t.brand ? [brandKey(t.brand)] : []).concat(t.appt ? [apptKey(t.appt)] : []));
+const apptKey = a => JSON.stringify([a.type || '', a.time || '', a.place || '']);
 /* 2.23.13: the brand Sarah picks for a shopping item in her app (New World Onerahi product data, via the relay's /brands).
    It rides on the shared item; shown under her pink-S item and in its edit sheet. Prices are the store's website price on the day. */
 const brandKey = b => JSON.stringify([b.brand || '', b.product || '', b.size || '', b.price == null ? '' : b.price, b.per || '', b.promo == null ? '' : b.promo, !!b.club, !!b.gf, b.store || '', b.at || '', !!b.any, !!b.other]);
@@ -4316,12 +4357,13 @@ function sharedNote() {
     if (st.snap[t.id] === h) { delete st.pend[t.id]; return; }
     const p = st.pend[t.id];
     if (p && !p.deleted && sharedHash(p) === h) return; // already queued
-    st.pend[t.id] = Object.assign({ id: t.id, created: t.created || now, by: SH.by(t), doneAt: t.done ? t.doneAt || now : 0, updated: now }, Object.fromEntries(SHARED_FIELDS.map(k => [k, k === 'done' ? !!t[k] : (t[k] || '')])), t.brand ? { brand: t.brand } : {});
+    st.pend[t.id] = Object.assign({ id: t.id, created: t.created || now, by: SH.by(t), doneAt: t.done ? t.doneAt || now : 0, updated: now }, Object.fromEntries(SHARED_FIELDS.map(k => [k, k === 'done' ? !!t[k] : (t[k] || '')])), t.brand ? { brand: t.brand } : {}, t.appt ? { appt: t.appt } : {});
   });
   Object.keys(st.snap).forEach(id => { if (!seen.has(id) && !(st.pend[id] && st.pend[id].deleted)) st.pend[id] = { id, deleted: true, updated: now }; });
 }
 function sharedSoon(ms = 1500) { clearTimeout(sharedTimer); sharedTimer = setTimeout(() => sharedSync(), ms); }
 async function sharedSync() {
+  try { publishSarahCar(); } catch (e) { }
   if (sharedBusy || !S) return;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) { sharedErr = 'offline'; return; }
   sharedBusy = true;
@@ -4534,7 +4576,7 @@ function calItems(fromT, toT) {
   loanPlanInRange(fromT, toT).forEach(x => ev.push({ src: 'due', title: `Loan · ${x.l.from} · ${centsMoney(x.cents)}`, date: x.d, time: 'Loan', go: `go('#loan/${x.l.id}')` }));
   S.drivers.forEach(d => [['aaExpiry', 'AA membership expires', 'AA'], ['licExpiry', 'driver licence expires', 'Licence']].forEach(([k, l, L]) => { if (d[k] && inR(d[k])) ev.push({ src: 'due', title: `${d.name}’s ${l}`, date: d[k], time: L, go: `go('#driver/${d.id}')` }); }));
   S.todos.filter(t => !t.done && t.due && inR(t.due)).forEach(t => ev.push({ src: 'due', title: t.title, date: t.due, time: 'To-do', go: `go('#todo')` }));
-  S.appts.filter(a => inR(a.date)).forEach(a => ev.push({ src: 'appt', title: a.title, date: a.date, time: a.time ? fmtTime(a.time) : 'All day', sort: a.time || '00:00', go: `apptForm('${a.id}')`, notes: a.notes, tag: a.evId ? 'Event' : undefined }));
+  S.appts.filter(a => inR(a.date) && !(a.from === 'sarah' && a.done)).forEach(a => ev.push({ src: 'appt', title: a.title, date: a.date, time: a.time ? fmtTime(a.time) : 'All day', sort: a.time || '00:00', go: `apptForm('${a.id}')`, notes: a.from === 'sarah' ? [a.place, a.notes].filter(Boolean).join(' · ') : a.notes, tag: a.evId ? 'Event' : a.from === 'sarah' ? 'Sarah' : undefined, sarah: a.from === 'sarah' }));
   S.birthdays.forEach(b => bdayDates(b, fromT, toT).forEach(d => {
     const age = bdayAge(b, d);
     ev.push({ src: 'bday', title: `${b.name}’s ${age > 0 ? ordinal(age) + ' ' : ''}birthday`, date: d, time: 'Birthday', sort: '', tag: 'Birthday', go: `birthdayForm('${b.id}')` });
@@ -4609,7 +4651,7 @@ function Calendar() {
   }
   const evRow = (e, ic) => {
     const inner = `<span class="bar" style="background:${e.color || `var(--${e.src})`}"></span>${ic ? `<span class="evic" style="--c:${e.color ? esc(e.color) : `var(--${e.src})`}">${I(calIcon(e))}</span>` : ''}<span class="time">${esc(e.time)}</span>
-     <div style="flex:1;min-width:0"><div class="t">${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}" ${e.color ? `style="background:${e.color}"` : ''}>${esc(e.done ? 'Done' : (e.tag || (e.src === 'appt' ? 'Appt' : 'Due')))}</span>`;
+     <div style="flex:1;min-width:0"><div class="t">${e.sarah ? sarahBadge({ from: 'sarah' }) : ''}${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}" ${e.color ? `style="background:${e.color}"` : ''}>${esc(e.done ? 'Done' : (e.tag || (e.src === 'appt' ? 'Appt' : 'Due')))}</span>`;
     if (e.src === 'mine' && e.id && e.orig) {
       const act = e.done ? 'Mark not done' : 'Mark complete';
       return `<div class="ev${ic ? ' evi' : ''}${e.done ? ' done' : ''}"><button type="button" class="tapzone" onclick="${e.go}">${inner}</button><button type="button" class="paybtn" aria-label="${act}: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})">${e.done ? 'Undo' : 'Done'}</button></div>`;
@@ -4675,6 +4717,7 @@ function dayIntoView() {
 }
 function shiftMonth(n) { let { y, m } = calMonth; m += n; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } calMonth = { y, m }; calSel = null; render(); }
 function apptForm(id, date, pre) {
+  { const sa = id && S.appts.find(x => x.id === id && x.from === 'sarah'); if (sa) { sarahApptSheet(sa); return; } }
   const a = id ? S.appts.find(x => x.id === id) : { title: '', date: date || (calSel != null ? isoT(calSel) : todayISO()), time: '', notes: '' };
   if (!id && pre && a) ['title', 'time', 'notes', 'evId', 'evUrl'].forEach(k => { if (pre[k]) a[k] = String(pre[k]); });
   openSheet(id ? 'Edit appointment' : 'Add an appointment',
@@ -6928,9 +6971,9 @@ const ATT_SOURCES = {
       sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}`,
       complete: `<button type="button" class="tick" aria-label="Mark complete: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})"><span>${I('check')}</span></button>` }) }))),
   // Appointments, including What's On events you added, today and the next 7 days
-  appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: `${attDay(d, a.date)}: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`,
-    html: attRow({ wx: 1, kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
-      sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; }),
+  appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK && !(a.from === 'sarah' && a.done); }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: `${attDay(d, a.date)}: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`,
+    html: attRow({ wx: 1, kind: 'appt', date: a.date, go: a.from === 'sarah' ? `apptForm('${a.id}')` : `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${a.from === 'sarah' ? sarahBadge({ from: 'sarah' }) : ''}${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
+      sub: `${a.from === 'sarah' ? 'Sarah’s ' + esc((SARAH_APPT_TYPE[a.kind] || 'appointment').toLowerCase()) + (a.place ? ' · ' + esc(a.place) : '') : a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? '' : ' · All day'}` }) }; }),
   // Connected Outlook / Google / iCloud calendars, today and the next 7 days (an event spanning several days shows once, on its first day here)
   ext: T => { const seen = new Set(); return extEvents(T, T + ATT_WEEK * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '', kind: 'ext', name: `${attDay(d, e.date)}: ${e.title}${e.time && e.time !== 'All day' && e.time !== 'Cont.' ? ' ' + e.time : ''}`,
     html: attRow({ wx: 1, kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal',
