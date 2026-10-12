@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.40';
+const APP_VERSION = '2.23.41';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3723,7 +3723,8 @@ function Home() {
   const shown = new Set(night ? parts.map(([k]) => k) : keys);
   homeShownNow = shown;
   const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
-  stripSumDone = false; homeSumT = sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
+  homeSumT = sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
+  const sumUnderWx = homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
   const sum = homeSumT ? '' : !night && sum0 ? homeSumFold(sum0) : sum0;
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
@@ -3767,7 +3768,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + (night && !qjTop() && stripOn() ? '' : (sumTop || qsBlock(''))) + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + sumUnderWx + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + (night && !qjTop() && stripOn() ? '' : (sumTop || qsBlock(''))) + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
     sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -13960,7 +13961,9 @@ function sumTickerize(el) {
   box.innerHTML = `<button type="button" class="tkline" aria-label="Summary: ${esc(plain)}. Tap for the full summary."><span class="tktrack" aria-hidden="true"><span class="tkrun">${piece}</span><span class="tkrun">${piece}</span></span></button>`;
   const foot = document.createElement('div'); foot.className = 'tkfoot';
   foot.innerHTML = `<span></span><button type="button" class="tkmore" aria-expanded="${tkOpen}">${tkOpen ? 'Hide full summary' : 'Full summary'}</button>`;
-  shade.appendChild(box); shade.appendChild(full); shade.appendChild(foot);
+  shade.appendChild(box); shade.appendChild(full);
+  // 2.23.41: the Full summary pill sits on its own line under the bar
+  const wrap = el.closest('#tkhome'); (wrap || shade).querySelectorAll(':scope > .tkfoot').forEach(x => x.remove()); (wrap || shade).appendChild(foot);
   tkX = 0;
 }
 let tkX = 0, tkLast = 0, tkDrag = null;
@@ -13982,7 +13985,7 @@ function tkFrame(t) {
 requestAnimationFrame(tkFrame);
 function tkToggleFull() {
   tkOpen = !tkOpen; const h = document.getElementById('homesum'); if (!h) return;
-  const a = h.querySelector('.sumtk'), f = h.querySelector('.sumfull'), m = h.querySelector('.tkmore');
+  const a = h.querySelector('.sumtk'), f = h.querySelector('.sumfull'), m = document.querySelector('#tkhome .tkmore') || h.querySelector('.tkmore');
   if (a) a.hidden = tkOpen; if (f) f.hidden = !tkOpen; if (m) { m.textContent = tkOpen ? 'Hide full summary' : 'Full summary'; m.setAttribute('aria-expanded', tkOpen); }
 }
 (() => {
@@ -13998,7 +14001,7 @@ function tkToggleFull() {
   document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
   document.addEventListener('mouseup', up);
   document.addEventListener('click', e => {
-    if (e.target && e.target.closest && e.target.closest('#homesum .tkmore')) return tkToggleFull();
+    if (e.target && e.target.closest && e.target.closest('#tkhome .tkmore, #homesum .tkmore')) return tkToggleFull();
     if (!inTk(e)) return;
     if (moved) { moved = false; return; }
     tkToggleFull();
