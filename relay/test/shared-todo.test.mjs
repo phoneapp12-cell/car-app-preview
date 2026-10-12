@@ -18,3 +18,13 @@ const t = Date.now();
 [s, d] = await call({ key: KEY, items: [{ id: 'st-aaaa1', deleted: true, updated: t + 20 }] }); assert.equal(d.items[0].deleted, true);
 assert.equal(mergeItems([], [{ id: 'x', title: 'y', updated: 1 }]).items.length, 0); // bad id
 console.log('shared-todo tests ok');
+
+import { cleanItem as ci2 } from '../src/shared-todo.js';
+import assert2 from 'node:assert/strict';
+import test2 from 'node:test';
+test2('brand travels on an item and is cleaned', () => {
+  const x = ci2({ id: 'abcd1', title: 'Lemon juice', list: 'Shopping', updated: 5, brand: { brand: 'Pams', product: 'Lemon Baking Juice', size: '250ml', price: '2.39', store: 'New World Onerahi', at: '2026-10-12', evil: 1 } }, 10);
+  assert2.equal(x.brand.brand, 'Pams'); assert2.equal(x.brand.price, 2.39); assert2.equal(x.brand.evil, undefined);
+  assert2.equal(ci2({ id: 'abcd2', title: 'Milk', updated: 5, brand: { price: 3 } }, 10).brand, undefined);
+  assert2.equal(ci2({ id: 'abcd3', title: 'Milk', updated: 5, brand: { any: true } }, 10).brand.any, true);
+});

@@ -16,6 +16,15 @@ async function kvKey(k) {
   return 'shared-todo-v1:' + hex;
 }
 const str = (v, n) => String(v == null ? '' : v).slice(0, n);
+const num = v => { const n = Number(v); return v !== null && v !== '' && Number.isFinite(n) && n >= 0 && n < 100000 ? Math.round(n * 100) / 100 : null; };
+// 1.3.0 / 2.23.13: the brand Sarah picked for a shopping item (from New World's own product search, or typed).
+export function cleanBrand(b) {
+  if (!b || typeof b !== 'object') return null;
+  const o = { brand: str(b.brand, 60).trim(), product: str(b.product, 120).trim(), size: str(b.size, 30).trim(), price: num(b.price), per: b.per === 'kg' ? 'kg' : '',
+    promo: num(b.promo), club: !!b.club, gf: !!b.gf, store: str(b.store, 60).trim(), at: /^\d{4}-\d{2}-\d{2}$/.test(String(b.at || '')) ? b.at : '', any: !!b.any, other: !!b.other };
+  if (!o.any && !o.brand && !o.product) return null;
+  return o;
+}
 export function cleanItem(x, now = Date.now()) {
   if (!x || typeof x !== 'object') return null;
   const id = String(x.id || '');
@@ -27,7 +36,8 @@ export function cleanItem(x, now = Date.now()) {
   return {
     id, title, list: str(x.list, 24).trim() || 'To-do', due: /^\d{4}-\d{2}-\d{2}$/.test(String(x.due || '')) ? x.due : '',
     notes: str(x.notes, 1000), priority: PRI.includes(x.priority) ? x.priority : 'normal', done: !!x.done,
-    doneAt: x.done ? Number(x.doneAt) || updated : 0, created: Number(x.created) || updated, by: x.by === 'shane' ? 'shane' : 'sarah', updated
+    doneAt: x.done ? Number(x.doneAt) || updated : 0, created: Number(x.created) || updated, by: x.by === 'shane' ? 'shane' : 'sarah', updated,
+    ...(cleanBrand(x.brand) ? { brand: cleanBrand(x.brand) } : {})
   };
 }
 export function mergeItems(cur, incoming, now = Date.now()) {
