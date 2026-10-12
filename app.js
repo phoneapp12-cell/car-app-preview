@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.36';
+const APP_VERSION = '2.23.37';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3626,7 +3626,24 @@ function quoteJokeCard() {
   if (!q && !j) return '';
   return homeSec(q && j ? 'Quote &amp; joke' : q ? 'Quote of the day' : 'Joke of the day') + `<div class="card qjcard" id="quotejoke">${q ? `<div class="qjq"><p>“${esc(q.t)}”</p><div class="qjw">${esc(q.w)}</div></div>` : ''}${j ? `<div class="qjj"><p><span aria-hidden="true">😄</span> ${esc(j[0])}</p><details class="jans"><summary>Tap for the answer</summary><p class="ja">${esc(j[1])}</p></details></div>` : ''}</div>`;
 }
-function comingUpCard() {
+/* 2.23.37: card artwork for Coming up and Just added (Krea 2 Turbo images in art/). Settings: Card artwork. */
+const cardArtOn = () => !(S && S.settings && S.settings.cardArt === false);
+const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', bday: 'bday', health: 'health', appt: 'health', med: 'health', pet: 'health', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'ev', ext: 'ev', todo: 'todo', note: 'todo', meal: 'shop', shop: 'shop' };
+function cardArt(html, kind) {
+  if (!cardArtOn() || !html) return html;
+  const t = kind === 'cu' ? 'Coming up' : 'Just added';
+  html = html.replace(/<div class="sec">(Coming up|Just added)\s*([\s\S]*?)<\/div>/, (m, ti, link) => `<div class="artban" style="background-image:url(art/${kind}-banner.webp)"><span class="artbt">${ti}</span>${link ? `<span class="artbl">${link}</span>` : ''}</div>`);
+  // each row: the icon tile becomes the matching illustration (Sarah's things get the heart locket)
+  html = html.replace(/(<(?:button|div) class="row[^"]*"[^>]*>)\s*<div class="ic ([a-z]+)"([^>]*)>([\s\S]*?)<\/div>(\s*<div class="tx">)([\s\S]*?<div class="t">)/g, (m, open, ic, attrs, svg, tx, t) => {
+    const sar = /jasarah/.test(open) || /sarahbadge|class="sbadge|Sarah/.test(t.slice(0, 200)) && /from Sarah|Sarah added|Sarah’s/.test(m + t);
+    const a = sar ? 'sarah' : CARD_ART_IC[ic];
+    if (!a) return m;
+    return `${open}<div class="ic ${ic} icart"><img src="art/ic-${a}.webp" alt="" width="40" height="40" loading="lazy"></div>${tx}${t}`;
+  });
+  return html.replace(/(id="(?:comingup|justadded)")/, '$1 data-art="1"').replace(/class="(list[^"]*)" id="(comingup|justadded)"/, 'class="$1 artlist" id="$2"');
+}
+function comingUpCard() { return cardArt(comingUpCard0(), 'cu'); }
+function comingUpCard0() {
   const list = comingUpList();
   if (!list.length) return homeSec('Coming up', '<a href="#calendar">Calendar</a>') + `<div class="card empty" id="comingup"><div class="t">Nothing coming up in the next 30 days</div><div class="s">Sweet as.</div></div>`;
   const over = list.filter(x => x.days <= 0).length, n = cuShowAll ? list.length : Math.max(CU_SHOW, over);
@@ -3651,7 +3668,8 @@ function justAddedList(now = Date.now()) {
   return out.sort((a, b) => (a.who === 'sarah' ? 0 : 1) - (b.who === 'sarah' ? 0 : 1) || b.at - a.at);
 }
 function jaAgo(at, now = Date.now()) { const m = Math.round((now - at) / 6e4); return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 120 ? '1 hr ago' : m < 1440 ? Math.round(m / 60) + ' hrs ago' : 'yesterday'; }
-function justAddedCard() {
+function justAddedCard() { return cardArt(justAddedCard0(), 'ja'); }
+function justAddedCard0() {
   const list = justAddedList();
   const head = homeSec('Just added', list.length ? '<button class="linkbtn jaclear" id="jaclear" onclick="justAddedClear()">Clear…</button>' : '');
   if (!list.length) return head + `<div class="card empty" id="justadded"><div class="t">Nothing new in the last two days</div><div class="s">New things from Sarah, and bills from emails, show here.</div></div>`;
@@ -14619,6 +14637,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Scrolling summary</div><div class="s">On: the summary sits under the rotating strip, a little shorter, as one line scrolling right to left. Touch to pause, drag to scrub. Tap Full summary to read it all. Off: the full summary as before.</div></div><button class="switch ${sumScrollOn() ? 'on' : ''}" role="switch" aria-checked="${sumScrollOn()}" aria-label="Scrolling summary" id="sumscrollsw" onclick="S.settings.sumFull=sumScrollOn();save().then(render)"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Card artwork</div><div class="s">Picture headers and illustrated icons on Coming up and Just added. Off: the plain cards.</div></div><button class="switch ${cardArtOn() ? 'on' : ''}" role="switch" aria-checked="${cardArtOn()}" aria-label="Card artwork" id="cardartsw" onclick="toggleSetting('cardArt')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
