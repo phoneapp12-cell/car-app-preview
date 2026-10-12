@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.11';
+const APP_VERSION = '2.23.12';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8420,6 +8420,16 @@ async function setTextSize(k) {
   if (!TEXT_SIZES.some(x => x[0] === k)) return;
   S.settings.textSize = k; applyTextSize(); await save(); render();
 }
+function mascotPicker() {
+  const cur = mascotKey();
+  return `<div class="list" id="mascotpick" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Mascot</div><div class="s">The ${cur} next to Notifications. Its mood follows the time of day.</div></div>
+    <div class="seg mascotseg" role="radiogroup" aria-label="Mascot" style="width:100%">${Object.keys(MASCOTS).map(k => `<button type="button" class="${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-mascot="${k}" onclick="setMascot('${k}')">${mascotMini(k)}<span>${MASCOTS[k].name}</span></button>`).join('')}</div></div></div>`;
+}
+async function setMascot(k) {
+  if (!MASCOTS[k] || k === mascotKey()) return;
+  const s = snap(); S.settings.mascot = k; await save(); render();
+  toast(`${MASCOTS[k].name} mascot on.`, 'Undo', undoTo(s));
+}
 function textSizePicker() {
   const cur = textSizeKey(), name = TEXT_SIZES.find(x => x[0] === cur)[1];
   return `<div class="list" id="textsize" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Text size</div><div class="s">${name}</div></div>
@@ -13419,10 +13429,63 @@ function catState(now = new Date()) {
   return h >= 5 && h < 9 ? 'energetic' : h >= 9 && h < 13 ? 'alert' : h >= 13 && h < 17 ? 'tired' : h >= 17 && h < 21 ? 'drowsy' : 'sleep';
 }
 const CAT_WORDS = { energetic: 'wide awake', alert: 'alert', tired: 'a bit tired', drowsy: 'drowsy', sleep: 'asleep' };
+/* 2.23.12: Mascot is a choice, Cat or Dog (S.settings.mascot, default cat). Both share every class name, so the mood,
+   tap, idle-tap and reduced-motion CSS works for either; .hdog only recolours and adds the floppy-ear moves.
+   To swap in image art later, set img to a path prefix (e.g. 'mascot/dog-'): the header then shows
+   <prefix><mood>.webp (energetic, alert, tired, drowsy, sleep, tap) over the SVG, and falls back to the SVG if it fails. */
+const MASCOTS = {
+  cat: { name: 'Cat', img: '', says: { energetic: ['Meow!', 'Mrrp!', 'Play?'], alert: ['Meow!', 'Mrrp?', 'Hi!'], tired: ['Mew…', 'Meow.', 'Nap soon?'], drowsy: ['mew…', '*yawn*', 'Bedtime?'], sleep: ['purr…', 'zzz…', 'mrrr…'] } },
+  dog: { name: 'Dog', img: '', says: { energetic: ['Woof!', 'Ball?', 'Play?'], alert: ['Woof!', 'Pats?', 'Boof!'], tired: ['boof…', 'Pats?', '*yawn*'], drowsy: ['boof…', '*yawn*', 'mmf…'], sleep: ['snore…', 'zzz…', '*snuffle*'] } }
+};
+const mascotKey = () => { const k = S && S.settings && S.settings.mascot; return MASCOTS[k] ? k : 'cat'; };
 function catHtml() {
-  const st = catState();
+  const st = catState(), k = mascotKey(), m = MASCOTS[k];
+  const img = m.img ? `<img class="mimg" alt="" src="${m.img}${st}.webp" onload="this.parentNode.classList.add('hasimg')" onerror="this.parentNode.classList.remove('hasimg');this.remove()">` : '';
+  return `<button type="button" class="hcat cat-${st}${k === 'dog' ? ' hdog' : ''}" id="hcat" aria-label="The ${k} is ${CAT_WORDS[st]}" onclick="catPoke(event)">${k === 'dog' ? dogSvg() : catSvg()}${img}<span class="ctrip" aria-hidden="true"></span><span class="cbub" aria-hidden="true"></span></button>`;
+}
+function mascotMini(k) { return `<span class="hcat mprev cat-alert${k === 'dog' ? ' hdog' : ''}" aria-hidden="true">${k === 'dog' ? dogSvg() : catSvg()}</span>`; }
+function dogSvg() {
+  return `<svg viewBox="0 0 48 40" aria-hidden="true">
+<g class="csit">
+  <path class="ctail" d="M33 34 C40 34 43 28 41 21"/><path class="ctail ctip" pathLength="100" d="M33 34 C40 34 43 28 41 21"/>
+  <ellipse class="cfur" cx="24" cy="30" rx="11" ry="8.5"/>
+  <ellipse class="cbelly" cx="24" cy="32" rx="5.5" ry="5"/>
+  <ellipse class="cfur cpawl" cx="19.5" cy="37.6" rx="3" ry="1.9"/>
+  <ellipse class="cfur cpaw" cx="28.5" cy="37.6" rx="3" ry="1.9"/>
+  <g class="ctapaw"><ellipse class="cfur" cx="28.5" cy="37.4" rx="3.3" ry="2.5"/><ellipse class="cbean" cx="28.5" cy="38.1" rx="1.3" ry="1"/><circle class="cbean" cx="26.6" cy="36.4" r=".55"/><circle class="cbean" cx="28.5" cy="35.8" r=".55"/><circle class="cbean" cx="30.4" cy="36.4" r=".55"/></g>
+  <path class="ccollar" d="M16.6 22.6 Q24 26.6 31.4 22.6"/><circle class="ctag" cx="24" cy="25.6" r="1.2"/>
+  <g class="chead">
+    <ellipse class="cfur" cx="24" cy="15.5" rx="9.4" ry="8.7"/>
+    <ellipse class="cspot" cx="27.9" cy="14.6" rx="2.9" ry="2.7"/>
+    <ellipse class="ceye" cx="20.3" cy="15" rx="1.6" ry="2"/><ellipse class="ceye" cx="27.7" cy="15" rx="1.6" ry="2"/>
+    <path class="clid" d="M18.4 13.2 Q20.3 11.8 22.2 13.2 M25.8 13.2 Q27.7 11.8 29.6 13.2"/>
+    <ellipse class="cbelly" cx="24" cy="19.6" rx="4.6" ry="3.4"/>
+    <ellipse class="cnose" cx="24" cy="18" rx="1.7" ry="1.15"/>
+    <path class="cwhisk" d="M24 19.2 L24 20.4 M22.2 20.8 Q24 22 25.8 20.8"/>
+    <ellipse class="cmouth" cx="24" cy="21.8" rx="1.6" ry="1.8"/>
+    <path class="cear cearl" d="M16.4 9.4 C11.6 8.8 10.4 15 12 20.6 C13.2 22.6 15.8 21.2 16.4 17.6 Z"/>
+    <path class="cear cearr" d="M31.6 9.4 C36.4 8.8 37.6 15 36 20.6 C34.8 22.6 32.2 21.2 31.6 17.6 Z"/>
+  </g>
+</g>
+<g class="csleep">
+  <g class="cbreath">
+    <path class="ctail2" d="M38.5 32 C41 38.5 26 40.5 15 37.5"/><path class="ctail2 ctip" pathLength="100" d="M38.5 32 C41 38.5 26 40.5 15 37.5"/>
+    <ellipse class="cfur" cx="26" cy="30" rx="13.5" ry="7.5"/>
+    <ellipse class="cfur" cx="13.8" cy="29" rx="7" ry="6.4"/>
+    <path class="cshut" d="M10.8 28 Q12 29.2 13.2 28 M14.6 28 Q15.8 29.2 17 28"/>
+    <ellipse class="cbelly" cx="13.9" cy="32" rx="3.3" ry="2.3"/>
+    <ellipse class="cnose" cx="13.9" cy="31.1" rx="1.15" ry=".8"/>
+    <path class="cear" d="M9.2 24 C5.8 25 5.6 30.6 7.8 33 C9 34 10.2 31.4 9.9 28.4 Z"/>
+    <path class="cear" d="M18.4 24 C21.8 25 22 30.6 19.8 33 C18.6 34 17.4 31.4 17.7 28.4 Z"/>
+    <ellipse class="cfur" cx="19" cy="35.8" rx="3.2" ry="1.8"/>
+  </g>
+  <text class="cz cz1" x="30" y="18">z</text><text class="cz cz2" x="35" y="12">z</text><text class="cz cz3" x="40" y="6">Z</text>
+</g>
+</svg>`;
+}
+function catSvg() {
   const ears = (a, b) => `<path class="cear" d="${a}"/><path class="cearin" d="${b}"/>`;
-  return `<button type="button" class="hcat cat-${st}" id="hcat" aria-label="The cat is ${CAT_WORDS[st]}" onclick="catPoke(event)"><svg viewBox="0 0 48 40" aria-hidden="true">
+  return `<svg viewBox="0 0 48 40" aria-hidden="true">
 <g class="csit">
   <path class="ctail" d="M33 35 C42 35 46 27 42 17"/><path class="ctail ctip" pathLength="100" d="M33 35 C42 35 46 27 42 17"/>
   <ellipse class="cfur" cx="24" cy="30" rx="11" ry="8.5"/>
@@ -13453,7 +13516,7 @@ function catHtml() {
   </g>
   <text class="cz cz1" x="30" y="18">z</text><text class="cz cz2" x="35" y="12">z</text><text class="cz cz3" x="40" y="6">Z</text>
 </g>
-</svg><span class="ctrip" aria-hidden="true"></span><span class="cbub" aria-hidden="true"></span></button>`;
+</svg>`;
 }
 function catTick() {
   const el = document.getElementById('hcat');
@@ -13461,7 +13524,8 @@ function catTick() {
   const st = catState();
   if (el.classList.contains('cat-' + st)) return;
   el.className = el.className.replace(/\bcat-(energetic|alert|tired|drowsy|sleep)\b/, 'cat-' + st);
-  el.setAttribute('aria-label', 'The cat is ' + CAT_WORDS[st]);
+  el.setAttribute('aria-label', 'The ' + mascotKey() + ' is ' + CAT_WORDS[st]);
+  const im = el.querySelector('.mimg'), m = MASCOTS[mascotKey()]; if (im && m.img) im.src = m.img + st + '.webp';
 }
 setInterval(catTick, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) catTick(); });
@@ -13471,7 +13535,7 @@ function catPoke(e) {
   const el = document.getElementById('hcat'); if (!el) return;
   catTick();
   const st = catState(), bub = el.querySelector('.cbub');
-  const says = { energetic: ['Meow!', 'Mrrp!', 'Play?'], alert: ['Meow!', 'Mrrp?', 'Hi!'], tired: ['Mew…', 'Meow.', 'Nap soon?'], drowsy: ['mew…', '*yawn*', 'Bedtime?'], sleep: ['purr…', 'zzz…', 'mrrr…'] }[st];
+  const says = MASCOTS[mascotKey()].says[st];
   if (bub) bub.textContent = says[Math.floor(Math.random() * says.length)];
   el.classList.remove('react'); void el.offsetWidth; el.classList.add('react');
   clearTimeout(catPokeT); catPokeT = setTimeout(() => el.classList.remove('react'), 1600);
@@ -13495,7 +13559,8 @@ function catTapNow() {
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches, bub = el.querySelector('.cbub');
   if (bub) bub.textContent = still ? '🐾' : cfg.say;
   el.classList.add('tapping');
-  clearTimeout(catTapT); catTapT = setTimeout(() => el.classList.remove('tapping'), still ? 1600 : cfg.ms + 500);
+  const im = el.querySelector('.mimg'), mm = MASCOTS[mascotKey()]; if (im && mm.img) im.src = mm.img + 'tap.webp';
+  clearTimeout(catTapT); catTapT = setTimeout(() => { el.classList.remove('tapping'); if (im && mm.img) im.src = mm.img + catState() + '.webp'; }, still ? 1600 : cfg.ms + 500);
   return true;
 }
 function catIdleCheck() {
@@ -13536,6 +13601,7 @@ function Settings() {
   ${themePicker()}
   ${themeNowNote()}
   ${textSizePicker()}
+  ${mascotPicker()}
   <div class="list" style="margin-top:10px">
    <div class="srow"><div class="tx"><div class="t">Match phone</div><div class="s">${themeKey() === 'auto' ? 'Auto (weather) switches to Night sky after sunset by itself, so this has no effect' : themeKey() === 'night' ? 'Night sky is already dark, so it stays on either way' : 'Use Dark when the phone is in dark mode' + (themeKey() === 'dark' ? ', Teal when it isn’t' : ', ' + THEMES.find(x => x[0] === themeKey())[1] + ' when it isn’t')}.</div></div><button class="switch ${S.settings.themeAuto ? 'on' : ''}" role="switch" aria-checked="${!!S.settings.themeAuto}" aria-label="Match phone light or dark mode" onclick="toggleThemeAuto()"></button></div>
   </div>

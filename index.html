@@ -1146,6 +1146,7 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 @keyframes catStir{0%,100%{transform:none}40%{transform:scale(1.06,.94)}}
 .hcat .ctapaw{opacity:0;transform-box:view-box;transform-origin:28.5px 37.5px;pointer-events:none}
 .hcat .cbean{fill:#F9A8C4}
+.hcat .ctapaw *{vector-effect:non-scaling-stroke}
 .hcat .ctrip{position:absolute;left:52px;top:73px;width:34px;height:34px;border-radius:50%;border:2.5px solid var(--brand,#0f766e);opacity:0;transform:scale(.2);pointer-events:none;z-index:2}
 .hcat.tapping .cpaw{opacity:0}
 .hcat.tapping .cbub{opacity:1;transform:none;transition-delay:.25s;left:auto;right:84px;top:58px}
@@ -1160,6 +1161,40 @@ button.diaryline:active{background:rgba(90,60,20,.08)}
 @keyframes catTap{0%{opacity:1;transform:none}35%{opacity:1;transform:translate(-1px,-6px) rotate(-14deg) scale(1.35)}60%{opacity:1;transform:translate(0,1px) scale(2.4)}75%{opacity:1;transform:translate(0,0) scale(2.1)}100%{opacity:1;transform:none}}
 @keyframes catTapLazy{0%{opacity:1;transform:none}40%{opacity:1;transform:translate(0,-3px) rotate(-8deg) scale(1.2)}62%{opacity:1;transform:translate(0,1px) scale(1.9)}80%{opacity:1;transform:translate(0,1px) scale(1.75)}100%{opacity:1;transform:none}}
 @keyframes catRipple{0%{opacity:.85;transform:scale(.2)}100%{opacity:0;transform:scale(1.5)}}
+.hcat .ccollar,.hcat .ctag,.hcat .cspot{display:none}
+.hdog .cfur{fill:#E2B47A;stroke:#6B4A2B}
+.hdog .cbelly{fill:#FFF1DC}
+.hdog .cear{fill:#A8723F;stroke:#6B4A2B}
+.hdog .cspot{display:inline;fill:#C98F55}
+.hdog .ctail,.hdog .ctail2{stroke:#D49A5A}
+.hdog .ctip{stroke:#FFF1DC}
+.hdog .ceye{fill:#24170D}
+.hdog .clid{stroke:#5A3B20}
+.hdog .cnose{fill:#2D1F17}
+.hdog .cwhisk{stroke:#6B4A2B;stroke-width:.7;fill:none;opacity:.9}
+.hdog .cmouth{fill:#BE3455}
+.hdog .cshut{stroke:#3B2A1C}
+.hdog .cbean{fill:#8B5E3C}
+.hdog .ccollar{display:inline;fill:none;stroke:#DC2626;stroke-width:1.9;stroke-linecap:round}
+.hdog .ctag{display:inline;fill:#FACC15;stroke:#A16207;stroke-width:.5}
+.hdog .cz{fill:#9A7B5A}
+.hdog .cearl{transform-box:view-box;transform-origin:16.4px 10px}
+.hdog .cearr{transform-box:view-box;transform-origin:31.6px 10px}
+.hdog.cat-energetic .ctail{animation:catSwish .28s ease-in-out infinite alternate}
+.hdog.cat-energetic .cearl{animation:dogEarL .7s ease-in-out infinite}
+.hdog.cat-energetic .cearr{animation:dogEarR .7s ease-in-out infinite}
+.hdog.cat-alert .ctail{animation:catSwish .8s ease-in-out infinite alternate}
+.hdog.cat-alert .cearl{transform:rotate(8deg)}.hdog.cat-alert .cearr{transform:rotate(-8deg)}
+.hdog.cat-tired .ctail{animation:catSwishSoft 2.4s ease-in-out infinite alternate}
+.hdog.cat-drowsy .cearl{transform:rotate(-6deg)}.hdog.cat-drowsy .cearr{transform:rotate(6deg)}
+@keyframes dogEarL{0%,100%{transform:rotate(14deg)}50%{transform:rotate(26deg)}}
+@keyframes dogEarR{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(-26deg)}}
+.hcat .mimg{position:absolute;inset:0;width:116px;height:96px;object-fit:contain;pointer-events:none}
+.hcat.hasimg>svg{opacity:0}
+.hcat.mprev{position:relative;display:inline-block;right:auto;top:auto;width:46px;height:38px;vertical-align:middle;pointer-events:none}
+.hcat.mprev svg{width:46px;height:38px}
+.hcat.mprev *{animation:none!important}
+.mascotseg button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px}
 @media (prefers-reduced-motion:reduce){.hcat *,.hcat svg{animation:none!important;transition:none!important}}
 /* 2.23.3 temperature colour */
 .tcol[style*="--tcl"]{color:var(--tcl);text-shadow:0 0 1px rgba(255,255,255,.55)}
