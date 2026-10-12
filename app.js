@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.23';
+const APP_VERSION = '2.23.24';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4318,7 +4318,7 @@ const SH = {
     if (t._appt) { Object.assign(t._appt, sarahApptFrom(x), { id: t._appt.id }); return; }
     if (t._mine || t._hitem) { const ap = x.appt || {}; // 2.23.23: Sarah changed one he shared with her
       if (t._mine) { Object.assign(t._mine, { title: String(x.title || t._mine.title).slice(0, 80), date: x.due || t._mine.date, time: ap.time || '', notes: x.notes || '', place: ap.place || '' }); if (x.claim) t._mine.claim = claimNorm(x.claim); }
-      else { Object.assign(t._hitem, { name: String(x.title || t._hitem.name).slice(0, 40), apptDate: x.due || t._hitem.apptDate, apptTime: ap.time || '' }); if (ap.place) t._hitem.clinic = String(ap.place).slice(0, 60); }
+      else { Object.assign(t._hitem, { name: String(x.title || t._hitem.name).slice(0, 40), apptDate: x.due || t._hitem.apptDate, apptTime: ap.time || '' }); if (ap.place) t._hitem.clinic = String(ap.place).slice(0, 60); if (x.claim) t._hitem.claim = claimNorm(x.claim); }
       return; }
     if (!!t._shop !== isSarahShopList(x.list)) { SH.remove(t.id); SH.add(Object.assign({}, x, { created: t.created || x.created, by: SH.by(t) })); return; } // moved to or from her Shopping list
     if (t._todo) { const o = t._todo; Object.assign(o, { title: x.title, sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) o.doneAt = o.doneAt || x.doneAt || Date.now(); else delete o.doneAt; return; } // your own: stays on your list
@@ -4351,7 +4351,7 @@ const apptKindOf = t => /dent|hygien|orthodont/i.test(t) ? 'dentist' : /\b(docto
 const mineApptView = a => Object.assign({ id: a.id, title: a.title, list: 'Appointments', due: a.date, notes: a.notes || '', priority: 'normal', done: false, created: uidTime(a.id) || 1.7e12, by: 'shane',
   appt: { type: apptKindOf(a.title + ' ' + (a.notes || '')), time: a.time || '', place: a.place || '' }, _mine: a }, a.claim ? { claim: a.claim } : {});
 const healthApptView = ({ p, it }) => ({ id: 'hs-' + it.id, title: it.name + (isSarahPerson(p) ? '' : ''), list: 'Appointments', due: it.apptDate, notes: it.phone ? 'Clinic phone ' + it.phone : '', priority: 'normal', done: false,
-  created: uidTime(it.id) || 1.7e12, by: 'shane', appt: { type: it.kind === 'dentist' || it.kind === 'hygienist' ? 'dentist' : it.kind === 'doctor' || it.kind === 'gp' ? 'doctor' : apptKindOf(it.name), time: it.apptTime || '', place: it.clinic || '' }, _hitem: it });
+  created: uidTime(it.id) || 1.7e12, by: 'shane', appt: { type: it.kind === 'dentist' || it.kind === 'hygienist' ? 'dentist' : it.kind === 'doctor' || it.kind === 'gp' ? 'doctor' : apptKindOf(it.name), time: it.apptTime || '', place: it.clinic || '' }, _hitem: it, ...(it.claim ? { claim: it.claim } : {}) });
 /* 2.23.17: Sarah's appointments (doctor, dentist, other). She shares them by default; they arrive as shared items on the
    Appointments list and live here in S.appts with from: 'sarah', so they show in Calendar and Coming up with her pink S.
    Read-only here: details only, changes are made in her app. */
@@ -4561,6 +4561,13 @@ function claimCtx(ref) {
       defaults: { patient: sarah ? 'Sarah' : 'Shane', provider: a.place ? String(a.place).split(',')[0].trim() : '', reason: a.title, date: a.date },
       save: async (c, quiet) => { a.claim = c; await save(); if (!quiet || !sheetOpen) render(); if (sarah) sharedSync(); } };
   }
+  if (ref.startsWith('h:')) { // 2.23.24: Health check-ups (bookings and visits) too
+    const [, pid, iid] = ref.split(':'), p = getPerson(pid), it = p && getHItem(p, iid); if (!it) return null;
+    const sarah = isSarahPerson(p), shared = sarah && healthSarahItems().some(x => x.it === it);
+    return { title: p.name + ': ' + it.name, claim: it.claim, shared, other: 'Sarah', awayNote: 'That photo is on Sarah’s phone. Ask her to share it.',
+      defaults: { patient: sarah ? 'Sarah' : /^\s*shane\b/i.test(p.name) ? 'Shane' : p.name, provider: it.clinic || '', reason: it.name, date: it.apptDate || it.last || todayISO() },
+      save: async (c, quiet) => { it.claim = c; await save(); if (!quiet || !sheetOpen) render(); if (shared) sharedSync(); } };
+  }
   S.claims = Array.isArray(S.claims) ? S.claims : [];
   const x = ref.startsWith('c:') ? S.claims.find(y => y.id === ref.slice(2)) : null;
   if (ref.startsWith('c:') && !x) return null;
@@ -4571,6 +4578,11 @@ function claimRows() {
   const t = todayISO(), out = [];
   (S.appts || []).forEach(a => { if (!a || !a.date || !isHealthAppt(a)) return; if (!a.claim && (a.date >= t || daysLeft(a.date) < -60)) return;
     out.push({ ref: 'a:' + a.id, title: a.title, date: a.date, claim: a.claim || null, sarah: a.from === 'sarah' }); });
+  (S.health || []).forEach(p => (p.items || []).forEach(it => {
+    const d = it.claim && it.claim.date || (it.apptDate && it.apptDate < t ? it.apptDate : it.last);
+    if (!it.claim && !(d && d < t && daysLeft(d) >= -30)) return;
+    out.push({ ref: `h:${p.id}:${it.id}`, title: p.name + ': ' + it.name, date: d || '', claim: it.claim || null, sarah: isSarahPerson(p) });
+  }));
   (S.claims || []).forEach(x => { if (x && x.claim) out.push({ ref: 'c:' + x.id, title: x.claim.reason || 'Claim', date: x.claim.date, claim: x.claim, sarah: false }); });
   return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 }
@@ -5002,7 +5014,7 @@ function apptForm(id, date, pre) {
     (a.evId ? '' : `<div class="field"><span>For</span>${segHtml('for', [['shane', 'Shane'], ['sarah', 'Sarah'], ['other', 'Other']], a.for || (SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')) ? 'sarah' : 'shane'))}</div>
       <label class="checkrow" id="sharesarahrow" style="display:${(a.for || (SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')) ? 'sarah' : 'shane')) === 'sarah' ? 'flex' : 'none'};gap:10px;align-items:flex-start;margin:0 2px 12px"><input type="checkbox" name="shareSarah" ${a.shareSarah === false ? '' : 'checked'} style="width:20px;height:20px;margin-top:2px"><span><b>Share with Sarah</b><br><small class="muted">It shows in her app’s Appointments with your blue S. Changes go both ways.</small></span></label>`) +
     (a.evUrl ? `<p class="muted" style="margin:4px 0 0">From Whangārei events. <a href="${esc(a.evUrl)}" target="_blank" rel="noopener">Open the event page</a></p>` : '') +
-    (id && isHealthAppt(a) ? `<div class="btns" style="margin-top:6px"><button type="button" class="btn small" onclick="claimSheet('a:${id}')">${I('medkit')} UniMed claim${a.claim && a.claim.status !== 'none' ? ' · ' + CLAIM_ST[a.claim.status] : ''}</button></div>` : ''),
+    (id && !a.evId ? `<div class="btns" style="margin-top:6px"><button type="button" class="btn small" onclick="claimSheet('a:${id}')">${I('medkit')} UniMed claim${a.claim && a.claim.status !== 'none' ? ' · ' + CLAIM_ST[a.claim.status] : ''}</button></div>` : ''),
     async v => {
       if (!v.title) return 'Please say what the appointment is.';
       if (!parseD(v.date)) return 'Please choose a date.';
@@ -7802,7 +7814,9 @@ function Health(arg, iid) {
   if (arg) return PersonDetail(arg, iid);
   const missing = HEALTH_PEOPLE.filter(n => !S.health.some(p => p.name.toLowerCase() === n.toLowerCase()));
   const chips = missing.length ? `<div class="chips hpeople">${missing.map(n => `<button class="chip" data-name="${n}" onclick="quickPerson('${n}')">${I('plus')} ${n}</button>`).join('')}</div>` : '';
+  const nClaim = (() => { try { return claimRows().filter(x => claimOpen(x.claim)).length; } catch (e) { return 0; } })();
   return header('Health', S.health.length ? plural(S.health.length, 'person', 'people') : 'Dentist, doctor, check-ups and more', addBtn('Add a person', 'personForm()')) +
+    `<button class="row card hclaimlink" id="hclaims" onclick="go('#claims')"><div class="ic health">${I('medkit')}</div><div style="flex:1;min-width:0"><div class="t">UniMed claims</div><div class="s">${nClaim ? plural(nClaim, 'claim') + ' to make' : 'Smart Claim helper: details, invoice photos, status'}</div></div>${I('right')}</button>` +
     (S.health.length ? S.health.map(p => {
       const next = healthNext(p).slice(0, 3);
       return `<div class="carcard petcard hcard" role="button" tabindex="0" data-person="${p.id}" onclick="go('#health/${p.id}')"><div class="carhead">${hPic(p)}
@@ -7823,7 +7837,7 @@ function hRow(p, it) {
     : due ? `<b class="duewhen">Due ${fmtW(due)}</b> ${pill(d)}` : `<span class="pill none">${it.last && it.unit === 'none' ? 'Done' : 'No date yet'}</span>`;
   return `<div class="row care hrow" data-item="${it.id}"><button class="tapzone" aria-label="Edit ${esc(it.name)}" onclick="hItemForm('${p.id}','${it.id}')"><div class="ic health">${I(HEALTH_ICON[it.kind] || 'medkit')}</div>
     <div class="tx"><div class="t">${esc(it.name)}</div><div class="s">${top}</div><div class="s">${bits.join(' · ')}</div></div></button>
-    <div class="hbtns">${it.phone ? `<a class="iconbtn hcall" href="${telHref(it.phone)}" aria-label="Call ${esc(it.clinic || it.name)} on ${esc(it.phone)}">${I('call')}</a>` : ''}<button class="btn small" aria-label="Done: ${esc(it.name)}" onclick="hDoneForm('${p.id}','${it.id}')">${I('check')} Done</button></div></div>`;
+    <div class="hbtns">${it.phone ? `<a class="iconbtn hcall" href="${telHref(it.phone)}" aria-label="Call ${esc(it.clinic || it.name)} on ${esc(it.phone)}">${I('call')}</a>` : ''}<button class="btn small" aria-label="Done: ${esc(it.name)}" onclick="hDoneForm('${p.id}','${it.id}')">${I('check')} Done</button>${it.apptDate || it.last || it.claim ? `<button class="btn small hclaim" aria-label="UniMed claim for ${esc(it.name)}" onclick="claimSheet('h:${p.id}:${it.id}')">${I('medkit')} ${it.claim && it.claim.status !== 'none' ? CLAIM_ST[it.claim.status] : 'Claim'}</button>` : ''}</div></div>`;
 }
 function PersonDetail(id, iid) {
   const p = getPerson(id);
@@ -7905,7 +7919,8 @@ function hItemForm(pid, iid, kind) {
     field('Booked appointment (optional)', inp('apptDate', it.apptDate, 'type="date"')) +
     field('Appointment time', inp('apptTime', it.apptTime, 'type="time"'), 'Optional. The booking shows on the Calendar and is cleared when you tick Done.') +
     (isSarahPerson(p) ? `<label class="checkrow" style="display:flex;gap:10px;align-items:flex-start;margin:0 2px 12px"><input type="checkbox" name="shareSarah" ${it.shareSarah === false ? '' : 'checked'} style="width:20px;height:20px;margin-top:2px"><span><b>Share with Sarah</b><br><small class="muted">A booked appointment shows in her app’s Appointments with your blue S.</small></span></label>` : '') +
-    (it.apptDate ? `<div class="btns" style="margin:-4px 0 8px"><button type="button" class="btn small" id="hclearappt">${I('x')} Clear booking</button></div>` : ''),
+    (it.apptDate ? `<div class="btns" style="margin:-4px 0 8px"><button type="button" class="btn small" id="hclearappt">${I('x')} Clear booking</button></div>` : '') +
+    (iid && (it.apptDate || it.last || it.claim) ? `<div class="btns" style="margin:0 0 8px"><button type="button" class="btn small" onclick="claimSheet('h:${pid}:${iid}')">${I('medkit')} UniMed claim${it.claim && it.claim.status !== 'none' ? ' · ' + CLAIM_ST[it.claim.status] : ''}</button></div>` : ''),
     async v => {
       if (!v.name) return 'Please give it a name.';
       const unit = v.unit, every = Math.round(+v.every);
@@ -9219,7 +9234,7 @@ const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[
 const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans', 'claims'] },
-  { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'about'] },
+  { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge', 'roadworks'] },
