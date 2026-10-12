@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.35';
+const APP_VERSION = '2.23.36';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13914,66 +13914,72 @@ function erCard() {
    About 30% shorter: very short greetings and the least important tail are left out of the scroll;
    "Full summary" shows everything. Swipe to move, pauses while touched, off screen or hidden; reduced motion = manual. */
 const sumScrollOn = () => !(S && S.settings && S.settings.sumFull === true);
-let stripSumDone = false, homeSumT = '', tkIdx = 0, tkAt = Date.now(), tkTouch = false, tkOpen = false;
-const TK_MS = 5000;
+let stripSumDone = false, homeSumT = '', tkTouch = false, tkOpen = false;
 function qsBlock(h) { const t = stripSumDone ? '' : homeSumT; stripSumDone = true; return (h || '') + t; }
 function sumTickerize(el) {
+  // 2.23.36: one continuous line, scrolling right to left (news ticker). Tap for Full summary with the + Add buttons.
   if (!el || el.dataset.tk || !sumScrollOn()) return;
   const shade = el.querySelector('.sumshade') || el;
   const all = [...shade.querySelectorAll('.sumbul > li, .sumsug, .sumnote')];
   if (!all.length) return;
   el.dataset.tk = '1';
-  let pick = all.filter(c => !(c.matches('li') && !c.classList.contains('late') && !c.classList.contains('urgent') && c.textContent.trim().length < 22));
-  if (!pick.length) pick = all.slice(0, 1);
   const urg = c => c.classList.contains('late') || c.classList.contains('urgent');
+  let pick = all.filter(c => !(c.matches('li') && !urg(c) && c.textContent.trim().length < 22));
+  if (!pick.length) pick = all.slice(0, 1);
   const keep = Math.max(1, Math.round(all.length * 0.7));
   if (pick.length > keep) { const u = pick.filter(urg), o = pick.filter(c => !urg(c)); pick = pick.filter(c => urg(c) || o.indexOf(c) < Math.max(0, keep - u.length)); }
   const full = document.createElement('div'); full.className = 'sumfull'; full.hidden = !tkOpen;
   while (shade.firstChild) full.appendChild(shade.firstChild);
-  const box = document.createElement('div'); box.className = 'sumtk'; box.setAttribute('aria-roledescription', 'carousel'); box.setAttribute('aria-label', 'Summary');
-  const view = document.createElement('div'); view.className = 'tkview';
-  tkIdx = tkIdx % pick.length;
-  pick.forEach((c, i) => {
-    const s = document.createElement('div'); s.className = 'tkslide' + (i === tkIdx ? ' on' : ''); s.setAttribute('aria-hidden', i !== tkIdx);
-    const k = c.cloneNode(true); k.removeAttribute('id');
-    if (k.matches('li')) { const ul = document.createElement('ul'); ul.className = 'sumbul'; ul.appendChild(k); s.appendChild(ul); } else s.appendChild(k);
-    view.appendChild(s);
-  });
-  box.appendChild(view);
+  const piece = pick.map(c => { const t = (c.querySelector('.tx') || c).textContent.replace(/\s+/g, ' ').trim(); const cls = [...c.classList].filter(k => !/^(sumli|sumsug|sumnote)$/.test(k)).join(' ');
+    return `<span class="tki ${c.matches('.sumsug') ? 'sug' : ''} ${esc(cls)}"${c.getAttribute('style') ? ` style="${esc(c.getAttribute('style'))}"` : ''}>${esc(t)}</span><span class="tksep" aria-hidden="true">•</span>`; }).join('');
+  const plain = pick.map(c => (c.querySelector('.tx') || c).textContent.replace(/\s+/g, ' ').trim()).join(' • ');
+  const box = document.createElement('div'); box.className = 'sumtk'; box.hidden = tkOpen;
+  box.innerHTML = `<button type="button" class="tkline" aria-label="Summary: ${esc(plain)}. Tap for the full summary."><span class="tktrack" aria-hidden="true"><span class="tkrun">${piece}</span><span class="tkrun">${piece}</span></span></button>`;
   const foot = document.createElement('div'); foot.className = 'tkfoot';
-  foot.innerHTML = (pick.length > 1 ? `<span class="tkdots">${pick.map((_, i) => `<button type="button" class="tkdot${i === tkIdx ? ' on' : ''}" data-i="${i}" aria-label="Summary line ${i + 1}"></button>`).join('')}</span>` : '<span></span>') +
-    `<button type="button" class="tkmore" aria-expanded="${tkOpen}">${tkOpen ? 'Hide full summary' : 'Full summary'}</button>`;
-  box.hidden = tkOpen; shade.appendChild(box); shade.appendChild(full); shade.appendChild(foot);
+  foot.innerHTML = `<span></span><button type="button" class="tkmore" aria-expanded="${tkOpen}">${tkOpen ? 'Hide full summary' : 'Full summary'}</button>`;
+  shade.appendChild(box); shade.appendChild(full); shade.appendChild(foot);
+  tkX = 0;
 }
-function tkShow(i) {
-  const el = document.querySelector('#homesum .sumtk'); if (!el) return;
-  const sl = el.querySelectorAll('.tkslide'), n = sl.length; if (!n) return;
-  const prev = tkIdx; tkIdx = ((i % n) + n) % n; tkAt = Date.now();
-  const back = i < prev;
-  sl.forEach((s, k) => { s.classList.toggle('back', back); s.classList.toggle('on', k === tkIdx); s.classList.toggle('out', k === prev && k !== tkIdx); s.setAttribute('aria-hidden', k !== tkIdx); });
-  document.querySelectorAll('#homesum .tkdot').forEach((d, k) => d.classList.toggle('on', k === tkIdx));
+let tkX = 0, tkLast = 0, tkDrag = null;
+const TK_PX = 55;
+function tkFrame(t) {
+  const h = document.getElementById('homesum');
+  if (h && !h.dataset.tk && sumScrollOn() && h.closest('#tkhome')) sumTickerize(h);
+  const tr = h && h.querySelector('.sumtk:not([hidden]) .tktrack');
+  const dt = tkLast ? Math.min(100, t - tkLast) : 0; tkLast = t;
+  if (tr) {
+    const run = tr.firstElementChild, w = run ? run.offsetWidth : 0;
+    const r = tr.getBoundingClientRect(), vis = r.height && r.bottom > 0 && r.top < innerHeight;
+    if (w && vis && !tkTouch && !tkDrag && !document.hidden && !stripReduced()) tkX += TK_PX * dt / 1000;
+    if (stripReduced() && !tkDrag) tkX = 0;
+    if (w) { tkX = ((tkX % w) + w) % w; tr.style.transform = `translate3d(${-tkX}px,0,0)`; }
+  }
+  requestAnimationFrame(tkFrame);
 }
-setInterval(() => {
-  const h = document.getElementById('homesum'); if (h && !h.dataset.tk && sumScrollOn() && h.closest('#tkhome')) sumTickerize(h);
-  const el = h && h.querySelector('.sumtk');
-  if (!el || el.hidden || tkTouch || document.hidden || stripReduced() || el.querySelectorAll('.tkslide').length < 2) { tkAt = Math.max(tkAt, Date.now() - TK_MS + 1500); return; }
-  const r = el.getBoundingClientRect(); if (r.bottom <= 0 || r.top >= innerHeight || !r.height) { tkAt = Date.now(); return; }
-  if (Date.now() - tkAt >= TK_MS) tkShow(tkIdx + 1);
-}, 400);
+requestAnimationFrame(tkFrame);
+function tkToggleFull() {
+  tkOpen = !tkOpen; const h = document.getElementById('homesum'); if (!h) return;
+  const a = h.querySelector('.sumtk'), f = h.querySelector('.sumfull'), m = h.querySelector('.tkmore');
+  if (a) a.hidden = tkOpen; if (f) f.hidden = !tkOpen; if (m) { m.textContent = tkOpen ? 'Hide full summary' : 'Full summary'; m.setAttribute('aria-expanded', tkOpen); }
+}
 (() => {
-  let x0 = 0, y0 = 0, moved = false;
-  const inTk = e => e.target && e.target.closest && e.target.closest('#homesum .sumtk');
-  document.addEventListener('touchstart', e => { if (!inTk(e)) return; tkTouch = true; moved = false; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
-  document.addEventListener('touchend', e => { if (!tkTouch) return; tkTouch = false; tkAt = Date.now(); const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { moved = true; tkShow(tkIdx + (dx < 0 ? 1 : -1)); } }, { passive: true });
-  document.addEventListener('touchcancel', () => { tkTouch = false; });
-  document.addEventListener('mouseover', e => { tkTouch = !!inTk(e) && matchMedia('(hover:hover)').matches; });
+  let moved = false;
+  const inTk = e => e.target && e.target.closest && e.target.closest('#homesum .tkline');
+  const down = (x, y) => { tkTouch = true; moved = false; tkDrag = { x, y, x0: tkX }; };
+  const move = (x, y, e) => { if (!tkDrag) return; const dx = x - tkDrag.x; if (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(y - tkDrag.y)) moved = true; if (moved) { tkX = tkDrag.x0 - dx; if (e && e.cancelable) e.preventDefault(); } };
+  const up = () => { tkTouch = false; tkDrag = null; };
+  document.addEventListener('touchstart', e => { if (inTk(e)) down(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  document.addEventListener('touchmove', e => { if (tkDrag) move(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: false });
+  document.addEventListener('touchend', up, { passive: true }); document.addEventListener('touchcancel', up);
+  document.addEventListener('mousedown', e => { if (inTk(e)) down(e.clientX, e.clientY); });
+  document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+  document.addEventListener('mouseup', up);
   document.addEventListener('click', e => {
-    const t = e.target && e.target.closest && e.target.closest('#homesum .tkdot, #homesum .tkmore'); if (!t) { if (moved && inTk(e)) { moved = false; e.stopPropagation(); e.preventDefault(); } return; }
-    if (t.classList.contains('tkdot')) return tkShow(+t.dataset.i);
-    tkOpen = !tkOpen; const h = document.getElementById('homesum');
-    h.querySelector('.sumtk').hidden = tkOpen; h.querySelector('.sumfull').hidden = !tkOpen; t.textContent = tkOpen ? 'Hide full summary' : 'Full summary'; t.setAttribute('aria-expanded', tkOpen);
-  }, true);
+    if (e.target && e.target.closest && e.target.closest('#homesum .tkmore')) return tkToggleFull();
+    if (!inTk(e)) return;
+    if (moved) { moved = false; return; }
+    tkToggleFull();
+  });
 })();
 
 /* ================= ROTATING STRIP (2.23.34) =================
@@ -14612,7 +14618,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Scrolling summary</div><div class="s">On: the summary sits under the rotating strip, a little shorter, with each line sliding in from the right. Tap Full summary to read it all. Off: the full summary as before.</div></div><button class="switch ${sumScrollOn() ? 'on' : ''}" role="switch" aria-checked="${sumScrollOn()}" aria-label="Scrolling summary" id="sumscrollsw" onclick="S.settings.sumFull=sumScrollOn();save().then(render)"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Scrolling summary</div><div class="s">On: the summary sits under the rotating strip, a little shorter, as one line scrolling right to left. Touch to pause, drag to scrub. Tap Full summary to read it all. Off: the full summary as before.</div></div><button class="switch ${sumScrollOn() ? 'on' : ''}" role="switch" aria-checked="${sumScrollOn()}" aria-label="Scrolling summary" id="sumscrollsw" onclick="S.settings.sumFull=sumScrollOn();save().then(render)"></button></div>
    <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
