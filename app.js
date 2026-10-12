@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.24';
+const APP_VERSION = '2.23.25';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -220,11 +220,11 @@ const addBtn = (label, fn) => `<button class="iconbtn add" aria-label="${label}"
 const empty = (t, s, btnLabel, fn) => `<div class="card empty"><div class="t">${t}</div><div class="s">${s}</div>${btnLabel ? `<button class="btn primary" style="flex:none;padding:12px 22px" onclick="${fn}">${I('plus')} ${btnLabel}</button>` : ''}</div>`;
 function go(h) { if (location.hash === h) render(); else location.hash = h; }
 let toastTimer;
-function toast(msg, btn, fn) {
+function toast(msg, btn, fn, ms) {
   const t = $('#toast'); $('#toastmsg').textContent = msg;
   const b = $('#toastbtn'); b.textContent = btn || ''; b.style.display = btn ? '' : 'none';
   b.onclick = () => { t.classList.remove('show'); fn && fn(); };
-  t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), btn ? 6000 : 3500);
+  t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms || (btn ? 6000 : 3500));
 }
 
 /* ---------- pop-up sheet (forms), closes with Android back ---------- */
@@ -3653,12 +3653,21 @@ function justAddedList(now = Date.now()) {
 function jaAgo(at, now = Date.now()) { const m = Math.round((now - at) / 6e4); return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 120 ? '1 hr ago' : m < 1440 ? Math.round(m / 60) + ' hrs ago' : 'yesterday'; }
 function justAddedCard() {
   const list = justAddedList();
-  const head = homeSec('Just added', list.length ? '<button class="linkbtn" id="jaclear" onclick="justAddedClear()">Clear</button>' : '');
+  const head = homeSec('Just added', list.length ? '<button class="linkbtn jaclear" id="jaclear" onclick="justAddedClear()">Clear…</button>' : '');
   if (!list.length) return head + `<div class="card empty" id="justadded"><div class="t">Nothing new in the last two days</div><div class="s">New things from Sarah, and bills from emails, show here.</div></div>`;
   return head + `<div class="list" id="justadded">${list.slice(0, 12).map(x => `<button class="row ja${x.who === 'sarah' ? ' jasarah' : ''}" onclick="${x.go}"><div class="ic ${x.ic}">${I(x.icon)}</div><div class="tx"><div class="t">${x.title}</div><div class="s">${x.sub}</div></div><span class="jaago">${esc(jaAgo(x.at))}</span></button>`).join('')}</div>` +
     (list.length > 12 ? `<p class="muted" style="margin:6px 4px 0">and ${list.length - 12} more</p>` : '');
 }
-async function justAddedClear() { S.settings.justSeenAt = Date.now(); await save(); render(); toast('Cleared. New things will show here again.'); }
+/* 2.23.25: Clear used to empty the card with one tap. Now it asks first, and Undo stays up for 8 seconds.
+   Clearing only hides what's there now (nothing is deleted), so Undo puts it all back. */
+function justAddedClear() {
+  const n = justAddedList().length;
+  confirmSheet('Clear Just added?', `This hides the ${plural(n, 'item')} listed now. Nothing is deleted, and new things will show here again.`, 'Clear', async () => {
+    const prev = S.settings.justSeenAt; S.settings.justSeenAt = Date.now(); await save(); render();
+    toast('Just added cleared.', 'Undo', async () => { if (prev) S.settings.justSeenAt = prev; else delete S.settings.justSeenAt; await save(); render(); }, 8000);
+  });
+}
+const justAddedOn = () => !(S && S.settings && S.settings.justAdded === false);
 let homeSumOpen = false;
 function homeSumFold(sum) { return `<details class="sumfold" id="sumfold"${homeSumOpen ? ' open' : ''} ontoggle="homeSumOpen=this.open"><summary>${I('star')}<span>Summary</span><small>tap to ${homeSumOpen ? 'hide' : 'read'}</small></summary>${sum}</details>`; }
 // 2.22.21: one bad Home piece logs and drops out instead of blanking the whole app.
@@ -3704,7 +3713,7 @@ function Home() {
       sections.push({ keys: g.keys, html: `<section class="hsec${fresh ? ' hnew' : ''}" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${fresh ? '<span class="newtag">New</span>' : ''}${body}</section>` });
     } catch (e) { console.error('Home section', g.k, e); }
   });
-  if (!night) [['comingup', comingUpCard], ['justadded', justAddedCard]].concat(qjTop() ? [] : [['quotejoke', quoteJokeCard]]).forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
+  if (!night) [['comingup', comingUpCard], ].concat(justAddedOn() ? [['justadded', justAddedCard]] : []).concat(qjTop() ? [] : [['quotejoke', quoteJokeCard]]).forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
@@ -14121,6 +14130,7 @@ function Settings() {
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
@@ -16321,6 +16331,7 @@ async function start() {
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');
   }
   // 2.22.21: a failure here must not leave a blank screen or skip service worker registration (updates).
+  try { if (S && S.settings && !S.settings.jaRestore25) { delete S.settings.justSeenAt; S.settings.jaRestore25 = true; await save(); } } catch (e) { } // 2.23.25: bring back a Just added list cleared by accident
   try { await loadCal(); } catch (e) { console.error('loadCal', e); }
   try { await loadMail(); } catch (e) { console.error('loadMail', e); }
   try { await loadRwm(); } catch (e) { console.error('loadRwm', e); }
