@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.31';
+const APP_VERSION = '2.23.32';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3743,7 +3743,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (qjTop() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + sumTop + (night && !qjTop() ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : '') + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + homeTry('rewards', () => erCard(), '') + (qjTop() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + sumTop + (night && !qjTop() ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : '') + cards +
     sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -13144,6 +13144,7 @@ const MAIL_BULK_RE = /(newsletter|marketing|promo|offers|deals|mailer|campaign|n
 const MAIL_KEY_RE = /(invoice|\bbill\b|payment|overdue|\bdue\b|statement|receipt|refund|\border\b|delivery|deliver|courier|parcel|appointment|booking|confirm|security|password|sign.?in|verify|verification|\bcode\b|account|rego|registration|\bwof\b|insurance|\bird\b|\btax\b|council|reminder|urgent|action required|important|roster|shift|interview|contract|mortgage|loan|bank|vet|doctor|dentist|school|court|\bfine\b|ticket)/i;
 function mailIsImportant(it) {
   const subj = it.subject || '';
+  if (/@comms\.everydayrewards\.co\.nz$/i.test(it.addr || '')) return false; // 2.23.32: these get their own card
   if (/@members\.netflix\.com$/i.test(it.addr || '')) return false; // 2.22.87: Netflix promos go to the summary, never the mail strip
   if (MAIL_AD_RE.test(subj)) return false;
   if (it.high || MAIL_KEY_RE.test(subj)) return true;
@@ -13430,6 +13431,7 @@ async function refreshMail(force) {
   paintHomeSum();
   refreshLawnInvoice(false);
   refreshKora(false);
+  refreshEr(false);
   refreshNf(false);
 }
 function mailSettingsSection() {
@@ -13808,6 +13810,97 @@ async function refreshKora(force) {
     if (!sheetOpen && (h === 'bills' || h === 'budget' || h === 'home' || h === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
   } catch (e) { }
   finally { koraBusy = false; }
+}
+
+/* ================= EVERYDAY REWARDS PROMOTIONS (2.23.32) =================
+   Emails from promotions@comms.everydayrewards.co.nz, read on this phone (Outlook Mail.Read, Gmail when connected), no AI.
+   Each one becomes: a one-line summary from the subject (offer and points), "Boost first" when the email says the offer
+   must be boosted/activated, the end date, and a link to the offer (or the email). End date: the latest "Boost …valid …
+   until/to <date>" in the terms; otherwise the first "until / 'til / before <day> <date>" in the text; otherwise 7 days
+   after it arrived. Sorted by soonest end, expired ones drop off by themselves. Only the parsed lines are kept. */
+const ER_FROM = 'promotions@comms.everydayrewards.co.nz';
+const ER_SKIP = /(protection|password|sign.?in|security|verify|verification|\bcode\b|account details|update your details)/i;
+const ER_MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+let ER = null, erBusy = false, erAt = 0, erMore = false;
+const erOn = () => S.settings.erPromos !== false;
+async function loadEr() { try { const c = await kvGet('erPromos'); ER = c && Array.isArray(c.list) ? c : null; } catch (e) { ER = null; } }
+function erDate(s, recv) {
+  s = String(s || '').trim(); let m;
+  const pad = n => String(n).padStart(2, '0');
+  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/))) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${pad(+m[2])}-${pad(+m[1])}`;
+  if ((m = s.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,})\.?,?\s*(\d{4})?$/)) && ER_MON[m[2].slice(0, 3).toLowerCase()]) {
+    const r = new Date(recv || Date.now()); let y = m[3] ? +m[3] : r.getFullYear(); const mo = ER_MON[m[2].slice(0, 3).toLowerCase()];
+    if (!m[3] && mo < r.getMonth() + 1 - 6) y++; // "1 January" in a December email
+    return `${y}-${pad(mo)}-${pad(+m[1])}`;
+  }
+  return '';
+}
+// Pure: subject + email HTML in, one promotion out (or null)
+function erParse(subject, html, recvISO, webLink) {
+  subject = String(subject || '');
+  if (ER_SKIP.test(subject)) return null;
+  let doc; try { doc = new DOMParser().parseFromString(String(html || ''), 'text/html'); } catch (e) { return null; }
+  doc.querySelectorAll('style,script,head').forEach(x => x.remove());
+  const text = String(doc.body ? doc.body.textContent : '').replace(/[\u00a0\u034f\u200b-\u200d\u2007\u00ad]/g, ' ').replace(/\s+/g, ' ');
+  const DT = '(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}|\\d{1,2}(?:st|nd|rd|th)?\\s+[A-Za-z]{3,9}\\.?,?(?:\\s+\\d{4})?)';
+  const ends = [];
+  for (const sent of text.split(/(?<=[.;])\s+/)) {
+    if (!/(boost|offer|promotion)[^.]{0,40}\bvalid\b|promotion period/i.test(sent) || /free deliver|delivery/i.test(sent)) continue; // only the terms' "Boost … valid … until" lines
+    const re = new RegExp('(?:until|to|till|[’‘\\x27]til)\\s+(?:\\w+day,?\\s+)?' + DT, 'gi'); let m;
+    while ((m = re.exec(sent))) { const d = erDate(m[1], recvISO); if (d) ends.push(d); }
+  }
+  let end = ends.sort().pop() || '';
+  if (!end) { const m = text.match(new RegExp('(?:until|[’‘\\x27]til|till|before|ends?)\\s+(?:\\w+day,?\\s+)?' + DT, 'i')); if (m) end = erDate(m[1], recvISO); }
+  if (!end) { const r = new Date(recvISO || Date.now()); r.setDate(r.getDate() + 7); end = isoT(Date.UTC(r.getFullYear(), r.getMonth(), r.getDate())); }
+  const boost = /no boosting required/i.test(text) && !/needs to be activated|hit\s*[‘'"]?\s*boost/i.test(text) ? false : /needs to be activated|hit\s*[‘'"]?\s*boost|boost all|more boosts|boost now|boost offer/i.test(text);
+  let link = '';
+  for (const a of doc.querySelectorAll('a[href]')) { const t = (a.textContent || '').replace(/\s+/g, ' ').trim(); if (/^(boost( now| offer| all)?|activate|shop now|order now|get started|find out more)$/i.test(t)) { link = a.getAttribute('href'); break; } }
+  if (link && !/^https:\/\//i.test(link)) link = '';
+  const sum = subject.replace(/^\s*[A-Z][a-z]+,\s+/, '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F]/gu, '').replace(/\s+/g, ' ').trim();
+  return { sum: (sum.charAt(0).toUpperCase() + sum.slice(1)).slice(0, 110), end, boost, link, web: webLink && /^https:\/\//.test(webLink) ? webLink : '', at: recvISO || '' };
+}
+async function erOutlook() {
+  const since = new Date(Date.now() - 45 * DAY).toISOString();
+  const url = 'https://graph.microsoft.com/v1.0/me/messages?$filter=' + encodeURIComponent(`receivedDateTime ge ${since} and from/emailAddress/address eq '${ER_FROM}'`) + '&$top=15&$select=id,subject,receivedDateTime,webLink,body';
+  let token = await mailAccess('microsoft'), d;
+  try { d = await getJSONAuth(url, token); } catch (e) { if (e && e.status === 401) { MAIL.microsoft.expiresAt = 0; token = await mailAccess('microsoft'); d = await getJSONAuth(url, token); } else throw e; }
+  return (d.value || []).map(x => erParse(x.subject, x.body && x.body.content, x.receivedDateTime, x.webLink)).filter(Boolean);
+}
+async function erGmail() {
+  const token = await mailAccess('google');
+  const list = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=' + encodeURIComponent('from:' + ER_FROM + ' newer_than:45d'), token);
+  const out = [];
+  for (const it of (list.messages || []).slice(0, 10)) {
+    try {
+      const g = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(it.id) + '?format=full', token);
+      const h = n => (((g.payload && g.payload.headers) || []).find(x => x.name.toLowerCase() === n) || {}).value || '';
+      let html = ''; const walk = p => { if (!p || html) return; if (p.mimeType === 'text/html' && p.body && p.body.data) { const b = atob(p.body.data.replace(/-/g, '+').replace(/_/g, '/')); html = new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); } (p.parts || []).forEach(walk); }; walk(g.payload);
+      const p = erParse(h('subject'), html, new Date(Number(g.internalDate)).toISOString(), 'https://mail.google.com/mail/u/0/#all/' + it.id); if (p) out.push(p);
+    } catch (e) { }
+  }
+  return out;
+}
+async function refreshEr(force) {
+  if (erBusy || !S || !erOn() || (!mailConnected('microsoft') && !mailConnected('google'))) return;
+  if (!force && erAt && Date.now() - erAt < 30 * 60 * 1000) return;
+  erBusy = true;
+  try {
+    const parts = await Promise.all([mailConnected('microsoft') ? erOutlook().catch(() => null) : [], mailConnected('google') ? erGmail().catch(() => null) : []]);
+    if (parts.every(p => p === null)) return;
+    const seen = new Set(), list = parts.flat().filter(Boolean).sort((a, b) => String(b.at).localeCompare(String(a.at))).filter(p => { const k = p.sum.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    erAt = Date.now(); const had = JSON.stringify(ER && ER.list); ER = { at: erAt, list }; await kvSet('erPromos', ER).catch(() => { });
+    if (had !== JSON.stringify(list) && !sheetOpen && ((location.hash || '#home') === '#home' || location.hash === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
+  } finally { erBusy = false; }
+}
+const erLive = () => (ER && ER.list || []).filter(p => p.end >= todayISO()).sort((a, b) => a.end.localeCompare(b.end) || String(b.at).localeCompare(String(a.at)));
+function erCard() {
+  if (!erOn()) return '';
+  const all = erLive(); if (!all.length) return '';
+  const show = erMore ? all : all.slice(0, 3);
+  const endTxt = e => { const d = daysLeft(e); return d === 0 ? 'Ends today' : d === 1 ? 'Ends tomorrow' : 'Ends ' + fmtW(e); };
+  return `<div class="card ercard" id="ercard"><div class="erh"><b>Everyday Rewards</b><span class="muted">${all.length} offer${all.length === 1 ? '' : 's'}</span></div>
+    ${show.map(p => `<a class="errow" href="${esc(p.link || p.web)}" target="_blank" rel="noopener"><div class="tx"><div class="t">${esc(p.sum)}</div><div class="s"><span class="${daysLeft(p.end) <= 2 ? 'erend soon' : 'erend'}">${endTxt(p.end)}</span>${p.boost ? ' · <span class="erboost">Boost first</span>' : ''}</div></div>${p.web && p.link ? `<span class="ermail" role="link" tabindex="0" onclick="event.preventDefault();event.stopPropagation();window.open('${esc(p.web)}','_blank','noopener')">Email</span>` : ''}</a>`).join('')}
+    ${all.length > 3 ? `<button class="linkbtn" id="ermore" onclick="erMore=!erMore;render()">${erMore ? 'Less' : 'More (' + (all.length - 3) + ')'}</button>` : ''}</div>`;
 }
 
 /* ================= NEW ON NETFLIX (2.22.87) =================
@@ -14381,6 +14474,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Everyday Rewards offers</div><div class="s">A card near the top with the offers from Everyday Rewards emails, soonest ending first. Expired ones drop off.</div></div><button class="switch ${erOn() ? 'on' : ''}" role="switch" aria-checked="${erOn()}" aria-label="Everyday Rewards offers" id="ersw" onclick="toggleSetting('erPromos', ${!erOn()}).then(() => refreshEr(true))"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
   </div>
   <div class="sec">Places</div>
@@ -16585,6 +16679,7 @@ async function start() {
   try { await loadMail(); } catch (e) { console.error('loadMail', e); }
   try { await loadRwm(); } catch (e) { console.error('loadRwm', e); }
   try { await loadNf(); } catch (e) { console.error('loadNf', e); }
+  try { await loadEr(); } catch (e) { console.error('loadEr', e); }
   try { await finishMailSignIn(); } catch (e) { console.error('finishMailSignIn', e); }
   for (const f of [loadWx, loadAlerts, loadEvs, loadCls, loadRoadworks, loadTv, loadNews, loadBlogs, loadPodcasts]) { try { f(); } catch (e) { console.error('load', e); } }
   try { render(); } catch (e) { console.error('First render', e); }
