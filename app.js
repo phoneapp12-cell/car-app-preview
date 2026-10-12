@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.21';
+const APP_VERSION = '2.23.22';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3611,6 +3611,7 @@ function cuCat(x) {
   return '';
 }
 const cuColoursOn = () => !(S && S.settings && S.settings.cuColours === false);
+const qjTop = () => !!(S && S.settings && S.settings.qjTop); // 2.23.22: quote & joke at the top (off: under Just added)
 const dailyJokeOn = () => !(S && S.settings && S.settings.dailyJoke === false);
 async function toggleSetting(k, on) { S.settings[k] = on; await save(); render(); }
 function cuLegend(list) {
@@ -3703,7 +3704,7 @@ function Home() {
       sections.push({ keys: g.keys, html: `<section class="hsec${fresh ? ' hnew' : ''}" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${fresh ? '<span class="newtag">New</span>' : ''}${body}</section>` });
     } catch (e) { console.error('Home section', g.k, e); }
   });
-  if (!night) [['comingup', comingUpCard], ['justadded', justAddedCard], ['quotejoke', quoteJokeCard]].forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
+  if (!night) [['comingup', comingUpCard], ['justadded', justAddedCard]].concat(qjTop() ? [] : [['quotejoke', quoteJokeCard]]).forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
@@ -3733,7 +3734,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + sumTop + (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : '') + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (qjTop() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + sumTop + (night && !qjTop() ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : '') + cards +
     sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -14073,6 +14074,7 @@ function Settings() {
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
   </div>
