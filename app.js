@@ -9067,7 +9067,14 @@ async function setTextSize(k) {
 function mascotPicker() {
   const cur = mascotKey();
   return `<div class="list" id="mascotpick" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Mascot</div><div class="s">The ${cur} next to Notifications. Its mood follows the time of day.</div></div>
-    <div class="seg mascotseg" role="radiogroup" aria-label="Mascot" style="width:100%">${Object.keys(MASCOTS).map(k => `<button type="button" class="${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-mascot="${k}" onclick="setMascot('${k}')">${mascotMini(k)}<span>${MASCOTS[k].name}</span></button>`).join('')}</div></div></div>`;
+    <div class="seg mascotseg" role="radiogroup" aria-label="Mascot" style="width:100%">${Object.keys(MASCOTS).map(k => `<button type="button" class="${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-mascot="${k}" onclick="setMascot('${k}')">${mascotMini(k)}<span>${MASCOTS[k].name}</span></button>`).join('')}</div>
+    <div class="tx" style="flex-basis:100%;margin-top:10px"><div class="t">Style</div><div class="s">${mascotArt() === 'krea' ? 'Krea art: a picture made with Krea' : 'Drawn: the original moving drawing'}</div></div>
+    <div class="seg mascotseg" id="mascotart" role="radiogroup" aria-label="Mascot style" style="width:100%">${[['svg', 'Drawn'], ['krea', 'Krea art']].map(([a, l]) => `<button type="button" class="${a === mascotArt() ? 'on' : ''}" role="radio" aria-checked="${a === mascotArt()}" data-art="${a}" onclick="setMascotArt('${a}')">${mascotMini(mascotKey(), a)}<span>${l}</span></button>`).join('')}</div></div></div>`;
+}
+async function setMascotArt(a) {
+  if (a !== 'svg' && a !== 'krea' || a === mascotArt()) return;
+  const s = snap(); S.settings.mascotArt = a; await save(); render();
+  toast(a === 'krea' ? 'Krea art mascot on.' : 'Drawn mascot on.', 'Undo', undoTo(s));
 }
 async function setMascot(k) {
   if (!MASCOTS[k] || k === mascotKey()) return;
@@ -14113,12 +14120,17 @@ const MASCOTS = {
   dog: { name: 'Dog', img: '', says: { energetic: ['Woof!', 'Ball?', 'Play?'], alert: ['Woof!', 'Pats?', 'Boof!'], tired: ['boof…', 'Pats?', '*yawn*'], drowsy: ['boof…', '*yawn*', 'mmf…'], sleep: ['snore…', 'zzz…', '*snuffle*'] } }
 };
 const mascotKey = () => { const k = S && S.settings && S.settings.mascot; return MASCOTS[k] ? k : 'cat'; };
+// 2.23.28: art style. 'svg' (default, drawn) or 'krea' (Krea-made picture, mascot/<cat|dog>-krea.webp). Moods, sleep and taps
+// are CSS on the picture; if it fails to load, the SVG shows instead.
+const mascotArt = () => S && S.settings && S.settings.mascotArt === 'krea' ? 'krea' : 'svg';
+const kreaImg = k => `<img class="kimg" alt="" src="mascot/${k}-krea.webp" onerror="this.parentNode.classList.remove('hkrea');this.remove()">`;
 function catHtml() {
   const st = catState(), k = mascotKey(), m = MASCOTS[k];
   const img = m.img ? `<img class="mimg" alt="" src="${m.img}${st}.webp" onload="this.parentNode.classList.add('hasimg')" onerror="this.parentNode.classList.remove('hasimg');this.remove()">` : '';
-  return `<button type="button" class="hcat cat-${st}${k === 'dog' ? ' hdog' : ''}" id="hcat" aria-label="The ${k} is ${CAT_WORDS[st]}" onclick="catPoke(event)">${k === 'dog' ? dogSvg() : catSvg()}${img}<span class="ctrip" aria-hidden="true"></span><span class="cbub" aria-hidden="true"></span></button>`;
+  const kr = mascotArt() === 'krea';
+  return `<button type="button" class="hcat cat-${st}${k === 'dog' ? ' hdog' : ''}${kr ? ' hkrea' : ''}" id="hcat" aria-label="The ${k} is ${CAT_WORDS[st]}" onclick="catPoke(event)">${k === 'dog' ? dogSvg() : catSvg()}${kr ? kreaImg(k) + '<span class="kz" aria-hidden="true"><i>z</i><i>z</i><i>Z</i></span>' : img}<span class="ctrip" aria-hidden="true"></span><span class="cbub" aria-hidden="true"></span></button>`;
 }
-function mascotMini(k) { return `<span class="hcat mprev cat-alert${k === 'dog' ? ' hdog' : ''}" aria-hidden="true">${k === 'dog' ? dogSvg() : catSvg()}</span>`; }
+function mascotMini(k, art) { const kr = (art || mascotArt()) === 'krea'; return `<span class="hcat mprev cat-alert${k === 'dog' ? ' hdog' : ''}${kr ? ' hkrea' : ''}" aria-hidden="true">${k === 'dog' ? dogSvg() : catSvg()}${kr ? kreaImg(k) : ''}</span>`; }
 function dogSvg() {
   return `<svg viewBox="0 0 48 40" aria-hidden="true">
 <g class="csit">

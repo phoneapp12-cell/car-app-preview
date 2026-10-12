@@ -1358,6 +1358,32 @@ html[data-theme="dark"] .row.cucat,html[data-theme="night"] .row.cucat{backgroun
 .clpdf .pdfic{font-weight:900;font-size:0.875rem}.clpdf small{font-size:0.5625rem;line-height:1.1;padding:0 3px;overflow:hidden;max-height:2.3em;word-break:break-all}
 .ecrow{align-items:flex-start}.ecrow .ecpdf{font-size:0.75rem;word-break:break-all}.ecbtns{display:flex;flex-direction:column;gap:6px;flex:none}
 .pdfpv{flex:1;min-height:0;width:100%;overflow:auto;display:flex;justify-content:center;align-items:flex-start}.pdfpv canvas{max-width:100%;height:auto;background:#fff;border-radius:6px}
+
+/* 2.23.28: Krea art mascot. The picture replaces the SVG; moods are CSS on the picture */
+.hcat.hkrea>svg{display:none}
+.hcat .kimg{position:absolute;left:30px;top:6px;width:84px;height:84px;object-fit:contain;pointer-events:none;transform-origin:50% 95%;transition:filter .9s,transform .9s;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}
+.hcat.mprev .kimg{position:static;width:100%;height:100%}
+.hcat .kz{position:absolute;left:96px;top:0;font:800 13px/1 system-ui,sans-serif;color:#7C8DB5;pointer-events:none}
+.hcat .kz i{position:absolute;font-style:normal;opacity:0}
+.hcat .kz i:nth-child(2){left:7px;top:-8px;font-size:15px}.hcat .kz i:nth-child(3){left:15px;top:-18px;font-size:18px}
+.hcat.hkrea.cat-energetic .kimg{animation:catBounce .7s ease-in-out infinite}
+.hcat.hkrea.cat-alert .kimg{animation:kTilt 6s ease-in-out infinite}
+.hcat.hkrea.cat-tired .kimg{filter:saturate(.85) drop-shadow(0 2px 3px rgba(0,0,0,.15));animation:kSway 5s ease-in-out infinite}
+.hcat.hkrea.cat-drowsy .kimg{filter:saturate(.7) brightness(.93) drop-shadow(0 2px 3px rgba(0,0,0,.15));animation:kNod 6s ease-in-out infinite}
+.hcat.hkrea.cat-sleep .kimg{filter:saturate(.5) brightness(.8) drop-shadow(0 2px 3px rgba(0,0,0,.15));transform:rotate(-8deg) translateY(4px) scale(.92);animation:kBreath 4s ease-in-out infinite}
+.hcat.hkrea.cat-sleep .kz i{animation:kZ 3.6s ease-in-out infinite}.hcat.hkrea.cat-sleep .kz i:nth-child(2){animation-delay:1.2s}.hcat.hkrea.cat-sleep .kz i:nth-child(3){animation-delay:2.4s}
+.hcat.hkrea.react:not(.cat-sleep) .kimg{animation:kHop 1.1s ease-in-out}
+.hcat.hkrea.react.cat-sleep .kimg{animation:kStir 1.1s ease-in-out}
+.hcat.hkrea.tapping .kimg{animation:kTapA .55s ease-in-out 2}
+@keyframes kTilt{0%,70%,100%{transform:rotate(0)}78%,90%{transform:rotate(-7deg)}}
+@keyframes kSway{0%,100%{transform:rotate(0)}50%{transform:rotate(3deg) translateY(1px)}}
+@keyframes kNod{0%,60%,100%{transform:rotate(0)}70%,85%{transform:rotate(6deg) translateY(3px)}}
+@keyframes kBreath{0%,100%{transform:rotate(-8deg) translateY(4px) scale(.92)}50%{transform:rotate(-8deg) translateY(4px) scale(.95,.9)}}
+@keyframes kZ{0%{opacity:0;transform:translate(0,4px)}30%{opacity:1}100%{opacity:0;transform:translate(6px,-10px)}}
+@keyframes kHop{0%,100%{transform:none}25%{transform:translateY(-8px) scale(1.04,.97)}50%{transform:translateY(0) scale(1.05,.95)}75%{transform:rotate(-5deg)}}
+@keyframes kStir{0%,100%{transform:rotate(-8deg) translateY(4px) scale(.92)}40%{transform:rotate(-3deg) translateY(2px) scale(.94)}}
+@keyframes kTapA{0%,100%{transform:none}50%{transform:rotate(-10deg) translate(-4px,2px)}}
+@media (prefers-reduced-motion:reduce){.hcat.hkrea .kimg,.hcat.hkrea .kz i{animation:none!important}.hcat.hkrea.cat-sleep .kz i{opacity:.8}}
 </style>
 </head>
 <body>
