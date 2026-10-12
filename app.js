@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.13';
+const APP_VERSION = '2.23.14';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3508,6 +3508,110 @@ function nightSeenCommit() {
 document.addEventListener('visibilitychange', () => { if (document.hidden) nightSeenCommit(); });
 window.addEventListener('hashchange', () => { if (!/^#?(home)?$/.test(location.hash)) nightSeenCommit(); });
 
+
+/* 2.23.14: daytime Notifications (5am to 8pm NZ) is just two cards.
+   "Coming up": one list of everything with a date in the next 30 days (or overdue), from every part of the app:
+   the Upcoming sources (cars, bills incl. Kora and lawns, to-dos incl. Sarah's and shared ones, pets, health,
+   birthdays, events, appointments, calendars, garden, dinner) plus later events, today's pills, gym nights,
+   payday and countdowns. Sorted by date (overdue first), then priority on the same day, then time. No repeats.
+   "Just added": things added in the last 48 hours anywhere, Sarah's first-class (with her brand picks), and bills
+   the app added from emails. Clear hides what's there now. The night feed is unchanged. */
+const CU_DAYS = 30, CU_SHOW = 10, JA_MS = 48 * 3600e3;
+let cuShowAll = false;
+const cuNorm = s => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z#0-9]+;/gi, ' ').replace(/^(Today|Tomorrow|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|In \d+ days):\s*/i, '').replace(/\s+\d{1,2}(:\d{2})?\s*(am|pm)$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+function cuWhen(d, iso) { return d < 0 ? duePill(d) : d <= 1 ? duePill(d) : `<span class="pill duepill ${dueTone(d)}">${d < 7 ? attDay(d, iso).slice(0, 3) : 'In ' + d + ' days'}</span>`; }
+function cuChip(html, d, iso) {
+  if (/class="pill/.test(html)) return html;
+  const chip = cuWhen(d, iso), arrow = I('right');
+  if (html.includes(arrow)) return html.replace(arrow, chip);
+  const i = html.lastIndexOf('</button>'); return i < 0 ? html : html.slice(0, i) + chip + html.slice(i);
+}
+// 0 high, 1 medium, 2 low
+function cuPri(x) {
+  const ref = x.ref || {};
+  if (x.kind === 'todo') { const p = ref.todo && ref.todo.priority; return p === 'high' ? 0 : p === 'low' ? 2 : x.days < 0 ? 0 : 1; }
+  if (x.kind === 'bill' || x.kind === 'med') return x.days <= 0 ? 0 : 1;
+  if (x.kind === 'car' || x.kind === 'driver' || x.kind === 'pet' || x.kind === 'health') return x.days < 0 ? 0 : x.days === 0 ? 0 : 1;
+  if (x.kind === 'appt' || x.kind === 'ext' || x.kind === 'mine' || x.kind === 'bday' || x.kind === 'comm') return 1;
+  return 2;
+}
+const CU_EXTRA = {
+  // My events, appointments and calendars beyond the Upcoming window, out to 30 days
+  mineLater: T => mineItems(T + 2 * DAY, T + CU_DAYS * DAY, true).filter(e => !e.done).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: e.title,
+    html: attRow({ kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'mine', icon: 'repeat', title: esc(e.title) + (e.hm ? ' ' + fmtTime(e.hm) : ''), sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}` }) }; }),
+  apptLater: T => S.appts.filter(a => { const d = daysLeft(a.date); return d > ATT_WEEK && d <= CU_DAYS; }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: a.title,
+    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: esc(a.title) + (a.time ? ' ' + fmtTime(a.time) : ''), sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) }; }),
+  extLater: T => { const seen = new Set(); return extEvents(T + (ATT_WEEK + 1) * DAY, T + CU_DAYS * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '', kind: 'ext', name: e.title,
+    html: attRow({ kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal', title: esc(e.title), sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}` }) }; }); },
+  // Pills still to take today
+  meds: T => { const m = medsState(), d = todayISO(); return m.list.filter(x => x && x.name && !medTakenAt(x.id, d)).map(x => ({ days: 0, rank: 1, sort: x.time || '99', kind: 'med', name: x.name,
+    html: attRow({ kind: 'med', date: d, go: `go('#meds')`, ic: 'health', icon: 'pill', title: esc(x.name) + (x.dose ? ' · ' + esc(x.dose) : ''), sub: `Medication · ${x.time ? fmtTime(x.time) : 'Any time'} today` }) })); },
+  // Gym nights (Tuesday and Wednesday after work), today and tomorrow
+  gym: T => [0, 1].filter(n => { const w = new Date(T + n * DAY).getUTCDay(); return w === 2 || w === 3; }).map(n => ({ days: n, rank: 1, sort: '18:15', kind: 'gym', name: 'Gym',
+    html: attRow({ kind: 'gym', date: isoT(T + n * DAY), go: `go('#gym')`, ic: 'health', icon: 'heart', title: 'Gym' + (n ? '' : ' tonight'), sub: `After work · Day ${new Date(T + n * DAY).getUTCDay() === 3 ? 'B' : 'A'}` }) })),
+  // Next payday
+  pay: T => { const ds = paydays(); if (!ds) return []; const nx = ds.find(d => d >= todayISO()); if (!nx) return []; const d = daysLeft(nx); if (d > CU_DAYS) return [];
+    return [{ days: d, rank: 2, sort: '', kind: 'pay', name: 'Payday', html: attRow({ kind: 'pay', date: nx, go: `go('#bills')`, ic: 'bill', icon: 'cash', title: 'Payday', sub: `Pay day · ${fmtW(nx)}` }) }]; },
+  // Your countdowns and public holidays
+  cd: T => countdownRows().filter(x => x.kind === 'mine' || x.kind === 'hol').map(x => ({ x, d: daysLeft(x.date) })).filter(o => o.d >= 0 && o.d <= CU_DAYS).map(({ x, d }) => ({ days: d, rank: 2, sort: '', kind: x.kind === 'hol' ? 'hol' : 'count', name: x.name,
+    html: cdRow(x, false) }))
+};
+function comingUpList() {
+  const T = todayT(), all = [];
+  try { homeAttention().forEach(x => all.push(x)); } catch (e) { }
+  Object.values(CU_EXTRA).forEach(src => { try { src(T).forEach(x => all.push(x)); } catch (e) { } });
+  const seen = new Set(), out = [];
+  all.filter(x => x && x.html && x.days <= CU_DAYS).forEach(x => {
+    x.pri = cuPri(x);
+    const iso = (String(x.html).match(/data-date="(\d{4}-\d{2}-\d{2})"/) || [])[1] || isoT(T + x.days * DAY);
+    const k = iso + '|' + cuNorm(x.name || x.html);
+    if (seen.has(k)) return; seen.add(k);
+    x.iso = iso; out.push(x);
+  });
+  return out.sort((a, b) => a.days - b.days || a.pri - b.pri || a.rank - b.rank || String(a.sort || '').localeCompare(String(b.sort || '')));
+}
+function cuRowHtml(x) {
+  let h = cuChip(x.html, x.days, x.iso);
+  const t = x.ref && x.ref.todo;
+  if (t && isSarahTodo(t)) h = h.replace('<div class="t">', '<div class="t">' + sarahBadge(t));
+  else if (t && isMineShared(t)) h = h.replace('<div class="t">', '<div class="t"><span class="bluedot" title="Shared with Sarah"></span>');
+  if (x.pri === 0) h = h.replace('class="row', 'class="row cuhi');
+  return h;
+}
+function comingUpCard() {
+  const list = comingUpList();
+  if (!list.length) return homeSec('Coming up', '<a href="#calendar">Calendar</a>') + `<div class="card empty" id="comingup"><div class="t">Nothing coming up in the next 30 days</div><div class="s">Sweet as.</div></div>`;
+  const over = list.filter(x => x.days <= 0).length, n = cuShowAll ? list.length : Math.max(CU_SHOW, over);
+  return homeSec('Coming up', '<a href="#calendar">Calendar</a>') + `<div class="list" id="comingup">${list.slice(0, n).map(cuRowHtml).join('')}</div>` +
+    (list.length > n ? `<div class="btns"><button class="btn" id="cumore" onclick="cuShowAll=true;render()">Show more (${list.length - n})</button></div>` : cuShowAll && list.length > CU_SHOW ? `<div class="btns"><button class="btn" id="cumore" onclick="cuShowAll=false;render()">Show fewer</button></div>` : '');
+}
+const uidTime = id => { const m = String(id || '').match(/-([0-9a-z]{6,12})[0-9a-z]{4}$/); if (!m) return 0; const t = parseInt(m[1], 36); return t > 1.5e12 && t < 4e12 ? t : 0; };
+const jaTime = x => { const c = Number(x && x.created) || 0; return c > 1.5e12 ? c : uidTime(x && x.id); };
+function justAddedList(now = Date.now()) {
+  const seenAt = Number(S.settings && S.settings.justSeenAt) || 0, from = Math.max(now - JA_MS, seenAt), out = [];
+  const add = (at, o) => { if (at > from && at <= now + 6e4) out.push(Object.assign({ at }, o)); };
+  (S.todos || []).forEach(t => { if (t.done) return; add(jaTime(t), { who: isSarahTodo(t) ? 'sarah' : '', ic: 'todo', icon: 'todo', title: (isSarahTodo(t) ? sarahBadge(t) : '') + esc(t.title), sub: `${isSarahTodo(t) ? 'Sarah added · ' : ''}To-do · ${esc(t.list || '')}${t.due ? ' · ' + fmtW(t.due) : ''}`, go: `todoForm('${t.id}')` }); });
+  ((S.shop && S.shop.items) || []).forEach(x => { if (x.done) return; const sar = isSarahShop(x); add(jaTime(x), { who: sar ? 'sarah' : '', ic: 'meal', icon: 'cart', title: (sar ? sarahBadge({ from: 'sarah' }) : '') + esc(x.name), sub: [sar ? 'Sarah added' : '', 'Shopping', x.brand ? esc(brandLine(x.brand)) : ''].filter(Boolean).join(' · '), go: `go('#shopping');setTimeout(()=>shopEdit('${x.id}'),60)` }); });
+  (S.bills || []).forEach(b => { if (b.paid) return; const inv = b.invoice; const at = inv && inv.at ? (Number(inv.at) || Date.parse(inv.at) || 0) : 0;
+    if (at) add(at, { who: 'auto', ic: 'bill', icon: billIcon(b.name), title: esc(b.name), sub: `Added from ${esc(inv.from || 'an')} email · ${money(b.amount)} due ${fmtW(b.due)}`, go: `go('#bills')` });
+    else add(uidTime(b.id), { ic: 'bill', icon: billIcon(b.name), title: esc(b.name), sub: `Bill · ${money(b.amount)} due ${fmtW(b.due)}`, go: `go('#bills')` }); });
+  (S.appts || []).forEach(a => add(uidTime(a.id), { ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: esc(a.title), sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? ' ' + fmtTime(a.time) : ''}`, go: `calOpenDay(${parseD(a.date)})` }));
+  (S.myEvents || []).forEach(e => add(uidTime(e.id), { ic: 'mine', icon: 'repeat', title: esc(e.title), sub: `My event · from ${fmtW(e.start)}`, go: `mineForm('${e.id}')` }));
+  (S.birthdays || []).forEach(b => add(uidTime(b.id), { ic: 'bday', icon: 'cake', title: esc(b.name) + '’s birthday', sub: 'Birthday', go: `go('#birthdays')` }));
+  (S.countdowns || []).forEach(c => add(uidTime(c.id), { ic: 'count', icon: 'clock', title: esc(c.name), sub: 'Countdown · ' + fmtW(c.date), go: `go('#countdown')` }));
+  return out.sort((a, b) => (a.who === 'sarah' ? 0 : 1) - (b.who === 'sarah' ? 0 : 1) || b.at - a.at);
+}
+function jaAgo(at, now = Date.now()) { const m = Math.round((now - at) / 6e4); return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 120 ? '1 hr ago' : m < 1440 ? Math.round(m / 60) + ' hrs ago' : 'yesterday'; }
+function justAddedCard() {
+  const list = justAddedList();
+  const head = homeSec('Just added', list.length ? '<button class="linkbtn" id="jaclear" onclick="justAddedClear()">Clear</button>' : '');
+  if (!list.length) return head + `<div class="card empty" id="justadded"><div class="t">Nothing new in the last two days</div><div class="s">New things from Sarah, and bills from emails, show here.</div></div>`;
+  return head + `<div class="list" id="justadded">${list.slice(0, 12).map(x => `<button class="row ja${x.who === 'sarah' ? ' jasarah' : ''}" onclick="${x.go}"><div class="ic ${x.ic}">${I(x.icon)}</div><div class="tx"><div class="t">${x.title}</div><div class="s">${x.sub}</div></div><span class="jaago">${esc(jaAgo(x.at))}</span></button>`).join('')}</div>` +
+    (list.length > 12 ? `<p class="muted" style="margin:6px 4px 0">and ${list.length - 12} more</p>` : '');
+}
+async function justAddedClear() { S.settings.justSeenAt = Date.now(); await save(); render(); toast('Cleared. New things will show here again.'); }
+let homeSumOpen = false;
+function homeSumFold(sum) { return `<details class="sumfold" id="sumfold"${homeSumOpen ? ' open' : ''} ontoggle="homeSumOpen=this.open"><summary>${I('star')}<span>Summary</span><small>tap to ${homeSumOpen ? 'hide' : 'read'}</small></summary>${sum}</details>`; }
 // 2.22.21: one bad Home piece logs and drops out instead of blanking the whole app.
 function homeTry(label, fn, fb = '') {
   try { const v = fn(); return v == null ? fb : v; } catch (e) { console.error('Home ' + label, e); return fb; }
@@ -3532,14 +3636,16 @@ function Home() {
   const night = homeTry('night', () => homeNight(), false);
   if (night) { const fun = NIGHT_KEYS.filter(k => !keys.includes(k)); keys.splice(0, keys.length, ...fun, ...keys.filter(k => !NIGHT_KEYS.includes(k))); }
   // 1.15.0: each section sits in its own block with a divider line between them
-  const parts = keys.map(k => { try { return [k, ((night && NIGHT_CARD[k]) || NOTIF_CARD[k] || HOME_CARD[k])()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
+  const parts = !night ? [] : keys.map(k => { try { return [k, ((night && NIGHT_CARD[k]) || NOTIF_CARD[k] || HOME_CARD[k])()]; } catch (e) { console.error('Home card', k, e); return [k, '']; } }).filter(([, h]) => h && h.trim());
   const groups = parts.map(([k, h]) => ({ k, keys: [k], h }));
   const tintN = groups.length;
-  const shown = new Set(parts.map(([k]) => k));
+  const shown = new Set(night ? parts.map(([k]) => k) : keys);
   homeShownNow = shown;
-  const sum = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
+  const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
+  const sum = !night && sum0 ? homeSumFold(sum0) : sum0;
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
+  if (!night) before = 0; // 2.23.14: daytime summary is the small fold at the top
   const precede = new Set(order.slice(0, before));
   const sections = [];
   groups.forEach((g, i) => {
@@ -3549,6 +3655,7 @@ function Home() {
       sections.push({ keys: g.keys, html: `<section class="hsec${fresh ? ' hnew' : ''}" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${fresh ? '<span class="newtag">New</span>' : ''}${body}</section>` });
     } catch (e) { console.error('Home section', g.k, e); }
   });
+  if (!night) [['comingup', comingUpCard], ['justadded', justAddedCard]].forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 2))}">${h}</section>` }); });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
@@ -3578,7 +3685,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + (night ? '' : homeTry('book ask', () => bookAskCard())) + homeTry('know', () => knowCard()) + sumTop + homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + sumTop + (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : '') + cards +
     sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -6802,7 +6909,7 @@ function attRow(o) {
 const gardenIsFeed = j => /feed/i.test(j.jobKey || '') || /^Feed\b/.test(j.title || '');
 const ATT_SOURCES = {
   // WOF / rego / service, AA and licence, bills, to-dos with a due date, pet care: within 30 days or overdue (as before)
-  due: T => dueItems(S).filter(x => x.days <= 30 && x.kind !== 'health').map(x => ({ days: x.days, rank: 0, sort: '', kind: x.kind, name: x.title, html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })),
+  due: T => dueItems(S).filter(x => x.days <= 30 && x.kind !== 'health').map(x => ({ days: x.days, rank: 0, sort: '', kind: x.kind, name: x.title, ref: x, html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })),
   // My events (payday, rubbish day…), today and tomorrow. Skipped dates are left out and moved ones show on their new date.
   // 1.82.0: a date marked done stays saved and is left out of Upcoming.
   mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).filter(e => !e.done).map(e => ({ days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: `${attWhen(d)}: ${e.title}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
