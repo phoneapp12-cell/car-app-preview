@@ -4,6 +4,8 @@
  * This file does not fetch mailbox contents. Subjects stay on the phone.
  */
 export const MAIL_REDIRECT = 'https://phoneapp12-cell.github.io/car-app-preview/';
+// Sarah's To-do signs in to her own Outlook on her phone with the same app registration (1.7.0)
+export const MAIL_REDIRECTS = [MAIL_REDIRECT, 'https://phoneapp12-cell.github.io/sarahs-todo/'];
 
 const PROVIDERS = {
   google: {
@@ -87,9 +89,9 @@ export async function exchangeMail(env, body, fetchImpl = fetch) {
   if (!p) return { status: 400, data: { error: 'bad_provider' } };
   const clientId = cleanId(env && env[p.idKey]);
   if (!clientId) return { status: 400, data: { error: 'client_id_missing', provider, missing: p.idKey } };
-  if (!body || body.redirectUri !== MAIL_REDIRECT) return { status: 400, data: { error: 'bad_redirect' } };
+  if (!body || !MAIL_REDIRECTS.includes(body.redirectUri)) return { status: 400, data: { error: 'bad_redirect' } };
   const secret = secretValue(env, p.secretKey);
-  const params = { client_id: clientId, redirect_uri: MAIL_REDIRECT };
+  const params = { client_id: clientId, redirect_uri: body.redirectUri };
   if (body.refreshToken) {
     if (!piece(body.refreshToken, 8, 4096)) return { status: 400, data: { error: 'bad_request' } };
     params.grant_type = 'refresh_token';

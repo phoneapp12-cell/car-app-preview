@@ -64,6 +64,10 @@ ok(r.status === 400 && data.error === 'client_id_missing' && data.missing === 'G
 r = await post({ provider: 'microsoft', code: 'goodcode', codeVerifier: verifier, redirectUri: REDIR }, O, { ALLOWED_ORIGIN: O, GOOGLE_CLIENT_ID: GID });
 data = await r.json();
 ok(data.error === 'client_id_missing' && data.missing === 'MICROSOFT_CLIENT_ID', 'missing Microsoft client id');
+r = await post({ provider: 'microsoft', code: 'goodcode', codeVerifier: verifier, redirectUri: 'https://phoneapp12-cell.github.io/sarahs-todo/' });
+ok(r.status === 200 && calls[calls.length - 1].body.includes('redirect_uri=' + encodeURIComponent('https://phoneapp12-cell.github.io/sarahs-todo/')), "Sarah's To-do return address allowed and passed through");
+r = await post({ provider: 'microsoft', code: 'goodcode', codeVerifier: verifier, redirectUri: 'https://phoneapp12-cell.github.io/other/' });
+ok(r.status === 400, 'other github.io paths refused');
 r = await post({ provider: 'google', code: 'goodcode', codeVerifier: verifier, redirectUri: 'https://evil.example/cb' });
 ok(r.status === 400 && (await r.json()).error === 'bad_redirect', 'bad redirect refused');
 r = await post({ provider: 'google', code: 'goodcode', codeVerifier: verifier, redirectUri: REDIR }, 'https://evil.example');
