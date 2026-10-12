@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.18';
+const APP_VERSION = '2.23.19';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -800,6 +800,7 @@ function dailyJokeFor(now) {
   return DAILY_JOKES[i];
 }
 function dailyJokeCard() {
+  if (!dailyJokeOn()) return '';
   const j = dailyJokeFor();
   if (!j) return '';
   return `<div class="card jokecard" id="dailyjoke"><div class="jhead"><span class="jemo" aria-hidden="true">😄</span><span>Joke of the day</span></div><p class="jq">${esc(j[0])}</p><details class="jans"><summary>Tap for the answer</summary><p class="ja">${esc(j[1])}</p></details></div>`;
@@ -3589,13 +3590,44 @@ function cuRowHtml(x) {
   if (t && isSarahTodo(t)) h = h.replace('<div class="t">', '<div class="t">' + sarahBadge(t));
   else if (t && isMineShared(t)) h = h.replace('<div class="t">', '<div class="t"><span class="bluedot" title="Shared with Sarah"></span>');
   if (x.pri === 0) h = h.replace('class="row', 'class="row cuhi');
+  const cat = cuColoursOn() ? cuCat(x) : '';
+  if (cat) h = h.replace('class="row', `class="row cucat cu-${cat}`);
   return h;
+}
+/* 2.23.19: colour-code Coming up by category. Bills and other money rows stay plain. */
+const CU_CATS = [['car', 'Car'], ['pet', 'Pets'], ['bday', 'Birthdays'], ['event', 'Calendar & events'], ['health', 'Health'], ['todo', 'To-dos'], ['gym', 'Gym'], ['hol', 'Holidays & countdowns']];
+function cuCat(x) {
+  const k = x && x.kind;
+  if (k === 'car' || k === 'driver') return 'car';
+  if (k === 'pet') return 'pet';
+  if (k === 'bday') return 'bday';
+  if (k === 'health' || k === 'med' || k === 'claim') return 'health';
+  if (k === 'todo') return 'todo';
+  if (k === 'gym') return 'gym';
+  if (k === 'hol' || k === 'cd') return 'hol';
+  if (k === 'appt' || k === 'ext' || k === 'mine' || k === 'night' || k === 'ev') return HEALTH_RE.test(String(x.name || '')) || /Sarah’s (doctor|dentist)/.test(String(x.html || '')) ? 'health' : 'event';
+  return ''; // bills, loans, pay days, commission
+}
+const cuColoursOn = () => !(S && S.settings && S.settings.cuColours === false);
+const dailyJokeOn = () => !(S && S.settings && S.settings.dailyJoke === false);
+async function toggleSetting(k, on) { S.settings[k] = on; await save(); render(); }
+function cuLegend(list) {
+  if (!cuColoursOn()) return '';
+  const used = new Set(list.map(cuCat).filter(Boolean));
+  if (!used.size) return '';
+  return `<details class="culegend"><summary>Colour key</summary><div class="cukeys">${CU_CATS.map(([k, l]) => `<span class="cuk cu-${k}${used.has(k) ? '' : ' unused'}">${esc(l)}</span>`).join('')}<span class="cuk plain">Bills</span></div></details>`;
+}
+// Daytime: one compact card with the day's quote and joke (night keeps the photo quote and joke cards)
+function quoteJokeCard() {
+  const q = showDailyQuote() ? dailyQuoteFor() : null, j = dailyJokeOn() ? dailyJokeFor() : null;
+  if (!q && !j) return '';
+  return homeSec(q && j ? 'Quote &amp; joke' : q ? 'Quote of the day' : 'Joke of the day') + `<div class="card qjcard" id="quotejoke">${q ? `<div class="qjq"><p>“${esc(q.t)}”</p><div class="qjw">${esc(q.w)}</div></div>` : ''}${j ? `<div class="qjj"><p><span aria-hidden="true">😄</span> ${esc(j[0])}</p><details class="jans"><summary>Tap for the answer</summary><p class="ja">${esc(j[1])}</p></details></div>` : ''}</div>`;
 }
 function comingUpCard() {
   const list = comingUpList();
   if (!list.length) return homeSec('Coming up', '<a href="#calendar">Calendar</a>') + `<div class="card empty" id="comingup"><div class="t">Nothing coming up in the next 30 days</div><div class="s">Sweet as.</div></div>`;
   const over = list.filter(x => x.days <= 0).length, n = cuShowAll ? list.length : Math.max(CU_SHOW, over);
-  return homeSec('Coming up', '<a href="#calendar">Calendar</a>') + `<div class="list" id="comingup">${list.slice(0, n).map(cuRowHtml).join('')}</div>` +
+  return homeSec('Coming up', '<a href="#calendar">Calendar</a>') + `<div class="list${cuColoursOn() ? ' cucolours' : ''}" id="comingup">${list.slice(0, n).map(cuRowHtml).join('')}</div>` + cuLegend(list.slice(0, n)) +
     (list.length > n ? `<div class="btns"><button class="btn" id="cumore" onclick="cuShowAll=true;render()">Show more (${list.length - n})</button></div>` : cuShowAll && list.length > CU_SHOW ? `<div class="btns"><button class="btn" id="cumore" onclick="cuShowAll=false;render()">Show fewer</button></div>` : '');
 }
 const uidTime = id => { const m = String(id || '').match(/-([0-9a-z]{6,12})[0-9a-z]{4}$/); if (!m) return 0; const t = parseInt(m[1], 36); return t > 1.5e12 && t < 4e12 ? t : 0; };
@@ -3669,7 +3701,7 @@ function Home() {
       sections.push({ keys: g.keys, html: `<section class="hsec${fresh ? ' hnew' : ''}" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${fresh ? '<span class="newtag">New</span>' : ''}${body}</section>` });
     } catch (e) { console.error('Home section', g.k, e); }
   });
-  if (!night) [['comingup', comingUpCard], ['justadded', justAddedCard]].forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 2))}">${h}</section>` }); });
+  if (!night) [['comingup', comingUpCard], ['justadded', justAddedCard], ['quotejoke', quoteJokeCard]].forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
@@ -14026,6 +14058,8 @@ function Settings() {
   <div class="sec">Notifications page</div>
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type (car, pets, birthdays, events, health, to-dos, gym, holidays). Bills stay plain.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
   </div>
   <div class="sec">Places</div>
   <div class="list" id="placesopt">
