@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.25';
+const APP_VERSION = '2.23.26';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4414,7 +4414,7 @@ function claimNorm(c) {
   if (!c || typeof c !== 'object') return null;
   const s = (v, n) => String(v == null ? '' : v).slice(0, n).trim();
   return { status: CLAIM_ST[c.status] ? c.status : 'none', patient: s(c.patient, 60), provider: s(c.provider, 120), reason: s(c.reason, 160), date: clIso(c.date),
-    amount: claimAmtStr(c.amount), notes: s(c.notes, 1000), photos: (Array.isArray(c.photos) ? c.photos : []).filter(p => p && /^[\w-]{6,40}$/.test(String(p.id || ''))).slice(0, 6).map(p => ({ id: String(p.id), up: !!p.up })),
+    amount: claimAmtStr(c.amount), notes: s(c.notes, 1000), photos: (Array.isArray(c.photos) ? c.photos : []).filter(p => p && /^[\w-]{6,40}$/.test(String(p.id || ''))).slice(0, 6).map(p => Object.assign({ id: String(p.id), up: !!p.up }, p.pdf ? { pdf: true, name: String(p.name || 'invoice.pdf').slice(0, 120) } : {})),
     submittedAt: clIso(c.submittedAt), paidAt: clIso(c.paidAt), paidAmt: claimAmtStr(c.paidAmt), updated: Number(c.updated) || 0 };
 }
 const claimKey = c => c ? JSON.stringify([c.status, c.patient, c.provider, c.reason, c.date, c.amount, c.notes, (c.photos || []).map(p => p.id + (p.up ? '+' : '')).join(), c.submittedAt, c.paidAt, c.paidAmt]) : '';
@@ -4457,14 +4457,14 @@ async function clPhLoad(p) { let d = await clPhGet(p.id); if (!d && p.up) d = aw
 // Sends any photos not yet on the relay (shared claims only). Returns true if any changed.
 async function claimUploadPhotos(c) {
   let changed = false;
-  for (const p of (c && c.photos) || []) { if (!p.up && await clPhUpload(p.id)) { p.up = true; changed = true; } }
+  for (const p of (c && c.photos) || []) { if (!p.up && !p.pdf && await clPhUpload(p.id)) { p.up = true; changed = true; } } // PDFs stay on this phone
   if (changed) c.updated = Date.now();
   return changed;
 }
 let clEdit = null;
 function claimPhotosHtml() {
   const ph = (clEdit && clEdit.photos) || [];
-  return ph.map((p, i) => `<div class="clthumb" data-i="${i}"><button type="button" class="climg" onclick="clPhotoView(${i})" aria-label="Show invoice photo ${i + 1}"><img alt="" data-ph="${esc(p.id)}"></button><button type="button" class="clx" aria-label="Remove photo" onclick="claimPhotoDrop(${i})">×</button></div>`).join('') ||
+  return ph.map((p, i) => p.pdf ? `<div class="clthumb clpdf" data-i="${i}"><button type="button" class="climg" onclick="clPhotoView(${i})" aria-label="Show invoice PDF ${esc(p.name || '')}"><span class="pdfic">PDF</span><small>${esc(String(p.name || 'invoice.pdf').slice(0, 28))}</small></button><button type="button" class="clx" aria-label="Remove PDF" onclick="claimPhotoDrop(${i})">×</button></div>` : `<div class="clthumb" data-i="${i}"><button type="button" class="climg" onclick="clPhotoView(${i})" aria-label="Show invoice photo ${i + 1}"><img alt="" data-ph="${esc(p.id)}"></button><button type="button" class="clx" aria-label="Remove photo" onclick="claimPhotoDrop(${i})">×</button></div>`).join('') ||
     '<p class="muted" style="margin:0;font-size:0.8125rem">No invoice photo yet.</p>';
 }
 async function claimPhotosPaint() {
@@ -4487,6 +4487,7 @@ async function clPhotoView(i) {
   const p = clEdit && clEdit.photos[i]; if (!p) return;
   const d = await clPhLoad(p);
   if (!d) { toast(clEdit.awayNote || 'That photo is on the other phone.'); return; }
+  if (p.pdf) return pdfView(d, p.name || 'invoice.pdf');
   const el = document.createElement('div'); el.className = 'phview'; el.id = 'phview';
   el.innerHTML = `<img src="${d}" alt="Invoice photo"><div class="pvbar">${navigator.share ? `<button type="button" class="btn" id="pvshare">${I('share')} Share invoice</button>` : ''}<a class="btn" href="${d}" download="invoice-${i + 1}.jpg">${I('download')} Save</a><button type="button" class="btn primary" id="pvclose">Close</button></div>`;
   document.body.appendChild(el);
@@ -4504,7 +4505,7 @@ const claimPatient = v => v.pt === 'other' ? (v.ptother || '') : v.pt || '';
 function claimText(v) {
   const n = clEdit.photos.length;
   return ['UniMed Smart Claim', 'Policy: ' + (v.policy || '(policy number)'), 'Patient name: ' + (claimPatient(v) || '—'), 'Service provider: ' + (v.provider || '—'), 'Reason for visit: ' + (v.reason || '—'),
-    'Date of visit: ' + (clDmy(v.date) || '—'), 'Amount paid: ' + (claimMoney(claimAmtStr(v.amount)) || '—'), 'Itemised invoice: ' + (n ? n + (n === 1 ? ' photo' : ' photos') : 'not added yet')].concat(v.notes ? ['Notes: ' + v.notes] : []).join('\n');
+    'Date of visit: ' + (clDmy(v.date) || '—'), 'Amount paid: ' + (claimMoney(claimAmtStr(v.amount)) || '—'), 'Itemised invoice: ' + (n ? (clEdit.photos.some(p => p.pdf) ? n + (n === 1 ? ' file (PDF)' : ' files') : n + (n === 1 ? ' photo' : ' photos')) : 'not added yet')].concat(v.notes ? ['Notes: ' + v.notes] : []).join('\n');
 }
 async function claimCopy() {
   const t = claimText(claimFormVals());
@@ -4532,13 +4533,14 @@ function claimSheet(ref) {
     field('Reason for visit', inp('reason', c.reason, 'maxlength="160" placeholder="e.g. GP consultation"')) +
     `<div class="two">${field('Date of visit', inp('date', c.date, 'type="date"'))}${field('Amount paid', inp('amount', c.amount, 'inputmode="decimal" placeholder="$0.00"'))}</div><div class="clwarn" id="clwarn"></div>` +
     `<div class="field"><span>Itemised invoice</span><div class="clph" id="clph"></div>
-      <div class="btns" style="margin-top:6px"><label class="btn small">${I('camera')} Add photo<input type="file" accept="image/*" multiple hidden id="clfile"></label><button type="button" class="btn small" id="clview" onclick="clPhotoView(0)">${I('image')} Show full screen</button></div>
+      <div class="btns" style="margin-top:6px"><label class="btn small">${I('camera')} Add photo<input type="file" accept="image/*" multiple hidden id="clfile"></label><button type="button" class="btn small" id="clview" onclick="clPhotoView(0)">${I('image')} Show full screen</button><button type="button" class="btn small" id="clemail" onclick="emailClaim('${ref}')">${I('mail')} Email claim</button></div>
       <small>${cx.shared ? 'Photos sync with ' + esc(cx.other) + ' when they’re small enough.' : 'Photos stay on this phone.'}</small></div>` +
     field('Notes', area('notes', c.notes, 'Optional')) +
     field('Status', sel('status', Object.entries(CLAIM_ST), c.status), 'Smart Claim keeps drafts for 30 days') +
     `<div data-st="submitted paid">${field('Submitted on', inp('submittedAt', c.submittedAt || todayISO(), 'type="date"'))}</div>` +
     `<div class="two" data-st="paid">${field('Paid on', inp('paidAt', c.paidAt || todayISO(), 'type="date"'))}${field('Reimbursed', inp('paidAmt', c.paidAmt, 'inputmode="decimal" placeholder="$0.00"'))}</div>` +
-    `<div class="btns clbtns"><button type="button" class="btn small" onclick="claimCopy()">${I('copy')} Copy details</button><a class="btn small primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a></div>
+    `<div class="btns clbtns"><button type="button" class="btn small" onclick="claimCopy()">${I('copy')} Copy details</button><a class="btn small primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a><button type="button" class="btn small" onclick="claimMailto()">${I('mail')} Email UniMed draft</button></div>
+     <p class="muted clhelp" style="margin-top:4px">The portal is fastest. UniMed also takes claims by email: the draft opens in your mail app with the details, attach the invoice yourself and send it when you’re ready.</p>
      <p class="muted clhelp">Help: <a href="tel:0800600666">0800 600 666</a> · <a href="mailto:claims@unimed.co.nz">claims@unimed.co.nz</a>${cx.shared ? '' : cx.privNote ? ' · ' + cx.privNote : ''}</p>`,
     async v => {
       const out = claimNorm({ status: v.status, patient: claimPatient(v), provider: v.provider, reason: v.reason, date: v.date, amount: v.amount, notes: v.notes, photos: clEdit.photos,
@@ -4556,6 +4558,153 @@ function claimSheet(ref) {
   claimWarn(); claimPhotosPaint();
 }
 
+
+/* ================= EMAIL CLAIM (2.23.26) =================
+   Lists health invoice emails with a PDF from the last 2 months: Central Family Health (Admin@centralfamily.co.nz),
+   Tui Chiropractic (its Cliniko invoices come from notifications@cliniko.com as "Tui Chiropractic (via Cliniko)", news
+   from info@tuichiropractic.co.nz) and any dentist (e.g. reception@tikipungadentalcentre.nz). Read-only, on this phone:
+   Outlook with Mail.Read, Gmail with gmail.readonly when connected. Picking one fills in the claim and keeps the PDF on
+   this phone to share or save into Smart Claim. Nothing is ever sent. */
+const EC_DAYS = 62;
+const EC_SOURCES = [
+  { k: 'cfh', provider: 'Central Family Health Care', reason: 'GP / doctor visit', test: m => /@centralfamily\.co\.nz$/i.test(m.addr) || /central\s*family|\bcfhc?\b/i.test(m.name + ' ' + m.subject) },
+  { k: 'tui', provider: 'Tui Chiropractic', reason: 'Chiropractic treatment', test: m => /@tuichiropractic\.co\.nz$/i.test(m.addr) || /\btui\s*chiro/i.test(m.name + ' ' + m.subject) },
+  { k: 'dent', provider: '', reason: 'Dental treatment', test: m => /dental|dentist|orthodont/i.test(m.name + ' ' + m.addr + ' ' + m.subject) }
+];
+const ecSource = m => EC_SOURCES.find(x => x.test(m)) || null;
+const ecIsPdf = a => /\.pdf$/i.test(String(a.name || a.filename || '')) || /pdf/i.test(String(a.contentType || a.mimeType || ''));
+const ecProviderName = (src, m) => src.provider || String(m.name || '').replace(/^reception@|^admin@/i, '').replace(/@.*$/, '').replace(/\s*\(via [^)]*\)/i, '').trim() || m.addr;
+let ecList = null, ecBusy = false, ecErr = '', ecCtx = null;
+async function ecOutlook() {
+  if (!mailConnected('microsoft')) return [];
+  const since = new Date(Date.now() - EC_DAYS * DAY).toISOString();
+  let url = 'https://graph.microsoft.com/v1.0/me/messages?$filter=' + encodeURIComponent(`receivedDateTime ge ${since} and hasAttachments eq true`) + '&$orderby=receivedDateTime%20desc&$top=100&$select=id,subject,from,receivedDateTime,bodyPreview';
+  let token = await mailAccess('microsoft'); const out = [];
+  for (let page = 0; url && page < 4; page++) {
+    let d; try { d = await getJSONAuth(url, token); } catch (e) { if (e && e.status === 401) { MAIL.microsoft.expiresAt = 0; token = await mailAccess('microsoft'); d = await getJSONAuth(url, token); } else throw e; }
+    (d.value || []).forEach(x => { const m = { box: 'outlook', id: x.id, subject: x.subject || '', name: (x.from && x.from.emailAddress && x.from.emailAddress.name) || '', addr: (x.from && x.from.emailAddress && x.from.emailAddress.address) || '', at: x.receivedDateTime, text: x.bodyPreview || '' }; const src = ecSource(m); if (src) out.push(Object.assign(m, { src })); });
+    url = d['@odata.nextLink'] || '';
+  }
+  for (const m of out.slice(0, 20)) {
+    try { const a = await getJSONAuth('https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(m.id) + '/attachments?$select=id,name,contentType,size', token);
+      m.pdfs = (a.value || []).filter(ecIsPdf).map(x => ({ id: x.id, name: x.name, size: x.size })); } catch (e) { m.pdfs = []; }
+  }
+  return out.filter(m => m.pdfs && m.pdfs.length);
+}
+async function ecGmail() {
+  if (!mailConnected('google')) return [];
+  const token = await mailAccess('google');
+  const q = `has:attachment filename:pdf newer_than:${EC_DAYS}d (from:centralfamily.co.nz OR from:cliniko.com OR from:tuichiropractic.co.nz OR dental OR dentist OR "Central Family" OR "Tui Chiropractic")`;
+  const list = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=' + encodeURIComponent(q), token);
+  const out = [];
+  for (const it of (list.messages || []).slice(0, 15)) {
+    try {
+      const g = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(it.id) + '?format=full', token);
+      const h = n => ((g.payload && g.payload.headers) || []).find(x => x.name.toLowerCase() === n) || {};
+      const from = String(h('from').value || ''), mm = from.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>/);
+      const m = { box: 'gmail', id: it.id, subject: String(h('subject').value || ''), name: mm ? mm[1].trim() : from, addr: mm ? mm[2] : from, at: new Date(Number(g.internalDate)).toISOString(), text: g.snippet || '' };
+      const src = ecSource(m); if (!src) continue;
+      const pdfs = []; const walk = p => { if (!p) return; if (p.filename && p.body && p.body.attachmentId && ecIsPdf(p)) pdfs.push({ id: p.body.attachmentId, name: p.filename, size: p.body.size }); (p.parts || []).forEach(walk); }; walk(g.payload);
+      if (pdfs.length) out.push(Object.assign(m, { src, pdfs }));
+    } catch (e) { }
+  }
+  return out;
+}
+async function ecLoad() {
+  if (ecBusy) return; ecBusy = true; ecErr = '';
+  try {
+    const parts = await Promise.all([ecOutlook().catch(e => { ecErr = 'Outlook could not be read just now.'; return []; }), ecGmail().catch(() => [])]);
+    ecList = parts.flat().sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  } finally { ecBusy = false; }
+}
+async function ecBytes(m, a) {
+  if (m.box === 'outlook') {
+    const token = await mailAccess('microsoft');
+    const r = await fetch('https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(m.id) + '/attachments/' + encodeURIComponent(a.id) + '/$value', { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) throw new Error('http ' + r.status); return new Uint8Array(await r.arrayBuffer());
+  }
+  const token = await mailAccess('google');
+  const d = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(m.id) + '/attachments/' + encodeURIComponent(a.id), token);
+  const b = atob(String(d.data || '').replace(/-/g, '+').replace(/_/g, '/')); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u;
+}
+const u8ToDataUrl = u => new Promise(res => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).replace(/^data:[^;]*;/, 'data:application/pdf;')); fr.readAsDataURL(new Blob([u], { type: 'application/pdf' })); });
+let pdfjsP = null;
+function pdfjs() { // loaded only when a PDF is opened or read (about 1 MB, from jsDelivr)
+  return pdfjsP || (pdfjsP = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs').then(m => { m.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs'; return m; }).catch(e => { pdfjsP = null; throw e; }));
+}
+async function pdfText(u) {
+  try { const lib = await pdfjs(), doc = await lib.getDocument({ data: u.slice(0) }).promise; let t = '';
+    for (let i = 1; i <= Math.min(doc.numPages, 3); i++) { const pg = await doc.getPage(i), c = await pg.getTextContent(); let lastY = null; c.items.forEach(x => { const y = x.transform && x.transform[5]; t += (lastY != null && Math.abs(y - lastY) > 2 ? '\n' : ' ') + x.str; lastY = y; }); t += '\n'; }
+    return t; } catch (e) { return ''; }
+}
+const EC_MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+function ecParse(text) {
+  const t = String(text || ''), out = {};
+  const amt = t.match(/\b(?:total(?:\s+(?:paid|due|amount|incl\.?\s*gst))?|amount\s+(?:paid|due)|balance(?:\s+due)?|invoice\s+total)\b[^\d$\n]{0,30}\$?\s*(\d{1,5}(?:,\d{3})*\.\d{2})/i) || t.match(/\$\s*(\d{1,5}(?:,\d{3})*\.\d{2})/);
+  if (amt) out.amount = claimAmtStr(amt[1].replace(/,/g, ''));
+  const d = t.match(/\b(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(20\d{2})\b/i) || null;
+  if (d) out.date = `${d[3]}-${String(EC_MON[d[2].toLowerCase().slice(0, 3)]).padStart(2, '0')}-${String(+d[1]).padStart(2, '0')}`;
+  else { const n = t.match(/\b(\d{1,2})\/(\d{1,2})\/(20\d{2})\b/); if (n) out.date = `${n[3]}-${n[2].padStart(2, '0')}-${n[1].padStart(2, '0')}`; }
+  return out;
+}
+function ecSheetHtml() {
+  if (!mailConnected('microsoft') && !mailConnected('google')) return `<p class="muted">Connect Outlook (or Gmail) in Settings › Email first. The app reads mail on this phone only.</p>`;
+  if (ecBusy || !ecList) return `<p class="muted" id="ecwait">Looking through the last 2 months of email…</p>`;
+  if (!ecList.length) return `<p class="muted" id="ecnone">No invoice PDFs from Central Family Health, Tui Chiropractic or a dentist in the last 2 months${mailConnected('google') ? ' (Outlook and Gmail checked)' : ' (Outlook checked)'}.</p>${ecErr ? `<p class="muted">${esc(ecErr)}</p>` : ''}`;
+  return `<div class="list" id="eclist">${ecList.flatMap((m, i) => m.pdfs.map((a, j) => `<div class="row ecrow"><div class="ic health">${I('doc')}</div><div class="tx" style="flex:1;min-width:0"><div class="t">${esc(ecProviderName(m.src, m))}</div>
+    <div class="s">${esc(fmtW(String(m.at).slice(0, 10)))} · ${esc(m.subject)}</div><div class="s ecpdf">${esc(a.name)}</div></div>
+    <div class="ecbtns"><button type="button" class="btn small" aria-label="Preview PDF" onclick="ecPreview(${i},${j})">${I('eye')} View</button><button type="button" class="btn small primary" onclick="ecPick(${i},${j})">Use</button></div></div>`)).join('')}</div>
+    <p class="muted" style="font-size:0.8125rem;margin:8px 2px 0">Read from ${mailConnected('google') ? 'Outlook and Gmail' : 'Outlook'} on this phone. Nothing is sent.</p>`;
+}
+async function emailClaim(ref) {
+  ecCtx = { ref: ref || 'new', vals: document.getElementById('sf') ? claimFormVals() : null, photos: clEdit ? clEdit.photos.slice() : [] };
+  openSheet('Claim from an email', `<div id="ecbox">${ecSheetHtml()}</div>`, null);
+  if (!ecList && (mailConnected('microsoft') || mailConnected('google'))) { await ecLoad(); const b = document.getElementById('ecbox'); if (b) b.innerHTML = ecSheetHtml(); }
+}
+async function ecFetch(i, j) {
+  const m = ecList[i], a = m && m.pdfs[j]; if (!a) return null;
+  if (!a.data) { toast('Opening the PDF…'); a.bytes = await ecBytes(m, a); a.data = await u8ToDataUrl(a.bytes); }
+  return { m, a };
+}
+async function ecPreview(i, j) { try { const x = await ecFetch(i, j); if (x) pdfView(x.a.data, x.a.name); } catch (e) { toast('That PDF could not be opened.'); } }
+async function ecPick(i, j) {
+  let x; try { x = await ecFetch(i, j); } catch (e) { toast('That PDF could not be read.'); return; }
+  if (!x) return;
+  const { m, a } = x, got = Object.assign(ecParse(m.text), ecParse(await pdfText(x.a.bytes)));
+  const pid = uid('ph'); await clPhPut(pid, a.data);
+  const ref = ecCtx ? ecCtx.ref : 'new', base = Object.assign(claimNorm({}), (claimCtx(ref) || {}).claim || {});
+  const v = ecCtx && ecCtx.vals;
+  const c = claimNorm(Object.assign(base, v ? { patient: claimPatient(v), provider: v.provider, reason: v.reason, date: v.date, amount: v.amount, notes: v.notes, status: v.status } : {}, {
+    provider: ecProviderName(m.src, m), reason: (v && v.reason) || m.src.reason, date: got.date || String(m.at).slice(0, 10), amount: got.amount || (v && v.amount) || '',
+    patient: (v && claimPatient(v)) || base.patient || 'Shane', notes: [(v && v.notes) || base.notes, 'From email: ' + m.subject + ' (' + fmtW(String(m.at).slice(0, 10)) + ')'].filter(Boolean).join('\n'),
+    photos: ((ecCtx && ecCtx.photos) || base.photos || []).concat([{ id: pid, up: false, pdf: true, name: a.name }]), updated: Date.now() }));
+  const cx = claimCtx(ref); if (!cx) return;
+  await cx.save(c, true);
+  const nref = ref === 'new' ? 'c:' + S.claims[S.claims.length - 1].id : ref;
+  claimSheet(nref);
+  toast(got.amount ? `Filled in from the email: ${claimMoney(c.amount)} on ${fmtW(c.date)}.` : 'Filled in from the email. Please check the amount.');
+}
+async function pdfView(data, name) {
+  const el = document.createElement('div'); el.className = 'phview'; el.id = 'phview';
+  el.innerHTML = `<div class="pdfpv" id="pdfpv"><p class="muted" style="color:#fff">Loading preview…</p></div><div class="pvbar"><button type="button" class="btn" id="pvopen">${I('doc')} Open PDF</button>${navigator.share ? `<button type="button" class="btn" id="pvshare">${I('share')} Share</button>` : ''}<a class="btn" href="${data}" download="${esc(name)}">${I('download')} Save</a><button type="button" class="btn primary" id="pvclose">Close</button></div>`;
+  document.body.appendChild(el);
+  const blob = await (await fetch(data)).blob(), file = new File([blob], name, { type: 'application/pdf' });
+  el.querySelector('#pvclose').onclick = () => el.remove();
+  el.querySelector('#pvopen').onclick = () => { const u = URL.createObjectURL(blob); window.open(u, '_blank'); setTimeout(() => URL.revokeObjectURL(u), 60000); };
+  const sb = el.querySelector('#pvshare');
+  if (sb) sb.onclick = async () => { try { if (navigator.canShare && !navigator.canShare({ files: [file] })) { toast('This phone can’t share files from here. Use Save instead.'); return; } await navigator.share({ files: [file], title: name }); } catch (e) { } };
+  try { // first page as a picture, so it can be checked here
+    const lib = await pdfjs(), doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise, pg = await doc.getPage(1);
+    const vp = pg.getViewport({ scale: 1 }), sc = Math.min(2.5, (Math.min(innerWidth, 900) * (devicePixelRatio || 1)) / vp.width), v2 = pg.getViewport({ scale: sc });
+    const cv = document.createElement('canvas'); cv.width = v2.width; cv.height = v2.height; await pg.render({ canvasContext: cv.getContext('2d'), viewport: v2 }).promise;
+    const box = el.querySelector('#pdfpv'); if (box) { box.innerHTML = ''; box.appendChild(cv); }
+  } catch (e) { const box = el.querySelector('#pdfpv'); if (box) box.innerHTML = '<p style="color:#fff">No preview on this phone. Use Open PDF.</p>'; }
+}
+function claimMailto() {
+  const v = claimFormVals();
+  const body = claimText(v) + '\n\n(Invoice attached.)';
+  location.href = 'mailto:claims@unimed.co.nz?subject=' + encodeURIComponent('Claim: ' + (claimPatient(v) || '') + ' · ' + (v.provider || '') + ' · ' + clDmy(v.date)) + '&body=' + encodeURIComponent(body);
+}
 // My App side: claims on his own health appointments, on Sarah's shared ones (synced with her), or on their own
 const HEALTH_RE = /\b(doctor|dr\b|gp\b|dentist|dental|hygienist|optom|optician|eye (test|check)|physio|chiro|osteo|podiat|specialist|surgeon|clinic|medical|hospital|x-?ray|scan|ultrasound|mri|blood test|skin check|derm|audiolog|hearing)/i;
 const isHealthAppt = a => !!(a && (a.from === 'sarah' ? a.kind === 'doctor' || a.kind === 'dentist' || a.claim : HEALTH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')) || a.claim));
@@ -4592,7 +4741,7 @@ function claimRows() {
     if (!it.claim && !(d && d < t && daysLeft(d) >= -30)) return;
     out.push({ ref: `h:${p.id}:${it.id}`, title: p.name + ': ' + it.name, date: d || '', claim: it.claim || null, sarah: isSarahPerson(p) });
   }));
-  (S.claims || []).forEach(x => { if (x && x.claim) out.push({ ref: 'c:' + x.id, title: x.claim.reason || 'Claim', date: x.claim.date, claim: x.claim, sarah: false }); });
+  (S.claims || []).forEach(x => { if (x && x.claim) out.push({ ref: 'c:' + x.id, title: [x.claim.provider, x.claim.reason].filter(Boolean).join(' · ') || 'Claim', date: x.claim.date, claim: x.claim, sarah: false }); });
   return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 }
 function claimRowHtml(x) {
@@ -4606,7 +4755,8 @@ function Claims() {
   const paidSum = paid.reduce((n, x) => n + Number(x.claim.paidAmt || 0), 0);
   return header('UniMed claims', todo.length ? plural(todo.length, 'claim') + ' to make' + (sent.length ? ' · ' + sent.length + ' waiting' : '') : sent.length ? sent.length + ' waiting on UniMed' : 'All caught up', `<button class="iconbtn add" aria-label="New claim" onclick="claimSheet('new')">${I('plus')}</button>`) +
     `<div class="card cltipcard"><div class="cltip" style="margin:0 0 10px">${I('info')}<div>Claims are made in UniMed’s Smart Claim portal: policy, patient, provider, reason, visit date, amount paid, and a photo of the <b>itemised invoice</b> (not the EFTPOS receipt). At least $${CLAIM_MIN}. Drafts keep for 30 days there.</div></div>
-      <div class="btns"><a class="btn primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a><a class="btn" href="tel:0800600666">${I('phone')} 0800 600 666</a></div></div>` +
+      <div class="btns"><a class="btn primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a><a class="btn" href="tel:0800600666">${I('phone')} 0800 600 666</a></div>
+      <div class="btns" style="margin-top:8px"><button class="btn" id="ecopen" onclick="emailClaim('new')">${I('mail')} Email claim: invoices from CFH, Tui Chiropractic, dentist</button></div></div>` +
     `<div class="sec">To claim</div>` + (todo.length ? `<div class="list" id="claimtodo">${todo.map(claimRowHtml).join('')}</div>` : `<div class="card empty"><div class="t">Nothing to claim</div><div class="s">Health appointments (yours and Sarah’s) show here after the visit. Tap + for anything else.</div></div>`) +
     (sent.length ? `<div class="sec">Submitted</div><div class="list">${sent.map(claimRowHtml).join('')}</div>` : '') +
     (paid.length ? `<details class="spast"><summary>Paid (${paid.length}${paidSum ? ' · ' + claimMoney(paidSum.toFixed(2)) + ' back' : ''})</summary><div class="list">${paid.map(claimRowHtml).join('')}</div></details>` : '') +
