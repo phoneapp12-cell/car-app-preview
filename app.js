@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.17';
+const APP_VERSION = '2.23.18';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3547,6 +3547,8 @@ const CU_EXTRA = {
   // My events, appointments and calendars beyond the Upcoming window, out to 30 days
   mineLater: T => mineItems(T + 2 * DAY, T + CU_DAYS * DAY, true).filter(e => !e.done).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: e.title,
     html: attRow({ kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'mine', icon: 'repeat', title: esc(e.title) + (e.hm ? ' ' + fmtTime(e.hm) : ''), sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}` }) }; }),
+  claims: T => claimRows().filter(x => claimOpen(x.claim) && x.date && daysLeft(x.date) <= -1 && daysLeft(x.date) >= -30).map(x => ({ days: 0, rank: 2, sort: 'zz', kind: 'claim', name: 'Claim for ' + x.title,
+    html: attRow({ kind: 'claim', date: todayISO(), go: `claimSheet('${x.ref}')`, ic: 'health', icon: 'medkit', title: `${x.sarah ? sarahBadge({ from: 'sarah' }) : ''}Claim for ${esc(x.title)} not submitted`, sub: `UniMed · visit ${fmtW(x.date)}${x.claim && x.claim.status === 'draft' ? ' · draft saved' : ''}` }) })),
   apptLater: T => S.appts.filter(a => { const d = daysLeft(a.date); return d > ATT_WEEK && d <= CU_DAYS && !(a.from === 'sarah' && a.done); }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: a.title,
     html: attRow({ kind: 'appt', date: a.date, go: a.from === 'sarah' ? `apptForm('${a.id}')` : `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: (a.from === 'sarah' ? sarahBadge({ from: 'sarah' }) : '') + esc(a.title) + (a.time ? ' ' + fmtTime(a.time) : ''), sub: `${a.from === 'sarah' ? 'Sarah’s ' + esc((SARAH_APPT_TYPE[a.kind] || 'appointment').toLowerCase()) + (a.place ? ' · ' + esc(a.place) : '') : a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) }; }),
   extLater: T => { const seen = new Set(); return extEvents(T + (ATT_WEEK + 1) * DAY, T + CU_DAYS * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '', kind: 'ext', name: e.title,
@@ -4295,16 +4297,16 @@ const SH = {
 const SARAH_APPT_TYPE = { doctor: 'Doctor', dentist: 'Dentist', other: 'Appointment' };
 function sarahApptFrom(x) {
   const a = x.appt || {};
-  return { id: x.id, title: String(x.title || '').slice(0, 80), date: x.due || '', time: a.time || '', place: a.place || '', kind: SARAH_APPT_TYPE[a.type] ? a.type : 'other', notes: x.notes || '', from: 'sarah', created: x.created || Date.now(), done: !!x.done };
+  return { id: x.id, title: String(x.title || '').slice(0, 80), date: x.due || '', time: a.time || '', place: a.place || '', kind: SARAH_APPT_TYPE[a.type] ? a.type : 'other', notes: x.notes || '', from: 'sarah', created: x.created || Date.now(), done: !!x.done, claim: claimNorm(x.claim) };
 }
-const sarahApptView = a => ({ id: a.id, title: a.title, list: 'Appointments', due: a.date, notes: a.notes || '', priority: 'normal', done: !!a.done, created: a.created, by: 'sarah', appt: { type: a.kind || 'other', time: a.time || '', place: a.place || '' }, _appt: a });
+const sarahApptView = a => Object.assign({ id: a.id, title: a.title, list: 'Appointments', due: a.date, notes: a.notes || '', priority: 'normal', done: !!a.done, created: a.created, by: 'sarah', appt: { type: a.kind || 'other', time: a.time || '', place: a.place || '' }, _appt: a }, a.claim ? { claim: a.claim } : {});
 function sarahApptSheet(a) {
   const maps = a.place ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.place)}` : '';
   openSheet(`${sarahBadge({ from: 'sarah' })}${esc(a.title)}`, `<div class="dcard" id="sarahappt"><div class="h"><i class="dot" style="background:#DB2777"></i> Sarah’s ${esc((SARAH_APPT_TYPE[a.kind] || 'Appointment').toLowerCase())} appointment</div>
     <div class="big" style="font-size:1.125rem">${fmtLong(a.date)}</div>
     <div class="muted" style="margin-top:4px">${a.time ? fmtTime(a.time) : 'All day'}${a.place ? ' · ' + esc(a.place) : ''}</div>
     ${a.notes ? `<div class="muted notes" style="margin-top:6px">${esc(a.notes)}</div>` : ''}</div>
-    ${maps ? `<div class="btns"><a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a></div>` : ''}
+    <div class="btns">${maps ? `<a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a>` : ''}<button type="button" class="btn" onclick="claimSheet('a:${a.id}')">${I('medkit')} UniMed claim${a.claim && a.claim.status !== 'none' ? ' · ' + CLAIM_ST[a.claim.status] : ''}</button></div>
     <p class="muted" style="margin:8px 2px 0">Sarah added this in her app. She keeps it up to date there.</p>`, null);
 }
 /* Sarah's car due dates for her app. Only the Haval (PNU312): WOF, rego, service date, service km and odometer.
@@ -4324,6 +4326,210 @@ async function publishSarahCar() {
     if (r.ok) try { localStorage.setItem('sarahCarSent', sig); } catch (e) { }
   } catch (e) { } finally { sarahCarBusy = false; }
 }
+/* ================= UNIMED SMART CLAIM HELPER (2.23.18) =================
+   UniMed has no public API: claims are made by the member in the Smart Claim portal. This helper keeps the details
+   ready to copy, holds the itemised invoice photo(s) on this phone (shown full screen so they can be saved or shared
+   into the portal's upload), and tracks the claim: Not claimed → Draft saved → Submitted → Paid. No logins, nothing
+   automated on UniMed's site. */
+const UNIMED_URL = 'https://unimed.co.nz/claims';
+const CLAIM_ST = { none: 'Not claimed', draft: 'Draft saved', submitted: 'Submitted', paid: 'Paid', skip: 'Not claiming' };
+const CLAIM_PATIENTS = ['Shane', 'Sarah'];
+const CLAIM_MIN = 10;
+const CL_PHOTO_MAX = 440000; // characters of a JPEG data URL (about 320 KB): the most the relay will hold for one photo
+const CL_PHOTO_URL = () => SHARED_URL.replace(/\/shared-todo$/, '/shared-photo');
+const clIso = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : '';
+const claimAmtStr = v => { const n = Number(String(v == null ? '' : v).replace(/[^\d.]/g, '')); return isFinite(n) && n > 0 && n < 1e6 ? n.toFixed(2) : ''; };
+const claimMoney = v => v ? '$' + Number(v).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+function claimNorm(c) {
+  if (!c || typeof c !== 'object') return null;
+  const s = (v, n) => String(v == null ? '' : v).slice(0, n).trim();
+  return { status: CLAIM_ST[c.status] ? c.status : 'none', patient: s(c.patient, 60), provider: s(c.provider, 120), reason: s(c.reason, 160), date: clIso(c.date),
+    amount: claimAmtStr(c.amount), notes: s(c.notes, 1000), photos: (Array.isArray(c.photos) ? c.photos : []).filter(p => p && /^[\w-]{6,40}$/.test(String(p.id || ''))).slice(0, 6).map(p => ({ id: String(p.id), up: !!p.up })),
+    submittedAt: clIso(c.submittedAt), paidAt: clIso(c.paidAt), paidAmt: claimAmtStr(c.paidAmt), updated: Number(c.updated) || 0 };
+}
+const claimKey = c => c ? JSON.stringify([c.status, c.patient, c.provider, c.reason, c.date, c.amount, c.notes, (c.photos || []).map(p => p.id + (p.up ? '+' : '')).join(), c.submittedAt, c.paidAt, c.paidAmt]) : '';
+const claimOpen = c => !c || c.status === 'none' || c.status === 'draft';
+const claimChip = c => c && c.status !== 'none' ? `<span class="clchip ${c.status}">${CLAIM_ST[c.status]}${c.status === 'paid' && c.paidAmt ? ' ' + claimMoney(c.paidAmt) : ''}</span>` : '';
+// Invoice photos live in their own small IndexedDB on this phone (kept out of the main save and its sync)
+let clPhDbP = null;
+function clPhDb() { return clPhDbP || (clPhDbP = new Promise((res, rej) => { const r = indexedDB.open('claim-photos', 1); r.onupgradeneeded = () => r.result.createObjectStore('p'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); })); }
+async function clPhTx(mode, fn) { const db = await clPhDb(); return new Promise((res, rej) => { const t = db.transaction('p', mode), st = t.objectStore('p'); let out; const q = fn(st); if (q) q.onsuccess = () => { out = q.result; }; t.oncomplete = () => res(out); t.onerror = () => rej(t.error); }); }
+const clPhPut = (id, data) => clPhTx('readwrite', st => st.put(data, id));
+const clPhGet = id => clPhTx('readonly', st => st.get(id)).catch(() => null);
+const clPhDel = id => clPhTx('readwrite', st => st.delete(id)).catch(() => null);
+async function clPhCompress(file) {
+  let img;
+  try { img = await createImageBitmap(file); } catch (e) { img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); }); }
+  let max = 1600, q = 0.72, out = '';
+  for (let k = 0; k < 7; k++) {
+    const w0 = img.width, h0 = img.height, sc = Math.min(1, max / Math.max(w0, h0)), c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w0 * sc)); c.height = Math.max(1, Math.round(h0 * sc));
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+    out = c.toDataURL('image/jpeg', q);
+    if (out.length <= CL_PHOTO_MAX) break;
+    max = Math.round(max * 0.82); q = Math.max(0.45, q - 0.07);
+  }
+  return out;
+}
+async function clPhRemote(id) {
+  try {
+    const r = await fetch(CL_PHOTO_URL(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, id }) });
+    if (!r.ok) return null; const d = await r.json();
+    if (d && typeof d.data === 'string' && d.data.startsWith('data:image/')) { await clPhPut(id, d.data).catch(() => { }); return d.data; }
+  } catch (e) { }
+  return null;
+}
+async function clPhUpload(id) {
+  const data = await clPhGet(id); if (!data || data.length > CL_PHOTO_MAX) return false;
+  try { const r = await fetch(CL_PHOTO_URL(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, id, data }) }); return r.ok; } catch (e) { return false; }
+}
+async function clPhLoad(p) { let d = await clPhGet(p.id); if (!d && p.up) d = await clPhRemote(p.id); return d || null; }
+// Sends any photos not yet on the relay (shared claims only). Returns true if any changed.
+async function claimUploadPhotos(c) {
+  let changed = false;
+  for (const p of (c && c.photos) || []) { if (!p.up && await clPhUpload(p.id)) { p.up = true; changed = true; } }
+  if (changed) c.updated = Date.now();
+  return changed;
+}
+let clEdit = null;
+function claimPhotosHtml() {
+  const ph = (clEdit && clEdit.photos) || [];
+  return ph.map((p, i) => `<div class="clthumb" data-i="${i}"><button type="button" class="climg" onclick="clPhotoView(${i})" aria-label="Show invoice photo ${i + 1}"><img alt="" data-ph="${esc(p.id)}"></button><button type="button" class="clx" aria-label="Remove photo" onclick="claimPhotoDrop(${i})">×</button></div>`).join('') ||
+    '<p class="muted" style="margin:0;font-size:0.8125rem">No invoice photo yet.</p>';
+}
+async function claimPhotosPaint() {
+  const box = document.getElementById('clph'); if (!box) return;
+  box.innerHTML = claimPhotosHtml();
+  for (const im of box.querySelectorAll('img[data-ph]')) {
+    const p = clEdit.photos.find(x => x.id === im.dataset.ph); const d = p ? await clPhLoad(p) : null;
+    if (d) im.src = d; else im.closest('.clthumb').classList.add('away');
+  }
+  const vb = document.getElementById('clview'); if (vb) vb.hidden = !clEdit.photos.length;
+}
+async function claimAddFiles(files) {
+  for (const f of [...files].slice(0, 6 - clEdit.photos.length)) {
+    try { const d = await clPhCompress(f), id = uid('ph'); await clPhPut(id, d); clEdit.photos.push({ id, up: false }); } catch (e) { toast('That photo could not be read.'); }
+  }
+  claimPhotosPaint();
+}
+function claimPhotoDrop(i) { const p = clEdit.photos.splice(i, 1)[0]; if (p) clEdit.dropped.push(p.id); claimPhotosPaint(); }
+async function clPhotoView(i) {
+  const p = clEdit && clEdit.photos[i]; if (!p) return;
+  const d = await clPhLoad(p);
+  if (!d) { toast(clEdit.awayNote || 'That photo is on the other phone.'); return; }
+  const el = document.createElement('div'); el.className = 'phview'; el.id = 'phview';
+  el.innerHTML = `<img src="${d}" alt="Invoice photo"><div class="pvbar">${navigator.share ? `<button type="button" class="btn" id="pvshare">${I('share')} Share invoice</button>` : ''}<a class="btn" href="${d}" download="invoice-${i + 1}.jpg">${I('download')} Save</a><button type="button" class="btn primary" id="pvclose">Close</button></div>`;
+  document.body.appendChild(el);
+  el.querySelector('#pvclose').onclick = () => el.remove();
+  const sb = el.querySelector('#pvshare');
+  if (sb) sb.onclick = async () => {
+    try { const b = await (await fetch(d)).blob(), file = new File([b], `invoice-${i + 1}.jpg`, { type: 'image/jpeg' });
+      if (navigator.canShare && !navigator.canShare({ files: [file] })) { toast('This phone can’t share photos from here. Use Save instead.'); return; }
+      await navigator.share({ files: [file], title: 'Invoice' }); } catch (e) { }
+  };
+}
+const clDmy = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '';
+function claimFormVals() { const v = {}; new FormData($('#sf')).forEach((x, k) => { if (typeof x === 'string') v[k] = x.trim(); }); return v; }
+const claimPatient = v => v.pt === 'other' ? (v.ptother || '') : v.pt || '';
+function claimText(v) {
+  const n = clEdit.photos.length;
+  return ['UniMed Smart Claim', 'Policy: ' + (v.policy || '(policy number)'), 'Patient name: ' + (claimPatient(v) || '—'), 'Service provider: ' + (v.provider || '—'), 'Reason for visit: ' + (v.reason || '—'),
+    'Date of visit: ' + (clDmy(v.date) || '—'), 'Amount paid: ' + (claimMoney(claimAmtStr(v.amount)) || '—'), 'Itemised invoice: ' + (n ? n + (n === 1 ? ' photo' : ' photos') : 'not added yet')].concat(v.notes ? ['Notes: ' + v.notes] : []).join('\n');
+}
+async function claimCopy() {
+  const t = claimText(claimFormVals());
+  try { await navigator.clipboard.writeText(t); toast('Claim details copied. Paste them into Smart Claim.'); }
+  catch (e) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); toast('Claim details copied.'); } catch (x) { toast('Could not copy on this phone.'); } a.remove(); }
+}
+function claimWarn() {
+  const f = $('#sf'); if (!f) return; const a = claimAmtStr(f.amount.value), w = document.getElementById('clwarn');
+  if (w) w.textContent = a && Number(a) < CLAIM_MIN ? `Under $${CLAIM_MIN}: UniMed’s smallest claim is $${CLAIM_MIN}.` : '';
+  const st = f.status.value; f.querySelectorAll('[data-st]').forEach(el => { el.style.display = el.dataset.st.split(' ').includes(st) ? '' : 'none'; });
+  const o = f.querySelector('[name=ptother]'); if (o) o.closest('label').style.display = (f.pt && f.pt.value) !== 'other' ? 'none' : '';
+}
+function claimSheet(ref) {
+  const cx = claimCtx(ref); if (!cx) return;
+  const c = Object.assign(claimNorm({}), cx.defaults, cx.claim ? claimNorm(cx.claim) : {});
+  clEdit = { ref, photos: (c.photos || []).map(p => Object.assign({}, p)), dropped: [], awayNote: cx.awayNote };
+  const pv = CLAIM_PATIENTS.includes(c.patient) ? c.patient : (c.patient ? 'other' : CLAIM_PATIENTS[0]);
+  openSheet('UniMed claim',
+    `<div class="cltip">${I('info')}<div>UniMed needs the provider’s <b>itemised invoice</b>, not an EFTPOS receipt. Claims must be at least $${CLAIM_MIN}. GP, dental and optical: pay first, then claim it back.</div></div>` +
+    (cx.title ? `<div class="clfor">For: <b>${cx.titleHtml || esc(cx.title)}</b></div>` : '') +
+    field('Policy number', inp('policy', claimPolicy(), 'inputmode="numeric" maxlength="30" placeholder="From your UniMed card"'), 'Saved on this phone for next time') +
+    `<div class="field"><span>Patient</span>${segHtml('pt', CLAIM_PATIENTS.map(p => [p, p]).concat([['other', 'Someone else']]), pv)}</div>` +
+    field('Patient’s name', inp('ptother', pv === 'other' ? c.patient : '', 'maxlength="60"')) +
+    field('Service provider', inp('provider', c.provider, 'maxlength="120" placeholder="e.g. Onerahi Medical Centre"')) +
+    field('Reason for visit', inp('reason', c.reason, 'maxlength="160" placeholder="e.g. GP consultation"')) +
+    `<div class="two">${field('Date of visit', inp('date', c.date, 'type="date"'))}${field('Amount paid', inp('amount', c.amount, 'inputmode="decimal" placeholder="$0.00"'))}</div><div class="clwarn" id="clwarn"></div>` +
+    `<div class="field"><span>Itemised invoice</span><div class="clph" id="clph"></div>
+      <div class="btns" style="margin-top:6px"><label class="btn small">${I('camera')} Add photo<input type="file" accept="image/*" multiple hidden id="clfile"></label><button type="button" class="btn small" id="clview" onclick="clPhotoView(0)">${I('image')} Show full screen</button></div>
+      <small>${cx.shared ? 'Photos sync with ' + esc(cx.other) + ' when they’re small enough.' : 'Photos stay on this phone.'}</small></div>` +
+    field('Notes', area('notes', c.notes, 'Optional')) +
+    field('Status', sel('status', Object.entries(CLAIM_ST), c.status), 'Smart Claim keeps drafts for 30 days') +
+    `<div data-st="submitted paid">${field('Submitted on', inp('submittedAt', c.submittedAt || todayISO(), 'type="date"'))}</div>` +
+    `<div class="two" data-st="paid">${field('Paid on', inp('paidAt', c.paidAt || todayISO(), 'type="date"'))}${field('Reimbursed', inp('paidAmt', c.paidAmt, 'inputmode="decimal" placeholder="$0.00"'))}</div>` +
+    `<div class="btns clbtns"><button type="button" class="btn small" onclick="claimCopy()">${I('copy')} Copy details</button><a class="btn small primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a></div>
+     <p class="muted clhelp">Help: <a href="tel:0800600666">0800 600 666</a> · <a href="mailto:claims@unimed.co.nz">claims@unimed.co.nz</a>${cx.shared ? '' : cx.privNote ? ' · ' + cx.privNote : ''}</p>`,
+    async v => {
+      const out = claimNorm({ status: v.status, patient: claimPatient(v), provider: v.provider, reason: v.reason, date: v.date, amount: v.amount, notes: v.notes, photos: clEdit.photos,
+        submittedAt: v.status === 'submitted' || v.status === 'paid' ? v.submittedAt || todayISO() : '', paidAt: v.status === 'paid' ? v.paidAt || todayISO() : '', paidAmt: v.status === 'paid' ? v.paidAmt : '', updated: Date.now() });
+      claimPolicySet(v.policy || '');
+      clEdit.dropped.forEach(id => clPhDel(id));
+      await cx.save(out);
+      const low = out.amount && Number(out.amount) < CLAIM_MIN;
+      toast(low ? `Saved. Note: under $${CLAIM_MIN} is below UniMed’s minimum.` : 'Claim saved.');
+      if (cx.shared && out.photos.some(p => !p.up)) claimUploadPhotos(out).then(ch => { if (ch) cx.save(out, true); });
+    }, 'Save');
+  wireSeg('pt', () => claimWarn());
+  const f = $('#sf'); f.amount.addEventListener('input', claimWarn); f.status.addEventListener('change', claimWarn);
+  $('#clfile').addEventListener('change', e => { claimAddFiles(e.target.files); e.target.value = ''; });
+  claimWarn(); claimPhotosPaint();
+}
+
+// My App side: claims on his own health appointments, on Sarah's shared ones (synced with her), or on their own
+const HEALTH_RE = /\b(doctor|dr\b|gp\b|dentist|dental|hygienist|optom|optician|eye (test|check)|physio|chiro|osteo|podiat|specialist|surgeon|clinic|medical|hospital|x-?ray|scan|ultrasound|mri|blood test|skin check|derm|audiolog|hearing)/i;
+const isHealthAppt = a => !!(a && (a.from === 'sarah' ? a.kind === 'doctor' || a.kind === 'dentist' || a.claim : HEALTH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')) || a.claim));
+function claimPolicy() { return String((S.settings && S.settings.unimedPolicy) || ''); }
+function claimPolicySet(v) { S.settings.unimedPolicy = String(v).slice(0, 30); }
+function claimCtx(ref) {
+  ref = String(ref || 'new');
+  if (ref.startsWith('a:')) {
+    const a = (S.appts || []).find(x => x.id === ref.slice(2)); if (!a) return null;
+    const sarah = a.from === 'sarah';
+    return { title: a.title + ' · ' + fmtW(a.date), titleHtml: (sarah ? sarahBadge({ from: 'sarah' }) : '') + esc(a.title + ' · ' + fmtW(a.date)), claim: a.claim, shared: sarah, other: 'Sarah', awayNote: 'That photo is on Sarah’s phone. Ask her to share it.',
+      defaults: { patient: sarah ? 'Sarah' : 'Shane', provider: a.place ? String(a.place).split(',')[0].trim() : '', reason: a.title, date: a.date },
+      save: async (c, quiet) => { a.claim = c; await save(); if (!quiet || !sheetOpen) render(); if (sarah) sharedSync(); } };
+  }
+  S.claims = Array.isArray(S.claims) ? S.claims : [];
+  const x = ref.startsWith('c:') ? S.claims.find(y => y.id === ref.slice(2)) : null;
+  if (ref.startsWith('c:') && !x) return null;
+  return { title: x ? (x.claim.reason || 'Claim') : '', claim: x ? x.claim : null, shared: false, defaults: { patient: 'Shane', date: todayISO() },
+    save: async (c, quiet) => { if (x) x.claim = c; else S.claims.push({ id: uid('claim'), claim: c }); await save(); if (!quiet || !sheetOpen) render(); } };
+}
+function claimRows() {
+  const t = todayISO(), out = [];
+  (S.appts || []).forEach(a => { if (!a || !a.date || !isHealthAppt(a)) return; if (!a.claim && (a.date >= t || daysLeft(a.date) < -60)) return;
+    out.push({ ref: 'a:' + a.id, title: a.title, date: a.date, claim: a.claim || null, sarah: a.from === 'sarah' }); });
+  (S.claims || []).forEach(x => { if (x && x.claim) out.push({ ref: 'c:' + x.id, title: x.claim.reason || 'Claim', date: x.claim.date, claim: x.claim, sarah: false }); });
+  return out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+function claimRowHtml(x) {
+  const c = x.claim;
+  return `<button class="row" onclick="claimSheet('${x.ref}')"><div class="ic health">${I('medkit')}</div><div style="flex:1;min-width:0"><div class="t">${x.sarah ? sarahBadge({ from: 'sarah' }) : ''}${esc(x.title)}</div>
+    <div class="s">${c && c.patient ? esc(c.patient) + ' · ' : ''}Visit ${x.date ? fmtW(x.date) : '—'}${c && c.amount ? ' · ' + claimMoney(c.amount) : ''}${c && c.submittedAt && c.status === 'submitted' ? ' · sent ' + fmtW(c.submittedAt) : ''}</div></div>${c && c.status !== 'none' ? claimChip(c) : '<span class="clchip none">Claim?</span>'}</button>`;
+}
+function Claims() {
+  const rows = claimRows(), todo = rows.filter(x => claimOpen(x.claim)), sent = rows.filter(x => x.claim && x.claim.status === 'submitted'),
+    paid = rows.filter(x => x.claim && x.claim.status === 'paid'), skip = rows.filter(x => x.claim && x.claim.status === 'skip');
+  const paidSum = paid.reduce((n, x) => n + Number(x.claim.paidAmt || 0), 0);
+  return header('UniMed claims', todo.length ? plural(todo.length, 'claim') + ' to make' + (sent.length ? ' · ' + sent.length + ' waiting' : '') : sent.length ? sent.length + ' waiting on UniMed' : 'All caught up', `<button class="iconbtn add" aria-label="New claim" onclick="claimSheet('new')">${I('plus')}</button>`) +
+    `<div class="card cltipcard"><div class="cltip" style="margin:0 0 10px">${I('info')}<div>Claims are made in UniMed’s Smart Claim portal: policy, patient, provider, reason, visit date, amount paid, and a photo of the <b>itemised invoice</b> (not the EFTPOS receipt). At least $${CLAIM_MIN}. Drafts keep for 30 days there.</div></div>
+      <div class="btns"><a class="btn primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a><a class="btn" href="tel:0800600666">${I('phone')} 0800 600 666</a></div></div>` +
+    `<div class="sec">To claim</div>` + (todo.length ? `<div class="list" id="claimtodo">${todo.map(claimRowHtml).join('')}</div>` : `<div class="card empty"><div class="t">Nothing to claim</div><div class="s">Health appointments (yours and Sarah’s) show here after the visit. Tap + for anything else.</div></div>`) +
+    (sent.length ? `<div class="sec">Submitted</div><div class="list">${sent.map(claimRowHtml).join('')}</div>` : '') +
+    (paid.length ? `<details class="spast"><summary>Paid (${paid.length}${paidSum ? ' · ' + claimMoney(paidSum.toFixed(2)) + ' back' : ''})</summary><div class="list">${paid.map(claimRowHtml).join('')}</div></details>` : '') +
+    (skip.length ? `<details class="spast"><summary>Not claiming (${skip.length})</summary><div class="list">${skip.map(claimRowHtml).join('')}</div></details>` : '');
+}
 // An undo puts the to-dos back, but keeps the sync note as it is now, so the undo itself is sent to Sarah.
 const keepShared = old => { if (S && S.settings && old && old.settings) old.settings.shared = S.settings.shared; return old; };
 /* ---- Shared to-do sync (Sarah's To-do <-> My App) ----
@@ -4333,7 +4539,7 @@ const keepShared = old => { if (S && S.settings && old && old.settings) old.sett
 const SHARED_URL = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/shared-todo';
 const SHARED_KEY = 'sArgfZGJrHxJN9I319FJeFLhFshrHsRU2xDFnnLL'; // only opens this one shared list
 const SHARED_FIELDS = ['title', 'list', 'due', 'notes', 'priority', 'done'];
-const sharedHash = t => JSON.stringify(SHARED_FIELDS.map(k => k === 'done' ? !!t[k] : String(t[k] == null ? '' : t[k])).concat(t.brand ? [brandKey(t.brand)] : []).concat(t.appt ? [apptKey(t.appt)] : []));
+const sharedHash = t => JSON.stringify(SHARED_FIELDS.map(k => k === 'done' ? !!t[k] : String(t[k] == null ? '' : t[k])).concat(t.brand ? [brandKey(t.brand)] : []).concat(t.appt ? [apptKey(t.appt)] : []).concat(t.claim ? [claimKey(claimNorm(t.claim))] : []));
 const apptKey = a => JSON.stringify([a.type || '', a.time || '', a.place || '']);
 /* 2.23.13: the brand Sarah picks for a shopping item in her app (New World Onerahi product data, via the relay's /brands).
    It rides on the shared item; shown under her pink-S item and in its edit sheet. Prices are the store's website price on the day. */
@@ -4357,12 +4563,20 @@ function sharedNote() {
     if (st.snap[t.id] === h) { delete st.pend[t.id]; return; }
     const p = st.pend[t.id];
     if (p && !p.deleted && sharedHash(p) === h) return; // already queued
-    st.pend[t.id] = Object.assign({ id: t.id, created: t.created || now, by: SH.by(t), doneAt: t.done ? t.doneAt || now : 0, updated: now }, Object.fromEntries(SHARED_FIELDS.map(k => [k, k === 'done' ? !!t[k] : (t[k] || '')])), t.brand ? { brand: t.brand } : {}, t.appt ? { appt: t.appt } : {});
+    st.pend[t.id] = Object.assign({ id: t.id, created: t.created || now, by: SH.by(t), doneAt: t.done ? t.doneAt || now : 0, updated: now }, Object.fromEntries(SHARED_FIELDS.map(k => [k, k === 'done' ? !!t[k] : (t[k] || '')])), t.brand ? { brand: t.brand } : {}, t.appt ? { appt: t.appt } : {}, t.claim ? { claim: t.claim } : {});
   });
   Object.keys(st.snap).forEach(id => { if (!seen.has(id) && !(st.pend[id] && st.pend[id].deleted)) st.pend[id] = { id, deleted: true, updated: now }; });
 }
 function sharedSoon(ms = 1500) { clearTimeout(sharedTimer); sharedTimer = setTimeout(() => sharedSync(), ms); }
+let clRetryAt = 0;
+async function claimRetryUploads() { // photos that couldn't go up when saved (offline): try again, at most every 5 minutes
+  if (Date.now() - clRetryAt < 300000) return; clRetryAt = Date.now();
+  let ch = false;
+  for (const a of (S.appts || [])) { if (a && a.claim && a.from === 'sarah' && a.claim.photos.some(p => !p.up)) { if (await claimUploadPhotos(a.claim)) ch = true; } }
+  if (ch) { await save(); }
+}
 async function sharedSync() {
+  try { if (S) claimRetryUploads(); } catch (e) { }
   try { publishSarahCar(); } catch (e) { }
   if (sharedBusy || !S) return;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) { sharedErr = 'offline'; return; }
@@ -4724,7 +4938,8 @@ function apptForm(id, date, pre) {
     field('What is it?', inp('title', a.title, 'placeholder="e.g. Haircut" required maxlength="80"')) +
     `<div class="two">${field('Date', inp('date', a.date, 'type="date" required'))}${field('Time', inp('time', a.time, 'type="time"'), 'Leave blank for all day')}</div>` +
     field('Where / notes', area('notes', a.notes)) +
-    (a.evUrl ? `<p class="muted" style="margin:4px 0 0">From Whangārei events. <a href="${esc(a.evUrl)}" target="_blank" rel="noopener">Open the event page</a></p>` : ''),
+    (a.evUrl ? `<p class="muted" style="margin:4px 0 0">From Whangārei events. <a href="${esc(a.evUrl)}" target="_blank" rel="noopener">Open the event page</a></p>` : '') +
+    (id && isHealthAppt(a) ? `<div class="btns" style="margin-top:6px"><button type="button" class="btn small" onclick="claimSheet('a:${id}')">${I('medkit')} UniMed claim${a.claim && a.claim.status !== 'none' ? ' · ' + CLAIM_ST[a.claim.status] : ''}</button></div>` : ''),
     async v => {
       if (!v.title) return 'Please say what the appointment is.';
       if (!parseD(v.date)) return 'Please choose a date.';
@@ -8880,6 +9095,7 @@ function More() {
     sleep: () => 'Your sleep and morning check-in',
     gym: () => 'Gym visits and workouts',
     meds: () => 'Your medications',
+    claims: () => { const n = claimRows().filter(x => claimOpen(x.claim)).length; return n ? plural(n, 'claim') + ' to make' : 'UniMed Smart Claim helper'; },
     roster: () => { try { const n = rosterNext(); return n ? 'Next start ' + esc(n) : 'Days and start times'; } catch (e) { return 'Days and start times'; } }
   });
   const pills = { pets: petOver ? `<span class="pill over">${petOver} overdue</span>` : '', health: hOver ? `<span class="pill over">${hOver} overdue</span>` : '',
@@ -8915,6 +9131,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   sleep: ['moon', 'roster', 'Sleep', 'Sleep'],
   gym: ['heart', 'health', 'Gym', 'Gym'],
   meds: ['medkit', 'health', 'Medications', 'Meds'],
+  claims: ['medkit', 'health', 'UniMed claims', 'Claims'],
   diary: ['book', 'diary', 'Diary', 'Diary'],
   countdown: ['clock', 'count', 'Countdown', 'Countdown'],
   notes: ['note', 'note', 'Notes', 'Notes']
@@ -8924,7 +9141,7 @@ const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
-  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans'] },
+  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans', 'claims'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
@@ -15609,7 +15826,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds };
+  const map = { claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {

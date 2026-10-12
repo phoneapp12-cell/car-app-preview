@@ -42,3 +42,15 @@ test2('appointment details ride only on Appointments items; car is cleaned and s
   await sharedCarRoute({ key, car: { plate: 'PNU312', wof: '2026-10-16' } }, env);
   assert2.equal((await sharedCarRoute({ key }, env))[1].car.wof, '2026-10-16');
 });
+
+import { cleanItem as ci4, sharedPhotoRoute } from '../src/shared-todo.js';
+test2('claims ride on appointments; photos store and read back', async () => {
+  const a = ci4({ id: 'appt9', title: 'GP', list: 'Appointments', due: '2026-10-10', updated: 5, claim: { status: 'draft', amount: '$45.5', photos: [{ id: 'ph-abc123', up: 1 }, { id: 'bad id!' }], evil: 1 } }, 10);
+  assert2.equal(a.claim.amount, '45.50'); assert2.equal(a.claim.photos.length, 1); assert2.equal(a.claim.evil, undefined);
+  const kv = new Map(), env = { EVENTS_KV: { get: async k => kv.get(k) || null, put: async (k, v) => kv.set(k, v) } };
+  const key = 'k'.repeat(40);
+  assert2.equal((await sharedPhotoRoute({ key, id: 'ph-abc123', data: 'javascript:x' }, env))[0], 400);
+  assert2.equal((await sharedPhotoRoute({ key, id: 'ph-abc123', data: 'data:image/jpeg;base64,AAAA' }, env))[0], 200);
+  assert2.equal((await sharedPhotoRoute({ key, id: 'ph-abc123' }, env))[1].data, 'data:image/jpeg;base64,AAAA');
+  assert2.equal((await sharedPhotoRoute({ key: 'z'.repeat(40), id: 'ph-abc123' }, env))[0], 404);
+});

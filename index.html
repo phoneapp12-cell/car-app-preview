@@ -1306,6 +1306,28 @@ body.tabs-open .btabs{z-index:31}
 .btrow .iconbtn:disabled{opacity:.3}
 .btrow .tx{min-width:0}
 .btadd .chip:disabled{opacity:.4}
+/* UniMed claim helper */
+.cltip{display:flex;gap:10px;align-items:flex-start;background:var(--claimtip,rgba(14,116,144,.1));border-radius:12px;padding:10px 12px;margin:0 0 12px;font-size:0.875rem;line-height:1.35}
+.cltip .i{flex:none;width:20px;height:20px;margin-top:1px}
+.clfor{margin:-4px 2px 10px;font-size:0.875rem}
+.clwarn{color:#B45309;font-weight:700;font-size:0.8125rem;margin:-6px 2px 8px}
+.clwarn:empty{display:none}
+.clph{display:flex;flex-wrap:wrap;gap:8px}
+.clthumb{position:relative;width:72px;height:72px;border-radius:10px;overflow:hidden;background:rgba(127,127,127,.15)}
+.clthumb .climg{display:block;width:100%;height:100%;padding:0;border:0;background:none}
+.clthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.clthumb.away::after{content:'On the other phone';position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:0.6875rem;padding:4px;pointer-events:none}
+.clthumb .clx{position:absolute;top:2px;right:2px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:16px;line-height:24px;padding:0}
+.clbtns{margin-top:4px;flex-wrap:wrap}
+.clbtns .btn{flex:1 1 auto}
+.clhelp{font-size:0.8125rem;margin:8px 2px 0}
+.clchip{flex:none;font-size:0.75rem;font-weight:800;border-radius:999px;padding:4px 9px;white-space:nowrap;background:rgba(127,127,127,.18)}
+.clchip.draft{background:#FEF3C7;color:#92400E}.clchip.submitted{background:#DBEAFE;color:#1E40AF}.clchip.paid{background:#DCFCE7;color:#166534}.clchip.none{background:#FCE7F3;color:#9D174D}
+.phview{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}
+.phview img{max-width:100%;max-height:calc(100% - 70px);object-fit:contain;background:#fff;border-radius:6px}
+.phview .pvbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+.spast{margin:8px 0 12px}
+.spast summary{cursor:pointer;font-weight:700;color:var(--accent,var(--brand));padding:10px 4px;font-size:0.9375rem}
 </style>
 </head>
 <body>

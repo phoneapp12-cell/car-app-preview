@@ -23,6 +23,16 @@ export function cleanAppt(a) {
   if (!a || typeof a !== 'object') return null;
   return { type: APPT_TYPES.includes(a.type) ? a.type : 'other', time: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(a.time || '')) ? a.time : '', place: str(a.place, 160).trim() };
 }
+// 1.5.0 / 2.23.18: a UniMed claim on a shared appointment (details and status; photos travel separately via /shared-photo)
+const CLAIM_ST = ['none', 'draft', 'submitted', 'paid', 'skip'];
+const iso = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : '';
+const amt = v => { const n = Number(String(v == null ? '' : v).replace(/[^\d.]/g, '')); return isFinite(n) && n > 0 && n < 1e6 ? n.toFixed(2) : ''; };
+export function cleanClaim(c) {
+  if (!c || typeof c !== 'object') return null;
+  return { status: CLAIM_ST.includes(c.status) ? c.status : 'none', patient: str(c.patient, 60).trim(), provider: str(c.provider, 120).trim(), reason: str(c.reason, 160).trim(), date: iso(c.date),
+    amount: amt(c.amount), notes: str(c.notes, 1000).trim(), photos: (Array.isArray(c.photos) ? c.photos : []).filter(p => p && /^[\w-]{6,40}$/.test(String(p.id || ''))).slice(0, 6).map(p => ({ id: String(p.id), up: !!p.up })),
+    submittedAt: iso(c.submittedAt), paidAt: iso(c.paidAt), paidAmt: amt(c.paidAmt), updated: Number(c.updated) || 0 };
+}
 // 1.3.0 / 2.23.13: the brand Sarah picked for a shopping item (from New World's own product search, or typed).
 export function cleanBrand(b) {
   if (!b || typeof b !== 'object') return null;
@@ -44,7 +54,8 @@ export function cleanItem(x, now = Date.now()) {
     notes: str(x.notes, 1000), priority: PRI.includes(x.priority) ? x.priority : 'normal', done: !!x.done,
     doneAt: x.done ? Number(x.doneAt) || updated : 0, created: Number(x.created) || updated, by: x.by === 'shane' ? 'shane' : 'sarah', updated,
     ...(cleanBrand(x.brand) ? { brand: cleanBrand(x.brand) } : {}),
-    ...(x.list === 'Appointments' && cleanAppt(x.appt) ? { appt: cleanAppt(x.appt) } : {})
+    ...(x.list === 'Appointments' && cleanAppt(x.appt) ? { appt: cleanAppt(x.appt) } : {}),
+    ...(x.list === 'Appointments' && cleanClaim(x.claim) ? { claim: cleanClaim(x.claim) } : {})
   };
 }
 export function mergeItems(cur, incoming, now = Date.now()) {
@@ -111,4 +122,26 @@ export async function sharedCarRoute(body, env, now = Date.now()) {
     if (!same) { await env.EVENTS_KV.put(key, JSON.stringify(c)); cur = c; }
   }
   return [200, { ok: true, car: cur || null, now }];
+}
+
+/* 1.5.0 / 2.23.18: invoice photos for shared UniMed claims. One compressed JPEG per id (≤ ~320 KB), same shared key,
+   kept 120 days. A body with `data` stores it; without, reads it. */
+export const PHOTO_MAX = 440000;
+export async function sharedPhotoRoute(body, env) {
+  const k = normSharedKey(body && body.key);
+  if (!k) return [403, { error: 'bad_key' }];
+  const id = String((body && body.id) || '');
+  if (!/^[\w-]{6,40}$/.test(id)) return [400, { error: 'bad_id' }];
+  if (!env || !env.EVENTS_KV || typeof env.EVENTS_KV.get !== 'function') return [503, { error: 'shared_unavailable' }];
+  const dig = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('shared-photo-v1:' + k + ':' + id));
+  let hex = ''; for (const b of new Uint8Array(dig)) hex += b.toString(16).padStart(2, '0');
+  const key = 'shared-photo-v1:' + hex;
+  if (body.data != null) {
+    const d = String(body.data);
+    if (d.length > PHOTO_MAX || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d)) return [400, { error: 'bad_photo' }];
+    await env.EVENTS_KV.put(key, d, { expirationTtl: 120 * 86400 });
+    return [200, { ok: true }];
+  }
+  const d = await env.EVENTS_KV.get(key);
+  return d ? [200, { ok: true, data: d }] : [404, { error: 'not_found' }];
 }
