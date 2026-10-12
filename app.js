@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.33';
+const APP_VERSION = '2.23.34';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2625,8 +2625,8 @@ function homeSceneCard(inner, noSugs) {
   const body = inner || '<p class="sumnote">Nothing much to flag right now. Have a good one.</p>';
   let sugs = '';
   try { sugs = noSugs ? '' : homeSugHtml(); } catch (e) { sugs = ''; }
-  let nf = ''; try { nf = nfHtml(); } catch (e) { nf = ''; } // 2.22.87: New on Netflix, at the very bottom
-  let tr = ''; try { tr = sumTravelHtml(); } catch (e) { tr = ''; } // 2.22.98: today's travel spot, above Netflix
+  let nf = ''; try { nf = stripOn() ? '' : nfHtml(); } catch (e) { nf = ''; } // 2.22.87: New on Netflix, at the very bottom
+  let tr = ''; try { tr = stripOn() ? '' : sumTravelHtml(); } catch (e) { tr = ''; } // 2.22.98: today's travel spot, above Netflix
   return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${sugs}${tr}${nf}</div></div>`;
 }
 function homeSumFallback() {
@@ -3713,7 +3713,7 @@ function Home() {
       sections.push({ keys: g.keys, html: `<section class="hsec${fresh ? ' hnew' : ''}" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${fresh ? '<span class="newtag">New</span>' : ''}${body}</section>` });
     } catch (e) { console.error('Home section', g.k, e); }
   });
-  if (!night) [['comingup', comingUpCard], ].concat(justAddedOn() ? [['justadded', justAddedCard]] : []).concat(qjTop() ? [] : [['quotejoke', quoteJokeCard]]).forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
+  if (!night) [['comingup', comingUpCard], ].concat(justAddedOn() ? [['justadded', justAddedCard]] : []).concat(qjTop() ? [] : [['quotejoke', () => stripOn() ? stripHtml() : quoteJokeCard()]]).forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
@@ -3743,7 +3743,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + homeTry('rewards', () => erCard(), '') + (qjTop() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + sumTop + (night && !qjTop() ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : '') + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => stripHtml(), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + sumTop + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => stripHtml(), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
     sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -13908,6 +13908,72 @@ function erCard() {
     ${all.length > 3 ? `<button class="linkbtn" id="ermore" onclick="erMore=!erMore;render()">${erMore ? 'Less' : 'More (' + (all.length - 3) + ')'}</button>` : ''}</div>`;
 }
 
+/* ================= ROTATING STRIP (2.23.34) =================
+   Quote, joke, travel spot, fact, next countdown, Netflix and Countdown rewards in one small card that changes every 6 s.
+   Swipe to move, tap to open. Pauses while touched, off screen, app hidden, or reduced motion (manual only). */
+const stripOn = () => !(S && S.settings && S.settings.qjStrip === false);
+let stripIdx = 0, stripAt = Date.now(), stripTouch = false, stripJA = false;
+const STRIP_MS = 6000;
+function stripSlides() {
+  const out = [], add = (k, lbl, body, go) => { if (body) out.push({ k, lbl, body, go: go || '' }); };
+  try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
+  try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (j) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
+  try { const p = travelToday(); if (p && p.name) add('travel', 'Today’s travel spot', `<p class="qsq"><b>${esc(p.name)}</b>, ${esc(p.country)}</p><div class="qsw">${esc(travelKmText(travelKm(p.lat, p.lon)))} away · ${esc(sumTravelTime(p.tz))} there</div>`, "go('#travel')"); } catch (e) {}
+  try { const f = homePick(131, HOME_FACTS); if (f) add('fact', 'Did you know?', `<p class="qsq">${esc(String(f.line || f))}</p>`); } catch (e) {}
+  try { const c = countdownRows()[0]; if (c) add('count', 'Countdown', `<p class="qsq"><b>${esc(c.name)}</b></p><div class="qsw">${esc(cdWords(cdDays(c.date)))} · ${esc(fmtW(c.date))}</div>`, "go('#countdown')"); } catch (e) {}
+  try { if (NF && mailConnected('microsoft')) { const t = todayISO(), fr = (NF.fresh || []).slice(0, 3), co = (NF.coming || []).filter(x => x.date && x.date >= t).slice(0, 2); const x = fr[0] || co[0];
+    if (x) add('netflix', 'New on Netflix', `<p class="qsq">${esc(fr.map(y => y.title).join(', ') || '')}${fr.length && co.length ? '' : ''}</p>${co.length ? `<div class="qsw">Coming: ${esc(co.map(y => y.title + ' (' + fmtW(y.date) + ')').join(', '))}</div>` : ''}`, x.link ? 'url:' + x.link : ''); } } catch (e) {}
+  try { if (erOn()) { const a = erLive(); if (a.length) add('rewards', 'Countdown rewards', `<p class="qsq">${esc(a[0].sum)}</p><div class="qsw">${daysLeft(a[0].end) === 0 ? 'Ends today' : 'Ends ' + esc(fmtW(a[0].end))}${a[0].boost ? ' · Boost first' : ''}${a.length > 1 ? ' · +' + (a.length - 1) + ' more' : ''}</div>`, (a[0].link || a[0].web) ? 'url:' + (a[0].link || a[0].web) : ''); } } catch (e) {}
+  return out;
+}
+function stripHtml() {
+  const sl = stripSlides(); if (!sl.length) return '';
+  stripIdx = ((stripIdx % sl.length) + sl.length) % sl.length;
+  return `<div class="card qstrip" id="qstrip" role="region" aria-roledescription="carousel" aria-label="Today’s bits" data-n="${sl.length}">
+    <div class="qsview">${sl.map((s, i) => `<div class="qslide${i === stripIdx ? ' on' : ''}" data-k="${s.k}" data-go="${esc(s.go)}" aria-hidden="${i !== stripIdx}"><div class="qslbl">${esc(s.lbl)}</div>${s.body}</div>`).join('')}</div>
+    ${sl.length > 1 ? `<div class="qsdots">${sl.map((s, i) => `<button type="button" class="qsdot${i === stripIdx ? ' on' : ''}" data-i="${i}" aria-label="${esc(s.lbl)}"></button>`).join('')}</div>` : ''}</div>`;
+}
+function stripShow(i) {
+  const el = document.getElementById('qstrip'); if (!el) return;
+  const sl = el.querySelectorAll('.qslide'), n = sl.length; if (!n) return;
+  const prev = stripIdx; stripIdx = ((i % n) + n) % n; stripAt = Date.now();
+  if (prev !== stripIdx && stripJA) { stripJA = false; const a = el.querySelector('.qslide[data-k="joke"] .qsa'); if (a) { a.classList.remove('on'); a.textContent = 'Tap for the answer'; } }
+  sl.forEach((s, k) => { s.classList.toggle('on', k === stripIdx); s.setAttribute('aria-hidden', k !== stripIdx); });
+  el.querySelectorAll('.qsdot').forEach((d, k) => d.classList.toggle('on', k === stripIdx));
+}
+const stripReduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+function stripTick() {
+  const el = document.getElementById('qstrip');
+  if (!el || stripTouch || document.hidden || stripReduced() || stripJA || +el.dataset.n < 2) { stripAt = Math.max(stripAt, Date.now() - STRIP_MS + 1500); return; }
+  const r = el.getBoundingClientRect();
+  if (r.bottom <= 0 || r.top >= innerHeight || !r.height) { stripAt = Date.now(); return; }
+  if (Date.now() - stripAt >= STRIP_MS) stripShow(stripIdx + 1);
+}
+setInterval(stripTick, 500);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) stripAt = Date.now(); });
+(() => {
+  let x0 = 0, y0 = 0, moved = false;
+  const inStrip = e => e.target && e.target.closest && e.target.closest('#qstrip');
+  document.addEventListener('touchstart', e => { if (!inStrip(e)) return; stripTouch = true; moved = false; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchmove', e => { if (!stripTouch) return; if (Math.abs(e.touches[0].clientX - x0) > 10) moved = true; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (!stripTouch) return; stripTouch = false; stripAt = Date.now();
+    const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { moved = true; stripShow(stripIdx + (dx < 0 ? 1 : -1)); }
+  }, { passive: true });
+  document.addEventListener('touchcancel', () => { stripTouch = false; });
+  document.addEventListener('mouseover', e => { if (e.pointerType === 'touch') return; stripTouch = !!inStrip(e) && matchMedia('(hover:hover)').matches; });
+  document.addEventListener('click', e => {
+    if (!inStrip(e)) return;
+    if (moved) { moved = false; return; }
+    const dot = e.target.closest('.qsdot'); if (dot) { stripShow(+dot.dataset.i); return; }
+    const s = e.target.closest('.qslide'); if (!s) return; const g = s.dataset.go || '';
+    if (g === 'joke') { stripJA = !stripJA; const a = s.querySelector('.qsa'); const j = dailyJokeFor(); if (a && j) { a.classList.toggle('on', stripJA); a.textContent = stripJA ? j[1] : 'Tap for the answer'; } stripAt = Date.now(); return; }
+    if (g.startsWith('url:')) { const u = g.slice(4); if (/^https:\/\//.test(u)) window.open(u, '_blank', 'noopener'); return; }
+    if (g === "go('#travel')") go('#travel'); else if (g === "go('#countdown')") go('#countdown');
+  });
+})();
+
 /* ================= NEW ON NETFLIX (2.22.87) =================
    Netflix's own promo emails in Shane's Outlook (sender @members.netflix.com) list what is new. Account mail
    (@account.netflix.com: sign-in codes, new devices, billing) is never used. The phone reads them with its Outlook
@@ -14029,6 +14095,7 @@ function nfPaint() {
   try {
     const h = (location.hash || '#home').slice(1);
     if ((h !== 'home' && h !== '') || homeEdit) return;
+    if (stripOn()) return;
     const html = nfHtml(), cur = document.getElementById('nfnew');
     if (cur) { if (html) cur.outerHTML = html; else cur.remove(); return; }
     if (!html) return;
@@ -14477,6 +14544,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Countdown rewards</div><div class="s">A card near the top with Countdown (Woolworths) offers from your Everyday Rewards emails, soonest ending first. Fuel, FreshChoice, MILKRUN and other partner offers are left out. Hidden when there are none.</div></div><button class="switch ${erOn() ? 'on' : ''}" role="switch" aria-checked="${erOn()}" aria-label="Countdown rewards" id="ersw" onclick="toggleSetting('erPromos', ${!erOn()}).then(() => refreshEr(true))"></button></div>
@@ -15732,7 +15800,7 @@ function homeKnowCard(lead, bits) {
     const style = overdue ? '' : ` style="--bar:${bars[i % bars.length]}"`;
     return `<li class="${b.kind || 'note'}${overdue ? ' urgent' : ''}"${style}><span class="tx">${esc(b.text)}</span></li>`;
   }).join('')}</ul>` : '';
-  let nf = ''; try { nf = nfHtml(); } catch (e) { nf = ''; }
+  let nf = ''; try { nf = stripOn() ? '' : nfHtml(); } catch (e) { nf = ''; }
   return `<div class="card homesum know" id="homesum"><p class="knowlead">${esc(lead)}</p>${ul}${nf}</div>`;
 }
 function homeKnownSummary(urgent, mentioned) {
