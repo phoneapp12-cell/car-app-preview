@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.41';
+const APP_VERSION = '2.23.42';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3673,7 +3673,9 @@ function justAddedList(now = Date.now()) {
   return out.sort((a, b) => (a.who === 'sarah' ? 0 : 1) - (b.who === 'sarah' ? 0 : 1) || b.at - a.at);
 }
 function jaAgo(at, now = Date.now()) { const m = Math.round((now - at) / 6e4); return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 120 ? '1 hr ago' : m < 1440 ? Math.round(m / 60) + ' hrs ago' : 'yesterday'; }
-function justAddedCard() { return cardArt(justAddedCard0(), 'ja'); }
+// 2.23.42: a pill under Just added switches the feed between scrolling list and carousel (double-tap still works)
+const feedPill = (id) => `<div class="feedpillrow"><button type="button" class="feedpill" id="${id}" onclick="event.stopPropagation();setHomeFeedMode(homeFeedMode === 'list' ? 'carousel' : 'list')">${homeFeedMode === 'list' ? 'Tap here for carousel view' : 'Tap here to change back to scrolling'}</button></div>`;
+function justAddedCard() { return cardArt(justAddedCard0(), 'ja') + feedPill('feedpillja'); }
 function justAddedCard0() {
   const list = justAddedList();
   const head = homeSec('Just added', list.length ? '<button class="linkbtn jaclear" id="jaclear" onclick="justAddedClear()">Clear…</button>' : '');
@@ -3756,7 +3758,7 @@ function Home() {
       <div class="hcar-track" id="hcartrack">${carItems}</div>
       <div class="hcar-dots">${carDots}</div>
     </div>
-    <p class="hcar-hint muted">Swipe for next · double-tap for list</p>
+    <p class="hcar-hint muted">Swipe for next · double-tap for list</p>${feedPill('feedpillcar')}
   </div>` : '';
   const listFeed = sections.length ? `<div class="hfeed" id="homefeed" data-mode="list">
     <p class="hcar-hint muted">Double-tap for carousel</p>
