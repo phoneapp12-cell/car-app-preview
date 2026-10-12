@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.39';
+const APP_VERSION = '2.23.40';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3628,17 +3628,22 @@ function quoteJokeCard() {
 }
 /* 2.23.37: card artwork for Coming up and Just added (Krea 2 Turbo images in art/). Settings: Card artwork. */
 const cardArtOn = () => !(S && S.settings && S.settings.cardArt === false);
-const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', bday: 'bday', health: 'health', appt: 'health', med: 'health', pet: 'health', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'ev', ext: 'ev', todo: 'todo', note: 'todo', meal: 'shop', shop: 'shop' };
+const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', br: 'car', bday: 'bday', health: 'health', appt: 'health', med: 'health', pet: 'pet', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'ev', ext: 'ev', todo: 'todo', note: 'todo', idea: 'todo', meal: 'shop', shop: 'shop', ln: 'news', blog: 'news', pod: 'radio', rad: 'radio', tv: 'tv', vid: 'tv', comm: 'weather' };
+// 2.23.40: a few titles pick a more exact picture
+const CARD_ART_WORD = [[/\bdent(ist|al)\b|teeth|hygien/i, 'dentist'], [/garden|plant|lawn|mow|seedling|compost/i, 'garden'], [/\b(dog|cat|vet|flea|worm(ing)?|pet)\b/i, 'pet'], [/\\b(weather|rain|storm|wind)\\b/i, 'weather'], [/flight|travel|trip|airport|passport/i, 'travel'], [/netflix|\bTV\b|movie|film/i, 'tv'], [/rewards|countdown|woolworths/i, 'rewards'], [/radio|podcast|music|gig|concert/i, 'radio'], [/birthday/i, 'bday']];
 function cardArt(html, kind) {
   if (!cardArtOn() || !html) return html;
   const t = kind === 'cu' ? 'Coming up' : 'Just added';
   html = html.replace(/<div class="sec">(Coming up|Just added)\s*([\s\S]*?)<\/div>/, (m, ti, link) => `<div class="artban" style="background-image:url(art/${kind}-banner.webp)"><span class="artbt">${ti}</span>${link ? `<span class="artbl">${link}</span>` : ''}</div>`);
   // each row: the icon tile becomes the matching illustration (Sarah's things get the heart locket)
-  html = html.replace(/(<(?:button|div) class="row[^"]*"[^>]*>)\s*<div class="ic ([a-z]+)"([^>]*)>([\s\S]*?)<\/div>(\s*<div class="tx">)([\s\S]*?<div class="t">)/g, (m, open, ic, attrs, svg, tx, t) => {
+  html = html.replace(/(<(?:button|div) class="row[^"]*"[^>]*>)\s*<div class="ic ([a-z]+)"([^>]*)>([\s\S]*?)<\/div>(\s*<div class="tx">)([\s\S]*?<div class="t">)/g, (m, open, ic, attrs, svg, tx, t, off, str) => {
+    const near = str.slice(off, off + m.length + 260).replace(/<[^>]+>/g, ' ');
     const sar = /jasarah/.test(open) || /sarahbadge|class="sbadge|Sarah/.test(t.slice(0, 200)) && /from Sarah|Sarah added|Sarah’s/.test(m + t);
-    const a = sar ? 'sarah' : CARD_ART_IC[ic];
+    const tt = t.replace(/<[^>]+>/g, ' ') + ' ' + (m.match(/<div class="t">([^<]*)/) || [])[1];
+    const w = CARD_ART_WORD.find(([re]) => re.test(near));
+    const a = sar ? 'sarah' : (w && w[1]) || CARD_ART_IC[ic];
     if (!a) return m;
-    return `${open}<div class="ic ${ic} icart"><img src="art/ic-${a}.webp" alt="" width="40" height="40" loading="lazy"></div>${tx}${t}`;
+    return `${open}<div class="ic ${ic} icart"><img src="art/i3-${a}.webp" alt="" width="40" height="40" loading="lazy"></div>${tx}${t}`;
   });
   return html.replace(/(id="(?:comingup|justadded)")/, '$1 data-art="1"').replace(/class="(list[^"]*)" id="(comingup|justadded)"/, 'class="$1 artlist" id="$2"');
 }
@@ -14006,6 +14011,7 @@ function tkToggleFull() {
 const stripOn = () => !(S && S.settings && S.settings.qjStrip === false);
 let stripIdx = 0, stripAt = Date.now(), stripTouch = false, stripJA = false;
 const STRIP_MS = 6000;
+const STRIP_ART = { travel: 'travel', count: 'hol', netflix: 'tv', rewards: 'rewards' };
 function stripSlides() {
   const out = [], add = (k, lbl, body, go) => { if (body) out.push({ k, lbl, body, go: go || '' }); };
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
@@ -14022,7 +14028,7 @@ function stripHtml() {
   const sl = stripSlides(); if (!sl.length) return '';
   stripIdx = ((stripIdx % sl.length) + sl.length) % sl.length;
   return `<div class="card qstrip" id="qstrip" role="region" aria-roledescription="carousel" aria-label="Today’s bits" data-n="${sl.length}">
-    <div class="qsview">${sl.map((s, i) => `<div class="qslide${i === stripIdx ? ' on' : ''}" data-k="${s.k}" data-go="${esc(s.go)}" aria-hidden="${i !== stripIdx}"><div class="qslbl">${esc(s.lbl)}</div>${s.body}</div>`).join('')}</div>
+    <div class="qsview">${sl.map((s, i) => `<div class="qslide${i === stripIdx ? ' on' : ''}" data-k="${s.k}" data-go="${esc(s.go)}" aria-hidden="${i !== stripIdx}"><div class="qslbl">${cardArtOn() && STRIP_ART[s.k] ? `<img class="qsico" src="art/i3-${STRIP_ART[s.k]}.webp" alt="">` : ''}${esc(s.lbl)}</div>${s.body}</div>`).join('')}</div>
     ${sl.length > 1 ? `<div class="qsdots">${sl.map((s, i) => `<button type="button" class="qsdot${i === stripIdx ? ' on' : ''}" data-i="${i}" aria-label="${esc(s.lbl)}"></button>`).join('')}</div>` : ''}</div>`;
 }
 function stripShow(i) {
