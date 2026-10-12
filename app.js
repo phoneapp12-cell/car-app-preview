@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.30';
+const APP_VERSION = '2.23.31';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9070,17 +9070,59 @@ function mascotPicker() {
     <div class="seg mascotseg" role="radiogroup" aria-label="Mascot" style="width:100%">${Object.keys(MASCOTS).map(k => `<button type="button" class="${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-mascot="${k}" onclick="setMascot('${k}')">${mascotMini(k)}<span>${MASCOTS[k].name}</span></button>`).join('')}</div>
     <div class="tx" style="flex-basis:100%;margin-top:10px"><div class="t">Style</div><div class="s">${MASCOT_ARTS.find(x => x[0] === mascotArt())[2]}</div></div>
     <div class="seg mascotseg" id="mascotart" role="radiogroup" aria-label="Mascot style" style="width:100%">${MASCOT_ARTS.map(([a, l]) => `<button type="button" class="${a === mascotArt() ? 'on' : ''}" role="radio" aria-checked="${a === mascotArt()}" data-art="${a}" onclick="setMascotArt('${a}')">${mascotMini(mascotKey(), a)}<span>${l}</span></button>`).join('')}</div>
-    <label class="tx" style="flex-basis:100%;margin-top:12px;display:flex;align-items:center;gap:10px"><div style="flex:1"><div class="t">Sounds</div><div class="s">A meow or a soft woof when you tap the ${mascotKey()}. Never on its own.</div></div><input type="checkbox" id="mascotsound" ${mascotSoundOn() ? 'checked' : ''} onchange="setMascotSound(this.checked)"></label></div></div>`;
+    <label class="tx" style="flex-basis:100%;margin-top:12px;display:flex;align-items:center;gap:10px"><div style="flex:1"><div class="t">Sounds</div><div class="s">${mascotKey() === 'cat' ? 'The cat meows now and then by itself (every minute or so while this page is showing and it’s awake), and when you tap it.' : 'The dog gives a soft woof every few minutes, and when you tap it.'} Starts after your first tap anywhere. Quiet while it sleeps.</div></div><input type="checkbox" id="mascotsound" ${mascotSoundOn() ? 'checked' : ''} onchange="setMascotSound(this.checked)"></label></div></div>`;
 }
 /* 2.23.30: mascot sounds, made with WebAudio (no recordings): a short meow for the cat, a soft woof for the dog.
    Only when tapped, never by itself. Settings › Mascot › Sounds (on by default). */
 const mascotSoundOn = () => !(S && S.settings && S.settings.mascotSound === false);
 let mAudio = null;
-function mascotSound(k) {
+/* 2.23.31: the meow is a real cat: "Meow of a pleading cat" by Heismark, Wikimedia Commons, public domain
+   (https://commons.wikimedia.org/wiki/File:Meow_of_a_pleading_cat.oga), cut into 3 short meows in sound/. The woof stays
+   synthesised (no public-domain dog bark found). Audio unlocks on the first touch, click or key press; after that the cat
+   meows by itself every 45–90 s while the Notifications page is showing and it's awake, and the dog gives a soft woof every few minutes. */
+const MEOWS = ['sound/meow1.mp3', 'sound/meow2.mp3', 'sound/meow3.mp3'];
+let meowBufs = null, audioUnlocked = false;
+function mAudioCtx() { mAudio = mAudio || new (window.AudioContext || window.webkitAudioContext)(); return mAudio; }
+async function meowLoad() {
+  if (meowBufs) return meowBufs; const ac = mAudioCtx();
+  meowBufs = (await Promise.all(MEOWS.map(u => fetch(u).then(r => r.arrayBuffer()).then(b => new Promise((ok, no) => ac.decodeAudioData(b, ok, no))).catch(() => null)))).filter(Boolean);
+  return meowBufs;
+}
+function audioUnlock() {
+  if (audioUnlocked) return;
+  try { const ac = mAudioCtx(); if (ac.state === 'suspended') ac.resume(); const b = ac.createBuffer(1, 1, 22050), s = ac.createBufferSource(); s.buffer = b; s.connect(ac.destination); s.start(0); audioUnlocked = true; meowLoad(); } catch (e) { }
+}
+['touchstart', 'pointerdown', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, audioUnlock, { capture: true, passive: true }));
+async function meowPlay(vol) {
+  const ac = mAudioCtx(); if (ac.state === 'suspended') await ac.resume().catch(() => { });
+  const bufs = await meowLoad(); if (!bufs.length) return false;
+  const src = ac.createBufferSource(), g = ac.createGain(); src.buffer = bufs[Math.floor(Math.random() * bufs.length)]; src.playbackRate.value = 0.95 + Math.random() * 0.12;
+  g.gain.value = vol || 0.9; src.connect(g); g.connect(ac.destination); src.start(); return true;
+}
+let autoT = null;
+function mascotAutoNext() { clearTimeout(autoT); const cat = mascotKey() === 'cat'; autoT = setTimeout(mascotAuto, (cat ? 45 + Math.random() * 45 : 150 + Math.random() * 150) * 1000); }
+async function mascotAuto() {
+  try {
+    const el = document.getElementById('hcat'), st = catState();
+    if (el && !document.hidden && audioUnlocked && mascotSoundOn() && st !== 'sleep' && !sheetOpen) {
+      const k = mascotKey(), bub = el.querySelector('.cbub');
+      if (k === 'cat') { if (await meowPlay(0.8)) { if (bub) bub.textContent = 'Meow!'; el.classList.remove('meowing'); void el.offsetWidth; el.classList.add('meowing'); setTimeout(() => el.classList.remove('meowing'), 1300); } }
+      else { mascotSound('dog', 0.5); if (bub) bub.textContent = 'woof'; el.classList.add('meowing'); setTimeout(() => el.classList.remove('meowing'), 1100); }
+    }
+  } catch (e) { }
+  mascotAutoNext();
+}
+setTimeout(() => { try { mascotAutoNext(); } catch (e) { } }, 1000);
+document.addEventListener('visibilitychange', () => { try { if (!document.hidden) mascotAutoNext(); else clearTimeout(autoT); } catch (e) { } });
+function mascotSound(k, vol) {
   if (!mascotSoundOn()) return;
+  if (k === 'cat') { meowPlay().then(ok => { if (!ok) mascotSynth('cat'); }); return; }
+  mascotSynth(k, vol);
+}
+function mascotSynth(k, vol) {
   try {
     mAudio = mAudio || new (window.AudioContext || window.webkitAudioContext)(); const ac = mAudio; if (ac.state === 'suspended') ac.resume();
-    const t = ac.currentTime + 0.02, out = ac.createGain(); out.gain.value = 0.9; out.connect(ac.destination);
+    const t = ac.currentTime + 0.02, out = ac.createGain(); out.gain.value = vol || 0.9; out.connect(ac.destination);
     if (k === 'cat') {
       const o = ac.createOscillator(), vib = ac.createOscillator(), vg = ac.createGain(), g = ac.createGain(), f1 = ac.createBiquadFilter(), f2 = ac.createBiquadFilter(), mix = ac.createGain();
       o.type = 'sawtooth'; o.frequency.setValueAtTime(430, t); o.frequency.linearRampToValueAtTime(760, t + 0.16); o.frequency.linearRampToValueAtTime(620, t + 0.38); o.frequency.exponentialRampToValueAtTime(360, t + 0.66);
@@ -14159,6 +14201,7 @@ const mascotArt = () => { const a = S && S.settings && S.settings.mascotArt; ret
 const kreaImg = (k, a) => { const life = (a || mascotArt()) === 'life', oe = `onerror="const h=this.closest('.hcat');if(h)h.classList.remove('hkrea')"`;
   // 2.23.30: the Lifelike dog's tail is its own picture (cut from the photo), drawn behind the body and rotated at its base
   if (life && k === 'dog') return `<span class="kwrap"><img class="ktail" alt="" src="mascot/dog-life-tail.webp" ${oe}><img class="kimg klife" alt="" src="mascot/dog-life-body.webp" ${oe}></span>`;
+  if (k === 'dog') return `<span class="kwrap"><img class="ktail kt-krea" alt="" src="mascot/dog-krea-tail.webp" ${oe}><img class="kimg" alt="" src="mascot/dog-krea-body.webp" ${oe}></span>`; // 2.23.31: Krea art tail cut out too
   return `<span class="kwrap"><img class="kimg${life ? ' klife' : ''}" alt="" src="mascot/${k}-${life ? 'life' : 'krea'}.webp" ${oe}></span>`; };
 function catHtml() {
   const st = catState(), k = mascotKey(), m = MASCOTS[k];

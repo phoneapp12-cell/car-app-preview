@@ -1405,6 +1405,32 @@ html[data-theme="dark"] .row.cucat,html[data-theme="night"] .row.cucat{backgroun
 @keyframes kWiggle{0%,100%{transform:none}15%,45%,75%{transform:rotate(-4deg) translateX(-2px)}30%,60%,90%{transform:rotate(4deg) translateX(2px)}}
 @keyframes kMeow{0%,100%{transform:none}20%{transform:translateY(-4px) rotate(-4deg) scale(1.03)}45%{transform:translateY(-2px) rotate(-6deg) scale(1.05,1.02)}70%{transform:rotate(-2deg)}}
 @media (prefers-reduced-motion:reduce){.hcat.hkrea .ktail{animation:none!important}}
+
+/* 2.23.31: every dog wags, all the time the page is showing (slower at night). Bigger, wider tail swing. */
+.hdog .ctail{transform-box:view-box;transform-origin:33px 34px;stroke-width:4.4}
+.hdog .ctail2{transform-box:view-box;transform-origin:38.5px 32px}
+.hdog.cat-energetic .ctail{animation:dWag .26s ease-in-out infinite alternate!important}
+.hdog.cat-alert .ctail{animation:dWag .34s ease-in-out infinite alternate!important}
+.hdog.cat-tired .ctail{animation:dWag .45s ease-in-out infinite alternate!important}
+.hdog.cat-drowsy .ctail{animation:dWag .6s ease-in-out infinite alternate!important}
+.hdog.cat-sleep .ctail2{animation:dWagLow 1.1s ease-in-out infinite alternate!important}
+.hdog.react .ctail,.hdog.tapping .ctail{animation:dWag .15s ease-in-out infinite alternate!important}
+@keyframes dWag{from{transform:rotate(-30deg)}to{transform:rotate(26deg)}}
+@keyframes dWagLow{from{transform:rotate(-10deg)}to{transform:rotate(10deg)}}
+.hcat .kwrap .ktail.kt-krea{transform-origin:90.2% 76.3%}
+.hcat.hkrea .ktail{animation:lWag .34s ease-in-out infinite alternate!important}
+.hcat.hkrea .ktail.kt-krea{animation-name:kWagK!important}
+.hcat.hkrea.cat-energetic .ktail{animation-duration:.26s!important}
+.hcat.hkrea.cat-tired .ktail{animation-duration:.45s!important}
+.hcat.hkrea.cat-drowsy .ktail{animation-duration:.6s!important}
+.hcat.hkrea.cat-sleep .ktail{animation-duration:1.1s!important}
+.hcat.hkrea.react .ktail,.hcat.hkrea.tapping .ktail{animation-duration:.15s!important}
+@keyframes lWag{from{transform:rotate(-28deg) scale(1.3)}to{transform:rotate(28deg) scale(1.3)}}
+@keyframes kWagK{from{transform:rotate(-6deg) scale(1.2)}to{transform:rotate(32deg) scale(1.2)}}
+.hcat.hkrea:not(.hdog).meowing .kwrap{animation:kMeow .9s ease-in-out!important}
+.hcat:not(.hkrea).meowing .chead{animation:catTilt 1s ease-in-out}.hcat.meowing .cmouth{transform:scale(1)!important;transition:transform .15s}
+.hcat.meowing .cbub{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.hdog .ctail,.hdog .ctail2,.hcat.hkrea .ktail{animation-duration:1.4s!important}}
 </style>
 </head>
 <body>
