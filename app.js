@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.20';
+const APP_VERSION = '2.23.21';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1468,6 +1468,7 @@ function homeNearItems(now) {
         const c = f && CAL[f.id];
         if (!c || !Array.isArray(c.events)) return;
         c.events.forEach(e => {
+          if (calBusy(e, f)) return;
           if (!e || e.allDay || !e.title) return;
           if (Number.isFinite(+e.start)) push(e.title, +e.start - nowD.getTime());
           else pushAt(e.title, e.date, e.time);
@@ -5077,6 +5078,15 @@ async function syncFeeds(force = false, onlyId = null) {
   if (!sheetOpen) render();
   queueCheck();
 }
+/* 2.23.21: Google free/busy placeholders ("Busy", or an untitled block with no details from a Google feed) are hidden
+   everywhere: Calendar, Coming up, Just added, the summary and AI context, and clash checks. */
+const BUSY_RE = /^\s*\(?\s*(busy|free\s*\/\s*busy|busy\s*\(private\)|private\s*busy)\s*\)?\s*$/i;
+function calBusy(e, f) {
+  if (!e) return false;
+  const t = String(e.title || '');
+  if (BUSY_RE.test(t)) return true;
+  return /^\(no title\)$|^\s*$/i.test(t) && !e.location && !e.desc && /google\.com/i.test(String((f && f.url) || ''));
+}
 async function syncOne(f) {
   const c = CAL[f.id] = CAL[f.id] || { events: [] };
   c.lastAttempt = Date.now();
@@ -5093,7 +5103,7 @@ async function syncOne(f) {
     if (!res.ok) { let j = {}; try { j = await res.json(); } catch (e) { } throw fail(j.error || 'relay'); }
     const text = await res.text();
     let r; try { r = CalImport.parseFeed(text); } catch (e) { throw fail('parse'); }
-    Object.assign(c, { events: r.events, count: r.count, calName: r.calName, syncedAt: Date.now(), error: null });
+    Object.assign(c, { events: r.events.filter(e => !calBusy(e, f)), count: r.count, calName: r.calName, syncedAt: Date.now(), error: null });
   } catch (e) { c.error = e.code || 'relay'; }
   finally { syncingNow.delete(f.id); }
 }
@@ -5104,6 +5114,7 @@ function extEvents(fromT, toT) {
   S.feeds.forEach(f => {
     const c = CAL[f.id]; if (!c || !c.events) return;
     c.events.forEach(e => {
+      if (calBusy(e, f)) return;
       if (e.birthday && bdayMatch(e)) return; // already in Birthdays, don't show it twice
       if (holDup(e, hol)) return; // already shown as a built-in public holiday
       const s = parseD(e.date), en = Math.min(parseD(e.endDate || e.date) || s, s + 62 * DAY);
@@ -14324,7 +14335,7 @@ function diaryAppts(iso) {
     const evs = CAL[f.id] && CAL[f.id].events;
     if (!Array.isArray(evs)) return;
     evs.forEach(e => {
-      if (!e || !String(e.title || '').trim() || parseD(e.date) == null) return;
+      if (!e || calBusy(e, f) || !String(e.title || '').trim() || parseD(e.date) == null) return;
       if (e.birthday && bdayMatch(e)) return;
       const start = parseD(e.date), en = parseD(e.endDate || e.date);
       const end = en == null ? start : Math.max(start, en);
