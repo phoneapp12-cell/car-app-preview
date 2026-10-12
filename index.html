@@ -1361,22 +1361,18 @@ html[data-theme="dark"] .row.cucat,html[data-theme="night"] .row.cucat{backgroun
 
 /* 2.23.28: Krea art mascot. The picture replaces the SVG; moods are CSS on the picture */
 .hcat.hkrea>svg{display:none}
-.hcat .kimg{position:absolute;left:30px;top:6px;width:84px;height:84px;object-fit:contain;pointer-events:none;transform-origin:50% 95%;transition:filter .9s,transform .9s;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}
-.hcat.mprev .kimg{position:static;width:100%;height:100%}
-.hcat .kimg.klife{left:34px;top:0;width:78px;height:94px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))}
-.hcat.mprev .kimg.klife{position:static;width:100%;height:100%}
 .hcat .kz{position:absolute;left:96px;top:0;font:800 13px/1 system-ui,sans-serif;color:#7C8DB5;pointer-events:none}
 .hcat .kz i{position:absolute;font-style:normal;opacity:0}
 .hcat .kz i:nth-child(2){left:7px;top:-8px;font-size:15px}.hcat .kz i:nth-child(3){left:15px;top:-18px;font-size:18px}
-.hcat.hkrea.cat-energetic .kimg{animation:catBounce .7s ease-in-out infinite}
-.hcat.hkrea.cat-alert .kimg{animation:kTilt 6s ease-in-out infinite}
-.hcat.hkrea.cat-tired .kimg{filter:saturate(.85) drop-shadow(0 2px 3px rgba(0,0,0,.15));animation:kSway 5s ease-in-out infinite}
-.hcat.hkrea.cat-drowsy .kimg{filter:saturate(.7) brightness(.93) drop-shadow(0 2px 3px rgba(0,0,0,.15));animation:kNod 6s ease-in-out infinite}
-.hcat.hkrea.cat-sleep .kimg{filter:saturate(.5) brightness(.8) drop-shadow(0 2px 3px rgba(0,0,0,.15));transform:rotate(-8deg) translateY(4px) scale(.92);animation:kBreath 4s ease-in-out infinite}
+.hcat.hkrea.cat-energetic .kwrap{animation:catBounce .7s ease-in-out infinite}
+.hcat.hkrea.cat-alert .kwrap{animation:kTilt 6s ease-in-out infinite}
+.hcat.hkrea.cat-tired .kwrap{filter:saturate(.85) drop-shadow(0 2px 3px rgba(0,0,0,.15));animation:kSway 5s ease-in-out infinite}
+.hcat.hkrea.cat-drowsy .kwrap{filter:saturate(.7) brightness(.93) drop-shadow(0 2px 3px rgba(0,0,0,.15));animation:kNod 6s ease-in-out infinite}
+.hcat.hkrea.cat-sleep .kwrap{filter:saturate(.5) brightness(.8) drop-shadow(0 2px 3px rgba(0,0,0,.15));transform:rotate(-8deg) translateY(4px) scale(.92);animation:kBreath 4s ease-in-out infinite}
 .hcat.hkrea.cat-sleep .kz i{animation:kZ 3.6s ease-in-out infinite}.hcat.hkrea.cat-sleep .kz i:nth-child(2){animation-delay:1.2s}.hcat.hkrea.cat-sleep .kz i:nth-child(3){animation-delay:2.4s}
-.hcat.hkrea.react:not(.cat-sleep) .kimg{animation:kHop 1.1s ease-in-out}
-.hcat.hkrea.react.cat-sleep .kimg{animation:kStir 1.1s ease-in-out}
-.hcat.hkrea.tapping .kimg{animation:kTapA .55s ease-in-out 2}
+.hcat.hkrea.react:not(.cat-sleep) .kwrap{animation:kHop 1.1s ease-in-out}
+.hcat.hkrea.react.cat-sleep .kwrap{animation:kStir 1.1s ease-in-out}
+.hcat.hkrea.tapping .kwrap{animation:kTapA .55s ease-in-out 2}
 @keyframes kTilt{0%,70%,100%{transform:rotate(0)}78%,90%{transform:rotate(-7deg)}}
 @keyframes kSway{0%,100%{transform:rotate(0)}50%{transform:rotate(3deg) translateY(1px)}}
 @keyframes kNod{0%,60%,100%{transform:rotate(0)}70%,85%{transform:rotate(6deg) translateY(3px)}}
@@ -1385,7 +1381,30 @@ html[data-theme="dark"] .row.cucat,html[data-theme="night"] .row.cucat{backgroun
 @keyframes kHop{0%,100%{transform:none}25%{transform:translateY(-8px) scale(1.04,.97)}50%{transform:translateY(0) scale(1.05,.95)}75%{transform:rotate(-5deg)}}
 @keyframes kStir{0%,100%{transform:rotate(-8deg) translateY(4px) scale(.92)}40%{transform:rotate(-3deg) translateY(2px) scale(.94)}}
 @keyframes kTapA{0%,100%{transform:none}50%{transform:rotate(-10deg) translate(-4px,2px)}}
-@media (prefers-reduced-motion:reduce){.hcat.hkrea .kimg,.hcat.hkrea .kz i{animation:none!important}.hcat.hkrea.cat-sleep .kz i{opacity:.8}}
+@media (prefers-reduced-motion:reduce){.hcat.hkrea .kwrap,.hcat.hkrea .kz i{animation:none!important}.hcat.hkrea.cat-sleep .kz i{opacity:.8}}
+/* 2.23.30: bigger picture mascots (about 1.5x), dog tail as its own layer, cat meow */
+.top:has(.hcat.hkrea){min-height:150px}
+.top:has(.hcat.hkrea) .sub{max-width:calc(100% - 128px)}
+.hcat.hkrea{width:150px;height:146px;top:-12px;right:40px}
+.hcat .kwrap{position:absolute;right:6px;top:0;width:126px;height:144px;display:grid;grid-template:100% / 100%;justify-items:center;align-items:end;pointer-events:none;transform-origin:50% 95%;transition:filter .9s,transform .9s;filter:drop-shadow(0 2px 4px rgba(0,0,0,.22))}
+.hcat .kwrap img{grid-area:1/1;height:100%;width:auto;max-width:100%;object-fit:contain;pointer-events:none}
+.hcat .kwrap .ktail{transform-origin:22% 87.3%}
+.hcat.mprev .kwrap{position:static;width:100%;height:100%;filter:none}
+.hcat.hkrea .kz{left:auto;right:4px;top:6px;font-size:16px}
+.hcat.hkrea .cbub{left:auto;right:96px;top:70px}
+.hcat.hkrea.cat-energetic .ktail{animation:kWag .38s ease-in-out infinite alternate}
+.hcat.hkrea.cat-alert .ktail{animation:kWagBurst 3.2s ease-in-out infinite}
+.hcat.hkrea.cat-tired .ktail{animation:kWag 1.1s ease-in-out infinite alternate}
+.hcat.hkrea.cat-drowsy .ktail{animation:kWag 2.4s ease-in-out infinite alternate}
+.hcat.hkrea.cat-sleep .ktail{animation:none;transform:rotate(-6deg)}
+.hcat.hkrea.react:not(.cat-sleep) .ktail,.hcat.hkrea.tapping .ktail{animation:kWag .16s ease-in-out 10 alternate}
+.hcat.hkrea.hdog:not(:has(.ktail)).react:not(.cat-sleep) .kwrap{animation:kWiggle .9s ease-in-out}
+.hcat.hkrea:not(.hdog).react:not(.cat-sleep) .kwrap{animation:kMeow .9s ease-in-out}
+@keyframes kWag{from{transform:rotate(-16deg)}to{transform:rotate(14deg)}}
+@keyframes kWagBurst{0%,45%,100%{transform:rotate(0)}50%,60%,70%{transform:rotate(-15deg)}55%,65%,75%{transform:rotate(13deg)}}
+@keyframes kWiggle{0%,100%{transform:none}15%,45%,75%{transform:rotate(-4deg) translateX(-2px)}30%,60%,90%{transform:rotate(4deg) translateX(2px)}}
+@keyframes kMeow{0%,100%{transform:none}20%{transform:translateY(-4px) rotate(-4deg) scale(1.03)}45%{transform:translateY(-2px) rotate(-6deg) scale(1.05,1.02)}70%{transform:rotate(-2deg)}}
+@media (prefers-reduced-motion:reduce){.hcat.hkrea .ktail{animation:none!important}}
 </style>
 </head>
 <body>

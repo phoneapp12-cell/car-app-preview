@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.29';
+const APP_VERSION = '2.23.30';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9069,8 +9069,39 @@ function mascotPicker() {
   return `<div class="list" id="mascotpick" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Mascot</div><div class="s">The ${cur} next to Notifications. Its mood follows the time of day.</div></div>
     <div class="seg mascotseg" role="radiogroup" aria-label="Mascot" style="width:100%">${Object.keys(MASCOTS).map(k => `<button type="button" class="${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-mascot="${k}" onclick="setMascot('${k}')">${mascotMini(k)}<span>${MASCOTS[k].name}</span></button>`).join('')}</div>
     <div class="tx" style="flex-basis:100%;margin-top:10px"><div class="t">Style</div><div class="s">${MASCOT_ARTS.find(x => x[0] === mascotArt())[2]}</div></div>
-    <div class="seg mascotseg" id="mascotart" role="radiogroup" aria-label="Mascot style" style="width:100%">${MASCOT_ARTS.map(([a, l]) => `<button type="button" class="${a === mascotArt() ? 'on' : ''}" role="radio" aria-checked="${a === mascotArt()}" data-art="${a}" onclick="setMascotArt('${a}')">${mascotMini(mascotKey(), a)}<span>${l}</span></button>`).join('')}</div></div></div>`;
+    <div class="seg mascotseg" id="mascotart" role="radiogroup" aria-label="Mascot style" style="width:100%">${MASCOT_ARTS.map(([a, l]) => `<button type="button" class="${a === mascotArt() ? 'on' : ''}" role="radio" aria-checked="${a === mascotArt()}" data-art="${a}" onclick="setMascotArt('${a}')">${mascotMini(mascotKey(), a)}<span>${l}</span></button>`).join('')}</div>
+    <label class="tx" style="flex-basis:100%;margin-top:12px;display:flex;align-items:center;gap:10px"><div style="flex:1"><div class="t">Sounds</div><div class="s">A meow or a soft woof when you tap the ${mascotKey()}. Never on its own.</div></div><input type="checkbox" id="mascotsound" ${mascotSoundOn() ? 'checked' : ''} onchange="setMascotSound(this.checked)"></label></div></div>`;
 }
+/* 2.23.30: mascot sounds, made with WebAudio (no recordings): a short meow for the cat, a soft woof for the dog.
+   Only when tapped, never by itself. Settings › Mascot › Sounds (on by default). */
+const mascotSoundOn = () => !(S && S.settings && S.settings.mascotSound === false);
+let mAudio = null;
+function mascotSound(k) {
+  if (!mascotSoundOn()) return;
+  try {
+    mAudio = mAudio || new (window.AudioContext || window.webkitAudioContext)(); const ac = mAudio; if (ac.state === 'suspended') ac.resume();
+    const t = ac.currentTime + 0.02, out = ac.createGain(); out.gain.value = 0.9; out.connect(ac.destination);
+    if (k === 'cat') {
+      const o = ac.createOscillator(), vib = ac.createOscillator(), vg = ac.createGain(), g = ac.createGain(), f1 = ac.createBiquadFilter(), f2 = ac.createBiquadFilter(), mix = ac.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(430, t); o.frequency.linearRampToValueAtTime(760, t + 0.16); o.frequency.linearRampToValueAtTime(620, t + 0.38); o.frequency.exponentialRampToValueAtTime(360, t + 0.66);
+      vib.frequency.value = 7; vg.gain.value = 9; vib.connect(vg); vg.connect(o.frequency);
+      f1.type = 'bandpass'; f1.Q.value = 5; f1.frequency.setValueAtTime(650, t); f1.frequency.linearRampToValueAtTime(1150, t + 0.2); f1.frequency.linearRampToValueAtTime(750, t + 0.66); // "m-ee-ow" vowel
+      f2.type = 'bandpass'; f2.Q.value = 7; f2.frequency.setValueAtTime(1700, t); f2.frequency.linearRampToValueAtTime(2300, t + 0.2); f2.frequency.linearRampToValueAtTime(1100, t + 0.66);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.06); g.gain.setValueAtTime(0.5, t + 0.32); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+      o.connect(f1); o.connect(f2); f1.connect(mix); f2.connect(mix); mix.gain.value = 0.9; mix.connect(g); g.connect(out);
+      o.start(t); vib.start(t); o.stop(t + 0.75); vib.stop(t + 0.75);
+    } else {
+      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(210, t); o.frequency.exponentialRampToValueAtTime(95, t + 0.2);
+      lp.type = 'lowpass'; lp.frequency.setValueAtTime(1100, t); lp.frequency.exponentialRampToValueAtTime(300, t + 0.2); lp.Q.value = 3;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.45, t + 0.025); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      const n = ac.createBufferSource(), buf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.12), ac.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      const ng = ac.createGain(); ng.gain.value = 0.12; n.buffer = buf; n.connect(lp);
+      o.connect(lp); lp.connect(g); g.connect(out); o.start(t); o.stop(t + 0.3); n.start(t);
+    }
+  } catch (e) { }
+}
+async function setMascotSound(on) { const s = snap(); S.settings.mascotSound = !!on; await save(); render(); toast(on ? 'Mascot sounds on.' : 'Mascot sounds off.', 'Undo', undoTo(s)); if (on) mascotSound(mascotKey()); }
 async function setMascotArt(a) {
   if (!MASCOT_ARTS.some(x => x[0] === a) || a === mascotArt()) return;
   const s = snap(); S.settings.mascotArt = a; await save(); render();
@@ -14125,7 +14156,10 @@ const mascotKey = () => { const k = S && S.settings && S.settings.mascot; return
 // 2.23.29: 'life' = lifelike photo (mascot/<k>-life.webp, Krea 2 Large, background removed)
 const MASCOT_ARTS = [['svg', 'Drawn', 'Drawn: the original moving drawing'], ['krea', 'Krea art', 'Krea art: a cartoon picture made with Krea'], ['life', 'Lifelike', 'Lifelike: a photo-style picture made with Krea']];
 const mascotArt = () => { const a = S && S.settings && S.settings.mascotArt; return a === 'krea' || a === 'life' ? a : 'svg'; };
-const kreaImg = (k, a) => `<img class="kimg${(a || mascotArt()) === 'life' ? ' klife' : ''}" alt="" src="mascot/${k}-${(a || mascotArt()) === 'life' ? 'life' : 'krea'}.webp" onerror="this.parentNode.classList.remove('hkrea');this.remove()">`;
+const kreaImg = (k, a) => { const life = (a || mascotArt()) === 'life', oe = `onerror="const h=this.closest('.hcat');if(h)h.classList.remove('hkrea')"`;
+  // 2.23.30: the Lifelike dog's tail is its own picture (cut from the photo), drawn behind the body and rotated at its base
+  if (life && k === 'dog') return `<span class="kwrap"><img class="ktail" alt="" src="mascot/dog-life-tail.webp" ${oe}><img class="kimg klife" alt="" src="mascot/dog-life-body.webp" ${oe}></span>`;
+  return `<span class="kwrap"><img class="kimg${life ? ' klife' : ''}" alt="" src="mascot/${k}-${life ? 'life' : 'krea'}.webp" ${oe}></span>`; };
 function catHtml() {
   const st = catState(), k = mascotKey(), m = MASCOTS[k];
   const img = m.img ? `<img class="mimg" alt="" src="${m.img}${st}.webp" onload="this.parentNode.classList.add('hasimg')" onerror="this.parentNode.classList.remove('hasimg');this.remove()">` : '';
@@ -14225,7 +14259,9 @@ function catPoke(e) {
   catTick();
   const st = catState(), bub = el.querySelector('.cbub');
   const says = MASCOTS[mascotKey()].says[st];
-  if (bub) bub.textContent = says[Math.floor(Math.random() * says.length)];
+  const kk = mascotKey();
+  if (bub) bub.textContent = kk === 'cat' && st !== 'sleep' ? 'Meow!' : says[Math.floor(Math.random() * says.length)];
+  if (e && st !== 'sleep') mascotSound(kk); // only on a real tap, never on its own
   el.classList.remove('react'); void el.offsetWidth; el.classList.add('react');
   clearTimeout(catPokeT); catPokeT = setTimeout(() => el.classList.remove('react'), 1600);
 }
