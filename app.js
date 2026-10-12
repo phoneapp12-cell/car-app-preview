@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.26';
+const APP_VERSION = '2.23.27';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4560,12 +4560,13 @@ function claimSheet(ref) {
 
 
 /* ================= EMAIL CLAIM (2.23.26) =================
-   Lists health invoice emails with a PDF from the last 2 months: Central Family Health (Admin@centralfamily.co.nz),
+   Lists health invoice emails with a PDF from the last 3 months (from the 1st of the month 3 months back): Central Family Health (Admin@centralfamily.co.nz),
    Tui Chiropractic (its Cliniko invoices come from notifications@cliniko.com as "Tui Chiropractic (via Cliniko)", news
    from info@tuichiropractic.co.nz) and any dentist (e.g. reception@tikipungadentalcentre.nz). Read-only, on this phone:
    Outlook with Mail.Read, Gmail with gmail.readonly when connected. Picking one fills in the claim and keeps the PDF on
    this phone to share or save into Smart Claim. Nothing is ever sent. */
-const EC_DAYS = 62;
+const ecSince = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() - 3, 1); };
+const ecDays = () => Math.ceil((Date.now() - ecSince()) / DAY) + 1;
 const EC_SOURCES = [
   { k: 'cfh', provider: 'Central Family Health Care', reason: 'GP / doctor visit', test: m => /@centralfamily\.co\.nz$/i.test(m.addr) || /central\s*family|\bcfhc?\b/i.test(m.name + ' ' + m.subject) },
   { k: 'tui', provider: 'Tui Chiropractic', reason: 'Chiropractic treatment', test: m => /@tuichiropractic\.co\.nz$/i.test(m.addr) || /\btui\s*chiro/i.test(m.name + ' ' + m.subject) },
@@ -4577,7 +4578,7 @@ const ecProviderName = (src, m) => src.provider || String(m.name || '').replace(
 let ecList = null, ecBusy = false, ecErr = '', ecCtx = null;
 async function ecOutlook() {
   if (!mailConnected('microsoft')) return [];
-  const since = new Date(Date.now() - EC_DAYS * DAY).toISOString();
+  const since = ecSince().toISOString();
   let url = 'https://graph.microsoft.com/v1.0/me/messages?$filter=' + encodeURIComponent(`receivedDateTime ge ${since} and hasAttachments eq true`) + '&$orderby=receivedDateTime%20desc&$top=100&$select=id,subject,from,receivedDateTime,bodyPreview';
   let token = await mailAccess('microsoft'); const out = [];
   for (let page = 0; url && page < 4; page++) {
@@ -4594,7 +4595,7 @@ async function ecOutlook() {
 async function ecGmail() {
   if (!mailConnected('google')) return [];
   const token = await mailAccess('google');
-  const q = `has:attachment filename:pdf newer_than:${EC_DAYS}d (from:centralfamily.co.nz OR from:cliniko.com OR from:tuichiropractic.co.nz OR dental OR dentist OR "Central Family" OR "Tui Chiropractic")`;
+  const q = `has:attachment filename:pdf newer_than:${ecDays()}d (from:centralfamily.co.nz OR from:cliniko.com OR from:tuichiropractic.co.nz OR dental OR dentist OR "Central Family" OR "Tui Chiropractic")`;
   const list = await getJSONAuth('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=' + encodeURIComponent(q), token);
   const out = [];
   for (const it of (list.messages || []).slice(0, 15)) {
@@ -4649,8 +4650,8 @@ function ecParse(text) {
 }
 function ecSheetHtml() {
   if (!mailConnected('microsoft') && !mailConnected('google')) return `<p class="muted">Connect Outlook (or Gmail) in Settings › Email first. The app reads mail on this phone only.</p>`;
-  if (ecBusy || !ecList) return `<p class="muted" id="ecwait">Looking through the last 2 months of email…</p>`;
-  if (!ecList.length) return `<p class="muted" id="ecnone">No invoice PDFs from Central Family Health, Tui Chiropractic or a dentist in the last 2 months${mailConnected('google') ? ' (Outlook and Gmail checked)' : ' (Outlook checked)'}.</p>${ecErr ? `<p class="muted">${esc(ecErr)}</p>` : ''}`;
+  if (ecBusy || !ecList) return `<p class="muted" id="ecwait">Looking through the last 3 months of email…</p>`;
+  if (!ecList.length) return `<p class="muted" id="ecnone">No invoice PDFs from Central Family Health, Tui Chiropractic or a dentist in the last 3 months${mailConnected('google') ? ' (Outlook and Gmail checked)' : ' (Outlook checked)'}.</p>${ecErr ? `<p class="muted">${esc(ecErr)}</p>` : ''}`;
   return `<div class="list" id="eclist">${ecList.flatMap((m, i) => m.pdfs.map((a, j) => `<div class="row ecrow"><div class="ic health">${I('doc')}</div><div class="tx" style="flex:1;min-width:0"><div class="t">${esc(ecProviderName(m.src, m))}</div>
     <div class="s">${esc(fmtW(String(m.at).slice(0, 10)))} · ${esc(m.subject)}</div><div class="s ecpdf">${esc(a.name)}</div></div>
     <div class="ecbtns"><button type="button" class="btn small" aria-label="Preview PDF" onclick="ecPreview(${i},${j})">${I('eye')} View</button><button type="button" class="btn small primary" onclick="ecPick(${i},${j})">Use</button></div></div>`)).join('')}</div>
@@ -4756,7 +4757,7 @@ function Claims() {
   return header('UniMed claims', todo.length ? plural(todo.length, 'claim') + ' to make' + (sent.length ? ' · ' + sent.length + ' waiting' : '') : sent.length ? sent.length + ' waiting on UniMed' : 'All caught up', `<button class="iconbtn add" aria-label="New claim" onclick="claimSheet('new')">${I('plus')}</button>`) +
     `<div class="card cltipcard"><div class="cltip" style="margin:0 0 10px">${I('info')}<div>Claims are made in UniMed’s Smart Claim portal: policy, patient, provider, reason, visit date, amount paid, and a photo of the <b>itemised invoice</b> (not the EFTPOS receipt). At least $${CLAIM_MIN}. Drafts keep for 30 days there.</div></div>
       <div class="btns"><a class="btn primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a><a class="btn" href="tel:0800600666">${I('phone')} 0800 600 666</a></div>
-      <div class="btns" style="margin-top:8px"><button class="btn" id="ecopen" onclick="emailClaim('new')">${I('mail')} Email claim: invoices from CFH, Tui Chiropractic, dentist</button></div></div>` +
+      <div class="btns" style="margin-top:8px"><button class="btn" id="ecopen" onclick="emailClaim('new')">${I('mail')} Email claim: last 3 months of CFH, Tui Chiropractic, dentist invoices</button></div></div>` +
     `<div class="sec">To claim</div>` + (todo.length ? `<div class="list" id="claimtodo">${todo.map(claimRowHtml).join('')}</div>` : `<div class="card empty"><div class="t">Nothing to claim</div><div class="s">Health appointments (yours and Sarah’s) show here after the visit. Tap + for anything else.</div></div>`) +
     (sent.length ? `<div class="sec">Submitted</div><div class="list">${sent.map(claimRowHtml).join('')}</div>` : '') +
     (paid.length ? `<details class="spast"><summary>Paid (${paid.length}${paidSum ? ' · ' + claimMoney(paidSum.toFixed(2)) + ' back' : ''})</summary><div class="list">${paid.map(claimRowHtml).join('')}</div></details>` : '') +
