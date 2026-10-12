@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.32';
+const APP_VERSION = '2.23.33';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13820,6 +13820,7 @@ async function refreshKora(force) {
    after it arrived. Sorted by soonest end, expired ones drop off by themselves. Only the parsed lines are kept. */
 const ER_FROM = 'promotions@comms.everydayrewards.co.nz';
 const ER_SKIP = /(protection|password|sign.?in|security|verify|verification|\bcode\b|account details|update your details)/i;
+const ER_PARTNER = /(g\.a\.s\.|\bgas\b station|freshchoice|fresh choice|milkrun|\bpartners?\b|skinny|\bbp\b|petstock|\basb\b|aia|vitality|\bfuel\b|per litre|qantas|airpoints|mastercard|credit card)/i;
 const ER_MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
 let ER = null, erBusy = false, erAt = 0, erMore = false;
 const erOn = () => S.settings.erPromos !== false;
@@ -13857,7 +13858,11 @@ function erParse(subject, html, recvISO, webLink) {
   for (const a of doc.querySelectorAll('a[href]')) { const t = (a.textContent || '').replace(/\s+/g, ' ').trim(); if (/^(boost( now| offer| all)?|activate|shop now|order now|get started|find out more)$/i.test(t)) { link = a.getAttribute('href'); break; } }
   if (link && !/^https:\/\//i.test(link)) link = '';
   const sum = subject.replace(/^\s*[A-Z][a-z]+,\s+/, '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F]/gu, '').replace(/\s+/g, ' ').trim();
-  return { sum: (sum.charAt(0).toUpperCase() + sum.slice(1)).slice(0, 110), end, boost, link, web: webLink && /^https:\/\//.test(webLink) ? webLink : '', at: recvISO || '' };
+  // 2.23.33: Shane only wants Countdown offers. Countdown is now Woolworths NZ; the emails say "Woolworths" (and "Woolies").
+  // A Countdown offer names Woolworths/Countdown in the subject or the opening lines and isn't a partner deal.
+  const lead = (() => { const i = text.indexOf('Kia ora'); return i < 0 ? text.slice(0, 500) : text.slice(i, i + 400); })();
+  const cd = /\b(woolworths|countdown|woolies)\b/i.test(subject + ' ' + lead) && !ER_PARTNER.test(subject + ' ' + lead.slice(0, 160));
+  return { cd, sum: (sum.charAt(0).toUpperCase() + sum.slice(1)).slice(0, 110), end, boost, link, web: webLink && /^https:\/\//.test(webLink) ? webLink : '', at: recvISO || '' };
 }
 async function erOutlook() {
   const since = new Date(Date.now() - 45 * DAY).toISOString();
@@ -13892,13 +13897,13 @@ async function refreshEr(force) {
     if (had !== JSON.stringify(list) && !sheetOpen && ((location.hash || '#home') === '#home' || location.hash === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
   } finally { erBusy = false; }
 }
-const erLive = () => (ER && ER.list || []).filter(p => p.end >= todayISO()).sort((a, b) => a.end.localeCompare(b.end) || String(b.at).localeCompare(String(a.at)));
+const erLive = () => (ER && ER.list || []).filter(p => p.cd && p.end >= todayISO()).sort((a, b) => a.end.localeCompare(b.end) || String(b.at).localeCompare(String(a.at)));
 function erCard() {
   if (!erOn()) return '';
   const all = erLive(); if (!all.length) return '';
   const show = erMore ? all : all.slice(0, 3);
   const endTxt = e => { const d = daysLeft(e); return d === 0 ? 'Ends today' : d === 1 ? 'Ends tomorrow' : 'Ends ' + fmtW(e); };
-  return `<div class="card ercard" id="ercard"><div class="erh"><b>Everyday Rewards</b><span class="muted">${all.length} offer${all.length === 1 ? '' : 's'}</span></div>
+  return `<div class="card ercard" id="ercard"><div class="erh"><b>Countdown rewards</b><span class="muted">${all.length} offer${all.length === 1 ? '' : 's'}</span></div>
     ${show.map(p => `<a class="errow" href="${esc(p.link || p.web)}" target="_blank" rel="noopener"><div class="tx"><div class="t">${esc(p.sum)}</div><div class="s"><span class="${daysLeft(p.end) <= 2 ? 'erend soon' : 'erend'}">${endTxt(p.end)}</span>${p.boost ? ' · <span class="erboost">Boost first</span>' : ''}</div></div>${p.web && p.link ? `<span class="ermail" role="link" tabindex="0" onclick="event.preventDefault();event.stopPropagation();window.open('${esc(p.web)}','_blank','noopener')">Email</span>` : ''}</a>`).join('')}
     ${all.length > 3 ? `<button class="linkbtn" id="ermore" onclick="erMore=!erMore;render()">${erMore ? 'Less' : 'More (' + (all.length - 3) + ')'}</button>` : ''}</div>`;
 }
@@ -14474,7 +14479,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Everyday Rewards offers</div><div class="s">A card near the top with the offers from Everyday Rewards emails, soonest ending first. Expired ones drop off.</div></div><button class="switch ${erOn() ? 'on' : ''}" role="switch" aria-checked="${erOn()}" aria-label="Everyday Rewards offers" id="ersw" onclick="toggleSetting('erPromos', ${!erOn()}).then(() => refreshEr(true))"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Countdown rewards</div><div class="s">A card near the top with Countdown (Woolworths) offers from your Everyday Rewards emails, soonest ending first. Fuel, FreshChoice, MILKRUN and other partner offers are left out. Hidden when there are none.</div></div><button class="switch ${erOn() ? 'on' : ''}" role="switch" aria-checked="${erOn()}" aria-label="Countdown rewards" id="ersw" onclick="toggleSetting('erPromos', ${!erOn()}).then(() => refreshEr(true))"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
   </div>
   <div class="sec">Places</div>
