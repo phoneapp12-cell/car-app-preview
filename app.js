@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.14';
+const APP_VERSION = '2.23.15';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1651,7 +1651,7 @@ function homeSugCar() {
 function homeSugEvent() {
   try {
     if (typeof upcomingEvents !== 'function' || !EVS) return null;
-    const list = upcomingEvents().filter(e => e && e.title && !evAppt(e.id) && daysLeft(e.date) >= 0 && daysLeft(e.date) <= 7 && !isWhangareiGrowersMarket(e));
+    const list = upcomingEvents().filter(e => e && e.title && !evAppt(e.id) && daysLeft(e.date) >= 0 && daysLeft(e.date) <= 7 && !isWhangareiGrowersMarket(e) && !evDuringWork(e));
     if (!list.length) return null;
     const likes = /\b(tech|technology|gadget|garden|gardening|plant|music|food|gluten|cooking|science|ai)\b/i;
     const a = homeAklParts();
@@ -3464,6 +3464,14 @@ function homeNight(now = new Date()) {
 }
 const NIGHT_KEYS = ['news', 'blogging', 'videos', 'events', 'tv', 'top40', 'travel', 'ideas'];
 const NIGHT_CARD = {
+  events: () => {
+    const nl = nightlifeSoon(7, 4), ids = new Set(nl.map(e => e.id));
+    const rest = upcomingEvents().filter(e => !ids.has(e.id) && !evDuringWork(e) && !(e.cats || []).includes('Movies')).slice(0, Math.max(0, 5 - nl.length));
+    const row = e => `<button class="row" onclick="go('#events')"><div class="ic ev">${I(isNightlife(e) ? 'music' : 'ticket')}</div><div class="tx"><div class="t">${esc(e.title)}</div>
+      <div class="s">${daysLeft(e.date) === 0 ? 'Tonight' : fmtW(e.date)}${e.time ? ' · ' + fmtTime(e.time) : ''}${e.venue ? ' · ' + esc(e.venue.split(',')[0]) : ''}${isNightlife(e) && e.cats[1] ? ' · ' + esc(e.cats[1]) : ''}</div></div>${evAppt(e.id) ? '<span class="pill fine">Added</span>' : ''}</button>`;
+    if (!nl.length && !rest.length) return HOME_CARD.events();
+    return `<div class="sec">${nl.length ? 'Nightlife &amp; what’s on' : 'What’s on in Whangārei'} <a href="#events">All events</a></div><div class="list" id="homenight">${nl.concat(rest).map(row).join('')}</div>`;
+  },
   videos: () => {
     if (homeOn('videos')) return HOME_CARD.videos();
     const sarah = currentSarahVideo();
@@ -3549,6 +3557,9 @@ const CU_EXTRA = {
   // Gym nights (Tuesday and Wednesday after work), today and tomorrow
   gym: T => [0, 1].filter(n => { const w = new Date(T + n * DAY).getUTCDay(); return w === 2 || w === 3; }).map(n => ({ days: n, rank: 1, sort: '18:15', kind: 'gym', name: 'Gym',
     html: attRow({ kind: 'gym', date: isoT(T + n * DAY), go: `go('#gym')`, ic: 'health', icon: 'heart', title: 'Gym' + (n ? '' : ' tonight'), sub: `After work · Day ${new Date(T + n * DAY).getUTCDay() === 3 ? 'B' : 'A'}` }) })),
+  // Nightlife in the next 3 days that isn't during a shift (a few, lowest priority)
+  night: T => nightlifeSoon(3, 3).map(e => { const d = daysLeft(e.date); return { days: d, rank: 3, sort: e.time || '', kind: 'night', name: e.title,
+    html: attRow({ kind: 'night', date: e.date, go: `go('#events')`, ic: 'ev', icon: 'music', title: esc(e.title) + (e.time ? ' ' + fmtTime(e.time) : ''), sub: `${esc((e.cats && e.cats[1]) || 'Nightlife')} · ${esc(String(e.venue || '').split(',')[0])}` }) }; }),
   // Next payday
   pay: T => { const ds = paydays(); if (!ds) return []; const nx = ds.find(d => d >= todayISO()); if (!nx) return []; const d = daysLeft(nx); if (d > CU_DAYS) return [];
     return [{ days: d, rank: 2, sort: '', kind: 'pay', name: 'Payday', html: attRow({ kind: 'pay', date: nx, go: `go('#bills')`, ic: 'bill', icon: 'cash', title: 'Payday', sub: `Pay day · ${fmtW(nx)}` }) }]; },
@@ -10718,7 +10729,7 @@ const WDC_WHATSON = 'https://www.wdc.govt.nz/Events/Whats-On';
 let EVS = null, evBusy = false, evFailed = false, evQuery = '', evCat = 'All';
 function loadEvs() { try { const e = JSON.parse(localStorage.getItem('events') || 'null'); EVS = e && e.at && e.data && Array.isArray(e.data.events) ? e : null; } catch (x) { EVS = null; } }
 async function refreshEvents(force = false) {
-  const thin = EVS && !(EVS.data.events || []).some(e => (e.cats || []).includes('Movies'));
+  const thin = EVS && (!(EVS.data.events || []).some(e => (e.cats || []).includes('Movies')) || !EVS.data.sources); // 2.23.15: older saved lists have no nightlife
   if (evBusy || (!force && EVS && Date.now() - EVS.at < EV_MAX_AGE && !thin)) return;
   if (!RELAY_URL) { evFailed = true; updEvents(); return; }
   evBusy = true; if (force) updEvents();
@@ -10750,6 +10761,29 @@ function upcomingEvents() {
   return EVS.data.events.filter(e => !isSilverFestival(e) && (e.end || e.date) >= T && !(e.date === T && !e.end && e.endTime && e.endTime <= hm))
     .map(e => e.date < T ? Object.assign({}, e, { date: T }) : e);
 }
+/* 2.23.15: nightlife (gigs, comedy, theatre, quiz and DJ nights, night markets) comes from Eventfinda via the relay.
+   Work rule: an event is only left out of Home, the night feed and Coming up when its time overlaps a roster shift
+   (start to finish from Settings › About you › roster; if a finish isn't set: Thursday 7:15pm, Sunday 7pm, others 6pm).
+   Events after work always show. Untimed events are never dropped. The Events tab lists everything and marks clashes. */
+const isNightlife = e => !!(e && Array.isArray(e.cats) && e.cats.includes('Nightlife'));
+function evShift(iso) {
+  try {
+    const r = rosterState(), dow = String(new Date(parseD(iso)).getUTCDay()), st = r.days[dow];
+    if (!st) return null;
+    const en = r.ends[dow] || (dow === '4' ? '19:15' : dow === '0' ? '19:00' : '18:00');
+    return { start: st, end: en };
+  } catch (e) { return null; }
+}
+function evDuringWork(e) {
+  if (!e || !e.time) return false;
+  const sh = evShift(e.date); if (!sh) return false;
+  const toM = hm => +hm.slice(0, 2) * 60 + +hm.slice(3, 5);
+  const a = toM(e.time), b = e.endTime && toM(e.endTime) > a ? toM(e.endTime) : a + 90;
+  return a < toM(sh.end) && b > toM(sh.start);
+}
+function nightlifeSoon(days = 7, max = 4) {
+  return upcomingEvents().filter(e => isNightlife(e) && daysLeft(e.date) <= days && !evDuringWork(e)).slice(0, max);
+}
 const evById = id => (EVS ? EVS.data.events.find(e => e.id === id && !isSilverFestival(e)) : null);
 const evAppt = id => S.appts.find(a => a.evId === id);
 function evWhen(e) {
@@ -10759,7 +10793,7 @@ function evWhen(e) {
 function evCats() {
   const n = {};
   upcomingEvents().forEach(e => (e.cats || []).forEach(c => { n[c] = (n[c] || 0) + 1; }));
-  return Object.keys(n).sort((a, b) => n[b] - n[a] || a.localeCompare(b)).slice(0, 10);
+  return Object.keys(n).sort((a, b) => (b === 'Nightlife') - (a === 'Nightlife') || n[b] - n[a] || a.localeCompare(b)).slice(0, 10);
 }
 function evMatches(e) {
   if (evCat !== 'All' && !(e.cats || []).includes(evCat)) return false;
@@ -10772,7 +10806,7 @@ function evCard(e) {
     ? `<div class="evhead">${growersMarketThumb()}<div class="evt">${esc(e.title)}</div></div>`
     : `<div class="evt">${esc(e.title)}</div>`;
   return `<div class="card evcard" data-ev="${esc(e.id)}">${head}
-    <div class="evm">${I('clock')}<span>${esc(evWhen(e))}${e.end ? ` · until ${fmtW(e.end)}` : ''}</span></div>
+    <div class="evm">${I('clock')}<span>${esc(evWhen(e))}${e.end ? ` · until ${fmtW(e.end)}` : ''}${evDuringWork(e) ? ' · <b class="evclash">during your shift</b>' : ''}</span></div>
     ${e.venue ? `<div class="evm">${I('pin')}<span>${esc(e.venue)}</span></div>` : ''}
     ${e.desc ? `<div class="evd">${esc(e.desc)}</div>` : ''}
     ${(e.cats && e.cats.length) || e.cost ? `<div class="evtags">${(e.cats || []).map(c => `<span>${esc(c)}</span>`).join('')}${e.cost ? `<span class="cost">${esc(e.cost)}</span>` : ''}</div>` : ''}
@@ -11292,7 +11326,7 @@ function Meds() {
 function Events() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
   const head = back + header('Events', 'What’s on in Whangārei · next 60 days');
-  const src = `<a href="${WDC_WHATSON}" target="_blank" rel="noopener">Whangārei District Council’s What’s On</a>, <a href="https://www.eventcinemas.co.nz/Cinema/Whangarei" target="_blank" rel="noopener">Event Cinemas</a> and local markets`;
+  const src = `<a href="${WDC_WHATSON}" target="_blank" rel="noopener">Whangārei District Council’s What’s On</a>, <a href="https://www.eventfinda.co.nz/whatson/events/whangarei" target="_blank" rel="noopener">Eventfinda</a> (gigs, comedy, shows and nightlife), <a href="https://www.eventcinemas.co.nz/Cinema/Whangarei" target="_blank" rel="noopener">Event Cinemas</a> and local markets`;
   const town = `<div class="card" id="towncard"><div class="t" style="font-weight:800;margin-bottom:6px">Around town</div>
     <div class="s">Movies are at Event Cinemas, 18 James Street. CineNexus has been mentioned for Bank Street, but there’s no opening date, so the sessions here are Event’s.</div>
     <div class="s" style="margin-top:6px">Worth a look when something’s on: the Butter Factory at 8 Butter Factory Lane and 1905 for live music, Octagon Theatre and Forum North for shows, Quarry Arts Centre and Reyburn House for art, and McKay Stadium for expos. The Canopy Night Market is Friday evenings at the Town Basin in season.</div></div>` + homeTry('akl concerts', () => aklConcertsCard(), '');

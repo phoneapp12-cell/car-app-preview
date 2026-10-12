@@ -1,4 +1,5 @@
 import { parseCinema, localEvents, CINEMA_SCHEDULE } from './local.js';
+import { getNightlife } from './nightlife.js';
 /* Local events for the Due Dates app: Whangārei District Council "What's On", plus Event Cinemas and local markets (local.js).
  *
  * Source: https://www.wdc.govt.nz/Events/Whats-On (official council listing; robots.txt allows it).
@@ -225,6 +226,13 @@ export async function getFeed(env, fetchImpl = fetch, now = Date.now()) {
   const extra = localEvents(state && state.movies, nzToday(now));
   const ids = new Set(feed.events.map(e => e.id));
   for (const e of extra) if (!ids.has(e.id)) feed.events.push(e);
+  // 2.23.15: nightlife and evening shows from Eventfinda (skipping any the council already lists that night)
+  let night = [];
+  try { night = await getNightlife(env, fetchImpl, now); } catch (e) { night = []; }
+  const tkey = e => e.date + '|' + String(e.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 30);
+  const have = new Set(feed.events.map(tkey));
+  for (const e of night) if (!ids.has(e.id) && !have.has(tkey(e))) feed.events.push(e);
+  feed.sources = [feed.source, { name: 'Eventfinda (gigs, comedy, theatre, nightlife)', url: 'https://www.eventfinda.co.nz/whatson/events/whangarei' }];
   feed.events.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99') || a.title.localeCompare(b.title));
   feed.events = feed.events.slice(0, 700);
   feed.count = feed.events.length;
