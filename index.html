@@ -1328,16 +1328,19 @@ body.tabs-open .btabs{z-index:31}
 .phview .pvbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center}
 .spast{margin:8px 0 12px}
 .spast summary{cursor:pointer;font-weight:700;color:var(--accent,var(--brand));padding:10px 4px;font-size:0.9375rem}
-/* 2.23.19 Coming up colours */
-.cu-car{--cuc:37 99 235}.cu-pet{--cuc:146 92 46}.cu-bday{--cuc:219 39 119}.cu-event{--cuc:124 58 237}.cu-health{--cuc:13 148 136}.cu-todo{--cuc:22 163 74}.cu-gym{--cuc:234 88 12}.cu-hol{--cuc:202 138 4}
-html[data-theme="dark"] .cu-car,html[data-theme="night"] .cu-car{--cuc:96 165 250}html[data-theme="dark"] .cu-pet,html[data-theme="night"] .cu-pet{--cuc:196 146 98}html[data-theme="dark"] .cu-bday,html[data-theme="night"] .cu-bday{--cuc:244 114 182}html[data-theme="dark"] .cu-event,html[data-theme="night"] .cu-event{--cuc:167 139 250}html[data-theme="dark"] .cu-health,html[data-theme="night"] .cu-health{--cuc:45 212 191}html[data-theme="dark"] .cu-todo,html[data-theme="night"] .cu-todo{--cuc:74 222 128}html[data-theme="dark"] .cu-gym,html[data-theme="night"] .cu-gym{--cuc:251 146 60}html[data-theme="dark"] .cu-hol,html[data-theme="night"] .cu-hol{--cuc:250 204 21}
-.row.cucat{background-image:linear-gradient(90deg,rgb(var(--cuc)/.17),rgb(var(--cuc)/.06) 70%,rgb(var(--cuc)/.03));box-shadow:inset 4px 0 0 rgb(var(--cuc))}
+/* 2.23.20 Coming up colours: more vibrant, bills in gold, holidays lime */
+.cu-money{--cuc:217 152 0}.cu-car{--cuc:37 99 235}.cu-pet{--cuc:146 84 30}.cu-bday{--cuc:236 38 132}.cu-event{--cuc:124 58 237}.cu-health{--cuc:13 160 145}.cu-todo{--cuc:22 163 74}.cu-gym{--cuc:240 90 10}.cu-hol{--cuc:120 190 20}
+html[data-theme="dark"] .cu-money,html[data-theme="night"] .cu-money{--cuc:250 196 40}html[data-theme="dark"] .cu-car,html[data-theme="night"] .cu-car{--cuc:96 165 250}html[data-theme="dark"] .cu-pet,html[data-theme="night"] .cu-pet{--cuc:205 150 95}html[data-theme="dark"] .cu-bday,html[data-theme="night"] .cu-bday{--cuc:247 110 180}html[data-theme="dark"] .cu-event,html[data-theme="night"] .cu-event{--cuc:170 140 255}html[data-theme="dark"] .cu-health,html[data-theme="night"] .cu-health{--cuc:45 220 200}html[data-theme="dark"] .cu-todo,html[data-theme="night"] .cu-todo{--cuc:74 222 128}html[data-theme="dark"] .cu-gym,html[data-theme="night"] .cu-gym{--cuc:255 140 50}html[data-theme="dark"] .cu-hol,html[data-theme="night"] .cu-hol{--cuc:170 230 60}
+.row.cucat{background-image:linear-gradient(90deg,rgb(var(--cuc)/.30),rgb(var(--cuc)/.16) 65%,rgb(var(--cuc)/.10));box-shadow:inset 5px 0 0 rgb(var(--cuc))}
+html[data-theme="dark"] .row.cucat,html[data-theme="night"] .row.cucat{background-image:linear-gradient(90deg,rgb(var(--cuc)/.26),rgb(var(--cuc)/.13) 65%,rgb(var(--cuc)/.08))}
+#comingup .row{border-top:1px solid color-mix(in srgb,var(--ink) 16%,transparent)}
+#comingup .row:first-child{border-top:0}
 .culegend{margin:6px 4px 0;font-size:0.75rem}
 .culegend summary{cursor:pointer;color:var(--ink3);font-weight:700;list-style:none;display:inline-block;padding:4px 0}
 .culegend summary::-webkit-details-marker{display:none}
 .culegend summary::before{content:'● ';color:rgb(124 58 237)}
 .cukeys{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-.cuk{border-radius:999px;padding:3px 8px 3px 6px;font-weight:700;color:var(--ink);background:rgb(var(--cuc)/.16);box-shadow:inset 3px 0 0 rgb(var(--cuc))}
+.cuk{border-radius:999px;padding:3px 8px 3px 7px;font-weight:700;color:var(--ink);background:rgb(var(--cuc)/.28);box-shadow:inset 4px 0 0 rgb(var(--cuc))}
 .cuk.plain{background:var(--card);box-shadow:inset 0 0 0 1px var(--line)}
 .cuk.unused{opacity:.55}
 .qjcard{padding:12px 14px}

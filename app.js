@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.19';
+const APP_VERSION = '2.23.20';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3595,7 +3595,7 @@ function cuRowHtml(x) {
   return h;
 }
 /* 2.23.19: colour-code Coming up by category. Bills and other money rows stay plain. */
-const CU_CATS = [['car', 'Car'], ['pet', 'Pets'], ['bday', 'Birthdays'], ['event', 'Calendar & events'], ['health', 'Health'], ['todo', 'To-dos'], ['gym', 'Gym'], ['hol', 'Holidays & countdowns']];
+const CU_CATS = [['money', 'Bills & money'], ['car', 'Car'], ['pet', 'Pets'], ['bday', 'Birthdays'], ['event', 'Calendar & events'], ['health', 'Health'], ['todo', 'To-dos'], ['gym', 'Gym'], ['hol', 'Holidays & countdowns']];
 function cuCat(x) {
   const k = x && x.kind;
   if (k === 'car' || k === 'driver') return 'car';
@@ -3606,7 +3606,8 @@ function cuCat(x) {
   if (k === 'gym') return 'gym';
   if (k === 'hol' || k === 'cd') return 'hol';
   if (k === 'appt' || k === 'ext' || k === 'mine' || k === 'night' || k === 'ev') return HEALTH_RE.test(String(x.name || '')) || /Sarah’s (doctor|dentist)/.test(String(x.html || '')) ? 'health' : 'event';
-  return ''; // bills, loans, pay days, commission
+  if (k === 'bill' || k === 'loan' || k === 'pay' || k === 'comm' || k === 'budget') return 'money'; // 2.23.20: bills get their own colour
+  return '';
 }
 const cuColoursOn = () => !(S && S.settings && S.settings.cuColours === false);
 const dailyJokeOn = () => !(S && S.settings && S.settings.dailyJoke === false);
@@ -3615,7 +3616,7 @@ function cuLegend(list) {
   if (!cuColoursOn()) return '';
   const used = new Set(list.map(cuCat).filter(Boolean));
   if (!used.size) return '';
-  return `<details class="culegend"><summary>Colour key</summary><div class="cukeys">${CU_CATS.map(([k, l]) => `<span class="cuk cu-${k}${used.has(k) ? '' : ' unused'}">${esc(l)}</span>`).join('')}<span class="cuk plain">Bills</span></div></details>`;
+  return `<details class="culegend"><summary>Colour key</summary><div class="cukeys">${CU_CATS.map(([k, l]) => `<span class="cuk cu-${k}${used.has(k) ? '' : ' unused'}">${esc(l)}</span>`).join('')}</div></details>`;
 }
 // Daytime: one compact card with the day's quote and joke (night keeps the photo quote and joke cards)
 function quoteJokeCard() {
@@ -12901,7 +12902,9 @@ async function saveMail() {
 const mailConnected = p => !!(MAIL[p] && MAIL[p].refreshToken);
 const mailAnyConnected = () => mailConnected('google') || mailConnected('microsoft');
 // 2.22.65: show the mail line on Home under the weather
+const mailStripOn = () => !(S && S.settings && S.settings.mailStrip === false); // 2.23.20: only hides the strip; mail reading carries on
 function mailStrip() {
+  if (!mailStripOn()) return '';
   const t = homeMailLine();
   if (!t) return '';
   return `<button type="button" class="notifwx notifmail" id="notifmail" onclick="mailOpenInbox()"><span class="nwxic" style="font-size:1.5rem">✉️</span><span class="nwxtx"><span class="nwxnow">Important mail</span><span class="nwxnext">${esc(t)}</span></span>${I('right')}</button>`;
@@ -14059,7 +14062,8 @@ function Settings() {
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type (car, pets, birthdays, events, health, to-dos, gym, holidays). Bills stay plain.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
   </div>
   <div class="sec">Places</div>
   <div class="list" id="placesopt">
