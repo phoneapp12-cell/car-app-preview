@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.34';
+const APP_VERSION = '2.23.35';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3700,7 +3700,8 @@ function Home() {
   const shown = new Set(night ? parts.map(([k]) => k) : keys);
   homeShownNow = shown;
   const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
-  const sum = !night && sum0 ? homeSumFold(sum0) : sum0;
+  stripSumDone = false; homeSumT = sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
+  const sum = homeSumT ? '' : !night && sum0 ? homeSumFold(sum0) : sum0;
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
   if (!night) before = 0; // 2.23.14: daytime summary is the small fold at the top
@@ -3713,7 +3714,7 @@ function Home() {
       sections.push({ keys: g.keys, html: `<section class="hsec${fresh ? ' hnew' : ''}" data-k="${g.k}" style="${homeTry('tint', () => homeTintStyle(i, tintN))}">${fresh ? '<span class="newtag">New</span>' : ''}${body}</section>` });
     } catch (e) { console.error('Home section', g.k, e); }
   });
-  if (!night) [['comingup', comingUpCard], ].concat(justAddedOn() ? [['justadded', justAddedCard]] : []).concat(qjTop() ? [] : [['quotejoke', () => stripOn() ? stripHtml() : quoteJokeCard()]]).forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
+  if (!night) [['comingup', comingUpCard], ].concat(justAddedOn() ? [['justadded', justAddedCard]] : []).concat(qjTop() ? [] : [['quotejoke', () => qsBlock(stripOn() ? stripHtml() : quoteJokeCard())]]).forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
@@ -3743,7 +3744,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => stripHtml(), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + sumTop + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => stripHtml(), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
+  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + (night && !qjTop() && stripOn() ? '' : (sumTop || qsBlock(''))) + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
     sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -13908,6 +13909,73 @@ function erCard() {
     ${all.length > 3 ? `<button class="linkbtn" id="ermore" onclick="erMore=!erMore;render()">${erMore ? 'Less' : 'More (' + (all.length - 3) + ')'}</button>` : ''}</div>`;
 }
 
+/* ================= SCROLLING SUMMARY (2.23.35) =================
+   Under the rotating strip. The summary's sentences become chunks that slide in from the right every 5 s.
+   About 30% shorter: very short greetings and the least important tail are left out of the scroll;
+   "Full summary" shows everything. Swipe to move, pauses while touched, off screen or hidden; reduced motion = manual. */
+const sumScrollOn = () => !(S && S.settings && S.settings.sumFull === true);
+let stripSumDone = false, homeSumT = '', tkIdx = 0, tkAt = Date.now(), tkTouch = false, tkOpen = false;
+const TK_MS = 5000;
+function qsBlock(h) { const t = stripSumDone ? '' : homeSumT; stripSumDone = true; return (h || '') + t; }
+function sumTickerize(el) {
+  if (!el || el.dataset.tk || !sumScrollOn()) return;
+  const shade = el.querySelector('.sumshade') || el;
+  const all = [...shade.querySelectorAll('.sumbul > li, .sumsug, .sumnote')];
+  if (!all.length) return;
+  el.dataset.tk = '1';
+  let pick = all.filter(c => !(c.matches('li') && !c.classList.contains('late') && !c.classList.contains('urgent') && c.textContent.trim().length < 22));
+  if (!pick.length) pick = all.slice(0, 1);
+  const urg = c => c.classList.contains('late') || c.classList.contains('urgent');
+  const keep = Math.max(1, Math.round(all.length * 0.7));
+  if (pick.length > keep) { const u = pick.filter(urg), o = pick.filter(c => !urg(c)); pick = pick.filter(c => urg(c) || o.indexOf(c) < Math.max(0, keep - u.length)); }
+  const full = document.createElement('div'); full.className = 'sumfull'; full.hidden = !tkOpen;
+  while (shade.firstChild) full.appendChild(shade.firstChild);
+  const box = document.createElement('div'); box.className = 'sumtk'; box.setAttribute('aria-roledescription', 'carousel'); box.setAttribute('aria-label', 'Summary');
+  const view = document.createElement('div'); view.className = 'tkview';
+  tkIdx = tkIdx % pick.length;
+  pick.forEach((c, i) => {
+    const s = document.createElement('div'); s.className = 'tkslide' + (i === tkIdx ? ' on' : ''); s.setAttribute('aria-hidden', i !== tkIdx);
+    const k = c.cloneNode(true); k.removeAttribute('id');
+    if (k.matches('li')) { const ul = document.createElement('ul'); ul.className = 'sumbul'; ul.appendChild(k); s.appendChild(ul); } else s.appendChild(k);
+    view.appendChild(s);
+  });
+  box.appendChild(view);
+  const foot = document.createElement('div'); foot.className = 'tkfoot';
+  foot.innerHTML = (pick.length > 1 ? `<span class="tkdots">${pick.map((_, i) => `<button type="button" class="tkdot${i === tkIdx ? ' on' : ''}" data-i="${i}" aria-label="Summary line ${i + 1}"></button>`).join('')}</span>` : '<span></span>') +
+    `<button type="button" class="tkmore" aria-expanded="${tkOpen}">${tkOpen ? 'Hide full summary' : 'Full summary'}</button>`;
+  box.hidden = tkOpen; shade.appendChild(box); shade.appendChild(full); shade.appendChild(foot);
+}
+function tkShow(i) {
+  const el = document.querySelector('#homesum .sumtk'); if (!el) return;
+  const sl = el.querySelectorAll('.tkslide'), n = sl.length; if (!n) return;
+  const prev = tkIdx; tkIdx = ((i % n) + n) % n; tkAt = Date.now();
+  const back = i < prev;
+  sl.forEach((s, k) => { s.classList.toggle('back', back); s.classList.toggle('on', k === tkIdx); s.classList.toggle('out', k === prev && k !== tkIdx); s.setAttribute('aria-hidden', k !== tkIdx); });
+  document.querySelectorAll('#homesum .tkdot').forEach((d, k) => d.classList.toggle('on', k === tkIdx));
+}
+setInterval(() => {
+  const h = document.getElementById('homesum'); if (h && !h.dataset.tk && sumScrollOn() && h.closest('#tkhome')) sumTickerize(h);
+  const el = h && h.querySelector('.sumtk');
+  if (!el || el.hidden || tkTouch || document.hidden || stripReduced() || el.querySelectorAll('.tkslide').length < 2) { tkAt = Math.max(tkAt, Date.now() - TK_MS + 1500); return; }
+  const r = el.getBoundingClientRect(); if (r.bottom <= 0 || r.top >= innerHeight || !r.height) { tkAt = Date.now(); return; }
+  if (Date.now() - tkAt >= TK_MS) tkShow(tkIdx + 1);
+}, 400);
+(() => {
+  let x0 = 0, y0 = 0, moved = false;
+  const inTk = e => e.target && e.target.closest && e.target.closest('#homesum .sumtk');
+  document.addEventListener('touchstart', e => { if (!inTk(e)) return; tkTouch = true; moved = false; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', e => { if (!tkTouch) return; tkTouch = false; tkAt = Date.now(); const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { moved = true; tkShow(tkIdx + (dx < 0 ? 1 : -1)); } }, { passive: true });
+  document.addEventListener('touchcancel', () => { tkTouch = false; });
+  document.addEventListener('mouseover', e => { tkTouch = !!inTk(e) && matchMedia('(hover:hover)').matches; });
+  document.addEventListener('click', e => {
+    const t = e.target && e.target.closest && e.target.closest('#homesum .tkdot, #homesum .tkmore'); if (!t) { if (moved && inTk(e)) { moved = false; e.stopPropagation(); e.preventDefault(); } return; }
+    if (t.classList.contains('tkdot')) return tkShow(+t.dataset.i);
+    tkOpen = !tkOpen; const h = document.getElementById('homesum');
+    h.querySelector('.sumtk').hidden = tkOpen; h.querySelector('.sumfull').hidden = !tkOpen; t.textContent = tkOpen ? 'Hide full summary' : 'Full summary'; t.setAttribute('aria-expanded', tkOpen);
+  }, true);
+})();
+
 /* ================= ROTATING STRIP (2.23.34) =================
    Quote, joke, travel spot, fact, next countdown, Netflix and Countdown rewards in one small card that changes every 6 s.
    Swipe to move, tap to open. Pauses while touched, off screen, app hidden, or reduced motion (manual only). */
@@ -14544,6 +14612,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Scrolling summary</div><div class="s">On: the summary sits under the rotating strip, a little shorter, with each line sliding in from the right. Tap Full summary to read it all. Off: the full summary as before.</div></div><button class="switch ${sumScrollOn() ? 'on' : ''}" role="switch" aria-checked="${sumScrollOn()}" aria-label="Scrolling summary" id="sumscrollsw" onclick="S.settings.sumFull=sumScrollOn();save().then(render)"></button></div>
    <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
