@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '2.23.37';
+const VERSION = '2.23.38';
 const CACHE = 'due-dates-' + VERSION;
 const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['art/cu-banner.webp', 'art/ja-banner.webp', 'art/ic-bill.webp', 'art/ic-car.webp', 'art/ic-bday.webp', 'art/ic-health.webp', 'art/ic-hol.webp', 'art/ic-ev.webp', 'art/ic-todo.webp', 'art/ic-shop.webp', 'art/ic-sarah.webp', './', './mascot/cat-krea.webp', './mascot/dog-krea.webp', './mascot/cat-life.webp', './mascot/dog-life.webp', './mascot/dog-life-body.webp', './mascot/dog-life-tail.webp', './mascot/dog-krea-body.webp', './mascot/dog-krea-tail.webp', './sound/meow1.mp3', './sound/meow2.mp3', './sound/meow3.mp3', './index.html', './app.js', './sync-logic.js', './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest', './data/tides-whangarei.json',
