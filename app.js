@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.22';
+const APP_VERSION = '2.23.23';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4303,22 +4303,28 @@ const SH = {
   state: () => { S.settings.shared = S.settings.shared && typeof S.settings.shared === 'object' ? S.settings.shared : {}; return S.settings.shared; },
   items: () => [...(S.todos || []).filter(isSarahTodo), ...(S.todos || []).filter(isMineShared).map(mineTodoView),
     ...((S.shop && S.shop.items) || []).filter(x => isSarahShop(x) || isMineShared(x)).map(sarahShopView),
-    ...(S.appts || []).filter(a => a && a.from === 'sarah').map(sarahApptView)],
+    ...(S.appts || []).filter(a => a && a.from === 'sarah').map(sarahApptView),
+    ...(S.appts || []).filter(apptForSarah).map(mineApptView), ...healthSarahItems().map(healthApptView)],
   by: t => (t && t.by) || (isSarahTodo(t) ? 'sarah' : 'shane'),
   want: () => true,
   add: x => {
     const mine = x.by === 'shane';
+    if (x.list === 'Appointments' && mine) return; // one of his own shared to Sarah that's gone here: nothing to bring back
     if (x.list === 'Appointments' && !mine) { S.appts.push(sarahApptFrom(x)); return; } // 2.23.17: her doctor/dentist appointments go in the calendar
     if (isSarahShopList(x.list)) { const it = sarahShopItem(x); if (mine) { delete it.from; it.sharedS = true; } S.shop.items.push(it); return; }
     if (mine) { S.todos.push({ id: x.id, title: x.title, list: (S.lists && S.lists[0]) || 'To-do', sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), sharedS: true }); return; }
     S.todos.push({ id: x.id, title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), from: 'sarah' }); },
   update: (t, x) => {
     if (t._appt) { Object.assign(t._appt, sarahApptFrom(x), { id: t._appt.id }); return; }
+    if (t._mine || t._hitem) { const ap = x.appt || {}; // 2.23.23: Sarah changed one he shared with her
+      if (t._mine) { Object.assign(t._mine, { title: String(x.title || t._mine.title).slice(0, 80), date: x.due || t._mine.date, time: ap.time || '', notes: x.notes || '', place: ap.place || '' }); if (x.claim) t._mine.claim = claimNorm(x.claim); }
+      else { Object.assign(t._hitem, { name: String(x.title || t._hitem.name).slice(0, 40), apptDate: x.due || t._hitem.apptDate, apptTime: ap.time || '' }); if (ap.place) t._hitem.clinic = String(ap.place).slice(0, 60); }
+      return; }
     if (!!t._shop !== isSarahShopList(x.list)) { SH.remove(t.id); SH.add(Object.assign({}, x, { created: t.created || x.created, by: SH.by(t) })); return; } // moved to or from her Shopping list
     if (t._todo) { const o = t._todo; Object.assign(o, { title: x.title, sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) o.doneAt = o.doneAt || x.doneAt || Date.now(); else delete o.doneAt; return; } // your own: stays on your list
     if (t._shop) { const it = t._shop; Object.assign(it, { name: String(x.title || '').slice(0, 120), list: x.list, due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done }); if (x.brand) it.brand = x.brand; else delete it.brand; if (x.done) it.doneAt = it.doneAt || x.doneAt || Date.now(); else delete it.doneAt; return; }
     Object.assign(t, { title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) t.doneAt = x.doneAt || Date.now(); else delete t.doneAt; },
-  remove: id => { S.appts = (S.appts || []).filter(a => !(a.id === id && a.from === 'sarah')); S.todos = S.todos.filter(t => !(t.id === id && (isSarahTodo(t) || isMineShared(t)))); S.shop.items = S.shop.items.filter(x => !(x.id === id && (isSarahShop(x) || isMineShared(x)))); },
+  remove: id => { healthSarahItems().forEach(({ it }) => { if ('hs-' + it.id === id) { it.apptDate = ''; it.apptTime = ''; } }); S.appts = (S.appts || []).filter(a => !(a.id === id && (a.from === 'sarah' || apptForSarah(a)))); S.todos = S.todos.filter(t => !(t.id === id && (isSarahTodo(t) || isMineShared(t)))); S.shop.items = S.shop.items.filter(x => !(x.id === id && (isSarahShop(x) || isMineShared(x)))); },
   persist: async changed => {
     sharedApplying = true;
     try { await save(); } finally { sharedApplying = false; }
@@ -4326,6 +4332,26 @@ const SH = {
   }
 };
 
+
+/* 2.23.23: Sarah's appointments that Shane keeps (Health › Sarah's booked check-ups, and Calendar appointments marked
+   For: Sarah or that mention Sarah) go to her app's Appointments with the blue S. Two-way: her edits and deletes come
+   back here. Shane's own health items and medications never go. "Share with Sarah" (default on) can stop one. */
+const SARAH_RE = /\bsarah\b/i;
+const apptForSarah = a => !!(a && a.from !== 'sarah' && !a.evId && a.shareSarah !== false && (a.for === 'sarah' || (!a.for && SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')))));
+const isSarahPerson = p => !!(p && /^\s*sarah\b/i.test(String(p.name || '')));
+function healthSarahItems() {
+  const out = [];
+  (S.health || []).forEach(p => (p.items || []).forEach(it => {
+    if (!it || !it.apptDate || it.shareSarah === false || daysLeft(it.apptDate) < -60) return;
+    if (isSarahPerson(p) || SARAH_RE.test([it.name, it.clinic].join(' '))) out.push({ p, it });
+  }));
+  return out;
+}
+const apptKindOf = t => /dent|hygien|orthodont/i.test(t) ? 'dentist' : /\b(doctor|dr|gp)\b|medical|clinic/i.test(t) ? 'doctor' : 'other';
+const mineApptView = a => Object.assign({ id: a.id, title: a.title, list: 'Appointments', due: a.date, notes: a.notes || '', priority: 'normal', done: false, created: uidTime(a.id) || 1.7e12, by: 'shane',
+  appt: { type: apptKindOf(a.title + ' ' + (a.notes || '')), time: a.time || '', place: a.place || '' }, _mine: a }, a.claim ? { claim: a.claim } : {});
+const healthApptView = ({ p, it }) => ({ id: 'hs-' + it.id, title: it.name + (isSarahPerson(p) ? '' : ''), list: 'Appointments', due: it.apptDate, notes: it.phone ? 'Clinic phone ' + it.phone : '', priority: 'normal', done: false,
+  created: uidTime(it.id) || 1.7e12, by: 'shane', appt: { type: it.kind === 'dentist' || it.kind === 'hygienist' ? 'dentist' : it.kind === 'doctor' || it.kind === 'gp' ? 'doctor' : apptKindOf(it.name), time: it.apptTime || '', place: it.clinic || '' }, _hitem: it });
 /* 2.23.17: Sarah's appointments (doctor, dentist, other). She shares them by default; they arrive as shared items on the
    Appointments list and live here in S.appts with from: 'sarah', so they show in Calendar and Coming up with her pink S.
    Read-only here: details only, changes are made in her app. */
@@ -4973,20 +4999,24 @@ function apptForm(id, date, pre) {
     field('What is it?', inp('title', a.title, 'placeholder="e.g. Haircut" required maxlength="80"')) +
     `<div class="two">${field('Date', inp('date', a.date, 'type="date" required'))}${field('Time', inp('time', a.time, 'type="time"'), 'Leave blank for all day')}</div>` +
     field('Where / notes', area('notes', a.notes)) +
+    (a.evId ? '' : `<div class="field"><span>For</span>${segHtml('for', [['shane', 'Shane'], ['sarah', 'Sarah'], ['other', 'Other']], a.for || (SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')) ? 'sarah' : 'shane'))}</div>
+      <label class="checkrow" id="sharesarahrow" style="display:${(a.for || (SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')) ? 'sarah' : 'shane')) === 'sarah' ? 'flex' : 'none'};gap:10px;align-items:flex-start;margin:0 2px 12px"><input type="checkbox" name="shareSarah" ${a.shareSarah === false ? '' : 'checked'} style="width:20px;height:20px;margin-top:2px"><span><b>Share with Sarah</b><br><small class="muted">It shows in her app’s Appointments with your blue S. Changes go both ways.</small></span></label>`) +
     (a.evUrl ? `<p class="muted" style="margin:4px 0 0">From Whangārei events. <a href="${esc(a.evUrl)}" target="_blank" rel="noopener">Open the event page</a></p>` : '') +
     (id && isHealthAppt(a) ? `<div class="btns" style="margin-top:6px"><button type="button" class="btn small" onclick="claimSheet('a:${id}')">${I('medkit')} UniMed claim${a.claim && a.claim.status !== 'none' ? ' · ' + CLAIM_ST[a.claim.status] : ''}</button></div>` : ''),
     async v => {
       if (!v.title) return 'Please say what the appointment is.';
       if (!parseD(v.date)) return 'Please choose a date.';
-      if (id) Object.assign(a, { title: v.title, date: v.date, time: v.time, notes: v.notes });
+      const who = v.for === 'sarah' || v.for === 'other' ? v.for : 'shane', fs = who === 'sarah' ? { for: who, shareSarah: v.shareSarah === 'on' } : { for: who, shareSarah: false };
+      if (id) Object.assign(a, { title: v.title, date: v.date, time: v.time, notes: v.notes }, a.evId ? {} : fs);
       else {
-        const row = { id: uid('appt'), title: v.title, date: v.date, time: v.time, notes: v.notes };
+        const row = Object.assign({ id: uid('appt'), title: v.title, date: v.date, time: v.time, notes: v.notes }, a.evId ? {} : fs);
         if (a.evId && !evAppt(a.evId)) { row.evId = a.evId; if (a.evUrl) row.evUrl = a.evUrl; }
         S.appts.push(row);
       }
-      await save(); render(); toast(id ? 'Appointment updated.' : 'Appointment added.');
+      await save(); render(); toast((id ? 'Appointment updated.' : 'Appointment added.') + (fs.for === 'sarah' && fs.shareSarah && !a.evId ? ' It’s in Sarah’s app too.' : '')); sharedSoon();
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn" style="flex:0 0 auto" aria-label="Move to your to-do list" onclick="apptToTodo('${id}')">${I('check')} To-do</button><button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete appointment" onclick="deleteAppt('${id}')">${I('trash')}</button>` : '');
+  if (document.querySelector('[data-seg="for"]')) wireSeg('for', w => { const r = $('#sharesarahrow'); if (r) r.style.display = w === 'sarah' ? 'flex' : 'none'; });
 }
 /* 2.22.50: move a calendar entry back to the to-do list. A to-do that was added to the calendar just comes off
    the calendar (the to-do stays, with the time kept in its notes only if it already had one); any other
@@ -7874,6 +7904,7 @@ function hItemForm(pid, iid, kind) {
     `<p class="muted" style="margin:-4px 2px 12px;font-size:0.84375rem" id="hhint"></p>` +
     field('Booked appointment (optional)', inp('apptDate', it.apptDate, 'type="date"')) +
     field('Appointment time', inp('apptTime', it.apptTime, 'type="time"'), 'Optional. The booking shows on the Calendar and is cleared when you tick Done.') +
+    (isSarahPerson(p) ? `<label class="checkrow" style="display:flex;gap:10px;align-items:flex-start;margin:0 2px 12px"><input type="checkbox" name="shareSarah" ${it.shareSarah === false ? '' : 'checked'} style="width:20px;height:20px;margin-top:2px"><span><b>Share with Sarah</b><br><small class="muted">A booked appointment shows in her app’s Appointments with your blue S.</small></span></label>` : '') +
     (it.apptDate ? `<div class="btns" style="margin:-4px 0 8px"><button type="button" class="btn small" id="hclearappt">${I('x')} Clear booking</button></div>` : ''),
     async v => {
       if (!v.name) return 'Please give it a name.';
@@ -7885,6 +7916,7 @@ function hItemForm(pid, iid, kind) {
       if (v.apptTime && !v.apptDate) return 'Please choose the appointment date as well as the time.';
       if (v.apptDate && !parseD(v.apptDate)) return 'Please check the appointment date.';
       const s = snap(), upd = { kind: v.kind, name: v.name, clinic: v.clinic, phone: v.phone, every: unit === 'none' ? 0 : every, unit, last: v.last, due: v.due, apptDate: v.apptDate, apptTime: v.apptDate ? v.apptTime : '' };
+      if (isSarahPerson(p)) upd.shareSarah = v.shareSarah === 'on';
       if (iid) Object.assign(it, upd); else p.items.push(Object.assign({ id: uid('hi') }, upd));
       await save(); render(); toast(iid ? 'Saved.' : `${v.name} added.`, 'Undo', undoTo(s));
     }, iid ? 'Save' : 'Add',
