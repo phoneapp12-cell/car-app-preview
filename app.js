@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.51';
+const APP_VERSION = '2.23.52';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -170,6 +170,7 @@ async function save() {
   try { await kvSet('data', S); } catch (e) { toast('Sorry, that couldn’t be saved on this phone.'); throw e; }
   queueCheck();
   schedulePhoneSync();
+  try { gcalSoon(); } catch (e) { }
   if (!sharedApplying) { try { sharedSoon(); } catch (e) { } }
 }
 // Take a copy so an action can be undone
@@ -4524,7 +4525,8 @@ function sarahApptSheet(a) {
     <div class="muted" style="margin-top:4px">${a.time ? fmtTime(a.time) : 'All day'}${a.place ? ' · ' + esc(a.place) : ''}</div>
     ${a.notes ? `<div class="muted notes" style="margin-top:6px">${esc(a.notes)}</div>` : ''}</div>
     <div class="btns">${maps ? `<a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a>` : ''}<button type="button" class="btn" onclick="claimSheet('a:${a.id}')">${I('medkit')} UniMed claim${a.claim && a.claim.status !== 'none' ? ' · ' + CLAIM_ST[a.claim.status] : ''}</button></div>
-    <p class="muted" style="margin:8px 2px 0">Sarah added this in her app. She keeps it up to date there.</p>`, null);
+    <div class="btns"><button type="button" class="btn" id="sagcal" onclick="gcalToggleSarahAppt('${a.id}')">${I('cal')} ${a.gcalWant ? 'Remove from Family calendar' : 'Add to Family calendar'}</button></div>
+    <p class="muted" style="margin:8px 2px 0">Sarah added this in her app. She keeps it up to date there.${a.gcalWant ? ' Her changes update your Family calendar too.' : ''}</p>`, null);
 }
 /* Sarah's car due dates for her app. Only the Haval (PNU312): WOF, rego, service date, service km and odometer.
    Sent to the relay's /shared-car when they change (checked on open and with each shared sync). Nothing else. */
@@ -5128,14 +5130,15 @@ function sTodoCal(id) {
   openSheet('Add to calendar', `<label style="display:block">Title<input style="display:block;width:100%" name="title" value="${esc(t.title)}" maxlength="80" required></label>
     <label style="display:block;margin-top:8px">Date<input style="display:block" type="date" name="date" value="${date}" required></label>
     <label style="display:block;margin-top:8px">Time (optional)<input style="display:block" type="time" name="time" value="${todoClock(t)}"></label>
-    <p class="muted" style="margin:6px 0 0">Saves to My App’s calendar with Sarah’s S and shows in her app’s Appointments. Your Google Family calendar isn’t connected for writing, so it won’t go there.</p>`,
+    ${gcalCheckRow(true)}
+    <p class="muted" style="margin:6px 0 0">Saves to My App’s calendar with Sarah’s S and shows in her app’s Appointments.</p>`,
     async v => {
       const title = String(v.title || '').trim().slice(0, 80); if (!title || !parseD(v.date)) return 'Add a title and date.';
       if (todoAppt(t)) return;
-      const appt = { id: uid('appt'), title, date: v.date, time: /^\d{2}:\d{2}$/.test(v.time || '') ? v.time : '', notes: t.notes || '', todoId: t.id, sTodo: true, for: 'sarah', shareSarah: true };
+      const appt = { id: uid('appt'), title, date: v.date, time: /^\d{2}:\d{2}$/.test(v.time || '') ? v.time : '', notes: t.notes || '', todoId: t.id, sTodo: true, for: 'sarah', shareSarah: true, gcalWant: v.gcal === 'on' };
       S.appts.push(appt); t.apptId = appt.id;
-      await save(); render();
-      toast(`On the calendar for ${fmtW(appt.date)}${appt.time ? ' at ' + fmtTime(appt.time) : ''}. Shared to Sarah’s app.`);
+      await save(); render(); if (appt.gcalWant) setTimeout(() => gcalAfterTick(appt), 400);
+      toast(`On the calendar for ${fmtW(appt.date)}${appt.time ? ' at ' + fmtTime(appt.time) : ''}. Shared to Sarah’s app${appt.gcalWant ? ' and going on your Family calendar' : ''}.`);
     }, 'Add to calendar');
 }
 async function addTodoCal(id) {
@@ -5350,6 +5353,7 @@ function apptForm(id, date, pre) {
     field('What is it?', inp('title', a.title, 'placeholder="e.g. Haircut" required maxlength="80"')) +
     `<div class="two">${field('Date', inp('date', a.date, 'type="date" required'))}${field('Time', inp('time', a.time, 'type="time"'), 'Leave blank for all day')}</div>` +
     field('Where / notes', area('notes', a.notes)) +
+    gcalCheckRow(id ? !!a.gcalWant : false) +
     (a.evId ? '' : `<div class="field"><span>For</span>${segHtml('for', [['shane', 'Shane'], ['sarah', 'Sarah'], ['other', 'Other']], a.for || (SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')) ? 'sarah' : 'shane'))}</div>
       <label class="checkrow" id="sharesarahrow" style="display:${(a.for || (SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')) ? 'sarah' : 'shane')) === 'sarah' ? 'flex' : 'none'};gap:10px;align-items:flex-start;margin:0 2px 12px"><input type="checkbox" name="shareSarah" ${a.shareSarah === false ? '' : 'checked'} style="width:20px;height:20px;margin-top:2px"><span><b>Share with Sarah</b><br><small class="muted">It shows in her app’s Appointments with your blue S. Changes go both ways.</small></span></label>`) +
     (a.evUrl ? `<p class="muted" style="margin:4px 0 0">From Whangārei events. <a href="${esc(a.evUrl)}" target="_blank" rel="noopener">Open the event page</a></p>` : '') +
@@ -5358,13 +5362,14 @@ function apptForm(id, date, pre) {
       if (!v.title) return 'Please say what the appointment is.';
       if (!parseD(v.date)) return 'Please choose a date.';
       const who = v.for === 'sarah' || v.for === 'other' ? v.for : 'shane', fs = who === 'sarah' ? { for: who, shareSarah: v.shareSarah === 'on' } : { for: who, shareSarah: false };
-      if (id) Object.assign(a, { title: v.title, date: v.date, time: v.time, notes: v.notes }, a.evId ? {} : fs);
+      const gw = v.gcal === 'on', gNew = gw && !(id && a.gcalWant);
+      if (id) Object.assign(a, { title: v.title, date: v.date, time: v.time, notes: v.notes, gcalWant: gw }, a.evId ? {} : fs);
       else {
-        const row = Object.assign({ id: uid('appt'), title: v.title, date: v.date, time: v.time, notes: v.notes }, a.evId ? {} : fs);
+        const row = Object.assign({ id: uid('appt'), title: v.title, date: v.date, time: v.time, notes: v.notes, gcalWant: gw }, a.evId ? {} : fs);
         if (a.evId && !evAppt(a.evId)) { row.evId = a.evId; if (a.evUrl) row.evUrl = a.evUrl; }
         S.appts.push(row);
       }
-      await save(); render(); toast((id ? 'Appointment updated.' : 'Appointment added.') + (fs.for === 'sarah' && fs.shareSarah && !a.evId ? ' It’s in Sarah’s app too.' : '')); sharedSoon();
+      await save(); render(); toast((id ? 'Appointment updated.' : 'Appointment added.') + (fs.for === 'sarah' && fs.shareSarah && !a.evId ? ' It’s in Sarah’s app too.' : '')); sharedSoon(); if (gNew) setTimeout(() => gcalAfterTick(), 400);
     }, id ? 'Save' : 'Add',
     id ? `<button type="button" class="btn" style="flex:0 0 auto" aria-label="Move to your to-do list" onclick="apptToTodo('${id}')">${I('check')} To-do</button><button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete appointment" onclick="deleteAppt('${id}')">${I('trash')}</button>` : '');
   if (document.querySelector('[data-seg="for"]')) wireSeg('for', w => { const r = $('#sharesarahrow'); if (r) r.style.display = w === 'sarah' ? 'flex' : 'none'; });
@@ -13378,11 +13383,11 @@ async function saveMail() {
   ['google', 'microsoft'].forEach(p => {
     const b = MAIL[p];
     if (!b || !b.refreshToken) return;
-    keep[p] = { refreshToken: b.refreshToken, accessToken: b.accessToken || '', expiresAt: b.expiresAt || 0, email: b.email || '' };
+    keep[p] = { refreshToken: b.refreshToken, accessToken: b.accessToken || '', expiresAt: b.expiresAt || 0, email: b.email || '', cal: !!b.cal, calOnly: !!b.calOnly, calId: b.calId || '', calName: b.calName || '' };
   });
   try { await kvSet('mailboxes', keep); } catch (e) { }
 }
-const mailConnected = p => !!(MAIL[p] && MAIL[p].refreshToken);
+const mailConnected = p => !!(MAIL[p] && MAIL[p].refreshToken && !MAIL[p].calOnly);
 const mailAnyConnected = () => mailConnected('google') || mailConnected('microsoft');
 // 2.22.65: show the mail line on Home under the weather
 const mailStripOn = () => !(S && S.settings && S.settings.mailStrip === false); // 2.23.20: only hides the strip; mail reading carries on
@@ -13453,6 +13458,108 @@ async function mailSignIn(provider) {
   }
   location.href = u.toString();
 }
+/* 2.23.52: Google Family calendar (write). Incremental consent on the same Google client: the first time Shane ticks
+   "Family calendar", Google asks for calendar.events (create/change/delete events) plus calendar.calendarlist.readonly
+   (only to find the calendar named "Family"; calendar.events alone can't list calendars). include_granted_scopes keeps
+   Gmail read. Appointments with gcalWant are mirrored there; S.settings.gcalMap {apptId: {id, cal, h}} holds each
+   Google event id, so edits PATCH it, deletes DELETE it, and nothing is created twice. */
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly';
+const gcalMap = () => { S.settings.gcalMap = S.settings.gcalMap && typeof S.settings.gcalMap === 'object' ? S.settings.gcalMap : {}; return S.settings.gcalMap; };
+const gcalReady = () => !!(MAIL.google && MAIL.google.refreshToken && MAIL.google.cal);
+async function gcalConnect() {
+  const cfg = await mailConfig(), c = cfg.google || {};
+  if (!c.clientId) { toast('Google sign-in isn’t set up on the calendar link service yet.'); return; }
+  const pkce = await makePkce();
+  const state = b64urlBytes(crypto.getRandomValues(new Uint8Array(16))) + '.gcal.google';
+  try { localStorage.setItem('ddMailPkce', JSON.stringify({ verifier: pkce.verifier, state, provider: 'google', cal: true, back: location.hash || '#home', at: Date.now() })); } catch (e) { toast('This browser won’t keep the sign-in step.'); return; }
+  const u = new URL(c.authorize);
+  Object.entries({ client_id: c.clientId, redirect_uri: MAIL_REDIRECT, response_type: 'code', scope: GCAL_SCOPE, state, code_challenge: pkce.challenge, code_challenge_method: 'S256', access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' }).forEach(([k, v]) => u.searchParams.set(k, v));
+  if (MAIL.google && MAIL.google.email) u.searchParams.set('login_hint', MAIL.google.email);
+  location.href = u.toString();
+}
+function gcalPrompt() {
+  openSheet('Connect Google calendar', `<p style="margin:0 0 8px">To put events on your <b>Family</b> Google calendar, Google will ask you to let My App <b>see, create, change and delete events</b> on your calendars and <b>see your calendar list</b> (just to find Family). Gmail stays read-only.</p><p class="muted" style="margin:0">Events are saved in My App now and go to Google as soon as you’re connected.</p>`, async () => () => gcalConnect(), 'Connect Google calendar');
+}
+async function gcalFetch(method, url, body) {
+  const tok = await mailAccess('google');
+  const r = await fetch(url, { method, cache: 'no-store', headers: Object.assign({ Authorization: 'Bearer ' + tok, Accept: 'application/json' }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401 || r.status === 403) throw Object.assign(new Error('gcal auth'), { status: r.status });
+  if (r.status === 404 || r.status === 410) return null;
+  if (!r.ok) throw Object.assign(new Error('gcal ' + r.status), { status: r.status });
+  return r.status === 204 ? {} : r.json().catch(() => ({}));
+}
+async function gcalFamilyId() {
+  if (MAIL.google.calId) return MAIL.google.calId;
+  let page = '', hit = null;
+  do {
+    const d = await gcalFetch('GET', 'https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer&maxResults=250' + (page ? '&pageToken=' + encodeURIComponent(page) : ''));
+    const items = (d && d.items) || [];
+    hit = items.find(c => /^family$/i.test(String(c.summaryOverride || c.summary || '').trim())) || items.find(c => /\bfamily\b/i.test(String(c.summaryOverride || c.summary || ''))) || hit;
+    page = d && d.nextPageToken;
+  } while (!hit && page);
+  if (!hit) throw Object.assign(new Error('no family'), { nofamily: true });
+  MAIL.google.calId = hit.id; MAIL.google.calName = hit.summaryOverride || hit.summary; await saveMail();
+  return hit.id;
+}
+const gcalAddDays = (iso, n) => isoT(parseD(iso) + n * DAY);
+function gcalBody(a) {
+  const desc = [a.notes || '', a.sTodo || a.from === 'sarah' || a.for === 'sarah' ? 'Sarah · from My App' : 'From My App'].filter(Boolean).join('\n');
+  const b = { summary: String(a.title || 'Appointment'), description: desc };
+  if (a.place) b.location = a.place;
+  if (/^\d{2}:\d{2}$/.test(a.time || '')) {
+    const [h, m] = a.time.split(':').map(Number), e = h * 60 + m + 60, ed = e >= 1440 ? gcalAddDays(a.date, 1) : a.date, em = e % 1440;
+    b.start = { dateTime: `${a.date}T${a.time}:00`, timeZone: 'Pacific/Auckland' };
+    b.end = { dateTime: `${ed}T${String(Math.floor(em / 60)).padStart(2, '0')}:${String(em % 60).padStart(2, '0')}:00`, timeZone: 'Pacific/Auckland' };
+  } else { b.start = { date: a.date }; b.end = { date: gcalAddDays(a.date, 1) }; }
+  return b;
+}
+let gcalBusy = false, gcalAgain = false, gcalTimer = 0;
+function gcalSoon() { clearTimeout(gcalTimer); gcalTimer = setTimeout(() => gcalSync().catch(() => {}), 1500); }
+async function gcalSync() {
+  if (!S || !S.settings) return;
+  const map = gcalMap(), want = (S.appts || []).filter(a => a && a.gcalWant && parseD(a.date));
+  const ids = new Set(want.map(a => a.id)), gone = Object.keys(map).filter(k => !ids.has(k));
+  if (!want.some(a => !map[a.id] || map[a.id].h !== JSON.stringify(gcalBody(a))) && !gone.length) return;
+  if (!gcalReady() || navigator.onLine === false) return;
+  if (gcalBusy) { gcalAgain = true; return; }
+  gcalBusy = true; let changed = false;
+  try {
+    const cal = await gcalFamilyId(), base = id => `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(id)}/events`;
+    for (const k of gone) { const m = map[k]; try { await gcalFetch('DELETE', base(m.cal) + '/' + encodeURIComponent(m.id)); } catch (e) { if (e.status === 401 || e.status === 403) throw e; continue; } delete map[k]; changed = true; }
+    for (const a of want) {
+      const body = gcalBody(a), h = JSON.stringify(body), m = map[a.id];
+      if (m && m.h === h) continue;
+      let ev = null;
+      if (m) ev = await gcalFetch('PATCH', base(m.cal) + '/' + encodeURIComponent(m.id), body);
+      if (!ev || !ev.id) { // new, or deleted on Google: (re)create with a stable id so a retry can't make a second copy
+        const gid = (m && m.gid) || ('myapp' + a.id.replace(/[^a-v0-9]/g, '') + Date.now().toString(32)).toLowerCase().replace(/[^a-v0-9]/g, '').slice(0, 64);
+        map[a.id] = { id: gid, gid, cal, h: '' }; await kvSet('data', S);
+        try { ev = await gcalFetch('POST', base(cal), Object.assign({ id: gid }, body)); }
+        catch (e) { if (e.status === 409) ev = await gcalFetch('PATCH', base(cal) + '/' + gid, body); else throw e; }
+      }
+      if (ev && ev.id) { map[a.id] = { id: ev.id, gid: ev.id, cal: m && ev.id === m.id ? m.cal : cal, h }; a.gcalId = ev.id; changed = true; }
+    }
+  } catch (e) {
+    if (e.status === 403 || e.status === 401) { MAIL.google.cal = false; await saveMail(); toast('Google calendar needs connecting again.', 'Connect', gcalPrompt); }
+    else if (e.nofamily) toast('No Google calendar called “Family” that you can add to. Events stay in My App.');
+  } finally {
+    gcalBusy = false;
+    if (changed) { try { await kvSet('data', S); } catch (e) { } }
+    if (gcalAgain) { gcalAgain = false; gcalSoon(); }
+  }
+}
+function gcalCheckRow(on) {
+  return `<label class="checkrow" style="display:flex;gap:10px;align-items:flex-start;margin:10px 2px 4px"><input type="checkbox" name="gcal" ${on ? 'checked' : ''} style="width:20px;height:20px;margin-top:2px"><span><b>Family calendar</b><br><small class="muted">${gcalReady() ? 'Also adds it to your Google “' + esc((MAIL.google && MAIL.google.calName) || 'Family') + '” calendar.' : 'Also adds it to your Google Family calendar. The first time, you’ll be asked to connect Google calendar.'}</small></span></label>`;
+}
+async function gcalAfterTick(a) {
+  if (gcalReady()) { gcalSoon(); return; }
+  gcalPrompt();
+}
+async function gcalToggleSarahAppt(id) {
+  const a = (S.appts || []).find(x => x.id === id); if (!a) return;
+  a.gcalWant = !a.gcalWant; await save(); await closeSheet(); render();
+  if (a.gcalWant) { toast('Adding to your Family calendar.'); gcalAfterTick(a); } else toast('Taken off your Family calendar.');
+}
 async function mailToken(body) {
   const r = await fetch(RELAY_URL + '/mail/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
@@ -13472,7 +13579,8 @@ async function finishMailSignIn() {
   try { localStorage.removeItem('ddMailPkce'); } catch (e) { }
   const provider = state.endsWith('.google') ? 'google' : state.endsWith('.microsoft') ? 'microsoft' : '';
   if (!provider) { toast('That sign-in link was not recognised.'); return; }
-  if (location.hash !== '#settings') location.hash = '#settings';
+  const isCal = state.endsWith('.gcal.google');
+  if (isCal) { if (saved && saved.back && location.hash !== saved.back) location.hash = saved.back; } else if (location.hash !== '#settings') location.hash = '#settings';
   if (err) { toast('Sign-in was cancelled.'); return; }
   if (!saved || saved.state !== state || saved.provider !== provider || !saved.verifier || Date.now() - saved.at > 15 * 60 * 1000) {
     toast('That sign-in step expired. Try again from Settings.');
@@ -13482,10 +13590,14 @@ async function finishMailSignIn() {
     const tok = await mailToken({ provider, code, codeVerifier: saved.verifier, redirectUri: MAIL_REDIRECT });
     if (!tok.accessToken) throw new Error('mail');
     if (!tok.refreshToken) { toast('Sign-in did not grant offline access, so it cannot be kept. Try again.'); return; }
+    const prev = MAIL[provider];
     const box = { refreshToken: tok.refreshToken, accessToken: tok.accessToken, expiresAt: Date.now() + (Number(tok.expiresIn) || 3600) * 1000 - 60000, email: '' };
+    if (isCal) { box.cal = true; box.calOnly = !(prev && prev.refreshToken && !prev.calOnly); }
+    else if (prev && prev.cal) { box.cal = true; box.calId = prev.calId || ''; box.calName = prev.calName || ''; } // include_granted_scopes keeps calendar
     MAIL[provider] = box;
     try { box.email = await mailAddress(provider, box.accessToken); } catch (e) { }
     await saveMail();
+    if (isCal) { toast('Google calendar connected. Adding to Family…'); gcalSoon(); return; }
     toast(provider === 'google' ? 'Gmail connected.' : 'Outlook connected.');
     refreshMail(true);
   } catch (e) {
