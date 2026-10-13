@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.43';
+const APP_VERSION = '2.23.44';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -374,7 +374,32 @@ let homeCarIdx = 0;
 try {
   const m = localStorage.getItem('homeFeedMode');
   if (m === 'list' || m === 'carousel') homeFeedMode = m;
+  // 2.23.44: carousel is the default. Switch once to carousel; after that his choice sticks.
+  if (!localStorage.getItem('feedCarMig44')) { localStorage.setItem('feedCarMig44', '1'); homeFeedMode = 'carousel'; localStorage.setItem('homeFeedMode', 'carousel'); }
 } catch (e) {}
+/* 2.23.44: scroll chaining. Until the carousel's top reaches the top of the page view, vertical swipes
+   scroll the whole page (the card's inner scroll is locked). Once it's there, the card scrolls. When the
+   card is back at its top and you swipe down, the page scrolls up again and the card locks. */
+function hcarLockCheck() {
+  const root = document.getElementById('homecarousel'), v = document.getElementById('view');
+  if (!root || !v) return;
+  const vt = v.getBoundingClientRect().top, ct = root.querySelector('.hcar-stage').getBoundingClientRect().top;
+  const atEnd = v.scrollTop + v.clientHeight >= v.scrollHeight - 2;
+  const was = root.classList.contains('hcar-locked');
+  // coming down onto the card: stop the page with the card's top exactly at the top, then hand over to the card
+  if ((was || hcarHold) && ct - vt < 0 && ct - vt > -v.clientHeight * 0.6) { hcarHold = true; v.scrollTop += ct - vt; root.classList.remove('hcar-locked'); return; }
+  const lock = ct - vt > 6 && !atEnd;
+  if (was !== lock) {
+    root.classList.toggle('hcar-locked', lock);
+    if (lock) root.querySelectorAll('.hcar-item .hsec').forEach(x => { if (x.scrollTop) x.scrollTop = 0; });
+  }
+}
+// While the finger that brought the card up is still moving (and its fling), hold the page at the card's top.
+let hcarHold = false, hcarHoldT = 0;
+document.addEventListener('touchstart', () => { clearTimeout(hcarHoldT); hcarHold = false; }, { passive: true, capture: true });
+document.addEventListener('touchend', () => { clearTimeout(hcarHoldT); if (hcarHold) hcarHoldT = setTimeout(() => { hcarHold = false; }, 900); }, { passive: true, capture: true });
+document.addEventListener('scroll', e => { if (e.target && e.target.id === 'view') hcarLockCheck(); }, { capture: true, passive: true });
+window.addEventListener('resize', () => hcarLockCheck());
 function setHomeFeedMode(mode) {
   homeFeedMode = mode === 'list' ? 'list' : 'carousel';
   try { localStorage.setItem('homeFeedMode', homeFeedMode); } catch (e) {}
@@ -3673,6 +3698,49 @@ function justAddedList(now = Date.now()) {
   return out.sort((a, b) => (a.who === 'sarah' ? 0 : 1) - (b.who === 'sarah' ? 0 : 1) || b.at - a.at);
 }
 function jaAgo(at, now = Date.now()) { const m = Math.round((now - at) / 6e4); return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 120 ? '1 hr ago' : m < 1440 ? Math.round(m / 60) + ' hrs ago' : 'yesterday'; }
+/* 2.23.44: Notifications carousel by category. Coming up and Just added first, then a card per tab with a
+   short live preview and an Open link. Category label + colour on each card, jump chips above the carousel. */
+const TAB_CATS = [
+  { id: 'today', name: 'Today', col: '#2563eb', keys: ['comingup', 'justadded', 'quotejoke', 'todo', 'calendar'] },
+  { id: 'money', name: 'Money', col: '#059669', keys: ['bills', 'budget', 'claims'] },
+  { id: 'home', name: 'Home & Life', col: '#d97706', keys: ['shopping', 'meals', 'health', 'cars', 'pets', 'birthdays'] },
+  { id: 'out', name: 'Out & About', col: '#7c3aed', keys: ['events', 'travel'] },
+  { id: 'fun', name: 'Fun', col: '#db2777', keys: ['news', 'videos', 'tv'] }
+];
+const TAB_ART = { todo: 'todo', calendar: 'ev', bills: 'bill', budget: 'bill', claims: 'health', shopping: 'shop', meals: 'shop', health: 'health', cars: 'car', pets: 'pet', birthdays: 'bday', events: 'ev', travel: 'travel', news: 'news', videos: 'tv', tv: 'tv' };
+const TAB_NAME = { todo: 'To-do', calendar: 'Calendar', bills: 'Bills', budget: 'Budget', claims: 'Claims', shopping: 'Shopping', meals: 'Meals', health: 'Health', cars: 'Cars', pets: 'Pets', birthdays: 'Birthdays', events: 'Events', travel: 'Travel', news: 'News', videos: 'Videos', tv: 'TV guide' };
+const tabCatOf = k => TAB_CATS.find(c => c.keys.includes(k));
+function tabRow(k, t, s, go) {
+  const a = TAB_ART[k];
+  return `<button class="row" onclick="${go || `go('#${k}')`}"><div class="ic ${(NAV[k] && NAV[k][1]) || 'todo'}${cardArtOn() && a ? ' icart' : ''}">${cardArtOn() && a ? `<img src="art/i3-${a}.webp" alt="" width="40" height="40" loading="lazy">` : I((NAV[k] && NAV[k][0]) || 'right')}</div><div class="tx"><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ''}</div></button>`;
+}
+const TAB_PREVIEW = {
+  calendar: () => { const T = todayISO(); const l = (S.appts || []).filter(a => a.date >= T && !a.done).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).slice(0, 4);
+    return l.length ? l.map(a => tabRow('calendar', esc(a.title), fmtW(a.date) + (a.time ? ' · ' + fmtTime(a.time) : ''), `calOpenDay(${parseD(a.date)})`)).join('') : tabRow('calendar', 'Nothing booked', 'Appointments, events and holidays'); },
+  budget: () => tabRow('budget', 'This fortnight', budgetMoreSub()),
+  claims: () => { const l = claimRows().filter(x => claimOpen(x.claim)).slice(0, 4); return l.length ? l.map(x => tabRow('claims', 'Claim for ' + esc(x.title), 'UniMed · visit ' + fmtW(x.date), `claimSheet('${x.ref}')`)).join('') : tabRow('claims', 'No open claims', 'UniMed claims'); },
+  health: () => tabRow('health', 'Health', healthMoreSub()),
+  travel: () => { const p = travelToday(); return tabRow('travel', esc(p.name) + ', ' + esc(p.country), esc(travelKmText(travelKm(p.lat, p.lon))) + ' away · ' + esc(sumTravelTime(p.tz)) + ' there'); }
+};
+function tabCardHtml(k) {
+  const name = TAB_NAME[k] || (NAV[k] && NAV[k][2]) || k;
+  let body = '';
+  try { if (TAB_PREVIEW[k]) body = `<div class="list tabprev">${TAB_PREVIEW[k]()}</div>`; else if (HOME_CARD[k]) body = cardArt(HOME_CARD[k](), '') || ''; } catch (e) { body = ''; }
+  body = body.replace(/^\s*<div class="sec">[\s\S]*?<\/div>/, '');
+  if (!body.trim()) body = `<div class="list tabprev">${tabRow(k, name, 'Nothing to show right now')}</div>`;
+  return `<div class="tabhead">${cardArtOn() && TAB_ART[k] ? `<img src="art/i3-${TAB_ART[k]}.webp" alt="" class="tabico">` : ''}<span class="tabname">${esc(name)}</span></div>${body}<div class="feedpillrow"><button type="button" class="feedpill tabopen" onclick="event.stopPropagation();go('#${k}')">Open ${esc(name)} ${I('right')}</button></div>`;
+}
+function catBand(k) { const c = tabCatOf(k); return c ? `<div class="catband" style="--cat:${c.col}">${esc(c.name)}</div>` : ''; }
+function catJumpRow(sections) {
+  const first = {}; sections.forEach((s, i) => { const c = tabCatOf(s.keys[0]); if (c && first[c.id] == null) first[c.id] = i; });
+  const cats = TAB_CATS.filter(c => first[c.id] != null); if (cats.length < 2) return '';
+  return `<div class="catjump" role="toolbar" aria-label="Jump to a category">${cats.map(c => `<button type="button" class="catchip" style="--cat:${c.col}" onclick="catJump(${first[c.id]})">${esc(c.name)}</button>`).join('')}</div>`;
+}
+function catJump(i) {
+  const d = document.querySelector(`#homecarousel .hcar-dot[data-i="${i}"]`);
+  if (d) { d.click(); const r = document.getElementById('homecarousel'); if (r) try { r.scrollIntoView({ block: 'start', behavior: stripReduced() ? 'auto' : 'smooth' }); } catch (e) {} return; }
+  const sec = document.querySelectorAll('#homefeed > section.hsec')[i]; if (sec) sec.scrollIntoView({ block: 'start', behavior: stripReduced() ? 'auto' : 'smooth' });
+}
 // 2.23.42: a pill under Just added switches the feed between scrolling list and carousel (double-tap still works)
 const feedPill = (id) => `<div class="feedpillrow"><button type="button" class="feedpill" id="${id}" onclick="event.stopPropagation();setHomeFeedMode(homeFeedMode === 'list' ? 'carousel' : 'list')">${homeFeedMode === 'list' ? 'Tap here for carousel view' : 'Tap here to change back to scrolling'}</button></div>`;
 function justAddedCard() { return cardArt(justAddedCard0(), 'ja') + feedPill('feedpillja'); }
@@ -3741,6 +3809,12 @@ function Home() {
     } catch (e) { console.error('Home section', g.k, e); }
   });
   if (!night) [['comingup', comingUpCard], ].concat(justAddedOn() ? [['justadded', justAddedCard]] : []).concat(qjTop() ? [] : [['quotejoke', () => qsBlock(stripOn() ? stripHtml() : quoteJokeCard())]]).forEach(([k, fn], i) => { const h = homeTry(k, fn, ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday" data-k="${k}" style="${homeTry('tint', () => homeTintStyle(i, 3))}">${h}</section>` }); });
+  // 2.23.44: one card per tab, by category, after Coming up / Just added
+  { const have = new Set(sections.flatMap(x => x.keys)); TAB_CATS.forEach(c => c.keys.forEach(k => { if (have.has(k) || ['comingup', 'justadded', 'quotejoke'].includes(k)) return; if (!TAB_NAME[k] || !(NAV[k] || HOME_CARD[k] || TAB_PREVIEW[k])) return;
+    const h = homeTry('tab ' + k, () => tabCardHtml(k), ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday htab" data-k="${k}" style="--cat:${c.col}">${h}</section>` }); })); }
+  // keep category order (night cards that aren't in a category go last)
+  { const ord = k => { const ci = TAB_CATS.findIndex(c => c.keys.includes(k)); return ci < 0 ? 99 : ci * 20 + TAB_CATS[ci].keys.indexOf(k); }; sections.sort((a, b) => ord(a.keys[0]) - ord(b.keys[0])); }
+  sections.forEach(sec => { const b = catBand(sec.keys[0]); if (b) sec.html = sec.html.replace(/(<section class="hsec[^"]*"[^>]*>)/, '$1' + b).replace(/<section class="hsec/, '<section data-cat="1" class="hsec'); });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
   const sumTop = sum && before === 0 ? sum : '';
@@ -3753,14 +3827,15 @@ function Home() {
   const startI = Math.max(0, Math.min(Math.max(sections.length - 1, 0), homeCarIdx | 0));
   const carItems = sections.map((sec, i) => `<div class="hcar-item${i === startI ? ' hcar-front' : ''}" data-i="${i}"${i === startI ? '' : ' aria-hidden="true"'}>${sec.html}</div>`).join('');
   const carDots = sections.map((_, i) => `<button type="button" class="hcar-dot${i === startI ? ' on' : ''}" data-i="${i}" aria-label="Card ${i + 1}"></button>`).join('');
-  const carousel = sections.length ? `<div class="hcar" id="homecarousel" aria-roledescription="carousel" aria-label="Notifications cards" data-i="${startI}">
+  const jump = homeTry('cat jump', () => catJumpRow(sections), '');
+  const carousel = sections.length ? jump + `<div class="hcar" id="homecarousel" aria-roledescription="carousel" aria-label="Notifications cards" data-i="${startI}">
     <div class="hcar-stage" id="hcarstage">
       <div class="hcar-track" id="hcartrack">${carItems}</div>
       <div class="hcar-dots">${carDots}</div>
     </div>
     ${feedPill('feedpillcar')}
   </div>` : '';
-  const listFeed = sections.length ? `<div class="hfeed" id="homefeed" data-mode="list">
+  const listFeed = sections.length ? jump + `<div class="hfeed" id="homefeed" data-mode="list">
     
     ${listBody}
   </div>` : '';
@@ -16549,6 +16624,7 @@ function wireHomeCarousel() {
   }
 
   apply(false);
+  hcarLockCheck(); setTimeout(hcarLockCheck, 300);
 
   dots.forEach(d => {
     d.onclick = e => {
