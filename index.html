@@ -1521,6 +1521,15 @@ html[data-theme="dark"] .ic.icart{box-shadow:inset 0 1px 0 rgba(255,255,255,.16)
 .catchip{flex:none;background:var(--cat);color:#fff;border:1.75px solid #000;border-radius:999px;padding:7px 14px;font-weight:800;font-size:.875rem;box-shadow:inset 0 1.5px 0 rgba(255,255,255,.4),0 3px 0 #000;cursor:pointer}
 .catchip:active{transform:translateY(3px);box-shadow:0 0 0 #000}
 @media (prefers-reduced-motion: reduce){.catchip:active{transform:none}}
+/* 2.23.45: clear square tick boxes */
+.tick span{width:22px!important;height:22px!important;border-radius:5px!important;border:2px solid #1f2937!important;background:#fff!important;box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.tick svg.i{width:15px;height:15px;stroke-width:3.4;color:#fff;opacity:0}
+.done .tick span{background:#1d5fbf!important;border-color:#0b2a5c!important}
+.done .tick svg.i{opacity:1}
+.tick:active span{transform:scale(.9)}
+html[data-theme="dark"] .tick span{border-color:#e5e7eb!important;background:transparent!important}
+html[data-theme="dark"] .done .tick span{background:#3b82f6!important;border-color:#bfdbfe!important}
+@media (prefers-reduced-motion: reduce){.tick:active span{transform:none}}
 </style>
 </head>
 <body>

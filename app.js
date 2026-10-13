@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.44';
+const APP_VERSION = '2.23.45';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3814,6 +3814,10 @@ function Home() {
     const h = homeTry('tab ' + k, () => tabCardHtml(k), ''); if (h) sections.push({ keys: [k], html: `<section class="hsec hday htab" data-k="${k}" style="--cat:${c.col}">${h}</section>` }); })); }
   // keep category order (night cards that aren't in a category go last)
   { const ord = k => { const ci = TAB_CATS.findIndex(c => c.keys.includes(k)); return ci < 0 ? 99 : ci * 20 + TAB_CATS[ci].keys.indexOf(k); }; sections.sort((a, b) => ord(a.keys[0]) - ord(b.keys[0])); }
+  // 2.23.45: tab cards that came from the night/notification feed get the same icon header
+  sections.forEach(sec => { const k = sec.keys[0]; if (!TAB_NAME[k] || sec.html.includes('class="tabhead"')) return;
+    const head = `<div class="tabhead">${cardArtOn() && TAB_ART[k] ? `<img src="art/i3-${TAB_ART[k]}.webp" alt="" class="tabico">` : ''}<span class="tabname">${esc(TAB_NAME[k])}</span></div>`;
+    sec.html = sec.html.replace(/(<section class="hsec[^"]*"[^>]*>(?:<span class="newtag">New<\/span>)?)\s*(<div class="sec">[\s\S]*?<\/div>)?/, (m, open) => open + head); });
   sections.forEach(sec => { const b = catBand(sec.keys[0]); if (b) sec.html = sec.html.replace(/(<section class="hsec[^"]*"[^>]*>)/, '$1' + b).replace(/<section class="hsec/, '<section data-cat="1" class="hsec'); });
   let at = 0;
   if (before > 0) sections.forEach((sec, i) => { if (sec.keys.some(k => precede.has(k))) at = i + 1; });
