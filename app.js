@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.53';
+const APP_VERSION = '2.23.54';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3691,9 +3691,9 @@ function quoteJokeCard() {
 }
 /* 2.23.37: card artwork for Coming up and Just added (Krea 2 Turbo images in art/). Settings: Card artwork. */
 const cardArtOn = () => !(S && S.settings && S.settings.cardArt === false);
-const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', br: 'car', bday: 'bday', health: 'health', appt: 'health', med: 'health', pet: 'pet', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'ev', ext: 'ev', todo: 'todo', note: 'todo', idea: 'todo', meal: 'shop', shop: 'shop', ln: 'news', blog: 'news', pod: 'radio', rad: 'radio', tv: 'tv', vid: 'tv', comm: 'weather' };
+const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', br: 'car', bday: 'bday', health: 'health', med: 'health', pet: 'pet', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'cal', ext: 'cal', appt: 'cal', todo: 'todo', note: 'todo', idea: 'todo', meal: 'plate', shop: 'shop', ln: 'news', blog: 'news', pod: 'radio', rad: 'radio', tv: 'tv', vid: 'tv', comm: 'weather' };
 // 2.23.40: a few titles pick a more exact picture
-const CARD_ART_WORD = [[/\b(pay ?day|wages|salary|pay day|commission)\b/i, 'bill'], [/\b(gym|workout|exercise)\b/i, 'health'], [/\b(petrol|fuel|diesel|gas station)\b/i, 'car'], [/\bdent(ist|al)\b|teeth|hygien/i, 'dentist'], [/garden|plant|lawn|mow|seedling|compost/i, 'garden'], [/\b(dog|cat|vet|flea|worm(ing)?|pet)\b/i, 'pet'], [/\\b(weather|rain|storm|wind)\\b/i, 'weather'], [/flight|travel|trip|airport|passport/i, 'travel'], [/netflix|\bTV\b|movie|film/i, 'tv'], [/rewards|countdown|woolworths/i, 'rewards'], [/radio|podcast|music|gig|concert/i, 'radio'], [/birthday/i, 'bday']];
+const CARD_ART_WORD = [[/\b(pay ?day|wages|salary|pay day|commission)\b/i, 'money'], [/\b(gym|workout|exercise)\b/i, 'gym'], [/\b(petrol|fuel|diesel|gas station)\b/i, 'fuel'], [/\bdent(ist|al)\b|teeth|hygien/i, 'dentist'], [/garden|plant|lawn|mow|seedling|compost/i, 'garden'], [/\b(dog|cat|vet|flea|worm(ing)?|pet)\b/i, 'pet'], [/\b(weather|rain|storm|wind)\b/i, 'weather'], [/flight|travel|trip|airport|passport/i, 'travel'], [/netflix|\bTV\b|movie|film/i, 'tv'], [/rewards|countdown|woolworths/i, 'rewards'], [/radio|podcast|music|gig|concert/i, 'radio'], [/birthday/i, 'bday']];
 function cardArt(html, kind) {
   if (!cardArtOn() || !html) return html;
   const t = kind === 'cu' ? 'Coming up' : 'Just added';
@@ -3703,11 +3703,11 @@ function cardArt(html, kind) {
   html = html.replace(/<div class="ic ([a-z]+)( [a-z-]+)?"([^>]*)>(\s*<svg[\s\S]*?<\/svg>\s*)<\/div>/g, (m, ic, extra, attrs, svg, off, str) => {
     if (/icart/.test(extra || '')) return m;
     const rowAt = Math.max(str.lastIndexOf('class="row', off), 0);
-    const near = str.slice(off, off + m.length + 320).replace(/<[^>]+>/g, ' ');
+    const nx = str.indexOf('class="row', off + 1), near = str.slice(off, Math.min(off + m.length + 320, nx > off ? nx : Infinity)).replace(/<[^>]+>/g, ' '); // 2.23.54: this row only
     const before = str.slice(rowAt, off);
     const w = CARD_ART_WORD.find(([re]) => re.test(near));
     const sar = /jasarah/.test(before) || /Sarah added|from Sarah|Sarah’s (?!car|payday)/.test(near);
-    const a = (w && w[1]) || (sar ? 'sarah' : '') || CARD_ART_IC[ic] || 'ev';
+    const a = (w && w[1]) || (sar ? 'sarah' : '') || CARD_ART_IC[ic] || 'cal'; // 2.23.54: generic events fall back to the calendar. Hand-drawn i3-money/gym/fuel/cal/plate; swap in Krea files under the same names
     return `<div class="ic ${ic}${extra || ''} icart"${attrs.replace(/style="[^"]*"/, '')}><img src="art/i3-${a}.webp" alt="" width="40" height="40" loading="lazy"></div>`;
   });
   return html.replace(/(id="(?:comingup|justadded)")/, '$1 data-art="1"').replace(/class="(list[^"]*)" id="(comingup|justadded)"/, 'class="$1 artlist" id="$2"');
@@ -3749,7 +3749,7 @@ const TAB_CATS = [
   { id: 'out', name: 'Out & About', col: '#7c3aed', keys: ['events', 'travel'] },
   { id: 'fun', name: 'Fun', col: '#db2777', keys: ['news', 'videos', 'tv'] }
 ];
-const TAB_ART = { todo: 'todo', calendar: 'ev', bills: 'bill', budget: 'bill', claims: 'health', shopping: 'shop', meals: 'shop', health: 'health', cars: 'car', pets: 'pet', birthdays: 'bday', events: 'ev', travel: 'travel', news: 'news', videos: 'tv', tv: 'tv' };
+const TAB_ART = { todo: 'todo', calendar: 'cal', bills: 'bill', budget: 'money', claims: 'health', shopping: 'shop', meals: 'plate', health: 'health', cars: 'car', pets: 'pet', birthdays: 'bday', events: 'ev', travel: 'travel', news: 'news', videos: 'tv', tv: 'tv' };
 const TAB_NAME = { todo: 'To-do', calendar: 'Calendar', bills: 'Bills', budget: 'Budget', claims: 'Claims', shopping: 'Shopping', meals: 'Meals', health: 'Health', cars: 'Cars', pets: 'Pets', birthdays: 'Birthdays', events: 'Events', travel: 'Travel', news: 'News', videos: 'Videos', tv: 'TV guide' };
 const tabCatOf = k => TAB_CATS.find(c => c.keys.includes(k));
 function tabRow(k, t, s, go) {
