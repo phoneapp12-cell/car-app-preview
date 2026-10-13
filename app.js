@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.48';
+const APP_VERSION = '2.23.49';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3596,12 +3596,46 @@ const CU_EXTRA = {
   cd: T => countdownRows().filter(x => x.kind === 'mine' || x.kind === 'hol').map(x => ({ x, d: daysLeft(x.date) })).filter(o => o.d >= 0 && o.d <= CU_DAYS).map(({ x, d }) => ({ days: d, rank: 2, sort: '', kind: x.kind === 'hol' ? 'hol' : 'count', name: x.name,
     html: cdRow(x, false) }))
 };
+/* 2.23.49: Coming up is Shane's own things. Auto-sourced events (nightlife suggestions, built-in public holidays,
+   holiday/observance/sport subscription feeds) are left out. His own calendars, My events, appointments,
+   events he tapped Add on, Sarah's shared appointments and his countdowns stay. Planned meals are added,
+   and when fewer than 6 things fall in the 30 days it looks further ahead until there are 6. */
+const CU_MIN = 6;
+const feedNotMine = f => /holiday|observance|public hol|sport|fixture|moon phase|school term|daylight|weather|eventfinda|nightlife|what'?s on/i.test(String(f.name || '') + ' ' + String(f.url || f.src || '')) || /#holiday@group\.v\.calendar|#contacts@group|calendarlabs|officeholidays/i.test(String(f.url || f.src || ''));
+function cuExcluded(x) {
+  if (x.kind === 'night' || x.kind === 'hol') return true;
+  if (x.kind === 'ext') { const bad = (S.feeds || []).filter(feedNotMine).map(f => esc(f.name)); return bad.some(n => n && String(x.html).includes('>' + n + ' · ')); }
+  return false;
+}
+function cuMeals(T) {
+  const out = [];
+  for (let d = 0; d <= 4; d++) { const iso = isoT(T + d * DAY), e = (M().plan || {})[iso]; if (!e || !e.title) continue; try { if (!isCookNight(iso)) continue; } catch (er) {}
+    const lbl = d === 0 ? 'Tonight' : attDay(d, iso);
+    out.push({ days: d, rank: 3, sort: '19:00', kind: 'meal', name: `${lbl}: ${e.title}`, html: attRow({ kind: 'meal', date: iso, go: `openNight('${iso}')`, ic: 'meal', icon: 'meal', title: `${esc(lbl)}: ${esc(e.title)}`, sub: `Dinner · Meal planner` }) }); }
+  return out;
+}
+function cuFar(T, from, to) {
+  const out = [], inR = d => d > from && d <= to;
+  try { dueItems(S).filter(x => inR(x.days)).forEach(x => out.push({ days: x.days, rank: 0, sort: '', kind: x.kind, name: x.title, ref: x, html: rowFor(x).replace('class="row"', `class="row att" data-kind="${x.kind}" data-date="${x.date}"`) })); } catch (e) {}
+  try { mineItems(T + (from + 1) * DAY, T + to * DAY, true).filter(e => !e.done).forEach(e => { const d = daysLeft(e.date); out.push({ days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: e.title,
+    html: attRow({ kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'mine', icon: 'repeat', title: esc(e.title), sub: `My event · ${fmtW(e.date)}` }) }); }); } catch (e) {}
+  try { S.appts.filter(a => inR(daysLeft(a.date)) && !(a.from === 'sarah' && a.done)).forEach(a => out.push({ days: daysLeft(a.date), rank: 1, sort: a.time || '', kind: 'appt', name: a.title,
+    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: (a.from === 'sarah' ? sarahBadge({ from: 'sarah' }) : '') + esc(a.title), sub: `${a.from === 'sarah' ? 'Sarah’s appointment' : a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) })); } catch (e) {}
+  try { S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => inR(x.d)).forEach(x => out.push({ days: x.d, rank: 2, sort: '', kind: 'bday', name: x.b.name + '’s birthday',
+    html: attRow({ kind: 'bday', date: x.iso, go: `go('#birthdays')`, ic: 'bday', icon: 'cake', title: esc(x.b.name) + '’s birthday', sub: 'Birthday · ' + fmtW(x.iso) }) })); } catch (e) {}
+  try { countdownRows().filter(x => x.kind === 'mine' && inR(daysLeft(x.date))).forEach(x => out.push({ days: daysLeft(x.date), rank: 2, sort: '', kind: 'count', name: x.name, html: cdRow(x, false) })); } catch (e) {}
+  return out;
+}
 function comingUpList() {
   const T = todayT(), all = [];
   try { homeAttention().forEach(x => all.push(x)); } catch (e) { }
   Object.values(CU_EXTRA).forEach(src => { try { src(T).forEach(x => all.push(x)); } catch (e) { } });
+  try { cuMeals(T).forEach(x => all.push(x)); } catch (e) { }
+  let pool = all.filter(x => x && x.html && x.days <= CU_DAYS && !cuExcluded(x));
+  // fewer than 6? look further ahead, a month at a time, up to a year
+  for (let to = 60; to <= 365 && pool.length < CU_MIN; to += 30) { const far = cuFar(T, to - 30 === 30 ? CU_DAYS : to - 30, to).sort((a, b) => a.days - b.days); while (far.length && pool.length < CU_MIN) pool.push(far.shift()); }
   const seen = new Set(), out = [];
-  all.filter(x => x && x.html && x.days <= CU_DAYS).forEach(x => {
+  pool.forEach(x => {
     x.pri = cuPri(x);
     const iso = (String(x.html).match(/data-date="(\d{4}-\d{2}-\d{2})"/) || [])[1] || isoT(T + x.days * DAY);
     const k = iso + '|' + cuNorm(x.name || x.html);
@@ -3621,7 +3655,7 @@ function cuRowHtml(x) {
   return h;
 }
 /* 2.23.19: colour-code Coming up by category. Bills and other money rows stay plain. */
-const CU_CATS = [['money', 'Bills & money'], ['car', 'Car'], ['pet', 'Pets'], ['bday', 'Birthdays'], ['event', 'Calendar & events'], ['health', 'Health'], ['todo', 'To-dos'], ['gym', 'Gym'], ['hol', 'Holidays & countdowns']];
+const CU_CATS = [['meal', 'Meals'], ['money', 'Bills & money'], ['car', 'Car'], ['pet', 'Pets'], ['bday', 'Birthdays'], ['event', 'Calendar & events'], ['health', 'Health'], ['todo', 'To-dos'], ['gym', 'Gym'], ['hol', 'Holidays & countdowns']];
 function cuCat(x) {
   const k = x && x.kind;
   if (k === 'car' || k === 'driver') return 'car';
@@ -3630,6 +3664,7 @@ function cuCat(x) {
   if (k === 'health' || k === 'med' || k === 'claim') return 'health';
   if (k === 'todo') return 'todo';
   if (k === 'gym') return 'gym';
+  if (k === 'meal') return 'meal';
   if (k === 'hol' || k === 'cd') return 'hol';
   if (k === 'appt' || k === 'ext' || k === 'mine' || k === 'night' || k === 'ev') return HEALTH_RE.test(String(x.name || '')) || /Sarah’s (doctor|dentist)/.test(String(x.html || '')) ? 'health' : 'event';
   if (k === 'bill' || k === 'loan' || k === 'pay' || k === 'comm' || k === 'budget') return 'money'; // 2.23.20: bills get their own colour
