@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.47';
+const APP_VERSION = '2.23.48';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -594,13 +594,13 @@ const HOME_CARD = {
       if (x.kind === 'loan') {
         const name = 'Loan · ' + x.l.from;
         return `<div class="row bill"><button class="tapzone" onclick="go('#loan/${x.l.id}')"><div class="ic bill">${I('coins')}</div>
-      <div class="tx"><div class="t">${esc(name)}</div><div class="s">Plan · due ${fmtW(x.d)}</div></div><div class="badgestack">${duePill(daysLeft(x.d))}${moneyBadge(x.cents / 100, name)}</div></button>
-      <button class="paybtn" onclick="payForm('${x.l.id}')">Record</button></div>`;
+      <div class="tx"><div class="t">${esc(name)}</div><div class="s">Plan · due ${fmtW(x.d)}</div></div><div class="badgestack">${duePill(daysLeft(x.d))}${moneyBadge(x.cents / 100)}</div></button>
+      <button class="paybtn" aria-label="Record a payment: ${esc(name)}" onclick="payForm('${x.l.id}')">Rec</button></div>`;
       }
       const b = x.b;
       return `<div class="row bill"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(b.name))}</div>
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Due ${fmtW(b.due)}</div></div><div class="badgestack">${duePill(daysLeft(b.due))}${moneyBadge(b.amount, b.name)}</div></button>
-      <button class="paybtn" onclick="markPaid('${b.id}')">Paid</button></div>`;
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Due ${fmtW(b.due)}</div></div><div class="badgestack">${duePill(daysLeft(b.due))}${moneyBadge(b.amount)}</div></button>
+      <button class="paybtn" aria-label="Mark paid: ${esc(b.name)}" onclick="markPaid('${b.id}')">Pd</button></div>`;
     }).join('')}</div>`;
   },
   cars: () => {
@@ -4335,7 +4335,7 @@ function Bills() {
         const name = 'Loan · ' + x.l.from;
         return `<div class="row bill payrow"><button class="tapzone" onclick="go('#loan/${x.l.id}')" aria-label="Open loan from ${esc(x.l.from)}"><div class="ic bill">${I('coins')}</div>
           <div class="tx"><div class="t">${esc(name)}</div><div class="s">Repayment plan · due ${fmtW(x.d)}</div></div></button>
-          <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.cents / 100, name)}<button class="paybtn" onclick="payForm('${x.l.id}')">Record</button></div></div>`;
+          <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.cents / 100)}<button class="paybtn" aria-label="Record a payment: ${esc(name)}" onclick="payForm('${x.l.id}')">Rec</button></div></div>`;
       }
       const cur = x.d === x.b.due;
       return `<div class="row bill payrow"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}"><div class="ic bill">${I(billIcon(x.b.name))}</div>

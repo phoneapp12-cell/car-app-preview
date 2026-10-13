@@ -1530,6 +1530,15 @@ html[data-theme="dark"] .ic.icart{box-shadow:inset 0 1px 0 rgba(255,255,255,.16)
 html[data-theme="dark"] .tick span{border-color:#e5e7eb!important;background:transparent!important}
 html[data-theme="dark"] .done .tick span{background:#3b82f6!important;border-color:#bfdbfe!important}
 @media (prefers-reduced-motion: reduce){.tick:active span{transform:none}}
+/* 2.23.48: bill rows keep the name readable on a 360px phone */
+.row.bill .tx{min-width:0;flex:1 1 auto;word-break:normal;overflow-wrap:normal;hyphens:none}
+.row.bill .tx .t{word-break:normal;overflow-wrap:break-word}
+.row.bill .badgestack{gap:3px;max-width:6.5rem}
+.row.bill .moneybadge b{font-size:1.0625rem}
+.row.bill .paybtn{padding:6px 9px;font-size:.8125rem;min-width:40px;margin-left:4px}
+#homebills .ic{width:38px;height:38px;flex:none}
+#homebills .ic.icart img{width:32px!important;height:32px!important}
+#homebills .row{gap:8px}
 </style>
 </head>
 <body>
