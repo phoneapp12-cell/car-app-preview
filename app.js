@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.49';
+const APP_VERSION = '2.23.50';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3609,9 +3609,11 @@ function cuExcluded(x) {
 }
 function cuMeals(T) {
   const out = [];
-  for (let d = 0; d <= 4; d++) { const iso = isoT(T + d * DAY), e = (M().plan || {})[iso]; if (!e || !e.title) continue; try { if (!isCookNight(iso)) continue; } catch (er) {}
+  // 2.23.50: every planned meal, today and the next 7 days, whatever the night (not only cook nights)
+  for (let d = 0; d <= 7; d++) { const iso = isoT(T + d * DAY), e = ((M() || {}).plan || {})[iso]; if (!e || !String(e.title || '').trim()) continue;
     const lbl = d === 0 ? 'Tonight' : attDay(d, iso);
     out.push({ days: d, rank: 3, sort: '19:00', kind: 'meal', name: `${lbl}: ${e.title}`, html: attRow({ kind: 'meal', date: iso, go: `openNight('${iso}')`, ic: 'meal', icon: 'meal', title: `${esc(lbl)}: ${esc(e.title)}`, sub: `Dinner · Meal planner` }) }); }
+  if (!out.length) out.push({ days: 0, rank: 9, sort: 'zz', kind: 'meal', name: 'Plan meals', html: attRow({ kind: 'meal', date: isoT(T), go: `go('#meals')`, ic: 'meal', icon: 'meal', title: 'Plan meals', sub: 'Nothing planned for the next week · Meal planner', right: '<span class="pill none">Plan</span>' }) });
   return out;
 }
 function cuFar(T, from, to) {
@@ -3713,7 +3715,9 @@ function comingUpCard() { return cardArt(comingUpCard0(), 'cu'); }
 function comingUpCard0() {
   const list = comingUpList();
   if (!list.length) return homeSec('Coming up', '<a href="#calendar">Calendar</a>') + `<div class="card empty" id="comingup"><div class="t">Nothing coming up in the next 30 days</div><div class="s">Sweet as.</div></div>`;
-  const over = list.filter(x => x.days <= 0).length, n = cuShowAll ? list.length : Math.max(CU_SHOW, over);
+  const over = list.filter(x => x.days <= 0).length; let n = cuShowAll ? list.length : Math.max(CU_SHOW, over);
+  // 2.23.50: tonight's and tomorrow's meals are never cut off
+  { const mi = list.map((x, i) => (x.kind === 'meal' && x.days <= 1 ? i : -1)).filter(i => i >= n); mi.reverse().forEach(i => { const [x] = list.splice(i, 1); list.splice(Math.min(n - 1, list.findIndex(y => y.days > x.days) < 0 ? n - 1 : list.findIndex(y => y.days > x.days)), 0, x); }); }
   return homeSec('Coming up', '<a href="#calendar">Calendar</a>') + `<div class="list${cuColoursOn() ? ' cucolours' : ''}" id="comingup">${list.slice(0, n).map(cuRowHtml).join('')}</div>` + cuLegend(list.slice(0, n)) +
     (list.length > n ? `<div class="btns"><button class="btn" id="cumore" onclick="cuShowAll=true;render()">Show more (${list.length - n})</button></div>` : cuShowAll && list.length > CU_SHOW ? `<div class="btns"><button class="btn" id="cumore" onclick="cuShowAll=false;render()">Show fewer</button></div>` : '');
 }
