@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.50';
+const APP_VERSION = '2.23.51';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3577,7 +3577,7 @@ const CU_EXTRA = {
   claims: T => claimRows().filter(x => claimOpen(x.claim) && x.date && daysLeft(x.date) <= -1 && daysLeft(x.date) >= -30).map(x => ({ days: 0, rank: 2, sort: 'zz', kind: 'claim', name: 'Claim for ' + x.title,
     html: attRow({ kind: 'claim', date: todayISO(), go: `claimSheet('${x.ref}')`, ic: 'health', icon: 'medkit', title: `${x.sarah ? sarahBadge({ from: 'sarah' }) : ''}Claim for ${esc(x.title)} not submitted`, sub: `UniMed · visit ${fmtW(x.date)}${x.claim && x.claim.status === 'draft' ? ' · draft saved' : ''}` }) })),
   apptLater: T => S.appts.filter(a => { const d = daysLeft(a.date); return d > ATT_WEEK && d <= CU_DAYS && !(a.from === 'sarah' && a.done); }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: a.title,
-    html: attRow({ kind: 'appt', date: a.date, go: a.from === 'sarah' ? `apptForm('${a.id}')` : `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: (a.from === 'sarah' ? sarahBadge({ from: 'sarah' }) : '') + esc(a.title) + (a.time ? ' ' + fmtTime(a.time) : ''), sub: `${a.from === 'sarah' ? 'Sarah’s ' + esc((SARAH_APPT_TYPE[a.kind] || 'appointment').toLowerCase()) + (a.place ? ' · ' + esc(a.place) : '') : a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) }; }),
+    html: attRow({ kind: 'appt', date: a.date, go: a.from === 'sarah' ? `apptForm('${a.id}')` : `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: ((a.from === 'sarah' || a.sTodo) ? sarahBadge({ from: 'sarah' }) : '') + esc(a.title) + (a.time ? ' ' + fmtTime(a.time) : ''), sub: `${a.from === 'sarah' ? 'Sarah’s ' + esc((SARAH_APPT_TYPE[a.kind] || 'appointment').toLowerCase()) + (a.place ? ' · ' + esc(a.place) : '') : a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) }; }),
   extLater: T => { const seen = new Set(); return extEvents(T + (ATT_WEEK + 1) * DAY, T + CU_DAYS * DAY).filter(e => { const k = (e.tag || '') + '|' + e.title; if (seen.has(k)) return false; seen.add(k); return true; }).map(e => { const d = daysLeft(e.date); return { days: d, rank: 1, sort: e.sort || '', kind: 'ext', name: e.title,
     html: attRow({ kind: 'ext', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'ext', icStyle: e.color ? `background:${e.color}1f;color:${e.color}` : '', icon: 'cal', title: esc(e.title), sub: `${esc(e.tag || 'Calendar')} · ${fmtW(e.date)}` }) }; }); },
   // Pills still to take today
@@ -3622,7 +3622,7 @@ function cuFar(T, from, to) {
   try { mineItems(T + (from + 1) * DAY, T + to * DAY, true).filter(e => !e.done).forEach(e => { const d = daysLeft(e.date); out.push({ days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: e.title,
     html: attRow({ kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${parseD(e.date)})`, ic: 'mine', icon: 'repeat', title: esc(e.title), sub: `My event · ${fmtW(e.date)}` }) }); }); } catch (e) {}
   try { S.appts.filter(a => inR(daysLeft(a.date)) && !(a.from === 'sarah' && a.done)).forEach(a => out.push({ days: daysLeft(a.date), rank: 1, sort: a.time || '', kind: 'appt', name: a.title,
-    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: (a.from === 'sarah' ? sarahBadge({ from: 'sarah' }) : '') + esc(a.title), sub: `${a.from === 'sarah' ? 'Sarah’s appointment' : a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) })); } catch (e) {}
+    html: attRow({ kind: 'appt', date: a.date, go: `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: ((a.from === 'sarah' || a.sTodo) ? sarahBadge({ from: 'sarah' }) : '') + esc(a.title), sub: `${a.from === 'sarah' ? 'Sarah’s appointment' : a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}` }) })); } catch (e) {}
   try { S.birthdays.map(b => Object.assign({ b }, bdayInfo(b))).filter(x => inR(x.d)).forEach(x => out.push({ days: x.d, rank: 2, sort: '', kind: 'bday', name: x.b.name + '’s birthday',
     html: attRow({ kind: 'bday', date: x.iso, go: `go('#birthdays')`, ic: 'bday', icon: 'cake', title: esc(x.b.name) + '’s birthday', sub: 'Birthday · ' + fmtW(x.iso) }) })); } catch (e) {}
   try { countdownRows().filter(x => x.kind === 'mine' && inR(daysLeft(x.date))).forEach(x => out.push({ days: daysLeft(x.date), rank: 2, sort: '', kind: 'count', name: x.name, html: cdRow(x, false) })); } catch (e) {}
@@ -3649,7 +3649,7 @@ function comingUpList() {
 function cuRowHtml(x) {
   let h = cuChip(x.html, x.days, x.iso);
   const t = x.ref && x.ref.todo;
-  if (t && isSarahTodo(t)) h = h.replace('<div class="t">', '<div class="t">' + sarahBadge(t));
+  if (t && isSarahTodo(t)) h = sTodoCalInject(h.replace('<div class="t">', '<div class="t">' + sarahBadge(t)), t);
   else if (t && isMineShared(t)) h = h.replace('<div class="t">', '<div class="t"><span class="bluedot" title="Shared with Sarah"></span>');
   if (x.pri === 0) h = h.replace('class="row', 'class="row cuhi');
   const cat = cuColoursOn() ? cuCat(x) : '';
@@ -3726,7 +3726,7 @@ const jaTime = x => { const c = Number(x && x.created) || 0; return c > 1.5e12 ?
 function justAddedList(now = Date.now()) {
   const seenAt = Number(S.settings && S.settings.justSeenAt) || 0, from = Math.max(now - JA_MS, seenAt), out = [];
   const add = (at, o) => { if (at > from && at <= now + 6e4) out.push(Object.assign({ at }, o)); };
-  (S.todos || []).forEach(t => { if (t.done) return; add(jaTime(t), { who: isSarahTodo(t) ? 'sarah' : '', ic: 'todo', icon: 'todo', title: (isSarahTodo(t) ? sarahBadge(t) : '') + esc(t.title), sub: `${isSarahTodo(t) ? 'Sarah added · ' : ''}To-do · ${esc(t.list || '')}${t.due ? ' · ' + fmtW(t.due) : ''}`, go: `todoForm('${t.id}')` }); });
+  (S.todos || []).forEach(t => { if (t.done) return; add(jaTime(t), { who: isSarahTodo(t) ? 'sarah' : '', ic: 'todo', icon: 'todo', title: (isSarahTodo(t) ? sarahBadge(t) : '') + esc(t.title), sub: `${isSarahTodo(t) ? 'Sarah added · ' : ''}To-do · ${esc(t.list || '')}${t.due ? ' · ' + fmtW(t.due) : ''}`, go: `todoForm('${t.id}')`, tid: isSarahTodo(t) ? t.id : '' }); });
   ((S.shop && S.shop.items) || []).forEach(x => { if (x.done) return; const sar = isSarahShop(x); add(jaTime(x), { who: sar ? 'sarah' : '', ic: 'meal', icon: 'cart', title: (sar ? sarahBadge({ from: 'sarah' }) : '') + esc(x.name), sub: [sar ? 'Sarah added' : '', 'Shopping', x.brand ? esc(brandLine(x.brand)) : ''].filter(Boolean).join(' · '), go: `go('#shopping');setTimeout(()=>shopEdit('${x.id}'),60)` }); });
   (S.bills || []).forEach(b => { if (b.paid) return; const inv = b.invoice; const at = inv && inv.at ? (Number(inv.at) || Date.parse(inv.at) || 0) : 0;
     if (at) add(at, { who: 'auto', ic: 'bill', icon: billIcon(b.name), title: esc(b.name), sub: `Added from ${esc(inv.from || 'an')} email · ${money(b.amount)} due ${fmtW(b.due)}`, go: `go('#bills')` });
@@ -3789,7 +3789,7 @@ function justAddedCard0() {
   const list = justAddedList();
   const head = homeSec('Just added', list.length ? '<button class="linkbtn jaclear" id="jaclear" onclick="justAddedClear()">Clear…</button>' : '');
   if (!list.length) return head + `<div class="card empty" id="justadded"><div class="t">Nothing new in the last two days</div><div class="s">New things from Sarah, and bills from emails, show here.</div></div>`;
-  return head + `<div class="list" id="justadded">${list.slice(0, 12).map(x => `<button class="row ja${x.who === 'sarah' ? ' jasarah' : ''}" onclick="${x.go}"><div class="ic ${x.ic}">${I(x.icon)}</div><div class="tx"><div class="t">${x.title}</div><div class="s">${x.sub}</div></div><span class="jaago">${esc(jaAgo(x.at))}</span></button>`).join('')}</div>` +
+  return head + `<div class="list" id="justadded">${list.slice(0, 12).map(x => (h => x.tid ? sTodoCalInject(h, (S.todos || []).find(t => t.id === x.tid)) : h)(`<button class="row ja${x.who === 'sarah' ? ' jasarah' : ''}" onclick="${x.go}"><div class="ic ${x.ic}">${I(x.icon)}</div><div class="tx"><div class="t">${x.title}</div><div class="s">${x.sub}</div></div><span class="jaago">${esc(jaAgo(x.at))}</span></button>`)).join('')}</div>` +
     (list.length > 12 ? `<p class="muted" style="margin:6px 4px 0">and ${list.length - 12} more</p>` : '');
 }
 /* 2.23.25: Clear used to empty the card with one tap. Now it asks first, and Undo stays up for 8 seconds.
@@ -5104,12 +5104,44 @@ function todoClock(t) {
 function todoAppt(t) { return t && t.apptId ? S.appts.find(a => a.id === t.apptId) || null : null; }
 function todoCalBtn(t) {
   const on = !!todoAppt(t);
+  if (isSarahTodo(t)) return `<button class="paybtn scalbtn" style="margin-top:0;align-self:center" onclick="event.stopPropagation();sTodoCal('${t.id}')" aria-label="${on ? 'On calendar' : 'Add to calendar'}: ${esc(t.title)}">${on ? 'On calendar' : 'Add to calendar'}</button>`;
   const label = on ? 'In your calendar' : 'Add to calendar';
   return `<button class="paybtn" style="margin-top:0;align-self:center" onclick="addTodoCal('${t.id}')" aria-label="${label}: ${esc(t.title)}">${label}</button>`;
+}
+/* 2.23.51: Sarah's to-dos (pink S) -> a quick sheet -> My App's calendar with her S. It's marked For: Sarah, so the
+   existing shared appointment flow (apptForSarah) puts it in her app's Appointments too. Google is read-only here
+   (gmail.readonly only, no calendar write scope), so there's no Family calendar option. */
+function sTodoCalInject(h, t) {
+  if (!t || !isSarahTodo(t) || t.done) return h;
+  const on = !!todoAppt(t), b = `<button type="button" class="paybtn scalbtn" style="margin:0 6px 0 2px;align-self:center;flex:none;padding:4px 8px;min-width:0;font-size:12px;white-space:nowrap" onclick="event.stopPropagation();sTodoCal('${t.id}')" aria-label="${on ? 'On calendar' : 'Add to calendar'}: ${esc(t.title)}">${on ? '✓ Cal' : '+ Cal'}</button>`;
+  if (/^<div /.test(h)) return h.replace(/<\/div>\s*$/, b + '</div>');
+  const m = h.match(/^<button ([^>]*?)onclick="([^"]*)"([^>]*)>([\s\S]*)<\/button>\s*$/);
+  if (!m) return h;
+  return `<div ${m[1]}${m[3]} style="display:flex;align-items:center;padding:0"><button type="button" class="tapzone" style="flex:1;min-width:0;display:flex;align-items:center;gap:inherit;background:none;border:0;color:inherit;text-align:left;font:inherit;padding:inherit" onclick="${m[2]}">${m[4]}</button>${b}</div>`;
+}
+function sTodoCal(id) {
+  const t = (S.todos || []).find(x => x.id === id);
+  if (!t || !isSarahTodo(t)) return;
+  const have = todoAppt(t);
+  if (have) { toast(`Already on the calendar for ${fmtW(have.date)}.`, 'Open', () => apptForm(have.id)); return; }
+  const date = parseD(t.due) ? t.due : todayISO();
+  openSheet('Add to calendar', `<label style="display:block">Title<input style="display:block;width:100%" name="title" value="${esc(t.title)}" maxlength="80" required></label>
+    <label style="display:block;margin-top:8px">Date<input style="display:block" type="date" name="date" value="${date}" required></label>
+    <label style="display:block;margin-top:8px">Time (optional)<input style="display:block" type="time" name="time" value="${todoClock(t)}"></label>
+    <p class="muted" style="margin:6px 0 0">Saves to My App’s calendar with Sarah’s S and shows in her app’s Appointments. Your Google Family calendar isn’t connected for writing, so it won’t go there.</p>`,
+    async v => {
+      const title = String(v.title || '').trim().slice(0, 80); if (!title || !parseD(v.date)) return 'Add a title and date.';
+      if (todoAppt(t)) return;
+      const appt = { id: uid('appt'), title, date: v.date, time: /^\d{2}:\d{2}$/.test(v.time || '') ? v.time : '', notes: t.notes || '', todoId: t.id, sTodo: true, for: 'sarah', shareSarah: true };
+      S.appts.push(appt); t.apptId = appt.id;
+      await save(); render();
+      toast(`On the calendar for ${fmtW(appt.date)}${appt.time ? ' at ' + fmtTime(appt.time) : ''}. Shared to Sarah’s app.`);
+    }, 'Add to calendar');
 }
 async function addTodoCal(id) {
   const t = S.todos.find(x => x.id === id);
   if (!t || t.done) return;
+  if (isSarahTodo(t)) return sTodoCal(id);
   const f = document.getElementById('sf');
   const fromForm = !!(sheetOpen && f && f.title && f.list && f.due);
   let title = t.title, list = t.list, due = t.due, notes = t.notes || '';
