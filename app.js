@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.45';
+const APP_VERSION = '2.23.46';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14029,7 +14029,9 @@ function sumTickerize(el) {
   if (!all.length) return;
   el.dataset.tk = '1';
   const urg = c => c.classList.contains('late') || c.classList.contains('urgent');
-  let pick = all.filter(c => !(c.matches('li') && !urg(c) && c.textContent.trim().length < 22));
+  // 2.23.46: no weather in the ticker (the weather box already shows it)
+  const wxLine = c => !c.matches('.sumsug') && /°|\b(weather|forecast|temperature|degrees|rain(y|ing)?|showers?|drizzle|sunny|sunshine|cloudy|clouds?|overcast|wind(y)?|gusts?|storms?|thunder|frost|humid|hot|cold|chilly|warm(er)?|cool(er)?|umbrella|sunset|sunrise|uv)\b/i.test(c.textContent);
+  let pick = all.filter(c => !wxLine(c) && !(c.matches('li') && !urg(c) && c.textContent.trim().length < 22));
   if (!pick.length) pick = all.slice(0, 1);
   const keep = Math.max(1, Math.round(all.length * 0.7));
   if (pick.length > keep) { const u = pick.filter(urg), o = pick.filter(c => !urg(c)); pick = pick.filter(c => urg(c) || o.indexOf(c) < Math.max(0, keep - u.length)); }
@@ -14045,9 +14047,10 @@ function sumTickerize(el) {
   shade.appendChild(box); shade.appendChild(full);
   // 2.23.41: the Full summary pill sits on its own line under the bar
   const wrap = el.closest('#tkhome'); (wrap || shade).querySelectorAll(':scope > .tkfoot').forEach(x => x.remove()); (wrap || shade).appendChild(foot);
-  tkX = 0;
+  // 2.23.46: re-renders rebuild this element; only restart the scroll when the words actually change
+  if (plain !== tkText) { tkText = plain; tkX = 0; }
 }
-let tkX = 0, tkLast = 0, tkDrag = null;
+let tkX = 0, tkLast = 0, tkDrag = null, tkText = '';
 const TK_PX = 55;
 function tkFrame(t) {
   const h = document.getElementById('homesum');
