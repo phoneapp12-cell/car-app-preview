@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.54';
+const APP_VERSION = '2.23.55';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7347,23 +7347,67 @@ function addToShop(names, meal) {
   });
   return n;
 }
+/* 2.23.55: Woolworths NZ prices next to each shopping item, from the relay's /prices (woolworths.co.nz's own public
+   product search, online default-store prices). A chosen brand is matched; otherwise the top relevant product.
+   Real prices only: no match means no price. Kept on this phone ~20 h, refreshed as items are added and daily. */
+const WW_AGE = 20 * 3600e3;
+let WWP = null, wwBusy = false, wwTimer = 0, wwTries = 0;
+const wwStore = () => { if (!WWP) { try { WWP = JSON.parse(localStorage.getItem('wwPrices') || '{}') || {}; } catch (e) { WWP = {}; } } return WWP; };
+const wwBrand = x => (x && x.brand && !x.brand.any ? String(x.brand.brand || x.brand.name || (typeof x.brand === 'string' ? x.brand : '') || '') : '');
+const wwKey = x => mNorm(x.name) + '|' + wwBrand(x).toLowerCase();
+const wwGet = x => { const e = wwStore()[wwKey(x)]; return e && e.product ? e.product : null; };
+const wwMoney = v => '$' + Number(v).toFixed(2);
+const wwTitle = s => String(s || '').replace(/\b([a-z])/g, c => c.toUpperCase());
+function wwPriceHtml(x) {
+  if (x.done) return '';
+  const p = wwGet(x); if (!p) return '';
+  const unit = p.unit && !(p.per === 'kg' && /^1kg$/i.test(p.unit.per)) ? `<small>${wwMoney(p.unit.price)}/${esc(p.unit.per.replace(/^1(?=[a-z])/i, ''))}</small>` : '';
+  return `<a class="wwprice" href="${esc(p.url || 'https://www.woolworths.co.nz/')}" target="_blank" rel="noopener" aria-label="${esc(wwTitle(p.name))} ${p.size ? esc(p.size) + ' ' : ''}at Woolworths, ${wwMoney(p.price)}${p.per ? ' per kg' : ''}${p.special ? ', on special' : ''}" title="${esc(wwTitle(p.name))}${p.size ? ' ' + esc(p.size) : ''}">${p.special ? `<span class="wwsp">${p.club ? 'Club' : 'Special'}</span>` : ''}<b>${wwMoney(p.price)}${p.per ? '<small>/kg</small>' : ''}</b>${unit}</a>`;
+}
+function wwTotalHtml(open) {
+  const priced = open.filter(wwGet); if (!priced.length) return '';
+  const sum = priced.reduce((a, x) => a + wwGet(x).price, 0), kg = priced.some(x => wwGet(x).per === 'kg');
+  return `<div class="wwtotal" id="wwtotal"><span>Estimated total <b>${wwMoney(sum)}</b></span><small>${priced.length} of ${open.length} priced at Woolworths${kg ? ' · by-kg items as 1 kg' : ''}</small></div>`;
+}
+function wwSoon(ms = 800) { clearTimeout(wwTimer); wwTimer = setTimeout(() => wwRefresh().catch(() => {}), ms); }
+async function wwRefresh() {
+  if (wwBusy || !RELAY_URL || navigator.onLine === false || !S || !S.shop) return;
+  const st = wwStore(), now = Date.now();
+  const need = [], seen = new Set();
+  S.shop.items.filter(x => !x.done).forEach(x => { const k = wwKey(x), e = st[k]; if (seen.has(k) || (e && now - e.at < WW_AGE)) return; seen.add(k); need.push(x); });
+  if (!need.length) return;
+  wwBusy = true; let changed = false, pending = false;
+  try {
+    const r = await fetch(RELAY_URL + '/prices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, items: need.slice(0, 25).map(x => ({ q: x.name, brand: wwBrand(x) })) }) });
+    const d = await r.json().catch(() => null);
+    if (r.ok && d && Array.isArray(d.items)) d.items.forEach((it, i) => {
+      const x = need[i]; if (!x || !it) return;
+      if (it.pending || it.error) { pending = true; return; }
+      st[wwKey(x)] = { at: now, product: it.product || null }; changed = true;
+    });
+  } catch (e) { } finally { wwBusy = false; }
+  if (changed) { try { localStorage.setItem('wwPrices', JSON.stringify(st)); } catch (e) { } if (/^#shop/.test(location.hash) && !sheetOpen) render(); }
+  if ((pending || need.length > 25) && wwTries++ < 6) wwSoon(4000); else if (!pending) wwTries = 0;
+}
+setInterval(() => { if (/^#shop/.test(location.hash)) wwSoon(100); }, 3600e3);
 function shopRow(x) {
   const hint = needsCheck(x.name) ? ' <span class="chk">check label</span>' : '';
   const sub = [x.brand ? `<span class="brandln">${esc(brandLine(x.brand))}</span>` : '', x.meals.length ? 'For ' + esc(x.meals.slice(0, 3).join(', ')) + (x.meals.length > 3 ? '…' : '') : '', isMineShared(x) ? 'Shared with Sarah' : ''].filter(Boolean).join(' · ');
   return `<div class="row shopitem ${x.done ? 'done' : ''}" data-id="${x.id}"><button class="tick" aria-label="${x.done ? 'Untick' : 'Tick off'} ${esc(x.name)}" onclick="shopTick('${x.id}')"><span>${I('check')}</span></button>
-    <button class="tapzone" onclick="shopEdit('${x.id}')"><div class="tx"><div class="t">${isSarahShop(x) ? sarahBadge({ from: 'sarah' }) : ''}${esc(x.name)}${hint}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div></button></div>`;
+    <button class="tapzone" onclick="shopEdit('${x.id}')"><div class="tx"><div class="t">${isSarahShop(x) ? sarahBadge({ from: 'sarah' }) : ''}${esc(x.name)}${hint}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div></button>${wwPriceHtml(x)}</div>`;
 }
 function Shopping() {
   const open = S.shop.items.filter(x => !x.done).sort((a, b) => (a.created || 0) - (b.created || 0));
   const got = S.shop.items.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const nights = shopNights().length;
+  wwSoon();
   return header('Shopping list', open.length ? plural(open.length, 'thing') + ' to get' : 'Nothing to get') + mealTabs('shop') +
     `<form class="addbar" onsubmit="shopQuickAdd(event)"><input id="newshop" placeholder="Add an item…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New shopping item"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="shopshare"> Also add to Sarah’s list</label>
     <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button>` : ''}</div>
-    ${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
+    ${wwTotalHtml(open)}${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
     ${got.length ? `<div class="sec">Got <button onclick="clearGot()">Clear</button></div><div class="list" id="shopgot">${got.map(shopRow).join('')}</div>` : ''}
-    <div class="foot">“Check label” means gluten often hides in it, so look for “gluten free” on the pack. Tap an item to change or delete it.</div>`;
+    <div class="foot">“Check label” means gluten often hides in it, so look for “gluten free” on the pack. Tap an item to change or delete it. Prices are Woolworths NZ online prices (woolworths.co.nz), checked daily; tap one to open the product.</div>`;
 }
 async function shopQuickAdd(e) {
   e.preventDefault();
