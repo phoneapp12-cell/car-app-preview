@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.46';
+const APP_VERSION = '2.23.47';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3655,20 +3655,22 @@ function quoteJokeCard() {
 const cardArtOn = () => !(S && S.settings && S.settings.cardArt === false);
 const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', br: 'car', bday: 'bday', health: 'health', appt: 'health', med: 'health', pet: 'pet', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'ev', ext: 'ev', todo: 'todo', note: 'todo', idea: 'todo', meal: 'shop', shop: 'shop', ln: 'news', blog: 'news', pod: 'radio', rad: 'radio', tv: 'tv', vid: 'tv', comm: 'weather' };
 // 2.23.40: a few titles pick a more exact picture
-const CARD_ART_WORD = [[/\bdent(ist|al)\b|teeth|hygien/i, 'dentist'], [/garden|plant|lawn|mow|seedling|compost/i, 'garden'], [/\b(dog|cat|vet|flea|worm(ing)?|pet)\b/i, 'pet'], [/\\b(weather|rain|storm|wind)\\b/i, 'weather'], [/flight|travel|trip|airport|passport/i, 'travel'], [/netflix|\bTV\b|movie|film/i, 'tv'], [/rewards|countdown|woolworths/i, 'rewards'], [/radio|podcast|music|gig|concert/i, 'radio'], [/birthday/i, 'bday']];
+const CARD_ART_WORD = [[/\b(pay ?day|wages|salary|pay day|commission)\b/i, 'bill'], [/\b(gym|workout|exercise)\b/i, 'health'], [/\b(petrol|fuel|diesel|gas station)\b/i, 'car'], [/\bdent(ist|al)\b|teeth|hygien/i, 'dentist'], [/garden|plant|lawn|mow|seedling|compost/i, 'garden'], [/\b(dog|cat|vet|flea|worm(ing)?|pet)\b/i, 'pet'], [/\\b(weather|rain|storm|wind)\\b/i, 'weather'], [/flight|travel|trip|airport|passport/i, 'travel'], [/netflix|\bTV\b|movie|film/i, 'tv'], [/rewards|countdown|woolworths/i, 'rewards'], [/radio|podcast|music|gig|concert/i, 'radio'], [/birthday/i, 'bday']];
 function cardArt(html, kind) {
   if (!cardArtOn() || !html) return html;
   const t = kind === 'cu' ? 'Coming up' : 'Just added';
   html = html.replace(/<div class="sec">(Coming up|Just added)\s*([\s\S]*?)<\/div>/, (m, ti, link) => `<div class="artban" style="background-image:url(art/${kind}-banner.webp)"><span class="artbt">${ti}</span>${link ? `<span class="artbl">${link}</span>` : ''}</div>`);
   // each row: the icon tile becomes the matching illustration (Sarah's things get the heart locket)
-  html = html.replace(/(<(?:button|div) class="row[^"]*"[^>]*>)\s*<div class="ic ([a-z]+)"([^>]*)>([\s\S]*?)<\/div>(\s*<div class="tx">)([\s\S]*?<div class="t">)/g, (m, open, ic, attrs, svg, tx, t, off, str) => {
-    const near = str.slice(off, off + m.length + 260).replace(/<[^>]+>/g, ' ');
-    const sar = /jasarah/.test(open) || /sarahbadge|class="sbadge|Sarah/.test(t.slice(0, 200)) && /from Sarah|Sarah added|Sarah’s/.test(m + t);
-    const tt = t.replace(/<[^>]+>/g, ' ') + ' ' + (m.match(/<div class="t">([^<]*)/) || [])[1];
+  // 2.23.47: every icon tile in the card, wherever it sits in the row (rows with a tick box put it after the box)
+  html = html.replace(/<div class="ic ([a-z]+)( [a-z-]+)?"([^>]*)>(\s*<svg[\s\S]*?<\/svg>\s*)<\/div>/g, (m, ic, extra, attrs, svg, off, str) => {
+    if (/icart/.test(extra || '')) return m;
+    const rowAt = Math.max(str.lastIndexOf('class="row', off), 0);
+    const near = str.slice(off, off + m.length + 320).replace(/<[^>]+>/g, ' ');
+    const before = str.slice(rowAt, off);
     const w = CARD_ART_WORD.find(([re]) => re.test(near));
-    const a = sar ? 'sarah' : (w && w[1]) || CARD_ART_IC[ic];
-    if (!a) return m;
-    return `${open}<div class="ic ${ic} icart"><img src="art/i3-${a}.webp" alt="" width="40" height="40" loading="lazy"></div>${tx}${t}`;
+    const sar = /jasarah/.test(before) || /Sarah added|from Sarah|Sarah’s (?!car|payday)/.test(near);
+    const a = (w && w[1]) || (sar ? 'sarah' : '') || CARD_ART_IC[ic] || 'ev';
+    return `<div class="ic ${ic}${extra || ''} icart"${attrs.replace(/style="[^"]*"/, '')}><img src="art/i3-${a}.webp" alt="" width="40" height="40" loading="lazy"></div>`;
   });
   return html.replace(/(id="(?:comingup|justadded)")/, '$1 data-art="1"').replace(/class="(list[^"]*)" id="(comingup|justadded)"/, 'class="$1 artlist" id="$2"');
 }
