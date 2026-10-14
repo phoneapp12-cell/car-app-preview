@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.73';
+const APP_VERSION = '2.23.74';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9230,14 +9230,69 @@ function themeArt(k) {
   }
   return (TA_ART[k] = h);
 }
+
+/* 2.23.74: weather theme art, drawn in SVG/CSS. Rain, wind and fog move with transforms only (cheap), and
+   prefers-reduced-motion stops all of it (index.html). Clear nights reuse the Night sky art, sunny days the Sunshine art. */
+const WX_SKY = { sunny: ['#FFE7A3', '#FFF4DA', '#FFE6C2'], hot: ['#FFC98A', '#FFE2B8', '#FFD9A0'], pc: ['#BFE6F4', '#DDF2F8', '#EEF8F6'], windy: ['#BFE3F2', '#E3F3F9', '#EEF8F6'],
+  cloudy: ['#C9D3DD', '#E1E7ED', '#E9EDF1'], drizzle: ['#BCC7D2', '#DCE2E9', '#E6EBF0'], rain: ['#A9B6C4', '#D3DAE2', '#E1E6EC'], heavy: ['#A8B4C2', '#CDD4DC', '#DCE1E7'], storm: ['#97A3B2', '#C3CBD5', '#D6DCE3'], fog: ['#DDE2E6', '#EBEEF1', '#EEF1F3'] };
+const WX_SKY_N = { clear: ['#050A1F', '#0B1438', '#18215A'], cloud: ['#0A0F22', '#121A36', '#1C2440'], storm: ['#05070F', '#0E1322', '#1A2030'], fog: ['#0E1424', '#182034', '#222A3E'] };
+function wxSky(t) {
+  const m = t.slice(3).split('-'), k = m[0], n = m[1] === 'n';
+  const c = n ? WX_SKY_N[k === 'storm' || k === 'heavy' ? 'storm' : k === 'fog' ? 'fog' : ['sunny', 'hot', 'windy'].includes(k) ? 'clear' : 'cloud'] : WX_SKY[k] || WX_SKY.sunny;
+  return `linear-gradient(180deg,${c[0]} 0%,${c[1]} 45%,${c[2]} 100%)`;
+}
+function wxCloud(x, y, sc, col, op) { return `<g transform="translate(${x} ${y}) scale(${sc})" opacity="${op}"><ellipse cx="0" cy="0" rx="46" ry="20" fill="${col}"/><ellipse cx="-24" cy="-10" rx="24" ry="20" fill="${col}"/><ellipse cx="14" cy="-18" rx="30" ry="26" fill="${col}"/><ellipse cx="40" cy="-4" rx="20" ry="16" fill="${col}"/></g>`; }
+function wxClouds(n, col, op, seed) {
+  const r = taRand(seed); let g = '';
+  for (let i = 0; i < n; i++) g += wxCloud(taN(r() * 420 - 10), taN(30 + r() * 150), taN(.7 + r() * .9), col, taN(op * (.7 + r() * .3)));
+  return `<g class="ta-drift" style="animation-duration:${60 + seed % 30}s">${g}</g>`;
+}
+function wxRainTile(len, w, op, col) {
+  let l = ''; [[8, 6], [34, 52], [58, 18], [70, 84], [20, 96]].forEach(([x, y]) => { l += `<line x1="${x}" y1="${y}" x2="${x - 3}" y2="${y + len}" stroke="${col}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`; l += `<line x1="${x}" y1="${y - 120}" x2="${x - 3}" y2="${y - 120 + len}" stroke="${col}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`; });
+  return `url('data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='80' height='120'>${l.replace(/"/g, "'")}</svg>`).replace(/'/g, '%27')}')`;
+}
+const WX_RAIN = { drizzle: [10, 1.2, .45, 2.4], rain: [18, 1.6, .55, 1.1], heavy: [26, 2, .65, .75], storm: [24, 2, .6, .8] };
+function wxArt(t, prev) {
+  const m = t.slice(3).split('-'), k = m[0], n = m[1] === 'n', key = t + (prev ? '|p' : '');
+  if (TA_ART[key]) return TA_ART[key];
+  let h = '';
+  const clear = ['sunny', 'hot'].includes(k);
+  if (prev) { // small picture for the theme picker
+    const body = (clear || k === 'windy' || k === 'pc' ? (n ? '<circle cx="74" cy="18" r="9" fill="#F4EBC4"/>' : '<circle cx="18" cy="14" r="12" fill="#FDB022"/>') : '') +
+      (['pc', 'cloudy', 'drizzle', 'rain', 'heavy', 'storm'].includes(k) ? wxCloud(52, 26, .55, n ? '#4A5578' : k === 'pc' ? '#FFFFFF' : '#8E9AAB', .95) : '') +
+      (WX_RAIN[k] ? `<g stroke="${n ? '#9FB3E6' : '#3F5E80'}" stroke-width="1.6" stroke-linecap="round" opacity=".8">${[30, 44, 58, 72].map(x => `<line x1="${x}" y1="38" x2="${x - 3}" y2="${38 + WX_RAIN[k][0] * .6}"/>`).join('')}</g>` : '') +
+      (k === 'storm' ? '<path d="M56 34l-8 12h6l-5 12 12-15h-6l5-9Z" fill="#FFD84A"/>' : '') +
+      (k === 'windy' ? `<g fill="none" stroke="${n ? '#B9C4E8' : '#2C6E8A'}" stroke-width="2" stroke-linecap="round" opacity=".8"><path d="M10 34h46q8 0 8-6"/><path d="M18 44h60q8 0 8 6"/></g>` : '') +
+      (k === 'fog' ? `<g fill="${n ? '#8F9AB8' : '#FFFFFF'}" opacity=".8"><rect x="6" y="28" width="88" height="5" rx="2.5"/><rect x="16" y="38" width="76" height="5" rx="2.5"/><rect x="4" y="48" width="70" height="5" rx="2.5"/></g>` : '') +
+      (n ? '<g fill="#fff"><circle cx="12" cy="10" r="1"/><circle cx="40" cy="8" r="1"/><circle cx="90" cy="34" r="1"/></g>' : '') +
+      (k === 'hot' && !n ? '<path d="M0 52Q50 40 100 50V62H0Z" fill="#F59E42" opacity=".6"/>' : '');
+    return (TA_ART[key] = `<svg viewBox="0 0 100 62" aria-hidden="true">${body}</svg>`);
+  }
+  if (clear) h = themeArt(n ? 'night' : 'sun');
+  else if (n) h = TA_SVG('ta-top', '0 0 400 300', `<g fill="#fff">${[[40, 30], [120, 70], [210, 24], [300, 60], [370, 110], [80, 140]].map(([x, y], i) => `<circle class="ta-tw" style="animation-delay:-${i * .7}s" cx="${x}" cy="${y}" r="1.2" opacity="${k === 'pc' || k === 'windy' ? .9 : .35}"/>`).join('')}</g>${k === 'pc' || k === 'windy' ? '<circle cx="330" cy="50" r="22" fill="#F4EBC4" opacity=".9"/><circle cx="340" cy="42" r="20" fill="#0B1438"/>' : ''}`);
+  else if (k === 'pc' || k === 'windy') h = TA_SVG('ta-top', '0 0 400 300', `<defs><radialGradient id="wxSunG"><stop offset="0" stop-color="#FFE27A" stop-opacity=".9"/><stop offset="1" stop-color="#FFC94D" stop-opacity="0"/></radialGradient></defs><circle class="ta-glow" cx="320" cy="40" r="120" fill="url(#wxSunG)"/><circle cx="320" cy="40" r="34" fill="#FDB022" opacity=".9"/>`);
+  const cl = { pc: [4, .9], cloudy: [7, .95], drizzle: [7, .95], rain: [8, 1], heavy: [9, 1], storm: [9, 1], windy: [3, .7], fog: [0, 0] }[k];
+  if (cl && cl[0]) {
+    const col = n ? (k === 'storm' || k === 'heavy' ? '#262D40' : '#323B58') : k === 'pc' || k === 'windy' ? '#FFFFFF' : k === 'cloudy' ? '#F2F5F8' : k === 'drizzle' ? '#DDE3EA' : k === 'rain' ? '#C3CCD6' : k === 'heavy' ? '#A7B2BF' : '#8C98A8';
+    h += TA_SVG('ta-top', '0 0 400 300', wxClouds(cl[0], col, cl[1], k.length * 7 + 3) + (k !== 'pc' && k !== 'windy' ? wxClouds(Math.ceil(cl[0] / 2), col, cl[1] * .8, k.length * 13 + 5) : ''));
+  }
+  if (WX_RAIN[k]) { const [len, w, op, dur] = WX_RAIN[k]; h += `<div class="ta-rain" style="background-image:${wxRainTile(len, w, op, n ? '#A9BCEB' : '#46617F')};animation-duration:${dur}s"></div>`; }
+  if (k === 'storm') h += `<div class="ta-flash"></div>` + TA_SVG('ta-top ta-bolt', '0 0 400 300', '<path d="M250 70l-26 52h20l-18 52 44-66h-22l18-38Z" fill="#FFE27A"/>');
+  if (k === 'windy') h += `<div class="ta-windl">${TA_SVG('', '0 0 800 300', [60, 120, 190, 250].map((y, i) => `<path d="M${i * 60} ${y}h220q30 0 30-20M${400 + i * 60} ${y}h220q30 0 30-20" fill="none" stroke="${n ? '#B9C4E8' : '#2C6E8A'}" stroke-width="3" stroke-linecap="round" opacity="${n ? .35 : .3}"/>`).join(''), 'none')}</div>`;
+  if (k === 'fog') h += [18, 34, 52, 70].map((y, i) => `<div class="ta-fogb" style="top:${y}%;animation-duration:${40 + i * 9}s;animation-delay:-${i * 7}s;background:linear-gradient(90deg,transparent,${n ? 'rgba(150,165,200,.28)' : 'rgba(255,255,255,.75)'} 30%,${n ? 'rgba(150,165,200,.28)' : 'rgba(255,255,255,.75)'} 70%,transparent)"></div>`).join('');
+  if (k === 'hot' && !n) h += `<div class="ta-haze"></div>`;
+  if (!clear) h += TA_SVG('ta-bot', '0 0 400 200', `<path d="M0 140Q90 100 190 130T400 120V200H0Z" fill="${n ? '#0A0F1E' : '#8FA59A'}" opacity="${n ? .9 : .45}"/><path d="M0 170Q120 140 250 165T400 158V200H0Z" fill="${n ? '#060A14' : '#6F877C'}" opacity="${n ? .95 : .4}"/>`, 'xMidYMax slice');
+  return (TA_ART[key] = h);
+}
 function themeArtApply(t) {
   const app = document.getElementById('app'); if (!app) return;
   let el = document.getElementById('themeart');
-  const gfx = GFX_THEMES.includes(t);
+  const gfx = GFX_THEMES.includes(t) || /^wx-/.test(t);
   document.documentElement.classList.toggle('gfx', gfx);
   if (!gfx) { if (el) el.remove(); return; }
   if (!el) { el = document.createElement('div'); el.id = 'themeart'; el.setAttribute('aria-hidden', 'true'); app.insertBefore(el, app.firstChild); }
-  if (el.dataset.k !== t) { el.dataset.k = t; el.innerHTML = themeArt(t); }
+  if (el.dataset.k !== t) { el.dataset.k = t; el.innerHTML = /^wx-/.test(t) ? wxArt(t) : themeArt(t); el.style.background = /^wx-/.test(t) ? wxSky(t) : ''; }
+  document.documentElement.dataset.wx = /^wx-/.test(t) ? t.slice(3) : '';
 }
 // Small picture for the theme picker.
 const TA_PREV = {
@@ -9264,8 +9319,43 @@ const THEMES = [
   ['beach', 'Beach', 'Sand, sea and pōhutukawa', '#0E6E8C', '#E6F5F9', '#FFFDF7', '#122A33', '#BFE6F4'],
   ['night', 'Night sky', 'Stars and a crescent moon', '#A5B8FF', '#0B1438', '#141D47', '#E9ECFF', '#050A1F'],
   ['bush', 'Bush walk', 'Ferns, kauri and mist', '#2F6B3A', '#EAF1E4', '#FBFCF8', '#16231A', '#DCE8D2'],
-  ['auto', 'Auto (weather)', 'Picks one of the four from the forecast', '#0E6E8C', '#E6F5F9', '#FFFDF7', '#122A33', '#BFE6F4']
+  ['auto', 'Auto (weather)', 'Matches the weather in Onerahi, dark after sunset', '#0E6E8C', '#E6F5F9', '#FFFDF7', '#122A33', '#BFE6F4'],
+  // 2.23.74: weather themes. Each switches to its night version from 1 hour after sunset to 5am.
+  ['w-sunny', 'Sunny', 'Weather', '#B8500A', '#FFF4DA', '#FFFBF2', '#2A1C0E', '#FFE7A3'],
+  ['w-hot', 'Hot day', 'Weather', '#B8500A', '#FFE2B8', '#FFFBF2', '#2A1C0E', '#FFC98A'],
+  ['w-pc', 'Partly cloudy', 'Weather', '#0E6E8C', '#E6F5F9', '#FFFDF7', '#122A33', '#BFE6F4'],
+  ['w-cloudy', 'Cloudy', 'Weather', '#2D5E86', '#E7ECF1', '#FCFDFE', '#17212B', '#C9D3DD'],
+  ['w-drizzle', 'Drizzle', 'Weather', '#2D5E86', '#E3E8EE', '#FCFDFE', '#17212B', '#BCC7D2'],
+  ['w-rain', 'Rain', 'Weather', '#2D5E86', '#DDE3EA', '#FCFDFE', '#17212B', '#A9B6C4'],
+  ['w-heavy', 'Heavy rain', 'Weather', '#2D5E86', '#D3DAE2', '#FCFDFE', '#17212B', '#93A1B1'],
+  ['w-storm', 'Storm', 'Weather', '#2D5E86', '#CBD2DB', '#FCFDFE', '#17212B', '#7D8A9C'],
+  ['w-windy', 'Windy', 'Weather', '#0E6E8C', '#EAF6FA', '#FFFDF7', '#122A33', '#BFE3F2'],
+  ['w-fog', 'Fog', 'Weather', '#2D5E86', '#EEF1F3', '#FCFDFE', '#17212B', '#DDE2E6'],
+  ['grey', 'Overcast', '', '#2D5E86', '#E7ECF1', '#FCFDFE', '#17212B', '#C9D3DD', 'hidden']
 ];
+const WX_KIND_NAME = { sunny: 'Sunny', hot: 'Hot day', pc: 'Partly cloudy', cloudy: 'Cloudy', drizzle: 'Drizzle', rain: 'Rain', heavy: 'Heavy rain', storm: 'Storm', windy: 'Windy', fog: 'Fog' };
+const WX_PAL = { sunny: 'sun', hot: 'sun', pc: 'beach', windy: 'beach', cloudy: 'grey', drizzle: 'grey', rain: 'grey', heavy: 'grey', storm: 'grey', fog: 'grey' };
+function wxNightNow() { try { return homeNight(); } catch (e) { const h = new Date().getHours(); return h >= 20 || h < 5; } }
+// From the current Open-Meteo weather code, wind and temperature
+function wxKindNow() {
+  if (!(WX && validWx(WX.data))) return { kind: 'sunny', why: 'no forecast yet' };
+  const c = WX.data.current, code = +c.weather_code, temp = c.temperature_2m, wind = c.wind_speed_10m, t = Math.round(temp);
+  let w = ''; try { w = wmo(code, true, wind).words.toLowerCase(); } catch (e) { }
+  const why = (w ? w + ', ' : '') + t + '°' + (typeof wind === 'number' ? ', wind ' + Math.round(wind) + ' km/h' : '');
+  let kind;
+  if (code >= 95) kind = 'storm';
+  else if ([65, 67, 82].includes(code)) kind = 'heavy';
+  else if ([61, 63, 66, 80, 81].includes(code)) kind = 'rain';
+  else if (code >= 51 && code <= 57) kind = 'drizzle';
+  else if (code === 45 || code === 48) kind = 'fog';
+  else if (code >= 71) kind = 'cloudy'; // snow is rare here: overcast look
+  else if (typeof wind === 'number' && wind >= WX_WINDY) kind = 'windy';
+  else if (code === 3) kind = 'cloudy';
+  else if (code === 2) kind = temp >= 27 ? 'hot' : 'pc';
+  else kind = temp >= 25 ? 'hot' : 'sunny';
+  return { kind, why };
+}
+function wxThemeState() { const k = themeKey(); if (k === 'auto') { const p = wxKindNow(); return { kind: p.kind, why: p.why, night: wxNightNow() }; } if (/^w-/.test(k)) return { kind: k.slice(2), why: '', night: wxNightNow() }; return null; }
 /* 2.23.9: Auto (weather). After sunset until sunrise: Night sky. In daylight, from the current Open-Meteo weather:
    clear or mostly clear and warm (18° or more) -> Sunshine; clear, mostly clear or partly cloudy and cooler, or a
    dry windy day (40 km/h or more) -> Beach; cloudy, fog, drizzle, rain, showers, snow or storms -> Bush walk.
@@ -9281,28 +9371,13 @@ function autoSunTimes() {
   } catch (e) { return null; }
 }
 function autoThemePick() {
-  const hasWx = !!(WX && validWx(WX.data));
-  const st = hasWx ? autoSunTimes() : null;
-  let day;
-  try { day = hasWx ? wxIsDay() : null; } catch (e) { day = null; }
-  if (day == null) { const a = homeAklParts() || {}; day = a.hour >= 7 && a.hour < 19; }
-  if (!day) return { key: 'night', why: st ? (st.now >= st.set ? 'after sunset ' + fmtTime(st.set) : 'before sunrise ' + fmtTime(st.rise)) : 'night time, no forecast yet' };
-  if (!hasWx) return { key: 'sun', why: 'daytime, no forecast yet' };
-  const c = WX.data.current, code = +c.weather_code, temp = c.temperature_2m, wind = c.wind_speed_10m;
-  const w = wmo(code, true, wind), t = Math.round(temp);
-  const why = w.words.toLowerCase() + ', ' + t + '°';
-  let cands, band;
-  if (code === 3 || code >= 45) { cands = ['bush']; band = 'grey'; }
-  else if (typeof wind === 'number' && wind >= WX_WINDY) { cands = ['beach']; band = 'windy'; }
-  else if (code <= 1) { cands = temp >= 25 ? ['sun'] : temp >= 18 ? ['sun', 'beach'] : ['beach']; band = 'clear' + (temp >= 25 ? 'hot' : temp >= 18 ? 'warm' : 'cool'); }
-  else { cands = temp >= 25 ? ['sun', 'beach'] : ['beach']; band = 'pc' + (temp >= 25 ? 'hot' : 'mild'); }
-  const key = cands.length > 1 ? cands[autoHash(todayISO() + '|' + band) % cands.length] : cands[0];
-  return { key, why };
+  const st = wxThemeState() || (() => { const p = wxKindNow(); return { kind: p.kind, why: p.why, night: wxNightNow() }; })();
+  return { key: 'w-' + st.kind, kind: st.kind, night: st.night, why: (st.why || '') + (st.night ? (st.why ? ', ' : '') + 'night' : '') };
 }
 let autoLastKey = '';
 function autoThemeTick() {
-  if (!S || !S.settings || themeKey() !== 'auto') return;
-  const k = autoThemePick().key;
+  if (!S || !S.settings || !wxThemeState()) return;
+  const st = wxThemeState(), k = st.kind + (st.night ? '-n' : '');
   if (k === autoLastKey) return;
   const first = !autoLastKey;
   let reduce = false; try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
@@ -9310,19 +9385,18 @@ function autoThemeTick() {
   else applyTheme();
   if ((location.hash || '').slice(1) === 'settings') { try { const n = document.getElementById('themenow'); if (n) n.outerHTML = themeNowNote(); } catch (e) {} }
 }
-setInterval(() => { try { autoThemeTick(); } catch (e) {} }, 10 * 60 * 1000);
+setInterval(() => { try { autoThemeTick(); } catch (e) {} }, 30 * 60 * 1000); // 2.23.74: every 30 minutes, and on open
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { try { autoThemeTick(); } catch (e) {} } });
 function themeNowNote() {
-  if (themeKey() !== 'auto') return '';
-  const p = autoThemePick(), th = THEMES.find(x => x[0] === p.key);
-  return `<div class="muted themenow" id="themenow">Now: ${esc(th ? th[1] : p.key)} (${esc(p.why)})</div>`;
+  const st = wxThemeState(); if (!st) return '';
+  return `<div class="muted themenow" id="themenow">Now: ${esc(WX_KIND_NAME[st.kind] || st.kind)}${st.night ? ' (night)' : ''}${st.why ? ' · ' + esc(st.why) : ''}</div>`;
 }
 const themeKey = () => { const t = S && S.settings && S.settings.theme; return THEMES.some(x => x[0] === t) ? t : 'teal'; };
 const phoneDark = () => { try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; } };
 // Match phone: Dark when the phone is in dark mode, otherwise the chosen light theme (Teal if Dark was chosen)
 function effectiveTheme() {
   const t = themeKey();
-  if (t === 'auto') return autoThemePick().key;
+  { const st = wxThemeState(); if (st) return st.night ? 'night' : WX_PAL[st.kind] || 'sun'; } // Auto and weather themes look after night themselves
   if (!S || !S.settings || !S.settings.themeAuto) return t;
   if (t === 'auto') return autoThemePick().key; // 2.23.9: Auto (weather) looks after night itself
   if (t === 'night') return 'night'; // already dark
@@ -9333,8 +9407,9 @@ function applyTheme() {
   if (t === 'teal') root.removeAttribute('data-theme'); else if (root.getAttribute('data-theme') !== t) root.setAttribute('data-theme', t);
   const th = THEMES.find(x => x[0] === t), m = document.querySelector('meta[name="theme-color"]');
   if (m && m.content !== th[7]) m.content = th[7];
-  try { themeArtApply(t); } catch (e) { }
-  if (themeKey() === 'auto') autoLastKey = t;
+  const st = wxThemeState();
+  try { themeArtApply(st ? 'wx-' + st.kind + (st.night ? '-n' : '') : t); } catch (e) { }
+  autoLastKey = st ? st.kind + (st.night ? '-n' : '') : '';
   try { localStorage.setItem('theme', JSON.stringify({ t: themeKey(), auto: !!(S.settings && S.settings.themeAuto), e: t })); } catch (e) { }
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (S && S.settings.themeAuto) { applyTheme(); render(); } }); } catch (e) { }
@@ -9342,15 +9417,16 @@ async function setTheme(k) {
   if (!THEMES.some(x => x[0] === k)) return;
   const s = snap(); S.settings.theme = k; applyTheme(); await save(); render();
   const th = THEMES.find(x => x[0] === k);
-  if (k === 'auto') { const p = autoThemePick(), n = THEMES.find(x => x[0] === p.key); toast(`Auto (weather) on. Now: ${n ? n[1] : p.key}.`, 'Undo', undoTo(s)); return; }
+  if (k === 'auto') { const p = autoThemePick(); toast(`Auto (weather) on. Now: ${WX_KIND_NAME[p.kind] || p.kind}${p.night ? ' (night)' : ''}.`, 'Undo', undoTo(s)); return; }
+  if (/^w-/.test(k)) { toast(`${th[1]} theme on. It turns to its night version an hour after sunset.`, 'Undo', undoTo(s)); return; }
   toast(`${th[1]} theme on.${S.settings.themeAuto && (k === 'dark' ? !phoneDark() : phoneDark()) ? ' Match phone is on, so you’ll see it when the phone is in ' + (k === 'dark' ? 'dark' : 'light') + ' mode.' : ''}`, 'Undo', undoTo(s));
 }
 async function toggleThemeAuto() { S.settings.themeAuto = !S.settings.themeAuto; applyTheme(); await save(); render(); }
 function themePicker() {
   const cur = themeKey();
-  return `<div class="themes" id="themepicker" role="radiogroup" aria-label="Colour theme">${THEMES.map(([k, name, note, brand, bg, card, ink]) =>
-    `<button class="theme ${k === cur ? 'on' : ''}${GFX_THEMES.includes(k) || k === 'auto' ? ' tgfx' : ''}" role="radio" aria-checked="${k === cur}" data-theme-key="${k}" aria-label="${name} theme${note ? ' (' + note.toLowerCase() + ')' : ''}" onclick="setTheme('${k}')">
-      ${k === 'auto' ? `<span class="tprev tp-auto">${GFX_THEMES.map(g => `<span class="tq tp-${g}">${taPrev(g)}</span>`).join('')}</span>` : GFX_THEMES.includes(k) ? `<span class="tprev tp-${k}">${taPrev(k)}<span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span></span>` : `<span class="tprev" style="background:${bg}"><span class="tbar" style="background:${k === 'dark' ? card : brand}"></span><span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span><span class="tbtn" style="background:${brand}"></span></span>`}
+  return `<div class="themes" id="themepicker" role="radiogroup" aria-label="Colour theme">${THEMES.filter(x => !x[8]).map(([k, name, note, brand, bg, card, ink]) =>
+    `<button class="theme ${k === cur ? 'on' : ''}${GFX_THEMES.includes(k) || k === 'auto' || /^w-/.test(k) ? ' tgfx' : ''}" role="radio" aria-checked="${k === cur}" data-theme-key="${k}" aria-label="${name} theme${note ? ' (' + note.toLowerCase() + ')' : ''}" onclick="setTheme('${k}')">
+      ${/^w-/.test(k) ? `<span class="tprev" style="background:${wxSky('wx-' + k.slice(2))}">${wxArt('wx-' + k.slice(2), true)}</span>` : k === 'auto' ? `<span class="tprev tp-auto">${GFX_THEMES.map(g => `<span class="tq tp-${g}">${taPrev(g)}</span>`).join('')}</span>` : GFX_THEMES.includes(k) ? `<span class="tprev tp-${k}">${taPrev(k)}<span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span></span>` : `<span class="tprev" style="background:${bg}"><span class="tbar" style="background:${k === 'dark' ? card : brand}"></span><span class="tcard" style="background:${card}"><i style="background:${brand}"></i><i style="background:${ink};opacity:.35"></i></span><span class="tbtn" style="background:${brand}"></span></span>`}
       <span class="tname">${k === cur ? I('check') : ''}${name}</span></button>`).join('')}</div>`;
 }
 
