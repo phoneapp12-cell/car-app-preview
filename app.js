@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.62';
+const APP_VERSION = '2.23.63';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14531,11 +14531,13 @@ let stripRankedAt = Date.now();
 function stripRerank() { try { const el = document.getElementById('qstrip'); if (!el || stripTouch) return; stripRankedAt = Date.now(); const k = ((el.querySelector('.qslide.on') || {}).dataset || {}).k; const h = stripHtml(); if (!h) return; const tmp = document.createElement('div'); tmp.innerHTML = h; const nu = tmp.firstElementChild; const i = [...nu.querySelectorAll('.qslide')].findIndex(s => s.dataset.k === k); el.replaceWith(nu); if (i >= 0) stripShow(i); } catch (e) { } }
 setInterval(() => { if (Date.now() - stripRankedAt >= SMART_SLOT) stripRerank(); }, 10 * 60e3);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - stripRankedAt >= SMART_SLOT) { loadWx16(); stripRerank(); } });
+// 2.23.63: a leading emoji in a slide label becomes a big icon (dropped when the slide already has a picture icon)
+function stripLbl(l, hasImg) { const m = String(l).match(/^(\p{Extended_Pictographic}\uFE0F?)\s*/u); if (!m) return esc(l); const rest = esc(l.slice(m[0].length)); return hasImg ? rest : `<span class="qsemo" aria-hidden="true">${m[1]}</span>${rest}`; }
 function stripHtml() {
   let sl = stripSlides(); try { sl = stripRank(sl.concat(smartSlides())); } catch (e) { } if (!sl.length) return '';
   stripIdx = ((stripIdx % sl.length) + sl.length) % sl.length;
   return `<div class="card qstrip" id="qstrip" role="region" aria-roledescription="carousel" aria-label="Today’s bits" data-n="${sl.length}">
-    <div class="qsview">${sl.map((s, i) => `<div class="qslide${i === stripIdx ? ' on' : ''}" data-k="${s.k}" data-go="${esc(s.go)}" aria-hidden="${i !== stripIdx}"><div class="qslbl">${cardArtOn() && STRIP_ART[s.k] ? `<img class="qsico" src="art/i3-${STRIP_ART[s.k]}.webp" alt="">` : ''}${esc(s.lbl)}</div>${s.body}</div>`).join('')}</div>
+    <div class="qsview">${sl.map((s, i) => `<div class="qslide${i === stripIdx ? ' on' : ''}" data-k="${s.k}" data-go="${esc(s.go)}" aria-hidden="${i !== stripIdx}"><div class="qslbl">${cardArtOn() && STRIP_ART[s.k] ? `<img class="qsico" src="art/i3-${STRIP_ART[s.k]}.webp" alt="">` : ''}${stripLbl(s.lbl, cardArtOn() && STRIP_ART[s.k])}</div>${s.body}</div>`).join('')}</div>
     ${sl.length > 1 ? `<div class="qsdots">${sl.map((s, i) => `<button type="button" class="qsdot${i === stripIdx ? ' on' : ''}" data-i="${i}" aria-label="${esc(s.lbl)}"></button>`).join('')}</div>` : ''}</div>`;
 }
 function stripShow(i) {
