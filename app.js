@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.60';
+const APP_VERSION = '2.23.61';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14415,13 +14415,19 @@ function headsUpList() {
   }));
   return out.sort((a, b) => (b.route - a.route) || a.start.localeCompare(b.start)).slice(0, 4);
 }
+/* 2.23.61: the joke slide goes 3 hours after it's read. Read = the joke slide was on screen (strip in view, app
+   visible) for 3 seconds or more, or tapped. The first read time is kept per joke in localStorage. */
+const jokeKey = j => 'jokeRead:' + todayISO() + ':' + String(j && j[0] || '').slice(0, 40);
+let jokeSeen = 0;
+function jokeMarkRead() { try { const j = dailyJokeFor(); if (!j) return; const k = jokeKey(j); if (!localStorage.getItem(k)) localStorage.setItem(k, String(Date.now())); } catch (e) { } }
+function jokeExpired(j) { try { const t = +localStorage.getItem(jokeKey(j)) || 0; return t > 0 && Date.now() - t > 3 * 3600e3; } catch (e) { return false; } }
 function stripSlides() {
   const out = [], add = (k, lbl, body, go) => { if (body) out.push({ k, lbl, body, go: go || '' }); };
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
-  try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (j) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
+  try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (j && !jokeExpired(j)) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
   try { const p = travelToday(); if (p && p.name) add('travel', 'Today’s travel spot', `<p class="qsq"><b>${esc(p.name)}</b>, ${esc(p.country)}</p><div class="qsw">${esc(travelKmText(travelKm(p.lat, p.lon)))} away · ${esc(sumTravelTime(p.tz))} there</div>`, "go('#travel')"); } catch (e) {}
   try { const f = homePick(131, HOME_FACTS); if (f) add('fact', 'Did you know?', `<p class="qsq">${esc(String(f.line || f))}</p>`); } catch (e) {}
-  try { const c = countdownRows()[0]; if (c) add('count', 'Countdown', `<p class="qsq"><b>${esc(c.name)}</b></p><div class="qsw">${esc(cdWords(cdDays(c.date)))} · ${esc(fmtW(c.date))}</div>`, "go('#countdown')"); } catch (e) {}
+  try { const c = countdownRows().filter(x => x && !/\bpay ?day\b/i.test(String(x.name || '')))[0]; if (c) add('count', 'Countdown', `<p class="qsq"><b>${esc(c.name)}</b></p><div class="qsw">${esc(cdWords(cdDays(c.date)))} · ${esc(fmtW(c.date))}</div>`, "go('#countdown')"); } catch (e) {}
   try { if (NF && mailConnected('microsoft')) { const t = todayISO(), fr = (NF.fresh || []).slice(0, 3), co = (NF.coming || []).filter(x => x.date && x.date >= t).slice(0, 2); const x = fr[0] || co[0];
     if (x) add('netflix', 'New on Netflix', `<p class="qsq">${esc(fr.map(y => y.title).join(', ') || '')}${fr.length && co.length ? '' : ''}</p>${co.length ? `<div class="qsw">Coming: ${esc(co.map(y => y.title + ' (' + fmtW(y.date) + ')').join(', '))}</div>` : ''}`, 'app:netflix'); } } catch (e) {}
   try { const H = headsUpList(); if (H.length) add('heads', '⚠️ Heads up', `<p class="qsq"><b>${esc(H[0].what)}</b></p><div class="qsw">${esc(H[0].when)}${H[0].where ? ' · ' + esc(H[0].where) : ''}${H.length > 1 ? ' · +' + (H.length - 1) + ' more' : ''}</div>`, H[0].url ? 'url:' + H[0].url : "go('#bridge')"); } catch (e) {}
@@ -14447,6 +14453,7 @@ function stripShow(i) {
 const stripReduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
 function stripTick() {
   const el = document.getElementById('qstrip');
+  try { if (el && !document.hidden) { const on = el.querySelector('.qslide.on'), rr = el.getBoundingClientRect(); if (on && on.dataset.k === 'joke' && rr.height && rr.bottom > 0 && rr.top < innerHeight) { jokeSeen = jokeSeen || Date.now(); if (Date.now() - jokeSeen >= 3000) jokeMarkRead(); } else jokeSeen = 0; } } catch (e) { }
   if (!el || stripTouch || document.hidden || stripReduced() || stripJA || +el.dataset.n < 2) { stripAt = Math.max(stripAt, Date.now() - STRIP_MS + 1500); return; }
   const r = el.getBoundingClientRect();
   if (r.bottom <= 0 || r.top >= innerHeight || !r.height) { stripAt = Date.now(); return; }
@@ -14471,7 +14478,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) stri
     if (moved) { moved = false; return; }
     const dot = e.target.closest('.qsdot'); if (dot) { stripShow(+dot.dataset.i); return; }
     const s = e.target.closest('.qslide'); if (!s) return; const g = s.dataset.go || '';
-    if (g === 'joke') { stripJA = !stripJA; const a = s.querySelector('.qsa'); const j = dailyJokeFor(); if (a && j) { a.classList.toggle('on', stripJA); a.textContent = stripJA ? j[1] : 'Tap for the answer'; } stripAt = Date.now(); return; }
+    if (g === 'joke') { jokeMarkRead(); stripJA = !stripJA; const a = s.querySelector('.qsa'); const j = dailyJokeFor(); if (a && j) { a.classList.toggle('on', stripJA); a.textContent = stripJA ? j[1] : 'Tap for the answer'; } stripAt = Date.now(); return; }
     if (g.startsWith('app:')) { openStreamApp(g.slice(4)); return; }
     if (g.startsWith('url:')) { const u = g.slice(4); if (/^https:\/\//.test(u)) window.open(u, '_blank', 'noopener'); return; }
     if (g === "go('#travel')") go('#travel'); else if (g === "go('#countdown')") go('#countdown');
