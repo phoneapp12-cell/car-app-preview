@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.63';
+const APP_VERSION = '2.23.64';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14508,6 +14508,7 @@ function smartSlides() {
       add('garden', '🌱 Garden', `<p class="qsq">${esc(smartPick(cool ? SMART_GARDEN.concat(SMART_GARDEN_COOL) : SMART_GARDEN, 1))}</p><div class="qsw">${Math.round(w.now)}° and dry for the next few hours</div>`, '', 52); }
     if (w && dry && light && h < 16 && !work && !night) { const o = smartPick(SMART_OUT, 2); add('out', '🥾 Get out', `<p class="qsq"><b>${esc(o[0])}</b></p><div class="qsw">${esc(o[1])} · ${Math.round(w.now)}°, dry for now</div>`, '', 50); }
   } catch (e) { }
+  try { const p = myPhCurrent(); if (p) add('photo', '📷 My photos', `<img class="qsphoto" src="${p.url}" alt="One of your photos">`, 'photos', 47); } catch (e) { }
   try { if (!atWork) add('tidy', '🧺 Quick win', `<p class="qsq">${esc(smartPick(SMART_TIDY, 3))}</p>`, '', night ? 22 : (work && work.phase === 'now') ? 15 : 38); } catch (e) { }
   try { if (h >= 18 || h < 1) { const e = smartPick(SMART_EVE, 4); add('eve', '🎬 Tonight', `<p class="qsq">${esc(e)}</p>`, /Similar picks/.test(e) ? "go('#top40')" : '', w && !dry ? 46 : 36); } } catch (e) { }
   return out;
@@ -14531,13 +14532,69 @@ let stripRankedAt = Date.now();
 function stripRerank() { try { const el = document.getElementById('qstrip'); if (!el || stripTouch) return; stripRankedAt = Date.now(); const k = ((el.querySelector('.qslide.on') || {}).dataset || {}).k; const h = stripHtml(); if (!h) return; const tmp = document.createElement('div'); tmp.innerHTML = h; const nu = tmp.firstElementChild; const i = [...nu.querySelectorAll('.qslide')].findIndex(s => s.dataset.k === k); el.replaceWith(nu); if (i >= 0) stripShow(i); } catch (e) { } }
 setInterval(() => { if (Date.now() - stripRankedAt >= SMART_SLOT) stripRerank(); }, 10 * 60e3);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - stripRankedAt >= SMART_SLOT) { loadWx16(); stripRerank(); } });
+/* 2.23.64: My photos in the strip. Shane picks photos one at a time from his phone (photo picker, no forced camera).
+   Each is resized on the phone to about 1080px (WebP, or JPEG if the browser can't make WebP) and kept only in this
+   phone's IndexedDB ('strip-photos'): never uploaded, not in backups. One photo slide at a time: a new photo each
+   ~5-hour strip slot, going through all of them in a shuffled order before any repeats. */
+let myPhDbP = null, MYPH = [], myPhLoaded = false;
+function myPhDb() { return myPhDbP || (myPhDbP = new Promise((res, rej) => { const r = indexedDB.open('strip-photos', 1); r.onupgradeneeded = () => r.result.createObjectStore('p'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); })); }
+async function myPhTx(mode, fn) { const db = await myPhDb(); return new Promise((res, rej) => { const t = db.transaction('p', mode), st = t.objectStore('p'); let out; const q = fn(st); if (q) q.onsuccess = () => { out = q.result; }; t.oncomplete = () => res(out); t.onerror = () => rej(t.error); }); }
+async function myPhLoad() {
+  try {
+    const rows = await myPhTx('readonly', st => st.getAll());
+    MYPH.forEach(p => { try { URL.revokeObjectURL(p.url); } catch (e) { } });
+    MYPH = (rows || []).filter(r => r && r.id && r.blob).sort((a, b) => a.at - b.at).map(r => ({ id: r.id, at: r.at, url: URL.createObjectURL(r.blob) }));
+  } catch (e) { MYPH = []; }
+  myPhLoaded = true;
+}
+async function myPhResize(file) {
+  const img = await new Promise((res, rej) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); res(i); }; i.onerror = () => { URL.revokeObjectURL(u); rej(new Error('img')); }; i.src = u; });
+  const k = Math.min(1, 1080 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+  c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  let b = await new Promise(r => c.toBlob(r, 'image/webp', 0.82));
+  if (!b || b.type !== 'image/webp') b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.84));
+  return b;
+}
+function myPhAdd() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    try { const blob = await myPhResize(f); const id = uid('ph'); await myPhTx('readwrite', st => st.put({ id, at: Date.now(), blob }, id)); await myPhLoad();
+      try { localStorage.setItem('myPhPick', JSON.stringify({ slot: Math.floor(Date.now() / SMART_SLOT), id, seen: (myPhState().seen || []).concat(id) })); } catch (e) { }
+      render(); toast('Photo added to the strip. It stays on this phone only.'); }
+    catch (e) { toast('Couldn’t add that photo.'); }
+  };
+  inp.click();
+}
+async function myPhRemove(id) {
+  try { await myPhTx('readwrite', st => st.delete(id)); } catch (e) { }
+  await myPhLoad(); render(); if (sheetOpen) myPhManage(); toast('Photo removed.');
+}
+function myPhManage() {
+  openSheet('My photos', MYPH.length ? `<p class="muted" style="margin:0 0 8px">${MYPH.length} photo${MYPH.length === 1 ? '' : 's'}, kept on this phone only. One shows in the strip at a time and it changes every few hours.</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${MYPH.map(p => `<div style="position:relative"><img src="${p.url}" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1.5px solid #111"><button type="button" class="btn small" style="position:absolute;right:4px;bottom:4px;padding:2px 8px;min-height:0" onclick="myPhRemove('${p.id}')" aria-label="Remove this photo">Remove</button></div>`).join('')}</div>` : '<p class="muted">No photos yet.</p>',
+    async () => () => myPhAdd(), 'Add photo');
+}
+function myPhState() { try { return JSON.parse(localStorage.getItem('myPhPick') || '{}') || {}; } catch (e) { return {}; } }
+function myPhCurrent() {
+  if (!MYPH.length) return null;
+  const slot = Math.floor(Date.now() / SMART_SLOT), st = myPhState(), ids = MYPH.map(p => p.id);
+  let cur = MYPH.find(p => p.id === st.id);
+  if (!cur || st.slot !== slot) {
+    let seen = (st.seen || []).filter(x => ids.includes(x)); let left = ids.filter(x => !seen.includes(x) && x !== st.id);
+    if (!left.length) { seen = []; left = ids.filter(x => x !== st.id); if (!left.length) left = ids; }
+    const id = left[Math.floor(Math.random() * left.length)]; cur = MYPH.find(p => p.id === id);
+    try { localStorage.setItem('myPhPick', JSON.stringify({ slot, id, seen: seen.concat(id) })); } catch (e) { }
+  }
+  return cur;
+}
+setTimeout(() => myPhLoad().then(() => { if (MYPH.length && (location.hash === '#home' || !location.hash)) render(); }), 1500);
 // 2.23.63: a leading emoji in a slide label becomes a big icon (dropped when the slide already has a picture icon)
 function stripLbl(l, hasImg) { const m = String(l).match(/^(\p{Extended_Pictographic}\uFE0F?)\s*/u); if (!m) return esc(l); const rest = esc(l.slice(m[0].length)); return hasImg ? rest : `<span class="qsemo" aria-hidden="true">${m[1]}</span>${rest}`; }
 function stripHtml() {
   let sl = stripSlides(); try { sl = stripRank(sl.concat(smartSlides())); } catch (e) { } if (!sl.length) return '';
   stripIdx = ((stripIdx % sl.length) + sl.length) % sl.length;
   return `<div class="card qstrip" id="qstrip" role="region" aria-roledescription="carousel" aria-label="Today’s bits" data-n="${sl.length}">
-    <div class="qsview">${sl.map((s, i) => `<div class="qslide${i === stripIdx ? ' on' : ''}" data-k="${s.k}" data-go="${esc(s.go)}" aria-hidden="${i !== stripIdx}"><div class="qslbl">${cardArtOn() && STRIP_ART[s.k] ? `<img class="qsico" src="art/i3-${STRIP_ART[s.k]}.webp" alt="">` : ''}${stripLbl(s.lbl, cardArtOn() && STRIP_ART[s.k])}</div>${s.body}</div>`).join('')}</div>
+    <button type="button" class="qsadd" aria-label="Add a photo to the strip">+</button><div class="qsview">${sl.map((s, i) => `<div class="qslide${i === stripIdx ? ' on' : ''}" data-k="${s.k}" data-go="${esc(s.go)}" aria-hidden="${i !== stripIdx}"><div class="qslbl">${cardArtOn() && STRIP_ART[s.k] ? `<img class="qsico" src="art/i3-${STRIP_ART[s.k]}.webp" alt="">` : ''}${stripLbl(s.lbl, cardArtOn() && STRIP_ART[s.k])}</div>${s.body}</div>`).join('')}</div>
     ${sl.length > 1 ? `<div class="qsdots">${sl.map((s, i) => `<button type="button" class="qsdot${i === stripIdx ? ' on' : ''}" data-i="${i}" aria-label="${esc(s.lbl)}"></button>`).join('')}</div>` : ''}</div>`;
 }
 function stripShow(i) {
@@ -14574,8 +14631,10 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) stri
   document.addEventListener('click', e => {
     if (!inStrip(e)) return;
     if (moved) { moved = false; return; }
+    if (e.target.closest('.qsadd')) { myPhAdd(); return; }
     const dot = e.target.closest('.qsdot'); if (dot) { stripShow(+dot.dataset.i); return; }
     const s = e.target.closest('.qslide'); if (!s) return; const g = s.dataset.go || '';
+    if (g === 'photos') { myPhManage(); return; }
     if (g === 'joke') { jokeMarkRead(); stripJA = !stripJA; const a = s.querySelector('.qsa'); const j = dailyJokeFor(); if (a && j) { a.classList.toggle('on', stripJA); a.textContent = stripJA ? j[1] : 'Tap for the answer'; } stripAt = Date.now(); return; }
     if (g.startsWith('app:')) { openStreamApp(g.slice(4)); return; }
     if (g.startsWith('url:')) { const u = g.slice(4); if (/^https:\/\//.test(u)) window.open(u, '_blank', 'noopener'); return; }
@@ -15180,6 +15239,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Scrolling summary</div><div class="s">On: the summary sits under the rotating strip, a little shorter, as one line scrolling right to left. Touch to pause, drag to scrub. Tap Full summary to read it all. Off: the full summary as before.</div></div><button class="switch ${sumScrollOn() ? 'on' : ''}" role="switch" aria-checked="${sumScrollOn()}" aria-label="Scrolling summary" id="sumscrollsw" onclick="S.settings.sumFull=sumScrollOn();save().then(render)"></button></div>
    <div class="srow"><div class="tx"><div class="t">Card artwork</div><div class="s">Picture headers and illustrated icons on Coming up and Just added. Off: the plain cards.</div></div><button class="switch ${cardArtOn() ? 'on' : ''}" role="switch" aria-checked="${cardArtOn()}" aria-label="Card artwork" id="cardartsw" onclick="toggleSetting('cardArt')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix, Prime Video and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
+   <div class="srow"><div class="tx"><div class="t">My photos in the strip</div><div class="s">Add your own photos one at a time. They stay on this phone only. One shows at a time and changes every few hours.</div></div><button class="btn small" id="myphbtn" onclick="myPhManage()">${MYPH.length ? 'Photos (' + MYPH.length + ')' : 'Add photo'}</button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Countdown rewards</div><div class="s">A card near the top with Countdown (Woolworths) offers from your Everyday Rewards emails, soonest ending first. Fuel, FreshChoice, MILKRUN and other partner offers are left out. Hidden when there are none.</div></div><button class="switch ${erOn() ? 'on' : ''}" role="switch" aria-checked="${erOn()}" aria-label="Countdown rewards" id="ersw" onclick="toggleSetting('erPromos', ${!erOn()}).then(() => refreshEr(true))"></button></div>
