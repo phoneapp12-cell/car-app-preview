@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.74';
+const APP_VERSION = '2.23.75';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12392,7 +12392,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-14'
+// VIDEO_LIST_UPDATED = '2026-10-15'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -12409,8 +12409,8 @@ const VIDEO_CATS = [
   { id: 'wood', name: 'Woodworking', sub: 'Beginner projects with basic tools', extra: true }
 ];
 const VIDEOS = [
-  { id: 'ohqxP8EEumo', title: 'iPhone 18 Pro Review: All About that Chip', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=ohqxP8EEumo', reason: 'MKBHD’s full review of the iPhone 18 Pro.' },
-  { id: '3iRUwVzRDZQ', title: 'Xiaomi 18 Fold: How Does This Happen?', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=3iRUwVzRDZQ', reason: 'MKBHD on Xiaomi’s new foldable and how it landed beside Apple’s.' },
+  { id: 'TD74a5g5rp0', title: 'Everything Apple announced in under 10 mins - Welcome Home 2026', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=TD74a5g5rp0', reason: 'Linus Tech Tips sums up everything Apple announced at Welcome Home 2026 in under ten minutes.' },
+  { id: 'QVv3mQzlrN0', title: 'Apple Homeview Impressions: Not Convinced!', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=QVv3mQzlrN0', reason: 'MKBHD’s first impressions of Apple Homeview, and why he isn’t sold on it yet.' },
   { id: 'ANmTVYkEtLw', title: 'Google Pixel 11/Pro Review: Poker Face', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=ANmTVYkEtLw', reason: 'MKBHD’s full review of the Google Pixel 11 and Pixel 11 Pro.' },
   { id: 'Fx0x3oI_ngo', title: 'How Expensive is the Fastest PC of 2026?', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=Fx0x3oI_ngo', reason: 'Linus Tech Tips prices up what a top-end PC costs in 2026.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
@@ -12429,7 +12429,7 @@ const VIDEOS = [
   { id: '_A6AqTWbpDI', title: '4 EASY ONE-POT MEAL IDEAS 🍽 Low FODMAP, Gluten free Recipes | Becky Excell x Alaska Seafood [AD]', channel: 'Becky Excell', category: 'cook', url: 'https://www.youtube.com/watch?v=_A6AqTWbpDI', reason: 'Four easy one-pot gluten-free dinner ideas from Becky Excell.' },
   { id: 'AdxEKxhpQVk', title: 'CHICKEN PICCATA (GLUTEN-FREE, DAIRY-FREE)', channel: 'Olivia Adriance', category: 'cook', url: 'https://www.youtube.com/watch?v=AdxEKxhpQVk', reason: 'A gluten-free chicken piccata dinner you can cook on a weeknight.' },
   { id: 'VrB-Te3PQnE', title: 'Gluten Free Italian Classics | Chicken Marsala & Chicken Parm', channel: 'Giada De Laurentiis', category: 'cook', url: 'https://www.youtube.com/watch?v=VrB-Te3PQnE', reason: 'Gluten-free chicken marsala and chicken parmesan for dinner.' },
-  { id: 'zCt8eL-zaUE', title: 'D.I.Y. Made Easy: Living Room Layout and Functionality Upgrade', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=zCt8eL-zaUE', reason: 'How to improve a living room layout with simple Bunnings DIY ideas.' },
+  { id: 'HVguMaNxFEY', title: 'How To Remove Tiles', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=HVguMaNxFEY', reason: 'Bunnings Warehouse shows how to remove old tiles ahead of a renovation.' },
   { id: 'ltSz75TAqew', title: 'D.I.Y. Made Easy: An Affordable Kitchen Makeover', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=ltSz75TAqew', reason: 'An affordable kitchen makeover using materials from Bunnings.' },
   { id: 'XUGYn4D-xgg', title: 'How To Apply Bathroom Sealant', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=XUGYn4D-xgg', reason: 'How to apply bathroom sealant cleanly for a tidy renovation finish.' },
   { id: 'i9bRkiMVY4g', title: 'How to Make Paint Repairs Invisible 👀🎨', channel: 'Bunnings Warehouse', category: 'reno', url: 'https://www.youtube.com/watch?v=i9bRkiMVY4g', reason: 'How to touch up paint so repairs blend into the wall.' },
