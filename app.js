@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.61';
+const APP_VERSION = '2.23.62';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14394,7 +14394,7 @@ function tkToggleFull() {
 const stripOn = () => !(S && S.settings && S.settings.qjStrip === false);
 let stripIdx = 0, stripAt = Date.now(), stripTouch = false, stripJA = false;
 const STRIP_MS = 6000;
-const STRIP_ART = { heads: 'car', travel: 'travel', count: 'hol', netflix: 'tv', prime: 'tv', rewards: 'rewards' };
+const STRIP_ART = { next: 'cal', plan: 'cal', garden: 'garden', out: 'travel', wxout: 'weather', heads: 'car', travel: 'travel', count: 'hol', netflix: 'tv', prime: 'tv', rewards: 'rewards' };
 /* 2.23.60: Heads up. Upcoming road closures from Whangārei District Council's Roadworks and closures page (the
    relay's /closures, the same source as the bridge page): next 14 days, not finished, his Onerahi to Port Road
    route first. Real notices only; no slide when there are none. */
@@ -14435,8 +14435,104 @@ function stripSlides() {
   try { if (erOn()) { const a = erLive(); if (a.length) add('rewards', 'Countdown rewards', `<p class="qsq">${esc(a[0].sum)}</p><div class="qsw">${daysLeft(a[0].end) === 0 ? 'Ends today' : 'Ends ' + esc(fmtW(a[0].end))}${a[0].boost ? ' · Boost first' : ''}${a.length > 1 ? ' · +' + (a.length - 1) + ' more' : ''}</div>`, (a[0].link || a[0].web) ? 'url:' + (a[0].link || a[0].web) : ''); } } catch (e) {}
   return out;
 }
+/* 2.23.62: a context-aware strip. Rule-based slides from what's real in the app (his calendar and to-dos, the
+   roster, gym days and skips, Mum's Monday, the Sunday cleaning job, cooking nights, the weather now and over the
+   next 5 hours, where he is, MetService warnings and the 16-day Open-Meteo forecast) plus tips he likes. Each slide
+   gets a score; the strip shows the best ones and drops the rest. Time-of-day rules apply on every draw; the strip
+   itself is re-ranked and the long forecast refreshed every ~5 hours and on open when stale. No AI. */
+const SMART_TIDY = ['Ten-minute tidy: clear one surface, like the kitchen bench or bedside table', 'Sort one drawer: keep, bin or donate', 'Garage: hang the tools you use most where you can see them', 'Phone photos: delete a screenful of duplicates and screenshots', 'Fridge: wipe one shelf and move the oldest food to the front', 'Pantry: group like with like and check best-before dates', 'Car interior: empty the door pockets and give the mats a shake', 'Inbox: unsubscribe from three emails you never read', 'Paperwork: file this week’s bills and receipts in one go', 'Wardrobe: anything not worn in a year goes in a donate bag', 'Week ahead: check the calendar and jot what needs doing', 'Laundry: one load start to finish, folded and put away'];
+const SMART_GARDEN = ['Pull a few weeds while the soil’s soft', 'Deadhead spent flowers to keep them coming', 'Check the veggies for slugs and snails', 'A quick tidy of the garden edges', 'Plant a few seedlings in a gap', 'Prune anything leggy or crossing'];
+const SMART_GARDEN_COOL = ['Cool enough to water the pots and seedlings', 'Cool enough for a feed of liquid fertiliser'];
+const SMART_OUT = [['Whangārei Falls loop', 'short bush walk to the falls'], ['A.H. Reed Memorial Kauri Park', 'boardwalk through the kauri'], ['Mt Manaia track', 'bush climb with big views of the Heads'], ['Ocean Beach', 'surf beach out at the Heads'], ['Smugglers Bay', 'walk in from Urquharts Bay'], ['Abbey Caves', 'limestone caves and bush'], ['Pārua Bay', 'sheltered bay near home'], ['Onerahi foreshore', 'easy walk by the water, close to home']];
+const SMART_EVE = ['A chapter of a book before the night gets away', 'Make a track on Suno, the AI music app', 'Pick a movie for the weekend', 'Try a new song from your Similar picks', 'Line up a feel-good movie'];
+const SMART_SLOT = 5 * 3600e3;
+const smartPick = (arr, salt) => arr[(Math.floor(Date.now() / SMART_SLOT) + salt) % arr.length];
+function wxNext5() {
+  const h = WX && WX.data && WX.data.hourly, c = WX && WX.data && WX.data.current; if (!h || !Array.isArray(h.time) || !c) return null;
+  const local = wxLocalNow(), key = local.iso + 'T' + local.hm.slice(0, 2); let maxT = c.temperature_2m, rain = 0, n = 0;
+  for (let i = 0; i < h.time.length && n < 5; i++) { const t = h.time[i]; if (typeof t !== 'string' || t.slice(0, 13) <= key) continue; n++; const tp = arr(h, 'temperature_2m', i), rp = arr(h, 'precipitation_probability', i); if (num(tp)) maxT = Math.max(maxT, tp); if (num(rp)) rain = Math.max(rain, rp); }
+  return { now: c.temperature_2m, maxT, rain, wet: num(c.precipitation) && c.precipitation > 0.1 };
+}
+// 16-day daily forecast for Onerahi (Open-Meteo allows browser requests), kept 6 hours on this phone
+const WX16_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-35.7700&longitude=174.3700&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,weather_code&timezone=Pacific%2FAuckland&forecast_days=16&wind_speed_unit=kmh';
+let WX16 = null, wx16Busy = false;
+try { WX16 = JSON.parse(localStorage.getItem('wx16') || 'null'); } catch (e) { WX16 = null; }
+async function loadWx16() {
+  if (wx16Busy || navigator.onLine === false || (WX16 && Date.now() - WX16.at < 6 * 3600e3)) return;
+  wx16Busy = true;
+  try { const d = await getJSON(WX16_URL, 15000); if (d && d.daily && Array.isArray(d.daily.time)) { WX16 = { at: Date.now(), daily: d.daily }; try { localStorage.setItem('wx16', JSON.stringify(WX16)); } catch (e) { } } } catch (e) { } finally { wx16Busy = false; }
+}
+function wxOutlook() {
+  const out = [];
+  try { liveAlerts().slice(0, 2).forEach(a => out.push({ score: /^(orange|red)$/i.test(a.colour || '') ? 88 : 64, lbl: '⚠️ MetService', what: alertName(a), when: (a.onset ? 'From ' + aklWhen(a.onset) : '') + (a.expires ? (a.onset ? ' to ' : 'Until ') + aklWhen(a.expires) : ''), tip: /wind|gale/i.test(alertName(a)) ? 'Secure outdoor stuff and the trampoline' : /rain|thunder/i.test(alertName(a)) ? 'Clear gutters and drains' : '', go: 'url:' + (/^https:\/\//.test(a.web || '') ? a.web : METSERVICE_WARN_URL) })); } catch (e) { }
+  const d = WX16 && WX16.daily; if (!d) return out;
+  const T = todayISO(), rows = d.time.map((t, i) => ({ t, hi: d.temperature_2m_max[i], lo: d.temperature_2m_min[i], rain: d.precipitation_sum[i], gust: d.wind_gusts_10m_max[i], code: d.weather_code[i] })).filter(r => r.t >= T);
+  const span = (a, b) => a === b ? fmtW(a) : fmtW(a) + '–' + fmtW(b), lab = t => dayGap(t, T) > 7 ? '🔭 Outlook' : '🌦️ Weather ahead';
+  const runs = test => { const rs = []; let s = null; rows.forEach((r, i) => { if (test(r)) { if (!s) s = { a: r.t, b: r.t, n: 0, x: r }; s.b = r.t; s.n++; } else if (s) { rs.push(s); s = null; } }); if (s) rs.push(s); return rs; };
+  const hot = runs(r => num(r.hi) && r.hi >= 26).find(s => s.n >= 2);
+  if (hot) out.push({ score: 50, lbl: lab(hot.a), what: `Hot spell, ${Math.round(Math.max(...rows.filter(r => r.t >= hot.a && r.t <= hot.b).map(r => r.hi)))}° or so`, when: span(hot.a, hot.b), tip: 'Water the garden early or late, not in the heat' });
+  const cold = rows.find(r => num(r.lo) && r.lo <= 3);
+  if (cold) out.push({ score: 56, lbl: lab(cold.t), what: `Cold night, low of ${Math.round(cold.lo)}°${cold.lo <= 1 ? ', frost likely' : ''}`, when: fmtW(cold.t), tip: 'Cover tender plants the evening before' });
+  const wet = rows.find(r => num(r.rain) && r.rain >= 25);
+  if (wet) out.push({ score: 54, lbl: lab(wet.t), what: `Heavy rain, about ${Math.round(wet.rain)} mm`, when: fmtW(wet.t), tip: 'Clear the gutters and bring the washing in' });
+  const wind = rows.find(r => num(r.gust) && r.gust >= 75);
+  if (wind) out.push({ score: 55, lbl: lab(wind.t), what: `Strong wind, gusts to ${Math.round(wind.gust)} km/h`, when: fmtW(wind.t), tip: 'Secure outdoor furniture and loose things' });
+  const storm = rows.find(r => [95, 96, 99].includes(r.code));
+  if (storm && !wet) out.push({ score: 52, lbl: lab(storm.t), what: 'Thunderstorms possible', when: fmtW(storm.t), tip: 'Unplug the spa pump if lightning is close' });
+  return out;
+}
+function smartSlides() {
+  try { loadWx16(); } catch (e) { }
+  const out = [], add = (k, lbl, body, go, score) => { if (body && score > 0) out.push({ k, lbl, body, go: go || '', score }); };
+  const a = homeAklParts() || {}, min = a.min || 0, dow = a.dow, h = min / 60, T = todayISO();
+  let where = ''; try { where = placeHere() || ''; } catch (e) { }
+  const atWork = where === 'work';
+  const tt = sumToday(a), work = tt.work, tm = sugDayFacts(1);
+  const w = wxNext5(), dry = w ? w.rain < 40 && !w.wet : false, light = h >= 7 && h < 19.5;
+  const night = (() => { try { return homeNight(); } catch (e) { return h >= 20 || h < 5; } })();
+  const nm = x => String(x.name).replace(/^(Today|Tonight|Tomorrow|[A-Z][a-z]+day): /, '');
+  try { const L = comingUpList().filter(x => x && x.kind !== 'meal' && x.kind !== 'gym' && !/\bwalk\b.*\bzeus\b|\bzeus\b.*\bwalk\b/i.test(x.name) && x.days >= 0 && x.days <= 3).slice(0, 2);
+    if (L.length) add('next', '📅 Next up', `<p class="qsq"><b>${esc(nm(L[0]))}</b></p><div class="qsw">${L[0].days === 0 ? 'Today' : L[0].days === 1 ? 'Tomorrow' : esc(fmtW(isoT(todayT() + L[0].days * DAY)))}${L[1] ? ' · then ' + esc(nm(L[1])) : ''}</div>`, "go('#calendar')", L[0].days === 0 ? 92 : L[0].days === 1 ? (h >= 17 ? 80 : 60) : 45); } catch (e) { }
+  try {
+    if (dow === 1 && h >= 12 && h < 20) add('plan', '🏡 Tonight', '<p class="qsq"><b>Mum’s tonight</b></p><div class="qsw">Monday at your mum’s</div>', '', 70);
+    if (dow === 0 && h < 19) add('plan', '🧽 Today', '<p class="qsq"><b>Cleaning job until 7 pm</b></p><div class="qsw">Sunday</div>', '', 62);
+    if (sugDayFacts(0).gym && h >= 12 && h < 19.5) add('plan', '💪 After work', `<p class="qsq"><b>Gym tonight</b></p><div class="qsw">Day ${dow === 3 ? 'B' : 'A'} · after work</div>`, "go('#gym')", 66);
+    if ((dow === 5 || dow === 6) && h >= 10 && h < 19.5) { const m = ((M() || {}).plan || {})[T];
+      add('plan', '🍳 Cooking night', m && m.title ? `<p class="qsq"><b>${esc(m.title)}</b></p><div class="qsw">${esc((sugGf(m.title).match(/\((GF:[^)]*)\)$/) || [])[1] || 'Keep it gluten free')}</div>` : '<p class="qsq"><b>Pick a gluten-free dinner</b></p><div class="qsw">Tap for the meal planner</div>', "go('#meals')", 74); }
+    if (h >= 17 && !tm.work) add('plan', '🌅 Tomorrow', `<p class="qsq"><b>Tomorrow’s a day off</b></p><div class="qsw">Plan something you like</div>`, '', 48);
+  } catch (e) { }
+  try { const O = wxOutlook().sort((x, y) => y.score - x.score); if (O.length) { const o = O[0]; add('wxout', o.lbl, `<p class="qsq"><b>${esc(o.what)}</b></p><div class="qsw">${esc(o.when)}${o.tip ? ' · ' + esc(o.tip) : ''}${O.length > 1 ? ' · +' + (O.length - 1) + ' more' : ''}</div>`, o.go || "go('#weather')", o.score); } } catch (e) { }
+  try {
+    const free = !work || work.phase === 'done';
+    if (w && dry && light && free && !night && !atWork) { const cool = w.now <= 10 && w.maxT <= 10;
+      add('garden', '🌱 Garden', `<p class="qsq">${esc(smartPick(cool ? SMART_GARDEN.concat(SMART_GARDEN_COOL) : SMART_GARDEN, 1))}</p><div class="qsw">${Math.round(w.now)}° and dry for the next few hours</div>`, '', 52); }
+    if (w && dry && light && h < 16 && !work && !night) { const o = smartPick(SMART_OUT, 2); add('out', '🥾 Get out', `<p class="qsq"><b>${esc(o[0])}</b></p><div class="qsw">${esc(o[1])} · ${Math.round(w.now)}°, dry for now</div>`, '', 50); }
+  } catch (e) { }
+  try { if (!atWork) add('tidy', '🧺 Quick win', `<p class="qsq">${esc(smartPick(SMART_TIDY, 3))}</p>`, '', night ? 22 : (work && work.phase === 'now') ? 15 : 38); } catch (e) { }
+  try { if (h >= 18 || h < 1) { const e = smartPick(SMART_EVE, 4); add('eve', '🎬 Tonight', `<p class="qsq">${esc(e)}</p>`, /Similar picks/.test(e) ? "go('#top40')" : '', w && !dry ? 46 : 36); } } catch (e) { }
+  return out;
+}
+const STRIP_BASE = { heads: 60, count: 40, netflix: 34, prime: 34, rewards: 38, quote: 32, joke: 44, travel: 26, fact: 24 };
+function stripRank(list) {
+  const a = homeAklParts() || {}, h = (a.min || 0) / 60; let where = ''; try { where = placeHere() || ''; } catch (e) { }
+  const eve = h >= 18 || h < 1;
+  list.forEach(s => {
+    if (s.score != null) return;
+    let v = STRIP_BASE[s.k] || 30;
+    if (s.k === 'heads') { try { const H = headsUpList()[0]; if (H && H.route) v += 25; if (H && H.start <= addDays(todayISO(), 2)) v += 10; if (where === 'work' && h >= 15) v += 10; } catch (e) { } }
+    if ((s.k === 'netflix' || s.k === 'prime') && eve) v += 20;
+    if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
+    s.score = v;
+  });
+  return list.filter(s => s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 9);
+}
+// Re-rank about every 5 hours, and when the app comes back after that long
+let stripRankedAt = Date.now();
+function stripRerank() { try { const el = document.getElementById('qstrip'); if (!el || stripTouch) return; stripRankedAt = Date.now(); const k = ((el.querySelector('.qslide.on') || {}).dataset || {}).k; const h = stripHtml(); if (!h) return; const tmp = document.createElement('div'); tmp.innerHTML = h; const nu = tmp.firstElementChild; const i = [...nu.querySelectorAll('.qslide')].findIndex(s => s.dataset.k === k); el.replaceWith(nu); if (i >= 0) stripShow(i); } catch (e) { } }
+setInterval(() => { if (Date.now() - stripRankedAt >= SMART_SLOT) stripRerank(); }, 10 * 60e3);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - stripRankedAt >= SMART_SLOT) { loadWx16(); stripRerank(); } });
 function stripHtml() {
-  const sl = stripSlides(); if (!sl.length) return '';
+  let sl = stripSlides(); try { sl = stripRank(sl.concat(smartSlides())); } catch (e) { } if (!sl.length) return '';
   stripIdx = ((stripIdx % sl.length) + sl.length) % sl.length;
   return `<div class="card qstrip" id="qstrip" role="region" aria-roledescription="carousel" aria-label="Today’s bits" data-n="${sl.length}">
     <div class="qsview">${sl.map((s, i) => `<div class="qslide${i === stripIdx ? ' on' : ''}" data-k="${s.k}" data-go="${esc(s.go)}" aria-hidden="${i !== stripIdx}"><div class="qslbl">${cardArtOn() && STRIP_ART[s.k] ? `<img class="qsico" src="art/i3-${STRIP_ART[s.k]}.webp" alt="">` : ''}${esc(s.lbl)}</div>${s.body}</div>`).join('')}</div>
