@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.66';
+const APP_VERSION = '2.23.67';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14522,7 +14522,7 @@ function smartSlides() {
   const w = wxNext5(), dry = w ? w.rain < 40 && !w.wet : false, light = h >= 7 && h < 19.5;
   const night = (() => { try { return homeNight(); } catch (e) { return h >= 20 || h < 5; } })();
   const nm = x => String(x.name).replace(/^(Today|Tonight|Tomorrow|[A-Z][a-z]+day): /, '');
-  try { const L = comingUpList().filter(x => x && x.kind !== 'meal' && x.kind !== 'gym' && !/\bwalk\b.*\bzeus\b|\bzeus\b.*\bwalk\b/i.test(x.name) && x.days >= 0 && x.days <= 3).slice(0, 2);
+  try { const L = comingUpList().filter(x => x && x.kind !== 'meal' && x.kind !== 'gym' && !/\bwalk\b.*\bzeus\b|\bzeus\b.*\bwalk\b/i.test(x.name) && !/\b(teeth|tooth|floss|face ?wash|skin ?care|shower|meds?|medication|pills?|tablets?|bed ?time|sleep)\b/i.test(x.name) && !(x.ref && x.ref.todo && /daily|day/i.test(String(x.ref.todo.repeat || ''))) && x.days >= 0 && x.days <= 3).slice(0, 2);
     if (L.length) add('next', '📅 Next up', `<p class="qsq"><b>${esc(nm(L[0]))}</b></p><div class="qsw">${L[0].days === 0 ? 'Today' : L[0].days === 1 ? 'Tomorrow' : esc(fmtW(isoT(todayT() + L[0].days * DAY)))}${L[1] ? ' · then ' + esc(nm(L[1])) : ''}</div>`, "go('#calendar')", L[0].days === 0 ? 92 : L[0].days === 1 ? (h >= 17 ? 80 : 60) : 45); } catch (e) { }
   try {
     if (dow === 1 && h >= 12 && h < 20) add('plan', '🏡 Tonight', '<p class="qsq"><b>Mum’s tonight</b></p><div class="qsw">Monday at your mum’s</div>', '', 70);
