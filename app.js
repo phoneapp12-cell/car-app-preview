@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.65';
+const APP_VERSION = '2.23.66';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8808,9 +8808,31 @@ function budgetMortgagesOf(b) {
   // Labels stay Mortgage 1 / 2 / 3. Only the amount changes each fortnight.
   return BUDGET_MORTGAGE_DEFAULTS.map((label, n) => {
     const x = raw[n] && typeof raw[n] === 'object' ? raw[n] : {};
-    return { id: String(x.id || ('bm' + (n + 1))), name: label, amount: budgetAmtOr0(x.amount) };
+    const amount = budgetAmtOr0(x.amount);
+    return { id: String(x.id || ('bm' + (n + 1))), name: label, amount, set: x.set === true || (x.set !== false && x.set === undefined && amount > 0) };
   });
 }
+/* 2.23.66: mortgages carry forward to the next pay fortnight. A mortgage he hasn't typed for a fortnight uses the
+   amount from the fortnight before (and so on back), shown as "carried forward" and counted in the totals. Typing
+   over it saves that fortnight's own amount; Reset goes back to the carried amount. Nothing is made up: with no
+   earlier amount it stays blank. */
+function budgetPrev(b) {
+  const s0 = parseD(b && b.start); if (s0 == null) return null;
+  return (S.budgets || []).filter(x => x !== b && parseD(x.start) != null && parseD(x.start) < s0).sort((a, c) => parseD(c.start) - parseD(a.start))[0] || null;
+}
+function budgetMortEff(b, depth = 0) {
+  const ms = budgetMortgagesOf(b), prev = depth < 30 && ms.some(m => !m.set) ? budgetPrev(b) : null, pe = prev ? budgetMortEff(prev, depth + 1) : null;
+  return ms.map((m, n) => m.set ? Object.assign({}, m, { eff: m.amount, carried: false, base: pe ? pe[n].eff : 0, from: prev ? prev.name : '' })
+    : Object.assign({}, m, { eff: pe ? pe[n].eff : 0, carried: !!(pe && pe[n].eff > 0), base: pe ? pe[n].eff : 0, from: prev ? prev.name : '' }));
+}
+function budgetEnsureNext() {
+  const cur = payPeriod(0), nx = payPeriod(1); if (!cur || !nx || nx.off !== 1) return false;
+  const list = S.budgets || []; if (!list.some(b => b.start && b.start <= cur.start)) return false;
+  if (list.some(b => b.start === nx.start)) return false;
+  list.push({ id: uid('bud'), name: budgetRangeLabel(nx.start, nx.end), start: nx.start, end: nx.end, next: nx.next, period: 'fortnight', pay: 0, mortgages: BUDGET_MORTGAGE_DEFAULTS.map((l, n) => ({ id: 'bm' + (n + 1), name: l, amount: 0, set: false })), lines: [], auto: true });
+  S.budgets = list; return true;
+}
+async function budgetMortgageReset(id, n) { const b = getBudget(id); if (!b) return; const ms = budgetMortgagesOf(b); ms[n].set = false; ms[n].amount = 0; b.mortgages = ms; await save(); render(); toast('Back to the carried-forward amount.'); }
 function normBudgets(list) {
   // Do not call payPeriod here: normalise runs before S is set, and paydays() reads S.
   return (Array.isArray(list) ? list : []).filter(b => b && typeof b === 'object' && b.id).map(b => {
@@ -8828,9 +8850,10 @@ function normBudgets(list) {
       pay,
       mortgages: budgetMortgagesOf(b),
       lines: (Array.isArray(b.lines) ? b.lines : []).filter(x => x && typeof x === 'object' && budgetAmt(x.amount) > 0)
-        .map(x => ({ id: String(x.id || uid('bl')), name: String(x.name || 'Spending').slice(0, 60), amount: budgetAmt(x.amount) }))
+        .map(x => ({ id: String(x.id || uid('bl')), name: String(x.name || 'Spending').slice(0, 60), amount: budgetAmt(x.amount) })),
+      auto: !!b.auto
     };
-  }).filter(b => b.pay > 0 || b.mortgages.some(m => m.amount > 0) || b.lines.length);
+  }).filter(b => b.auto || b.pay > 0 || b.mortgages.some(m => m.amount > 0) || b.lines.length);
 }
 const getBudget = id => (S.budgets || []).find(b => b.id === id);
 // Bills due in this budget's payday fortnight, using the same dates and amounts as Bills.
@@ -8881,19 +8904,19 @@ function budgetBillRows(b) {
   return items;
 }
 function budgetCalc(b) {
-  const mortgages = budgetMortgagesOf(b);
-  const mort = Math.round(mortgages.reduce((n, x) => n + x.amount, 0) * 100) / 100;
+  const mortgages = budgetMortEff(b);
+  const mort = Math.round(mortgages.reduce((n, x) => n + x.eff, 0) * 100) / 100, carried = Math.round(mortgages.filter(x => x.carried).reduce((n, x) => n + x.eff, 0) * 100) / 100;
   const bills = budgetBillRows(b);
   const billTot = Math.round(bills.reduce((n, x) => n + x.amount, 0) * 100) / 100;
   const spend = Math.round((b.lines || []).reduce((n, x) => n + x.amount, 0) * 100) / 100;
   const out = Math.round((mort + billTot + spend) * 100) / 100;
   const pay = budgetAmtOr0(b.pay);
-  return { pay, mort, billTot, spend, out, left: Math.round((pay - out) * 100) / 100, mortgages, bills };
+  return { pay, mort, carried, billTot, spend, out, left: Math.round((pay - out) * 100) / 100, mortgages, bills };
 }
 function budgetCard(b) {
   const k = budgetCalc(b);
-  const mortRows = k.mortgages.map((x, n) => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">Type this fortnight’s amount</div></div>
-      <div class="moneyin" style="max-width:120px;margin:0"><span>$</span><input inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((x.amount || 0) * 100))}" aria-label="${esc(x.name)} amount" onchange="budgetMortgageSet(${jsArg(b.id)},${n},this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"></div></div>`).join('');
+  const mortRows = k.mortgages.map((x, n) => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.carried ? '<span class="carrytag" style="margin-left:0">Carried forward</span> type to change' : x.set && x.base > 0 && x.base !== x.eff ? `Your amount · <button type="button" class="linkbtn" onclick="budgetMortgageReset(${jsArg(b.id)},${n})">Reset to ${money(x.base)}</button>` : 'Type this fortnight’s amount'}</div></div>
+      <div class="moneyin" style="max-width:120px;margin:0"><span>$</span><input inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((x.eff || 0) * 100))}" aria-label="${esc(x.name)} amount${x.carried ? ' (carried forward)' : ''}" onchange="budgetMortgageSet(${jsArg(b.id)},${n},this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"></div></div>`).join('');
   const billRows = k.bills.length
     ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="${x.loanId ? `go('#loan/${x.loanId}')` : `go('#bills')`}"><div class="ic bill">${I(x.loanId ? 'coins' : billIcon(x.name))}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.paid ? '<span class="ok">✓ Paid</span> ' + fmtW(x.paidOn || x.due) : (x.late ? 'Overdue, was due ' : 'Due ') + fmtW(x.due)}</div></div></button><b>${money(x.amount)}</b></div>`).join('')
     : `<div class="card muted" style="margin:0">${payPeriod(0) ? 'No bills due in this fortnight.' : 'Set your payday in Bills so this fortnight’s bills can show here.'}</div>`;
@@ -8904,7 +8927,7 @@ function budgetCard(b) {
       <div style="flex:1;min-width:0"><div class="carname">${esc(b.name)}</div><div class="carmodel">Pay fortnight</div></div>
       <button type="button" class="iconbtn" aria-label="Edit ${esc(b.name)}" onclick="budgetForm(${jsArg(b.id)})">${I('pen')}</button></div>
     <div class="lowed"><small>${k.left < 0 ? 'Over budget' : 'Left after bills'}</small><b class="lamt">${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></div>
-    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span><span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b></span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
+    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span><span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b>${k.carried ? `<small class="carrytag">${money(k.carried)} carried</small>` : ''}</span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
     <div class="sec" style="margin-top:12px">This fortnight's pay</div>
     <div class="list"><div class="row"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wages</div><div class="s">Changes each pay · tap edit to update</div></div><b>${k.pay ? money(k.pay) : '—'}</b></div></div>
     <div class="sec">Three mortgages</div>
@@ -8920,6 +8943,7 @@ function budgetCard(b) {
       <button aria-label="Add spending">${I('plus')}</button></form></div>`;
 }
 function Budget() {
+  try { if (budgetEnsureNext()) save(); } catch (e) { }
   const list = [...(S.budgets || [])].sort((a, b) => (parseD(b.start) || 0) - (parseD(a.start) || 0));
   const sub = list.length ? 'One budget for each pay fortnight' : 'What’s left after pay day';
   const needPay = !payPeriod(0);
@@ -8963,7 +8987,7 @@ function budgetForm(id) {
       const mortgages = BUDGET_MORTGAGE_DEFAULTS.map((label, n) => {
         const mc = parseCents(v['mamt' + n]);
         const amount = mc == null || !String(v['mamt' + n] || '').trim() ? 0 : Math.min(Math.max(mc, 0), MAX_CENTS) / 100;
-        return { id: morts[n].id, name: label, amount };
+        return { id: morts[n].id, name: label, amount, set: !!String(v['mamt' + n] || '').trim() && mc != null };
       });
       let start = b.start, end = b.end, next = b.next || '';
       if (!id && v.range) {
@@ -9006,6 +9030,7 @@ async function budgetMortgageSet(id, index, raw) {
   const morts = budgetMortgagesOf(b);
   const mc = parseCents(String(raw || '').trim());
   morts[n].amount = mc == null || !String(raw || '').trim() ? 0 : Math.min(Math.max(mc, 0), MAX_CENTS) / 100;
+  morts[n].set = !!String(raw || '').trim() && mc != null; // blank goes back to the carried-forward amount
   b.mortgages = morts;
   await save(); render();
 }
