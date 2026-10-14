@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.59';
+const APP_VERSION = '2.23.60';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14394,7 +14394,27 @@ function tkToggleFull() {
 const stripOn = () => !(S && S.settings && S.settings.qjStrip === false);
 let stripIdx = 0, stripAt = Date.now(), stripTouch = false, stripJA = false;
 const STRIP_MS = 6000;
-const STRIP_ART = { travel: 'travel', count: 'hol', netflix: 'tv', prime: 'tv', rewards: 'rewards' };
+const STRIP_ART = { heads: 'car', travel: 'travel', count: 'hol', netflix: 'tv', prime: 'tv', rewards: 'rewards' };
+/* 2.23.60: Heads up. Upcoming road closures from Whangārei District Council's Roadworks and closures page (the
+   relay's /closures, the same source as the bridge page): next 14 days, not finished, his Onerahi to Port Road
+   route first. Real notices only; no slide when there are none. */
+const HU_ROUTE = /onerahi|riverside|te matau|dave culham|port r(oa)?d|hatea|kioreroa|okara|tarewa/i;
+let huTried = 0;
+function headsUpList() {
+  try { if ((!CLS || Date.now() - CLS.at > 6 * 3600e3) && Date.now() - huTried > 15 * 60e3) { huTried = Date.now(); refreshClosures(true); } } catch (e) { }
+  const list = (CLS && CLS.data && CLS.data.closures) || [], T = todayISO(), lim = addDays(T, 14), out = [];
+  const hm = t => t ? fmtTime(t).replace(':00', '').replace(/\s/g, '') : '';
+  list.forEach(c => (c.dates || []).forEach(d => {
+    if (!d || !d.start || (d.end || d.start) < T || d.start > lim) return;
+    const blob = [c.title, c.where, c.desc].join(' '), route = HU_ROUTE.test(blob);
+    let what = String(c.title || 'Road closure').replace(/\s+temporary road closure$/i, ' closed').replace(/\s+road closure$/i, ' closed');
+    if (/te matau a pohe/i.test(blob) && !/te matau/i.test(what)) what = what.replace(/ closed$/, '') + ' (incl. Te Matau a Pohe bridge) closed';
+    const day = d.end && d.end !== d.start ? fmtW(d.start) + '–' + fmtW(d.end) : fmtW(d.start);
+    const when = day + (d.time ? ' ' + hm(d.time) + (d.endTime ? '–' + hm(d.endTime) : '') : '');
+    out.push({ what, when, where: String(c.where || '').replace(/,\s*\d{4}$/, '').slice(0, 60), url: /^https:\/\//.test(c.url || '') ? c.url : '', route, start: d.start });
+  }));
+  return out.sort((a, b) => (b.route - a.route) || a.start.localeCompare(b.start)).slice(0, 4);
+}
 function stripSlides() {
   const out = [], add = (k, lbl, body, go) => { if (body) out.push({ k, lbl, body, go: go || '' }); };
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
@@ -14404,6 +14424,7 @@ function stripSlides() {
   try { const c = countdownRows()[0]; if (c) add('count', 'Countdown', `<p class="qsq"><b>${esc(c.name)}</b></p><div class="qsw">${esc(cdWords(cdDays(c.date)))} · ${esc(fmtW(c.date))}</div>`, "go('#countdown')"); } catch (e) {}
   try { if (NF && mailConnected('microsoft')) { const t = todayISO(), fr = (NF.fresh || []).slice(0, 3), co = (NF.coming || []).filter(x => x.date && x.date >= t).slice(0, 2); const x = fr[0] || co[0];
     if (x) add('netflix', 'New on Netflix', `<p class="qsq">${esc(fr.map(y => y.title).join(', ') || '')}${fr.length && co.length ? '' : ''}</p>${co.length ? `<div class="qsw">Coming: ${esc(co.map(y => y.title + ' (' + fmtW(y.date) + ')').join(', '))}</div>` : ''}`, 'app:netflix'); } } catch (e) {}
+  try { const H = headsUpList(); if (H.length) add('heads', '⚠️ Heads up', `<p class="qsq"><b>${esc(H[0].what)}</b></p><div class="qsw">${esc(H[0].when)}${H[0].where ? ' · ' + esc(H[0].where) : ''}${H.length > 1 ? ' · +' + (H.length - 1) + ' more' : ''}</div>`, H[0].url ? 'url:' + H[0].url : "go('#bridge')"); } catch (e) {}
   try { const P = primeList(); if (P) add('prime', 'New on Prime', `${P.fresh.length ? `<p class="qsq">${esc(P.fresh.map(y => y.title).join(', '))}</p>` : ''}${P.coming.length ? `<div class="qsw">Coming: ${esc(P.coming.map(y => y.title + ' (' + fmtW(y.date) + ')').join(', '))}</div>` : ''}`, 'app:prime'); } catch (e) {}
   try { if (erOn()) { const a = erLive(); if (a.length) add('rewards', 'Countdown rewards', `<p class="qsq">${esc(a[0].sum)}</p><div class="qsw">${daysLeft(a[0].end) === 0 ? 'Ends today' : 'Ends ' + esc(fmtW(a[0].end))}${a[0].boost ? ' · Boost first' : ''}${a.length > 1 ? ' · +' + (a.length - 1) + ' more' : ''}</div>`, (a[0].link || a[0].web) ? 'url:' + (a[0].link || a[0].web) : ''); } } catch (e) {}
   return out;
