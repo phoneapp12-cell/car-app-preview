@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.69';
+const APP_VERSION = '2.23.70';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14558,11 +14558,22 @@ function smartSlides() {
   } catch (e) { }
   try { const b = bdaySoonSlide(); if (b) add('bday', '🎂 Birthday soon', b.body, "go('#birthdays')", b.score); } catch (e) { }
   try { if (h >= 17 && h < 22.5) { const tv = tvTonightSlide(); if (tv) add('tv', '📺 On TV tonight', tv, "go('#tv')", h >= 18.5 ? 58 : 42); } } catch (e) { }
+  try { // 2.23.70: daily media picks, only real titles from the app's own lists
+    const day = Math.floor(todayT() / DAY), pick = (a, n) => a.length ? a[(day + n) % a.length] : null, vs = preferFilmVideoTitles(videoSuggestions() || []).filter(v => v && v.title && v.url);
+    const isVlog = v => /vlog|day (trip|in|at)|with me|explore|road trip|a fun day/i.test(v.title) || v.category === 'travel';
+    const vl = pick(vs.filter(isVlog), 0), vg = pick(vs.filter(v => !isVlog(v)), 1);
+    if (vl) add('vlog', '🎥 Vlog pick', `<p class="qsq"><b>${esc(vl.title)}</b></p><div class="qsw">${esc(vl.channel || '')} · Tap to watch on YouTube</div>`, 'url:' + vl.url, 33);
+    if (vg) add('video', '▶️ Video pick', `<p class="qsq"><b>${esc(vg.title)}</b></p><div class="qsw">${esc(vg.channel || '')} · Tap to watch on YouTube</div>`, 'url:' + vg.url, 32);
+    const bk = pick(BOOK_PICKS, 0); if (bk) add('book', '📚 Book pick', `<p class="qsq"><b>${esc(bk[0])}</b></p><div class="qsw">${esc(bk[1])} · Tap to look it up</div>`, 'url:https://www.google.com/search?tbm=bks&q=' + encodeURIComponent(bk[0] + ' ' + bk[1]), 31);
+    const sg = pick(musPicks(), 0); if (sg) add('song', '🎵 Song pick', `<p class="qsq"><b>${esc(sg[0])}</b></p><div class="qsw">${esc(sg[1])} · Tap for YouTube Music</div>`, 'song:' + sg[0] + '\u241F' + sg[1], 34);
+  } catch (e) { }
   try { const p = myPhCurrent(); if (p) add('photo', '📷 My photos', `<img class="qsphoto" src="${p.url}" alt="One of your photos">`, 'photos', 47); } catch (e) { }
   try { if (!atWork) add('tidy', '🧺 Quick win', `<p class="qsq">${esc(smartPick(SMART_TIDY, 3))}</p>`, '', night ? 22 : (work && work.phase === 'now') ? 15 : 38); } catch (e) { }
   try { if (h >= 18 || h < 1) { const e = smartPick(SMART_EVE, 4); add('eve', '🎬 Tonight', `<p class="qsq">${esc(e)}</p>`, /Similar picks/.test(e) ? "go('#top40')" : '', w && !dry ? 46 : 36); } } catch (e) { }
   return out;
 }
+// Well-known published books (title, author); nothing made up
+const BOOK_PICKS = [['Atomic Habits', 'James Clear'], ['The Luminaries', 'Eleanor Catton'], ['Project Hail Mary', 'Andy Weir'], ['The Martian', 'Andy Weir'], ['The Midnight Library', 'Matt Haig'], ['A Man Called Ove', 'Fredrik Backman'], ['The Thursday Murder Club', 'Richard Osman'], ['Lessons in Chemistry', 'Bonnie Garmus'], ['Educated', 'Tara Westover'], ['Deep Work', 'Cal Newport'], ['Mister Pip', 'Lloyd Jones'], ['Where the Crawdads Sing', 'Delia Owens'], ['The Seven Husbands of Evelyn Hugo', 'Taylor Jenkins Reid'], ['Four Thousand Weeks', 'Oliver Burkeman'], ['The Bone People', 'Keri Hulme']];
 const STRIP_BASE = { heads: 60, count: 40, netflix: 34, prime: 34, rewards: 38, quote: 32, joke: 44, travel: 26, fact: 24 };
 function stripRank(list) {
   const a = homeAklParts() || {}, h = (a.min || 0) / 60; let where = ''; try { where = placeHere() || ''; } catch (e) { }
@@ -14575,7 +14586,8 @@ function stripRank(list) {
     if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
     s.score = v;
   });
-  return list.filter(s => s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 9);
+  const keep = list.filter(s => s.k === 'travel'), rest = list.filter(s => s.k !== 'travel' && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
+  return rest.concat(keep).sort((x, y) => y.score - x.score); // 2.23.70: Place of the day always stays
 }
 // Re-rank about every 5 hours, and when the app comes back after that long
 let stripRankedAt = Date.now();
@@ -14688,7 +14700,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) stri
     if (g === 'joke') { jokeMarkRead(); stripJA = !stripJA; const a = s.querySelector('.qsa'); const j = dailyJokeFor(); if (a && j) { a.classList.toggle('on', stripJA); a.textContent = stripJA ? j[1] : 'Tap for the answer'; } stripAt = Date.now(); return; }
     if (g.startsWith('app:')) { openStreamApp(g.slice(4)); return; }
     if (g.startsWith('url:')) { const u = g.slice(4); if (/^https:\/\//.test(u)) window.open(u, '_blank', 'noopener'); return; }
-    if (g === "go('#travel')") go('#travel'); else if (g === "go('#countdown')") go('#countdown');
+    if (g.startsWith('song:')) { const [t, ar] = g.slice(5).split('\u241F'); musOpen(t, ar || ''); return; }
+    { const m = /^go\('(#[a-z0-9]+)'\)$/.exec(g); if (m) { go(m[1]); return; } } // 2.23.70: any app page
   });
 })();
 
