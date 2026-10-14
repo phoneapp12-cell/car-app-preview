@@ -1,6 +1,7 @@
 import { sharedTodoRoute, sharedCarRoute, sharedPhotoRoute } from './shared-todo.js';
 import { brandsRoute } from './brands.js';
 import { pricesRoute } from './prices.js';
+import { primeRoute } from './prime.js';
 /* Calendar link relay for the Due Dates app (plus three fixed, read-only extras: /events, /weather and /closures).
  *
  * Why it exists: Outlook.com and Google serve private iCal (.ics) links without CORS headers,
@@ -340,6 +341,11 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       const code = e.message === 'bad_query' ? 'bad_query' : 'videos_unavailable';
       return json(code === 'bad_query' ? 400 : 502, code, origin, env);
     }
+  }
+  if (path === '/prime') {
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try { const data = await primeRoute(env, fetchImpl); return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } }); }
+    catch (e) { return json(502, 'prime_unavailable', origin, env); }
   }
   if (path === '/prices') {
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);

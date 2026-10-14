@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.57';
+const APP_VERSION = '2.23.58';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14322,12 +14322,12 @@ function tkToggleFull() {
 })();
 
 /* ================= ROTATING STRIP (2.23.34) =================
-   Quote, joke, travel spot, fact, next countdown, Netflix and Countdown rewards in one small card that changes every 6 s.
+   Quote, joke, travel spot, fact, next countdown, Netflix, Prime Video and Countdown rewards in one small card that changes every 6 s.
    Swipe to move, tap to open. Pauses while touched, off screen, app hidden, or reduced motion (manual only). */
 const stripOn = () => !(S && S.settings && S.settings.qjStrip === false);
 let stripIdx = 0, stripAt = Date.now(), stripTouch = false, stripJA = false;
 const STRIP_MS = 6000;
-const STRIP_ART = { travel: 'travel', count: 'hol', netflix: 'tv', rewards: 'rewards' };
+const STRIP_ART = { travel: 'travel', count: 'hol', netflix: 'tv', prime: 'tv', rewards: 'rewards' };
 function stripSlides() {
   const out = [], add = (k, lbl, body, go) => { if (body) out.push({ k, lbl, body, go: go || '' }); };
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
@@ -14336,7 +14336,8 @@ function stripSlides() {
   try { const f = homePick(131, HOME_FACTS); if (f) add('fact', 'Did you know?', `<p class="qsq">${esc(String(f.line || f))}</p>`); } catch (e) {}
   try { const c = countdownRows()[0]; if (c) add('count', 'Countdown', `<p class="qsq"><b>${esc(c.name)}</b></p><div class="qsw">${esc(cdWords(cdDays(c.date)))} · ${esc(fmtW(c.date))}</div>`, "go('#countdown')"); } catch (e) {}
   try { if (NF && mailConnected('microsoft')) { const t = todayISO(), fr = (NF.fresh || []).slice(0, 3), co = (NF.coming || []).filter(x => x.date && x.date >= t).slice(0, 2); const x = fr[0] || co[0];
-    if (x) add('netflix', 'New on Netflix', `<p class="qsq">${esc(fr.map(y => y.title).join(', ') || '')}${fr.length && co.length ? '' : ''}</p>${co.length ? `<div class="qsw">Coming: ${esc(co.map(y => y.title + ' (' + fmtW(y.date) + ')').join(', '))}</div>` : ''}`, x.link ? 'url:' + x.link : ''); } } catch (e) {}
+    if (x) add('netflix', 'New on Netflix', `<p class="qsq">${esc(fr.map(y => y.title).join(', ') || '')}${fr.length && co.length ? '' : ''}</p>${co.length ? `<div class="qsw">Coming: ${esc(co.map(y => y.title + ' (' + fmtW(y.date) + ')').join(', '))}</div>` : ''}`, 'app:netflix'); } } catch (e) {}
+  try { const P = primeList(); if (P) add('prime', 'New on Prime', `${P.fresh.length ? `<p class="qsq">${esc(P.fresh.map(y => y.title).join(', '))}</p>` : ''}${P.coming.length ? `<div class="qsw">Coming: ${esc(P.coming.map(y => y.title + ' (' + fmtW(y.date) + ')').join(', '))}</div>` : ''}`, 'app:prime'); } catch (e) {}
   try { if (erOn()) { const a = erLive(); if (a.length) add('rewards', 'Countdown rewards', `<p class="qsq">${esc(a[0].sum)}</p><div class="qsw">${daysLeft(a[0].end) === 0 ? 'Ends today' : 'Ends ' + esc(fmtW(a[0].end))}${a[0].boost ? ' · Boost first' : ''}${a.length > 1 ? ' · +' + (a.length - 1) + ' more' : ''}</div>`, (a[0].link || a[0].web) ? 'url:' + (a[0].link || a[0].web) : ''); } } catch (e) {}
   return out;
 }
@@ -14383,6 +14384,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) stri
     const dot = e.target.closest('.qsdot'); if (dot) { stripShow(+dot.dataset.i); return; }
     const s = e.target.closest('.qslide'); if (!s) return; const g = s.dataset.go || '';
     if (g === 'joke') { stripJA = !stripJA; const a = s.querySelector('.qsa'); const j = dailyJokeFor(); if (a && j) { a.classList.toggle('on', stripJA); a.textContent = stripJA ? j[1] : 'Tap for the answer'; } stripAt = Date.now(); return; }
+    if (g.startsWith('app:')) { openStreamApp(g.slice(4)); return; }
     if (g.startsWith('url:')) { const u = g.slice(4); if (/^https:\/\//.test(u)) window.open(u, '_blank', 'noopener'); return; }
     if (g === "go('#travel')") go('#travel'); else if (g === "go('#countdown')") go('#countdown');
   });
@@ -14397,6 +14399,30 @@ const NF_MAX_AGE = 3 * 3600 * 1000;
 const NF_WINDOW = 14 * 24 * 3600 * 1000;
 const NF_SKIP_SUBJ = /(code|sign.?in|password|payment|billing|invoice|receipt|device|account|household|membership|price|plan\b|update your|verify|top 10|watching in your area)/i;
 const NF_JUNK = /^(netflix|hero image|content block image|play|remind me|more info|play trailer|\+ my list)$/i;
+/* 2.23.58: New on Prime Video NZ. No Prime "new on" emails come in, so the relay's /prime reads Flicks' dated monthly
+   guide (ottpath.com as fallback): real titles and NZ dates only, cached 24 h there and ~12 h here. */
+let PRIME = null;
+try { PRIME = JSON.parse(localStorage.getItem('primeNew') || 'null'); } catch (e) { PRIME = null; }
+function primeList() {
+  if (!PRIME || !Array.isArray(PRIME.items) || !PRIME.items.length) return null;
+  const t = todayISO(), wk = isoT(todayT() - 7 * DAY), nx = isoT(todayT() + 14 * DAY), ok = x => x && x.title && /^\d{4}-\d\d-\d\d$/.test(x.date || '');
+  const fresh = PRIME.items.filter(x => ok(x) && x.date <= t && x.date >= wk).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+  const coming = PRIME.items.filter(x => ok(x) && x.date > t && x.date <= nx).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+  return fresh.length || coming.length ? { fresh, coming } : null;
+}
+async function loadPrime(force) {
+  if (!RELAY_URL || navigator.onLine === false) return;
+  if (!force && PRIME && Date.now() - Date.parse(PRIME.checked || 0) < 12 * 3600e3) return;
+  try { const r = await fetch(RELAY_URL + '/prime', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items) && d.items.length) { PRIME = { checked: new Date().toISOString(), source: d.source, items: d.items }; try { localStorage.setItem('primeNew', JSON.stringify(PRIME)); } catch (e) { } if (location.hash === '#home' || !location.hash) render(); } } catch (e) { }
+}
+setTimeout(() => loadPrime(), 4000); setInterval(() => loadPrime(), 6 * 3600e3);
+/* Tap hands off to the installed app: Android intent with the web page as fallback; elsewhere the https universal link. */
+const STREAM_APPS = { netflix: { web: 'https://www.netflix.com/', pkg: 'com.netflix.mediaclient' }, prime: { web: 'https://www.primevideo.com/', pkg: 'com.amazon.avod.thirdpartyclient' } };
+function openStreamApp(k) {
+  const a = STREAM_APPS[k]; if (!a) return;
+  if (/Android/i.test(navigator.userAgent)) { const u = new URL(a.web); location.href = `intent://${u.host}${u.pathname}#Intent;scheme=https;package=${a.pkg};S.browser_fallback_url=${encodeURIComponent(a.web)};end`; return; }
+  location.href = a.web;
+}
 let NF = null, nfBusy = false;
 async function loadNf() { try { const c = await kvGet('netflixNew'); NF = c && Array.isArray(c.fresh) ? c : null; } catch (e) { NF = null; } }
 function nfTitle(s) {
@@ -14960,7 +14986,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Scrolling summary</div><div class="s">On: the summary sits under the rotating strip, a little shorter, as one line scrolling right to left. Touch to pause, drag to scrub. Tap Full summary to read it all. Off: the full summary as before.</div></div><button class="switch ${sumScrollOn() ? 'on' : ''}" role="switch" aria-checked="${sumScrollOn()}" aria-label="Scrolling summary" id="sumscrollsw" onclick="S.settings.sumFull=sumScrollOn();save().then(render)"></button></div>
    <div class="srow"><div class="tx"><div class="t">Card artwork</div><div class="s">Picture headers and illustrated icons on Coming up and Just added. Off: the plain cards.</div></div><button class="switch ${cardArtOn() ? 'on' : ''}" role="switch" aria-checked="${cardArtOn()}" aria-label="Card artwork" id="cardartsw" onclick="toggleSetting('cardArt')"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix, Prime Video and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Countdown rewards</div><div class="s">A card near the top with Countdown (Woolworths) offers from your Everyday Rewards emails, soonest ending first. Fuel, FreshChoice, MILKRUN and other partner offers are left out. Hidden when there are none.</div></div><button class="switch ${erOn() ? 'on' : ''}" role="switch" aria-checked="${erOn()}" aria-label="Countdown rewards" id="ersw" onclick="toggleSetting('erPromos', ${!erOn()}).then(() => refreshEr(true))"></button></div>
