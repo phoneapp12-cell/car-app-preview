@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.64';
+const APP_VERSION = '2.23.65';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3530,8 +3530,14 @@ function homeFeedKeys(keys) {
    local events, TV, Top 40, the travel spot and starred ideas. Bills, Upcoming, due cards, to-dos and notes
    follow underneath. A small "New" tag marks a card whose top items changed since it was last on screen. */
 function homeNight(now = new Date()) {
-  const h = +new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', hourCycle: 'h23' }).format(now) % 24;
-  return h >= 20 || h < 5;
+  // 2.23.65: starts 1 hour after today's Onerahi/Whangārei sunset (Open-Meteo daily sunset), 8 pm if that's not known yet. Ends 5 am as before.
+  const p = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(now);
+  const h = +(p.find(x => x.type === 'hour') || {}).value % 24, mi = +(p.find(x => x.type === 'minute') || {}).value || 0, min = h * 60 + mi;
+  if (h < 5) return true;
+  let start = 20 * 60;
+  try { const d = WX && WX.data && WX.data.daily, iso = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(now), i = d && Array.isArray(d.time) ? d.time.indexOf(iso) : -1, ss = i >= 0 && d.sunset ? String(d.sunset[i] || '') : '';
+    const m = ss.match(/T(\d{2}):(\d{2})/); if (m) start = Math.min(23 * 60 + 59, +m[1] * 60 + +m[2] + 60); } catch (e) { }
+  return min >= start;
 }
 const NIGHT_KEYS = ['news', 'blogging', 'videos', 'events', 'tv', 'top40', 'travel', 'ideas'];
 const NIGHT_CARD = {
