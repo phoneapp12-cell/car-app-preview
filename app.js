@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.68';
+const APP_VERSION = '2.23.69';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14477,7 +14477,24 @@ const SMART_GARDEN_COOL = ['Cool enough to water the pots and seedlings', 'Cool 
 const SMART_OUT = [['Whangārei Falls loop', 'short bush walk to the falls'], ['A.H. Reed Memorial Kauri Park', 'boardwalk through the kauri'], ['Mt Manaia track', 'bush climb with big views of the Heads'], ['Ocean Beach', 'surf beach out at the Heads'], ['Smugglers Bay', 'walk in from Urquharts Bay'], ['Abbey Caves', 'limestone caves and bush'], ['Pārua Bay', 'sheltered bay near home'], ['Onerahi foreshore', 'easy walk by the water, close to home']];
 const SMART_EVE = ['A chapter of a book before the night gets away', 'Make a track on Suno, the AI music app', 'Pick a movie for the weekend', 'Try a new song from your Similar picks', 'Line up a feel-good movie'];
 const SMART_SLOT = 5 * 3600e3;
-const smartPick = (arr, salt) => arr[(Math.floor(Date.now() / SMART_SLOT) + salt) % arr.length];
+// 2.23.69: a new version moves the strip on one slot, so tips and the photo change straight away
+let STRIP_BUMP = 0; try { STRIP_BUMP = +localStorage.getItem('stripBump') || 0; if (localStorage.getItem('stripVer') !== APP_VERSION) { STRIP_BUMP++; localStorage.setItem('stripBump', String(STRIP_BUMP)); localStorage.setItem('stripVer', APP_VERSION); } } catch (e) { }
+const smartSlot = () => Math.floor(Date.now() / SMART_SLOT) + STRIP_BUMP;
+const smartPick = (arr, salt) => arr[(smartSlot() + salt) % arr.length];
+// Birthdays in the next fortnight, from the Birthdays list
+function bdaySoonSlide() {
+  const L = (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 14).sort((x, y) => x.d - y.d);
+  if (!L.length) return null; const x = L[0], when = x.d === 0 ? 'Today! 🎂' : x.d === 1 ? 'Tomorrow' : 'In ' + x.d + ' days · ' + fmtW(isoT(todayT() + x.d * DAY));
+  const age = x.b.year && +x.b.year > 1900 ? ' (' + (new Date(isoT(todayT() + x.d * DAY)).getFullYear() - +x.b.year) + ')' : '';
+  return { body: `<p class="qsq"><b>${esc(x.b.name)}’s birthday${age}</b></p><div class="qsw">${esc(when)}${L[1] ? ' · then ' + esc(L[1].b.name) + (L[1].d === 1 ? ' tomorrow' : ' in ' + L[1].d + ' days') : ''}</div>`, score: x.d === 0 ? 90 : x.d <= 2 ? 72 : x.d <= 7 ? 55 : 40 };
+}
+// Prime-time shows on the free channels, from the TV guide the app already loads
+function tvTonightSlide() {
+  if (!TV || !TV.data || !TV.data.slots) return null; const now = Date.now(), at = new Date(); at.setHours(19, 30, 0, 0); const t = Math.max(now, +at);
+  const rows = TV_CHANNELS.filter(ch => TV_HOME_SHORT.has(ch.id)).map(ch => { const sl = (TV.data.slots[ch.id] || []).find(x => x && x.title && x.until > t && x.start <= t + 30 * 60e3); return sl ? { ch: ch.name, sl } : null; }).filter(Boolean).slice(0, 3);
+  if (!rows.length) return null;
+  return `<p class="qsq"><b>${esc(rows[0].sl.title)}</b></p><div class="qsw">${rows.map((r, i) => (i ? esc(r.sl.title) + ' · ' : '') + esc(r.ch) + ' ' + esc(tvClock(r.sl.start))).join(' · ')}</div>`;
+}
 function wxNext5() {
   const h = WX && WX.data && WX.data.hourly, c = WX && WX.data && WX.data.current; if (!h || !Array.isArray(h.time) || !c) return null;
   const local = wxLocalNow(), key = local.iso + 'T' + local.hm.slice(0, 2); let maxT = c.temperature_2m, rain = 0, n = 0;
@@ -14539,6 +14556,8 @@ function smartSlides() {
       add('garden', '🌱 Garden', `<p class="qsq">${esc(smartPick(cool ? SMART_GARDEN.concat(SMART_GARDEN_COOL) : SMART_GARDEN, 1))}</p><div class="qsw">${Math.round(w.now)}° and dry for the next few hours</div>`, '', 52); }
     if (w && dry && light && h < 16 && !work && !night) { const o = smartPick(SMART_OUT, 2); add('out', '🥾 Get out', `<p class="qsq"><b>${esc(o[0])}</b></p><div class="qsw">${esc(o[1])} · ${Math.round(w.now)}°, dry for now</div>`, '', 50); }
   } catch (e) { }
+  try { const b = bdaySoonSlide(); if (b) add('bday', '🎂 Birthday soon', b.body, "go('#birthdays')", b.score); } catch (e) { }
+  try { if (h >= 17 && h < 22.5) { const tv = tvTonightSlide(); if (tv) add('tv', '📺 On TV tonight', tv, "go('#tv')", h >= 18.5 ? 58 : 42); } } catch (e) { }
   try { const p = myPhCurrent(); if (p) add('photo', '📷 My photos', `<img class="qsphoto" src="${p.url}" alt="One of your photos">`, 'photos', 47); } catch (e) { }
   try { if (!atWork) add('tidy', '🧺 Quick win', `<p class="qsq">${esc(smartPick(SMART_TIDY, 3))}</p>`, '', night ? 22 : (work && work.phase === 'now') ? 15 : 38); } catch (e) { }
   try { if (h >= 18 || h < 1) { const e = smartPick(SMART_EVE, 4); add('eve', '🎬 Tonight', `<p class="qsq">${esc(e)}</p>`, /Similar picks/.test(e) ? "go('#top40')" : '', w && !dry ? 46 : 36); } } catch (e) { }
@@ -14591,7 +14610,7 @@ function myPhAdd() {
   inp.onchange = async () => {
     const f = inp.files && inp.files[0]; if (!f) return;
     try { const blob = await myPhResize(f); const id = uid('ph'); await myPhTx('readwrite', st => st.put({ id, at: Date.now(), blob }, id)); await myPhLoad();
-      try { localStorage.setItem('myPhPick', JSON.stringify({ slot: Math.floor(Date.now() / SMART_SLOT), id, seen: (myPhState().seen || []).concat(id) })); } catch (e) { }
+      try { localStorage.setItem('myPhPick', JSON.stringify({ slot: smartSlot(), id, seen: (myPhState().seen || []).concat(id) })); } catch (e) { }
       render(); toast('Photo added to the strip. It stays on this phone only.'); }
     catch (e) { toast('Couldn’t add that photo.'); }
   };
@@ -14608,7 +14627,7 @@ function myPhManage() {
 function myPhState() { try { return JSON.parse(localStorage.getItem('myPhPick') || '{}') || {}; } catch (e) { return {}; } }
 function myPhCurrent() {
   if (!MYPH.length) return null;
-  const slot = Math.floor(Date.now() / SMART_SLOT), st = myPhState(), ids = MYPH.map(p => p.id);
+  const slot = smartSlot(), st = myPhState(), ids = MYPH.map(p => p.id);
   let cur = MYPH.find(p => p.id === st.id);
   if (!cur || st.slot !== slot) {
     let seen = (st.seen || []).filter(x => ids.includes(x)); let left = ids.filter(x => !seen.includes(x) && x !== st.id);
