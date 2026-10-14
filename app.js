@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.71';
+const APP_VERSION = '2.23.72';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3794,18 +3794,21 @@ function jaAgo(at, now = Date.now()) { const m = Math.round((now - at) / 6e4); r
 const TAB_CATS = [
   { id: 'today', name: 'Today', col: '#2563eb', keys: ['comingup', 'justadded', 'quotejoke', 'todo', 'calendar'] },
   { id: 'money', name: 'Money', col: '#059669', keys: ['bills', 'budget', 'claims'] },
-  { id: 'home', name: 'Home & Life', col: '#d97706', keys: ['shopping', 'meals', 'health', 'cars', 'pets', 'birthdays'] },
+  { id: 'home', name: 'Home & Life', col: '#d97706', keys: ['shopping', 'meals', 'ideas', 'health', 'cars', 'pets', 'birthdays'] },
   { id: 'out', name: 'Out & About', col: '#7c3aed', keys: ['events', 'travel'] },
   { id: 'fun', name: 'Fun', col: '#db2777', keys: ['news', 'videos', 'tv'] }
 ];
 const TAB_ART = { todo: 'todo', calendar: 'cal', bills: 'bill', budget: 'money', claims: 'health', shopping: 'shop', meals: 'plate', health: 'health', cars: 'car', pets: 'pet', birthdays: 'bday', events: 'ev', travel: 'travel', news: 'news', videos: 'tv', tv: 'tv' };
-const TAB_NAME = { todo: 'To-do', calendar: 'Calendar', bills: 'Bills', budget: 'Budget', claims: 'Claims', shopping: 'Shopping', meals: 'Meals', health: 'Health', cars: 'Cars', pets: 'Pets', birthdays: 'Birthdays', events: 'Events', travel: 'Travel', news: 'News', videos: 'Videos', tv: 'TV guide' };
+const TAB_NAME = { ideas: 'Ideas', todo: 'To-do', calendar: 'Calendar', bills: 'Bills', budget: 'Budget', claims: 'Claims', shopping: 'Shopping', meals: 'Meals', health: 'Health', cars: 'Cars', pets: 'Pets', birthdays: 'Birthdays', events: 'Events', travel: 'Travel', news: 'News', videos: 'Videos', tv: 'TV guide' };
 const tabCatOf = k => TAB_CATS.find(c => c.keys.includes(k));
 function tabRow(k, t, s, go) {
   const a = TAB_ART[k];
   return `<button class="row" onclick="${go || `go('#${k}')`}"><div class="ic ${(NAV[k] && NAV[k][1]) || 'todo'}${cardArtOn() && a ? ' icart' : ''}">${cardArtOn() && a ? `<img src="art/i3-${a}.webp" alt="" width="40" height="40" loading="lazy">` : I((NAV[k] && NAV[k][0]) || 'right')}</div><div class="tx"><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ''}</div></button>`;
 }
 const TAB_PREVIEW = {
+  // 2.23.72: Ideas came back to Home (left out of the categories in 2.23.44; the ideas themselves were never touched)
+  ideas: () => { const L = (S.ideas || []).filter(i => i && i.title).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.created || 0) - (a.created || 0)).slice(0, 4);
+    return L.length ? L.map(i => tabRow('ideas', (i.pinned ? '★ ' : '') + esc(i.title), esc(i.cat || 'Idea'))).join('') + (S.ideas.length > 4 ? tabRow('ideas', 'All ' + S.ideas.length + ' ideas', 'Tap to see them all') : '') : tabRow('ideas', 'No ideas yet', 'Jot things down'); },
   calendar: () => { const T = todayISO(); const l = (S.appts || []).filter(a => a.date >= T && !a.done).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).slice(0, 4);
     return l.length ? l.map(a => tabRow('calendar', esc(a.title), fmtW(a.date) + (a.time ? ' · ' + fmtTime(a.time) : ''), `calOpenDay(${parseD(a.date)})`)).join('') : tabRow('calendar', 'Nothing booked', 'Appointments, events and holidays'); },
   budget: () => tabRow('budget', 'This fortnight', budgetMoreSub()),
