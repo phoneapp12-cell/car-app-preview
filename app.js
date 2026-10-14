@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.72';
+const APP_VERSION = '2.23.73';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14532,6 +14532,14 @@ function wxOutlook() {
   if (storm && !wet) out.push({ score: 52, lbl: lab(storm.t), what: 'Thunderstorms possible', when: fmtW(storm.t), tip: 'Unplug the spa pump if lightning is close' });
   return out;
 }
+// 2.23.73: light, friendly questions to get to know coworkers. Nothing personal or sensitive.
+const COWORK_QS = ['What’s the best thing you’ve ever eaten on holiday?', 'If you could master any skill overnight, what would it be?', 'What was your first ever job?', 'What’s a hobby you’d love to try one day?', 'What’s the best concert or live show you’ve been to?', 'If you could live in any decade, which would you pick?', 'What’s your go-to takeaway order?', 'What’s a film you could watch over and over?', 'What did you want to be when you were a kid?', 'What’s the most interesting place you’ve visited in New Zealand?', 'Are you a morning person or a night owl?', 'What’s a song that always gets you in a good mood?', 'If you had a free Saturday with no plans, what would you do?', 'What’s the best book you’ve read lately?', 'What’s a food you couldn’t stand as a kid but love now?', 'Tea or coffee, and how do you take it?', 'What’s a TV show you’d recommend to anyone?', 'If you could have any animal as a pet, what would it be?', 'What’s the best piece of advice you’ve been given?', 'What’s your favourite beach or swimming spot?', 'If you could travel anywhere next month, where would you go?', 'What’s something you’re surprisingly good at?', 'What’s your favourite season, and why?', 'What’s the best snack for a long shift?', 'What sport did you play at school, if any?', 'What’s a skill you picked up in the last few years?', 'If you could have dinner with any famous person, who would it be?', 'What’s your favourite board game or card game?', 'What’s a small thing that makes your day better?', 'What’s the strangest food you’ve ever tried?', 'Sweet or savoury breakfast?', 'What app on your phone do you use the most for fun?', 'What’s a place on your travel bucket list?', 'What was your favourite cartoon growing up?', 'If you could instantly speak another language, which one?', 'What’s the best road trip you’ve been on?', 'Do you have a favourite local café or bakery?', 'What’s a video game you loved as a kid?', 'What’s a talent you wish you had?', 'If you won a free weekend away, where would you go?', 'What’s your favourite thing to cook?', 'What’s the most beautiful view you’ve ever seen?', 'Cats or dogs, or something else entirely?', 'What’s a movie that made you laugh the most?', 'What’s your favourite way to spend a rainy day?', 'If you could be on any game show, which one?', 'What’s a fun fact about your home town?', 'What’s your all-time favourite dessert?', 'What’s the best gift you’ve ever been given?', 'If you could time travel for a day, past or future?', 'What’s a podcast or YouTube channel you enjoy?', 'What’s the best thing about where you grew up?', 'What’s your favourite pizza topping?', 'If you could invent a new holiday, what would it celebrate?', 'What’s a good tune for a long drive?', 'Have you ever met someone famous?', 'What’s your favourite time of day?', 'What’s a smell that reminds you of childhood?', 'What’s the best day trip from Whangārei?', 'Would you rather explore space or the deep ocean?', 'What’s your favourite ice cream flavour?', 'What would your perfect sandwich have in it?', 'What’s something on your to-try list this year?', 'What superpower would be most useful at work?', 'What’s the best thing you’ve made with your hands?'];
+function coworkQ() {
+  const day = Math.floor(todayT() / DAY), n = COWORK_QS.length, cyc = Math.floor(day / n), a = COWORK_QS.slice();
+  let seed = cyc * 7919 + 104729; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a[day % n];
+}
 function smartSlides() {
   try { loadWx16(); } catch (e) { }
   const out = [], add = (k, lbl, body, go, score) => { if (body && score > 0) out.push({ k, lbl, body, go: go || '', score }); };
@@ -14565,6 +14573,8 @@ function smartSlides() {
     const v = currentSarahVideo(); if (v && v.id) { const pt = Date.parse(v.published || ''), isNew = pt && Date.now() - pt < 3 * DAY;
       const when = pt ? new Date(pt).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short' }) : '';
       add('sarah', '🎬 Sarah’s latest video', `<div class="qssv"><img class="qsthumb" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="" loading="lazy"><div><p class="qsq"><b>${esc(v.title)}</b></p><div class="qsw">${esc(when)}${isNew ? ' · <span class="qsnew">New</span>' : ''} · Tap to watch</div></div></div>`, 'url:' + v.url, isNew ? 95 : 45); } } catch (e) { }
+  try { // 2.23.73: one friendly question a day for a coworker, only while at work
+    if (atWork || (work && work.phase === 'now')) add('cowork', '💬 Ask a coworker', `<p class="qsq"><b>${esc(coworkQ())}</b></p><div class="qsw">A new question tomorrow</div>`, '', 64); } catch (e) { }
   try { // 2.23.70: daily media picks, only real titles from the app's own lists
     const day = Math.floor(todayT() / DAY), pick = (a, n) => a.length ? a[(day + n) % a.length] : null, vs = preferFilmVideoTitles(videoSuggestions() || []).filter(v => v && v.title && v.url);
     const isVlog = v => /vlog|day (trip|in|at)|with me|explore|road trip|a fun day/i.test(v.title) || v.category === 'travel';
