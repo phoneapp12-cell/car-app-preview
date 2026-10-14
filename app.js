@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.58';
+const APP_VERSION = '2.23.59';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2519,6 +2519,11 @@ function aiSumCtx() {
   try { const hb = useHabits(); if (hb.length) ctx.habits = hb; } catch (e) {}
   try { ctx.knowMe = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-12).map(x => x.q + ' ' + x.a); } catch (e) {}
   ctx.facts = AI_FACTS;
+  try { // 2.23.59: exact day facts for today and tomorrow, so suggestions never put gym or work on the wrong day
+    const f0 = sugDayFacts(0), f1 = sugDayFacts(1);
+    ctx.todayFacts = f0.line; ctx.tomorrowFacts = f1.line;
+    ctx.sugRule = 'Suggestions: only say gym on a day listed as a gym day above (gym is Tuesday and Wednesday after work only). Never suggest anything already in todos, eventsToday, eventsThisWeek or mealsPlanned. If a meal is mentioned, give the gluten-free swap (he is coeliac), e.g. stir fry: tamari or GF soy sauce. Spa ideas are fine. Never mention bedtime, sleep, medication or being late.';
+  } catch (e) {}
   try { if (homeNight()) nightCtx(ctx); } catch (e) {}
   return ctx;
 }
@@ -2578,10 +2583,47 @@ function aiSumBullets() {
   const walkDog = /\b(walk|walking)\b/i; const dog = /\b(zeus|dog|dogs)\b/i;
   const bf = bfastLine();
   let night = false; try { night = homeNight(); } catch (e) {}
-  const lines = AI_SUM.lines.filter(t => { const x = String(t); return !(walkDog.test(x) && dog.test(x)) && !BFAST_TV_RE.test(x) && (!night || nightOk(x)); }).concat(bf && (!night || nightOk(bf)) ? [bf] : []);
+  const lines = AI_SUM.lines.filter(t => { const x = String(t); return !(walkDog.test(x) && dog.test(x)) && !(gymSkipped(todayISO()) && GYM_WORD.test(x) && !/\btomorrow\b/i.test(x)) && !BFAST_TV_RE.test(x) && (!night || nightOk(x)); }).concat(bf && (!night || nightOk(bf)) ? [bf] : []);
   const lis = lines.map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
   return lis ? '<ul class="sumbul">' + lis + '</ul>' : '';
 }
+/* 2.23.59: day facts, duplicate and gluten-free checks for the summary's + Add suggestions */
+const GYM_DOWS = [2, 3]; // Tuesday and Wednesday, after work
+// One-off gym skips by date (the regular Tue/Wed plan stays). S.settings.gymSkip can hold more ISO dates.
+const GYM_SKIP = ['2026-10-14']; // Shane is skipping tonight only
+const gymSkipped = iso => GYM_SKIP.includes(iso) || ((S.settings && S.settings.gymSkip) || []).includes(iso);
+const GYM_WORD = /\b(gym|workout|work out|training session|weights|treadmill|day [ab])\b/i;
+function sugDayFacts(off) {
+  const a = homeAklParts() || {}, dow = ((a.dow || 0) + off) % 7, WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  let r = { days: {}, ends: {} }; try { r = rosterState(); } catch (e) { }
+  const st = r.days && r.days[String(dow)], en = r.ends && r.ends[String(dow)];
+  const work = !!st, iso = isoT(todayT() + off * DAY), skip = gymSkipped(iso), gym = work && GYM_DOWS.includes(dow) && !skip;
+  let long = false; if (st && en) { const m = t => { const [h, mm] = String(t).split(':').map(Number); return h * 60 + mm; }; long = m(en) - m(st) >= 9 * 60; }
+  const line = `${off ? 'Tomorrow' : 'Today'} is ${WD[dow]}: ${work ? `work day, Noel Leeming ${fmtTime(st)}${en ? '–' + fmtTime(en) : ''}${long ? ' (long shift)' : ''}` : 'day off (no work)'}; ${gym ? 'gym day (after work)' : skip ? 'NOT a gym day (skipping the gym this time: do not mention the gym at all)' : 'NOT a gym day'}.`;
+  return { dow, work, gym, long, line };
+}
+const SUG_STOP = new Set('the a an and or for to of in on at your you with from this that tomorrow today tonight morning evening afternoon week some like check add maybe time sort sorting tasks task list plan get make set up out new sarah zeus shane home work'.split(' '));
+const sugWords = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !SUG_STOP.has(w)).map(w => w.replace(/(ing|es|s)$/, ''));
+function sugDup(blob) {
+  const w = new Set(sugWords(blob)); if (!w.size) return false;
+  const T = todayISO(), have = [];
+  (S.todos || []).forEach(t => { if (t && !t.done) have.push(t.title); });
+  (S.appts || []).forEach(a => { if (a && a.date >= T) have.push(a.title); });
+  try { extEvents(todayT(), todayT() + 14 * DAY).forEach(e => have.push(e.title)); } catch (e) { }
+  try { const p = (M() && M().plan) || {}; Object.keys(p).forEach(d => { if (d >= T && p[d] && p[d].title) have.push(p[d].title); }); } catch (e) { }
+  return have.some(h => sugWords(h).some(x => w.has(x)));
+}
+function sugDayOk(blob) {
+  if (!GYM_WORD.test(blob)) return true;
+  if (gymSkipped(todayISO()) && !/\btomorrow\b/i.test(blob)) return false;
+  const f0 = sugDayFacts(0), f1 = sugDayFacts(1);
+  if (/\btomorrow\b/i.test(blob)) return f1.gym;
+  if (/\b(today|tonight|this (afternoon|evening))\b/i.test(blob) || !/\b(mon|tues|wednes|thurs|fri|satur|sun)day\b/i.test(blob)) return f0.gym || f1.gym;
+  return true;
+}
+const SUG_GF = [[/stir[ -]?fr(y|ies)|\bsoy\b|teriyaki/i, 'GF: use tamari or GF soy sauce'], [/\bpasta|spaghetti|lasagne|noodles?\b/i, 'GF: use GF pasta or rice noodles'], [/\bpizza\b/i, 'GF: GF pizza base'], [/\bburgers?\b|\bwraps?\b|\bsandwich/i, 'GF: GF buns or wraps'], [/\bgravy|crumbed|batter|schnitzel\b/i, 'GF: GF flour or crumbs'], [/\bbeer\b/i, 'GF: GF beer']];
+function sugGf(t) { const x = String(t || ''); if (/gluten|\bGF\b|tamari/i.test(x)) return x; const g = SUG_GF.find(([re]) => re.test(x)); return g ? x.replace(/[.!]?\s*$/, '') + ' (' + g[1] + ')' : x; }
+const SUG_NAG = /\b(bed ?time|go to bed|early night|sleep|medication|meds|pills?|tablets?|running late|be late|lateness)\b/i;
 function aiSugList() {
   if (!aiSumFresh() || !AI_SUM.sugs.length) return null;
   let today = ''; try { today = DD.nzClock().iso || ''; } catch (e) {}
@@ -2589,11 +2631,12 @@ function aiSugList() {
   const foodRe = /\b(dinner|tea tonight|pizza|meal|cook|recipe|takeaway|supper)\b/i;
   const lawnRe = /\b(mow|mowing|lawn|lawns)\b/i; let lawn = null; try { lawn = homeSugLawns(); } catch (e) {} // 2.22.48: lawns follow the fortnightly rule only
   const walkDogRe = /\b(walk|walking)\b/i, dogRe = /\b(zeus|dog|dogs)\b/i; // 2.22.84: walk is already a to-do
-  const out = AI_SUM.sugs.filter(x => { const blob = String(x.text || '') + ' ' + String(x.title || ''); return !BFAST_TV_RE.test(blob) && !lawnRe.test(blob) && !(walkDogRe.test(blob) && dogRe.test(blob)); }).filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
+  const out = AI_SUM.sugs.filter(x => { const blob = String(x.text || '') + ' ' + String(x.title || ''); return !BFAST_TV_RE.test(blob) && !lawnRe.test(blob) && !(walkDogRe.test(blob) && dogRe.test(blob)) && !SUG_NAG.test(blob) && sugDayOk(blob) && !sugDup(blob); }).filter(x => !(planned && foodRe.test(String(x.text || '') + ' ' + String(x.title || '')))).map((x, i) => {
     const title = String(x.title || x.text || '').slice(0, 80);
     const type = ['todo', 'note', 'appt'].includes(x.type) ? x.type : 'todo';
     const pre = type === 'note' ? { text: String(x.text || title) } : type === 'appt' ? { title, date: today, time: '', notes: '' } : { title, due: today, priority: 'normal', list: 'Home' };
-    return { id: 'ai' + i, type, text: String(x.text || title), pre };
+    if (pre.title) pre.title = sugGf(pre.title).slice(0, 80); if (pre.text) pre.text = sugGf(pre.text);
+    return { id: 'ai' + i, type, text: sugGf(String(x.text || title)), pre };
   }).filter(x => x.text);
   let tv = null, shop = null; try { tv = homeSugTv(); } catch (e) {} try { shop = homeSugShop(); } catch (e) {}
   let use = null; try { use = homeSugUse(); } catch (e) {}
@@ -3300,7 +3343,7 @@ function homeRoutineLine() {
       'If the medication was a bit late, restless legs can play up'
     ]);
     // Tuesday and Wednesday only, after the 6pm finish. Not during the work day, and not Thursday.
-    if ((dow === 2 || dow === 3) && min >= 18 * 60 && min < 21 * 60) return homePick(205, [
+    if ((dow === 2 || dow === 3) && !gymSkipped(todayISO()) && min >= 18 * 60 && min < 21 * 60) return homePick(205, [
       'Gym tonight, if you feel like it',
       'The gym’s there tonight, if you want it'
     ]);
@@ -3585,7 +3628,7 @@ const CU_EXTRA = {
   meds: T => { const m = medsState(), d = todayISO(); return m.list.filter(x => x && x.name && !medTakenAt(x.id, d)).map(x => ({ days: 0, rank: 1, sort: x.time || '99', kind: 'med', name: x.name,
     html: attRow({ kind: 'med', date: d, go: `go('#meds')`, ic: 'health', icon: 'pill', title: esc(x.name) + (x.dose ? ' · ' + esc(x.dose) : ''), sub: `Medication · ${x.time ? fmtTime(x.time) : 'Any time'} today` }) })); },
   // Gym nights (Tuesday and Wednesday after work), today and tomorrow
-  gym: T => [0, 1].filter(n => { const w = new Date(T + n * DAY).getUTCDay(); return w === 2 || w === 3; }).map(n => ({ days: n, rank: 1, sort: '18:15', kind: 'gym', name: 'Gym',
+  gym: T => [0, 1].filter(n => { const w = new Date(T + n * DAY).getUTCDay(); return (w === 2 || w === 3) && !gymSkipped(isoT(T + n * DAY)); }).map(n => ({ days: n, rank: 1, sort: '18:15', kind: 'gym', name: 'Gym',
     html: attRow({ kind: 'gym', date: isoT(T + n * DAY), go: `go('#gym')`, ic: 'health', icon: 'heart', title: 'Gym' + (n ? '' : ' tonight'), sub: `After work · Day ${new Date(T + n * DAY).getUTCDay() === 3 ? 'B' : 'A'}` }) })),
   // Nightlife in the next 3 days that isn't during a shift (a few, lowest priority)
   night: T => nightlifeSoon(3, 3).map(e => { const d = daysLeft(e.date); return { days: d, rank: 3, sort: e.time || '', kind: 'night', name: e.title,
@@ -13076,8 +13119,32 @@ function top40Row(v) {
     <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div></div></div>
     <div class="s hvwhy">${esc(reason)}</div>${videoDateLine(v.id)}${videoOpenLink(v.id)}</div>`;
 }
+/* 2.23.59: Your music on the Top 40 page. "From your likes" is Shane's YouTube Music liked songs (as he listed them).
+   "Similar picks" are real, well-known songs in the same upbeat-pop/heartfelt style: 15 from a fixed pool, a fresh
+   set each week. Each opens YouTube Music on that song's search (Android: the app, with the web as fallback). */
+const MUS_LIKES = [['Let Me Down Slowly', 'Alec Benjamin'], ['One Of Your Girls', 'Troye Sivan'], ['Got Me Started', 'Troye Sivan'], ['Never Gonna Not Dance Again', 'P!NK'], ['TRUSTFALL', 'P!NK'], ['Try', 'P!NK'], ['Night Changes', 'One Direction'], ['Kiss Me', 'Dermot Kennedy'], ['Only Love Can Hurt Like This (Remix) feat. Teddy Swims', 'Paloma Faith'], ['Too Sweet', 'Hozier'], ['SNAP', 'Rosa Linn'], ['Deeper Well', 'Kacey Musgraves'], ['HAPPY', 'NF'], ['Sit Still Look Pretty', 'Daya'], ['comethru', 'Jeremy Zucker'], ['The Scientist', 'Coldplay'], ['Perfect', 'Ed Sheeran'], ['BIRDS OF A FEATHER', 'Billie Eilish'], ['Numb Little Bug', 'Em Beihold'], ['Lose Control', 'Teddy Swims']];
+const MUS_POOL = [['As It Was', 'Harry Styles'], ['Someone You Loved', 'Lewis Capaldi'], ['Before You Go', 'Lewis Capaldi'], ['Ocean Eyes', 'Billie Eilish'], ['Heather', 'Conan Gray'], ['Photograph', 'Ed Sheeran'], ['Shivers', 'Ed Sheeran'], ['Fix You', 'Coldplay'], ['Yellow', 'Coldplay'], ['Story of My Life', 'One Direction'], ['Little Things', 'One Direction'], ['Outnumbered', 'Dermot Kennedy'], ['Power Over Me', 'Dermot Kennedy'], ['Take Me to Church', 'Hozier'], ['Cherry Wine', 'Hozier'], ['What About Us', 'P!NK'], ['Just Give Me a Reason', 'P!NK'], ['Rainbow', 'Kacey Musgraves'], ['Slow Burn', 'Kacey Musgraves'], ['Youth', 'Troye Sivan'], ['Rush', 'Troye Sivan'], ['Let You Down', 'NF'], ['Hide Away', 'Daya'], ['you were good to me', 'Jeremy Zucker'], ['Golden Hour', 'JVKE'], ['Until I Found You', 'Stephen Sanchez'], ['Die With A Smile', 'Lady Gaga & Bruno Mars'], ['Flowers', 'Miley Cyrus'], ['drivers license', 'Olivia Rodrigo'], ['Riptide', 'Vance Joy'], ['Dancing On My Own', 'Calum Scott'], ['Say You Won\u2019t Let Go', 'James Arthur'], ['Train Wreck', 'James Arthur'], ['Atlantis', 'Seafret'], ['Infinity', 'Jaymes Young'], ['Watermelon Sugar', 'Harry Styles'], ['lovely', 'Billie Eilish & Khalid'], ['Water Under the Bridge', 'Adele'], ['Bad Habits', 'Ed Sheeran'], ['Anti-Hero', 'Taylor Swift']];
+function musPicks() {
+  const wk = Math.floor(todayT() / (7 * DAY)), a = MUS_POOL.slice();
+  let seed = wk * 9301 + 49297; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a.slice(0, 15);
+}
+const musQ = (t, ar) => encodeURIComponent(t + ' ' + ar);
+function musOpen(t, ar) {
+  const web = 'https://music.youtube.com/search?q=' + musQ(t, ar);
+  if (/Android/i.test(navigator.userAgent)) { location.href = `intent://music.youtube.com/search?q=${musQ(t, ar)}#Intent;scheme=https;package=com.google.android.apps.youtube.music;S.browser_fallback_url=${encodeURIComponent(web)};end`; return; }
+  try { window.open(web, '_blank', 'noopener'); } catch (e) { location.href = web; }
+}
+function musRow([t, ar]) {
+  return `<div class="row musrow"><button type="button" class="tapzone" onclick="musOpen(${jsArg(t)}, ${jsArg(ar)})" aria-label="Play ${esc(t)} by ${esc(ar)} on YouTube Music"><div class="ic t40">${I('music')}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${esc(ar)}</div></div></button><a class="musyt" href="https://www.youtube.com/results?search_query=${musQ(t, ar)}" target="_blank" rel="noopener" aria-label="${esc(t)} on YouTube">YouTube</a></div>`;
+}
+function musHtml() {
+  return homeSec('From your likes', '<a href="https://music.youtube.com/playlist?list=LM" target="_blank" rel="noopener">Liked songs</a>') + `<div class="list" id="muslikes">${MUS_LIKES.map(musRow).join('')}</div>` +
+    homeSec('Similar picks', '<span class="muted" style="font-size:12px">New set each week</span>') + `<div class="list" id="muspicks">${musPicks().map(musRow).join('')}</div>`;
+}
 function Top40() {
-  return header('Top 40', 'Current chart music videos') +
+  return header('Top 40', 'Current chart music videos') + musHtml() + homeSec('Top 40 this week', '') +
     `<div class="top40bar" id="top40bar"><button type="button" class="btn primary" id="top40surprise" onclick="surpriseTop40()">${I('shuffle')} Surprise me</button></div>` +
     `<div class="list" id="top40list">${TOP40.map(top40Row).join('')}</div>` +
     `<div class="foot">Chart as of 10 Oct 2026. New Zealand Official Top 40 singles, 9 October to 15 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it in that row. Tap a song to play it in the picture beside the description.</div>`;
