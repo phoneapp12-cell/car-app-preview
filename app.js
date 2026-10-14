@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.56';
+const APP_VERSION = '2.23.57';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3693,7 +3693,7 @@ function quoteJokeCard() {
 const cardArtOn = () => !(S && S.settings && S.settings.cardArt === false);
 const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', br: 'car', bday: 'bday', health: 'health', med: 'health', pet: 'pet', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'cal', ext: 'cal', appt: 'cal', todo: 'todo', note: 'todo', idea: 'todo', meal: 'plate', shop: 'shop', ln: 'news', blog: 'news', pod: 'radio', rad: 'radio', tv: 'tv', vid: 'tv', comm: 'weather' };
 // 2.23.40: a few titles pick a more exact picture
-const CARD_ART_WORD = [[/\b(pay ?day|wages|salary|pay day|commission)\b/i, 'money'], [/\b(gym|workout|exercise)\b/i, 'gym'], [/\b(petrol|fuel|diesel|gas station)\b/i, 'fuel'], [/\bdent(ist|al)\b|teeth|hygien/i, 'dentist'], [/garden|plant|lawn|mow|seedling|compost/i, 'garden'], [/\b(dog|cat|vet|flea|worm(ing)?|pet)\b/i, 'pet'], [/\b(weather|rain|storm|wind)\b/i, 'weather'], [/flight|travel|trip|airport|passport/i, 'travel'], [/netflix|\bTV\b|movie|film/i, 'tv'], [/rewards|countdown|woolworths/i, 'rewards'], [/radio|podcast|music|gig|concert/i, 'radio'], [/birthday/i, 'bday']];
+const CARD_ART_WORD = [[/\b(rubbish|bins?|recycl(e|ing)|wheelie|refuse|garbage|trash)\b/i, 'bin'], [/\b(pay ?day|wages|salary|pay day|commission)\b/i, 'money'], [/\b(gym|workout|exercise)\b/i, 'gym'], [/\b(petrol|fuel|diesel|gas station)\b/i, 'fuel'], [/\bdent(ist|al)\b|teeth|hygien/i, 'dentist'], [/garden|plant|lawn|mow|seedling|compost/i, 'garden'], [/\b(dog|cat|vet|flea|worm(ing)?|pet)\b/i, 'pet'], [/\b(weather|rain|storm|wind)\b/i, 'weather'], [/flight|travel|trip|airport|passport/i, 'travel'], [/netflix|\bTV\b|movie|film/i, 'tv'], [/rewards|countdown|woolworths/i, 'rewards'], [/radio|podcast|music|gig|concert/i, 'radio'], [/birthday/i, 'bday']];
 function cardArt(html, kind) {
   if (!cardArtOn() || !html) return html;
   const t = kind === 'cu' ? 'Coming up' : 'Just added';
