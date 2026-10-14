@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.70';
+const APP_VERSION = '2.23.71';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14558,6 +14558,10 @@ function smartSlides() {
   } catch (e) { }
   try { const b = bdaySoonSlide(); if (b) add('bday', '🎂 Birthday soon', b.body, "go('#birthdays')", b.score); } catch (e) { }
   try { if (h >= 17 && h < 22.5) { const tv = tvTonightSlide(); if (tv) add('tv', '📺 On TV tonight', tv, "go('#tv')", h >= 18.5 ? 58 : 42); } } catch (e) { }
+  try { // 2.23.71: Sarah's latest video, from her channel feed via the relay; always kept, New for 3 days
+    const v = currentSarahVideo(); if (v && v.id) { const pt = Date.parse(v.published || ''), isNew = pt && Date.now() - pt < 3 * DAY;
+      const when = pt ? new Date(pt).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short' }) : '';
+      add('sarah', '🎬 Sarah’s latest video', `<div class="qssv"><img class="qsthumb" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="" loading="lazy"><div><p class="qsq"><b>${esc(v.title)}</b></p><div class="qsw">${esc(when)}${isNew ? ' · <span class="qsnew">New</span>' : ''} · Tap to watch</div></div></div>`, 'url:' + v.url, isNew ? 95 : 45); } } catch (e) { }
   try { // 2.23.70: daily media picks, only real titles from the app's own lists
     const day = Math.floor(todayT() / DAY), pick = (a, n) => a.length ? a[(day + n) % a.length] : null, vs = preferFilmVideoTitles(videoSuggestions() || []).filter(v => v && v.title && v.url);
     const isVlog = v => /vlog|day (trip|in|at)|with me|explore|road trip|a fun day/i.test(v.title) || v.category === 'travel';
@@ -14586,7 +14590,7 @@ function stripRank(list) {
     if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
     s.score = v;
   });
-  const keep = list.filter(s => s.k === 'travel'), rest = list.filter(s => s.k !== 'travel' && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
+  const PIN = new Set(['travel', 'sarah']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
   return rest.concat(keep).sort((x, y) => y.score - x.score); // 2.23.70: Place of the day always stays
 }
 // Re-rank about every 5 hours, and when the app comes back after that long
