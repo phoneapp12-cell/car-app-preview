@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.85';
+const APP_VERSION = '2.23.86';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9914,6 +9914,7 @@ function More() {
     loans: () => loansMoreSub(),
     budget: () => budgetMoreSub(),
     lights: () => hueKey() ? 'Philips Hue rooms, lights and scenes' : 'Connect Philips Hue',
+    heat: () => hueKey() ? 'Panasonic and Mitsubishi' : 'Needs Lights to be linked first',
     events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
     news: () => newsMoreSub(),
     tv: () => 'TVNZ 1, TVNZ 2, Three and Sky Starter',
@@ -9981,7 +9982,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   diary: ['book', 'diary', 'Diary', 'Diary'],
   countdown: ['clock', 'count', 'Countdown', 'Countdown'],
   notes: ['note', 'note', 'Notes', 'Notes'],
-  lights: ['bulb', 'garden', 'Lights', 'Lights']
+  lights: ['bulb', 'garden', 'Lights', 'Lights'],
+  heat: ['sun', 'garden', 'Heat pumps', 'Heat']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -9991,7 +9993,7 @@ const NAV_GROUPS = [
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans', 'claims'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
-  { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights'] },
+  { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge', 'roadworks'] },
   { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts', 'radio', 'travel'] }
 ];
@@ -12278,6 +12280,61 @@ function hueBody() {
   }).join('');
   const lights = (d.lights || []).map(l => `<div class="card" data-hue="light:${esc(l.id)}"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t">${esc(l.name || 'Light')}</div><div class="s huest">${l.on ? 'On' + (l.bri != null ? ' · ' + l.bri + '%' : '') : 'Off'}</div></div>${sw('light', l.id, l.on)}</div>${sl('light', l.id, l.bri)}</div>`).join('');
   return (roomCards ? `<div class="sec">Rooms</div>${roomCards}` : '') + (lights ? `<details><summary class="sec" style="cursor:pointer">All lights</summary>${lights}</details>` : '') + (!roomCards && !lights ? `<div class="card empty"><div class="t">No lights found</div><div class="s">Add them in the Philips Hue app first.</div></div>` : '') + `<button type="button" class="btn small" style="margin-top:10px" onclick="hueLoad()">Refresh</button>`;
+}
+/* 2.23.86: Heat pumps (Panasonic Comfort Cloud + Mitsubishi MELCloud) via the relay. Same phone key as Hue. */
+let HEAT = { st: 'idle', data: null, err: '' };
+async function heatCall(path, body) {
+  const r = await fetch(RELAY_URL + '/heat/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: hueKey(), ...(body || {}) }) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('http_' + r.status)); return j;
+}
+function heatRedraw() { const el = document.getElementById('heatbox'); if (el) el.innerHTML = heatBody(); }
+async function heatLoad(force) {
+  if (!hueKey()) { HEAT.st = 'nolink'; heatRedraw(); return; }
+  const had = HEAT.st === 'ok'; HEAT.st = 'loading'; HEAT.err = ''; if (!had) heatRedraw();
+  try { const j = await heatCall('status'); HEAT.data = j; HEAT.st = j.setup === false ? 'nosetup' : j.linked ? 'ok' : 'unlinked'; if (j.linked) { HEATSTRIP = { at: Date.now(), data: j }; if (document.getElementById('qstrip')) stripRerank(); } }
+  catch (e) { HEAT.st = 'error'; HEAT.err = String(e.message || e); }
+  heatRedraw();
+}
+async function heatSet(id, extra) {
+  try {
+    const r = await heatCall('set', { id, ...extra }); if (!r || !r.ok) throw new Error(r && r.error || 'set_failed');
+    const u = (HEAT.data && HEAT.data.units || []).find(x => x.id === id); if (u) { if (typeof extra.on === 'boolean') u.on = extra.on; if (extra.mode) u.mode = extra.mode; if (extra.temp != null) u.temp = extra.temp; if (extra.fan) u.fan = extra.fan; heatUnitUpdate(u); }
+  } catch (e) { toast('That didn’t work. Try again in a moment.'); }
+}
+function heatUnitUpdate(u) {
+  const card = document.querySelector(`[data-heat="${CSS.escape(u.id)}"]`); if (!card) return;
+  const sw = card.querySelector('.switch'); if (sw) { sw.classList.toggle('on', !!u.on); sw.setAttribute('aria-checked', !!u.on); sw.setAttribute('onclick', `heatSet(${jsArg(u.id)},{on:${!u.on}})`); }
+  const st = card.querySelector('.heatst'); if (st) st.textContent = (u.on ? 'On' : 'Off') + (u.mode ? ' · ' + u.mode : '') + (u.temp != null ? ' · ' + u.temp + '°' : '');
+  const t = card.querySelector('.heatt'); if (t && u.temp != null) t.textContent = u.temp + '°';
+}
+function heatBody() {
+  if (HEAT.st === 'idle' || HEAT.st === 'loading') return `<div class="card"><div class="s">Checking heat pumps…</div></div>`;
+  if (HEAT.st === 'nosetup') return `<div class="card empty"><div class="t">Heat pumps aren’t set up yet</div><div class="s">The Comfort Cloud or MELCloud login still needs adding on the relay.</div></div>`;
+  if (HEAT.st === 'nolink' || HEAT.st === 'unlinked') return `<div class="card empty"><div class="t">Link Philips Hue first</div><div class="s">Heat pumps use the same phone link as Lights. Open Lights, connect Hue, then come back here.</div><button type="button" class="btn small" style="margin-top:8px" onclick="go('#lights')">Open Lights</button></div>`;
+  if (HEAT.st === 'error') return `<div class="card empty"><div class="t">Couldn’t reach the heat pumps</div><div class="s">Try again in a moment.</div><button type="button" class="btn small" style="margin-top:8px" onclick="heatLoad(true)">Try again</button></div>`;
+  const d = HEAT.data || {}, units = d.units || [], brands = d.brands || {};
+  const notes = [];
+  if (brands.panasonic && brands.panasonic.ok === false) notes.push(`Panasonic: ${esc(brands.panasonic.error === 'mfa_required' ? 'needs a one-time code' : brands.panasonic.error === 'not_configured' ? 'not configured' : 'couldn’t sign in')}`);
+  if (brands.mitsubishi && brands.mitsubishi.ok === false) notes.push(`Mitsubishi: ${esc(brands.mitsubishi.error === 'not_configured' ? 'not configured' : 'couldn’t sign in')}`);
+  const modes = ['heat','cool','dry','fan','auto'], fans = ['auto','low','mid','high'];
+  const cards = units.map(u => {
+    const room = u.room != null ? `Room ${u.room}°` : '', out = u.outdoor != null ? `Outside ${u.outdoor}°` : '';
+    return `<div class="card" data-heat="${esc(u.id)}"><div class="row" style="align-items:center;gap:10px"><div style="flex:1;min-width:0"><div class="t" style="font-weight:800">${esc(u.name || 'Unit')}</div><div class="s">${esc(u.brand || '')}${room || out ? ' · ' + [room, out].filter(Boolean).join(' · ') : ''}</div><div class="s heatst">${u.on ? 'On' : 'Off'}${u.mode ? ' · ' + esc(u.mode) : ''}${u.temp != null ? ' · ' + u.temp + '°' : ''}</div></div><button class="switch ${u.on ? 'on' : ''}" role="switch" aria-checked="${!!u.on}" aria-label="On or off" onclick="heatSet(${jsArg(u.id)},{on:${!u.on}})"></button></div>
+      <div class="chips scroll" style="margin-top:8px">${modes.map(m => `<button type="button" class="chip ${u.mode === m ? 'on' : ''}" onclick="heatSet(${jsArg(u.id)},{mode:${jsArg(m)},on:true})">${m}</button>`).join('')}</div>
+      <div class="row" style="align-items:center;gap:8px;margin-top:8px"><button type="button" class="btn small" onclick="heatSet(${jsArg(u.id)},{temp:${(u.temp || 20) - 1},on:true})">−</button><span class="heatt" style="font-weight:800;min-width:3ch;text-align:center">${u.temp != null ? u.temp + '°' : '—'}</span><button type="button" class="btn small" onclick="heatSet(${jsArg(u.id)},{temp:${(u.temp || 20) + 1},on:true})">+</button>
+      <div class="chips scroll" style="flex:1">${fans.map(f => `<button type="button" class="chip ${u.fan === f ? 'on' : ''}" onclick="heatSet(${jsArg(u.id)},{fan:${jsArg(f)}}})">${f}</button>`).join('')}</div></div></div>`;
+  }).join('');
+  return (notes.length ? `<div class="card"><div class="s">${notes.join('<br>')}</div></div>` : '') + (cards || `<div class="card empty"><div class="t">No heat pumps found</div><div class="s">Check the Comfort Cloud or MELCloud app.</div></div>`) + `<button type="button" class="btn small" style="margin-top:10px" onclick="heatLoad(true)">Refresh</button>`;
+}
+function Heat() {
+  setTimeout(() => { if (HEAT.st !== 'loading') heatLoad(); }, 0);
+  return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Heat pumps', 'Panasonic and Mitsubishi') + `<div id="heatbox">${heatBody()}</div>`;
+}
+let HEATSTRIP = { at: 0, data: null };
+function heatStripSlides() {
+  const d = (HEAT.st === 'ok' && HEAT.data) || (HEATSTRIP && HEATSTRIP.data); if (!d || !Array.isArray(d.units) || !d.units.length) return [];
+  const bits = d.units.slice(0, 4).map(u => `<b>${esc(u.name || 'Unit')}</b> ${u.on ? 'on' : 'off'}${u.temp != null ? ' ' + u.temp + '°' : ''}${u.room != null ? ' · room ' + u.room + '°' : ''}`);
+  return [['heat', '♨️ Heat pumps', `<p class="qsq">${bits.join(' · ')}</p>${d.units.length > 4 ? `<div class="qsw">+${d.units.length - 4} more</div>` : ''}`, "go('#heat')"]];
 }
 function Lights() {
   setTimeout(() => { if (HUE.st !== 'loading') hueLoad(); if (HUES.st !== 'loading') hueSensLoad(); }, 0); // once per visit (render() skips re-renders here)
@@ -14848,6 +14905,7 @@ async function hueStripFetch() {
     if (a && a.linked && Array.isArray(a.sensors)) { HUESTRIP.sens = a.sensors; hueBattSave(a.sensors); } else if (a && a.linked === false) { HUESTRIP.sens = null; hueBattSave([]); }
     if (b && b.linked) HUESTRIP.lights = b; else if (b && b.linked === false) HUESTRIP.lights = null;
     HUESTRIP.ok = !!(a || b);
+    if (hueKey() && (!HEATSTRIP.data || Date.now() - (HEATSTRIP.at || 0) > 120000)) { try { const h = await heatCall('status'); if (h && h.linked) { HEATSTRIP = { at: Date.now(), data: h }; if (HEAT.st === 'ok') HEAT.data = h; } } catch (e) {} }
     if (document.getElementById('qstrip')) stripRerank();
   } catch (e) { } finally { HUESTRIP.busy = false; }
 }
@@ -14869,6 +14927,7 @@ function hueStripSlides() {
 function stripSlides() {
   const out = [], add = (k, lbl, body, go) => { if (body) out.push({ k, lbl, body, go: go || '' }); };
   try { hueStripSlides().forEach(x => add(...x)); } catch (e) {}
+  try { heatStripSlides().forEach(x => add(...x)); } catch (e) {}
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
   try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (j && !jokeExpired(j)) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
   try { const p = travelToday(); if (p && p.name) add('travel', 'Today’s travel spot', `<p class="qsq"><b>${esc(p.name)}</b>, ${esc(p.country)}</p><div class="qsw">${esc(travelKmText(travelKm(p.lat, p.lon)))} away · ${esc(sumTravelTime(p.tz))} there</div>`, "go('#travel')"); } catch (e) {}
@@ -15015,7 +15074,7 @@ function stripRank(list) {
     if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
     s.score = v;
   });
-  const PIN = new Set(['travel', 'sarah', 'huetemp', 'huelights', 'huebatt']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
+  const PIN = new Set(['travel', 'sarah', 'huetemp', 'huelights', 'huebatt', 'heat']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
   return rest.concat(keep).sort((x, y) => y.score - x.score); // 2.23.70: Place of the day always stays
 }
 // Re-rank about every 5 hours, and when the app comes back after that long
@@ -17534,7 +17593,7 @@ let renderedHash = null;
 function render() {
   if (!S) return;
   // 2.23.83: the Lights page never redraws itself; only navigation (a hash change) rebuilds it.
-  if (location.hash === '#lights' && renderedHash === '#lights' && !render.force) return;
+  if ((location.hash === '#lights' || location.hash === '#heat') && renderedHash === location.hash && !render.force) return;
   renderedHash = location.hash;
   if (!skipNoteCapture) captureNoteComposer();
   const noteRoute = (location.hash || '#home').slice(1).split('/')[0];
@@ -17543,7 +17602,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights };
+  const map = { claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, heat: Heat };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {

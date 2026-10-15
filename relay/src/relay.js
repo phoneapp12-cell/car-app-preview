@@ -197,6 +197,7 @@ export async function fetchFeed(u, fetchImpl = fetch) {
 const STATUS = { bad_url: 400, host_not_allowed: 403, not_found: 404, denied: 403, upstream_error: 502, timeout: 504, too_large: 413, not_calendar: 422, too_many_redirects: 502 };
 
 import { hueRoute } from './hue.js';
+import { heatRoute } from './heat.js';
 export async function handle(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get('Origin') || '';
   const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
@@ -204,6 +205,10 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
 
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: okOrigin ? 204 : 403, headers: corsHeaders(origin, env) });
+  }
+  if (path.startsWith('/heat/')) {
+    try { return await heatRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }
+    catch (e) { return json(502, 'heat_unavailable', origin, env); }
   }
   if (path.startsWith('/hue/')) { // 2.23.79: Philips Hue
     try { return await hueRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }
