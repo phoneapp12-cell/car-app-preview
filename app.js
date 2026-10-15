@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.94';
+const APP_VERSION = '2.23.95';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12515,11 +12515,7 @@ function Heat() {
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Heat pumps', 'Panasonic and Mitsubishi') + `<div id="heatbox">${heatBody()}</div>`;
 }
 let HEATSTRIP = { at: 0, data: null };
-function heatStripSlides() {
-  const d = (HEAT.st === 'ok' && HEAT.data) || (HEATSTRIP && HEATSTRIP.data); if (!d || !Array.isArray(d.units) || !d.units.length) return [];
-  const bits = d.units.slice(0, 4).map(u => `<b>${esc(u.name || 'Unit')}</b> ${u.on ? 'on' : 'off'}${u.temp != null ? ' ' + u.temp + '°' : ''}${u.room != null ? ' · room ' + u.room + '°' : ''}`);
-  return [['heat', '♨️ Heat pumps', `<p class="qsq">${bits.join(' · ')}</p>${d.units.length > 4 ? `<div class="qsw">+${d.units.length - 4} more</div>` : ''}`, "go('#heat')"]];
-}
+function heatStripSlides() { return []; } // 2.23.95: slide removed
 
 
 /* 2.23.90: room temps under "Hi Shane" when at home. Lounge = Panasonic room temp, Bedroom = Mitsubishi (hidden until MELCloud works).
@@ -15146,7 +15142,7 @@ function hueStripSlides() {
 function stripSlides() {
   const out = [], add = (k, lbl, body, go) => { try { if (body) out.push({ k, lbl, body, go: go || '' }); } catch (e) {} };
   try { (typeof hueStripSlides === 'function' ? hueStripSlides() : []).forEach(x => { try { add(...x); } catch (e) {} }); } catch (e) {}
-  try { (typeof heatStripSlides === 'function' ? heatStripSlides() : []).forEach(x => { try { add(...x); } catch (e) {} }); } catch (e) {}
+  // 2.23.95: Heat pumps slide removed (heatStripSlides kept as a no-op so nothing can throw)
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
   try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (j && !jokeExpired(j)) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
   try { const p = travelToday(); if (p && p.name) add('travel', 'Today’s travel spot', `<p class="qsq"><b>${esc(p.name)}</b>, ${esc(p.country)}</p><div class="qsw">${esc(travelKmText(travelKm(p.lat, p.lon)))} away · ${esc(sumTravelTime(p.tz))} there</div>`, "go('#travel')"); } catch (e) {}
@@ -15293,7 +15289,7 @@ function stripRank(list) {
     if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
     s.score = v;
   });
-  const PIN = new Set(['travel', 'sarah', 'huelights', 'huebatt', 'heat']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
+  const PIN = new Set(['travel', 'sarah', 'huelights', 'huebatt']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
   return rest.concat(keep).sort((x, y) => y.score - x.score); // 2.23.70: Place of the day always stays
 }
 // Re-rank about every 5 hours, and when the app comes back after that long
