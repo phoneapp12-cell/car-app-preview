@@ -1676,16 +1676,21 @@ html:is([data-theme="dark"],[data-theme="night"]) #view .qstrip :is(.qslbl,.qsq,
 
 /* 2.24.9: page banners and 3D bill icons */
 .pageban{height:84px;border-radius:18px;background-size:cover;background-position:center right;margin:0 0 12px;box-shadow:0 6px 18px rgba(10,40,90,.15)}
-.top.banhead{position:relative;align-items:flex-start;min-height:104px;padding:12px 12px 12px 16px;border-radius:18px;background-size:cover;background-position:center right;margin-bottom:12px;box-shadow:0 6px 18px rgba(10,40,90,.15);overflow:hidden}
+.top.banhead{position:relative;align-items:center;min-height:96px;padding:12px 12px 12px 16px;border-radius:18px;background-size:cover;background-position:center right;margin-bottom:12px;box-shadow:0 6px 18px rgba(10,40,90,.15);overflow:hidden}
 .top.banhead::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,22,52,.55),rgba(6,22,52,.15) 60%,transparent);pointer-events:none}
 .top.banhead>*{position:relative}
-.banhead .bantx{min-width:0;flex:1;max-width:66%;align-self:center}
-.banhead .bantx h1,.banhead .bantx .sub{color:#fff!important;text-shadow:0 1px 3px rgba(0,0,0,.55)}
+.banhead .bantx{min-width:0;flex:1;max-width:62%;align-self:center}
+html body .top.banhead:not(.banfail) .bantx :is(h1,.sub){color:#fff!important;-webkit-text-fill-color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6),0 0 8px rgba(0,0,0,.25)!important;background:none!important}
+.banwrap{position:relative}
+.banwrap .banbtns{display:flex;justify-content:flex-end;gap:8px;margin:0 0 6px}
+.banwrap .banbtns .iconbtn{width:36px;height:36px}
+.banwrap .banbtns .iconbtn svg{width:18px;height:18px}
+html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color:var(--onbrand,#fff)!important;opacity:1!important}
 .banhead .bantx .sub{opacity:.95;font-size:.9rem;line-height:1.25}
 .top.banhead.banfail{min-height:0;padding:6px 0 12px;border-radius:0;box-shadow:none;overflow:visible}
 .top.banhead.banfail::before{display:none}
 .banhead.banfail .bantx{max-width:none}
-.banhead.banfail .bantx h1,.banhead.banfail .bantx .sub{color:inherit!important;text-shadow:none}
+.banhead.banfail .bantx h1,.banhead.banfail .bantx .sub{text-shadow:none}
 .ic.bill.billart{background:var(--bill-bg)!important;padding:0;display:flex;align-items:center;justify-content:center}
 .ic.bill.billart img{width:34px;height:34px;object-fit:contain}
 

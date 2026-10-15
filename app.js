@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.25.1';
+const APP_VERSION = '2.25.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -226,8 +226,7 @@ function moneyBadge(amount, label) {
 function banHeader(title, sub, extra, k) {
   try {
     if (typeof cardArtOn === 'function' && !cardArtOn()) return header(title, sub, extra);
-    return `<div class="top banhead" style="background-image:url(art/${k}-banner.webp)"><img src="art/${k}-banner.webp" alt="" hidden onerror="var h=this.closest('.banhead');if(h){h.classList.add('banfail');h.style.backgroundImage='none'}"><div class="bantx"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
-  <div class="iconrow">${extra}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
+    return `<div class="banwrap"><div class="iconrow banbtns">${extra}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div><div class="top banhead" style="background-image:url(art/${k}-banner.webp)"><img src="art/${k}-banner.webp" alt="" hidden onerror="var h=this.closest('.banhead');if(h){h.classList.add('banfail');h.style.backgroundImage='none'}"><div class="bantx"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div></div>`;
   } catch (e) { return header(title, sub, extra); }
 }
 function header(title, sub, extra = '') {
