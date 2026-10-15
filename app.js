@@ -3861,6 +3861,59 @@ function homeSumFold(sum) { return `<details class="sumfold" id="sumfold"${homeS
 function homeTry(label, fn, fb = '') {
   try { const v = fn(); return v == null ? fb : v; } catch (e) { console.error('Home ' + label, e); return fb; }
 }
+
+/* ================= 2.23.75: Clean Home layout (Settings › Appearance › Home layout). The classic layout stays the default.
+   Same data and features, just a calmer look: header with the dog, weather card, Priority overview, Today's summary,
+   then the strip and every category section, plus a bottom bar with a + quick-add button. ================= */
+const cleanOn = () => !!(S && S.settings && S.settings.homeLayout === 'clean');
+async function setHomeLayout(v) { S.settings.homeLayout = v; await save(); document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'clean' ? 'Clean layout on.' : 'Classic layout on.'); }
+function homeLayoutPicker() {
+  const c = cleanOn();
+  return `<div class="list" id="homelayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Home layout</div><div class="s">${c ? 'Clean: soft cards, Priority overview and a bottom bar' : 'Classic (the usual layout)'}</div></div></div>
+    <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${c ? '' : 'on'}" onclick="setHomeLayout('classic')">Classic</button><button type="button" class="chip ${c ? 'on' : ''}" onclick="setHomeLayout('clean')">Clean</button></div></div>`;
+}
+function cleanHead(name, now) {
+  const h = now.getHours(), hi = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  let n = 0; try { n = justAddedOn() ? justAddedList().length : 0; } catch (e) { }
+  return `<div class="clhead"><img class="cldog" src="art/dog.webp" alt="" width="52" height="52"><div class="cltx"><h1>${hi}, ${esc(name)}</h1><div class="cldate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</div></div>
+    <button type="button" class="clbell" aria-label="${n ? n + ' new in Just added' : 'Just added'}" onclick="cleanBell()">${I('bell')}${n ? '<span class="cldot"></span>' : ''}</button></div>`;
+}
+function cleanBell() { const el = document.querySelector('[data-k="justadded"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else toast('Nothing new in Just added.'); }
+function cleanWx() {
+  const fresh = WX && validWx(WX.data);
+  if (!fresh) return `<div class="clcard clwx"><span class="clwxic">${I('cloudsun')}</span><div class="cltx"><b>Weather loading…</b></div><button type="button" class="clref" aria-label="Refresh weather" onclick="refreshWx(true)">${I('refresh')}</button></div>`;
+  const c = WX.data.current, day = wxIsDay(), w = wmo(c.weather_code, day, c.wind_speed_10m), d = WX.data.daily || {}, i = Array.isArray(d.time) ? d.time.indexOf(wxLocalNow().iso) : -1;
+  const hi = i >= 0 && num(d.temperature_2m_max[i]) ? Math.round(d.temperature_2m_max[i]) : null, lo = i >= 0 && num(d.temperature_2m_min[i]) ? Math.round(d.temperature_2m_min[i]) : null;
+  const next = homeTry('weather next', () => notifWxNext(), []), out = homeTry('weather outlook', () => notifWxOutlook(w, next), ''), sun = homeTry('weather sun', () => wxSunMention(), '');
+  const warn = homeTry('weather warning line', () => alertStripLine(), '');
+  return `<div class="clcard clwx"><button type="button" class="clwxmain" onclick="go('#weather')" aria-label="Weather: ${esc(Math.round(c.temperature_2m) + '°, ' + w.words)}. Tap for the forecast.">
+    <span class="clwxic">${wxIcon(w)}</span><span class="clwxt">${Math.round(c.temperature_2m)}°</span><span class="cltx"><b>${esc(w.words)}</b>${hi != null ? `<span class="clsub">H ${hi}° · L ${lo}°</span>` : ''}${out ? `<span class="clsub">${esc(out)}</span>` : ''}${sun ? `<span class="clsub">${esc(sun)}</span>` : ''}${warn ? `<span class="clsub clwarn">${esc(warn)}</span>` : ''}</span></button>
+    <button type="button" class="clref" aria-label="Refresh weather" onclick="refreshWx(true);toast('Checking the weather…')">${I('refresh')}</button></div>`;
+}
+function cleanPri() {
+  const out = [], seen = new Set();
+  const act = h => { const m = /onclick="([^"]*)"/.exec(h || ''); return m ? m[1] : "go('#calendar')"; };
+  try { comingUpList().filter(x => x && x.name).slice(0, 6).forEach((x, i) => { const key = String(x.name).toLowerCase(); if (seen.has(key)) return; seen.add(key);
+    const tag = i === 0 ? ['NEXT', 'cltag-next'] : x.days <= 3 ? ['DUE SOON', 'cltag-soon'] : ['UPCOMING', 'cltag-up'];
+    const when = x.days < 0 ? 'Overdue' : x.days === 0 ? 'Today' : x.days === 1 ? 'Tomorrow' : fmtW(isoT(todayT() + x.days * DAY));
+    let h = ''; try { h = cuRowHtml(x); } catch (e) { }
+    out.push({ tag, t: String(x.name).replace(/<[^>]*>/g, ''), s: when, a: act(h), b: x.kind === 'bill' ? 'View bill' : x.kind === 'meal' ? 'See meal' : 'Open' }); }); } catch (e) { }
+  try { (S.countdowns || []).filter(c => c && c.date >= todayISO()).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 1).forEach(c => { if (seen.has(String(c.name).toLowerCase())) return; out.push({ tag: ['UPCOMING', 'cltag-up'], t: c.name, s: dayGap(c.date, todayISO()) + ' days · ' + fmtW(c.date), a: "go('#countdown')", b: 'Countdown' }); }); } catch (e) { }
+  try { const H = headsUpList()[0]; if (H) out.push({ tag: ['HEADS UP', 'cltag-heads'], t: H.what, s: H.when, a: H.url ? `window.open(${jsArg(H.url)},'_blank','noopener')` : "go('#roadworks')", b: 'Details' }); } catch (e) { }
+  try { let where = ''; try { where = placeHere() || ''; } catch (e) { } const t = sumToday(homeAklParts() || {}); if (where === 'work' || (t.work && t.work.phase === 'now')) out.push({ tag: ['AT WORK', 'cltag-work'], t: coworkQ(), s: 'Ask a coworker', a: "toast('Have a good chat!')", b: 'Got it' }); } catch (e) { }
+  if (!out.length) return '';
+  return `<div class="clsec"><h2>Priority overview</h2><a href="#calendar">See all</a></div><div class="clpri" role="list">${out.map(o => `<div class="clcard clpc" role="listitem"><span class="cltag ${o.tag[1]}">${o.tag[0]}</span><div class="clpt">${esc(o.t)}</div><div class="clps">${esc(o.s)}</div><button type="button" class="clbtn" onclick="${esc(o.a)}">${esc(o.b)}</button></div>`).join('')}</div>`;
+}
+let clSumOpen = false;
+function cleanSum(sum0) {
+  if (!sum0) return '';
+  let lines = [];
+  try { const d = document.createElement('div'); d.innerHTML = sum0; lines = [...d.querySelectorAll('.sumbul > li, .sumsug, .sumnote')].map(e => (e.querySelector('.tx') || e).textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 3); } catch (e) { }
+  return `<div class="clsec"><h2>Today’s summary</h2></div><div class="clcard clsum">${clSumOpen ? sum0 : `<button type="button" class="clsumbtn" onclick="clSumOpen=true;render()" aria-label="Open the full summary">${lines.map(l => `<p>${esc(l)}</p>`).join('')}<span class="clmore">Full summary ${I('right')}</span></button>`}${clSumOpen ? `<button type="button" class="linkbtn" style="display:block;margin:8px 0 0 auto" onclick="clSumOpen=false;render()">Show less</button>` : ''}</div>`;
+}
+function cleanFab() {
+  openSheet('Add', `<div class="list">${[['todo', 'To-do', 'todoForm()'], ['cal', 'Calendar', 'apptForm()'], ['cart', 'Shopping', 'shopForm()'], ['note', 'Note', 'noteForm()'], ['camera', 'Photo for the strip', 'myPhAdd()']].map(([ic, l, f]) => `<button class="row" onclick="closeSheet().then(()=>${f})"><div class="ic todo">${I(ic)}</div><div class="tx"><div class="t">${l}</div></div>${I('right')}</button>`).join('')}</div>`);
+}
 function Home() {
   if (homeEdit) return HomeEdit();
   const now = new Date();
@@ -3886,10 +3939,11 @@ function Home() {
   const tintN = groups.length;
   const shown = new Set(night ? parts.map(([k]) => k) : keys);
   homeShownNow = shown;
+  const clean = cleanOn();
   const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
-  homeSumT = sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
+  homeSumT = !clean && sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
   const sumUnderWx = homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
-  const sum = homeSumT ? '' : !night && sum0 ? homeSumFold(sum0) : sum0;
+  const sum = clean || homeSumT ? '' : !night && sum0 ? homeSumFold(sum0) : sum0;
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
   if (!night) before = 0; // 2.23.14: daytime summary is the small fold at the top
@@ -3939,11 +3993,11 @@ function Home() {
   </div>` : '';
   // 2.22.28: nothing to show, so say so instead of leaving a gap
   const emptyNote = sections.length ? '' : '<div class="card empty" id="homeempty"><div class="t">Nothing due right now.</div><div class="s">Things that are due, your to-dos and your notes show up here.</div></div>';
-  const feed = (homeFeedMode === 'list' ? listFeed : carousel) || emptyNote;
+  const feed = ((clean || homeFeedMode === 'list') ? listFeed : carousel) || emptyNote;
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
-  const sumForCar = homeFeedMode === 'list' && sections.length ? '' : (sumMid || '');
+  const sumForCar = clean || (homeFeedMode === 'list' && sections.length) ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), '')) + homeTry('weather strip', () => notifWxStrip()) + sumUnderWx + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + (night && !qjTop() && stripOn() ? '' : (sumTop || qsBlock(''))) + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
+  return homeTry('commute', () => commuteBanner()) + (clean ? homeTry('clean head', () => cleanHead(name, now), '') : header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), ''))) + (clean ? homeTry('clean wx', () => cleanWx(), '') + homeTry('clean pri', () => cleanPri(), '') + homeTry('clean sum', () => cleanSum(sum0), '') : homeTry('weather strip', () => notifWxStrip())) + sumUnderWx + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + (night && !qjTop() && stripOn() ? '' : (sumTop || qsBlock(''))) + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
     sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -15379,6 +15433,7 @@ function Settings() {
   ${syncSettingsRow()}
   ${websiteSettingsRow()}
   <div class="sec" id="appearance">Appearance</div>
+  ${homeLayoutPicker()}
   ${themePicker()}
   ${themeNowNote()}
   ${textSizePicker()}
@@ -17105,8 +17160,8 @@ function btState() {
 let btPress = null, btLong = false;
 function bottomTabs(route) {
   let nav = document.getElementById('btabs');
-  const b = btState();
-  document.body.classList.toggle('btabs-on', b.on);
+  const b = cleanOn() ? { on: true, keys: ['home', 'calendar', 'todo', 'budget', 'more'] } : btState();
+  document.body.classList.toggle('btabs-on', b.on); document.documentElement.classList.toggle('clean', cleanOn());
   if (!b.on) { if (nav) nav.remove(); return; }
   if (!nav) {
     nav = document.createElement('nav'); nav.id = 'btabs'; nav.className = 'btabs'; nav.setAttribute('aria-label', 'Bottom tabs');
@@ -17120,7 +17175,9 @@ function bottomTabs(route) {
   const over = (() => { try { return dueItems(S).filter(x => x.days < 0).length; } catch (e) { return 0; } })();
   nav.innerHTML = b.keys.map(k => { const [full, short, ic] = btMeta(k); const on = k === cur || (k === 'more' && route === 'more');
     return `<button type="button" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} aria-label="${esc(full)}" data-bt="${k}" onclick="btGo('${k}')"><span class="w">${I(ic)}${k === 'home' && over ? `<span class="badge">${over}</span>` : ''}</span><span class="lbl">${esc(short)}</span></button>`; }).join('');
-  nav.style.setProperty('--btn', b.keys.length);
+  if (cleanOn()) { const CL = { home: 'Home', calendar: 'Plan', todo: 'Tasks', budget: 'Money', more: 'More' }; nav.querySelectorAll('button[data-bt]').forEach(x => { const l = x.querySelector('.lbl'); if (l && CL[x.dataset.bt]) l.textContent = CL[x.dataset.bt]; });
+    const keys = [...nav.children]; if (keys.length === 5) { const f = document.createElement('button'); f.type = 'button'; f.className = 'clfab'; f.setAttribute('aria-label', 'Quick add'); f.innerHTML = I('plus'); f.onclick = cleanFab; nav.insertBefore(f, keys[2]); } }
+  nav.style.setProperty('--btn', b.keys.length + (cleanOn() ? 1 : 0));
 }
 function btGo(k) {
   if (btLong) { btLong = false; return; } // the long press opened the customiser
