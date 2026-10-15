@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.80';
+const APP_VERSION = '2.23.81';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12208,6 +12208,47 @@ function hueSensBody() {
   }).join('');
   return (cards || `<div class="card empty"><div class="t">No sensors found</div><div class="s">Motion sensors, switches and dials added in the Hue app show here.</div></div>`) + `<button type="button" class="btn small" style="margin-top:10px" onclick="hueSensLoad()">Refresh sensors</button>`;
 }
+/* 2.23.81: late at night (11:30pm to 5am NZ), if any Hue light is on, offer to turn them all off.
+   Not now hides it for an hour. Once all are off, it doesn't ask again that night. */
+function hueNightKey() { const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()), g = t => (p.find(x => x.type === t) || {}).value; const m = +g('hour') * 60 + +g('minute'); if (!(m >= 23 * 60 + 30 || m < 5 * 60)) return ''; const d = new Date(Date.now() - (m < 5 * 60 ? 86400000 : 0)); return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(d); }
+let hueNightBusy = false;
+async function hueNightCheck() {
+  try {
+    if (hueNightBusy || !hueKey() || document.hidden) return;
+    const night = hueNightKey(); if (!night) { hueNightHide(); return; }
+    if (localStorage.getItem('hueNightDone') === night) return;
+    if (+(localStorage.getItem('hueNightSnooze') || 0) > Date.now()) return;
+    hueNightBusy = true;
+    const j = await hueCall('lights'); if (!j || !j.linked) return;
+    const anyOn = (j.rooms || []).some(r => r && r.on) || (j.lights || []).some(l => l && l.on);
+    if (!anyOn) { localStorage.setItem('hueNightDone', night); hueNightHide(); return; }
+    if (document.getElementById('huenight')) return;
+    const el = document.createElement('div'); el.id = 'huenight'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Lights');
+    el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 10px);z-index:9000;width:min(94vw,520px);background:var(--card);color:var(--ink);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:14px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px';
+    el.innerHTML = `<div style="flex:1 1 200px;font-weight:700">${I('bulb')} Want all the lights turned off?</div><div style="display:flex;gap:8px"><button type="button" class="btn small" onclick="hueNightLater()">Not now</button><button type="button" class="btn primary small" onclick="hueNightOff()">Turn all off</button></div>`;
+    document.body.appendChild(el);
+  } catch (e) { } finally { hueNightBusy = false; }
+}
+function hueNightHide() { const el = document.getElementById('huenight'); if (el) el.remove(); }
+function hueNightLater() { try { localStorage.setItem('hueNightSnooze', String(Date.now() + 3600000)); } catch (e) { } hueNightHide(); }
+async function hueNightOff() {
+  hueNightHide();
+  try {
+    let ok = false;
+    try { const r = await hueCall('alloff'); ok = !!(r && r.ok); } catch (e) { }
+    if (!ok) { // fallback: each room, then any light still on
+      const j = await hueCall('lights');
+      for (const r of (j.rooms || [])) if (r && r.on && r.group) await hueCall('set', { type: 'grouped_light', id: r.group, on: false });
+      for (const l of (j.lights || [])) if (l && l.on) await hueCall('set', { type: 'light', id: l.id, on: false }).catch(() => {});
+    }
+    localStorage.setItem('hueNightDone', hueNightKey() || 'x');
+    toast('All lights are off. Night!');
+    if (document.getElementById('huebox')) setTimeout(hueLoad, 500);
+  } catch (e) { toast('Couldn’t turn the lights off. The bridge may be offline.'); }
+}
+setTimeout(hueNightCheck, 3000);
+setInterval(hueNightCheck, 5 * 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(hueNightCheck, 800); });
 function hueBody() {
   if (HUE.st === 'idle' || HUE.st === 'loading') return `<div class="card"><div class="s">Checking your lights…</div></div>`;
   if (HUE.st === 'nosetup') return `<div class="card empty"><div class="t">Philips Hue isn’t set up yet</div><div class="s">The Hue developer app still needs registering. Once that’s done, a Connect button shows here.</div></div>`;

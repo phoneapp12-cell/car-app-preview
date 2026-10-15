@@ -101,6 +101,13 @@ export async function hueRoute(path, request, env, f, okOrigin, reply) {
       delete out.undefined;
       return reply(200, { setup: true, linked: true, sensors: Object.values(out).filter(d => d.motion || d.temp || d.light || d.contact || d.button || d.rotary || (d.battery && !/bridge/i.test(d.product))) });
     }
+    if (path === '/hue/alloff') { // 2.23.81: every light off through the bridge's whole-home group
+      const homes = await clip(env, rec, f, 'GET', 'bridge_home').then(x => x.data || []);
+      const ids = homes.flatMap(h => (h.services || []).filter(x => x.rtype === 'grouped_light').map(x => x.rid));
+      if (!ids.length) return reply(200, { ok: false, error: 'no_home_group' });
+      for (const id of ids) await clip(env, rec, f, 'PUT', 'grouped_light/' + id, { on: { on: false } });
+      return reply(200, { ok: true });
+    }
     if (path === '/hue/set') {
       const id = String(body.id || '');
       if (!/^[0-9a-f-]{36}$/.test(id)) return reply(400, { error: 'bad_id' });
