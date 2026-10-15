@@ -1516,6 +1516,11 @@ html[data-theme="dark"] .ic.icart{box-shadow:inset 0 1px 0 rgba(255,255,255,.16)
 .catband{display:inline-block;position:sticky;top:0;z-index:3;background:var(--cat);color:#fff;font-weight:800;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:0 0 10px 10px;margin:0 0 6px 14px;border:1.5px solid #000;border-top:0;box-shadow:0 2px 0 #000}
 .hsec[data-cat]{border-top:5px solid var(--cat,#2563eb)!important}
 .tabhead{display:flex;align-items:center;gap:10px;margin:4px 6px 10px}
+.tabban{position:relative;min-height:84px;border-radius:14px;overflow:hidden;padding:0 14px;margin:0 0 10px;color:#fff;box-shadow:0 6px 16px rgba(10,40,90,.18)}
+.tabban .tabbanimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:right center;z-index:0}
+.tabban::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(6,22,52,.7),rgba(6,22,52,.2) 55%,transparent)}
+.tabban>.tabico,.tabban>.tabname{position:relative;z-index:2}
+.tabban>.tabname{color:#fff!important;text-shadow:0 1px 3px rgba(0,0,0,.5)}
 .tabico{width:44px;height:44px;filter:drop-shadow(0 3px 3px rgba(0,0,0,.2))}
 .tabname{font-size:1.35rem;font-weight:850;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}
 .tabopen{display:inline-flex;align-items:center;gap:6px}.tabopen svg{width:16px;height:16px}

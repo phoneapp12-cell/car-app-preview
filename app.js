@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.10';
+const APP_VERSION = '2.24.11';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4026,13 +4026,22 @@ const TAB_PREVIEW = {
   health: () => tabRow('health', 'Health', healthMoreSub()),
   travel: () => { const p = travelToday(); return tabRow('travel', esc(p.name) + ', ' + esc(p.country), esc(travelKmText(travelKm(p.lat, p.lon))) + ' away · ' + esc(sumTravelTime(p.tz)) + ' there'); }
 };
+const TAB_BAN = { comingup: 'cu', justadded: 'ja', todo: 'todo', calendar: 'cal', bills: 'bills', budget: 'budget', claims: 'health', shopping: 'shopping', meals: 'meals', ideas: 'ideas', health: 'health', cars: 'cars', pets: 'pets', birthdays: 'birthdays', events: 'events', travel: 'travel', news: 'news', videos: 'tv', tv: 'tv' };
+function tabHeadHtml(k, name) {
+  try {
+    const art = cardArtOn();
+    const ico = art && TAB_ART[k] ? `<img src="art/i3-${TAB_ART[k]}.webp" alt="" class="tabico">` : '';
+    const ban = art && TAB_BAN[k] ? `<img src="art/${TAB_BAN[k]}-banner.webp" alt="" class="tabbanimg" onerror="var h=this.parentNode;if(h)h.classList.remove('tabban');this.remove()">` : '';
+    return `<div class="tabhead${ban ? ' tabban' : ''}">${ban}${ico}<span class="tabname">${esc(name)}</span></div>`;
+  } catch (e) { return `<div class="tabhead"><span class="tabname">${esc(name)}</span></div>`; }
+}
 function tabCardHtml(k) {
   const name = TAB_NAME[k] || (NAV[k] && NAV[k][2]) || k;
   let body = '';
   try { if (TAB_PREVIEW[k]) body = `<div class="list tabprev">${TAB_PREVIEW[k]()}</div>`; else if (HOME_CARD[k]) body = cardArt(HOME_CARD[k](), '') || ''; } catch (e) { body = ''; }
   body = body.replace(/^\s*<div class="sec">[\s\S]*?<\/div>/, '');
   if (!body.trim()) body = `<div class="list tabprev">${tabRow(k, name, 'Nothing to show right now')}</div>`;
-  return `<div class="tabhead">${cardArtOn() && TAB_ART[k] ? `<img src="art/i3-${TAB_ART[k]}.webp" alt="" class="tabico">` : ''}<span class="tabname">${esc(name)}</span></div>${body}<div class="feedpillrow"><button type="button" class="feedpill tabopen" onclick="event.stopPropagation();go('#${k}')">Open ${esc(name)} ${I('right')}</button></div>`;
+  return `${tabHeadHtml(k, name)}${body}<div class="feedpillrow"><button type="button" class="feedpill tabopen" onclick="event.stopPropagation();go('#${k}')">Open ${esc(name)} ${I('right')}</button></div>`;
 }
 function catBand(k) { const c = tabCatOf(k); return c ? `<div class="catband" style="--cat:${c.col}">${esc(c.name)}</div>` : ''; }
 function catJumpRow(sections) {
@@ -4183,8 +4192,8 @@ function Home() {
   // keep category order (night cards that aren't in a category go last)
   { const ord = k => { const ci = TAB_CATS.findIndex(c => c.keys.includes(k)); return ci < 0 ? 99 : ci * 20 + TAB_CATS[ci].keys.indexOf(k); }; sections.sort((a, b) => ord(a.keys[0]) - ord(b.keys[0])); }
   // 2.23.45: tab cards that came from the night/notification feed get the same icon header
-  sections.forEach(sec => { const k = sec.keys[0]; if (!TAB_NAME[k] || sec.html.includes('class="tabhead"')) return;
-    const head = `<div class="tabhead">${cardArtOn() && TAB_ART[k] ? `<img src="art/i3-${TAB_ART[k]}.webp" alt="" class="tabico">` : ''}<span class="tabname">${esc(TAB_NAME[k])}</span></div>`;
+  sections.forEach(sec => { const k = sec.keys[0]; if (!TAB_NAME[k] || sec.html.includes('class="tabhead')) return;
+    const head = tabHeadHtml(k, TAB_NAME[k]);
     sec.html = sec.html.replace(/(<section class="hsec[^"]*"[^>]*>(?:<span class="newtag">New<\/span>)?)\s*(<div class="sec">[\s\S]*?<\/div>)?/, (m, open) => open + head); });
   sections.forEach(sec => { const b = catBand(sec.keys[0]); if (b) sec.html = sec.html.replace(/(<section class="hsec[^"]*"[^>]*>)/, '$1' + b).replace(/<section class="hsec/, '<section data-cat="1" class="hsec'); });
   let at = 0;
