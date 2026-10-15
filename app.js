@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.83';
+const APP_VERSION = '2.23.84';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14822,16 +14822,18 @@ function jokeExpired(j) { try { const t = +localStorage.getItem(jokeKey(j)) || 0
    and there's data. Fetched at most every 10 minutes while the app is open; tapping opens Lights. */
 let HUESTRIP = { at: 0, sens: null, lights: null, busy: false };
 async function hueStripFetch() {
-  if (!hueKey() || HUESTRIP.busy || document.hidden || Date.now() - HUESTRIP.at < 10 * 60000) return;
+  if (!hueKey() || HUESTRIP.busy || document.hidden || Date.now() - HUESTRIP.at < (HUESTRIP.ok ? 10 * 60000 : 45000)) return;
   HUESTRIP.busy = true; HUESTRIP.at = Date.now();
   try {
     const [a, b] = await Promise.all([hueCall('sensors').catch(() => null), hueCall('lights').catch(() => null)]);
-    HUESTRIP.sens = a && a.linked && Array.isArray(a.sensors) ? a.sensors : null;
-    HUESTRIP.lights = b && b.linked ? b : null;
+    // 2.23.84: same linked test as the Lights page; a failed fetch keeps the last good data and retries in 45s
+    if (a && a.linked && Array.isArray(a.sensors)) HUESTRIP.sens = a.sensors; else if (a && a.linked === false) HUESTRIP.sens = null;
+    if (b && b.linked) HUESTRIP.lights = b; else if (b && b.linked === false) HUESTRIP.lights = null;
+    HUESTRIP.ok = !!(a || b);
     if (document.getElementById('qstrip')) stripRerank();
   } catch (e) { } finally { HUESTRIP.busy = false; }
 }
-setTimeout(hueStripFetch, 4000); setInterval(hueStripFetch, 60000);
+setTimeout(hueStripFetch, 2500); setInterval(hueStripFetch, 30000); document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(hueStripFetch, 600); });
 function hueStripSlides() {
   const out = [], num = x => typeof x === 'number' && Number.isFinite(x);
   const T = (HUESTRIP.sens || []).filter(d => d && d.temp && num(d.temp.c));
@@ -14994,7 +14996,7 @@ function stripRank(list) {
     if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
     s.score = v;
   });
-  const PIN = new Set(['travel', 'sarah']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
+  const PIN = new Set(['travel', 'sarah', 'huetemp', 'huelights']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
   return rest.concat(keep).sort((x, y) => y.score - x.score); // 2.23.70: Place of the day always stays
 }
 // Re-rank about every 5 hours, and when the app comes back after that long
