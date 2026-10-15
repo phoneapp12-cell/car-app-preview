@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.81';
+const APP_VERSION = '2.23.82';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14808,8 +14808,36 @@ const jokeKey = j => 'jokeRead:' + todayISO() + ':' + String(j && j[0] || '').sl
 let jokeSeen = 0;
 function jokeMarkRead() { try { const j = dailyJokeFor(); if (!j) return; const k = jokeKey(j); if (!localStorage.getItem(k)) localStorage.setItem(k, String(Date.now())); } catch (e) { } }
 function jokeExpired(j) { try { const t = +localStorage.getItem(jokeKey(j)) || 0; return t > 0 && Date.now() - t > 3 * 3600e3; } catch (e) { return false; } }
+/* 2.23.82: Hue strip slides. Room temps (from /hue/sensors) and Lights on (from /hue/lights), only when linked
+   and there's data. Fetched at most every 10 minutes while the app is open; tapping opens Lights. */
+let HUESTRIP = { at: 0, sens: null, lights: null, busy: false };
+async function hueStripFetch() {
+  if (!hueKey() || HUESTRIP.busy || document.hidden || Date.now() - HUESTRIP.at < 10 * 60000) return;
+  HUESTRIP.busy = true; HUESTRIP.at = Date.now();
+  try {
+    const [a, b] = await Promise.all([hueCall('sensors').catch(() => null), hueCall('lights').catch(() => null)]);
+    HUESTRIP.sens = a && a.linked && Array.isArray(a.sensors) ? a.sensors : null;
+    HUESTRIP.lights = b && b.linked ? b : null;
+    stripRerank();
+  } catch (e) { } finally { HUESTRIP.busy = false; }
+}
+setTimeout(hueStripFetch, 4000); setInterval(hueStripFetch, 60000);
+function hueStripSlides() {
+  const out = [], num = x => typeof x === 'number' && Number.isFinite(x);
+  const T = (HUESTRIP.sens || []).filter(d => d && d.temp && num(d.temp.c));
+  if (T.length) out.push(['huetemp', '🌡️ Room temps', `<p class="qsq">${T.slice(0, 4).map(d => `<b>${esc(String(d.room || d.name || 'Sensor'))}</b> ${d.temp.c.toFixed(1)}°C`).join(' · ')}</p>${T.length > 4 ? `<div class="qsw">+${T.length - 4} more</div>` : ''}`, "go('#lights')"]);
+  const L = HUESTRIP.lights;
+  if (L && (Array.isArray(L.rooms) || Array.isArray(L.lights))) {
+    const rooms = (L.rooms || []).filter(r => r && r.on);
+    if (rooms.length) out.push(['huelights', '💡 Lights on', `<p class="qsq">${rooms.slice(0, 4).map(r => `<b>${esc(String(r.name || 'Room'))}</b>${num(r.bri) ? ' ' + Math.round(r.bri) + '%' : ''}`).join(' · ')}</p>${rooms.length > 4 ? `<div class="qsw">+${rooms.length - 4} more rooms</div>` : ''}`, "go('#lights')"]);
+    else if ((L.lights || []).some(l => l && l.on)) { const on = L.lights.filter(l => l && l.on); out.push(['huelights', '💡 Lights on', `<p class="qsq">${on.slice(0, 4).map(l => `<b>${esc(String(l.name || 'Light'))}</b>${num(l.bri) ? ' ' + Math.round(l.bri) + '%' : ''}`).join(' · ')}</p>`, "go('#lights')"]); }
+    else if ((L.rooms || []).length || (L.lights || []).length) out.push(['huelights', '💡 Lights', '<p class="qsq"><b>All lights off</b></p>', "go('#lights')"]);
+  }
+  return out;
+}
 function stripSlides() {
   const out = [], add = (k, lbl, body, go) => { if (body) out.push({ k, lbl, body, go: go || '' }); };
+  try { hueStripSlides().forEach(x => add(...x)); } catch (e) {}
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
   try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (j && !jokeExpired(j)) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
   try { const p = travelToday(); if (p && p.name) add('travel', 'Today’s travel spot', `<p class="qsq"><b>${esc(p.name)}</b>, ${esc(p.country)}</p><div class="qsw">${esc(travelKmText(travelKm(p.lat, p.lon)))} away · ${esc(sumTravelTime(p.tz))} there</div>`, "go('#travel')"); } catch (e) {}
