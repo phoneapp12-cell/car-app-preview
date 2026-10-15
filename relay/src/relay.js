@@ -198,6 +198,7 @@ const STATUS = { bad_url: 400, host_not_allowed: 403, not_found: 404, denied: 40
 
 import { hueRoute } from './hue.js';
 import { heatRoute } from './heat.js';
+import { alarmRoute } from './alarm.js';
 export async function handle(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get('Origin') || '';
   const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
@@ -205,6 +206,10 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
 
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: okOrigin ? 204 : 403, headers: corsHeaders(origin, env) });
+  }
+  if (path.startsWith('/alarm/')) {
+    try { return await alarmRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }
+    catch (e) { return new Response(JSON.stringify({ error: 'alarm_unavailable' }), { status: 502, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json' } }); }
   }
   if (path.startsWith('/heat/')) {
     try { return await heatRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }

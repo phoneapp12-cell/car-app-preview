@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.96';
+const APP_VERSION = '2.23.97';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10047,6 +10047,7 @@ function More() {
     budget: () => budgetMoreSub(),
     lights: () => hueKey() ? 'Philips Hue rooms, lights and scenes' : 'Connect Philips Hue',
     heat: () => hueKey() ? 'Panasonic and Mitsubishi' : 'Needs Lights to be linked first',
+    alarm: () => { try { return alarmSub(); } catch (e) { return 'ADT alarm status'; } },
     events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
     news: () => newsMoreSub(),
     tv: () => 'TVNZ 1, TVNZ 2, Three and Sky Starter',
@@ -10115,7 +10116,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   countdown: ['clock', 'count', 'Countdown', 'Countdown'],
   notes: ['note', 'note', 'Notes', 'Notes'],
   lights: ['bulb', 'garden', 'Lights', 'Lights'],
-  heat: ['sun', 'garden', 'Heat pumps', 'Heat']
+  heat: ['sun', 'garden', 'Heat pumps', 'Heat'],
+  alarm: ['shield', 'garden', 'Alarm', 'Alarm']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -10125,7 +10127,7 @@ const NAV_GROUPS = [
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans', 'claims'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
-  { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat'] },
+  { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge', 'roadworks'] },
   { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts', 'radio', 'travel'] }
 ];
@@ -12549,6 +12551,53 @@ async function hroomFetch() {
   finally { hroomBusy = false; }
   try { const el = document.getElementById('homerooms'); if (el) { const h = hroomInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { }
 }
+
+/* 2.23.97: Alarm (ADT / Alarm.com), READ-ONLY via the relay. Never arms or disarms. Same phone key as Lights.
+   Cached locally; fetched at most once a minute; only #alarmbox and the strip update (no full re-render). */
+let ALARM = (() => { try { const c = JSON.parse(localStorage.getItem('alarmCache') || 'null'); return { st: c ? 'ok' : 'idle', data: c && c.data, at: c ? c.at : 0, busy: false }; } catch (e) { return { st: 'idle', data: null, at: 0, busy: false }; } })();
+function alarmOpen() { try { return ((ALARM.data && ALARM.data.sensors) || []).filter(x => x && x.open); } catch (e) { return []; } }
+function alarmSub() { const o = alarmOpen(); return !hueKey() ? 'Needs Lights to be linked first' : o.length ? o.length + ' open' : 'Doors, windows and batteries'; }
+async function alarmLoad(force) {
+  try {
+    if (ALARM.busy || !hueKey() || navigator.onLine === false) return;
+    if (!force && ALARM.at && Date.now() - ALARM.at < 60000) return;
+    ALARM.busy = true;
+    const r = await fetch(RELAY_URL + '/alarm/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: hueKey() }) });
+    const j = await r.json().catch(() => ({}));
+    if (j && j.linked && Array.isArray(j.sensors) && (j.sensors.length || !j.error)) { ALARM.data = j; ALARM.st = 'ok'; ALARM.at = Date.now(); try { localStorage.setItem('alarmCache', JSON.stringify({ at: ALARM.at, data: j })); } catch (e) { } }
+    else { ALARM.st = j && j.setup === false ? 'nosetup' : j && j.linked === false ? 'nolink' : 'error'; ALARM.err = (j && j.error) || ''; ALARM.at = Date.now(); }
+  } catch (e) { ALARM.st = ALARM.data ? 'ok' : 'error'; ALARM.at = Date.now(); }
+  finally { ALARM.busy = false; }
+  try { const el = document.getElementById('alarmbox'); if (el) el.innerHTML = alarmBody(); } catch (e) { }
+  try { if (document.getElementById('qstrip') && typeof stripRerank === 'function') stripRerank(); } catch (e) { }
+}
+function alarmBody() {
+  try {
+    if (!hueKey()) return `<div class="card empty"><div class="t">Link Philips Hue first</div><div class="s">The alarm uses the same phone link as Lights.</div><button type="button" class="btn small" style="margin-top:8px" onclick="go('#lights')">Open Lights</button></div>`;
+    const d = ALARM.data;
+    if (!d) return ALARM.st === 'error' || ALARM.st === 'nosetup' ? `<div class="card empty"><div class="t">Couldn’t reach the alarm</div><div class="s">Try again in a moment.</div><button type="button" class="btn small" style="margin-top:8px" onclick="alarmLoad(true)">Try again</button></div>` : `<div class="card"><div class="s">Checking the alarm…</div></div>`;
+    const ps = (d.partitions || [])[0], armed = ps ? ps.state : 'unknown';
+    const sens = (d.sensors || []).filter(x => x && x.kind === 'contact').slice().sort((a, b) => (b.open - a.open) || a.name.localeCompare(b.name));
+    const low = (d.sensors || []).filter(x => x && x.lowBatt), faults = (d.sensors || []).filter(x => x && x.fault);
+    const age = d.at ? Math.max(0, Math.round((Date.now() - d.at) / 60000)) : null;
+    const row = x => `<div class="row" style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06)"><div style="flex:1">${esc(x.name)}</div><b style="color:${x.open ? '#c62828' : x.fault ? '#a16207' : 'inherit'}">${x.open ? 'Open' : esc(x.state || 'Closed')}</b></div>`;
+    return `<div class="card"><div class="t" style="font-weight:800">${armed === 'disarmed' ? 'Disarmed' : esc(armed.charAt(0).toUpperCase() + armed.slice(1))}</div><div class="s">${alarmOpen().length ? alarmOpen().length + ' open' : 'Everything closed'}${age != null ? ' · updated ' + (age < 1 ? 'just now' : age + ' min ago') : ''}${d.stale ? ' · offline, last known' : ''}</div></div>`
+      + `<div class="sec">Doors and windows</div><div class="card">${sens.map(row).join('') || '<div class="s">No door or window sensors</div>'}</div>`
+      + (low.length ? `<div class="sec">Low batteries</div><div class="card">${low.map(x => `<div class="s">🪫 ${esc(x.name)}</div>`).join('')}</div>` : '')
+      + (faults.length ? `<div class="sec">Needs a look</div><div class="card">${faults.map(x => `<div class="s">${esc(x.name)}: ${esc(x.state || 'fault')}</div>`).join('')}</div>` : '')
+      + `<button type="button" class="btn small" style="margin-top:10px" onclick="alarmLoad(true)">Refresh</button><div class="s muted" style="margin-top:8px">Read only. Arm and disarm in the ADT app.</div>`;
+  } catch (e) { return `<div class="card empty"><div class="t">Couldn’t show the alarm</div></div>`; }
+}
+function Alarm() {
+  setTimeout(() => alarmLoad(), 0);
+  return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Alarm', 'ADT doors, windows and batteries') + `<div id="alarmbox">${alarmBody()}</div>`;
+}
+function alarmStripSlides() {
+  try { const o = alarmOpen(); if (!o.length) return [];
+    return [['alarm', '🚪 ' + (o.length === 1 ? o[0].name + ' open' : o.length + ' doors/windows open'), `<p class="qsq"><b>${esc(o.slice(0, 3).map(x => x.name).join(', '))}</b>${o.length > 3 ? ' +' + (o.length - 3) : ''}</p><div class="qsw">ADT alarm · tap to see</div>`, "go('#alarm')"]];
+  } catch (e) { return []; }
+}
+setTimeout(() => { try { alarmLoad(); } catch (e) { } }, 3500); setInterval(() => { try { if (!document.hidden) alarmLoad(); } catch (e) { } }, 90000);
 function Lights() {
   setTimeout(() => { if (HUE.st !== 'loading') hueLoad(); if (HUES.st !== 'loading') hueSensLoad(); }, 0);
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Lights', 'All lights, Lounge, Kitchen and Dining') + `<div id="huebox">${hueBody()}</div><div class="sec">Sensors</div><div id="huesens">${hueSensBody()}</div>`;
@@ -15144,6 +15193,7 @@ function stripSlides() {
   const out = [], add = (k, lbl, body, go) => { try { if (body) out.push({ k, lbl, body, go: go || '' }); } catch (e) {} };
   try { (typeof hueStripSlides === 'function' ? hueStripSlides() : []).forEach(x => { try { add(...x); } catch (e) {} }); } catch (e) {}
   // 2.23.95: Heat pumps slide removed (heatStripSlides kept as a no-op so nothing can throw)
+  try { (typeof alarmStripSlides === 'function' ? alarmStripSlides() : []).forEach(x => { try { add(...x); } catch (e) {} }); } catch (e) {}
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
   try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (j && !jokeExpired(j)) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
   try { const p = travelToday(); if (p && p.name) add('travel', 'Today’s travel spot', `<p class="qsq"><b>${esc(p.name)}</b>, ${esc(p.country)}</p><div class="qsw">${esc(travelKmText(travelKm(p.lat, p.lon)))} away · ${esc(sumTravelTime(p.tz))} there</div>`, "go('#travel')"); } catch (e) {}
@@ -15290,7 +15340,7 @@ function stripRank(list) {
     if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
     s.score = v;
   });
-  const PIN = new Set(['travel', 'sarah', 'huelights', 'huebatt']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
+  const PIN = new Set(['travel', 'sarah', 'huelights', 'huebatt', 'alarm']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
   return rest.concat(keep).sort((x, y) => y.score - x.score); // 2.23.70: Place of the day always stays
 }
 // Re-rank about every 5 hours, and when the app comes back after that long
@@ -17809,7 +17859,7 @@ let renderedHash = null;
 function render() {
   if (!S) return;
   // 2.23.83: the Lights page never redraws itself; only navigation (a hash change) rebuilds it.
-  if ((location.hash === '#lights' || location.hash === '#heat') && renderedHash === location.hash && !render.force) return;
+  if ((location.hash === '#lights' || location.hash === '#heat' || location.hash === '#alarm') && renderedHash === location.hash && !render.force) return;
   renderedHash = location.hash;
   if (!skipNoteCapture) captureNoteComposer();
   const noteRoute = (location.hash || '#home').slice(1).split('/')[0];
@@ -17818,7 +17868,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
