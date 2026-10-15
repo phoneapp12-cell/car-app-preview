@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.3';
+const APP_VERSION = '2.24.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1310,6 +1310,7 @@ function homeEaseLine() {
       wet = mood === 'wet';
       sunny = mood === 'sun';
     } catch (e) { wet = false; sunny = false; }
+    try { if (sumWx().wet) sunny = false; } catch (e) { }
     const atWork = homeWhere() === 'work';
     if (a.hour >= 21 || a.hour < 5) return homeAwakeLine();
     const heads = rosterHeadsUp(a, atWork);
@@ -1533,8 +1534,8 @@ function homeNearLine(seen, now) {
   try {
     const picked = [];
     homeNearItems(now).forEach(x => {
-      if (!x || !x.key || (seen && seen.has(x.key))) return;
-      if (picked.some(y => y.key === x.key)) return;
+      if (!x || !x.key || (seen && seen.has(x.key)) || !sumMine(x.title) || picked.length >= 2) return;
+      if (picked.some(y => y.key === x.key || (sumDedupeKey(x.title, 1) === 'wof' && sumDedupeKey(y.title, 1) === 'wof'))) return;
       picked.push(x);
     });
     if (!picked.length) return '';
@@ -2388,7 +2389,8 @@ function touchUse(ids, phase) { try { phase = phase || sumPhaseKey(); const h = 
 function sumWx() {
   const o = { t: null, fine: false, warm5: false };
   try { const c = WX && WX.data && WX.data.current; if (c) { o.t = c.temperature_2m; o.fine = c.weather_code <= 3 && !(c.precipitation > 0); } } catch (e) { }
-  try { const h = WX && WX.data && WX.data.hourly; if (h && Array.isArray(h.time)) { const k = wxLocalNow(), key = k.iso + 'T' + k.hm.slice(0, 2); let n = 0; for (let i = 0; i < h.time.length && n < 6; i++) { if (String(h.time[i]).slice(0, 13) < key) continue; n++; if (h.temperature_2m[i] > 10) o.warm5 = true; } } } catch (e) { }
+  try { const h = WX && WX.data && WX.data.hourly; if (h && Array.isArray(h.time)) { const k = wxLocalNow(), key = k.iso + 'T' + k.hm.slice(0, 2); let n = 0; for (let i = 0; i < h.time.length && n < 6; i++) { if (String(h.time[i]).slice(0, 13) < key) continue; n++; if (h.temperature_2m[i] > 10) o.warm5 = true; if (n <= 5 && ((h.precipitation_probability && h.precipitation_probability[i] >= 40) || (h.weather_code && h.weather_code[i] >= 51))) o.wet = true; } } } catch (e) { }
+  if (o.wet) o.fine = false; // 2.24.4: rain due in the next few hours: no outdoor ideas
   if (o.t == null || o.t > 10) o.warm5 = true; // unknown weather: play safe, no feeding or watering
   return o;
 }
@@ -2486,7 +2488,7 @@ function sumPool() {
   try { (S.bills || []).filter(b => !b.paid && daysLeft(b.due) >= 0 && daysLeft(b.due) <= 7).slice(0, 2).forEach(b => out.push({ k: 'bill', t: b.name + ' due ' + fmtW(b.due) })); } catch (e) { }
   try { const o = wxOutlook().sort((x, y) => y.score - x.score)[0]; if (o) out.push({ k: 'outlook', t: o.what + ', ' + o.when }); } catch (e) { }
   try { const b = (S.birthdays || []).map(x => Object.assign({ x }, bdayInfo(x))).filter(y => y.d >= 0 && y.d <= 14).sort((p, q) => p.d - q.d)[0]; if (b) out.push({ k: 'birthday', t: b.x.name + '’s birthday ' + (b.d === 0 ? 'today' : b.d === 1 ? 'tomorrow' : 'in ' + b.d + ' days') }); } catch (e) { }
-  try { const v = currentSarahVideo(); if (v && Date.now() - Date.parse(v.published || 0) < 3 * 864e5) out.push({ k: 'sarah', t: 'Sarah’s new video “' + v.title + '”' }); } catch (e) { }
+  try { const v = currentSarahVideo(); if (v && Date.now() - Date.parse(v.published || 0) < 3 * 864e5 && sumGoodTitle(v.title)) out.push({ k: 'sarah', t: 'Sarah’s new video “' + v.title + '”' }); } catch (e) { }
   try { headsUpList().slice(0, 1).forEach(h => { const g = dayGap(h.start, T); out.push({ k: 'closure', t: h.what + ', ' + h.when + (g === 0 ? ' (today)' : g === 1 ? ' (tomorrow)' : ' (in ' + g + ' days, not today)') + (h.route ? ' (on your route)' : '') }); }); } catch (e) { }
   try { const m = (M() || {}).plan || {}; [0, 1].forEach(d => { const x = m[addDays(T, d)]; if (x && x.title) out.push({ k: 'meal', t: (d ? 'Tomorrow' : 'Tonight') + '’s dinner: ' + x.title }); }); } catch (e) { }
   try { out.push({ k: 'tip', t: smartPick(SMART_TIDY, 7) }); } catch (e) { }
@@ -2621,6 +2623,8 @@ function aiSumCtx() {
     ctx.sugRule = 'Suggestions: only say gym on a day listed as a gym day above (gym is Tuesday and Wednesday after work only). Never suggest anything already in todos, eventsToday, eventsThisWeek or mealsPlanned. If a meal is mentioned, give the gluten-free swap (he is coeliac), e.g. stir fry: tamari or GF soy sauce. Spa ideas are fine. Never mention bedtime, sleep, medication or being late.';
   } catch (e) {}
   try { if (Array.isArray(ctx.todos)) ctx.todos = ctx.todos.filter(t => !SUM_SELF_RE.test(typeof t === 'string' ? t : JSON.stringify(t))); } catch (e) {}
+  try { ['due', 'todos', 'soon', 'eventsToday'].forEach(k => { if (Array.isArray(ctx[k])) { let w = 0; ctx[k] = ctx[k].filter(t => { const x = typeof t === 'string' ? t : JSON.stringify(t); if (!sumMine(x)) return false; if (/\bwof\b/i.test(x)) { if (w++) return false; } return true; }); } }); // 2.24.4: his own items only, one WOF
+    ctx.styleRule = 'Mention at most 1 or 2 of his own to-dos, woven into a sentence, never a list of quoted titles. Never quote his notes or answers word for word. Only suggest outdoor things (bushwalk, beach, garden) if weather says no rain in the next few hours.'; } catch (e) {}
   try { // 2.23.76: variety and the at-work focus
     const ws = sumWorkState(tt), slot = Math.floor(tt.min / 210) + Math.floor(todayT() / DAY) * 7;
     let pool = sumPool(); if (ws.quiet) pool = pool.filter(x => sumWorkOk(x.t, ws) && x.k !== 'meal' && x.k !== 'sarah' && x.k !== 'tip');
@@ -2669,8 +2673,8 @@ async function aiSumFetch() {
     // 2.22.54: give the weather a few seconds to arrive first, so the one summary drawn has it
     for (let i = 0; i < 10 && !WX && wxBusy; i++) await new Promise(r => setTimeout(r, 500));
     // 2.22.63: 30s timeout and one retry, so a slow AI moment doesn't drop the summary
-    const ctxNow = aiSumCtx(), tIds = ctxNow._touchIds || [], tTxt = ctxNow.personalTouches || []; delete ctxNow._touchIds; const phase0 = 0; void phase0;
-    phase = sumPhaseKey(), tNow = sumToday(), allowed = timesIn(JSON.stringify(ctxNow));
+    const ctxNow = aiSumCtx(), tIds = ctxNow._touchIds || [], tTxt = ctxNow.personalTouches || []; delete ctxNow._touchIds;
+    const phase = sumPhaseKey(), tNow = sumToday(), allowed = timesIn(JSON.stringify(ctxNow));
     const once = async () => {
       const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const tm = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} }, 30000);
@@ -2683,6 +2687,10 @@ async function aiSumFetch() {
     const kept = d.lines.slice(0, 5).map(x => String(x).slice(0, 220)).filter(x => aiLineOk(x, tNow, allowed) && (!nightNow || nightOk(x))); // 2.22.97, 2.23.6
     { const ws = sumWorkState(tNow), seenL = new Set(sumHist().filter(x => x.phase !== phase).map(x => x.t)); const k2 = kept.filter(x => sumWorkOk(x, ws) && !SUM_SELF_RE.test(x)); const k3 = k2.filter(x => !seenL.has(sumNorm(x))); kept.splice(0, kept.length, ...(k3.length >= 2 ? k3 : k2)); }
     { const k4 = kept.filter(aiLineSafe); kept.splice(0, kept.length, ...k4); }
+    try { // 2.24.4: at most one line about his jobs
+      const keys = [...new Set([].concat(ctxNow.todos || [], ctxNow.due || []).map(t => String(t).replace(/\s*\(.*$/, '').toLowerCase().split(/\s+/).filter(w => w.length > 3)[0]).filter(Boolean))];
+      let jobs = 0; const k5 = kept.filter(l => { const lo = l.toLowerCase(); if (!keys.some(k => lo.includes(k))) return true; return !jobs++; }); kept.splice(0, kept.length, ...k5);
+    } catch (e) { }
     try { if (sumToday().min < 360) { // 2.23.92: late night always has room temps and one morning line; max 4 lines
       const tc = sumTouches(4), rt = tc.find(x => x.id === 'roomtemp'), mo = lateMorningLine();
       if (rt && !kept.some(k => /°/.test(k))) kept.splice(1, 0, rt.t);
@@ -3236,12 +3244,17 @@ function homeUrgentPool() {
     return !!homePlainTitle(x.name);
   });
 }
+/* 2.24.4: the written summary only names Shane's own items (Sarah's car, PNU312, her medicine etc. are hers), one WOF at most, two names at most. */
+const SUM_SARAH_RE = /\bsarah|\bpnu ?312\b|\bhaval\b/i;
+const sumGoodTitle = t => { t = String(t || '').trim(); return t.length >= 6 && /[a-z]{3}/i.test(t.replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/gi, '')) && !/^(img|vid|mov|dsc)[_-]?\d+/i.test(t); };
+const sumMine = t => !SUM_SARAH_RE.test(String(t || ''));
+const sumDedupeKey = (t, key) => /\bwof\b/i.test(String(t || '')) ? 'wof' : key;
 function homeUniqueDue(pool, pred, mentioned) {
   const out = [];
   (pool || []).forEach(x => {
-    if (!pred(x)) return;
+    if (!pred(x) || !sumMine(x.name) || out.length >= 2) return;
     const plain = homePlainTitle(x.name);
-    const key = homeMentionKey(plain);
+    const key = sumDedupeKey(plain, homeMentionKey(plain));
     if (!plain || !key || (mentioned && mentioned.has(key)) || out.some(y => y.key === key)) return;
     out.push({ days: x.days, plain, key });
   });
@@ -4065,7 +4078,7 @@ function cleanHead(name, now) {
 }
 /* 2.24.3: Classic layout gets the same dog as Clean, on the left of the header (same art, size and look). Falls back to the plain header. */
 function classicDogHead(name, now) {
-  const h = header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), ''));
+  const h = header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => (mascotKey() === 'dog' ? '' : catHtml()), '')); // 2.24.4: the left dog replaces the wagging header dog (no two dogs); a chosen cat stays
   return h.replace('<div class="top"><div style="min-width:0">', '<div class="top"><div class="cldogwrap"><img class="cldog" src="art/dog.webp" alt="" width="52" height="52" onerror="this.remove()"><div style="min-width:0">').replace(/<\/div>\s*<div class="iconrow">/, '</div></div>\n  <div class="iconrow">');
 }
 function cleanBell() { const el = document.querySelector('[data-k="justadded"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else toast('Nothing new in Just added.'); }
@@ -17293,6 +17306,8 @@ function homeMoodLine() {
   } catch (e) { return ''; }
 }
 function aboutFitLine() {
+  return ''; // 2.24.4: never paste his own answers/notes back verbatim
+  // eslint-disable-next-line no-unreachable
   try {
     const a = homeAklParts();
     if (!a) return '';
@@ -17386,7 +17401,7 @@ function homeUpKey(x) {
     if (homeSaysTv(x.name) || /\broadworks?\b/i.test(x.name)) return '';
     if (Number.isFinite(x.days) && x.days < 0) return '';
     const plain = homePlainTitle(x.name);
-    const key = homeMentionKey(plain);
+    const key = sumDedupeKey(plain, homeMentionKey(plain));
     if (!plain || !key) return '';
     return x.kind + '|' + key;
   } catch (e) { return ''; }
