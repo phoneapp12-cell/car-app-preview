@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.89';
+const APP_VERSION = '2.23.90';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2374,6 +2374,67 @@ function homeSuggestions() {
    Once per app open: send a small context (time, place, weather, due items, to-dos, notes, roster, about-you
    answers and standing facts) and use the returned bullets and suggestions. The rule-based summary stays as the
    fallback whenever the AI is slow, offline or fails. Nothing is stored on the relay. */
+/* 2.23.90: About Shane. A compact profile for the summary (AI and plain), plus 1–2 personal touches per refresh,
+   picked for the time, day and weather, never the same touch twice within 24 hours. */
+const SHANE_PROFILE = 'Shane, 52, lives at Onerahi near the beaches (Whangārei). Wife Sarah (51, teacher aide at Raurimu Avenue School, makes sunset YouTube videos); daughters Millesha and Cass; granddaughter Aranea; niece-in-law Monique; dog Zeus. Works at Noel Leeming, 4 Port Rd Whangārei: 8:30 start, Thursday till 7:15pm, other days 6pm (days off from the roster). Gym Tue/Wed after work; Monday evening at his mum’s; Sunday cleaning job till 7pm. Cooks Fri/Sat; coeliac so everything gluten free; loves pizza, Turkish Delight, an occasional merlot. Dinner 8–9pm, spa about 10–11pm, TV and AI music (Suno) in the evenings. Loves bushwalks, gardening, movies, books and tech (Hue, Tapo, heat pumps, Alexa/Google). Favourite colour blue. Night owl; watches TVNZ Breakfast.';
+function aboutProfile() {
+  let ans = [];
+  try { ans = (aboutState().answers || []).filter(x => x && x.qid !== 'mood' && x.text && x.text !== '(skipped)').slice(-8).map(x => (aboutAsk(aboutQ(x.qid)) || x.qid) + ' ' + String(x.text).slice(0, 60)); } catch (e) { }
+  return { facts: SHANE_PROFILE, aboutYou: ans };
+}
+function touchHist() { try { return (JSON.parse(localStorage.getItem('sumTouch') || '[]') || []).filter(x => x && Date.now() - x.at < 864e5); } catch (e) { return []; } }
+function touchUse(ids) { try { const h = touchHist(); ids.forEach(id => { if (!h.some(x => x.id === id)) h.push({ id, at: Date.now() }); }); localStorage.setItem('sumTouch', JSON.stringify(h.slice(-40))); } catch (e) { } }
+function sumWx() {
+  const o = { t: null, fine: false, warm5: false };
+  try { const c = WX && WX.data && WX.data.current; if (c) { o.t = c.temperature_2m; o.fine = c.weather_code <= 3 && !(c.precipitation > 0); } } catch (e) { }
+  try { const h = WX && WX.data && WX.data.hourly; if (h && Array.isArray(h.time)) { const k = wxLocalNow(), key = k.iso + 'T' + k.hm.slice(0, 2); let n = 0; for (let i = 0; i < h.time.length && n < 6; i++) { if (String(h.time[i]).slice(0, 13) < key) continue; n++; if (h.temperature_2m[i] > 10) o.warm5 = true; } } } catch (e) { }
+  if (o.t == null || o.t > 10) o.warm5 = true; // unknown weather: play safe, no feeding or watering
+  return o;
+}
+function sumSunsetMin() {
+  try { const d = WX.data.daily, iso = todayISO(), i = d.time.indexOf(iso), m = String(d.sunset[i] || '').match(/T(\d{2}):(\d{2})/); if (m) return +m[1] * 60 + +m[2]; } catch (e) { }
+  return null;
+}
+// Candidate touches for right now. Each {id, t}. No bedtime, teeth, meds, lateness or work-hours nags; never walk Zeus; no garden feeding/watering when warm.
+function sumTouchCands(tt) {
+  tt = tt || sumToday();
+  const out = [], add = (id, t) => out.push({ id, t }), ws = sumWorkState(tt), wx = sumWx(), dow = tt.dow, m = tt.min, off = !tt.work, eve = m >= 17 * 60 || m < 120;
+  const T = todayISO();
+  if (m < 360) { // 2.23.90: night owl hours: right now, plus at most a brief note on the morning
+    try { const L = (HUESTRIP && HUESTRIP.lights) || {}, on = (L.rooms || []).filter(r => r && r.on).map(r => r.name); if (on.length) add('lightsoff', 'The ' + engList(on.slice(0, 3)) + ' light' + (on.length > 1 ? 's are' : ' is') + ' still on, one tap on Lights to switch off'); } catch (e) { }
+    try { const t = (HUESTRIP.sens || []).find(d => d && d.temp && Number.isFinite(d.temp.c)); const u = ((HEAT.data || (HEATSTRIP && HEATSTRIP.data) || {}).units || []).find(x => x && Number.isFinite(x.room)); if (u) add('roomtemp', (u.name || 'The lounge') + ' is ' + (+u.room).toFixed(1) + '°C' + (u.on ? ', heat pump on at ' + u.temp + '°' : ', heat pump off')); else if (t) add('roomtemp', String(t.room || t.name) + ' is ' + t.temp.c.toFixed(1) + '°C right now'); } catch (e) { }
+    add('winddown', homePick(99, ['A quiet wind-down: a chapter of your book, or a Suno song about the beach', 'Still up? A short episode or a few pages of your book is a nice way to wind down', 'Late one: a calm Suno playlist and the lights down low']));
+    try { const f = sugDayFacts(0); if (f.work) add('morning', 'First thing: work from ' + fmtTime(rosterState().days[String(f.dow)]) + (wx.t != null ? ', around ' + Math.round(wx.t) + '° for the drive' : '')); } catch (e) { }
+    return out;
+  }
+  try { const a = (S.birthdays || []).find(b => /aranea/i.test(b.name || '')); if (a) { const i = bdayInfo(a); if (i.d >= 0 && i.d <= 60) add('aranea', i.d === 0 ? 'Aranea’s birthday today' + (i.age ? ', she’s ' + i.age : '') + ' — big hug from Grandad' : 'Aranea turns ' + (i.age || 9) + ' in ' + i.d + ' day' + (i.d === 1 ? '' : 's') + (i.d > 10 ? ', plenty of time to plan something fun' : ', worth sorting a present soon')); } } catch (e) { }
+  if (!out.some(x => x.id === 'aranea')) add('aranea', 'Aranea’s 9th birthday is coming up soon, a fun one to start planning');
+  if (ws.quiet) { // at work: only light, work-friendly touches
+    add('blue', 'A bit of blue sky on the drive home would suit you, blue being your colour');
+    if (dow === 4) add('thu', 'Long Thursday, you’re on till 7:15pm, Sarah might have tea sorted');
+    return out.filter(x => x.id !== 'aranea' || true);
+  }
+  if ((dow === 5 || dow === 6) && m >= 14 * 60 && m < 21 * 60) add('pizza', homePick(97, ['Cook night: a GF pizza with a crispy base and whatever’s in the fridge', 'Your cook night: GF pizza bases, a good tomato sauce and loads of toppings', 'Cook night idea: GF pizza with ham, pineapple and a drizzle of chilli honey']));
+  if (dow === 6 && m >= 17 * 60) add('merlot', 'Saturday night: a glass of merlot and a good movie sounds right');
+  if (off && wx.fine && m >= 7 * 60 && m < 15 * 60) add('bush', homePick(98, ['Fine day off: a bushwalk at Mount Parihaka or the Whangārei Falls track', 'A good day for a bushwalk, maybe the A.H. Reed Kauri Park loop', 'Fine and free: the coastal walk round Onerahi or a beach wander']));
+  const ss = sumSunsetMin(); if (ss != null && m >= ss - 90 && m <= ss + 10 && wx.fine) add('sunset', 'Golden hour soon, a nice one for Sarah’s sunset video from the Onerahi foreshore');
+  if (eve && m >= 19 * 60 || m < 120) add('quiet', homePick(99, ['Quiet night: a good book, or try a Suno song about the beach', 'A movie night pick: something from the Videos tab with Turkish Delight on the side', 'A quiet one: a chapter of your book in the spa']));
+  if (off && m >= 8 * 60 && m < 17 * 60) add('garden', wx.warm5 ? 'Garden time: a bit of weeding or planting while it’s mild' : 'Garden time: a good day to feed and water the veggies while it’s cool');
+  if (dow === 1 && m >= 15 * 60 && m < 21 * 60) add('mum', 'Monday at your mum’s tonight, say hi from all of us');
+  if (dow === 0 && m < 19 * 60 && m >= 10 * 60) add('clean', 'Cleaning job till 7, then the evening’s yours');
+  add('tech', homePick(96, ['The Hue lights can set a blue glow for movie night', 'A heat-pump preset for when you get home would be cosy', 'Tapo and Alexa can do a goodnight scene with one word']));
+  return out;
+}
+function sumTouches(n) {
+  n = n || 2; const used = new Set(touchHist().map(x => x.id)), all = sumTouchCands();
+  let pick = all.filter(x => !used.has(x.id));
+  const pri = ['lightsoff', 'roomtemp', 'winddown', 'morning', 'aranea', 'pizza', 'merlot', 'sunset', 'bush', 'mum', 'clean', 'quiet', 'garden', 'thu', 'bfast', 'blue', 'tech'];
+  pick.sort((a, b) => pri.indexOf(a.id) - pri.indexOf(b.id));
+  // rotate a little so the same top pick isn't always first
+  if (pick.length > 2) { const r = (Math.floor(sumToday().min / 210) + homeSugOpenN) % 2; if (r) pick = [pick[1], pick[0]].concat(pick.slice(2)); }
+  if (!pick.length) pick = all.slice(0, 1);
+  return pick.slice(0, n).filter(x => sumWorkOk(x.t) || sumWorkState().quiet);
+}
 let AI_SUM = null, aiSumOpen = -1, aiSumBusy = false;
 const AI_FACTS = ['52, wife Sarah, daughters Millesha and Cass, granddaughter Aranea', 'Dog Zeus. Walking him is already on the to-do list, so never suggest a walk with him',
   'Coeliac: food ideas must be gluten free', 'Loves pizza, Turkish Delight, merlot now and then, cooking on Fri and Sat nights',
@@ -2560,6 +2621,10 @@ function aiSumCtx() {
     ctx.varietyRule = 'Open with the lead item (in your own words), then vary the order. Use items from more. Never reuse a sentence or the same wording as any line in avoidLines.';
     if (ws.quiet) { ctx.atWorkRule = 'He is at work now' + (ws.end ? ' until ' + ws.end : '') + '. Only work-hours things: what is due today, closures on his route home, the weather for the drive home near finish time, the coworker question, quick wins. Do NOT mention gym, tonight, evening, dinner, TV, music, movies, the spa or any after-work plans.'; try { ctx.coworkerQuestion = coworkQ(); } catch (e) { } delete ctx.mealsPlanned; }
   } catch (e) {}
+  try { const pr = aboutProfile(); ctx.aboutShane = pr.facts; if (pr.aboutYou.length) ctx.aboutYouAnswers = pr.aboutYou; delete ctx.facts; delete ctx.about;
+    const tc = sumTouches(2); ctx.personalTouches = tc.map(x => x.t); ctx._touchIds = tc.map(x => x.id);
+    { const mm = sumToday().min; ctx.timeOfDayRule = mm < 360 ? 'It is after midnight and he is still up (night owl). Focus only on right now: lights still on, a quiet wind-down idea, what is on, room temperature and heat pump. At most one brief line about the morning (leave time and the weather for the drive). Do not mention this evening’s plans, cooking, gym or the day’s jobs.' : mm < 600 ? 'Morning: talk about the day ahead. Do not mention this evening’s plans (dinner, TV, spa, merlot, cooking) yet.' : mm < 1020 ? 'Afternoon: the rest of today, then tonight.' : 'Evening: tonight, plus one line about tomorrow.'; }
+    ctx.personalRule = 'Make it personal and warm, short. Weave in 1 or 2 of personalTouches naturally (they fit right now). Use aboutShane only for context, never list facts back. Never nag about bedtime, teeth, meds, lateness or work hours. Never suggest walking Zeus. No garden feeding or watering if it is above 10°C now or in the next 5 hours.'; } catch (e) {}
   try { if (homeNight()) nightCtx(ctx); } catch (e) {}
   return ctx;
 }
@@ -2591,7 +2656,8 @@ async function aiSumFetch() {
     // 2.22.54: give the weather a few seconds to arrive first, so the one summary drawn has it
     for (let i = 0; i < 10 && !WX && wxBusy; i++) await new Promise(r => setTimeout(r, 500));
     // 2.22.63: 30s timeout and one retry, so a slow AI moment doesn't drop the summary
-    const ctxNow = aiSumCtx(), phase = sumPhaseKey(), tNow = sumToday(), allowed = timesIn(JSON.stringify(ctxNow));
+    const ctxNow = aiSumCtx(), tIds = ctxNow._touchIds || [], tTxt = ctxNow.personalTouches || []; delete ctxNow._touchIds; const phase0 = 0; void phase0;
+    phase = sumPhaseKey(), tNow = sumToday(), allowed = timesIn(JSON.stringify(ctxNow));
     const once = async () => {
       const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const tm = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} }, 30000);
@@ -2604,6 +2670,8 @@ async function aiSumFetch() {
     const kept = d.lines.slice(0, 5).map(x => String(x).slice(0, 220)).filter(x => aiLineOk(x, tNow, allowed) && (!nightNow || nightOk(x))); // 2.22.97, 2.23.6
     { const ws = sumWorkState(tNow), seenL = new Set(sumHist().filter(x => x.phase !== phase).map(x => x.t)); const k2 = kept.filter(x => sumWorkOk(x, ws) && !SUM_SELF_RE.test(x)); const k3 = k2.filter(x => !seenL.has(sumNorm(x))); kept.splice(0, kept.length, ...(k3.length >= 2 ? k3 : k2)); }
     if (!kept.length) throw new Error('all_lines_dropped');
+    try { const kw = { aranea: /aranea/i, pizza: /pizza/i, merlot: /merlot/i, sunset: /sunset|golden/i, bush: /bush|walk|track/i, mum: /mum/i, clean: /clean/i, quiet: /book|movie|suno/i, garden: /garden|weed|plant/i, thu: /7:15|thursday/i, bfast: /breakfast/i, blue: /blue/i, tech: /hue|heat|tapo|alexa/i };
+      const hit = tIds.filter(id => kw[id] && kept.some(l => kw[id].test(l))); if (!hit.length && tTxt[0] && !BFAST_TV_RE.test(tTxt[0])) { kept.splice(Math.min(2, kept.length), 0, tTxt[0]); hit.push(tIds[0]); } touchUse(hit); } catch (e) { }
     AI_SUM = { lines: kept, sugs: (d.sugs || []).slice(0, 3).filter(x => aiLineOk(String((x && x.text) || ''), tNow, allowed) && (!nightNow || nightOk(String((x && x.text) || '') + ' ' + String((x && x.title) || '')))), open: openN, at: Date.now(), phase };
     aiSumOpen = openN;
     try { localStorage.setItem('aiSumLast', JSON.stringify(AI_SUM)); } catch (e) {}
@@ -3057,6 +3125,7 @@ function homeSumCard(bits) {
       for (let i = ps.length - 1; i >= 0; i--) if (!sumWorkOk(ps[i].replace(/<[^>]*>/g, ''), ws)) ps.splice(i, 1);
       if (ws.quiet) { const add = []; const H = headsUpList().find(h => h.route); if (H) add.push(li(esc(dot('On your way home: ' + H.what + ', ' + H.when)))); add.push(li(esc('Ask a coworker: ' + coworkQ()))); ps.splice(Math.min(must.length, ps.length), 0, ...add); }
       else if (!night) { const pl = sumPool(); if (pl.length) { const x = pl[(Math.floor(sumToday().min / 210) + homeSugOpenN) % pl.length]; ps.push(li(esc(dot(homeCapClause(x.t))))); } }
+      try { const tc = sumTouches(ws.quiet ? 1 : 2).filter(x => !BFAST_TV_RE.test(x.t)); tc.forEach(x => ps.push(li(esc(dot(homeCapClause(x.t)))))); if (tc.length && !aiSumFresh()) touchUse(tc.map(x => x.id)); } catch (e) { }
     } catch (e) {}
     if (night) { try { nightSumLines().forEach(t => ps.push(li(esc(dot(homeCapClause(homeStripEnd(t))))))); } catch (e) {} } // 2.23.6
     if (flavour && !sumWorkOk(flavour)) flavour = '';
