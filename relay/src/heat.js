@@ -6,7 +6,6 @@ const P_ACC = 'https://accsmart.panasonic.com';
 const P_CID = 'Xmy6xIYIitMxngjB2rHvlm6HSDNnaMJx';
 const P_A0 = 'eyJuYW1lIjoiQXV0aDAuQW5kcm9pZCIsImVudiI6eyJhbmRyb2lkIjoiMzAifSwidmVyc2lvbiI6IjIuOS4zIn0=';
 const P_REDIR = 'panasonic-iot-cfc://authglb.digital.panasonic.com/android/com.panasonic.ACCsmart/callback';
-const MEL = 'https://app.melcloud.com/Mitsubishi.Wifi.Client';
 const KV = 'heat-v1', CACHE_MS = 120000;
 const rnd = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(b => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[b % 62]).join(''); };
 const sha = async s => { const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return btoa(String.fromCharCode(...new Uint8Array(d))).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); };
@@ -151,48 +150,61 @@ async function pSet(env, f, id, body) {
   return r.ok ? { ok: true } : { ok: false, error: 'set_' + r.status };
 }
 
+// 2.23.93: Mitsubishi via MELView (NZ/AU), not MELCloud. Auth cookie cached in KV.
+const MV = 'https://api.melview.net/api';
+const MMODE = { 1: 'heat', 2: 'dry', 3: 'cool', 7: 'fan', 8: 'auto' }, MFAN = { 0: 'auto', 2: 'low', 3: 'mid', 5: 'high' };
+const MMODE_R = Object.fromEntries(Object.entries(MMODE).map(([k, v]) => [v, +k])), MFAN_R = Object.fromEntries(Object.entries(MFAN).map(([k, v]) => [v, +k]));
+const mvNum = x => { const n = parseFloat(x); return Number.isFinite(n) ? n : null; };
 async function mLogin(env, f) {
-  const email = env.MELCLOUD_EMAIL, pass = env.MELCLOUD_PASSWORD;
+  const email = env.MELVIEW_EMAIL, pass = env.MELVIEW_PASSWORD;
   if (!email || !pass) return { ok: false, error: 'not_configured' };
-  const r = await f(MEL + '/Login/ClientLogin', { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0' }, body: JSON.stringify({ Email: email, Password: pass, Language: 0, AppVersion: '1.32.1.0', Persist: true, CaptchaResponse: null }) });
-  if (!r.ok) return { ok: false, error: 'login_' + r.status };
-  const j = await r.json(); if (!(j.LoginData && j.LoginData.ContextKey)) return { ok: false, error: j.ErrorMessage || 'login_failed' };
-  const rec = await load(env); rec.m = { key: j.LoginData.ContextKey, at: Date.now() }; rec.mErr = null; await save(env, rec); return { ok: true };
+  const r = await f(MV + '/login.aspx', { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0' }, body: JSON.stringify({ user: email, pass, appversion: '5.3.1330' }) });
+  const sc = r.headers.get('set-cookie') || ''; const m = sc.match(/auth=([^;]+)/);
+  const rec = await load(env);
+  if (!r.ok || !m) { rec.mErr = 'login_failed'; await save(env, rec); return { ok: false, error: 'login_failed' }; }
+  rec.m = { cookie: 'auth=' + m[1], at: Date.now() }; rec.mErr = null; await save(env, rec); return { ok: true };
 }
-async function mEnsure(env, f) {
-  const rec = await load(env); if (rec.m && rec.m.key && Date.now() - (rec.m.at || 0) < 12 * 3600000) return rec;
+async function mEnsure(env, f, force) {
+  const rec = await load(env); if (!force && rec.m && rec.m.cookie && Date.now() - (rec.m.at || 0) < 12 * 3600000) return rec;
   await mLogin(env, f); return await load(env);
 }
-const MMODE = { 1: 'heat', 2: 'dry', 3: 'cool', 7: 'fan', 8: 'auto' }, MFAN = { 0: 'auto', 1: 'low', 2: 'mid', 3: 'high' };
-const MMODE_R = Object.fromEntries(Object.entries(MMODE).map(([k, v]) => [v, +k])), MFAN_R = Object.fromEntries(Object.entries(MFAN).map(([k, v]) => [v, +k]));
+async function mPost(env, f, path, body) {
+  for (let i = 0; i < 2; i++) {
+    const rec = await mEnsure(env, f, i > 0); if (!rec.m || !rec.m.cookie) throw new Error(rec.mErr || 'login_failed');
+    const r = await f(MV + path, { method: 'POST', headers: { 'content-type': 'application/json', cookie: rec.m.cookie, 'user-agent': 'Mozilla/5.0' }, body: JSON.stringify(body || {}) });
+    if (r.status === 401 || r.status === 403) continue;
+    const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) { if (i === 0) continue; throw new Error('bad_json'); }
+    if (!r.ok) throw new Error('http_' + r.status);
+    return j;
+  }
+  throw new Error('auth_failed');
+}
 async function mUnits(env, f) {
-  const rec = await mEnsure(env, f); if (!rec.m || !rec.m.key) return { error: rec.mErr || 'login_failed', units: [] };
+  if (!env.MELVIEW_EMAIL || !env.MELVIEW_PASSWORD) return { error: 'not_configured', units: [] };
   try {
-    const r = await f(MEL + '/User/ListDevices', { headers: { 'X-MitsContextKey': rec.m.key, 'content-type': 'application/json' } });
-    if (!r.ok) throw new Error('list_' + r.status);
-    const j = await r.json(); const list = [];
-    for (const b of (Array.isArray(j) ? j : [])) for (const d of b.Structure?.Devices || []) {
-      const de = d.Device || d; list.push({ id: 'm:' + de.DeviceID, brand: 'Mitsubishi', name: d.DeviceName || de.DeviceName || ('Unit ' + de.DeviceID), on: !!de.Power, mode: MMODE[de.OperationMode] || 'auto', temp: de.SetTemperature, room: de.RoomTemperature, outdoor: de.OutdoorTemperature ?? null, fan: MFAN[de.FanSpeed] || 'auto', building: b.ID });
+    const j = await mPost(env, f, '/rooms.aspx', {}); const list = [];
+    const bs = Array.isArray(j) ? j : (j && j.buildings) || [];
+    for (const b of bs) for (const u of (b && b.units) || []) {
+      if (!u || u.unitid == null) continue;
+      const pw = u.power; const on = pw === 'on' || pw === 1 || pw === '1' || pw === true;
+      list.push({ id: 'm:' + u.unitid, brand: 'Mitsubishi', name: String(u.room || ('Unit ' + u.unitid)).replace(/^./, c => c.toUpperCase()), on, mode: MMODE[+u.mode] || 'auto', temp: mvNum(u.settemp), room: mvNum(u.temp), outdoor: null, fan: 'auto', status: u.status || '' });
     }
-    rec.mErr = null; await save(env, rec); return { units: list };
-  } catch (e) { rec.mErr = String(e.message || e).slice(0, 40); await save(env, rec); return { error: rec.mErr, units: [] }; }
+    const rec = await load(env); rec.mErr = null; await save(env, rec); return { units: list };
+  } catch (e) { const rec = await load(env); rec.mErr = String(e.message || e).slice(0, 40); await save(env, rec); return { error: rec.mErr, units: [] }; }
 }
 async function mSet(env, f, id, body) {
-  const did = +id.slice(2); const rec = await mEnsure(env, f); if (!rec.m) return { ok: false, error: rec.mErr || 'login_failed' };
-  const list = await f(MEL + '/User/ListDevices', { headers: { 'X-MitsContextKey': rec.m.key } });
-  const j = await list.json(); let cur = null, building = null;
-  for (const b of (Array.isArray(j) ? j : [])) for (const d of b.Structure?.Devices || []) if ((d.Device || d).DeviceID === did) { cur = d.Device || d; building = b.ID; }
-  if (!cur) return { ok: false, error: 'not_found' };
-  let flags = 0; if (typeof body.on === 'boolean') { cur.Power = body.on; flags |= 1; }
-  if (body.mode && MMODE_R[body.mode] != null) { cur.OperationMode = MMODE_R[body.mode]; flags |= 2; }
-  if (Number.isFinite(+body.temp)) { cur.SetTemperature = +body.temp; flags |= 4; }
-  if (body.fan && MFAN_R[body.fan] != null) { cur.FanSpeed = MFAN_R[body.fan]; flags |= 8; }
-  cur.EffectiveFlags = flags; cur.HasPendingCommand = true; cur.DeviceID = did;
-  const r = await f(MEL + '/Device/SetAta', { method: 'POST', headers: { 'X-MitsContextKey': rec.m.key, 'content-type': 'application/json' }, body: JSON.stringify(cur) });
-  return r.ok ? { ok: true } : { ok: false, error: 'set_' + r.status };
+  const uid = String(id.slice(2)); if (!/^\d+$/.test(uid)) return { ok: false, error: 'bad_id' };
+  const c = [];
+  if (typeof body.on === 'boolean') c.push(body.on ? 'PW1' : 'PW0');
+  if (body.mode && MMODE_R[body.mode] != null) c.push('MD' + MMODE_R[body.mode]);
+  if (Number.isFinite(+body.temp) && +body.temp >= 10 && +body.temp <= 31) c.push('TS' + (Math.round(+body.temp * 2) / 2));
+  if (body.fan && MFAN_R[body.fan] != null) c.push('FS' + MFAN_R[body.fan]);
+  if (!c.length) return { ok: false, error: 'nothing_to_do' };
+  try { const j = await mPost(env, f, '/unitcommand.aspx', { unitid: uid, v: 2, commands: c.join(',') }); return j && j.error && j.error !== 'ok' ? { ok: false, error: String(j.error).slice(0, 40) } : { ok: true }; }
+  catch (e) { return { ok: false, error: String(e.message || e).slice(0, 40) }; }
 }
 
-function ready(env) { return !!(env && env.EVENTS_KV && ((env.PANASONIC_EMAIL && env.PANASONIC_PASSWORD) || (env.MELCLOUD_EMAIL && env.MELCLOUD_PASSWORD))); }
+function ready(env) { return !!(env && env.EVENTS_KV && ((env.PANASONIC_EMAIL && env.PANASONIC_PASSWORD) || (env.MELVIEW_EMAIL && env.MELVIEW_PASSWORD))); }
 export async function heatRoute(path, request, env, f, okOrigin, reply) {
   if (request.method !== 'POST') return reply(405, { error: 'post_only' });
   if (!okOrigin) return reply(403, { error: 'forbidden_origin' });

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.92';
+const APP_VERSION = '2.23.93';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12464,7 +12464,7 @@ function heatUnitUpdate(u) {
 }
 function heatBody() {
   if (HEAT.st === 'idle' || HEAT.st === 'loading') return `<div class="card"><div class="s">Checking heat pumps…</div></div>`;
-  if (HEAT.st === 'nosetup') return `<div class="card empty"><div class="t">Heat pumps aren’t set up yet</div><div class="s">The Comfort Cloud or MELCloud login still needs adding on the relay.</div></div>`;
+  if (HEAT.st === 'nosetup') return `<div class="card empty"><div class="t">Heat pumps aren’t set up yet</div><div class="s">The Comfort Cloud or MELView login still needs adding on the relay.</div></div>`;
   if (HEAT.st === 'nolink' || HEAT.st === 'unlinked') return `<div class="card empty"><div class="t">Link Philips Hue first</div><div class="s">Heat pumps use the same phone link as Lights. Open Lights, connect Hue, then come back here.</div><button type="button" class="btn small" style="margin-top:8px" onclick="go('#lights')">Open Lights</button></div>`;
   if (HEAT.st === 'error') return `<div class="card empty"><div class="t">Couldn’t reach the heat pumps</div><div class="s">Try again in a moment.</div><button type="button" class="btn small" style="margin-top:8px" onclick="heatLoad(true)">Try again</button></div>`;
   const d = HEAT.data || {}, units = d.units || [], brands = d.brands || {};
@@ -12479,7 +12479,7 @@ function heatBody() {
       <div class="row" style="align-items:center;gap:8px;margin-top:8px"><button type="button" class="btn small" onclick="heatSet(${jsArg(u.id)},{temp:${(u.temp || 20) - 1},on:true})">−</button><span class="heatt" style="font-weight:800;min-width:3ch;text-align:center">${u.temp != null ? u.temp + '°' : '—'}</span><button type="button" class="btn small" onclick="heatSet(${jsArg(u.id)},{temp:${(u.temp || 20) + 1},on:true})">+</button>
       <div class="chips scroll" style="flex:1">${fans.map(f => `<button type="button" class="chip ${u.fan === f ? 'on' : ''}" onclick="heatSet(${jsArg(u.id)},{fan:${jsArg(f)}}})">${f}</button>`).join('')}</div></div></div>`;
   }).join('');
-  return (notes.length ? `<div class="card"><div class="s">${notes.join('<br>')}</div></div>` : '') + (cards || `<div class="card empty"><div class="t">No heat pumps found</div><div class="s">Check the Comfort Cloud or MELCloud app.</div></div>`) + `<button type="button" class="btn small" style="margin-top:10px" onclick="heatLoad(true)">Refresh</button>`;
+  return (notes.length ? `<div class="card"><div class="s">${notes.join('<br>')}</div></div>` : '') + (cards || `<div class="card empty"><div class="t">No heat pumps found</div><div class="s">Check the Comfort Cloud or MELView app.</div></div>`) + `<button type="button" class="btn small" style="margin-top:10px" onclick="heatLoad(true)">Refresh</button>`;
 }
 function Heat() {
   setTimeout(() => { if (HEAT.st !== 'loading') heatLoad(); }, 0);
