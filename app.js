@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.87';
+const APP_VERSION = '2.23.88';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14911,8 +14911,23 @@ setTimeout(hueStripFetch, 2500); setInterval(hueStripFetch, 30000); document.add
 function hueStripSlides() {
   const out = [], num = x => typeof x === 'number' && Number.isFinite(x);
   const LB = hueLowBatt(); if (LB.length) out.push(['huebatt', '🪫 Battery low', `<p class="qsq">${LB.slice(0, 3).map(d => `<b>${esc(d.name)}</b> ${Math.round(d.pct)}%`).join(' · ')}</p>${LB.length > 3 ? `<div class="qsw">+${LB.length - 3} more</div>` : '<div class="qsw">Philips Hue · swap the battery soon</div>'}`, "go('#lights')"]);
+  // 2.23.88: Room temps = Hue sensors + heat-pump indoor temps (from the existing heat status cache)
   const T = (HUESTRIP.sens || []).filter(d => d && d.temp && num(d.temp.c));
-  if (T.length) out.push(['huetemp', '🌡️ Room temps', `<p class="qsq">${T.slice(0, 4).map(d => `<b>${esc(String(d.room || d.name || 'Sensor'))}</b> ${d.temp.c.toFixed(1)}°C`).join(' · ')}</p>${T.length > 4 ? `<div class="qsw">+${T.length - 4} more</div>` : ''}`, "go('#lights')"]);
+  const hueBits = T.map(d => `<b>${esc(String(d.room || d.name || 'Sensor'))}</b> ${d.temp.c.toFixed(1)}°C`);
+  const heatSrc = (HEAT.st === 'ok' && HEAT.data) || (HEATSTRIP && HEATSTRIP.data);
+  const heatBits = [];
+  (heatSrc && heatSrc.units || []).forEach(u => {
+    if (!u || !num(u.room)) return;
+    let s = `<b>${esc(String(u.name || 'Heat pump'))}</b> ${(+u.room).toFixed(1)}°C`;
+    if (u.on && num(u.temp)) s += ` · set ${(+u.temp).toFixed(1)}°`;
+    if (num(u.outdoor)) s += ` · out ${(+u.outdoor).toFixed(1)}°`;
+    heatBits.push(s);
+  });
+  const tempBits = hueBits.concat(heatBits);
+  if (tempBits.length) {
+    const go = heatBits.length ? "go('#heat')" : "go('#lights')";
+    out.push(['huetemp', '🌡️ Room temps', `<p class="qsq">${tempBits.slice(0, 4).join(' · ')}</p>${tempBits.length > 4 ? `<div class="qsw">+${tempBits.length - 4} more</div>` : ''}`, go]);
+  }
   const L = HUESTRIP.lights;
   if (L && (Array.isArray(L.rooms) || Array.isArray(L.lights))) {
     // 2.23.87: only Lounge / Kitchen / Dining (Kitchen = any name containing kitchen)
