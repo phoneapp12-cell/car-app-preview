@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.8';
+const APP_VERSION = '2.24.9';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -184,6 +184,15 @@ function colourHex(name) {
   for (const k of Object.keys(COLOURS)) if (n.includes(k)) return COLOURS[k];
   return '#0F766E';
 }
+/* 2.24.9: Krea 3D bill icons on the same orange bill tile; the line icon comes back if the picture fails to load. */
+const BILL_ART = { zap: 'zap', phone: 'phone', wifi: 'wifi', umbrella: 'umbrella', house: 'house', drop: 'drop', tv: 'tv', bill: 'bill' };
+function billIc(name) {
+  let k = 'bill'; try { k = billIcon(name); } catch (e) { }
+  const a = BILL_ART[k];
+  if (!a || (typeof cardArtOn === 'function' && !cardArtOn())) return `<div class="ic bill">${I(k)}</div>`;
+  return `<div class="ic bill billart"><img src="art/i3-${a}.webp" alt="" width="34" height="34" loading="lazy" onerror="this.nextElementSibling.hidden=false;this.remove()"><span hidden>${I(k)}</span></div>`;
+}
+function pageBan(k) { try { if (typeof cardArtOn === 'function' && !cardArtOn()) return ''; return `<div class="pageban" style="background-image:url(art/${k}-banner.webp)" aria-hidden="true"></div>`; } catch (e) { return ''; } }
 function billIcon(name) {
   const n = String(name || '').toLowerCase();
   if (/power|electric|ecotricity|energy|gas|contact|mercury|genesis|meridian/.test(n)) return 'zap';
@@ -599,7 +608,7 @@ const HOME_CARD = {
       <button class="paybtn" aria-label="Record a payment: ${esc(name)}" onclick="payForm('${x.l.id}')">Rec</button></div>`;
       }
       const b = x.b;
-      return `<div class="row bill"><button class="tapzone" onclick="go('#bills')"><div class="ic bill">${I(billIcon(b.name))}</div>
+      return `<div class="row bill"><button class="tapzone" onclick="go('#bills')">${billIc(b.name)}
       <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Due ${fmtW(b.due)}</div></div><div class="badgestack">${duePill(daysLeft(b.due))}${moneyBadge(b.amount)}</div></button>
       <button class="paybtn" aria-label="Mark paid: ${esc(b.name)}" onclick="markPaid('${b.id}')">Pd</button></div>`;
     }).join('')}</div>`;
@@ -3938,7 +3947,7 @@ function quoteJokeCard() {
 }
 /* 2.23.37: card artwork for Coming up and Just added (Krea 2 Turbo images in art/). Settings: Card artwork. */
 const cardArtOn = () => !(S && S.settings && S.settings.cardArt === false);
-const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', br: 'car', bday: 'bday', health: 'health', med: 'health', pet: 'pet', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'cal', ext: 'cal', appt: 'cal', todo: 'todo', note: 'todo', idea: 'todo', meal: 'plate', shop: 'shop', ln: 'news', blog: 'news', pod: 'radio', rad: 'radio', tv: 'tv', vid: 'tv', comm: 'weather' };
+const CARD_ART_IC = { bill: 'bill', pay: 'bill', loan: 'bill', car: 'car', driver: 'car', rw: 'car', br: 'car', bday: 'bday', health: 'health', med: 'health', pet: 'pet', hol: 'hol', count: 'hol', ev: 'ev', night: 'ev', mine: 'cal', ext: 'cal', appt: 'appt', todo: 'todo', note: 'todo', idea: 'todo', meal: 'plate', shop: 'shop', ln: 'news', blog: 'news', pod: 'radio', rad: 'radio', tv: 'tv', vid: 'tv', comm: 'weather' };
 // 2.23.40: a few titles pick a more exact picture
 const CARD_ART_WORD = [[/\b(rubbish|bins?|recycl(e|ing)|wheelie|refuse|garbage|trash)\b/i, 'bin'], [/\b(pay ?day|wages|salary|pay day|commission)\b/i, 'money'], [/\b(gym|workout|exercise)\b/i, 'gym'], [/\b(petrol|fuel|diesel|gas station)\b/i, 'fuel'], [/\bdent(ist|al)\b|teeth|hygien/i, 'dentist'], [/garden|plant|lawn|mow|seedling|compost/i, 'garden'], [/\b(dog|cat|vet|flea|worm(ing)?|pet)\b/i, 'pet'], [/\b(weather|rain|storm|wind)\b/i, 'weather'], [/flight|travel|trip|airport|passport/i, 'travel'], [/netflix|\bTV\b|movie|film/i, 'tv'], [/rewards|countdown|woolworths/i, 'rewards'], [/radio|podcast|music|gig|concert/i, 'radio'], [/birthday/i, 'bday']];
 function cardArt(html, kind) {
@@ -3955,7 +3964,7 @@ function cardArt(html, kind) {
     const w = CARD_ART_WORD.find(([re]) => re.test(near));
     const sar = /jasarah/.test(before) || /Sarah added|from Sarah|Sarah’s (?!car|payday)/.test(near);
     const a = (w && w[1]) || (sar ? 'sarah' : '') || CARD_ART_IC[ic] || 'cal'; // 2.23.54: generic events fall back to the calendar. Hand-drawn i3-money/gym/fuel/cal/plate; swap in Krea files under the same names
-    return `<div class="ic ${ic}${extra || ''} icart"${attrs.replace(/style="[^"]*"/, '')}><img src="art/i3-${a}.webp" alt="" width="40" height="40" loading="lazy"></div>`;
+    return `<div class="ic ${ic}${extra || ''} icart"${attrs.replace(/style="[^"]*"/, '')}><img src="art/i3-${a}.webp" alt="" width="40" height="40" loading="lazy" onerror="this.onerror=null;this.src='art/i3-cal.webp'"></div>`;
   });
   return html.replace(/(id="(?:comingup|justadded)")/, '$1 data-art="1"').replace(/class="(list[^"]*)" id="(comingup|justadded)"/, 'class="$1 artlist" id="$2"');
 }
@@ -4653,7 +4662,7 @@ function Bills() {
   const showPay = S.bills.length > 0 || hasLoanPlans;
   const row = b => {
     const d = daysLeft(b.due);
-    return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}"><div class="ic bill">${I(billIcon(b.name))}</div>
+    return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}">${billIc(b.name)}
       <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div></div></button>
       <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
       ${b.paid ? `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>` : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
@@ -4692,7 +4701,7 @@ function Bills() {
           <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.cents / 100)}<button class="paybtn" aria-label="Record a payment: ${esc(name)}" onclick="payForm('${x.l.id}')">Rec</button></div></div>`;
       }
       const cur = x.d === x.b.due;
-      return `<div class="row bill payrow"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}"><div class="ic bill">${I(billIcon(x.b.name))}</div>
+      return `<div class="row bill payrow"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}">${billIc(x.b.name)}
         <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.d)}${x.d === x.b.due && billInvoice(x.b) ? ' · ' + billInvoiceText(x.b) : ''}</div></div></button>
         <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.b.amount, x.b.name)}${cur ? `<button class="paybtn" onclick="markPaid('${x.b.id}')">Mark paid</button>` : ''}</div></div>`;
     };
@@ -4712,7 +4721,7 @@ function Bills() {
       ${sorted.length ? `<div class="list">${sorted.map(row).join('')}</div>` : (hasLoanPlans && !S.bills.length ? '<div class="card muted">No other bills yet. Loan repayments are in the pay list above.</div>' : '<div class="card muted">All paid up. Good as gold!</div>')}
       ${paid.length ? `<div class="sec">Paid</div><div class="list">${paid.map(row).join('')}</div>` : ''}`
     : empty('No bills yet', 'Add your regular bills, like power, phone or insurance, and we’ll remind you 3 days before each one is due. Loan repayment plans also show here once you’ve set a payday.', 'Add a bill', 'billForm()');
-  return header('Bills', 'Regular bills, loan plans, and due dates', addBtn('Add a bill', 'billForm()')) + body;
+  return header('Bills', 'Regular bills, loan plans, and due dates', addBtn('Add a bill', 'billForm()')) + pageBan('bills') + body;
 }
 async function markPaid(id) {
   const b = S.bills.find(x => x.id === id), s = snap();
@@ -5357,7 +5366,7 @@ function Todo() {
     ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
-  return header('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()')) +
+  return header('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()')) + pageBan('todo') +
     `<div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${esc(l)}</button>`).join('')}
       <button class="chip plus" onclick="listForm()">+ New list</button></div>
     ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
@@ -5656,7 +5665,7 @@ function Calendar() {
       (Object.keys(groups).length ? Object.keys(groups).map(k => `<div class="agday">${dayLabel(k)}</div>${groups[k].map(evRow).join('')}`).join('')
         : empty('Nothing in the next 3 weeks', 'Add an appointment, or tap a day on the calendar.', 'Add an appointment', 'apptForm()'));
   }
-  return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
+  return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) + pageBan('cal') +
     `<div class="calsearch"><span aria-hidden="true">${I('search')}</span><input type="search" id="calq" placeholder="Search events, notes, places…" aria-label="Search the calendar" value="${esc(calQ)}" oninput="calSearchInput(this.value)"></div><div id="calres">${calSearchHtml()}</div>
     <div class="card calcard"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
@@ -9226,7 +9235,7 @@ function budgetCard(b) {
   const mortRows = k.mortgages.map((x, n) => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.carried ? '<span class="carrytag" style="margin-left:0">Carried forward</span> type to change' : x.set && x.base > 0 && x.base !== x.eff ? `Your amount · <button type="button" class="linkbtn" onclick="budgetMortgageReset(${jsArg(b.id)},${n})">Reset to ${money(x.base)}</button>` : 'Type this fortnight’s amount'}</div></div>
       <div class="moneyin" style="max-width:120px;margin:0"><span>$</span><input inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((x.eff || 0) * 100))}" aria-label="${esc(x.name)} amount${x.carried ? ' (carried forward)' : ''}" onchange="budgetMortgageSet(${jsArg(b.id)},${n},this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"></div></div>`).join('');
   const billRows = k.bills.length
-    ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="${x.loanId ? `go('#loan/${x.loanId}')` : `go('#bills')`}"><div class="ic bill">${I(x.loanId ? 'coins' : billIcon(x.name))}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.paid ? '<span class="ok">✓ Paid</span> ' + fmtW(x.paidOn || x.due) : (x.late ? 'Overdue, was due ' : 'Due ') + fmtW(x.due)}</div></div></button><b>${money(x.amount)}</b></div>`).join('')
+    ? k.bills.map(x => `<div class="row"><button class="tapzone" onclick="${x.loanId ? `go('#loan/${x.loanId}')` : `go('#bills')`}">${x.loanId ? `<div class="ic bill">${I('coins')}</div>` : billIc(x.name)}<div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.paid ? '<span class="ok">✓ Paid</span> ' + fmtW(x.paidOn || x.due) : (x.late ? 'Overdue, was due ' : 'Due ') + fmtW(x.due)}</div></div></button><b>${money(x.amount)}</b></div>`).join('')
     : `<div class="card muted" style="margin:0">${payPeriod(0) ? 'No bills due in this fortnight.' : 'Set your payday in Bills so this fortnight’s bills can show here.'}</div>`;
   const lines = (b.lines || []).map(x => `<div class="row" data-bline="${esc(x.id)}"><div class="tx"><div class="t">${esc(x.name)}</div></div><b>${money(x.amount)}</b>
       <button type="button" class="iconbtn" aria-label="Delete ${esc(x.name)}" onclick="budgetLineDelete(${jsArg(b.id)},${jsArg(x.id)})">${I('trash')}</button></div>`).join('');
