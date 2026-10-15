@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.98';
+const APP_VERSION = '2.23.99';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12580,6 +12580,16 @@ async function alarmLoad(force) {
   try { if (typeof homeAlarmRedraw === 'function') homeAlarmRedraw(); } catch (e) { }
   try { if (document.getElementById('qstrip') && typeof stripRerank === 'function') stripRerank(); } catch (e) { }
 }
+function alarmEventsHtml(d) {
+  try {
+    const ev = (d && Array.isArray(d.events) ? d.events : []).filter(e => e && e.t).slice().sort((a, b) => Date.parse(b.t) - Date.parse(a.t)).slice(0, 25);
+    if (!ev.length) return '';
+    const fmtT = iso => { const x = new Date(iso); if (isNaN(x)) return ''; const p = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit', hour12: true, weekday: 'short', day: 'numeric' }).formatToParts(x), g = k => (p.find(y => y.type === k) || {}).value || ''; const tm = g('hour') + ':' + g('minute') + g('dayPeriod').toLowerCase().replace(/\s|\./g, ''); const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(x); return day === todayISO() ? tm : day === addDays(todayISO(), -1) ? 'yesterday ' + tm : g('weekday') + ' ' + tm; };
+    const verb = w => { const x = String(w || '').toLowerCase(); return x === 'opened' ? 'opened' : x === 'closed' ? 'closed' : x === 'opened/closed' ? 'opened and closed' : x === 'activated' ? 'motion' : '· ' + String(w || ''); };
+    const rows = ev.map(e => { const red = e.crit || /alarm|trigger|burglar|fire|panic|police|intrusion/i.test(e.what); return `<div class="row" style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)${red ? ';color:#c62828;font-weight:700' : ''}"><div style="flex:1">${esc(e.dev ? e.dev + ' ' + verb(e.what) : e.what)}</div><span class="s" style="${red ? 'color:#c62828' : ''}">${esc(fmtT(e.t))}</span></div>`; }).join('');
+    return `<div class="sec">Recent activity</div><div class="card">${rows}</div>`;
+  } catch (e) { return ''; }
+}
 function alarmBody() {
   try {
     if (!hueKey()) return `<div class="card empty"><div class="t">Link Philips Hue first</div><div class="s">The alarm uses the same phone link as Lights.</div><button type="button" class="btn small" style="margin-top:8px" onclick="go('#lights')">Open Lights</button></div>`;
@@ -12592,6 +12602,7 @@ function alarmBody() {
     const row = x => `<div class="row" style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06)"><div style="flex:1">${esc(x.name)}</div><b style="color:${x.open ? '#c62828' : x.fault ? '#a16207' : 'inherit'}">${x.open ? 'Open' : esc(x.state || 'Closed')}</b></div>`;
     return `<div class="card"><div class="t" style="font-weight:800">${armed === 'disarmed' ? 'Disarmed' : esc(armed.charAt(0).toUpperCase() + armed.slice(1))}</div><div class="s">${alarmOpen().length ? alarmOpen().length + ' open' : 'Everything closed'}${age != null ? ' · updated ' + (age < 1 ? 'just now' : age + ' min ago') : ''}${d.stale ? ' · offline, last known' : ''}</div></div>`
       + `<div class="sec">Doors and windows</div><div class="card">${sens.map(row).join('') || '<div class="s">No door or window sensors</div>'}</div>`
+      + alarmEventsHtml(d)
       + (low.length ? `<div class="sec">Low batteries</div><div class="card">${low.map(x => `<div class="s">🪫 ${esc(x.name)}</div>`).join('')}</div>` : '')
       + (faults.length ? `<div class="sec">Needs a look</div><div class="card">${faults.map(x => `<div class="s">${esc(x.name)}: ${esc(x.state || 'fault')}</div>`).join('')}</div>` : '')
       + `<button type="button" class="btn small" style="margin-top:10px" onclick="alarmLoad(true)">Refresh</button><div class="s muted" style="margin-top:8px">Read only. Arm and disarm in the ADT app.</div>`;

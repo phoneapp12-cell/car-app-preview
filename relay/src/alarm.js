@@ -59,9 +59,12 @@ async function read(env, f) {
     const sensors = (js.data || []).map(d => { const a = d.attributes || {}; const t = a.deviceType;
       const kind = t === 1 ? 'contact' : t === 2 ? 'motion' : t === 5 ? 'smoke' : 'other';
       return { name: String(a.description || 'Sensor'), kind, state: String(a.displayStateText || ''), open: t === 1 && a.state === 2, fault: !!a.isMalfunctioning || a.state === 0, lowBatt: battLow(a) }; });
+    let events = [];
+    try { const rh = await req(f, jar, B + '/web/api/activity/historyEvents', { headers: hdr(jar) });
+      if (rh.ok) { const jh = await rh.json(); events = (jh.data || []).map(d => { const a = d.attributes || {}; return { t: String(a.eventDate || ''), dev: String(a.deviceDescription || ''), what: String(a.description || ''), crit: !!a.isCritical, type: a.eventType ?? null }; }).filter(e => e.t && !/^idle$/i.test(e.what)).slice(0, 40); } } catch (e) { events = []; }
     const parts = (jp.data || []).map(d => { const a = d.attributes || {}; return { name: String(a.description || 'Alarm'), state: PSTATE[a.state] || 'unknown' }; });
     await save(env, { ...rec, jar, jarAt: rec.jarAt || Date.now(), err: null });
-    return { sensors, partitions: parts };
+    return { sensors, partitions: parts, events };
   }
   throw new Error('auth_failed');
 }
