@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.9';
+const APP_VERSION = '2.24.10';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -534,6 +534,8 @@ function homeEditRows() {
   rows.splice(i, 0, { kind: 'sum' });
   return rows.filter(keep);
 }
+// 2.24.10: small Krea icon in front of a heading/pill; hidden if the picture fails; off with Card artwork off.
+const artIco = (a, cls = 'hico') => { try { return (typeof cardArtOn === 'function' && cardArtOn()) ? `<img class="${cls}" src="art/i3-${a}.webp" alt="" width="22" height="22" onerror="this.remove()">` : ''; } catch (e) { return ''; } };
 const homeSec = (title, link) => `<div class="sec">${title}${link ? ' ' + link : ''}</div>`;
 // 1.98.0: label a Home section only when it has no heading of its own.
 // The three counters name themselves. The bridge card and the compact line already say Lifting bridge.
@@ -3943,7 +3945,7 @@ function cuLegend(list) {
 function quoteJokeCard() {
   const q = showDailyQuote() ? dailyQuoteFor() : null, j = dailyJokeOn() ? dailyJokeFor() : null;
   if (!q && !j) return '';
-  return homeSec(q && j ? 'Quote &amp; joke' : q ? 'Quote of the day' : 'Joke of the day') + `<div class="card qjcard" id="quotejoke">${q ? `<div class="qjq"><p>“${esc(q.t)}”</p><div class="qjw">${esc(q.w)}</div></div>` : ''}${j ? `<div class="qjj"><p><span aria-hidden="true">😄</span> ${esc(j[0])}</p><details class="jans"><summary>Tap for the answer</summary><p class="ja">${esc(j[1])}</p></details></div>` : ''}</div>`;
+  return homeSec(artIco('quote') + (q && j ? 'Quote &amp; joke' : q ? 'Quote of the day' : 'Joke of the day')) + `<div class="card qjcard" id="quotejoke">${q ? `<div class="qjq"><p>“${esc(q.t)}”</p><div class="qjw">${esc(q.w)}</div></div>` : ''}${j ? `<div class="qjj"><p><span aria-hidden="true">😄</span> ${esc(j[0])}</p><details class="jans"><summary>Tap for the answer</summary><p class="ja">${esc(j[1])}</p></details></div>` : ''}</div>`;
 }
 /* 2.23.37: card artwork for Coming up and Just added (Krea 2 Turbo images in art/). Settings: Card artwork. */
 const cardArtOn = () => !(S && S.settings && S.settings.cardArt === false);
@@ -4005,8 +4007,9 @@ const TAB_CATS = [
   { id: 'out', name: 'Out & About', col: '#7c3aed', keys: ['events', 'travel'] },
   { id: 'fun', name: 'Fun', col: '#db2777', keys: ['news', 'videos', 'tv'] }
 ];
-const TAB_ART = { todo: 'todo', calendar: 'cal', bills: 'bill', budget: 'money', claims: 'health', shopping: 'shop', meals: 'plate', health: 'health', cars: 'car', pets: 'pet', birthdays: 'bday', events: 'ev', travel: 'travel', news: 'news', videos: 'tv', tv: 'tv' };
+const TAB_ART = { ideas: 'idea', todo: 'todo', calendar: 'cal', bills: 'bill', budget: 'money', claims: 'health', shopping: 'shop', meals: 'plate', health: 'health', cars: 'car', pets: 'pet', birthdays: 'bday', events: 'ev', travel: 'travel', news: 'news', videos: 'tv', tv: 'tv' };
 const TAB_NAME = { ideas: 'Ideas', todo: 'To-do', calendar: 'Calendar', bills: 'Bills', budget: 'Budget', claims: 'Claims', shopping: 'Shopping', meals: 'Meals', health: 'Health', cars: 'Cars', pets: 'Pets', birthdays: 'Birthdays', events: 'Events', travel: 'Travel', news: 'News', videos: 'Videos', tv: 'TV guide' };
+const CAT_ART = { today: 'cal', money: 'money', home: 'house', out: 'travel', fun: 'tv' };
 const tabCatOf = k => TAB_CATS.find(c => c.keys.includes(k));
 function tabRow(k, t, s, go) {
   const a = TAB_ART[k];
@@ -4035,7 +4038,7 @@ function catBand(k) { const c = tabCatOf(k); return c ? `<div class="catband" st
 function catJumpRow(sections) {
   const first = {}; sections.forEach((s, i) => { const c = tabCatOf(s.keys[0]); if (c && first[c.id] == null) first[c.id] = i; });
   const cats = TAB_CATS.filter(c => first[c.id] != null); if (cats.length < 2) return '';
-  return `<div class="catjump" role="toolbar" aria-label="Jump to a category">${cats.map(c => `<button type="button" class="catchip" style="--cat:${c.col}" onclick="catJump(${first[c.id]})">${esc(c.name)}</button>`).join('')}</div>`;
+  return `<div class="catjump" role="toolbar" aria-label="Jump to a category">${cats.map(c => `<button type="button" class="catchip" style="--cat:${c.col}" onclick="catJump(${first[c.id]})">${artIco(CAT_ART[c.id] || '', 'catico')}${esc(c.name)}</button>`).join('')}</div>`;
 }
 function catJump(i) {
   const d = document.querySelector(`#homecarousel .hcar-dot[data-i="${i}"]`);
@@ -4126,7 +4129,7 @@ function cleanSum(sum0) {
   if (!sum0) return '';
   let lines = [];
   try { const d = document.createElement('div'); d.innerHTML = sum0; lines = [...d.querySelectorAll('.sumbul > li, .sumsug, .sumnote')].map(e => (e.querySelector('.tx') || e).textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 3); } catch (e) { }
-  return `<div class="clsec"><h2>Today’s summary</h2></div><div class="clcard clsum">${clSumOpen ? sum0 : `<button type="button" class="clsumbtn" onclick="clSumOpen=true;render()" aria-label="Open the full summary">${lines.map(l => `<p>${esc(l)}</p>`).join('')}<span class="clmore">Full summary ${I('right')}</span></button>`}${clSumOpen ? `<button type="button" class="linkbtn" style="display:block;margin:8px 0 0 auto" onclick="clSumOpen=false;render()">Show less</button>` : ''}</div>`;
+  return `<div class="clsec"><h2>${artIco('sum')}Today’s summary</h2></div><div class="clcard clsum">${clSumOpen ? sum0 : `<button type="button" class="clsumbtn" onclick="clSumOpen=true;render()" aria-label="Open the full summary">${lines.map(l => `<p>${esc(l)}</p>`).join('')}<span class="clmore">Full summary ${I('right')}</span></button>`}${clSumOpen ? `<button type="button" class="linkbtn" style="display:block;margin:8px 0 0 auto" onclick="clSumOpen=false;render()">Show less</button>` : ''}</div>`;
 }
 function cleanFab() {
   openSheet('Add', `<div class="list">${[['todo', 'To-do', 'todoForm()'], ['cal', 'Calendar', 'apptForm()'], ['cart', 'Shopping', 'shopForm()'], ['note', 'Note', 'noteForm()'], ['camera', 'Photo for the strip', 'myPhAdd()']].map(([ic, l, f]) => `<button class="row" onclick="closeSheet().then(()=>${f})"><div class="ic todo">${I(ic)}</div><div class="tx"><div class="t">${l}</div></div>${I('right')}</button>`).join('')}</div>`);
@@ -15154,7 +15157,7 @@ function sumTickerize(el) {
   const box = document.createElement('div'); box.className = 'sumtk'; box.hidden = tkOpen;
   box.innerHTML = `<button type="button" class="tkline" aria-label="Summary: ${esc(plain)}. Tap for the full summary."><span class="tktrack" aria-hidden="true"><span class="tkrun">${piece}</span><span class="tkrun">${piece}</span></span></button>`;
   const foot = document.createElement('div'); foot.className = 'tkfoot';
-  foot.innerHTML = `<span></span><button type="button" class="tkmore" aria-expanded="${tkOpen}">${tkOpen ? 'Hide full summary' : 'Full summary'}</button>`;
+  foot.innerHTML = `<span></span><button type="button" class="tkmore" aria-expanded="${tkOpen}">${artIco('sum', 'catico')}${tkOpen ? 'Hide full summary' : 'Full summary'}</button>`;
   shade.appendChild(box); shade.appendChild(full);
   // 2.23.41: the Full summary pill sits on its own line under the bar
   const wrap = el.closest('#tkhome'); (wrap || shade).querySelectorAll(':scope > .tkfoot').forEach(x => x.remove()); (wrap || shade).appendChild(foot);
