@@ -1631,6 +1631,17 @@ html.clean:is([data-theme="dark"],[data-theme="night"]) .clwarn{color:#FCA5A5}
 html.clean :is(.callout,.card:not(.clcard)){border:0!important;box-shadow:0 4px 18px rgba(16,24,40,.07)!important;border-radius:20px!important}html.clean .hsec>*{border-color:transparent}/* 2.23.85: Battery low strip slide in red, readable day and night */
 .qstrip .qslide[data-k="huebatt"] :is(.qslbl,.qsq,.qsq b,.qsw){color:#C62828!important}
 html:is([data-theme="dark"],[data-theme="night"],[data-wx$="-n"]) .qstrip .qslide[data-k="huebatt"] :is(.qslbl,.qsq,.qsq b,.qsw){color:#FF8A80!important}
+
+/* 2.24.6: compact, see-through weather card on Notifications (themed background shows through) */
+body .notifwx.notifwx{background:rgba(255,255,255,.18)!important;-webkit-backdrop-filter:blur(3px) saturate(1.1);backdrop-filter:blur(3px) saturate(1.1);padding:6px 12px!important;min-height:0!important;gap:8px!important;box-shadow:0 1px 6px rgba(0,0,0,.08)!important}
+body .notifwx.notifwx .nwxtx{line-height:1.2!important;gap:0!important}
+body .notifwx.notifwx .nwxnow,body .notifwx.notifwx .nwxnext,body .notifwx.notifwx .nwxtemp{text-shadow:0 0 6px rgba(255,255,255,.9),0 0 2px rgba(255,255,255,.9)}
+body .notifwx.notifwx .nwxnow{font-size:.95rem}
+body .notifwx.notifwx .nwxnext{font-size:.85rem;margin:0!important}
+body .notifwx.notifwx .nwxtemp{font-size:1.6rem!important}
+body .notifwx.notifwx .nwxic svg,body .notifwx.notifwx .nwxic img{width:30px!important;height:30px!important}
+html.dark body .notifwx.notifwx{background:rgba(20,24,32,.25)!important}
+html.dark body .notifwx.notifwx .nwxnow,html.dark body .notifwx.notifwx .nwxnext,html.dark body .notifwx.notifwx .nwxtemp{text-shadow:0 0 6px rgba(0,0,0,.9)}
 </style>
 </head>
 <body>
