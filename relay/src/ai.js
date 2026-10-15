@@ -24,6 +24,17 @@ const NIGHT_WRITE = `WRITE 3 or 4 bullet lines (NIGHT MODE), each one full sente
 2 to 4. Built around 2 to 4 different items from interesting (news headlines, videos, New on Netflix, the Top 40, the travel spot, local events): name the real headline, title or song exactly as given, and say in a dry, cheeky way why it might be worth a look tonight. Include at least one news headline when interesting has one, and at least one video, show or song. Never invent a story's details beyond the headline.
 NIGHT RULES (strict, override everything else): never mention bills, overdue or due items, payments, invoices, the mortgage, budget, money, chores or to-dos that are jobs. No nagging. Suggestions are relaxed only: watch, read, listen, or plan something fun.
 `;
+// 2.23.92: same rules as the app: real day facts, nothing invented, and a strict 00:00–06:00 mode.
+const FACT_RULES = `
+DAY FACTS (strict): dayFacts gives today's and tomorrow's real weekday, work day or day off, and gym yes/no. Use only these. Gym only on a day where dayFacts says gym yes (Tuesday and Wednesday after work only); never suggest gym, a gym playlist or a workout for any other day.
+NO INVENTING (strict): never invent traits, habits, styles, tastes, preferences, celebrations or occasions. Only use what is in aboutShane, aboutYouAnswers, knowMe and the rest of the context. Never write things like "your ... style" or "since you love ..." unless that exact fact is given.
+`;
+const LATE_WRITE = `LATE NIGHT MODE (00:00 to 06:00, he is still up; overrides everything else): WRITE exactly 3 short lines, each one sentence of 8 to 22 words:
+1. Right now: lights still on and/or room temperatures, using personalTouches exactly as given (name the room and temperature).
+2. One quiet wind-down idea (a book, a calm Suno track, a short episode, the lights down low).
+3. One brief line about the morning: if dayFacts.today is a work day, the start time and weather for the drive; otherwise a gentle day-off note.
+NEVER mention tonight, this evening, merlot, wine, dinner, cooking, cook night, gym, workouts, after work, parties or celebrations. No bills, money, chores or nagging (bedtime, sleep, teeth, meds). Suggestions: at most one, relaxed only.
+`;
 export const SYSTEM_NIGHT = (() => {
   const a = SYSTEM.indexOf('WRITE 4 or 5'), b = SYSTEM.indexOf('Always speak TO him');
   return a > 0 && b > a ? SYSTEM.slice(0, a) + NIGHT_WRITE + SYSTEM.slice(b) : SYSTEM + '\n' + NIGHT_WRITE;
@@ -45,7 +56,7 @@ export async function aiSummary(env, body) {
   for (const m of MODELS) {
     try {
       r = await env.AI.run(m, {
-        messages: [{ role: 'system', content: ctx.night === true ? SYSTEM_NIGHT : SYSTEM }, { role: 'user', content: 'Context: ' + ctxText }],
+        messages: [{ role: 'system', content: ctx.lateNightRule ? SYSTEM_LATE : ctx.night === true ? SYSTEM_NIGHT_FULL : SYSTEM_DAY_FULL }, { role: 'user', content: 'Context: ' + ctxText }],
         max_tokens: 700, temperature: 0.7
       });
       used = m; break;
@@ -61,3 +72,7 @@ export async function aiSummary(env, body) {
   if (!lines.length) throw new Error('empty');
   return { lines, sugs, model: used };
 }
+
+export const SYSTEM_DAY_FULL = SYSTEM + FACT_RULES;
+export const SYSTEM_NIGHT_FULL = SYSTEM_NIGHT + FACT_RULES;
+export const SYSTEM_LATE = SYSTEM_NIGHT + FACT_RULES + LATE_WRITE;
