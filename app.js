@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.25.2';
+const APP_VERSION = '2.25.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -17911,7 +17911,7 @@ function bottomTabs(route) {
   const cur = item === '' ? 'home' : item;
   const over = (() => { try { return dueItems(S).filter(x => x.days < 0).length; } catch (e) { return 0; } })();
   nav.innerHTML = b.keys.map(k => { const [full, short, ic] = btMeta(k); const on = k === cur || (k === 'more' && route === 'more');
-    return `<button type="button" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} aria-label="${esc(full)}" data-bt="${k}" onclick="btGo('${k}')"><span class="w">${I(ic)}${k === 'home' && over ? `<span class="badge">${over}</span>` : ''}</span><span class="lbl">${esc(short)}</span></button>`; }).join('');
+    return `<button type="button" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} aria-label="${esc(full)}" data-bt="${k}" onclick="btGo('${k}')"><span class="w">${sideIco(k, ic)}${k === 'home' && over ? `<span class="badge">${over}</span>` : ''}</span><span class="lbl">${esc(short)}</span></button>`; }).join('');
   if (cleanOn()) { const CL = { home: 'Home', calendar: 'Plan', todo: 'Tasks', budget: 'Money', more: 'More' }; nav.querySelectorAll('button[data-bt]').forEach(x => { const l = x.querySelector('.lbl'); if (l && CL[x.dataset.bt]) l.textContent = CL[x.dataset.bt]; });
     const keys = [...nav.children]; if (keys.length === 5) { const f = document.createElement('button'); f.type = 'button'; f.className = 'clfab'; f.setAttribute('aria-label', 'Quick add'); f.innerHTML = I('plus'); f.onclick = cleanFab; nav.insertBefore(f, keys[2]); } }
   nav.style.setProperty('--btn', b.keys.length + (cleanOn() ? 1 : 0));
@@ -17965,7 +17965,7 @@ function bottomTabsSetting() {
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);

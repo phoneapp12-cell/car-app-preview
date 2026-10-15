@@ -1299,6 +1299,8 @@ html[data-theme="night"] .hcat{filter:drop-shadow(0 0 6px rgba(200,210,255,.25))
   background:color-mix(in srgb,var(--card) 88%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(0,0,0,.06)}
 .btabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;padding:4px 2px;border-radius:14px;color:var(--ink3);font-size:0.6875rem;font-weight:700;-webkit-touch-callout:none;user-select:none;touch-action:manipulation}
 .btabs button svg{width:22px;height:22px}
+.btabs button .sideico{width:26px;height:26px;opacity:.82;transition:transform .15s}
+.btabs button.on .sideico{opacity:1;transform:scale(1.08)}
 .btabs button.on{color:var(--brand);background:color-mix(in srgb,var(--brand) 13%,transparent)}
 .btabs span.w{position:relative;display:flex}
 .btabs .badge{position:absolute;right:-10px;top:-5px;background:var(--red);color:var(--card);font-size:0.625rem;border-radius:999px;padding:1px 5px;font-weight:700;line-height:1.3}
