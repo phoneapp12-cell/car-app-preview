@@ -4115,7 +4115,7 @@ function Home() {
   // Overview summary sits above the carousel (list mode already splices sumMid into feedParts, when there is a list)
   const sumForCar = clean || (homeFeedMode === 'list' && sections.length) ? '' : (sumMid || '');
   const name = homeTry('name', () => S.settings.name) || 'Shane';
-  return homeTry('commute', () => commuteBanner()) + (clean ? homeTry('clean head', () => cleanHead(name, now), '') : header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), ''))) + (clean ? homeTry('clean wx', () => cleanWx(), '') + homeTry('clean pri', () => cleanPri(), '') + homeTry('clean sum', () => cleanSum(sum0), '') : homeTry('weather strip', () => notifWxStrip())) + sumUnderWx + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + (night && !qjTop() && stripOn() ? '' : (sumTop || qsBlock(''))) + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
+  return homeTry('commute', () => commuteBanner()) + (clean ? homeTry('clean head', () => cleanHead(name, now), '') : header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => catHtml(), ''))) + homeTry('room temps', () => homeRoomTemps(), '') + (clean ? homeTry('clean wx', () => cleanWx(), '') + homeTry('clean pri', () => cleanPri(), '') + homeTry('clean sum', () => cleanSum(sum0), '') : homeTry('weather strip', () => notifWxStrip())) + sumUnderWx + homeTry('mail strip', () => mailStrip()) + homeTry('gym now', () => gymNowHtml()) + (stripOn() ? '' : homeTry('rewards', () => erCard(), '')) + (qjTop() && stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : '') + (qjTop() && !stripOn() ? (night ? homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard()) : homeTry('quotejoke top', () => quoteJokeCard().replace('class="card qjcard"', 'class="card qjcard qjtop"'), '')) : '') + (night ? homeTry('place ask', () => placeAskHtml()) + homeTry('sleep ask', () => sleepCheckCard()) + homeTry('routine ask', () => routineAskCard()) + homeTry('know', () => knowCard()) : '') + (night && !qjTop() && stripOn() ? '' : (sumTop || qsBlock(''))) + (night && !qjTop() ? (stripOn() ? homeTry('strip', () => qsBlock(stripHtml()), '') : homeTry('quote', () => dailyQuoteCard()) + homeTry('joke', () => dailyJokeCard())) : '') + cards +
     sumForCar + feed + (night ? homeTry('book ask', () => bookAskCard()) : '') + `${homeTry('sync note', () => syncNote())}
     <div class="foot">${homeTry('saved where', () => savedWhere())}</div>
     <button class="linkbtn" id="homecustomise" style="display:block;margin:8px 0 6px auto" onclick="homeEdit=true;render();$('#view').scrollTop=0">Customise</button>`;
@@ -12459,6 +12459,37 @@ function heatStripSlides() {
   return [['heat', '♨️ Heat pumps', `<p class="qsq">${bits.join(' · ')}</p>${d.units.length > 4 ? `<div class="qsw">+${d.units.length - 4} more</div>` : ''}`, "go('#heat')"]];
 }
 
+
+/* 2.23.90: room temps under "Hi Shane" when at home. Lounge = Panasonic room temp, Bedroom = Mitsubishi (hidden until MELCloud works).
+   Uses the cached heat status; one quiet fetch at most every 10 minutes, updates only #homerooms (no full re-render). */
+let HROOM = (() => { try { return JSON.parse(localStorage.getItem('heatCache') || 'null'); } catch (e) { return null; } })(), hroomBusy = false;
+function hroomData() { try { return (typeof HEAT !== 'undefined' && HEAT && HEAT.st === 'ok' && HEAT.data) || (typeof HEATSTRIP !== 'undefined' && HEATSTRIP && HEATSTRIP.data) || (HROOM && HROOM.data) || null; } catch (e) { return null; } }
+function hroomInner() {
+  const d = hroomData(), units = d && Array.isArray(d.units) ? d.units : [], ok = x => typeof x === 'number' && Number.isFinite(x);
+  const pan = units.filter(u => u && u.brand === 'Panasonic' && ok(u.room)), mit = units.filter(u => u && u.brand === 'Mitsubishi' && ok(u.room));
+  const lo = pan.find(u => /lounge/i.test(u.name || '')) || pan[0], be = mit.find(u => /bed/i.test(u.name || '')) || mit[0];
+  const row = (lbl, t) => `<span class="hroom">${lbl} <b class="tcol"${tempStyle(t)}>${(+t).toFixed(1)}°C</b></span>`;
+  let ha = null; try { const sens = (typeof HUESTRIP !== 'undefined' && HUESTRIP && Array.isArray(HUESTRIP.sens)) ? HUESTRIP.sens : (JSON.parse(localStorage.getItem('hueSensCache') || 'null') || []); const x = (sens || []).find(d => d && /hall/i.test(String(d.room || '') + ' ' + String(d.name || '')) && d.temp && ok(d.temp.c)); if (x) ha = x.temp.c; } catch (e) { }
+  return (lo ? row('Lounge', lo.room) : '') + (be ? row('Bedroom', be.room) : '') + (ha != null ? row('Hallway', ha) : '');
+}
+function homeRoomTemps() {
+  try { if (sumWorkState().atWork) return ''; } catch (e) { return ''; }
+  setTimeout(hroomFetch, 0);
+  const h = hroomInner();
+  return `<div id="homerooms" class="homerooms" onclick="go('#heat')"${h ? '' : ' hidden'}>${h}</div>`;
+}
+async function hroomFetch() {
+  try {
+    if (hroomBusy || typeof hueKey !== 'function' || !hueKey() || navigator.onLine === false) return;
+    if (HROOM && Date.now() - HROOM.at < 10 * 60000) return;
+    hroomBusy = true;
+    const j = await heatCall('status');
+    if (j && j.linked && Array.isArray(j.units)) { HROOM = { at: Date.now(), data: j }; try { localStorage.setItem('heatCache', JSON.stringify(HROOM)); } catch (e) { } }
+    else HROOM = { at: Date.now(), data: (HROOM && HROOM.data) || null };
+  } catch (e) { HROOM = { at: Date.now(), data: (HROOM && HROOM.data) || null }; }
+  finally { hroomBusy = false; }
+  try { const el = document.getElementById('homerooms'); if (el) { const h = hroomInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { }
+}
 function Lights() {
   setTimeout(() => { if (HUE.st !== 'loading') hueLoad(); if (HUES.st !== 'loading') hueSensLoad(); }, 0);
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Lights', 'All lights, Lounge, Kitchen and Dining') + `<div id="huebox">${hueBody()}</div><div class="sec">Sensors</div><div id="huesens">${hueSensBody()}</div>`;
@@ -15025,7 +15056,7 @@ async function hueStripFetch() {
   try {
     const [a, b] = await Promise.all([hueCall('sensors').catch(() => null), hueCall('lights').catch(() => null)]);
     // 2.23.84: same linked test as the Lights page; a failed fetch keeps the last good data and retries in 45s
-    if (a && a.linked && Array.isArray(a.sensors)) { HUESTRIP.sens = a.sensors; hueBattSave(a.sensors); } else if (a && a.linked === false) { HUESTRIP.sens = null; hueBattSave([]); }
+    if (a && a.linked && Array.isArray(a.sensors)) { HUESTRIP.sens = a.sensors; hueBattSave(a.sensors); try { const el = document.getElementById('homerooms'); if (el) { const h = hroomInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } } else if (a && a.linked === false) { HUESTRIP.sens = null; hueBattSave([]); }
     if (b && b.linked) HUESTRIP.lights = b; else if (b && b.linked === false) HUESTRIP.lights = null;
     HUESTRIP.ok = !!(a || b);
     if (hueKey() && (!HEATSTRIP.data || Date.now() - (HEATSTRIP.at || 0) > 120000)) { try { const h = await heatCall('status'); if (h && h.linked) { HEATSTRIP = { at: Date.now(), data: h }; if (HEAT.st === 'ok') HEAT.data = h; } } catch (e) {} }
@@ -15037,25 +15068,7 @@ function hueStripSlides() {
   const out = [], num = x => typeof x === 'number' && Number.isFinite(x);
   try {
   const LB = hueLowBatt(); if (LB.length) out.push(['huebatt', '🪫 Battery low', `<p class="qsq">${LB.slice(0, 3).map(d => `<b>${esc(d.name)}</b> ${Math.round(d.pct)}%`).join(' · ')}</p>${LB.length > 3 ? `<div class="qsw">+${LB.length - 3} more</div>` : '<div class="qsw">Philips Hue · swap the battery soon</div>'}`, "go('#lights')"]);
-  // 2.23.88: Room temps = Hue sensors + heat-pump indoor temps (from the existing heat status cache)
-  const T = (HUESTRIP.sens || []).filter(d => d && d.temp && num(d.temp.c));
-  const hueBits = T.map(d => `<b>${esc(String(d.room || d.name || 'Sensor'))}</b> ${d.temp.c.toFixed(1)}°C`);
-  let heatSrc = null; try { heatSrc = (typeof HEAT !== 'undefined' && HEAT && HEAT.st === 'ok' && HEAT.data) || (typeof HEATSTRIP !== 'undefined' && HEATSTRIP && HEATSTRIP.data) || null; } catch (e) { heatSrc = null; }
-  const heatBits = [];
-  try {
-    (heatSrc && Array.isArray(heatSrc.units) ? heatSrc.units : []).forEach(u => {
-      if (!u || !num(u.room)) return;
-      let s = `<b>${esc(String(u.name || 'Heat pump'))}</b> ${(+u.room).toFixed(1)}°C`;
-      if (u.on && num(u.temp)) s += ` · set ${(+u.temp).toFixed(1)}°`;
-      if (num(u.outdoor)) s += ` · out ${(+u.outdoor).toFixed(1)}°`;
-      heatBits.push(s);
-    });
-  } catch (e) { }
-  const tempBits = hueBits.concat(heatBits);
-  if (tempBits.length) {
-    const go = heatBits.length ? "go('#heat')" : "go('#lights')";
-    out.push(['huetemp', '🌡️ Room temps', `<p class="qsq">${tempBits.slice(0, 4).join(' · ')}</p>${tempBits.length > 4 ? `<div class="qsw">+${tempBits.length - 4} more</div>` : ''}`, go]);
-  }
+  // 2.23.90: Room temps slide removed (room temps now show under "Hi Shane").
   const L = HUESTRIP.lights;
   if (L && (Array.isArray(L.rooms) || Array.isArray(L.lights))) {
     // 2.23.87: only Lounge / Kitchen / Dining (Kitchen = any name containing kitchen)
@@ -15218,7 +15231,7 @@ function stripRank(list) {
     if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
     s.score = v;
   });
-  const PIN = new Set(['travel', 'sarah', 'huetemp', 'huelights', 'huebatt', 'heat']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
+  const PIN = new Set(['travel', 'sarah', 'huelights', 'huebatt', 'heat']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
   return rest.concat(keep).sort((x, y) => y.score - x.score); // 2.23.70: Place of the day always stays
 }
 // Re-rank about every 5 hours, and when the app comes back after that long
