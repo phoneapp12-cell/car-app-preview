@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.76';
+const APP_VERSION = '2.23.77';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5410,7 +5410,35 @@ function homeHolidays() {
       <div class="tx"><div class="t">${esc(h.name)}, ${fmtW(h.date)}</div><div class="s">Public holiday · ${d === 0 ? 'today' : d === 1 ? 'tomorrow' : 'in ' + d + ' days'}${off}${h.regional ? ' · ' + esc(h.regional) : ''}</div></div></button>`;
   }).join('')}</div>`;
 }
-let calMonth = null, calSel = null;
+let calMonth = null, calSel = null, calQ = '', calHl = null;
+// v2.23.77 calendar search: titles, notes and locations across every calendar source, past and future; case and accents ignored
+const calFold = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’‘`]/g, "'").toLowerCase();
+function calSearchHits(q) {
+  const n = calFold(q).trim(); if (n.length < 2) return [];
+  const T = todayT(), words = n.split(/\s+/), raw = {};
+  (S.appts || []).forEach(a => raw['a' + a.title + a.date] = [a.notes, a.location].join(' '));
+  (S.myEvents || []).forEach(a => raw['m' + a.title] = [a.notes, a.location, a.loc].join(' '));
+  const hits = calItems(T - 3 * 365 * DAY, T + 2 * 365 * DAY).filter(e => {
+    const hay = calFold([e.title, e.notes, e.location, e.loc, e.tag, calType(e), raw['a' + e.title + e.date], raw['m' + e.title]].join(' '));
+    return words.every(w => hay.includes(w));
+  });
+  const fut = hits.filter(e => parseD(e.date) >= T), past = hits.filter(e => parseD(e.date) < T).reverse();
+  return [...fut, ...past].slice(0, 60);
+}
+const calType = e => ({ appt: 'Appointment', mine: 'My event', ext: 'Family calendar', bday: 'Birthday', meal: 'Meal', hol: 'Holiday', pet: 'Pet', health: 'Health', garden: 'Garden' })[e.src] || (e.time === 'Bill' ? 'Bill' : e.time === 'To-do' ? 'To-do' : 'Due date');
+function calSearchHtml() {
+  const q = calQ.trim(); if (calFold(q).length < 2) return '';
+  const hits = calSearchHits(q), T = todayT();
+  if (!hits.length) return `<div class="card muted" style="margin:8px 0">Nothing found for “${esc(q)}”.</div>`;
+  return `<div class="muted" style="margin:6px 2px">${plural(hits.length, 'result')}</div>` + hits.map(e => { const d = parseD(e.date);
+    return `<button class="ev" onclick="calJump(${d},${jsArg(e.title)})"><span class="bar" style="background:${e.color || `var(--${e.src})`}"></span><span class="time">${esc(fmtW(e.date))}</span>
+      <div style="flex:1;min-width:0"><div class="t">${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}">${esc(calType(e))}</span></button>`; }).join('');
+}
+function calSearchInput(v) { calQ = v; const r = document.getElementById('calres'); if (r) r.innerHTML = calSearchHtml(); }
+function calJump(t, title) {
+  const d = new Date(t); calMonth = { y: d.getUTCFullYear(), m: d.getUTCMonth() }; calSel = t; calHl = title; calQ = ''; render();
+  setTimeout(() => { const el = document.querySelector('.ev.hl'); el && el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
+}
 function Calendar() {
   const now = new Date();
   if (!calMonth) calMonth = { y: now.getFullYear(), m: now.getMonth() };
@@ -5437,7 +5465,7 @@ function Calendar() {
       const act = e.done ? 'Mark not done' : 'Mark complete';
       return `<div class="ev${ic ? ' evi' : ''}${e.done ? ' done' : ''}"><button type="button" class="tapzone" onclick="${e.go}">${inner}</button><button type="button" class="paybtn" aria-label="${act}: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})">${e.done ? 'Undo' : 'Done'}</button></div>`;
     }
-    return `<button class="ev${ic ? ' evi' : ''}" onclick="${e.go}">${inner}</button>`;
+    return `<button class="ev${ic ? ' evi' : ''}${calHl && e.title === calHl ? ' hl' : ''}" onclick="${e.go}">${inner}</button>`;
   };
   const dayLabel = s => { const d = daysLeft(s); return (d === 0 ? 'Today · ' : d === 1 ? 'Tomorrow · ' : '') + fmtW(s); };
   let agenda;
@@ -5453,7 +5481,8 @@ function Calendar() {
         : empty('Nothing in the next 3 weeks', 'Add an appointment, or tap a day on the calendar.', 'Add an appointment', 'apptForm()'));
   }
   return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) +
-    `<div class="card calcard"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
+    `<div class="calsearch"><span aria-hidden="true">${I('search')}</span><input type="search" id="calq" placeholder="Search events, notes, places…" aria-label="Search the calendar" value="${esc(calQ)}" oninput="calSearchInput(this.value)"></div><div id="calres">${calSearchHtml()}</div>
+    <div class="card calcard"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
      <div class="legend"><span><i class="dot" style="background:var(--due)"></i>Due dates</span><span><i class="dot" style="background:var(--appt)"></i>Appointments</span>${showMine() && S.myEvents.length ? '<span><i class="dot" style="background:var(--mine)"></i>My events</span>' : ''}${S.birthdays.length ? '<span><i class="dot" style="background:var(--bday)"></i>Birthdays</span>' : ''}${showHolidays() ? '<span><i class="dot" style="background:var(--hol)"></i>Public holidays</span>' : ''}${showMealsCal() && Object.keys(M().plan).length ? '<span><i class="dot" style="background:var(--meal)"></i>Meals</span>' : ''}${showPetsCal() && S.pets.some(p => p.care.some(c => careDue(c))) ? '<span><i class="dot" style="background:var(--pet)"></i>Pets</span>' : ''}${gardenCalItems(gridStart, gridEnd).length ? '<span><i class="dot" style="background:var(--garden)"></i>Garden</span>' : ''}${showHealthCal() && S.health.some(p => p.items.some(it => it.apptDate || careDue(it))) ? '<span><i class="dot" style="background:var(--health)"></i>Health</span>' : ''}${S.feeds.map(f => `<span><i class="dot" style="background:${esc(f.colour)}"></i>${esc(f.name)}</span>`).join('')}
       ${y !== now.getFullYear() || m !== now.getMonth() ? `<button style="margin-left:auto;color:var(--brand);font-weight:700" onclick="calMonth=null;calSel=null;render()">Back to today</button>` : ''}</div>
@@ -5463,7 +5492,7 @@ function Calendar() {
     ${S.feeds.length ? syncNote(true) : `<div class="callout blue" style="margin-top:16px">${I('link')}<div><b>Bring in your Outlook or Google calendar.</b> Paste your calendar link once and your appointments show up here, with reminders.
       <div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="go('#settings');setTimeout(()=>{const x=document.getElementById('calsec');x&&x.scrollIntoView()},50)">Connect a calendar</button></div></div></div>`}`;
 }
-function pickDay(t) { calSel = calSel === t ? null : t; render(); if (calSel !== null) setTimeout(dayIntoView, 30); }
+function pickDay(t) { calHl = null; calSel = calSel === t ? null : t; render(); if (calSel !== null) setTimeout(dayIntoView, 30); }
 // v1.9.0 calendar helpers: short chip label, an icon per kind, and the day view (all-day items, then timed items)
 // month chips are narrow: long labels are cut to their first word ("Rubbish day" -> "Rubbish", "Labour Day" -> "Labour")
 function chipLabel(e) { const l = chipFull(e).trim(), w = l.split(/\s+/)[0]; return l.length > 8 && w.length >= 3 ? w.replace(/[’',:·-]+$/, '') : l; }
