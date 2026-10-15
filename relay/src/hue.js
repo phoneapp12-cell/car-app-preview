@@ -77,10 +77,12 @@ export async function hueRoute(path, request, env, f, okOrigin, reply) {
   if (!mine) return reply(200, { setup: true, linked: false });
   try {
     if (path === '/hue/lights') {
-      const [rooms, lights, groups, scenes] = await Promise.all(['room', 'light', 'grouped_light', 'scene'].map(p => clip(env, rec, f, 'GET', p).then(x => x.data || [])));
+      // 2.23.87: include zones (e.g. Kitchen spotlights) alongside rooms so Kitchen can toggle every kitchen-named group
+      const [rooms, zones, lights, groups, scenes] = await Promise.all(['room', 'zone', 'light', 'grouped_light', 'scene'].map(p => clip(env, rec, f, 'GET', p).then(x => x.data || []).catch(() => [])));
       const gl = Object.fromEntries(groups.map(g => [g.id, g]));
+      const mapGroup = r => { const g = (r.services || []).find(s => s.rtype === 'grouped_light'), G = g && gl[g.rid]; return { id: r.id, name: r.metadata && r.metadata.name, group: g && g.rid, on: !!(G && G.on && G.on.on), bri: G && G.dimming ? Math.round(G.dimming.brightness) : null }; };
       return reply(200, { setup: true, linked: true,
-        rooms: rooms.map(r => { const g = (r.services || []).find(s => s.rtype === 'grouped_light'), G = g && gl[g.rid]; return { id: r.id, name: r.metadata && r.metadata.name, group: g && g.rid, on: !!(G && G.on && G.on.on), bri: G && G.dimming ? Math.round(G.dimming.brightness) : null }; }),
+        rooms: [...rooms.map(mapGroup), ...zones.map(mapGroup)],
         lights: lights.map(l => ({ id: l.id, name: l.metadata && l.metadata.name, on: !!(l.on && l.on.on), bri: l.dimming ? Math.round(l.dimming.brightness) : null, owner: l.owner && l.owner.rid })),
         scenes: scenes.map(s => ({ id: s.id, name: s.metadata && s.metadata.name, room: s.group && s.group.rid })) });
     }

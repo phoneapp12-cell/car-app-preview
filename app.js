@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.86';
+const APP_VERSION = '2.23.87';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12171,12 +12171,12 @@ async function hueConnect() {
 }
 async function hueSet(type, id, extra) {
   try {
-    await hueCall('set', { type, id, ...extra }); if (type === 'scene') { toast('Scene on.'); return; }
-    const d = HUE.data || {}, list = type === 'grouped_light' ? (d.rooms || []).filter(r => r.group === id) : (d.lights || []).filter(l => l.id === id);
-    list.forEach(x => { if (typeof extra.on === 'boolean') x.on = extra.on; if (extra.bri != null) x.bri = extra.bri; });
-    hueCtlUpdate(type, id, list[0]);
-  }
-  catch (e) { toast('That didn’t work. The bridge may be offline.'); }
+    await hueCall('set', { type, id, ...extra });
+    const d = HUE.data || {};
+    if (type === 'grouped_light') (d.rooms || []).filter(r => r.group === id).forEach(x => { if (typeof extra.on === 'boolean') x.on = extra.on; });
+    if (type === 'light') (d.lights || []).filter(l => l.id === id).forEach(x => { if (typeof extra.on === 'boolean') x.on = extra.on; });
+    hueCtlUpdate();
+  } catch (e) { toast('That didn’t work. The bridge may be offline.'); }
 }
 /* 2.23.80: Sensors (motion, temperature, light level, battery, contact, buttons, dials). Every field is optional. */
 let HUES = { st: 'idle', list: [], err: '' };
@@ -12199,27 +12199,24 @@ function hueWhen(iso) {
 }
 const HUE_BTN = { initial_press: 'pressed', short_release: 'short press', long_press: 'held', long_release: 'released after hold', repeat: 'held', double_short_release: 'double press' };
 function hueSensBody() {
-  if (HUES.st === 'idle' || HUES.st === 'loading') return `<div class="card"><div class="s">Checking sensors…</div></div>`;
-  if (HUES.st === 'error') return `<div class="card empty"><div class="t">Couldn’t read the sensors</div><div class="s">The Hue bridge or service may be offline.</div><button type="button" class="btn small" style="margin-top:8px" onclick="hueSensLoad()">Try again</button></div>`;
+  if (HUES.st === 'idle' || HUES.st === 'loading') return `<div class="s" style="padding:8px 2px">Checking sensors…</div>`;
+  if (HUES.st === 'error') return `<div class="s" style="padding:8px 2px">Couldn’t read the sensors. <button type="button" class="chip" onclick="hueSensLoad()">Try again</button></div>`;
   if (HUES.st === 'unlinked') return '';
   const n = x => typeof x === 'number' && Number.isFinite(x);
-  const cards = HUES.list.filter(d => d && typeof d === 'object').map(d => {
-    const L = [];
+  const rows = HUES.list.filter(d => d && typeof d === 'object').map(d => {
+    const bits = [];
     try {
-      if (d.motion) L.push(`${d.motion.enabled === false ? 'Motion: turned off' : d.motion.on ? '<b>Motion now</b>' : 'No motion'}${d.motion.changed ? ' · changed ' + esc(hueWhen(d.motion.changed)) : ''}`);
-      if (d.temp && n(d.temp.c)) L.push(`Temperature ${d.temp.c.toFixed(1)}°C`);
-      if (d.light && n(d.light.lux)) L.push(`Light ${d.light.lux.toLocaleString('en-NZ')} lux`);
-      if (d.contact) L.push(`${d.contact.open ? '<b>Open</b>' : 'Closed'}${d.contact.changed ? ' · ' + esc(hueWhen(d.contact.changed)) : ''}`);
-      if (d.button && d.button.event) L.push(`Last press: ${d.button.n ? 'button ' + esc(String(d.button.n)) + ', ' : ''}${esc(HUE_BTN[d.button.event] || String(d.button.event).replace(/_/g, ' '))}${d.button.when ? ' · ' + esc(hueWhen(d.button.when)) : ''}`);
-      if (d.rotary && (d.rotary.direction || d.rotary.action)) L.push(`Dial: ${esc(String(d.rotary.direction || d.rotary.action).replace(/_/g, ' '))}${n(d.rotary.steps) ? ' ' + d.rotary.steps + ' steps' : ''}${d.rotary.when ? ' · ' + esc(hueWhen(d.rotary.when)) : ''}`);
-      if (d.battery && n(d.battery.pct)) L.push(`Battery ${Math.round(d.battery.pct)}%${d.battery.state === 'low' || d.battery.state === 'critical' ? ' · <b>' + esc(d.battery.state) + '</b>' : ''}`);
+      if (d.motion) bits.push(d.motion.enabled === false ? 'off' : d.motion.on ? 'motion' : 'quiet');
+      if (d.temp && n(d.temp.c)) bits.push(d.temp.c.toFixed(1) + '°');
+      if (d.contact) bits.push(d.contact.open ? 'open' : 'closed');
+      if (d.battery && n(d.battery.pct)) bits.push(Math.round(d.battery.pct) + '%');
     } catch (e) { }
     const low = hueBattIsLow(d) && !(hueBattDis()[d.id] > Date.now());
-    return `<div class="card"><div class="t" style="font-weight:800">${esc(String(d.name || 'Sensor'))}${hueBattIsLow(d) ? ` <span style="display:inline-block;background:#C62828;color:#fff;border-radius:999px;padding:1px 8px;font-size:.75rem;font-weight:800;vertical-align:middle">🪫 ${Math.round(d.battery.pct)}%</span>` : ''}</div>${low ? `<div data-batt="${esc(String(d.id))}"><button type="button" class="chip" style="margin-top:4px" onclick="hueBattDismiss(${jsArg(String(d.id))})">Dismiss alert for 7 days</button></div>` : ''}${d.room ? `<div class="s">${esc(String(d.room))}</div>` : ''}${L.map(x => `<div class="s" style="margin-top:3px">${x}</div>`).join('') || '<div class="s">No readings yet.</div>'}</div>`;
+    return `<div class="row" style="align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><div class="t" style="font-weight:700">${esc(String(d.name || 'Sensor'))}${hueBattIsLow(d) ? ` <span style="display:inline-block;background:#C62828;color:#fff;border-radius:999px;padding:1px 7px;font-size:.72rem;font-weight:800;vertical-align:middle">🪫 ${Math.round(d.battery.pct)}%</span>` : ''}</div><div class="s">${esc(String(d.room || ''))}${bits.length ? (d.room ? ' · ' : '') + bits.join(' · ') : ''}</div>${low ? `<div data-batt="${esc(String(d.id))}"><button type="button" class="chip" style="margin-top:4px" onclick="hueBattDismiss(${jsArg(String(d.id))})">Dismiss for 7 days</button></div>` : ''}</div></div>`;
   }).join('');
-  return (cards || `<div class="card empty"><div class="t">No sensors found</div><div class="s">Motion sensors, switches and dials added in the Hue app show here.</div></div>`) + `<button type="button" class="btn small" style="margin-top:10px" onclick="hueSensLoad()">Refresh sensors</button>`;
+  return `<div class="card" style="padding:4px 14px">${rows || '<div class="s" style="padding:10px 0">No sensors found.</div>'}<button type="button" class="btn small" style="margin:8px 0 10px" onclick="hueSensLoad()">Refresh sensors</button></div>`;
 }
-/* 2.23.81: late at night (11:30pm to 5am NZ), if any Hue light is on, offer to turn them all off.
+/* 2.23.81/* 2.23.81: late at night (11:30pm to 5am NZ), if any Hue light is on, offer to turn them all off.
    Not now hides it for an hour. Once all are off, it doesn't ask again that night. */
 function hueNightKey() { const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()), g = t => (p.find(x => x.type === t) || {}).value; const m = +g('hour') * 60 + +g('minute'); if (!(m >= 23 * 60 + 30 || m < 5 * 60)) return ''; const d = new Date(Date.now() - (m < 5 * 60 ? 86400000 : 0)); return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(d); }
 let hueNightBusy = false;
@@ -12254,91 +12251,92 @@ async function hueNightOff() {
     }
     localStorage.setItem('hueNightDone', hueNightKey() || 'x');
     toast('All lights are off. Night!');
-    { const d = HUE.data; if (d) { (d.rooms || []).forEach(r => { r.on = false; hueCtlUpdate('grouped_light', r.group, r); }); (d.lights || []).forEach(l => { l.on = false; hueCtlUpdate('light', l.id, l); }); } }
+    { const d = HUE.data; if (d) { (d.rooms || []).forEach(r => { if (r) r.on = false; }); (d.lights || []).forEach(l => { if (l) l.on = false; }); } hueCtlUpdate(); }
   } catch (e) { toast('Couldn’t turn the lights off. The bridge may be offline.'); }
 }
 setTimeout(hueNightCheck, 3000);
 setInterval(hueNightCheck, 5 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(hueNightCheck, 800); });
-function hueCtlUpdate(type, id, x) { // only the touched card changes
-  if (!x) return; const card = document.querySelector(`[data-hue="${type}:${id}"]`); if (!card) return;
-  const sw = card.querySelector('.switch'); if (sw) { sw.classList.toggle('on', !!x.on); sw.setAttribute('aria-checked', !!x.on); sw.setAttribute('onclick', `hueSet(${jsArg(type)},${jsArg(id)},{on:${!x.on}})`); }
-  const st = card.querySelector('.huest'); if (st) st.textContent = x.on ? 'On' + (x.bri != null ? ' · ' + x.bri + '%' : '') : 'Off';
+/* 2.23.87: simple Lights — All lights + Lounge / Kitchen / Dining. Kitchen includes every Hue room, zone
+   or light whose name contains "kitchen" (e.g. Kitchen spotlights). On = any of those is on. */
+const HUE_SIMPLE = [
+  { key: 'lounge', label: 'Lounge', match: n => /\blounge\b/i.test(n) },
+  { key: 'kitchen', label: 'Kitchen', match: n => /kitchen/i.test(n) },
+  { key: 'dining', label: 'Dining', match: n => /dining/i.test(n) }
+];
+function hueRoomMatch(want, name) { return want.match(String(name || '')); }
+function hueSimpleTargets(key) {
+  const d = HUE.data || {}, want = HUE_SIMPLE.find(x => x.key === key); if (!want) return { rooms: [], lights: [] };
+  return {
+    rooms: (d.rooms || []).filter(r => r && r.group && hueRoomMatch(want, r.name)),
+    lights: (d.lights || []).filter(l => l && l.id && hueRoomMatch(want, l.name))
+  };
+}
+function hueSimpleState(key) {
+  const t = hueSimpleTargets(key); if (!t.rooms.length && !t.lights.length) return { found: false, on: false };
+  return { found: true, on: t.rooms.some(r => r.on) || t.lights.some(l => l.on) };
+}
+function hueAllState() {
+  const d = HUE.data || {};
+  const rooms = d.rooms || [], lights = d.lights || [];
+  if (!rooms.length && !lights.length) return { found: false, on: false };
+  return { found: true, on: rooms.some(r => r && r.on) || lights.some(l => l && l.on) };
+}
+function hueCtlUpdate() { // refresh the four big toggles from HUE.data
+  const box = document.getElementById('huebox'); if (!box) return;
+  const all = hueAllState();
+  const a = box.querySelector('[data-hue="all"]'); if (a) {
+    a.classList.toggle('on', !!all.on); a.setAttribute('aria-checked', !!all.on); a.disabled = !all.found;
+    a.classList.toggle('offmiss', !all.found); const st = a.querySelector('.huest'); if (st) st.textContent = !all.found ? 'Not found in Hue' : all.on ? 'On' : 'Off';
+  }
+  HUE_SIMPLE.forEach(w => {
+    const s = hueSimpleState(w.key), el = box.querySelector(`[data-hue="${w.key}"]`); if (!el) return;
+    el.classList.toggle('on', !!s.on); el.setAttribute('aria-checked', !!s.on); el.disabled = !s.found;
+    el.classList.toggle('offmiss', !s.found); const st = el.querySelector('.huest'); if (st) st.textContent = !s.found ? 'Not found in Hue' : s.on ? 'On' : 'Off';
+  });
+}
+async function hueToggleAll(on) {
+  try {
+    if (on === false) {
+      let ok = false; try { const r = await hueCall('alloff'); ok = !!(r && r.ok); } catch (e) { }
+      if (!ok) {
+        for (const r of (HUE.data && HUE.data.rooms || [])) if (r && r.group) await hueCall('set', { type: 'grouped_light', id: r.group, on: false }).catch(() => {});
+        for (const l of (HUE.data && HUE.data.lights || [])) if (l && l.on) await hueCall('set', { type: 'light', id: l.id, on: false }).catch(() => {});
+      }
+      (HUE.data && HUE.data.rooms || []).forEach(r => { if (r) r.on = false; });
+      (HUE.data && HUE.data.lights || []).forEach(l => { if (l) l.on = false; });
+    } else {
+      const rooms = (HUE.data && HUE.data.rooms || []).filter(r => r && r.group);
+      if (rooms.length) for (const r of rooms) { await hueCall('set', { type: 'grouped_light', id: r.group, on: true }); r.on = true; }
+      else for (const l of (HUE.data && HUE.data.lights || [])) if (l && l.id) { await hueCall('set', { type: 'light', id: l.id, on: true }); l.on = true; }
+    }
+    hueCtlUpdate();
+  } catch (e) { toast('That didn’t work. The bridge may be offline.'); }
+}
+async function hueToggleRoom(key, on) {
+  try {
+    const t = hueSimpleTargets(key); if (!t.rooms.length && !t.lights.length) return;
+    for (const r of t.rooms) { await hueCall('set', { type: 'grouped_light', id: r.group, on: !!on }); r.on = !!on; }
+    for (const l of t.lights) { await hueCall('set', { type: 'light', id: l.id, on: !!on }); l.on = !!on; }
+    hueCtlUpdate();
+  } catch (e) { toast('That didn’t work. The bridge may be offline.'); }
+}
+function hueBigBtn(key, label, state) {
+  const miss = !state.found, on = !!state.on;
+  return `<button type="button" class="card huebig ${on ? 'on' : ''}${miss ? ' offmiss' : ''}" data-hue="${key}" role="switch" aria-checked="${on}" ${miss ? 'disabled' : ''} onclick="${key === 'all' ? `hueToggleAll(${!on})` : `hueToggleRoom(${jsArg(key)},${!on})`}" style="width:100%;text-align:left;padding:18px 20px;margin:0 0 12px;border:2px solid ${miss ? 'var(--line)' : on ? 'var(--brand)' : 'var(--line)'};opacity:${miss ? '.55' : '1'};cursor:${miss ? 'default' : 'pointer'}">
+    <div class="row" style="align-items:center;gap:14px"><div style="flex:1"><div class="t" style="font-weight:800;font-size:1.25rem">${esc(label)}</div><div class="s huest" style="font-size:1rem;margin-top:2px">${miss ? 'Not found in Hue' : on ? 'On' : 'Off'}</div></div>
+    <span class="switch ${on ? 'on' : ''}" aria-hidden="true" style="pointer-events:none;transform:scale(1.25)"></span></div></button>`;
 }
 function hueBody() {
   if (HUE.st === 'idle' || HUE.st === 'loading') return `<div class="card"><div class="s">Checking your lights…</div></div>`;
   if (HUE.st === 'nosetup') return `<div class="card empty"><div class="t">Philips Hue isn’t set up yet</div><div class="s">The Hue developer app still needs registering. Once that’s done, a Connect button shows here.</div></div>`;
   if (HUE.st === 'unlinked') return `<div class="card"><div class="t" style="font-weight:800">Connect your Hue lights</div><div class="s" style="margin:4px 0 10px">You sign in on Philips Hue’s own page and allow My App. Your Hue password never comes to this app.</div><button type="button" class="btn primary" onclick="hueConnect()">${I('bulb')} Connect Philips Hue</button></div>`;
   if (HUE.st === 'error') return `<div class="card empty"><div class="t">Couldn’t reach your lights</div><div class="s">The Hue bridge or service may be offline.</div><button type="button" class="btn small" style="margin-top:8px" onclick="hueLoad()">Try again</button></div>`;
-  const d = HUE.data || {}, rooms = d.rooms || [], scenes = d.scenes || [];
-  const sw = (type, id, on) => `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="On or off" onclick="hueSet(${jsArg(type)},${jsArg(id)},{on:${!on}})"></button>`;
-  const sl = (type, id, bri) => bri == null ? '' : `<input type="range" min="1" max="100" value="${bri}" aria-label="Brightness" style="width:100%;margin-top:6px" onchange="hueSet(${jsArg(type)},${jsArg(id)},{bri:+this.value,on:true})">`;
-  const roomCards = rooms.map(r => {
-    const sc = scenes.filter(x => x.room === r.id);
-    return `<div class="card" data-hue="grouped_light:${esc(r.group || '')}"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t" style="font-weight:800">${esc(r.name || 'Room')}</div><div class="s huest">${r.on ? 'On' + (r.bri != null ? ' · ' + r.bri + '%' : '') : 'Off'}</div></div>${r.group ? sw('grouped_light', r.group, r.on) : ''}</div>${r.group ? sl('grouped_light', r.group, r.bri) : ''}
-      ${sc.length ? `<div class="chips scroll" style="margin-top:8px">${sc.map(x => `<button class="chip" onclick="hueSet('scene',${jsArg(x.id)})">${esc(x.name || 'Scene')}</button>`).join('')}</div>` : ''}</div>`;
-  }).join('');
-  const lights = (d.lights || []).map(l => `<div class="card" data-hue="light:${esc(l.id)}"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t">${esc(l.name || 'Light')}</div><div class="s huest">${l.on ? 'On' + (l.bri != null ? ' · ' + l.bri + '%' : '') : 'Off'}</div></div>${sw('light', l.id, l.on)}</div>${sl('light', l.id, l.bri)}</div>`).join('');
-  return (roomCards ? `<div class="sec">Rooms</div>${roomCards}` : '') + (lights ? `<details><summary class="sec" style="cursor:pointer">All lights</summary>${lights}</details>` : '') + (!roomCards && !lights ? `<div class="card empty"><div class="t">No lights found</div><div class="s">Add them in the Philips Hue app first.</div></div>` : '') + `<button type="button" class="btn small" style="margin-top:10px" onclick="hueLoad()">Refresh</button>`;
-}
-/* 2.23.86: Heat pumps (Panasonic Comfort Cloud + Mitsubishi MELCloud) via the relay. Same phone key as Hue. */
-let HEAT = { st: 'idle', data: null, err: '' };
-async function heatCall(path, body) {
-  const r = await fetch(RELAY_URL + '/heat/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: hueKey(), ...(body || {}) }) });
-  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('http_' + r.status)); return j;
-}
-function heatRedraw() { const el = document.getElementById('heatbox'); if (el) el.innerHTML = heatBody(); }
-async function heatLoad(force) {
-  if (!hueKey()) { HEAT.st = 'nolink'; heatRedraw(); return; }
-  const had = HEAT.st === 'ok'; HEAT.st = 'loading'; HEAT.err = ''; if (!had) heatRedraw();
-  try { const j = await heatCall('status'); HEAT.data = j; HEAT.st = j.setup === false ? 'nosetup' : j.linked ? 'ok' : 'unlinked'; if (j.linked) { HEATSTRIP = { at: Date.now(), data: j }; if (document.getElementById('qstrip')) stripRerank(); } }
-  catch (e) { HEAT.st = 'error'; HEAT.err = String(e.message || e); }
-  heatRedraw();
-}
-async function heatSet(id, extra) {
-  try {
-    const r = await heatCall('set', { id, ...extra }); if (!r || !r.ok) throw new Error(r && r.error || 'set_failed');
-    const u = (HEAT.data && HEAT.data.units || []).find(x => x.id === id); if (u) { if (typeof extra.on === 'boolean') u.on = extra.on; if (extra.mode) u.mode = extra.mode; if (extra.temp != null) u.temp = extra.temp; if (extra.fan) u.fan = extra.fan; heatUnitUpdate(u); }
-  } catch (e) { toast('That didn’t work. Try again in a moment.'); }
-}
-function heatUnitUpdate(u) {
-  const card = document.querySelector(`[data-heat="${CSS.escape(u.id)}"]`); if (!card) return;
-  const sw = card.querySelector('.switch'); if (sw) { sw.classList.toggle('on', !!u.on); sw.setAttribute('aria-checked', !!u.on); sw.setAttribute('onclick', `heatSet(${jsArg(u.id)},{on:${!u.on}})`); }
-  const st = card.querySelector('.heatst'); if (st) st.textContent = (u.on ? 'On' : 'Off') + (u.mode ? ' · ' + u.mode : '') + (u.temp != null ? ' · ' + u.temp + '°' : '');
-  const t = card.querySelector('.heatt'); if (t && u.temp != null) t.textContent = u.temp + '°';
-}
-function heatBody() {
-  if (HEAT.st === 'idle' || HEAT.st === 'loading') return `<div class="card"><div class="s">Checking heat pumps…</div></div>`;
-  if (HEAT.st === 'nosetup') return `<div class="card empty"><div class="t">Heat pumps aren’t set up yet</div><div class="s">The Comfort Cloud or MELCloud login still needs adding on the relay.</div></div>`;
-  if (HEAT.st === 'nolink' || HEAT.st === 'unlinked') return `<div class="card empty"><div class="t">Link Philips Hue first</div><div class="s">Heat pumps use the same phone link as Lights. Open Lights, connect Hue, then come back here.</div><button type="button" class="btn small" style="margin-top:8px" onclick="go('#lights')">Open Lights</button></div>`;
-  if (HEAT.st === 'error') return `<div class="card empty"><div class="t">Couldn’t reach the heat pumps</div><div class="s">Try again in a moment.</div><button type="button" class="btn small" style="margin-top:8px" onclick="heatLoad(true)">Try again</button></div>`;
-  const d = HEAT.data || {}, units = d.units || [], brands = d.brands || {};
-  const notes = [];
-  if (brands.panasonic && brands.panasonic.ok === false) notes.push(`Panasonic: ${esc(brands.panasonic.error === 'mfa_required' ? 'needs a one-time code' : brands.panasonic.error === 'not_configured' ? 'not configured' : 'couldn’t sign in')}`);
-  if (brands.mitsubishi && brands.mitsubishi.ok === false) notes.push(`Mitsubishi: ${esc(brands.mitsubishi.error === 'not_configured' ? 'not configured' : 'couldn’t sign in')}`);
-  const modes = ['heat','cool','dry','fan','auto'], fans = ['auto','low','mid','high'];
-  const cards = units.map(u => {
-    const room = u.room != null ? `Room ${u.room}°` : '', out = u.outdoor != null ? `Outside ${u.outdoor}°` : '';
-    return `<div class="card" data-heat="${esc(u.id)}"><div class="row" style="align-items:center;gap:10px"><div style="flex:1;min-width:0"><div class="t" style="font-weight:800">${esc(u.name || 'Unit')}</div><div class="s">${esc(u.brand || '')}${room || out ? ' · ' + [room, out].filter(Boolean).join(' · ') : ''}</div><div class="s heatst">${u.on ? 'On' : 'Off'}${u.mode ? ' · ' + esc(u.mode) : ''}${u.temp != null ? ' · ' + u.temp + '°' : ''}</div></div><button class="switch ${u.on ? 'on' : ''}" role="switch" aria-checked="${!!u.on}" aria-label="On or off" onclick="heatSet(${jsArg(u.id)},{on:${!u.on}})"></button></div>
-      <div class="chips scroll" style="margin-top:8px">${modes.map(m => `<button type="button" class="chip ${u.mode === m ? 'on' : ''}" onclick="heatSet(${jsArg(u.id)},{mode:${jsArg(m)},on:true})">${m}</button>`).join('')}</div>
-      <div class="row" style="align-items:center;gap:8px;margin-top:8px"><button type="button" class="btn small" onclick="heatSet(${jsArg(u.id)},{temp:${(u.temp || 20) - 1},on:true})">−</button><span class="heatt" style="font-weight:800;min-width:3ch;text-align:center">${u.temp != null ? u.temp + '°' : '—'}</span><button type="button" class="btn small" onclick="heatSet(${jsArg(u.id)},{temp:${(u.temp || 20) + 1},on:true})">+</button>
-      <div class="chips scroll" style="flex:1">${fans.map(f => `<button type="button" class="chip ${u.fan === f ? 'on' : ''}" onclick="heatSet(${jsArg(u.id)},{fan:${jsArg(f)}}})">${f}</button>`).join('')}</div></div></div>`;
-  }).join('');
-  return (notes.length ? `<div class="card"><div class="s">${notes.join('<br>')}</div></div>` : '') + (cards || `<div class="card empty"><div class="t">No heat pumps found</div><div class="s">Check the Comfort Cloud or MELCloud app.</div></div>`) + `<button type="button" class="btn small" style="margin-top:10px" onclick="heatLoad(true)">Refresh</button>`;
-}
-function Heat() {
-  setTimeout(() => { if (HEAT.st !== 'loading') heatLoad(); }, 0);
-  return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Heat pumps', 'Panasonic and Mitsubishi') + `<div id="heatbox">${heatBody()}</div>`;
-}
-let HEATSTRIP = { at: 0, data: null };
-function heatStripSlides() {
-  const d = (HEAT.st === 'ok' && HEAT.data) || (HEATSTRIP && HEATSTRIP.data); if (!d || !Array.isArray(d.units) || !d.units.length) return [];
-  const bits = d.units.slice(0, 4).map(u => `<b>${esc(u.name || 'Unit')}</b> ${u.on ? 'on' : 'off'}${u.temp != null ? ' ' + u.temp + '°' : ''}${u.room != null ? ' · room ' + u.room + '°' : ''}`);
-  return [['heat', '♨️ Heat pumps', `<p class="qsq">${bits.join(' · ')}</p>${d.units.length > 4 ? `<div class="qsw">+${d.units.length - 4} more</div>` : ''}`, "go('#heat')"]];
+  return hueBigBtn('all', 'All lights', hueAllState()) + HUE_SIMPLE.map(w => hueBigBtn(w.key, w.label, hueSimpleState(w.key))).join('') + `<button type="button" class="btn small" onclick="hueLoad()">Refresh</button>`;
 }
 function Lights() {
-  setTimeout(() => { if (HUE.st !== 'loading') hueLoad(); if (HUES.st !== 'loading') hueSensLoad(); }, 0); // once per visit (render() skips re-renders here)
-  return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Lights', 'Philips Hue rooms, lights, scenes and sensors') + `<div id="huebox">${hueBody()}</div><div class="sec">Sensors</div><div id="huesens">${hueSensBody()}</div>`;
+  setTimeout(() => { if (HUE.st !== 'loading') hueLoad(); if (HUES.st !== 'loading') hueSensLoad(); }, 0);
+  return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Lights', 'All lights, Lounge, Kitchen and Dining') + `<div id="huebox">${hueBody()}</div><div class="sec">Sensors</div><div id="huesens">${hueSensBody()}</div>`;
 }
 function Gym() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
@@ -14917,9 +14915,11 @@ function hueStripSlides() {
   if (T.length) out.push(['huetemp', '🌡️ Room temps', `<p class="qsq">${T.slice(0, 4).map(d => `<b>${esc(String(d.room || d.name || 'Sensor'))}</b> ${d.temp.c.toFixed(1)}°C`).join(' · ')}</p>${T.length > 4 ? `<div class="qsw">+${T.length - 4} more</div>` : ''}`, "go('#lights')"]);
   const L = HUESTRIP.lights;
   if (L && (Array.isArray(L.rooms) || Array.isArray(L.lights))) {
-    const rooms = (L.rooms || []).filter(r => r && r.on);
-    if (rooms.length) out.push(['huelights', '💡 Lights on', `<p class="qsq">${rooms.slice(0, 4).map(r => `<b>${esc(String(r.name || 'Room'))}</b>${num(r.bri) ? ' ' + Math.round(r.bri) + '%' : ''}`).join(' · ')}</p>${rooms.length > 4 ? `<div class="qsw">+${rooms.length - 4} more rooms</div>` : ''}`, "go('#lights')"]);
-    else if ((L.lights || []).some(l => l && l.on)) { const on = L.lights.filter(l => l && l.on); out.push(['huelights', '💡 Lights on', `<p class="qsq">${on.slice(0, 4).map(l => `<b>${esc(String(l.name || 'Light'))}</b>${num(l.bri) ? ' ' + Math.round(l.bri) + '%' : ''}`).join(' · ')}</p>`, "go('#lights')"]); }
+    // 2.23.87: only Lounge / Kitchen / Dining (Kitchen = any name containing kitchen)
+    const prev = HUE.data; HUE.data = L;
+    const on = HUE_SIMPLE.filter(w => hueSimpleState(w.key).on).map(w => w.label);
+    HUE.data = prev;
+    if (on.length) out.push(['huelights', '💡 Lights on', `<p class="qsq"><b>${esc(on.join(', '))}</b></p>`, "go('#lights')"]);
     else if ((L.rooms || []).length || (L.lights || []).length) out.push(['huelights', '💡 Lights', '<p class="qsq"><b>All lights off</b></p>', "go('#lights')"]);
   }
   return out;
