@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.12';
+const APP_VERSION = '2.25.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -17957,6 +17957,14 @@ function bottomTabsSetting() {
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
+// 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel' };
+function sideIco(k, ic) {
+  try {
+    if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
+    return `<img src="art/i3-${SIDE_ART[k]}.webp" alt="" class="sideico" onerror="var n=this.nextElementSibling;if(n)n.style.display='';this.remove()"><span class="sideline" style="display:none">${I(ic)}</span>`;
+  } catch (e) { return I(ic); }
+}
 function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
@@ -17965,7 +17973,7 @@ function tabbar(active) {
   const meta = k => k === 'home' ? ['Notifications', 'home'] : k === 'settings' ? ['Settings', 'gear'] : k === 'more' ? ['More', 'more'] : [NAV[k][2], NAV[k][0]];
   const btn = k => {
     const [l, ic] = meta(k);
-    return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${I(ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
+    return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
   };
   const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
   $('#tabbar').innerHTML = groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
