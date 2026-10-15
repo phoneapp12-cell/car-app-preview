@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.25.4';
+const APP_VERSION = '2.25.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7781,22 +7781,6 @@ function shopRow(x) {
   return `<div class="row shopitem ${x.done ? 'done' : ''}" data-id="${x.id}"><button class="tick" aria-label="${x.done ? 'Untick' : 'Tick off'} ${esc(x.name)}" onclick="shopTick('${x.id}')"><span>${I('check')}</span></button>
     <button class="tapzone" onclick="shopEdit('${x.id}')"><div class="tx"><div class="t">${isSarahShop(x) ? sarahBadge({ from: 'sarah' }) : ''}${esc(x.name)}${hint}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div></button>${wwPriceHtml(x)}</div>`;
 }
-// 2.25.4: one-time COPY of the open shopping list to Monique's Helper, as a link (no server, no sync).
-// Leaves out Sarah's items and any notes; names (and qty) only.
-function shopMoniqueLink() {
-  const items = S.shop.items.filter(x => x && !x.done && !isSarahShop(x) && x.name).map(x => { const o = { n: String(x.name).slice(0, 80) }; if (x.qty) o.q = String(x.qty).slice(0, 20); return o; }).slice(0, 200);
-  if (!items.length) return null;
-  const b = btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, i: items })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return { url: 'https://phoneapp12-cell.github.io/moniques-helper/#shopimport=' + b, n: items.length };
-}
-async function sendShopToMonique() {
-  try {
-    const l = shopMoniqueLink(); if (!l) { toast('Nothing on your list to send'); return; }
-    const text = 'Here’s a copy of my shopping list (' + plural(l.n, 'item') + '). Tap to add it to your Helper app:';
-    if (navigator.share) { try { await navigator.share({ title: 'Shopping list', text, url: l.url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
-    try { await navigator.clipboard.writeText(text + ' ' + l.url); toast('Link copied. Paste it to Monique.'); } catch (e) { prompt('Copy this link and send it to Monique:', l.url); }
-  } catch (e) { toast('Sorry, that couldn’t be sent.'); }
-}
 function Shopping() {
   const open = S.shop.items.filter(x => !x.done).sort((a, b) => (a.created || 0) - (b.created || 0));
   const got = S.shop.items.filter(x => x.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
@@ -7805,7 +7789,7 @@ function Shopping() {
   return header('Shopping list', open.length ? plural(open.length, 'thing') + ' to get' : 'Nothing to get') + mealTabs('shop') +
     `<form class="addbar" onsubmit="shopQuickAdd(event)"><input id="newshop" placeholder="Add an item…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New shopping item"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="shopshare"> Also add to Sarah’s list</label>
-    <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button><button class="btn" id="shopmon" onclick="sendShopToMonique()">${I('share')} Send to Monique</button>` : ''}</div>
+    <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button>` : ''}</div>
     ${wwTotalHtml(open)}${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
     ${got.length ? `<div class="sec">Got <button onclick="clearGot()">Clear</button></div><div class="list" id="shopgot">${got.map(shopRow).join('')}</div>` : ''}
     <div class="foot">“Check label” means gluten often hides in it, so look for “gluten free” on the pack. Tap an item to change or delete it. Prices are Woolworths NZ online prices (woolworths.co.nz), checked daily; tap one to open the product.</div>`;
