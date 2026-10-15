@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.93';
+const APP_VERSION = '2.23.94';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2404,8 +2404,8 @@ function sumTouchCands(tt) {
   if (m < 360) { // 2.23.90: night owl hours: right now, plus at most a brief note on the morning
     try { const L = (HUESTRIP && HUESTRIP.lights) || {}, on = (L.rooms || []).filter(r => r && r.on).map(r => r.name); if (on.length) add('lightsoff', 'The ' + engList(on.slice(0, 3)) + ' light' + (on.length > 1 ? 's are' : ' is') + ' still on, one tap on Lights to switch off'); } catch (e) { }
     try { const t = ((typeof HUESTRIP !== 'undefined' && HUESTRIP && HUESTRIP.sens) || []).find(d => d && d.temp && Number.isFinite(d.temp.c)); const u = (((typeof hroomData === 'function' && hroomData()) || {}).units || []).find(x => x && x.brand === 'Panasonic' && Number.isFinite(x.room)) || (((typeof hroomData === 'function' && hroomData()) || {}).units || []).find(x => x && Number.isFinite(x.room)); if (u) add('roomtemp', (u.name || 'The lounge') + ' is ' + (+u.room).toFixed(1) + '°C' + (u.on ? ', heat pump on at ' + u.temp + '°' : ', heat pump off')); else if (t) add('roomtemp', String(t.room || t.name) + ' is ' + t.temp.c.toFixed(1) + '°C right now'); } catch (e) { }
-    add('winddown', homePick(99, ['A quiet wind-down: a chapter of your book, or a Suno song about the beach', 'Still up? A short episode or a few pages of your book is a nice way to wind down', 'Late one: a calm Suno playlist and the lights down low']));
-    try { const f = sugDayFacts(0); if (f.work) add('morning', 'First thing: work from ' + fmtTime(rosterState().days[String(f.dow)]) + (wx.t != null ? ', around ' + Math.round(wx.t) + '° for the drive' : '')); } catch (e) { }
+    add('winddown', homePick(99, ['A quiet wind-down: a chapter of your book, or a Suno song about the beach', 'A short episode or a few pages of your book is a nice way to wind down', 'Late one: a calm Suno playlist and the lights down low']));
+    try { const mo = typeof lateMorningLine === 'function' ? lateMorningLine() : ''; if (mo) add('morning', mo); } catch (e) { }
     return out;
   }
   try { const a = (S.birthdays || []).find(b => /aranea/i.test(b.name || '')); if (a) { const i = bdayInfo(a); if (i.d >= 0 && i.d <= 60) add('aranea', i.d === 0 ? 'Aranea’s birthday today' + (i.age ? ', she’s ' + i.age : '') + ' — big hug from Grandad' : 'Aranea turns ' + (i.age || 9) + ' in ' + i.d + ' day' + (i.d === 1 ? '' : 's') + (i.d > 10 ? ', plenty of time to plan something fun' : ', worth sorting a present soon')); } } catch (e) { }
@@ -2495,7 +2495,8 @@ function sumPool() {
    none of it is sent to the AI, any line or suggestion that mentions it is dropped, and the summary is built
    around a few interesting things instead (news headlines, videos, New on Netflix, the Top 40, the travel spot, events). */
 const NIGHT_MONEY_RE = /\b(bills?|overdue|over-due|payments?|pay|paying|paid|due|invoices?|mortgages?|budget\w*|loans?|repayments?|rates|rent|debts?|owe|owed|owing|insurance|premiums?|direct debits?|money|spend\w*|savings?|bank\w*|fees?|fines?|instal?ments?|subscriptions?|wof|rego|registration)\b/i;
-const nightOk = txt => !NIGHT_MONEY_RE.test(String(txt || ''));
+const NIGHT_HEAVY_RE = /\b(hospitali[sz]ed|injur\w*|chemical|exposure|crash\w*|collision|fire|blaze|dead|died|dies|death\w*|killed|fatal\w*|evacuat\w*|explosion|toxic|hazard\w*|spill|police|arrest\w*|charged|court|missing|drown\w*|stabb\w*|assault\w*|shooting|attack\w*|earthquake|flood\w*|serious)\b/i;
+const nightOk = txt => !NIGHT_MONEY_RE.test(String(txt || '')) && !NIGHT_HEAVY_RE.test(String(txt || ''));
 function nightPicks() {
   const out = [];
   try {
@@ -2705,9 +2706,9 @@ async function aiSumFetch() {
 const LATE_BAN_RE = /\b(tonight|this evening|merlot|wine|dinner|tea tonight|gym|workout|cook(ing)? night|cook(ing)?|after[- ]work|celebrat\w*|party)\b/i;
 const INVENT_RE = /\byour [\w\s-]{0,24}\b(style|personality|knack|signature|trademark)\b|\b(as|since) you (love|enjoy|like|prefer)\b/i;
 function lateMorningLine() {
-  try { const f = sugDayFacts(0), wx = sumWx(); const r = rosterState(), st = r.days[String(f.dow)];
+  try { const f = sugDayFacts(0); let wx = { t: null, fine: false }; try { wx = sumWx(); } catch (e) { } let st = ''; try { st = rosterState().days[String(f.dow)]; } catch (e) { }
     if (f.work && st) return 'In the morning: work from ' + fmtTime(st) + (wx.t != null ? ', about ' + Math.round(wx.t) + '° for the drive' : '');
-    return 'In the morning: a day off, so no rush' + (wx.fine ? ', and it looks fine out' : ''); } catch (e) { return ''; }
+    return 'In the morning: a day off, so no rush' + (wx.fine ? ', and it looks clear out' : ''); } catch (e) { return ''; }
 }
 function aiLineSafe(x) {
   x = String(x || ''); let mm = 0; try { mm = sumToday().min; } catch (e) { }
@@ -2716,6 +2717,31 @@ function aiLineSafe(x) {
   if (/\b(gym|workout|work out|weights|treadmill)\b/i.test(x)) { try { const f0 = sugDayFacts(0), f1 = sugDayFacts(1); if (/\btomorrow\b/i.test(x) ? !f1.gym : !f0.gym) return false; } catch (e) { return false; } }
   return true;
 }
+/* 2.23.94: last pass over every summary path (plain and AI). Dedupe by opener and similarity, drop heading fragments,
+   00–06 night filter, and no dinner ideas when the Meal planner already has tonight's dinner. */
+function sumPlannedTitle() { try { const p = (M() && M().plan) || {}, x = p[todayISO()]; return x && x.title ? String(x.title) : ''; } catch (e) { return ''; } }
+const SUM_MEAL_RE = /\b(dinner|tea tonight|cook(ing)?|recipe|meal|stir[ -]?fry|pizza night|takeaway)\b/i;
+function sumLineKeep(txt, seen) {
+  try {
+    const x = String(txt || '').replace(/\s+/g, ' ').trim(); if (!x) return false;
+    const words = x.replace(/[^\p{L}\p{N}' ]/gu, ' ').split(/\s+/).filter(Boolean);
+    if (words.length < 5 && !/^(good (morning|afternoon|evening)|hope|morning|evening|night owl)/i.test(x) && !/\d/.test(x)) return false; // heading fragments
+    let mm = 720; try { mm = sumToday().min; } catch (e) { }
+    if (mm < 360 && (LATE_BAN_RE.test(x) || SUM_MEAL_RE.test(x))) return false;
+    try { if (homeNight() && !nightOk(x)) return false; } catch (e) { }
+    const planned = sumPlannedTitle();
+    if (planned && SUM_MEAL_RE.test(x) && !x.toLowerCase().includes(planned.toLowerCase().slice(0, 12))) return false;
+    if (/\bnot a strong case\b/i.test(x)) return false;
+    const op = words.slice(0, 2).join(' ').toLowerCase(), set = new Set(words.map(w => w.toLowerCase()).filter(w => w.length > 3));
+    for (const s of seen) {
+      if (s.op === op && /^(still up|night owl|quiet hours|hope the|good evening|good morning)/.test(op)) return false;
+      let inter = 0; set.forEach(w => { if (s.set.has(w)) inter++; });
+      if (set.size && inter / Math.min(set.size, s.set.size || 1) >= 0.6) return false;
+    }
+    seen.push({ op, set }); return true;
+  } catch (e) { return true; }
+}
+function sumCleanLis(arr) { const seen = []; return (arr || []).filter(h => sumLineKeep(String(h).replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, "'"), seen)); }
 function aiSumFresh() { return !!(AI_SUM && AI_SUM.v === APP_VERSION && AI_SUM.open === homeSugOpenN && Date.now() - AI_SUM.at < 4 * 3600 * 1000 && AI_SUM.phase === sumPhaseKey()); }
 function aiSumBullets() {
   if (!aiSumFresh()) return '';
@@ -2723,6 +2749,7 @@ function aiSumBullets() {
   const bf = bfastLine();
   let night = false; try { night = homeNight(); } catch (e) {}
   const lines = AI_SUM.lines.filter(t => { const x = String(t); return aiLineSafe(x) && sumWorkOk(x) && !SUM_SELF_RE.test(x) && !(walkDog.test(x) && dog.test(x)) && !(gymSkipped(todayISO()) && GYM_WORD.test(x) && !/\btomorrow\b/i.test(x)) && !BFAST_TV_RE.test(x) && (!night || nightOk(x)); }).concat(bf && (!night || nightOk(bf)) ? [bf] : []);
+  try { const seen = []; const c = lines.filter(t => sumLineKeep(t, seen)); lines.splice(0, lines.length, ...c); } catch (e) { }
   const lis = lines.map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
   return lis ? '<ul class="sumbul">' + lis + '</ul>' : '';
 }
@@ -2786,6 +2813,7 @@ function homeSugHtml() {
   try { list = aiSugList() || homeSuggestions(); } catch (e) { list = []; }
   try { list = list.filter(x => x && sumWorkOk(String(x.text || '') + ' ' + String((x.pre && (x.pre.title || x.pre.text)) || ''))); } catch (e) {} // 2.23.76
   try { if (homeNight()) list = list.filter(x => x && nightOk(String(x.text || '') + ' ' + String((x.pre && (x.pre.title || x.pre.text)) || ''))); } catch (e) {} // 2.23.6
+  try { const mm = sumToday().min, planned = sumPlannedTitle(); list = list.filter(x => { const t = String(x.text || '') + ' ' + String((x.pre && (x.pre.title || x.pre.text)) || ''); if (mm < 360 && (LATE_BAN_RE.test(t) || SUM_MEAL_RE.test(t))) return false; if (planned && SUM_MEAL_RE.test(t)) return false; return !/\bnot a strong case\b/i.test(t); }); } catch (e) { } // 2.23.94
   homeSugNow = list;
   if (!list.length) return '';
   const label = { todo: 'to your to-do list', note: 'as a note', appt: 'to your calendar' };
@@ -2884,7 +2912,7 @@ function homeRhetoricalLine() {
       const plan = typeof M === 'function' && M() && M().plan ? M().plan : null;
       const entry = plan && plan[todayISO()];
       const title = entry && !entry.cooked && entry.title ? String(entry.title).replace(/\s+/g, ' ').trim() : '';
-      if (title && !homeGlutenFood(title)) return 'Is ' + homeQuote(title) + ' not a strong case for dinner tonight?';
+      void title;
     } catch (e) {}
     const part = homeDayPart();
     return part ? 'Shane, is there really a better time to take the ' + part + ' at your own pace?' : '';
@@ -3173,6 +3201,7 @@ function homeSumCard(bits) {
     try { setTimeout(() => { aiSumFetch(); }, 0); } catch (e) {}
     // 2.22.54: while the AI summary is on its way, hold a short placeholder instead of drawing interim versions
     if (aiSumOpen !== homeSugOpenN && navigator.onLine !== false) return homeSceneCard('<p class="sumnote muted" style="opacity:.75">Putting your summary together…</p>', true);
+    try { const c = sumCleanLis(ps); ps.splice(0, ps.length, ...c); } catch (e) { }
     if (!ps.length) return homeSumFallback();
     return homeSceneCard('<ul class="sumbul">' + ps.join('') + '</ul>');
   } catch (e) {
