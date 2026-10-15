@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.25.0';
+const APP_VERSION = '2.25.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -221,6 +221,14 @@ function duePill(d, prefix = '') {
 function moneyBadge(amount, label) {
   const under = label ? `<small>${esc(label)}</small>` : '';
   return `<span class="moneybadge"><b>${money(amount)}</b>${under}</span>`;
+}
+// 2.25.1: page title and description inside the page banner. Art off -> normal header; image fails -> plain header look.
+function banHeader(title, sub, extra, k) {
+  try {
+    if (typeof cardArtOn === 'function' && !cardArtOn()) return header(title, sub, extra);
+    return `<div class="top banhead" style="background-image:url(art/${k}-banner.webp)"><img src="art/${k}-banner.webp" alt="" hidden onerror="var h=this.closest('.banhead');if(h){h.classList.add('banfail');h.style.backgroundImage='none'}"><div class="bantx"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
+  <div class="iconrow">${extra}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
+  } catch (e) { return header(title, sub, extra); }
 }
 function header(title, sub, extra = '') {
   return `<div class="top"><div style="min-width:0"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>
@@ -4733,7 +4741,7 @@ function Bills() {
       ${sorted.length ? `<div class="list">${sorted.map(row).join('')}</div>` : (hasLoanPlans && !S.bills.length ? '<div class="card muted">No other bills yet. Loan repayments are in the pay list above.</div>' : '<div class="card muted">All paid up. Good as gold!</div>')}
       ${paid.length ? `<div class="sec">Paid</div><div class="list">${paid.map(row).join('')}</div>` : ''}`
     : empty('No bills yet', 'Add your regular bills, like power, phone or insurance, and we’ll remind you 3 days before each one is due. Loan repayment plans also show here once you’ve set a payday.', 'Add a bill', 'billForm()');
-  return header('Bills', 'Regular bills, loan plans, and due dates', addBtn('Add a bill', 'billForm()')) + pageBan('bills') + body;
+  return banHeader('Bills', 'Regular bills, loan plans, and due dates', addBtn('Add a bill', 'billForm()'), 'bills') + body;
 }
 async function markPaid(id) {
   const b = S.bills.find(x => x.id === id), s = snap();
@@ -5378,7 +5386,7 @@ function Todo() {
     ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`;
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
-  return header('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()')) + pageBan('todo') +
+  return banHeader('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()'), 'todo') +
     `<div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${esc(l)}</button>`).join('')}
       <button class="chip plus" onclick="listForm()">+ New list</button></div>
     ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
@@ -5677,7 +5685,7 @@ function Calendar() {
       (Object.keys(groups).length ? Object.keys(groups).map(k => `<div class="agday">${dayLabel(k)}</div>${groups[k].map(evRow).join('')}`).join('')
         : empty('Nothing in the next 3 weeks', 'Add an appointment, or tap a day on the calendar.', 'Add an appointment', 'apptForm()'));
   }
-  return header('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()')) + pageBan('cal') +
+  return banHeader('Calendar', S.feeds.length ? 'Due dates, appointments and ' + S.feeds.map(f => esc(f.name)).join(' & ') : 'Due dates and appointments', addBtn('Add an appointment', 'apptForm()'), 'cal') +
     `<div class="calsearch"><span aria-hidden="true">${I('search')}</span><input type="search" id="calq" placeholder="Search events, notes, places…" aria-label="Search the calendar" value="${esc(calQ)}" oninput="calSearchInput(this.value)"></div><div id="calres">${calSearchHtml()}</div>
     <div class="card calcard"><div class="monthbar"><button class="iconbtn" aria-label="Previous month" onclick="shiftMonth(-1)">${I('left')}</button>
       <b>${MONL[m]} ${y}</b><button class="iconbtn" aria-label="Next month" onclick="shiftMonth(1)">${I('right')}</button></div>
