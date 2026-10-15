@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.91';
+const APP_VERSION = '2.23.92';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2630,6 +2630,10 @@ function aiSumCtx() {
   try { const pr = aboutProfile(); ctx.aboutShane = pr.facts; if (pr.aboutYou.length) ctx.aboutYouAnswers = pr.aboutYou; delete ctx.facts; delete ctx.about;
     const tc = sumTouches(sumToday().min < 360 ? 4 : 2); ctx.personalTouches = tc.map(x => x.t); ctx._touchIds = tc.map(x => x.id);
     { const mm = sumToday().min; ctx.timeOfDayRule = mm < 360 ? 'It is after midnight and he is still up (night owl). Focus only on right now: lights still on, a quiet wind-down idea, what is on, room temperature and heat pump. At most one brief line about the morning (leave time and the weather for the drive). Do not mention this evening’s plans, cooking, gym or the day’s jobs.' : mm < 600 ? 'Morning: talk about the day ahead. Do not mention this evening’s plans (dinner, TV, spa, merlot, cooking) yet.' : mm < 1020 ? 'Afternoon: the rest of today, then tonight.' : 'Evening: tonight, plus one line about tomorrow.'; }
+    try { const f0 = sugDayFacts(0), f1 = sugDayFacts(1), WDn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      ctx.dayFacts = { today: { weekday: WDn[f0.dow], work: f0.work ? 'work day' : 'day off', gym: f0.gym ? 'yes, after work' : 'no' }, tomorrow: { weekday: WDn[f1.dow], work: f1.work ? 'work day' : 'day off', gym: f1.gym ? 'yes, after work' : 'no' } }; } catch (e) { }
+    ctx.noInventRule = 'Never invent traits, habits, styles or preferences. Only use what is in aboutShane, aboutYouAnswers and knowMe. Never invent celebrations or occasions. Gym only if dayFacts says gym yes for that day (gym is Tuesday and Wednesday after work only).';
+    if (sumToday().min < 360) ctx.lateNightRule = 'It is between midnight and 6am and he is still up. Write exactly 3 short lines: (1) right now: lights still on and/or room temperatures from personalTouches, (2) one quiet wind-down idea, (3) one brief line for the morning (work start and weather if today is a work day, otherwise a gentle day-off note). Do NOT mention tonight, this evening, merlot, wine, dinner, cooking, gym, after work or celebrations.';
     ctx.personalRule = 'Make it personal and warm, short. Weave in 1 or 2 of personalTouches naturally (they fit right now). Use aboutShane only for context, never list facts back. Never nag about bedtime, teeth, meds, lateness or work hours. Never suggest walking Zeus. No garden feeding or watering if it is above 10°C now or in the next 5 hours.'; } catch (e) {}
   try { if (homeNight()) nightCtx(ctx); } catch (e) {}
   return ctx;
@@ -2649,7 +2653,7 @@ async function aiSumFetch() {
   // 2.22.82: reuse the last summary for 1 hour, then write a new one.
   try {
     const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null');
-    if (last && Array.isArray(last.lines) && last.lines.length && Date.now() - last.at < 4 * 3600 * 1000 && last.phase === sumPhaseKey()) {
+    if (last && last.v === APP_VERSION && Array.isArray(last.lines) && last.lines.length && Date.now() - last.at < 4 * 3600 * 1000 && last.phase === sumPhaseKey()) {
       AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: homeSugOpenN, at: last.at, phase: last.phase };
       aiSumOpen = homeSugOpenN;
       const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
@@ -2675,27 +2679,50 @@ async function aiSumFetch() {
     const nightNow = !!ctxNow.night;
     const kept = d.lines.slice(0, 5).map(x => String(x).slice(0, 220)).filter(x => aiLineOk(x, tNow, allowed) && (!nightNow || nightOk(x))); // 2.22.97, 2.23.6
     { const ws = sumWorkState(tNow), seenL = new Set(sumHist().filter(x => x.phase !== phase).map(x => x.t)); const k2 = kept.filter(x => sumWorkOk(x, ws) && !SUM_SELF_RE.test(x)); const k3 = k2.filter(x => !seenL.has(sumNorm(x))); kept.splice(0, kept.length, ...(k3.length >= 2 ? k3 : k2)); }
+    { const k4 = kept.filter(aiLineSafe); kept.splice(0, kept.length, ...k4); }
+    try { if (sumToday().min < 360) { // 2.23.92: late night always has room temps and one morning line; max 4 lines
+      const tc = sumTouches(4), rt = tc.find(x => x.id === 'roomtemp'), mo = lateMorningLine();
+      if (rt && !kept.some(k => /°/.test(k))) kept.splice(1, 0, rt.t);
+      if (mo && !kept.some(k => /\bmorning\b/i.test(k))) { if (kept.length >= 4) kept.splice(3); kept.push(mo); }
+    } } catch (e) { }
+    try { if (sumToday().min < 360 && kept.length < 3) { const bf = sumTouches(4).map(x => x.t).concat(nightSumLines()).filter(t => aiLineSafe(t) && !kept.some(k => sumNorm(k) === sumNorm(t))); kept.push(...bf.slice(0, 3 - kept.length)); } } catch (e) { }
     if (!kept.length) throw new Error('all_lines_dropped');
     try { const kw = { aranea: /aranea/i, pizza: /pizza/i, merlot: /merlot/i, sunset: /sunset|golden/i, bush: /bush|walk|track/i, mum: /mum/i, clean: /clean/i, quiet: /book|movie|suno/i, garden: /garden|weed|plant/i, thu: /7:15|thursday/i, bfast: /breakfast/i, blue: /blue/i, tech: /hue|heat|tapo|alexa/i };
       const hit = tIds.filter(id => kw[id] && kept.some(l => kw[id].test(l))); if (!hit.length && tTxt[0] && !BFAST_TV_RE.test(tTxt[0])) { kept.splice(Math.min(2, kept.length), 0, tTxt[0]); hit.push(tIds[0]); } touchUse(hit); } catch (e) { }
-    AI_SUM = { lines: kept, sugs: (d.sugs || []).slice(0, 3).filter(x => aiLineOk(String((x && x.text) || ''), tNow, allowed) && (!nightNow || nightOk(String((x && x.text) || '') + ' ' + String((x && x.title) || '')))), open: openN, at: Date.now(), phase };
+    AI_SUM = { v: APP_VERSION, lines: kept, sugs: (d.sugs || []).slice(0, 3).filter(x => aiLineSafe(String((x && x.text) || '') + ' ' + String((x && x.title) || '')) && aiLineOk(String((x && x.text) || ''), tNow, allowed) && (!nightNow || nightOk(String((x && x.text) || '') + ' ' + String((x && x.title) || '')))), open: openN, at: Date.now(), phase };
     aiSumOpen = openN;
     try { localStorage.setItem('aiSumLast', JSON.stringify(AI_SUM)); } catch (e) {}
     sumHistAdd(kept, phase);
     const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
   } catch (e) {
     aiSumOpen = openN; // no AI this open: reuse the last AI summary if it's under 1 hour old, else the usual summary
-    try { const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null'); if (last && Array.isArray(last.lines) && Date.now() - last.at < 4 * 3600 * 1000 && last.phase === sumPhaseKey()) AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: openN, at: last.at, phase: last.phase }; } catch (e3) {}
+    try { const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null'); if (last && last.v === APP_VERSION && Array.isArray(last.lines) && Date.now() - last.at < 4 * 3600 * 1000 && last.phase === sumPhaseKey()) AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: openN, at: last.at, phase: last.phase }; } catch (e3) {}
     try { const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; } } catch (e2) {}
   } finally { aiSumBusy = false; }
 }
-function aiSumFresh() { return !!(AI_SUM && AI_SUM.open === homeSugOpenN && Date.now() - AI_SUM.at < 4 * 3600 * 1000 && AI_SUM.phase === sumPhaseKey()); }
+/* 2.23.92: hard post-filter for AI lines. 00:00–06:00: nothing about tonight/evening, merlot, dinner, gym, cooking or after work.
+   Any time: gym only on a real gym day (Tue/Wed work days), and no invented traits ("your ... style"). */
+const LATE_BAN_RE = /\b(tonight|this evening|merlot|wine|dinner|tea tonight|gym|workout|cook(ing)? night|cook(ing)?|after[- ]work|celebrat\w*|party)\b/i;
+const INVENT_RE = /\byour [\w\s-]{0,24}\b(style|personality|knack|signature|trademark)\b|\b(as|since) you (love|enjoy|like|prefer)\b/i;
+function lateMorningLine() {
+  try { const f = sugDayFacts(0), wx = sumWx(); const r = rosterState(), st = r.days[String(f.dow)];
+    if (f.work && st) return 'In the morning: work from ' + fmtTime(st) + (wx.t != null ? ', about ' + Math.round(wx.t) + '° for the drive' : '');
+    return 'In the morning: a day off, so no rush' + (wx.fine ? ', and it looks fine out' : ''); } catch (e) { return ''; }
+}
+function aiLineSafe(x) {
+  x = String(x || ''); let mm = 0; try { mm = sumToday().min; } catch (e) { }
+  if (mm < 360 && LATE_BAN_RE.test(x)) return false;
+  if (INVENT_RE.test(x)) return false;
+  if (/\b(gym|workout|work out|weights|treadmill)\b/i.test(x)) { try { const f0 = sugDayFacts(0), f1 = sugDayFacts(1); if (/\btomorrow\b/i.test(x) ? !f1.gym : !f0.gym) return false; } catch (e) { return false; } }
+  return true;
+}
+function aiSumFresh() { return !!(AI_SUM && AI_SUM.v === APP_VERSION && AI_SUM.open === homeSugOpenN && Date.now() - AI_SUM.at < 4 * 3600 * 1000 && AI_SUM.phase === sumPhaseKey()); }
 function aiSumBullets() {
   if (!aiSumFresh()) return '';
   const walkDog = /\b(walk|walking|walkies|exercise|run|jog)\b/i; const dog = /\b(zeus|dog|dogs)\b/i;
   const bf = bfastLine();
   let night = false; try { night = homeNight(); } catch (e) {}
-  const lines = AI_SUM.lines.filter(t => { const x = String(t); return sumWorkOk(x) && !SUM_SELF_RE.test(x) && !(walkDog.test(x) && dog.test(x)) && !(gymSkipped(todayISO()) && GYM_WORD.test(x) && !/\btomorrow\b/i.test(x)) && !BFAST_TV_RE.test(x) && (!night || nightOk(x)); }).concat(bf && (!night || nightOk(bf)) ? [bf] : []);
+  const lines = AI_SUM.lines.filter(t => { const x = String(t); return aiLineSafe(x) && sumWorkOk(x) && !SUM_SELF_RE.test(x) && !(walkDog.test(x) && dog.test(x)) && !(gymSkipped(todayISO()) && GYM_WORD.test(x) && !/\btomorrow\b/i.test(x)) && !BFAST_TV_RE.test(x) && (!night || nightOk(x)); }).concat(bf && (!night || nightOk(bf)) ? [bf] : []);
   const lis = lines.map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
   return lis ? '<ul class="sumbul">' + lis + '</ul>' : '';
 }
