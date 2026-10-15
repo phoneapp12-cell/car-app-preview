@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.90';
+const APP_VERSION = '2.23.91';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2383,7 +2383,8 @@ function aboutProfile() {
   return { facts: SHANE_PROFILE, aboutYou: ans };
 }
 function touchHist() { try { return (JSON.parse(localStorage.getItem('sumTouch') || '[]') || []).filter(x => x && Date.now() - x.at < 864e5); } catch (e) { return []; } }
-function touchUse(ids) { try { const h = touchHist(); ids.forEach(id => { if (!h.some(x => x.id === id)) h.push({ id, at: Date.now() }); }); localStorage.setItem('sumTouch', JSON.stringify(h.slice(-40))); } catch (e) { } }
+// 2.23.91: touches are fixed per summary slot (phase), so re-renders show the same 1–2 instead of using them up.
+function touchUse(ids, phase) { try { phase = phase || sumPhaseKey(); const h = touchHist(); ids.forEach(id => { if (!h.some(x => x.id === id && x.phase === phase)) h.push({ id, at: Date.now(), phase }); }); localStorage.setItem('sumTouch', JSON.stringify(h.slice(-40))); } catch (e) { } }
 function sumWx() {
   const o = { t: null, fine: false, warm5: false };
   try { const c = WX && WX.data && WX.data.current; if (c) { o.t = c.temperature_2m; o.fine = c.weather_code <= 3 && !(c.precipitation > 0); } } catch (e) { }
@@ -2402,7 +2403,7 @@ function sumTouchCands(tt) {
   const T = todayISO();
   if (m < 360) { // 2.23.90: night owl hours: right now, plus at most a brief note on the morning
     try { const L = (HUESTRIP && HUESTRIP.lights) || {}, on = (L.rooms || []).filter(r => r && r.on).map(r => r.name); if (on.length) add('lightsoff', 'The ' + engList(on.slice(0, 3)) + ' light' + (on.length > 1 ? 's are' : ' is') + ' still on, one tap on Lights to switch off'); } catch (e) { }
-    try { const t = (HUESTRIP.sens || []).find(d => d && d.temp && Number.isFinite(d.temp.c)); const u = ((HEAT.data || (HEATSTRIP && HEATSTRIP.data) || {}).units || []).find(x => x && Number.isFinite(x.room)); if (u) add('roomtemp', (u.name || 'The lounge') + ' is ' + (+u.room).toFixed(1) + '°C' + (u.on ? ', heat pump on at ' + u.temp + '°' : ', heat pump off')); else if (t) add('roomtemp', String(t.room || t.name) + ' is ' + t.temp.c.toFixed(1) + '°C right now'); } catch (e) { }
+    try { const t = ((typeof HUESTRIP !== 'undefined' && HUESTRIP && HUESTRIP.sens) || []).find(d => d && d.temp && Number.isFinite(d.temp.c)); const u = (((typeof hroomData === 'function' && hroomData()) || {}).units || []).find(x => x && x.brand === 'Panasonic' && Number.isFinite(x.room)) || (((typeof hroomData === 'function' && hroomData()) || {}).units || []).find(x => x && Number.isFinite(x.room)); if (u) add('roomtemp', (u.name || 'The lounge') + ' is ' + (+u.room).toFixed(1) + '°C' + (u.on ? ', heat pump on at ' + u.temp + '°' : ', heat pump off')); else if (t) add('roomtemp', String(t.room || t.name) + ' is ' + t.temp.c.toFixed(1) + '°C right now'); } catch (e) { }
     add('winddown', homePick(99, ['A quiet wind-down: a chapter of your book, or a Suno song about the beach', 'Still up? A short episode or a few pages of your book is a nice way to wind down', 'Late one: a calm Suno playlist and the lights down low']));
     try { const f = sugDayFacts(0); if (f.work) add('morning', 'First thing: work from ' + fmtTime(rosterState().days[String(f.dow)]) + (wx.t != null ? ', around ' + Math.round(wx.t) + '° for the drive' : '')); } catch (e) { }
     return out;
@@ -2426,14 +2427,19 @@ function sumTouchCands(tt) {
   return out;
 }
 function sumTouches(n) {
-  n = n || 2; const used = new Set(touchHist().map(x => x.id)), all = sumTouchCands();
-  let pick = all.filter(x => !used.has(x.id));
-  const pri = ['lightsoff', 'roomtemp', 'winddown', 'morning', 'aranea', 'pizza', 'merlot', 'sunset', 'bush', 'mum', 'clean', 'quiet', 'garden', 'thu', 'bfast', 'blue', 'tech'];
-  pick.sort((a, b) => pri.indexOf(a.id) - pri.indexOf(b.id));
-  // rotate a little so the same top pick isn't always first
-  if (pick.length > 2) { const r = (Math.floor(sumToday().min / 210) + homeSugOpenN) % 2; if (r) pick = [pick[1], pick[0]].concat(pick.slice(2)); }
-  if (!pick.length) pick = all.slice(0, 1);
-  return pick.slice(0, n).filter(x => sumWorkOk(x.t) || sumWorkState().quiet);
+  n = n || 2;
+  let ph = ''; try { ph = sumPhaseKey(); } catch (e) { }
+  let all = []; try { all = sumTouchCands(); } catch (e) { return []; }
+  const h = touchHist(), mine = h.filter(x => x.phase === ph).map(x => x.id), used = new Set(h.filter(x => x.phase !== ph).map(x => x.id));
+  let pick = all.filter(x => mine.includes(x.id));
+  if (pick.length < n) {
+    const pri = ['lightsoff', 'roomtemp', 'winddown', 'morning', 'aranea', 'pizza', 'merlot', 'sunset', 'bush', 'mum', 'clean', 'quiet', 'garden', 'thu', 'blue', 'tech'];
+    let more = all.filter(x => !used.has(x.id) && !pick.some(p => p.id === x.id)).sort((a, b) => pri.indexOf(a.id) - pri.indexOf(b.id));
+    if (!more.length && !pick.length) more = all.slice(0, n);
+    pick = pick.concat(more.slice(0, n - pick.length));
+  }
+  try { const ws = sumWorkState(); pick = pick.filter(x => !BFAST_TV_RE.test(x.t) && (ws.quiet || sumWorkOk(x.t, ws))); } catch (e) { }
+  return pick.slice(0, n);
 }
 let AI_SUM = null, aiSumOpen = -1, aiSumBusy = false;
 const AI_FACTS = ['52, wife Sarah, daughters Millesha and Cass, granddaughter Aranea', 'Dog Zeus. Walking him is already on the to-do list, so never suggest a walk with him',
@@ -2519,7 +2525,7 @@ function nightSumLines() {
   if (news[0]) out.push(homePick(95, ['Tonight’s reading: ' + news[0].text.replace(/^(Local|NZ) news: /, '') , 'Worth a look on the News page: ' + news[0].text.replace(/^(Local|NZ) news: /, '')]));
   if (news[1]) out.push('And from around the country: ' + news[1].text.replace(/^(Local|NZ) news: /, ''));
   if (vid) out.push(vid.text + ', if you fancy something to watch');
-  if (top) out.push(top.text + ', in case the spa needs a soundtrack');
+  if (top) { let mm = 0; try { mm = sumToday().min; } catch (e) { } out.push(top.text + (mm >= 1290 && mm <= 1410 ? ', in case the spa needs a soundtrack' : ', a good one to have on')); }
   else if (ev) out.push(ev.text);
   return out.slice(0, 4);
 }
@@ -2622,7 +2628,7 @@ function aiSumCtx() {
     if (ws.quiet) { ctx.atWorkRule = 'He is at work now' + (ws.end ? ' until ' + ws.end : '') + '. Only work-hours things: what is due today, closures on his route home, the weather for the drive home near finish time, the coworker question, quick wins. Do NOT mention gym, tonight, evening, dinner, TV, music, movies, the spa or any after-work plans.'; try { ctx.coworkerQuestion = coworkQ(); } catch (e) { } delete ctx.mealsPlanned; }
   } catch (e) {}
   try { const pr = aboutProfile(); ctx.aboutShane = pr.facts; if (pr.aboutYou.length) ctx.aboutYouAnswers = pr.aboutYou; delete ctx.facts; delete ctx.about;
-    const tc = sumTouches(2); ctx.personalTouches = tc.map(x => x.t); ctx._touchIds = tc.map(x => x.id);
+    const tc = sumTouches(sumToday().min < 360 ? 4 : 2); ctx.personalTouches = tc.map(x => x.t); ctx._touchIds = tc.map(x => x.id);
     { const mm = sumToday().min; ctx.timeOfDayRule = mm < 360 ? 'It is after midnight and he is still up (night owl). Focus only on right now: lights still on, a quiet wind-down idea, what is on, room temperature and heat pump. At most one brief line about the morning (leave time and the weather for the drive). Do not mention this evening’s plans, cooking, gym or the day’s jobs.' : mm < 600 ? 'Morning: talk about the day ahead. Do not mention this evening’s plans (dinner, TV, spa, merlot, cooking) yet.' : mm < 1020 ? 'Afternoon: the rest of today, then tonight.' : 'Evening: tonight, plus one line about tomorrow.'; }
     ctx.personalRule = 'Make it personal and warm, short. Weave in 1 or 2 of personalTouches naturally (they fit right now). Use aboutShane only for context, never list facts back. Never nag about bedtime, teeth, meds, lateness or work hours. Never suggest walking Zeus. No garden feeding or watering if it is above 10°C now or in the next 5 hours.'; } catch (e) {}
   try { if (homeNight()) nightCtx(ctx); } catch (e) {}
@@ -3125,7 +3131,7 @@ function homeSumCard(bits) {
       for (let i = ps.length - 1; i >= 0; i--) if (!sumWorkOk(ps[i].replace(/<[^>]*>/g, ''), ws)) ps.splice(i, 1);
       if (ws.quiet) { const add = []; const H = headsUpList().find(h => h.route); if (H) add.push(li(esc(dot('On your way home: ' + H.what + ', ' + H.when)))); add.push(li(esc('Ask a coworker: ' + coworkQ()))); ps.splice(Math.min(must.length, ps.length), 0, ...add); }
       else if (!night) { const pl = sumPool(); if (pl.length) { const x = pl[(Math.floor(sumToday().min / 210) + homeSugOpenN) % pl.length]; ps.push(li(esc(dot(homeCapClause(x.t))))); } }
-      try { const tc = sumTouches(ws.quiet ? 1 : 2).filter(x => !BFAST_TV_RE.test(x.t)); tc.forEach(x => ps.push(li(esc(dot(homeCapClause(x.t)))))); if (tc.length && !aiSumFresh()) touchUse(tc.map(x => x.id)); } catch (e) { }
+      try { const late = sumToday().min < 360; const tc = sumTouches(ws.quiet ? 1 : late ? 4 : 2); const at = late ? 1 : Math.min(ps.length, 3); ps.splice(at, 0, ...tc.map(x => li(esc(dot(homeCapClause(x.t)))))); if (tc.length) touchUse(tc.map(x => x.id)); } catch (e) { }
     } catch (e) {}
     if (night) { try { nightSumLines().forEach(t => ps.push(li(esc(dot(homeCapClause(homeStripEnd(t))))))); } catch (e) {} } // 2.23.6
     if (flavour && !sumWorkOk(flavour)) flavour = '';
