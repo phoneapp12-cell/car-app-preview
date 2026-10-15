@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.95';
+const APP_VERSION = '2.23.96';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2720,6 +2720,7 @@ function aiLineSafe(x) {
 /* 2.23.94: last pass over every summary path (plain and AI). Dedupe by opener and similarity, drop heading fragments,
    00–06 night filter, and no dinner ideas when the Meal planner already has tonight's dinner. */
 function sumPlannedTitle() { try { const p = (M() && M().plan) || {}, x = p[todayISO()]; return x && x.title ? String(x.title) : ''; } catch (e) { return ''; } }
+const LATE_CHORE_RE = /\b(haircut|hair|tyres?|tires?|vet|lawns?|mow\w*|clean\w*|cars?|wof|rego|service|book\w*|appointment|calendar|to-?do|wash\w*|dishwasher|laundry|tidy\w*|declutter\w*|wardrobe|garage|sort\w*|top-?up|chores?|errands?|pay\w*|due)\b/i; // 2.23.96: hidden 00–06
 const SUM_MEAL_RE = /\b(dinner|tea tonight|cook(ing)?|recipe|meal|stir[ -]?fry|pizza night|takeaway)\b/i;
 function sumLineKeep(txt, seen) {
   try {
@@ -2727,7 +2728,7 @@ function sumLineKeep(txt, seen) {
     const words = x.replace(/[^\p{L}\p{N}' ]/gu, ' ').split(/\s+/).filter(Boolean);
     if (words.length < 5 && !/^(good (morning|afternoon|evening)|hope|morning|evening|night owl)/i.test(x) && !/\d/.test(x)) return false; // heading fragments
     let mm = 720; try { mm = sumToday().min; } catch (e) { }
-    if (mm < 360 && (LATE_BAN_RE.test(x) || SUM_MEAL_RE.test(x))) return false;
+    if (mm < 360 && (LATE_BAN_RE.test(x) || SUM_MEAL_RE.test(x) || LATE_CHORE_RE.test(x))) return false;
     try { if (homeNight() && !nightOk(x)) return false; } catch (e) { }
     const planned = sumPlannedTitle();
     if (planned && SUM_MEAL_RE.test(x) && !x.toLowerCase().includes(planned.toLowerCase().slice(0, 12))) return false;
@@ -2813,7 +2814,7 @@ function homeSugHtml() {
   try { list = aiSugList() || homeSuggestions(); } catch (e) { list = []; }
   try { list = list.filter(x => x && sumWorkOk(String(x.text || '') + ' ' + String((x.pre && (x.pre.title || x.pre.text)) || ''))); } catch (e) {} // 2.23.76
   try { if (homeNight()) list = list.filter(x => x && nightOk(String(x.text || '') + ' ' + String((x.pre && (x.pre.title || x.pre.text)) || ''))); } catch (e) {} // 2.23.6
-  try { const mm = sumToday().min, planned = sumPlannedTitle(); list = list.filter(x => { const t = String(x.text || '') + ' ' + String((x.pre && (x.pre.title || x.pre.text)) || ''); if (mm < 360 && (LATE_BAN_RE.test(t) || SUM_MEAL_RE.test(t))) return false; if (planned && SUM_MEAL_RE.test(t)) return false; return !/\bnot a strong case\b/i.test(t); }); } catch (e) { } // 2.23.94
+  try { const mm = sumToday().min, planned = sumPlannedTitle(); list = list.filter(x => { const t = String(x.text || '') + ' ' + String((x.pre && (x.pre.title || x.pre.text)) || ''); if (mm < 360 && (LATE_BAN_RE.test(t) || SUM_MEAL_RE.test(t) || LATE_CHORE_RE.test(t) || x.type === 'todo' || x.type === 'appt')) return false; if (planned && SUM_MEAL_RE.test(t)) return false; return !/\bnot a strong case\b/i.test(t); }); } catch (e) { } // 2.23.94
   homeSugNow = list;
   if (!list.length) return '';
   const label = { todo: 'to your to-do list', note: 'as a note', appt: 'to your calendar' };
