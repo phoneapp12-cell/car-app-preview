@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.78';
+const APP_VERSION = '2.23.79';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9910,6 +9910,7 @@ function More() {
     reminders: () => remindersMoreSub(),
     loans: () => loansMoreSub(),
     budget: () => budgetMoreSub(),
+    lights: () => hueKey() ? 'Philips Hue rooms, lights and scenes' : 'Connect Philips Hue',
     events: () => ne ? `Next: ${esc(ne.title)}, ${daysLeft(ne.date) === 0 ? 'today' : fmtW(ne.date)}` : 'What’s on in Whangārei',
     news: () => newsMoreSub(),
     tv: () => 'TVNZ 1, TVNZ 2, Three and Sky Starter',
@@ -9976,7 +9977,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   claims: ['medkit', 'health', 'UniMed claims', 'Claims'],
   diary: ['book', 'diary', 'Diary', 'Diary'],
   countdown: ['clock', 'count', 'Countdown', 'Countdown'],
-  notes: ['note', 'note', 'Notes', 'Notes']
+  notes: ['note', 'note', 'Notes', 'Notes'],
+  lights: ['bulb', 'garden', 'Lights', 'Lights']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -9986,7 +9988,7 @@ const NAV_GROUPS = [
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans', 'claims'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
-  { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas'] },
+  { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge', 'roadworks'] },
   { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts', 'radio', 'travel'] }
 ];
@@ -12139,6 +12141,52 @@ function gymLogForm(id) {
       const g = gymState(); g.log.push(e); g.log = g.log.slice(-1500);
       await save(); gymRefresh(); toast('Logged. Nice work.');
     });
+}
+/* 2.23.79: Lights (Philips Hue, through the relay's /hue endpoints; the Hue sign-in happens on Philips' own page).
+   The phone keeps only its own random relay key (localStorage 'hueKey'); Hue tokens stay in the relay. */
+let HUE = { st: 'idle', data: null, err: '' };
+const hueKey = () => { try { return localStorage.getItem('hueKey') || ''; } catch (e) { return ''; } };
+async function hueCall(path, body) {
+  const r = await fetch(RELAY_URL + '/hue/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: hueKey(), ...(body || {}) }) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ('http_' + r.status)); return j;
+}
+function hueRedraw() { const el = document.getElementById('huebox'); if (el) el.innerHTML = hueBody(); }
+async function hueLoad() {
+  HUE.st = 'loading'; HUE.err = ''; hueRedraw();
+  try { const j = await hueCall('lights'); HUE.data = j; HUE.st = j.setup === false ? 'nosetup' : j.linked ? 'ok' : 'unlinked'; }
+  catch (e) { HUE.st = 'error'; HUE.err = String(e.message || e); }
+  hueRedraw();
+}
+async function hueConnect() {
+  try {
+    const r = await fetch(RELAY_URL + '/hue/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); const j = await r.json();
+    if (j.setup === false || !j.key || !j.url) { HUE.st = 'nosetup'; hueRedraw(); return; }
+    localStorage.setItem('hueKey', j.key); location.href = j.url;
+  } catch (e) { toast('Couldn’t reach the lights service. Try again soon.'); }
+}
+async function hueSet(type, id, extra) {
+  try { await hueCall('set', { type, id, ...extra }); if (type === 'scene') toast('Scene on.'); setTimeout(hueLoad, 400); }
+  catch (e) { toast('That didn’t work. The bridge may be offline.'); }
+}
+function hueBody() {
+  if (HUE.st === 'idle' || HUE.st === 'loading') return `<div class="card"><div class="s">Checking your lights…</div></div>`;
+  if (HUE.st === 'nosetup') return `<div class="card empty"><div class="t">Philips Hue isn’t set up yet</div><div class="s">The Hue developer app still needs registering. Once that’s done, a Connect button shows here.</div></div>`;
+  if (HUE.st === 'unlinked') return `<div class="card"><div class="t" style="font-weight:800">Connect your Hue lights</div><div class="s" style="margin:4px 0 10px">You sign in on Philips Hue’s own page and allow My App. Your Hue password never comes to this app.</div><button type="button" class="btn primary" onclick="hueConnect()">${I('bulb')} Connect Philips Hue</button></div>`;
+  if (HUE.st === 'error') return `<div class="card empty"><div class="t">Couldn’t reach your lights</div><div class="s">The Hue bridge or service may be offline.</div><button type="button" class="btn small" style="margin-top:8px" onclick="hueLoad()">Try again</button></div>`;
+  const d = HUE.data || {}, rooms = d.rooms || [], scenes = d.scenes || [];
+  const sw = (type, id, on) => `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="On or off" onclick="hueSet(${jsArg(type)},${jsArg(id)},{on:${!on}})"></button>`;
+  const sl = (type, id, bri) => bri == null ? '' : `<input type="range" min="1" max="100" value="${bri}" aria-label="Brightness" style="width:100%;margin-top:6px" onchange="hueSet(${jsArg(type)},${jsArg(id)},{bri:+this.value,on:true})">`;
+  const roomCards = rooms.map(r => {
+    const sc = scenes.filter(x => x.room === r.id);
+    return `<div class="card"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t" style="font-weight:800">${esc(r.name || 'Room')}</div><div class="s">${r.on ? 'On' + (r.bri != null ? ' · ' + r.bri + '%' : '') : 'Off'}</div></div>${r.group ? sw('grouped_light', r.group, r.on) : ''}</div>${r.group ? sl('grouped_light', r.group, r.bri) : ''}
+      ${sc.length ? `<div class="chips scroll" style="margin-top:8px">${sc.map(x => `<button class="chip" onclick="hueSet('scene',${jsArg(x.id)})">${esc(x.name || 'Scene')}</button>`).join('')}</div>` : ''}</div>`;
+  }).join('');
+  const lights = (d.lights || []).map(l => `<div class="card"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t">${esc(l.name || 'Light')}</div><div class="s">${l.on ? 'On' + (l.bri != null ? ' · ' + l.bri + '%' : '') : 'Off'}</div></div>${sw('light', l.id, l.on)}</div>${sl('light', l.id, l.bri)}</div>`).join('');
+  return (roomCards ? `<div class="sec">Rooms</div>${roomCards}` : '') + (lights ? `<details><summary class="sec" style="cursor:pointer">All lights</summary>${lights}</details>` : '') + (!roomCards && !lights ? `<div class="card empty"><div class="t">No lights found</div><div class="s">Add them in the Philips Hue app first.</div></div>` : '') + `<button type="button" class="btn small" style="margin-top:10px" onclick="hueLoad()">Refresh</button>`;
+}
+function Lights() {
+  setTimeout(() => { if (HUE.st !== 'loading') hueLoad(); }, 0);
+  return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Lights', 'Philips Hue rooms, lights and scenes') + `<div id="huebox">${hueBody()}</div>`;
 }
 function Gym() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
@@ -17351,7 +17399,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds };
+  const map = { claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
