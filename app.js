@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.25.5';
+const APP_VERSION = '2.25.6';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14098,11 +14098,26 @@ function syncStatusLine() {
   return (st.ok ? 'Last sync ' : 'Last try ') + ago(st.at) + (st.msg ? '. ' + st.msg : '.');
 }
 let phoneSyncMute = false, phoneSyncTimer = null, phoneSyncJob = null, phoneSyncPending = null, phoneSyncBigTold = false;
+// 2.25.6: fewer relay writes. Pushes wait 15 s after the last change, at most one every 2 minutes,
+// and are skipped when nothing in the synced data changed. Leaving the app sends any change straight away.
+const PHONE_SYNC_GAP = 120000;
+let phoneSyncLastAt = 0;
 function schedulePhoneSync() {
   if (phoneSyncMute || !syncCode()) return;
   clearTimeout(phoneSyncTimer);
-  phoneSyncTimer = setTimeout(() => queuePhoneSync('push'), 1200);
+  const wait = Math.max(15000, phoneSyncLastAt + PHONE_SYNC_GAP - Date.now());
+  phoneSyncTimer = setTimeout(() => queuePhoneSync('push'), wait);
 }
+function syncFingerprint(b) {
+  try {
+    const d = Object.assign({}, b.data); delete d.updatedAt;
+    const t = JSON.stringify({ d, l: b.local });
+    let h1 = 0x811c9dc5, h2 = 0x1234567;
+    for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = Math.imul(h2 ^ c, 2246822519); }
+    return t.length + ':' + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+  } catch (e) { return ''; }
+}
+document.addEventListener('visibilitychange', () => { try { if (document.visibilityState === 'hidden' && phoneSyncTimer && syncCode()) { clearTimeout(phoneSyncTimer); phoneSyncTimer = null; queuePhoneSync('push'); } } catch (e) { } });
 function queuePhoneSync(mode) {
   if (phoneSyncMute || !syncCode() || !S) return Promise.resolve();
   if (phoneSyncJob) { if (mode === 'open' || phoneSyncPending === 'open') phoneSyncPending = 'open'; else phoneSyncPending = 'push'; return phoneSyncJob; }
@@ -14150,8 +14165,11 @@ async function phoneSyncPushOnce() {
     phoneSyncMute = true;
     try { S.updatedAt = new Date().toISOString(); await kvSet('data', S); } finally { phoneSyncMute = false; }
   }
+  const bundle = syncBundle(), fp0 = syncFingerprint(bundle), fp = fp0 ? String(code).slice(-6) + '|' + fp0 : '';
+  let lastFp = ''; try { lastFp = localStorage.getItem('syncLastFp') || ''; } catch (e) { }
+  if (fp && fp === lastFp) { phoneSyncLastAt = Date.now(); return; } // nothing new to send
   let enc;
-  try { enc = await SyncLogic.encryptSync(code, syncBundle()); }
+  try { enc = await SyncLogic.encryptSync(code, bundle); }
   catch (e) {
     if (e && e.message === 'too_big') {
       setSyncStatus(false, 'Too big to sync');
@@ -14161,7 +14179,8 @@ async function phoneSyncPushOnce() {
     throw e;
   }
   const res = await syncPost({ op: 'push', code, updatedAt: S.updatedAt, iv: enc.iv, ct: enc.ct });
-  if (res.stored) { setSyncStatus(true, 'Synced'); return; }
+  phoneSyncLastAt = Date.now();
+  if (res.stored) { try { if (fp) localStorage.setItem('syncLastFp', fp); } catch (e) { } setSyncStatus(true, 'Synced'); return; }
   if (res.reason === 'older' && res.ct) {
     const pack = await SyncLogic.decryptSync(code, res.iv, res.ct);
     if (SyncLogic.decideSync(S, pack) === 'pull' && !sheetOpen) {

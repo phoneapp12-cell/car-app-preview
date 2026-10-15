@@ -1,3 +1,4 @@
+import { cacheGet, cachePut, cacheDel } from './kvguard.js';
 /* Heat pumps (2.23.86): Panasonic Comfort Cloud + Mitsubishi MELCloud.
    Emails/passwords are Worker secrets; never returned. Tokens cache in EVENTS_KV.
    Gated like Hue: allowed Origin + the phone's Hue key fingerprint (same key as Lights). */
@@ -17,7 +18,7 @@ async function keyOk(env, key) {
   return hex === (await hueOwner(env));
 }
 async function load(env) { try { return await env.EVENTS_KV.get(KV, { type: 'json' }) || {}; } catch (e) { return {}; } }
-async function save(env, rec) { await env.EVENTS_KV.put(KV, JSON.stringify(rec)); }
+async function save(env, rec) { const { cache, ...keep } = rec || {}; await env.EVENTS_KV.put(KV, JSON.stringify(keep)); }
 
 function pApiKey(ts, token) {
   const ms = String(Date.parse(ts.replace(' ', 'T') + 'Z'));
@@ -213,17 +214,17 @@ export async function heatRoute(path, request, env, f, okOrigin, reply) {
   if (!(await keyOk(env, body.key))) return reply(200, { setup: true, linked: false });
   try {
     if (path === '/heat/status') {
-      const rec = await load(env);
-      if (rec.cache && Date.now() - (rec.cache.at || 0) < CACHE_MS) return reply(200, { setup: true, linked: true, ...rec.cache.data });
+      const cc = await cacheGet('heat-status');
+      if (cc && Date.now() - (cc.at || 0) < CACHE_MS) return reply(200, { setup: true, linked: true, ...cc.data });
       const [p, m] = await Promise.all([pUnits(env, f), mUnits(env, f)]);
       const data = { brands: { panasonic: p.error ? { ok: false, error: p.error } : { ok: true }, mitsubishi: m.error ? { ok: false, error: m.error } : { ok: true } }, units: [...(p.units || []), ...(m.units || [])] };
-      const r2 = await load(env); r2.cache = { at: Date.now(), data }; await save(env, r2);
+      await cachePut('heat-status', { at: Date.now(), data }, Math.ceil(CACHE_MS / 1000));
       return reply(200, { setup: true, linked: true, ...data });
     }
     if (path === '/heat/set') {
       const id = String(body.id || ''); if (!/^([pm]):/.test(id)) return reply(400, { error: 'bad_id' });
       const r = id.startsWith('p:') ? await pSet(env, f, id, body) : await mSet(env, f, id, body);
-      if (r.ok) { const rec = await load(env); delete rec.cache; await save(env, rec); }
+      if (r.ok) await cacheDel('heat-status');
       return reply(200, r);
     }
   } catch (e) { return reply(502, { error: 'heat_unavailable', detail: String(e && e.message || e).slice(0, 80) }); }

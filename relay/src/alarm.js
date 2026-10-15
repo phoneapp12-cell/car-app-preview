@@ -1,3 +1,4 @@
+import { cacheGet, cachePut } from './kvguard.js';
 /* 2.23.97: Alarm.com (ADT NZ) READ-ONLY status. No arm/disarm or any command endpoint exists here.
    Secrets: ADC_USERNAME, ADC_PASSWORD, ADC_MFA_COOKIE (trusted-device cookie). Session cookies cache in EVENTS_KV.
    Gated like Hue: allowed Origin + the phone's Hue key fingerprint. */
@@ -11,7 +12,7 @@ async function keyOk(env, key) {
   return [...new Uint8Array(dig)].map(b => b.toString(16).padStart(2, '0')).join('') === (await hueOwner(env));
 }
 async function load(env) { try { return await env.EVENTS_KV.get(KV, { type: 'json' }) || {}; } catch (e) { return {}; } }
-async function save(env, rec) { await env.EVENTS_KV.put(KV, JSON.stringify(rec)); }
+async function save(env, rec) { const { cache, ...keep } = rec || {}; await env.EVENTS_KV.put(KV, JSON.stringify(keep)); }
 function takeCookies(jar, res) {
   let list = []; try { list = res.headers.getSetCookie ? res.headers.getSetCookie() : []; } catch (e) { }
   if (!list.length) { const one = res.headers.get('set-cookie'); if (one) list = one.split(/,(?=\s*[A-Za-z0-9_.-]+=)/); }
@@ -50,7 +51,7 @@ async function read(env, f) {
   const rec = await load(env);
   let jar = rec.jar && Date.now() - (rec.jarAt || 0) < SESS_MS ? rec.jar : null;
   for (let i = 0; i < 2; i++) {
-    if (!jar) { jar = await login(env, f); rec.jar = jar; rec.jarAt = Date.now(); }
+    if (!jar) { jar = await login(env, f); rec.jar = jar; rec.jarAt = Date.now(); rec.fresh = true; }
     const rs = await req(f, jar, B + '/web/api/devices/sensors', { headers: hdr(jar) });
     if (rs.status === 401 || rs.status === 403 || rs.status === 409) { if (i === 0) { jar = null; continue; } throw new Error(rs.status === 409 ? '2fa_required' : 'auth_' + rs.status); }
     if (!rs.ok) throw new Error('sensors_' + rs.status);
@@ -63,7 +64,9 @@ async function read(env, f) {
     try { const rh = await req(f, jar, B + '/web/api/activity/historyEvents', { headers: hdr(jar) });
       if (rh.ok) { const jh = await rh.json(); events = (jh.data || []).map(d => { const a = d.attributes || {}; return { t: String(a.eventDate || ''), dev: String(a.deviceDescription || ''), what: String(a.description || ''), crit: !!a.isCritical, type: a.eventType ?? null }; }).filter(e => e.t && !/^idle$/i.test(e.what)).slice(0, 40); } } catch (e) { events = []; }
     const parts = (jp.data || []).map(d => { const a = d.attributes || {}; return { name: String(a.description || 'Alarm'), state: PSTATE[a.state] || 'unknown' }; });
-    await save(env, { ...rec, jar, jarAt: rec.jarAt || Date.now(), err: null });
+    { const now = Date.now(), changed = JSON.stringify(rec.jar || null) !== JSON.stringify(jar);
+      const fresh = rec.fresh; delete rec.fresh;
+      if (fresh || rec.err || !rec.savedAt || (changed && now - rec.savedAt > 5 * 60000)) await save(env, { ...rec, jar, jarAt: rec.jarAt || now, err: null, savedAt: now }); }
     return { sensors, partitions: parts, events };
   }
   throw new Error('auth_failed');
@@ -76,14 +79,15 @@ export async function alarmRoute(path, request, env, f, okOrigin, reply) {
   if (!(await keyOk(env, body.key))) return reply(200, { setup: true, linked: false });
   if (path !== '/alarm/status') return reply(404, { error: 'not_found' });
   try {
-    const rec = await load(env);
-    if (rec.cache && Date.now() - rec.cache.at < CACHE_MS) return reply(200, { setup: true, linked: true, at: rec.cache.at, ...rec.cache.data });
+    const cc = await cacheGet('alarm-status');
+    if (cc && Date.now() - cc.at < CACHE_MS) return reply(200, { setup: true, linked: true, at: cc.at, ...cc.data });
     const data = await read(env, f);
-    const r2 = await load(env); r2.cache = { at: Date.now(), data }; await save(env, r2);
-    return reply(200, { setup: true, linked: true, at: r2.cache.at, ...data });
+    const at = Date.now(); await cachePut('alarm-status', { at, data }, 3600); await cachePut('alarm-last', { at, data }, 86400);
+    return reply(200, { setup: true, linked: true, at, ...data });
   } catch (e) {
     const err = String(e && e.message || e).slice(0, 40); const r3 = await load(env); r3.err = err; r3.jar = null; await save(env, r3).catch(() => { });
-    if (r3.cache) return reply(200, { setup: true, linked: true, stale: true, error: err, at: r3.cache.at, ...r3.cache.data });
+    const last = (await cacheGet('alarm-last')) || r3.cache;
+    if (last) return reply(200, { setup: true, linked: true, stale: true, error: err, at: last.at, ...last.data });
     return reply(200, { setup: true, linked: true, error: err, sensors: [], partitions: [] });
   }
 }
