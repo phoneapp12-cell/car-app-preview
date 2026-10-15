@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.6';
+const APP_VERSION = '2.24.7';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4080,6 +4080,11 @@ function cleanHead(name, now) {
 function classicDogHead(name, now) {
   const h = header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => (mascotKey() === 'dog' ? '' : catHtml()), '')); // 2.24.4: the left dog replaces the wagging header dog (no two dogs); a chosen cat stays
   return h.replace('<div class="top"><div style="min-width:0">', '<div class="top"><div class="cldogwrap"><img class="cldog" src="art/dog.webp" alt="" width="52" height="52" onerror="this.remove()"><div style="min-width:0">').replace(/<\/div>\s*<div class="iconrow">/, '</div></div>\n  <div class="iconrow">');
+}
+// 2.24.7: Settings › Check for update. Asks the service worker for a new version, then reloads.
+async function checkAppUpdate() {
+  try { toast('Checking for an update…'); const r = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (r) { await r.update(); if (r.waiting) r.waiting.postMessage({ type: 'SKIP_WAITING' }); } } catch (e) { }
+  setTimeout(() => location.reload(), 1200);
 }
 function cleanBell() { const el = document.querySelector('[data-k="justadded"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else toast('Nothing new in Just added.'); }
 function cleanWx() {
@@ -12573,8 +12578,33 @@ function homeRoomTemps() {
   let rooms = '', al = '';
   try { if (!sumWorkState().atWork) { setTimeout(hroomFetch, 0); const h = hroomInner(); rooms = `<div id="homerooms" class="homerooms" onclick="go('#heat')"${h ? '' : ' hidden'}>${h}</div>`; } } catch (e) { rooms = ''; }
   try { const a = homeAlarmInner(); al = `<div id="homealarm" class="homealarm" onclick="go('#alarm')"${a ? '' : ' hidden'}>${a}</div>`; } catch (e) { al = ''; }
-  if (!rooms && !al) return '';
-  return `<div class="homehead2">${rooms || '<div></div>'}${al}</div>`;
+  let li = ''; try { setTimeout(hlightFetch, 0); const l = homeLightsInner(); li = `<div id="homelights" class="homelights" onclick="go('#lights')"${l ? '' : ' hidden'}>${l}</div>`; } catch (e) { li = ''; }
+  if (!rooms && !al && !li) return '';
+  return `<div class="homehead2">${rooms || '<div></div>'}<div class="homeright">${al}${li}</div></div>`;
+}
+/* 2.24.7: Hue lights on, right of the header under the open doors (amber). Grouped by room; hidden when none on or no data. */
+let HLIGHT = (() => { try { return JSON.parse(localStorage.getItem('hlightCache') || 'null'); } catch (e) { return null; } })(), hlightBusy = false;
+function homeLightsInner() {
+  try {
+    const d = HLIGHT && HLIGHT.data; if (!d || Date.now() - HLIGHT.at > 30 * 60000) return '';
+    let names = (d.rooms || []).filter(r => r && r.on).map(r => String(r.name || '').trim()).filter(Boolean);
+    if (!names.length) names = (d.lights || []).filter(l => l && l.on).map(l => String(l.room || l.name || '').trim()).filter(Boolean);
+    names = [...new Set(names.map(n => /kitchen|spot/i.test(n) ? 'Kitchen' : n))];
+    const ord = n => /lounge|living/i.test(n) ? 0 : /kitchen/i.test(n) ? 1 : /dining/i.test(n) ? 2 : 3;
+    names.sort((a, b) => ord(a) - ord(b) || a.localeCompare(b));
+    if (!names.length) return '';
+    return names.slice(0, 3).map(n => `<span class="hli">${esc(n)} on</span>`).join('') + (names.length > 3 ? `<span class="hli">+${names.length - 3} more on</span>` : '');
+  } catch (e) { return ''; }
+}
+async function hlightFetch() {
+  try {
+    if (hlightBusy || typeof hueKey !== 'function' || !hueKey() || navigator.onLine === false) return;
+    if (HLIGHT && Date.now() - HLIGHT.at < 60000) return;
+    hlightBusy = true;
+    const j = await hueCall('lights');
+    if (j && j.linked) { HLIGHT = { at: Date.now(), data: { rooms: (j.rooms || []).map(r => ({ name: r.name, on: !!r.on })), lights: (j.lights || []).map(l => ({ name: l.name, room: l.room, on: !!l.on })) } }; try { localStorage.setItem('hlightCache', JSON.stringify(HLIGHT)); } catch (e) { } }
+  } catch (e) { } finally { hlightBusy = false; }
+  try { const el = document.getElementById('homelights'); if (el) { const h = homeLightsInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { }
 }
 // 2.23.98: open doors/windows from Alarm.com, right side of the header, opposite the temps. Hidden when nothing is open.
 function homeAlarmInner() {
@@ -16198,6 +16228,7 @@ function Settings() {
    <a class="srow" href="https://transact.nzta.govt.nz/v2/check-expiry" target="_blank" rel="noopener"><div class="tx"><div class="t">Check WOF and rego expiry dates</div><div class="s">transact.nzta.govt.nz</div></div>${I('ext')}</a>
    <a class="srow" href="https://transact.nzta.govt.nz/v2/vehicle-licence-renewal" target="_blank" rel="noopener"><div class="tx"><div class="t">Renew rego online</div><div class="s">transact.nzta.govt.nz</div></div>${I('ext')}</a>
   </div>
+  <div class="card" id="appver" style="text-align:center;padding:14px"><div style="font-weight:800;font-size:1.05rem">Version ${APP_VERSION}</div><div class="btns" style="justify-content:center;margin-top:8px"><button type="button" class="btn small" onclick="checkAppUpdate()">${I('refresh')} Check for update</button></div></div>
   <div class="foot">My App · version ${APP_VERSION}<br>${savedWhere()}</div>`;
 }
 async function toggleSetting(k) { S.settings[k] = S.settings[k] === false; await save(); await setupBackground(); render(); }
