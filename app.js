@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.0';
+const APP_VERSION = '2.24.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13026,7 +13026,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-15'
+// VIDEO_LIST_UPDATED = '2026-10-16'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -13046,7 +13046,7 @@ const VIDEOS = [
   { id: 'TD74a5g5rp0', title: 'Everything Apple announced in under 10 mins - Welcome Home 2026', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=TD74a5g5rp0', reason: 'Linus Tech Tips sums up everything Apple announced at Welcome Home 2026 in under ten minutes.' },
   { id: 'QVv3mQzlrN0', title: 'Apple Homeview Impressions: Not Convinced!', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=QVv3mQzlrN0', reason: 'MKBHD’s first impressions of Apple Homeview, and why he isn’t sold on it yet.' },
   { id: 'ANmTVYkEtLw', title: 'Google Pixel 11/Pro Review: Poker Face', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=ANmTVYkEtLw', reason: 'MKBHD’s full review of the Google Pixel 11 and Pixel 11 Pro.' },
-  { id: 'Fx0x3oI_ngo', title: 'How Expensive is the Fastest PC of 2026?', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=Fx0x3oI_ngo', reason: 'Linus Tech Tips prices up what a top-end PC costs in 2026.' },
+  { id: 'qqhIp0OaZWI', title: 'NVIDIA RTX Spark 7 Good and Bad Things', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=qqhIp0OaZWI', reason: 'Linus Tech Tips runs through the good and bad points of the new NVIDIA RTX Spark.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
   { id: '2_XNm1xE0Y4', title: 'PB Live: Headphones & Audio - Showcase & Sale', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=2_XNm1xE0Y4', reason: 'A PB Tech live showcase of headphones and audio gear on sale.' },
   { id: '4XkoerzEWuk', title: 'I BOUGHT the CHEAPEST pre-built gaming PC from JB HiFi 😬', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=4XkoerzEWuk', reason: 'TechSauce unboxes the cheapest pre-built gaming PC from JB Hi-Fi.' },
@@ -13055,7 +13055,7 @@ const VIDEOS = [
   { id: 'CkAg3RLv1-E', title: 'Top Tips for Citrus Success! | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=CkAg3RLv1-E', reason: 'Gardening Australia’s top tips for healthier citrus trees.' },
   { id: 'mkA-AAJRIcM', title: '8 Crops You Should Plant in October ASAP', channel: 'Epic Gardening', category: 'garden', url: 'https://www.youtube.com/watch?v=mkA-AAJRIcM', reason: 'Eight crops worth planting in October, right on time for spring in New Zealand.' },
   { id: 'WM_mlF9MH6k', title: 'I let my tomato seeds rot to save them...', channel: 'Epic Gardening', category: 'garden', url: 'https://www.youtube.com/watch?v=WM_mlF9MH6k', reason: 'A tomato seed trick that helps you save seed for next season.' },
-  { id: 'szVXpM7VVMg', title: 'How to Learn So Fast People Assume You’re Naturally Gifted (with AI)', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=szVXpM7VVMg', reason: 'Ali Abdaal on learning faster with simple AI-backed habits.' },
+  { id: '9_l_xMvI7YY', title: 'Planning feels productive, but it\'s not', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=9_l_xMvI7YY', reason: 'Ali Abdaal on why planning can feel like progress when it isn’t, and what to do instead.' },
   { id: 'I8Om2suIykU', title: 'One of the most underrated skills: knowing when to ignore advice', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=I8Om2suIykU', reason: 'Why knowing which advice to skip saves time and focus.' },
   { id: 'MBPHU7aaklM', title: 'Success Is Hard Until You Build Systems Like This', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=MBPHU7aaklM', reason: 'How building simple systems makes big goals easier to stick with.' },
   { id: 'K8AMhj-ImMI', title: 'If you’re ambitious but inconsistent, please watch this', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=K8AMhj-ImMI', reason: 'Ali Abdaal on staying consistent when ambition alone is not enough.' },
