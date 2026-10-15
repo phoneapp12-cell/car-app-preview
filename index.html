@@ -1574,6 +1574,8 @@ html:is([data-theme="dark"],[data-theme="night"]){--muted:#C3CCDA}html:is([data-
 html.gfx:not([data-theme="night"]) .top :is(.sub,.subhi,.subdate,h1){color:var(--ink)!important;text-shadow:0 0 6px rgba(255,255,255,.9),0 0 2px rgba(255,255,255,.9)}html.gfx:not([data-theme="night"]) :is(.catchip,.catband){background:color-mix(in srgb,var(--cat) 72%,#000)}html.gfx:not([data-theme="night"]) .tabname{background:rgba(15,23,35,.62);padding:0 8px;border-radius:8px}html.gfx:not([data-theme="night"]) .culegend>summary{color:var(--ink)}html[data-theme="grey"] .cuk{color:var(--ink)!important}html.gfx:not([data-theme="night"]) :is(.foot,.linkbtn,.tkmore,.ytopen,.culegend>summary){color:var(--ink)!important}html.gfx:not([data-theme="night"]) :is(.foot,.culegend>summary){background:var(--glass);border-radius:10px;padding:4px 8px}html.gfx:not([data-theme="night"]) .cuk{background-color:rgba(255,255,255,.9)!important;color:var(--ink)!important}
 /* 2.23.75 Clean Home layout */
 html.clean .clhead{display:flex;align-items:center;gap:12px;margin:4px 0 16px}
+html:not(.clean) .cldogwrap{display:flex;align-items:center;gap:12px;min-width:0}
+html:not(.clean) .cldogwrap .cldog{width:52px;height:52px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,.15);flex:none;background:#FFECCD}
 html.clean .cldog{width:52px;height:52px;border-radius:50%;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,.15);flex:none;background:#FFECCD}
 html.clean .clhead .cltx{flex:1;min-width:0}
 html.clean .clhead h1{font-size:1.3rem;font-weight:800;margin:0;color:var(--ink);line-height:1.2}
