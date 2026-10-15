@@ -1624,7 +1624,10 @@ html.clean:is([data-theme="dark"],[data-theme="night"]) .cltag-up{background:#31
 html.clean:is([data-theme="dark"],[data-theme="night"]) .cltag-heads{background:#881337;color:#FFE4E6}
 html.clean:is([data-theme="dark"],[data-theme="night"]) .cltag-work{background:#14532D;color:#DCFCE7}
 html.clean:is([data-theme="dark"],[data-theme="night"]) .clwarn{color:#FCA5A5}
-html.clean :is(.callout,.card:not(.clcard)){border:0!important;box-shadow:0 4px 18px rgba(16,24,40,.07)!important;border-radius:20px!important}html.clean .hsec>*{border-color:transparent}</style>
+html.clean :is(.callout,.card:not(.clcard)){border:0!important;box-shadow:0 4px 18px rgba(16,24,40,.07)!important;border-radius:20px!important}html.clean .hsec>*{border-color:transparent}/* 2.23.85: Battery low strip slide in red, readable day and night */
+.qstrip .qslide[data-k="huebatt"] :is(.qslbl,.qsq,.qsq b,.qsw){color:#C62828!important}
+html:is([data-theme="dark"],[data-theme="night"],[data-wx$="-n"]) .qstrip .qslide[data-k="huebatt"] :is(.qslbl,.qsq,.qsq b,.qsw){color:#FF8A80!important}
+</style>
 </head>
 <body>
 <div id="app">

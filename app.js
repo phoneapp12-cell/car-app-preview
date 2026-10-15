@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.84';
+const APP_VERSION = '2.23.85';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3680,6 +3680,9 @@ const CU_EXTRA = {
   meds: T => { const m = medsState(), d = todayISO(); return m.list.filter(x => x && x.name && !medTakenAt(x.id, d)).map(x => ({ days: 0, rank: 1, sort: x.time || '99', kind: 'med', name: x.name,
     html: attRow({ kind: 'med', date: d, go: `go('#meds')`, ic: 'health', icon: 'pill', title: esc(x.name) + (x.dose ? ' · ' + esc(x.dose) : ''), sub: `Medication · ${x.time ? fmtTime(x.time) : 'Any time'} today` }) })); },
   // Gym nights (Tuesday and Wednesday after work), today and tomorrow
+  // 2.23.85: Hue sensors and switches with a low battery (from the last sensor fetch)
+  huebatt: T => hueLowBatt().map(d => ({ days: 0, rank: 0, sort: '00', kind: 'huebatt', name: d.name + ' battery low',
+    html: attRow({ kind: 'huebatt', date: todayISO(), go: `go('#lights')`, ic: 'bill', icStyle: 'background:#FDE8E8;color:#C62828', icon: 'warn', title: `${esc(d.name)} battery low, ${Math.round(d.pct)}%`, sub: `Philips Hue${d.room ? ' · ' + esc(d.room) : ''} · swap the battery soon` }) })),
   gym: T => [0, 1].filter(n => { const w = new Date(T + n * DAY).getUTCDay(); return (w === 2 || w === 3) && !gymSkipped(isoT(T + n * DAY)); }).map(n => ({ days: n, rank: 1, sort: '18:15', kind: 'gym', name: 'Gym',
     html: attRow({ kind: 'gym', date: isoT(T + n * DAY), go: `go('#gym')`, ic: 'health', icon: 'heart', title: 'Gym' + (n ? '' : ' tonight'), sub: `After work · Day ${new Date(T + n * DAY).getUTCDay() === 3 ? 'B' : 'A'}` }) })),
   // Nightlife in the next 3 days that isn't during a shift (a few, lowest priority)
@@ -12178,7 +12181,7 @@ let HUES = { st: 'idle', list: [], err: '' };
 function hueSensRedraw() { const el = document.getElementById('huesens'); if (el) el.innerHTML = hueSensBody(); }
 async function hueSensLoad() {
   const had = HUES.st === 'ok'; HUES.st = 'loading'; if (!had) hueSensRedraw();
-  try { const j = await hueCall('sensors'); HUES.list = Array.isArray(j && j.sensors) ? j.sensors : []; HUES.st = j && j.linked === false ? 'unlinked' : 'ok'; }
+  try { const j = await hueCall('sensors'); HUES.list = Array.isArray(j && j.sensors) ? j.sensors : []; if (j && j.linked) { HUESTRIP.sens = HUES.list; hueBattSave(HUES.list); } HUES.st = j && j.linked === false ? 'unlinked' : 'ok'; }
   catch (e) { HUES.st = 'error'; HUES.err = String(e.message || e); }
   hueSensRedraw();
 }
@@ -12209,7 +12212,8 @@ function hueSensBody() {
       if (d.rotary && (d.rotary.direction || d.rotary.action)) L.push(`Dial: ${esc(String(d.rotary.direction || d.rotary.action).replace(/_/g, ' '))}${n(d.rotary.steps) ? ' ' + d.rotary.steps + ' steps' : ''}${d.rotary.when ? ' · ' + esc(hueWhen(d.rotary.when)) : ''}`);
       if (d.battery && n(d.battery.pct)) L.push(`Battery ${Math.round(d.battery.pct)}%${d.battery.state === 'low' || d.battery.state === 'critical' ? ' · <b>' + esc(d.battery.state) + '</b>' : ''}`);
     } catch (e) { }
-    return `<div class="card"><div class="t" style="font-weight:800">${esc(String(d.name || 'Sensor'))}</div>${d.room ? `<div class="s">${esc(String(d.room))}</div>` : ''}${L.map(x => `<div class="s" style="margin-top:3px">${x}</div>`).join('') || '<div class="s">No readings yet.</div>'}</div>`;
+    const low = hueBattIsLow(d) && !(hueBattDis()[d.id] > Date.now());
+    return `<div class="card"><div class="t" style="font-weight:800">${esc(String(d.name || 'Sensor'))}${hueBattIsLow(d) ? ` <span style="display:inline-block;background:#C62828;color:#fff;border-radius:999px;padding:1px 8px;font-size:.75rem;font-weight:800;vertical-align:middle">🪫 ${Math.round(d.battery.pct)}%</span>` : ''}</div>${low ? `<div data-batt="${esc(String(d.id))}"><button type="button" class="chip" style="margin-top:4px" onclick="hueBattDismiss(${jsArg(String(d.id))})">Dismiss alert for 7 days</button></div>` : ''}${d.room ? `<div class="s">${esc(String(d.room))}</div>` : ''}${L.map(x => `<div class="s" style="margin-top:3px">${x}</div>`).join('') || '<div class="s">No readings yet.</div>'}</div>`;
   }).join('');
   return (cards || `<div class="card empty"><div class="t">No sensors found</div><div class="s">Motion sensors, switches and dials added in the Hue app show here.</div></div>`) + `<button type="button" class="btn small" style="margin-top:10px" onclick="hueSensLoad()">Refresh sensors</button>`;
 }
@@ -14821,13 +14825,27 @@ function jokeExpired(j) { try { const t = +localStorage.getItem(jokeKey(j)) || 0
 /* 2.23.82: Hue strip slides. Room temps (from /hue/sensors) and Lights on (from /hue/lights), only when linked
    and there's data. Fetched at most every 10 minutes while the app is open; tapping opens Lights. */
 let HUESTRIP = { at: 0, sens: null, lights: null, busy: false };
+/* 2.23.85: low batteries (Hue says low/critical, or 20% or under). Remembered from the last sensor fetch so they show
+   straight away on the next open; clear by themselves once the battery reads fine. Dismiss hides one device for 7 days. */
+const hueBattIsLow = d => !!(d && d.battery && typeof d.battery.pct === 'number' && (d.battery.pct <= 20 || d.battery.state === 'low' || d.battery.state === 'critical'));
+function hueBattDis() { try { return JSON.parse(localStorage.getItem('hueBattDismiss') || '{}') || {}; } catch (e) { return {}; } }
+function hueLowBatt() {
+  try {
+    if (!hueKey()) return [];
+    let list = HUESTRIP.sens; if (!list) { try { list = JSON.parse(localStorage.getItem('hueBattLow') || '[]'); } catch (e) { list = []; } }
+    const dis = hueBattDis(), now = Date.now();
+    return (list || []).filter(hueBattIsLow).filter(d => !(dis[d.id] > now)).map(d => ({ id: d.id, name: String(d.name || 'Sensor'), room: String(d.room || ''), pct: d.battery.pct, state: d.battery.state || '' }));
+  } catch (e) { return []; }
+}
+function hueBattSave(list) { try { localStorage.setItem('hueBattLow', JSON.stringify((list || []).filter(hueBattIsLow).map(d => ({ id: d.id, name: d.name, room: d.room, battery: d.battery })))); } catch (e) { } }
+function hueBattDismiss(id) { const d = hueBattDis(); d[id] = Date.now() + 7 * 86400000; try { localStorage.setItem('hueBattDismiss', JSON.stringify(d)); } catch (e) { } const b = document.querySelector(`[data-batt="${CSS.escape(id)}"]`); if (b) b.remove(); toast('Hidden for 7 days.'); }
 async function hueStripFetch() {
   if (!hueKey() || HUESTRIP.busy || document.hidden || Date.now() - HUESTRIP.at < (HUESTRIP.ok ? 10 * 60000 : 45000)) return;
   HUESTRIP.busy = true; HUESTRIP.at = Date.now();
   try {
     const [a, b] = await Promise.all([hueCall('sensors').catch(() => null), hueCall('lights').catch(() => null)]);
     // 2.23.84: same linked test as the Lights page; a failed fetch keeps the last good data and retries in 45s
-    if (a && a.linked && Array.isArray(a.sensors)) HUESTRIP.sens = a.sensors; else if (a && a.linked === false) HUESTRIP.sens = null;
+    if (a && a.linked && Array.isArray(a.sensors)) { HUESTRIP.sens = a.sensors; hueBattSave(a.sensors); } else if (a && a.linked === false) { HUESTRIP.sens = null; hueBattSave([]); }
     if (b && b.linked) HUESTRIP.lights = b; else if (b && b.linked === false) HUESTRIP.lights = null;
     HUESTRIP.ok = !!(a || b);
     if (document.getElementById('qstrip')) stripRerank();
@@ -14836,6 +14854,7 @@ async function hueStripFetch() {
 setTimeout(hueStripFetch, 2500); setInterval(hueStripFetch, 30000); document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(hueStripFetch, 600); });
 function hueStripSlides() {
   const out = [], num = x => typeof x === 'number' && Number.isFinite(x);
+  const LB = hueLowBatt(); if (LB.length) out.push(['huebatt', '🪫 Battery low', `<p class="qsq">${LB.slice(0, 3).map(d => `<b>${esc(d.name)}</b> ${Math.round(d.pct)}%`).join(' · ')}</p>${LB.length > 3 ? `<div class="qsw">+${LB.length - 3} more</div>` : '<div class="qsw">Philips Hue · swap the battery soon</div>'}`, "go('#lights')"]);
   const T = (HUESTRIP.sens || []).filter(d => d && d.temp && num(d.temp.c));
   if (T.length) out.push(['huetemp', '🌡️ Room temps', `<p class="qsq">${T.slice(0, 4).map(d => `<b>${esc(String(d.room || d.name || 'Sensor'))}</b> ${d.temp.c.toFixed(1)}°C`).join(' · ')}</p>${T.length > 4 ? `<div class="qsw">+${T.length - 4} more</div>` : ''}`, "go('#lights')"]);
   const L = HUESTRIP.lights;
@@ -14996,7 +15015,7 @@ function stripRank(list) {
     if (s.k === 'rewards' && h >= 8 && h < 19 && where !== 'work') v += 8;
     s.score = v;
   });
-  const PIN = new Set(['travel', 'sarah', 'huetemp', 'huelights']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
+  const PIN = new Set(['travel', 'sarah', 'huetemp', 'huelights', 'huebatt']), keep = list.filter(s => PIN.has(s.k)), rest = list.filter(s => !PIN.has(s.k) && s.score >= 20).sort((x, y) => y.score - x.score).slice(0, 16 - keep.length);
   return rest.concat(keep).sort((x, y) => y.score - x.score); // 2.23.70: Place of the day always stays
 }
 // Re-rank about every 5 hours, and when the app comes back after that long
