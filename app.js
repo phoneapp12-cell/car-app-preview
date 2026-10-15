@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.11';
+const APP_VERSION = '2.24.12';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10911,8 +10911,8 @@ async function testBridgePush() {
 /* ================= WEATHER (Open-Meteo, Whangārei) ================= */
 // Open-Meteo is free, needs no key and allows browser requests. Credit: "Weather data by Open-Meteo.com" (CC BY 4.0).
 const WX_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-35.7251&longitude=174.3237' +
-  '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation' +
-  '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,is_day' + // v1.9.0: hourly strip
+  '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day,precipitation,uv_index' +
+  '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,is_day,uv_index' + // v1.9.0: hourly strip
   '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,precipitation_sum,wind_gusts_10m_max,sunrise,sunset' +
   '&timezone=Pacific%2FAuckland&forecast_days=7&forecast_hours=48&wind_speed_unit=kmh';
 const WX_MAX_AGE = 30 * 60 * 1000;
@@ -11254,6 +11254,18 @@ function notifWxOutlook(nowW, next) {
   const bits = [what, tt, rain != null && rain >= 20 ? rain + '% chance of rain' : ''].filter(Boolean);
   return bits.length ? 'Next 2 hrs: ' + bits.join(', ') : '';
 }
+// 2.24.12: current UV index (Open-Meteo), WHO colour scale. Hidden at night or with no data.
+function wxUV() {
+  try {
+    const d = WX && WX.data; if (!d || !d.current || !wxIsDay()) return null;
+    let v = d.current.uv_index;
+    if (!num(v)) { const h = d.hourly || {}, t = d.current.time; const i = Array.isArray(h.time) && t ? h.time.indexOf(String(t).slice(0, 13) + ':00') : -1; v = i >= 0 && h.uv_index ? h.uv_index[i] : null; }
+    if (!num(v) || v < 0) return null;
+    const n = Math.round(v);
+    const lv = n <= 2 ? ['Low', 'uvlow'] : n <= 5 ? ['Moderate', 'uvmod'] : n <= 7 ? ['High', 'uvhigh'] : n <= 10 ? ['Very high', 'uvvhigh'] : ['Extreme', 'uvext'];
+    return { n, words: lv[0], cls: lv[1] };
+  } catch (e) { return null; }
+}
 function notifWxStrip() {
   const fresh = WX && validWx(WX.data) && Date.now() - (WX.at || 0) < NWX_STALE;
   const warn = homeTry('weather warning line', () => alertStripLine(), ''); // 2.22.32: official orange/red only
@@ -11267,9 +11279,10 @@ function notifWxStrip() {
   const outlook = homeTry('weather outlook', () => notifWxOutlook(nowW, next), '');
   const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '';
   const sun = homeTry('weather sun', () => wxSunMention(), ''); // 2.22.43: next sunrise or sunset
-  const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${outlook ? ' ' + outlook + '.' : ''}${sun ? ' ' + sun + '.' : ''}${warn ? ' ' + warn.replace(/^⚠\s*/, 'MetService ') + '.' : ''} Tap for the full forecast.`;
+  const uv = wxUV();
+  const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${uv ? ' UV ' + uv.n + ' ' + uv.words + '.' : ''}${outlook ? ' ' + outlook + '.' : ''}${sun ? ' ' + sun + '.' : ''}${warn ? ' ' + warn.replace(/^⚠\s*/, 'MetService ') + '.' : ''} Tap for the full forecast.`;
   return `<button type="button" class="notifwx" id="notifwx" onclick="go('#weather')" aria-label="${esc(label)}">
-    <span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp tcol"${tempStyle(c.temperature_2m)}>${temp}</b>` : ''}<span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${sun ? `<span class="nwxnext nwxsun">${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}${warnHtml}</span>${I('right')}</button>`;
+    <span class="nwxleft"><span class="nwxrow"><span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp tcol"${tempStyle(c.temperature_2m)}>${temp}</b>` : ''}</span>${uv ? `<span class="nwxuv ${uv.cls}">UV ${uv.n} ${uv.words}</span>` : ''}</span><span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${sun ? `<span class="nwxnext nwxsun">${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}${warnHtml}</span>${I('right')}</button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Notifications</button>`;
