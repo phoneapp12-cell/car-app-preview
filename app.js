@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.24.1';
+const APP_VERSION = '2.24.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4757,7 +4757,15 @@ const SH = {
   want: () => true,
   add: x => {
     const mine = x.by === 'shane';
-    if (x.list === 'Appointments' && mine) return; // one of his own shared to Sarah that's gone here: nothing to bring back
+    if (x.list === 'Appointments' && mine) { // 2.24.2: one of his shared to Sarah that came back (restored): put it back here
+      const ap = x.appt || {};
+      if (/^hs-/.test(x.id)) { healthSarahItemsAll().forEach(({ it }) => { if ('hs-' + it.id === x.id) { it.apptDate = x.due || it.apptDate; it.apptTime = ap.time || ''; if (x.claim) it.claim = claimNorm(x.claim); } }); return; }
+      if (x.done || (S.appts || []).some(a => a.id === x.id)) return;
+      const st = (S.todos || []).find(t => isSarahTodo(t) && !t.done && !t.apptId && t.title === x.title);
+      const row = { id: x.id, title: String(x.title || '').slice(0, 80), date: x.due || '', time: ap.time || '', notes: x.notes || '', place: ap.place || '', for: 'sarah', shareSarah: true };
+      if (st) { row.todoId = st.id; row.sTodo = true; st.apptId = row.id; }
+      if (x.claim) row.claim = claimNorm(x.claim);
+      S.appts.push(row); return; }
     if (x.list === 'Appointments' && !mine) { S.appts.push(sarahApptFrom(x)); return; } // 2.23.17: her doctor/dentist appointments go in the calendar
     if (isSarahShopList(x.list)) { const it = sarahShopItem(x); if (mine) { delete it.from; it.sharedS = true; } S.shop.items.push(it); return; }
     if (mine) { S.todos.push({ id: x.id, title: x.title, list: (S.lists && S.lists[0]) || 'To-do', sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), sharedS: true }); return; }
@@ -4787,6 +4795,7 @@ const SH = {
 const SARAH_RE = /\bsarah\b/i;
 const apptForSarah = a => !!(a && a.from !== 'sarah' && !a.evId && a.shareSarah !== false && (a.for === 'sarah' || (!a.for && SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')))));
 const isSarahPerson = p => !!(p && /^\s*sarah\b/i.test(String(p.name || '')));
+function healthSarahItemsAll() { const out = []; (S.health || []).forEach(p => (p.items || []).forEach(it => { if (it && (isSarahPerson(p) || SARAH_RE.test([it.name, it.clinic].join(' ')))) out.push({ p, it }); })); return out; }
 function healthSarahItems() {
   const out = [];
   (S.health || []).forEach(p => (p.items || []).forEach(it => {
