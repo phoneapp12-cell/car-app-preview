@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.82';
+const APP_VERSION = '2.23.83';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12152,7 +12152,7 @@ async function hueCall(path, body) {
 }
 function hueRedraw() { const el = document.getElementById('huebox'); if (el) el.innerHTML = hueBody(); }
 async function hueLoad() {
-  HUE.st = 'loading'; HUE.err = ''; hueRedraw();
+  const had = HUE.st === 'ok'; HUE.st = 'loading'; HUE.err = ''; if (!had) hueRedraw();
   try { const j = await hueCall('lights'); HUE.data = j; HUE.st = j.setup === false ? 'nosetup' : j.linked ? 'ok' : 'unlinked'; }
   catch (e) { HUE.st = 'error'; HUE.err = String(e.message || e); }
   hueRedraw();
@@ -12165,14 +12165,19 @@ async function hueConnect() {
   } catch (e) { toast('Couldn’t reach the lights service. Try again soon.'); }
 }
 async function hueSet(type, id, extra) {
-  try { await hueCall('set', { type, id, ...extra }); if (type === 'scene') toast('Scene on.'); setTimeout(hueLoad, 400); }
+  try {
+    await hueCall('set', { type, id, ...extra }); if (type === 'scene') { toast('Scene on.'); return; }
+    const d = HUE.data || {}, list = type === 'grouped_light' ? (d.rooms || []).filter(r => r.group === id) : (d.lights || []).filter(l => l.id === id);
+    list.forEach(x => { if (typeof extra.on === 'boolean') x.on = extra.on; if (extra.bri != null) x.bri = extra.bri; });
+    hueCtlUpdate(type, id, list[0]);
+  }
   catch (e) { toast('That didn’t work. The bridge may be offline.'); }
 }
 /* 2.23.80: Sensors (motion, temperature, light level, battery, contact, buttons, dials). Every field is optional. */
 let HUES = { st: 'idle', list: [], err: '' };
 function hueSensRedraw() { const el = document.getElementById('huesens'); if (el) el.innerHTML = hueSensBody(); }
 async function hueSensLoad() {
-  HUES.st = 'loading'; hueSensRedraw();
+  const had = HUES.st === 'ok'; HUES.st = 'loading'; if (!had) hueSensRedraw();
   try { const j = await hueCall('sensors'); HUES.list = Array.isArray(j && j.sensors) ? j.sensors : []; HUES.st = j && j.linked === false ? 'unlinked' : 'ok'; }
   catch (e) { HUES.st = 'error'; HUES.err = String(e.message || e); }
   hueSensRedraw();
@@ -12243,12 +12248,17 @@ async function hueNightOff() {
     }
     localStorage.setItem('hueNightDone', hueNightKey() || 'x');
     toast('All lights are off. Night!');
-    if (document.getElementById('huebox')) setTimeout(hueLoad, 500);
+    { const d = HUE.data; if (d) { (d.rooms || []).forEach(r => { r.on = false; hueCtlUpdate('grouped_light', r.group, r); }); (d.lights || []).forEach(l => { l.on = false; hueCtlUpdate('light', l.id, l); }); } }
   } catch (e) { toast('Couldn’t turn the lights off. The bridge may be offline.'); }
 }
 setTimeout(hueNightCheck, 3000);
 setInterval(hueNightCheck, 5 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(hueNightCheck, 800); });
+function hueCtlUpdate(type, id, x) { // only the touched card changes
+  if (!x) return; const card = document.querySelector(`[data-hue="${type}:${id}"]`); if (!card) return;
+  const sw = card.querySelector('.switch'); if (sw) { sw.classList.toggle('on', !!x.on); sw.setAttribute('aria-checked', !!x.on); sw.setAttribute('onclick', `hueSet(${jsArg(type)},${jsArg(id)},{on:${!x.on}})`); }
+  const st = card.querySelector('.huest'); if (st) st.textContent = x.on ? 'On' + (x.bri != null ? ' · ' + x.bri + '%' : '') : 'Off';
+}
 function hueBody() {
   if (HUE.st === 'idle' || HUE.st === 'loading') return `<div class="card"><div class="s">Checking your lights…</div></div>`;
   if (HUE.st === 'nosetup') return `<div class="card empty"><div class="t">Philips Hue isn’t set up yet</div><div class="s">The Hue developer app still needs registering. Once that’s done, a Connect button shows here.</div></div>`;
@@ -12259,14 +12269,14 @@ function hueBody() {
   const sl = (type, id, bri) => bri == null ? '' : `<input type="range" min="1" max="100" value="${bri}" aria-label="Brightness" style="width:100%;margin-top:6px" onchange="hueSet(${jsArg(type)},${jsArg(id)},{bri:+this.value,on:true})">`;
   const roomCards = rooms.map(r => {
     const sc = scenes.filter(x => x.room === r.id);
-    return `<div class="card"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t" style="font-weight:800">${esc(r.name || 'Room')}</div><div class="s">${r.on ? 'On' + (r.bri != null ? ' · ' + r.bri + '%' : '') : 'Off'}</div></div>${r.group ? sw('grouped_light', r.group, r.on) : ''}</div>${r.group ? sl('grouped_light', r.group, r.bri) : ''}
+    return `<div class="card" data-hue="grouped_light:${esc(r.group || '')}"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t" style="font-weight:800">${esc(r.name || 'Room')}</div><div class="s huest">${r.on ? 'On' + (r.bri != null ? ' · ' + r.bri + '%' : '') : 'Off'}</div></div>${r.group ? sw('grouped_light', r.group, r.on) : ''}</div>${r.group ? sl('grouped_light', r.group, r.bri) : ''}
       ${sc.length ? `<div class="chips scroll" style="margin-top:8px">${sc.map(x => `<button class="chip" onclick="hueSet('scene',${jsArg(x.id)})">${esc(x.name || 'Scene')}</button>`).join('')}</div>` : ''}</div>`;
   }).join('');
-  const lights = (d.lights || []).map(l => `<div class="card"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t">${esc(l.name || 'Light')}</div><div class="s">${l.on ? 'On' + (l.bri != null ? ' · ' + l.bri + '%' : '') : 'Off'}</div></div>${sw('light', l.id, l.on)}</div>${sl('light', l.id, l.bri)}</div>`).join('');
+  const lights = (d.lights || []).map(l => `<div class="card" data-hue="light:${esc(l.id)}"><div class="row" style="align-items:center;gap:10px"><div style="flex:1"><div class="t">${esc(l.name || 'Light')}</div><div class="s huest">${l.on ? 'On' + (l.bri != null ? ' · ' + l.bri + '%' : '') : 'Off'}</div></div>${sw('light', l.id, l.on)}</div>${sl('light', l.id, l.bri)}</div>`).join('');
   return (roomCards ? `<div class="sec">Rooms</div>${roomCards}` : '') + (lights ? `<details><summary class="sec" style="cursor:pointer">All lights</summary>${lights}</details>` : '') + (!roomCards && !lights ? `<div class="card empty"><div class="t">No lights found</div><div class="s">Add them in the Philips Hue app first.</div></div>` : '') + `<button type="button" class="btn small" style="margin-top:10px" onclick="hueLoad()">Refresh</button>`;
 }
 function Lights() {
-  setTimeout(() => { if (HUE.st !== 'loading') hueLoad(); if (HUES.st !== 'loading') hueSensLoad(); }, 0);
+  setTimeout(() => { if (HUE.st !== 'loading') hueLoad(); if (HUES.st !== 'loading') hueSensLoad(); }, 0); // once per visit (render() skips re-renders here)
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>` + header('Lights', 'Philips Hue rooms, lights, scenes and sensors') + `<div id="huebox">${hueBody()}</div><div class="sec">Sensors</div><div id="huesens">${hueSensBody()}</div>`;
 }
 function Gym() {
@@ -14818,7 +14828,7 @@ async function hueStripFetch() {
     const [a, b] = await Promise.all([hueCall('sensors').catch(() => null), hueCall('lights').catch(() => null)]);
     HUESTRIP.sens = a && a.linked && Array.isArray(a.sensors) ? a.sensors : null;
     HUESTRIP.lights = b && b.linked ? b : null;
-    stripRerank();
+    if (document.getElementById('qstrip')) stripRerank();
   } catch (e) { } finally { HUESTRIP.busy = false; }
 }
 setTimeout(hueStripFetch, 4000); setInterval(hueStripFetch, 60000);
@@ -17499,8 +17509,12 @@ function activeTab(r) {
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
 }
 let renderedDay = todayISO();
+let renderedHash = null;
 function render() {
   if (!S) return;
+  // 2.23.83: the Lights page never redraws itself; only navigation (a hash change) rebuilds it.
+  if (location.hash === '#lights' && renderedHash === '#lights' && !render.force) return;
+  renderedHash = location.hash;
   if (!skipNoteCapture) captureNoteComposer();
   const noteRoute = (location.hash || '#home').slice(1).split('/')[0];
   if (noteRoute !== 'notes' && noteRec) noteStopQuiet();
