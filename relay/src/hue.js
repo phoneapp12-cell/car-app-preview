@@ -84,6 +84,23 @@ export async function hueRoute(path, request, env, f, okOrigin, reply) {
         lights: lights.map(l => ({ id: l.id, name: l.metadata && l.metadata.name, on: !!(l.on && l.on.on), bri: l.dimming ? Math.round(l.dimming.brightness) : null, owner: l.owner && l.owner.rid })),
         scenes: scenes.map(s => ({ id: s.id, name: s.metadata && s.metadata.name, room: s.group && s.group.rid })) });
     }
+    if (path === '/hue/sensors') { // added with app 2.23.80: one entry per sensor device
+      const get = t => clip(env, rec, f, 'GET', t).then(x => x.data || []).catch(() => []);
+      const T = ['device', 'room', 'motion', 'temperature', 'light_level', 'device_power', 'contact', 'button', 'relative_rotary'];
+      const [devices, rooms, ...rest] = await Promise.all(T.map(get)), R = Object.fromEntries(T.slice(2).map((t, i) => [t, rest[i]]));
+      const roomOf = {}; rooms.forEach(r => (r.children || []).forEach(c => { if (c.rtype === 'device') roomOf[c.rid] = r.metadata && r.metadata.name; }));
+      const out = {}, dev = id => out[id] || (out[id] = (() => { const d = devices.find(x => x.id === id) || {}; return { id, name: (d.metadata && d.metadata.name) || (d.product_data && d.product_data.product_name) || 'Sensor', product: d.product_data && d.product_data.product_name || '', room: roomOf[id] || '' }; })());
+      const own = x => x.owner && x.owner.rid;
+      R.motion.forEach(x => { const m = x.motion || {}, r = m.motion_report || {}; dev(own(x)).motion = { on: r.motion !== undefined ? !!r.motion : !!m.motion, changed: r.changed || null, enabled: x.enabled !== false }; });
+      R.temperature.forEach(x => { const t = x.temperature || {}, r = t.temperature_report || {}; const v = r.temperature !== undefined ? r.temperature : t.temperature; if (typeof v === 'number') dev(own(x)).temp = { c: Math.round(v * 10) / 10, changed: r.changed || null }; });
+      R.light_level.forEach(x => { const l = x.light || {}, r = l.light_level_report || {}; const v = r.light_level !== undefined ? r.light_level : l.light_level; if (typeof v === 'number') dev(own(x)).light = { lux: Math.round(Math.pow(10, (v - 1) / 10000)), changed: r.changed || null }; });
+      R.device_power.forEach(x => { const p = x.power_state || {}; if (typeof p.battery_level === 'number') dev(own(x)).battery = { pct: p.battery_level, state: p.battery_state || '' }; });
+      R.contact.forEach(x => { const r = x.contact_report || {}; if (r.state) dev(own(x)).contact = { open: r.state === 'no_contact', changed: r.changed || null }; });
+      R.button.forEach(x => { const b = x.button || {}, r = b.button_report || {}; const ev = r.event || b.last_event; if (!ev) return; const d = dev(own(x)), when = r.updated || null; if (!d.button || (when && (!d.button.when || when > d.button.when))) d.button = { event: ev, n: x.metadata && x.metadata.control_id || null, when }; });
+      R.relative_rotary.forEach(x => { const q = x.relative_rotary || {}, r = q.rotary_report || q.last_event || {}; const rot = r.rotation || {}; if (r.action || rot.direction) dev(own(x)).rotary = { action: r.action || '', direction: rot.direction || '', steps: rot.steps || null, when: r.updated || null }; });
+      delete out.undefined;
+      return reply(200, { setup: true, linked: true, sensors: Object.values(out).filter(d => d.motion || d.temp || d.light || d.contact || d.button || d.rotary || (d.battery && !/bridge/i.test(d.product))) });
+    }
     if (path === '/hue/set') {
       const id = String(body.id || '');
       if (!/^[0-9a-f-]{36}$/.test(id)) return reply(400, { error: 'bad_id' });
