@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.23.97';
+const APP_VERSION = '2.23.98';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12534,11 +12534,19 @@ function hroomInner() {
   return (lo ? row('Lounge', lo.room) : '') + (be ? row('Bedroom', be.room) : '') + (ha != null ? row('Hallway', ha) : '');
 }
 function homeRoomTemps() {
-  try { if (sumWorkState().atWork) return ''; } catch (e) { return ''; }
-  setTimeout(hroomFetch, 0);
-  const h = hroomInner();
-  return `<div id="homerooms" class="homerooms" onclick="go('#heat')"${h ? '' : ' hidden'}>${h}</div>`;
+  let rooms = '', al = '';
+  try { if (!sumWorkState().atWork) { setTimeout(hroomFetch, 0); const h = hroomInner(); rooms = `<div id="homerooms" class="homerooms" onclick="go('#heat')"${h ? '' : ' hidden'}>${h}</div>`; } } catch (e) { rooms = ''; }
+  try { const a = homeAlarmInner(); al = `<div id="homealarm" class="homealarm" onclick="go('#alarm')"${a ? '' : ' hidden'}>${a}</div>`; } catch (e) { al = ''; }
+  if (!rooms && !al) return '';
+  return `<div class="homehead2">${rooms || '<div></div>'}${al}</div>`;
 }
+// 2.23.98: open doors/windows from Alarm.com, right side of the header, opposite the temps. Hidden when nothing is open.
+function homeAlarmInner() {
+  try { const o = typeof alarmOpen === 'function' ? alarmOpen() : []; if (!o.length) return '';
+    return o.slice(0, 3).map(x => `<span class="hal">${esc(String(x.name || 'Door'))} open</span>`).join('') + (o.length > 3 ? `<span class="hal">+${o.length - 3} more open</span>` : '');
+  } catch (e) { return ''; }
+}
+function homeAlarmRedraw() { try { const el = document.getElementById('homealarm'); if (el) { const a = homeAlarmInner(); el.innerHTML = a; el.hidden = !a; } } catch (e) { } }
 async function hroomFetch() {
   try {
     if (hroomBusy || typeof hueKey !== 'function' || !hueKey() || navigator.onLine === false) return;
@@ -12569,6 +12577,7 @@ async function alarmLoad(force) {
   } catch (e) { ALARM.st = ALARM.data ? 'ok' : 'error'; ALARM.at = Date.now(); }
   finally { ALARM.busy = false; }
   try { const el = document.getElementById('alarmbox'); if (el) el.innerHTML = alarmBody(); } catch (e) { }
+  try { if (typeof homeAlarmRedraw === 'function') homeAlarmRedraw(); } catch (e) { }
   try { if (document.getElementById('qstrip') && typeof stripRerank === 'function') stripRerank(); } catch (e) { }
 }
 function alarmBody() {
