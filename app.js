@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.5';
+const APP_VERSION = '2.26.6';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18646,7 +18646,7 @@ function glWarnRedraw() { glBellRedraw(); try { const el = document.getElementBy
 function glAlertsBody() { const L = glWarnList(), hint = L.some(x => x.flag) ? '' : '<p class="muted glhint">Flag events in Events to see them here.</p>'; return (L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook, road or bridge closures and events you flag show up here.</div></div>') + hint; }
 function GlAlerts() {
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Warnings, road closures and local events') + `<div id="glalerts">${glAlertsBody()}</div>
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + `<div id="glalerts">${glAlertsBody()}</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: 16 Sherwood Road, Onerahi to 4 Port Road.</div>`;
 }
 function glWxSky(kind, day) {
@@ -18833,3 +18833,46 @@ function glEventHeads() {
 }
 { const f = glWarnList; glWarnList = function () { const w = f.apply(this, arguments); return w.concat(glEventHeads()); }; }
 { const f = refreshEvents; refreshEvents = async function () { const r = await f.apply(this, arguments); try { glWarnRedraw(); } catch (e) { } return r; }; }
+
+/* ================= 2.26.6: Notifications page sections =================
+   Urgent: weather and road warnings, overdue and due today. Coming up: tomorrow and the next days (cars within 7).
+   From Sarah: things she added in the last 24 hours. Flagged events last. Everything counts in the bell.
+   Uses Coming up (so nag items and the garden rule are already filtered); Busy calendar entries and sport are left out. */
+function glDueItems() {
+  const out = [];
+  try {
+    glCU().forEach(x => {
+      const k = x.kind, d = x.days, name = String(x.name || x.html || '').replace(/<[^>]+>/g, ' ');
+      if (!glOk(name) || /\bbusy\b/i.test(name)) return;
+      const t = x.ref && x.ref.todo, hi = !!(t && t.priority === 'high');
+      const ok = k === 'bill' || k === 'pay' || k === 'loan' ? d <= 1 : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? d >= 0 && d <= 1 : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
+      if (!ok) return;
+      let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
+      out.push({ days: d, html: h });
+    });
+  } catch (e) { }
+  return out;
+}
+function glSarahItems() {
+  const out = [], since = Date.now() - 864e5;
+  const add = (x, where, what) => { if (x && !x.done && +x.created >= since && x.title && glOk(x.title)) out.push(`<button class="row" onclick="go('${where}')"><div class="ic todo"><span class="sbadge">S</span></div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${what} · added ${esc(ago(+x.created))}</div></div>${I('right')}</button>`); };
+  try { (S.todos || []).filter(isSarahTodo).forEach(t => add(t, '#todo', 'To-do from Sarah')); } catch (e) { }
+  try { ((S.shop && S.shop.items) || []).filter(x => isSarahShop(x)).forEach(x => add(x, '#shopping', 'Shopping from Sarah')); } catch (e) { }
+  try { (S.appts || []).filter(a => a && a.from === 'sarah').forEach(a => add(a, '#calendar', 'Sarah’s appointment' + (a.date ? ' · ' + fmtW(a.date) : ''))); } catch (e) { }
+  return out;
+}
+function glAlertParts() {
+  const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems();
+  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn };
+}
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.flags.length; } catch (e) { return 0; } }
+glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
+glAlertsBody = function () {
+  const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
+  const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
+  const dueU = p.dueUrgent.length ? `<div class="list">${p.dueUrgent.map(x => x.html).join('')}</div>` : '';
+  const html = sec('Urgent', warnHtml + dueU) + sec('Coming up', p.coming.length ? `<div class="list">${p.coming.map(x => x.html).join('')}</div>` : '') +
+    sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
+    sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>');
+  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+};
