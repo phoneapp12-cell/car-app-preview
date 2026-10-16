@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.18';
+const APP_VERSION = '2.26.19';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3942,6 +3942,7 @@ function cuCat(x) {
 }
 const cuColoursOn = () => !(S && S.settings && S.settings.cuColours === false);
 const qjTop = () => !!(S && S.settings && S.settings.qjTop); // 2.23.22: quote & joke at the top (off: under Just added)
+const factOn = () => !(S && S.settings && S.settings.dailyFact === false); // 2.26.19
 const dailyJokeOn = () => !(S && S.settings && S.settings.dailyJoke === false);
 async function toggleSetting(k, on) { S.settings[k] = on; await save(); render(); }
 function cuLegend(list) {
@@ -10679,7 +10680,7 @@ async function refreshBridgeTraffic(force = false) {
   BR_TR = { at: Date.now(), settled: true, likely: !!(judged && judged.likelyClosed), line };
   updBridge();
 }
-const brMode = () => (S && S.settings.bridgeHome) || 'near';
+const brMode = () => 'off'; // 2.26.19: Lifting bridge Home card retired (bridge and road warnings live in Notifications); also stops the per-minute Home redraw
 const pad = n => String(n).padStart(2, '0');
 const hmStr = m => pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60);
 function brWhen(iso, min, prep) {
@@ -16194,15 +16195,18 @@ function Settings() {
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Scrolling summary</div><div class="s">On: the summary sits under the rotating strip, a little shorter, as one line scrolling right to left. Touch to pause, drag to scrub. Off: the full summary as before.</div></div><button class="switch ${sumScrollOn() ? 'on' : ''}" role="switch" aria-checked="${sumScrollOn()}" aria-label="Scrolling summary" id="sumscrollsw" onclick="S.settings.sumFull=sumScrollOn();save().then(render)"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Fun fact</div><div class="s">A new fun fact each day, as its own panel on Home.</div></div><button class="switch ${factOn() ? 'on' : ''}" role="switch" aria-checked="${factOn()}" aria-label="Fun fact" id="factsw" onclick="toggleSetting('dailyFact', ${!factOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Card artwork</div><div class="s">Picture headers and illustrated icons on Coming up and Just added. Off: the plain cards.</div></div><button class="switch ${cardArtOn() ? 'on' : ''}" role="switch" aria-checked="${cardArtOn()}" aria-label="Card artwork" id="cardartsw" onclick="toggleSetting('cardArt')"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
+  </div>
+  <div class="sec" style="font-size:.8rem;opacity:.8">Classic layout</div>
+  <div class="list">
+   <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix, Prime Video and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
    <div class="srow"><div class="tx"><div class="t">My photos in the strip</div><div class="s">Add your own photos one at a time. They stay on this phone only. One shows at a time and changes every few hours.</div></div><button class="btn small" id="myphbtn" onclick="myPhManage()">${MYPH.length ? 'Photos (' + MYPH.length + ')' : 'Add photo'}</button></div>
    <div class="srow"><div class="tx"><div class="t">Quote &amp; joke at the top</div><div class="s">Off: they sit under Just added (day) and above the feed (night). On: they come first, just under the weather.</div></div><button class="switch ${qjTop() ? 'on' : ''}" role="switch" aria-checked="${qjTop()}" aria-label="Quote and joke at the top" id="qjtopsw" onclick="toggleSetting('qjTop', ${!qjTop()})"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Countdown rewards</div><div class="s">A card near the top with Countdown (Woolworths) offers from your Everyday Rewards emails, soonest ending first. Fuel, FreshChoice, MILKRUN and other partner offers are left out. Hidden when there are none.</div></div><button class="switch ${erOn() ? 'on' : ''}" role="switch" aria-checked="${erOn()}" aria-label="Countdown rewards" id="ersw" onclick="toggleSetting('erPromos', ${!erOn()}).then(() => refreshEr(true))"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
   </div>
   <div class="sec">Places</div>
   <div class="list" id="placesopt">
@@ -16251,14 +16255,6 @@ function Settings() {
    ${canShare ? `<button class="btn" onclick="shareBackup()">${I('share')} Share backup</button>` : ''}</div>
   <input type="file" id="importfile" accept=".json,application/json" style="display:none" onchange="importFile(this)">
 
-  <div class="sec">Lifting bridge</div>
-  <div class="list">
-   <div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">On Home</div><div class="s">The lifting bridge on Dave Culham Drive (Te Matau ā Pohe). Not live – based on the council’s lift times.</div></div>
-    <div class="seg" id="brmode" style="width:100%">${[['near', 'Near only'], ['always', 'Always on Home'], ['off', 'Off']].map(([v, l]) => `<button type="button" class="${brMode() === v ? 'on' : ''}" aria-pressed="${brMode() === v}" onclick="setBridgeHome('${v}')">${l}</button>`).join('')}</div>
-    <div class="s" style="flex-basis:100%;color:var(--ink2);font-size:0.8125rem">${brMode() === 'near' ? (S.settings.bridgeLoc ? 'Shows at the top of Home when you open the app within about 2 km of the bridge.' : 'Shows as a short line under the weather. Tap “Show when I’m near” to see it at the top of Home only when you’re close.') : brMode() === 'always' ? 'Always at the top of Home.' : 'Not on Home. It’s still under More.'}</div></div>
-   <div class="srow"><div class="tx"><div class="t">Use my location</div><div class="s">${S.settings.bridgeLoc ? 'On, only while the app is open. Your location isn’t saved.' : 'Off. Only used if you tap “Show when I’m near”.'}</div></div>
-    ${S.settings.bridgeLoc ? `<button class="btn small" onclick="stopBridgeLoc()">Stop</button>` : `<button class="btn small" onclick="enableBridgeLoc()">${I('pin')} Show when I’m near</button>`}</div>
-  </div>
 
   ${mailSettingsSection()}
 
@@ -18438,7 +18434,7 @@ async function start() {
   syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
   mailConfig().then(() => { if (!sheetOpen && location.hash === '#settings') render(); });
   refreshMail();
-  if (brMode() !== 'off' || location.hash === '#bridge') { refreshClosures(); refreshBridgeTraffic(); }
+  refreshClosures(); if (location.hash === '#bridge') refreshBridgeTraffic(); // 2.26.19: closures always load for Notifications
   checkBridgeLoc(true);
   checkHere(true);
   if ('serviceWorker' in navigator) {
@@ -18466,7 +18462,7 @@ async function start() {
     check();
     syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
     refreshMail();
-    if (brMode() !== 'off') { refreshClosures(); refreshBridgeTraffic(); }
+    refreshClosures(); // 2.26.19
     checkBridgeLoc(true);
     checkHere(true);
     if (swReg) swReg.update().catch(() => { });
@@ -18821,9 +18817,6 @@ function glTiles() {
   add('nightlife', 'out', 'Nightlife', () => { const e = nightlifeSoon(7, 2); return e.length ? e.map(x => x.title).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#events')");
   add('place', 'out', 'Place of the day', () => { const p = travelToday(); return p ? p.name + ', ' + p.country : ''; }, B('travel'), '', "go('#travel')");
   add('recipe', 'food', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
-  add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : (j && (j.t || j.q)) || String(j || ''); }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
-  add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#be185d', '#831843'], "glInfo('quote')");
-  add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#0891b2', '#164e63'], "glInfo('fact')");
   add('tvguide', 'watch', 'TV guide', () => 'TVNZ 1 · TVNZ 2 · Three', 'i3-tv', ['#b45309', '#7c2d12'], "go('#tv')");
   return T;
 }
@@ -18835,6 +18828,14 @@ function glInfo(k) { // 2.26.14: joke, quote and fact tiles used go('#home'), a 
     else { t = 'Fun fact'; h = `<p style="font-size:1.05rem">${esc(HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length])}</p>`; }
     openSheet(t, h, null);
   } catch (e) { } }
+let glJokeOpen = false;
+function glPanels() { // 2.26.19: joke, quote and fact each as its own panel, each with its own setting
+  const P = [];
+  try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (Array.isArray(j) && glOk(j[0])) P.push(`<button type="button" class="card glpanel" onclick="glJokeOpen=!glJokeOpen;const a=this.querySelector('.glpa');a.textContent=glJokeOpen?a.dataset.a:'Tap for the answer';a.classList.toggle('on',glJokeOpen)"><span class="glph">😄 Joke of the day</span><b>${esc(j[0])}</b><span class="glpa${glJokeOpen ? ' on' : ''}" data-a="${esc(j[1] || '')}">${glJokeOpen ? esc(j[1] || '') : 'Tap for the answer'}</span></button>`); } } catch (e) { }
+  try { if (showDailyQuote()) { const q = dailyQuoteFor(); if (q && glOk(q.t)) P.push(`<div class="card glpanel"><span class="glph">💬 Quote of the day</span><b>“${esc(q.t)}”</b>${q.w ? `<span class="glpa on">${esc(q.w)}</span>` : ''}</div>`); } } catch (e) { }
+  try { if (factOn()) { const f = HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length]; if (f && glOk(f)) P.push(`<div class="card glpanel"><span class="glph">💡 Fun fact</span><b>${esc(f)}</b></div>`); } } catch (e) { }
+  return P.length ? `<div class="glpanels">${P.join('')}</div>` : '';
+}
 function glTileHtml(t, small) {
   const img = /^art\//.test(t.art);
   const st = img ? `background-image:url('${t.art}')` : `--a:${t.grad[0]};--b:${t.grad[1]}`;
@@ -18926,7 +18927,7 @@ function glanceHome() {
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
     wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + cards +
-    (m.night ? entZ + asks + orgZ : orgZ + entZ) +
+    (m.night ? homeTry('gl panels', () => glPanels(), '') + entZ + asks + orgZ : orgZ + homeTry('gl panels', () => glPanels(), '') + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
 }
