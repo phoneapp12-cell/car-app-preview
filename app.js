@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.19';
+const APP_VERSION = '2.26.20';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18817,6 +18817,10 @@ function glTiles() {
   add('nightlife', 'out', 'Nightlife', () => { const e = nightlifeSoon(7, 2); return e.length ? e.map(x => x.title).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#events')");
   add('place', 'out', 'Place of the day', () => { const p = travelToday(); return p ? p.name + ', ' + p.country : ''; }, B('travel'), '', "go('#travel')");
   add('recipe', 'food', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
+  // 2.26.20: joke, quote and fact back as their own blue tiles, each with its own setting; tap opens a sheet
+  if (dailyJokeOn()) add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
+  if (showDailyQuote()) add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('quote')");
+  if (factOn()) add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#2563eb', '#1e3a8a'], "glInfo('fact')");
   add('tvguide', 'watch', 'TV guide', () => 'TVNZ 1 · TVNZ 2 · Three', 'i3-tv', ['#b45309', '#7c2d12'], "go('#tv')");
   return T;
 }
@@ -18927,7 +18931,7 @@ function glanceHome() {
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
     wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + cards +
-    (m.night ? homeTry('gl panels', () => glPanels(), '') + entZ + asks + orgZ : orgZ + homeTry('gl panels', () => glPanels(), '') + entZ) +
+    (m.night ? entZ + asks + orgZ : orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
 }
