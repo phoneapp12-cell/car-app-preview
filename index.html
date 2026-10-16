@@ -1802,6 +1802,17 @@ html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color
 #glalerts .list>* .pill,#glalerts .list>* [class*="pill"],#glalerts .list>* [class*="badge"],#glalerts .list>* .tag,#glalerts .list>* .due{background:none!important;color:#475569!important;box-shadow:none!important;border:0!important;font-weight:700}
 #glalerts .list>*{min-height:58px;box-sizing:border-box}
 #glalerts .glwarnwrap,#glalerts .glflagwrap{background:none!important;box-shadow:none!important;border:0!important}
+
+/* 2.26.9: status tiles */
+.gltiles{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;cursor:pointer}
+.gltile{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.12);height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:0 2px}
+.gltile svg{width:18px;height:18px;stroke:#475569;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.gltile b{font-size:.8rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.gltile small{font-size:.63rem;color:#64748b;white-space:nowrap}
+.gltile.glalert{box-shadow:inset 0 0 0 1.5px #dc2626}.gltile.glalert b{color:#b91c1c}
+.glnight .gltile.glalert b{color:#f87171}
+.glupdrow{justify-content:flex-end;margin-top:3px}
+.glnight .gltile,.gldark .gltile{background:#1e293b}.glnight .gltile b{color:#f1f5f9}.glnight .gltile svg{stroke:#cbd5e1}.glnight .gltile small{color:#94a3b8}
 </style>
 </head>
 <body>

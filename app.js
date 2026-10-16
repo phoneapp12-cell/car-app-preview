@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.8';
+const APP_VERSION = '2.26.9';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18560,14 +18560,16 @@ function glUpdated() { const t = Math.max(HLIGHT && HLIGHT.at || 0, ALARM && ALA
 const glTempCol = t => { const v = parseFloat(t); return !Number.isFinite(v) ? ['#e0f2fe', '#bae6fd', '#0c4a6e'] : v < 12 ? ['#dbeafe', '#93c5fd', '#1e3a8a'] : v < 17 ? ['#cffafe', '#67e8f9', '#155e75'] : v < 21 ? ['#dcfce7', '#86efac', '#14532d'] : v < 25 ? ['#fef3c7', '#fcd34d', '#78350f'] : ['#ffedd5', '#fb923c', '#7c2d12']; };
 const GL_WAVE = '<svg class="glwave" viewBox="0 0 24 12" aria-hidden="true"><path d="M0 8 C4 2 8 2 12 6 S20 11 24 4 V12 H0Z" fill="#22d3ee" opacity=".55"/><path d="M0 8 C4 2 8 2 12 6 S20 11 24 4" fill="none" stroke="#0e7490" stroke-width="1.6"/></svg>';
 function glStatInner() {
-  const ch = [], m = glMode();
-  const T = glTemps(); T.forEach(x => { const c = glTempCol(x.t); ch.push(`<span class="glch gltemp" style="--t1:${c[0]};--t2:${c[1]};color:${c[2]}"><span class="glci">🌡</span>${esc(x.n)} <b>${esc(x.t)}</b></span>`); });
-  const D = glDoors(); if (D && D.length) ch.push(`<span class="glch gldoor"><img src="art/i3-shield.webp" alt="" class="glcimg" onerror="this.remove()">${D.length} open</span>`);
-  const L = glLights(); if (L && L.length) ch.push(`<span class="glch gllight"><span class="glci glbulb">💡</span>${L.length} on</span>`); else if (L) ch.push('<span class="glch gllightoff"><span class="glci">💡</span>Lights off</span>'); else if (hueKey()) ch.push('<span class="glch gllightoff"><span class="glci">💡</span>Lights –</span>');
-  const uv = !m.night ? wxUV() : null; if (uv && wxIsDay()) ch.push(`<span class="glch nwxuv ${uv.cls} gluv"><span class="glci">☀️</span>UV ${uv.n} ${esc(uv.words)}</span>`);
-  const td = glTideNext(2); if (td.length) ch.push(`<span class="glch gltidech">${GL_WAVE}${td.map(x => (x.high ? '▲ ' : '▼ ') + aklTime(x.ms)).join('  ')}</span>`);
-  const R = glRoadItems().filter(x => x.route); if (R.length) ch.push(`<span class="glch gldoor">🚧 ${R.length} on your route</span>`);
-  if (!ch.length) return '';
+  const m = glMode(), ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`; // 2.26.9: five equal tiles, icon over value
+  const tile = (i, v, l, cls = '') => `<span class="gltile${cls}">${ic(i)}<b>${esc(v)}</b><small>${esc(l)}</small></span>`;
+  const T = glTemps(), D = glDoors(), L = glLights(), td = glTideNext(2);
+  const tv = T.map(x => parseFloat(x.t)).filter(Number.isFinite), lo = Math.min(...tv), hi = Math.max(...tv);
+  const ch = [
+    tile('M14 14V4a2 2 0 0 0-4 0v10a4 4 0 1 0 4 0z', !tv.length ? '–' : lo === hi ? lo.toFixed(1) + '°' : `${lo.toFixed(1)}–${hi.toFixed(1)}°`, tv.length ? (tv.length === 1 ? T[0].n : tv.length + ' rooms') : 'Temps'),
+    tile('M5 21V3h11v18M14 12h.01', !D ? '–' : D.length ? D.length + ' open' : 'Closed', 'Doors', D && D.length ? ' glalert' : ''),
+    tile('M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z', !L ? '–' : L.length ? L.length + ' on' : 'Off', 'Lights'),
+    (() => { const uv = wxIsDay() ? wxUV() : null; return tile('M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2v2M12 20v2M2 12h2M20 12h2', uv ? `${uv.n} ${uv.words}` : 'Night', 'UV'); })(),
+    tile('M2 14c3-4 5-4 8 0s5 4 8 0 3-2 4-1', td.length ? (td[0].high ? '▲' : '▼') + aklTime(td[0].ms).replace(/\s?[ap]m$/i, '') : '–', 'Tide')];
   const up = glUpdated();
   let x = '';
   if (glStatOpen) {
@@ -18580,7 +18582,7 @@ function glStatInner() {
     td.forEach(t => rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#weather')"><span>${t.high ? 'High' : 'Low'} tide · Onerahi</span><b>${aklTime(t.ms)} · ${tideM(t)}</b></button>`));
     x = `<div class="glx">${rows.join('')}</div>`;
   }
-  return `<div class="glchips">${ch.join('')}<span class="glupd">${esc(up)} ${glStatOpen ? '▴' : '▾'}</span></div>${x}`;
+  return `<div class="gltiles">${ch.join('')}</div><div class="glchips glupdrow"><span class="glupd">${esc(up)} ${glStatOpen ? '▴' : '▾'}</span></div>${x}`;
 }
 function glStatRedraw() { try { const el = document.getElementById('glstat'); if (el) { const h = glStatInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } }
 function glStatToggle() { glStatOpen = !glStatOpen; glStatRedraw(); }
