@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.13';
+const APP_VERSION = '2.26.14';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18023,8 +18023,11 @@ function activeTab(r) {
 }
 let renderedDay = todayISO();
 let renderedHash = null;
+let glTouchAt = 0; document.addEventListener('pointerdown', () => { glTouchAt = Date.now(); }, { capture: true, passive: true });
 function render() {
   if (!S) return;
+  // 2.26.14: a background refresh (TV, bridge, weather) rebuilt Home between finger-down and the click, so the tap was lost. Wait for the tap to finish.
+  try { if (!render.nav && !(window.event && /^(click|submit|change|input|keydown|pointerup|touchend)$/.test(window.event.type)) && glanceOn() && ((location.hash || '#home').slice(1).split('/')[0] || 'home') === 'home' && Date.now() - glTouchAt < 900) { clearTimeout(render.t); render.t = setTimeout(render, 950); return; } } catch (e) { }
   // 2.23.83: the Lights page never redraws itself; only navigation (a hash change) rebuilds it.
   if ((location.hash === '#lights' || location.hash === '#heat' || location.hash === '#alarm') && renderedHash === location.hash && !render.force) return;
   renderedHash = location.hash;
@@ -18287,7 +18290,7 @@ function wireHomeFeedList() {
 window.addEventListener('online', () => { if (S) { syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); } });
 window.addEventListener('offline', () => { if (S) updWx(); });
 window.addEventListener('hashchange', () => {
-  setTabsOpen(false); if (sheetOpen) hideSheet(); render(); $('#view').scrollTop = 0;
+  setTabsOpen(false); if (sheetOpen) hideSheet(); render.nav = true; try { render(); } finally { render.nav = false; } $('#view').scrollTop = 0;
   const r = (location.hash || '').replace(/^#/, '').split('/')[0];
   if (r === 'blogging' || r === 'home' || r === '') refreshBlogs(false);
   if (r === 'podcasts' || r === 'home' || r === '') refreshPodcasts(false);
@@ -18829,13 +18832,20 @@ function glTiles() {
   add('nightlife', 'out', 'Nightlife', () => { const e = nightlifeSoon(7, 2); return e.length ? e.map(x => x.title).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#events')");
   add('place', 'out', 'Place of the day', () => { const p = travelToday(); return p ? p.name + ', ' + p.country : ''; }, B('travel'), '', "go('#travel')");
   add('recipe', 'food', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
-  add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : (j && (j.t || j.q)) || String(j || ''); }, 'i3-quote', ['#2563eb', '#1e3a8a'], "go('#home')");
-  add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#be185d', '#831843'], "go('#home')");
-  add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#0891b2', '#164e63'], "go('#home')");
+  add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : (j && (j.t || j.q)) || String(j || ''); }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
+  add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#be185d', '#831843'], "glInfo('quote')");
+  add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#0891b2', '#164e63'], "glInfo('fact')");
   add('tvguide', 'watch', 'TV guide', () => 'TVNZ 1 · TVNZ 2 · Three', 'i3-tv', ['#b45309', '#7c2d12'], "go('#tv')");
   return T;
 }
 function glShuffle(arr, seed) { const a = arr.slice(); let s = seed * 7919 + 104729; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function glInfo(k) { // 2.26.14: joke, quote and fact tiles used go('#home'), a no-op on Home; open them in a sheet instead
+  try { let t = '', h = '';
+    if (k === 'joke') { const j = dailyJokeFor(); t = 'Joke of the day'; h = Array.isArray(j) ? `<p style="font-size:1.05rem;font-weight:700">${esc(j[0])}</p><p>${esc(j[1] || '')}</p>` : `<p>${esc(String(j && (j.t || j.q) || j || ''))}</p>`; }
+    else if (k === 'quote') { const q = dailyQuoteFor(); t = 'Quote of the day'; h = q ? `<p style="font-size:1.05rem;font-weight:700">“${esc(q.t)}”</p><p class="muted">${esc(q.w || '')}</p>` : ''; }
+    else { t = 'Fun fact'; h = `<p style="font-size:1.05rem">${esc(HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length])}</p>`; }
+    openSheet(t, h, null);
+  } catch (e) { } }
 function glTileHtml(t, small) {
   const img = /^art\//.test(t.art);
   const st = img ? `background-image:url('${t.art}')` : `--a:${t.grad[0]};--b:${t.grad[1]}`;
@@ -18852,7 +18862,7 @@ function glOrderFor(m) {
 }
 function glEntInner() {
   const m = glMode(), all = glTiles(); if (!all.length) return '';
-  const pri = glOrderFor(m), sh = glShuffle(all, glDay() * 31 + glOpenN);
+  const pri = glOrderFor(m), seed = glDay() * 31 + glOpenN, hk = k => { let x = seed * 2654435761 >>> 0; for (const c of k) x = Math.imul(x ^ c.charCodeAt(0), 16777619) >>> 0; return x; }, sh = all.slice().sort((a, b) => hk(a.k) - hk(b.k)); // 2.26.14: stable per tile, so tiles that load later don't reshuffle the rest under a finger
   const sorted = m.night ? sh : sh.sort((a, b) => pri.indexOf(a.cat) - pri.indexOf(b.cat));
   const big = m.night;
   const cap = m.night ? 99 : m.off ? 4 : 3; // 2.26.3: night shows every tile that has data
