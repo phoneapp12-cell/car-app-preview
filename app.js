@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.12';
+const APP_VERSION = '2.26.13';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13773,7 +13773,7 @@ function wireVideoSwipe() {
 }
 // Sarah Jenkins, @sarahjenkins1510. Confirmed 2 Oct 2026 (oembed). A newer one from the channel replaces it.
 const SARAH_CHANNEL_ID = 'UC2sjJeoD0gLkf66iLbm28hg';
-const SARAH_KNOWN = { id: 'hyuecefG9Aw', title: '2 October 2026', channel: 'Sarah Jenkins', published: '2026-10-02T04:54:17+00:00' };
+const SARAH_KNOWN = { id: 'ShTVHD_hSLY', title: '16 October 2026', channel: 'Sarah Jenkins', published: '2026-10-16T06:47:35+00:00' };
 let sarahMem = null;
 function sarahPick(a, b) {
   if (!a || typeof a.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(a.id)) return b || null;
@@ -13782,6 +13782,7 @@ function sarahPick(a, b) {
   if (ap && bp && ap !== bp) return ap > bp ? a : b;
   return b;
 }
+function glSarahOpen() { const v = currentSarahVideo(); if (v && v.id) window.open(v.url, '_blank', 'noopener'); else go('#videos'); } // 2.26.13: open her newest video itself
 function currentSarahVideo() {
   let v = SARAH_KNOWN;
   const saved = S && S.settings && S.settings.sarahLatest;
@@ -13800,7 +13801,7 @@ async function refreshSarah() {
       const data = await getJSON(RELAY_URL + '/sarah', 12000);
       if (data.channelId && data.channelId !== SARAH_CHANNEL_ID) return;
       announced = typeof data.announced === 'string' ? data.announced : '';
-      const top = Array.isArray(data.videos) ? data.videos[0] : null;
+      const top = Array.isArray(data.videos) ? data.videos.filter(x => x && typeof x.id === 'string').sort((a, b) => String(b.published || '').localeCompare(String(a.published || '')))[0] || null : null; // 2.26.13: newest by date
       if (top && typeof top.id === 'string' && /^[A-Za-z0-9_-]{11}$/.test(top.id)) {
         let title = String(top.title || '').replace(/\s+/g, ' ').trim();
         let channel = String(top.channel || '').replace(/\s+/g, ' ').trim();
@@ -18034,7 +18035,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { alerts: GlAlerts, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { alerts: GlAlerts, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -18718,6 +18719,73 @@ function glWarnCard(x) {
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
 function glWarnRedraw() { glBellRedraw(); try { const el = document.getElementById('glalerts'); if (el) el.innerHTML = glAlertsBody(); } catch (e) { } }
 function glAlertsBody() { const L = glWarnList(), hint = L.some(x => x.flag) ? '' : '<p class="muted glhint">Flag events in Events to see them here.</p>'; return (L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook, road or bridge closures and events you flag show up here.</div></div>') + hint; }
+
+/* 2.26.13: Languages. A new te reo Māori and French word or phrase each day from a fixed, hand-checked list.
+   Meaning, simple say-it guide, tap to hear (phone voices only: fr-FR; Māori only when a mi-NZ voice exists), a 3-question quiz,
+   Learned ticks and a streak, all kept on this phone. No reminders. */
+const LANG_MI = [
+  ['Kia ora', 'Hello; thanks; good health', 'kee-ah aw-rah'], ['Mōrena', 'Good morning', 'maw-reh-nah'], ['Tēnā koe', 'Greetings (to one person)', 'teh-nah kweh'],
+  ['Kei te pēhea koe?', 'How are you?', 'kay teh peh-heh-ah kweh'], ['Kei te pai', 'I’m good / it’s fine', 'kay teh pie'], ['Ka pai', 'Good; well done', 'kah pie'],
+  ['Ngā mihi', 'Thanks; regards', 'ngah mee-hee'], ['Haere mai', 'Welcome; come here', 'hie-reh my'], ['Haere rā', 'Goodbye (to someone leaving)', 'hie-reh rah'],
+  ['E noho rā', 'Goodbye (to someone staying)', 'eh naw-haw rah'], ['Ka kite anō', 'See you again', 'kah kee-teh ah-naw'], ['Pō mārie', 'Good night', 'paw mah-ree-eh'],
+  ['Āe', 'Yes', 'eye'], ['Kāo', 'No', 'kah-aw'], ['Whānau', 'Family', 'fah-noh'], ['Whare', 'House', 'fah-reh'], ['Kai', 'Food', 'kie'], ['Wai', 'Water', 'why'],
+  ['Moana', 'Sea; ocean', 'maw-ah-nah'], ['Ngahere', 'Forest; the bush', 'ngah-heh-reh'], ['Kaimoana', 'Seafood', 'kie-maw-ah-nah'], ['Mahi', 'Work', 'mah-hee'],
+  ['Aroha', 'Love; compassion', 'ah-raw-hah'], ['Ua', 'Rain', 'oo-ah'], ['Hau', 'Wind', 'hoh'], ['Tamariki', 'Children', 'tah-mah-ree-kee'], ['Mokopuna', 'Grandchild', 'maw-kaw-poo-nah'],
+  ['Kia kaha', 'Be strong; keep going', 'kee-ah kah-hah'], ['Nō hea koe?', 'Where are you from?', 'naw heh-ah kweh'], ['He aha tēnā?', 'What’s that (near you)?', 'heh ah-hah teh-nah']];
+const LANG_FR = [
+  ['Bonjour', 'Hello; good morning', 'bon-zhoor'], ['Bonsoir', 'Good evening', 'bon-swahr'], ['Merci beaucoup', 'Thank you very much', 'mair-see boh-koo'],
+  ['S’il vous plaît', 'Please (polite)', 'seel voo pleh'], ['De rien', 'You’re welcome', 'duh ryan'], ['Excusez-moi', 'Excuse me', 'ex-kew-zay mwah'],
+  ['Comment ça va ?', 'How’s it going?', 'koh-mahn sah vah'], ['Ça va bien', 'I’m doing well', 'sah vah byan'], ['Au revoir', 'Goodbye', 'oh ruh-vwahr'],
+  ['À bientôt', 'See you soon', 'ah byan-toh'], ['À demain', 'See you tomorrow', 'ah duh-man'], ['Bonne nuit', 'Good night', 'bun nwee'], ['Bonne journée', 'Have a good day', 'bun zhoor-nay'],
+  ['Enchanté', 'Pleased to meet you', 'ahn-shahn-tay'], ['Je m’appelle Shane', 'My name is Shane', 'zhuh mah-pel Shane'], ['Je ne comprends pas', 'I don’t understand', 'zhuh nuh kom-prahn pah'],
+  ['Parlez-vous anglais ?', 'Do you speak English?', 'par-lay voo ahn-gleh'], ['Je voudrais un café', 'I would like a coffee', 'zhuh voo-dreh an kah-fay'],
+  ['L’addition, s’il vous plaît', 'The bill, please', 'lah-dee-syon seel voo pleh'], ['Où sont les toilettes ?', 'Where are the toilets?', 'oo son lay twah-let'],
+  ['Combien ça coûte ?', 'How much does it cost?', 'kom-byan sah koot'], ['Sans gluten', 'Gluten-free', 'sahn glew-ten'], ['Bon appétit', 'Enjoy your meal', 'bon ah-pay-tee'],
+  ['Santé !', 'Cheers!', 'sahn-tay'], ['Il fait beau', 'The weather is nice', 'eel feh boh'], ['Il pleut', 'It’s raining', 'eel pluh'], ['La plage', 'The beach', 'lah plahzh'],
+  ['Le pain', 'Bread', 'luh pan'], ['J’aime la musique', 'I love music', 'zhem lah mew-zeek'], ['Je suis désolé', 'I’m sorry', 'zhuh swee day-zoh-lay']];
+const LANGS = { mi: { name: 'Te reo Māori', list: LANG_MI, voice: 'mi' }, fr: { name: 'French', list: LANG_FR, voice: 'fr' } };
+function langDay() { const n = new Date(); return Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 864e5); }
+function langToday(k) { const L = LANGS[k].list; return L[langDay() % L.length]; }
+function langSt() { try { return JSON.parse(localStorage.getItem('langProg') || 'null') || { learned: {}, days: [] }; } catch (e) { return { learned: {}, days: [] }; } }
+function langSave(st) { try { localStorage.setItem('langProg', JSON.stringify(st)); } catch (e) { } }
+function langStreak(st) { const set = new Set(st.days || []); let d = langDay(), n = 0; if (!set.has(d)) d--; while (set.has(d)) { n++; d--; } return n; }
+function langLearn(k, w) { const st = langSt(), key = k + ':' + w; if (st.learned[key]) delete st.learned[key]; else { st.learned[key] = langDay(); if (!(st.days || []).includes(langDay())) (st.days = st.days || []).push(langDay()); st.days = st.days.slice(-400); } langSave(st); render(); }
+function langVoice(k) { try { const want = LANGS[k].voice, vs = speechSynthesis.getVoices() || []; return vs.find(v => (v.lang || '').toLowerCase().replace('_', '-').startsWith(want + '-')) || vs.find(v => (v.lang || '').toLowerCase().startsWith(want)) || null; } catch (e) { return null; } }
+function langSay(k, i) { try { const v = langVoice(k), w = LANGS[k].list[i]; if (!v || !w) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(w[0]); u.voice = v; u.lang = v.lang; u.rate = .85; speechSynthesis.speak(u); } catch (e) { } }
+try { if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => { if ((location.hash || '').startsWith('#lang')) render(); }; } catch (e) { }
+let langQ = null;
+function langQuizStart(k) { // three questions from today and the days before; pick the right meaning of three
+  const L = LANGS[k].list, d = langDay(), idx = [0, 1, 2].map(o => ((d - o) % L.length + L.length) % L.length);
+  langQ = { k, n: 0, right: 0, qs: idx.map(i => { const wrong = [(i + 7) % L.length, (i + 13) % L.length]; const opts = [i, ...wrong].sort(() => Math.random() - .5); return { i, opts }; }), pick: null };
+  render();
+}
+function langQuizPick(j) { if (!langQ || langQ.pick != null) return; langQ.pick = j; if (j === langQ.qs[langQ.n].i) langQ.right++; render(); }
+function langQuizNext() { if (!langQ) return; langQ.n++; langQ.pick = null; if (langQ.n >= 3) { const st = langSt(); if (!(st.days || []).includes(langDay())) { (st.days = st.days || []).push(langDay()); langSave(st); } } render(); }
+function langCard(k) {
+  const L = LANGS[k], i = langDay() % L.list.length, w = L.list[i], st = langSt(), done = !!st.learned[k + ':' + w[0]], v = langVoice(k);
+  const learnedN = Object.keys(st.learned).filter(x => x.startsWith(k + ':')).length;
+  let quiz = '';
+  if (langQ && langQ.k === k) {
+    if (langQ.n >= 3) quiz = `<div class="langq"><b>Quiz done: ${langQ.right} of 3</b> ${langQ.right === 3 ? 'Ka pai! 🎉'.replace('Ka pai!', k === 'fr' ? 'Bravo !' : 'Ka pai!') : ''}<div style="margin-top:8px"><button class="chip" onclick="langQ=null;render()">Close</button></div></div>`;
+    else { const q = langQ.qs[langQ.n], ok = langQ.pick != null;
+      quiz = `<div class="langq"><div class="muted" style="font-size:.75rem">Question ${langQ.n + 1} of 3</div><div style="font-weight:800;font-size:1.05rem;margin:4px 0 8px">What does “${esc(L.list[q.i][0])}” mean?</div>` +
+        q.opts.map(j => `<button class="langopt${ok && j === q.i ? ' ok' : ok && j === langQ.pick ? ' no' : ''}" onclick="langQuizPick(${j})">${esc(L.list[j][1])}</button>`).join('') +
+        (ok ? `<button class="chip on" style="margin-top:8px" onclick="langQuizNext()">${langQ.n < 2 ? 'Next' : 'Finish'}</button>` : '') + '</div>'; }
+  }
+  return `<div class="card langc"><div class="langh">${esc(L.name)} · word of the day</div>
+    <div class="langw">${esc(w[0])}</div><div class="langm">${esc(w[1])}</div><div class="langp">Say it: <i>${esc(w[2])}</i></div>
+    <div class="chips" style="margin-top:10px">${v ? `<button class="chip" onclick="langSay('${k}',${i})">🔊 Hear it</button>` : ''}
+    <button class="chip ${done ? 'on' : ''}" onclick="langLearn('${k}', ${JSON.stringify(w[0]).replace(/"/g, '&quot;')})">${done ? '✓ Learned' : 'Mark learned'}</button>
+    <button class="chip" onclick="langQuizStart('${k}')">Quick quiz</button></div>
+    <div class="muted" style="font-size:.75rem;margin-top:8px">${learnedN} of ${L.list.length} learned</div>${quiz}</div>`;
+}
+function Languages() {
+  const st = langSt(), s = langStreak(st);
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Languages', 'A new te reo Māori and French word each day') +
+    `<div class="muted" style="margin:0 4px 10px;font-size:.85rem">${s ? `🔥 ${s}-day streak` : 'Learn a word or try the quiz to start a streak'}</div>` + langCard('mi') + langCard('fr') +
+    `<div class="foot">Kept on this phone. “Hear it” uses your phone’s own voices; Māori audio shows only if your phone has a te reo Māori voice.</div>`;
+}
+
 function GlAlerts() {
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + `<div id="glalerts">${glAlertsBody()}</div>
@@ -18747,7 +18815,8 @@ function glTiles() {
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#tv')");
   add('movies', 'watch', 'Movies', () => { const e = upcomingEvents().filter(x => (x.cats || []).includes('Movies')); return e.length ? e[0].title : ''; }, B('events'), '', "go('#events')");
   add('videos', 'watch', 'Videos', () => (glFirst(HOME_CARD.videos()) || {}).t, B('tv'), '', "go('#videos')");
-  add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "go('#videos')");
+  add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "glSarahOpen()");
+  add('lang', 'fun', 'Word of the day', () => { const m = langToday('mi'), f = langToday('fr'); return `${m[0]} · ${f[0]}`; }, 'i3-idea', ['#0d9488', '#1d4ed8'], "go('#lang')"); // 2.26.13
   add('top40', 'listen', 'Top 40 NZ', () => { const f = glFirst(NIGHT_CARD.top40()); return f ? '#1 ' + f.t : ''; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
   add('radio', 'listen', 'Radio', () => (glFirst(HOME_CARD.radio()) || {}).t || 'NZ stations, live', 'i3-radio', ['#16a34a', '#065f46'], "go('#radio')");
   add('podcasts', 'listen', 'Podcasts', () => (glFirst(HOME_CARD.podcasts()) || {}).t, 'i3-phone', ['#9333ea', '#4c1d95'], "go('#podcasts')");
