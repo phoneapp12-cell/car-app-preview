@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.17';
+const APP_VERSION = '2.26.18';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9782,14 +9782,7 @@ async function setTextSize(k) {
   if (!TEXT_SIZES.some(x => x[0] === k)) return;
   S.settings.textSize = k; applyTextSize(); await save(); render();
 }
-function mascotPicker() {
-  const cur = mascotKey();
-  return `<div class="list" id="mascotpick" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap"><div class="tx" style="flex-basis:100%"><div class="t">Mascot</div><div class="s">The ${cur} next to Notifications. Its mood follows the time of day.</div></div>
-    <div class="seg mascotseg" role="radiogroup" aria-label="Mascot" style="width:100%">${Object.keys(MASCOTS).map(k => `<button type="button" class="${k === cur ? 'on' : ''}" role="radio" aria-checked="${k === cur}" data-mascot="${k}" onclick="setMascot('${k}')">${mascotMini(k)}<span>${MASCOTS[k].name}</span></button>`).join('')}</div>
-    <div class="tx" style="flex-basis:100%;margin-top:10px"><div class="t">Style</div><div class="s">${MASCOT_ARTS.find(x => x[0] === mascotArt())[2]}</div></div>
-    <div class="seg mascotseg" id="mascotart" role="radiogroup" aria-label="Mascot style" style="width:100%">${MASCOT_ARTS.map(([a, l]) => `<button type="button" class="${a === mascotArt() ? 'on' : ''}" role="radio" aria-checked="${a === mascotArt()}" data-art="${a}" onclick="setMascotArt('${a}')">${mascotMini(mascotKey(), a)}<span>${l}</span></button>`).join('')}</div>
-    <label class="tx" style="flex-basis:100%;margin-top:12px;display:flex;align-items:center;gap:10px"><div style="flex:1"><div class="t">Sounds</div><div class="s">${mascotKey() === 'cat' ? 'The cat meows now and then by itself (every minute or so while this page is showing and it’s awake), and when you tap it.' : 'The dog gives a soft woof every few minutes, and when you tap it.'} Starts after your first tap anywhere. Quiet while it sleeps.</div></div><input type="checkbox" id="mascotsound" ${mascotSoundOn() ? 'checked' : ''} onchange="setMascotSound(this.checked)"></label></div></div>`;
-}
+function mascotPicker() { return ''; } // 2.26.18: mascots removed
 /* 2.23.30: mascot sounds, made with WebAudio (no recordings): a short meow for the cat, a soft woof for the dog.
    Only when tapped, never by itself. Settings › Mascot › Sounds (on by default). */
 const mascotSoundOn = () => !(S && S.settings && S.settings.mascotSound === false);
@@ -9818,7 +9811,7 @@ async function meowPlay(vol) {
   g.gain.value = vol || 0.9; src.connect(g); g.connect(ac.destination); src.start(); return true;
 }
 let autoT = null;
-function mascotAutoNext() { clearTimeout(autoT); const cat = mascotKey() === 'cat'; autoT = setTimeout(mascotAuto, (cat ? 45 + Math.random() * 45 : 150 + Math.random() * 150) * 1000); }
+function mascotAutoNext() { clearTimeout(autoT); } // 2.26.18: mascots removed
 async function mascotAuto() {
   try {
     const el = document.getElementById('hcat'), st = catState();
@@ -9832,11 +9825,7 @@ async function mascotAuto() {
 }
 setTimeout(() => { try { mascotAutoNext(); } catch (e) { } }, 1000);
 document.addEventListener('visibilitychange', () => { try { if (!document.hidden) mascotAutoNext(); else clearTimeout(autoT); } catch (e) { } });
-function mascotSound(k, vol) {
-  if (!mascotSoundOn()) return;
-  if (k === 'cat') { meowPlay().then(ok => { if (!ok) mascotSynth('cat'); }); return; }
-  mascotSynth(k, vol);
-}
+function mascotSound(k, vol) { } // 2.26.18: mascots removed
 function mascotSynth(k, vol) {
   try {
     mAudio = mAudio || new (window.AudioContext || window.webkitAudioContext)(); const ac = mAudio; if (ac.state === 'suspended') ac.resume();
@@ -16034,12 +16023,7 @@ const kreaImg = (k, a) => { const life = (a || mascotArt()) === 'life', oe = `on
   if (life && k === 'dog') return `<span class="kwrap"><img class="ktail" alt="" src="mascot/dog-life-tail.webp" ${oe}><img class="kimg klife" alt="" src="mascot/dog-life-body.webp" ${oe}></span>`;
   if (k === 'dog') return `<span class="kwrap"><img class="ktail kt-krea" alt="" src="mascot/dog-krea-tail.webp" ${oe}><img class="kimg" alt="" src="mascot/dog-krea-body.webp" ${oe}></span>`; // 2.23.31: Krea art tail cut out too
   return `<span class="kwrap"><img class="kimg${life ? ' klife' : ''}" alt="" src="mascot/${k}-${life ? 'life' : 'krea'}.webp" ${oe}></span>`; };
-function catHtml() {
-  const st = catState(), k = mascotKey(), m = MASCOTS[k];
-  const img = m.img ? `<img class="mimg" alt="" src="${m.img}${st}.webp" onload="this.parentNode.classList.add('hasimg')" onerror="this.parentNode.classList.remove('hasimg');this.remove()">` : '';
-  const kr = mascotArt() !== 'svg';
-  return `<button type="button" class="hcat cat-${st}${k === 'dog' ? ' hdog' : ''}${kr ? ' hkrea' : ''}" id="hcat" aria-label="The ${k} is ${CAT_WORDS[st]}" onclick="catPoke(event)">${k === 'dog' ? dogSvg() : catSvg()}${kr ? kreaImg(k) + '<span class="kz" aria-hidden="true"><i>z</i><i>z</i><i>Z</i></span>' : img}<span class="ctrip" aria-hidden="true"></span><span class="cbub" aria-hidden="true"></span></button>`;
-}
+function catHtml() { return ''; } // 2.26.18: cat and dog mascots removed (Shane approved)
 function mascotMini(k, art) { const kr = (art || mascotArt()) !== 'svg'; return `<span class="hcat mprev cat-alert${k === 'dog' ? ' hdog' : ''}${kr ? ' hkrea' : ''}" aria-hidden="true">${k === 'dog' ? dogSvg() : catSvg()}${kr ? kreaImg(k, art) : ''}</span>`; }
 function dogSvg() {
   return `<svg viewBox="0 0 48 40" aria-hidden="true">
@@ -18039,7 +18023,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { alerts: GlAlerts, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -18598,7 +18582,7 @@ function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
   return `<div class="top glhead"><div class="glhome"><img src="art/i3-house.webp" alt="" width="46" height="46" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></div><div style="min-width:0;flex:1"><h1>Home</h1><div class="sub">${sub}</div>${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div>
-  <div class="iconrow">${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
+  <div class="iconrow"><button class="iconbtn" aria-label="Summary" onclick="go('#summary')">${I('news')}</button>${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -18790,6 +18774,10 @@ function Languages() {
     `<div class="foot">Kept on this phone. “Hear it” uses your phone’s own voices; Māori audio shows only if your phone has a te reo Māori voice.</div>`;
 }
 
+function SummaryPage() { // 2.26.18: the Home summary feed, now its own page
+  const body = (() => { try { return homeOverview(new Set()); } catch (e) { return ''; } })();
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Summary', 'Your day at a glance') + (body || '<div class="card empty"><div class="t">Nothing to sum up yet</div><div class="s">Check back in a moment.</div></div>');
+}
 function GlAlerts() {
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + `<div id="glalerts">${glAlertsBody()}</div>
@@ -18929,9 +18917,7 @@ function glanceHome() {
   let cards = '';
   if ('Notification' in window && Notification.permission === 'default' && S.settings.reminders !== false) cards += `<div class="callout green">${I('bell')}<div style="flex:1"><b>Get reminders on this phone</b><br>We’ll nudge you before WOFs, rego, bills and to-dos are due.<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="turnOnReminders()">Turn on reminders</button></div></div></div>`;
   if (deferredPrompt && !isStandalone()) cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
-  const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(new Set()) : '', '');
-  const tk = sum0 ? (sumScrollOn() ? `<div id="tkhome">${sum0}</div>` : homeSumFold(sum0)) : '';
-  stripSumDone = true; homeSumT = sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
+  const tk = ''; stripSumDone = true; homeSumT = ''; // 2.26.18: the summary feed moved off Home to its own page (top-bar icon)
   const stat = glStatInner();
   const wx = `<div class="glwx">${homeTry('gl weather', () => glWxCard(m), '') || homeTry('weather strip', () => notifWxStrip(), '')}${glTideStrip()}${tk}</div>`;
   const ent = homeTry('gl ent', () => glEntInner(), ''), org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
@@ -19071,8 +19057,7 @@ glAlertsBody = function () {
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
   const dueU = p.dueUrgent.length || gU ? `<div class="list">${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
-  const html = sec('Urgent', warnHtml + dueU) + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
-    sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
-    sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>');
+  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
+    sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '');
   return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
