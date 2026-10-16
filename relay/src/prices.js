@@ -2,10 +2,11 @@
  * POST /prices { key, items: [{ q, brand }] } -> one real product per item from woolworths.co.nz's own public
  * product search (the call the website makes). Price, unit (cup) price, special flag and product page. A chosen
  * brand must match; otherwise the top relevant result. Nothing is made up: no product, no price. Cached 18 h per
- * query in KV, rate-limited per key, at most 25 items a call. No AI.
+ * query (Cache API), rate-limited per key, at most 25 items a call. No AI.
  */
 import { normSharedKey } from './shared-todo.js';
 import { normQuery, rateOk } from './brands.js';
+import { cacheGet, cachePut } from './kvguard.js';
 
 const WW = 'https://www.woolworths.co.nz';
 const TTL = 18 * 3600, MAX = 25, LIVE_PER_CALL = 8;
@@ -46,11 +47,9 @@ export async function wwSearch(q, fetchImpl) {
   if (!d || !d.products) throw Object.assign(new Error('ww_shape'), { status: 502 });
   return d.products.items || [];
 }
-export async function pricesRoute(body, env, fetchImpl = fetch, now = Date.now()) {
-  const k = normSharedKey(body && body.key);
-  if (!k) return [403, { error: 'bad_key' }];
-  const list = (Array.isArray(body && body.items) ? body.items : []).slice(0, MAX);
-  const kv = env && env.EVENTS_KV && typeof env.EVENTS_KV.get === 'function' ? env.EVENTS_KV : null;
+// 2.25.7: cached with the Cache API (no KV writes). Shared by My App (/prices, shared key) and
+// Monique's Helper (/mh-prices, origin-gated, rate-limited per IP). Neither sees the other's lists.
+async function lookup(list, rateKey, fetchImpl, now, debug) {
   const out = []; let live = 0, blocked = 0;
   for (const it of list) {
     const q = normQuery(it && it.q), brand = normQuery(it && it.brand) || '';
@@ -58,17 +57,27 @@ export async function pricesRoute(body, env, fetchImpl = fetch, now = Date.now()
     const ck = 'ww-v1:' + q + '|' + brand;
     const m = mem.get(ck);
     if (m && now - m.at < TTL * 1000) { out.push(m.data); continue; }
-    if (kv) { try { const c = await kv.get(ck, { type: 'json' }); if (c && c.q) { mem.set(ck, { at: Date.parse(c.checked) || now, data: c }); out.push(c); continue; } } catch (e) { } }
-    if (live >= LIVE_PER_CALL || blocked || !rateOk('ww:' + k, now)) { out.push({ q, pending: true }); continue; }
+    try { const c = await cacheGet(ck); if (c && c.q) { mem.set(ck, { at: Date.parse(c.checked) || now, data: c }); out.push(c); continue; } } catch (e) { }
+    if (live >= LIVE_PER_CALL || blocked || !rateOk(rateKey, now)) { out.push({ q, pending: true }); continue; }
     live++;
     try {
       const items = await wwSearch(brand ? brand + ' ' + q : q, fetchImpl);
-      let pick = pickProduct(items, q, brand);
+      const pick = pickProduct(items, q, brand);
       const data = { q, brand, checked: new Date(now).toISOString(), product: pick };
       mem.set(ck, { at: now, data }); if (mem.size > 500) mem.clear();
-      if (kv) { try { await kv.put(ck, JSON.stringify(data), { expirationTtl: TTL }); } catch (e) { } }
+      await cachePut(ck, data, TTL);
       out.push(data);
-    } catch (e) { blocked = e.status || 502; out.push({ q, error: 'unavailable', detail: body && body.debug ? String(e.snip || e.message) : undefined }); }
+    } catch (e) { blocked = e.status || 502; out.push({ q, error: 'unavailable', detail: debug ? String(e.snip || e.message) : undefined }); }
   }
-  return [200, { ok: true, source: 'woolworths.co.nz', store: 'Woolworths online (default store prices)', blocked: blocked || 0, items: out }];
+  return { ok: true, source: 'woolworths.co.nz', store: 'Woolworths online (default store prices)', blocked: blocked || 0, items: out };
+}
+export async function pricesRoute(body, env, fetchImpl = fetch, now = Date.now()) {
+  const k = normSharedKey(body && body.key);
+  if (!k) return [403, { error: 'bad_key' }];
+  const list = (Array.isArray(body && body.items) ? body.items : []).slice(0, MAX);
+  return [200, await lookup(list, 'ww:' + k, fetchImpl, now, body && body.debug)];
+}
+export async function mhPricesRoute(body, ip, fetchImpl = fetch, now = Date.now()) {
+  const list = (Array.isArray(body && body.items) ? body.items : []).slice(0, 10).map(x => ({ q: x && x.q }));
+  return [200, await lookup(list, 'mh:' + String(ip || '?').slice(0, 64), fetchImpl, now, false)];
 }
