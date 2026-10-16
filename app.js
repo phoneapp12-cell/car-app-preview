@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.4';
+const APP_VERSION = '2.26.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -3760,7 +3760,7 @@ const NIGHT_CARD = {
     const nl = nightlifeSoon(7, 4), ids = new Set(nl.map(e => e.id));
     const rest = upcomingEvents().filter(e => !ids.has(e.id) && !evDuringWork(e) && !(e.cats || []).includes('Movies')).slice(0, Math.max(0, 5 - nl.length));
     const row = e => `<button class="row" onclick="go('#events')"><div class="ic ev">${I(isNightlife(e) ? 'music' : 'ticket')}</div><div class="tx"><div class="t">${esc(e.title)}</div>
-      <div class="s">${daysLeft(e.date) === 0 ? 'Tonight' : fmtW(e.date)}${e.time ? ' · ' + fmtTime(e.time) : ''}${e.venue ? ' · ' + esc(e.venue.split(',')[0]) : ''}${isNightlife(e) && e.cats[1] ? ' · ' + esc(e.cats[1]) : ''}</div></div>${evAppt(e.id) ? '<span class="pill fine">Added</span>' : ''}</button>`;
+      <div class="s">${daysLeft(e.date) === 0 ? 'Tonight' : fmtW(e.date)}${e.time ? ' · ' + fmtTime(e.time) : ''}${e.venue ? ' · ' + esc(e.venue.split(',')[0]) : ''}${isNightlife(e) && e.cats[1] ? ' · ' + esc(e.cats[1]) : ''}</div></div>${evAppt(e.id) ? '<span class="pill fine">Added</span>' : ''}${evFlagMini(e)}</button>`;
     if (!nl.length && !rest.length) return HOME_CARD.events();
     return `<div class="sec">${nl.length ? 'Nightlife &amp; what’s on' : 'What’s on in Whangārei'} <a href="#events">All events</a></div><div class="list" id="homenight">${nl.concat(rest).map(row).join('')}</div>`;
   },
@@ -12142,7 +12142,7 @@ function evCard(e) {
     ${(e.cats && e.cats.length) || e.cost ? `<div class="evtags">${(e.cats || []).map(c => `<span>${esc(c)}</span>`).join('')}${e.cost ? `<span class="cost">${esc(e.cost)}</span>` : ''}</div>` : ''}
     <div class="btns">${a ? `<button class="btn small added" onclick="apptForm('${a.id}')" aria-label="Added to your calendar: ${esc(e.title)}">${I('check')} Added</button>`
       : `<button class="btn small primary" onclick="addEvent(${jsArg(e.id)})" aria-label="Add to calendar: ${esc(e.title)}">${I('plus')} Add to calendar</button>`}
-      <a class="btn small" href="${esc(e.url)}" target="_blank" rel="noopener">Details ${I('ext')}</a></div></div>`;
+      <a class="btn small" href="${esc(e.url)}" target="_blank" rel="noopener">Details ${I('ext')}</a>${evFlagBtn(e)}</div></div>`;
 }
 function evList() {
   const list = upcomingEvents().filter(evMatches);
@@ -18638,11 +18638,12 @@ function glWarnList() {
 }
 function glWarnCard(x) {
   const cls = `glwarn ${x.red ? 'glw-red' : x.info ? 'glw-info' : 'glw-amb'}${x.route ? ' glw-route' : ''}`, inner = `<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ''}`;
+  if (x.flag) return `<div class="glflagwrap">${x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="go('#events')">${inner}</button>`}<button type="button" class="glunflag" onclick="evFlagToggle(${jsArg(x.flag)}, event)" aria-label="Unflag ${esc(x.what)}">Unflag</button></div>`;
   return x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="${esc(x.go || '')}">${inner}</button>`;
 }
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
 function glWarnRedraw() { glBellRedraw(); try { const el = document.getElementById('glalerts'); if (el) el.innerHTML = glAlertsBody(); } catch (e) { } }
-function glAlertsBody() { const L = glWarnList(); return L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook and road or bridge closures near you show up here.</div></div>'; }
+function glAlertsBody() { const L = glWarnList(), hint = L.some(x => x.flag) ? '' : '<p class="muted glhint">Flag events in Events to see them here.</p>'; return (L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook, road or bridge closures and events you flag show up here.</div></div>') + hint; }
 function GlAlerts() {
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Warnings, road closures and local events') + `<div id="glalerts">${glAlertsBody()}</div>
@@ -18803,15 +18804,31 @@ const evSportText = e => [e && e.title, e && Array.isArray(e.cats) ? e.cats.join
 { const f = podEpisodes; podEpisodes = function () { const r = f.apply(this, arguments); return Array.isArray(r) ? r.filter(x => !isSport((x && ((x.title || '') + ' ' + (x.show || x.podcast || ''))) || '')) : r; }; }
 { const f = homeOverview; homeOverview = function () { const h = f.apply(this, arguments); try { if (!h || !SPORT_RE.test(h.replace(/<[^>]+>/g, ' '))) return h; const d = document.createElement('div'); d.innerHTML = h; d.querySelectorAll('.sumbul > li, .sumsug, .sumnote, .sumnf, li').forEach(el => { if (isSport(el.textContent)) el.remove(); }); return d.innerHTML; } catch (e) { return h; } }; }
 
-/* ================= 2.26.4: local event heads-ups on the Notifications page =================
-   Notable public events (fireworks: Guy Fawkes, New Year's Eve, Matariki; light and lantern shows) from the real
-   events feed (council + Eventfinda through the relay), next 30 days. Info level: listed after warnings, counted in the bell. */
-const GL_EVENT_RE = /\b(fireworks?|guy fawkes|new year'?s eve|nye|matariki|lantern festival|light show|lights festival|christmas parade|santa parade|carols by candlelight)\b/i;
+/* ================= 2.26.5: flagged events =================
+   Shane flags events (Events list, nightlife and the night card). Only flagged events show on the Notifications page
+   (info cards after the warnings) and count in the bell. A snapshot is kept in settings, which go to his own phones
+   with the usual phone sync (never to Monique). A flag drops off by itself once the event has passed. */
+function evFlags() {
+  try { S.settings = S.settings || {}; let f = S.settings.evFlags; if (!f || typeof f !== 'object' || Array.isArray(f)) f = S.settings.evFlags = {};
+    const T = todayISO(); Object.keys(f).forEach(k => { const x = f[k]; if (!x || !x.date || (x.end || x.date) < T) delete f[k]; }); return f; } catch (e) { return {}; }
+}
+const evFlagged = id => !!evFlags()[id];
+async function evFlagToggle(id, ev) {
+  try { if (ev) { ev.stopPropagation(); ev.preventDefault(); } } catch (e) { }
+  const f = evFlags();
+  if (f[id]) { delete f[id]; toast('Unflagged.'); }
+  else { const e = evById(id); if (!e) return; f[id] = { id: e.id, title: String(e.title || '').slice(0, 140), date: e.date, end: e.end || '', time: e.time || '', venue: String(e.venue || '').slice(0, 120), url: /^https:\/\//.test(e.url || '') ? e.url : '' }; toast('Flagged. It’ll show in Notifications.'); }
+  await save();
+  try { document.querySelectorAll(`[data-flag="${CSS.escape(id)}"]`).forEach(b => { const on = !!f[id]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); const l = b.querySelector('.fl'); if (l) l.textContent = on ? 'Flagged' : 'Flag'; }); } catch (e) { }
+  try { glBellRedraw(); glWarnRedraw(); } catch (e) { }
+}
+function evFlagBtn(e) { const on = evFlagged(e.id); return `<button type="button" class="btn small evflag${on ? ' on' : ''}" data-flag="${esc(e.id)}" aria-pressed="${on}" onclick="evFlagToggle(${jsArg(e.id)}, event)" aria-label="Flag for Notifications: ${esc(e.title)}">🚩 <span class="fl">${on ? 'Flagged' : 'Flag'}</span></button>`; }
+function evFlagMini(e) { const on = evFlagged(e.id); return `<span role="button" tabindex="0" class="evflagmini${on ? ' on' : ''}" data-flag="${esc(e.id)}" aria-pressed="${on}" aria-label="Flag for Notifications: ${esc(e.title)}" onclick="evFlagToggle(${jsArg(e.id)}, event)">🚩</span>`; }
 function glEventHeads() {
   try {
-    return upcomingEvents().filter(e => e && e.title && GL_EVENT_RE.test(e.title + ' ' + (e.desc || '').slice(0, 200)) && daysLeft(e.date) <= 30 && glOk(e.title))
-      .sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 4)
-      .map(e => { const d = daysLeft(e.date); return { pri: 10, info: true, tag: '🎆 Local event' + (d === 0 ? ' · Today' : d === 1 ? ' · Tomorrow' : ' · In ' + d + ' days'), what: e.title, s: [fmtW(e.date) + (e.time ? ' · ' + fmtTime(e.time) : ''), e.venue].filter(Boolean).join(' · '), url: /^https:\/\//.test(e.url || '') ? e.url : '', go: "go('#events')" }; });
+    const T = todayISO();
+    return Object.values(evFlags()).filter(x => x && (x.end || x.date) >= T && glOk(x.title)).sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .map(x => { const d = Math.max(0, daysLeft(x.date)); return { pri: 10, info: true, flag: x.id, tag: '🚩 Flagged event' + (d === 0 ? ' · Today' : d === 1 ? ' · Tomorrow' : ' · In ' + d + ' days'), what: x.title, s: [fmtW(x.date < T ? T : x.date) + (x.time ? ' · ' + fmtTime(x.time) : ''), x.venue].filter(Boolean).join(' · '), url: x.url }; });
   } catch (e) { return []; }
 }
 { const f = glWarnList; glWarnList = function () { const w = f.apply(this, arguments); return w.concat(glEventHeads()); }; }
