@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.2';
+const APP_VERSION = '2.26.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18545,14 +18545,16 @@ function glRoadItems() {
   return out.sort((a, b) => (b.route - a.route) || (b.closed - a.closed));
 }
 function glUpdated() { const t = Math.max(HLIGHT && HLIGHT.at || 0, ALARM && ALARM.data && ALARM.at || 0); return t ? (Date.now() - t < 90e3 ? 'updated just now' : 'updated ' + ago(t)) : ''; }
+const glTempCol = t => { const v = parseFloat(t); return !Number.isFinite(v) ? ['#e0f2fe', '#bae6fd', '#0c4a6e'] : v < 12 ? ['#dbeafe', '#93c5fd', '#1e3a8a'] : v < 17 ? ['#cffafe', '#67e8f9', '#155e75'] : v < 21 ? ['#dcfce7', '#86efac', '#14532d'] : v < 25 ? ['#fef3c7', '#fcd34d', '#78350f'] : ['#ffedd5', '#fb923c', '#7c2d12']; };
+const GL_WAVE = '<svg class="glwave" viewBox="0 0 24 12" aria-hidden="true"><path d="M0 8 C4 2 8 2 12 6 S20 11 24 4 V12 H0Z" fill="#22d3ee" opacity=".55"/><path d="M0 8 C4 2 8 2 12 6 S20 11 24 4" fill="none" stroke="#0e7490" stroke-width="1.6"/></svg>';
 function glStatInner() {
   const ch = [], m = glMode();
-  const T = glTemps(); if (T.length) ch.push(`<span class="glch">🌡 ${T.map(x => esc(x.n) + ' ' + esc(x.t)).join(' · ')}</span>`);
-  const D = glDoors(); if (D && D.length) ch.push(`<span class="glch glred">🚪 ${D.length} open</span>`);
-  const L = glLights(); if (L && L.length) ch.push(`<span class="glch glamb">💡 ${L.length} on</span>`);
-  const uv = !m.night ? wxUV() : null; if (uv && wxIsDay()) ch.push(`<span class="glch nwxuv ${uv.cls}">☀️ UV ${uv.n} ${esc(uv.words)}</span>`);
-  const td = glTideNext(2); if (td.length) ch.push(`<span class="glch gltide">🌊 ${td.map(x => (x.high ? 'High ' : 'Low ') + aklTime(x.ms)).join(' · ')}</span>`);
-  const R = glRoadItems().filter(x => x.route); if (R.length) ch.push(`<span class="glch glred">🚧 ${R.length} on your route</span>`);
+  const T = glTemps(); T.forEach(x => { const c = glTempCol(x.t); ch.push(`<span class="glch gltemp" style="--t1:${c[0]};--t2:${c[1]};color:${c[2]}"><span class="glci">🌡</span>${esc(x.n)} <b>${esc(x.t)}</b></span>`); });
+  const D = glDoors(); if (D && D.length) ch.push(`<span class="glch gldoor"><img src="art/i3-shield.webp" alt="" class="glcimg" onerror="this.remove()">${D.length} open</span>`);
+  const L = glLights(); if (L && L.length) ch.push(`<span class="glch gllight"><span class="glci glbulb">💡</span>${L.length} on</span>`);
+  const uv = !m.night ? wxUV() : null; if (uv && wxIsDay()) ch.push(`<span class="glch nwxuv ${uv.cls} gluv"><span class="glci">☀️</span>UV ${uv.n} ${esc(uv.words)}</span>`);
+  const td = glTideNext(2); if (td.length) ch.push(`<span class="glch gltidech">${GL_WAVE}${td.map(x => (x.high ? '▲ ' : '▼ ') + aklTime(x.ms)).join('  ')}</span>`);
+  const R = glRoadItems().filter(x => x.route); if (R.length) ch.push(`<span class="glch gldoor">🚧 ${R.length} on your route</span>`);
   if (!ch.length) return '';
   const up = glUpdated();
   let x = '';
@@ -18611,7 +18613,9 @@ function glTideStrip() {
     const hAt = ms => { for (let i = 0; i + 1 < P.length; i++) { const a = P[i], b = P[i + 1]; if (ms >= a.ms && ms <= b.ms) { const f = (ms - a.ms) / (b.ms - a.ms); return a.m + (b.m - a.m) * (1 - Math.cos(Math.PI * f)) / 2; } } return null; };
     let d = ''; for (let i = 0; i <= 40; i++) { const ms = W0 + (W1 - W0) * i / 40, h = hAt(ms); if (h == null) continue; d += (d ? ' L' : 'M') + xOf(ms).toFixed(1) + ' ' + yOf(h).toFixed(1); }
     const hn = hAt(now), a = L[nx], b = L[nx + 1];
-    return `<button type="button" class="gltide" onclick="go('#weather')" aria-label="Tides at Onerahi: next ${a.high ? 'high' : 'low'} ${aklTime(a.ms)}"><span class="gltl">🌊 Onerahi</span><svg viewBox="0 0 200 30" preserveAspectRatio="none" aria-hidden="true">${d ? `<path d="${d}" fill="none" stroke="#06b6d4" stroke-width="2.4"/>` : ''}${hn != null ? `<circle cx="${xOf(now).toFixed(1)}" cy="${yOf(hn).toFixed(1)}" r="4" fill="#0e7490"/>` : ''}</svg><span class="gltr"><b>${a.high ? 'High' : 'Low'} ${aklTime(a.ms)}</b> ${tideM(a)}${b ? `<br>${b.high ? 'High' : 'Low'} ${aklTime(b.ms)} ${tideM(b)}` : ''}</span></button>`;
+    const area = d ? d + ' L200 30 L0 30 Z' : '';
+    const marks = P.filter(x => x.ms >= W0 && x.ms <= W1).map(x => `<text x="${xOf(x.ms).toFixed(1)}" y="${x.high ? (yOf(x.m) - 2).toFixed(1) : (yOf(x.m) + 7).toFixed(1)}" font-size="6" text-anchor="middle" fill="#0e7490">${x.high ? '▲' : '▼'}</text>`).join('');
+    return `<button type="button" class="gltide" onclick="go('#weather')" aria-label="Tides at Onerahi: next ${a.high ? 'high' : 'low'} ${aklTime(a.ms)}"><span class="gltl">🌊 Onerahi</span><svg viewBox="0 0 200 30" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="gltg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22d3ee" stop-opacity=".55"/><stop offset="1" stop-color="#0891b2" stop-opacity=".08"/></linearGradient></defs>${area ? `<path d="${area}" fill="url(#gltg)"/>` : ''}${d ? `<path d="${d}" fill="none" stroke="#06b6d4" stroke-width="2.2"/>` : ''}${marks}${hn != null ? `<line x1="${xOf(now).toFixed(1)}" y1="0" x2="${xOf(now).toFixed(1)}" y2="30" stroke="#0e7490" stroke-width=".6" stroke-dasharray="2 2"/><circle cx="${xOf(now).toFixed(1)}" cy="${yOf(hn).toFixed(1)}" r="4.2" fill="#fff" stroke="#0e7490" stroke-width="2"/>` : ''}</svg><span class="gltr"><b>${a.high ? 'High' : 'Low'} ${aklTime(a.ms)}</b> ${tideM(a)}${b ? `<br>${b.high ? 'High' : 'Low'} ${aklTime(b.ms)} ${tideM(b)}` : ''}</span></button>`;
   } catch (e) { return ''; }
 }
 /* ---- roads: NZTA highway events through the relay (/traffic, Cache API), plus the council closures already used for Heads up ---- */
@@ -18640,12 +18644,17 @@ function GlAlerts() {
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Weather warnings and road closures') + `<div id="glalerts">${glAlertsBody()}</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: 16 Sherwood Road, Onerahi to 4 Port Road.</div>`;
 }
+function glWxSky(kind, day) {
+  if (!day) return kind === 'clear' || kind === 'pc' ? ['#0b1438', '#312e81', '#4c1d95', 1] : kind === 'rain' || kind === 'showers' || kind === 'drizzle' || kind === 'storm' ? ['#0f172a', '#1e293b', '#334155', 1] : ['#111827', '#1f2937', '#374151', 1];
+  return kind === 'clear' ? ['#38bdf8', '#7dd3fc', '#fde68a', 0] : kind === 'pc' || kind === 'wind' ? ['#60a5fa', '#93c5fd', '#e0f2fe', 0] : kind === 'cloud' || kind === 'fog' ? ['#94a3b8', '#cbd5e1', '#e2e8f0', 0] : kind === 'storm' ? ['#334155', '#475569', '#64748b', 1] : ['#64748b', '#94a3b8', '#cbd5e1', 0];
+}
 function glWxCard(m) {
   const fresh = WX && validWx(WX.data) && Date.now() - (WX.at || 0) < NWX_STALE; if (!fresh) return '';
-  const c = WX.data.current, nowW = wmo(c.weather_code, wxIsDay(), c.wind_speed_10m), next = homeTry('weather next', () => notifWxNext(), []);
-  const out = homeTry('weather outlook', () => notifWxOutlook(nowW, next), ''), sun = homeTry('weather sun', () => wxSunMention(), ''), uv = !m.night && wxIsDay() ? wxUV() : null;
-  const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '';
-  return `<button type="button" class="glwxc" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}"><span class="glwxi">${wxIcon(nowW)}</span>${temp ? `<b class="glwxt tcol"${tempStyle(c.temperature_2m)}>${temp}</b>` : ''}<span class="glwxw"><b>${esc(nowW.words)}</b>${out ? `<span>${esc(out)}</span>` : ''}${sun ? `<span>${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}</span>${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}</button>`;
+  const day = wxIsDay(), c = WX.data.current, nowW = wmo(c.weather_code, day, c.wind_speed_10m), next = homeTry('weather next', () => notifWxNext(), []);
+  const out = homeTry('weather outlook', () => notifWxOutlook(nowW, next), ''), sun = homeTry('weather sun', () => wxSunMention(), ''), uv = !m.night && day ? wxUV() : null;
+  const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '', sky = glWxSky(nowW.kind, day);
+  const fx = !day && (nowW.kind === 'clear' || nowW.kind === 'pc') ? '<span class="glstars"></span>' : ['rain', 'showers', 'drizzle', 'storm'].includes(nowW.kind) ? '<span class="glrain"></span>' : day && nowW.kind === 'clear' ? '<span class="glrays"></span>' : '';
+  return `<button type="button" class="glwxc${sky[3] ? ' gldark' : ''}" style="--s1:${sky[0]};--s2:${sky[1]};--s3:${sky[2]}" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}">${fx}<span class="glwxi">${wxIcon(nowW, 'big')}</span><span class="glwxw">${temp ? `<b class="glwxt">${temp}</b>` : ''}<b class="glwxn">${esc(nowW.words)}</b>${out ? `<span>${esc(out)}</span>` : ''}${sun ? `<span>${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}</span>${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}</button>`;
 }
 /* ---- Entertainment ---- */
 const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
@@ -18698,11 +18707,11 @@ function glEntInner() {
   const pri = glOrderFor(m), sh = glShuffle(all, glDay() * 31 + glOpenN);
   const sorted = m.night ? sh : sh.sort((a, b) => pri.indexOf(a.cat) - pri.indexOf(b.cat));
   const big = m.night;
-  const cap = m.night ? 8 : m.off ? 4 : 3;
+  const cap = m.night ? 99 : m.off ? 4 : 3; // 2.26.3: night shows every tile that has data
   const list = glFilt !== 'all' ? sorted.filter(t => t.cat === glFilt) : (big && glAll) ? sorted : sorted.slice(0, cap);
   const have = new Set(all.map(t => t.cat));
   const filt = big ? `<div class="glfilt" role="toolbar">${GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).map(c => `<button type="button" class="${glFilt === c[0] ? 'on' : ''}" onclick="glFilt='${c[0]}';glEntRedraw()">${c[1]}${c[0] === 'all' ? ' ' + all.length : ''}</button>`).join('')}</div>` : '';
-  const more = big ? (glFilt === 'all' && all.length > cap ? `<button type="button" class="glmore" onclick="glAll=!glAll;glEntRedraw()">${glAll ? 'Show fewer ▴' : 'Show all ' + all.length + ' ▾'}</button>` : '') : `<button type="button" class="glmore" onclick="glNightPeek()">All entertainment (${all.length}) ›</button>`;
+  const more = big ? (glFilt === 'all' && all.length > cap && !m.night ? `<button type="button" class="glmore" onclick="glAll=!glAll;glEntRedraw()">${glAll ? 'Show fewer ▴' : 'Show all ' + all.length + ' ▾'}</button>` : '') : `<button type="button" class="glmore" onclick="glNightPeek()">All entertainment (${all.length}) ›</button>`;
   return filt + (big && glFilt === 'all' ? glHero() : '') + `<div class="glgrid${!big && !m.off ? ' glg3' : ''}">${list.map(t => glTileHtml(t, !big && !m.off)).join('')}</div>` + more;
 }
 function glNightPeek() { glFilt = 'all'; glAll = true; const el = document.getElementById('glent'); if (el) { el.classList.add('glbig'); el.innerHTML = glEntBig(); } }
