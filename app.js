@@ -18878,7 +18878,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- Organise ---- */
 function glGardenSafe() { try { const w = wxNext5(); return !!(w && num(w.now) && num(w.maxT) && w.now <= 10 && w.maxT <= 10); } catch (e) { return false; } }
 const glGardenOkText = t => glGardenSafe() || !/\b(water|watering|feed|feeding|fertili[sz]e|liquid feed)\b/i.test(String(t || ''));
-function glCU() { try { return comingUpList().filter(x => x && glOk(x.name || x.html) && (x.kind !== 'garden' || glGardenOkText(x.name || String(x.html).replace(/<[^>]+>/g, ' ')))); } catch (e) { return []; } }
+function glCU() { try { return comingUpList().filter(x => x && glOk(x.name || x.html) && (x.kind !== 'garden' || (!(typeof x.days === 'number' && x.days < -30) && glGardenOkText(x.name || String(x.html).replace(/<[^>]+>/g, ' '))))); } catch (e) { return []; } }
 function glTabs(m) { return m.off ? [['today', 'Today'], ['todo', 'To-do'], ['garden', 'Garden & Out'], ['bills', 'Bills'], ['calendar', 'Calendar'], ['cars', 'Cars']] : [['today', 'Today'], ['todo', 'To-do'], ['bills', 'Bills'], ['calendar', 'Calendar'], ['cars', 'Cars'], ['garden', 'Garden & Out']]; }
 function glTodayRows(m) {
   const n = m.night ? 2 : m.off ? 4 : 6, rows = [];
@@ -19014,18 +19014,33 @@ function glSarahItems() {
   try { (S.appts || []).filter(a => a && a.from === 'sarah').forEach(a => add(a, '#calendar', 'Sarah’s appointment' + (a.date ? ' · ' + fmtW(a.date) : ''))); } catch (e) { }
   return out;
 }
+function glGardenAlert() { // 2.26.15: garden card on the Notifications page. Watering rule: not above 10° now or in the next 5 hours.
+  try {
+    const w = wxNext5(), safe = glGardenSafe(), WF = /\b(water|watering|feed|feeding|fertili[sz]e|liquid feed)\b/i;
+    // jobs from the app's garden reminders; anything over 30 days overdue is stale (old test or forgotten items), so it's left out
+    const jobs = comingUpList().filter(x => x && x.kind === 'garden' && typeof x.days === 'number' && x.days >= -30 && x.days <= 2)
+      .map(x => ({ d: x.days, n: String(x.name || x.html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() })).filter(x => x.n && glOk(x.n));
+    const doable = jobs.filter(x => safe || !WF.test(x.n)), dueNow = doable.filter(x => x.d <= 0);
+    const status = !w ? '' : safe ? `Good time to water or feed: ${Math.round(w.now)}° now, up to ${Math.round(w.maxT)}° in the next 5 hours` : `Too warm to water or feed right now: ${Math.round(w.now)}° now, up to ${Math.round(w.maxT)}° in the next 5 hours`;
+    const jl = jobs.slice(0, 3).map(x => `${esc(x.n)}${x.d < 0 ? ` (${-x.d} day${x.d === -1 ? '' : 's'} overdue)` : x.d === 0 ? ' (today)' : x.d === 1 ? ' (tomorrow)' : ' (in 2 days)'}${!safe && WF.test(x.n) ? ' · wait till it’s cooler' : ''}`);
+    if (!status && !jl.length) return null;
+    const html = `<button class="row" onclick="go('#garden')"><div class="ic garden"><span style="font-size:1.25rem">🌱</span></div><div class="tx"><div class="t">Garden</div>${status ? `<div class="s">${esc(status)}</div>` : ''}${jl.map(j => `<div class="s">• ${j}</div>`).join('')}</div>${I('right')}</button>`;
+    return { html, urgent: dueNow.length > 0, count: doable.length > 0 };
+  } catch (e) { return null; }
+}
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems();
-  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn };
+  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert() };
 }
-function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.flags.length; } catch (e) { return 0; } }
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0); } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
-  const dueU = p.dueUrgent.length ? `<div class="list">${p.dueUrgent.map(x => x.html).join('')}</div>` : '';
-  const html = sec('Urgent', warnHtml + dueU) + sec('Coming up', p.coming.length ? `<div class="list">${p.coming.map(x => x.html).join('')}</div>` : '') +
+  const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
+  const dueU = p.dueUrgent.length || gU ? `<div class="list">${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
+  const html = sec('Urgent', warnHtml + dueU) + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
     sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
     sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>');
-  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
