@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.1';
+const APP_VERSION = '2.26.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18000,7 +18000,7 @@ function tabbar(active) {
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
   const listed = new Set(NAV_GROUPS.flatMap(g => g.keys));
   const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge && !(listed.has('bills') && listed.has('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
-  const meta = k => k === 'home' ? ['Notifications', 'home'] : k === 'settings' ? ['Settings', 'gear'] : k === 'more' ? ['More', 'more'] : [NAV[k][2], NAV[k][0]];
+  const meta = k => k === 'home' ? [glanceOn() ? 'Home' : 'Notifications', 'home'] : k === 'settings' ? ['Settings', 'gear'] : k === 'more' ? ['More', 'more'] : [NAV[k][2], NAV[k][0]];
   const btn = k => {
     const [l, ic] = meta(k);
     return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
@@ -18012,7 +18012,7 @@ function activeTab(r) {
   const item = ROUTE_ITEM[r] || r, tabs = navOrder();
   if (r === 'settings') return 'settings';
   if (tabs.includes(item)) return item;
-  if (r === 'home' || r === 'weather' || r === 'drivers' || !r) return 'home';
+  if (r === 'home' || r === 'weather' || r === 'drivers' || r === 'alerts' || !r) return 'home';
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
 }
 let renderedDay = todayISO();
@@ -18029,7 +18029,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { alerts: GlAlerts, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -18516,12 +18516,15 @@ function glMode(now = new Date()) {
   const workDone = !off && em != null && min >= em;
   return { night, off, start, end, h, min, dow: a.dow, morning: h < 12, workDone, beforeWork: !off && sm != null && min < sm, atWork: !off && sm != null && min >= sm && (em == null || min < em) };
 }
-function glShift(m) { return m.start ? fmtTime(m.start) + (m.end ? '–' + fmtTime(m.end) : '') : ''; }
+function glHm(hm) { const m = hmMin(hm); if (m == null) return ''; const h = Math.floor(m / 60), mi = m % 60, h12 = h % 12 || 12; return h12 + (mi ? ':' + String(mi).padStart(2, '0') : '') + (h < 12 ? 'am' : 'pm'); }
+function glShift(m) { return m.start ? glHm(m.start) + (m.end ? '–' + glHm(m.end) : '') : ''; }
+function glBellBtn() { let n = 0; try { n = glWarnList().length; } catch (e) { } return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' active' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; }
+function glBellRedraw() { try { const el = document.getElementById('glbell'); if (el) el.outerHTML = glBellBtn(); } catch (e) { } }
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
-  return `<div class="top glhead"><div class="glhome"><img src="art/i3-house.webp" alt="" width="46" height="46" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></div><div style="min-width:0;flex:1"><h1>Notifications</h1><div class="sub">${sub}</div></div>
-  <div class="iconrow"><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
+  return `<div class="top glhead"><div class="glhome"><img src="art/i3-house.webp" alt="" width="46" height="46" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></div><div style="min-width:0;flex:1"><h1>Home</h1><div class="sub">${sub}</div></div>
+  <div class="iconrow">${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() {
@@ -18577,7 +18580,7 @@ function homeStatusRefresh() {
   try { loadTides(); glTidesEnsure(); } catch (e) { }
   try { glTrafficLoad(); } catch (e) { }
   try { refreshAlerts(); loadWx16(); } catch (e) { }
-  setTimeout(glStatRedraw, 50);
+  setTimeout(() => { glStatRedraw(); glBellRedraw(); }, 50);
 }
 function glPoll() { clearInterval(glPollT); glPollT = setInterval(() => { if (!document.hidden) { homeStatusRefresh(); glStatRedraw(); } }, 60000); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) { glHiddenAt = Date.now(); return; } if (glHiddenAt && Date.now() - glHiddenAt > 10 * 60e3) { glOpenN++; try { localStorage.setItem('glOpenN', String(glOpenN)); } catch (e) { } } setTimeout(homeStatusRefresh, 300); });
@@ -18619,13 +18622,31 @@ async function glTrafficLoad() {
   try { const r = await fetch(RELAY_URL + '/traffic', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items)) { TRAFFIC = { at: Date.now(), data: d }; try { localStorage.setItem('nztaTraffic', JSON.stringify(TRAFFIC)); } catch (e) { } glWarnRedraw(); glStatRedraw(); } } catch (e) { }
   finally { trafficBusy = false; }
 }
-function glWarnInner() {
-  const cards = [];
-  try { wxOutlook().sort((x, y) => y.score - x.score).slice(0, 3).forEach(o => cards.push(`<button type="button" class="glwarn ${o.score >= 80 ? 'glw-red' : 'glw-amb'}" onclick="${esc(o.go || "go('#weather')")}"><span class="glwtag">${esc(o.lbl)}</span><b>${esc(o.what)}</b><span>${esc(o.when)}${o.tip ? ' · ' + esc(o.tip) : ''}</span></button>`)); } catch (e) { }
-  try { const R = glRoadItems(); R.slice(0, 3).forEach(x => cards.push(`<a class="glwarn ${x.route || x.closed ? 'glw-red' : 'glw-amb'}" ${x.url ? `href="${esc(x.url)}" target="_blank" rel="noopener"` : ''}><span class="glwtag">${x.route ? '🚗 On your commute' : '🚧 Roads near you'} · ${x.src === 'NZTA' ? 'NZTA' : 'Council'}</span><b>${esc(x.what)}</b><span>${esc([x.when, x.note].filter(Boolean).join(' · ').slice(0, 170))}</span></a>`)); if (R.length > 3) cards.push(`<button type="button" class="glmore" onclick="go('#roadworks')">+${R.length - 3} more road notices</button>`); } catch (e) { }
-  return cards.join('');
+function glWarnList() {
+  const L = [];
+  try { wxOutlook().forEach(o => L.push({ pri: o.score >= 80 ? 90 : o.score >= 60 ? 70 : 40, red: o.score >= 80, tag: o.lbl, what: o.what, s: (o.when || '') + (o.tip ? ' · ' + o.tip : ''), go: o.go || "go('#weather')" })); } catch (e) { }
+  try { glRoadItems().forEach(x => L.push({ pri: x.route ? 95 : x.closed ? 60 : 30, red: x.route || x.closed, route: x.route, tag: (x.route ? '🚗 On your commute' : '🚧 Roads near you') + ' · ' + (x.src === 'NZTA' ? 'NZTA' : 'Council'), what: x.what, s: [x.when, x.note].filter(Boolean).join(' · ').slice(0, 220), url: x.url })); } catch (e) { }
+  return L.filter(x => x.what && glOk(x.what)).sort((a, b) => b.pri - a.pri);
 }
-function glWarnRedraw() { try { const el = document.getElementById('glwarn'); if (el) { const h = glWarnInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } }
+function glWarnCard(x) {
+  const cls = `glwarn ${x.red ? 'glw-red' : 'glw-amb'}${x.route ? ' glw-route' : ''}`, inner = `<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ''}`;
+  return x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="${esc(x.go || '')}">${inner}</button>`;
+}
+function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
+function glWarnRedraw() { glBellRedraw(); try { const el = document.getElementById('glalerts'); if (el) el.innerHTML = glAlertsBody(); } catch (e) { } }
+function glAlertsBody() { const L = glWarnList(); return L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook and road or bridge closures near you show up here.</div></div>'; }
+function GlAlerts() {
+  setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); } catch (e) { } }, 0);
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Weather warnings and road closures') + `<div id="glalerts">${glAlertsBody()}</div>
+  <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: 16 Sherwood Road, Onerahi to 4 Port Road.</div>`;
+}
+function glWxCard(m) {
+  const fresh = WX && validWx(WX.data) && Date.now() - (WX.at || 0) < NWX_STALE; if (!fresh) return '';
+  const c = WX.data.current, nowW = wmo(c.weather_code, wxIsDay(), c.wind_speed_10m), next = homeTry('weather next', () => notifWxNext(), []);
+  const out = homeTry('weather outlook', () => notifWxOutlook(nowW, next), ''), sun = homeTry('weather sun', () => wxSunMention(), ''), uv = !m.night && wxIsDay() ? wxUV() : null;
+  const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '';
+  return `<button type="button" class="glwxc" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}"><span class="glwxi">${wxIcon(nowW)}</span>${temp ? `<b class="glwxt tcol"${tempStyle(c.temperature_2m)}>${temp}</b>` : ''}<span class="glwxw"><b>${esc(nowW.words)}</b>${out ? `<span>${esc(out)}</span>` : ''}${sun ? `<span>${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}</span>${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}</button>`;
+}
 /* ---- Entertainment ---- */
 const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
 const GL_SUNO = ['A Suno track about Onerahi and the harbour', 'A Suno song about a sunny day off', 'A calm Suno playlist for tonight', 'A Suno track about the Te Matau ā Pohe bridge', 'A Suno song about the Northland coast'];
@@ -18743,14 +18764,14 @@ function glanceHome() {
   const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(new Set()) : '', '');
   const tk = sum0 ? (sumScrollOn() ? `<div id="tkhome">${sum0}</div>` : homeSumFold(sum0)) : '';
   stripSumDone = true; homeSumT = sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
-  const stat = glStatInner(), warn = homeTry('gl warn', () => glWarnInner(), '');
-  const wx = `<div class="glwx">${homeTry('weather strip', () => notifWxStrip(), '')}${glTideStrip()}${tk}</div>`;
+  const stat = glStatInner();
+  const wx = `<div class="glwx">${homeTry('gl weather', () => glWxCard(m), '') || homeTry('weather strip', () => notifWxStrip(), '')}${glTideStrip()}${tk}</div>`;
   const ent = homeTry('gl ent', () => glEntInner(), ''), org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const orgZ = org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
-    `<div id="glwarn" class="glwarns"${warn ? '' : ' hidden'}>${warn}</div>` + wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + cards +
+    wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + cards +
     (m.night ? entZ + asks + orgZ : orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
