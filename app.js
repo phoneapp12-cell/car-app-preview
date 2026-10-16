@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.10';
+const APP_VERSION = '2.26.11';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10492,6 +10492,7 @@ function rememberFix(pos) {
     noteHomeArrival();
     noteNewSpot(hereFix, speed); // 2.22.31
     nwCheck(hereFix); // 2.22.88
+    try { if (!window.__glLineLoc && glLoc()) { window.__glLineLoc = 1; window.__glLine = ''; const el = document.querySelector('.glhead .glline'), l = glLine(glMode()); if (el && l) el.textContent = l; } } catch (e) { } // 2.26.11
   } catch (e) {}
 }
 // 2.22.88: at New World Onerahi (128 Onerahi Rd), once per visit, offer the shopping list.
@@ -18530,6 +18531,33 @@ function glBellRedraw() { try { const el = document.getElementById('glbell'); if
    never Zeus walks, never sport. Rotates each open and never repeats the previous line. */
 function glBook() { try { return (localStorage.getItem('readingBook') || '').trim().slice(0, 60); } catch (e) { return ''; } }
 function glSetBook(v) { try { localStorage.setItem('readingBook', String(v || '').trim().slice(0, 60)); } catch (e) { } }
+
+/* 2.26.11: where Shane is, for the greeting line only. Uses the fix the app already reads (checkHere: only when the browser
+   already allows location, never prompts). Stays on the phone: nothing is sent to the relay or saved anywhere. */
+const GL_SPOTS = [
+  { k: 'home', lat: -35.7495414, lon: 174.3646323, r: 200 }, // 16 Sherwood Road, Onerahi
+  { k: 'work', lat: -35.7300535, lon: 174.3273886, r: 200 }, // 4 Port Road, Whangārei
+  { k: 'beach', lat: -35.7563, lon: 174.3585, r: 600 }, // Onerahi foreshore and beach
+  { k: 'beach', lat: -35.8391, lon: 174.4597, r: 1200 }, // Ocean Beach
+  { k: 'beach', lat: -35.6127, lon: 174.5160, r: 1200 }, // Tutukaka harbour
+  { k: 'bush', lat: -35.7055, lon: 174.3335, r: 700 }, // AH Reed Kauri Park
+  { k: 'bush', lat: -35.7187, lon: 174.3447, r: 900 }, // Mt Parihaka
+  { k: 'bush', lat: -35.6988, lon: 174.3005, r: 600 }, // Whangārei Falls
+  { k: 'town', lat: -35.7251, lon: 174.3237, r: 900 }]; // Whangārei town centre and Town Basin
+function glLoc() {
+  try { const f = typeof hereFix !== 'undefined' ? hereFix : null; if (!f || Date.now() - f.at > 20 * 60000 || (f.acc != null && f.acc > 1000)) return null;
+    const m = (a, b, c, d) => { const R = 6371000, x = (c - a) * Math.PI / 180, y = (d - b) * Math.PI / 180 * Math.cos((a + c) / 2 * Math.PI / 180); return R * Math.hypot(x, y); };
+    const hit = GL_SPOTS.find(p => m(f.lat, f.lon, p.lat, p.lon) <= p.r); return hit ? hit.k : 'out'; } catch (e) { return null; }
+}
+function glLocLines(h) {
+  const k = glLoc(); if (!k) return [];
+  if (k === 'home') return h >= 19 || h < 2 ? ['Home sweet home. Spa later? ♨️', 'Home and cosy. Film or a new Suno track?'] : ['Home sweet home 🏡', 'Pottering about at home today?'];
+  if (k === 'work') return ['Busy one at Port Rd? 👋', 'Hope Port Rd is treating you well today', 'Coffee break soon? ☕'];
+  if (k === 'beach') return ['Nice spot for a walk 🌊', 'Beach time. Enjoy the sea air'];
+  if (k === 'bush') return ['Nice spot for a walk 🌿', 'Bush walk? Enjoy the green'];
+  if (k === 'town') return ['In town? Anything good on?', 'Out in town. Treat yourself to a coffee? ☕'];
+  return ['Out and about? Anything good nearby?', 'Out and about. Enjoy it!'];
+}
 function glLinePool(m, now = new Date()) {
   const h = now.getHours(), d = now.getDay(), L = [], add = (...x) => L.push(...x), b = glBook();
   let k = 'sunny', t = null; try { k = wxKindNow().kind; t = Math.round(WX.data.current.temperature_2m); } catch (e) { }
@@ -18551,6 +18579,7 @@ function glLinePool(m, now = new Date()) {
   if (fine && h >= 8 && h < 17 && t != null && t > 10) add('Garden looking good? 🌼');
   if (wet) add('Rainy one. Movie night? 🍿', 'Rain on the roof. Book and a cuppa? 📖');
   add('Turkish Delight o’clock? 🍬');
+  const LL = glLocLines(h); if (LL.length) L.unshift(...LL, ...LL); // 2.26.11: location lines weighted double
   return L.filter(x => glOk(x) && !/zeus|walk the dog|bed ?time|sleep|teeth|meds|tablets|late for/i.test(x));
 }
 function glLine(m) {
@@ -18559,7 +18588,7 @@ function glLine(m) {
   if (!window.__glLine || !P.includes(window.__glLine)) { const c = P.length > 1 ? P.filter(x => x !== last) : P; window.__glLine = c[Math.floor(Math.random() * c.length)]; try { localStorage.setItem('glLineLast', window.__glLine); } catch (e) { } }
   return window.__glLine;
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) window.__glLine = ''; });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { window.__glLine = ''; window.__glLineLoc = 0; } });
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
