@@ -1,3 +1,4 @@
+import { cacheGet, cachePut } from './kvguard.js';
 /* Philips Hue (Remote Hue API, cloud). Added with app 2.23.79.
    Client id and secret are Worker secrets HUE_CLIENT_ID / HUE_CLIENT_SECRET (HUE_APP_ID optional), never in the repo.
    Only the app can use it: every call needs the allowed Origin AND the phone's own Hue key (random, made by the relay
@@ -101,7 +102,12 @@ export async function hueRoute(path, request, env, f, okOrigin, reply) {
       R.button.forEach(x => { const b = x.button || {}, r = b.button_report || {}; const ev = r.event || b.last_event; if (!ev) return; const d = dev(own(x)), when = r.updated || null; if (!d.button || (when && (!d.button.when || when > d.button.when))) d.button = { event: ev, n: x.metadata && x.metadata.control_id || null, when }; });
       R.relative_rotary.forEach(x => { const q = x.relative_rotary || {}, r = q.rotary_report || q.last_event || {}; const rot = r.rotation || {}; if (r.action || rot.direction) dev(own(x)).rotary = { action: r.action || '', direction: rot.direction || '', steps: rot.steps || null, when: r.updated || null }; });
       delete out.undefined;
-      return reply(200, { setup: true, linked: true, sensors: Object.values(out).filter(d => d.motion || d.temp || d.light || d.contact || d.button || d.rotary || (d.battery && !/bridge/i.test(d.product))) });
+      // 2.26.17: devices (lights, sensors, switches) the bridge can't reach right now. Read-only; cached 10 min in the Cache API, no KV.
+      let offline = null;
+      try { const cc = await cacheGet('hue-conn'); if (cc && Array.isArray(cc.list)) offline = cc.list; } catch (e) { }
+      if (!offline) { try { const zc = await get('zigbee_connectivity'); offline = zc.filter(z => z && z.status && z.status !== 'connected').map(z => { const id = own(z), d = devices.find(x => x.id === id) || {}; return { id, name: (d.metadata && d.metadata.name) || (d.product_data && d.product_data.product_name) || 'Device', product: (d.product_data && d.product_data.product_name) || '', room: roomOf[id] || '', status: z.status }; }).filter(x => !/bridge/i.test(x.product)); await cachePut('hue-conn', { list: offline }, 600); } catch (e) { offline = null; } }
+      Object.values(out).forEach(d => { if (offline && offline.some(o => o.id === d.id)) d.offline = true; });
+      return reply(200, { setup: true, linked: true, offline, sensors: Object.values(out).filter(d => d.motion || d.temp || d.light || d.contact || d.button || d.rotary || (d.battery && !/bridge/i.test(d.product))) });
     }
     if (path === '/hue/alloff') { // 2.23.81: every light off through the bridge's whole-home group
       const homes = await clip(env, rec, f, 'GET', 'bridge_home').then(x => x.data || []);

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.16';
+const APP_VERSION = '2.26.17';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -15319,6 +15319,7 @@ async function hueStripFetch() {
   try {
     const [a, b] = await Promise.all([hueCall('sensors').catch(() => null), hueCall('lights').catch(() => null)]);
     // 2.23.84: same linked test as the Lights page; a failed fetch keeps the last good data and retries in 45s
+    if (a && a.linked && Array.isArray(a.offline)) devOfflineNote(a.offline); // 2.26.17
     if (a && a.linked && Array.isArray(a.sensors)) { HUESTRIP.sens = a.sensors; hueBattSave(a.sensors); try { localStorage.setItem('hueSensCache', JSON.stringify(a.sensors.filter(d => d && d.temp && typeof d.temp.c === 'number').map(d => ({ name: d.name, room: d.room, temp: { c: d.temp.c } })))); } catch (e) { } try { const el = document.getElementById('homerooms'); if (el) { const h = hroomInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } } else if (a && a.linked === false) { HUESTRIP.sens = null; hueBattSave([]); }
     if (b && b.linked) { HUESTRIP.lights = b; try { HLIGHT = { at: Date.now(), data: { rooms: (b.rooms || []).map(r => ({ name: r.name, on: !!r.on })), lights: (b.lights || []).map(l => ({ name: l.name, room: l.room, on: !!l.on })) } }; localStorage.setItem('hlightCache', JSON.stringify(HLIGHT)); } catch (e) { } } else if (b && b.linked === false) HUESTRIP.lights = null;
     try { glStatRedraw(); } catch (e) { }
@@ -19028,8 +19029,39 @@ function glGardenAlert() { // 2.26.15: garden card on the Notifications page. Wa
     return { html, urgent: dueNow.length > 0, count: doable.length > 0 };
   } catch (e) { return null; }
 }
+/* 2.26.17: device problems on the Notifications page. Read-only: never arms, disarms or controls anything. */
+function devOffline() { try { return JSON.parse(localStorage.getItem('hueOffline') || '{}') || {}; } catch (e) { return {}; } }
+function devOfflineNote(list) { // remember when each device was first seen offline; only flag after 30 minutes so blips don't show
+  const prev = devOffline(), now = Date.now(), next = {};
+  (list || []).forEach(o => { if (o && o.id) next[o.id] = { name: o.name, room: o.room, product: o.product, since: (prev[o.id] && prev[o.id].since) || now }; });
+  try { localStorage.setItem('hueOffline', JSON.stringify(next)); } catch (e) { }
+}
+function glDeviceItems() {
+  const out = [], row = (icon, t, s, urgent, go) => out.push({ days: urgent ? 0 : 50, html: `<button class="row" onclick="${go}"><div class="ic"><span style="font-size:1.2rem">${icon}</span></div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${esc(s)}</div></div>${I('right')}</button>` });
+  try { // Hue batteries
+    const dis = hueBattDis(), now = Date.now();
+    let sens = (HUESTRIP && Array.isArray(HUESTRIP.sens) && HUESTRIP.sens.length) ? HUESTRIP.sens : null; if (!sens) sens = JSON.parse(localStorage.getItem('hueBattLow') || '[]') || [];
+    sens.filter(d => d && d.battery && typeof d.battery.pct === 'number' && d.battery.pct <= 20 && !(dis[d.id] > now))
+      .sort((a, b) => a.battery.pct - b.battery.pct).forEach(d => row('🪫', `${d.name}: battery ${d.battery.pct}%`, `Hue${d.room ? ' · ' + d.room : ''} · ${d.battery.pct <= 10 ? 'replace soon' : 'getting low'}`, d.battery.pct <= 10, "go('#lights')"));
+  } catch (e) { }
+  try { // Hue lights, sensors and switches the bridge can't reach for 30+ minutes
+    const o = devOffline(), now = Date.now();
+    Object.values(o).filter(x => x && now - x.since >= 30 * 60000).forEach(x => row('📡', `${x.name} is offline`, `Hue${x.room ? ' · ' + x.room : ''} · not reachable for ${ago(x.since).replace(/ ago$/, '')}`, false, "go('#lights')"));
+  } catch (e) { }
+  try { // alarm sensors (read only)
+    const d = ALARM && ALARM.data, sn = (d && d.sensors) || [];
+    sn.filter(x => x && x.fault).forEach(x => row('🚨', `${x.name}: sensor trouble`, 'Alarm · ' + (x.state || 'needs checking'), true, "go('#alarm')"));
+    sn.filter(x => x && x.lowBatt && !x.fault).forEach(x => row('🪫', `${x.name}: low battery`, 'Alarm sensor', false, "go('#alarm')"));
+  } catch (e) { }
+  try { // heat pumps
+    const h = HEATSTRIP && HEATSTRIP.data; const B = (h && h.brands) || {};
+    [['panasonic', 'Panasonic heat pump'], ['mitsubishi', 'Mitsubishi heat pump']].forEach(([k, n]) => { const b = B[k]; if (b && b.ok === false && b.error !== 'not_configured') row('🌡️', `${n} not responding`, 'Heat pump app link · will retry', false, "go('#heat')"); });
+    ((h && h.units) || []).filter(u => u && /fault|error|offline/i.test(String(u.status || ''))).forEach(u => row('🌡️', `${u.name}: ${u.status}`, 'Heat pump', false, "go('#heat')"));
+  } catch (e) { }
+  return out;
+}
 function glAlertParts() {
-  const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems();
+  const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
   return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert() };
 }
 function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0); } catch (e) { return 0; } }
