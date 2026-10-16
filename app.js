@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.3';
+const APP_VERSION = '2.26.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2148,6 +2148,7 @@ async function loadTvwPicks() {
       if (!title || /infomercial|paid programming|teleshopping|close/i.test(title)) continue;
       const movie = cats.includes('Movie') && b - a >= 75 * 60000, comedy = cats.some(c => /comedy/i.test(c));
       if (!movie && !comedy) continue;
+      if (isSport(title + ' ' + cats.join(' '))) continue;
       const desc = unx(((/<desc[^>]*>([^<]+)/.exec(body)) || [])[1] || '').trim().slice(0, 160);
       out.push({ t: title, ch, a, b, k: movie ? 'movie' : 'comedy', d: desc });
     }
@@ -2659,6 +2660,7 @@ function aiSumCtx() {
       ctx.dayFacts = { today: { weekday: WDn[f0.dow], work: f0.work ? 'work day' : 'day off', gym: f0.gym ? 'yes, after work' : 'no' }, tomorrow: { weekday: WDn[f1.dow], work: f1.work ? 'work day' : 'day off', gym: f1.gym ? 'yes, after work' : 'no' } }; } catch (e) { }
     ctx.noInventRule = 'Never invent traits, habits, styles or preferences. Only use what is in aboutShane, aboutYouAnswers and knowMe. Never invent celebrations or occasions. Gym only if dayFacts says gym yes for that day (gym is Tuesday and Wednesday after work only).';
     if (sumToday().min < 360) ctx.lateNightRule = 'It is between midnight and 6am and he is still up. Write exactly 3 short lines: (1) right now: lights still on and/or room temperatures from personalTouches, (2) one quiet wind-down idea, (3) one brief line for the morning (work start and weather if today is a work day, otherwise a gentle day-off note). Do NOT mention tonight, this evening, merlot, wine, dinner, cooking, gym, after work or celebrations.';
+    ctx.noSport = 'Never mention sport of any kind (rugby, league, cricket, netball, football, matches, teams, scores).';
     ctx.personalRule = 'Make it personal and warm, short. Weave in 1 or 2 of personalTouches naturally (they fit right now). Use aboutShane only for context, never list facts back. Never nag about bedtime, teeth, meds, lateness or work hours. Never suggest walking Zeus. At most ONE line about to-dos or household jobs, and never two lines on the same topic. A household tip is never the opening line. Open with something about his actual day (day off or work, weather, a personal touch). No garden feeding or watering if it is above 10°C now or in the next 5 hours.'; } catch (e) {}
   try { if (homeNight()) nightCtx(ctx); } catch (e) {}
   return ctx;
@@ -11734,6 +11736,7 @@ function tvTake(attrs, body, now, acc) {
     const cat = tvUnesc(catM[1]).replace(/\s+/g, ' ').trim();
     if (cat && cats.indexOf(cat) === -1) cats.push(cat);
   }
+  if (isSport(title + ' ' + cats.join(' '))) return; // 2.26.4: no sport
   (acc.slots[ch[1]] || (acc.slots[ch[1]] = [])).push({ title, start, until, cats });
 }
 function tvFinish(acc, now) {
@@ -11937,7 +11940,7 @@ function newsUrl(u) {
 // 2.23.5: human interest and politics only. The relay already drops these; this catches anything saved earlier.
 const NEWS_BLOCK = /\b(courts?|courtroom|trials?|retrial|jury|sentenc\w*|judges?|jail\w*|prisons?|prisoners?|inmates?|charged|charges? laid|facing charges|accused|guilty|convict\w*|acquit\w*|plead\w*|bail|parole|murder\w*|homicides?|manslaughter|kill\w*|death of|deaths?|died|dies|dead|bod(y|ies) found|remains found|coroner\w*|inquest|stab\w*|shooting|shootings|shooters?|shot dead|shot|gunm[ae]n|guns?|firearms?|armed|weapons?|assault\w*|attack\w*|violen\w*|brawl\w*|abus\w*|rap(e|ed|es|ist|ists)|sexual\w*|sex|sexually|indecen\w*|porn\w*|exploit\w*|grooming|molest\w*|paedophil\w*|pedophil\w*|harass\w*|stalk(ing|er|ed)|gangs?|gang\w+|police hunt|manhunt|arrest\w*|offend\w*|offender\w*|kidnap\w*|abduct\w*|hostage\w*|terror\w*|bomb(s|ed|er|ers|ing|ings)?|explosi\w*|fatal\w*|crash victims?|drown\w*|suicid\w*|execut(e|ed|es|ion|ions)|war|wars|warfare|massacre\w*|genocide|riot\w*|robber\w*|burglar\w*|ram raid\w*|stolen|injur(ed|ies|y)|hit[ -]and[ -]run|crash(es|ed)?|collisions?|police (are )?(appeal\w*|investigat\w*|seek\w*)|sought|missing (man|woman|person|teen|boy|girl|child))\b/i;
 const NEWS_SAFE = /\b(ticking time bomb|time bomb|bombshell|green shoots|price wars?|war of words|heart attacks?|panic attacks?|shot in the arm|long shot|big shots?|death of the high street)\b/gi;
-const newsOk = x => !NEWS_BLOCK.test(String(x.title || '').replace(NEWS_SAFE, ' '));
+const newsOk = x => !NEWS_BLOCK.test(String(x.title || '').replace(NEWS_SAFE, ' ')) && !isSport(String(x.title || '') + ' ' + String(x.desc || x.summary || ''));
 // 2.23.6: two sections. Local (Northland) stories go after 7 days, New Zealand ones after 3.
 const NEWS_SECS = { local: { title: 'Local — Northland', days: 7 }, nz: { title: 'New Zealand', days: 3 } };
 function newsSec(key) {
@@ -18498,8 +18501,9 @@ start();
 // 2.26.1: Settings › Notifications layout: New (default) or Classic layout (the pre-2.26.0 page, exactly). Kept on this phone only.
 const glanceOn = () => { try { return localStorage.getItem('notifLayout') !== 'classic'; } catch (e) { return true; } };
 function setNotifLayout(v) { try { localStorage.setItem('notifLayout', v === 'classic' ? 'classic' : 'new'); } catch (e) { } try { if (S && S.settings && S.settings.homeLayout === 'glance') S.settings.homeLayout = 'classic'; } catch (e) { } document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'classic' ? 'Classic layout on.' : 'New layout on.'); }
+const glSportOk = t => !isSport(t);
 const GL_NO = /\bwalk\b.*\bzeus\b|\bzeus\b.*\bwalk\b|\b(teeth|tooth|floss|face ?wash|skin ?care|meds?|medication|pills?|tablets?|bed ?time|go to (bed|sleep)|running late|you'?re late|work hours)\b/i;
-const glOk = t => !GL_NO.test(String(t || ''));
+const glOk = t => !GL_NO.test(String(t || '')) && !isSport(t);
 const glTxt = h => { try { const d = document.createElement('div'); d.innerHTML = h || ''; return d; } catch (e) { return null; } };
 function glFirst(h) { // first row title / subtitle of an existing card
   try { const d = glTxt(h); if (!d) return null; const r = d.querySelector('.row .t') || d.querySelector('.t'); if (!r) return null;
@@ -18633,15 +18637,15 @@ function glWarnList() {
   return L.filter(x => x.what && glOk(x.what)).sort((a, b) => b.pri - a.pri);
 }
 function glWarnCard(x) {
-  const cls = `glwarn ${x.red ? 'glw-red' : 'glw-amb'}${x.route ? ' glw-route' : ''}`, inner = `<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ''}`;
+  const cls = `glwarn ${x.red ? 'glw-red' : x.info ? 'glw-info' : 'glw-amb'}${x.route ? ' glw-route' : ''}`, inner = `<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ''}`;
   return x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="${esc(x.go || '')}">${inner}</button>`;
 }
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
 function glWarnRedraw() { glBellRedraw(); try { const el = document.getElementById('glalerts'); if (el) el.innerHTML = glAlertsBody(); } catch (e) { } }
 function glAlertsBody() { const L = glWarnList(); return L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook and road or bridge closures near you show up here.</div></div>'; }
 function GlAlerts() {
-  setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); } catch (e) { } }, 0);
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Weather warnings and road closures') + `<div id="glalerts">${glAlertsBody()}</div>
+  setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Warnings, road closures and local events') + `<div id="glalerts">${glAlertsBody()}</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: 16 Sherwood Road, Onerahi to 4 Port Road.</div>`;
 }
 function glWxSky(kind, day) {
@@ -18785,3 +18789,30 @@ function glanceHome() {
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
 }
+
+/* ================= 2.26.4: no sport anywhere =================
+   Shane doesn't want sport: it's filtered out of the TV guide and TV picks, news, events and nightlife, videos,
+   blogs and podcasts, the ticker and summary, and the Home tiles. His own calendar items are never touched. */
+const SPORT_RE = /\b(sports?|sporting|rugby|all blacks|black ferns|super rugby|rugby league|nrl|nz warriors|cricket|black ?caps|white ferns|netball|silver ferns|football|soccer|a-league|fifa|premier league|afl|basketball|nbl|tall blacks|golf|tennis|motorsport|motor racing|formula ?1|formula one|f1 grand prix|supercars|speedway|boxing|ufc|mma|wrestling|athletics|olympics?|olympic games|commonwealth games|hockey|black sticks|rowing|america'?s cup|sailgp|triathlon|ironman|surf lifesaving|horse racing|harness racing|trots|darts|snooker|lawn bowls|squash|volleyball|baseball|softball|nfl|nba|motocross|crusaders|northland taniwha|bunnings npc|ranfurly shield|sky sport|espn|kick-?off|grand final|test match|world cup|six nations|bledisloe|haka challenge|match highlights|live match|v\.? (france|england|australia|ireland|wales|scotland|south africa|argentina|fiji|samoa|tonga|india|pakistan|sri lanka))\b/i;
+function isSport(t) { try { return SPORT_RE.test(String(t || '')); } catch (e) { return false; } }
+const evSportText = e => [e && e.title, e && Array.isArray(e.cats) ? e.cats.join(' ') : ''].join(' ');
+{ const f = upcomingEvents; upcomingEvents = function () { return (f.apply(this, arguments) || []).filter(e => !isSport(evSportText(e)) && !(e && Array.isArray(e.cats) && e.cats.some(c => /^sports?$/i.test(c)))); }; }
+{ const f = videosForCat; videosForCat = function () { const r = f.apply(this, arguments); return Array.isArray(r) ? r.filter(v => !isSport((v && (v.title + ' ' + (v.channel || ''))) || '')) : r; }; }
+{ const f = videoSuggestions; videoSuggestions = function () { const r = f.apply(this, arguments); return Array.isArray(r) ? r.filter(v => !isSport((v && ((v.title || '') + ' ' + (v.channel || ''))) || '')) : r; }; }
+{ const f = blogPosts; blogPosts = function () { const r = f.apply(this, arguments); return Array.isArray(r) ? r.filter(x => !isSport((x && ((x.title || '') + ' ' + (x.blog || ''))) || '')) : r; }; }
+{ const f = podEpisodes; podEpisodes = function () { const r = f.apply(this, arguments); return Array.isArray(r) ? r.filter(x => !isSport((x && ((x.title || '') + ' ' + (x.show || x.podcast || ''))) || '')) : r; }; }
+{ const f = homeOverview; homeOverview = function () { const h = f.apply(this, arguments); try { if (!h || !SPORT_RE.test(h.replace(/<[^>]+>/g, ' '))) return h; const d = document.createElement('div'); d.innerHTML = h; d.querySelectorAll('.sumbul > li, .sumsug, .sumnote, .sumnf, li').forEach(el => { if (isSport(el.textContent)) el.remove(); }); return d.innerHTML; } catch (e) { return h; } }; }
+
+/* ================= 2.26.4: local event heads-ups on the Notifications page =================
+   Notable public events (fireworks: Guy Fawkes, New Year's Eve, Matariki; light and lantern shows) from the real
+   events feed (council + Eventfinda through the relay), next 30 days. Info level: listed after warnings, counted in the bell. */
+const GL_EVENT_RE = /\b(fireworks?|guy fawkes|new year'?s eve|nye|matariki|lantern festival|light show|lights festival|christmas parade|santa parade|carols by candlelight)\b/i;
+function glEventHeads() {
+  try {
+    return upcomingEvents().filter(e => e && e.title && GL_EVENT_RE.test(e.title + ' ' + (e.desc || '').slice(0, 200)) && daysLeft(e.date) <= 30 && glOk(e.title))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 4)
+      .map(e => { const d = daysLeft(e.date); return { pri: 10, info: true, tag: '🎆 Local event' + (d === 0 ? ' · Today' : d === 1 ? ' · Tomorrow' : ' · In ' + d + ' days'), what: e.title, s: [fmtW(e.date) + (e.time ? ' · ' + fmtTime(e.time) : ''), e.venue].filter(Boolean).join(' · '), url: /^https:\/\//.test(e.url || '') ? e.url : '', go: "go('#events')" }; });
+  } catch (e) { return []; }
+}
+{ const f = glWarnList; glWarnList = function () { const w = f.apply(this, arguments); return w.concat(glEventHeads()); }; }
+{ const f = refreshEvents; refreshEvents = async function () { const r = await f.apply(this, arguments); try { glWarnRedraw(); } catch (e) { } return r; }; }
