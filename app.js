@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.25.6';
+const APP_VERSION = '2.25.7';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -15204,11 +15204,10 @@ function sumTickerize(el) {
   const plain = pick.map(c => (c.querySelector('.tx') || c).textContent.replace(/\s+/g, ' ').trim()).join(' • ');
   const box = document.createElement('div'); box.className = 'sumtk'; box.hidden = tkOpen;
   box.innerHTML = `<button type="button" class="tkline" aria-label="Summary: ${esc(plain)}. Tap for the full summary."><span class="tktrack" aria-hidden="true"><span class="tkrun">${piece}</span><span class="tkrun">${piece}</span></span></button>`;
-  const foot = document.createElement('div'); foot.className = 'tkfoot';
-  foot.innerHTML = `<span></span><button type="button" class="tkmore" aria-expanded="${tkOpen}">${artIco('sum', 'catico')}${tkOpen ? 'Hide full summary' : 'Full summary'}</button>`;
   shade.appendChild(box); shade.appendChild(full);
   // 2.23.41: the Full summary pill sits on its own line under the bar
-  const wrap = el.closest('#tkhome'); (wrap || shade).querySelectorAll(':scope > .tkfoot').forEach(x => x.remove()); (wrap || shade).appendChild(foot);
+  // 2.25.7: no Full summary button; tap the ticker to open, tap the summary (not its buttons) to go back
+  const wrap = el.closest('#tkhome'); try { (wrap || shade).querySelectorAll(':scope > .tkfoot').forEach(x => x.remove()); } catch (e) { }
   // 2.23.46: re-renders rebuild this element; only restart the scroll when the words actually change
   if (plain !== tkText) { tkText = plain; tkX = 0; }
 }
@@ -15247,7 +15246,7 @@ function tkToggleFull() {
   document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
   document.addEventListener('mouseup', up);
   document.addEventListener('click', e => {
-    if (e.target && e.target.closest && e.target.closest('#tkhome .tkmore, #homesum .tkmore')) return tkToggleFull();
+    try { if (tkOpen && e.target && e.target.closest && e.target.closest('#homesum .sumfull') && !e.target.closest('button, a, input, select, textarea, label, [onclick]')) return tkToggleFull(); } catch (x) { }
     if (!inTk(e)) return;
     if (moved) { moved = false; return; }
     tkToggleFull();
