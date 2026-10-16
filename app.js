@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.9';
+const APP_VERSION = '2.26.10';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4098,7 +4098,7 @@ async function setHomeLayout(v) { S.settings.homeLayout = v; await save(); docum
 function homeLayoutPicker() {
   const gl = glanceOn(), c = cleanOn();
   return `<div class="list" id="notiflayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Notifications layout</div><div class="s">${gl ? 'New: home status, warnings, Organise and Entertainment by time of day' : 'Classic layout: the page as it was before 2.26.0'}</div></div></div>
-    <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${gl ? 'on' : ''}" onclick="setNotifLayout('new')">New</button><button type="button" class="chip ${gl ? '' : 'on'}" onclick="setNotifLayout('classic')">Classic layout</button></div></div>` + (gl ? '' : `<div class="list" id="homelayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Classic style</div><div class="s">${c ? 'Clean: soft cards, Priority overview and a bottom bar' : 'Classic (the usual layout)'}</div></div></div>
+    <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${gl ? 'on' : ''}" onclick="setNotifLayout('new')">New</button><button type="button" class="chip ${gl ? '' : 'on'}" onclick="setNotifLayout('classic')">Classic layout</button></div></div>` + (gl ? `<div class="list" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Currently reading</div><div class="s">Used in the friendly line under your greeting on Home</div></div></div><div style="padding:0 12px 12px"><input type="text" maxlength="60" placeholder="Book title, e.g. Spare" value="${esc(glBook())}" onchange="glSetBook(this.value);window.__glLine=''" style="width:100%;box-sizing:border-box"></div></div>` : '') + (gl ? '' : `<div class="list" id="homelayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Classic style</div><div class="s">${c ? 'Clean: soft cards, Priority overview and a bottom bar' : 'Classic (the usual layout)'}</div></div></div>
     <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${c ? '' : 'on'}" onclick="setHomeLayout('classic')">Classic</button><button type="button" class="chip ${c ? 'on' : ''}" onclick="setHomeLayout('clean')">Clean</button></div></div>`);
 }
 function cleanHead(name, now) {
@@ -18525,10 +18525,45 @@ function glHm(hm) { const m = hmMin(hm); if (m == null) return ''; const h = Mat
 function glShift(m) { return m.start ? glHm(m.start) + (m.end ? '–' + glHm(m.end) : '') : ''; }
 function glBellBtn() { let n = 0; try { n = glWarnList().length; } catch (e) { } return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' active' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; }
 function glBellRedraw() { try { const el = document.getElementById('glbell'); if (el) el.outerHTML = glBellBtn(); } catch (e) { } }
+
+/* 2.26.10: one friendly personal line under the greeting. Rule-based, no AI. Never nags (bedtime, meds, teeth, lateness, work),
+   never Zeus walks, never sport. Rotates each open and never repeats the previous line. */
+function glBook() { try { return (localStorage.getItem('readingBook') || '').trim().slice(0, 60); } catch (e) { return ''; } }
+function glSetBook(v) { try { localStorage.setItem('readingBook', String(v || '').trim().slice(0, 60)); } catch (e) { } }
+function glLinePool(m, now = new Date()) {
+  const h = now.getHours(), d = now.getDay(), L = [], add = (...x) => L.push(...x), b = glBook();
+  let k = 'sunny', t = null; try { k = wxKindNow().kind; t = Math.round(WX.data.current.temperature_2m); } catch (e) { }
+  const wet = /rain|drizzle|heavy|storm/.test(k), fine = /sunny|clear/.test(k) || (!wet && k !== 'fog' && k !== 'windy' && k !== 'cloudy');
+  if (b) add(`How’s ‘${b}’ going?`, `A few chapters of ‘${b}’ tonight?`.replace(' tonight', h >= 17 || h < 4 ? ' tonight' : ' later'));
+  if (h >= 23 || h < 4) add('Up late again? 🦉', 'Night owl hours. The quiet is the best bit.', 'Suno time? Good hour for a new track 🎵', 'Late-night film, or one more song?');
+  else if (h >= 21) add('Spa time? ♨️', 'Suno time? 🎵', 'Movie night, or something new in Suno?', 'A glass of merlot kind of evening? 🍷');
+  else if (h >= 17) add('Suno time? 🎵', 'Anything good to watch tonight? 🎬');
+  if (h >= 5 && h < 10) add('Breakfast on TVNZ with your coffee? ☕', 'Morning! Kettle on?');
+  if (h >= 4 && h < 12 && !m.off) add('Have a good one at work today 👋');
+  if (m.off && h >= 8 && h < 18) add('Day off: anything fun planned?', fine ? 'Good day for a bushwalk or a wander along Onerahi beach?' : 'Lazy day? Good excuse for a film.');
+  if ((d === 5 || d === 6) && h >= 15 && h < 20) add('Cooking something gluten-free tonight? 🍳', 'GF pizza night? 🍕');
+  if ((d === 2 || d === 3) && !m.off && h >= 14 && h < 19) add('Gym after work today? 💪');
+  if (d === 1 && h >= 12 && h < 20) add('Monday at mum’s. Say hi from the app 💛');
+  if (d === 0 && h >= 12 && h < 19) add('Sunday cleaning shift. Nearly there by 7 🧽');
+  if (d === 0 && h >= 19 && h < 23) add('Cleaning done. Feet up tonight? 🛋️');
+  if (fine && h >= 9 && h < 17) add(t != null && t >= 18 ? `${t}° and sunny. Beach day at Onerahi? 🏖️` : 'Nice out. A walk in the bush, maybe? 🌿');
+  if (fine && h >= 8 && h < 17 && t != null && t <= 10) add('Cool and calm. A good spell for the garden 🌱');
+  if (fine && h >= 8 && h < 17 && t != null && t > 10) add('Garden looking good? 🌼');
+  if (wet) add('Rainy one. Movie night? 🍿', 'Rain on the roof. Book and a cuppa? 📖');
+  add('Turkish Delight o’clock? 🍬');
+  return L.filter(x => glOk(x) && !/zeus|walk the dog|bed ?time|sleep|teeth|meds|tablets|late for/i.test(x));
+}
+function glLine(m) {
+  const P = glLinePool(m); if (!P.length) return '';
+  let last = ''; try { last = sessionStorage.getItem('glLineLast') || localStorage.getItem('glLineLast') || ''; } catch (e) { }
+  if (!window.__glLine || !P.includes(window.__glLine)) { const c = P.length > 1 ? P.filter(x => x !== last) : P; window.__glLine = c[Math.floor(Math.random() * c.length)]; try { localStorage.setItem('glLineLast', window.__glLine); } catch (e) { } }
+  return window.__glLine;
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) window.__glLine = ''; });
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
-  return `<div class="top glhead"><div class="glhome"><img src="art/i3-house.webp" alt="" width="46" height="46" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></div><div style="min-width:0;flex:1"><h1>Home</h1><div class="sub">${sub}</div></div>
+  return `<div class="top glhead"><div class="glhome"><img src="art/i3-house.webp" alt="" width="46" height="46" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></div><div style="min-width:0;flex:1"><h1>Home</h1><div class="sub">${sub}</div>${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div>
   <div class="iconrow">${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
 }
 /* ---- Home status ---- */
