@@ -1790,6 +1790,18 @@ html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color
 .glance.glnight .glmore{color:#93c5fd}
 .glorgcard{padding:4px 0;margin-bottom:10px}
 .glorgcard .glmore{margin:0}
+
+/* 2.26.8: Notifications page, every card the same plain white box */
+#glalerts .list,#glalerts .glwarns{display:flex;flex-direction:column;gap:8px;background:none;border:0;box-shadow:none;padding:0;margin:0 0 6px}
+#glalerts .list>*,#glalerts .glwarn,#glalerts .glwarnwrap>.glwarn,#glalerts .glflagwrap>.glwarn{background:#fff!important;color:#1e293b!important;border:0!important;border-left:0!important;border-radius:14px!important;padding:12px 14px!important;box-shadow:0 1px 4px rgba(0,0,0,.12)!important;margin:0!important}
+#glalerts .list>*{display:flex;align-items:center;gap:10px}
+#glalerts .list>* *,#glalerts .glwarn *{color:inherit}
+#glalerts .list>* .s,#glalerts .glwarn .s,#glalerts .muted{color:#64748b!important}
+#glalerts .glwtag{color:#64748b!important;opacity:1}
+#glalerts [class*="ic"]:not(svg){background:none!important;box-shadow:none!important}
+#glalerts .list>* .pill,#glalerts .list>* [class*="pill"],#glalerts .list>* [class*="badge"],#glalerts .list>* .tag,#glalerts .list>* .due{background:none!important;color:#475569!important;box-shadow:none!important;border:0!important;font-weight:700}
+#glalerts .list>*{min-height:58px;box-sizing:border-box}
+#glalerts .glwarnwrap,#glalerts .glflagwrap{background:none!important;box-shadow:none!important;border:0!important}
 </style>
 </head>
 <body>
