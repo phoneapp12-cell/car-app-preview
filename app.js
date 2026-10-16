@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.0';
+const APP_VERSION = '2.26.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4092,11 +4092,12 @@ function homeTry(label, fn, fb = '') {
    Same data and features, just a calmer look: header with the dog, weather card, Priority overview, Today's summary,
    then the strip and every category section, plus a bottom bar with a + quick-add button. ================= */
 const cleanOn = () => !!(S && S.settings && S.settings.homeLayout === 'clean');
-async function setHomeLayout(v) { S.settings.homeLayout = v; S.settings.glanceMig = 1; await save(); document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'clean' ? 'Clean layout on.' : v === 'glance' ? 'Glance layout on.' : 'Classic layout on.'); }
+async function setHomeLayout(v) { S.settings.homeLayout = v; await save(); document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'clean' ? 'Clean layout on.' : 'Classic layout on.'); }
 function homeLayoutPicker() {
-  const c = cleanOn(), gl = glanceOn();
-  return `<div class="list" id="homelayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Home layout</div><div class="s">${gl ? 'Glance: home status, warnings, Organise and Entertainment by time of day' : c ? 'Clean: soft cards, Priority overview and a bottom bar' : 'Classic (the older layout)'}</div></div></div>
-    <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${gl ? 'on' : ''}" onclick="setHomeLayout('glance')">Glance</button><button type="button" class="chip ${!gl && !c ? 'on' : ''}" onclick="setHomeLayout('classic')">Classic</button><button type="button" class="chip ${c ? 'on' : ''}" onclick="setHomeLayout('clean')">Clean</button></div></div>`;
+  const gl = glanceOn(), c = cleanOn();
+  return `<div class="list" id="notiflayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Notifications layout</div><div class="s">${gl ? 'New: home status, warnings, Organise and Entertainment by time of day' : 'Classic layout: the page as it was before 2.26.0'}</div></div></div>
+    <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${gl ? 'on' : ''}" onclick="setNotifLayout('new')">New</button><button type="button" class="chip ${gl ? '' : 'on'}" onclick="setNotifLayout('classic')">Classic layout</button></div></div>` + (gl ? '' : `<div class="list" id="homelayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Classic style</div><div class="s">${c ? 'Clean: soft cards, Priority overview and a bottom bar' : 'Classic (the usual layout)'}</div></div></div>
+    <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${c ? '' : 'on'}" onclick="setHomeLayout('classic')">Classic</button><button type="button" class="chip ${c ? 'on' : ''}" onclick="setHomeLayout('clean')">Clean</button></div></div>`);
 }
 function cleanHead(name, now) {
   const h = now.getHours(), hi = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
@@ -18494,7 +18495,9 @@ start();
    prominent warning cards (weather outlook, MetService, road closures), weather + tides + ticker in one card,
    then Organise and Entertainment, ordered by time of day and the roster (work day vs day off).
    Every part is guarded: if anything throws, the classic Home renders instead, so the page never blanks. */
-const glanceOn = () => { try { const s = S && S.settings; if (!s) return false; if (!s.glanceMig) { s.homeLayout = 'glance'; s.glanceMig = 1; } return !s.homeLayout || s.homeLayout === 'glance'; } catch (e) { return false; } };
+// 2.26.1: Settings › Notifications layout: New (default) or Classic layout (the pre-2.26.0 page, exactly). Kept on this phone only.
+const glanceOn = () => { try { return localStorage.getItem('notifLayout') !== 'classic'; } catch (e) { return true; } };
+function setNotifLayout(v) { try { localStorage.setItem('notifLayout', v === 'classic' ? 'classic' : 'new'); } catch (e) { } try { if (S && S.settings && S.settings.homeLayout === 'glance') S.settings.homeLayout = 'classic'; } catch (e) { } document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'classic' ? 'Classic layout on.' : 'New layout on.'); }
 const GL_NO = /\bwalk\b.*\bzeus\b|\bzeus\b.*\bwalk\b|\b(teeth|tooth|floss|face ?wash|skin ?care|meds?|medication|pills?|tablets?|bed ?time|go to (bed|sleep)|running late|you'?re late|work hours)\b/i;
 const glOk = t => !GL_NO.test(String(t || ''));
 const glTxt = h => { try { const d = document.createElement('div'); d.innerHTML = h || ''; return d; } catch (e) { return null; } };
