@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.25.8';
+const APP_VERSION = '2.26.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4092,11 +4092,11 @@ function homeTry(label, fn, fb = '') {
    Same data and features, just a calmer look: header with the dog, weather card, Priority overview, Today's summary,
    then the strip and every category section, plus a bottom bar with a + quick-add button. ================= */
 const cleanOn = () => !!(S && S.settings && S.settings.homeLayout === 'clean');
-async function setHomeLayout(v) { S.settings.homeLayout = v; await save(); document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'clean' ? 'Clean layout on.' : 'Classic layout on.'); }
+async function setHomeLayout(v) { S.settings.homeLayout = v; S.settings.glanceMig = 1; await save(); document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'clean' ? 'Clean layout on.' : v === 'glance' ? 'Glance layout on.' : 'Classic layout on.'); }
 function homeLayoutPicker() {
-  const c = cleanOn();
-  return `<div class="list" id="homelayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Home layout</div><div class="s">${c ? 'Clean: soft cards, Priority overview and a bottom bar' : 'Classic (the usual layout)'}</div></div></div>
-    <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${c ? '' : 'on'}" onclick="setHomeLayout('classic')">Classic</button><button type="button" class="chip ${c ? 'on' : ''}" onclick="setHomeLayout('clean')">Clean</button></div></div>`;
+  const c = cleanOn(), gl = glanceOn();
+  return `<div class="list" id="homelayout" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Home layout</div><div class="s">${gl ? 'Glance: home status, warnings, Organise and Entertainment by time of day' : c ? 'Clean: soft cards, Priority overview and a bottom bar' : 'Classic (the older layout)'}</div></div></div>
+    <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${gl ? 'on' : ''}" onclick="setHomeLayout('glance')">Glance</button><button type="button" class="chip ${!gl && !c ? 'on' : ''}" onclick="setHomeLayout('classic')">Classic</button><button type="button" class="chip ${c ? 'on' : ''}" onclick="setHomeLayout('clean')">Clean</button></div></div>`;
 }
 function cleanHead(name, now) {
   const h = now.getHours(), hi = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
@@ -4152,6 +4152,7 @@ function cleanFab() {
 }
 function Home() {
   if (homeEdit) return HomeEdit();
+  if (glanceOn()) { const g = homeTry('glance', () => glanceHome(), ''); if (g && g.length > 300) return g; } // 2.26.0: falls back to the classic page on any error
   const now = new Date();
   let cards = '';
   if ('Notification' in window && Notification.permission === 'default' && S.settings.reminders !== false)
@@ -12640,12 +12641,13 @@ function homeLightsInner() {
 async function hlightFetch() {
   try {
     if (hlightBusy || typeof hueKey !== 'function' || !hueKey() || navigator.onLine === false) return;
-    if (HLIGHT && Date.now() - HLIGHT.at < 60000) return;
+    if (HLIGHT && Date.now() - HLIGHT.at < 30000) return;
     hlightBusy = true;
     const j = await hueCall('lights');
     if (j && j.linked) { HLIGHT = { at: Date.now(), data: { rooms: (j.rooms || []).map(r => ({ name: r.name, on: !!r.on })), lights: (j.lights || []).map(l => ({ name: l.name, room: l.room, on: !!l.on })) } }; try { localStorage.setItem('hlightCache', JSON.stringify(HLIGHT)); } catch (e) { } }
   } catch (e) { } finally { hlightBusy = false; }
   try { const el = document.getElementById('homelights'); if (el) { const h = homeLightsInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { }
+  try { glStatRedraw(); } catch (e) { }
 }
 // 2.23.98: open doors/windows from Alarm.com, right side of the header, opposite the temps. Hidden when nothing is open.
 function homeAlarmInner() {
@@ -12665,6 +12667,7 @@ async function hroomFetch() {
   } catch (e) { HROOM = { at: Date.now(), data: (HROOM && HROOM.data) || null }; }
   finally { hroomBusy = false; }
   try { const el = document.getElementById('homerooms'); if (el) { const h = hroomInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { }
+  try { glStatRedraw(); } catch (e) { }
 }
 
 /* 2.23.97: Alarm (ADT / Alarm.com), READ-ONLY via the relay. Never arms or disarms. Same phone key as Lights.
@@ -12685,6 +12688,7 @@ async function alarmLoad(force) {
   finally { ALARM.busy = false; }
   try { const el = document.getElementById('alarmbox'); if (el) el.innerHTML = alarmBody(); } catch (e) { }
   try { if (typeof homeAlarmRedraw === 'function') homeAlarmRedraw(); } catch (e) { }
+  try { glStatRedraw(); } catch (e) { }
   try { if (document.getElementById('qstrip') && typeof stripRerank === 'function') stripRerank(); } catch (e) { }
 }
 function alarmEventsHtml(d) {
@@ -18483,3 +18487,268 @@ async function start() {
   }, 60 * 1000);
 }
 start();
+
+/* ================= 2.26.0: Glance Home (Settings › Appearance › Home layout › Glance, the default) =================
+   Locked night layout and the day layouts Shane approved. Same data as before, laid out for a quick look:
+   house icon header, Home status chips (temps, doors, lights, UV, tides, roads) that refresh while open,
+   prominent warning cards (weather outlook, MetService, road closures), weather + tides + ticker in one card,
+   then Organise and Entertainment, ordered by time of day and the roster (work day vs day off).
+   Every part is guarded: if anything throws, the classic Home renders instead, so the page never blanks. */
+const glanceOn = () => { try { const s = S && S.settings; if (!s) return false; if (!s.glanceMig) { s.homeLayout = 'glance'; s.glanceMig = 1; } return !s.homeLayout || s.homeLayout === 'glance'; } catch (e) { return false; } };
+const GL_NO = /\bwalk\b.*\bzeus\b|\bzeus\b.*\bwalk\b|\b(teeth|tooth|floss|face ?wash|skin ?care|meds?|medication|pills?|tablets?|bed ?time|go to (bed|sleep)|running late|you'?re late|work hours)\b/i;
+const glOk = t => !GL_NO.test(String(t || ''));
+const glTxt = h => { try { const d = document.createElement('div'); d.innerHTML = h || ''; return d; } catch (e) { return null; } };
+function glFirst(h) { // first row title / subtitle of an existing card
+  try { const d = glTxt(h); if (!d) return null; const r = d.querySelector('.row .t') || d.querySelector('.t'); if (!r) return null;
+    const row = r.closest('.row'), s = row && row.querySelector('.s'); const t = r.textContent.replace(/\s+/g, ' ').trim(); return t ? { t, s: s ? s.textContent.replace(/\s+/g, ' ').trim() : '' } : null; } catch (e) { return null; }
+}
+let glOpenN = (() => { try { const n = (+localStorage.getItem('glOpenN') || 0) + 1; localStorage.setItem('glOpenN', String(n)); return n; } catch (e) { return 1; } })(), glHiddenAt = 0;
+let glFilt = 'all', glAll = false, glStatOpen = false, glOrgTab = '';
+function glMode(now = new Date()) {
+  const a = homeAklParts(now) || {}, min = a.min || 0, h = min / 60;
+  let start = '', end = ''; try { const r = rosterState(), k = String(a.dow); start = r.days[k] || ''; end = (r.ends || {})[k] || ''; } catch (e) { }
+  const off = !start;
+  let night = h >= 18 || h < 5; try { night = night || homeNight(now); } catch (e) { }
+  const sm = start ? hmMin(start) : null, em = end ? hmMin(end) : null;
+  const workDone = !off && em != null && min >= em;
+  return { night, off, start, end, h, min, dow: a.dow, morning: h < 12, workDone, beforeWork: !off && sm != null && min < sm, atWork: !off && sm != null && min >= sm && (em == null || min < em) };
+}
+function glShift(m) { return m.start ? fmtTime(m.start) + (m.end ? '–' + fmtTime(m.end) : '') : ''; }
+function glHead(name, m, now) {
+  const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
+  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
+  return `<div class="top glhead"><div class="glhome"><img src="art/i3-house.webp" alt="" width="46" height="46" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></div><div style="min-width:0;flex:1"><h1>Notifications</h1><div class="sub">${sub}</div></div>
+  <div class="iconrow"><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
+}
+/* ---- Home status ---- */
+function glTemps() {
+  try { const d = glTxt(hroomInner()); if (!d) return []; return [...d.querySelectorAll('.hroom')].map(x => { const b = x.querySelector('b'); return { n: x.firstChild ? String(x.firstChild.textContent).trim().replace(/^Hallway$/, 'Hall') : '', t: b ? b.textContent.replace('°C', '°') : '' }; }).filter(x => x.n && x.t); } catch (e) { return []; }
+}
+function glLights() {
+  try { const d = HLIGHT && HLIGHT.data; if (!d || Date.now() - HLIGHT.at > 6 * 3600e3) return null;
+    let names = (d.rooms || []).filter(r => r && r.on).map(r => String(r.name || '').trim()).filter(Boolean);
+    if (!names.length) names = (d.lights || []).filter(l => l && l.on).map(l => String(l.room || l.name || '').trim()).filter(Boolean);
+    return [...new Set(names.map(n => /kitchen|spot/i.test(n) ? 'Kitchen' : n))]; } catch (e) { return null; }
+}
+function glDoors() { try { if (!ALARM || !ALARM.data || Date.now() - (ALARM.at || 0) > 6 * 3600e3) return null; return alarmOpen().map(x => String(x.name || 'Door')); } catch (e) { return null; } }
+function glTideNext(n = 2) { try { const now = Date.now(); return tideRange(2).filter(x => x.ms > now).slice(0, n); } catch (e) { return []; } }
+function glRoadItems() {
+  const out = [];
+  try { const L = (TRAFFIC && TRAFFIC.data && TRAFFIC.data.items) || []; L.filter(x => x && (x.commute || x.closed || x.km <= 12)).forEach(x => out.push({ src: 'NZTA', what: (x.closed ? '⛔ ' : '🚧 ') + (x.where || x.desc), when: x.until ? (/further notice/i.test(x.until) ? 'Until further notice' : 'Until ' + x.until.replace(/^(\d+)\/(\d+)\/\d{4}\s*/, (m0, d, mo) => d + '/' + mo + ' ')) : '', note: x.comments || x.desc, route: !!x.commute, closed: !!x.closed, url: 'https://www.journeys.nzta.govt.nz/' })); } catch (e) { }
+  try { headsUpList().forEach(h => out.push({ src: 'WDC', what: '⛔ ' + h.what, when: h.when, note: h.where, route: !!h.route, closed: true, url: h.url })); } catch (e) { }
+  return out.sort((a, b) => (b.route - a.route) || (b.closed - a.closed));
+}
+function glUpdated() { const t = Math.max(HLIGHT && HLIGHT.at || 0, ALARM && ALARM.data && ALARM.at || 0); return t ? (Date.now() - t < 90e3 ? 'updated just now' : 'updated ' + ago(t)) : ''; }
+function glStatInner() {
+  const ch = [], m = glMode();
+  const T = glTemps(); if (T.length) ch.push(`<span class="glch">🌡 ${T.map(x => esc(x.n) + ' ' + esc(x.t)).join(' · ')}</span>`);
+  const D = glDoors(); if (D && D.length) ch.push(`<span class="glch glred">🚪 ${D.length} open</span>`);
+  const L = glLights(); if (L && L.length) ch.push(`<span class="glch glamb">💡 ${L.length} on</span>`);
+  const uv = !m.night ? wxUV() : null; if (uv && wxIsDay()) ch.push(`<span class="glch nwxuv ${uv.cls}">☀️ UV ${uv.n} ${esc(uv.words)}</span>`);
+  const td = glTideNext(2); if (td.length) ch.push(`<span class="glch gltide">🌊 ${td.map(x => (x.high ? 'High ' : 'Low ') + aklTime(x.ms)).join(' · ')}</span>`);
+  const R = glRoadItems().filter(x => x.route); if (R.length) ch.push(`<span class="glch glred">🚧 ${R.length} on your route</span>`);
+  if (!ch.length) return '';
+  const up = glUpdated();
+  let x = '';
+  if (glStatOpen) {
+    const rows = [];
+    (D || []).forEach(n => rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#alarm')"><span>${esc(n)}</span><b class="glredt">Open</b></button>`));
+    if (L && L.length) rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#lights')"><span>Lights on</span><b class="glambt">${esc(L.join(', '))}</b></button>`);
+    if (D && !D.length) rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#alarm')"><span>Doors and windows</span><b>All closed</b></button>`);
+    if (L && !L.length) rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#lights')"><span>Lights</span><b>All off</b></button>`);
+    T.forEach(t => rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#heat')"><span>${esc(t.n)}</span><b>${esc(t.t)}</b></button>`));
+    td.forEach(t => rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#weather')"><span>${t.high ? 'High' : 'Low'} tide · Onerahi</span><b>${aklTime(t.ms)} · ${tideM(t)}</b></button>`));
+    x = `<div class="glx">${rows.join('')}</div>`;
+  }
+  return `<div class="glchips">${ch.join('')}<span class="glupd">${esc(up)} ${glStatOpen ? '▴' : '▾'}</span></div>${x}`;
+}
+function glStatRedraw() { try { const el = document.getElementById('glstat'); if (el) { const h = glStatInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } }
+function glStatToggle() { glStatOpen = !glStatOpen; glStatRedraw(); }
+let glPollT = 0, glLastRefresh = 0;
+function homeStatusRefresh() {
+  try { if (document.hidden || !glanceOn() || ((location.hash || '#home').slice(1).split('/')[0] || 'home') !== 'home') return; } catch (e) { return; }
+  glLastRefresh = Date.now();
+  try { hlightFetch(); } catch (e) { }
+  try { alarmLoad(); } catch (e) { }
+  try { hroomFetch(); } catch (e) { }
+  try { loadTides(); glTidesEnsure(); } catch (e) { }
+  try { glTrafficLoad(); } catch (e) { }
+  try { refreshAlerts(); loadWx16(); } catch (e) { }
+  setTimeout(glStatRedraw, 50);
+}
+function glPoll() { clearInterval(glPollT); glPollT = setInterval(() => { if (!document.hidden) { homeStatusRefresh(); glStatRedraw(); } }, 60000); }
+document.addEventListener('visibilitychange', () => { if (document.hidden) { glHiddenAt = Date.now(); return; } if (glHiddenAt && Date.now() - glHiddenAt > 10 * 60e3) { glOpenN++; try { localStorage.setItem('glOpenN', String(glOpenN)); } catch (e) { } } setTimeout(homeStatusRefresh, 300); });
+window.addEventListener('focus', () => { if (Date.now() - glLastRefresh > 20000) setTimeout(homeStatusRefresh, 300); });
+window.addEventListener('pageshow', () => setTimeout(homeStatusRefresh, 300));
+glPoll();
+/* ---- tides: bundled LINZ file first; the relay's /tides (same LINZ data) when the file is missing or about to run out ---- */
+let glTideTry = 0;
+async function glTidesEnsure() {
+  try {
+    const lastMs = validTides(TIDES) ? TIDES.t[TIDES.t.length - 1] * 60000 : 0;
+    if (lastMs > Date.now() + 30 * 864e5) return;
+    if (!tideFailed && !validTides(TIDES) && tideBusy) return;
+    let c = null; try { c = JSON.parse(localStorage.getItem('tidesRelay') || 'null'); } catch (e) { }
+    if (c && validTides(c.data) && c.data.t[c.data.t.length - 1] * 60000 > lastMs) { TIDES = c.data; tideFailed = false; }
+    if (!RELAY_URL || navigator.onLine === false || Date.now() - glTideTry < 6 * 3600e3 || (c && Date.now() - c.at < 864e5)) return;
+    glTideTry = Date.now();
+    const r = await fetch(RELAY_URL + '/tides'); const d = await r.json();
+    if (r.ok && validTides(d) && d.t[d.t.length - 1] * 60000 > (validTides(TIDES) ? TIDES.t[TIDES.t.length - 1] * 60000 : 0)) { TIDES = d; tideFailed = false; try { localStorage.setItem('tidesRelay', JSON.stringify({ at: Date.now(), data: d })); } catch (e) { } glStatRedraw(); }
+  } catch (e) { }
+}
+function glTideStrip() {
+  try {
+    const now = Date.now(), L = tideRange(2); if (!L.length) return '';
+    const nx = L.findIndex(x => x.ms > now); if (nx < 1) return '';
+    const W0 = now - 9 * 3600e3, W1 = now + 15 * 3600e3, P = L.filter((x, i) => i >= nx - 2 && i <= nx + 3);
+    const yOf = m => 26 - (m - 0.3) / 3.0 * 22, xOf = ms => (ms - W0) / (W1 - W0) * 200;
+    const hAt = ms => { for (let i = 0; i + 1 < P.length; i++) { const a = P[i], b = P[i + 1]; if (ms >= a.ms && ms <= b.ms) { const f = (ms - a.ms) / (b.ms - a.ms); return a.m + (b.m - a.m) * (1 - Math.cos(Math.PI * f)) / 2; } } return null; };
+    let d = ''; for (let i = 0; i <= 40; i++) { const ms = W0 + (W1 - W0) * i / 40, h = hAt(ms); if (h == null) continue; d += (d ? ' L' : 'M') + xOf(ms).toFixed(1) + ' ' + yOf(h).toFixed(1); }
+    const hn = hAt(now), a = L[nx], b = L[nx + 1];
+    return `<button type="button" class="gltide" onclick="go('#weather')" aria-label="Tides at Onerahi: next ${a.high ? 'high' : 'low'} ${aklTime(a.ms)}"><span class="gltl">🌊 Onerahi</span><svg viewBox="0 0 200 30" preserveAspectRatio="none" aria-hidden="true">${d ? `<path d="${d}" fill="none" stroke="#06b6d4" stroke-width="2.4"/>` : ''}${hn != null ? `<circle cx="${xOf(now).toFixed(1)}" cy="${yOf(hn).toFixed(1)}" r="4" fill="#0e7490"/>` : ''}</svg><span class="gltr"><b>${a.high ? 'High' : 'Low'} ${aklTime(a.ms)}</b> ${tideM(a)}${b ? `<br>${b.high ? 'High' : 'Low'} ${aklTime(b.ms)} ${tideM(b)}` : ''}</span></button>`;
+  } catch (e) { return ''; }
+}
+/* ---- roads: NZTA highway events through the relay (/traffic, Cache API), plus the council closures already used for Heads up ---- */
+let TRAFFIC = (() => { try { const c = JSON.parse(localStorage.getItem('nztaTraffic') || 'null'); return c && c.data && Array.isArray(c.data.items) ? c : null; } catch (e) { return null; } })(), trafficBusy = false, trafficTry = 0;
+async function glTrafficLoad() {
+  if (!RELAY_URL || trafficBusy || navigator.onLine === false || Date.now() - trafficTry < 10 * 60e3) return;
+  trafficBusy = true; trafficTry = Date.now();
+  try { const r = await fetch(RELAY_URL + '/traffic', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items)) { TRAFFIC = { at: Date.now(), data: d }; try { localStorage.setItem('nztaTraffic', JSON.stringify(TRAFFIC)); } catch (e) { } glWarnRedraw(); glStatRedraw(); } } catch (e) { }
+  finally { trafficBusy = false; }
+}
+function glWarnInner() {
+  const cards = [];
+  try { wxOutlook().sort((x, y) => y.score - x.score).slice(0, 3).forEach(o => cards.push(`<button type="button" class="glwarn ${o.score >= 80 ? 'glw-red' : 'glw-amb'}" onclick="${esc(o.go || "go('#weather')")}"><span class="glwtag">${esc(o.lbl)}</span><b>${esc(o.what)}</b><span>${esc(o.when)}${o.tip ? ' · ' + esc(o.tip) : ''}</span></button>`)); } catch (e) { }
+  try { const R = glRoadItems(); R.slice(0, 3).forEach(x => cards.push(`<a class="glwarn ${x.route || x.closed ? 'glw-red' : 'glw-amb'}" ${x.url ? `href="${esc(x.url)}" target="_blank" rel="noopener"` : ''}><span class="glwtag">${x.route ? '🚗 On your commute' : '🚧 Roads near you'} · ${x.src === 'NZTA' ? 'NZTA' : 'Council'}</span><b>${esc(x.what)}</b><span>${esc([x.when, x.note].filter(Boolean).join(' · ').slice(0, 170))}</span></a>`)); if (R.length > 3) cards.push(`<button type="button" class="glmore" onclick="go('#roadworks')">+${R.length - 3} more road notices</button>`); } catch (e) { }
+  return cards.join('');
+}
+function glWarnRedraw() { try { const el = document.getElementById('glwarn'); if (el) { const h = glWarnInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } }
+/* ---- Entertainment ---- */
+const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
+const GL_SUNO = ['A Suno track about Onerahi and the harbour', 'A Suno song about a sunny day off', 'A calm Suno playlist for tonight', 'A Suno track about the Te Matau ā Pohe bridge', 'A Suno song about the Northland coast'];
+const glDay = () => { try { return aklDayNumber(); } catch (e) { return Math.floor(Date.now() / 864e5); } };
+function glPickRecipe() { try { const L = visibleIdeas().filter(i => i && i.title && !/\b(wheat|regular pasta|flour tortilla)\b/i.test(i.title)); if (!L.length) return null; return L[(glDay() * 3 + glOpenN) % L.length]; } catch (e) { return null; } }
+function glTiles() {
+  const B = n => `art/${n}-banner.webp`, T = [];
+  const add = (k, cat, title, fn, art, grad, go) => { try { const s = fn(); if (s && glOk(s) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(String(s))) T.push({ k, cat, title, s: String(s).slice(0, 70), art, grad, go }); } catch (e) { } };
+  add('netflix', 'watch', 'New on Netflix', () => { const f = NF && mailConnected('microsoft') ? (NF.fresh || []) : []; return f.length ? f.slice(0, 2).map(x => x.title).join(', ') : ''; }, B('ideas'), '', "go('#tv')");
+  add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#tv')");
+  add('movies', 'watch', 'Movies', () => { const e = upcomingEvents().filter(x => (x.cats || []).includes('Movies')); return e.length ? e[0].title : ''; }, B('events'), '', "go('#events')");
+  add('videos', 'watch', 'Videos', () => (glFirst(HOME_CARD.videos()) || {}).t, B('tv'), '', "go('#videos')");
+  add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "go('#videos')");
+  add('top40', 'listen', 'Top 40 NZ', () => { const f = glFirst(NIGHT_CARD.top40()); return f ? '#1 ' + f.t : ''; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
+  add('radio', 'listen', 'Radio', () => (glFirst(HOME_CARD.radio()) || {}).t || 'NZ stations, live', 'i3-radio', ['#16a34a', '#065f46'], "go('#radio')");
+  add('podcasts', 'listen', 'Podcasts', () => (glFirst(HOME_CARD.podcasts()) || {}).t, 'i3-phone', ['#9333ea', '#4c1d95'], "go('#podcasts')");
+  add('suno', 'listen', 'AI music idea', () => GL_SUNO[(glDay() + glOpenN) % GL_SUNO.length], 'i3-radio', ['#a21caf', '#581c87'], "go('#notes')");
+  add('blogs', 'read', 'Blogs', () => (glFirst(HOME_CARD.blogging()) || {}).t, 'i3-note', ['#0d9488', '#155e75'], "go('#blogging')");
+  add('posts', 'read', 'Your posts', () => { const p = postsSorted(); return p.length ? p[0].title : ''; }, 'i3-idea', ['#ca8a04', '#9a3412'], "go('#blogging/mine')");
+  add('localnews', 'read', 'Local news', () => { const n = (newsSec('local') || []).filter(newsOk); return n.length ? n[0].title : ''; }, B('news'), '', "go('#news')");
+  add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
+  add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(x => !(x.cats || []).includes('Movies') && !isNightlife(x)); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
+  add('nightlife', 'out', 'Nightlife', () => { const e = nightlifeSoon(7, 2); return e.length ? e.map(x => x.title).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#events')");
+  add('place', 'out', 'Place of the day', () => { const p = travelToday(); return p ? p.name + ', ' + p.country : ''; }, B('travel'), '', "go('#travel')");
+  add('recipe', 'food', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
+  add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : (j && (j.t || j.q)) || String(j || ''); }, 'i3-quote', ['#2563eb', '#1e3a8a'], "go('#home')");
+  add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#be185d', '#831843'], "go('#home')");
+  add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#0891b2', '#164e63'], "go('#home')");
+  add('tvguide', 'watch', 'TV guide', () => 'TVNZ 1 · TVNZ 2 · Three', 'i3-tv', ['#b45309', '#7c2d12'], "go('#tv')");
+  return T;
+}
+function glShuffle(arr, seed) { const a = arr.slice(); let s = seed * 7919 + 104729; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function glTileHtml(t, small) {
+  const img = /^art\//.test(t.art);
+  const st = img ? `background-image:url('${t.art}')` : `--a:${t.grad[0]};--b:${t.grad[1]}`;
+  return `<button type="button" class="gltile${img ? '' : ' glic'}${small ? ' glsm' : ''}" style="${st}" onclick="${esc(t.go)}" aria-label="${esc(t.title + ': ' + t.s)}">${img ? '' : `<img src="art/${t.art}.webp" alt="" loading="lazy" onerror="this.remove()">`}<span class="gltag">${esc(GL_CATS.find(c => c[0] === t.cat)[1].toUpperCase())}</span><span class="gltt">${esc(t.title)}<small>${esc(t.s)}</small></span></button>`;
+}
+function glHero() {
+  try { const f = glFirst(HOME_CARD.tv()); if (!f || !glOk(f.t)) return '';
+    return `<button type="button" class="gltile glhero" style="background-image:url('art/tv-banner.webp')" onclick="go('#tv')"><span class="gltag">TV TONIGHT</span><span class="gltt">${esc(f.t)}<small>${esc(f.s)}</small></span></button>`; } catch (e) { return ''; }
+}
+function glOrderFor(m) {
+  if (m.night) return ['watch', 'listen', 'fun', 'out', 'read', 'food'];
+  if (m.off) return ['out', 'food', 'listen', 'watch', 'fun', 'read'];
+  return ['fun', 'read', 'food', 'listen', 'out', 'watch'];
+}
+function glEntInner() {
+  const m = glMode(), all = glTiles(); if (!all.length) return '';
+  const pri = glOrderFor(m), sh = glShuffle(all, glDay() * 31 + glOpenN);
+  const sorted = m.night ? sh : sh.sort((a, b) => pri.indexOf(a.cat) - pri.indexOf(b.cat));
+  const big = m.night;
+  const cap = m.night ? 8 : m.off ? 4 : 3;
+  const list = glFilt !== 'all' ? sorted.filter(t => t.cat === glFilt) : (big && glAll) ? sorted : sorted.slice(0, cap);
+  const have = new Set(all.map(t => t.cat));
+  const filt = big ? `<div class="glfilt" role="toolbar">${GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).map(c => `<button type="button" class="${glFilt === c[0] ? 'on' : ''}" onclick="glFilt='${c[0]}';glEntRedraw()">${c[1]}${c[0] === 'all' ? ' ' + all.length : ''}</button>`).join('')}</div>` : '';
+  const more = big ? (glFilt === 'all' && all.length > cap ? `<button type="button" class="glmore" onclick="glAll=!glAll;glEntRedraw()">${glAll ? 'Show fewer ▴' : 'Show all ' + all.length + ' ▾'}</button>` : '') : `<button type="button" class="glmore" onclick="glNightPeek()">All entertainment (${all.length}) ›</button>`;
+  return filt + (big && glFilt === 'all' ? glHero() : '') + `<div class="glgrid${!big && !m.off ? ' glg3' : ''}">${list.map(t => glTileHtml(t, !big && !m.off)).join('')}</div>` + more;
+}
+function glNightPeek() { glFilt = 'all'; glAll = true; const el = document.getElementById('glent'); if (el) { el.classList.add('glbig'); el.innerHTML = glEntBig(); } }
+function glEntBig() { const save = glMode; try { glMode = () => Object.assign(save(), { night: true }); return glEntInner(); } finally { glMode = save; } }
+function glEntRedraw() { try { const el = document.getElementById('glent'); if (el) el.innerHTML = el.classList.contains('glbig') && !glMode().night ? glEntBig() : glEntInner(); } catch (e) { } }
+/* ---- Organise ---- */
+function glGardenSafe() { try { const w = wxNext5(); return !!(w && num(w.now) && num(w.maxT) && w.now <= 10 && w.maxT <= 10); } catch (e) { return false; } }
+const glGardenOkText = t => glGardenSafe() || !/\b(water|watering|feed|feeding|fertili[sz]e|liquid feed)\b/i.test(String(t || ''));
+function glCU() { try { return comingUpList().filter(x => x && glOk(x.name || x.html) && (x.kind !== 'garden' || glGardenOkText(x.name || String(x.html).replace(/<[^>]+>/g, ' ')))); } catch (e) { return []; } }
+function glTabs(m) { return m.off ? [['today', 'Today'], ['todo', 'To-do'], ['garden', 'Garden & Out'], ['bills', 'Bills'], ['calendar', 'Calendar'], ['cars', 'Cars']] : [['today', 'Today'], ['todo', 'To-do'], ['bills', 'Bills'], ['calendar', 'Calendar'], ['cars', 'Cars'], ['garden', 'Garden & Out']]; }
+function glTodayRows(m) {
+  const n = m.night ? 2 : m.off ? 4 : 6, rows = [];
+  if (!m.off && !m.night && !m.workDone) rows.push(tabRow('calendar', 'Work ' + esc(glShift(m)), 'Roster' + (m.end ? ' · free from ' + esc(fmtTime(m.end)) : ''), "go('#roster')"));
+  const L = glCU(), k = Math.max(0, n - rows.length);
+  L.slice(0, k).forEach(x => { try { rows.push(cuRowHtml(x)); } catch (e) { } });
+  return { html: rows.join(''), more: Math.max(0, L.length - k) };
+}
+function glGardenRows() {
+  const rows = [];
+  try { glCU().filter(x => x.kind === 'garden').slice(0, 2).forEach(x => rows.push(cuRowHtml(x))); } catch (e) { }
+  if (!rows.length) rows.push(tabRow('garden', 'Garden', glGardenSafe() ? 'Cool enough to water or feed if needed' : 'Too warm to water or feed right now', "go('#garden')"));
+  try { upcomingEvents().filter(e => !evDuringWork(e)).slice(0, 2).forEach(e => rows.push(tabRow('events', esc(e.title), esc((e.date ? fmtW(e.date) : '') + (e.venue ? ' · ' + e.venue : '')), "go('#events')"))); } catch (e) { }
+  try { const p = travelToday(); if (p) rows.push(tabRow('travel', 'Place of the day: ' + esc(p.name), esc(p.country), "go('#travel')")); } catch (e) { }
+  return rows.join('');
+}
+function glOrgBody(k, m) {
+  try {
+    if (k === 'today') { const r = glTodayRows(m); return `<div class="list tabprev">${r.html || tabRow('calendar', 'Nothing due right now', 'Enjoy the day')}</div>${r.more ? `<button type="button" class="glmore" onclick="go('#calendar')">+${r.more} more · tap to open</button>` : ''}`; }
+    if (k === 'garden') return `<div class="list tabprev">${glGardenRows()}</div>`;
+    let body = TAB_PREVIEW[k] ? TAB_PREVIEW[k]() : HOME_CARD[k] ? cardArt(HOME_CARD[k](), '') : '';
+    body = String(body || '').replace(/^\s*<div class="sec">[\s\S]*?<\/div>/, '');
+    if (!body.trim()) body = tabRow(k, TAB_NAME[k] || k, 'Nothing to show right now');
+    return `<div class="${TAB_PREVIEW[k] ? 'list tabprev' : ''}">${body}</div><button type="button" class="glmore" onclick="go('#${k}')">Open ${esc(TAB_NAME[k] || k)} ›</button>`;
+  } catch (e) { return ''; }
+}
+function glOrgSet(k) { glOrgTab = k; try { const el = document.getElementById('glorg'); if (el) el.innerHTML = glOrgInner(); } catch (e) { } }
+function glQuick(m) {
+  const T = todayISO(), Q = [];
+  const q = (k, art, a, b, title, s, go) => Q.push(`<button type="button" class="gltile glic glsm" style="--a:${a};--b:${b}" onclick="${go}"><img src="art/i3-${art}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltt">${title}<small>${esc(s)}</small></span></button>`);
+  try { const o = (S.todos || []).filter(t => t && !t.done && glOk(t.title)), td = o.filter(t => t.due && t.due <= T).length; q('todo', 'todo', '#2563eb', '#1e40af', 'To-do', td ? td + ' today · ' + o.length + ' open' : o.length ? o.length + ' open' : 'All done', "go('#todo')"); } catch (e) { }
+  try { const b = (S.bills || []).filter(x => x && !x.paid && x.due).sort((x, y) => String(x.due).localeCompare(String(y.due)))[0]; q('bills', 'bill', '#dc2626', '#9a3412', 'Bills', b ? b.name + ' · ' + (daysLeft(b.due) < 0 ? 'overdue' : fmtW(b.due)) : 'Nothing due', "go('#bills')"); } catch (e) { }
+  try { const a = (S.appts || []).filter(x => x && x.date === T && !x.done); q('calendar', 'cal', '#7c3aed', '#4c1d95', 'Calendar', !m.off ? 'Work ' + glShift(m) + (a.length ? ' · ' + a.length + ' more' : '') : a.length ? a[0].title : 'Free all day', "go('#calendar')"); } catch (e) { }
+  try { const c = glCU().filter(x => x.kind === 'car' || x.kind === 'driver'), od = c.filter(x => x.days < 0).length; q('cars', 'car', '#0891b2', '#155e75', 'Cars', c.length ? (od ? od + ' overdue · ' : '') + c.length + ' due' : 'All good', "go('#cars')"); } catch (e) { }
+  try { const g = glCU().find(x => x.kind === 'garden'); q('garden', 'garden', '#16a34a', '#14532d', 'Garden', g ? String(g.name || '').replace(/<[^>]+>/g, '') : glGardenSafe() ? 'Cool enough to water' : 'Nothing to do', "go('#garden')"); } catch (e) { }
+  try { const n = (S.shop && S.shop.items || []).filter(x => x && !x.done).length; q('shop', 'shop', '#ea580c', '#9a3412', 'Shopping', n ? plural(n, 'item') : 'List is empty', "go('#shopping')"); } catch (e) { }
+  return `<div class="glgrid glg3">${Q.join('')}</div>`;
+}
+function glOrgInner() {
+  const m = glMode(), tabs = glTabs(m); if (!tabs.some(t => t[0] === glOrgTab)) glOrgTab = 'today';
+  return `<div class="glfilt" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" class="${glOrgTab === k ? 'on' : ''}" onclick="glOrgSet('${k}')">${l}</button>`).join('')}</div><div class="card glorgcard">${glOrgBody(glOrgTab, m)}</div>`;
+}
+function glanceHome() {
+  const now = new Date(), m = glMode(now), name = homeTry('name', () => S.settings.name) || 'Shane';
+  homeShownNow = new Set(); homeDueCards = new Set();
+  setTimeout(homeStatusRefresh, 0);
+  let cards = '';
+  if ('Notification' in window && Notification.permission === 'default' && S.settings.reminders !== false) cards += `<div class="callout green">${I('bell')}<div style="flex:1"><b>Get reminders on this phone</b><br>We’ll nudge you before WOFs, rego, bills and to-dos are due.<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="turnOnReminders()">Turn on reminders</button></div></div></div>`;
+  if (deferredPrompt && !isStandalone()) cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
+  const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(new Set()) : '', '');
+  const tk = sum0 ? (sumScrollOn() ? `<div id="tkhome">${sum0}</div>` : homeSumFold(sum0)) : '';
+  stripSumDone = true; homeSumT = sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
+  const stat = glStatInner(), warn = homeTry('gl warn', () => glWarnInner(), '');
+  const wx = `<div class="glwx">${homeTry('weather strip', () => notifWxStrip(), '')}${glTideStrip()}${tk}</div>`;
+  const ent = homeTry('gl ent', () => glEntInner(), ''), org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
+  const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
+  const orgZ = org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
+  const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
+  const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
+    `<div id="glwarn" class="glwarns"${warn ? '' : ' hidden'}>${warn}</div>` + wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + cards +
+    (m.night ? entZ + asks + orgZ : orgZ + entZ) +
+    `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
+  return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
+}

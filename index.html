@@ -1703,6 +1703,53 @@ html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color
 .catchip{display:inline-flex;align-items:center}
 .sideico{width:28px;height:28px;object-fit:contain;display:block;filter:drop-shadow(0 1px 2px rgba(10,40,90,.2))}
 .sideline{display:contents}
+/* 2.26.0: Glance Home */
+.glance .glhead{align-items:center;gap:10px}
+.glance .glhome{width:52px;height:52px;flex:none;border-radius:16px;background:rgba(255,255,255,.55);display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.glance.glnight .glhome{background:rgba(255,255,255,.14)}
+.glance .glhome img{width:44px;height:44px;object-fit:contain}
+.glance .glhome.glnoimg::before{content:'🏠';font-size:30px}
+.glstat{margin:6px 0 10px;cursor:pointer}
+.glchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.glch{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;font-weight:700;font-size:.78rem;background:#fff;color:#1f2937;box-shadow:0 1px 3px rgba(0,0,0,.14);line-height:1.2}
+.glch.glred{background:#fee2e2;color:#b91c1c}.glch.glamb{background:#fef3c7;color:#92400e}.glch.gltide{background:#cffafe;color:#155e75}
+.glch.nwxuv{margin:0}
+.glupd{font-size:.72rem;opacity:.75;margin-left:auto}
+.glx{margin-top:8px;background:rgba(255,255,255,.92);color:#1f2937;border-radius:14px;padding:4px 12px;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.glxr{display:flex;justify-content:space-between;gap:10px;width:100%;background:none;border:0;padding:7px 0;font:inherit;font-size:.85rem;color:inherit;text-align:left;border-bottom:1px solid rgba(0,0,0,.06)}
+.glxr:last-child{border-bottom:0}.glxr b{text-align:right}.glredt{color:#b91c1c}.glambt{color:#92400e}
+.glwarns{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}
+.glwarn{display:flex;flex-direction:column;gap:2px;text-align:left;border:0;border-radius:14px;padding:10px 12px;font:inherit;text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,.15);border-left:6px solid}
+.glwarn b{font-size:.95rem}.glwarn span{font-size:.8rem;opacity:.9}.glwarn .glwtag{font-size:.68rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.85}
+.glw-amb{background:#fff7ed;color:#7c2d12;border-color:#f59e0b}.glw-red{background:#fef2f2;color:#7f1d1d;border-color:#dc2626}
+.glwx{border-radius:18px;overflow:hidden;margin:0 0 12px;box-shadow:0 2px 8px rgba(0,0,0,.14);background:var(--card,#fff)}
+.glwx .notifwx{margin:0!important;border-radius:0!important;box-shadow:none!important;border:0!important;width:100%}
+.glwx #tkhome{margin:0!important}.glwx #tkhome>*{border-radius:0!important;margin:0!important}
+.gltide{display:flex;align-items:center;gap:8px;width:100%;padding:6px 14px;border:0;border-top:1px solid rgba(0,0,0,.07);background:transparent;font:inherit;font-size:.78rem;color:#0e7490;text-align:left}
+.gltide svg{flex:1;height:28px;min-width:60px}.gltl{white-space:nowrap;font-weight:600}.gltr{white-space:nowrap;text-align:right}
+.glzone{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;opacity:.85;margin:16px 2px 8px}
+.glzone a{text-decoration:none;color:inherit}
+.glfilt{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 0 10px;padding:1px}
+.glfilt::-webkit-scrollbar{display:none}
+.glfilt button{flex:none;font:inherit;font-weight:700;font-size:.76rem;padding:5px 11px;border-radius:999px;border:0;background:#fff;color:#334155;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.glfilt button.on{background:#2563eb;color:#fff}
+.glgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.glgrid.glg3{grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:4px}
+.gltile{position:relative;height:96px;border:0;border-radius:16px;overflow:hidden;background:#334155 center/cover no-repeat;box-shadow:0 2px 8px rgba(0,0,0,.22);font:inherit;text-align:left;padding:0;color:#fff}
+.gltile.glic{background:linear-gradient(135deg,var(--a),var(--b))}
+.gltile.glic img{position:absolute;right:6px;top:8px;width:54px;height:54px;object-fit:contain}
+.gltile.glsm{height:74px}.gltile.glsm.glic img{width:34px;height:34px;top:6px}
+.gltile .gltt{position:absolute;left:10px;right:40px;bottom:7px;font-weight:800;font-size:.9rem;line-height:1.15;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+.gltile.glsm .gltt{right:6px;font-size:.8rem}
+.gltile .gltt small{display:block;font-weight:600;font-size:.72rem;opacity:.95;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gltile .gltag{position:absolute;top:6px;right:8px;background:rgba(0,0,0,.6);color:#fff;font-weight:700;font-size:.6rem;padding:2px 6px;border-radius:6px;z-index:2}
+.gltile.glic .gltag{top:auto;bottom:6px}
+.gltile.glhero{display:block;width:100%;height:150px;margin:0 0 10px}
+.gltile.glhero .gltt{font-size:1.1rem;right:12px}
+.glmore{display:block;width:100%;margin:8px 0 0;padding:8px;border:0;background:none;font:inherit;font-weight:700;font-size:.85rem;color:#2563eb;text-align:center}
+.glance.glnight .glmore{color:#93c5fd}
+.glorgcard{padding:4px 0;margin-bottom:10px}
+.glorgcard .glmore{margin:0}
 </style>
 </head>
 <body>
