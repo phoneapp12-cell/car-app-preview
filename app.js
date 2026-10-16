@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.20';
+const APP_VERSION = '2.26.21';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2675,12 +2675,23 @@ function nightCtx(ctx) {
   ctx.nightRule = 'It is night (after 8pm). Write a relaxed evening summary for you, built around 2 to 4 of the items in interesting (news headlines, videos, New on Netflix, the Top 40, the travel spot, local events): say what each is and why it might be worth a look tonight. Dry, cheeky jokes are fine. Never mention bills, overdue or due items, payments, invoices, the mortgage, budget, money or chores. The travel spot and New on Netflix are also shown under the summary, so only mention them in passing. Suggestions: relaxed things only (watch, read, listen, plan something fun), never a payment or a chore.';
   return ctx;
 }
+const SUM_REUSE_MS = 3600 * 1000; // 2.26.21: a cached AI summary is reused for at most 1 hour (was 4 hours)
+let sumForce = false;
+function sumUpdatedAt() { try { if (AI_SUM && AI_SUM.at) return AI_SUM.at; const l = JSON.parse(localStorage.getItem('aiSumLast') || 'null'); return l && l.at || 0; } catch (e) { return 0; } }
+function sumRefresh(force) { // Summary page: new summary now (force) or when the cached one is over 30 minutes old
+  const age = Date.now() - (sumUpdatedAt() || 0);
+  if (!force && (aiSumBusy || Date.now() - (sumRefresh.at || 0) < 60000 || (age < 30 * 60000 && aiSumFresh()))) return;
+  sumRefresh.at = Date.now();
+  sumForce = !!force || age >= 30 * 60000; AI_SUM = null; aiSumOpen = -1; try { homeSugNewOpen(); } catch (e) { }
+  if (force) { try { toast('Refreshing your summary…'); } catch (e) { } }
+  if ((location.hash || '').slice(1) === 'summary') setTimeout(render, 0);
+}
 async function aiSumFetch() {
   if (aiSumBusy || (aiSumOpen === homeSugOpenN && (!AI_SUM || AI_SUM.phase === sumPhaseKey())) || navigator.onLine === false) return; // 2.22.97: a new part of day gets a fresh summary
   // 2.22.82: reuse the last summary for 1 hour, then write a new one.
   try {
     const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null');
-    if (last && last.v === APP_VERSION && Array.isArray(last.lines) && last.lines.length && Date.now() - last.at < 4 * 3600 * 1000 && last.phase === sumPhaseKey()) {
+    if (last && last.v === APP_VERSION && Array.isArray(last.lines) && last.lines.length && Date.now() - last.at < SUM_REUSE_MS && last.phase === sumPhaseKey() && !sumForce) {
       AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: homeSugOpenN, at: last.at, phase: last.phase };
       aiSumOpen = homeSugOpenN;
       const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
@@ -2723,13 +2734,14 @@ async function aiSumFetch() {
     AI_SUM = { v: APP_VERSION, lines: kept, sugs: (d.sugs || []).slice(0, 3).filter(x => aiLineSafe(String((x && x.text) || '') + ' ' + String((x && x.title) || '')) && aiLineOk(String((x && x.text) || ''), tNow, allowed) && (!nightNow || nightOk(String((x && x.text) || '') + ' ' + String((x && x.title) || '')))), open: openN, at: Date.now(), phase };
     aiSumOpen = openN;
     try { localStorage.setItem('aiSumLast', JSON.stringify(AI_SUM)); } catch (e) {}
+    sumForce = false; try { const u = document.getElementById('sumupd'); if (u) u.textContent = 'Updated ' + fmtTime(new Date(AI_SUM.at).toTimeString().slice(0, 5)); } catch (e) { }
     sumHistAdd(kept, phase);
     const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; }
   } catch (e) {
     aiSumOpen = openN; // no AI this open: reuse the last AI summary if it's under 1 hour old, else the usual summary
     try { const last = JSON.parse(localStorage.getItem('aiSumLast') || 'null'); if (last && last.v === APP_VERSION && Array.isArray(last.lines) && Date.now() - last.at < 4 * 3600 * 1000 && last.phase === sumPhaseKey()) AI_SUM = { lines: last.lines, sugs: last.sugs || [], open: openN, at: last.at, phase: last.phase }; } catch (e3) {}
     try { const el = document.getElementById('homesum'); if (el) { const h = homeTry('summary', () => homeSumCard(), ''); if (h) el.outerHTML = h; } } catch (e2) {}
-  } finally { aiSumBusy = false; }
+  } finally { aiSumBusy = false; sumForce = false; }
 }
 /* 2.23.92: hard post-filter for AI lines. 00:00–06:00: nothing about tonight/evening, merlot, dinner, gym, cooking or after work.
    Any time: gym only on a real gym day (Tue/Wed work days), and no invented traits ("your ... style"). */
@@ -4114,9 +4126,23 @@ function classicDogHead(name, now) {
   return h.replace('<div class="top"><div style="min-width:0">', '<div class="top"><div class="cldogwrap"><img class="cldog" src="art/dog.webp" alt="" width="52" height="52" onerror="this.remove()"><div style="min-width:0">').replace(/<\/div>\s*<div class="iconrow">/, '</div></div>\n  <div class="iconrow">');
 }
 // 2.24.7: Settings › Check for update. Asks the service worker for a new version, then reloads.
-async function checkAppUpdate() {
-  try { toast('Checking for an update…'); const r = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (r) { await r.update(); if (r.waiting) r.waiting.postMessage({ type: 'SKIP_WAITING' }); } } catch (e) { }
-  setTimeout(() => location.reload(), 1200);
+async function checkAppUpdate() { // 2.26.21: compare with the live version; if the phone is stuck on an old one, clear the old copy and reload
+  toast('Checking for an update…');
+  let live = '';
+  try { const t = await (await fetch('sw.js?check=' + Date.now(), { cache: 'no-store' })).text(); live = (/VERSION = '([^']+)'/.exec(t) || [])[1] || ''; } catch (e) { }
+  if (live && live === APP_VERSION) { toast('You’re up to date (version ' + APP_VERSION + ').'); return; }
+  try {
+    const r = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    if (r) {
+      const changed = new Promise(ok => { navigator.serviceWorker.addEventListener('controllerchange', () => ok(true), { once: true }); setTimeout(() => ok(false), 8000); });
+      await r.update(); if (r.waiting) r.waiting.postMessage({ type: 'SKIP_WAITING' });
+      if (await changed) { location.reload(); return; }
+      // still stuck: drop the old service worker and its cached files, then load fresh (your data stays on the phone)
+      try { await r.unregister(); } catch (e) { }
+      try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch (e) { }
+    }
+  } catch (e) { }
+  location.reload();
 }
 function cleanBell() { const el = document.querySelector('[data-k="justadded"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else toast('Nothing new in Just added.'); }
 function cleanWx() {
@@ -9804,7 +9830,7 @@ function audioUnlock() {
   if (audioUnlocked) return;
   try { const ac = mAudioCtx(); if (ac.state === 'suspended') ac.resume(); const b = ac.createBuffer(1, 1, 22050), s = ac.createBufferSource(); s.buffer = b; s.connect(ac.destination); s.start(0); audioUnlocked = true; meowLoad(); } catch (e) { }
 }
-['touchstart', 'pointerdown', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, audioUnlock, { capture: true, passive: true }));
+// 2.26.21: no mascot sounds any more, so no audio unlock or meow download on first tap
 async function meowPlay(vol) {
   const ac = mAudioCtx(); if (ac.state === 'suspended') await ac.resume().catch(() => { });
   const bufs = await meowLoad(); if (!bufs.length) return false;
@@ -18444,7 +18470,8 @@ async function start() {
       hadController = true;
     });
     navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'go') go(e.data.hash); });
-    try { swReg = await navigator.serviceWorker.register('sw.js'); } catch (e) { swReg = null; }
+    try { swReg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }); } catch (e) { swReg = null; }
+    try { if (swReg) { swReg.update().catch(() => { }); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') swReg.update().catch(() => { }); }); } } catch (e) { } // 2.26.21: look for a new version on every open and return
     scheduleReminders().catch(() => { });
   }
   if (isStandalone()) requestPersist();
@@ -18457,6 +18484,7 @@ async function start() {
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState !== 'visible') return;
     try { homeSugNewOpen(); } catch (e) {}
+    try { if ((location.hash || '').slice(1) === 'summary') sumRefresh(false); } catch (e) {} // 2.26.21
     if (!sheetOpen) { try { const d = await kvGet('data'); if (d) { ideaStepsDirty = false; S = normalise(d); if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); } } } catch (e) { } render(); }
     phoneSyncOpen();
     check();
@@ -18770,9 +18798,12 @@ function Languages() {
     `<div class="foot">Kept on this phone. “Hear it” uses your phone’s own voices; Māori audio shows only if your phone has a te reo Māori voice.</div>`;
 }
 
-function SummaryPage() { // 2.26.18: the Home summary feed, now its own page
+function SummaryPage() { // 2.26.18: the Home summary feed, now its own page. 2.26.21: refreshes on open, on return, and with a Refresh button
+  if (!SummaryPage.busy) { SummaryPage.busy = true; try { sumRefresh(false); } finally { SummaryPage.busy = false; } }
   const body = (() => { try { return homeOverview(new Set()); } catch (e) { return ''; } })();
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Summary', 'Your day at a glance') + (body || '<div class="card empty"><div class="t">Nothing to sum up yet</div><div class="s">Check back in a moment.</div></div>');
+  const at = sumUpdatedAt(), upd = at ? 'Updated ' + fmtTime(new Date(at).toTimeString().slice(0, 5)) + (Date.now() - at > 864e5 ? ' ' + fmtW(todayISO(new Date(at))) : '') : 'Not updated yet';
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Summary', 'Your day at a glance') +
+    `<div class="sumbar"><span id="sumupd" class="muted">${esc(upd)}</span><button type="button" class="btn small" onclick="sumRefresh(true)">${I('refresh')} Refresh</button></div>` + (body || '<div class="card empty"><div class="t">Nothing to sum up yet</div><div class="s">Check back in a moment.</div></div>');
 }
 function GlAlerts() {
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
