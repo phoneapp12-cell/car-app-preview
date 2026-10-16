@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.6';
+const APP_VERSION = '2.26.7';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12617,7 +12617,7 @@ function hroomInner() {
   const pan = units.filter(u => u && u.brand === 'Panasonic' && ok(u.room)), mit = units.filter(u => u && u.brand === 'Mitsubishi' && ok(u.room));
   const lo = pan.find(u => /lounge/i.test(u.name || '')) || pan[0], be = mit.find(u => /bed/i.test(u.name || '')) || mit[0];
   const row = (lbl, t) => `<span class="hroom">${lbl} <b class="tcol"${tempStyle(t)}>${(+t).toFixed(1)}°C</b></span>`;
-  let ha = null; try { const sens = (typeof HUESTRIP !== 'undefined' && HUESTRIP && Array.isArray(HUESTRIP.sens)) ? HUESTRIP.sens : (JSON.parse(localStorage.getItem('hueSensCache') || 'null') || []); const x = (sens || []).find(d => d && /hall/i.test(String(d.room || '') + ' ' + String(d.name || '')) && d.temp && ok(d.temp.c)); if (x) ha = x.temp.c; } catch (e) { }
+  let ha = null; try { const sens = (typeof HUESTRIP !== 'undefined' && HUESTRIP && Array.isArray(HUESTRIP.sens) && HUESTRIP.sens.length) ? HUESTRIP.sens : (JSON.parse(localStorage.getItem('hueSensCache') || 'null') || []); const x = (sens || []).find(d => d && /hall/i.test(String(d.room || '') + ' ' + String(d.name || '')) && d.temp && ok(d.temp.c)); if (x) ha = x.temp.c; } catch (e) { }
   return (lo ? row('Lounge', lo.room) : '') + (be ? row('Bedroom', be.room) : '') + (ha != null ? row('Hallway', ha) : '');
 }
 function homeRoomTemps() {
@@ -15317,8 +15317,9 @@ async function hueStripFetch() {
   try {
     const [a, b] = await Promise.all([hueCall('sensors').catch(() => null), hueCall('lights').catch(() => null)]);
     // 2.23.84: same linked test as the Lights page; a failed fetch keeps the last good data and retries in 45s
-    if (a && a.linked && Array.isArray(a.sensors)) { HUESTRIP.sens = a.sensors; hueBattSave(a.sensors); try { const el = document.getElementById('homerooms'); if (el) { const h = hroomInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } } else if (a && a.linked === false) { HUESTRIP.sens = null; hueBattSave([]); }
-    if (b && b.linked) HUESTRIP.lights = b; else if (b && b.linked === false) HUESTRIP.lights = null;
+    if (a && a.linked && Array.isArray(a.sensors)) { HUESTRIP.sens = a.sensors; hueBattSave(a.sensors); try { localStorage.setItem('hueSensCache', JSON.stringify(a.sensors.filter(d => d && d.temp && typeof d.temp.c === 'number').map(d => ({ name: d.name, room: d.room, temp: { c: d.temp.c } })))); } catch (e) { } try { const el = document.getElementById('homerooms'); if (el) { const h = hroomInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } } else if (a && a.linked === false) { HUESTRIP.sens = null; hueBattSave([]); }
+    if (b && b.linked) { HUESTRIP.lights = b; try { HLIGHT = { at: Date.now(), data: { rooms: (b.rooms || []).map(r => ({ name: r.name, on: !!r.on })), lights: (b.lights || []).map(l => ({ name: l.name, room: l.room, on: !!l.on })) } }; localStorage.setItem('hlightCache', JSON.stringify(HLIGHT)); } catch (e) { } } else if (b && b.linked === false) HUESTRIP.lights = null;
+    try { glStatRedraw(); } catch (e) { }
     HUESTRIP.ok = !!(a || b);
     if (hueKey() && (!HEATSTRIP.data || Date.now() - (HEATSTRIP.at || 0) > 120000)) { try { const h = await heatCall('status'); if (h && h.linked) { HEATSTRIP = { at: Date.now(), data: h }; if (HEAT.st === 'ok') HEAT.data = h; } } catch (e) {} }
     if (document.getElementById('qstrip')) stripRerank();
@@ -18531,11 +18532,18 @@ function glHead(name, m, now) {
   <div class="iconrow">${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
 }
 /* ---- Home status ---- */
-function glTemps() {
-  try { const d = glTxt(hroomInner()); if (!d) return []; return [...d.querySelectorAll('.hroom')].map(x => { const b = x.querySelector('b'); return { n: x.firstChild ? String(x.firstChild.textContent).trim().replace(/^Hallway$/, 'Hall') : '', t: b ? b.textContent.replace('°C', '°') : '' }; }).filter(x => x.n && x.t); } catch (e) { return []; }
+function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
+  const out = [], seen = new Set(), ok = x => typeof x === 'number' && Number.isFinite(x);
+  const add = (n, c) => { const k = n.toLowerCase(); if (!n || !ok(c) || seen.has(k)) return; seen.add(k); out.push({ n, t: (+c).toFixed(1) + '°' }); };
+  try { const d = hroomData(), units = d && Array.isArray(d.units) ? d.units : [];
+    const lo = units.find(u => u && u.brand === 'Panasonic' && ok(u.room) && /lounge/i.test(u.name || '')) || units.find(u => u && u.brand === 'Panasonic' && ok(u.room)); if (lo) add('Lounge', lo.room);
+    const be = units.find(u => u && u.brand === 'Mitsubishi' && ok(u.room)); if (be) add('Bedroom', be.room); } catch (e) { }
+  try { let sens = (HUESTRIP && Array.isArray(HUESTRIP.sens) && HUESTRIP.sens.length) ? HUESTRIP.sens : null; if (!sens) sens = JSON.parse(localStorage.getItem('hueSensCache') || 'null') || [];
+    sens.forEach(d => { if (!d || !d.temp || !ok(d.temp.c)) return; let n = String(d.room || d.name || '').replace(/\s*(sensor|motion sensor|temperature)\s*$/i, '').trim(); if (/hall/i.test(n + ' ' + (d.name || ''))) n = 'Hall'; add(n, d.temp.c); }); } catch (e) { }
+  return out;
 }
-function glLights() {
-  try { const d = HLIGHT && HLIGHT.data; if (!d || Date.now() - HLIGHT.at > 6 * 3600e3) return null;
+function glLights() { // 2.26.6: last known value is always shown ([] = all off); null only when Hue has never answered
+  try { const d = HLIGHT && HLIGHT.data; if (!d) return null;
     let names = (d.rooms || []).filter(r => r && r.on).map(r => String(r.name || '').trim()).filter(Boolean);
     if (!names.length) names = (d.lights || []).filter(l => l && l.on).map(l => String(l.room || l.name || '').trim()).filter(Boolean);
     return [...new Set(names.map(n => /kitchen|spot/i.test(n) ? 'Kitchen' : n))]; } catch (e) { return null; }
@@ -18555,7 +18563,7 @@ function glStatInner() {
   const ch = [], m = glMode();
   const T = glTemps(); T.forEach(x => { const c = glTempCol(x.t); ch.push(`<span class="glch gltemp" style="--t1:${c[0]};--t2:${c[1]};color:${c[2]}"><span class="glci">🌡</span>${esc(x.n)} <b>${esc(x.t)}</b></span>`); });
   const D = glDoors(); if (D && D.length) ch.push(`<span class="glch gldoor"><img src="art/i3-shield.webp" alt="" class="glcimg" onerror="this.remove()">${D.length} open</span>`);
-  const L = glLights(); if (L && L.length) ch.push(`<span class="glch gllight"><span class="glci glbulb">💡</span>${L.length} on</span>`);
+  const L = glLights(); if (L && L.length) ch.push(`<span class="glch gllight"><span class="glci glbulb">💡</span>${L.length} on</span>`); else if (L) ch.push('<span class="glch gllightoff"><span class="glci">💡</span>Lights off</span>'); else if (hueKey()) ch.push('<span class="glch gllightoff"><span class="glci">💡</span>Lights –</span>');
   const uv = !m.night ? wxUV() : null; if (uv && wxIsDay()) ch.push(`<span class="glch nwxuv ${uv.cls} gluv"><span class="glci">☀️</span>UV ${uv.n} ${esc(uv.words)}</span>`);
   const td = glTideNext(2); if (td.length) ch.push(`<span class="glch gltidech">${GL_WAVE}${td.map(x => (x.high ? '▲ ' : '▼ ') + aklTime(x.ms)).join('  ')}</span>`);
   const R = glRoadItems().filter(x => x.route); if (R.length) ch.push(`<span class="glch gldoor">🚧 ${R.length} on your route</span>`);
