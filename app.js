@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.11';
+const APP_VERSION = '2.26.12';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18625,7 +18625,7 @@ const glTempCol = t => { const v = parseFloat(t); return !Number.isFinite(v) ? [
 const GL_WAVE = '<svg class="glwave" viewBox="0 0 24 12" aria-hidden="true"><path d="M0 8 C4 2 8 2 12 6 S20 11 24 4 V12 H0Z" fill="#22d3ee" opacity=".55"/><path d="M0 8 C4 2 8 2 12 6 S20 11 24 4" fill="none" stroke="#0e7490" stroke-width="1.6"/></svg>';
 function glStatInner() {
   const m = glMode(), ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`; // 2.26.9: five equal tiles, icon over value
-  const tile = (i, v, l, cls = '') => `<span class="gltile${cls}">${ic(i)}<b>${esc(v)}</b><small>${esc(l)}</small></span>`;
+  const tile = (i, v, l, cls = '') => `<span class="glst${cls}">${ic(i)}<b>${esc(v)}</b><small>${esc(l)}</small></span>`;
   const T = glTemps(), D = glDoors(), L = glLights(), td = glTideNext(2);
   const tv = T.map(x => parseFloat(x.t)).filter(Number.isFinite), lo = Math.min(...tv), hi = Math.max(...tv);
   const ch = [
@@ -18646,7 +18646,7 @@ function glStatInner() {
     td.forEach(t => rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#weather')"><span>${t.high ? 'High' : 'Low'} tide · Onerahi</span><b>${aklTime(t.ms)} · ${tideM(t)}</b></button>`));
     x = `<div class="glx">${rows.join('')}</div>`;
   }
-  return `<div class="gltiles">${ch.join('')}</div><div class="glchips glupdrow"><span class="glupd">${esc(up)} ${glStatOpen ? '▴' : '▾'}</span></div>${x}`;
+  return `<div class="glstiles">${ch.join('')}</div><div class="glchips glupdrow"><span class="glupd">${esc(up)} ${glStatOpen ? '▴' : '▾'}</span></div>${x}`;
 }
 function glStatRedraw() { try { const el = document.getElementById('glstat'); if (el) { const h = glStatInner(); el.innerHTML = h; el.hidden = !h; } } catch (e) { } }
 function glStatToggle() { glStatOpen = !glStatOpen; glStatRedraw(); }

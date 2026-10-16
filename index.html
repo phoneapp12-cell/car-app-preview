@@ -1804,17 +1804,22 @@ html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color
 #glalerts .glwarnwrap,#glalerts .glflagwrap{background:none!important;box-shadow:none!important;border:0!important}
 
 /* 2.26.9: status tiles */
-.gltiles{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;cursor:pointer}
-.gltile{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.12);height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:0 2px}
-.gltile svg{width:18px;height:18px;stroke:#475569;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.gltile b{font-size:.8rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.gltile small{font-size:.63rem;color:#64748b;white-space:nowrap}
-.gltile.glalert{box-shadow:inset 0 0 0 1.5px #dc2626}.gltile.glalert b{color:#b91c1c}
-.glnight .gltile.glalert b{color:#f87171}
+.glstiles{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;cursor:pointer}
+.glst{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.12);height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:0 2px}
+.glst svg{width:18px;height:18px;stroke:#475569;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.glst b{font-size:.8rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.glst small{font-size:.63rem;color:#64748b;white-space:nowrap}
+.glst.glalert{box-shadow:inset 0 0 0 1.5px #dc2626}.glst.glalert b{color:#b91c1c}
+.glnight .glst.glalert b{color:#f87171}
 .glupdrow{justify-content:flex-end;margin-top:3px}
-.glnight .gltile,.gldark .gltile{background:#1e293b}.glnight .gltile b{color:#f1f5f9}.glnight .gltile svg{stroke:#cbd5e1}.glnight .gltile small{color:#94a3b8}
+.glnight .glst,.gldark .glst{background:#1e293b}.glnight .glst b{color:#f1f5f9}.glnight .glst svg{stroke:#cbd5e1}.glnight .glst small{color:#94a3b8}
 .glance .glhead .glline{font-size:.85rem;font-weight:600;color:#0f766e;margin-top:2px;line-height:1.3}
 .glance.glnight .glhead .glline,.glnight .glhead .glline{color:#5eead4}
+
+/* 2.26.12: entertainment tiles back to the mock-up look: blue gradient, 3D art top right, tag badge top right */
+.gltile.glic{background:linear-gradient(135deg,#1e3a8a,#3b82f6 60%,#93c5fd)!important}
+.gltile.glic .gltag{top:6px;bottom:auto;right:8px;background:rgba(15,23,42,.65)}
+.gltile.glic img{top:14px}
 </style>
 </head>
 <body>
