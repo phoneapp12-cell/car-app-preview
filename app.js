@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.82';
+const APP_VERSION = '2.26.83';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4840,12 +4840,13 @@ function billForm(id, pre) {
       const dueChanged = !id || v.due !== b.due;
       const upd = { name: v.name, amount: Math.round(amt * 100) / 100, due: v.due, repeat: v.repeat, notes: v.notes, paidBy: v.paidBy === 'card' ? 'card' : '' };
       if (dueChanged) upd.anchor = new Date(parseD(v.due)).getUTCDate();
+      if (id ? dueChanged : (pre && pre.email && v.due !== pre.due)) upd.dueByHand = true; // 2.26.83: his own date wins over the email's
       // 2.26.63: ends after N payments → the last due date; comes out of a bank or account
       const en = String(v.endn || '').trim(); if (en && !(Math.round(+en) >= 1 && Math.round(+en) <= 600)) return 'Please type how many payments are left as a number, like 10, or leave it blank.';
       upd.lastDue = en && v.repeat !== 'none' ? billLastDue(Object.assign({}, b, upd), Math.round(+en)) : '';
       billSetFrom(id || null, upd, v.from);
       if (id) { if (dueChanged) upd.paid = false; Object.assign(b, upd); }
-      else { const nb = Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? Object.assign({ link: pre.link, linkType: pre.linkType }, pre.regoMonths ? { regoMonths: pre.regoMonths } : {}) : {}); S.bills.push(nb); if (upd._acct) { S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[nb.id] = upd._acct; } delete nb._acct; }
+      else { const nb = Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? Object.assign({ link: pre.link, linkType: pre.linkType }, pre.regoMonths ? { regoMonths: pre.regoMonths } : {}) : {}); if (pre && pre.email && pre.email.id) nb.email = Object.assign({}, pre.email, { forDue: nb.due }); S.bills.push(nb); if (upd._acct) { S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[nb.id] = upd._acct; } delete nb._acct; }
       if (id) delete b._acct;
       await save(); render(); toast(id ? 'Bill updated.' : 'Bill added.');
     }, id ? 'Save' : 'Add bill',
@@ -15705,7 +15706,7 @@ async function mbPdfOf(m, nm) { const r = { biller: nm || m.name || 'bill' };
     setTimeout(() => URL.revokeObjectURL(u), 120e3);
   } catch (e) { toast(navigator.onLine === false ? 'You’re offline. Try again with signal.' : 'Couldn’t open the PDF just now, so here’s the email.'); try { window.open(m.link, '_blank', 'noopener'); } catch (e2) { } }
 }
-function mbAddBill(k) { const r = MB_REG[k]; if (!r) return; billForm(null, { name: r.biller, amount: r.amount != null ? r.amount : '', due: r.due || '', repeat: 'none', notes: 'From email, received ' + fmtW(String(r.m.at).slice(0, 10)) }); }
+function mbAddBill(k) { const r = MB_REG[k]; if (!r) return; billForm(null, { email: Object.assign(emRefOf(r.m) || {}, { due: r.due || '' }), name: r.biller, amount: r.amount != null ? r.amount : '', due: r.due || '', repeat: 'none', notes: 'From email, received ' + fmtW(String(r.m.at).slice(0, 10)) }); }
 function mbRow(k, ic, title, sub, extra, url, cls = '', m) {
   MB_REG[k] = Object.assign(MB_REG[k] || {}, { url });
   if (m && m.id && !/emView\(/.test(extra || '')) { const b = emBtns(emRefOf(m)); extra = extra && /class="mbbtns"/.test(extra) ? extra.replace(/<\/div>$/, b.replace(/^<div class="embtns[^"]*">/, '').replace(/<\/div>$/, '') + '</div>') : (extra || '') + b; } // 2.26.82
@@ -19059,6 +19060,7 @@ async function start() {
   try { if (!S.settings.acctAuto69) { const K = S.settings.billAcctKeep || {}; Object.keys(K).forEach(k => { const b = (S.bills || []).find(x => x.id === k.split('|')[0]); if (!b || !/\b(mortgage|home ?loans?)\b/i.test(b.name || '')) delete K[k]; }); S.settings.billAcctKeep = K; S.settings.acctAuto69 = true; await save(); if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => cfLoad(), 1500); } } catch (e) { console.error('acctAuto69', e); }
   try { if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => { if (!CF && !CFbusy) cfLoad(); }, 2500); } catch (e) { } // 2.26.73: bank data on open, so bills paid from the bank are marked
   try { const mm = await mort3Mig(); if (mm) { render(); setTimeout(() => toast(mm, 'View', () => go('#budget')), 5500); } } catch (e) { console.error('mort3', e); }
+  try { const cm = await coeliac8Mig(); if (cm) { render(); setTimeout(() => toast(cm, 'View', () => go('#bills')), 2500); } } catch (e) { console.error('coeliac8', e); }
   try { const bm = await bills66Mig(); if (bm) { render(); setTimeout(() => toast(bm, 'View', () => go('#bills')), 4000); } } catch (e) { console.error('bills66', e); }
   try { const im = await insBillMig(); if (im) { render(); setTimeout(() => toast(im, 'View', () => go('#bills')), 2600); } } catch (e) { console.error('ins579', e); }
   phoneSyncOpen();
@@ -21146,6 +21148,25 @@ function emBillScore(bill, m, info) {
   if (!(amtOk || dueOk || invOk || vary)) return 0;
   return p * 10 + (amtOk ? 5 : 0) + (dueOk ? 5 : 0) + (invOk ? 10 : 0) + (String(m.at) > '' ? 0 : 0);
 }
+/* 2.26.83: the email's due date wins on a one-off bill, unless he changed the date himself (b.dueByHand).
+   Repeating bills are left alone (their next due moves on by itself). Returns the bills it moved, with a bell note. */
+function emDueWins() {
+  const fixed = [], M = emMsgs();
+  (S.bills || []).forEach(b => {
+    const r = b && b.email; if (!r || !r.id || b.paid || b.dueByHand || (b.repeat || 'none') !== 'none') return;
+    if (r.forDue !== b.due) return; // the link is for this due date only
+    if (r.due === undefined) { const m = M.find(x => x.src === r.src && x.id === r.id); if (!m) return; let i = null; try { i = mbBillInfo(m); } catch (e) { } r.due = i && i.due ? i.due : ''; }
+    if (!r.due || !parseD(r.due) || r.due === b.due) return;
+    if (Array.isArray(b.paidDues) && b.paidDues.some(p => p && p.due === r.due)) return; // that one's already paid
+    fixed.push({ name: String(b.name || 'A bill').slice(0, 40), was: b.due, now: r.due });
+    b.dueWas = b.due; b.due = r.due; b.anchor = new Date(parseD(r.due)).getUTCDate(); r.forDue = r.due;
+  });
+  if (fixed.length) { const L = (S.settings.appNotices || []).slice();
+    L.push({ id: 'emdue-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Due date taken from the email: ' + fixed.slice(0, 6).map(x => x.name + ' ' + fmtW(x.now)).join(', '),
+      body: fixed.slice(0, 10).map(x => x.name + ' was showing ' + fmtW(x.was) + ', the email says ' + fmtW(x.now)).join(' · ') + '. If you change a date yourself in Bills, your date stays.' });
+    S.settings.appNotices = L.slice(-30); }
+  return fixed;
+}
 // match bills to their emails (new ones and, once, every existing bill). Returns the names linked this time.
 function emLinkAll() {
   const msgs = emMsgs(); if (!msgs.length || !Array.isArray(S.bills)) return [];
@@ -21153,15 +21174,16 @@ function emLinkAll() {
   const used = new Set(S.bills.map(b => emBill(b)).filter(Boolean).map(emKey)), linked = [];
   S.bills.forEach(b => {
     if (!b || emBill(b) || (b.paid && b.email)) return;
-    let best = null, bs = 0;
+    let best = null, bs = 0, bi = null;
     const k = (() => { try { return billKind(b); } catch (e) { return null; } })();
     if (k && k.kind === 'rego' && k.car) { const r = emRego(k.car); if (r && !used.has(emKey(r))) { best = r; bs = 99; } }
-    if (!best) B.forEach(x => { const sc = emBillScore(b, x.m, x.info); if (sc > bs && !used.has(x.m.src + ':' + x.m.id)) { bs = sc; best = emRefOf(x.m); } });
+    if (!best) B.forEach(x => { const sc = emBillScore(b, x.m, x.info); if (sc > bs && !used.has(x.m.src + ':' + x.m.id)) { bs = sc; best = emRefOf(x.m); bi = x.info; } });
     if (!best) return;
-    used.add(emKey(best)); b.email = Object.assign(best, { forDue: b.due }); linked.push(String(b.name || 'A bill').slice(0, 40));
+    used.add(emKey(best)); b.email = Object.assign(best, { forDue: b.due }, bi && bi.due ? { due: bi.due } : {}); linked.push(String(b.name || 'A bill').slice(0, 40));
   });
-  if (linked.length) {
-    if (!S.settings.emLinkNote) { S.settings.emLinkNote = todayISO(); const L = (S.settings.appNotices || []).slice();
+  const fixed = emDueWins();
+  if (linked.length || fixed.length) {
+    if (linked.length && !S.settings.emLinkNote) { S.settings.emLinkNote = todayISO(); const L = (S.settings.appNotices || []).slice();
       L.push({ id: 'emlink-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Linked to their emails: ' + linked.slice(0, 10).join(', ') + (linked.length > 10 ? ' and ' + (linked.length - 10) + ' more' : ''), body: 'View email and Open PDF now show on these wherever they appear.' });
       S.settings.appNotices = L.slice(-30); }
     save(); }
@@ -21513,6 +21535,19 @@ async function mort3Mig() {
   // Tamahi / Taimahi Trust comes out of ANZ Bill Account (where the bank shows it), not ANZ Personal
   (S.bills || []).filter(x => x && /\bta(i)?mahi\b/i.test(x.name || '')).forEach(x => { x.fromBank = 'ANZ'; x.fromAcct = 'BILL ACCOUNT'; if (S.settings.cfBillAcct) delete S.settings.cfBillAcct[x.id]; });
   S.settings.mort3Mig = true; await save(); return 'Mortgage 3 merged into the ASB repayment ($1,182.13 a fortnight)';
+}
+/* 2.26.83: one-time: Coeliac NZ membership renewal INV-560747 ($60) is due Thu 8 Oct 2026, as the Xero email says.
+   It was showing Fri 16 Oct. Still unpaid, so it shows as overdue. A note goes on the bell page. */
+async function coeliac8Mig() {
+  if (!S || !S.settings || S.settings.coeliac8Mig) return '';
+  const b = (S.bills || []).filter(x => x && /coeliac/i.test(x.name || '') && !x.paid && !(Array.isArray(x.paidDues) && x.paidDues.some(p => p && p.due === '2026-10-08'))).sort((x, y) => Math.abs((+x.amount || 0) - 60) - Math.abs((+y.amount || 0) - 60))[0];
+  S.settings.coeliac8Mig = true;
+  if (!b) { await save(); return ''; }
+  const was = b.due; b.due = '2026-10-08'; b.anchor = 8; b.paid = false; delete b.dueByHand; if (was && was !== b.due) b.dueWas = was;
+  if (b.email && b.email.id) { b.email.forDue = b.due; b.email.due = b.due; }
+  S.settings.appNotices = (S.settings.appNotices || []).filter(n => n && n.id !== 'coeliac8').concat({ id: 'coeliac8', kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(),
+    title: 'Coeliac NZ is due Thu 8 Oct, as the email says', body: 'Membership renewal INV-560747, $60.00.' + (was && was !== b.due ? ' It was showing ' + fmtW(was) + '.' : '') + ' It’s still unpaid, so it shows as overdue.' }).slice(-30);
+  await save(); return 'Coeliac NZ now due Thu 8 Oct, from the email';
 }
 /* 2.26.66: one-time: Ecotricity $75 a week going forward and Kora about $120 a fortnight (varies), both from the
    ANZ Bill Account (where the bank shows them going out). Ecotricity is paid by hand, mostly midweek, so the next one is
