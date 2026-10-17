@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.51';
+const APP_VERSION = '2.26.52';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11454,6 +11454,18 @@ function wxCompactIcon(w, day, phase) {
 }
 // 1.83.0: the banner names today's sunset after sunrise, and the next sunrise after sunset.
 // The clock and the times are both Pacific/Auckland, from the forecast already loaded. No time is invented.
+// 2.26.52: the next sunrise/sunset as a warm pill; glows within 30 minutes of it
+function wxSunMins(now = new Date()) {
+  try { const d = WX.data.daily, local = wxLocalNow(now), nk = local.iso + 'T' + local.hm, ev = [];
+    d.time.forEach((t, i) => { [d.sunrise[i], d.sunset[i]].forEach(x => { if (typeof x === 'string' && x.slice(0, 16) > nk) ev.push(x.slice(0, 16)); }); });
+    ev.sort(); if (!ev.length) return null; const ms = x => Date.UTC(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10), +x.slice(11, 13), +x.slice(14, 16));
+    return Math.round((ms(ev[0]) - ms(nk)) / 60000); } catch (e) { return null; }
+}
+function sunPill(sun, cls = '') {
+  if (!sun) return ''; const rise = /^Sunrise/.test(sun), i = sun.lastIndexOf(', '), lab = i > 0 ? sun.slice(0, i) : sun, tm = i > 0 ? sun.slice(i + 2) : '';
+  const mins = wxSunMins(), soon = mins != null && mins <= 30;
+  return `<span class="sunpill ${rise ? 'rise' : 'set'}${soon ? ' soon' : ''} ${cls}"><span class="sunic" aria-hidden="true">${rise ? '🌅' : '🌇'}</span><span>${esc(lab)}${soon ? ` in ${Math.max(1, mins)} min` : ''}</span>${tm ? `<b>${esc(tm)}</b>` : ''}</span>`;
+}
 function wxSunMention(now = new Date()) {
   const d = WX && WX.data && WX.data.daily;
   if (!d || !Array.isArray(d.time) || !Array.isArray(d.sunrise) || !Array.isArray(d.sunset)) return '';
@@ -11569,7 +11581,7 @@ function notifWxStrip() {
   const uv = wxUV();
   const label = `Whangārei weather now: ${temp ? temp + ', ' : ''}${nowW.words}.${uv ? ' UV ' + uv.n + ' ' + uv.words + '.' : ''}${outlook ? ' ' + outlook + '.' : ''}${sun ? ' ' + sun + '.' : ''}${warn ? ' ' + warn.replace(/^⚠\s*/, 'MetService ') + '.' : ''} Tap for the full forecast.`;
   return `<button type="button" class="notifwx" id="notifwx" onclick="go('#weather')" aria-label="${esc(label)}">
-    <span class="nwxleft"><span class="nwxrow"><span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp tcol"${tempStyle(c.temperature_2m)}>${temp}</b>` : ''}</span>${uv ? `<span class="nwxuv ${uv.cls}">UV ${uv.n} ${uv.words}</span>` : ''}</span><span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${sun ? `<span class="nwxnext nwxsun">${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}${warnHtml}</span>${I('right')}</button>`;
+    <span class="nwxleft"><span class="nwxrow"><span class="nwxic">${wxIcon(nowW)}</span>${temp ? `<b class="nwxtemp tcol"${tempStyle(c.temperature_2m)}>${temp}</b>` : ''}</span>${uv ? `<span class="nwxuv ${uv.cls}">UV ${uv.n} ${uv.words}</span>` : ''}</span><span class="nwxtx"><span class="nwxnow">${esc(nowW.words)}</span>${outlook ? `<span class="nwxnext">${esc(outlook)}</span>` : ''}${sun ? `${sunPill(sun, 'nwxsun')}` : ''}${warnHtml}</span>${I('right')}</button>`;
 }
 function Weather() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Notifications</button>`;
@@ -19508,7 +19520,7 @@ function glWxCard(m) {
   const out = homeTry('weather outlook', () => notifWxOutlook(nowW, next), ''), sun = homeTry('weather sun', () => wxSunMention(), ''), uv = !m.night && day ? wxUV() : null;
   const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '', sky = glWxSky(nowW.kind, day);
   const fx = !day && (nowW.kind === 'clear' || nowW.kind === 'pc') ? '<span class="glstars"></span>' : ['rain', 'showers', 'drizzle', 'storm'].includes(nowW.kind) ? '<span class="glrain"></span>' : day && nowW.kind === 'clear' ? '<span class="glrays"></span>' : '';
-  return `<button type="button" class="glwxc${sky[3] ? ' gldark' : ''}" style="--s1:${sky[0]};--s2:${sky[1]};--s3:${sky[2]}" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}">${fx}<span class="glwxi">${wxIcon(nowW, 'big')}</span><span class="glwxw">${temp ? `<b class="glwxt">${temp}</b>` : ''}<b class="glwxn">${esc(nowW.words)}</b>${out ? `<span>${esc(out)}</span>` : ''}${sun ? `<span>${/^Sunrise/.test(sun) ? '🌅' : '🌇'} ${esc(sun)}</span>` : ''}</span>${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}</button>`;
+  return `<button type="button" class="glwxc${sky[3] ? ' gldark' : ''}" style="--s1:${sky[0]};--s2:${sky[1]};--s3:${sky[2]}" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}">${fx}<span class="glwxi">${wxIcon(nowW, 'big')}</span><span class="glwxw">${temp ? `<b class="glwxt">${temp}</b>` : ''}<b class="glwxn">${esc(nowW.words)}</b>${out ? `<span>${esc(out)}</span>` : ''}${sun ? sunPill(sun, 'glsunp') : ''}</span>${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}</button>`;
 }
 /* ---- Entertainment ---- */
 const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
@@ -19643,7 +19655,7 @@ function glanceHome() {
   if (deferredPrompt && !isStandalone()) cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
   const tk = ''; stripSumDone = true; homeSumT = ''; // 2.26.18: the summary feed moved off Home to its own page (top-bar icon)
   const stat = glStatInner();
-  const wx = `<div class="glwx">${homeTry('gl weather', () => glWxCard(m), '') || homeTry('weather strip', () => notifWxStrip(), '')}${glTideStrip()}${tk}</div>`;
+  const wx = `<div class="glwx">${homeTry('gl weather', () => glWxCard(m), '') || homeTry('weather strip', () => notifWxStrip(), '')}${tk}</div>`; // 2.26.52: small Onerahi tide strip taken off Home (Tides page and the Tide tile stay)
   const ent = homeTry('gl ent', () => glEntInner(), ''), org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const orgZ = org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';

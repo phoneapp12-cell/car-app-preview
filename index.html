@@ -1848,6 +1848,19 @@ html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color
 .glst b{font-size:.8rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .glst small{font-size:.63rem;color:#64748b;white-space:nowrap}
 .glst.glalert{box-shadow:inset 0 0 0 1.5px #dc2626}.glst.glalert b{color:#b91c1c}
+/* 2.26.52 bigger Home weather card (tide strip removed) */.glwx .glwxc{min-height:150px;padding:16px 18px;gap:14px}.glwx .glwxc .glwxi svg{width:108px!important;height:108px!important}.glwx .glwxt{font-size:3.1rem!important}.glwx .glwxn{font-size:1.2rem}.glwx .glwxw>span{font-size:.95rem}
+@media (max-width:380px){.glwx .glwxc{padding:14px 12px;gap:10px}.glwx .glwxc .glwxi svg{width:88px!important;height:88px!important}.glwx .glwxt{font-size:2.7rem!important}}
+/* 2.26.52 sunrise / sunset pill */
+.sunpill{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;width:max-content;max-width:100%;margin-top:5px;padding:3px 10px 3px 6px;border-radius:999px;font-size:.8125rem;line-height:1.25;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 3px rgba(0,0,0,.18),inset 0 0 0 1px rgba(255,255,255,.45)}
+.sunpill b{font-weight:800;font-size:.875rem}.sunpill .sunic{font-size:1rem;line-height:1}
+.sunpill.rise{background:linear-gradient(100deg,#fde68a,#fdba74 70%,#fecaca);color:#7c2d12}
+.sunpill.set{background:linear-gradient(100deg,#fb923c,#f472b6);color:#fff;text-shadow:0 1px 1px rgba(124,45,18,.35)}
+.gldark .sunpill,.glnight .sunpill{box-shadow:0 0 0 1px rgba(255,255,255,.25),0 2px 8px rgba(0,0,0,.35)}
+.sunpill.soon.rise{box-shadow:0 0 0 2px #fde68a,0 0 14px 3px rgba(251,191,36,.6)}.sunpill.soon.set{box-shadow:0 0 0 2px #fdba74,0 0 14px 3px rgba(244,114,182,.6)}
+@media (prefers-reduced-motion:no-preference){.sunpill.soon{animation:sunglow 2.6s ease-in-out infinite}}
+@keyframes sunglow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.12) saturate(1.15)}}
+.notifwx .sunpill{margin-top:4px}
+@media (max-width:370px){.sunpill{font-size:.75rem;padding:2px 8px 2px 5px}.sunpill b{font-size:.8125rem}}
 /* 2.26.51 email sections on Notifications */.mbsteps{display:flex;gap:3px;margin:7px 0 2px}.mbsteps span{flex:1;font-size:.625rem;font-weight:700;color:#94a3b8;border-top:4px solid #e2e8f0;padding-top:3px;text-align:center;line-height:1.15}.mbsteps span.on{border-color:#14b8a6;color:#0f766e}.mbsteps span.cur{color:#115e59}.mbbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.mbbtns .btn.small{padding:6px 12px;font-size:.8125rem;flex:none}.row.mbrow.mburg{box-shadow:inset 4px 0 0 #dc2626}.row.mbrow .ic{font-size:1.2rem}
 /* 2.26.51 power tile */button.glst{border:0;font:inherit;cursor:pointer;width:100%}.glst.glpwr svg{stroke:#2563eb}.glst.glpwr.under{background:#eff6ff;box-shadow:inset 0 0 0 1.5px #93c5fd}.glst.glpwr.under b{color:#1d4ed8}.glst.glpwr.over{background:#fffbeb;box-shadow:inset 0 0 0 1.5px #f59e0b}.glst.glpwr.over b{color:#b45309}.glst.glpwr.over svg{stroke:#d97706}.glnight .glst.glpwr.under,.gldark .glst.glpwr.under{background:#1e3a8a}.glnight .glst.glpwr.under b{color:#bfdbfe}.glnight .glst.glpwr.over,.gldark .glst.glpwr.over{background:#451a03}.glnight .glst.glpwr.over b{color:#fcd34d}
 .glnight .glst.glalert b{color:#f87171}
