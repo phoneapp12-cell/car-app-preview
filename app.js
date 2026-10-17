@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.59';
+const APP_VERSION = '2.26.60';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9525,7 +9525,8 @@ function budgetCalc(b) {
   const cardK = (() => { try { return cardCycle(b, bills); } catch (e) { return { use: 0, pay: 0 }; } })(), debt = cardK.pay; // 2.26.36: one outgoing for the Rewards card
   const out = Math.round((mort + billTot + spend + debt) * 100) / 100;
   const pay = budgetAmtOr0(b.pay);
-  return { pay, mort, carried, billTot, spend, debt, cardK, out, left: Math.round((pay - out) * 100) / 100, mortgages, bills };
+  const sarah = (() => { try { return swFor(b); } catch (e) { return null; } })(), sAmt = sarah ? sarah.amount : 0; // 2.26.59: Sarah's wages from Cash flow
+  return { pay, sarah, mort, carried, billTot, spend, debt, cardK, out, left: Math.round((pay + sAmt - out) * 100) / 100, mortgages, bills };
 }
 function budgetCard(b) {
   const k = budgetCalc(b);
@@ -9540,12 +9541,13 @@ function budgetCard(b) {
     <div class="carhead"><div class="carpic loanpic">${I('cash')}</div>
       <div style="flex:1;min-width:0"><div class="carname">${esc(b.name)}</div><div class="carmodel">Pay fortnight</div></div>
       <button type="button" class="iconbtn" aria-label="Edit ${esc(b.name)}" onclick="budgetForm(${jsArg(b.id)})">${I('pen')}</button></div>
-    <div class="lowed"><small>${k.left < 0 ? 'Over budget' : 'Left after bills'}</small><b class="lamt">${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></div>
-    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span>${k.debt || k.cardK.use ? `<span>Rewards card <b>${money(k.debt)}</b>${k.cardK.use ? `<small class="carrytag${k.cardK.warn ? ' cardwarn' : ''}">${money(k.cardK.use)} of ${money(k.cardK.limit)}</small>` : ''}</span>` : ''}<span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b>${k.carried ? `<small class="carrytag">${money(k.carried)} carried</small>` : ''}</span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
+    <div class="lowed"><small>${k.left < 0 ? 'Over budget' : 'Left after bills'}${k.sarah && k.sarah.expected ? ' (with Sarah’s expected pay)' : ''}</small><b class="lamt">${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></div>
+    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span>${k.sarah && !k.sarah.none ? `<span>Sarah <b>${money(k.sarah.amount)}</b>${k.sarah.expected ? '<small class="carrytag">expected</small>' : ''}</span>` : ''}${k.debt || k.cardK.use ? `<span>Rewards card <b>${money(k.debt)}</b>${k.cardK.use ? `<small class="carrytag${k.cardK.warn ? ' cardwarn' : ''}">${money(k.cardK.use)} of ${money(k.cardK.limit)}</small>` : ''}</span>` : ''}<span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b>${k.carried ? `<small class="carrytag">${money(k.carried)} carried</small>` : ''}</span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
     <div class="sec" style="margin-top:12px">This fortnight's pay</div>
-    <div class="list"><div class="row"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wages</div><div class="s">Changes each pay · tap edit to update</div></div><b>${k.pay ? money(k.pay) : '—'}</b></div></div>
-    <div class="sec">Three mortgages</div>
-    <p class="muted" style="margin:-4px 2px 8px">Type each amount for this fortnight. The names stay Mortgage 1, 2 and 3.</p>
+    <div class="list"><div class="row"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Your wages</div><div class="s">Changes each pay · tap edit to update</div></div><b>${k.pay ? money(k.pay) : '—'}</b></div>
+      <button type="button" class="row tapzone swrow" onclick="go('#cashflow')"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Sarah’s wages</div><div class="s">${!k.sarah ? (cfKey() ? 'From Cash flow · none found yet. Tap a transaction in Cash flow to teach it.' : 'From Cash flow · connect your bank in Settings') : k.sarah.none ? 'From Cash flow · none landed this fortnight' : k.sarah.expected ? '<span class="carrytag" style="margin-left:0">Expected</span> average of her last 3 pays · switches to the real amount when it lands' : '✓ Landed ' + esc(k.sarah.dates.map(d => fmtW(d)).join(', ')) + ' · from Cash flow'}</div></div><b>${k.sarah && !k.sarah.none ? money(k.sarah.amount) : '—'}</b></button></div>
+    <div class="sec">Three mortgages · ASB</div>
+    <p class="muted" style="margin:-4px 2px 8px">With ASB now (moved from ANZ). Type each amount for this fortnight. The names stay Mortgage 1, 2 and 3.</p>
     <div class="list">${mortRows}</div>
     <div class="sec">Bills this fortnight <a href="#bills" style="font-weight:650">Open Bills</a></div>
     <div class="list">${billRows}</div>
@@ -9558,6 +9560,8 @@ function budgetCard(b) {
 }
 function Budget() {
   try { if (budgetEnsureNext()) save(); } catch (e) { }
+  asbMortMigrate();
+  if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => cfLoad(), 0); // Sarah's wages come from Cash flow
   const list = [...(S.budgets || [])].sort((a, b) => (parseD(b.start) || 0) - (parseD(a.start) || 0));
   const sub = list.length ? 'One budget for each pay fortnight' : 'What’s left after pay day';
   const needPay = !payPeriod(0);
@@ -19783,7 +19787,7 @@ function glStartedTxt(t) { if (!t.startedAt) return ''; const d = new Date(t.sta
    checked and stored only on the relay (encrypted). This phone keeps a random device key (localStorage cfKey), never
    the tokens. Bank data stays in memory here. Projection: balances now, minus unpaid Bills and this fortnight's mortgages
    still to come, up to the day before next pay. Pay isn't counted until it lands. */
-let CF = null, CFbusy = false, CFerr = '', CFmock = null;
+let CF = null, CFbusy = false, CFerr = '', CFmock = null, CFmore = false;
 function cfKey() { try { return localStorage.getItem('cfKey') || ''; } catch (e) { return ''; } }
 function cfStat() { try { return JSON.parse(localStorage.getItem('cfStatus') || 'null'); } catch (e) { return null; } }
 function cfForget() { try { localStorage.removeItem('cfKey'); localStorage.removeItem('cfStatus'); } catch (e) { } CF = null; }
@@ -19889,12 +19893,12 @@ async function cfLoad(force) {
   try {
     const [s, d] = force ? await cfApi('/cashflow/refresh', 'POST', {}) : await cfApi('/cashflow');
     if (s === 200 && d.connected === false) { cfForget(); }
-    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); }
+    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); }
     else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
     else CFerr = cfErrText(s, d);
   } catch (e) { CFerr = 'Cash flow couldn’t load. Check your connection.'; }
-  CFbusy = false; if ((location.hash || '').startsWith('#cashflow') && !sheetOpen) render();
+  CFbusy = false; if (/^#(cashflow|budget)/.test(location.hash || '') && !sheetOpen) render();
 }
 // the $1,000 ASB rewards card: its real available balance feeds the Budget card (owed = limit − available)
 function cfCardAcct(D) { const C = (D.accounts || []).filter(a => a.type === 'CREDITCARD'); return C.find(a => a.limit === 1000) || C.find(a => /reward/i.test(a.name)) || (C.length === 1 ? C[0] : null); }
@@ -19917,12 +19921,13 @@ function cfPlan(D, pp) {
     const acct = (S.settings.cfBillAcct || {})[b.id] || (hist[0] && hist[0].acct) || (main && main.id);
     out.push({ what: b.name, amount: +b.amount, date: b.due, acct });
   });
-  try { const bud = (S.budgets || []).find(x => x.start === pp.start); if (bud) budgetMortEff(bud).filter(m => m.eff > 0).forEach(m => {
-    const near = t => t.amount < 0 && Math.abs(-t.amount - m.eff) <= 2;
-    if (txs.some(t => inP(t) && near(t))) return; // already gone out this fortnight
-    const prev = txs.find(t => near(t) && t.date.slice(0, 10) < pp.start);
-    let date = end; if (prev) { let d = prev.date.slice(0, 10); while (d < pp.start) d = addDays(d, 14); if (d <= end) date = d < T ? T : d; }
-    out.push({ what: m.name, amount: m.eff, date, acct: prev ? prev.acct : main && main.id, mort: 1 });
+  try { const used = new Set(), mort = cfMortAcct(D); const bud = (S.budgets || []).find(x => x.start === pp.start); if (bud) budgetMortEff(bud).filter(m => m.eff > 0).forEach(m => {
+    // 2.26.59: mortgages are with ASB now. Old ANZ repayments never count; ASB principal + interest lines are summed.
+    const R = cfAsbRepays(D), near = x => Math.abs(x.amount - m.eff) <= 2, inP2 = x => x.date >= pp.start && x.date <= T;
+    if (R.some(x => inP2(x) && near(x) && !used.has(x))) { used.add(R.find(x => inP2(x) && near(x) && !used.has(x))); return; } // already gone out this fortnight
+    const prev = R.find(x => near(x) && x.date < pp.start);
+    let date = end; if (prev) { let d = prev.date; while (d < pp.start) d = addDays(d, 14); if (d <= end) date = d < T ? T : d; }
+    out.push({ what: m.name + ' (ASB)', amount: m.eff, date, acct: (prev && D.accounts.some(a => a.id === prev.acct && cfSpendable(a)) ? prev.acct : mort && mort.id), mort: 1 });
   }); } catch (e) { }
   out.sort((a, b) => a.date.localeCompare(b.date));
   const accts = D.accounts.filter(cfSpendable).map(a => { let bal = cfBal(a), min = bal, low = null; out.filter(o => o.acct === a.id).forEach(o => { bal = Math.round((bal - o.amount) * 100) / 100; if (bal < min) { min = bal; } if (bal < 0 && !low) low = o; }); return { a, now: cfBal(a), end: bal, min, low }; });
@@ -19937,18 +19942,20 @@ function cfPlan(D, pp) {
 }
 function cfBody(M) {
   const D = M.data, pp = payPeriod(0), T = todayISO();
-  const order = a => a.type === 'CREDITCARD' ? 30 + (/ASB/i.test(a.bank) ? 0 : 1) : /ASB/i.test(a.bank) ? 0 : /ANZ/i.test(a.bank) ? 10 : /kiwi/i.test(a.bank) ? 20 : 25;
-  const grp = a => a.type === 'CREDITCARD' ? (a.bank || 'Credit') + ' card' : a.bank || 'Other';
+  const order = a => a.type === 'LOAN' ? 40 : a.type === 'CREDITCARD' ? 30 + (/ASB/i.test(a.bank) ? 0 : 1) : /ASB/i.test(a.bank) ? 0 : /ANZ/i.test(a.bank) ? 10 : /kiwi/i.test(a.bank) ? 20 : 25;
+  const grp = a => a.type === 'LOAN' ? 'Loans' : a.type === 'CREDITCARD' ? (a.bank || 'Credit') + ' card' : a.bank || 'Other';
   const A = [...D.accounts].sort((a, b) => order(a) - order(b) || cfBal(b) - cfBal(a)), groups = [];
   A.forEach(a => { const g = grp(a); let G = groups.find(x => x.g === g); if (!G) groups.push(G = { g, L: [] }); G.L.push(a); });
   const card = cfCardAcct(D);
-  const accRow = a => a.type === 'CREDITCARD'
+  const accRow = a => a.type === 'LOAN'
+    ? `<div class="row cfrow"><div class="tx"><div class="t">${esc(a.bank ? a.bank + ' ' : '')}${esc(a.name)}</div><div class="s">${a.limit ? `Revolving · ${cfMoney(a.available || 0)} free to draw of ${cfMoney(a.limit)} · ` : ''}not counted as money you can spend</div></div><b class="cfamt neg">${cfMoney(a.balance || 0)}</b></div>`
+    : a.type === 'CREDITCARD'
     ? `<div class="row cfrow"><div class="tx"><div class="t">${esc(a.name)}${a.number ? ` <span class="muted">··${esc(a.number.slice(-4))}</span>` : ''}</div><div class="s">Available ${cfMoney(a.available || 0)}${a.limit ? ' of ' + cfMoney(a.limit) : ''} · you owe ${cfMoney(Math.max(0, a.limit ? a.limit - (a.available || 0) : -(a.balance || 0)))}${a === card ? ' · feeds Budget’s Rewards card' : ''}</div>${a.limit ? `<div class="pbar"><i style="width:${Math.min(100, Math.round(100 * (a.limit - (a.available || 0)) / a.limit))}%"></i></div>` : ''}</div></div>`
     : `<div class="row cfrow"><div class="tx"><div class="t">${esc(a.name)}${a.number ? ` <span class="muted">··${esc(a.number.slice(-4))}</span>` : ''}</div><div class="s">${esc(({ CHECKING: 'Everyday', SAVINGS: 'Savings', LOAN: 'Loan', KIWISAVER: 'KiwiSaver' })[a.type] || a.type.toLowerCase())}${a.available != null && a.balance != null && a.available !== a.balance ? ' · balance ' + cfMoney(a.balance) : ''}</div></div><b class="cfamt${cfBal(a) < 0 ? ' neg' : ''}">${cfMoney(cfBal(a))}</b></div>`;
   const total = D.accounts.filter(cfSpendable).reduce((n, a) => n + cfBal(a), 0);
   let flow = '', proj = '';
   if (pp) {
-    const tx = (D.transactions || []).filter(t => t.date.slice(0, 10) >= pp.start && t.date.slice(0, 10) <= T && t.cat2 !== 'transfer');
+    const tx = (D.transactions || []).filter(t => t.date.slice(0, 10) >= pp.start && t.date.slice(0, 10) <= T && (t.cat2 !== 'transfer' || cfMortTx(D, t))).map(t => cfMortTx(D, t) ? Object.assign({}, t, { cat2: 'mortgage' }) : t);
     const inn = tx.filter(t => t.amount > 0).reduce((n, t) => n + t.amount, 0), outt = tx.filter(t => t.amount < 0).reduce((n, t) => n - t.amount, 0);
     const by = c => tx.filter(t => t.amount < 0 && t.cat2 === c).reduce((n, t) => n - t.amount, 0), w = Math.max(inn, outt) || 1;
     flow = `<div class="sec">This pay fortnight · ${esc(fmtW(pp.start))} – ${esc(fmtW(pp.end))}</div><div class="card cfflow">
@@ -19961,14 +19968,18 @@ function cfBody(M) {
       `<div class="list">${P.accts.filter(x => x.now !== x.end || x.min < 0).map(x => `<div class="row cfrow${x.min < 0 ? ' cflow' : ''}"><div class="tx"><div class="t">${esc(cfAName(x.a))}</div><div class="s">${x.min < 0 ? `⚠️ Goes below $0 on ${esc(fmtW(x.low.date))} (${esc(x.low.what)})` : 'Stays above $0'}</div></div><b class="cfamt${x.end < 0 ? ' neg' : ''}">${cfMoney(x.now)} → ${cfMoney(x.end)}</b></div>`).join('') || `<div class="row"><div class="tx"><div class="t">Nothing else due before payday</div><div class="s">From Bills and this fortnight’s mortgages</div></div></div>`}</div>` +
       (P.out.length ? `<div class="list cfout">${P.out.map(o => `<div class="row"><div class="tx"><div class="t">${esc(o.what)}</div><div class="s">${esc(fmtW(o.date))} · from ${esc(nm(o.acct))}</div></div><b class="cfamt">${cfMoney(-o.amount)}</b></div>`).join('')}</div>` : '');
   } else proj = `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday</b><br>Cash flow uses the same pay fortnight as Bills and Budget.<div style="margin-top:8px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
-  const main = cfMain(D), tags = { transfer: 'Own transfer', income: 'Income', mortgage: 'Mortgage', card: 'Card' };
-  const recent = (D.transactions || []).slice(0, 12).map(t => { const bill = t.amount < 0 ? (S.bills || []).find(b => cfBillTx(b, [t]).length && cfToks(b.name).some(w => (t.desc + ' ' + t.merchant).toLowerCase().includes(w))) : null;
-    return `<div class="row cfrow"><div class="tx"><div class="t">${esc(t.merchant || t.desc)}</div><div class="s">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))}${bill ? ` · <span class="cftag bill">Bill: ${esc(bill.name)}</span>` : tags[t.cat2] ? ` · <span class="cftag ${t.cat2}">${tags[t.cat2]}</span>` : ''}</div></div><b class="cfamt${t.amount < 0 ? '' : ' pos'}">${cfMoney(t.amount)}</b></div>`; }).join('');
+  const main = cfMain(D), mortA = cfMortAcct(D), tags = { transfer: 'Own transfer', income: 'Income', mortgage: 'Mortgage', card: 'Card' };
+  const recent = (D.transactions || []).slice(0, CFmore ? 80 : 12).map(t => { const mk = cfMortTx(D, t), sw = swIs(t); const bill = t.amount < 0 ? (S.bills || []).find(b => cfBillTx(b, [t]).length && cfToks(b.name).some(w => (t.desc + ' ' + t.merchant).toLowerCase().includes(w))) : null;
+    const tag = sw ? `<span class="cftag income">Income: Sarah’s wages</span>` : mk === 'old' ? `<span class="cftag mortgage old">Mortgage (old ANZ)</span>` : mk === 'asb' ? `<span class="cftag mortgage">Mortgage (ASB)</span>` : bill ? `<span class="cftag bill">Bill: ${esc(bill.name)}</span>` : tags[t.cat2] ? `<span class="cftag ${t.cat2}">${tags[t.cat2]}</span>` : '';
+    return `<button type="button" class="row cfrow cftx" onclick="cfTxSheet(${jsArg(t.id)})"><div class="tx"><div class="t">${esc(t.merchant || t.desc)}</div><div class="s">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))}${tag ? ' · ' + tag : ''}</div></div><b class="cfamt${t.amount < 0 ? '' : ' pos'}">${cfMoney(t.amount)}</b></button>`; }).join('');
+  const swL = (D.transactions || []).filter(swIs), swA = swAvg();
   return `<div class="cfupd muted">Updated ${esc(cfWhen(M.at || D.at))} · <button type="button" class="linkbtn" onclick="cfRefresh()">Refresh</button> <small>(at most once an hour)</small></div>
-    <div class="card cftotal"><span>Spendable across your accounts</span><b>${cfMoney(total)}</b></div>` +
+    <div class="card cftotal"><span>Spendable across your accounts</span><small class="muted" style="display:block;font-size:.72rem">Not counting loans or the card</small><b>${cfMoney(total)}</b></div>` +
     groups.map(G => `<div class="sec">${esc(G.g)}</div><div class="list">${G.L.map(accRow).join('')}</div>`).join('') + flow + proj +
-    `<div class="sec">Recent</div><div class="list">${recent}</div>
-    <div class="list" style="margin-top:12px"><label class="srow"><div class="tx"><div class="t">Bills and mortgages come out of</div><div class="s">Used when a bill hasn’t been paid from the bank before</div></div><select onchange="cfSetMain(this.value)">${D.accounts.filter(cfSpendable).map(a => `<option value="${esc(a.id)}"${main && main.id === a.id ? ' selected' : ''}>${esc(cfAName(a))}</option>`).join('')}</select></label></div>
+    `<div class="sec">Sarah’s wages</div><div class="list"><div class="row"><div class="tx"><div class="t">${swL.length ? `${plural(swL.length, 'pay')} found · usually ${cfMoney(swA)}` : 'Not found yet'}</div><div class="s">${swL.length ? 'Last ' + esc(fmtW(swL[0].date.slice(0, 10))) + ' into ' + esc(nm2(D, swL[0].acct)) + ' · ' : ''}Payer contains: ${swRules() || '—'}</div><div class="s muted">Tap a money-in transaction below to teach it. Budget shows her pay each fortnight.</div></div></div></div>
+    <div class="sec">Recent · tap one to teach Sarah’s wages</div><div class="list">${recent}</div><div class="btns" style="margin-top:6px"><button type="button" class="btn small" onclick="CFmore=!CFmore;render()">${CFmore ? 'Show fewer' : 'Show more'}</button></div>
+    <div class="list" style="margin-top:12px"><label class="srow"><div class="tx"><div class="t">Bills come out of</div><div class="s">Used when a bill hasn’t been paid from the bank before</div></div><select onchange="cfSetMain(this.value)">${D.accounts.filter(cfSpendable).map(a => `<option value="${esc(a.id)}"${main && main.id === a.id ? ' selected' : ''}>${esc(cfAName(a))}</option>`).join('')}</select></label>
+    <label class="srow"><div class="tx"><div class="t">Mortgages (ASB) come out of</div><div class="s">${S.settings.cfMortAcct ? 'Your choice' : 'Where the ASB loan repayments came from'}. Old ANZ home-loan payments are history only.</div></div><select onchange="cfSetMort(this.value)">${D.accounts.filter(cfSpendable).map(a => `<option value="${esc(a.id)}"${mortA && mortA.id === a.id ? ' selected' : ''}>${esc(cfAName(a))}</option>`).join('')}</select></label></div>
     <div class="foot">Read-only, from Akahu (daily, or when you tap Refresh). Before-payday figures are worked out from Bills and this fortnight’s mortgages; pay isn’t counted until it lands. Bills already paid from the bank this fortnight are left out.</div>`;
 }
 function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
@@ -19983,6 +19994,81 @@ function CashFlow() {
   return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : '') + (CF.example ? `<div class="callout cfex"><b>Example data</b> · not your real accounts</div>` : '') + cfBody(CF);
 }
 function cfGoSettings() { go('#settings'); setTimeout(() => { const el = document.getElementById('akahuset'); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 300); }
+
+/* ================= SARAH'S WAGES + ASB MORTGAGES (2.26.59) =================
+   Sarah's pay is found in the Cash flow transactions by a payer-text rule (default: her Ministry of Education payroll
+   credits, which the bank shows as "MINISTRY OF EDUCATIO ..."). Tap any money-in transaction in Cash flow to teach it.
+   Only the pay dates and amounts are kept on this phone (S.settings.sarahWages.seen), so Budget can show them offline;
+   no account numbers. Budget: each pay fortnight sums what landed; current/future fortnights show the average of the
+   last 3 pays, marked expected, until it lands. Mortgages: ANZ home loans were refinanced to ASB in Sep 2026, so old
+   ANZ repayments are history only and the projection uses ASB. */
+const SW_DEFAULT = ['MINISTRY OF EDUCATIO', 'EDPAY', 'EDUCATION PAYROLL'];
+function swSt() { S.settings = S.settings || {}; const w = S.settings.sarahWages && typeof S.settings.sarahWages === 'object' ? S.settings.sarahWages : (S.settings.sarahWages = {}); if (!Array.isArray(w.rules)) w.rules = SW_DEFAULT.slice(); if (!Array.isArray(w.not)) w.not = []; if (!Array.isArray(w.seen)) w.seen = []; return w; }
+const swNorm = s => String(s || '').toUpperCase().replace(/\d+/g, ' ').replace(/[^A-Z&' ]/g, ' ').replace(/\s+/g, ' ').trim();
+function swIs(t) { if (!t || !(t.amount > 0)) return false; const w = swSt(); if (w.not.includes(t.id)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && p.includes(swNorm(r))); }
+// keep the found pays (date + amount only) so Budget has them without the bank data in memory
+function swFeed(D) {
+  try { const w = swSt(), txs = D.transactions || [], from = txs.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10);
+    const now = txs.filter(swIs).map(t => ({ id: t.id, d: t.date.slice(0, 10), a: t.amount }));
+    const keep = w.seen.filter(x => x.d < from); // older than the bank window: keep as it was
+    const seen = [...keep, ...now].sort((a, b) => a.d.localeCompare(b.d)).slice(-60);
+    w.from = from;
+    if (JSON.stringify(seen) !== JSON.stringify(w.seen)) { w.seen = seen; w.at = new Date().toISOString(); save(); }
+  } catch (e) { }
+}
+function swAvg() { const s = swSt().seen; const by = {}; s.forEach(x => { by[x.d] = Math.round(((by[x.d] || 0) + x.a) * 100) / 100; }); const L = Object.keys(by).sort().slice(-3).map(d => by[d]); return L.length ? Math.round(L.reduce((n, v) => n + v, 0) / L.length * 100) / 100 : 0; }
+// { amount, expected, n, dates } for a budget fortnight, or null when there's nothing to go on
+function swFor(b) {
+  const pp = budgetPeriodFor(b); if (!pp) return null;
+  const w = swSt(), L = w.seen.filter(x => x.d >= pp.start && x.d <= pp.end);
+  if (L.length) return { amount: Math.round(L.reduce((n, x) => n + x.a, 0) * 100) / 100, expected: false, n: L.length, dates: L.map(x => x.d) };
+  if (pp.end >= todayISO()) { const a = swAvg(); return a ? { amount: a, expected: true, n: 0, dates: [] } : null; }
+  if (w.from && pp.start >= w.from) return { amount: 0, expected: false, n: 0, dates: [], none: true };
+  return null;
+}
+function cfTxSheet(id) {
+  const D = CF && CF.data; const t = D && (D.transactions || []).find(x => x.id === id); if (!t) return;
+  const is = swIs(t), sug = swNorm(t.desc).split(' ').slice(0, 4).join(' ');
+  if (t.amount <= 0) { openSheet(esc(t.merchant || t.desc), `<p class="muted">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))} · ${esc(cfMoney(t.amount))}</p>`); return; }
+  openSheet(esc(t.merchant || t.desc), `<p class="muted" style="margin:0 0 10px">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))} · <b>${esc(cfMoney(t.amount))}</b></p>` +
+    (is ? `<p style="margin:0 0 10px">✓ Counted as <b>Sarah’s wages</b>.</p>` : '') +
+    field('Sarah’s wages are payments where the payer text contains', inp('rule', is ? (swSt().rules.find(r => swNorm(t.desc + ' ' + (t.merchant || '')).includes(swNorm(r))) || sug) : sug, 'maxlength="40" autocapitalize="characters"'), 'Matches any money in with this text. Numbers are ignored.'),
+    async v => { const r = swNorm(v.rule); if (r.length < 3) return 'Please type at least 3 letters of the payer text.'; const w = swSt(); if (!w.rules.some(x => swNorm(x) === r)) w.rules.push(r); w.not = w.not.filter(x => x !== t.id); swFeed(D); await save(); render(); toast('Sarah’s wages: payer contains “' + r + '”.'); },
+    is ? 'Save' : 'This is Sarah’s wages',
+    is ? `<button type="button" class="btn danger" style="flex:0 0 auto" onclick="swNot(${jsArg(t.id)})">Not her wages</button>` : '');
+}
+async function swNot(id) { const w = swSt(); if (!w.not.includes(id)) w.not.push(id); w.not = w.not.slice(-50); if (CF && CF.data) swFeed(CF.data); await save(); await closeSheet(); render(); toast('Left out of Sarah’s wages.'); }
+function swRules() { const w = swSt(); return w.rules.map(r => `<span class="cftag income">${esc(r)} <button type="button" class="linkbtn" aria-label="Remove ${esc(r)}" onclick="swDrop(${jsArg(r)})">✕</button></span>`).join(' '); }
+async function swDrop(r) { const w = swSt(); w.rules = w.rules.filter(x => x !== r); if (CF && CF.data) swFeed(CF.data); await save(); render(); }
+// mortgages: ASB repayments (principal + interest lines summed per loan per day), old ANZ ones are history
+const cfIsAnz = (D, t) => { const a = D.accounts.find(x => x.id === t.acct); return !!(a && /ANZ/i.test(a.bank)); };
+function cfMortTx(D, t) {
+  if (!(t.amount < 0)) return '';
+  const a = D.accounts.find(x => x.id === t.acct); if (!a || a.type === 'LOAN' || a.type === 'CREDITCARD') return '';
+  const s = t.desc + ' ' + (t.merchant || '');
+  const word = /\b(loan repay(ment)?|home ?loan|mortgage|hl repay)\b/i.test(s) || t.cat2 === 'mortgage';
+  if (/ANZ/i.test(a.bank)) { if (word || cfAnzMortAmt(-t.amount)) return 'old'; return ''; }
+  return word ? 'asb' : '';
+}
+function cfAnzMortAmt(v) { try { return (S.budgets || []).some(b => budgetMortEff(b).some(m => m.eff > 0 && Math.abs(v - m.eff) <= 2)); } catch (e) { return false; } }
+function cfAsbRepays(D) { // [{date, key, amount, acct}]
+  const g = new Map();
+  (D.transactions || []).filter(t => cfMortTx(D, t) === 'asb').forEach(t => { const k = t.date.slice(0, 10) + '|' + t.desc.replace(/(principal|interest)\b.*$/i, '').replace(/\s+/g, ' ').trim(); const x = g.get(k) || g.set(k, { date: t.date.slice(0, 10), key: k.split('|')[1], amount: 0, acct: t.acct }).get(k); x.amount = Math.round((x.amount - t.amount) * 100) / 100; });
+  return [...g.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+function cfMortAcct(D) {
+  const L = D.accounts.filter(cfSpendable), id = S.settings && S.settings.cfMortAcct, pick = L.find(a => a.id === id); if (pick) return pick;
+  const r = cfAsbRepays(D), cnt = {}; r.forEach(x => { cnt[x.acct] = (cnt[x.acct] || 0) + 1; });
+  const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0]; if (top && L.find(a => a.id === top)) return L.find(a => a.id === top);
+  return L.find(a => /ASB/i.test(a.bank) && /mortgage|home/i.test(a.name)) || L.filter(a => /ASB/i.test(a.bank) && a.type === 'CHECKING').sort((a, b) => cfBal(b) - cfBal(a))[0] || cfMain(D);
+}
+async function cfSetMort(id) { S.settings.cfMortAcct = id; await save(); render(); }
+// one-off: bill names that still say ANZ for a mortgage/home loan now say ASB
+function asbMortMigrate() {
+  try { if (S.settings.asbMortMig) return; let n = 0;
+    (S.bills || []).forEach(b => { if (b && /\b(mortgage|home ?loan)\b/i.test(b.name || '') && /\bANZ\b/.test(b.name || '')) { b.name = b.name.replace(/\bANZ\b/g, 'ASB'); n++; } });
+    S.settings.asbMortMig = 1; save(); return n; } catch (e) { }
+}
 
 /* ================= PACK-THE-CAR REMINDER (2.26.55) =================
    A My event can carry a 'pack the car' reminder (the Sunday Cleaning job has one by default: 9pm the night before).

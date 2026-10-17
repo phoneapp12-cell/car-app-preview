@@ -155,3 +155,20 @@ export async function runAkahu(env, fetchImpl = fetch, now = Date.now()) {
   if (pend) { delete cred.pending; await env.EVENTS_KV.put(K_CRED, await seal(env, cred)); }
   await refetch(env, cred, fetchImpl); return 'fetched';
 }
+// one-off, owner-triggered summary of regular credits (no tokens, no account numbers, long digit runs masked); kept 30 minutes
+export async function runAkahuInsight(env) {
+  const req = env.EVENTS_KV && env.AKAHU_ENC_KEY && await env.EVENTS_KV.get('akahu-insight-req'); if (!req) return 'none';
+  const deb = req === 'debits';
+  await env.EVENTS_KV.delete('akahu-insight-req');
+  const data = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!data) return 'nodata';
+  const an = Object.fromEntries(data.accounts.map(a => [a.id, (a.name + ' · ' + a.bank + ' · ' + a.type).slice(0, 80)]));
+  const bals = data.accounts.map(a => ({ n: an[a.id], bal: a.balance, avail: a.available, limit: a.limit }));
+  const mask = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
+  const g = new Map();
+  data.transactions.filter(t => (deb ? t.amount <= -150 : t.amount >= 50) && (deb || t.cat2 !== 'transfer')).forEach(t => { const k = mask(t.desc).replace(/#.*$/, '').slice(0, 40) + ' | ' + (an[t.acct] || '?'); (g.get(k) || g.set(k, []).get(k)).push(t); });
+  const out = [...g.entries()].map(([k, ts]) => { const d = ts.map(t => t.date.slice(0, 10)).sort(); const gaps = d.slice(1).map((x, i) => Math.round((Date.parse(x) - Date.parse(d[i])) / DAY)); const am = ts.map(t => t.amount).sort((a, b) => a - b);
+    return { key: k, n: ts.length, dates: d, gaps, min: am[0], max: am[am.length - 1], sample: [...new Set(ts.map(t => mask(t.desc)))].slice(0, 3), merchant: [...new Set(ts.map(t => t.merchant).filter(Boolean))].slice(0, 2), cat: [...new Set(ts.map(t => t.cat2 + '/' + t.cat))].slice(0, 3) }; })
+    .sort((a, b) => b.n - a.n || b.max - a.max).slice(0, 60);
+  await env.EVENTS_KV.put('akahu-insight-v1', JSON.stringify({ at: new Date().toISOString(), accounts: bals, txCount: data.transactions.length, dataAt: data.at, credits: out }), { expirationTtl: 1800 });
+  return 'done';
+}
