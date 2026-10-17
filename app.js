@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.46';
+const APP_VERSION = '2.26.47';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10229,6 +10229,7 @@ async function scheduleReminders() {
     } catch (e) {}
     try { sugPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.22.62
     try { if ((S.settings || {}).zeusCrate !== false) { const T = todayISO(), now = nzStampLocal().slice(11, 16); reminders.push({ id: 'zeus-crate', title: '🐕 Let Zeus out of his crate', date: now >= '07:00' ? addDays(T, 1) : T, time: '07:00', repeat: 'daily' }); } } catch (e) {} // 2.22.61
+    try { if ((S.settings || {}).offpeakPush === true) { const T = todayISO(), now = nzStampLocal().slice(11, 16); reminders.push({ id: 'pwr-offpeak', title: '🌙 Power’s off-peak now, until 7am. Good time for the dishwasher, washing or drier.', date: now >= '22:00' ? addDays(T, 1) : T, time: '22:00', repeat: 'daily' }); } } catch (e) {} // 2.26.47
     try { // 2.22.69: the night before gym (Tue and Wed), pack the gym bag and a towel
       if ((S.settings || {}).gymBag !== false) {
         const T = todayISO(), now = nzStampLocal().slice(11, 16), dow = (homeAklParts() || {}).dow;
@@ -19508,6 +19509,48 @@ function glSwipe(e) {
   el.addEventListener('touchmove', mv, { passive: false }); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
 }
 document.addEventListener('touchstart', glSwipe, { passive: true });
+/* 2.26.47: time-of-use band now (Northpower via Ecotricity): off-peak 10pm–7am every day; workdays peak 7–9:30am & 5:30–8pm, shoulder otherwise; weekends and public holidays shoulder 7am–10pm */
+const PWR_NL_ANNIV = ['2026-02-02', '2027-02-01', '2028-01-31'];
+function pwrNzParts(d) {
+  const p = {}; new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short' }).formatToParts(d).forEach(x => { p[x.type] = x.value; });
+  return { date: `${p.year}-${p.month}-${p.day}`, mins: (+p.hour % 24) * 60 + +p.minute, wd: p.weekday };
+}
+const pwrHolCache = {};
+function pwrIsHoliday(iso) {
+  const y = iso.slice(0, 4);
+  if (!pwrHolCache[y]) { let L = []; try { L = (nzHolidays(+y) || []).map(h => h.date); } catch (e) { } pwrHolCache[y] = new Set(L.concat(PWR_NL_ANNIV)); }
+  return pwrHolCache[y].has(iso);
+}
+function pwrBandAt(d) {
+  const z = pwrNzParts(d), m = z.mins;
+  if (m < 420 || m >= 1320) return 'offpeak';
+  if (z.wd === 'Sat' || z.wd === 'Sun' || pwrIsHoliday(z.date)) return 'shoulder';
+  return (m < 570 || (m >= 1050 && m < 1200)) ? 'peak' : 'shoulder';
+}
+function pwrBandNow(now) {
+  now = now || new Date(); const band = pwrBandAt(now), z0 = pwrNzParts(now);
+  let t = new Date(Math.floor(now.getTime() / 1800000) * 1800000 + 1800000), n = 0;
+  while (pwrBandAt(t) === band && n++ < 96) t = new Date(t.getTime() + 1800000);
+  const z = pwrNzParts(t), h = Math.floor(z.mins / 60), mm = z.mins % 60, ap = h < 12 ? 'am' : 'pm', h12 = h % 12 || 12;
+  const time = `${h12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${ap}`;
+  return { band, until: t, untilTxt: time + (z.date !== z0.date ? ' ' + z.wd : ''), key: band + '-' + z.date + '-' + z.mins };
+}
+const PWR_BAND_NAME = { offpeak: 'Off-peak', shoulder: 'Shoulder', peak: 'Peak' };
+function pwrRatesC() { const t = (typeof PWR !== 'undefined' && PWR && PWR.tou) || {}; const c = v => (Math.round(v * 1000) / 10).toFixed(1); return { offpeak: c(t.offpeak || 0.101), shoulder: c(t.shoulder || 0.144), peak: c(t.peak || 0.272) }; }
+function pwrOffpeakCard() {
+  let b; try { b = pwrBandNow(); } catch (e) { return null; } if (b.band !== 'offpeak') return null;
+  const id = 'offpeak-' + b.key; if (pnDis().includes(id)) return null; const R = pwrRatesC();
+  return { id, urgent: false, html: `<div class="row glnew pnrow pnoff" data-pn="${esc(id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('#power')"><div class="ic">🌙</div><div class="tx"><div class="t">Power’s off-peak now, until ${esc(b.untilTxt)}</div><div class="s pnbody">Cheapest time for the dishwasher, washing or drier. About ${R.offpeak}c a kWh, vs ${R.shoulder}c shoulder and ${R.peak}c peak.</div></div></div>` };
+}
+let pwrBandKey = '';
+function pwrBandTick() {
+  try { const b = pwrBandNow(); if (b.key === pwrBandKey) return; const first = !pwrBandKey; pwrBandKey = b.key; if (first) return;
+    const r = (location.hash || '').slice(1).split('/')[0];
+    if (r === 'alerts' || r === 'power') { if (!sheetOpen) render(); } else glBellRedraw();
+  } catch (e) { }
+}
+setInterval(pwrBandTick, 60e3);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pwrBandTick(); });
 /* 2.26.44: power notices (relay power doc "notices") on the Notifications page; dismissals kept on this phone */
 let pnFetchedAt = 0;
 function pnDis() { try { const a = JSON.parse(localStorage.getItem('pnDismiss') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
@@ -19516,11 +19559,12 @@ function pnItems() {
   try { if (Date.now() - pnFetchedAt > 20 * 60e3) { pnFetchedAt = Date.now(); setTimeout(pwrFetch, 0); } } catch (e) { }
   let N = []; try { N = (typeof PWR !== 'undefined' && PWR && Array.isArray(PWR.notices)) ? PWR.notices : []; } catch (e) { N = []; }
   const gone = new Set(pnDis()), IC = { bill: '🧾', payment: '💵', rates: '📈', compare: '🔎', signin: '🔑' };
-  return N.filter(n => n && n.id && n.title && !gone.has(n.id)).sort((a, b) => String(b.at).localeCompare(String(a.at))).map(n => {
+  const off = (() => { try { return pwrOffpeakCard(); } catch (e) { return null; } })();
+  return (off ? [off] : []).concat(N.filter(n => n && n.id && n.title && !gone.has(n.id)).sort((a, b) => String(b.at).localeCompare(String(a.at))).map(n => {
     let when = ''; try { when = new Date(n.at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) { }
     const urgent = n.level === 'urgent';
     return { id: n.id, urgent, html: `<div class="row glnew pnrow${urgent ? ' pnurg' : ''}" data-pn="${esc(n.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('#power')"><div class="ic">${IC[n.kind] || '⚡'}</div><div class="tx"><div class="t">${esc(n.title)}</div>${n.body ? `<div class="s pnbody">${esc(n.body)}</div>` : ''}<div class="s">Power${when ? ' · ' + esc(when) : ''}</div></div></div>` };
-  });
+  }));
 }
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
@@ -19588,7 +19632,7 @@ function PowerPage() {
   const B = (d.bills || []).slice(-3);
   const bills = B.length ? `<div class="card pwrcard"><div class="pwrh">Last bills · Ecotricity</div><table class="pwrtbl"><tr><th>Month</th><th>kWh</th><th>Charges</th></tr>${B.map(b => `<tr><td>${esc(b.month)}</td><td>${(+b.kWh).toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</td><td>${pwrD(b.totalInclGST)}</td></tr>`).join('')}</table><div class="s pwrnote">That month’s charges, incl GST.</div></div>` : '';
   const tc = t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1), share = pwrBudget() / 7;
-  return pwrWrap(back + `<div class="pwrhero"><div class="amt">${pwrD(tc)}</div><div class="lbl">spent on power today so far</div><div class="cmp ${tc > share ? 'over' : ''}">Your daily share of ${pwrM(pwrBudget())} a week is ${pwrD(share)}</div><div class="upd">Updated ${esc(when)} NZDT · may be a few hours old</div></div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + pwrWeekCard(d.week) + pwrArrearsCard(d.arrears) + today + yest + month + year + bills +
+  return pwrWrap(back + `<div class="pwrhero"><div class="amt">${pwrD(tc)}</div><div class="lbl">spent on power today so far</div><div class="cmp ${tc > share ? 'over' : ''}">Your daily share of ${pwrM(pwrBudget())} a week is ${pwrD(share)}</div><div class="upd">Updated ${esc(when)} NZDT · may be a few hours old</div>${(() => { try { const b = pwrBandNow(), R = pwrRatesC(); return `<div class="band ${b.band}">${b.band === 'offpeak' ? '🌙' : b.band === 'peak' ? '⚡' : '☀️'} ${PWR_BAND_NAME[b.band]} until ${esc(b.untilTxt)} · ${R[b.band]}c a kWh</div>`; } catch (e) { return ''; } })()}</div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + pwrWeekCard(d.week) + pwrArrearsCard(d.arrears) + today + yest + month + year + bills +
     (d.tou ? `<div class="s pwrnote" style="margin:4px 6px 18px">Time-of-use estimates, incl GST: peak ${(d.tou.peak * 100).toFixed(1)}c, shoulder ${(d.tou.shoulder * 100).toFixed(1)}c, off-peak ${(d.tou.offpeak * 100).toFixed(1)}c a kWh, plus ${pwrD(d.tou.daily)} a day, less ${(d.tou.exportCredit * 100).toFixed(1)}c a kWh sent back. Peak is weekdays 7–9:30am and 5:30–8pm; weekends and public holidays have no peak. Ecotricity ecoZER0 plan.</div>` :
     '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>') + pwrDots(0));
 }
@@ -19642,8 +19686,9 @@ async function ecoBillMig() {
 function pwrBudget() { const v = +localStorage.getItem('pwrWeekBudget'); return v > 0 ? v : 60; }
 function pwrSettings() {
   openSheet('Power settings', field('Weekly power budget ($)', inp('budget', String(pwrBudget()), 'inputmode="decimal" placeholder="60"'), 'Ecotricity grid power and daily charges for 7 days. Not the SolarZero subscription.') +
+    field('Tell me when off-peak starts', sel('offpeak', [['', 'Off'], ['on', 'On, a phone notification at 10pm']], S.settings.offpeakPush ? 'on' : ''), 'Uses the same phone notifications as your reminders. Works even when the app is closed.') +
     `<p class="muted" style="margin:6px 2px 0">For app-wide settings, use Settings on the Home page.</p>`,
-    async v => { const n = Number(String(v.budget || '').replace(/[$,\s]/g, '')); if (!(n > 0) || n > 10000) return 'Please enter a dollar amount, like 60.'; localStorage.setItem('pwrWeekBudget', String(Math.round(n * 100) / 100)); closeSheet(); render(); });
+    async v => { const n = Number(String(v.budget || '').replace(/[$,\s]/g, '')); if (!(n > 0) || n > 10000) return 'Please enter a dollar amount, like 60.'; localStorage.setItem('pwrWeekBudget', String(Math.round(n * 100) / 100)); const want = v.offpeak === 'on'; if (!!S.settings.offpeakPush !== want) { S.settings.offpeakPush = want; await save(); if (want && Notification.permission !== 'granted') { try { await enableReminderPush(); } catch (e) { } } else { try { await scheduleReminders(); } catch (e) { } } if (want) toast(Notification.permission === 'granted' ? 'You’ll get a notification at 10pm when off-peak starts.' : 'Allow notifications to get the off-peak alert.'); } closeSheet(); render(); });
 }
 function pwrWeekCard(w) {
   if (!w || w.total == null) return '';
