@@ -1838,6 +1838,14 @@ html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color
 #glalerts .list>* .btn.primary,#glalerts .glwarn .btn.primary{color:var(--onbrand)!important}
 #glalerts .list>* .btn.danger,#glalerts .glwarn .btn.danger{background:#FEE2E2!important;color:#991B1B!important}
 /* 2.26.76: new since last look: blue edge, soft blue glow and a New pill; fades after about a minute (--newage = seconds already on the page) */
+/* 2.26.77: New today at the top, compact */
+#glalerts .glnewtop .row{padding:7px 12px !important;min-height:0 !important;gap:10px}
+#glalerts .glnewtop .row .ic{width:30px;height:30px;min-width:30px;font-size:18px}
+#glalerts .glnewtop .row .t{font-size:14.5px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#glalerts .glnewtop:not(.all) .row:nth-child(n+4){display:none}
+#glalerts .glnewlist:not(:has(.row:nth-child(4))) + .glnewmore{display:none}
+#glalerts .glnewmore{display:block;margin:4px 0 0 auto;padding:4px 6px;font-size:13px;font-weight:600}
+#glalerts .glnewtop .row .s{font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #glalerts .glisnew{position:relative}
 #glalerts .glisnew::after{content:'';position:absolute;inset:0;border-radius:14px;pointer-events:none;box-shadow:inset 5px 0 0 #2563EB,0 0 0 2px rgba(37,99,235,.6),0 4px 14px rgba(37,99,235,.4);background:rgba(37,99,235,.07);animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}
 html body #glalerts span.newpill,html body #glalerts .glisnew span.newpill{display:inline-block;background:#1D4ED8!important;color:#fff!important;font-size:.68rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:1px 7px;margin-right:6px;vertical-align:2px;animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}

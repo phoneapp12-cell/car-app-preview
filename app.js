@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.76';
+const APP_VERSION = '2.26.77';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20968,9 +20968,11 @@ glAlertsBody = function () {
     sec('Power <span class="glswipehint">swipe left to archive</span>', pwN.length ? `<div class="list">${pwN.map(x => x.html).join('')}</div>` : '') +
     sec('Put back <span class="glswipehint">swipe left to archive again</span>', arcPb().length ? `<div class="list">${arcPutBackRows()}</div>` : '') +
     sec('Reminders <span class="glswipehint">swipe left to archive</span>', rmL.length ? `<div class="list">${rmL.map(x => x.html).join('')}</div>` : '') +
-    mbSections(p.mb) +
-    sec('New today <span class="glswipehint">swipe left to archive</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
-  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + p.ab.length + p.mb.length + p.rm.length + arcPb().length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+    mbSections(p.mb);
+  // 2.26.77: New today sits at the very top (compact rows), above Flagged events, Urgent and Reminders
+  // first three show; the rest sit behind 'Show more' so Urgent stays near the top
+  const top = sec('New today <span class="glswipehint">swipe left to archive</span>', p.fresh.length ? `<div class="list glnewlist glnewtop${window.bellFreshAll ? ' all' : ''}">${p.fresh.join('')}</div>${p.fresh.length > 3 ? `<button class="linkbtn glnewmore" onclick="window.bellFreshAll=!window.bellFreshAll;const L=this.previousElementSibling;L.classList.toggle('all',window.bellFreshAll);this.textContent=window.bellFreshAll?'Show fewer':'Show ${p.fresh.length - 3} more'">${window.bellFreshAll ? 'Show fewer' : `Show ${p.fresh.length - 3} more`}</button>` : ''}` : '');
+  return top + (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + p.ab.length + p.mb.length + p.rm.length + arcPb().length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
 
 /* 2.26.48: In progress for car due items (WOF / rego / service). Stored per car+part with the due date it was for, so it clears itself when the date is renewed.
