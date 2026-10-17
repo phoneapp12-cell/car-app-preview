@@ -431,6 +431,22 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) { return json(502, 'shared_unavailable', origin, env); }
   }
+  if (path === '/power') { // 2.26.39: SolarZero power figures pushed from the box
+    const H = { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
+    if (request.method === 'GET') {
+      if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+      const d = env.EVENTS_KV ? await env.EVENTS_KV.get('power-v1') : null;
+      return new Response(d || '{}', { status: 200, headers: H });
+    }
+    if (request.method !== 'PUT' && request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
+    const tok = env.POWER_WRITE_TOKEN || '';
+    const got = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    if (!tok || got.length !== tok.length || got !== tok) return json(401, 'unauthorised', origin, env);
+    let body; try { const raw = await request.text(); if (raw.length > 20000) return json(413, 'too_large', origin, env); body = JSON.parse(raw); } catch (e) { return json(400, 'bad_request', origin, env); }
+    if (!body || typeof body !== 'object' || !body.updatedAt) return json(400, 'bad_request', origin, env);
+    await env.EVENTS_KV.put('power-v1', JSON.stringify(body));
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: H });
+  }
   if (path === '/reno') { // 2.26.25: Millesha's Renovation (own key, own list)
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);

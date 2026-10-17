@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.38';
+const APP_VERSION = '2.26.39';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6298,19 +6298,14 @@ function copyStepsFrom(src) {
   const out = src.steps.filter(x => x && String(x.text || '').trim()).map(x => ({ id: uid('step'), text: String(x.text).trim(), done: !!x.done }));
   return out.length ? out : null;
 }
-// 2.26.38: the renovation-style progress line (thin bar, '% done', 'x of y'), used anywhere with tickable items. Done items always count.
+// 2.26.39: the renovation-style progress line (thin bar, '% done', 'x of y'), used anywhere with tickable items. Done items always count.
 function progLine(done, total, what, cls) {
   total = Math.max(0, total | 0); done = Math.min(total, Math.max(0, done | 0)); if (!total) return '';
   const p = Math.round(done / total * 100);
   return `<div class="pgl${p === 100 ? ' pgfull' : ''}${cls ? ' ' + cls : ''}"><div class="pglt"><span>${what ? esc(what) : 'Progress'}</span><b>${p === 100 ? '🎉 ' : ''}${p}% done · ${done} of ${total}</b></div><div class="pgbar"><i style="width:${p}%"></i></div></div>`;
 }
-function todoListProg(f) { // All: today's window (due today or overdue, plus anything ticked today). A list: everything in it.
-  const L = (S.todos || []).filter(t => t && (f === 'All' || t.list === f)), td = todayISO();
-  if (f === 'All') {
-    const tod = t => t.done ? (t.doneAt && todayISO(new Date(t.doneAt)) === td) : (t.due && t.due <= td && !(typeof waterBlock === 'function' && waterBlock(t)));
-    const W = L.filter(tod);
-    if (W.length) return progLine(W.filter(t => t.done).length, W.length, 'Today');
-  }
+function todoListProg(f) { // 2.26.39: All = every to-do on every list, ticked out of total (ticked ones count even when hidden).
+  const L = (S.todos || []).filter(t => t && (f === 'All' || t.list === f));
   return progLine(L.filter(t => t.done).length, L.length, f === 'All' ? 'All lists' : f);
 }
 function todoStepsBlock(t, where) {
@@ -18238,7 +18233,7 @@ function tabbar(active) {
     return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
   };
   const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
-  const reno = (() => { try { return renoOn() ? `<div class="tabgrp g-reno"><button class="${active === 'reno' ? 'on' : ''}" onclick="setTabsOpen(false);go('#reno')"><span class="w"><span style="font-size:1.3rem;line-height:1">🛠️</span></span><span class="lbl">Renovation ${window.Reno ? Reno.progress() + '%' : ''}</span></button></div>` : ''; } catch (e) { return ''; } })() + (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`; return `<div class="tabgrp g-reno2">${b('mumreno', '👵', 'Mum’s Renovation')}${b('myreno', '🔨', 'My Renovations')}${b('weekend', '🌤️', 'Days off plan')}</div>`; })();
+  const reno = (() => { try { return renoOn() ? `<div class="tabgrp g-reno"><button class="${active === 'reno' ? 'on' : ''}" onclick="setTabsOpen(false);go('#reno')"><span class="w"><span style="font-size:1.3rem;line-height:1">🛠️</span></span><span class="lbl">Renovation ${window.Reno ? Reno.progress() + '%' : ''}</span></button></div>` : ''; } catch (e) { return ''; } })() + (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`; return `<div class="tabgrp g-reno2">${b('mumreno', '👵', 'Mum’s Renovation')}${b('myreno', '🔨', 'My Renovations')}${b('weekend', '🌤️', 'Days off plan')}${b('power', '⚡', 'Power')}</div>`; })();
   $('#tabbar').innerHTML = reno + groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
@@ -18265,7 +18260,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { power: PowerPage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19522,3 +19517,44 @@ glAlertsBody = function () {
     sec('New today <span class="glswipehint">swipe left to clear</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
   return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
+
+/* ================= 2.26.39: Power (SolarZero figures pushed to the relay from the box; Ecotricity ecoZER0 rates) ================= */
+let PWR = (() => { try { return JSON.parse(localStorage.getItem('powerCache') || 'null'); } catch (e) { return null; } })(), pwrBusy = false;
+const PWR_RATE = { importBlend: 0.15, daily: 3.22, exportCredit: 0.092 }; // incl GST; blended import is an estimate
+function pwrFetch() {
+  if (pwrBusy) return; pwrBusy = true;
+  fetch(RELAY_URL + '/power', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+    pwrBusy = false;
+    if (d && d.updatedAt && (!PWR || d.updatedAt !== PWR.updatedAt)) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (location.hash === '#power') render(); }
+  }).catch(() => { pwrBusy = false; });
+}
+function pwrCost(imp, exp, days) { const c = (+imp || 0) * PWR_RATE.importBlend + PWR_RATE.daily * (days || 1) - (+exp || 0) * PWR_RATE.exportCredit; return Math.max(0, c); }
+const pwrK = v => (v == null || isNaN(v)) ? '–' : (+v).toLocaleString('en-NZ', { maximumFractionDigits: 1 }) + ' kWh';
+const pwrD = v => '$' + (+v || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function pwrRows(r) { return '<div class="pwrrows">' + r.filter(Boolean).map(([a, b]) => `<div><span>${esc(a)}</span><b>${b}</b></div>`).join('') + '</div>'; }
+function PowerPage() {
+  setTimeout(pwrFetch, 0);
+  const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Power', 'Your house power, from SolarZero');
+  const d = PWR;
+  if (!d || !d.updatedAt) return back + '<div class="card empty"><div class="t">Loading power figures…</div><div class="s">Needs the internet the first time.</div></div>';
+  const t = d.today || {}, m = d.month || {}, y = d.year || {};
+  let when = ''; try { when = new Date(d.updatedAt).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) { when = d.updatedAt; }
+  const solarBar = (sol, used, lbl) => used ? progLine(Math.round(Math.min(sol, used) * 10), Math.round(used * 10), lbl).replace(/· \d+ of \d+/, '').replace('done', 'solar') : '';
+  const today = `<div class="card pwrcard"><div class="pwrh">Today${t.date ? ' · ' + esc(fmtW(t.date)) : ''}</div>` +
+    progLine(t.fromSolarPct || 0, 100, 'From solar', 'pgsm').replace(/· \d+ of \d+/, '').replace('done', 'solar') +
+    pwrRows([['Used', pwrK(t.usedKWh)], ['Solar made', pwrK(t.solarKWh)], ['From the grid', pwrK(t.gridImportKWh)], ['Sent back', pwrK(t.gridExportKWh)],
+      ['Mix', `${t.fromSolarPct ?? '–'}% solar · ${t.fromBatteryPct ?? '–'}% battery · ${t.fromGridPct ?? '–'}% grid`],
+      t.batteryPct != null ? ['Battery', t.batteryPct + '%'] : null, t.liveHomeKW != null ? ['House using now', t.liveHomeKW + ' kW'] : null,
+      ['Cost so far (estimate)', pwrD(pwrCost(t.gridImportKWh, t.gridExportKWh, 1))]]) + '</div>';
+  const days = m.days || (m.avgPerDayKWh ? Math.round(m.usedKWh / m.avgPerDayKWh) : 30);
+  const month = `<div class="card pwrcard"><div class="pwrh">This month · ${esc(m.label || '')}</div>` + solarBar(m.solarKWh || 0, m.usedKWh || 0, 'Solar share') +
+    pwrRows([['Used', pwrK(m.usedKWh)], ['Average a day', pwrK(m.avgPerDayKWh)], ['Solar made', pwrK(m.solarKWh)], ['From the grid', pwrK(m.gridImportKWh)], ['Sent back', pwrK(m.gridExportKWh)],
+      ['Cost so far (estimate)', pwrD(pwrCost(m.gridImportKWh, m.gridExportKWh, days))]]) + '</div>';
+  const year = `<div class="card pwrcard"><div class="pwrh">Year · ${esc(y.label || '')}</div>` + solarBar(y.solarKWh || 0, y.usedKWh || 0, 'Solar share') +
+    pwrRows([['Used', pwrK(y.usedKWh)], ['Solar made', pwrK(y.solarKWh)], y.costWithSolarNZD != null ? ['Cost with solar', pwrD(y.costWithSolarNZD)] : null,
+      y.previousRetailerCostNZD != null ? ['Would have cost', pwrD(y.previousRetailerCostNZD)] : null, y.savingsNZD != null ? ['Saved', pwrD(y.savingsNZD)] : null]) + '<div class="s pwrnote">Year figures from SolarZero’s savings report.</div></div>';
+  const B = (d.bills || []).slice(-3);
+  const bills = B.length ? `<div class="card pwrcard"><div class="pwrh">Last bills · Ecotricity</div><table class="pwrtbl"><tr><th>Month</th><th>kWh</th><th>Charges</th></tr>${B.map(b => `<tr><td>${esc(b.month)}</td><td>${(+b.kWh).toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</td><td>${pwrD(b.totalInclGST)}</td></tr>`).join('')}</table><div class="s pwrnote">That month’s charges, incl GST.</div></div>` : '';
+  return back + `<div class="pwrupd">Updated ${esc(when)} NZDT · figures may be a few hours old</div>` + today + month + year + bills +
+    '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>';
+}
