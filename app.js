@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.31';
+const APP_VERSION = '2.26.32';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19208,11 +19208,13 @@ function glEventHeads() {
    Uses Coming up (so nag items and the garden rule are already filtered); Busy calendar entries and sport are left out. */
 function glDueItems() {
   const out = [];
+  try { glDueItems.nl = new Set(nlItems().map(x => x.id)); } catch (e) { glDueItems.nl = null; }
   try {
     glCU().forEach(x => {
       const k = x.kind, d = x.days, name = String(x.name || x.html || '').replace(/<[^>]+>/g, ' ');
       if (!glOk(name) || /\bbusy\b/i.test(name)) return;
       const t = x.ref && x.ref.todo, hi = !!(t && t.priority === 'high');
+      if (t && glDueItems.nl && glDueItems.nl.has(t.id)) return;
       const ok = k === 'bill' || k === 'pay' || k === 'loan' ? d <= 1 : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? false : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
       if (!ok) return;
       let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
@@ -19228,6 +19230,17 @@ function glDueItems() {
     });
   } catch (e) { }
   return out;
+}
+// 2.26.32: anything newly added to any of Shane's lists (to-do lists incl. custom ones, shopping) is a priority on Notifications
+// until it's ticked done or swiped away. Only items added from this version on (or in the 24 hours before it) count, so old items don't flood in.
+function nlSince() { try { let v = +localStorage.getItem('nlSince'); if (!v) { v = Date.now() - 864e5; localStorage.setItem('nlSince', String(v)); } return v; } catch (e) { return Date.now() - 864e5; } }
+function nlDis() { try { return JSON.parse(localStorage.getItem('nlDismiss') || '[]'); } catch (e) { return []; } }
+function nlDismiss(id) { const L = nlDis().filter(Boolean); if (!L.includes(id)) L.push(id); try { localStorage.setItem('nlDismiss', JSON.stringify(L.slice(-400))); } catch (e) { } }
+function nlItems() {
+  const since = nlSince(), gone = new Set(nlDis()), out = [];
+  try { (S.todos || []).forEach(t => { if (t && !t.done && !isSarahTodo(t) && +t.created >= since && !gone.has(t.id) && t.title && glOk(t.title)) out.push({ id: t.id, title: t.title, where: '#todo', list: t.list || 'To-do', due: t.due || '', days: t.due ? daysLeft(t.due) : null }); }); } catch (e) { }
+  try { ((S.shop && S.shop.items) || []).forEach(x => { if (x && !x.done && !isSarahShop(x) && +x.created >= since && !gone.has(x.id) && x.name && !(x.meals && x.meals.length) && glOk(x.name)) out.push({ id: x.id, title: x.name, where: '#shopping', list: 'Shopping', due: '', days: null }); }); } catch (e) { }
+  return out.map(x => ({ ...x, urgent: x.days !== null && x.days <= 0, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div></div>` }));
 }
 function glSarahItems() {
   const out = [], since = Date.now() - 864e5;
@@ -19293,12 +19306,12 @@ function glNewItems() {
   return out;
 }
 function glSwipe(e) {
-  const el = e.target.closest && e.target.closest('.glnew'); if (!el) return;
+  const el = e.target.closest && e.target.closest('.glnew'); if (!el) return; // 2.26.32: also the 'new on your lists' cards (data-nl)
   const t0 = e.touches[0], x0 = t0.clientX, y0 = t0.clientY; let dx = 0, dir = '';
   glSwipe.moved = false;
   const mv = ev => { const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0; if (!dir && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) dir = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y'; if (dir !== 'x') return; ev.preventDefault(); glSwipe.moved = true; dx = Math.min(0, ddx); el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(1 + dx / 400); };
   const end = () => { el.removeEventListener('touchmove', mv); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.style.transition = 'transform .2s ease, opacity .2s ease';
-    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.querySelector('.glnew')) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
+    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; if (el.dataset.nl) nlDismiss(el.dataset.nl); else nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.querySelector('.glnew')) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
     else { el.style.transform = ''; el.style.opacity = ''; }
     setTimeout(() => { glSwipe.moved = false; }, 50); };
   el.addEventListener('touchmove', mv, { passive: false }); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
@@ -19306,17 +19319,19 @@ function glSwipe(e) {
 document.addEventListener('touchstart', glSwipe, { passive: true });
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems() };
+  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems() };
 }
-function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length; } catch (e) { return 0; } }
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length; } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
-  const dueU = p.dueUrgent.length || gU ? `<div class="list">${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
+  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent);
+  const dueU = p.dueUrgent.length || gU || nlU.length ? `<div class="list">${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
   const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
+    sec('New on your lists <span class="glswipehint">swipe left to clear</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
     sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
     sec('New today <span class="glswipehint">swipe left to clear</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
-  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
