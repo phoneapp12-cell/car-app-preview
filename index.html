@@ -1851,6 +1851,24 @@ html body #glalerts .abrego .chip{font-weight:650;background:#E0E7FF !important;
 #glalerts .glnewlist:not(:has(.row:nth-child(4))) + .glnewmore{display:none}
 #glalerts .glnewmore{display:block;margin:4px 0 0 auto;padding:4px 6px;font-size:13px;font-weight:600}
 #glalerts .glnewtop .row .s{font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 2.26.82: View email / Open PDF on anything matched to an email */
+.embtns{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px}
+.emhost{flex-wrap:wrap}
+.emhost>.embtns{flex-basis:100%;padding-left:52px}
+.embtns.emstrip{position:relative;z-index:0;padding:0 12px 12px 64px;background:var(--card,#fff);border-radius:0;margin:0}
+.emabove{position:relative;z-index:1}
+.emwrap{display:flex;flex-direction:column}
+.emwrap>.emabove{margin-bottom:0 !important}
+.emwrap>.embtns.emstrip{margin:0 !important}
+#glalerts .list>.emwrap{display:block;padding:0!important;overflow:hidden}
+#glalerts .emwrap>.emabove{display:flex;align-items:center;gap:10px;width:100%;background:transparent!important;border:0!important;border-left:0!important;box-shadow:none!important;border-radius:0!important;padding:12px 14px!important;margin:0!important}
+#glalerts .emwrap>.embtns.emstrip{margin:0!important;padding:0 14px 12px 64px!important;background:transparent!important}
+html body .embtns .btn.embtn,html body .mbbtns .btn.embtn{background:#E0E7FF !important;color:#1E3A8A !important;border:1px solid #A5B4FC !important;font-weight:650}
+html body .embtns .btn.embtn.empdf,html body .mbbtns .btn.embtn.empdf{background:#1D4ED8 !important;color:#fff !important;border-color:#1D4ED8 !important}
+#emview .emhead{padding:2px 2px 10px;border-bottom:1px solid rgba(0,0,0,.1);margin-bottom:10px}
+#emview .emsubj{font-weight:750;font-size:16px;line-height:1.3}
+#emview .emmeta{font-size:13px;opacity:.75;margin-top:2px;word-break:break-word}
+#emview .embody{white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.45;max-height:55vh;overflow:auto}
 #glalerts .glisnew{position:relative}
 #glalerts .glisnew::after{content:'';position:absolute;inset:0;border-radius:14px;pointer-events:none;box-shadow:inset 5px 0 0 #2563EB,0 0 0 2px rgba(37,99,235,.6),0 4px 14px rgba(37,99,235,.4);background:rgba(37,99,235,.07);animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}
 html body #glalerts span.newpill,html body #glalerts .glisnew span.newpill{display:inline-block;background:#1D4ED8!important;color:#fff!important;font-size:.68rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:1px 7px;margin-right:6px;vertical-align:2px;animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}

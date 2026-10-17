@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.81';
+const APP_VERSION = '2.26.82';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -307,8 +307,8 @@ function rowFor(x) {
   const body = `<div class="ic ${x.kind}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div><div class="badgestack">${cpT ? progPill(cpT) : duePill(x.days)}${cash}</div>`;
   // 1.82.0: a to-do in Upcoming or the overdue list can be marked done here. It stays on the to-do list.
   if (x.kind === 'todo' && x.todo) return `<div class="row"><button type="button" class="tick" aria-label="Mark complete: ${esc(x.title)}" onclick="tick('${x.todo.id}')"><span>${I('check')}</span></button><button type="button" class="tapzone" onclick="go('${x.go}')">${body}</button></div>`;
-  if (x.kind === 'car' && x.car) return `<button class="row${cpT ? ' inprog' : ''}" onclick="carDueSheet('${x.car.id}','${x.part}')">${body}</button>`;
-  return `<button class="row${cpT ? ' inprog' : ''}" onclick="go('${x.go}')">${body}</button>`;
+  if (x.kind === 'car' && x.car) return `<button ${x.part === 'rego' ? `data-rego="${esc(x.car.id)}" ` : ''}class="row${cpT ? ' inprog' : ''}" onclick="carDueSheet('${x.car.id}','${x.part}')">${body}</button>`;
+  return `<button ${x.kind === 'bill' && x.bill ? `data-bill="${esc(x.bill.id)}" ` : ''}class="row${cpT ? ' inprog' : ''}" onclick="go('${x.go}')">${body}</button>`;
 }
 /* 1.14.0: Home cards can be reordered and switched on or off (Home › Customise). Saved as settings.homeOrder / settings.homeHidden.
    Cards with nothing to show hide themselves. The reminder and install prompts always stay at the top. */
@@ -4742,7 +4742,7 @@ function Bills() {
   const showPay = S.bills.length > 0 || hasLoanPlans;
   const row = b => {
     const d = daysLeft(b.due);
-    return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}">${billIc(b.name)}
+    return `<div class="row bill" data-bill="${esc(b.id)}"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}">${billIc(b.name)}
       <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : (billAutoLast(b) ? 'next ' : '') + 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div>${billAutoTxt(b)}</div></button>
       <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
       ${billAutoLast(b) ? `<button class="paybtn" aria-label="Undo the bank match for ${esc(b.name)}" onclick="billAutoUndo('${b.id}')">Undo</button>` : ''}${b.paid ? (billAutoLast(b) ? '' : `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>`) : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
@@ -4781,7 +4781,7 @@ function Bills() {
           <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.cents / 100)}<button class="paybtn" aria-label="Record a payment: ${esc(name)}" onclick="payForm('${x.l.id}')">Rec</button></div></div>`;
       }
       const cur = x.d === x.b.due;
-      return `<div class="row bill payrow"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}">${billIc(x.b.name)}
+      return `<div class="row bill payrow" data-bill="${esc(x.b.id)}"><button class="tapzone" onclick="billForm('${x.b.id}')" aria-label="Edit ${esc(x.b.name)}">${billIc(x.b.name)}
         <div class="tx"><div class="t">${esc(x.b.name)}</div><div class="s">${x.late ? 'Overdue, was due ' : 'Due '}${fmtW(x.d)}${x.d === x.b.due && billInvoice(x.b) ? ' · ' + billInvoiceText(x.b) : ''}</div></div></button>
         <div class="right badgestack">${pp.off <= 0 || dl <= 7 ? duePill(dl) : ''}${moneyBadge(x.b.amount, x.b.name)}${cur ? `<button class="paybtn" onclick="markPaid('${x.b.id}')">Mark paid</button>` : ''}</div></div>`;
     };
@@ -4830,6 +4830,7 @@ function billForm(id, pre) {
     field('Comes out of', sel('from', billFromOpts(), billFromVal(b)), 'For Cash flow’s before-payday check. Auto uses where it was paid from before.') +
     field('Ends after (payments, counting the next one)', inp('endn', billLeft(b) || '', 'inputmode="numeric" maxlength="3" placeholder="Keeps going"'), b.lastDue ? 'Last one ' + fmtW(b.lastDue) + '.' : 'Leave blank if it doesn’t end. Only for repeating bills.') +
     field('Notes', area('notes', b.notes, 'e.g. account number, paid by direct debit')) +
+    (id ? (() => { const r = emBill(b); return r ? `<div class="embill"><div class="muted" style="font-size:13px;margin:0 2px 6px">From ${esc(r.name || r.from || 'email')}${r.at ? ', ' + esc(fmtW(emDay(r.at))) : ''}: ${esc(r.subject)}</div>${emBtns(r)}</div>` : ''; })() : '') +
     (id && billInvoice(b) ? `<p class="muted" id="billinv" style="margin:4px 2px 0">${billInvoice(b).label ? esc(billInvoice(b).label) : 'Invoice ' + esc(billInvoice(b).no)} from ${esc(billInvoice(b).from || 'the email')}${billInvoice(b).amount != null ? ', ' + money(billInvoice(b).amount) : ''}${billInvoice(b).invDue ? ', due ' + esc(billInvoice(b).invDue) : ''}. Taken from the email in Outlook.</p>` : ''),
     async v => {
       if (!v.name) return 'Please give the bill a name.';
@@ -5653,7 +5654,7 @@ function calItems(fromT, toT) {
   S.cars.forEach(c => {
     [['wof', 'WOF', 'WOF'], ['rego', 'rego', 'Rego'], ['svcDate', 'service', 'Service']].forEach(([k, l, L]) => { if (c[k] && inR(c[k])) ev.push({ src: 'due', title: `${c.name} ${l} due`, date: c[k], time: L, go: `go('#car/${c.id}')` }); });
   });
-  S.bills.forEach(b => billDates(b, fromT, toT).forEach(d => ev.push({ src: 'due', title: `${b.name} · ${money(b.amount)}`, date: d, time: 'Bill', go: `go('#bills')` })));
+  S.bills.forEach(b => billDates(b, fromT, toT).forEach(d => ev.push({ src: 'due', title: `${b.name} · ${money(b.amount)}`, date: d, time: 'Bill', go: `go('#bills')`, bid: b.id })));
   loanPlanInRange(fromT, toT).forEach(x => ev.push({ src: 'due', title: `Loan · ${x.l.from} · ${centsMoney(x.cents)}`, date: x.d, time: 'Loan', go: `go('#loan/${x.l.id}')` }));
   S.drivers.forEach(d => [['aaExpiry', 'AA membership expires', 'AA'], ['licExpiry', 'driver licence expires', 'Licence']].forEach(([k, l, L]) => { if (d[k] && inR(d[k])) ev.push({ src: 'due', title: `${d.name}’s ${l}`, date: d[k], time: L, go: `go('#driver/${d.id}')` }); }));
   S.todos.filter(t => !t.done && t.due && inR(t.due)).forEach(t => ev.push({ src: 'due', title: t.title, date: t.due, time: 'To-do', go: `go('#todo')` }));
@@ -5763,9 +5764,9 @@ function Calendar() {
      <div style="flex:1;min-width:0"><div class="t">${e.sarah ? sarahBadge({ from: 'sarah' }) : ''}${esc(e.title)}</div>${e.notes ? `<div class="s">${esc(e.notes)}</div>` : ''}</div><span class="tag ${e.src}" ${e.color ? `style="background:${e.color}"` : ''}>${esc(e.done ? 'Done' : (e.tag || (e.src === 'appt' ? 'Appt' : 'Due')))}</span>`;
     if (e.src === 'mine' && e.id && e.orig) {
       const act = e.done ? 'Mark not done' : 'Mark complete';
-      return `<div class="ev${ic ? ' evi' : ''}${e.done ? ' done' : ''}"><button type="button" class="tapzone" onclick="${e.go}">${inner}</button><button type="button" class="paybtn" aria-label="${act}: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})">${e.done ? 'Undo' : 'Done'}</button></div>`;
+      return `<div class="ev${ic ? ' evi' : ''}${e.done ? ' done' : ''}"${e.bid ? ` data-bill="${esc(e.bid)}"` : ''}><button type="button" class="tapzone" onclick="${e.go}">${inner}</button><button type="button" class="paybtn" aria-label="${act}: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})">${e.done ? 'Undo' : 'Done'}</button></div>`;
     }
-    return `<button class="ev${ic ? ' evi' : ''}${calHl && e.title === calHl ? ' hl' : ''}" onclick="${e.go}">${inner}</button>`;
+    return `<button ${e.bid ? `data-bill="${esc(e.bid)}" ` : ''}class="ev${ic ? ' evi' : ''}${calHl && e.title === calHl ? ' hl' : ''}" onclick="${e.go}">${inner}</button>`;
   };
   const dayLabel = s => { const d = daysLeft(s); return (d === 0 ? 'Today · ' : d === 1 ? 'Tomorrow · ' : '') + fmtW(s); };
   let agenda;
@@ -9563,7 +9564,7 @@ function budgetCard(b) {
     (M.otherIn ? `<div class="row"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Other money in</div><div class="s"><span class="fnst paid">Landed ✓</span> ${plural(M.otherInN, 'payment')} from the bank (board, refunds and so on)</div></div><b>${money(M.otherIn)}</b></div>` : '') ||
     `<div class="row"><div class="tx"><div class="t">Your wages</div><div class="s">Type this fortnight’s pay, or connect the bank in Cash flow</div></div><button class="btn small" onclick="budgetForm(${jsArg(b.id)})">Add</button></div>`;
   const ic = x => x.kind === 'card' ? '<div class="ic bill">💳</div>' : x.kind === 'orbit' ? `<div class="ic bill">${I('house')}</div>` : x.kind === 'loan' ? `<div class="ic bill">${I('coins')}</div>` : billIc(x.name);
-  const outRows = M.OUT.filter(x => x.kind !== 'mort' && x.kind !== 'line').map(x => `<div class="row"><button class="tapzone" onclick="${x.reg ? `regSheet(${jsArg(x.key)})` : `go('${x.go || (x.kind === 'bill' ? '#bills' : '#cashflow')}')`}">${x.reg ? '<div class="ic bill">🔁</div>' : ic(x)}<div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.reg ? 'Regular payment (detected)' + (x.varies ? ', varies' : '') + ' · ' : ''}${stTxt(x)}${x.acct && x.st !== 'paid' && fnAcctName(x.acct) ? ' · from ' + esc(fnAcctName(x.acct)) : ''}${x.goal ? ' · goal: pay it off in full' : ''}</div></div></button><b>${amt(x)}</b></div>`).join('');
+  const outRows = M.OUT.filter(x => x.kind !== 'mort' && x.kind !== 'line').map(x => `<div class="row"${x.kind === 'bill' && x.id ? ` data-bill="${esc(x.id)}"` : ''}><button class="tapzone" onclick="${x.reg ? `regSheet(${jsArg(x.key)})` : `go('${x.go || (x.kind === 'bill' ? '#bills' : '#cashflow')}')`}">${x.reg ? '<div class="ic bill">🔁</div>' : ic(x)}<div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${x.reg ? 'Regular payment (detected)' + (x.varies ? ', varies' : '') + ' · ' : ''}${stTxt(x)}${x.acct && x.st !== 'paid' && fnAcctName(x.acct) ? ' · from ' + esc(fnAcctName(x.acct)) : ''}${x.goal ? ' · goal: pay it off in full' : ''}</div></div></button><b>${amt(x)}</b></div>`).join('');
   const mStat = n => { const x = M.OUT.find(y => y.kind === 'mort' && y.n === n); return x ? stTxt(x) + (x.st === 'paid' && Math.abs(x.amount - x.planned) >= 0.01 ? ' · bank ' + money(x.amount) : '') : ''; };
   const mortRows = k.mortgages.map((x, n) => `<div class="row"><div class="ic bill">${I('house')}</div><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${mStat(n) || (x.carried ? '<span class="carrytag" style="margin-left:0">Carried forward</span> type to change' : 'Type this fortnight’s amount')}${x.carried && mStat(n) ? ' · carried forward' : ''}${x.set && x.base > 0 && x.base !== x.eff ? ` · <button type="button" class="linkbtn" onclick="budgetMortgageReset(${jsArg(b.id)},${n})">Reset to ${money(x.base)}</button>` : ''}</div></div>
       <div class="moneyin" style="max-width:120px;margin:0"><span>$</span><input inputmode="decimal" placeholder="0.00" autocomplete="off" value="${centsIn(Math.round((x.eff || 0) * 100))}" aria-label="${esc(x.name)} amount${x.carried ? ' (carried forward)' : ''}" onchange="budgetMortgageSet(${jsArg(b.id)},${n},this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"></div></div>`).join('');
@@ -15607,6 +15608,7 @@ async function refreshMb(force) {
     const seen = new Map(); parts.flat().filter(Boolean).forEach(m => { const k = m.src + ':' + m.id, o = seen.get(k); if (!o) seen.set(k, m); else { o.qs = (o.qs || [o.q]).concat(m.q); if (m.text.length > o.text.length) o.text = m.text; o.track = o.track || m.track; o.olink = o.olink || m.olink; } });
     mbAt = Date.now(); const had = JSON.stringify(MB && MB.msgs); MB = { at: mbAt, msgs: [...seen.values()].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 160) };
     await kvSet('mailBell', MB).catch(() => { });
+    try { emLinkAll(); } catch (e) { } // 2.26.82
     if (had !== JSON.stringify(MB.msgs)) { if (location.hash === '#alerts' && !sheetOpen) render(); else glBellRedraw(); }
   } finally { mbBusy = false; }
 }
@@ -15685,8 +15687,8 @@ const mbAge = at => { const t = Date.parse(at); return t ? (Date.now() - t) / 86
 const mbToday = at => { try { return new Date(at).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }) === todayISO(); } catch (e) { return false; } };
 let MB_REG = {};
 function mbOpen(k) { if (glSwipe.moved) return; const r = MB_REG[k]; if (r && r.url) window.open(r.url, '_blank', 'noopener'); }
-async function mbPdf(k) {
-  const r = MB_REG[k]; if (!r || !r.m) return; const m = r.m;
+async function mbPdf(k) { const r = MB_REG[k]; if (!r || !r.m) return; return mbPdfOf(r.m, r.biller); }
+async function mbPdfOf(m, nm) { const r = { biller: nm || m.name || 'bill' };
   try {
     let blob = null;
     if (m.src === 'ms') {
@@ -15704,8 +15706,9 @@ async function mbPdf(k) {
   } catch (e) { toast(navigator.onLine === false ? 'You’re offline. Try again with signal.' : 'Couldn’t open the PDF just now, so here’s the email.'); try { window.open(m.link, '_blank', 'noopener'); } catch (e2) { } }
 }
 function mbAddBill(k) { const r = MB_REG[k]; if (!r) return; billForm(null, { name: r.biller, amount: r.amount != null ? r.amount : '', due: r.due || '', repeat: 'none', notes: 'From email, received ' + fmtW(String(r.m.at).slice(0, 10)) }); }
-function mbRow(k, ic, title, sub, extra, url, cls = '') {
+function mbRow(k, ic, title, sub, extra, url, cls = '', m) {
   MB_REG[k] = Object.assign(MB_REG[k] || {}, { url });
+  if (m && m.id && !/emView\(/.test(extra || '')) { const b = emBtns(emRefOf(m)); extra = extra && /class="mbbtns"/.test(extra) ? extra.replace(/<\/div>$/, b.replace(/^<div class="embtns[^"]*">/, '').replace(/<\/div>$/, '') + '</div>') : (extra || '') + b; } // 2.26.82
   return `<div class="row glnew mbrow ${cls}" data-mb="${esc(k)}" role="button" tabindex="0" onclick="mbOpen(this.dataset.mb)"><div class="ic">${ic}</div><div class="tx"><div class="t">${title}</div><div class="s">${sub}</div>${extra || ''}</div></div>`;
 }
 function mbSteps(st) { const n = Math.min(4, st); return `<div class="mbsteps">${['Ordered', 'Shipped', 'Out for delivery', 'Delivered'].map((x, i) => `<span class="${i < n ? 'on' : ''}${i === n - 1 ? ' cur' : ''}">${x}</span>`).join('')}</div>`; }
@@ -15732,7 +15735,7 @@ function mbItems() {
       const btn = `<div class="mbbtns"><button type="button" class="btn small" onclick="event.stopPropagation();window.open(MB_REG['${esc(key)}'].url,'_blank','noopener')">${g.track ? 'Track' : g.olink ? 'View order' : 'Open email'}</button></div>`;
       const ed = g.est && g.est[0] ? daysLeft(g.est[0]) : null;
       add({ sec: 'dl', key, urgent: g.st === 3 || g.delayed, coming: g.st === 2 && ed != null && ed <= 1, badge: g.st === 3 || mbToday(g.last.at), at: g.last.at,
-        html: mbRow(key, g.st === 4 ? '✅' : g.st === 3 ? '🚚' : '📦', esc(g.shop || g.carrier || 'Parcel') + (g.st === 3 ? ' · out for delivery today' : ''), sub, (g.st <= 4 ? mbSteps(g.delayed ? Math.max(1, g.st) : g.st) : '') + btn, url, g.delayed ? 'mburg' : '') });
+        html: mbRow(key, g.st === 4 ? '✅' : g.st === 3 ? '🚚' : '📦', esc(g.shop || g.carrier || 'Parcel') + (g.st === 3 ? ' · out for delivery today' : ''), sub, (g.st <= 4 ? mbSteps(g.delayed ? Math.max(1, g.st) : g.st) : '') + btn, url, g.delayed ? 'mburg' : '', g.last) });
     });
   } catch (e) { }
   // Click & collect: latest email per order wins
@@ -15743,7 +15746,7 @@ function mbItems() {
       const age = mbAge(g.m.at); if ((g.status === 'Collected' || g.status === 'Cancelled') && age > 1) return; if (g.status === 'Ordered' && age > 14) return; if (g.status === 'Ready to collect' && age > 14) return;
       const key = 'cc|' + g.store + '|' + g.order + '|' + g.status, later = g.pickup && daysLeft(g.pickup) > 0;
       add({ sec: 'cc', key, urgent: g.status === 'Ready to collect' && !later, coming: g.status === 'Ready to collect' && later, badge: g.status === 'Ready to collect' || mbToday(g.m.at), at: g.m.at,
-        html: mbRow(key, g.status === 'Ready to collect' ? '🛍️' : g.status === 'Collected' ? '✅' : g.status === 'Cancelled' ? '✖️' : '🧾', esc(g.store) + ' · ' + esc(g.status), ['Click & collect', 'Order ' + esc(g.order), g.pickup ? 'Pick up ' + esc(fmtW(g.pickup)) : '', esc(ago(Date.parse(g.m.at)))].filter(Boolean).join(' · '), '', g.m.link) });
+        html: mbRow(key, g.status === 'Ready to collect' ? '🛍️' : g.status === 'Collected' ? '✅' : g.status === 'Cancelled' ? '✖️' : '🧾', esc(g.store) + ' · ' + esc(g.status), ['Click & collect', 'Order ' + esc(g.order), g.pickup ? 'Pick up ' + esc(fmtW(g.pickup)) : '', esc(ago(Date.parse(g.m.at)))].filter(Boolean).join(' · '), '', g.m.link, '', g.m) });
     });
   } catch (e) { }
   // Bills by email (Ecotricity bills that already have a Power notice aren't repeated)
@@ -15760,8 +15763,8 @@ function mbItems() {
       const d = b.due ? daysLeft(b.due) : null; if (d == null && mbAge(m.at) > 14) return; if (d != null && d < -21) return;
       const key = 'bill|' + m.src + ':' + m.id; MB_REG[key] = { m, biller: b.biller, amount: b.amount, due: b.due };
       const sub = [b.amount != null ? '$' + b.amount.toFixed(2) : '', b.due ? (d < 0 ? 'was due ' + fmtW(b.due) : d === 0 ? 'due today' : 'due ' + fmtW(b.due)) : '', 'received ' + esc(fmtW(String(m.at).slice(0, 10)))].filter(Boolean).join(' · ');
-      const btns = `<div class="mbbtns"><button type="button" class="btn small primary" onclick="event.stopPropagation();mbPdf('${esc(key)}')">${m.att ? 'Open PDF' : 'Open email'}</button>${mt ? `<button type="button" class="btn small" onclick="event.stopPropagation();go('#bills')">In Bills: ${esc(mt.name)}</button>` : `<button type="button" class="btn small" onclick="event.stopPropagation();mbAddBill('${esc(key)}')">Add bill</button>`}</div>`;
-      add({ sec: 'bill', key, urgent: d != null && d <= 3, coming: d != null && d > 3 && d <= 14, badge: mbToday(m.at), at: m.at, html: mbRow(key, '🧾', esc(b.biller), sub, btns, m.link, d != null && d < 0 ? 'mburg' : '') });
+      const btns = `<div class="mbbtns">${emBtns(emRefOf(m)).replace(/^<div class="embtns[^"]*">/, '').replace(/<\/div>$/, '')}${mt ? `<button type="button" class="btn small" onclick="event.stopPropagation();go('#bills')">In Bills: ${esc(mt.name)}</button>` : `<button type="button" class="btn small" onclick="event.stopPropagation();mbAddBill('${esc(key)}')">Add bill</button>`}</div>`;
+      add({ sec: 'bill', key, urgent: d != null && d <= 3, coming: d != null && d > 3 && d <= 14, badge: mbToday(m.at), at: m.at, html: mbRow(key, '🧾', esc(b.biller), sub, btns, m.link, d != null && d < 0 ? 'mburg' : '', m) });
     });
   } catch (e) { }
   // Everyday Rewards: the same Countdown offers as the Home card
@@ -15777,7 +15780,7 @@ function mbItems() {
     const seenG = new Set();
     msgs.forEach(m => { const g = mbGfInfo(m); if (!g) return; try { if (m.att && mbBillInfo(m)) return; } catch (e) { } const key = 'gf|' + m.src + ':' + m.id; if (seenG.has(m.subject)) return; seenG.add(m.subject);
       add({ sec: 'gf', key, urgent: false, coming: false, badge: mbToday(m.at), at: m.at,
-        html: mbRow(key, '🌾', esc(g.who) + ': ' + esc(m.subject.slice(0, 90)), [g.line ? esc(g.line) : '', (g.ev ? '📅 ' + esc(fmtW(g.ev)) + ' · ' : '') + esc(fmtW(String(m.at).slice(0, 10)))].filter(Boolean).join('<br>'), '', m.link) }); });
+        html: mbRow(key, '🌾', esc(g.who) + ': ' + esc(m.subject.slice(0, 90)), [g.line ? esc(g.line) : '', (g.ev ? '📅 ' + esc(fmtW(g.ev)) + ' · ' : '') + esc(fmtW(String(m.at).slice(0, 10)))].filter(Boolean).join('<br>'), '', m.link, '', m) }); });
   } catch (e) { }
   return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
 }
@@ -20009,7 +20012,7 @@ function cfMain(D) { const L = D.accounts.filter(a => cfSpendable(a)); const id 
 function cfPlan(D, pp) {
   // 2.26.64: exactly Budget's "still to come" list for this fortnight (one engine, fnModel)
   const T = todayISO(), main = cfMain(D), M = fnModel(fnBudgetFor(pp)), ok = id => D.accounts.some(a => a.id === id && cfSpendable(a));
-  const out = (M ? M.toCome : []).map(x => ({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date > pp.end ? pp.end : x.date, acct: ok(x.acct) ? x.acct : main && main.id, card: x.kind === 'card', st: x.st, reg: x.reg, key: x.key }));
+  const out = (M ? M.toCome : []).map(x => ({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date > pp.end ? pp.end : x.date, acct: ok(x.acct) ? x.acct : main && main.id, card: x.kind === 'card', st: x.st, reg: x.reg, key: x.key, bid: x.kind === 'bill' ? x.id : '' }));
   out.sort((a, b) => a.date.localeCompare(b.date));
   const accts = D.accounts.filter(cfSpendable).map(a => { let bal = cfBal(a), min = bal, low = null; out.filter(o => o.acct === a.id).forEach(o => { bal = Math.round((bal - o.amount) * 100) / 100; if (bal < min) { min = bal; } if (bal < 0 && !low) low = o; }); return { a, now: cfBal(a), end: bal, min, low }; });
   const tips = [];
@@ -20042,7 +20045,7 @@ function cfBody(M) {
     const FM = fnModel(fnBudgetFor(pp)), P = cfPlan(D, pp), nm = id => { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : 'unknown account'; };
     sum = `<div class="card fnsum"><div class="fnsumt">${fnSummary(FM)}</div><button type="button" class="linkbtn" onclick="go('#budget')">See plan ›</button></div>`;
     proj = `<div class="sec">Still to come before payday · ${esc(fmtW(pp.next))}</div>` +
-      (P.out.length ? `<div class="list cfout">${P.out.map(o => `<div class="row"${o.reg ? ` role="button" onclick="regSheet(${jsArg(o.key)})"` : ''}><div class="tx"><div class="t">${esc(o.what)}</div><div class="s">${o.reg ? 'Regular payment (detected) · ' : ''}${o.st === 'overdue' ? '<span class="fnst over">Overdue</span> · ' : o.st === 'about' ? '<span class="fnst about">About</span> · ' : ''}${esc(fmtW(o.date))} · from ${esc(nm(o.acct))}</div></div><b class="cfamt">${cfMoney(-o.amount)}</b></div>`).join('')}<div class="row fntot"><div class="tx"><div class="t">Still to pay</div><div class="s">Same list as the plan in Budget</div></div><b class="cfamt">${cfMoney(-FM.toPay)}</b></div></div>` : `<div class="card muted">Nothing left to pay before payday.</div>`) +
+      (P.out.length ? `<div class="list cfout">${P.out.map(o => `<div class="row"${o.bid ? ` data-bill="${esc(o.bid)}"` : ''}${o.reg ? ` role="button" onclick="regSheet(${jsArg(o.key)})"` : ''}><div class="tx"><div class="t">${esc(o.what)}</div><div class="s">${o.reg ? 'Regular payment (detected) · ' : ''}${o.st === 'overdue' ? '<span class="fnst over">Overdue</span> · ' : o.st === 'about' ? '<span class="fnst about">About</span> · ' : ''}${esc(fmtW(o.date))} · from ${esc(nm(o.acct))}</div></div><b class="cfamt">${cfMoney(-o.amount)}</b></div>`).join('')}<div class="row fntot"><div class="tx"><div class="t">Still to pay</div><div class="s">Same list as the plan in Budget</div></div><b class="cfamt">${cfMoney(-FM.toPay)}</b></div></div>` : `<div class="card muted">Nothing left to pay before payday.</div>`) +
       `<div class="sec">Can each account cover it?</div>` +
       (P.tips.length ? `<div class="card cftips">${xferHas(D) ? `<div class="cftip">↔︎ Some accounts are short before money lands. “Transfers to make” at the top has the list, with dates that allow for when pay lands.</div>` : P.tips.map(t => `<div class="cftip">↔︎ ${esc(t)}</div>`).join('')}</div>` : '') +
       `<div class="list">${P.accts.filter(x => x.now !== x.end || x.min < 0).map(x => `<div class="row cfrow${x.min < 0 ? ' cflow' : ''}"><div class="tx"><div class="t">${esc(cfAName(x.a))}</div><div class="s">${x.min < 0 ? (cfIsOrbit(x.a) ? `⚠️ Over the limit on ${esc(fmtW(x.low.date))} (${esc(x.low.what)})` : `⚠️ Goes below $0 on ${esc(fmtW(x.low.date))} (${esc(x.low.what)})`) : cfIsOrbit(x.a) ? 'Free to draw stays above $0' : 'Covers it'}</div></div><b class="cfamt${x.end < 0 ? ' neg' : ''}">${cfMoney(x.now)} → ${cfMoney(x.end)}</b></div>`).join('') || `<div class="row"><div class="tx"><div class="t">Nothing else due before payday</div></div></div>`}</div>`;
@@ -21071,7 +21074,7 @@ function abItems() {
   const add = (key, type, d, urgent, title, sub, pre, icon) => {
     if (gone.has(key) || linked.has(key)) return;
     AB_REG[key] = Object.assign({ repeat: 'none', paidBy: '', amount: abLastAmt(type), link: key, linkType: type }, pre);
-    out.push({ key, days: d, urgent, html: `<div class="row glnew abrow" data-ab="${esc(key)}"><div class="ic bill">${icon}</div><div class="tx"><div class="t">Add a bill to your Budget?</div><div class="s">${title} · ${sub}</div>` +
+    out.push({ key, days: d, urgent, html: `<div class="row glnew abrow" data-ab="${esc(key)}"${pre && pre.rego ? ` data-rego="${esc(pre.rego.car)}"` : ''}><div class="ic bill">${icon}</div><div class="tx"><div class="t">Add a bill to your Budget?</div><div class="s">${title} · ${sub}</div>` +
       (pre && pre.rego ? (() => { const F = regoFees(getCar(pre.rego.car)); return `<div class="chips abrego">${[3, 6, 12].map(m => `<button type="button" class="chip" onclick="event.stopPropagation();if(!glSwipe.moved)abRego('${esc(key)}',${m})">${m} months ${money(F[m])}</button>`).join('')}</div><div class="s abregonote">${regoFeeNote()}</div>`; })() : '') +
       `<div class="abbtns"><button type="button" class="btn primary small" onclick="event.stopPropagation();if(!glSwipe.moved)abAdd('${esc(key)}')">Add bill</button><button type="button" class="btn small" onclick="event.stopPropagation();if(!glSwipe.moved)abNotNow('${esc(key)}',this.closest('.glnew'))">Not now</button></div></div></div>` });
   };
@@ -21113,6 +21116,94 @@ async function pnu312Mig() {
   if (!carProg(c, 'wof')) carProgAll()[c.id + '|wof'] = { due: c.wof, at: Date.now(), insp: '2026-10-16', fixes: [] };
   await save(); return `${c.name} WOF marked in progress · recheck by ${fmtW(addDays('2026-10-16', 28))}`;
 }
+
+/* ================= 2.26.82: EMAIL LINKS EVERYWHERE =================
+   Anything matched to an email keeps a small reference (mailbox, message id, subject, sender, date, has a PDF). Wherever that item shows,
+   'View email' opens a read-only view in the app and 'Open PDF' opens the attachment, both read straight from the mailbox with the
+   phone's own sign-in (the same path as Open PDF before). Nothing goes through the relay; no tokens are shown or stored. */
+const EM_REG = {};
+const emDay = at => { try { return new Date(at).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }); } catch (e) { return String(at).slice(0, 10); } };
+const emKey = r => r.src + ':' + r.id;
+function emRefOf(m) { return m && m.id && m.src ? { src: m.src, id: m.id, at: m.at || '', subject: String(m.subject || '').slice(0, 160), from: m.from || '', name: m.name || '', att: !!m.att, pdf: m.pdf || null, link: m.link || '' } : null; }
+function emBtns(r, cls) { if (!r) return ''; const k = emKey(r); EM_REG[k] = r; const g = "if(window.glSwipe&&glSwipe.moved)return;";
+  const lt = 'background:#E0E7FF !important;color:#1E3A8A !important;border:1px solid #A5B4FC !important;font-weight:650', dk = 'background:#1D4ED8 !important;color:#fff !important;border:1px solid #1D4ED8 !important;font-weight:650';
+  return `<div class="embtns ${cls || ''}"><button type="button" class="btn small embtn" style="${lt}" onclick="event.stopPropagation();event.preventDefault();${g}emView('${esc(k)}')">View email</button>${r.att ? `<button type="button" class="btn small embtn empdf" style="${dk}" onclick="event.stopPropagation();event.preventDefault();${g}emPdf('${esc(k)}')">Open PDF</button>` : ''}</div>`; }
+function emPdf(k) { const r = EM_REG[k]; if (r) mbPdfOf(r, r.name || 'bill'); }
+const emMsgs = () => (MB && Array.isArray(MB.msgs) ? MB.msgs : []);
+// a bill's email, only while it's for this due date (a paid one-off keeps it)
+function emBill(b) { const r = b && b.email; return r && r.id && (r.forDue === b.due || b.paid) ? r : null; }
+// the NZTA rego reminder for a car (subject names the plate)
+function emRego(carId) { const c = getCar(carId), p = billPlate(c); if (!p) return null; const m = emMsgs().filter(m => /nzta|transport agency|waka kotahi/i.test(m.from + ' ' + m.name) && String(m.subject || '').toUpperCase().replace(/\s/g, '').includes(p)).sort((a, b) => String(b.at).localeCompare(String(a.at)))[0];
+  if (m) return emRefOf(m); const bl = (S.bills || []).find(b => b && b.linkType === 'car|' + carId + '|rego' && !b.paid); return bl ? emBill(bl) : null; }
+function emBillScore(bill, m, info) {
+  const nm = info.biller + ' ' + (m.name || '') + ' ' + (m.from || '');
+  let p = 0; try { p = payeeScore(bill.name, nm); } catch (e) { p = 0; }
+  if (!p && /kora/i.test(bill.name) && /kora/i.test(nm)) p = 2; if (!p && /ecotricity/i.test(bill.name) && /ecotricity/i.test(nm)) p = 2;
+  if (!p) return 0;
+  const amt = +bill.amount || 0, amtOk = info.amount != null && amt > 0 && Math.abs(info.amount - amt) <= 0.01, dueOk = !!info.due && info.due === bill.due;
+  const inv = bill.invoice && bill.invoice.no, invOk = !!inv && (m.subject + ' ' + m.text).includes(String(inv));
+  const vary = (() => { try { return billVaries(bill) || /kora|ecotricity|power/i.test(bill.name); } catch (e) { return false; } })() && mbAge(m.at) <= 40; // varying bills (power, fuel card): the latest bill email from them
+  if (!(amtOk || dueOk || invOk || vary)) return 0;
+  return p * 10 + (amtOk ? 5 : 0) + (dueOk ? 5 : 0) + (invOk ? 10 : 0) + (String(m.at) > '' ? 0 : 0);
+}
+// match bills to their emails (new ones and, once, every existing bill). Returns the names linked this time.
+function emLinkAll() {
+  const msgs = emMsgs(); if (!msgs.length || !Array.isArray(S.bills)) return [];
+  const B = msgs.map(m => { let info = null; try { info = mbBillInfo(m); } catch (e) { } return info ? { m, info } : null; }).filter(Boolean).sort((a, b) => String(b.m.at).localeCompare(String(a.m.at)));
+  const used = new Set(S.bills.map(b => emBill(b)).filter(Boolean).map(emKey)), linked = [];
+  S.bills.forEach(b => {
+    if (!b || emBill(b) || (b.paid && b.email)) return;
+    let best = null, bs = 0;
+    const k = (() => { try { return billKind(b); } catch (e) { return null; } })();
+    if (k && k.kind === 'rego' && k.car) { const r = emRego(k.car); if (r && !used.has(emKey(r))) { best = r; bs = 99; } }
+    if (!best) B.forEach(x => { const sc = emBillScore(b, x.m, x.info); if (sc > bs && !used.has(x.m.src + ':' + x.m.id)) { bs = sc; best = emRefOf(x.m); } });
+    if (!best) return;
+    used.add(emKey(best)); b.email = Object.assign(best, { forDue: b.due }); linked.push(String(b.name || 'A bill').slice(0, 40));
+  });
+  if (linked.length) {
+    if (!S.settings.emLinkNote) { S.settings.emLinkNote = todayISO(); const L = (S.settings.appNotices || []).slice();
+      L.push({ id: 'emlink-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Linked to their emails: ' + linked.slice(0, 10).join(', ') + (linked.length > 10 ? ' and ' + (linked.length - 10) + ' more' : ''), body: 'View email and Open PDF now show on these wherever they appear.' });
+      S.settings.appNotices = L.slice(-30); }
+    save(); }
+  return linked;
+}
+// read one email, read-only, from the mailbox
+function emPlain(html) { try { const d = new DOMParser().parseFromString(String(html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|tr|li|h\d|table)>/gi, '\n'), 'text/html'); d.querySelectorAll('style,script,head,title').forEach(x => x.remove()); return String(d.body ? d.body.textContent : '').replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n\s*\n\s*\n+/g, '\n\n').trim(); } catch (e) { return ''; } }
+async function emView(k) {
+  const r = EM_REG[k]; if (!r) return; const prov = r.src === 'ms' ? 'microsoft' : 'google';
+  const ext = r.link ? `<a class="btn" href="${esc(r.link)}" target="_blank" rel="noopener">Open in ${r.src === 'ms' ? 'Outlook' : 'Gmail'}</a>` : '';
+  openSheet('Email', `<div id="emview"><p class="muted">Loading the email…</p></div>`, null, '', (r.att ? `<button type="button" class="btn primary" onclick="emPdf('${esc(k)}')">Open PDF</button>` : '') + ext);
+  const put = h => { const el = document.getElementById('emview'); if (el) el.innerHTML = h; };
+  if (!mailConnected(prov)) { put(`<p class="muted">${r.src === 'ms' ? 'Outlook' : 'Gmail'} isn’t connected on this phone, so the email can’t be read here.</p>`); return; }
+  try {
+    let subj = r.subject, from = r.name ? r.name + (r.from ? ' <' + r.from + '>' : '') : r.from, at = r.at, body = '';
+    if (r.src === 'ms') {
+      const d = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(r.id) + '?$select=subject,from,receivedDateTime,body,bodyPreview');
+      subj = d.subject || subj; const f = d.from && d.from.emailAddress; if (f) from = (f.name ? f.name + ' ' : '') + '<' + (f.address || '') + '>'; at = d.receivedDateTime || at;
+      body = d.body && d.body.content ? (/html/i.test(d.body.contentType || '') ? emPlain(d.body.content) : String(d.body.content)) : (d.bodyPreview || '');
+    } else {
+      const g = await mbAuthGet('google', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(r.id) + '?format=full');
+      const h = n => (((g.payload && g.payload.headers) || []).find(x => x.name.toLowerCase() === n) || {}).value || '';
+      const dec = s => { const b = atob(String(s).replace(/-/g, '+').replace(/_/g, '/')); return new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); };
+      let txt = '', html = ''; const walk = p => { if (!p) return; if (p.body && p.body.data) { if (!txt && p.mimeType === 'text/plain') txt = dec(p.body.data); if (!html && p.mimeType === 'text/html') html = dec(p.body.data); } (p.parts || []).forEach(walk); }; walk(g.payload);
+      subj = h('subject') || subj; from = h('from') || from; at = g.internalDate ? new Date(Number(g.internalDate)).toISOString() : at; body = txt || emPlain(html) || g.snippet || '';
+    }
+    let when = ''; try { when = new Date(at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { when = at; }
+    put(`<div class="emhead"><div class="emsubj">${esc(subj || '(no subject)')}</div><div class="emmeta">From ${esc(from || '')}</div><div class="emmeta">${esc(when)}</div></div><div class="embody">${esc(String(body).slice(0, 20000))}</div>`);
+  } catch (e) { put(`<p class="muted">${navigator.onLine === false ? 'You’re offline. Try again with signal.' : 'Couldn’t read that email just now.'}</p>`); }
+}
+// add the buttons to any row that names a bill (data-bill) or a car's rego (data-rego), wherever it shows
+function emDecorate(root) {
+  try { (root || document).querySelectorAll('[data-bill]:not([data-emd]),[data-rego]:not([data-emd])').forEach(el => {
+    let r = null; if (el.dataset.bill) { const b = (S.bills || []).find(x => x && x.id === el.dataset.bill); r = emBill(b); } else if (el.dataset.rego) r = emRego(el.dataset.rego);
+    if (!r) return; el.setAttribute('data-emd', '1');
+    const box = document.createElement('div'); box.innerHTML = emBtns(r); const btns = box.firstElementChild;
+    if (el.tagName === 'BUTTON' || el.tagName === 'A') { btns.classList.add('emstrip'); const cs = getComputedStyle(el); if (cs.backgroundImage && cs.backgroundImage !== 'none') btns.style.backgroundImage = cs.backgroundImage; if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') btns.style.backgroundColor = cs.backgroundColor; if (parseFloat(cs.borderLeftWidth) > 0) btns.style.borderLeft = cs.borderLeftWidth + ' ' + cs.borderLeftStyle + ' ' + cs.borderLeftColor; el.classList.add('emabove'); const w = document.createElement('div'); w.className = 'emwrap'; el.parentNode.insertBefore(w, el); w.appendChild(el); w.appendChild(btns); }
+    else { el.classList.add('emhost'); const tx = el.querySelector(':scope > .tx'); (tx || el).appendChild(btns); }
+  }); } catch (e) { }
+}
+(() => { let q = 0; const run = () => { q = 0; emDecorate(document); }; try { new MutationObserver(() => { if (!q) q = requestAnimationFrame(run); }).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { } })();
+setTimeout(async () => { try { if (!MB) await loadMb(); if (MB) { emLinkAll(); emDecorate(document); } } catch (e) { } }, 3500);
 /* ================= 2.26.39: Power (SolarZero figures pushed to the relay from the box; Ecotricity ecoZER0 rates) ================= */
 let PWR = (() => { try { return JSON.parse(localStorage.getItem('powerCache') || 'null'); } catch (e) { return null; } })(), pwrBusy = false;
 const PWR_RATE = { importBlend: 0.15, daily: 3.22, exportCredit: 0.092 }; // incl GST; blended import is an estimate
