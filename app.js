@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.33';
+const APP_VERSION = '2.26.34';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5398,7 +5398,7 @@ function todoPriority(t) {
 function todoPriRank(t) { return todoPriority(t) === 'high' ? 0 : todoPriority(t) === 'low' ? 2 : 1; }
 // 2.26.33: a to-do can be To do, In progress or Complete. `done` stays the source of truth (shared lists keep working); `status: 'doing'` marks In progress.
 const todoStatus = t => t && t.done ? 'done' : t && t.status === 'doing' ? 'doing' : 'todo';
-async function todoStart(id) { const t = (S.todos || []).find(x => x.id === id); if (!t || t.done) return; const s = snap(); if (t.status === 'doing') delete t.status; else t.status = 'doing'; await save(); render(); toast(t.status === 'doing' ? `In progress: ${t.title}` : `${t.title} back to To do.`, 'Undo', undoTo(s)); }
+async function todoStart(id) { const t = (S.todos || []).find(x => x.id === id); if (!t || t.done) return; const s = snap(); if (t.status === 'doing') { delete t.status; delete t.startedAt; } else { t.status = 'doing'; t.startedAt = Date.now(); } await save(); render(); toast(t.status === 'doing' ? `In progress: ${t.title}` : `${t.title} back to To do.`, 'Undo', undoTo(s)); }
 const todoStatBtn = t => t.done ? '' : `<button type="button" class="tstat ${todoStatus(t) === 'doing' ? 'doing' : ''}" onclick="todoStart('${t.id}')" aria-label="${todoStatus(t) === 'doing' ? 'In progress. Tap to set back to To do' : 'Start'}: ${esc(t.title)}">${todoStatus(t) === 'doing' ? '● In progress' : '▶ Start'}</button>`;
 function cmpOpenTodo(a, b) {
   return (todoStatus(a) === 'doing' ? 0 : 1) - (todoStatus(b) === 'doing' ? 0 : 1)
@@ -5446,7 +5446,7 @@ async function tick(id) {
   const t = S.todos.find(x => x.id === id); if (!t) return;
   const s = snap();
   t.done = !t.done;
-  if (t.done) { t.doneAt = Date.now(); delete t.status; } else delete t.doneAt;
+  if (t.done) { t.doneAt = Date.now(); delete t.status; delete t.startedAt; } else delete t.doneAt;
   await save();
   if (sheetOpen) await closeSheet();
   render();
@@ -19219,11 +19219,21 @@ function glDueItems() {
       const k = x.kind, d = x.days, name = String(x.name || x.html || '').replace(/<[^>]+>/g, ' ');
       if (!glOk(name) || /\bbusy\b/i.test(name)) return;
       const t = x.ref && x.ref.todo, hi = !!(t && t.priority === 'high');
-      if (t && glDueItems.nl && glDueItems.nl.has(t.id)) return;
+      if (k === 'todo') return; // 2.26.34: to-dos are added below (one card each)
       const ok = k === 'bill' || k === 'pay' || k === 'loan' ? d <= 1 : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? false : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
       if (!ok) return;
       let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
       out.push({ days: d, html: h });
+    });
+  } catch (e) { }
+  // 2.26.34: every open dated to-do: overdue/today → Urgent, 1–7 days → Coming up. Only overdue, today and tomorrow count.
+  // In-progress ones that aren't overdue/today go to the In progress section instead; new ones stay under 'New on your lists'.
+  try {
+    (S.todos || []).forEach(t => {
+      if (!t || t.done || !t.due || !t.title || !glOk(t.title) || (glDueItems.nl && glDueItems.nl.has(t.id))) return;
+      const d = daysLeft(t.due); if (d > 7) return;
+      const doing = todoStatus(t) === 'doing'; if (doing && d > 0) return;
+      out.push({ days: d, html: glTodoCard(t, d), noCount: d > 1, todoId: t.id });
     });
   } catch (e) { }
   // 2.26.31: birthdays from the Birthdays list, 28 days ahead. Today → Urgent; 1–28 days → Coming up; only 0–7 days count toward the bell badge.
@@ -19243,14 +19253,22 @@ function nlDis() { try { return JSON.parse(localStorage.getItem('nlDismiss') || 
 function nlDismiss(id) { const L = nlDis().filter(Boolean); if (!L.includes(id)) L.push(id); try { localStorage.setItem('nlDismiss', JSON.stringify(L.slice(-400))); } catch (e) { } }
 function nlItems() {
   const since = nlSince(), gone = new Set(nlDis()), out = [];
-  try { (S.todos || []).forEach(t => { if (t && !t.done && !isSarahTodo(t) && +t.created >= since && !gone.has(t.id) && t.title && glOk(t.title)) out.push({ id: t.id, title: t.title, where: '#todo', list: t.list || 'To-do', due: t.due || '', days: t.due ? daysLeft(t.due) : null }); }); } catch (e) { }
+  try { (S.todos || []).forEach(t => { if (t && !t.done && !isSarahTodo(t) && +t.created >= since && !gone.has(t.id) && t.title && glOk(t.title) && !(todoStatus(t) === 'doing' && !(t.due && daysLeft(t.due) <= 0))) out.push({ id: t.id, title: t.title, where: '#todo', list: t.list || 'To-do', due: t.due || '', days: t.due ? daysLeft(t.due) : null, doing: todoStatus(t) === 'doing' }); }); } catch (e) { }
   try { ((S.shop && S.shop.items) || []).forEach(x => { if (x && !x.done && !isSarahShop(x) && +x.created >= since && !gone.has(x.id) && x.name && !(x.meals && x.meals.length) && glOk(x.name)) out.push({ id: x.id, title: x.name, where: '#shopping', list: 'Shopping', due: '', days: null }); }); } catch (e) { }
-  return out.map(x => ({ ...x, urgent: x.days !== null && x.days <= 0, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div></div>` }));
+  return out.map(x => ({ ...x, urgent: x.days !== null && x.days <= 0, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div>${x.doing ? '<span class="pill glprog">In progress</span>' : ''}</div>` }));
+}
+function glStartedTxt(t) { if (!t.startedAt) return ''; const d = new Date(t.startedAt), today = todayISO(d) === todayISO(); return 'Started ' + (today ? fmtTime(d.toTimeString().slice(0, 5)) : fmtW(todayISO(d))); }
+function glTodoCard(t, d) {
+  const doing = todoStatus(t) === 'doing';
+  return `<button class="row" onclick="todoForm('${t.id}')"><div class="ic todo">${I('check')}</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list || 'To-do')}${t.due ? ' · ' + fmtW(t.due) : ''}${doing && t.startedAt ? ' · ' + glStartedTxt(t) : ''}</div></div>${doing ? '<span class="pill glprog">In progress</span>' : ''}${t.due ? pill(d) : ''}</button>`;
+}
+function glProgItems() { // 2.26.34: In progress section (not overdue/today; those sit under Urgent)
+  try { return (S.todos || []).filter(t => t && !t.done && todoStatus(t) === 'doing' && t.title && glOk(t.title) && !(t.due && daysLeft(t.due) <= 0)).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0)).map(t => glTodoCard(t, t.due ? daysLeft(t.due) : 0)); } catch (e) { return []; }
 }
 function glSarahItems() {
   const out = [], since = Date.now() - 864e5;
   const add = (x, where, what) => { if (x && !x.done && +x.created >= since && x.title && glOk(x.title)) out.push(`<button class="row" onclick="go('${where}')"><div class="ic todo"><span class="sbadge">S</span></div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${what} · added ${esc(ago(+x.created))}</div></div>${I('right')}</button>`); };
-  try { (S.todos || []).filter(isSarahTodo).forEach(t => add(t, '#todo', 'To-do from Sarah')); } catch (e) { }
+  try { (S.todos || []).filter(isSarahTodo).filter(t => !(t.due && daysLeft(t.due) <= 7) && todoStatus(t) !== 'doing').forEach(t => add(t, '#todo', 'To-do from Sarah')); } catch (e) { }
   try { ((S.shop && S.shop.items) || []).filter(x => isSarahShop(x)).forEach(x => add(x, '#shopping', 'Shopping from Sarah')); } catch (e) { }
   try { (S.appts || []).filter(a => a && a.from === 'sarah').forEach(a => add(a, '#calendar', 'Sarah’s appointment' + (a.date ? ' · ' + fmtW(a.date) : ''))); } catch (e) { }
   return out;
@@ -19324,7 +19342,7 @@ function glSwipe(e) {
 document.addEventListener('touchstart', glSwipe, { passive: true });
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems() };
+  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems() };
 }
 function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length; } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
@@ -19334,9 +19352,9 @@ glAlertsBody = function () {
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
   const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent);
   const dueU = p.dueUrgent.length || gU || nlU.length ? `<div class="list">${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
-  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
+  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
     sec('New on your lists <span class="glswipehint">swipe left to clear</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
     sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
     sec('New today <span class="glswipehint">swipe left to clear</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
-  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
