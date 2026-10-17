@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.58';
+const APP_VERSION = '2.26.59';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19791,8 +19791,23 @@ async function cfApi(path, method = 'GET', body) {
   const k = cfKey(), r = await fetch(RELAY_URL + path, { method, cache: 'no-store', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'X-Cash-Key': k } : {}), body: body ? JSON.stringify(body) : undefined });
   let d = {}; try { d = await r.json(); } catch (e) { } return [r.status, d];
 }
-const CF_ERR = { akahu_rejected: 'Akahu didn’t accept those tokens. Check you copied both in full (they start with user_token_ and app_token_).', bad_tokens: 'Those don’t look like Akahu tokens. The User Access Token starts with user_token_ and the App ID Token with app_token_.',
-  already_connected: 'A bank link is already connected from another phone. Disconnect it there first.', rate_limited: 'Too many tries. Please wait an hour and try again.', not_configured: 'The bank link isn’t set up on the relay yet.', akahu_unavailable: 'Akahu couldn’t be reached. Try again in a few minutes.' };
+const CF_ERR = { akahu_rejected: 'Akahu says the User Access Token isn’t valid (or was regenerated). Copy it again from my.akahu.nz › Developers.', bad_tokens: 'Those don’t look like Akahu tokens. The User Access Token starts with user_token_ and the App ID Token with app_token_.',
+  swapped: 'The two tokens are the wrong way round. Step 1 is the user_token_…, step 2 is the app_token_….', same_token: 'The same token is in both steps. Step 1 is the user_token_…, step 2 is the app_token_….',
+  akahu_forbidden: 'Akahu blocked this server. In my.akahu.nz › Developers › IP Address Ranges, remove the limit (or allow all), then try again.', akahu_rate: 'Akahu says too many requests. Wait a few minutes and try again.',
+  already_connected: 'A bank link is already connected from another phone. Disconnect it there first.', rate_limited: 'Too many tries. Please wait an hour and try again.', not_configured: 'The bank link isn’t set up on the relay yet.',
+  akahu_unavailable: 'Akahu couldn’t be reached. Try again in a few minutes.', akahu_unreachable: 'The relay couldn’t reach Akahu. Try again in a few minutes.', save_failed: 'Akahu worked, but the relay couldn’t save your bank data. Tell me and I’ll fix it.',
+  cashflow_failed: 'Something went wrong on the relay. Tell me and I’ll fix it.', forbidden_origin: 'The relay didn’t recognise the app. Open My App from its icon and try again.' };
+// plain words for any relay reply; never shows a token
+function cfErrText(s, d) {
+  d = d || {};
+  if (s === 0) return 'Couldn’t reach the relay. Check you’re online, then try again.';
+  if (d.error === 'rate_limited' && d.mins) return `Too many tries. Wait ${plural(d.mins, 'minute')} and try again.`;
+  if (d.error === 'akahu_error' || (d.error && !CF_ERR[d.error])) return `Akahu said no${d.status ? ' (' + d.status + ')' : ''}${d.step ? ' at ' + d.step : ''}${d.akahu ? ': ' + d.akahu : ''}. Try again; if it keeps happening, tell me.`;
+  if (!d.error) return `The relay gave an unexpected answer (${s}). Try again in a minute.`;
+  const base = CF_ERR[d.error];
+  if (d.error === 'akahu_forbidden' && d.step && d.step !== 'me') return `Akahu let the app in but blocked reading ${d.step}. In my.akahu.nz › Developers, check the app can see accounts and transactions.${d.akahu ? ' (' + d.akahu + ')' : ''}`;
+  return base + (d.akahu && ['akahu_rejected', 'akahu_forbidden'].includes(d.error) ? ` (Akahu: ${d.akahu})` : '');
+}
 function akahuSettings() {
   const st = cfStat();
   if (cfKey() && st) return `<div class="sec" id="akahuset">Connect bank (Akahu)</div><div class="list"><div class="srow"><div class="tx"><div class="t">Connected as ${esc(st.name || 'you')} · ${plural(st.accounts || 0, 'account')}</div><div class="s">Read-only. The tokens are kept only on the relay, encrypted; this phone has a device key.${st.at ? ' Updated ' + esc(cfWhen(st.at)) + '.' : ''}</div></div></div>
@@ -19821,10 +19836,10 @@ function akhClear() { AKH = { user: '', app: '', step: 1, at: 0 }; }
 const akhHold = () => { if (AKH.at && Date.now() - AKH.at > 10 * 60e3) akhClear(); return !!(AKH.user || AKH.app || (document.activeElement && /^ak(user|app)$/.test(document.activeElement.id || ''))); };
 const AK_U = /user_token_[A-Za-z0-9_-]{8,}/, AK_A = /app_token_[A-Za-z0-9_-]{8,}/;
 function akhInput(which, v) {
-  const t = String(v || '').replace(/(user_token_|app_token_)/g, ' $1'), u = t.match(AK_U), a = t.match(AK_A); // inputs drop newlines, so split the two tokens apart
+  const t = String(v || '').replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').replace(/(user_token_|app_token_)/g, ' $1'), u = t.match(AK_U), a = t.match(AK_A); // inputs drop newlines, so split the two tokens apart
   AKH.at = Date.now();
   if (u && a) { AKH.user = u[0]; AKH.app = a[0]; AKH.step = 2; akhRedraw(); return; } // both pasted at once
-  if (which === 'user') AKH.user = u ? u[0] : t.trim(); else AKH.app = a ? a[0] : t.trim();
+  if (which === 'user') AKH.user = u ? u[0] : t.replace(/\s+/g, ''); else AKH.app = a ? a[0] : t.replace(/\s+/g, '');
   if (which === 'user' && a && !u) { AKH.app = a[0]; AKH.user = ''; }
 }
 function akhRestore() { const u = document.getElementById('akuser'), a = document.getElementById('akapp'); if (u && !u.value && AKH.user) u.value = AKH.user; if (a && !a.value && AKH.app) a.value = AKH.app; }
@@ -19847,6 +19862,8 @@ async function akahuConnect() {
   const e = document.getElementById('akerr'), b = document.getElementById('akbtn');
   const a0 = document.getElementById('akapp'); if (a0 && a0.value) akhInput('app', a0.value);
   const user = AKH.user, app = AKH.app;
+  if (user.startsWith('app_token_') && app.startsWith('user_token_')) { AKH.user = app; AKH.app = user; akhRedraw(); const e3 = document.getElementById('akerr'); if (e3) e3.textContent = 'They were the wrong way round, so I’ve swapped them. Tap Connect again.'; return; }
+  if (user && user === app) { if (e) e.textContent = CF_ERR.same_token; return; }
   if (!/^user_token_\S{8,}$/.test(user)) { AKH.step = 1; akhRedraw(); return; }
   if (!/^app_token_\S{8,}$/.test(app)) { if (e) e.textContent = 'That doesn’t look like the App ID Token. It starts with app_token_.'; return; }
   if (b) { b.disabled = true; b.textContent = 'Checking with Akahu…'; } if (e) e.textContent = '';
@@ -19857,7 +19874,8 @@ async function akahuConnect() {
     toast(`Connected as ${d.name || 'you'} · ${plural(d.accounts || 0, 'account')}`); if (reloadPending) { location.reload(); return; } render(); return;
   }
   // keep the held keys so he can fix just the wrong one; they stay in memory only
-  if (b) { b.disabled = false; b.textContent = 'Connect'; } if (e) e.textContent = CF_ERR[d && d.error] || 'That didn’t work. Please try again.';
+  if (b) { b.disabled = false; b.textContent = 'Connect'; } if (e) e.textContent = cfErrText(s, d);
+  if (d && (d.error === 'swapped' || d.error === 'same_token')) { const u0 = AKH.user; if (d.error === 'swapped') { AKH.user = AKH.app; AKH.app = u0; akhRedraw(); const e3 = document.getElementById('akerr'); if (e3) e3.textContent = 'They were the wrong way round, so I’ve swapped them. Tap Connect again.'; } }
 }
 function akahuDisconnect() {
   confirmSheet('Disconnect your bank?', 'This deletes the stored Akahu tokens and bank data from the relay. Cash flow goes back to empty. You can connect again any time.', 'Disconnect', async () => {
@@ -19874,7 +19892,7 @@ async function cfLoad(force) {
     else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); }
     else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
-    else CFerr = CF_ERR[d.error] || 'Cash flow couldn’t load. Try again shortly.';
+    else CFerr = cfErrText(s, d);
   } catch (e) { CFerr = 'Cash flow couldn’t load. Check your connection.'; }
   CFbusy = false; if ((location.hash || '').startsWith('#cashflow') && !sheetOpen) render();
 }

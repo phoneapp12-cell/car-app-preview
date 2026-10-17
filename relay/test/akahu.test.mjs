@@ -73,5 +73,22 @@ await t('disconnect deletes the tokens and data', async () => {
   assert.equal(store.has('akahu-cred-v1'), false); assert.equal(store.has('akahu-data-v1'), false);
   const [, d] = await J(await handle(req('/akahu/status', 'GET', null, KEY), env, fetchImpl)); assert.equal(d.connected, false);
 });
+
+await t('regression 2.26.59: a big 90-day history (3,000 transactions) saves and connects', async () => {
+  store.clear(); const big = Array.from({ length: 3000 }, (_, i) => ({ _id: 'tx' + i, _account: 'acc_asb1', date: iso(i % 89), description: 'EFTPOS PURCHASE NUMBER ' + i, amount: -(i % 97 + 1.25), type: 'EFTPOS' }));
+  const fb = async (url, init) => url.includes('/transactions') ? Response.json({ success: true, items: big, cursor: { next: null } }) : fetchImpl(url, init);
+  const [s, d] = await J(await handle(req('/akahu/connect', 'POST', { user: U, app: A }), env, fb)); assert.equal(s, 200, JSON.stringify(d)); assert.ok(store.has('akahu-data-v1'));
+  const [s2, d2] = await J(await handle(req('/cashflow', 'GET', null, d.key), env, fb)); assert.equal(s2, 200); assert.equal(d2.data.transactions.length, 3000);
+  store.clear();
+});
+await t('specific errors: 403 from Akahu, swapped tokens, same token twice, stray spaces', async () => {
+  const f403 = async () => new Response(JSON.stringify({ success: false, message: 'IP address not allowed' }), { status: 403 });
+  const [s, d] = await J(await handle(req('/akahu/connect', 'POST', { user: U, app: A }), env, f403)); assert.equal(s, 403); assert.equal(d.error, 'akahu_forbidden'); assert.equal(d.akahu, 'IP address not allowed'); assert.equal(d.step, 'me');
+  const diag = JSON.parse(store.get('akahu-diag-v1')); assert.equal(diag.status, 403); assert.ok(!store.get('akahu-diag-v1').includes(U));
+  const [, d2] = await J(await handle(req('/akahu/connect', 'POST', { user: A, app: U }), env, fetchImpl)); assert.equal(d2.error, 'swapped');
+  const [, d3] = await J(await handle(req('/akahu/connect', 'POST', { user: A, app: A }), env, fetchImpl)); assert.ok(['same_token', 'bad_tokens'].includes(d3.error));
+  const [s4] = await J(await handle(req('/akahu/connect', 'POST', { user: ' ' + U + '\u200B\n', app: A + ' ' }), env, fetchImpl)); assert.equal(s4, 200);
+  store.clear();
+});
 await t('connect rate-limited', async () => { let last = 0; for (let i = 0; i < 8; i++) { last = (await handle(req('/akahu/connect', 'POST', { user: 'user_token_wrongwrongwrong', app: A }), env, fetchImpl)).status; } assert.equal(last, 429); });
 console.log(`${ok} passed`);

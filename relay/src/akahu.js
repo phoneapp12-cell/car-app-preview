@@ -5,10 +5,11 @@
    Connecting again needs that key, or tokens for the same Akahu user. Bank data is cached encrypted too.
    Akahu refreshes from the banks daily; we read it once a day (cron) and on 'Refresh' (at most once an hour). */
 const API = 'https://api.akahu.io/v1';
-const K_CRED = 'akahu-cred-v1', K_DATA = 'akahu-data-v1', K_RL = 'akahu-rl-v1';
+const K_CRED = 'akahu-cred-v1', K_DATA = 'akahu-data-v1', K_RL = 'akahu-rl-v1', K_DIAG = 'akahu-diag-v1';
 const DAY = 864e5;
 
-const b64 = u8 => btoa(String.fromCharCode(...u8));
+// 2.26.59: chunked; spreading a large ciphertext into fromCharCode overflowed the stack (bank data didn't save, connect failed)
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const b64url = u8 => b64(u8).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 async function sha(s) { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return b64(new Uint8Array(h)); }
@@ -22,12 +23,17 @@ async function seal(env, obj) { const iv = crypto.getRandomValues(new Uint8Array
 async function open(env, s) { if (!s) return null; try { const o = JSON.parse(s); const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(o.iv) }, await encKey(env), unb64(o.ct)); return JSON.parse(new TextDecoder().decode(pt)); } catch (e) { return null; } }
 const eq = (a, b) => { a = String(a || ''); b = String(b || ''); if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; };
 
+const safeMsg = m => String(m || '').replace(/(user|app)_token_[A-Za-z0-9_-]+/g, '$1_token_…').replace(/[^\w .,:;'’()\/-]/g, ' ').slice(0, 160).trim();
 async function akahu(cred, path, fetchImpl, method = 'GET') {
-  const r = await fetchImpl(API + path, { method, headers: { Authorization: 'Bearer ' + cred.user, 'X-Akahu-Id': cred.app, Accept: 'application/json' } });
+  const step = path.split('?')[0].replace(/^\//, '');
+  let r; try { r = await fetchImpl(API + path, { method, headers: { Authorization: 'Bearer ' + cred.user, 'X-Akahu-Id': cred.app, Accept: 'application/json' } }); }
+  catch (e) { const er = new Error('akahu_unreachable'); er.status = 502; er.code = 'akahu_unreachable'; er.step = step; throw er; }
   let d = null; try { d = await r.json(); } catch (e) { d = null; }
-  if (r.status === 401 || r.status === 403) { const e = new Error('akahu_auth'); e.status = 401; throw e; }
-  if (r.status === 429) { const e = new Error('akahu_rate'); e.status = 429; throw e; }
-  if (!r.ok || !d || d.success === false) { const e = new Error('akahu_error'); e.status = 502; throw e; }
+  const fail = code => { const e = new Error(code); e.status = r.status; e.code = code; e.step = step; e.msg = safeMsg(d && (d.message || d.error)); throw e; };
+  if (r.status === 401) fail('akahu_rejected');
+  if (r.status === 403) fail('akahu_forbidden');
+  if (r.status === 429) fail('akahu_rate');
+  if (!r.ok || !d || d.success === false) fail('akahu_error');
   return d;
 }
 const num = v => { const n = Number(v); return Number.isFinite(n) ? Math.round(n * 100) / 100 : null; };
@@ -94,20 +100,26 @@ export async function akahuRoute(path, request, env, fetchImpl = fetch) {
   let body = {};
   if (request.method === 'POST') { try { const raw = await request.text(); if (raw.length > 4000) return [413, { error: 'too_large' }]; body = raw ? JSON.parse(raw) : {}; } catch (e) { return [400, { error: 'bad_request' }]; } }
   if (path === '/akahu/connect' && request.method === 'POST') {
-    if (!(await rate(env, 'connect', 6, 3600))) return [429, { error: 'rate_limited' }];
-    const user = String(body.user || '').trim(), app = String(body.app || '').trim();
-    if (!/^user_token_[A-Za-z0-9_-]{8,200}$/.test(user) || !/^app_token_[A-Za-z0-9_-]{8,200}$/.test(app)) return [400, { error: 'bad_tokens' }];
+    const clean = v => String(v || '').replace(/[\s\u200B-\u200D\u2060\uFEFF]/g, '');
+    const user = clean(body.user), app = clean(body.app);
+    if (!/^user_token_[A-Za-z0-9_-]{8,200}$/.test(user) || !/^app_token_[A-Za-z0-9_-]{8,200}$/.test(app)) return [400, { error: user.startsWith('app_token_') && app.startsWith('user_token_') ? 'swapped' : user && user === app ? 'same_token' : 'bad_tokens' }];
+    // only tries that reach Akahu count towards the 6 an hour
+    if (!(await rate(env, 'connect', 6, 3600))) return [429, { error: 'rate_limited', mins: Math.max(1, Math.ceil((3600e3 - Date.now() % 3600e3) / 60e3)) }];
     const cand = { user, app };
-    let me; try { me = await akahu(cand, '/me', fetchImpl); } catch (e) { return [e.status === 401 ? 401 : 502, { error: e.status === 401 ? 'akahu_rejected' : 'akahu_unavailable' }]; }
+    const diag = async (e) => { try { await env.EVENTS_KV.put(K_DIAG, JSON.stringify({ at: new Date().toISOString(), step: e.step || '', status: e.status || 0, code: e.code || String(e.message || e).slice(0, 60), msg: e.msg || '', userLen: user.length, appLen: app.length }), { expirationTtl: 7 * 86400 }); } catch (er) { } };
+    const errOut = async e => { await diag(e); return [e.code === 'akahu_rejected' ? 401 : e.code === 'akahu_forbidden' ? 403 : e.code === 'akahu_rate' ? 429 : 502, { error: e.code || 'akahu_error', step: e.step || '', status: e.status || 0, akahu: e.msg || '' }]; };
+    let me; try { me = await akahu(cand, '/me', fetchImpl); } catch (e) { return errOut(e); }
     const item = me.item || {}, uid = String(item._id || ''), name = String(item.preferred_name || item.first_name || String(item.name || '').split(' ')[0] || '').slice(0, 40);
     const { cred: old, ok } = await authed(env, request);
     if (old && !ok && !(uid && eq(uid, old.uid))) return [409, { error: 'already_connected' }];
     const key = b64url(crypto.getRandomValues(new Uint8Array(32)));
     const cred = { user, app, uid, name, keyHash: await sha(key), at: new Date().toISOString(), manualAt: '' };
-    let data = null; try { data = await fetchAll(cred, fetchImpl); } catch (e) { return [502, { error: 'akahu_unavailable' }]; }
+    let data = null; try { data = await fetchAll(cred, fetchImpl); } catch (e) { return errOut(e); }
     cred.accounts = data.accounts.length;
-    await env.EVENTS_KV.put(K_CRED, await seal(env, cred));
-    await env.EVENTS_KV.put(K_DATA, await seal(env, data));
+    let sd, sc; try { sd = await seal(env, data); sc = await seal(env, cred); } catch (e) { return errOut({ code: 'save_failed', step: 'encrypt', msg: safeMsg(e && e.message) }); }
+    await env.EVENTS_KV.put(K_DATA, sd); // data first, so a stored login always has data
+    await env.EVENTS_KV.put(K_CRED, sc);
+    try { await env.EVENTS_KV.delete(K_DIAG); } catch (e) { }
     return [200, { ok: true, key, name, accounts: data.accounts.length }];
   }
   const { cred, ok } = await authed(env, request);
@@ -117,7 +129,7 @@ export async function akahuRoute(path, request, env, fetchImpl = fetch) {
   if (path === '/akahu/disconnect' && request.method === 'POST') { await env.EVENTS_KV.delete(K_CRED); await env.EVENTS_KV.delete(K_DATA); return [200, { ok: true, connected: false }]; }
   if (path === '/cashflow' && request.method === 'GET') {
     let data = await open(env, await env.EVENTS_KV.get(K_DATA));
-    if (!data) { try { data = await refetch(env, cred, fetchImpl); } catch (e) { return [502, { error: 'akahu_unavailable' }]; } }
+    if (!data) { try { data = await refetch(env, cred, fetchImpl); } catch (e) { return [e.code === 'akahu_rejected' ? 401 : 502, { error: e.code || 'akahu_error', step: e.step || '', status: e.status || 0, akahu: e.msg || '' }]; } }
     return [200, Object.assign(pubStatus(cred, data), { data })];
   }
   if (path === '/cashflow/refresh' && request.method === 'POST') {
@@ -126,7 +138,7 @@ export async function akahuRoute(path, request, env, fetchImpl = fetch) {
     cred.manualAt = new Date().toISOString(); cred.pending = Date.now();
     await env.EVENTS_KV.put(K_CRED, await seal(env, cred));
     try { await akahu(cred, '/refresh', fetchImpl, 'POST'); } catch (e) { if (e.status === 401) return [401, { error: 'akahu_rejected' }]; }
-    let data; try { data = await refetch(env, cred, fetchImpl); } catch (e) { return [502, { error: 'akahu_unavailable' }]; }
+    let data; try { data = await refetch(env, cred, fetchImpl); } catch (e) { return [502, { error: e.code || 'akahu_error', step: e.step || '', status: e.status || 0, akahu: e.msg || '' }]; }
     return [200, Object.assign(pubStatus(cred, data), { data, note: 'The banks can take a few minutes; it checks again shortly.' })];
   }
   return [404, { error: 'not_found' }];

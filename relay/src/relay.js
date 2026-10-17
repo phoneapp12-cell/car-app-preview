@@ -436,7 +436,7 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   if (path === '/cashflow' || path.startsWith('/cashflow/') || path.startsWith('/akahu/')) { // 2.26.57: Akahu cash flow (app origin + device key)
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     try { const [status, data] = await akahuRoute(path, request, env, fetchImpl); return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
-    catch (e) { return new Response(JSON.stringify({ error: 'cashflow_unavailable' }), { status: 502, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json' } }); }
+    catch (e) { return new Response(JSON.stringify({ error: 'cashflow_failed', detail: String(e && e.name || 'Error').slice(0, 40) }), { status: 502, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json' } }); }
   }
   if (path === '/power') { // 2.26.39: SolarZero power figures pushed from the box
     const H = { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
