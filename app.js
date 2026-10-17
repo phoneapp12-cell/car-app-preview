@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.70';
+const APP_VERSION = '2.26.71';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2798,7 +2798,7 @@ function aiSumBullets() {
   const lines = AI_SUM.lines.filter(t => { const x = String(t); return aiLineSafe(x) && sumWorkOk(x) && !SUM_SELF_RE.test(x) && !(walkDog.test(x) && dog.test(x)) && !(gymSkipped(todayISO()) && GYM_WORD.test(x) && !/\btomorrow\b/i.test(x)) && !BFAST_TV_RE.test(x) && (!night || nightOk(x)); }).concat(bf && (!night || nightOk(bf)) ? [bf] : []);
   try { const seen = []; const c = lines.filter(t => sumLineKeep(t, seen)); lines.splice(0, lines.length, ...c); } catch (e) { }
   const lis = lines.map(t => { const x = String(t).trim(); return x ? '<li class="sumli' + (/overdue/i.test(x) ? ' late' : '') + '">' + esc(/[.!?]$/.test(x) ? x : x + '.') + '</li>' : ''; }).join('');
-  return lis ? '<ul class="sumbul">' + lis + '</ul>' : '';
+  return lis ? '<ul class="sumbul">' + lis + homeTry('power line', () => homePowerLi(), '') + '</ul>' : '';
 }
 /* 2.23.59: day facts, duplicate and gluten-free checks for the summary's + Add suggestions */
 const GYM_DOWS = [2, 3]; // Tuesday and Wednesday, after work
@@ -3250,6 +3250,7 @@ function homeSumCard(bits) {
     // 2.22.54: while the AI summary is on its way, hold a short placeholder instead of drawing interim versions
     if (aiSumOpen !== homeSugOpenN && navigator.onLine !== false) return homeSceneCard('<p class="sumnote muted" style="opacity:.75">Putting your summary together…</p>', true);
     try { const c = sumCleanLis(ps); ps.splice(0, ps.length, ...c); } catch (e) { }
+    try { const pl = homePowerLi(); if (pl) ps.push(pl); } catch (e) { } // 2.26.71
     if (!ps.length) return homeSumFallback();
     return homeSceneCard('<ul class="sumbul">' + ps.join('') + '</ul>');
   } catch (e) {
@@ -20972,9 +20973,45 @@ function pwrFetch() {
   if (pwrBusy) return; pwrBusy = true;
   fetch(RELAY_URL + '/power', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
     pwrBusy = false;
-    if (d && d.updatedAt && (!PWR || JSON.stringify(d) !== JSON.stringify(PWR))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (/^#(power|compare|powertime|alerts)$/.test(location.hash)) render(); else { glBellRedraw(); try { glStatRedraw(); } catch (e) { } } }
+    if (d && d.updatedAt && (!PWR || JSON.stringify(d) !== JSON.stringify(PWR))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (/^#(power|compare|powertime|alerts)$/.test(location.hash)) render(); else { glBellRedraw(); try { glStatRedraw(); } catch (e) { } try { const li = document.getElementById('sumpwr'), x = homePowerLine(); if (li && x) li.textContent = '⚡ ' + x; } catch (e) { } } }
   }).catch(() => { pwrBusy = false; });
 }
+/* 2.26.71: end-of-day power line for the homepage summary, 8pm until 5am. Same figures as the Power page tiles
+   (today.usedKWh / solarKWh / gridImportKWh / gridExportKWh, today.cost.total; after midnight the Yesterday card's).
+   Older than 2 hours says "as at 9pm". Nothing loaded, or nothing for that day, means no line. */
+function homePowerLine(now = new Date()) {
+  try {
+    const d = (typeof PWR !== 'undefined' && PWR) || null; if (!d || !d.updatedAt) return '';
+    const p = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', hourCycle: 'h23' }).formatToParts(now);
+    const h = +(p.find(x => x.type === 'hour') || {}).value % 24; if (!(h >= 20 || h < 5)) return '';
+    const T = todayISO(), Y = addDays(T, -1), late = h < 5, day = late ? Y : T;
+    const k = v => (Math.round((+v || 0) * 10) / 10).toLocaleString('en-NZ', { maximumFractionDigits: 1 }) + ' kWh';
+    const up = Date.parse(d.updatedAt); let asAt = '';
+    if (up && Date.now() - up > 2 * 3600e3) { try { asAt = ' (as at ' + new Date(up).toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit', hour12: true }).replace(':00', '').replace(/\s/g, '').toLowerCase() + ')'; } catch (e) { } }
+    const t = d.today;
+    if (t && t.date === day && +t.usedKWh > 0) {
+      const used = +t.usedKWh, sol = +t.solarKWh || 0, pct = used ? Math.round(sol / used * 100) : 0;
+      let s = 'Power ' + (late ? 'yesterday' : 'today') + asAt + ': ' + k(used) + ' used — ' + k(sol) + ' from solar (' + pct + '%), ' + k(t.gridImportKWh) + ' from the grid' + (+t.gridExportKWh > 0 ? ', ' + k(t.gridExportKWh) + ' sent back' : '') + '.';
+      const cost = t.cost && t.cost.total != null ? +t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1);
+      const bits = ['About ' + pwrD(cost) + (late ? '' : ' so far')];
+      const m = d.month || {}, avg = +m.avgPerDayKWh;
+      if (avg > 0 && String(m.label || '').length) {
+        const r = used / avg, mon = String(m.label).split(' ')[0], full = { Jan: 'January', Feb: 'February', Mar: 'March', Apr: 'April', Jun: 'June', Jul: 'July', Aug: 'August', Sep: 'September', Oct: 'October', Nov: 'November', Dec: 'December' }[mon] || mon;
+        const cmp = r < 0.8 ? 'well under' : r < 0.95 ? 'a bit under' : r <= 1.05 ? 'about the same as' : r <= 1.2 ? 'a bit over' : 'well over';
+        bits.push(cmp + ' your ' + full + ' average of ' + k(avg).replace(' kWh', '') + ' kWh a day');
+      }
+      let tail = '';
+      if (t.batteryPct != null && !asAt) tail += ' Battery at ' + Math.round(+t.batteryPct) + '%.';
+      try { const b = t.cost && t.cost.bands, imp = t.cost && +t.cost.importKWh; if (b && imp > 1 && b.offpeak && b.offpeak.kWh / imp >= 0.6) tail += ' Mostly off-peak.'; } catch (e) { }
+      return s + ' ' + bits.join(', ') + '.' + tail;
+    }
+    const y = d.yesterday, yc = y && y.cost;
+    if (late && y && y.date === Y && yc && +yc.importKWh > 0)
+      return 'Power yesterday' + asAt + ': ' + k(yc.importKWh) + ' from the grid' + (+yc.exportKWh > 0 ? ', ' + k(yc.exportKWh) + ' sent back' : '') + '. About ' + pwrD(yc.total) + '.' + ((yc.bands && yc.bands.offpeak && yc.bands.offpeak.kWh / yc.importKWh >= 0.6) ? ' Mostly off-peak.' : '');
+    return '';
+  } catch (e) { return ''; }
+}
+function homePowerLi() { const x = homePowerLine(); return x ? '<li class="sumli" id="sumpwr">⚡ ' + esc(x) + '</li>' : ''; }
 function pwrCost(imp, exp, days) { const c = (+imp || 0) * PWR_RATE.importBlend + PWR_RATE.daily * (days || 1) - (+exp || 0) * PWR_RATE.exportCredit; return Math.max(0, c); }
 const pwrK = v => (v == null || isNaN(v)) ? '–' : (+v).toLocaleString('en-NZ', { maximumFractionDigits: 1 }) + ' kWh';
 const pwrD = v => '$' + (+v || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
