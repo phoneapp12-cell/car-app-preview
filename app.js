@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.55';
+const APP_VERSION = '2.26.56';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11467,7 +11467,7 @@ function wxSunMins(now = new Date()) {
 function sunPill(sun, cls = '') {
   if (!sun) return ''; const rise = /^Sunrise/.test(sun), i = sun.lastIndexOf(', '), lab = i > 0 ? sun.slice(0, i) : sun, tm = i > 0 ? sun.slice(i + 2) : '';
   const mins = wxSunMins(), soon = mins != null && mins <= 30;
-  return `<span class="sunpill ${rise ? 'rise' : 'set'}${soon ? ' soon' : ''} ${cls}"><span class="sunic" aria-hidden="true">${rise ? '🌅' : '🌇'}</span><span>${esc(lab)}${soon ? ` in ${Math.max(1, mins)} min` : ''}</span>${tm ? `<b>${esc(tm)}</b>` : ''}</span>`;
+  return `<span class="sunpill ${rise ? 'rise' : 'set'}${soon ? ' soon' : ''} ${cls}"><span class="sunic" aria-hidden="true">${rise ? '🌅' : '🌇'}</span><span>${esc(lab)}</span>${tm ? `<b>${esc(tm)}</b>` : ''}${soon ? `<span class="sunmin">· ${Math.max(1, mins)} min</span>` : ''}</span>`; // 2.26.56: 'Sunset 7:39 pm · 21 min', wraps rather than clipping
 }
 function wxSunMention(now = new Date()) {
   const d = WX && WX.data && WX.data.daily;
@@ -19197,7 +19197,7 @@ function glStatInner() {
   const T = glTemps(), D = glDoors(), L = glLights(), td = glTideNext(2);
   const tv = T.map(x => parseFloat(x.t)).filter(Number.isFinite), lo = Math.min(...tv), hi = Math.max(...tv);
   const ch = [
-    tile('M14 14V4a2 2 0 0 0-4 0v10a4 4 0 1 0 4 0z', !tv.length ? '–' : lo === hi ? lo.toFixed(1) + '°' : `${lo.toFixed(1)}–${hi.toFixed(1)}°`, tv.length ? (tv.length === 1 ? T[0].n : tv.length + ' rooms') : 'Temps'),
+    tile('M14 14V4a2 2 0 0 0-4 0v10a4 4 0 1 0 4 0z', !tv.length ? '–' : Math.round(lo) === Math.round(hi) ? Math.round(lo) + '°' : `${Math.round(lo)}–${Math.round(hi)}°`, tv.length ? (tv.length === 1 ? T[0].n : tv.length + ' rooms') : 'Temps'),
     tile('M5 21V3h11v18M14 12h.01', !D ? '–' : D.length ? D.length + ' open' : 'Closed', 'Doors', D && D.length ? ' glalert' : ''),
     tile('M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z', !L ? '–' : L.length ? L.length + ' on' : 'Off', 'Lights'),
     glPowerTile(ic), // 2.26.51: today's power cost replaces UV here (UV stays on the weather card)
