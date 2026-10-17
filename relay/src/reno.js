@@ -20,6 +20,8 @@ export function cleanReno(x, now = Date.now()) {
   if ('notes' in x) o.notes = str(x.notes, 600);
   if ('due' in x) o.due = /^\d{4}-\d{2}-\d{2}$/.test(String(x.due || '')) ? x.due : '';
   if ('floor' in x) o.floor = x.floor === 'tiles' ? 'tiles' : 'carpet';
+  if ('deadline' in x) o.deadline = /^\d{4}-\d{2}-\d{2}$/.test(String(x.deadline || '')) ? x.deadline : '';
+  if ('count' in x) { const c = Math.floor(Number(x.count)); o.count = c >= 0 && c < 1000 ? c : 0; }
   if ('hidden' in x) o.hidden = !!x.hidden;
   return o;
 }

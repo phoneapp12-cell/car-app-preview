@@ -4,7 +4,7 @@
   const RELAY = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/reno';
   const INSIDE = [['main', 'Main bedroom', '🛏️', 'carpet'], ['spare', 'Spare bedroom', '🛋️', 'carpet'], ['bath', 'Bathroom', '🛁', 'tiles'], ['hall', 'Hallway', '🚪', 'carpet'], ['lounge', 'Lounge', '📺', 'carpet'], ['dining', 'Dining', '🍽️', 'carpet'], ['kitchen', 'Kitchen', '🍳', 'tiles']];
   const AREAS = INSIDE.map(([k, n, e, f]) => ({ k, n, e, floorDef: f, jobs: [['clean', 'Clean'], ['mop', 'Mop ceiling'], ['speckle', 'Apply speckle (filler)'], ['sand', 'Sand'], ['ceiling', 'Paint ceiling (roof)'], ['walls', 'Paint walls'], ['floor', 'Flooring']] }))
-    .concat([{ k: 'out', n: 'Outside', e: '🏡', jobs: [['wash', 'House wash (walls, windows, soffits)'], ['gutters', 'Clear gutters and downpipes'], ['prep', 'Fix, scrape and sand weatherboards and trim'], ['paint', 'Paint exterior (if needed)'], ['decks', 'Clean decks and paths']] },
+    .concat([{ k: 'out', n: 'Outside', e: '🏡', jobs: [['wash', 'House wash (walls, windows, soffits)'], ['gutters', 'Clear gutters and downpipes'], ['prep', 'Fix, scrape and sand weatherboards and trim'], ['paint', 'Paint exterior (if needed)'], ['decks', 'Clean decks and paths'], ['metal', 'Metal man (scrap metal pickup)'], ['dump', 'Dump runs']] },
     { k: 'final', n: 'Final stage', e: '✨', final: true, jobs: [['clean', 'Final clean-up (whole house)'], ['lawns', 'Mow lawns and tidy edges']] }]);
   const ST = { todo: 'To do', doing: 'In progress', done: 'Done' };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -23,16 +23,25 @@
       if (r.ok) { const d = await r.json(); let ch = false; (d.items || []).forEach(x => { const h = st.items[x.id]; if (!h || x.updated > h.updated) { st.items[x.id] = x; ch = true; } }); st.dirty = st.dirty.filter(id => !sent.includes(id)); st.at = Date.now(); persist(); if (ch) onChange(); }
     } catch (e) { } finally { busy = false; }
   }
-  const job = (a, j) => { const e = ent(a.k + '-' + j[0]), ae = ent('a-' + a.k); return { id: a.k + '-' + j[0], title: j[0] === 'floor' ? 'Flooring: ' + ((ae.floor || a.floorDef) === 'tiles' ? 'stick-down tiles' : 'carpet') : j[1], status: e.status || 'todo', who: e.who || '', areaWho: ae.who || '', notes: e.notes || '', due: e.due || '', by: e.by || '' }; };
+  const job = (a, j) => { const e = ent(a.k + '-' + j[0]), ae = ent('a-' + a.k); return { id: a.k + '-' + j[0], title: j[0] === 'floor' ? 'Flooring: ' + ((ae.floor || a.floorDef) === 'tiles' ? 'stick-down tiles' : 'carpet') : j[1], status: e.status || 'todo', who: e.who || '', areaWho: ae.who || '', notes: e.notes || '', due: e.due || '', by: e.by || '', count: +e.count || 0, counter: j[0] === 'dump' }; };
   const jobsOf = a => a.jobs.map(j => job(a, j));
   const pct = L => L.length ? Math.round(L.reduce((s, j) => s + (j.status === 'done' ? 1 : j.status === 'doing' ? .5 : 0), 0) / L.length * 100) : 0;
   const finalOpen = () => AREAS.filter(a => !a.final).every(a => jobsOf(a).every(j => j.status === 'done'));
   const fmtD = d => { try { return new Date(d + 'T12:00').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' }); } catch (e) { return d; } };
+  const DEADLINE = '2026-11-22';
+  const nzToday = () => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch (e) { return new Date().toISOString().slice(0, 10); } };
+  const deadline = () => ent('project').deadline || DEADLINE;
+  function countdown() {
+    const d = deadline(), n = Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(nzToday() + 'T00:00:00Z')) / 864e5);
+    const cls = n < 7 ? 'rncd-red' : n < 14 ? 'rncd-amber' : 'rncd-blue';
+    const big = n > 1 ? n + ' days to go' : n === 1 ? '1 day to go' : n === 0 ? 'Deadline is today' : Math.abs(n) + (Math.abs(n) === 1 ? ' day' : ' days') + ' past the deadline';
+    return `<button type="button" class="rncd ${cls}" onclick="Reno.editDeadline()" aria-label="Deadline ${esc(fmtD(d))}. Tap to change"><span class="rncdi">⏳</span><span class="rncdt"><b>${big}</b><span>Deadline ${esc(fmtD(d))} · tap to change</span></span></button>`;
+  }
   const bar = p => `<div class="rnbar"><i style="width:${p}%"></i></div>`;
   function html() {
     const all = AREAS.filter(a => !a.final).flatMap(jobsOf), fin = finalOpen(), done = all.filter(j => j.status === 'done').length;
     const ov = pct(all.concat(fin ? jobsOf(AREAS[AREAS.length - 1]) : []));
-    let h = `<div class="rnhero"><div class="rnhl"><div class="rnk">Overall progress</div><div class="rnbig">${ov}%</div><div class="rns">${done} of ${all.length} jobs done${fin ? ' · final stage open' : ''}</div></div><div class="rnring" style="--p:${ov}"><span>🛠️</span></div></div>${bar(ov)}`;
+    let h = countdown() + `<div class="rnhero"><div class="rnhl"><div class="rnk">Overall progress</div><div class="rnbig">${ov}%</div><div class="rns">${done} of ${all.length} jobs done${fin ? ' · final stage open' : ''}</div></div><div class="rnring" style="--p:${ov}"><span>🛠️</span></div></div>${bar(ov)}`;
     let noted = false; try { noted = localStorage.getItem('renoNoteHidden') === '1'; } catch (e) { }
     if (!noted && done < all.length) h += `<div class="rnnote"><div><b>Project already underway?</b> Tick off what’s done: tap a job’s circle, or use “Mark room done” for a finished room.</div><button type="button" onclick="Reno.hideNote()" aria-label="Hide this note">✕</button></div>`;
     AREAS.forEach(a => {
@@ -40,7 +49,7 @@
       h += `<section class="rnarea${locked ? ' rnlocked' : ''}"><div class="rnah"><span class="rne">${a.e}</span><div class="rnat"><div class="rnan">${esc(a.n)}</div><div class="rnas">${locked ? 'Unlocks when everything else is done' : `${L.filter(j => j.status === 'done').length}/${L.length} done${ae.who ? ' · ' + esc(ae.who) : ''}`}</div></div><span class="rnp">${p}%</span></div>${bar(p)}`;
       if (!locked) {
         h += `<div class="rnctl"><button type="button" class="rnchip rnall" onclick="Reno.roomDone('${a.k}')">${L.every(j => j.status === 'done') ? '↺ Untick all' : '✓ Mark room done'}</button><button type="button" class="rnchip" onclick="Reno.assignArea('${a.k}')">👤 ${ae.who ? esc(ae.who) : 'Assign area'}</button>${a.floorDef ? `<span class="rnseg"><button type="button" class="${(ae.floor || a.floorDef) === 'carpet' ? 'on' : ''}" onclick="Reno.floor('${a.k}','carpet')">Carpet</button><button type="button" class="${(ae.floor || a.floorDef) === 'tiles' ? 'on' : ''}" onclick="Reno.floor('${a.k}','tiles')">Stick-down tiles</button></span>` : ''}</div>`;
-        h += L.map((j, i) => `<div class="rnjob s-${j.status}"><button type="button" class="rnst" aria-label="${j.status === 'done' ? 'Untick' : 'Tick done'}: ${esc(j.title)}" onclick="Reno.cycle('${j.id}')">${j.status === 'done' ? '✓' : i + 1}</button><button type="button" class="rnjt" onclick="Reno.edit('${j.id}')"><div class="t">${esc(j.title)}</div><div class="s"><span class="rnpill p-${j.status}">${ST[j.status]}</span>${j.status === 'done' && j.by ? ' · ticked by ' + esc(j.by) : ''}${j.who || j.areaWho ? ' · 👤 ' + esc(j.who || j.areaWho) : ''}${j.due ? ' · 📅 ' + fmtD(j.due) : ''}${j.notes ? ' · ' + esc(j.notes.slice(0, 60)) : ''}</div></button></div>`).join('');
+        h += L.map((j, i) => `<div class="rnjob s-${j.status}"><button type="button" class="rnst" aria-label="${j.status === 'done' ? 'Untick' : 'Tick done'}: ${esc(j.title)}" onclick="Reno.cycle('${j.id}')">${j.status === 'done' ? '✓' : i + 1}</button><button type="button" class="rnjt" onclick="Reno.edit('${j.id}')"><div class="t">${esc(j.title)}</div><div class="s"><span class="rnpill p-${j.status}">${ST[j.status]}</span>${j.status === 'done' && j.by ? ' · ticked by ' + esc(j.by) : ''}${j.who || j.areaWho ? ' · 👤 ' + esc(j.who || j.areaWho) : ''}${j.due ? ' · 📅 ' + fmtD(j.due) : ''}${j.notes ? ' · ' + esc(j.notes.slice(0, 60)) : ''}</div></button>${j.counter ? `<span class="rncnt"><b>${j.count}</b> ${j.count === 1 ? 'run' : 'runs'} done<button type="button" aria-label="Add a dump run" onclick="Reno.addRun('${j.id}')">+1</button></span>` : ''}</div>`).join('');
       }
       h += '</section>';
     });
@@ -60,6 +69,8 @@
     progress() { const all = AREAS.flatMap(jobsOf); return pct(all); },
     cycle(id) { const j = findJob(id); if (!j) return; setE(id, { status: j.status === 'done' ? 'todo' : 'done' }); },
     roomDone(k) { const a = AREAS.find(x => x.k === k); if (!a) return; const L = jobsOf(a), all = L.every(j => j.status === 'done'); if (!all && !confirm('Mark every job in ' + a.n + ' as done?')) return; L.forEach(j => { const e = Object.assign({}, ent(j.id), { id: j.id, status: all ? 'todo' : 'done', updated: Date.now(), by: me }); st.items[j.id] = e; if (!st.dirty.includes(j.id)) st.dirty.push(j.id); }); persist(); onChange(); soon(); },
+    editDeadline() { sheet('Project deadline', `<label class="rnl">Finish by<input class="rnin" id="rndl" type="date" value="${esc(deadline())}"></label><p class="rnhelp">Shows on everyone’s phone.</p>`, d => { const v = d.querySelector('#rndl').value; if (/^\d{4}-\d{2}-\d{2}$/.test(v)) setE('project', { deadline: v }); }); },
+    addRun(id) { const j = findJob(id); if (!j) return; setE(id, { count: j.count + 1, status: j.status === 'done' ? 'done' : 'doing' }); },
     hideNote() { try { localStorage.setItem('renoNoteHidden', '1'); } catch (e) { } onChange(); },
     floor(k, f) { setE('a-' + k, { floor: f }); },
     assignArea(k) { const a = AREAS.find(x => x.k === k), ae = ent('a-' + k); sheet('Who’s doing ' + a.n + '?', `<label class="rnl">Name<input class="rnin" id="rnwho" value="${esc(ae.who || '')}" placeholder="Type a name, e.g. Millesha" maxlength="40"></label><p class="rnhelp">Every job in this area goes to them, unless a job has its own name.</p>`, d => setE('a-' + k, { who: d.querySelector('#rnwho').value.trim() })); },
@@ -89,6 +100,9 @@
 .rnpill{border-radius:99px;padding:1px 7px;font-weight:700;font-size:.72rem}.p-todo{background:#f1f5f9;color:#475569}.p-doing{background:#fef3c7;color:#92400e}.p-done{background:#dcfce7;color:#166534}
 .rnall{background:#dcfce7;color:#166534}
 .rnnote{display:flex;gap:10px;align-items:flex-start;background:#fffbeb;border-radius:14px;padding:12px 14px;font-size:.88rem;color:#78350f}.rnnote button{border:0;background:none;font-size:1rem;color:#92400e;padding:0 2px}
+.rncd{display:flex;align-items:center;gap:12px;border:0;border-radius:18px;padding:12px 16px;text-align:left;color:#fff;width:100%}.rncdi{font-size:1.6rem}.rncdt{display:flex;flex-direction:column}.rncdt b{font-size:1.35rem;line-height:1.2}.rncdt span{font-size:.82rem;opacity:.92}
+.rncd-blue{background:linear-gradient(135deg,#0ea5e9,#2563eb)}.rncd-amber{background:linear-gradient(135deg,#f59e0b,#d97706)}.rncd-red{background:linear-gradient(135deg,#ef4444,#b91c1c)}
+.rncnt{display:flex;align-items:center;gap:6px;font-size:.78rem;color:#475569;flex:none}.rncnt b{font-size:1rem;color:#0f172a}.rncnt button{border:0;background:#1d4ed8;color:#fff;border-radius:99px;padding:6px 10px;font-weight:800;font-size:.85rem}
 .rnfoot{font-size:.78rem;color:#94a3b8;text-align:center;margin:4px 0 0}
 .rnsheet{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center}.rnsb{background:#fff;width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;color:#0f172a}
 .rnsb h3{margin:0;font-size:1.15rem}.rnl{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:650;color:#334155}.rnin{font:inherit;font-weight:400;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;font-size:1rem}
