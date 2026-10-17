@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.32';
+const APP_VERSION = '2.26.33';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5396,8 +5396,13 @@ function todoPriority(t) {
   return p === 'high' || p === 'low' ? p : 'normal';
 }
 function todoPriRank(t) { return todoPriority(t) === 'high' ? 0 : todoPriority(t) === 'low' ? 2 : 1; }
+// 2.26.33: a to-do can be To do, In progress or Complete. `done` stays the source of truth (shared lists keep working); `status: 'doing'` marks In progress.
+const todoStatus = t => t && t.done ? 'done' : t && t.status === 'doing' ? 'doing' : 'todo';
+async function todoStart(id) { const t = (S.todos || []).find(x => x.id === id); if (!t || t.done) return; const s = snap(); if (t.status === 'doing') delete t.status; else t.status = 'doing'; await save(); render(); toast(t.status === 'doing' ? `In progress: ${t.title}` : `${t.title} back to To do.`, 'Undo', undoTo(s)); }
+const todoStatBtn = t => t.done ? '' : `<button type="button" class="tstat ${todoStatus(t) === 'doing' ? 'doing' : ''}" onclick="todoStart('${t.id}')" aria-label="${todoStatus(t) === 'doing' ? 'In progress. Tap to set back to To do' : 'Start'}: ${esc(t.title)}">${todoStatus(t) === 'doing' ? '● In progress' : '▶ Start'}</button>`;
 function cmpOpenTodo(a, b) {
-  return todoPriRank(a) - todoPriRank(b)
+  return (todoStatus(a) === 'doing' ? 0 : 1) - (todoStatus(b) === 'doing' ? 0 : 1)
+    || todoPriRank(a) - todoPriRank(b)
     || (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15)
     || (b.created || 0) - (a.created || 0);
 }
@@ -5414,7 +5419,7 @@ function Todo() {
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const row = t => todoMetaDedupe(`<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
     <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${sharedMark(t)}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
-    ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${t.done ? '' : todoCalBtn(t)}</div>`);
+    ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}</div>`);
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
   return banHeader('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()'), 'todo') +
@@ -5441,7 +5446,7 @@ async function tick(id) {
   const t = S.todos.find(x => x.id === id); if (!t) return;
   const s = snap();
   t.done = !t.done;
-  if (t.done) t.doneAt = Date.now(); else delete t.doneAt;
+  if (t.done) { t.doneAt = Date.now(); delete t.status; } else delete t.doneAt;
   await save();
   if (sheetOpen) await closeSheet();
   render();

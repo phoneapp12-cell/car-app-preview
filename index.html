@@ -328,6 +328,9 @@ select.sel{font:inherit;font-size:0.9375rem;font-weight:600;color:var(--brand);b
 .bill .amt{font-weight:750;font-size:1rem}
 .paybtn{margin-top:6px;font-size:0.84375rem;font-weight:700;color:var(--brand);background:var(--brand2);border-radius:999px;padding:7px 12px;white-space:nowrap}
 .tapzone{flex:1;min-width:0;display:flex;align-items:center;gap:12px;text-align:left}
+.tstat{flex:none;border:1px solid var(--line);background:none;border-radius:999px;padding:5px 10px;font-size:.78rem;font-weight:700;color:var(--ink2);white-space:nowrap}
+.tstat.doing{background:#fef3c7;border-color:#fcd34d;color:#92400e}
+@media (max-width:560px){.row:has(>.tstat){flex-wrap:wrap;row-gap:6px}.row:has(>.tstat)>.tapzone{flex:1 1 calc(100% - 56px)}.row>.tstat{order:3;margin-left:56px}.row:has(>.tstat)>.paybtn{order:4;margin-left:0!important}}
 /* 2.26.22: on phones the calendar button and due pill squeezed the title to one letter per line; the button now drops under the title */
 .row .t,.row .s{overflow-wrap:break-word;word-break:normal}
 @media (max-width:560px){.row:has(>.paybtn){flex-wrap:wrap;row-gap:6px}.row:has(>.paybtn)>.tapzone{flex:1 1 calc(100% - 56px)}.row>.paybtn{margin-left:56px!important;align-self:flex-start!important;padding:5px 11px}.tapzone>.pill{flex:none}}
