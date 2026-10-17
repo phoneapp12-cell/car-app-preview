@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.68';
+const APP_VERSION = '2.26.69';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19028,6 +19028,7 @@ async function start() {
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   try { const pn = await pnu312Mig(); if (pn) { render(); setTimeout(() => toast(pn), 2600); } } catch (e) { console.error('pnu312', e); }
   try { const en = await ecoBillMig(); if (en) { render(); setTimeout(() => toast(en, 'View', () => go('#bills')), 1200); } } catch (e) { console.error('eco75', e); }
+  try { if (!S.settings.acctAuto69) { const K = S.settings.billAcctKeep || {}; Object.keys(K).forEach(k => { const b = (S.bills || []).find(x => x.id === k.split('|')[0]); if (!b || !/\b(mortgage|home ?loans?)\b/i.test(b.name || '')) delete K[k]; }); S.settings.billAcctKeep = K; S.settings.acctAuto69 = true; await save(); if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => cfLoad(), 1500); } } catch (e) { console.error('acctAuto69', e); }
   try { const mm = await mort3Mig(); if (mm) { render(); setTimeout(() => toast(mm, 'View', () => go('#budget')), 5500); } } catch (e) { console.error('mort3', e); }
   try { const bm = await bills66Mig(); if (bm) { render(); setTimeout(() => toast(bm, 'View', () => go('#bills')), 4000); } } catch (e) { console.error('bills66', e); }
   try { const im = await insBillMig(); if (im) { render(); setTimeout(() => toast(im, 'View', () => go('#bills')), 2600); } } catch (e) { console.error('ins579', e); }
@@ -20793,7 +20794,7 @@ function pnItems() {
   return (off ? [off] : []).concat(N.filter(n => n && n.id && n.title && !gone.has(n.id)).sort((a, b) => String(b.at).localeCompare(String(a.at))).map(n => {
     let when = ''; try { when = new Date(n.at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) { }
     const urgent = n.level === 'urgent';
-    return { id: n.id, urgent, html: `<div class="row glnew pnrow${urgent ? ' pnurg' : ''}" data-pn="${esc(n.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${/^#[a-z]+$/.test(n.go || '') ? n.go : '#power'}')"><div class="ic">${IC[n.kind] || '⚡'}</div><div class="tx"><div class="t">${esc(n.title)}</div>${n.body ? `<div class="s pnbody">${esc(n.body)}</div>` : ''}${n.bill && n.acct ? `<div class="mbbtns"><button type="button" class="btn small primary" onclick="event.stopPropagation();billAcctSwitch(${jsArg(n.bill)},${jsArg(n.acct)})">Switch</button><button type="button" class="btn small" onclick="event.stopPropagation();billAcctKeep(${jsArg(n.bill)},${jsArg(n.acct)})">Keep as is</button></div>` : ''}<div class="s">${esc(n.src || 'Power')}${when ? ' · ' + esc(when) : ''}</div></div></div>` };
+    return { id: n.id, urgent, html: `<div class="row glnew pnrow${urgent ? ' pnurg' : ''}" data-pn="${esc(n.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${/^#[a-z]+$/.test(n.go || '') ? n.go : '#power'}')"><div class="ic">${IC[n.kind] || '⚡'}</div><div class="tx"><div class="t">${esc(n.title)}</div>${n.body ? `<div class="s pnbody">${esc(n.body)}</div>` : ''}<div class="s">${esc(n.src || 'Power')}${when ? ' · ' + esc(when) : ''}</div></div></div>` };
   }));
 }
 function glAlertParts() {
@@ -21059,22 +21060,35 @@ async function insBillMig() {
    Runs whenever Cash flow loads or refreshes. Only names and amounts are compared; nothing leaves the phone. */
 function billAcctNow(D, b) { return (S.settings.cfBillAcct || {})[b.id] || billBankAcct(D, b) || ''; }
 function billAcctCheck(D) {
-  if (!D || !Array.isArray(S.bills)) return; S.settings.billAcctKeep = S.settings.billAcctKeep || {};
+  // 2.26.69: Shane's rule: apart from mortgages (always ASB MORTGAGE) and one-off bills, a bill follows the bank. No question;
+  // a quiet bell note records what moved, several at once in one note.
+  if (!D || !Array.isArray(S.bills)) return;
   const since = addDays(todayISO(), -90), sp = D.transactions.filter(t => { const a = D.accounts.find(x => x.id === t.acct); return a && cfSpendable(a) && !cfIsOrbit(a) && t.date.slice(0, 10) >= since; });
-  let L = (S.settings.appNotices || []).filter(n => !(n && n.bill)), ch = false;
+  const moved = [];
   S.bills.forEach(b => {
-    if (!b || b.paid || b.paidBy === 'card' || /\bmortgage\b/i.test(b.name || '')) return;
-    const cur = billAcctNow(D, b); if (!cur) return;
-    const tk = cfToks(b.name); if (!tk.length) return;
-    const hits = sp.filter(t => t.amount < 0 && tk.some(w => (t.desc + ' ' + (t.merchant || '')).toLowerCase().includes(w))).sort((a, c) => c.date.localeCompare(a.date)).slice(0, 3);
-    if (hits.length < 2) return; const cnt = {}; hits.forEach(t => { cnt[t.acct] = (cnt[t.acct] || 0) + 1; });
+    if (!b || b.paid || b.paidBy === 'card' || /\b(mortgage|home ?loans?)\b/i.test(b.name || '') || !b.repeat || b.repeat === 'none') return;
+    const cur = billAcctNow(D, b);
+    const tk = cfToks(b.name).filter(w => !/^(whangarei|northland|onerahi|google|card|fuel|limited|zealand|council|trust)$/.test(w)); if (!tk.length) return;
+    const hits = sp.filter(t => t.amount < 0 && !t.pair && t.cat2 !== 'transfer' && tk.some(w => (t.desc + ' ' + (t.merchant || '')).toLowerCase().includes(w))).sort((a, c) => c.date.localeCompare(a.date)).slice(0, 3);
+    if (!hits.length) return; const cnt = {}; hits.forEach(t => { cnt[t.acct] = (cnt[t.acct] || 0) + 1; });
     const top = Object.keys(cnt).sort((a, c) => cnt[c] - cnt[a])[0];
-    if (!top || top === cur || cnt[top] < 2 || S.settings.billAcctKeep[b.id + '|' + top]) return;
-    L.push({ id: 'bacct-' + b.id + '-' + top.slice(-8), kind: 'bill', src: 'Bills', go: '#bills', at: hits[0].date, bill: b.id, acct: top,
-      title: `${String(b.name).slice(0, 40)} has been coming out of ${fnAcctNameD(D, top)}, not ${fnAcctNameD(D, cur)}. Switch it?`, body: `${cnt[top]} of its last ${hits.length} payments in the bank came out of ${fnAcctNameD(D, top)}.` });
+    if (!top || top === cur || (hits.length > 1 && cnt[top] < 2)) return;
+    S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[b.id] = top;
+    const a = D.accounts.find(x => x.id === top); if (a) b.fromBank = BILL_BANKS.find(k => new RegExp(k, 'i').test(a.bank)) || b.fromBank; delete b.fromAcct;
+    moved.push({ name: String(b.name || 'A bill').slice(0, 40), to: fnAcctNameD(D, top), from: cur ? fnAcctNameD(D, cur) : '' });
   });
-  const old = JSON.stringify((S.settings.appNotices || []).filter(n => n && n.bill).map(n => n.id)), now = JSON.stringify(L.filter(n => n.bill).map(n => n.id));
-  if (old !== now) { S.settings.appNotices = L.slice(-30); save(); }
+  // the old Switch / Keep questions are gone
+  let L = (S.settings.appNotices || []).filter(n => !(n && n.bill));
+  if (moved.length) {
+    const by = {}; moved.forEach(m => { (by[m.to] = by[m.to] || []).push(m.name); });
+    const parts = Object.entries(by).map(([to, names]) => `${names.length > 2 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names.join(' and ')} now ${names.length > 1 ? 'come' : 'comes'} out of ${to}`);
+    L.push({ id: 'bacct-auto-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: parts.join('; ') + ', matching your bank.',
+      body: moved.map(m => m.name + (m.from ? ' was set to ' + m.from : ' had no account set')).join(' · ') + '. Bills follow your bank now, except mortgages (ASB MORTGAGE) and one-off bills.' });
+    cfRegulars.c = null;
+  }
+  const changed = moved.length || (S.settings.appNotices || []).some(n => n && n.bill && n.acct);
+  S.settings.appNotices = L.slice(-30); if (changed) save();
+  return moved;
 }
 function fnAcctNameD(D, id) { const a = D.accounts.find(x => x.id === id); return a ? (cfIsOrbit(a) ? 'ORBIT' : cfAName(a)) : 'another account'; }
 function billAcctDrop(id) { S.settings.appNotices = (S.settings.appNotices || []).filter(n => !(n && n.bill === id)); }
