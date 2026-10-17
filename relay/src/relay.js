@@ -134,7 +134,7 @@ function corsHeaders(origin, env) {
   if (origin && allowedOrigins(env).includes(origin)) {
     h['Access-Control-Allow-Origin'] = origin;
     h['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
-    h['Access-Control-Allow-Headers'] = 'Content-Type';
+    h['Access-Control-Allow-Headers'] = 'Content-Type, X-Cash-Key';
     h['Access-Control-Max-Age'] = '86400';
     h['Access-Control-Expose-Headers'] = 'X-Feed-Status, Last-Modified, ETag';
   }
@@ -201,6 +201,7 @@ export async function fetchFeed(u, fetchImpl = fetch) {
 const STATUS = { bad_url: 400, host_not_allowed: 403, not_found: 404, denied: 403, upstream_error: 502, timeout: 504, too_large: 413, not_calendar: 422, too_many_redirects: 502 };
 
 import { hueRoute } from './hue.js';
+import { akahuRoute } from './akahu.js';
 import { heatRoute } from './heat.js';
 import { alarmRoute } from './alarm.js';
 export async function handle(request, env = {}, fetchImpl = fetch) {
@@ -431,6 +432,11 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       if (data && data.error) return json(status, data.error, origin, env);
       return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) { return json(502, 'shared_unavailable', origin, env); }
+  }
+  if (path === '/cashflow' || path.startsWith('/cashflow/') || path.startsWith('/akahu/')) { // 2.26.57: Akahu cash flow (app origin + device key)
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try { const [status, data] = await akahuRoute(path, request, env, fetchImpl); return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
+    catch (e) { return new Response(JSON.stringify({ error: 'cashflow_unavailable' }), { status: 502, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json' } }); }
   }
   if (path === '/power') { // 2.26.39: SolarZero power figures pushed from the box
     const H = { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };

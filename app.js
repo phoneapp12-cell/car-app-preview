@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.56';
+const APP_VERSION = '2.26.57';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10396,6 +10396,7 @@ function More() {
     reminders: () => remindersMoreSub(),
     loans: () => loansMoreSub(),
     budget: () => budgetMoreSub(),
+    cashflow: () => { const st = cfStat(); return cfKey() && st ? `${esc(st.name || 'Connected')} · ${plural(st.accounts || 0, 'account')}` : 'Connect your bank (Akahu)'; },
     lights: () => hueKey() ? 'Philips Hue rooms, lights and scenes' : 'Connect Philips Hue',
     heat: () => hueKey() ? 'Panasonic and Mitsubishi' : 'Needs Lights to be linked first',
     alarm: () => { try { return alarmSub(); } catch (e) { return 'ADT alarm status'; } },
@@ -10450,7 +10451,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
   tv: ['tv', 'tv', 'TV guide', 'TV'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], about: ['info', 'about', 'About you', 'About'],
-  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
+  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], cashflow: ['coins', 'loan', 'Cash flow', 'Cash flow'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
@@ -10475,7 +10476,7 @@ const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
-  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'commission', 'loans', 'claims'] },
+  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'commission', 'loans', 'claims'] },
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
@@ -16807,6 +16808,7 @@ function Settings() {
    Reminders are checked every time you open the app. Background checks skip 9 pm to 7 am.
    <b>Android may delay background reminders if you don’t open the app for a while.</b> Opening it every few days keeps them coming.</div></div>
 
+  ${akahuSettings()}
   <div class="sec">Commission</div>
   <div class="list" id="commsettings">
    <div class="srow"><div class="tx"><div class="t">Pay fortnight starts</div><div class="s">${S.commission.anchor ? `Mondays. This pay fortnight: ${commRange(curFortnight())}.` : 'Not set up yet. Pick the Monday your pay fortnight started.'}</div></div><button class="btn small" onclick="anchorForm()">${S.commission.anchor ? 'Change' : 'Set up'}</button></div>
@@ -18588,7 +18590,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19774,6 +19776,153 @@ function nlItems() {
   return out.map(x => ({ ...x, wb: x.where === '#todo' ? waterBlock((S.todos || []).find(t => t.id === x.id)) : null })).map(x => ({ ...x, urgent: x.days !== null && x.days <= 0 && !x.wb, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.wb ? ' · 💧 ' + esc(x.wb) : x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div>${x.doing ? '<span class="pill glprog">In progress</span>' : ''}</div>` }));
 }
 function glStartedTxt(t) { if (!t.startedAt) return ''; const d = new Date(t.startedAt), today = todayISO(d) === todayISO(); return 'Started ' + (today ? fmtTime(d.toTimeString().slice(0, 5)) : fmtW(todayISO(d))); }
+/* ================= CASH FLOW (Akahu, 2.26.57) =================
+   Read-only bank balances and transactions via the relay. The Akahu tokens are pasted once in Settings › Connect bank,
+   checked and stored only on the relay (encrypted). This phone keeps a random device key (localStorage cfKey), never
+   the tokens. Bank data stays in memory here. Projection: balances now, minus unpaid Bills and this fortnight's mortgages
+   still to come, up to the day before next pay. Pay isn't counted until it lands. */
+let CF = null, CFbusy = false, CFerr = '', CFmock = null;
+function cfKey() { try { return localStorage.getItem('cfKey') || ''; } catch (e) { return ''; } }
+function cfStat() { try { return JSON.parse(localStorage.getItem('cfStatus') || 'null'); } catch (e) { return null; } }
+function cfForget() { try { localStorage.removeItem('cfKey'); localStorage.removeItem('cfStatus'); } catch (e) { } CF = null; }
+async function cfApi(path, method = 'GET', body) {
+  const k = cfKey(), r = await fetch(RELAY_URL + path, { method, cache: 'no-store', headers: Object.assign({ 'Content-Type': 'application/json' }, k ? { 'X-Cash-Key': k } : {}), body: body ? JSON.stringify(body) : undefined });
+  let d = {}; try { d = await r.json(); } catch (e) { } return [r.status, d];
+}
+const CF_ERR = { akahu_rejected: 'Akahu didn’t accept those tokens. Check you copied both in full (they start with user_token_ and app_token_).', bad_tokens: 'Those don’t look like Akahu tokens. The User Access Token starts with user_token_ and the App ID Token with app_token_.',
+  already_connected: 'A bank link is already connected from another phone. Disconnect it there first.', rate_limited: 'Too many tries. Please wait an hour and try again.', not_configured: 'The bank link isn’t set up on the relay yet.', akahu_unavailable: 'Akahu couldn’t be reached. Try again in a few minutes.' };
+function akahuSettings() {
+  const st = cfStat();
+  if (cfKey() && st) return `<div class="sec" id="akahuset">Connect bank (Akahu)</div><div class="list"><div class="srow"><div class="tx"><div class="t">Connected as ${esc(st.name || 'you')} · ${plural(st.accounts || 0, 'account')}</div><div class="s">Read-only. The tokens are kept only on the relay, encrypted; this phone has a device key.${st.at ? ' Updated ' + esc(cfWhen(st.at)) + '.' : ''}</div></div></div>
+    <div class="btns" style="padding:8px 12px 12px"><button type="button" class="btn small primary" onclick="go('#cashflow')">Open Cash flow</button><button type="button" class="btn small danger" onclick="akahuDisconnect()">Disconnect</button></div></div>`;
+  return `<div class="sec" id="akahuset">Connect bank (Akahu)</div><div class="list"><div style="padding:12px">
+    <p class="muted" style="margin:0 0 10px">For Cash flow. Paste the two tokens from your Akahu personal app (my.akahu.nz › Developers). Akahu is read-only: it can see balances and transactions, it can’t move money. They’re checked with Akahu, then kept only on the app’s relay, encrypted. They’re not saved on this phone.</p>
+    <label class="field"><span>User Access Token</span><input id="akuser" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="user_token_…"></label>
+    <label class="field"><span>App ID Token</span><input id="akapp" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="app_token_…"></label>
+    <p id="akerr" class="muted" style="color:#b91c1c;margin:4px 0 0" role="alert"></p>
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn primary" id="akbtn" onclick="akahuConnect()">Connect</button></div></div></div>`;
+}
+async function akahuConnect() {
+  const u = document.getElementById('akuser'), a = document.getElementById('akapp'), e = document.getElementById('akerr'), b = document.getElementById('akbtn');
+  const user = (u && u.value || '').trim(), app = (a && a.value || '').trim();
+  if (!/^user_token_\S{8,}$/.test(user) || !/^app_token_\S{8,}$/.test(app)) { if (e) e.textContent = CF_ERR.bad_tokens; return; }
+  if (b) { b.disabled = true; b.textContent = 'Checking with Akahu…'; } if (e) e.textContent = '';
+  let s, d; try { [s, d] = await cfApi('/akahu/connect', 'POST', { user, app }); } catch (er) { s = 0; d = { error: 'akahu_unavailable' }; }
+  if (s === 200 && d.key) {
+    try { localStorage.setItem('cfKey', d.key); localStorage.setItem('cfStatus', JSON.stringify({ name: d.name || '', accounts: d.accounts || 0, at: new Date().toISOString() })); } catch (er) { }
+    if (u) u.value = ''; if (a) a.value = ''; CF = null;
+    toast(`Connected as ${d.name || 'you'} · ${plural(d.accounts || 0, 'account')}`); render(); return;
+  }
+  if (u) u.value = ''; if (a) a.value = ''; // never leave them sitting in the page
+  if (b) { b.disabled = false; b.textContent = 'Connect'; } if (e) e.textContent = CF_ERR[d && d.error] || 'That didn’t work. Please try again.';
+}
+function akahuDisconnect() {
+  confirmSheet('Disconnect your bank?', 'This deletes the stored Akahu tokens and bank data from the relay. Cash flow goes back to empty. You can connect again any time.', 'Disconnect', async () => {
+    try { await cfApi('/akahu/disconnect', 'POST', {}); } catch (e) { } cfForget(); render(); toast('Bank disconnected.');
+  });
+}
+function cfWhen(iso) { const t = Date.parse(iso); if (!t) return ''; const d = nzStampLocal(new Date(t)); return (d.slice(0, 10) === todayISO() ? 'today ' : fmtW(d.slice(0, 10)) + ' ') + fmtTime(d.slice(11, 16)); }
+async function cfLoad(force) {
+  if (CFmock) { CF = CFmock; return; }
+  if (CFbusy || !cfKey()) return; CFbusy = true; CFerr = '';
+  try {
+    const [s, d] = force ? await cfApi('/cashflow/refresh', 'POST', {}) : await cfApi('/cashflow');
+    if (s === 200 && d.connected === false) { cfForget(); }
+    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); }
+    else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
+    else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
+    else CFerr = CF_ERR[d.error] || 'Cash flow couldn’t load. Try again shortly.';
+  } catch (e) { CFerr = 'Cash flow couldn’t load. Check your connection.'; }
+  CFbusy = false; if ((location.hash || '').startsWith('#cashflow') && !sheetOpen) render();
+}
+// the $1,000 ASB rewards card: its real available balance feeds the Budget card (owed = limit − available)
+function cfCardAcct(D) { const C = (D.accounts || []).filter(a => a.type === 'CREDITCARD'); return C.find(a => a.limit === 1000) || C.find(a => /reward/i.test(a.name)) || (C.length === 1 ? C[0] : null); }
+function cfFeedCard(D) {
+  try { const a = cfCardAcct(D); if (!a || a.available == null) return; const c = debtsSt().card, av = String(Math.round(a.available * 100) / 100), lim = a.limit ? String(a.limit) : c.limit;
+    if (c.available === av && c.limit === lim && c.akahu === a.id) return; Object.assign(c, { available: av, limit: lim, availAt: todayISO(), akahu: a.id }); delete c.availMig; c.balance = String(cardOwed(c)); save(); } catch (e) { }
+}
+const cfMoney = v => (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const cfSpendable = a => a.type !== 'CREDITCARD' && a.type !== 'LOAN' && a.type !== 'KIWISAVER' && a.type !== 'INVESTMENT' && a.type !== 'TERMDEPOSIT';
+const cfBal = a => a.available != null ? a.available : (a.balance || 0);
+const cfAName = a => `${a.bank ? a.bank + ' ' : ''}${a.name}`;
+const cfToks = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !/^(bill|payment|limited|power|direct|debit)$/.test(w));
+function cfBillTx(bill, txs) { const tk = cfToks(bill.name), amt = +bill.amount || 0; return txs.filter(t => t.amount < 0 && t.cat2 !== 'transfer' && (tk.some(w => (t.desc + ' ' + t.merchant).toLowerCase().includes(w)) || (amt && Math.abs(-t.amount - amt) <= 0.5))); }
+function cfMain(D) { const L = D.accounts.filter(a => cfSpendable(a)); const id = S.settings && S.settings.cfMain; return L.find(a => a.id === id) || L.filter(a => /ASB/i.test(a.bank) && a.type === 'CHECKING').sort((a, b) => cfBal(b) - cfBal(a))[0] || L[0] || null; }
+function cfPlan(D, pp) {
+  const T = todayISO(), end = pp.end, txs = D.transactions || [], main = cfMain(D), out = [];
+  const inP = t => t.date.slice(0, 10) >= pp.start && t.date.slice(0, 10) <= T;
+  (S.bills || []).filter(b => b && !b.paid && b.due && b.due >= T && b.due <= end && b.paidBy !== 'card' && +b.amount > 0 && !/\bmortgage\b/i.test(b.name || '')).forEach(b => {
+    const hist = cfBillTx(b, txs.filter(t => { const a = D.accounts.find(x => x.id === t.acct); return a && cfSpendable(a); })); if (hist.some(inP) && hist.find(inP).amount && Math.abs(-hist.find(inP).amount - b.amount) <= 1) return; // looks paid already
+    const acct = (S.settings.cfBillAcct || {})[b.id] || (hist[0] && hist[0].acct) || (main && main.id);
+    out.push({ what: b.name, amount: +b.amount, date: b.due, acct });
+  });
+  try { const bud = (S.budgets || []).find(x => x.start === pp.start); if (bud) budgetMortEff(bud).filter(m => m.eff > 0).forEach(m => {
+    const near = t => t.amount < 0 && Math.abs(-t.amount - m.eff) <= 2;
+    if (txs.some(t => inP(t) && near(t))) return; // already gone out this fortnight
+    const prev = txs.find(t => near(t) && t.date.slice(0, 10) < pp.start);
+    let date = end; if (prev) { let d = prev.date.slice(0, 10); while (d < pp.start) d = addDays(d, 14); if (d <= end) date = d < T ? T : d; }
+    out.push({ what: m.name, amount: m.eff, date, acct: prev ? prev.acct : main && main.id, mort: 1 });
+  }); } catch (e) { }
+  out.sort((a, b) => a.date.localeCompare(b.date));
+  const accts = D.accounts.filter(cfSpendable).map(a => { let bal = cfBal(a), min = bal, low = null; out.filter(o => o.acct === a.id).forEach(o => { bal = Math.round((bal - o.amount) * 100) / 100; if (bal < min) { min = bal; } if (bal < 0 && !low) low = o; }); return { a, now: cfBal(a), end: bal, min, low }; });
+  const tips = [];
+  accts.filter(x => x.min < 0).forEach(x => {
+    const need = Math.ceil(-x.min / 10) * 10, donor = accts.filter(y => y !== x && y.min - need >= 0).sort((p, q) => q.min - p.min)[0];
+    const by = fmtW(x.low.date).split(' ')[0];
+    tips.push(donor ? `Move ${cfMoney(need)} from ${cfAName(donor.a)} to ${cfAName(x.a)} before ${by} for the ${x.low.what}` : `${cfAName(x.a)} needs ${cfMoney(need)} more before ${by} for the ${x.low.what}, and no other account has enough spare`);
+    if (donor) donor.min -= need;
+  });
+  return { out, accts, tips };
+}
+function cfBody(M) {
+  const D = M.data, pp = payPeriod(0), T = todayISO();
+  const order = a => a.type === 'CREDITCARD' ? 30 + (/ASB/i.test(a.bank) ? 0 : 1) : /ASB/i.test(a.bank) ? 0 : /ANZ/i.test(a.bank) ? 10 : /kiwi/i.test(a.bank) ? 20 : 25;
+  const grp = a => a.type === 'CREDITCARD' ? (a.bank || 'Credit') + ' card' : a.bank || 'Other';
+  const A = [...D.accounts].sort((a, b) => order(a) - order(b) || cfBal(b) - cfBal(a)), groups = [];
+  A.forEach(a => { const g = grp(a); let G = groups.find(x => x.g === g); if (!G) groups.push(G = { g, L: [] }); G.L.push(a); });
+  const card = cfCardAcct(D);
+  const accRow = a => a.type === 'CREDITCARD'
+    ? `<div class="row cfrow"><div class="tx"><div class="t">${esc(a.name)}${a.number ? ` <span class="muted">··${esc(a.number.slice(-4))}</span>` : ''}</div><div class="s">Available ${cfMoney(a.available || 0)}${a.limit ? ' of ' + cfMoney(a.limit) : ''} · you owe ${cfMoney(Math.max(0, a.limit ? a.limit - (a.available || 0) : -(a.balance || 0)))}${a === card ? ' · feeds Budget’s Rewards card' : ''}</div>${a.limit ? `<div class="pbar"><i style="width:${Math.min(100, Math.round(100 * (a.limit - (a.available || 0)) / a.limit))}%"></i></div>` : ''}</div></div>`
+    : `<div class="row cfrow"><div class="tx"><div class="t">${esc(a.name)}${a.number ? ` <span class="muted">··${esc(a.number.slice(-4))}</span>` : ''}</div><div class="s">${esc(({ CHECKING: 'Everyday', SAVINGS: 'Savings', LOAN: 'Loan', KIWISAVER: 'KiwiSaver' })[a.type] || a.type.toLowerCase())}${a.available != null && a.balance != null && a.available !== a.balance ? ' · balance ' + cfMoney(a.balance) : ''}</div></div><b class="cfamt${cfBal(a) < 0 ? ' neg' : ''}">${cfMoney(cfBal(a))}</b></div>`;
+  const total = D.accounts.filter(cfSpendable).reduce((n, a) => n + cfBal(a), 0);
+  let flow = '', proj = '';
+  if (pp) {
+    const tx = (D.transactions || []).filter(t => t.date.slice(0, 10) >= pp.start && t.date.slice(0, 10) <= T && t.cat2 !== 'transfer');
+    const inn = tx.filter(t => t.amount > 0).reduce((n, t) => n + t.amount, 0), outt = tx.filter(t => t.amount < 0).reduce((n, t) => n - t.amount, 0);
+    const by = c => tx.filter(t => t.amount < 0 && t.cat2 === c).reduce((n, t) => n - t.amount, 0), w = Math.max(inn, outt) || 1;
+    flow = `<div class="sec">This pay fortnight · ${esc(fmtW(pp.start))} – ${esc(fmtW(pp.end))}</div><div class="card cfflow">
+      <div class="cfbar"><span>Money in</span><div class="pbar in"><i style="width:${Math.round(100 * inn / w)}%"></i></div><b>${cfMoney(inn)}</b></div>
+      <div class="cfbar"><span>Money out</span><div class="pbar out"><i style="width:${Math.round(100 * outt / w)}%"></i></div><b>${cfMoney(outt)}</b></div>
+      <div class="s muted">Mortgages ${cfMoney(by('mortgage'))} · card spending ${cfMoney(by('card'))} · other ${cfMoney(by('spend'))}. Transfers between your own accounts aren’t counted.</div></div>`;
+    const P = cfPlan(D, pp), nm = id => { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : 'unknown account'; };
+    proj = `<div class="sec">Before next pay · ${esc(fmtW(pp.next))}</div>` +
+      (P.tips.length ? `<div class="card cftips">${P.tips.map(t => `<div class="cftip">↔︎ ${esc(t)}</div>`).join('')}</div>` : '') +
+      `<div class="list">${P.accts.filter(x => x.now !== x.end || x.min < 0).map(x => `<div class="row cfrow${x.min < 0 ? ' cflow' : ''}"><div class="tx"><div class="t">${esc(cfAName(x.a))}</div><div class="s">${x.min < 0 ? `⚠️ Goes below $0 on ${esc(fmtW(x.low.date))} (${esc(x.low.what)})` : 'Stays above $0'}</div></div><b class="cfamt${x.end < 0 ? ' neg' : ''}">${cfMoney(x.now)} → ${cfMoney(x.end)}</b></div>`).join('') || `<div class="row"><div class="tx"><div class="t">Nothing else due before payday</div><div class="s">From Bills and this fortnight’s mortgages</div></div></div>`}</div>` +
+      (P.out.length ? `<div class="list cfout">${P.out.map(o => `<div class="row"><div class="tx"><div class="t">${esc(o.what)}</div><div class="s">${esc(fmtW(o.date))} · from ${esc(nm(o.acct))}</div></div><b class="cfamt">${cfMoney(-o.amount)}</b></div>`).join('')}</div>` : '');
+  } else proj = `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday</b><br>Cash flow uses the same pay fortnight as Bills and Budget.<div style="margin-top:8px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
+  const main = cfMain(D), tags = { transfer: 'Own transfer', income: 'Income', mortgage: 'Mortgage', card: 'Card' };
+  const recent = (D.transactions || []).slice(0, 12).map(t => { const bill = t.amount < 0 ? (S.bills || []).find(b => cfBillTx(b, [t]).length && cfToks(b.name).some(w => (t.desc + ' ' + t.merchant).toLowerCase().includes(w))) : null;
+    return `<div class="row cfrow"><div class="tx"><div class="t">${esc(t.merchant || t.desc)}</div><div class="s">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))}${bill ? ` · <span class="cftag bill">Bill: ${esc(bill.name)}</span>` : tags[t.cat2] ? ` · <span class="cftag ${t.cat2}">${tags[t.cat2]}</span>` : ''}</div></div><b class="cfamt${t.amount < 0 ? '' : ' pos'}">${cfMoney(t.amount)}</b></div>`; }).join('');
+  return `<div class="cfupd muted">Updated ${esc(cfWhen(M.at || D.at))} · <button type="button" class="linkbtn" onclick="cfRefresh()">Refresh</button> <small>(at most once an hour)</small></div>
+    <div class="card cftotal"><span>Spendable across your accounts</span><b>${cfMoney(total)}</b></div>` +
+    groups.map(G => `<div class="sec">${esc(G.g)}</div><div class="list">${G.L.map(accRow).join('')}</div>`).join('') + flow + proj +
+    `<div class="sec">Recent</div><div class="list">${recent}</div>
+    <div class="list" style="margin-top:12px"><label class="srow"><div class="tx"><div class="t">Bills and mortgages come out of</div><div class="s">Used when a bill hasn’t been paid from the bank before</div></div><select onchange="cfSetMain(this.value)">${D.accounts.filter(cfSpendable).map(a => `<option value="${esc(a.id)}"${main && main.id === a.id ? ' selected' : ''}>${esc(cfAName(a))}</option>`).join('')}</select></label></div>
+    <div class="foot">Read-only, from Akahu (daily, or when you tap Refresh). Before-payday figures are worked out from Bills and this fortnight’s mortgages; pay isn’t counted until it lands. Bills already paid from the bank this fortnight are left out.</div>`;
+}
+function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
+async function cfSetMain(id) { S.settings.cfMain = id; await save(); render(); }
+async function cfRefresh() { toast('Asking the banks for the latest…'); await cfLoad(true); if (CFerr) toast(CFerr); }
+function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
+function CashFlow() {
+  const head = moneyTabs('cashflow') + header('Cash flow', 'Your bank balances, and what’s left before payday');
+  if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
+  if (!CF && CFmock) CF = CFmock;
+  if (!CF) { if (!CFbusy) setTimeout(() => cfLoad(), 0); return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : `<div class="card muted">Loading your accounts…</div>`); }
+  return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : '') + (CF.example ? `<div class="callout cfex"><b>Example data</b> · not your real accounts</div>` : '') + cfBody(CF);
+}
+function cfGoSettings() { go('#settings'); setTimeout(() => { const el = document.getElementById('akahuset'); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 300); }
+
 /* ================= PACK-THE-CAR REMINDER (2.26.55) =================
    A My event can carry a 'pack the car' reminder (the Sunday Cleaning job has one by default: 9pm the night before).
    One push per occurrence (relay id sug-pack-<date>), no repeats. It shows as a '🧹 Pack the car' line with a tick box on
