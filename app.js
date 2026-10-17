@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.24';
+const APP_VERSION = '2.26.25';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16384,6 +16384,7 @@ function Settings() {
   ${websiteSettingsRow()}
   <div class="sec" id="appearance">Appearance</div>
   ${homeLayoutPicker()}
+  ${renoSetting()}
   ${themePicker()}
   ${themeNowNote()}
   ${textSizePicker()}
@@ -18194,7 +18195,8 @@ function tabbar(active) {
     return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
   };
   const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
-  $('#tabbar').innerHTML = groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
+  const reno = (() => { try { return renoOn() ? `<div class="tabgrp g-reno"><button class="${active === 'reno' ? 'on' : ''}" onclick="setTabsOpen(false);go('#reno')"><span class="w"><span style="font-size:1.3rem;line-height:1">🛠️</span></span><span class="lbl">Renovation ${window.Reno ? Reno.progress() + '%' : ''}</span></button></div>` : ''; } catch (e) { return ''; } })();
+  $('#tabbar').innerHTML = reno + groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
   const item = ROUTE_ITEM[r] || r, tabs = navOrder();
@@ -18220,7 +18222,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -18966,6 +18968,21 @@ function langCard(k) {
     <button class="chip" onclick="langQuizStart('${k}')">Quick quiz</button></div>
     <div class="muted" style="font-size:.75rem;margin-top:8px">${learnedN} of ${L.list.length} learned</div>${quiz}</div>`;
 }
+/* ================= 2.26.25: Millesha's Renovation (temporary page; Settings can hide it when the project's finished) ================= */
+const RENO_KEY = '3im0XgV50Be1sR1NgqrHDMIjKltsOJcmG9g8Gj57'; // opens only the renovation job list on the relay
+const RENO_LINK = 'https://phoneapp12-cell.github.io/car-app-preview/millesha.html#k=' + RENO_KEY;
+const renoOn = () => !(S && S.settings && S.settings.renoHide);
+async function setRenoHide(v) { S.settings.renoHide = !!v; await save(); render(); toast(v ? 'Renovation page hidden.' : 'Renovation page back in the menu.'); }
+function renoSetting() { const on = renoOn(); return `<div class="list" id="renoset" style="margin-top:10px"><div class="srow"><div class="tx"><div class="t">Millesha’s Renovation</div><div class="s">${on ? 'Shown in the side menu' : 'Hidden (project finished)'}</div></div></div>
+  <div class="chips" style="padding:0 12px 12px"><button type="button" class="chip ${on ? 'on' : ''}" onclick="setRenoHide(false)">Show</button><button type="button" class="chip ${on ? '' : 'on'}" onclick="setRenoHide(true)">Hide when project finished</button></div></div>`; }
+async function renoShare() { try { if (navigator.share) { await navigator.share({ title: 'Millesha’s Renovation', text: 'Our renovation checklist – tick jobs off as you go:', url: RENO_LINK }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(RENO_LINK); toast('Link copied. Send it to Millesha.'); } catch (e) { prompt('Copy this link for Millesha', RENO_LINK); } }
+function RenoPage() {
+  let body = ''; try { body = window.Reno ? Reno.html() : '<div class="card empty"><div class="t">Loading…</div></div>'; } catch (e) { body = ''; }
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Millesha’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, flooring') +
+    `<button type="button" class="row card" style="margin-bottom:12px" onclick="renoShare()"><div class="tx"><div class="t">Share with Millesha</div><div class="s">Her own page with just this checklist. Nothing else from My App.</div></div>${I('right')}</button>` + body;
+}
+try { if (window.Reno) Reno.init({ key: RENO_KEY, me: 'Shane', onChange: () => { if ((location.hash || '').slice(1) === 'reno') render(); } }); } catch (e) { }
+
 function Languages() {
   const st = langSt(), s = langStreak(st);
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Languages', 'A new te reo Māori and French word each day') +

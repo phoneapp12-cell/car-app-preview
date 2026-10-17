@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en-NZ"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d4ed8"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Renovation"><meta name="robots" content="noindex">
+<title>Millesha’s Renovation</title>
+<link rel="icon" href="icons/favicon-32.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;color:#0f172a;-webkit-tap-highlight-color:transparent}
+button{font:inherit;cursor:pointer}main{max-width:620px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) 14px 40px}
+.top{display:flex;align-items:center;gap:12px;margin:4px 2px 14px}.top img{width:48px;height:48px}.top h1{margin:0;font-size:1.45rem;letter-spacing:-.3px}.top p{margin:2px 0 0;color:#64748b;font-size:.88rem}
+.who{display:flex;gap:8px;align-items:center;font-size:.85rem;color:#475569;margin:0 2px 12px}.who input{font:inherit;border:1px solid #cbd5e1;border-radius:10px;padding:6px 10px;width:150px}
+.nokey{background:#fff;border-radius:16px;padding:18px;text-align:center;color:#475569}
+</style></head>
+<body><main>
+<div class="top"><img src="art/i3-house.webp" alt=""><div><h1>Millesha’s Renovation</h1><p>Room by room, job by job</p></div></div>
+<div class="who">You’re ticking as <input id="me" maxlength="40" placeholder="Your name"></div>
+<div id="root"></div>
+</main>
+<script src="reno.js?v=2.26.25"></script>
+<script>
+(function () {
+  let k = ''; const m = /[#&]k=([A-Za-z0-9_-]{32,128})/.exec(location.hash || '');
+  try { if (m) { localStorage.setItem('renoKey', m[1]); } k = localStorage.getItem('renoKey') || ''; } catch (e) { k = m ? m[1] : ''; }
+  const meIn = document.getElementById('me'); let me = 'Millesha'; try { me = localStorage.getItem('renoMe') || 'Millesha'; } catch (e) { } meIn.value = me;
+  const root = document.getElementById('root'), draw = () => { root.innerHTML = k ? Reno.html() : '<div class="nokey">Open this page from the link Shane sent you.</div>'; };
+  meIn.addEventListener('change', () => { try { localStorage.setItem('renoMe', meIn.value.trim() || 'Millesha'); } catch (e) { } Reno.init({ key: k, me: meIn.value.trim() || 'Millesha', onChange: draw }); });
+  Reno.init({ key: k, me, onChange: draw }); draw();
+})();
+</script></body></html>
