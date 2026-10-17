@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.22';
+const APP_VERSION = '2.26.23';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6234,13 +6234,15 @@ function ideaStepLines(title, notes) {
   return lines.slice(0, 8);
 }
 /* END_IDEA_STEP_FNS */
+// 2.26.22: on to-dos the 'A simple way to do this' steps only come from the word 'sort' (e.g. 'Sort garage'), not 'clean' or others
+function todoNoSteps(i) { return !!(i && /^todo/.test(String(i.id || '')) && !/\bsort/i.test(String(i.title || ''))); }
 function ensureIdeaSteps(i) {
   if (!i || typeof i !== 'object') return;
   if (Array.isArray(i.steps)) {
     i.steps.forEach(s => { if (s && typeof s === 'object') s.done = !!s.done; });
     return;
   }
-  const lines = ideaStepLines(i.title, i.notes);
+  const lines = todoNoSteps(i) ? null : ideaStepLines(i.title, i.notes);
   if (!lines || !lines.length) return;
   i.steps = lines.map(text => ({ id: uid('step'), text: text, done: false }));
   ideaStepsDirty = true;
@@ -6250,7 +6252,7 @@ function ideaStepsTicked(i) {
 }
 function refreshIdeaSteps(i) {
   if (!i || typeof i !== 'object') return;
-  const lines = ideaStepLines(i.title, i.notes);
+  const lines = todoNoSteps(i) ? null : ideaStepLines(i.title, i.notes);
   if (!lines) {
     if (!ideaStepsTicked(i)) delete i.steps;
     return;
@@ -6262,6 +6264,7 @@ function refreshIdeaSteps(i) {
 /* 2.22.4: the step checklists belong on open to-dos (same keyword rules as before). */
 function ensureTodoSteps(t) {
   if (!t || typeof t !== 'object' || t.done) return;
+  if (todoNoSteps(t)) { if (Array.isArray(t.steps)) { delete t.steps; ideaStepsDirty = true; } return; }
   ensureIdeaSteps(t);
 }
 function copyStepsFrom(src) {
@@ -6401,7 +6404,7 @@ async function ideaToTodo(id) {
   const list = S.lists.includes(i.cat) ? i.cat : S.lists[0];
   const td = { id: uid('todo'), title: i.title.slice(0, 120), list, due: '', notes: i.notes || '', priority: 'normal', done: false, created: Date.now(), fromIdea: id };
   const steps = copyStepsFrom(i); // the idea's own steps (with ticks) if it has them, otherwise made from the title
-  if (steps) td.steps = steps; else refreshIdeaSteps(td);
+  if (steps && !todoNoSteps(td)) td.steps = steps; else refreshIdeaSteps(td);
   S.todos.push(td);
   await save(); await closeSheet(); render();
   toast(`Added to your ${list} to-do list.`, 'View', () => { todoFilter = 'All'; go('#todo'); });
