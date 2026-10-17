@@ -2,7 +2,7 @@
    Only this job list travels, through the relay's /reno route with its own key. Nothing else from My App is shared. */
 (function () {
   const RELAY = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/reno';
-  const INSIDE = [['main', 'Main bedroom', '🛏️', 'carpet'], ['spare', 'Spare bedroom', '🛋️', 'carpet'], ['bath', 'Bathroom', '🛁', 'tiles'], ['hall', 'Hallway', '🚪', 'carpet'], ['lounge', 'Lounge', '📺', 'carpet'], ['dining', 'Dining', '🍽️', 'carpet'], ['kitchen', 'Kitchen', '🍳', 'tiles']];
+  const INSIDE = [['main', 'Main bedroom', '🛏️', 'carpet'], ['spare', 'Spare bedroom', '🛋️', 'carpet'], ['bath', 'Bathroom', '🛁', 'tiles'], ['hall', 'Hallway', '🚪', 'carpet'], ['lounge', 'Lounge', '📺', 'carpet'], ['dining', 'Dining', '🍽️', 'carpet'], ['kitchen', 'Kitchen', '🍳', 'tiles'], ['pantry', 'Pantry', '🥫', 'tiles'], ['laundry', 'Laundry', '🧺', 'tiles']];
   const AREAS = INSIDE.map(([k, n, e, f]) => ({ k, n, e, floorDef: f, jobs: [['clean', 'Clean'], ['mop', 'Mop ceiling'], ['speckle', 'Apply speckle (filler)'], ['sand', 'Sand'], ['ceiling', 'Paint ceiling (roof)'], ['walls', 'Paint walls'], ['floor', 'Flooring']] }))
     .concat([{ k: 'out', n: 'Outside', e: '🏡', jobs: [['wash', 'House wash (walls, windows, soffits)'], ['gutters', 'Clear gutters and downpipes'], ['prep', 'Fix, scrape and sand weatherboards and trim'], ['paint', 'Paint exterior (if needed)'], ['decks', 'Clean decks and paths'], ['metal', 'Metal man (scrap metal pickup)'], ['dump', 'Dump runs']] },
     { k: 'final', n: 'Final stage', e: '✨', final: true, jobs: [['clean', 'Final clean-up (whole house)'], ['lawns', 'Mow lawns and tidy edges']] }]);
