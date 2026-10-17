@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.62';
+const APP_VERSION = '2.26.63';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4732,7 +4732,7 @@ function Bills() {
   const row = b => {
     const d = daysLeft(b.due);
     return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}">${billIc(b.name)}
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div></div></button>
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div></div></button>
       <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
       ${b.paid ? `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>` : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
@@ -4815,6 +4815,8 @@ function billForm(id, pre) {
     `<div class="two">${field('Amount ($)', inp('amount', b.amount === '' ? '' : Number(b.amount).toFixed(2), 'inputmode="decimal" placeholder="0.00"'))}${field('Next due', inp('due', b.due, 'type="date" required'))}</div>` +
     field('Repeats', sel('repeat', Object.entries(REPEATS).map(([k, v]) => [k, k === 'none' ? 'Doesn’t repeat' : v]), b.repeat || 'none')) +
     field('Paid by', sel('paidBy', [['', 'Bank account'], ['card', 'Rewards card']], b.paidBy || ''), 'On the card: still shows when it’s due, and adds to the card in your budget') +
+    field('Comes out of', sel('from', billFromOpts(), billFromVal(b)), 'For Cash flow’s before-payday check. Auto uses where it was paid from before.') +
+    field('Ends after (payments, counting the next one)', inp('endn', billLeft(b) || '', 'inputmode="numeric" maxlength="3" placeholder="Keeps going"'), b.lastDue ? 'Last one ' + fmtW(b.lastDue) + '.' : 'Leave blank if it doesn’t end. Only for repeating bills.') +
     field('Notes', area('notes', b.notes, 'e.g. account number, paid by direct debit')) +
     (id && billInvoice(b) ? `<p class="muted" id="billinv" style="margin:4px 2px 0">${billInvoice(b).label ? esc(billInvoice(b).label) : 'Invoice ' + esc(billInvoice(b).no)} from ${esc(billInvoice(b).from || 'the email')}${billInvoice(b).amount != null ? ', ' + money(billInvoice(b).amount) : ''}${billInvoice(b).invDue ? ', due ' + esc(billInvoice(b).invDue) : ''}. Taken from the email in Outlook.</p>` : ''),
     async v => {
@@ -4825,8 +4827,13 @@ function billForm(id, pre) {
       const dueChanged = !id || v.due !== b.due;
       const upd = { name: v.name, amount: Math.round(amt * 100) / 100, due: v.due, repeat: v.repeat, notes: v.notes, paidBy: v.paidBy === 'card' ? 'card' : '' };
       if (dueChanged) upd.anchor = new Date(parseD(v.due)).getUTCDate();
+      // 2.26.63: ends after N payments → the last due date; comes out of a bank or account
+      const en = String(v.endn || '').trim(); if (en && !(Math.round(+en) >= 1 && Math.round(+en) <= 600)) return 'Please type how many payments are left as a number, like 10, or leave it blank.';
+      upd.lastDue = en && v.repeat !== 'none' ? billLastDue(Object.assign({}, b, upd), Math.round(+en)) : '';
+      billSetFrom(id || null, upd, v.from);
       if (id) { if (dueChanged) upd.paid = false; Object.assign(b, upd); }
-      else S.bills.push(Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? { link: pre.link, linkType: pre.linkType } : {}));
+      else { const nb = Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? { link: pre.link, linkType: pre.linkType } : {}); S.bills.push(nb); if (upd._acct) { S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[nb.id] = upd._acct; } delete nb._acct; }
+      if (id) delete b._acct;
       await save(); render(); toast(id ? 'Bill updated.' : 'Bill added.');
     }, id ? 'Save' : 'Add bill',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete bill" onclick="deleteBill('${id}')">${I('trash')}</button>` : '');
@@ -19010,6 +19017,7 @@ async function start() {
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   try { const pn = await pnu312Mig(); if (pn) { render(); setTimeout(() => toast(pn), 2600); } } catch (e) { console.error('pnu312', e); }
   try { const en = await ecoBillMig(); if (en) { render(); setTimeout(() => toast(en, 'View', () => go('#bills')), 1200); } } catch (e) { console.error('eco75', e); }
+  try { const im = await insBillMig(); if (im) { render(); setTimeout(() => toast(im, 'View', () => go('#bills')), 2600); } } catch (e) { console.error('ins579', e); }
   phoneSyncOpen();
   try { sharedStart(); } catch (e) { }
   syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
@@ -19925,7 +19933,7 @@ function cfPlan(D, pp) {
   const inP = t => t.date.slice(0, 10) >= pp.start && t.date.slice(0, 10) <= T;
   (S.bills || []).filter(b => b && !b.paid && b.due && b.due >= T && b.due <= end && b.paidBy !== 'card' && +b.amount > 0 && !/\bmortgage\b/i.test(b.name || '')).forEach(b => {
     const hist = cfBillTx(b, txs.filter(t => { const a = D.accounts.find(x => x.id === t.acct); return a && cfSpendable(a); })); if (hist.some(inP) && hist.find(inP).amount && Math.abs(-hist.find(inP).amount - b.amount) <= 1) return; // looks paid already
-    const acct = (S.settings.cfBillAcct || {})[b.id] || (hist[0] && hist[0].acct) || (main && main.id);
+    const acct = (S.settings.cfBillAcct || {})[b.id] || billBankAcct(D, b) || (hist[0] && hist[0].acct) || (main && main.id);
     out.push({ what: b.name, amount: +b.amount, date: b.due, acct });
   });
   try { const used = new Set(), mort = cfMortAcct(D); const bud = (S.budgets || []).find(x => x.start === pp.start); if (bud) budgetMortEff(bud).filter(m => m.eff > 0).forEach(m => {
@@ -20776,6 +20784,33 @@ function pwrArrearsCard(a) {
     (pays.length ? `<div class="pwrpays">${pays.slice(-8).reverse().map(p => `<div><span>${fd(p.date)}${p.src === 'manual' ? ' <small class="muted">(added by hand)</small>' : ''}</span><b>${pwrD(p.amt)}</b>` +
       (p.src === 'bill' ? `<button class="linkbtn" aria-label="Untick" title="Untick in Bills" onclick="ecoUntick('${esc(p.billId)}','${esc(p.due)}')">Untick</button>` : `<button class="linkbtn" aria-label="Remove" onclick="ecoPayDel('${esc(p.id)}')">✕</button>`) + '</div>').join('')}</div>` : `<div class="s pwrnote">No payments ticked off since ${fd(after)} yet.</div>`) +
     `<div class="s pwrnote">${a.carriedOver != null ? `The ${esc(a.bill)} balance includes ${pwrD(a.carriedOver)} carried over${a.lateFee ? ', a ' + pwrD(a.lateFee) + ' late fee' : ''} and ${pwrD(a.billCharges)} of charges. ` : ''}Only payments after ${fd(after)} count, because earlier ones are already on the bill. When the next bill comes in, it starts from that bill’s balance.${a.gap ? ' Some days since the bill have no figures yet.' : ''}</div></div>`;
+}
+/* 2.26.63: bills that end, and where a bill comes out of */
+function billLastDue(b, n) { let d = b.due; for (let i = 1; i < n && d; i++) d = DD.nextDue(Object.assign({}, b, { lastDue: '' }), d); return d || b.due; }
+function billLeft(b) { if (!b || !b.lastDue || !b.due || b.paid) return 0; let n = 0, d = b.due; while (d && d <= b.lastDue && n < 600) { n++; d = DD.nextDue(Object.assign({}, b, { lastDue: '' }), d); } return n; }
+const BILL_BANKS = ['ASB', 'ANZ', 'Kiwibank'];
+function billFromOpts() { const o = [['', 'Auto']].concat(BILL_BANKS.map(k => ['bank:' + k, k + ' (any account)'])); try { const D = CF && CF.data; if (D) D.accounts.filter(cfSpendable).forEach(a => o.push(['acct:' + a.id, cfAName(a)])); } catch (e) { } return o; }
+function billFromVal(b) { const a = b && b.id && (S.settings.cfBillAcct || {})[b.id]; return a ? 'acct:' + a : b && b.fromBank ? 'bank:' + b.fromBank : ''; }
+function billSetFrom(id, upd, v) { v = String(v || ''); S.settings.cfBillAcct = S.settings.cfBillAcct || {};
+  upd.fromBank = v.startsWith('bank:') ? v.slice(5) : ''; const acct = v.startsWith('acct:') ? v.slice(5) : '';
+  if (id) { if (acct) S.settings.cfBillAcct[id] = acct; else delete S.settings.cfBillAcct[id]; } else if (acct) upd._acct = acct; }
+// a bill set to a bank: the account in that bank named for it (or its amount), else the one with the most money
+function billBankAcct(D, b) {
+  if (!b || !b.fromBank) return '';
+  const L = D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && new RegExp(b.fromBank, 'i').test(a.bank || '')); if (!L.length) return '';
+  const amt = (+b.amount || 0).toFixed(2), tk = cfToks(b.name).map(w => w.slice(0, 4));
+  const hit = L.find(a => amt !== '0.00' && a.name.includes(amt)) || L.find(a => tk.some(w => a.name.toLowerCase().replace(/[^a-z]/g, '').includes(w.slice(1)))) ;
+  return (hit || L.slice().sort((x, y) => cfBal(y) - cfBal(x))[0]).id;
+}
+/* 2.26.63: one-time: Insurance $579.11 a month from Kiwibank, 10 payments from Sun 18 Oct 2026 to Sun 18 Jul 2027 */
+async function insBillMig() {
+  if (!S || !S.settings || S.settings.ins579Mig) return '';
+  S.bills = Array.isArray(S.bills) ? S.bills : [];
+  const fields = { name: 'Insurance', amount: 579.11, due: '2026-10-18', repeat: 'monthly', anchor: 18, lastDue: '2027-07-18', paidBy: '', fromBank: 'Kiwibank', paid: false };
+  const b = S.bills.find(x => x && /insur/i.test(x.name || '') && Math.abs((+x.amount || 0) - 579.11) < 0.01) || S.bills.find(x => x && Math.abs((+x.amount || 0) - 579.11) < 0.01);
+  if (b) { Object.assign(b, fields, { name: b.name || 'Insurance' }); if (!b.notes) b.notes = '10 monthly payments from Kiwibank, last one Sun 18 Jul 2027.'; }
+  else S.bills.push(Object.assign({ id: uid('bill'), notes: '10 monthly payments from Kiwibank, last one Sun 18 Jul 2027.' }, fields));
+  S.settings.ins579Mig = true; await save(); return b ? 'Insurance bill updated: $579.11 a month from Kiwibank' : 'Insurance added: $579.11 a month from Kiwibank, 10 payments';
 }
 /* 2.26.43: one-time: Ecotricity paid $75 a week from the bank account ($150 a fortnight in Budget). Only this one bill is touched. */
 async function ecoBillMig() {

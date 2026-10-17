@@ -173,7 +173,12 @@
 
   /* ---------- bills ---------- */
   const REPEATS = { none: 'One-off', weekly: 'Weekly', fortnightly: 'Fortnightly', monthly: 'Monthly', quarterly: 'Every 3 months', yearly: 'Yearly' };
+  // 2.26.63: a bill can end (bill.lastDue = its final due date); after that there's no next one
   function nextDue(bill, from) {
+    const n = nextDue0(bill, from);
+    return n && bill.lastDue && n > bill.lastDue ? null : n;
+  }
+  function nextDue0(bill, from) {
     const s = from || bill.due;
     switch (bill.repeat) {
       case 'weekly': return addDays(s, 7);
@@ -189,7 +194,7 @@
     const out = [];
     if (!bill.due || bill.paid) return out;
     let s = bill.due, n = 0;
-    while (s && parseD(s) <= toT && n < 500) {
+    while (s && parseD(s) <= toT && n < 500 && !(bill.lastDue && s > bill.lastDue)) {
       if (parseD(s) >= fromT) out.push(s);
       s = nextDue(bill, s); n++;
     }
