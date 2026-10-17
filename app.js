@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.65';
+const APP_VERSION = '2.26.66';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9492,7 +9492,8 @@ function budgetBillRows(b) {
   if (sT == null || eT == null) return [];
   const items = [];
   (S.bills || []).filter(x => x && !x.paid && budgetAmt(x.amount) > 0 && !/\bmortgage\b/i.test(String(x.name || ''))).forEach(bill => {
-    billDates(bill, sT, eT).forEach(d => items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: budgetAmt(bill.amount), due: d, late: 0, card: bill.paidBy === 'card' }));
+    const ku = KORA_BILL_RE.test(String(bill.name || '')) && budgetAmt(S.settings.koraUsual), kInv = bill.invoice && bill.invoice.billDue;
+    billDates(bill, sT, eT).forEach(d => { const about = !!(ku && (!kInv || d > kInv)); items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60) + (about ? ' (about)' : ''), amount: about ? ku : budgetAmt(bill.amount), due: d, late: 0, card: bill.paidBy === 'card' }); });
   });
   // Same as Bills for the current pay: include overdue still unpaid when this is the current fortnight.
   const cur = payPeriod(0);
@@ -19027,6 +19028,7 @@ async function start() {
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   try { const pn = await pnu312Mig(); if (pn) { render(); setTimeout(() => toast(pn), 2600); } } catch (e) { console.error('pnu312', e); }
   try { const en = await ecoBillMig(); if (en) { render(); setTimeout(() => toast(en, 'View', () => go('#bills')), 1200); } } catch (e) { console.error('eco75', e); }
+  try { const bm = await bills66Mig(); if (bm) { render(); setTimeout(() => toast(bm, 'View', () => go('#bills')), 4000); } } catch (e) { console.error('bills66', e); }
   try { const im = await insBillMig(); if (im) { render(); setTimeout(() => toast(im, 'View', () => go('#bills')), 2600); } } catch (e) { console.error('ins579', e); }
   phoneSyncOpen();
   try { sharedStart(); } catch (e) { }
@@ -20024,19 +20026,22 @@ function cfRegulars(D) {
   const T = todayISO(), card = cfCardAcct(D), ign = new Set(S.settings.regIgnore || []), g = new Map();
   (D.transactions || []).forEach(t => { const a = D.accounts.find(x => x.id === t.acct);
     if (!(t.amount < 0) || !a || !cfSpendable(a) || (card && t.acct === card.id) || t.pair || cfMortTx(D, t) || /^(INTEREST|FEE|LOAN)$/.test(t.type) || /\bDR\.?\s?INT\b|interest|overdraft fee/i.test(t.desc)) return;
+    if (/^PAY (SHANE|ANZ BILL)\b|\bS A (& S M )?JENKINS\b|\bS JENKINS ASB TO ASB\b/i.test(t.desc)) return; // money between your own accounts
     const k = regKeyOf(t); (g.get(k) || g.set(k, []).get(k)).push(t); });
   const out = [];
   g.forEach((L, key) => {
     if (L.length < 2 || ign.has(key)) return;
     L.sort((a, b) => a.date.localeCompare(b.date)); const d = L.map(t => t.date.slice(0, 10)), gaps = d.slice(1).map((x, i) => Math.round((parseD(x) - parseD(d[i])) / DAY)).filter(x => x > 0);
     if (!gaps.length) return; const med = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)];
-    const per = med >= 6 && med <= 8 ? 7 : med >= 13 && med <= 15 ? 14 : med >= 27 && med <= 32 ? 'm' : 0; if (!per) return;
-    const ok = gaps.filter(x => per === 'm' ? x >= 26 && x <= 34 : Math.abs(x - per) <= 2).length; if (ok < Math.max(1, Math.ceil(gaps.length * 0.7)) || (per === 7 && L.length < 3)) return;
+    const per = med >= 6 && med <= 8 ? 7 : med >= 13 && med <= 15 ? 14 : med >= 27 && med <= 34 ? 'm' : 0; if (!per) return;
+    const ok = gaps.filter(x => per === 'm' ? x >= 26 && x <= 34 : Math.abs(x - per) <= 2).length; if (ok < Math.max(1, Math.ceil(gaps.length * 0.7)) || (per === 7 && L.length < 3 && !L.every(t => t.type === 'STANDING ORDER'))) return;
     const am = L.slice(-3).map(t => -t.amount), avg = r2(am.reduce((n, v) => n + v, 0) / am.length), last = -L[L.length - 1].amount, varies = Math.max(...am) - Math.min(...am) > Math.max(1, avg * 0.25);
     const ld = d[d.length - 1], span = per === 'm' ? 31 : per; if ((parseD(T) - parseD(ld)) / DAY > span * 1.6) return; // stopped
     const name = String(L[L.length - 1].merchant || L[L.length - 1].desc).replace(/CARD NUMBER.*$/i, '').replace(/\s*\d[\d\s-]{3,}.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase()).slice(0, 40) || 'Regular payment';
     const tk = cfToks(name);
-    if ((S.bills || []).some(b => b && (cfToks(b.name).some(w => tk.includes(w) || swNorm(name).includes(swNorm(w))) || (+b.amount && Math.abs(+b.amount - last) <= 0.5)))) return; // already a bill
+    // 2.26.66: place and brand words (Whangarei DC rates vs Whangarei DC water) don't make it the same bill
+    const REG_COMMON = /^(whangarei|northland|onerahi|google|card|fuel|limited|nz|new|zealand|council)$/;
+    if ((S.bills || []).some(b => b && (cfToks(b.name).filter(w => !REG_COMMON.test(w)).some(w => tk.includes(w) || swNorm(name).includes(swNorm(w))) || (+b.amount && Math.abs(+b.amount - last) <= 0.5)))) return; // already a bill
     const next = from => { let x = ld; let i = 0; while (x < from && i++ < 60) x = per === 'm' ? addMonths(x, 1, +ld.slice(8, 10)) : addDays(x, per); return x; };
     out.push({ key, name, acct: L[0].acct, per, amount: varies ? avg : last, varies, last: ld, n: L.length, next });
   });
@@ -20065,6 +20070,8 @@ function xferPlan(D) {
     let d = t.date.slice(0, 10); while (d <= T) d = addDays(d, 14); for (; d <= H; d = addDays(d, 14)) ins.push({ what: nm, amount: amt, date: d, acct: t.acct }); });
   ins.sort((a, b) => a.date.localeCompare(b.date));
   const shaneIn = ins.filter(x => x.what === 'Your pay'), src = (shaneIn[0] && D.accounts.find(a => a.id === shaneIn[0].acct)) || cfOrbit(D) || main;
+  // 2.26.66: other regular money into that account (e.g. a weekly direct credit), the smallest of its last 3, on its usual beat
+  try { cfRegularIns(D, src.id).forEach(r => { let d = r.last; while (d <= T) d = addDays(d, r.per); for (; d <= H; d = addDays(d, r.per)) ins.push({ what: r.name, amount: r.amount, date: d, acct: src.id, other: 1 }); }); ins.sort((a, b) => a.date.localeCompare(b.date)); } catch (e) { }
   const done = S.settings.xferDone || {};
   const bal = {}; D.accounts.filter(cfSpendable).forEach(a => { bal[a.id] = cfBal(a); });
   // transfers already ticked as done (until the bank shows them) count as made
@@ -20102,6 +20109,17 @@ function xferPlan(D) {
   list.sort((a, b) => a.by.localeCompare(b.by));
   return { list, short, src, buf, outs, ins, H, srcEnd: r2(srcAt(H)), srcNow: bal[src.id] || 0 };
 }
+function cfRegularIns(D, acctId) {
+  const T = todayISO(), g = new Map();
+  (D.transactions || []).forEach(t => { if (t.acct !== acctId || !(t.amount > 0) || t.pair || t.cat2 === 'transfer' || mywIs(t) || swIs(t) || /^(INTEREST)$/.test(t.type)) return; const k = regKeyOf(t); (g.get(k) || g.set(k, []).get(k)).push(t); });
+  const out = [];
+  g.forEach(L => { if (L.length < 3) return; L.sort((a, b) => a.date.localeCompare(b.date)); const d = L.map(t => t.date.slice(0, 10)), gaps = d.slice(1).map((x, i) => Math.round((parseD(x) - parseD(d[i])) / DAY));
+    const med = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)], per = med >= 6 && med <= 8 ? 7 : med >= 13 && med <= 15 ? 14 : 0; if (!per) return;
+    const last = d[d.length - 1]; if ((parseD(T) - parseD(last)) / DAY > per * 1.6) return;
+    const name = String(L[L.length - 1].merchant || L[L.length - 1].desc).replace(/^FROM\s+/i, '').replace(/\s*\d[\d\s-]{3,}.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase()).slice(0, 30) || 'Regular money in';
+    out.push({ name, per, last, amount: Math.min(...L.slice(-3).map(t => t.amount)) }); });
+  return out;
+}
 function xferHas(D) { try { const X = xferPlan(D); return !!(X && (X.list.length || X.short.length)); } catch (e) { return false; } }
 function xferCard(D) {
   const X = (() => { try { return xferPlan(D); } catch (e) { console.error(e); return null; } })(); if (!X) return '';
@@ -20112,7 +20130,7 @@ function xferCard(D) {
   const sh = X.short.map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${cfMoney(s.amount)} ${s.own ? 'over its limit' : 'short'} for ${esc(s.first.what)} on ${esc(day(s.first.date))}${s.pay && s.pay > s.first.date ? ` · there isn’t enough spare until pay lands ${esc(day(s.pay))}, so move it then or ask the bank about timing` : s.pay ? ` · move it after pay lands ${esc(day(s.pay))}` : ' · no pay expected before then'}</div>`).join('');
   return `<div class="sec">Transfers to make · as at ${esc(day(todayISO()))}</div><div class="card xfcard">
     ${rows || (sh ? '' : `<div class="cfok">Nothing to move. Every paying account covers what’s coming out until ${esc(day(X.H))}.</div>`)}${sh ? `<div class="cftips" style="margin-top:6px">${sh}</div>` : ''}
-    <div class="s muted" style="margin-top:6px">Keeps ${cfMoney(X.buf)} in each paying account · <button type="button" class="linkbtn" onclick="xferBufForm()">change</button>. Pays land in ${esc(nm(X.src.id))}: ${X.ins.filter(i => i.acct === X.src.id).map(i => esc(i.what) + ' about ' + cfMoney(i.amount) + ' ' + esc(day(i.date))).join(', ') || 'none expected'}. Covers everything still to come up to ${esc(day(X.H))}.${dn ? ` ${plural(dn, 'transfer')} ticked done, counted until the bank shows ${dn > 1 ? 'them' : 'it'}.` : ''}</div></div>`;
+    <div class="s muted" style="margin-top:6px">Keeps ${cfMoney(X.buf)} in each paying account · <button type="button" class="linkbtn" onclick="xferBufForm()">change</button>. Money into ${esc(nm(X.src.id))}: ${X.ins.filter(i => i.acct === X.src.id).map(i => esc(i.what) + ' about ' + cfMoney(i.amount) + ' ' + esc(day(i.date))).join(', ') || 'none expected'}. Covers everything still to come up to ${esc(day(X.H))}${cfIsOrbit(X.src) ? `, leaving about ${cfMoney(X.srcEnd)} free in ORBIT` : ''}.${dn ? ` ${plural(dn, 'transfer')} ticked done, counted until the bank shows ${dn > 1 ? 'them' : 'it'}.` : ''}</div></div>`;
 }
 async function xferTick(key, amount, from, to) { S.settings.xferDone = S.settings.xferDone || {}; S.settings.xferDone[key] = { at: new Date().toISOString(), amount, from, to }; await save(); render(); toast('Marked done. It stays hidden until the bank shows it.'); }
 // a ticked transfer is dropped once the bank shows money arriving in that account for that amount (or more) after it was ticked
@@ -21018,6 +21036,7 @@ function billBankAcct(D, b) {
   if (!b || !b.fromBank) return '';
   const L = D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && new RegExp(b.fromBank, 'i').test(a.bank || '')); if (!L.length) return '';
   const amt = (+b.amount || 0).toFixed(2), tk = cfToks(b.name).map(w => w.slice(0, 4));
+  const named = b.fromAcct && L.find(a => String(a.name || '').toUpperCase().includes(String(b.fromAcct).toUpperCase())); if (named) return named.id;
   const hit = L.find(a => amt !== '0.00' && a.name.includes(amt)) || L.find(a => tk.some(w => a.name.toLowerCase().replace(/[^a-z]/g, '').includes(w.slice(1)))) ;
   return (hit || L.slice().sort((x, y) => cfBal(y) - cfBal(x))[0]).id;
 }
@@ -21030,6 +21049,25 @@ async function insBillMig() {
   if (b) { Object.assign(b, fields, { name: b.name || 'Insurance' }); if (!b.notes) b.notes = '10 monthly payments from Kiwibank, last one Sun 18 Jul 2027.'; }
   else S.bills.push(Object.assign({ id: uid('bill'), notes: '10 monthly payments from Kiwibank, last one Sun 18 Jul 2027.' }, fields));
   S.settings.ins579Mig = true; await save(); return b ? 'Insurance bill updated: $579.11 a month from Kiwibank' : 'Insurance added: $579.11 a month from Kiwibank, 10 payments';
+}
+/* 2.26.66: one-time: Ecotricity $75 a week going forward and Kora about $120 a fortnight (varies), both from the
+   ANZ Bill Account (where the bank shows them going out). Ecotricity is paid by hand, mostly midweek, so the next one is
+   Wed 21 Oct unless a date in the next week is already set. Kora is a direct debit every second Friday (next Fri 30 Oct);
+   its emailed invoice still sets the exact amount for that statement, later ones use the usual $120 (S.settings.koraUsual). */
+async function bills66Mig() {
+  if (!S || !S.settings || S.settings.bills66Mig) return '';
+  S.bills = Array.isArray(S.bills) ? S.bills : []; const T = todayISO();
+  let e = S.bills.find(x => x && /ecotricity/i.test(x.name || '')) || S.bills.find(x => x && /\b(power|electric|electricity)\b/i.test(x.name || ''));
+  if (!e) { e = { id: uid('bill'), name: 'Ecotricity (power)', notes: '$75 a week covers power and pays off the arrears.' }; S.bills.push(e); }
+  const eDue = e.due && e.due >= T && e.due <= addDays(T, 7) ? e.due : '2026-10-21';
+  Object.assign(e, { amount: 75, repeat: 'weekly', due: eDue, anchor: undefined, paidBy: '', fromBank: 'ANZ', fromAcct: 'BILL ACCOUNT', paid: false });
+  let k = S.bills.find(x => x && KORA_BILL_RE.test(String(x.name || '')));
+  if (!k) { k = { id: uid('bill'), name: 'Kora Fuel Card', amount: 120, due: '2026-10-30', anchor: 30, notes: 'Direct debit every second Friday. About $120 a fortnight, it varies.' }; S.bills.push(k); }
+  Object.assign(k, { repeat: 'fortnightly', paidBy: '', fromBank: 'ANZ', fromAcct: 'BILL ACCOUNT', paid: false });
+  if (!k.due || k.due < T) { k.due = '2026-10-30'; k.anchor = 30; if (!k.invoice) k.amount = 120; }
+  S.settings.koraUsual = 120;
+  if (S.settings.cfBillAcct) { delete S.settings.cfBillAcct[e.id]; delete S.settings.cfBillAcct[k.id]; }
+  S.settings.bills66Mig = true; await save(); return 'Ecotricity $75 a week and Kora about $120 a fortnight, both from ANZ Bill Account';
 }
 /* 2.26.43: one-time: Ecotricity paid $75 a week from the bank account ($150 a fortnight in Budget). Only this one bill is touched. */
 async function ecoBillMig() {

@@ -172,6 +172,25 @@ export async function runAkahuInsight(env) {
       last14: D.transactions.filter(t => Date.now() - Date.parse(t.date) < 14 * DAY && D.accounts.find(a => a.id === t.acct && a.type !== 'CREDITCARD' && !(a.type === 'LOAN' && !a.limit))).map(t => [t.date.slice(0, 10), mk(t.desc).slice(0, 36), t.amount, an[t.acct], t.pair ? 'pair' : '']) }), { expirationTtl: 1800 });
     return 'plan';
   }
+  if (req === 'mort3') { // 2.26.66: third mortgage (old ANZ), Ecotricity and Kora history, balances; masked, no account numbers
+    await env.EVENTS_KV.delete('akahu-insight-req');
+    const D = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!D) return 'nodata';
+    const mk = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
+    const A = Object.fromEntries(D.accounts.map(a => [a.id, a]));
+    const an = id => { const a = A[id]; return a ? mk(a.name) + ' · ' + a.bank + ' · ' + a.type : '?'; };
+    const row = t => [t.date.slice(0, 10), mk(t.desc).slice(0, 60), t.amount, an(t.acct), t.type, t.pair ? 'pair' : '', t.cat2 || ''];
+    const T = D.transactions.slice().sort((a, b) => a.date.localeCompare(b.date));
+    const isAnz = t => A[t.acct] && /ANZ/i.test(A[t.acct].bank);
+    await env.EVENTS_KV.put('akahu-insight-v1', JSON.stringify({ at: new Date().toISOString(), dataAt: D.at, first: T[0] && T[0].date,
+      accounts: D.accounts.map(a => ({ n: mk(a.name), bank: a.bank, type: a.type, bal: a.balance, avail: a.available, limit: a.limit, refreshed: a.refreshed })),
+      anzOut: T.filter(t => isAnz(t) && t.amount <= -100).map(row),
+      loanish: T.filter(t => /loan|mortgage|home ?l|hl |repay|principal|interest/i.test(t.desc + ' ' + t.merchant)).map(row),
+      eco: T.filter(t => /ecotric/i.test(t.desc + ' ' + t.merchant)).map(row),
+      kora: T.filter(t => /kora/i.test(t.desc + ' ' + t.merchant)).map(row),
+      big: T.filter(t => Math.abs(t.amount) >= 1000 && t.date.slice(0, 10) >= '2026-08-25' && t.date.slice(0, 10) <= '2026-09-15').map(row),
+      recent: T.filter(t => t.date.slice(0, 10) >= '2026-10-03' && A[t.acct] && A[t.acct].type !== 'CREDITCARD' && !(A[t.acct].type === 'LOAN' && !A[t.acct].limit)).map(row) }), { expirationTtl: 1800 });
+    return 'mort3';
+  }
   if (req === 'card') {
     const D = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!D) return 'nodata';
     const mk = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
