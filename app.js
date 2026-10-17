@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.79';
+const APP_VERSION = '2.26.80';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4813,7 +4813,7 @@ async function markPaid(id) {
     b.paidDues = b.paidDues.slice(-30);
   } catch (e) {}
   b.lastPaid = todayISO();
-  let regoMsg = ''; try { const mm = /^car\|([^|]+)\|rego$/.exec(b.linkType || ''); if (mm && b.regoMonths) { const c = getCar(mm[1]); if (c && c.rego && c.rego <= b.due) { c.rego = addMonths(c.rego, +b.regoMonths); regoMsg = ` ${c.name} rego now runs to ${fmt(c.rego)}.`; } } } catch (e) { } // 2.26.79
+  let regoMsg = ''; try { const nr = regoAdvance(b); if (nr) regoMsg = ` ${getCar(billKind(b).car).name} rego now runs to ${fmt(nr)}.`; } catch (e) { } // 2.26.79
   const n = nextDue(b);
   if (n) b.due = n; else { b.paid = true; b.paidOn = todayISO(); }
   await save(); render();
@@ -21270,6 +21270,22 @@ function billAcctNow(D, b) { return (S.settings.cfBillAcct || {})[b.id] || billB
 const BILL_AUTO_PCT = 0.15;
 const billIsMort = b => /\b(mortgage|home ?loans?)\b/i.test(String(b && b.name || ''));
 const billVaries = b => !!(b && (b.varies || KORA_BILL_RE.test(String(b.name || '')) || /\b(ecotricity|power|electricity)\b/i.test(String(b.name || '')) || !(budgetAmt(b.amount) > 0))); // Kora and the power bill: any amount
+/* 2.26.80: bills made from the bell prompts (rego, WOF, service, doctor, dentist, chiro) also match from the bank and the credit card.
+   Rego: NZTA / Waka Kotahi / NZ Transport Agency or a rego agent (NZ Post, AA, VTNZ, VINZ), at any price in REGO_FEES (online or agent).
+   WOF / service: a tester or garage, only when the amount is close. Health: the clinic type, only when the amount is close. */
+const REGO_PAYEE = /\b(NZTA|N\s?Z\s?T\s?A|WAKA\s?KOTAHI|NZ\s?TRANSPORT|NEW\s?ZEALAND\s?TRANSPORT|TRANSPORT\s?AGENCY|LTSA|MOTOR\s?VEHICLE\s?REG\w*|NZ\s?POST|NEW\s?ZEALAND\s?POST|POSTSHOP|VTNZ|VINZ|AUTOMOBILE\s?ASSOC\w*|AA\s?(CENTRE|CENTER|LICEN[CS]\w*|AUTO\w*|NORTHLAND|WHANGAREI|TRAVEL)|AA\s?NZ)\b|(^|\s)AA(\s|$)/i;
+const CAR_SHOP_PAYEE = /\b(VTNZ|VINZ|AA\s?(AUTO\w*|CENTRE|SERVICE\w*)|MTA|REPCO|AUTO\w*|MOTOR\w*|GARAGE|MECHANIC\w*|TYRES?|TIRES?|PIT\s?STOP|MIDAS|BRIDGESTONE|BEAUREPAIRES|FIRESTONE|TOYOTA|HONDA|HAVAL|GWM|ENGINEERING|WOF|SERVICE\s?CENT\w*|PANEL\s?BEAT\w*|BATTERY\s?TOWN|SUPA\s?CHEAP|AUTOSTOP|ULTRA\s?TUNE|PRO\s?CARE)\b/i;
+const HEALTH_PAYEE = { dentist: /\b(DENT\w*|SMILE\w*|ORAL|ORTHO\w*)\b/i, chiro: /\b(CHIRO\w*|SPINE|SPINAL|TUI\s?CHIRO\w*)\b/i, doctor: /\b(DOCTORS?|MEDICAL|MEDICINE|CFH|FAMILY\s?HEALTH|HEALTH\s?CENT\w*|GP|SURGERY|CLINIC|ACCIDENT\s?(&|AND)?\s?MEDICAL|WHITECROSS|URGENT\s?CARE)\b/i };
+function billKind(b) { const lt = String((b && b.linkType) || ''), m = /^car\|([^|]+)\|(rego|wof|svc)$/.exec(lt); if (m) return { kind: m[2], car: m[1] };
+  const h = /^h\|(dentist|chiro|doctor)$/.exec(lt); if (h) return { kind: 'health', h: h[1] };
+  if (/\brego\b|vehicle licen[cs]e/i.test((b && b.name) || '')) return { kind: 'rego', car: (() => { const p = String(b.name).toUpperCase().replace(/\s/g, ''); const c = (S.cars || []).find(x => x.plate && p.includes(String(x.plate).replace(/\s/g, '').toUpperCase())); return c ? c.id : ''; })() };
+  return null; }
+function regoPrices() { const L = []; ['petrol', 'diesel'].forEach(k => [3, 6, 12].forEach(m => { const v = REGO_FEES[k][m]; L.push({ m, v }, { m, v: r2(v + REGO_FEES.agentExtra) }); })); return L; }
+function regoMonthsFor(amt) { const x = regoPrices().find(p => Math.abs(p.v - amt) <= 0.1); return x ? x.m : 0; }
+function regoAdvance(b, on) { // the same as ticking it paid by hand: the car's rego runs on from the old expiry
+  try { const k = billKind(b); if (!k || k.kind !== 'rego' || !k.car) return ''; const c = getCar(k.car); const m = +b.regoMonths || regoMonthsFor(+b.amount); if (!c || !c.rego || !m || c.rego > b.due) return '';
+    c.rego = addMonths(c.rego, m); return c.rego; } catch (e) { return ''; } }
+const billPlate = c => String((c && c.plate) || '').replace(/\s/g, '').toUpperCase();
 function billAutoPay(D, quiet) {
   if (!D || !Array.isArray(S.bills) || !Array.isArray(D.transactions)) return [];
   const T = todayISO(), txs = D.transactions, from = txs.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10), acc = id => D.accounts.find(a => a.id === id);
@@ -21280,37 +21296,56 @@ function billAutoPay(D, quiet) {
   const own = t => { const x = String(t.desc || ''); return OWN_RE.test(x) || (t.pair && /^(KIWIBANK|ANZ|ASB|WESTPAC|BNZ)\b/i.test(x)); };
   const outs = txs.filter(t => t.amount < 0 && t.date.slice(0, 10) <= T);
   const done = [];
-  S.bills.forEach(b => {
+  // 2.26.80: rego bills go oldest due first, so when two cars' rego are open the earlier one takes an unmarked payment
+  const openRego = S.bills.filter(b => b && !b.paid && b.due && (billKind(b) || {}).kind === 'rego');
+  const order = S.bills.slice().sort((x, y) => { const rx = openRego.includes(x), ry = openRego.includes(y); return rx && ry ? String(x.due).localeCompare(String(y.due)) : 0; });
+  order.forEach(b => {
     if (!b || b.paid || !b.due || parseD(b.due) == null) return;
-    const not = new Set(Array.isArray(b.autoNot) ? b.autoNot : []), mort = billIsMort(b), vary = billVaries(b), exp = budgetAmt(b.amount);
+    const not = new Set(Array.isArray(b.autoNot) ? b.autoNot : []), mort = billIsMort(b), vary = billVaries(b), exp = budgetAmt(b.amount), K = billKind(b);
+    const before = K && K.kind === 'rego' ? 35 : K && (K.kind === 'wof' || K.kind === 'svc') ? 21 : 5, after = K && K.kind === 'rego' ? 14 : 7; // rego is often paid weeks early
+    const myPlate = K && K.car ? billPlate(getCar(K.car)) : '', others = K && K.kind === 'rego' ? openRego.filter(o => o !== b && !o.paid) : [];
+    const kindOk = t => { const x = t.desc + ' ' + (t.merchant || ''), amt = -t.amount;
+      if (!K) return false;
+      if (K.kind === 'rego') { if (!REGO_PAYEE.test(x) || !regoMonthsFor(amt)) return false;
+        const up = x.toUpperCase().replace(/\s/g, ''), oP = others.map(o => { const k2 = billKind(o); return k2 && k2.car ? billPlate(getCar(k2.car)) : ''; }).filter(Boolean);
+        if (myPlate && up.includes(myPlate)) return true; if (oP.some(p => up.includes(p))) return false; // the other car's plate
+        if (exp && Math.abs(amt - exp) <= 0.1) return true; return !others.some(o => Math.abs(budgetAmt(o.amount) - amt) <= 0.1); } // the other car's chosen price
+      const close = exp > 0 && Math.abs(amt - exp) <= Math.max(5, exp * BILL_AUTO_PCT);
+      if (K.kind === 'wof' || K.kind === 'svc') return close && CAR_SHOP_PAYEE.test(x);
+      if (K.kind === 'health') return close && HEALTH_PAYEE[K.h].test(x);
+      return false; };
     for (let guard = 0; guard < 40 && !b.paid; guard++) {
-      const due = b.due; if (addDays(due, -5) > T || addDays(due, 7) < from) break; // not due yet, or before the bank history
-      const lo = addDays(due, -5), hi = addDays(due, 7);
+      const due = b.due; if (addDays(due, -before) > T || addDays(due, after) < from) break; // not due yet, or before the bank history
+      const lo = addDays(due, -before), hi = addDays(due, after);
       const cand = outs.filter(t => { const d = t.date.slice(0, 10); if (d < lo || d > hi || usedIds.has(t.id) || not.has(t.id)) return false; const a = acc(t.acct); if (!a) return false;
         if (mort) return cfMortTx(D, t) === 'asb' && (!exp || Math.abs(-t.amount - exp) <= exp * BILL_AUTO_PCT);
         if (a.type === 'LOAN' && !a.limit) return false; if (own(t)) return false;
+        if (K && kindOk(t)) return true; // 2.26.80: rego / WOF / service / health payees (bank or credit card)
+        if (K && K.kind === 'rego') return false; // a rego bill only takes a rego payment
         if (!(payeeFor(b, t) > 0)) return false;
         return vary || Math.abs(-t.amount - exp) <= Math.max(0.5, exp * BILL_AUTO_PCT); });
       if (!cand.length && mort && exp) { const by = {}; outs.forEach(t => { const d = t.date.slice(0, 10); if (d >= lo && d <= hi && !usedIds.has(t.id) && !not.has(t.id) && cfMortTx(D, t) === 'asb') (by[d] = by[d] || []).push(t); });
         const d = Object.keys(by).sort((x, y) => Math.abs(dayGap(x, due)) - Math.abs(dayGap(y, due))).find(k => Math.abs(-fnSum(by[k]) - exp) <= exp * BILL_AUTO_PCT);
         if (d) { by[d].slice(1).forEach(t => usedIds.add(t.id)); cand.push({ id: by[d][0].id, date: by[d][0].date, amount: fnSum(by[d]), desc: by[d][0].desc, merchant: '', ids: by[d].map(t => t.id) }); } }
       if (!cand.length) break;
-      const sc = t => (payeeScore(b.name, t.desc + ' ' + (t.merchant || '')) === 2 ? 0 : 100) + (vary || !exp ? 0 : Math.abs(-t.amount - exp) / exp * 50) + Math.abs(dayGap(t.date.slice(0, 10), due));
+      const sc = t => (myPlate && (t.desc + ' ' + (t.merchant || '')).toUpperCase().replace(/\s/g, '').includes(myPlate) ? -200 : 0) + (K && exp && Math.abs(-t.amount - exp) <= 0.1 ? -100 : 0) + (K && kindOk(t) ? 0 : payeeScore(b.name, t.desc + ' ' + (t.merchant || '')) === 2 ? 0 : 100) + (vary || !exp ? 0 : Math.abs(-t.amount - exp) / exp * 50) + Math.abs(dayGap(t.date.slice(0, 10), due));
       const t = cand.sort((x, y) => sc(x) - sc(y))[0], on = t.date.slice(0, 10), amt = r2(-t.amount);
       usedIds.add(t.id);
       const inv = (() => { try { return billInvoice(b); } catch (e) { return null; } })();
       b.paidDues = (Array.isArray(b.paidDues) ? b.paidDues : []).filter(x => x && x.due !== due);
       b.paidDues.push(Object.assign({ due, on, amount: amt, auto: true, tx: t.id }, t.ids ? { txs: t.ids } : {}, exp && Math.abs(amt - exp) >= 0.01 ? { expected: exp } : {}, inv ? { invoice: inv.no } : {}));
       b.paidDues = b.paidDues.slice(-30); b.lastPaid = b.lastPaid && b.lastPaid > on ? b.lastPaid : on;
+      const kc = K && K.car && getCar(K.car), was = kc ? kc.rego : '', nr = regoAdvance(b, on); // 2.26.80: same as ticking it paid by hand
+      if (nr) { const pd = b.paidDues[b.paidDues.length - 1]; pd.regoWas = was; pd.regoCar = K.car; }
       const n = nextDue(b); if (n && n !== due) b.due = n; else { b.paid = true; b.paidOn = on; }
-      done.push({ id: b.id, name: String(b.name || 'A bill').slice(0, 40), amount: amt, on, due });
+      done.push({ id: b.id, name: String(b.name || 'A bill').slice(0, 40), amount: amt, on, due, card: (acc(t.acct) || {}).type === 'CREDITCARD', rego: nr });
     }
   });
   if (done.length) {
     const L = (S.settings.appNotices || []).slice();
     const shown = done.slice(0, 8).map(x => x.name + ' ' + money(x.amount).replace(/\.00$/, ''));
-    L.push({ id: 'bpaid-auto-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Marked paid from your bank: ' + shown.join(', ') + (done.length > 8 ? ' and ' + (done.length - 8) + ' more' : ''),
-      body: done.slice(0, 12).map(x => x.name + ' paid ' + fmtW(x.on) + (x.on !== x.due ? ' (due ' + fmtW(x.due) + ')' : '')).join(' · ') + '. Undo is on each bill if one’s wrong.' });
+    L.push({ id: 'bpaid-auto-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Marked paid from your ' + (done.every(x => x.card) ? 'credit card' : done.some(x => x.card) ? 'bank and credit card' : 'bank') + ': ' + shown.join(', ') + (done.length > 8 ? ' and ' + (done.length - 8) + ' more' : ''),
+      body: done.slice(0, 12).map(x => x.name + ' paid ' + fmtW(x.on) + (x.card ? ' on the credit card' : '') + (x.on !== x.due ? ' (due ' + fmtW(x.due) + ')' : '') + (x.rego ? ', rego now runs to ' + fmt(x.rego) : '')).join(' · ') + '. Undo is on each bill if one’s wrong.' });
     S.settings.appNotices = L.slice(-30);
     save(); try { if (!quiet && /^#(bills|home|alerts|budget|cashflow)?$/.test(location.hash || '')) render(); } catch (e) { }
   }
@@ -21323,6 +21358,7 @@ async function billAutoUndo(id) {
   const b = (S.bills || []).find(x => x.id === id), p = billAutoLast(b); if (!b || !p) return; const s = snap();
   b.paidDues = b.paidDues.filter(x => x !== p); b.autoNot = (Array.isArray(b.autoNot) ? b.autoNot : []).concat(p.tx).filter(Boolean).slice(-40);
   b.due = p.due; if (b.paid) { b.paid = false; delete b.paidOn; }
+  try { if (p.regoWas && p.regoCar) { const c = getCar(p.regoCar); if (c) c.rego = p.regoWas; } } catch (e) { } // 2.26.80: the car's rego goes back too
   const last = b.paidDues.reduce((m, x) => x && x.on > m ? x.on : m, ''); if (last) b.lastPaid = last; else delete b.lastPaid;
   await save(); render(); toast(`${b.name} is back to due ${fmtW(p.due)}. That bank payment won’t be used for it again.`, 'Undo', undoTo(s));
 }
