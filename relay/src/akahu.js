@@ -159,6 +159,31 @@ export async function runAkahu(env, fetchImpl = fetch, now = Date.now()) {
 export async function runAkahuInsight(env) {
   const req = env.EVENTS_KV && env.AKAHU_ENC_KEY && await env.EVENTS_KV.get('akahu-insight-req'); if (!req) return 'none';
   const deb = req === 'debits';
+  if (req === 'card') {
+    const D = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!D) return 'nodata';
+    const mk = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
+    const c = D.accounts.find(a => a.type === 'CREDITCARD'); if (!c) return 'nocard';
+    const T = D.transactions.filter(t => t.acct === c.id);
+    await env.EVENTS_KV.put('akahu-insight-v1', JSON.stringify({ at: new Date().toISOString(), card: { bal: c.balance, avail: c.available, limit: c.limit, refreshed: c.refreshed }, n: T.length, first: T.length ? T[T.length - 1].date : '',
+      credits: T.filter(t => t.amount > 0).map(t => [t.date.slice(0, 10), mk(t.desc).slice(0, 40), t.amount, t.type, t.cat2]),
+      fees: T.filter(t => /interest|fee|charge/i.test(t.desc)).map(t => [t.date.slice(0, 10), mk(t.desc).slice(0, 40), t.amount]),
+      toCard: D.transactions.filter(t => t.acct !== c.id && t.amount < 0 && /card|visa/i.test(t.desc)).map(t => [t.date.slice(0, 10), mk(t.desc).slice(0, 40), t.amount, t.cat2]),
+      spendByMonth: Object.entries(T.filter(t => t.amount < 0).reduce((m, t) => { const k = t.date.slice(0, 7); m[k] = Math.round(((m[k] || 0) - t.amount) * 100) / 100; return m; }, {})) }), { expirationTtl: 1800 });
+    return 'card';
+  }
+  if (req === 'orbit') {
+    const data0 = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!data0) return 'nodata';
+    const mask0 = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
+    const o = data0.accounts.find(a => a.type === 'LOAN' && a.limit); if (!o) return 'noorbit';
+    const T = data0.transactions.filter(t => t.acct === o.id).sort((a, b) => a.date.localeCompare(b.date));
+    const pick = T.filter(t => t.amount < 0 && (/interest|\bint\b|debit int/i.test(t.desc) || ['01', '02', '28', '29', '30', '31'].includes(t.date.slice(8, 10)) && Math.abs(t.amount) < 400));
+    // daily balances backwards from today's balance
+    let bal = o.balance, days = {}; const byDay = {}; T.forEach(t => { const d = t.date.slice(0, 10); byDay[d] = (byDay[d] || 0) + t.amount; });
+    for (let d = new Date(); d > new Date(Date.now() - 92 * DAY); d = new Date(d - DAY)) { const k = d.toISOString().slice(0, 10); days[k] = Math.round(bal * 100) / 100; bal -= byDay[k] || 0; }
+    const avg = m => { const v = Object.entries(days).filter(([k]) => k.startsWith(m)).map(([, v]) => v); return v.length ? { n: v.length, avg: Math.round(v.reduce((a, b) => a + b, 0) / v.length) } : null; };
+    await env.EVENTS_KV.put('akahu-insight-v1', JSON.stringify({ at: new Date().toISOString(), orbit: { bal: o.balance, avail: o.available, limit: o.limit, first: T[0] && T[0].date }, picks: pick.map(t => [t.date.slice(0, 10), mask0(t.desc), t.amount, t.type, t.cat2]), avg: { aug: avg('2026-08'), sep: avg('2026-09'), oct: avg('2026-10') }, small: T.filter(t => t.amount < 0 && Math.abs(t.amount) < 150).map(t => [t.date.slice(0, 10), mask0(t.desc).slice(0, 40), t.amount]).slice(-40) }), { expirationTtl: 1800 });
+    return 'orbit';
+  }
   await env.EVENTS_KV.delete('akahu-insight-req');
   const data = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!data) return 'nodata';
   const an = Object.fromEntries(data.accounts.map(a => [a.id, (a.name + ' · ' + a.bank + ' · ' + a.type).slice(0, 80)]));
