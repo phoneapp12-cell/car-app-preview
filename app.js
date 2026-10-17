@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.39';
+const APP_VERSION = '2.26.40';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19532,6 +19532,11 @@ function pwrCost(imp, exp, days) { const c = (+imp || 0) * PWR_RATE.importBlend 
 const pwrK = v => (v == null || isNaN(v)) ? '–' : (+v).toLocaleString('en-NZ', { maximumFractionDigits: 1 }) + ' kWh';
 const pwrD = v => '$' + (+v || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function pwrRows(r) { return '<div class="pwrrows">' + r.filter(Boolean).map(([a, b]) => `<div><span>${esc(a)}</span><b>${b}</b></div>`).join('') + '</div>'; }
+function pwrBreak(c) {
+  if (!c || !c.bands) return '';
+  const r = (l, b) => `<tr><td>${l}</td><td>${pwrK(b.kWh)}</td><td>${pwrD(b.cost)}</td></tr>`;
+  return `<table class="pwrtbl"><tr><th>Band</th><th>Grid</th><th>Cost</th></tr>${r('Peak', c.bands.peak)}${r('Shoulder', c.bands.shoulder)}${r('Off-peak', c.bands.offpeak)}<tr><td>Daily charge</td><td></td><td>${pwrD(c.daily)}</td></tr><tr><td>Export credit</td><td>${pwrK(c.exportKWh)}</td><td>−${pwrD(c.exportCredit)}</td></tr></table>`;
+}
 function PowerPage() {
   setTimeout(pwrFetch, 0);
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Power', 'Your house power, from SolarZero');
@@ -19545,16 +19550,20 @@ function PowerPage() {
     pwrRows([['Used', pwrK(t.usedKWh)], ['Solar made', pwrK(t.solarKWh)], ['From the grid', pwrK(t.gridImportKWh)], ['Sent back', pwrK(t.gridExportKWh)],
       ['Mix', `${t.fromSolarPct ?? '–'}% solar · ${t.fromBatteryPct ?? '–'}% battery · ${t.fromGridPct ?? '–'}% grid`],
       t.batteryPct != null ? ['Battery', t.batteryPct + '%'] : null, t.liveHomeKW != null ? ['House using now', t.liveHomeKW + ' kW'] : null,
-      ['Cost so far (estimate)', pwrD(pwrCost(t.gridImportKWh, t.gridExportKWh, 1))]]) + '</div>';
+      ['Cost so far (estimate)', pwrD(t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1))]]) + pwrBreak(t.cost) + '</div>';
+  const yc = d.yesterday && d.yesterday.cost;
+  const yest = yc ? `<div class="card pwrcard"><div class="pwrh">Yesterday · ${esc(fmtW(d.yesterday.date))}</div>` + pwrRows([['From the grid', pwrK(yc.importKWh)], ['Sent back', pwrK(yc.exportKWh)], ['Cost (estimate)', pwrD(yc.total)]]) + pwrBreak(yc) + '</div>' : '';
   const days = m.days || (m.avgPerDayKWh ? Math.round(m.usedKWh / m.avgPerDayKWh) : 30);
   const month = `<div class="card pwrcard"><div class="pwrh">This month · ${esc(m.label || '')}</div>` + solarBar(m.solarKWh || 0, m.usedKWh || 0, 'Solar share') +
     pwrRows([['Used', pwrK(m.usedKWh)], ['Average a day', pwrK(m.avgPerDayKWh)], ['Solar made', pwrK(m.solarKWh)], ['From the grid', pwrK(m.gridImportKWh)], ['Sent back', pwrK(m.gridExportKWh)],
-      ['Cost so far (estimate)', pwrD(pwrCost(m.gridImportKWh, m.gridExportKWh, days))]]) + '</div>';
+      ['Cost so far (estimate)', pwrD(m.cost ? m.cost.total : pwrCost(m.gridImportKWh, m.gridExportKWh, days))]]) +
+    (m.cost ? `<div class="s pwrnote">Estimate over ${m.cost.days} days: ${m.cost.hourlyDays} priced hour by hour, ${m.cost.mixDays} at ${Math.round(m.cost.mixRate * 1000) / 10}c a kWh (the ${esc(m.cost.mixSource)}’s peak/shoulder/off-peak mix). Includes ${pwrD(m.cost.daily)} of daily charges, less export credit.</div>` : '') + '</div>';
   const year = `<div class="card pwrcard"><div class="pwrh">Year · ${esc(y.label || '')}</div>` + solarBar(y.solarKWh || 0, y.usedKWh || 0, 'Solar share') +
     pwrRows([['Used', pwrK(y.usedKWh)], ['Solar made', pwrK(y.solarKWh)], y.costWithSolarNZD != null ? ['Cost with solar', pwrD(y.costWithSolarNZD)] : null,
       y.previousRetailerCostNZD != null ? ['Would have cost', pwrD(y.previousRetailerCostNZD)] : null, y.savingsNZD != null ? ['Saved', pwrD(y.savingsNZD)] : null]) + '<div class="s pwrnote">Year figures from SolarZero’s savings report.</div></div>';
   const B = (d.bills || []).slice(-3);
   const bills = B.length ? `<div class="card pwrcard"><div class="pwrh">Last bills · Ecotricity</div><table class="pwrtbl"><tr><th>Month</th><th>kWh</th><th>Charges</th></tr>${B.map(b => `<tr><td>${esc(b.month)}</td><td>${(+b.kWh).toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</td><td>${pwrD(b.totalInclGST)}</td></tr>`).join('')}</table><div class="s pwrnote">That month’s charges, incl GST.</div></div>` : '';
-  return back + `<div class="pwrupd">Updated ${esc(when)} NZDT · figures may be a few hours old</div>` + today + month + year + bills +
-    '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>';
+  return back + `<div class="pwrupd">Updated ${esc(when)} NZDT · figures may be a few hours old</div>` + today + yest + month + year + bills +
+    (d.tou ? `<div class="s pwrnote" style="margin:4px 6px 18px">Time-of-use estimates, incl GST: peak ${(d.tou.peak * 100).toFixed(1)}c, shoulder ${(d.tou.shoulder * 100).toFixed(1)}c, off-peak ${(d.tou.offpeak * 100).toFixed(1)}c a kWh, plus ${pwrD(d.tou.daily)} a day, less ${(d.tou.exportCredit * 100).toFixed(1)}c a kWh sent back. Peak is weekdays 7–9:30am and 5:30–8pm; weekends and public holidays have no peak. Ecotricity ecoZER0 plan.</div>` :
+    '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>');
 }
