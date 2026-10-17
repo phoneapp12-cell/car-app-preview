@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.42';
+const APP_VERSION = '2.26.43';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18233,7 +18233,7 @@ function tabbar(active) {
     return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
   };
   const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
-  const reno = (() => { try { return renoOn() ? `<div class="tabgrp g-reno"><button class="${active === 'reno' ? 'on' : ''}" onclick="setTabsOpen(false);go('#reno')"><span class="w"><span style="font-size:1.3rem;line-height:1">🛠️</span></span><span class="lbl">Renovation ${window.Reno ? Reno.progress() + '%' : ''}</span></button></div>` : ''; } catch (e) { return ''; } })() + (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`; return `<div class="tabgrp g-reno2">${b('mumreno', '👵', 'Mum’s Renovation')}${b('myreno', '🔨', 'My Renovations')}${b('weekend', '🌤️', 'Days off plan')}${b('power', '⚡', 'Power')}</div>`; })();
+  const reno = (() => { try { return renoOn() ? `<div class="tabgrp g-reno"><button class="${active === 'reno' ? 'on' : ''}" onclick="setTabsOpen(false);go('#reno')"><span class="w"><span style="font-size:1.3rem;line-height:1">🛠️</span></span><span class="lbl">Renovation ${window.Reno ? Reno.progress() + '%' : ''}</span></button></div>` : ''; } catch (e) { return ''; } })() + (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`; return `<div class="tabgrp g-reno2">${b('mumreno', '👵', 'Mum’s Renovation')}${b('myreno', '🔨', 'My Renovations')}${b('weekend', '🌤️', 'Days off plan')}${b('power', '⚡', (() => { try { const t = PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })())}</div>`; })();
   $('#tabbar').innerHTML = reno + groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
@@ -18670,6 +18670,7 @@ async function start() {
   try { render(); } catch (e) { console.error('First render', e); }
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
+  try { const en = await ecoBillMig(); if (en) { render(); setTimeout(() => toast(en, 'View', () => go('#bills')), 1200); } } catch (e) { console.error('eco75', e); }
   phoneSyncOpen();
   try { sharedStart(); } catch (e) { }
   syncFeeds(); refreshWx(); refreshAlerts(); refreshEvents(); refreshRoadworks(); refreshTv(); refreshNews(); refreshBlogs(); refreshPodcasts(); refreshSarah();
@@ -19563,9 +19564,47 @@ function PowerPage() {
       y.previousRetailerCostNZD != null ? ['Would have cost', pwrD(y.previousRetailerCostNZD)] : null, y.savingsNZD != null ? ['Saved', pwrD(y.savingsNZD)] : null]) + '<div class="s pwrnote">Year figures from SolarZero’s savings report.</div></div>';
   const B = (d.bills || []).slice(-3);
   const bills = B.length ? `<div class="card pwrcard"><div class="pwrh">Last bills · Ecotricity</div><table class="pwrtbl"><tr><th>Month</th><th>kWh</th><th>Charges</th></tr>${B.map(b => `<tr><td>${esc(b.month)}</td><td>${(+b.kWh).toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</td><td>${pwrD(b.totalInclGST)}</td></tr>`).join('')}</table><div class="s pwrnote">That month’s charges, incl GST.</div></div>` : '';
-  return pwrWrap(back + `<div class="pwrupd">Updated ${esc(when)} NZDT · figures may be a few hours old</div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + pwrWeekCard(d.week) + today + yest + month + year + bills +
+  const tc = t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1), share = pwrBudget() / 7;
+  return pwrWrap(back + `<div class="pwrhero"><div class="amt">${pwrD(tc)}</div><div class="lbl">spent on power today so far</div><div class="cmp ${tc > share ? 'over' : ''}">Your daily share of ${pwrM(pwrBudget())} a week is ${pwrD(share)}</div><div class="upd">Updated ${esc(when)} NZDT · may be a few hours old</div></div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + pwrWeekCard(d.week) + pwrArrearsCard(d.arrears) + today + yest + month + year + bills +
     (d.tou ? `<div class="s pwrnote" style="margin:4px 6px 18px">Time-of-use estimates, incl GST: peak ${(d.tou.peak * 100).toFixed(1)}c, shoulder ${(d.tou.shoulder * 100).toFixed(1)}c, off-peak ${(d.tou.offpeak * 100).toFixed(1)}c a kWh, plus ${pwrD(d.tou.daily)} a day, less ${(d.tou.exportCredit * 100).toFixed(1)}c a kWh sent back. Peak is weekdays 7–9:30am and 5:30–8pm; weekends and public holidays have no peak. Ecotricity ecoZER0 plan.</div>` :
     '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>') + pwrDots(0));
+}
+/* 2.26.43: Ecotricity arrears (start = latest bill's Total Amount Due; + estimated use since that bill's period end; − payments ticked off on this phone after the bill was issued) */
+function ecoPays() { try { const a = JSON.parse(localStorage.getItem('ecoPays') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function ecoPaySave(a) { try { localStorage.setItem('ecoPays', JSON.stringify(a)); } catch (e) { } }
+function ecoPayAdd(amt, date) { const a = ecoPays(), id = 'p' + Date.now(); a.push({ id, amt: Math.round(amt * 100) / 100, date }); ecoPaySave(a); render(); toast(`Payment of ${pwrD(amt)} noted`, 'Undo', () => ecoPayDel(id)); }
+function ecoPayDel(id) { ecoPaySave(ecoPays().filter(x => x.id !== id)); render(); }
+function ecoPayForm() {
+  openSheet('Payment to Ecotricity', `<div class="two">${field('Amount ($)', inp('amt', '75.00', 'inputmode="decimal"'))}${field('Paid on', inp('date', todayISO(), 'type="date" required'))}</div>`,
+    async v => { const n = Number(String(v.amt || '').replace(/[$,\s]/g, '')); if (!(n > 0) || n > 20000) return 'Please enter the amount you paid.'; if (!parseD(v.date)) return 'Please choose the date you paid.'; closeSheet(); ecoPayAdd(n, v.date); });
+}
+function pwrArrearsCard(a) {
+  if (!a || a.startBalance == null) return '';
+  const after = a.issued || a.periodEnd, pays = ecoPays().filter(p => p.date > after).sort((x, y) => x.date < y.date ? -1 : 1), paid = pays.reduce((s, p) => s + p.amt, 0);
+  const owedTop = a.startBalance + (a.usedSince || 0), bal = Math.max(0, owedTop - paid), pc = owedTop > 0 ? Math.min(100, Math.round(paid / owedTop * 100)) : 100;
+  const fd = iso => { try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }); } catch (e) { return iso; } };
+  const wkUse = a.weeklyUse, net = wkUse != null ? 75 - wkUse : null;
+  let payoff = '';
+  if (bal <= 0.5) payoff = 'All paid off 🎉';
+  else if (net != null && net > 0.5) { const wks = bal / net, dt = new Date(Date.now() + wks * 7 * 864e5); payoff = `At $75 a week, paid off around <b>${dt.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' })}</b> (about ${Math.ceil(wks)} weeks). That’s $75 less about ${pwrD(wkUse)} a week of power.`; }
+  else if (net != null) payoff = `At $75 a week this won’t go down, because power is about ${pwrD(wkUse)} a week.`;
+  return `<div class="card pwrcard pwrarr"><div class="pwrh">Ecotricity arrears</div>` +
+    `<div class="pgl"><div class="pglt"><span>Paid ${pwrD(paid)} of ${pwrD(owedTop)}</span><b>${pc}% to $0</b></div><div class="pgbar"><i style="width:${pc}%"></i></div></div>` +
+    pwrRows([['Owed now (estimate)', `<span style="font-size:1.1rem">${pwrD(bal)}</span>`], [`${esc(a.bill)} bill balance${a.due ? ' · due ' + fd(a.due) : ''}`, pwrD(a.startBalance)],
+      [`Power used since ${fd(a.periodEnd)} (estimate)`, '+' + pwrD(a.usedSince || 0)], ['Payments you’ve ticked off', '−' + pwrD(paid)]]) +
+    (payoff ? `<div class="pwrwline" style="font-weight:600">${payoff}</div>` : '') +
+    `<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="ecoPayAdd(75, todayISO())">I paid $75</button> <button class="btn small" onclick="ecoPayForm()">Other amount</button></div>` +
+    (pays.length ? `<div class="pwrpays">${pays.slice(-6).reverse().map(p => `<div><span>${fd(p.date)}</span><b>${pwrD(p.amt)}</b><button class="linkbtn" aria-label="Remove" onclick="ecoPayDel('${esc(p.id)}')">✕</button></div>`).join('')}</div>` : '') +
+    `<div class="s pwrnote">${a.carriedOver != null ? `The ${esc(a.bill)} balance includes ${pwrD(a.carriedOver)} carried over${a.lateFee ? ', a ' + pwrD(a.lateFee) + ' late fee' : ''} and ${pwrD(a.billCharges)} of charges. ` : ''}Payments are kept on this phone. Only ones after ${fd(after)} count, because earlier ones are already on the bill. When the next bill comes in, it starts from that bill’s balance.${a.gap ? ' Some days since the bill have no figures yet.' : ''}</div></div>`;
+}
+/* 2.26.43: one-time: Ecotricity paid $75 a week from the bank account ($150 a fortnight in Budget). Only this one bill is touched. */
+async function ecoBillMig() {
+  if (!S || !S.settings || S.settings.eco75Mig) return '';
+  S.bills = Array.isArray(S.bills) ? S.bills : [];
+  const b = S.bills.find(x => x && /ecotricity/i.test(x.name || '')) || S.bills.find(x => x && /\b(power|electric|electricity)\b/i.test(x.name || ''));
+  if (b) { b.amount = 75; b.repeat = 'weekly'; b.paidBy = ''; if (!b.due || b.due < todayISO()) b.due = '2026-10-26'; }
+  else S.bills.push({ id: uid('bill'), name: 'Ecotricity (power)', amount: 75, due: '2026-10-26', repeat: 'weekly', notes: '$75 a week covers power and pays off the arrears.', paidBy: '' });
+  S.settings.eco75Mig = true; await save(); return 'Ecotricity set to $75 a week';
 }
 /* 2.26.42: Last 7 days vs weekly budget (grid cost incl GST + daily charges; no SolarZero subscription). Budget stored on this phone only. */
 function pwrBudget() { const v = +localStorage.getItem('pwrWeekBudget'); return v > 0 ? v : 60; }
