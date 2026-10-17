@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.72';
+const APP_VERSION = '2.26.73';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4733,9 +4733,9 @@ function Bills() {
   const row = b => {
     const d = daysLeft(b.due);
     return `<div class="row bill"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}">${billIc(b.name)}
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div></div></button>
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : (billAutoLast(b) ? 'next ' : '') + 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div>${billAutoTxt(b)}</div></button>
       <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
-      ${b.paid ? `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>` : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
+      ${billAutoLast(b) ? `<button class="paybtn" aria-label="Undo the bank match for ${esc(b.name)}" onclick="billAutoUndo('${b.id}')">Undo</button>` : ''}${b.paid ? (billAutoLast(b) ? '' : `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>`) : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
   let pay = '';
   const pp = showPay ? payPeriod(payOff) : null;
@@ -19036,6 +19036,7 @@ async function start() {
   try { const pn = await pnu312Mig(); if (pn) { render(); setTimeout(() => toast(pn), 2600); } } catch (e) { console.error('pnu312', e); }
   try { const en = await ecoBillMig(); if (en) { render(); setTimeout(() => toast(en, 'View', () => go('#bills')), 1200); } } catch (e) { console.error('eco75', e); }
   try { if (!S.settings.acctAuto69) { const K = S.settings.billAcctKeep || {}; Object.keys(K).forEach(k => { const b = (S.bills || []).find(x => x.id === k.split('|')[0]); if (!b || !/\b(mortgage|home ?loans?)\b/i.test(b.name || '')) delete K[k]; }); S.settings.billAcctKeep = K; S.settings.acctAuto69 = true; await save(); if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => cfLoad(), 1500); } } catch (e) { console.error('acctAuto69', e); }
+  try { if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => { if (!CF && !CFbusy) cfLoad(); }, 2500); } catch (e) { } // 2.26.73: bank data on open, so bills paid from the bank are marked
   try { const mm = await mort3Mig(); if (mm) { render(); setTimeout(() => toast(mm, 'View', () => go('#budget')), 5500); } } catch (e) { console.error('mort3', e); }
   try { const bm = await bills66Mig(); if (bm) { render(); setTimeout(() => toast(bm, 'View', () => go('#bills')), 4000); } } catch (e) { console.error('bills66', e); }
   try { const im = await insBillMig(); if (im) { render(); setTimeout(() => toast(im, 'View', () => go('#bills')), 2600); } } catch (e) { console.error('ins579', e); }
@@ -19933,7 +19934,7 @@ async function cfLoad(force) {
   try {
     const [s, d] = force ? await cfApi('/cashflow/refresh', 'POST', {}) : await cfApi('/cashflow');
     if (s === 200 && d.connected === false) { cfForget(); }
-    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
+    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { billAutoPay(d.data); } catch (e) { console.error('billAutoPay', e); } try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
     else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
     else CFerr = cfErrText(s, d);
@@ -21172,6 +21173,71 @@ async function insBillMig() {
    payments, last 90 days, matched by payee) gets a bell note: Switch sets that account; Keep as is remembers the choice.
    Runs whenever Cash flow loads or refreshes. Only names and amounts are compared; nothing leaves the phone. */
 function billAcctNow(D, b) { return (S.settings.cfBillAcct || {})[b.id] || billBankAcct(D, b) || ''; }
+/* 2.26.73: bills mark themselves paid when the bank shows the payment (Shane: "automatically marked as paid as you see them go out").
+   A payment matches a bill's due date when the payee matches (2.26.70 fuzzy matching; exact beats close), the amount is within 15%
+   (any amount for variable bills like Kora; mortgages: the ASB repayment out of ASB MORTGAGE), and it went out 5 days before to 7
+   days after the due date. Own transfers between his accounts never count. The occurrence is stored in paidDues with the bank date
+   and amount (auto: true), a recurring bill moves on to its next due date (one-offs are marked paid), and one quiet bell note lists
+   what was marked. Undo on the bill puts it back and that payment won't be used for it again. */
+const BILL_AUTO_PCT = 0.15;
+const billIsMort = b => /\b(mortgage|home ?loans?)\b/i.test(String(b && b.name || ''));
+const billVaries = b => !!(b && (b.varies || KORA_BILL_RE.test(String(b.name || '')) || /\b(ecotricity|power|electricity)\b/i.test(String(b.name || '')) || !(budgetAmt(b.amount) > 0))); // Kora and the power bill: any amount
+function billAutoPay(D, quiet) {
+  if (!D || !Array.isArray(S.bills) || !Array.isArray(D.transactions)) return [];
+  const T = todayISO(), txs = D.transactions, from = txs.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10), acc = id => D.accounts.find(a => a.id === id);
+  const usedIds = new Set(); S.bills.forEach(b => (b.paidDues || []).forEach(p => { if (p && p.tx) usedIds.add(p.tx); if (p && Array.isArray(p.txs)) p.txs.forEach(x => usedIds.add(x)); }));
+  // an own transfer between his accounts. The bank's pair flag alone isn't enough (it also flags real bills like Ecotricity paid the same day as a same-sized transfer),
+  // so: his own-transfer wording, or a pair whose text starts with a bank's name (KIWIBANK INSURANCE into his Kiwibank account)
+  const OWN_RE = /^PAY (SHANE|ANZ BILL)\b|\bS A (& S M )?JENKINS\b|\bS JENKINS ASB TO ASB\b|^MB TRANSFER\b|^TO: *\d|^FC\d|\bTFR TO SARAH\b|^TRANSFER TO\b/i;
+  const own = t => { const x = String(t.desc || ''); return OWN_RE.test(x) || (t.pair && /^(KIWIBANK|ANZ|ASB|WESTPAC|BNZ)\b/i.test(x)); };
+  const outs = txs.filter(t => t.amount < 0 && t.date.slice(0, 10) <= T);
+  const done = [];
+  S.bills.forEach(b => {
+    if (!b || b.paid || !b.due || parseD(b.due) == null) return;
+    const not = new Set(Array.isArray(b.autoNot) ? b.autoNot : []), mort = billIsMort(b), vary = billVaries(b), exp = budgetAmt(b.amount);
+    for (let guard = 0; guard < 40 && !b.paid; guard++) {
+      const due = b.due; if (addDays(due, -5) > T || addDays(due, 7) < from) break; // not due yet, or before the bank history
+      const lo = addDays(due, -5), hi = addDays(due, 7);
+      const cand = outs.filter(t => { const d = t.date.slice(0, 10); if (d < lo || d > hi || usedIds.has(t.id) || not.has(t.id)) return false; const a = acc(t.acct); if (!a) return false;
+        if (mort) return cfMortTx(D, t) === 'asb' && (!exp || Math.abs(-t.amount - exp) <= exp * BILL_AUTO_PCT);
+        if (a.type === 'LOAN' && !a.limit) return false; if (own(t)) return false;
+        if (!(payeeFor(b, t) > 0)) return false;
+        return vary || Math.abs(-t.amount - exp) <= Math.max(0.5, exp * BILL_AUTO_PCT); });
+      if (!cand.length && mort && exp) { const by = {}; outs.forEach(t => { const d = t.date.slice(0, 10); if (d >= lo && d <= hi && !usedIds.has(t.id) && !not.has(t.id) && cfMortTx(D, t) === 'asb') (by[d] = by[d] || []).push(t); });
+        const d = Object.keys(by).sort((x, y) => Math.abs(dayGap(x, due)) - Math.abs(dayGap(y, due))).find(k => Math.abs(-fnSum(by[k]) - exp) <= exp * BILL_AUTO_PCT);
+        if (d) { by[d].slice(1).forEach(t => usedIds.add(t.id)); cand.push({ id: by[d][0].id, date: by[d][0].date, amount: fnSum(by[d]), desc: by[d][0].desc, merchant: '', ids: by[d].map(t => t.id) }); } }
+      if (!cand.length) break;
+      const sc = t => (payeeScore(b.name, t.desc + ' ' + (t.merchant || '')) === 2 ? 0 : 100) + (vary || !exp ? 0 : Math.abs(-t.amount - exp) / exp * 50) + Math.abs(dayGap(t.date.slice(0, 10), due));
+      const t = cand.sort((x, y) => sc(x) - sc(y))[0], on = t.date.slice(0, 10), amt = r2(-t.amount);
+      usedIds.add(t.id);
+      const inv = (() => { try { return billInvoice(b); } catch (e) { return null; } })();
+      b.paidDues = (Array.isArray(b.paidDues) ? b.paidDues : []).filter(x => x && x.due !== due);
+      b.paidDues.push(Object.assign({ due, on, amount: amt, auto: true, tx: t.id }, t.ids ? { txs: t.ids } : {}, exp && Math.abs(amt - exp) >= 0.01 ? { expected: exp } : {}, inv ? { invoice: inv.no } : {}));
+      b.paidDues = b.paidDues.slice(-30); b.lastPaid = b.lastPaid && b.lastPaid > on ? b.lastPaid : on;
+      const n = nextDue(b); if (n && n !== due) b.due = n; else { b.paid = true; b.paidOn = on; }
+      done.push({ id: b.id, name: String(b.name || 'A bill').slice(0, 40), amount: amt, on, due });
+    }
+  });
+  if (done.length) {
+    const L = (S.settings.appNotices || []).slice();
+    const shown = done.slice(0, 8).map(x => x.name + ' ' + money(x.amount).replace(/\.00$/, ''));
+    L.push({ id: 'bpaid-auto-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Marked paid from your bank: ' + shown.join(', ') + (done.length > 8 ? ' and ' + (done.length - 8) + ' more' : ''),
+      body: done.slice(0, 12).map(x => x.name + ' paid ' + fmtW(x.on) + (x.on !== x.due ? ' (due ' + fmtW(x.due) + ')' : '')).join(' · ') + '. Undo is on each bill if one’s wrong.' });
+    S.settings.appNotices = L.slice(-30);
+    save(); try { if (!quiet && /^#(bills|home|alerts|budget|cashflow)?$/.test(location.hash || '')) render(); } catch (e) { }
+  }
+  return done;
+}
+// the latest bank-marked payment on a bill, for the "Paid ✓ … (bank)" line and Undo
+function billAutoLast(b) { const L = (b && Array.isArray(b.paidDues) ? b.paidDues : []).filter(p => p && p.auto); if (!L.length) return null; const p = L.reduce((m, x) => (x.on || '') > (m.on || '') ? x : m, L[0]); return dayGap(todayISO(), p.on) <= 21 ? p : null; }
+function billAutoTxt(b) { const p = billAutoLast(b); if (!p) return ''; return `<div class="s bpaidbank">Paid ✓ ${esc(fmtW(p.on))} · ${money(p.amount)} (bank)${p.expected ? ` <small class="muted">expected ${money(p.expected)}</small>` : ''}</div>`; }
+async function billAutoUndo(id) {
+  const b = (S.bills || []).find(x => x.id === id), p = billAutoLast(b); if (!b || !p) return; const s = snap();
+  b.paidDues = b.paidDues.filter(x => x !== p); b.autoNot = (Array.isArray(b.autoNot) ? b.autoNot : []).concat(p.tx).filter(Boolean).slice(-40);
+  b.due = p.due; if (b.paid) { b.paid = false; delete b.paidOn; }
+  const last = b.paidDues.reduce((m, x) => x && x.on > m ? x.on : m, ''); if (last) b.lastPaid = last; else delete b.lastPaid;
+  await save(); render(); toast(`${b.name} is back to due ${fmtW(p.due)}. That bank payment won’t be used for it again.`, 'Undo', undoTo(s));
+}
 function billAcctCheck(D) {
   // 2.26.69: Shane's rule: apart from mortgages (always ASB MORTGAGE) and one-off bills, a bill follows the bank. No question;
   // a quiet bell note records what moved, several at once in one note.

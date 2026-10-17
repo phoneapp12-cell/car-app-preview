@@ -191,6 +191,17 @@ export async function runAkahuInsight(env) {
       recent: T.filter(t => t.date.slice(0, 10) >= '2026-10-03' && A[t.acct] && A[t.acct].type !== 'CREDITCARD' && !(A[t.acct].type === 'LOAN' && !A[t.acct].limit)).map(row) }), { expirationTtl: 1800 });
     return 'mort3';
   }
+  if (req === 'outs') { // 2.26.73: every payment out (and card purchases) for bill matching checks; masked, no account numbers
+    await env.EVENTS_KV.delete('akahu-insight-req');
+    const D = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!D) return 'nodata';
+    const mk = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
+    const A = Object.fromEntries(D.accounts.map(a => [a.id, a]));
+    const T = D.transactions.slice().sort((a, b) => a.date.localeCompare(b.date));
+    await env.EVENTS_KV.put('akahu-insight-v1', JSON.stringify({ at: new Date().toISOString(), dataAt: D.at, first: T[0] && T[0].date,
+      outs: T.filter(t => t.amount < 0).map(t => [t.date.slice(0, 10), mk(t.desc).slice(0, 50), t.amount, A[t.acct] ? mk(A[t.acct].name) + ' · ' + A[t.acct].bank + ' · ' + A[t.acct].type : '?', t.pair ? 'pair' : '', t.cat2 || '', mk(t.merchant).slice(0, 30)]),
+      insBig: T.filter(t => t.amount >= 20).map(t => [t.date.slice(0, 10), mk(t.desc).slice(0, 40), t.amount, A[t.acct] ? mk(A[t.acct].name) + ' · ' + A[t.acct].bank : '?', t.pair ? 'pair' : '']) }), { expirationTtl: 1800 });
+    return 'outs';
+  }
   if (req === 'card') {
     const D = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!D) return 'nodata';
     const mk = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
