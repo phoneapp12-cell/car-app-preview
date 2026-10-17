@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.61';
+const APP_VERSION = '2.26.62';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20051,43 +20051,48 @@ function orbFor(b) {
 // ---- credit card ----
 const cardDayOk = v => { const n = Math.round(+v); return n >= 1 && n <= 31 ? n : 0; };
 const dayIn = (y, m, d) => { const L = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(); return new Date(Date.UTC(y, m, Math.min(d, L))).toISOString().slice(0, 10); };
+// 2.26.62: ASB statement on the 26th (Shane), due a set number of days after it (default 14, his figure; editable)
+const CARD_STMT = 26, CARD_GAP = 14;
 function cardDays() {
-  const c = debtsSt().card, pays = Array.isArray(c.akPays) ? c.akPays : [];
-  const due = cardDayOk(c.dueDay) || (c.due && parseD(c.due) != null ? +c.due.slice(8, 10) : 0), dueGuess = !due && pays.length ? +pays[pays.length - 1].d.slice(8, 10) : 0;
-  return { due: due || dueGuess, dueGuess: !due && !!dueGuess, stmt: cardDayOk(c.stmtDay) };
+  const c = debtsSt().card, gap = Math.round(+c.payDays) >= 1 && Math.round(+c.payDays) <= 40 ? Math.round(+c.payDays) : CARD_GAP;
+  return { stmt: cardDayOk(c.stmtDay) || CARD_STMT, gap, due: 1, dueGuess: false };
 }
-function cardNextDue(from = todayISO()) {
-  const k = cardDays(); if (!k.due) return '';
-  const [y, m] = from.split('-').map(Number); let d = dayIn(y, m - 1, k.due); if (d < from) d = dayIn(y, m, k.due); return d;
-}
-function cardStmtBefore(due) { const k = cardDays(); if (!k.stmt || !due) return ''; const [y, m] = due.split('-').map(Number); let d = dayIn(y, m - 1, k.stmt); if (d >= due) d = dayIn(y, m - 2, k.stmt); return d; }
+function cardStmts(from) { const k = cardDays(), [y, m] = from.split('-').map(Number), L = []; for (let i = -3; i <= 2; i++) L.push(dayIn(y, m - 1 + i, k.stmt)); return L; }
+// the first due date on or after 'from', and its statement date
+function cardCycleOf(from = todayISO()) { const k = cardDays(); for (const st of cardStmts(from)) { const due = addDays(st, k.gap); if (due >= from) return { stmt: st, due }; } return null; }
+function cardNextDue(from = todayISO()) { const x = cardCycleOf(from); return x ? x.due : ''; }
+function cardStmtBefore(due) { const x = cardCycleOf(due); return x && x.due === due ? x.stmt : ''; }
 function orbIntCard(D) {
   const x = (() => { try { return cfOrbitInt(D); } catch (e) { return null; } })(); if (!x) return '';
   const L = x.ints.slice(-3).reverse();
   return `<div class="sec">ORBIT interest</div><div class="list"><div class="row cfrow"><div class="tx"><div class="t">Next on ${esc(fmtW(x.next))}: about ${cfMoney(x.est)}</div><div class="s">${L.length ? 'Charged ' + L.map(i => esc(fmtW(i.d)) + ' ' + cfMoney(i.a)).join(' · ') : 'No interest charge in the bank data yet'}${x.how ? ' · estimate from ' + x.how : ''}</div></div></div></div>`;
 }
 function cardFeedPays(D) { try { const a = cfCardAcct(D); if (!a) return; const c = debtsSt().card, L = (D.transactions || []).filter(t => t.acct === a.id && t.amount > 0).map(t => ({ d: t.date.slice(0, 10), a: t.amount, from: (D.transactions.find(x => x.id === t.pair) || {}).acct || '' })).sort((p, q) => p.d.localeCompare(q.d)).slice(-12);
-  const nd = cardDayOk(c.dueDay) ? cardNextDue() : ''; if (nd && c.due !== nd) { c.due = nd; save(); }
+  const nd = cardNextDue(); if (nd && c.due !== nd) { c.due = nd; save(); }
+  // what was owed at the end of the last statement day: owed now, with everything after that day undone
+  try { const T = todayISO(), st = cardStmts(T).filter(d => d <= T).pop(), tx = (D.transactions || []).filter(t => t.acct === a.id), first = tx.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10);
+    if (st && (!c.stmtSnap || c.stmtSnap.d !== st) && (first <= st || (D.at || '').slice(0, 10) === st)) { const owedNow = Math.max(0, (a.limit || 1000) - (a.available || 0)); const v = Math.round((owedNow + tx.filter(t => t.date.slice(0, 10) > st).reduce((n, t) => n + t.amount, 0)) * 100) / 100; c.stmtSnap = { d: st, owed: Math.max(0, v) }; save(); } } catch (e) { }
   if (JSON.stringify(L) !== JSON.stringify(c.akPays || [])) { c.akPays = L; save(); } } catch (e) { } }
 // the goal for the next due date, and what's been paid towards it
 function cardGoal() {
-  const c = debtsSt().card, due = cardNextDue(); if (!due) return null;
-  const stmt = cardStmtBefore(due), from = stmt || addDays(due, -30), pays = (c.akPays || []).filter(p => p.d > from && p.d <= due), paid = Math.round(pays.reduce((n, p) => n + p.a, 0) * 100) / 100;
-  const sb = dnum(c.stmtBal) && c.stmtFor === due ? dnum(c.stmtBal) : 0, owedNow = cardOwed(c);
-  const goal = sb ? sb : Math.round((owedNow + 0) * 100) / 100; // owed now already has these payments taken off
-  const left = sb ? Math.max(0, Math.round((sb - paid) * 100) / 100) : owedNow;
-  return { due, stmt, goal: sb || Math.round((owedNow + paid) * 100) / 100, left, paid, sb: !!sb, full: left <= 0.005, min: dnum(c.min) };
+  const c = debtsSt().card, cy = cardCycleOf(); if (!cy) return null; const { due, stmt } = cy;
+  const pays = (c.akPays || []).filter(p => p.d > stmt && p.d <= due), paid = Math.round(pays.reduce((n, p) => n + p.a, 0) * 100) / 100, owedNow = cardOwed(c);
+  const typed = dnum(c.stmtBal) && c.stmtFor === stmt ? dnum(c.stmtBal) : 0, snap = c.stmtSnap && c.stmtSnap.d === stmt ? c.stmtSnap.owed : null;
+  const sb = typed || (snap != null ? snap : 0), known = !!typed || snap != null, about = !typed && snap != null;
+  const left = known ? Math.max(0, Math.round((sb - paid) * 100) / 100) : owedNow;
+  const min = known && sb > 0 ? Math.min(sb, Math.max(Math.round(sb * 3) / 100, 10)) : 0; // ASB: greater of 3% or $10 (or the balance if less)
+  return { due, stmt, goal: known ? sb : Math.round((owedNow + paid) * 100) / 100, left, paid, sb: known, about, full: known ? left <= 0.005 : owedNow <= 0.005, min: Math.round(min * 100) / 100 };
 }
 async function cardDaysForm() {
-  const c = debtsSt().card, k = cardDays(), g = cardGoal(), opts = [['', '—']].concat(Array.from({ length: 31 }, (_, i) => [String(i + 1), String(i + 1)]));
-  openSheet('Card statement and due day',
-    `<p class="muted" style="margin:0 0 10px">Akahu doesn’t give the statement or due date, so set them from your ASB statement.${k.dueGuess ? ` The due day shown is a guess from your last card payment (${esc(fmtW(c.akPays[c.akPays.length - 1].d))}).` : ''}</p>` +
-    field('Statement day (day of the month)', sel('stmt', opts, k.stmt || '')) + field('Due day (day of the month)', sel('due', opts, k.due || '')) +
-    field('Statement balance ($, optional)', inp('sb', g && g.sb ? c.stmtBal : '', 'inputmode="decimal" placeholder="Leave blank to use what you owe now"'), g ? 'For the statement due ' + fmtW(g.due) + '.' : '') +
-    field('Minimum payment ($, optional)', inp('min', c.min || '', 'inputmode="decimal"'), 'From your statement. Left blank, no minimum is shown.'),
-    async v => { const due = cardDayOk(v.due); if (!due) return 'Please choose the due day.'; c.dueDay = due; c.stmtDay = cardDayOk(v.stmt) || ''; c.min = v.min;
-      const nd = cardNextDue(); c.due = nd; if (String(v.sb || '').trim()) { const n = +String(v.sb).replace(/[$,\s]/g, ''); if (!isFinite(n) || n < 0) return 'Please type the statement balance as a number, like 380.21.'; c.stmtBal = String(n); c.stmtFor = nd; } else { c.stmtBal = ''; c.stmtFor = ''; }
-      await save(); render(); toast('Card due day saved.'); });
+  const c = debtsSt().card, k = cardDays(), g = cardGoal(), opts = Array.from({ length: 31 }, (_, i) => [String(i + 1), String(i + 1)]);
+  openSheet('Card statement and due date',
+    `<p class="muted" style="margin:0 0 10px">Akahu doesn’t give the statement or due date, so they’re worked out from your statement day.</p>` +
+    field('Statement day (day of the month)', sel('stmt', opts, k.stmt)) +
+    field('Days to pay after statement', inp('gap', k.gap, 'inputmode="numeric" maxlength="2"'), 'ASB’s site says 20–25 for most cards; check “Payment due” on your statement.') +
+    field('Statement balance ($, optional)', inp('sb', c.stmtFor === (g && g.stmt) && dnum(c.stmtBal) ? c.stmtBal : '', 'inputmode="decimal" placeholder="' + (g && g.about ? 'About ' + money(g.goal) + ' from the bank' : 'From your statement') + '"'), g ? 'For the ' + fmtW(g.stmt) + ' statement, due ' + fmtW(g.due) + '.' : ''),
+    async v => { const gap = Math.round(+v.gap); if (!(gap >= 1 && gap <= 40)) return 'Please type the days to pay as a number from 1 to 40.'; c.stmtDay = cardDayOk(v.stmt) || CARD_STMT; c.payDays = gap; delete c.dueDay;
+      const cy = cardCycleOf(); c.due = cy ? cy.due : ''; if (String(v.sb || '').trim()) { const n = +String(v.sb).replace(/[$,\s]/g, ''); if (!isFinite(n) || n < 0) return 'Please type the statement balance as a number, like 380.21.'; c.stmtBal = String(n); c.stmtFor = cy ? cy.stmt : ''; } else { c.stmtBal = ''; c.stmtFor = ''; }
+      await save(); render(); toast('Card dates saved. Next due ' + fmtW(c.due) + '.'); });
 }
 function cardAfford(D, P) {
   const g = cardGoal(); if (!g) return null; if (g.full) return Object.assign({ ok: true }, g);
@@ -20102,12 +20107,12 @@ function cardCfCard(D, P) {
   const status = !x ? `<div class="s">Set the due day to plan paying it off.</div>`
     : x.full ? `<div class="cfok">✓ Paid in full for ${esc(fmtW(x.due))}${x.paid ? ' · ' + cfMoney(x.paid) + ' paid' : ''}</div>`
     : `${x.paid ? `<div class="s">Part paid ${cfMoney(x.paid)} · ${cfMoney(x.left)} to go</div>` : ''}${x.ok ? `<div class="cfok">Pay in full: ${cfMoney(x.left)} by ${esc(fmtW(x.due))} ✔ affordable</div><div class="s">From ${esc(cfAName(x.payA || {}))}${x.orb && x.payA !== x.orb ? ' and ORBIT’s free-to-draw' : ''}, after everything else due before payday.</div>`
-      : `<div class="cfwarn">Can manage about ${cfMoney(x.can)} now · ${cfMoney(x.short)} left would attract interest</div>${x.min ? `<div class="s">Minimum payment ${cfMoney(x.min)} (from your statement)</div>` : ''}`}
-      <div class="s muted">Paying less than the full amount by the due date means interest is charged on purchases.</div>`;
+      : `<div class="cfwarn">Can manage about ${cfMoney(x.can)} now · ${cfMoney(x.short)} left would attract interest</div>`}${x.min && !x.full ? `<div class="s">ASB minimum ${x.about ? 'about ' : ''}${cfMoney(x.min)} (3% of the statement balance, at least $10)</div>` : ''}
+      <div class="s muted">Paying less than the full amount by the due date means interest is charged on purchases. Up to 55 days interest free when last statement is paid in full.</div>`;
   return `<div class="sec">Credit card</div><div class="card cfcard">
-    <div class="row cfrow"><div class="tx"><div class="t">${esc(cfAName(a))}${x ? ` · due ${esc(fmtW(x.due))}` : ''}</div><div class="s">You owe ${cfMoney(owed)} · ${cfMoney(a.available || 0)} available of ${cfMoney(lim)}${x && x.sb ? ` · statement ${cfMoney(x.goal)}` : ''}</div><div class="pbar"><i style="width:${Math.min(100, Math.round(100 * owed / lim))}%"></i></div></div></div>
+    <div class="row cfrow"><div class="tx"><div class="t">${esc(cfAName(a))}${x ? ` · due ${esc(fmtW(x.due))}` : ''}</div><div class="s">You owe ${cfMoney(owed)} · ${cfMoney(a.available || 0)} available of ${cfMoney(lim)}${x && x.sb ? ` · statement ${x.about ? 'about ' : ''}${cfMoney(x.goal)}` : ''}</div><div class="pbar"><i style="width:${Math.min(100, Math.round(100 * owed / lim))}%"></i></div></div></div>
     <div style="padding:0 12px 10px">${status}
-    <div class="s" style="margin-top:6px">${k.due ? `Statement day ${k.stmt || '—'} · due day ${k.due}${k.dueGuess ? ' (guessed from your last payment)' : ''}` : 'Statement and due day not set'} · <button type="button" class="linkbtn" onclick="cardDaysForm()">${k.due && !k.dueGuess ? 'Change' : 'Set'}</button></div></div></div>`;
+    <div class="s" style="margin-top:6px">Statement on the ${k.stmt}${['th', 'st', 'nd', 'rd'][(k.stmt % 100 > 10 && k.stmt % 100 < 14) ? 0 : (k.stmt % 10 < 4 ? k.stmt % 10 : 0)]} · due ${k.gap} days later${x ? ' (' + esc(fmtW(x.stmt)) + ' statement → ' + esc(fmtW(x.due)) + ')' : ''} · <button type="button" class="linkbtn" onclick="cardDaysForm()">Change</button></div></div></div>`;
 }
 
 /* ================= SARAH'S WAGES + ASB MORTGAGES (2.26.59) =================
