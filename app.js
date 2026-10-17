@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.37';
+const APP_VERSION = '2.26.38';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5448,6 +5448,7 @@ function Todo() {
     ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
     <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="Add a to-do${todoFilter !== 'All' ? ' to ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="todoshare"> Also add to Sarah’s list</label>
+    ${todoListProg(todoFilter)}
     ${open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">All done. Good as gold!</div></div>' : empty('Nothing on your list', 'Type a to-do above and tap +, or add one with a due date.', 'Add a to-do', 'todoForm()'))}
     ${done.length ? `<div class="sec">Done <button onclick="clearDone()">Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}`;
 }
@@ -6297,6 +6298,21 @@ function copyStepsFrom(src) {
   const out = src.steps.filter(x => x && String(x.text || '').trim()).map(x => ({ id: uid('step'), text: String(x.text).trim(), done: !!x.done }));
   return out.length ? out : null;
 }
+// 2.26.38: the renovation-style progress line (thin bar, '% done', 'x of y'), used anywhere with tickable items. Done items always count.
+function progLine(done, total, what, cls) {
+  total = Math.max(0, total | 0); done = Math.min(total, Math.max(0, done | 0)); if (!total) return '';
+  const p = Math.round(done / total * 100);
+  return `<div class="pgl${p === 100 ? ' pgfull' : ''}${cls ? ' ' + cls : ''}"><div class="pglt"><span>${what ? esc(what) : 'Progress'}</span><b>${p === 100 ? '🎉 ' : ''}${p}% done · ${done} of ${total}</b></div><div class="pgbar"><i style="width:${p}%"></i></div></div>`;
+}
+function todoListProg(f) { // All: today's window (due today or overdue, plus anything ticked today). A list: everything in it.
+  const L = (S.todos || []).filter(t => t && (f === 'All' || t.list === f)), td = todayISO();
+  if (f === 'All') {
+    const tod = t => t.done ? (t.doneAt && todayISO(new Date(t.doneAt)) === td) : (t.due && t.due <= td && !(typeof waterBlock === 'function' && waterBlock(t)));
+    const W = L.filter(tod);
+    if (W.length) return progLine(W.filter(t => t.done).length, W.length, 'Today');
+  }
+  return progLine(L.filter(t => t.done).length, L.length, f === 'All' ? 'All lists' : f);
+}
 function todoStepsBlock(t, where) {
   if (!t || t.done || !Array.isArray(t.steps) || !t.steps.length) return '';
   const rows = t.steps.map(s => {
@@ -6304,7 +6320,7 @@ function todoStepsBlock(t, where) {
     const tick = 'todoStepTick(' + jsArg(t.id) + ',' + jsArg(s.id) + ')';
     return '<div class="row step' + (done ? ' done' : '') + '"><button type="button" class="tick" aria-label="' + (done ? 'Untick' : 'Tick') + ' ' + esc(s.text) + '" onclick="' + tick + '"><span>' + I('check') + '</span></button><button type="button" class="tapzone" onclick="' + tick + '"><div class="tx"><div class="t">' + esc(s.text) + '</div></div></button></div>';
   }).join('');
-  return '<div class="ideasteps todosteps" data-todosteps="' + esc(t.id) + '" data-todowhere="' + where + '"><div class="stepcap">A simple way to do this</div>' + rows + '</div>';
+  return '<div class="ideasteps todosteps" data-todosteps="' + esc(t.id) + '" data-todowhere="' + where + '"><div class="stepcap">A simple way to do this</div>' + progLine(t.steps.filter(s => s && s.done).length, t.steps.length, 'Steps', 'pgsm') + rows + '</div>';
 }
 function todoStepProg(t) {
   const lab = ideaProgressLabel(t);
@@ -6358,7 +6374,7 @@ function ideaStepsBlock(i, where) {
     const tick = 'ideaStepTick(' + jsArg(i.id) + ',' + jsArg(s.id) + ')';
     return '<div class="row step' + (done ? ' done' : '') + '"><button type="button" class="tick" aria-label="' + (done ? 'Untick' : 'Tick') + ' ' + esc(s.text) + '" onclick="' + tick + '"><span>' + I('check') + '</span></button><button type="button" class="tapzone" onclick="' + tick + '"><div class="tx"><div class="t">' + esc(s.text) + '</div></div></button></div>';
   }).join('');
-  return '<div class="ideasteps" data-ideasteps="' + esc(i.id) + '" data-ideawhere="' + where + '"><div class="stepcap">A simple way to do this</div>' + rows + '</div>';
+  return '<div class="ideasteps" data-ideasteps="' + esc(i.id) + '" data-ideawhere="' + where + '"><div class="stepcap">A simple way to do this</div>' + progLine(i.steps.filter(s => s && s.done).length, i.steps.length, 'Steps', 'pgsm') + rows + '</div>';
 }
 async function ideaStepTick(ideaId, stepId) {
   const i = (S.ideas || []).find(x => x && x.id === ideaId);
@@ -8021,7 +8037,7 @@ function Shopping() {
     `<form class="addbar" onsubmit="shopQuickAdd(event)"><input id="newshop" placeholder="Add an item…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New shopping item"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="shopshare"> Also add to Sarah’s list</label>
     <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button>` : ''}</div>
-    ${wwTotalHtml(open)}${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
+    ${progLine(got.length, open.length + got.length, 'Shopping')}${wwTotalHtml(open)}${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
     ${got.length ? `<div class="sec">Got <button onclick="clearGot()">Clear</button></div><div class="list" id="shopgot">${got.map(shopRow).join('')}</div>` : ''}
     <div class="foot">“Check label” means gluten often hides in it, so look for “gluten free” on the pack. Tap an item to change or delete it. Prices are Woolworths NZ online prices (woolworths.co.nz), checked daily; tap one to open the product.</div>`;
 }
@@ -18993,7 +19009,7 @@ function langCard(k) {
     <div class="chips" style="margin-top:10px">${v ? `<button class="chip" onclick="langSay('${k}',${i})">🔊 Hear it</button>` : ''}
     <button class="chip ${done ? 'on' : ''}" onclick="langLearn('${k}', ${JSON.stringify(w[0]).replace(/"/g, '&quot;')})">${done ? '✓ Learned' : 'Mark learned'}</button>
     <button class="chip" onclick="langQuizStart('${k}')">Quick quiz</button></div>
-    <div class="muted" style="font-size:.75rem;margin-top:8px">${learnedN} of ${L.list.length} learned</div>${quiz}</div>`;
+    ${progLine(learnedN, L.list.length, 'Words learned', 'pgsm')}${quiz}</div>`;
 }
 /* ================= 2.26.25: Millesha's Renovation (temporary page; Settings can hide it when the project's finished) ================= */
 const RENO_KEY = '3im0XgV50Be1sR1NgqrHDMIjKltsOJcmG9g8Gj57'; // opens only the renovation job list on the relay
@@ -19055,7 +19071,7 @@ async function wkAct(iso, k, act) {
 }
 function wkDayHtml(o, ord, compact) {
   const P = wkPlanFor(o, ord), lab = o.i === 0 ? 'Today' : o.i === 1 ? 'Tomorrow' : WDL[o.dow];
-  return `<div class="wkday"><div class="wkdh"><b>${lab}</b><span>${fmtW(o.iso)}</span>${P.notes.map(n => `<span class="wknote">${esc(n)}</span>`).join('')}</div>` +
+  return `<div class="wkday"><div class="wkdh"><b>${lab}</b><span>${fmtW(o.iso)}</span>${P.notes.map(n => `<span class="wknote">${esc(n)}</span>`).join('')}</div>` + (o.i === 0 ? progLine(P.slots.filter(x => P.D.dn[x.k]).length, P.slots.length, 'Today’s picks', 'pgsm') : '') +
     P.slots.map(x => { const dn = !!P.D.dn[x.k]; return `<div class="wkslot${x.free ? ' wkfree' : ''}${dn ? ' wkdone' : ''}"><button type="button" class="wktick" aria-label="${dn ? 'Untick' : 'Done'}: ${esc(x.t)}" onclick="wkAct('${o.iso}','${x.k}','done')">${dn ? '✓' : ''}</button><span class="wkic">${x.ic}</span><div class="wktx"${x.go ? ` onclick="go('${x.go}')" role="button"` : ''}><div class="t">${esc(x.t)}</div><div class="s">${esc(x.s)}</div></div>${dn ? '' : `<span class="wkbtns"><button type="button" onclick="wkAct('${o.iso}','${x.k}','swap')" aria-label="Swap">⇄</button><button type="button" onclick="wkAct('${o.iso}','${x.k}','skip')" aria-label="Skip">✕</button></span>`}</div>`; }).join('') +
     (P.skipped ? `<button type="button" class="wkunskip" onclick="wkAct('${o.iso}','','unskip')">Bring back ${P.skipped === 1 ? 'the skipped one' : 'skipped ones'}</button>` : '') + '</div>';
 }
@@ -19092,7 +19108,7 @@ async function myRenoDel(id) { S.myReno = myReno().filter(j => j.id !== id); awa
 function MyRenoPage() {
   const L = myReno(), open = L.filter(x => !x.done).sort((a, b) => (a.status === 'doing' ? 0 : 1) - (b.status === 'doing' ? 0 : 1)), done = L.filter(x => x.done), have = new Set(L.filter(x => !x.done).map(x => x.title.toLowerCase()));
   const row = x => `<div class="row mrrow${x.done ? ' done' : ''}"><button type="button" class="tick" aria-label="${x.done ? 'Not done' : 'Complete'}: ${esc(x.title)}" onclick="myRenoDone('${x.id}')"><span>${I('check')}</span></button><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${x.done ? 'Done ' + fmtW(x.doneAt) : x.status === 'doing' ? 'Started ' + fmtW(x.startedAt) : (x.side || 'To do')}</div></div>${x.done ? `<button type="button" class="iconbtn" aria-label="Remove" onclick="myRenoDel('${x.id}')">${I('trash')}</button>` : `<button type="button" class="tstat ${x.status === 'doing' ? 'doing' : ''}" onclick="myRenoStart('${x.id}')">${x.status === 'doing' ? '● In progress' : '▶ Start'}</button>`}</div>`;
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('My Renovations', 'Your own house jobs, one at a time') +
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('My Renovations', 'Your own house jobs, one at a time') + progLine(done.length, L.length, 'Jobs') +
     `<form class="addbar" onsubmit="event.preventDefault();myRenoAdd(this.n.value);this.n.value=''"><input name="n" placeholder="Add a job…" maxlength="80" autocomplete="off" aria-label="New job"><button aria-label="Add">${I('plus')}</button></form>` +
     (open.length ? `<div class="list">${open.map(row).join('')}</div>` : '<div class="card empty"><div class="t">No jobs yet</div><div class="s">Add one above, or pick from the ideas below on a motivated day.</div></div>') +
     `<div class="sec">Ideas for motivated days</div><p class="muted" style="margin:0 4px 8px">Optional. Tap a group to see it, and add only what you want.</p>` +
