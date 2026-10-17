@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.41';
+const APP_VERSION = '2.26.42';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18260,7 +18260,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { power: PowerPage, compare: ComparePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19525,7 +19525,7 @@ function pwrFetch() {
   if (pwrBusy) return; pwrBusy = true;
   fetch(RELAY_URL + '/power', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
     pwrBusy = false;
-    if (d && d.updatedAt && (!PWR || d.updatedAt !== PWR.updatedAt || JSON.stringify(d.compare || null) !== JSON.stringify(PWR.compare || null))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (location.hash === '#power' || location.hash === '#compare') render(); }
+    if (d && d.updatedAt && (!PWR || JSON.stringify(d) !== JSON.stringify(PWR))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (/^#(power|compare|powertime)$/.test(location.hash)) render(); }
   }).catch(() => { pwrBusy = false; });
 }
 function pwrCost(imp, exp, days) { const c = (+imp || 0) * PWR_RATE.importBlend + PWR_RATE.daily * (days || 1) - (+exp || 0) * PWR_RATE.exportCredit; return Math.max(0, c); }
@@ -19539,7 +19539,7 @@ function pwrBreak(c) {
 }
 function PowerPage() {
   setTimeout(pwrFetch, 0);
-  const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Power', 'Your house power, from SolarZero');
+  const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Power', 'Your house power, from SolarZero').replace(`aria-label="Settings" onclick="go('#settings')"`, `aria-label="Power settings" onclick="pwrSettings()"`);
   const d = PWR;
   if (!d || !d.updatedAt) return back + '<div class="card empty"><div class="t">Loading power figures…</div><div class="s">Needs the internet the first time.</div></div>';
   const t = d.today || {}, m = d.month || {}, y = d.year || {};
@@ -19563,15 +19563,34 @@ function PowerPage() {
       y.previousRetailerCostNZD != null ? ['Would have cost', pwrD(y.previousRetailerCostNZD)] : null, y.savingsNZD != null ? ['Saved', pwrD(y.savingsNZD)] : null]) + '<div class="s pwrnote">Year figures from SolarZero’s savings report.</div></div>';
   const B = (d.bills || []).slice(-3);
   const bills = B.length ? `<div class="card pwrcard"><div class="pwrh">Last bills · Ecotricity</div><table class="pwrtbl"><tr><th>Month</th><th>kWh</th><th>Charges</th></tr>${B.map(b => `<tr><td>${esc(b.month)}</td><td>${(+b.kWh).toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</td><td>${pwrD(b.totalInclGST)}</td></tr>`).join('')}</table><div class="s pwrnote">That month’s charges, incl GST.</div></div>` : '';
-  return pwrWrap(back + `<div class="pwrupd">Updated ${esc(when)} NZDT · figures may be a few hours old</div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + today + yest + month + year + bills +
+  return pwrWrap(back + `<div class="pwrupd">Updated ${esc(when)} NZDT · figures may be a few hours old</div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + pwrWeekCard(d.week) + today + yest + month + year + bills +
     (d.tou ? `<div class="s pwrnote" style="margin:4px 6px 18px">Time-of-use estimates, incl GST: peak ${(d.tou.peak * 100).toFixed(1)}c, shoulder ${(d.tou.shoulder * 100).toFixed(1)}c, off-peak ${(d.tou.offpeak * 100).toFixed(1)}c a kWh, plus ${pwrD(d.tou.daily)} a day, less ${(d.tou.exportCredit * 100).toFixed(1)}c a kWh sent back. Peak is weekdays 7–9:30am and 5:30–8pm; weekends and public holidays have no peak. Ecotricity ecoZER0 plan.</div>` :
     '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>') + pwrDots(0));
+}
+/* 2.26.42: Last 7 days vs weekly budget (grid cost incl GST + daily charges; no SolarZero subscription). Budget stored on this phone only. */
+function pwrBudget() { const v = +localStorage.getItem('pwrWeekBudget'); return v > 0 ? v : 60; }
+function pwrSettings() {
+  openSheet('Power settings', field('Weekly power budget ($)', inp('budget', String(pwrBudget()), 'inputmode="decimal" placeholder="60"'), 'Ecotricity grid power and daily charges for 7 days. Not the SolarZero subscription.') +
+    `<p class="muted" style="margin:6px 2px 0">For app-wide settings, use Settings on the Home page.</p>`,
+    async v => { const n = Number(String(v.budget || '').replace(/[$,\s]/g, '')); if (!(n > 0) || n > 10000) return 'Please enter a dollar amount, like 60.'; localStorage.setItem('pwrWeekBudget', String(Math.round(n * 100) / 100)); closeSheet(); render(); });
+}
+function pwrWeekCard(w) {
+  if (!w || w.total == null) return '';
+  const B = pwrBudget(), proj = w.projected != null ? w.projected : w.total, over = proj > B, diff = Math.abs(proj - B), p = Math.min(100, Math.round(w.total / B * 100)), pp = Math.min(100, Math.round(proj / B * 100));
+  const f = iso => { try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }); } catch (e) { return iso; } };
+  const partial = w.todayProjected != null;
+  const line = diff < 0.5 ? `About on your ${pwrM(B)}` : `About ${pwrM(diff)} ${over ? 'over' : 'under'} your ${pwrM(B)}`;
+  return `<div class="card pwrcard pwrweek ${over ? 'over' : 'under'}"><div class="pwrh">Last 7 days vs ${pwrM(B)}</div>` +
+    `<div class="pgl"><div class="pglt"><span>${f(w.from)} – ${f(w.to)}</span><b>${pwrD(w.total)} of ${pwrM(B)}</b></div><div class="pgbar pwrwbar"><em style="width:${pp}%"></em><i style="width:${p}%"></i></div></div>` +
+    `<div class="pwrwline">${line}${partial ? ' by the end of today' : ''}</div>` +
+    pwrRows([partial ? ['Whole week (estimate)', pwrD(proj)] : null, ['Average a day', pwrD(w.avgPerDay)]]) +
+    `<div class="s pwrnote">Grid power, daily charges and export credit, incl GST. Not the SolarZero subscription.${partial ? ' Today is part-way, so the rest of today is guessed from ' + (w.projMethod === 'yesterday-rest' ? 'the same hours yesterday.' : 'your daily average.') : ''}${w.missing && w.missing.length ? ' No figures for ' + w.missing.length + ' day(s).' : ''} Change the ${pwrM(B)} with the cog.</div></div>`;
 }
 /* ================= 2.26.41: Compare (price comparison from the relay power doc's "compare" block; swipe left on Power, right to go back) ================= */
 let pwrSlide = '';
 function pwrNav(h, dir) { pwrSlide = dir || ''; go(h); }
 function pwrWrap(html) { const c = pwrSlide ? ' pwrin-' + pwrSlide : ''; pwrSlide = ''; return `<div class="pwrpage${c}">${html}</div>`; }
-function pwrDots(i) { return `<div class="pwrdots" aria-hidden="true"><span class="${i === 0 ? 'on' : ''}"></span><span class="${i === 1 ? 'on' : ''}"></span></div>`; }
+function pwrDots(i) { return `<div class="pwrdots" aria-hidden="true">${[0, 1, 2].map(k => `<span class="${i === k ? 'on' : ''}"></span>`).join('')}</div>`; }
 const pwrM = v => '$' + Math.round(+v || 0).toLocaleString('en-NZ');
 function pwrDate(iso) { try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return iso; } }
 function ComparePage() {
@@ -19598,17 +19617,41 @@ function ComparePage() {
   const notes = `<div class="card pwrcard"><div class="pwrh">Good to know</div><ul class="pwrul">${(c.notes || []).map(n => `<li>${esc(n)}</li>`).join('')}` +
     (c.notCompared && c.notCompared.length ? `<li>Not compared: ${c.notCompared.map(esc).join('; ')}.</li>` : '') + '</ul>' +
     `<div class="s pwrnote">Source: ${c.sourceUrl ? `<a href="${esc(c.sourceUrl)}" target="_blank" rel="noopener">${esc(c.source || 'price data')}</a>` : esc(c.source || '')}. Rates checked ${ck.length ? (ck[0] === ck[ck.length - 1] ? pwrDate(ck[0]) : pwrDate(ck[0]) + ' – ' + pwrDate(ck[ck.length - 1])) : pwrDate(c.checkedAt)}. Compared ${pwrDate(c.checkedAt)}.</div></div>`;
-  return pwrWrap(back + now + others + notes + `<div class="pwrhint muted" style="text-align:center">← Swipe right to go back to Power</div>` + pwrDots(1));
+  return pwrWrap(back + `<button class="pwrhint" onclick="pwrNav('#powertime','r')">Swipe for time of day →</button>` + now + others + notes + `<div class="pwrhint muted" style="text-align:center">← Swipe right for Power · swipe left for time of day →</div>` + pwrDots(1));
+}
+/* ================= 2.26.42: Today by time of day (third swipe page; period totals computed on the box in update-power.mjs) ================= */
+let pwrTodDay = 'today';
+function pwrTodSet(k) { pwrTodDay = k; render(); }
+function PowerTimePage() {
+  setTimeout(pwrFetch, 0);
+  const back = `<button class="back" onclick="pwrNav('#compare','l')">${I('left')} Compare</button>` + header('Time of day', 'Your power in four parts of the day');
+  const d = PWR || {}, dayObj = pwrTodDay === 'yesterday' ? d.yesterday : d.today, P = dayObj && dayObj.periods;
+  const tabs = `<div class="pwrtabs"><button class="${pwrTodDay === 'today' ? 'on' : ''}" onclick="pwrTodSet('today')">Today</button><button class="${pwrTodDay === 'yesterday' ? 'on' : ''}" onclick="pwrTodSet('yesterday')">Yesterday</button></div>`;
+  if (!P || !Array.isArray(P.periods)) return pwrWrap(back + tabs + `<div class="card empty"><div class="t">${pwrTodDay === 'yesterday' ? 'No figures for yesterday yet' : 'Loading today’s figures…'}</div><div class="s">These come with the next power refresh.</div></div>` + pwrDots(2));
+  const hr = h => h === 0 || h === 24 ? '12am' : h === 12 ? '12pm' : h < 12 ? h + 'am' : (h - 12) + 'pm';
+  const max = Math.max(0.01, ...P.periods.flatMap(p => [p.importKWh || 0, p.exportKWh || 0, p.homeKWh || 0, p.solarKWh || 0]));
+  const bar = (lbl, v, cls) => v == null ? '' : `<div class="pwrbar"><span class="l">${lbl}</span><span class="b"><i class="${cls}" style="width:${Math.max(v > 0 ? 2 : 0, Math.round(v / max * 100))}%"></i></span><span class="v">${pwrK(v)}</span></div>`;
+  const top = P.periods.find(p => p.key === P.mostCost);
+  const blocks = P.periods.map(p => {
+    const head = `<div class="pwrh">${esc(p.label)} <span class="muted" style="font-weight:600">· ${hr(p.from)}–${hr(p.to)}</span>${p.key === P.mostCost ? ' <span class="pwrtop">Cost most</span>' : ''}</div>`;
+    if (p.status === 'todo' || p.status === 'nodata') return `<div class="card pwrcard pwrlater">${head}<div class="s">${p.status === 'todo' ? 'Still to come' : 'No figures for this part of the day'}</div></div>`;
+    return `<div class="card pwrcard">${head}` + bar('From grid', p.importKWh, 'g') + bar('Sent back', p.exportKWh, 'x') + bar('House used', p.homeKWh, 'h') + bar('Solar made', p.solarKWh, 's') +
+      pwrRows([[p.status === 'partial' ? 'Cost so far' : 'Cost', (p.cost < 0 ? '−' : '') + pwrD(Math.abs(p.cost))]]) + (p.status === 'partial' ? `<div class="s pwrnote">So far: ${p.hours} of ${p.to - p.from} hours.</div>` : '') + '</div>';
+  }).join('');
+  const sum = P.periods.reduce((a, p) => a + (p.cost || 0), 0);
+  const foot = `<div class="card pwrcard">` + pwrRows([['Parts of the day', pwrD(sum)], ['Daily charge (not split)', pwrD(P.daily)], [pwrTodDay === 'today' ? 'Total so far (estimate)' : 'Total (estimate)', pwrD(dayObj.cost && dayObj.cost.total != null ? dayObj.cost.total : sum + P.daily)]]) +
+    `<div class="s pwrnote">${top ? `${esc(top.label)} cost the most${pwrTodDay === 'today' ? ' so far' : ''}. ` : ''}Costs are estimates using peak, shoulder and off-peak prices hour by hour, less what you sent back.${P.hasHome || P.hasSolar ? ' House and solar figures are read off SolarZero’s hourly chart, so they’re close but not exact.' : ''}</div></div>`;
+  return pwrWrap(back + `<div class="pwrupd">${esc(fmtW(dayObj.date))}</div>` + tabs + blocks + foot + `<div class="pwrhint muted" style="text-align:center">← Swipe right to go back to Compare</div>` + pwrDots(2));
 }
 // Clear horizontal swipe only (vertical scrolling stays native; nothing is prevented)
 (function () {
   let x0 = 0, y0 = 0, t0 = 0, on = false;
   const route = () => (location.hash || '').slice(1).split('/')[0];
-  document.addEventListener('touchstart', e => { const r = route(); on = (r === 'power' || r === 'compare') && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,.pwrtbl'));
+  document.addEventListener('touchstart', e => { const r = route(); on = (r === 'power' || r === 'compare' || r === 'powertime') && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,.pwrtbl'));
     if (on) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); } }, { passive: true });
   document.addEventListener('touchend', e => { if (!on) return; on = false; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
     if (Date.now() - t0 > 900 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
-    const r = route(); if (r === 'power' && dx < 0) pwrNav('#compare', 'r'); else if (r === 'compare' && dx > 0) pwrNav('#power', 'l'); }, { passive: true });
+    const r = route(), order = ['power', 'compare', 'powertime'], i = order.indexOf(r), j = i + (dx < 0 ? 1 : -1); if (i >= 0 && j >= 0 && j < order.length) pwrNav('#' + order[j], dx < 0 ? 'r' : 'l'); }, { passive: true });
   document.addEventListener('touchcancel', () => { on = false; }, { passive: true });
 })();
 
