@@ -4,6 +4,7 @@
 <meta name="theme-color" content="#1d4ed8"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Renovation"><meta name="robots" content="noindex">
 <title>Millesha’s Renovation</title>
+<link rel="manifest" href="millesha.webmanifest">
 <link rel="icon" href="icons/favicon-32.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;color:#0f172a;-webkit-tap-highlight-color:transparent}
@@ -11,13 +12,18 @@ button{font:inherit;cursor:pointer}main{max-width:620px;margin:0 auto;padding:ca
 .top{display:flex;align-items:center;gap:12px;margin:4px 2px 14px}.top img{width:48px;height:48px}.top h1{margin:0;font-size:1.45rem;letter-spacing:-.3px}.top p{margin:2px 0 0;color:#64748b;font-size:.88rem}
 .who{display:flex;gap:8px;align-items:center;font-size:.85rem;color:#475569;margin:0 2px 12px}.who input{font:inherit;border:1px solid #cbd5e1;border-radius:10px;padding:6px 10px;width:150px}
 .nokey{background:#fff;border-radius:16px;padding:18px;text-align:center;color:#475569}
+.bar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 2px 12px}.who{margin:0}
+.share{border:0;background:#1d4ed8;color:#fff;border-radius:99px;padding:8px 14px;font-weight:700;font-size:.9rem}
+.a2hs{display:flex;gap:10px;align-items:flex-start;background:#eff6ff;color:#1e3a8a;border-radius:14px;padding:10px 12px;font-size:.85rem;margin:0 0 12px}.a2hs button{border:0;background:none;color:#1e3a8a;font-size:1rem}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:12px;font-size:.9rem;z-index:99999}
 </style></head>
 <body><main>
 <div class="top"><img src="art/i3-house.webp" alt=""><div><h1>Millesha’s Renovation</h1><p>Room by room, job by job</p></div></div>
-<div class="who">You’re ticking as <input id="me" maxlength="40" placeholder="Your name"></div>
+<div class="bar"><div class="who">You’re ticking as <input id="me" maxlength="40" placeholder="Your name"></div><button type="button" class="share" id="share">📤 Share</button></div>
+<div class="a2hs" id="a2hs" hidden><div>📲 <b>Keep this handy:</b> add it to your Home Screen (Safari: Share › Add to Home Screen; Chrome: ⋮ › Add to Home screen). Your ticks and name stay on this phone.</div><button type="button" id="a2hsx" aria-label="Hide">✕</button></div>
 <div id="root"></div>
 </main>
-<script src="reno.js?v=2.26.25"></script>
+<script src="reno.js?v=2.26.26"></script>
 <script>
 (function () {
   let k = ''; const m = /[#&]k=([A-Za-z0-9_-]{32,128})/.exec(location.hash || '');
@@ -25,6 +31,19 @@ button{font:inherit;cursor:pointer}main{max-width:620px;margin:0 auto;padding:ca
   const meIn = document.getElementById('me'); let me = 'Millesha'; try { me = localStorage.getItem('renoMe') || 'Millesha'; } catch (e) { } meIn.value = me;
   const root = document.getElementById('root'), draw = () => { root.innerHTML = k ? Reno.html() : '<div class="nokey">Open this page from the link Shane sent you.</div>'; };
   meIn.addEventListener('change', () => { try { localStorage.setItem('renoMe', meIn.value.trim() || 'Millesha'); } catch (e) { } Reno.init({ key: k, me: meIn.value.trim() || 'Millesha', onChange: draw }); });
+  if (k && !m) { try { history.replaceState(null, '', location.pathname + '#k=' + k); } catch (e) { } } // keep the key in the address so Add to Home Screen keeps it too
+  const link = () => location.origin + location.pathname + '#k=' + k;
+  const toast = t => { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); };
+  document.getElementById('share').onclick = async () => {
+    if (!k) return toast('Open the link Shane sent you first.');
+    const text = 'Come help with the renovation! Here’s our checklist – tick off jobs as you do them:';
+    try { if (navigator.share) { await navigator.share({ title: 'Millesha’s Renovation', text, url: link() }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(text + ' ' + link()); toast('Link copied – paste it in a message.'); } catch (e) { prompt('Copy this link', link()); }
+  };
+  const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+  let hid = false; try { hid = localStorage.getItem('renoA2hs') === '1'; } catch (e) { }
+  if (k && !standalone && !hid) document.getElementById('a2hs').hidden = false;
+  document.getElementById('a2hsx').onclick = () => { document.getElementById('a2hs').hidden = true; try { localStorage.setItem('renoA2hs', '1'); } catch (e) { } };
   Reno.init({ key: k, me, onChange: draw }); draw();
 })();
 </script></body></html>
