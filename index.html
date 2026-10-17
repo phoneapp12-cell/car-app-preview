@@ -41,7 +41,7 @@
 <style>
 :root{
   /* v1.9.0: every colour is a variable, so the themes (Settings › Appearance) only swap these. Default = the original teal look. */
-  --bg:#F4F6F5; --card:#fff; --ink:#15201D; --ink2:#51605B; --ink3:#86938F; --line:#E4E9E7; --desk:#DDE3E1;
+  --bg:#F4F6F5; --card:#fff; --ink:#15201D; --ink2:#51605B; --ink3:#6B7975; --line:#E4E9E7; --desk:#DDE3E1;
   --brand:#0F766E; --brand2:#E6F4F1; --branddk:#115E59; --onbrand:#fff; --focus:rgba(15,118,110,.18); --chart:#A7D7CF; --toastbtn:#7FE0D2;
   --soft:#F6F8F7; --soft2:#EEF2F1; --soft3:#F1F4F3; --btn:#EAF0EE; --field:#fff; --fieldline:#D5DDDA; --switchoff:#CBD5D2; --knob:#fff; --tick:#B8C4C0; --faint:#B6C0BD; --grab:#C9D2CF;
   --scrim:rgba(10,20,17,.4); --toast:#1C2623; --ontoast:#fff; --tabbg:rgba(255,255,255,.97); --white:#fff; --tagtext:#fff; --weekend:rgba(21,32,29,.035);
@@ -332,7 +332,9 @@ select.sel{font:inherit;font-size:0.9375rem;font-weight:600;color:var(--brand);b
 .wkcard{padding:14px}.wkhead{display:flex;justify-content:space-between;align-items:center;font-weight:750;margin-bottom:8px}.wkhead button{border:0;background:none;color:var(--brand);font-weight:650;font-size:.85rem}
 .wkdh{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin:2px 2px 8px}.wkdh b{font-size:1.05rem}.wkdh span{color:var(--ink2);font-size:.85rem}.wkdh .wknote{background:#eef2ff;color:#3730a3;border-radius:99px;padding:2px 9px;font-size:.75rem;font-weight:650}
 .wkslot{display:flex;align-items:center;gap:10px;padding:10px 4px;border-top:1px solid var(--line)}.wkslot:first-of-type{border-top:0}.wkic{font-size:1.4rem;width:34px;text-align:center;flex:none}.wktx{flex:1;min-width:0;cursor:pointer}.wktx .t{font-weight:650;font-size:.95rem}.wktx .s{font-size:.8rem;color:var(--ink2)}
-.wkfree{background:#f5f3ff;border-radius:14px;border-top:0;margin-top:4px;padding:10px 8px}.wkdone .t{color:var(--ink2);text-decoration:line-through}
+.wkfree{background:#f5f3ff;border-radius:14px;border-top:0;margin-top:4px;padding:10px 8px}
+/* 2.26.68: the pale free-time box keeps dark text in dark themes */
+.wkfree{--ink:#1E1B4B;--ink2:#4C4A73;--ink3:#5B5880;color:#1E1B4B}.wkfree .t{color:#1E1B4B!important}.wkfree .s{color:#4C4A73!important}.wkdone .t{color:var(--ink2);text-decoration:line-through}
 .wktick{width:28px;height:28px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;flex:none;color:#fff;font-weight:800}.wkdone .wktick{background:#22c55e;border-color:#22c55e}
 .wkbtns{display:flex;gap:4px;flex:none}.wkbtns button{border:0;background:var(--bg,#f1f5f9);border-radius:10px;width:32px;height:32px;color:var(--ink2);font-size:.95rem}
 .wkunskip{border:0;background:none;color:var(--brand);font-size:.82rem;font-weight:650;padding:6px 4px}.wkfoot{font-size:.78rem;color:var(--ink2);margin-top:6px}
@@ -1829,6 +1831,13 @@ html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color
 #glalerts .list>*,#glalerts .glwarn,#glalerts .glwarnwrap>.glwarn,#glalerts .glflagwrap>.glwarn{background:#fff!important;color:#1e293b!important;border:0!important;border-left:0!important;border-radius:14px!important;padding:12px 14px!important;box-shadow:0 1px 4px rgba(0,0,0,.12)!important;margin:0!important}
 #glalerts .list>*{display:flex;align-items:center;gap:10px}
 #glalerts .list>* *,#glalerts .glwarn *{color:inherit}
+/* 2.26.68: these cards are always white, so inside them the theme colours go back to light ones (buttons, lines, fields).
+   Secondary buttons were the theme's dark --btn with the card's dark text; primary ones lost their own text colour. */
+#glalerts .list>*,#glalerts .glwarn{--btn:#E2E8F0;--ink:#1E293B;--ink2:#475569;--ink3:#64748B;--line:#E2E8F0;--card:#fff;--soft:#F1F5F9;--soft2:#E2E8F0;--soft3:#F1F5F9;--field:#fff;--fieldline:#CBD5E1;--muted:#64748B}
+#glalerts .list>* .btn:not(.primary):not(.danger),#glalerts .glwarn .btn:not(.primary):not(.danger){background:#E2E8F0!important;color:#1E293B!important;border-color:#CBD5E1}
+#glalerts .list>* .btn.primary,#glalerts .glwarn .btn.primary{color:var(--onbrand)!important}
+#glalerts .list>* .btn.danger,#glalerts .glwarn .btn.danger{background:#FEE2E2!important;color:#991B1B!important}
+#glalerts .list>* .linkbtn,#glalerts .glwarn .linkbtn{color:#1D4ED8!important}
 #glalerts .list>* .s,#glalerts .glwarn .s,#glalerts .muted{color:#64748b!important}
 #glalerts .glwtag{color:#64748b!important;opacity:1}
 #glalerts [class*="ic"]:not(svg){background:none!important;box-shadow:none!important}

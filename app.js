@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.67';
+const APP_VERSION = '2.26.68';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19028,6 +19028,7 @@ async function start() {
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   try { const pn = await pnu312Mig(); if (pn) { render(); setTimeout(() => toast(pn), 2600); } } catch (e) { console.error('pnu312', e); }
   try { const en = await ecoBillMig(); if (en) { render(); setTimeout(() => toast(en, 'View', () => go('#bills')), 1200); } } catch (e) { console.error('eco75', e); }
+  try { const mm = await mort3Mig(); if (mm) { render(); setTimeout(() => toast(mm, 'View', () => go('#budget')), 5500); } } catch (e) { console.error('mort3', e); }
   try { const bm = await bills66Mig(); if (bm) { render(); setTimeout(() => toast(bm, 'View', () => go('#bills')), 4000); } } catch (e) { console.error('bills66', e); }
   try { const im = await insBillMig(); if (im) { render(); setTimeout(() => toast(im, 'View', () => go('#bills')), 2600); } } catch (e) { console.error('ins579', e); }
   phoneSyncOpen();
@@ -19924,7 +19925,7 @@ async function cfLoad(force) {
   try {
     const [s, d] = force ? await cfApi('/cashflow/refresh', 'POST', {}) : await cfApi('/cashflow');
     if (s === 200 && d.connected === false) { cfForget(); }
-    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); }
+    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { billAcctCheck(d.data); } catch (e) { } }
     else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
     else CFerr = cfErrText(s, d);
@@ -20061,9 +20062,10 @@ const xferBuf = () => { const v = +S.settings.xferBuffer; return v >= 0 && v <= 
 const ceil10 = v => Math.ceil(v / 10 - 1e-9) * 10;
 function xferPlan(D) {
   const T = todayISO(), p0 = payPeriod(0), p1 = payPeriod(1); if (!D || !p0) return null;
-  const H = p1 ? p1.end : p0.end, buf = xferBuf(), ok = id => D.accounts.some(a => a.id === id && cfSpendable(a));
+  // 2.26.68: two days past the end of next fortnight, so a repayment the Thursday after payday is planned from that pay
+  const p2 = payPeriod(2), H = p1 ? addDays(p1.end, 2) : p0.end, buf = xferBuf(), ok = id => D.accounts.some(a => a.id === id && cfSpendable(a));
   const main = cfMain(D), outs = [];
-  [p0, p1].filter(Boolean).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.toCome : []).forEach(x => outs.push({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date, acct: ok(x.acct) ? x.acct : main && main.id })); });
+  [p0, p1, p2 && p2.off === 2 ? p2 : null].filter(Boolean).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.toCome : []).filter(x => x.date <= H).forEach(x => outs.push({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date, acct: ok(x.acct) ? x.acct : main && main.id })); });
   // wages landing: on the usual 14-day beat after the last pay, into the account it last landed in
   const ins = [], landTx = (isT) => (D.transactions || []).filter(isT).sort((a, b) => b.date.localeCompare(a.date))[0];
   [['Your pay', mywIs, mywSt().seen], ['Sarah’s pay', swIs, swSt().seen]].forEach(([nm, isT, seen]) => { const t = landTx(isT); if (!t) return; const amt = fnAvg3(seen); if (!amt) return;
@@ -20198,7 +20200,8 @@ function fnModel(b) {
       const it = { kind: 'mort', n, name: m.name + ' (ASB)', planned: m.eff, amount: m.eff, carried: m.carried };
       const hit = R.find(x => inP(x.date) && x.date <= T && Math.abs(x.amount - m.eff) <= 2 && !used.has('m' + x.key + x.date));
       if (hit) { used.add('m' + hit.key + hit.date); Object.assign(it, { st: 'paid', amount: hit.amount, date: hit.date, bank: true, acct: hit.acct }); }
-      else { const prev = R.find(x => Math.abs(x.amount - m.eff) <= 2 && x.date < pp.start); let date = pp.end; if (prev) { let d = prev.date; while (d < pp.start) d = addDays(d, 14); if (d <= pp.end) date = d; }
+      else { const prev = R.find(x => Math.abs(x.amount - m.eff) <= 2 && x.date < pp.start) || R.find(x => x.date < pp.start); let date = pp.end; if (prev) { let d = prev.date; while (d < pp.start) d = addDays(d, 14); if (d <= pp.end) date = d; else date = ''; } // 2.26.68: same 14-day beat as ASB's repayments; none due this fortnight when the beat falls outside it
+        if (!date) return;
         Object.assign(it, { date, st: past && covered ? 'nomatch' : past ? 'planned' : date < T ? 'overdue' : 'due', acct: (prev && acc(prev.acct) && cfSpendable(acc(prev.acct)) ? prev.acct : mA && mA.id) }); }
       OUT.push(it); });
     // the matched repayment lines are no longer everyday spending
@@ -20784,12 +20787,13 @@ function pnDismiss(id) { const a = pnDis(); if (!a.includes(id)) a.push(id); try
 function pnItems() {
   try { if (Date.now() - pnFetchedAt > 20 * 60e3) { pnFetchedAt = Date.now(); setTimeout(pwrFetch, 0); } } catch (e) { }
   let N = []; try { N = (typeof PWR !== 'undefined' && PWR && Array.isArray(PWR.notices)) ? PWR.notices : []; } catch (e) { N = []; }
-  const gone = new Set(pnDis()), IC = { bill: '🧾', payment: '💵', rates: '📈', compare: '🔎', signin: '🔑' };
+  try { const L = (S.settings.appNotices || []).filter(n => n && n.id); if (L.length) N = N.concat(L); } catch (e) { } // 2.26.68: notes from one-time updates on this phone
+  const gone = new Set(pnDis()), IC = { money: '🏦', bill: '🧾', payment: '💵', rates: '📈', compare: '🔎', signin: '🔑' };
   const off = (() => { try { return pwrOffpeakCard(); } catch (e) { return null; } })();
   return (off ? [off] : []).concat(N.filter(n => n && n.id && n.title && !gone.has(n.id)).sort((a, b) => String(b.at).localeCompare(String(a.at))).map(n => {
     let when = ''; try { when = new Date(n.at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) { }
     const urgent = n.level === 'urgent';
-    return { id: n.id, urgent, html: `<div class="row glnew pnrow${urgent ? ' pnurg' : ''}" data-pn="${esc(n.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('#power')"><div class="ic">${IC[n.kind] || '⚡'}</div><div class="tx"><div class="t">${esc(n.title)}</div>${n.body ? `<div class="s pnbody">${esc(n.body)}</div>` : ''}<div class="s">Power${when ? ' · ' + esc(when) : ''}</div></div></div>` };
+    return { id: n.id, urgent, html: `<div class="row glnew pnrow${urgent ? ' pnurg' : ''}" data-pn="${esc(n.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${/^#[a-z]+$/.test(n.go || '') ? n.go : '#power'}')"><div class="ic">${IC[n.kind] || '⚡'}</div><div class="tx"><div class="t">${esc(n.title)}</div>${n.body ? `<div class="s pnbody">${esc(n.body)}</div>` : ''}${n.bill && n.acct ? `<div class="mbbtns"><button type="button" class="btn small primary" onclick="event.stopPropagation();billAcctSwitch(${jsArg(n.bill)},${jsArg(n.acct)})">Switch</button><button type="button" class="btn small" onclick="event.stopPropagation();billAcctKeep(${jsArg(n.bill)},${jsArg(n.acct)})">Keep as is</button></div>` : ''}<div class="s">${esc(n.src || 'Power')}${when ? ' · ' + esc(when) : ''}</div></div></div>` };
   }));
 }
 function glAlertParts() {
@@ -21049,6 +21053,51 @@ async function insBillMig() {
   if (b) { Object.assign(b, fields, { name: b.name || 'Insurance' }); if (!b.notes) b.notes = '10 monthly payments from Kiwibank, last one Sun 18 Jul 2027.'; }
   else S.bills.push(Object.assign({ id: uid('bill'), notes: '10 monthly payments from Kiwibank, last one Sun 18 Jul 2027.' }, fields));
   S.settings.ins579Mig = true; await save(); return b ? 'Insurance bill updated: $579.11 a month from Kiwibank' : 'Insurance added: $579.11 a month from Kiwibank, 10 payments';
+}
+/* 2.26.68: a bill whose payments keep leaving a different account from its 'Comes out of' (2 of its last 3 bank
+   payments, last 90 days, matched by payee) gets a bell note: Switch sets that account; Keep as is remembers the choice.
+   Runs whenever Cash flow loads or refreshes. Only names and amounts are compared; nothing leaves the phone. */
+function billAcctNow(D, b) { return (S.settings.cfBillAcct || {})[b.id] || billBankAcct(D, b) || ''; }
+function billAcctCheck(D) {
+  if (!D || !Array.isArray(S.bills)) return; S.settings.billAcctKeep = S.settings.billAcctKeep || {};
+  const since = addDays(todayISO(), -90), sp = D.transactions.filter(t => { const a = D.accounts.find(x => x.id === t.acct); return a && cfSpendable(a) && !cfIsOrbit(a) && t.date.slice(0, 10) >= since; });
+  let L = (S.settings.appNotices || []).filter(n => !(n && n.bill)), ch = false;
+  S.bills.forEach(b => {
+    if (!b || b.paid || b.paidBy === 'card' || /\bmortgage\b/i.test(b.name || '')) return;
+    const cur = billAcctNow(D, b); if (!cur) return;
+    const tk = cfToks(b.name); if (!tk.length) return;
+    const hits = sp.filter(t => t.amount < 0 && tk.some(w => (t.desc + ' ' + (t.merchant || '')).toLowerCase().includes(w))).sort((a, c) => c.date.localeCompare(a.date)).slice(0, 3);
+    if (hits.length < 2) return; const cnt = {}; hits.forEach(t => { cnt[t.acct] = (cnt[t.acct] || 0) + 1; });
+    const top = Object.keys(cnt).sort((a, c) => cnt[c] - cnt[a])[0];
+    if (!top || top === cur || cnt[top] < 2 || S.settings.billAcctKeep[b.id + '|' + top]) return;
+    L.push({ id: 'bacct-' + b.id + '-' + top.slice(-8), kind: 'bill', src: 'Bills', go: '#bills', at: hits[0].date, bill: b.id, acct: top,
+      title: `${String(b.name).slice(0, 40)} has been coming out of ${fnAcctNameD(D, top)}, not ${fnAcctNameD(D, cur)}. Switch it?`, body: `${cnt[top]} of its last ${hits.length} payments in the bank came out of ${fnAcctNameD(D, top)}.` });
+  });
+  const old = JSON.stringify((S.settings.appNotices || []).filter(n => n && n.bill).map(n => n.id)), now = JSON.stringify(L.filter(n => n.bill).map(n => n.id));
+  if (old !== now) { S.settings.appNotices = L.slice(-30); save(); }
+}
+function fnAcctNameD(D, id) { const a = D.accounts.find(x => x.id === id); return a ? (cfIsOrbit(a) ? 'ORBIT' : cfAName(a)) : 'another account'; }
+function billAcctDrop(id) { S.settings.appNotices = (S.settings.appNotices || []).filter(n => !(n && n.bill === id)); }
+async function billAcctSwitch(id, acct) { S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[id] = acct; const b = (S.bills || []).find(x => x.id === id); if (b) { const a = CF && CF.data && CF.data.accounts.find(x => x.id === acct); if (a) b.fromBank = BILL_BANKS.find(k => new RegExp(k, 'i').test(a.bank)) || b.fromBank; delete b.fromAcct; }
+  billAcctDrop(id); cfRegulars.c = null; await save(); render(); toast('Switched. It now comes out of ' + fnAcctName(acct) + '.'); }
+async function billAcctKeep(id, acct) { S.settings.billAcctKeep = S.settings.billAcctKeep || {}; S.settings.billAcctKeep[id + '|' + acct] = new Date().toISOString().slice(0, 10); billAcctDrop(id); await save(); render(); toast('Kept as it is. It won’t ask about that account again.'); }
+/* 2.26.68: one-time: the three old ANZ home loans were refinanced to two ASB loans on 7 Sep 2026. ASB takes $602.85 and
+   $579.28 (together $1,182.13) every second Thursday from ASB MORTGAGE (24 Sep, 8 Oct, next 22 Oct). The third ANZ loan
+   ($73.71 a week) was paid off and its balance is inside the two ASB loans, so Mortgage 3 is retired: budgets from 7 Sep
+   on get Mortgage 1 $602.85, Mortgage 2 $579.28 and Mortgage 3 $0 (set, so nothing carries forward). Earlier budgets keep
+   their ANZ amounts as history. A note goes on the bell page. */
+async function mort3Mig() {
+  if (!S || !S.settings || S.settings.mort3Mig) return '';
+  const old = [];
+  (S.budgets || []).forEach(b => { if (!b || !b.start || b.start < '2026-09-07') return;
+    const ms = budgetMortgagesOf(b); old.push({ b: b.start, m: budgetMortEff(b).map(m => m.eff) });
+    b.mortgages = [{ id: ms[0].id, amount: 602.85, set: true }, { id: ms[1].id, amount: 579.28, set: true }, { id: ms[2].id, amount: 0, set: true }]; });
+  S.settings.mort3Retired = { at: new Date().toISOString(), note: 'Old ANZ loan ($73.71 a week) paid off 7 Sep 2026, now inside the two ASB loans', before: old.slice(-6) };
+  S.settings.appNotices = (S.settings.appNotices || []).filter(n => n && n.id !== 'mort3-merged').concat({ id: 'mort3-merged', kind: 'money', src: 'Budget', go: '#budget', at: new Date().toISOString(),
+    title: 'Mortgage 3 is now part of the ASB repayment', body: 'The old third ANZ loan was paid off when you moved to ASB on 7 Sep. ASB takes $1,182.13 every second Thursday from ASB MORTGAGE (next Thu 22 Oct, then Thu 5 Nov), which covers all of it. Mortgage 1 is $602.85, Mortgage 2 is $579.28 and Mortgage 3 is $0 from now on.' }).slice(-20);
+  // Tamahi / Taimahi Trust comes out of ANZ Bill Account (where the bank shows it), not ANZ Personal
+  (S.bills || []).filter(x => x && /\bta(i)?mahi\b/i.test(x.name || '')).forEach(x => { x.fromBank = 'ANZ'; x.fromAcct = 'BILL ACCOUNT'; if (S.settings.cfBillAcct) delete S.settings.cfBillAcct[x.id]; });
+  S.settings.mort3Mig = true; await save(); return 'Mortgage 3 merged into the ASB repayment ($1,182.13 a fortnight)';
 }
 /* 2.26.66: one-time: Ecotricity $75 a week going forward and Kora about $120 a fortnight (varies), both from the
    ANZ Bill Account (where the bank shows them going out). Ecotricity is paid by hand, mostly midweek, so the next one is
