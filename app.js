@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.77';
+const APP_VERSION = '2.26.78';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18519,7 +18519,8 @@ function bottomTabs(route) {
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => nav.addEventListener(ev, () => clearTimeout(btPress)));
   }
   const item = ROUTE_ITEM[route] || route || 'home';
-  const cur = item === '' ? 'home' : item;
+  let cur = item === '' ? 'home' : item;
+  if (['power', 'compare', 'powertime', 'cashflow'].includes(route) && !b.keys.includes(cur)) cur = ['budget', 'bills', 'cashflow'].find(k => b.keys.includes(k)) || cur; // 2.26.78: Money tabs light the Money tab
   const bn = (() => { try { return glBellUnseen(); } catch (e) { return 0; } })(); // 2.26.75
   nav.innerHTML = b.keys.map(k => { const [full, short, ic] = btMeta(k); const on = k === cur || (k === 'more' && route === 'more');
     return `<button type="button" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} aria-label="${esc(full)}" data-bt="${k}" onclick="btGo('${k}')"><span class="w">${sideIco(k, ic)}${k === 'home' && bn ? `<span class="badge bellb">${bn > 9 ? '9+' : bn}</span>` : ''}</span><span class="lbl">${esc(short)}</span></button>`; }).join('');
@@ -18594,13 +18595,18 @@ function tabbar(active) {
     const [l, ic] = meta(k);
     return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
   };
-  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
-  const reno = (() => { try { return renoOn() ? `<div class="tabgrp g-reno"><button class="${active === 'reno' ? 'on' : ''}" onclick="setTabsOpen(false);go('#reno')"><span class="w"><span style="font-size:1.3rem;line-height:1">🛠️</span></span><span class="lbl">Renovation ${window.Reno ? Reno.progress() + '%' : ''}</span></button></div>` : ''; } catch (e) { return ''; } })() + (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`; return `<div class="tabgrp g-reno2">${b('mumreno', '👵', 'Mum’s Renovation')}${b('myreno', '🔨', 'My Renovations')}${b('weekend', '🌤️', 'Days off plan')}${b('power', '⚡', (() => { try { const t = PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })())}</div>`; })();
+  const pwrBtn = (() => { const l = (() => { try { const t = PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })(); return `<button class="${active === 'power' ? 'on' : ''}" ${active === 'power' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#power')"><span class="w"><span style="font-size:1.3rem;line-height:1">⚡</span></span><span class="lbl">${l}</span></button>`; })();
+  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'cashflow' ? pwrBtn : '')).join('')}</div>`).join('');
+  // 2.26.78: the project pages sit under a 'Projects' heading; Power moved into Money (as a link to Money › Power)
+  const reno = (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`;
+    let mill = ''; try { mill = renoOn() ? b('reno', '🛠️', 'Renovation ' + (window.Reno ? Reno.progress() + '%' : '')) : ''; } catch (e) { mill = ''; }
+    return `<div class="tabgrp g-reno g-projects"><div class="tabgh">Projects</div>${mill}${b('mumreno', '👵', 'Mum’s Renovation')}${b('myreno', '🔨', 'My Renovations')}${b('weekend', '🌤️', 'Days off plan')}</div>`; })();
   $('#tabbar').innerHTML = reno + groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
   const item = ROUTE_ITEM[r] || r, tabs = navOrder();
   if (r === 'settings') return 'settings';
+  if (r === 'power' || r === 'compare' || r === 'powertime') return 'power'; // 2.26.78: Money › Power
   if (tabs.includes(item)) return item;
   if (r === 'home' || r === 'weather' || r === 'drivers' || r === 'alerts' || !r) return 'home';
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
@@ -20041,7 +20047,7 @@ function cfBody(M) {
 function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
 async function cfSetMain(id) { S.settings.cfMain = id; await save(); render(); }
 async function cfRefresh() { toast('Asking the banks for the latest…'); await cfLoad(true); if (CFerr) toast(CFerr); }
-function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
+function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['power', 'Power']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
 function CashFlow() {
   const head = moneyTabs('cashflow') + header('Cash flow', 'Your bank balances, and what’s left before payday');
   if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
@@ -21130,7 +21136,7 @@ function homePowerLine(now = new Date()) {
     return '';
   } catch (e) { return ''; }
 }
-function homePowerLi() { const x = homePowerLine(); return x ? '<li class="sumli" id="sumpwr">⚡ ' + esc(x) + '</li>' : ''; }
+function homePowerLi() { const x = homePowerLine(); return x ? '<li class="sumli" id="sumpwr" role="link" tabindex="0" style="cursor:pointer" onclick="event.stopPropagation();go(\'#power\')">⚡ ' + esc(x) + '</li>' : ''; }
 function pwrCost(imp, exp, days) { const c = (+imp || 0) * PWR_RATE.importBlend + PWR_RATE.daily * (days || 1) - (+exp || 0) * PWR_RATE.exportCredit; return Math.max(0, c); }
 const pwrK = v => (v == null || isNaN(v)) ? '–' : (+v).toLocaleString('en-NZ', { maximumFractionDigits: 1 }) + ' kWh';
 const pwrD = v => '$' + (+v || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -21142,7 +21148,7 @@ function pwrBreak(c) {
 }
 function PowerPage() {
   setTimeout(pwrFetch, 0);
-  const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Power', 'Your house power, from SolarZero').replace(`aria-label="Settings" onclick="go('#settings')"`, `aria-label="Power settings" onclick="pwrSettings()"`);
+  const back = moneyTabs('power') /* 2.26.78: Power is the fourth Money tab */ + header('Power', 'Your house power, from SolarZero').replace(`aria-label="Settings" onclick="go('#settings')"`, `aria-label="Power settings" onclick="pwrSettings()"`);
   const d = PWR;
   if (!d || !d.updatedAt) return back + '<div class="card empty"><div class="t">Loading power figures…</div><div class="s">Needs the internet the first time.</div></div>';
   const t = d.today || {}, m = d.month || {}, y = d.year || {};
