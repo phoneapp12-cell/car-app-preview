@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.30';
+const APP_VERSION = '2.26.31';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19213,10 +19213,18 @@ function glDueItems() {
       const k = x.kind, d = x.days, name = String(x.name || x.html || '').replace(/<[^>]+>/g, ' ');
       if (!glOk(name) || /\bbusy\b/i.test(name)) return;
       const t = x.ref && x.ref.todo, hi = !!(t && t.priority === 'high');
-      const ok = k === 'bill' || k === 'pay' || k === 'loan' ? d <= 1 : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? d >= 0 && d <= 1 : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
+      const ok = k === 'bill' || k === 'pay' || k === 'loan' ? d <= 1 : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? false : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
       if (!ok) return;
       let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
       out.push({ days: d, html: h });
+    });
+  } catch (e) { }
+  // 2.26.31: birthdays from the Birthdays list, 28 days ahead. Today → Urgent; 1–28 days → Coming up; only 0–7 days count toward the bell badge.
+  try {
+    (S.birthdays || []).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 28 && glOk(x.b.name)).forEach(x => {
+      const when = x.d === 0 ? 'Today 🎂' : x.d === 1 ? 'Tomorrow' : x.d + ' days to go';
+      const h = `<button class="row" onclick="go('#birthdays')"><div class="ic bday">${I('cake')}</div><div class="tx"><div class="t">${esc(x.b.name)}’s birthday</div><div class="s">${fmtW(x.iso)}${x.age > 0 ? ` · turns ${x.age}` : ''}</div></div><span class="pill">${when}</span></button>`;
+      out.push({ days: x.d, html: h, noCount: x.d > 7 });
     });
   } catch (e) { }
   return out;
@@ -19300,7 +19308,7 @@ function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
   return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems() };
 }
-function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length; } catch (e) { return 0; } }
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length; } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
