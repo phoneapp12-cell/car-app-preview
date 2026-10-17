@@ -3,6 +3,7 @@
    Each item merges on its own `updated` time (newest wins), so a tick on one phone and a new item on the other
    never overwrite each other. Deletes are kept as short tombstones so they don't come back. No AI, nothing logged. */
 export const SHARED_MAX_ITEMS = 500;
+import { queueShop } from './shop-notify.js';
 const TOMBSTONE_MS = 60 * 24 * 3600 * 1000;
 const PRI = ['high', 'normal', 'low'];
 
@@ -88,6 +89,8 @@ export async function sharedTodoRoute(body, env, now = Date.now()) {
   const m = mergeItems(items, inc, now);
   let rev = cur && Number(cur.rev) || 0;
   if (m.changed) { rev += 1; await env.EVENTS_KV.put(key, JSON.stringify({ rev, updatedAt: new Date(now).toISOString(), items: m.items })); }
+  // 2.26.49 / 1.10.0: new Shopping items -> one push to the other person (batched about a minute). Never blocks the sync.
+  if (m.changed && cur && items.length) { try { await queueShop(env, k, items, m.items, now); } catch (e) { } }
   return [200, { ok: true, rev, items: m.items, now }];
 }
 

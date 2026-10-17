@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.48';
+const APP_VERSION = '2.26.49';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -303,7 +303,7 @@ function rowFor(x) {
   else if (x.kind === 'health') { icon = HEALTH_ICON[x.item.kind] || 'medkit'; sub = 'Health · ' + (x.item.clinic ? esc(x.item.clinic) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
   else sub = 'To-do · ' + esc(x.todo.list || '') + ' · ' + fmtW(x.date);
-  const cpT = (() => { try { return x.kind === 'car' ? carProgText(x.car, x.part) : x.kind === 'todo' && x.todo && todoStatus(x.todo) === 'doing' ? 'In progress' : ''; } catch (e) { return ''; } })();
+  const cpT = (() => { try { return x.kind === 'car' ? carProgShort(x.car, x.part) : x.kind === 'todo' && x.todo && todoStatus(x.todo) === 'doing' ? 'In progress' : ''; } catch (e) { return ''; } })();
   const body = `<div class="ic ${x.kind}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div><div class="badgestack">${cpT ? progPill(cpT) : duePill(x.days)}${cash}</div>`;
   // 1.82.0: a to-do in Upcoming or the overdue list can be marked done here. It stays on the to-do list.
   if (x.kind === 'todo' && x.todo) return `<div class="row"><button type="button" class="tick" aria-label="Mark complete: ${esc(x.title)}" onclick="tick('${x.todo.id}')"><span>${I('check')}</span></button><button type="button" class="tapzone" onclick="go('${x.go}')">${body}</button></div>`;
@@ -626,9 +626,9 @@ const HOME_CARD = {
   },
   cars: () => {
     if (!S.cars.length) return '';
-    const cell = (l, d) => d ? `<span class="cg"><small>${l}</small> ${fmt(d)} ${duePill(daysLeft(d))}</span>` : '';
+    const cell = (l, d, c, pt) => { if (!d) return ''; let cp = ''; try { cp = carProgShort(c, pt); } catch (e) { } return `<span class="cg"><small>${l}</small> ${fmt(d)} ${cp ? progPill(cp) : duePill(daysLeft(d))}</span>`; };
     return homeSec('Cars', '<a href="#cars">See all</a>') + `<div class="list" id="homecars">${S.cars.map(c => `<button class="row" onclick="go('#car/${c.id}')">${carMark(c)}
-      <div class="tx"><div class="t">${esc(c.name)}${c.plate ? ` <span class="plate small">${esc(c.plate)}</span>` : ''}</div><div class="cgrow">${cell('WOF', c.wof)}${cell('Rego', c.rego)}</div></div></button>`).join('')}</div>`;
+      <div class="tx"><div class="t">${esc(c.name)}${c.plate ? ` <span class="plate small">${esc(c.plate)}</span>` : ''}</div><div class="cgrow">${cell('WOF', c.wof, c, 'wof')}${cell('Rego', c.rego, c, 'rego')}</div></div></button>`).join('')}</div>`;
   },
   ideas: () => {
     const list = S.ideas.filter(i => i.pinned).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 5); if (!list.length) return '';
@@ -4376,7 +4376,7 @@ function svcCell(c) {
   return `<div><small>Service</small><span class="addsvc" role="button" onclick="event.stopPropagation();serviceForm('${c.id}',false)">+ Add service date</span></div>`;
 }
 function carTriple(c) {
-  const cell = (l, s) => s ? `<div><small>${l}</small><b>${fmt(s)}</b>${(() => { const pt = { WOF: 'wof', Rego: 'rego' }[l]; const cp = pt ? carProgText(c, pt) : ''; return cp ? progPill(cp) : pill(daysLeft(s)); })()}</div>` : `<div><small>${l}</small><b>Not set</b><span class="pill none">Add date</span></div>`;
+  const cell = (l, s) => s ? `<div><small>${l}</small><b>${fmt(s)}</b>${(() => { const pt = { WOF: 'wof', Rego: 'rego' }[l]; const cp = pt ? carProgShort(c, pt) : ''; return cp ? progPill(cp) : pill(daysLeft(s)); })()}</div>` : `<div><small>${l}</small><b>Not set</b><span class="pill none">Add date</span></div>`;
   return `<div class="triple">${cell('WOF', c.wof)}${cell('Rego', c.rego)}${svcCell(c)}</div>`;
 }
 function Cars() {
@@ -8037,7 +8037,20 @@ function Shopping() {
     <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button>` : ''}</div>
     ${progLine(got.length, open.length + got.length, 'Shopping')}${wwTotalHtml(open)}${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
     ${got.length ? `<div class="sec">Got <button onclick="clearGot()">Clear</button></div><div class="list" id="shopgot">${got.map(shopRow).join('')}</div>` : ''}
+    <div class="foot" id="shoppushline">${shopPushLine()}</div>
     <div class="foot">“Check label” means gluten often hides in it, so look for “gluten free” on the pack. Tap an item to change or delete it. Prices are Woolworths NZ online prices (woolworths.co.nz), checked daily; tap one to open the product.</div>`;
+}
+// 2.26.49: phone notification when Sarah adds to shopping (and Sarah gets one when you share an item with her)
+function shopPushLine() {
+  if (!pushOK()) return '';
+  const on = (S.settings || {}).shopPush !== false && Notification.permission === 'granted';
+  return on ? `🔔 You get a notification when Sarah adds to shopping, and she gets one when you share items with her. <button class="linkbtn" onclick="shopPushSet(false)">Turn off mine</button>`
+    : `🔕 No notification when Sarah adds to shopping. <button class="linkbtn" onclick="shopPushSet(true)">Turn on</button>`;
+}
+async function shopPushSet(on) {
+  S.settings.shopPush = !!on; if (on) localStorage.removeItem('shopPushReg'); await save();
+  if (on && Notification.permission !== 'granted') { try { await enableReminderPush(); } catch (e) { } } else { try { await scheduleReminders(); } catch (e) { } }
+  render(); toast(on ? 'You’ll get a notification when Sarah adds to shopping.' : 'Shopping notifications are off on this phone.');
 }
 async function shopQuickAdd(e) {
   e.preventDefault();
@@ -10253,12 +10266,25 @@ async function scheduleReminders() {
       else sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey() });
     }
     if (!sub) return reminders.length ? 'fail' : '';
+    try { shopPushReg(sub); } catch (e) { }
     if (!reminders.length && !S.settings.remOnRelay) return '';
     await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders });
     const on = reminders.length > 0;
     if (!!S.settings.remOnRelay !== on) { S.settings.remOnRelay = on; await save(); }
     return '';
   } catch (e) { return 'fail'; }
+}
+/* 2.26.49: when Sarah adds to the shared Shopping list, the relay sends this phone one push per batch
+   ('Sarah added to shopping: Milk, Bread'). This hands the relay the phone's push address (once a day, or when it changes).
+   Settings > Shopping pushes can switch it off. */
+async function shopPushReg(sub) {
+  if (!sub || !RELAY_URL || typeof SHARED_KEY === 'undefined') return;
+  const off = (S.settings || {}).shopPush === false, ep = sub.endpoint, k = 'shopPushReg', was = localStorage.getItem(k) || '';
+  if (off) { if (was) { try { await pushPost('/shared-push/unsubscribe', { key: SHARED_KEY, who: 'shane', endpoint: ep }); localStorage.removeItem(k); } catch (e) { } } return; }
+  const tag = ep.slice(-24) + '|' + todayISO(); if (was === tag) return;
+  const prev = was && !ep.endsWith(was.split('|')[0]) ? localStorage.getItem('shopPushEp') || undefined : undefined;
+  await pushPost('/shared-push/subscribe', { key: SHARED_KEY, who: 'shane', subscription: sub.toJSON(), ...(prev ? { previous: prev } : {}) });
+  localStorage.setItem(k, tag); localStorage.setItem('shopPushEp', ep);
 }
 async function enableReminderPush() {
   if (!pushOK()) { toast('This phone or browser can’t get push notifications. On Android, open the app from its icon (installed from Chrome).'); return; }
@@ -19306,7 +19332,7 @@ function glQuick(m) {
   try { const o = (S.todos || []).filter(t => t && !t.done && glOk(t.title)), td = o.filter(t => t.due && t.due <= T).length; q('todo', 'todo', '#2563eb', '#1e40af', 'To-do', td ? td + ' today · ' + o.length + ' open' : o.length ? o.length + ' open' : 'All done', "go('#todo')"); } catch (e) { }
   try { const b = (S.bills || []).filter(x => x && !x.paid && x.due).sort((x, y) => String(x.due).localeCompare(String(y.due)))[0]; q('bills', 'bill', '#dc2626', '#9a3412', 'Bills', b ? b.name + ' · ' + (daysLeft(b.due) < 0 ? 'overdue' : fmtW(b.due)) : 'Nothing due', "go('#bills')"); } catch (e) { }
   try { const a = (S.appts || []).filter(x => x && x.date === T && !x.done); q('calendar', 'cal', '#7c3aed', '#4c1d95', 'Calendar', !m.off ? 'Work ' + glShift(m) + (a.length ? ' · ' + a.length + ' more' : '') : a.length ? a[0].title : 'Free all day', "go('#calendar')"); } catch (e) { }
-  try { const c = glCU().filter(x => x.kind === 'car' || x.kind === 'driver'), od = c.filter(x => x.days < 0).length; q('cars', 'car', '#0891b2', '#155e75', 'Cars', c.length ? (od ? od + ' overdue · ' : '') + c.length + ' due' : 'All good', "go('#cars')"); } catch (e) { }
+  try { const c = glCU().filter(x => x.kind === 'car' || x.kind === 'driver'), ipf = x => { try { return !!(x.ref && x.ref.kind === 'car' && carProg(x.ref.car, x.ref.part)); } catch (e) { return false; } }, ip = c.filter(ipf).length, od = c.filter(x => x.days < 0 && !ipf(x)).length; q('cars', 'car', '#0891b2', '#155e75', 'Cars', c.length ? (od ? od + ' overdue · ' : '') + (ip ? ip + ' in progress · ' : '') + (c.length - ip ? (c.length - ip) + ' due' : '').replace(/ · $/, '') : 'All good', "go('#cars')"); } catch (e) { }
   try { const g = glCU().find(x => x.kind === 'garden'); q('garden', 'garden', '#16a34a', '#14532d', 'Garden', g ? String(g.name || '').replace(/<[^>]+>/g, '') : glGardenSafe() ? 'Cool enough to water' : 'Nothing to do', "go('#garden')"); } catch (e) { }
   try { const n = (S.shop && S.shop.items || []).filter(x => x && !x.done).length; q('shop', 'shop', '#ea580c', '#9a3412', 'Shopping', n ? plural(n, 'item') : 'List is empty', "go('#shopping')"); } catch (e) { }
   return `<div class="glgrid glg3">${Q.join('')}</div>`;
@@ -19450,7 +19476,12 @@ function glSarahItems() {
   const out = [], since = Date.now() - 864e5;
   const add = (x, where, what) => { if (x && !x.done && +x.created >= since && x.title && glOk(x.title)) out.push(`<button class="row" onclick="go('${where}')"><div class="ic todo"><span class="sbadge">S</span></div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${what} · added ${esc(ago(+x.created))}</div></div>${I('right')}</button>`); };
   try { (S.todos || []).filter(isSarahTodo).filter(t => !(t.due && daysLeft(t.due) <= 7) && todoStatus(t) !== 'doing').forEach(t => add(t, '#todo', 'To-do from Sarah')); } catch (e) { }
-  try { ((S.shop && S.shop.items) || []).filter(x => isSarahShop(x)).forEach(x => add(x, '#shopping', 'Shopping from Sarah')); } catch (e) { }
+  try { // 2.26.49: what Sarah added to shopping in the last day, in one row (shop items carry .name)
+    const L = ((S.shop && S.shop.items) || []).filter(x => isSarahShop(x) && !x.done && +x.created >= since && x.name && glOk(x.name)).sort((a, b) => b.created - a.created);
+    if (L.length) { const nm = x => { const b = x.brand, br = b && !b.any && !b.other ? String(b.brand || '').trim() : ''; return br && !x.name.toLowerCase().includes(br.toLowerCase()) ? `${x.name} (${br})` : x.name; };
+      const names = L.slice(0, 6).map(nm).join(', ') + (L.length > 6 ? ` and ${L.length - 6} more` : '');
+      out.push(`<button class="row shopfs" onclick="go('#shopping')"><div class="ic todo"><span class="sbadge">S</span></div><div class="tx"><div class="t">🛒 Sarah added to shopping</div><div class="s">${esc(names)} · ${esc(ago(+L[0].created))}</div></div>${I('right')}</button>`); }
+  } catch (e) { }
   try { (S.appts || []).filter(a => a && a.from === 'sarah').forEach(a => add(a, '#calendar', 'Sarah’s appointment' + (a.date ? ' · ' + fmtW(a.date) : ''))); } catch (e) { }
   return out;
 }
@@ -19611,6 +19642,13 @@ function carProgText(c, part) {
   if (part !== 'wof' || !e.insp) return 'In progress';
   const d = daysLeft(carRecheck(e));
   return 'In progress · ' + (d > 1 ? `recheck in ${d} days` : d === 1 ? 'recheck tomorrow' : d === 0 ? 'recheck today' : `recheck ${-d} day${d === -1 ? '' : 's'} overdue`);
+}
+// 2.26.49: short chip for list rows ('In progress · 27 days'); the full text stays on the sheet and bell page
+function carProgShort(c, part) {
+  const e = carProg(c, part); if (!e) return '';
+  if (part !== 'wof' || !e.insp) return 'In progress';
+  const d = daysLeft(carRecheck(e));
+  return 'In progress · ' + (d > 1 ? `${d} days` : d === 1 ? 'tomorrow' : d === 0 ? 'today' : 'overdue');
 }
 function carFixesLine(e) { const F = (e && e.fixes) || []; return F.length ? progLine(F.filter(f => f.done).length, F.length, 'Fixes needed', 'pgsm') : ''; }
 function carDueSheet(carId, part) {

@@ -1,5 +1,6 @@
 import { renoRoute } from './reno.js';
 import { sharedTodoRoute, sharedCarRoute, sharedPhotoRoute } from './shared-todo.js';
+import { sharedPushRoute } from './shop-notify.js';
 import { brandsRoute } from './brands.js';
 import { pricesRoute, mhPricesRoute } from './prices.js';
 import { primeRoute } from './prime.js';
@@ -487,6 +488,14 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     } catch (e) {
       return json(502, 'sync_unavailable', origin, env);
     }
+  }
+  if (path.startsWith('/shared-push/')) {
+    if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    let body = {};
+    try { const raw = await request.text(); if (raw.length > 4096) throw new Error('big'); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
+    const [status, data] = await sharedPushRoute(path, body, env);
+    return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
   }
   if (path.startsWith('/sunshine/')) {
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
