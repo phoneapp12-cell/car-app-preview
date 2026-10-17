@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.71';
+const APP_VERSION = '2.26.72';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9469,6 +9469,7 @@ function normBudgets(list) {
       period: 'fortnight',
       pay,
       mortgages: budgetMortgagesOf(b),
+      landed: b.landed && typeof b.landed === 'object' ? b.landed : undefined, // 2.26.72: wages as they landed in the bank
       lines: (Array.isArray(b.lines) ? b.lines : []).filter(x => x && typeof x === 'object' && budgetAmt(x.amount) > 0)
         .map(x => ({ id: String(x.id || uid('bl')), name: String(x.name || 'Spending').slice(0, 60), amount: budgetAmt(x.amount) })),
       auto: !!b.auto
@@ -9534,10 +9535,14 @@ function budgetCalc(b) {
   const cardK = (() => { try { return cardCycle(b, bills); } catch (e) { return { use: 0, pay: 0 }; } })(), debt = cardK.pay; // 2.26.36: one outgoing for the Rewards card
   const orbit = (() => { try { return orbFor(b); } catch (e) { return null; } })(), oAmt = orbit ? orbit.amount : 0; // 2.26.60
   const out = Math.round((mort + billTot + spend + debt + oAmt) * 100) / 100;
-  const pay = budgetAmtOr0(b.pay);
-  const sarah = (() => { try { return swFor(b); } catch (e) { return null; } })(), sAmt = sarah ? sarah.amount : 0; // 2.26.59: Sarah's wages from Cash flow
+  const LS = b.landed && b.landed.shane, LZ = b.landed && b.landed.sarah, pay = LS && LS.a > 0 ? LS.a : budgetAmtOr0(b.pay); // 2.26.72: actual once landed
+  const sarah = (() => { try { return LZ && LZ.a > 0 ? { amount: LZ.a, expected: false, n: 1, dates: [LZ.d] } : swFor(b); } catch (e) { return null; } })(), sAmt = sarah ? sarah.amount : 0; // 2.26.59: Sarah's wages from Cash flow
   return { pay, sarah, orbit, mort, carried, billTot, spend, debt, cardK, out, left: Math.round((pay + sAmt - out) * 100) / 100, mortgages, bills };
 }
+// 2.26.72: on the latest budget, a pointer to the next ASB card payment when it falls in a later fortnight (same amount as Cash flow)
+function budgetCardNext(b, M) { try { if (!M || !M.pp || M.OUT.some(x => x.kind === 'card' && x.st !== 'paid')) return ''; const latest = (S.budgets || []).reduce((m, x) => x.start > (m ? m.start : '') ? x : m, null); if (!latest || latest.id !== b.id) return '';
+  const g = cardGoal(); if (!g || g.full || g.due <= M.pp.end) return ''; const pp = [0, 1, 2, 3, 4].map(o => payPeriod(o)).find(p => p && p.start <= g.due && g.due <= p.end);
+  return `<p class="muted" style="margin:6px 2px 0">💳 Next ASB card payment: ${g.proj ? 'about ' : ''}${money(g.left)} due ${esc(fmtW(g.due))}${pp ? ', in the ' + esc(budgetRangeLabel(pp.start, pp.end)) + ' fortnight' : ''}. <a href="#cashflow">Card plan ›</a></p>`; } catch (e) { return ''; } }
 function budgetCard(b) {
   // 2.26.64: plan vs actual from the one engine (fnModel). Mortgages and set-aside lines stay typed here.
   const k = budgetCalc(b), M = fnModel(b) || { IN: [], OUT: [], evBy: {}, cardBills: [] };
@@ -9567,6 +9572,7 @@ function budgetCard(b) {
     <div class="sec" style="margin-top:12px">Money in</div><div class="list">${inRows}</div>
     <div class="sec">Money out <a href="#bills" style="font-weight:650">Open Bills</a></div>
     <div class="list">${outRows || `<div class="card muted" style="margin:0">${payPeriod(0) ? 'No bills or payments this fortnight.' : 'Set your payday in Bills so this fortnight’s bills can show here.'}</div>`}</div>
+    ${budgetCardNext(b, M)}
     ${M.cardBills.length ? `<p class="muted" style="margin:6px 2px 0">On the Rewards card: ${M.cardBills.map(x => esc(x.name.replace(/ · on Rewards card$/, '')) + ' ' + money(x.amount)).join(', ')} (paid through the ASB card payment).</p>` : ''}
     <div class="sec">Three mortgages · ASB</div>
     <p class="muted" style="margin:-4px 2px 8px">Type each amount for this fortnight. Paid ✓ when the ASB repayment shows in the bank.</p>
@@ -19927,7 +19933,7 @@ async function cfLoad(force) {
   try {
     const [s, d] = force ? await cfApi('/cashflow/refresh', 'POST', {}) : await cfApi('/cashflow');
     if (s === 200 && d.connected === false) { cfForget(); }
-    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { billAcctCheck(d.data); } catch (e) { } }
+    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
     else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
     else CFerr = cfErrText(s, d);
@@ -20019,9 +20025,9 @@ function cfBody(M) {
     return `<button type="button" class="row cfrow cftx" onclick="cfTxSheet(${jsArg(t.id)})"><div class="tx"><div class="t">${esc(t.merchant || t.desc)}</div><div class="s">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))}${tag ? ' · ' + tag : ''}</div></div><b class="cfamt${t.amount < 0 ? '' : ' pos'}">${cfMoney(t.amount)}</b></button>`; }).join('');
   const swL = (D.transactions || []).filter(swIs), swA = swAvg();
   try { xferSeen(D); } catch (e) { }
-  return sum + xferCard(D) + `<div class="cfupd muted">Updated ${esc(cfWhen(M.at || D.at))} · <button type="button" class="linkbtn" onclick="cfRefresh()">Refresh</button> <small>(at most once an hour)</small></div>
+  return sum + xferCard(D) + (() => { try { return cardCfCard(D); } catch (e) { return ''; } })() + `<div class="cfupd muted">Updated ${esc(cfWhen(M.at || D.at))} · <button type="button" class="linkbtn" onclick="cfRefresh()">Refresh</button> <small>(at most once an hour)</small></div>
     <div class="card cftotal"><span>Spendable across your accounts</span><small class="muted" style="display:block;font-size:.72rem">Includes ORBIT’s free-to-draw; not the home loans or the card</small><b>${cfMoney(total)}</b></div>` +
-    groups.map(G => `<div class="sec">${esc(G.g)}</div><div class="list">${G.L.map(accRow).join('')}</div>`).join('') + flow + proj + (pp ? (() => { try { return cardCfCard(D, cfPlan(D, pp)); } catch (e) { return ''; } })() : '') + orbIntCard(D) +
+    groups.map(G => `<div class="sec">${esc(G.g)}</div><div class="list">${G.L.map(accRow).join('')}</div>`).join('') + flow + proj + orbIntCard(D) +
     `<div class="sec">Sarah’s wages</div><div class="list"><div class="row"><div class="tx"><div class="t">${swL.length ? `${plural(swL.length, 'pay')} found · usually ${cfMoney(swA)}` : 'Not found yet'}</div><div class="s">${swL.length ? 'Last ' + esc(fmtW(swL[0].date.slice(0, 10))) + ' into ' + esc(nm2(D, swL[0].acct)) + ' · ' : ''}Payer contains: ${swRules() || '—'}</div><div class="s muted">Tap a money-in transaction below to teach it. Budget shows her pay each fortnight.</div></div></div></div>
     <div class="sec">Recent · tap one to teach Sarah’s wages</div><div class="list">${recent}</div><div class="btns" style="margin-top:6px"><button type="button" class="btn small" onclick="CFmore=!CFmore;render()">${CFmore ? 'Show fewer' : 'Show more'}</button></div>
     <div class="list" style="margin-top:12px"><label class="srow"><div class="tx"><div class="t">Bills come out of</div><div class="s">Used when a bill hasn’t been paid from the bank before</div></div><select onchange="cfSetMain(this.value)">${D.accounts.filter(cfSpendable).map(a => `<option value="${esc(a.id)}"${main && main.id === a.id ? ' selected' : ''}>${esc(cfAName(a))}</option>`).join('')}</select></label>
@@ -20090,15 +20096,18 @@ const ceil10 = v => Math.ceil(v / 10 - 1e-9) * 10;
 function xferPlan(D) {
   const T = todayISO(), p0 = payPeriod(0), p1 = payPeriod(1); if (!D || !p0) return null;
   // 2.26.68: two days past the end of next fortnight, so a repayment the Thursday after payday is planned from that pay
-  const p2 = payPeriod(2), H = p1 ? addDays(p1.end, 2) : p0.end, buf = xferBuf(), ok = id => D.accounts.some(a => a.id === id && cfSpendable(a));
+  // 2.26.72: and through the card's due date when that's later, so the card payment is planned too
+  let cyc = null; try { cyc = cardCycleOf(T); } catch (e) { }
+  const H0 = p1 ? addDays(p1.end, 2) : p0.end, cardDue = cyc && cyc.due > H0 && dayGap(cyc.due, T) <= 45 ? cyc.due : '', H = cardDue || H0, buf = xferBuf(), ok = id => D.accounts.some(a => a.id === id && cfSpendable(a));
   const main = cfMain(D), outs = [];
-  [p0, p1, p2 && p2.off === 2 ? p2 : null].filter(Boolean).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.toCome : []).filter(x => x.date <= H).forEach(x => outs.push({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date, acct: ok(x.acct) ? x.acct : main && main.id })); });
+  [0, 1, 2, 3].map(o => payPeriod(o)).filter((pp, i) => pp && pp.off === i && pp.start <= H).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.toCome : []).filter(x => x.date <= H).forEach(x => outs.push({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date, acct: ok(x.acct) ? x.acct : main && main.id, card: x.kind === 'card' ? 1 : 0, due: x.date })); });
   // wages landing: on the usual 14-day beat after the last pay, into the account it last landed in
   const ins = [], landTx = (isT) => (D.transactions || []).filter(isT).sort((a, b) => b.date.localeCompare(a.date))[0];
   [['Your pay', mywIs, mywSt().seen], ['Sarah’s pay', swIs, swSt().seen]].forEach(([nm, isT, seen]) => { const t = landTx(isT); if (!t) return; const amt = fnAvg3(seen); if (!amt) return;
     let d = t.date.slice(0, 10); while (d <= T) d = addDays(d, 14); for (; d <= H; d = addDays(d, 14)) ins.push({ what: nm, amount: amt, date: d, acct: t.acct }); });
   ins.sort((a, b) => a.date.localeCompare(b.date));
   const shaneIn = ins.filter(x => x.what === 'Your pay'), src = (shaneIn[0] && D.accounts.find(a => a.id === shaneIn[0].acct)) || cfOrbit(D) || main;
+  outs.filter(o => o.card).forEach(o => { o.acct = src.id; }); // 2.26.72: the card is paid straight from where the pay lands
   // 2.26.66: other regular money into that account (e.g. a weekly direct credit), the smallest of its last 3, on its usual beat
   try { cfRegularIns(D, src.id).forEach(r => { let d = r.last; while (d <= T) d = addDays(d, r.per); for (; d <= H; d = addDays(d, r.per)) ins.push({ what: r.name, amount: r.amount, date: d, acct: src.id, other: 1 }); }); ins.sort((a, b) => a.date.localeCompare(b.date)); } catch (e) { }
   const done = S.settings.xferDone || {};
@@ -20132,11 +20141,15 @@ function xferPlan(D) {
     if (amt > 0) list.push({ from: src.id, to: n.to, amount: amt, by: n.by, after: lastPay, first: n.first, items, key: src.id + '|' + n.to + '|' + n.by });
     if (amt < n.need) { const np = payDates.find(p => p > T && availFrom(p) - floor >= n.need - amt) || ''; short.push({ to: n.to, amount: n.need - amt, by: n.by, first: n.first, pay: np, items }); }
   });
+  // 2.26.72: the card payment comes from what's left once the bills are covered; any part that can't be paid is shown, not planned
+  let card = null; { const e = srcEv.find(x => x.card); if (e) { const full = e.amount, can = Math.max(0, Math.min(full, Math.floor((availFrom(e.date) - floor + full) * 100) / 100));
+      const nowOk = availFrom(T) - floor + full >= full - 0.005, after = nowOk ? '' : (payDates.filter(p => p > T && p <= e.date).find(p => availFrom(p) - floor + full >= Math.min(full, can) - 0.005) || '');
+      e.amount = can; card = { amount: full, can: r2(can), short: r2(full - can), due: e.due || e.date, after, from: src.id, nowCan: Math.max(0, r2(availFrom(T) - floor + can)) }; } }
   // 3) the source itself going under before pay lands (e.g. a standing order out of ORBIT)
   { const ds = [T, ...srcEv.map(e => e.date)].filter((x, i, A) => A.indexOf(x) === i).sort(); const bad = ds.find(d => srcAt(d) < floor - 0.005);
     if (bad) { const e = srcEv.find(x => x.date === bad && x.out) || { what: 'what comes out', date: bad }; short.push({ to: src.id, amount: r2(floor - srcAt(bad)), by: bad, first: e, pay: nextPay(bad), own: 1, items: [e.what] }); } }
   list.sort((a, b) => a.by.localeCompare(b.by));
-  return { list, short, src, buf, outs, ins, H, srcEnd: r2(srcAt(H)), srcNow: bal[src.id] || 0 };
+  return { list, short, src, buf, outs, ins, H, card, srcEnd: r2(srcAt(H)), srcNow: bal[src.id] || 0 };
 }
 function cfRegularIns(D, acctId) {
   const T = todayISO(), g = new Map();
@@ -20155,10 +20168,15 @@ function xferCard(D) {
   const nm = id => { const a = D.accounts.find(x => x.id === id); return a ? (cfIsOrbit(a) ? 'ORBIT' : cfAName(a)) : ''; }, day = d => fmtW(d);
   const done = S.settings.xferDone || {};
   const rows = X.list.filter(x => !done[x.key]).map(x => `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="xferTick(${jsArg(x.key)},${x.amount},${jsArg(x.from)},${jsArg(x.to)})"></button><div class="tx"><div class="t">Move ${cfMoney(x.amount)} from ${esc(nm(x.from))} to ${esc(nm(x.to))}</div><div class="s">${x.after ? `After pay lands ${esc(day(x.after))}, by ${esc(day(x.by))}` : `By ${esc(day(x.by))}`} · for ${esc(x.items.slice(0, 3).join(', '))}${x.items.length > 3 ? ' and ' + (x.items.length - 3) + ' more' : ''} (first one ${esc(day(x.first.date))})</div></div></div>`).join('');
+  // 2.26.72: the card payment, with a tick (marks it paid until the bank shows it)
+  let cardRows = ''; try { const k = X.card, g = cardGoal(), cA = cfCardAcct(D); if (k && g && !g.full && cA) { const cn = cfAName(cA).replace(/^Visa Rewards$/i, 'ASB Visa');
+      if (k.can > 0) cardRows += `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="cardTick(${k.can},${jsArg(k.due)})"></button><div class="tx"><div class="t">Pay ${cfMoney(k.can)} from ${esc(nm(k.from))} to ${esc(cn)} by ${esc(day(k.due))}</div><div class="s">${k.after ? `After pay lands ${esc(day(k.after))} · ` : ''}${k.short > 0 ? `part of the ${cfMoney(k.amount)} due; ${cfMoney(k.short)} would attract interest` : g.proj ? `the whole statement (about ${cfMoney(g.goal)}), so no interest` : 'the whole amount, so no interest'}</div></div></div>`;
+      if (g.proj && g.owedNow > 0 && k.nowCan >= g.owedNow - 0.005 && g.left > 0) cardRows += `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="cardTick(${Math.min(g.owedNow, g.left)},${jsArg(k.due)})"></button><div class="tx"><div class="t">Optional: pay ${cfMoney(Math.min(g.owedNow, g.left))} now from ${esc(nm(k.from))} to ${esc(cn)}</div><div class="s">What’s on the card today, before the ${esc(day(g.stmt))} statement. Only if you’d like it cleared early.</div></div></div>`;
+    } } catch (e) { }
   const dn = Object.values(done).filter(x => x && !x.seen).length;
   const sh = X.short.map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${cfMoney(s.amount)} ${s.own ? 'over its limit' : 'short'} for ${esc(s.first.what)} on ${esc(day(s.first.date))}${s.pay && s.pay > s.first.date ? ` · there isn’t enough spare until pay lands ${esc(day(s.pay))}, so move it then or ask the bank about timing` : s.pay ? ` · move it after pay lands ${esc(day(s.pay))}` : ' · no pay expected before then'}</div>`).join('');
   return `<div class="sec">Transfers to make · as at ${esc(day(todayISO()))}</div><div class="card xfcard">
-    ${rows || (sh ? '' : `<div class="cfok">Nothing to move. Every paying account covers what’s coming out until ${esc(day(X.H))}.</div>`)}${sh ? `<div class="cftips" style="margin-top:6px">${sh}</div>` : ''}
+    ${rows}${cardRows}${rows || cardRows ? '' : (sh ? '' : `<div class="cfok">Nothing to move. Every paying account covers what’s coming out until ${esc(day(X.H))}.</div>`)}${sh ? `<div class="cftips" style="margin-top:6px">${sh}</div>` : ''}
     <div class="s muted" style="margin-top:6px">Keeps ${cfMoney(X.buf)} in each paying account · <button type="button" class="linkbtn" onclick="xferBufForm()">change</button>. Money into ${esc(nm(X.src.id))}: ${X.ins.filter(i => i.acct === X.src.id).map(i => esc(i.what) + ' about ' + cfMoney(i.amount) + ' ' + esc(day(i.date))).join(', ') || 'none expected'}. Covers everything still to come up to ${esc(day(X.H))}${cfIsOrbit(X.src) ? `, leaving about ${cfMoney(X.srcEnd)} free in ORBIT` : ''}.${dn ? ` ${plural(dn, 'transfer')} ticked done, counted until the bank shows ${dn > 1 ? 'them' : 'it'}.` : ''}</div></div>`;
 }
 async function xferTick(key, amount, from, to) { S.settings.xferDone = S.settings.xferDone || {}; S.settings.xferDone[key] = { at: new Date().toISOString(), amount, from, to }; await save(); render(); toast('Marked done. It stays hidden until the bank shows it.'); }
@@ -20177,7 +20195,12 @@ function xferBufForm() { openSheet('Buffer in each account', field('Keep this mu
    With no bank data it falls back to what's typed in Budget and Bills. Nothing is made up. */
 const MYW_DEFAULT = ['NLG WAGES', 'NOEL LEEMING'];
 function mywSt() { S.settings = S.settings || {}; const w = S.settings.myWages && typeof S.settings.myWages === 'object' ? S.settings.myWages : (S.settings.myWages = {}); if (!Array.isArray(w.rules)) w.rules = MYW_DEFAULT.slice(); if (!Array.isArray(w.seen)) w.seen = []; return w; }
-function mywIs(t) { if (!t || !(t.amount > 0)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return mywSt().rules.some(r => r && p.includes(swNorm(r))); }
+function mywIs(t) { if (!t || !(t.amount > 0)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return mywSt().rules.some(r => r && (p.includes(swNorm(r)) || ruleClose(r, p))); }
+// 2.26.72: a payer rule also matches with small slips or a cut-off name (2.26.70 matching). Every real word of the rule must be there; a lone short word (WAGES, EDPAY) only matches exactly.
+function ruleClose(rule, text) { try { const ws = String(rule || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !PAYEE_COMMON.test(w)); if (!ws.length || (ws.length < 2 && ws[0].length < 7)) return false;
+  const xs = String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter(x => x.length >= 4); return ws.every(w => xs.some(x => wordClose(w, x))); } catch (e) { return false; } }
+// 2.26.72: which pay fortnight (Bills pay cycle) a pay belongs to: the payday on or before it; Shane's pay landing 1–2 days early counts for the payday it was early for
+function fnPayStart(d, early) { const ds = paydays(); if (!ds) return ''; let st = ''; for (const p of ds) { if (p <= d) st = p; else { if (early && dayGap(p, d) <= 2) st = p; break; } } return st; }
 function mywFeed(D) { try { const w = mywSt(), txs = D.transactions || [], from = txs.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10);
   const seen = [...w.seen.filter(x => x.d < from), ...txs.filter(mywIs).map(t => ({ id: t.id, d: t.date.slice(0, 10), a: t.amount }))].sort((a, b) => a.d.localeCompare(b.d)).slice(-60);
   w.from = from; if (JSON.stringify(seen) !== JSON.stringify(w.seen)) { w.seen = seen; save(); } } catch (e) { } }
@@ -20196,10 +20219,13 @@ function fnModel(b) {
   const IN = [], OUT = [];
   // ---- money in ----
   const income = (key, name, seen, typed, isT) => {
-    const L = D ? txs.filter(t => isT(t) && inP(dOf(t))) : [], S0 = L.length ? L.map(t => ({ id: t.id, d: dOf(t), a: t.amount })) : seen.filter(x => inP(x.d));
+    // 2.26.72: each pay counts in exactly one fortnight, by its pay date on the Bills pay cycle; kept on the budget (b.landed) once the bank has shown it
+    const inPay = d => { const st = fnPayStart(d, key === 'shane'); return st ? st >= pp.start && st <= pp.end : inP(d); };
+    const L = D ? txs.filter(t => isT(t) && inPay(dOf(t))) : [], keptL = b.landed && b.landed[key] && b.landed[key].a > 0 && !(D && covered) ? [{ d: b.landed[key].d, a: b.landed[key].a }] : [];
+    const S0 = L.length ? L.map(t => ({ id: t.id, d: dOf(t), a: t.amount })) : seen.filter(x => inPay(x.d)).length ? seen.filter(x => inPay(x.d)) : keptL;
     S0.forEach(x => x.id && used.add(x.id));
     const exp = typed > 0 ? typed : fnAvg3(seen.filter(x => x.d < pp.start).length ? seen.filter(x => x.d < pp.start) : seen);
-    if (S0.length) IN.push({ key, name, st: 'landed', amount: fnSum(S0, 'a'), planned: exp || fnSum(S0, 'a'), date: S0[S0.length - 1].d });
+    if (S0.length) IN.push({ key, name, st: 'landed', amount: fnSum(S0, 'a'), planned: typed > 0 ? typed : fnSum(S0, 'a'), date: S0[S0.length - 1].d, bankTx: L.length > 0 });
     else if (!past && exp) IN.push({ key, name, st: 'expected', amount: exp, planned: exp, typed: typed > 0 });
     else if (past && typed > 0 && !covered) IN.push({ key, name, st: 'planned', amount: typed, planned: typed, typed: true });
     else if (exp || typed) IN.push({ key, name, st: 'none', amount: 0, planned: exp });
@@ -20262,16 +20288,20 @@ function fnModel(b) {
   const inSoFar = r2(landed + fnSum(IN.filter(x => x.st === 'planned'))), outSoFar = r2(paid + everyday + pastPlanned);
   return { b, pp, cur, past, has: !!D, covered, IN, otherIn: fnSum(otherIn.map(t => ({ amount: t.amount }))), otherInN: otherIn.length, OUT, cardBills, toCome, everyday, evBy, evN: ev.length, onCard,
     landed: r2(landed), inPlan, paid, toPay, inSoFar, outSoFar,
-    planIn: r2(fnSum(IN, 'planned') + fnSum(otherIn.map(t => ({ amount: t.amount })))), planOut: r2(fnSum(OUT, 'planned')),
-    leftPlan: r2(fnSum(IN, 'planned') + fnSum(otherIn.map(t => ({ amount: t.amount }))) - fnSum(OUT, 'planned')),
+    planIn: r2(fnSum(IN.map(x => ({ amount: x.st === 'landed' ? x.amount : x.planned }))) + fnSum(otherIn.map(t => ({ amount: t.amount })))), planOut: r2(fnSum(OUT, 'planned')),
+    leftPlan: r2(fnSum(IN.map(x => ({ amount: x.st === 'landed' ? x.amount : x.planned }))) + fnSum(otherIn.map(t => ({ amount: t.amount }))) - fnSum(OUT, 'planned')),
     leftNow: r2(inSoFar - outSoFar), end: r2(inPlan - outSoFar - toPay) };
 }
 // the same sentence on Budget and Cash flow
 function fnSummary(M) {
   if (!M) return '';
   const a = fmtW(M.pp.start).replace(/^\w+ /, ''), z = fmtW(M.pp.end).replace(/^\w+ /, ''), rng = a.split(' ')[1] === z.split(' ')[1] ? a.split(' ')[0] + '–' + z : a + '–' + z;
-  return `${M.cur ? 'This fortnight' : 'Fortnight'} (${esc(rng)}): ${money(M.inSoFar)} in, ${money(M.outSoFar)} out, ${money(M.toPay)} still to pay · you should end with about ${M.end < 0 ? '−' + money(-M.end) : money(M.end)}.`;
+  return `${M.cur ? 'This fortnight' : 'Fortnight'} (${esc(rng)}): ${money(M.inSoFar)} in, ${money(M.outSoFar)} out, ${money(M.toPay)} still to pay${(() => { const c = (M.toCome || []).find(x => x.kind === 'card'); return c ? ' (incl. ASB card ' + money(c.amount) + ' due ' + esc(fmtW(c.date)) + ')' : ''; })()} · you should end with about ${M.end < 0 ? '−' + money(-M.end) : money(M.end)}.`;
 }
+// 2.26.72: on each bank refresh, every budget whose wages have landed keeps the actual amounts and dates (b.landed); the typed pay stays as the plan
+function budgetLandedSync() { try { let ch = 0; (S.budgets || []).forEach(b => { const M = fnModel(b); if (!M || !M.has) return; const L = Object.assign({}, b.landed || {});
+    ['shane', 'sarah'].forEach(k => { const x = M.IN.find(y => y.key === k); if (x && x.st === 'landed' && x.bankTx) L[k] = { a: x.amount, d: x.date }; else if (M.covered && (!x || x.st !== 'landed')) delete L[k]; });
+    const v = Object.keys(L).length ? L : undefined; if (JSON.stringify(v) !== JSON.stringify(b.landed)) { if (v) b.landed = v; else delete b.landed; ch++; } }); if (ch) save(); return ch; } catch (e) { return 0; } }
 function fnCurModel() { const pp = payPeriod(0); return pp ? fnModel(fnBudgetFor(pp)) : null; }
 const FN_ST = { paid: x => `<span class="fnst paid">Paid ✓</span> ${esc(fmtW(x.date))}${x.bank ? '' : ' · marked paid'}`, due: x => `<span class="fnst due">Due</span> ${esc(fmtW(x.date))}`, overdue: x => `<span class="fnst over">Overdue</span> was due ${esc(fmtW(x.date))}`,
   about: x => `<span class="fnst about">About</span> ${esc(fmtW(x.date))}`, setaside: () => `<span class="fnst due">Set aside</span>`, planned: () => `<span class="fnst">Planned</span>`, nomatch: x => `<span class="fnst">Not seen in the bank</span>${x.date ? ' · ' + esc(fmtW(x.date)) : ''}`,
@@ -20344,19 +20374,29 @@ function cardFeedPays(D) { try { const a = cfCardAcct(D); if (!a) return; const 
   // what was owed at the end of the last statement day: owed now, with everything after that day undone
   try { const T = todayISO(), st = cardStmts(T).filter(d => d <= T).pop(), tx = (D.transactions || []).filter(t => t.acct === a.id), first = tx.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10);
     if (st && (!c.stmtSnap || c.stmtSnap.d !== st) && (first <= st || (D.at || '').slice(0, 10) === st)) { const owedNow = Math.max(0, (a.limit || 1000) - (a.available || 0)); const v = Math.round((owedNow + tx.filter(t => t.date.slice(0, 10) > st).reduce((n, t) => n + t.amount, 0)) * 100) / 100; c.stmtSnap = { d: st, owed: Math.max(0, v) }; save(); } } catch (e) { }
-  if (JSON.stringify(L) !== JSON.stringify(c.akPays || [])) { c.akPays = L; save(); } } catch (e) { } }
+  if (JSON.stringify(L) !== JSON.stringify(c.akPays || [])) { c.akPays = L; save(); }
+  if (Array.isArray(c.ticks) && c.ticks.length) { const k = cardPend(c); if (k.length !== c.ticks.length) { c.ticks = k; save(); } } } catch (e) { } }
 // the goal for the next due date, and what's been paid towards it
 function cardGoal(cy) {
   const c = debtsSt().card; cy = cy || cardCycleOf(); if (!cy) return null; const { due, stmt } = cy, T = todayISO();
   const pays = (c.akPays || []).filter(p => p.d > stmt && p.d <= (due < T ? T : due)), paid = Math.round(pays.reduce((n, p) => n + p.a, 0) * 100) / 100, owedNow = cardOwed(c);
   const typed = dnum(c.stmtBal) && c.stmtFor === stmt ? dnum(c.stmtBal) : 0, snap = c.stmtSnap && c.stmtSnap.d === stmt ? c.stmtSnap.owed : null;
   const sb = typed || (snap != null ? snap : 0), known = !!typed || snap != null, about = !typed && snap != null;
-  const left = known ? Math.max(0, Math.round((sb - paid) * 100) / 100) : owedNow;
-  const min = known && sb > 0 ? Math.min(sb, Math.max(Math.round(sb * 3) / 100, 10)) : 0; // ASB: greater of 3% or $10 (or the balance if less)
+  // 2.26.72: before the statement, the goal is the projected statement: owed now plus card bills due before it. Ticked payments count until the bank shows them.
+  const pend = cardPend(c), pendA = r2(pend.reduce((n, t) => n + t.a, 0)), proj = !known && T <= stmt;
+  let adds = []; if (proj) { try { adds = budgetBillRows({ start: addDays(T, 1), end: stmt }).filter(x => x.card && !x.paid); } catch (e) { adds = []; } }
+  const projBal = proj ? r2(owedNow + fnSum(adds)) : 0; // owed now doesn't yet include a ticked payment the bank hasn't shown
+  const base = known ? sb : proj ? projBal : owedNow;
+  const left = Math.max(0, r2(base - (known ? paid : 0) - pendA));
+  const min = base > 0 ? Math.min(base, Math.max(Math.round(base * 3) / 100, 10)) : 0; // ASB: greater of 3% or $10 (or the balance if less)
   // a past due date with a payment made but no statement balance to check it against: take it as paid
   const pastPaid = due < T && !known && paid > 0;
-  return { due, stmt, goal: known ? sb : pastPaid ? paid : Math.round((owedNow + paid) * 100) / 100, left: pastPaid ? 0 : left, paid, sb: known, about, full: pastPaid || (known ? left <= 0.005 : owedNow <= 0.005), pastPaid, min: Math.round(min * 100) / 100 };
+  return { due, stmt, goal: known ? sb : pastPaid ? paid : proj ? projBal : Math.round((owedNow + paid) * 100) / 100, left: pastPaid ? 0 : left, paid: r2(paid + pendA), pend: pendA, sb: known, about, proj, projBal, adds, owedNow,
+    full: pastPaid || left <= 0.005, pastPaid, min: Math.round(min * 100) / 100 };
 }
+// payments ticked in the app (Transfers card) that the bank hasn't shown yet; a card payment of at least that amount on or after the day clears it
+function cardPend(c) { const P = c.akPays || []; return (Array.isArray(c.ticks) ? c.ticks : []).filter(t => t && t.a > 0 && !P.some(p => p.d >= t.d && p.a >= t.a - 0.01) && Date.now() - Date.parse(t.at || 0) < 10 * DAY); }
+async function cardTick(amount, due) { const c = debtsSt().card; c.ticks = cardPend(c).concat({ d: todayISO(), a: r2(+amount), due, at: new Date().toISOString() }); await save(); render(); toast('Card payment marked done. It counts as paid until the bank shows it.', 'Undo', async () => { c.ticks = (c.ticks || []).slice(0, -1); await save(); render(); }); }
 async function cardDaysForm() {
   const c = debtsSt().card, k = cardDays(), g = cardGoal(), opts = Array.from({ length: 31 }, (_, i) => [String(i + 1), String(i + 1)]);
   openSheet('Card statement and due date',
@@ -20376,18 +20416,29 @@ function cardAfford(D, P) {
   const can = Math.round((endOf(payA) + (orb && orb !== payA ? endOf(orb) : 0) + self) * 100) / 100;
   return Object.assign({ ok: can >= g.left, can: Math.min(can, g.left), short: Math.max(0, Math.round((g.left - can) * 100) / 100), payA, orb }, g);
 }
-function cardCfCard(D, P) {
+function cardCfCard(D) { // 2.26.72: "Credit card plan", under Transfers; the same amount as the Transfers line and Budget
   const a = cfCardAcct(D); if (!a) return '';
-  const k = cardDays(), x = cardAfford(D, P), lim = a.limit || 1000, owed = Math.max(0, Math.round((lim - (a.available || 0)) * 100) / 100);
-  const status = !x ? `<div class="s">Set the due day to plan paying it off.</div>`
-    : x.full ? `<div class="cfok">✓ Paid in full for ${esc(fmtW(x.due))}${x.paid ? ' · ' + cfMoney(x.paid) + ' paid' : ''}</div>`
-    : `${x.paid ? `<div class="s">Part paid ${cfMoney(x.paid)} · ${cfMoney(x.left)} to go</div>` : ''}${x.ok ? `<div class="cfok">Pay in full: ${cfMoney(x.left)} by ${esc(fmtW(x.due))} ✔ affordable</div><div class="s">From ${esc(cfAName(x.payA || {}))}${x.orb && x.payA !== x.orb ? ' and ORBIT’s free-to-draw' : ''}, after everything else due before payday.</div>`
-      : `<div class="cfwarn">Can manage about ${cfMoney(x.can)} now · ${cfMoney(x.short)} left would attract interest</div>`}${x.min && !x.full ? `<div class="s">ASB minimum ${x.about ? 'about ' : ''}${cfMoney(x.min)} (3% of the statement balance, at least $10)</div>` : ''}
-      <div class="s muted">Paying less than the full amount by the due date means interest is charged on purchases. Up to 55 days interest free when last statement is paid in full.</div>`;
-  return `<div class="sec">Credit card</div><div class="card cfcard">
-    <div class="row cfrow"><div class="tx"><div class="t">${esc(cfAName(a))}${x ? ` · due ${esc(fmtW(x.due))}` : ''}</div><div class="s">You owe ${cfMoney(owed)} · ${cfMoney(a.available || 0)} available of ${cfMoney(lim)}${x && x.sb ? ` · statement ${x.about ? 'about ' : ''}${cfMoney(x.goal)}` : ''}</div><div class="pbar"><i style="width:${Math.min(100, Math.round(100 * owed / lim))}%"></i></div></div></div>
+  const k = cardDays(), g = cardGoal(), X = (() => { try { return xferPlan(D); } catch (e) { return null; } })(), xc = X && X.card, lim = a.limit || 1000, owed = Math.max(0, Math.round((lim - (a.available || 0)) * 100) / 100);
+  const nm = id => { const x = D.accounts.find(y => y.id === id); return x ? (cfIsOrbit(x) ? 'ORBIT' : cfAName(x)) : ''; };
+  const th = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : (n % 10 < 4 ? n % 10 : 0)]);
+  let status = '';
+  if (!g) status = `<div class="s">Set the statement day to plan paying it off.</div>`;
+  else if (g.full) status = `<div class="cfok">✓ Paid in full for ${esc(fmtW(g.due))}${g.paid ? ' · ' + cfMoney(g.paid) + ' paid' + (g.pend ? ' (ticked, waiting for the bank)' : '') : ''}</div>`;
+  else {
+    if (g.proj) { const canNow = xc ? xc.nowCan >= owed - 0.005 : false, payAt = xc && xc.after ? xc.after : '';
+      status += `<div class="s">Statement on ${esc(fmtW(g.stmt))} · currently ${cfMoney(owed)}${owed > 0 ? (canNow ? ' — can pay that now if you like' : payAt ? ` — you could pay it once pay lands ${esc(fmtW(payAt))}, if you like` : '') : ''}</div>`;
+      status += `<div class="s">Projected statement about ${cfMoney(g.goal)}${g.adds.length ? ' (with ' + esc(g.adds.map(x => x.name.replace(/ · on Rewards card$/, '') + ' ' + money(x.amount)).join(', ')) + ' still to go on it)' : ''}</div>`; }
+    else status += `<div class="s">Statement ${esc(fmtW(g.stmt))}: ${g.about ? 'about ' : ''}${cfMoney(g.goal)}${g.paid ? ' · ' + cfMoney(g.paid) + ' paid' : ''}</div>`;
+    if (g.pend) status += `<div class="s">${cfMoney(g.pend)} ticked as paid, counted until the bank shows it</div>`;
+    if (!xc || xc.short <= 0.005) status += `<div class="cfok">Pay in full: ${cfMoney(g.left)} by ${esc(fmtW(g.due))}${xc ? ' ✔ affordable' : ''}</div>${xc ? `<div class="s">From ${esc(nm(xc.from))}${xc.after ? ' after pay lands ' + esc(fmtW(xc.after)) : ''}, after everything else that’s due. It’s in Transfers to make.</div>` : ''}`;
+    else status += `<div class="cfwarn">Pay ${cfMoney(xc.can)} by ${esc(fmtW(g.due))}, ${cfMoney(xc.short)} will attract interest</div><div class="s">That’s what ${esc(nm(xc.from))} can spare after everything else that’s due.</div>`;
+    if (g.min) status += `<div class="s">Minimum ${g.proj || g.about ? 'about ' : ''}${cfMoney(g.min)} (the greater of 3% or $10)</div>`;
+    status += `<div class="s muted">Paying the full statement by the due date means no interest on purchases.</div>`;
+  }
+  return `<div class="sec">Credit card plan</div><div class="card cfcard">
+    <div class="row cfrow"><div class="tx"><div class="t">${esc(cfAName(a))}${g ? ` · due ${esc(fmtW(g.due))}` : ''}</div><div class="s">You owe ${cfMoney(owed)} · ${cfMoney(a.available || 0)} available of ${cfMoney(lim)}</div><div class="pbar"><i style="width:${Math.min(100, Math.round(100 * owed / lim))}%"></i></div></div></div>
     <div style="padding:0 12px 10px">${status}
-    <div class="s" style="margin-top:6px">Statement on the ${k.stmt}${['th', 'st', 'nd', 'rd'][(k.stmt % 100 > 10 && k.stmt % 100 < 14) ? 0 : (k.stmt % 10 < 4 ? k.stmt % 10 : 0)]} · due ${k.gap} days later${x ? ' (' + esc(fmtW(x.stmt)) + ' statement → ' + esc(fmtW(x.due)) + ')' : ''} · <button type="button" class="linkbtn" onclick="cardDaysForm()">Change</button></div></div></div>`;
+    <div class="s" style="margin-top:6px">Statement on the ${th(k.stmt)} · due ${k.gap} days later${g ? ' (' + esc(fmtW(g.stmt)) + ' statement → ' + esc(fmtW(g.due)) + ')' : ''} · <button type="button" class="linkbtn" onclick="cardDaysForm()">Change</button></div></div></div>`;
 }
 
 /* ================= SARAH'S WAGES + ASB MORTGAGES (2.26.59) =================
@@ -20400,7 +20451,7 @@ function cardCfCard(D, P) {
 const SW_DEFAULT = ['MINISTRY OF EDUCATIO', 'EDPAY', 'EDUCATION PAYROLL'];
 function swSt() { S.settings = S.settings || {}; const w = S.settings.sarahWages && typeof S.settings.sarahWages === 'object' ? S.settings.sarahWages : (S.settings.sarahWages = {}); if (!Array.isArray(w.rules)) w.rules = SW_DEFAULT.slice(); if (!Array.isArray(w.not)) w.not = []; if (!Array.isArray(w.seen)) w.seen = []; return w; }
 const swNorm = s => String(s || '').toUpperCase().replace(/\d+/g, ' ').replace(/[^A-Z&' ]/g, ' ').replace(/\s+/g, ' ').trim();
-function swIs(t) { if (!t || !(t.amount > 0)) return false; const w = swSt(); if (w.not.includes(t.id)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && p.includes(swNorm(r))); }
+function swIs(t) { if (!t || !(t.amount > 0)) return false; const w = swSt(); if (w.not.includes(t.id)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && (p.includes(swNorm(r)) || ruleClose(r, p))); }
 // keep the found pays (date + amount only) so Budget has them without the bank data in memory
 function swFeed(D) {
   try { const w = swSt(), txs = D.transactions || [], from = txs.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10);
