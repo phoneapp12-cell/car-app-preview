@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.69';
+const APP_VERSION = '2.26.70';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19944,7 +19944,32 @@ const cfSpendable = a => a.type !== 'CREDITCARD' && (a.type !== 'LOAN' || cfIsOr
 const cfBal = a => cfIsOrbit(a) ? (a.available != null ? a.available : Math.round((a.limit + (a.balance || 0)) * 100) / 100) : a.available != null ? a.available : (a.balance || 0);
 const cfAName = a => `${a.bank ? a.bank + ' ' : ''}${a.name}`;
 const cfToks = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !/^(bill|payment|limited|power|direct|debit)$/.test(w));
-function cfBillTx(bill, txs) { const tk = cfToks(bill.name), amt = +bill.amount || 0; return txs.filter(t => t.amount < 0 && t.cat2 !== 'transfer' && (tk.some(w => (t.desc + ' ' + t.merchant).toLowerCase().includes(w)) || (amt && Math.abs(-t.amount - amt) <= 0.5))); }
+/* 2.26.70: bill name ↔ bank payee, tolerant of the bank cutting names short and small spelling slips
+   ('Tamahi Trust' ↔ 'TAIMAHI TRUS'). 2 = a word of the bill name is in the payee as typed (the old rule), 1 = close
+   (truncated prefix of 4+ letters, or ≤1 edit for 5–7 letter words, ≤2 for 8+), 0 = no. Place and brand words never
+   count on their own for the close match, so one bill doesn't take another's payments. */
+const PAYEE_COMMON = /^(whangarei|northland|onerahi|google|card|fuel|limited|zealand|council|trust|services?|company|group|holdings|online|store|shop|insurance|power)$/;
+function editDist(a, b, max) { if (Math.abs(a.length - b.length) > max) return max + 1; let p = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) { const c = [i]; let lo = i; for (let j = 1; j <= b.length; j++) { c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); lo = Math.min(lo, c[j]); } if (lo > max) return max + 1; p = c; } return p[b.length]; }
+function wordClose(w, x) {
+  if (w === x) return true; if (x.length >= 5 && w.startsWith(x)) return true; // the bank cut it short
+  const max = w.length >= 8 ? 2 : w.length >= 5 ? 1 : 0; if (!max || x.length < 4) return false;
+  if (editDist(w, x, max) <= max) return true;
+  return x.length < w.length && x.length >= 5 && [x.length, x.length + 1].some(n => editDist(w.slice(0, n), x, max) <= max); // cut short and a slip
+}
+function payeeScore(name, text) {
+  const low = String(text || '').toLowerCase(), xs = low.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+  let tk = cfToks(name); if (!tk.length) { tk = String(name || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length === 3 && !/^(the|and|for|nz|ltd)$/.test(w)); if (!tk.length) return 0; return tk.some(w => xs.includes(w)) ? 2 : 0; }
+  const own = tk.filter(w => !PAYEE_COMMON.test(w)), use = own.length ? own : tk; // place/brand words only count when that's all the name has
+  // as typed: a payee word starting with it (KENSINGTONFIT), or a longer word anywhere in the text
+  if (use.some(w => xs.some(x => x.startsWith(w)) || (w.length >= 6 && low.includes(w)))) return 2;
+  const xs4 = xs.filter(x => x.length >= 4 && !/^\d+$/.test(x) && !PAYEE_COMMON.test(x));
+  return own.some(w => xs4.some(x => wordClose(w, x))) ? 1 : 0;
+}
+// fuzzy only when no other bill names this payee exactly
+function payeeFor(bill, t) { const txt = t.desc + ' ' + (t.merchant || ''), sc = payeeScore(bill.name, txt); if (sc !== 1) return sc;
+  return (S.bills || []).some(o => o && o !== bill && o.id !== bill.id && payeeScore(o.name, txt) === 2) ? 0 : 1; }
+function cfBillTx(bill, txs) { const tk = cfToks(bill.name), amt = +bill.amount || 0; return txs.filter(t => t.amount < 0 && t.cat2 !== 'transfer' && (payeeFor(bill, t) > 0 || (amt && Math.abs(-t.amount - amt) <= 0.5))); }
 function cfMain(D) { const L = D.accounts.filter(a => cfSpendable(a)); const id = S.settings && S.settings.cfMain; return L.find(a => a.id === id) || L.filter(a => /ASB/i.test(a.bank) && a.type === 'CHECKING').sort((a, b) => cfBal(b) - cfBal(a))[0] || L[0] || null; }
 function cfPlan(D, pp) {
   // 2.26.64: exactly Budget's "still to come" list for this fortnight (one engine, fnModel)
@@ -19988,7 +20013,7 @@ function cfBody(M) {
       `<div class="list">${P.accts.filter(x => x.now !== x.end || x.min < 0).map(x => `<div class="row cfrow${x.min < 0 ? ' cflow' : ''}"><div class="tx"><div class="t">${esc(cfAName(x.a))}</div><div class="s">${x.min < 0 ? (cfIsOrbit(x.a) ? `⚠️ Over the limit on ${esc(fmtW(x.low.date))} (${esc(x.low.what)})` : `⚠️ Goes below $0 on ${esc(fmtW(x.low.date))} (${esc(x.low.what)})`) : cfIsOrbit(x.a) ? 'Free to draw stays above $0' : 'Covers it'}</div></div><b class="cfamt${x.end < 0 ? ' neg' : ''}">${cfMoney(x.now)} → ${cfMoney(x.end)}</b></div>`).join('') || `<div class="row"><div class="tx"><div class="t">Nothing else due before payday</div></div></div>`}</div>`;
   } else proj = `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday</b><br>Cash flow uses the same pay fortnight as Bills and Budget.<div style="margin-top:8px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
   const main = cfMain(D), mortA = cfMortAcct(D), tags = { transfer: 'Own transfer', income: 'Income', mortgage: 'Mortgage', card: 'Card' };
-  const recent = (D.transactions || []).slice(0, CFmore ? 80 : 12).map(t => { const mk = cfMortTx(D, t), sw = swIs(t); const bill = t.amount < 0 ? (S.bills || []).find(b => cfBillTx(b, [t]).length && cfToks(b.name).some(w => (t.desc + ' ' + t.merchant).toLowerCase().includes(w))) : null;
+  const recent = (D.transactions || []).slice(0, CFmore ? 80 : 12).map(t => { const mk = cfMortTx(D, t), sw = swIs(t); const bill = t.amount < 0 ? ((S.bills || []).find(b => cfBillTx(b, [t]).length && payeeScore(b.name, t.desc + ' ' + t.merchant) === 2) || (S.bills || []).find(b => cfBillTx(b, [t]).length && payeeFor(b, t) > 0)) : null;
     const tag = sw ? `<span class="cftag income">Income: Sarah’s wages</span>` : mk === 'old' ? `<span class="cftag mortgage old">Mortgage (old ANZ)</span>` : mk === 'asb' ? `<span class="cftag mortgage">Mortgage (ASB)</span>` : bill ? `<span class="cftag bill">Bill: ${esc(bill.name)}</span>` : tags[t.cat2] ? `<span class="cftag ${t.cat2}">${tags[t.cat2]}</span>` : '';
     return `<button type="button" class="row cfrow cftx" onclick="cfTxSheet(${jsArg(t.id)})"><div class="tx"><div class="t">${esc(t.merchant || t.desc)}</div><div class="s">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))}${tag ? ' · ' + tag : ''}</div></div><b class="cfamt${t.amount < 0 ? '' : ' pos'}">${cfMoney(t.amount)}</b></button>`; }).join('');
   const swL = (D.transactions || []).filter(swIs), swA = swAvg();
@@ -20043,7 +20068,7 @@ function cfRegulars(D) {
     const tk = cfToks(name);
     // 2.26.66: place and brand words (Whangarei DC rates vs Whangarei DC water) don't make it the same bill
     const REG_COMMON = /^(whangarei|northland|onerahi|google|card|fuel|limited|nz|new|zealand|council)$/;
-    if ((S.bills || []).some(b => b && (cfToks(b.name).filter(w => !REG_COMMON.test(w)).some(w => tk.includes(w) || swNorm(name).includes(swNorm(w))) || (+b.amount && Math.abs(+b.amount - last) <= 0.5)))) return; // already a bill
+    if ((S.bills || []).some(b => b && (cfToks(b.name).filter(w => !REG_COMMON.test(w)).some(w => tk.includes(w) || swNorm(name).includes(swNorm(w))) || payeeScore(b.name, name + ' ' + L[L.length - 1].desc) === 1 && cfToks(b.name).filter(w => !REG_COMMON.test(w)).length > 0 || (+b.amount && Math.abs(+b.amount - last) <= 0.5)))) return; // already a bill
     const next = from => { let x = ld; let i = 0; while (x < from && i++ < 60) x = per === 'm' ? addMonths(x, 1, +ld.slice(8, 10)) : addDays(x, per); return x; };
     out.push({ key, name, acct: L[0].acct, per, amount: varies ? avg : last, varies, last: ld, n: L.length, next });
   });
@@ -20189,7 +20214,7 @@ function fnModel(b) {
   bills.filter(x => !x.card).forEach(x => {
     const bill = (S.bills || []).find(y => y.id === x.id), it = { kind: x.loanId ? 'loan' : 'bill', id: x.id, name: x.name, planned: x.amount, amount: x.amount, date: x.due, go: x.loanId ? `#loan/${x.loanId}` : '#bills' };
     // one place for matching a bill to the bank: amount within 50c, or the bill's name and amount within 10%, from 7 days before to 3 days after
-    const m = D && bill ? txs.find(t => t.amount < 0 && !used.has(t.id) && spendAcct(t) && t.cat2 !== 'transfer' && dOf(t) >= addDays(x.due, -7) && dOf(t) <= addDays(x.due, 3) && dOf(t) <= T && (Math.abs(-t.amount - x.amount) <= 0.5 || (cfToks(bill.name).some(w => (t.desc + ' ' + t.merchant).toLowerCase().includes(w)) && Math.abs(-t.amount - x.amount) <= x.amount * 0.1))) : null;
+    const m = D && bill ? txs.find(t => t.amount < 0 && !used.has(t.id) && spendAcct(t) && t.cat2 !== 'transfer' && dOf(t) >= addDays(x.due, -7) && dOf(t) <= addDays(x.due, 3) && dOf(t) <= T && (Math.abs(-t.amount - x.amount) <= 0.5 || (payeeFor(bill, t) > 0 && Math.abs(-t.amount - x.amount) <= x.amount * 0.1))) : null;
     if (m) { used.add(m.id); Object.assign(it, { st: 'paid', amount: -m.amount, date: dOf(m), bank: true, acct: m.acct }); }
     else if (x.paid) Object.assign(it, { st: 'paid', date: x.paidOn || x.due, manual: true });
     else Object.assign(it, { st: st(x.due), acct: bill ? ((S.settings.cfBillAcct || {})[bill.id] || (D && billBankAcct(D, bill)) || (D && (cfBillTx(bill, txs.filter(spendAcct))[0] || {}).acct) || (main && main.id)) : main && main.id, late: x.late });
@@ -21069,7 +21094,7 @@ function billAcctCheck(D) {
     if (!b || b.paid || b.paidBy === 'card' || /\b(mortgage|home ?loans?)\b/i.test(b.name || '') || !b.repeat || b.repeat === 'none') return;
     const cur = billAcctNow(D, b);
     const tk = cfToks(b.name).filter(w => !/^(whangarei|northland|onerahi|google|card|fuel|limited|zealand|council|trust)$/.test(w)); if (!tk.length) return;
-    const hits = sp.filter(t => t.amount < 0 && !t.pair && t.cat2 !== 'transfer' && tk.some(w => (t.desc + ' ' + (t.merchant || '')).toLowerCase().includes(w))).sort((a, c) => c.date.localeCompare(a.date)).slice(0, 3);
+    const hits = sp.filter(t => t.amount < 0 && !t.pair && t.cat2 !== 'transfer' && (tk.some(w => (t.desc + ' ' + (t.merchant || '')).toLowerCase().includes(w)) || payeeFor(b, t) === 1)).sort((a, c) => c.date.localeCompare(a.date)).slice(0, 3);
     if (!hits.length) return; const cnt = {}; hits.forEach(t => { cnt[t.acct] = (cnt[t.acct] || 0) + 1; });
     const top = Object.keys(cnt).sort((a, c) => cnt[c] - cnt[a])[0];
     if (!top || top === cur || (hits.length > 1 && cnt[top] < 2)) return;
