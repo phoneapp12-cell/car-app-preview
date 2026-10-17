@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.40';
+const APP_VERSION = '2.26.41';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18260,7 +18260,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { power: PowerPage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { power: PowerPage, compare: ComparePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19525,7 +19525,7 @@ function pwrFetch() {
   if (pwrBusy) return; pwrBusy = true;
   fetch(RELAY_URL + '/power', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
     pwrBusy = false;
-    if (d && d.updatedAt && (!PWR || d.updatedAt !== PWR.updatedAt)) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (location.hash === '#power') render(); }
+    if (d && d.updatedAt && (!PWR || d.updatedAt !== PWR.updatedAt || JSON.stringify(d.compare || null) !== JSON.stringify(PWR.compare || null))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (location.hash === '#power' || location.hash === '#compare') render(); }
   }).catch(() => { pwrBusy = false; });
 }
 function pwrCost(imp, exp, days) { const c = (+imp || 0) * PWR_RATE.importBlend + PWR_RATE.daily * (days || 1) - (+exp || 0) * PWR_RATE.exportCredit; return Math.max(0, c); }
@@ -19563,7 +19563,52 @@ function PowerPage() {
       y.previousRetailerCostNZD != null ? ['Would have cost', pwrD(y.previousRetailerCostNZD)] : null, y.savingsNZD != null ? ['Saved', pwrD(y.savingsNZD)] : null]) + '<div class="s pwrnote">Year figures from SolarZero’s savings report.</div></div>';
   const B = (d.bills || []).slice(-3);
   const bills = B.length ? `<div class="card pwrcard"><div class="pwrh">Last bills · Ecotricity</div><table class="pwrtbl"><tr><th>Month</th><th>kWh</th><th>Charges</th></tr>${B.map(b => `<tr><td>${esc(b.month)}</td><td>${(+b.kWh).toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</td><td>${pwrD(b.totalInclGST)}</td></tr>`).join('')}</table><div class="s pwrnote">That month’s charges, incl GST.</div></div>` : '';
-  return back + `<div class="pwrupd">Updated ${esc(when)} NZDT · figures may be a few hours old</div>` + today + yest + month + year + bills +
+  return pwrWrap(back + `<div class="pwrupd">Updated ${esc(when)} NZDT · figures may be a few hours old</div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + today + yest + month + year + bills +
     (d.tou ? `<div class="s pwrnote" style="margin:4px 6px 18px">Time-of-use estimates, incl GST: peak ${(d.tou.peak * 100).toFixed(1)}c, shoulder ${(d.tou.shoulder * 100).toFixed(1)}c, off-peak ${(d.tou.offpeak * 100).toFixed(1)}c a kWh, plus ${pwrD(d.tou.daily)} a day, less ${(d.tou.exportCredit * 100).toFixed(1)}c a kWh sent back. Peak is weekdays 7–9:30am and 5:30–8pm; weekends and public holidays have no peak. Ecotricity ecoZER0 plan.</div>` :
-    '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>');
+    '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>') + pwrDots(0));
 }
+/* ================= 2.26.41: Compare (price comparison from the relay power doc's "compare" block; swipe left on Power, right to go back) ================= */
+let pwrSlide = '';
+function pwrNav(h, dir) { pwrSlide = dir || ''; go(h); }
+function pwrWrap(html) { const c = pwrSlide ? ' pwrin-' + pwrSlide : ''; pwrSlide = ''; return `<div class="pwrpage${c}">${html}</div>`; }
+function pwrDots(i) { return `<div class="pwrdots" aria-hidden="true"><span class="${i === 0 ? 'on' : ''}"></span><span class="${i === 1 ? 'on' : ''}"></span></div>`; }
+const pwrM = v => '$' + Math.round(+v || 0).toLocaleString('en-NZ');
+function pwrDate(iso) { try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return iso; } }
+function ComparePage() {
+  setTimeout(pwrFetch, 0);
+  const back = `<button class="back" onclick="pwrNav('#power','l')">${I('left')} Power</button>` + header('Compare', 'Your power cost vs other retailers');
+  const c = PWR && PWR.compare;
+  if (!c || !Array.isArray(c.plans)) return pwrWrap(back + '<div class="card empty"><div class="t">Loading the comparison…</div><div class="s">Needs the internet the first time.</div></div>' + pwrDots(1));
+  const sub = +c.subscriptionNZD || 0, cur = (c.current || []).map(m => ({ month: m.month, bill: +m.billNZD || 0, total: (+m.billNZD || 0) + sub }));
+  const avg = cur.length ? cur.reduce((a, m) => a + m.total, 0) / cur.length : 0;
+  const yr = c.currentYear && c.currentYear.gridNZD ? { label: c.currentYear.label, grid: +c.currentYear.gridNZD, total: +c.currentYear.gridNZD + sub * 12 } : null;
+  const now = `<div class="card pwrcard"><div class="pwrh">What you pay now</div><table class="pwrtbl"><tr><th>Month</th><th>Ecotricity</th><th>SolarZero</th><th>Total</th></tr>` +
+    cur.map(m => `<tr><td>${esc(m.month)}</td><td>${pwrD(m.bill)}</td><td>${pwrD(sub)}</td><td><b>${pwrD(m.total)}</b></td></tr>`).join('') +
+    (cur.length > 1 ? `<tr class="pwravg"><td>Average</td><td></td><td></td><td><b>${pwrD(avg)}</b></td></tr>` : '') + '</table>' +
+    (yr ? pwrRows([[`Full year · ${yr.label || ''}`, pwrM(yr.total)], ['That’s about', pwrM(yr.total / 12) + ' a month']]) + `<div class="s pwrnote">Year: ${pwrD(yr.grid)} grid power (SolarZero’s savings report) plus 12 × ${pwrD(sub)} subscription.</div>` : '') + '</div>';
+  const row = (p, i) => { const diff = Math.round(p.monthNZD - avg), cls = diff > 0 ? 'more' : 'less';
+    return `<div class="pwrcmp"><div class="pwrrk">${i + 1}</div><div class="pwrcx"><div class="t">${esc(p.retailer)}</div><div class="s">${esc(p.plan)}${p.dailyNZD ? ' · ' + pwrD(p.dailyNZD) + ' a day + ' + p.avgC + 'c a kWh avg' : ''}</div>` +
+      (p.url ? `<a class="pwrlink" href="${esc(p.url)}" target="_blank" rel="noopener">Website ↗</a>` : '') + `</div><div class="pwrcv"><b>${pwrM(p.monthNZD)}</b><span>a month</span>` +
+      (avg ? `<span class="pwrdiff ${cls}">${diff === 0 ? 'same' : (diff > 0 ? '+' : '−') + pwrM(Math.abs(diff)) + (diff > 0 ? ' more' : ' less')}</span>` : '') + '</div></div>'; };
+  const std = c.plans.filter(p => p.user !== 'low'), low = c.plans.filter(p => p.user === 'low');
+  const perMonth = c.usageKWhMonth || Math.round((c.usageKWhYear || 0) / 12);
+  const others = `<div class="card pwrcard"><div class="pwrh">Other retailers, with no solar</div><div class="s pwrnote" style="margin:0 0 8px">For your whole house use, about ${(perMonth || 0).toLocaleString('en-NZ')} kWh a month (${(+c.usageKWhYear || 0).toLocaleString('en-NZ')} kWh a year). Difference is against your ${pwrD(avg)} average.</div>` +
+    std.map(row).join('') + (low.length ? `<details class="pwrlow"><summary>Low-user plans (${low.length}). They cost more at your use</summary>${low.map(row).join('')}</details>` : '') + '</div>';
+  const ck = c.plans.map(p => p.checked).filter(Boolean).sort();
+  const notes = `<div class="card pwrcard"><div class="pwrh">Good to know</div><ul class="pwrul">${(c.notes || []).map(n => `<li>${esc(n)}</li>`).join('')}` +
+    (c.notCompared && c.notCompared.length ? `<li>Not compared: ${c.notCompared.map(esc).join('; ')}.</li>` : '') + '</ul>' +
+    `<div class="s pwrnote">Source: ${c.sourceUrl ? `<a href="${esc(c.sourceUrl)}" target="_blank" rel="noopener">${esc(c.source || 'price data')}</a>` : esc(c.source || '')}. Rates checked ${ck.length ? (ck[0] === ck[ck.length - 1] ? pwrDate(ck[0]) : pwrDate(ck[0]) + ' – ' + pwrDate(ck[ck.length - 1])) : pwrDate(c.checkedAt)}. Compared ${pwrDate(c.checkedAt)}.</div></div>`;
+  return pwrWrap(back + now + others + notes + `<div class="pwrhint muted" style="text-align:center">← Swipe right to go back to Power</div>` + pwrDots(1));
+}
+// Clear horizontal swipe only (vertical scrolling stays native; nothing is prevented)
+(function () {
+  let x0 = 0, y0 = 0, t0 = 0, on = false;
+  const route = () => (location.hash || '').slice(1).split('/')[0];
+  document.addEventListener('touchstart', e => { const r = route(); on = (r === 'power' || r === 'compare') && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,.pwrtbl'));
+    if (on) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); } }, { passive: true });
+  document.addEventListener('touchend', e => { if (!on) return; on = false; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Date.now() - t0 > 900 || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    const r = route(); if (r === 'power' && dx < 0) pwrNav('#compare', 'r'); else if (r === 'compare' && dx > 0) pwrNav('#power', 'l'); }, { passive: true });
+  document.addEventListener('touchcancel', () => { on = false; }, { passive: true });
+})();
+
