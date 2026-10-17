@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.23';
+const APP_VERSION = '2.26.24';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7207,12 +7207,182 @@ const MEAL_STARTERS = [
     "time": "30 minutes",
     "image": "images/recipe-satay-chicken.jpg",
     "method": "1. Cook the chicken thighs in a pan at 180°C for 6 minutes until lightly browned.\n2. Stir in the peanut butter, coconut milk and gluten-free soy sauce (tamari). Simmer at 95°C for 12 minutes until the chicken is cooked and the sauce is thick.\n3. Boil the rice at 100°C for 12 minutes and the green beans at 100°C for 4 minutes.\n4. Serve the chicken with the rice and beans."
+  },
+  {
+    "title": "Lamb and vegetable tray bake",
+    "tag": "Oven bake",
+    "ingr": "lamb leg steaks, carrots, kumara, red onion, courgette, broccoli, garlic, olive oil, fresh rosemary",
+    "notes": "",
+    "serves": "4",
+    "time": "1 hour",
+    "image": "images/recipe-lamb-and-vegetable-tray-bake.jpg",
+    "method": "1. Heat the oven to 200°C.\n2. Cut the carrots, kumara and red onion into chunks. Toss with olive oil, garlic and rosemary on a big tray. Roast at 200°C for 25 minutes.\n3. Add the courgette and broccoli and lay the lamb steaks on top. Roast at 200°C for 15 to 20 minutes until the lamb is cooked to your liking.\n4. Rest the lamb for 5 minutes, slice and serve with the veges."
+  },
+  {
+    "title": "Chicken and kumara traybake",
+    "tag": "Oven bake",
+    "ingr": "chicken drumsticks, kumara, potatoes, red capsicum, red onion, garlic, olive oil, smoked paprika, spinach",
+    "notes": "",
+    "serves": "4",
+    "time": "1 hour",
+    "image": "images/recipe-chicken-and-kumara-traybake.jpg",
+    "method": "1. Heat the oven to 200°C.\n2. Cut the kumara, potatoes, capsicum and onion into chunks. Toss with the olive oil, garlic and smoked paprika on a large tray.\n3. Nestle the chicken drumsticks in and season. Roast at 200°C for 45 minutes, turning once, until the chicken is cooked through (75°C inside).\n4. Stir the spinach through the hot veges for the last 2 minutes and serve."
+  },
+  {
+    "title": "Pork and cabbage stir-fry",
+    "tag": "Quick",
+    "ingr": "pork strips, cabbage, carrots, red capsicum, spring onions, garlic, ginger, gluten-free tamari, sesame oil, rice",
+    "notes": "",
+    "serves": "4",
+    "time": "25 minutes",
+    "image": "images/recipe-pork-and-cabbage-stir-fry.jpg",
+    "method": "1. Cook the rice for 12 minutes, then drain.\n2. Finely slice the cabbage, carrots, capsicum and spring onions.\n3. Heat a wok on high (about 220°C) with a little oil. Stir-fry the pork strips for 3 to 4 minutes until browned, then set aside.\n4. Stir-fry the garlic, ginger and veges for 4 minutes until just tender.\n5. Return the pork, add the gluten-free tamari and sesame oil, toss for 1 minute and serve on the rice."
+  },
+  {
+    "title": "Vegetable frittata",
+    "tag": "Budget",
+    "ingr": "eggs, potatoes, courgette, red capsicum, spinach, red onion, cherry tomatoes, cheddar cheese, olive oil",
+    "notes": "Vegetarian.",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-vegetable-frittata.jpg",
+    "method": "1. Heat the oven to 180°C.\n2. Slice the potatoes thinly and boil them for 6 minutes until just tender, then drain.\n3. In an ovenproof pan on the hob at 160°C, cook the onion, capsicum and courgette in olive oil for 5 minutes. Add the potatoes and spinach.\n4. Beat 8 eggs with salt and pepper, pour over, then top with the cherry tomatoes and grated cheddar.\n5. Cook on the hob for 3 minutes, then bake at 180°C for 15 minutes until set. Serve with a green salad."
+  },
+  {
+    "title": "Stuffed capsicums",
+    "tag": "Oven bake",
+    "ingr": "red capsicums, beef mince, rice, onion, garlic, courgette, tinned tomatoes, gluten-free stock, mozzarella, fresh parsley",
+    "notes": "",
+    "serves": "4",
+    "time": "1 hour",
+    "image": "images/recipe-stuffed-capsicums.jpg",
+    "method": "1. Heat the oven to 190°C. Cook the rice for 12 minutes and drain.\n2. Cook the onion, garlic and grated courgette at 160°C for 5 minutes, add the mince and brown it for 8 minutes.\n3. Stir in half the tinned tomatoes, a splash of gluten-free stock and the rice. Season.\n4. Halve the capsicums, remove the seeds, fill with the mince and set them on the rest of the tomatoes in a dish.\n5. Top with mozzarella and bake at 190°C for 30 minutes. Sprinkle with parsley."
+  },
+  {
+    "title": "Pumpkin and chickpea curry",
+    "tag": "Slow cook",
+    "ingr": "pumpkin, chickpeas, onion, garlic, ginger, gluten-free curry paste, coconut milk, tinned tomatoes, spinach, rice",
+    "notes": "Vegetarian.",
+    "serves": "4",
+    "time": "45 minutes",
+    "image": "images/recipe-pumpkin-and-chickpea-curry.jpg",
+    "method": "1. Cook the onion, garlic and ginger at 160°C for 5 minutes.\n2. Stir in the gluten-free curry paste for 1 minute, then add the pumpkin cubes, tinned tomatoes and coconut milk.\n3. Simmer at 95°C for 20 minutes until the pumpkin is tender. Add the drained chickpeas for the last 5 minutes.\n4. Stir in the spinach until wilted.\n5. Cook the rice for 12 minutes, drain and serve with the curry."
+  },
+  {
+    "title": "Roast vegetable salad with feta",
+    "tag": "Quick",
+    "ingr": "pumpkin, kumara, beetroot, red onion, baby spinach, cherry tomatoes, feta, pumpkin seeds, olive oil, balsamic vinegar",
+    "notes": "Vegetarian.",
+    "serves": "4",
+    "time": "45 minutes",
+    "image": "images/recipe-roast-vegetable-salad-with-feta.jpg",
+    "method": "1. Heat the oven to 200°C.\n2. Cube the pumpkin, kumara and beetroot and cut the onion into wedges. Toss in olive oil and roast at 200°C for 35 minutes, turning once.\n3. Toast the pumpkin seeds in a dry pan at 160°C for 3 minutes.\n4. Toss the warm veges with the spinach and halved tomatoes.\n5. Crumble over the feta, scatter the seeds and drizzle with olive oil and balsamic vinegar (check the label is gluten free)."
+  },
+  {
+    "title": "Chicken and vegetable soup",
+    "tag": "Slow cook",
+    "ingr": "chicken thighs, carrots, celery, onion, leek, potatoes, corn kernels, garlic, gluten-free chicken stock, fresh parsley",
+    "notes": "",
+    "serves": "6",
+    "time": "1 hour",
+    "image": "images/recipe-chicken-and-vegetable-soup.jpg",
+    "method": "1. Chop the onion, leek, celery, carrots and potatoes.\n2. Cook the onion, leek, celery and garlic in a big pot at 160°C for 6 minutes.\n3. Add the chicken thighs, carrots, potatoes and 2 litres of gluten-free chicken stock. Simmer at 95°C for 35 minutes.\n4. Lift out the chicken, shred it and return it with the corn. Simmer 5 minutes more.\n5. Season and serve with parsley."
+  },
+  {
+    "title": "Minestrone with rice",
+    "tag": "Budget",
+    "ingr": "onion, carrots, celery, courgette, garlic, tinned tomatoes, cannellini beans, silverbeet, rice, gluten-free vegetable stock, parmesan",
+    "notes": "Vegetarian.",
+    "serves": "6",
+    "time": "50 minutes",
+    "image": "images/recipe-minestrone-with-rice.jpg",
+    "method": "1. Dice the onion, carrots, celery and courgette.\n2. Cook the onion, carrots, celery and garlic at 160°C for 8 minutes.\n3. Add the tinned tomatoes and 1.5 litres of gluten-free vegetable stock. Bring to the boil, then add 1/2 cup of rice and simmer at 95°C for 15 minutes.\n4. Add the courgette, drained beans and shredded silverbeet. Simmer 10 minutes.\n5. Season and serve topped with parmesan."
+  },
+  {
+    "title": "Salmon with roast veges",
+    "tag": "Oven bake",
+    "ingr": "salmon fillets, asparagus, baby potatoes, broccolini, cherry tomatoes, lemon, garlic, olive oil, fresh dill",
+    "notes": "",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-salmon-with-roast-veges.jpg",
+    "method": "1. Heat the oven to 200°C.\n2. Halve the baby potatoes, toss with olive oil and garlic and roast at 200°C for 20 minutes.\n3. Add the asparagus, broccolini and tomatoes to the tray and lay the salmon fillets on top with lemon slices.\n4. Roast at 200°C for 12 to 15 minutes until the salmon flakes.\n5. Scatter with dill and serve with lemon wedges."
+  },
+  {
+    "title": "Thai green chicken curry",
+    "tag": "Takeaway-style",
+    "ingr": "chicken thighs, gluten-free green curry paste, coconut milk, green beans, courgette, red capsicum, bok choy, fish sauce, fresh basil, rice",
+    "notes": "",
+    "serves": "4",
+    "time": "35 minutes",
+    "image": "images/recipe-thai-green-chicken-curry.jpg",
+    "method": "1. Cook the rice for 12 minutes and drain.\n2. Fry the gluten-free green curry paste in a little oil at 160°C for 1 minute.\n3. Add the sliced chicken thighs and cook for 5 minutes, then pour in the coconut milk and simmer at 95°C for 10 minutes.\n4. Add the beans, courgette and capsicum for 5 minutes, then the bok choy for 2 minutes.\n5. Season with fish sauce (check it's gluten free), add basil and serve with the rice."
+  },
+  {
+    "title": "Vegetable fritters",
+    "tag": "Budget",
+    "ingr": "chickpea flour, eggs, courgette, carrots, corn kernels, spring onions, spinach, olive oil, Greek yoghurt, lemon",
+    "notes": "Vegetarian.",
+    "serves": "4",
+    "time": "30 minutes",
+    "image": "images/recipe-chickpea-flour-vegetable-fritters.jpg",
+    "method": "1. Grate the courgette and carrots and squeeze out the liquid. Chop the spring onions and spinach.\n2. Whisk 2 eggs with 3/4 cup of chickpea flour and a splash of water into a thick batter. Fold in all the veges and corn. Season.\n3. Heat a little oil in a pan at 170°C. Fry spoonfuls for 3 minutes each side until golden.\n4. Serve with Greek yoghurt mixed with lemon juice and a big salad."
+  },
+  {
+    "title": "Chicken cacciatore",
+    "tag": "Slow cook",
+    "ingr": "chicken thighs, onion, garlic, red capsicum, mushrooms, carrots, tinned tomatoes, olives, gluten-free chicken stock, fresh basil, rice",
+    "notes": "",
+    "serves": "4",
+    "time": "1 hour",
+    "image": "images/recipe-chicken-cacciatore.jpg",
+    "method": "1. Brown the chicken thighs in a large pan at 180°C for 5 minutes each side, then set aside.\n2. Cook the onion, garlic, carrot, capsicum and mushrooms at 160°C for 8 minutes.\n3. Add the tinned tomatoes and a cup of gluten-free stock. Return the chicken.\n4. Cover and simmer at 95°C for 35 minutes. Add the olives for the last 5 minutes.\n5. Scatter with basil and serve with rice."
+  },
+  {
+    "title": "Mushroom and courgette risotto",
+    "tag": "Quick",
+    "ingr": "arborio rice, mushrooms, courgette, onion, garlic, gluten-free vegetable stock, baby spinach, parmesan, butter, lemon",
+    "notes": "Vegetarian.",
+    "serves": "4",
+    "time": "40 minutes",
+    "image": "images/recipe-mushroom-and-courgette-risotto.jpg",
+    "method": "1. Heat 1.2 litres of gluten-free vegetable stock in a pot.\n2. Cook the onion and garlic in butter at 160°C for 4 minutes. Add the sliced mushrooms and cook 5 minutes.\n3. Stir in 1 1/2 cups of arborio rice for 1 minute.\n4. Add the hot stock a ladle at a time, stirring, for 18 minutes. Add the diced courgette halfway.\n5. Stir in the spinach, parmesan, a knob of butter and a squeeze of lemon. Serve straight away."
+  },
+  {
+    "title": "Chicken rice paper rolls",
+    "tag": "Quick",
+    "ingr": "rice paper wrappers, cooked chicken, rice vermicelli, carrots, cucumber, red cabbage, lettuce, fresh mint, coriander, gluten-free tamari, lime",
+    "notes": "",
+    "serves": "4",
+    "time": "30 minutes",
+    "image": "images/recipe-chicken-rice-paper-rolls.jpg",
+    "method": "1. Soak the rice vermicelli in boiling water for 4 minutes, then drain and cool.\n2. Cut the carrots and cucumber into thin sticks, shred the cabbage and lettuce, and slice the chicken.\n3. Dip a rice paper wrapper in warm water for 10 seconds and lay it flat.\n4. Fill with noodles, veges, chicken and herbs, fold in the sides and roll up tightly.\n5. Serve with gluten-free tamari mixed with lime juice for dipping."
+  },
+  {
+    "title": "Halloumi and vegetable skewers",
+    "tag": "BBQ",
+    "ingr": "halloumi, red capsicum, yellow capsicum, courgette, red onion, button mushrooms, cherry tomatoes, olive oil, lemon, quinoa",
+    "notes": "Vegetarian.",
+    "serves": "4",
+    "time": "35 minutes",
+    "image": "images/recipe-halloumi-and-vegetable-skewers.jpg",
+    "method": "1. Cook the quinoa for 12 minutes, drain and fluff.\n2. Cut the halloumi, capsicums, courgette and onion into chunks.\n3. Thread onto skewers with the mushrooms and tomatoes. Brush with olive oil and lemon.\n4. Grill on the BBQ at medium-high (about 200°C) for 8 to 10 minutes, turning, until charred.\n5. Serve on the quinoa with lemon wedges."
+  },
+  {
+    "title": "Cauliflower and broccoli cheese",
+    "tag": "Oven bake",
+    "ingr": "cauliflower, broccoli, milk, butter, cornflour, cheddar cheese, gluten-free mustard, spinach, gluten-free breadcrumbs",
+    "notes": "Vegetarian.",
+    "serves": "4",
+    "time": "45 minutes",
+    "image": "images/recipe-cauliflower-and-broccoli-cheese.jpg",
+    "method": "1. Heat the oven to 190°C.\n2. Cut the cauliflower and broccoli into florets and steam for 6 minutes. Lay in a baking dish with the spinach.\n3. Melt the butter in a pot at 140°C. Whisk 3 tablespoons of cornflour into 2 1/2 cups of milk and add it, stirring until thick (about 5 minutes).\n4. Stir in most of the cheddar and the gluten-free mustard. Pour over the veges.\n5. Top with the rest of the cheese and gluten-free breadcrumbs. Bake at 190°C for 20 minutes until golden."
   }
 ];
 // v1.4.1 swapped two v1.4.0 starters that don't work well gluten free (old id → new id)
 const MEAL_REPLACED = { 'meal-beef-and-black-bean': 'meal-beef-and-broccoli-stir-fry', 'meal-sausage-sizzle': 'meal-bbq-chicken-thighs-with-corn' };
 const MEAL_REPLACED_NAMES = { 'meal-beef-and-black-bean': 'Beef and black bean', 'meal-sausage-sizzle': 'Sausage sizzle' };
-const STARTER_VER = 3;
+const STARTER_VER = 4; // 2.26.24: 17 veg-packed gluten-free recipes added
 // Ingredients where gluten often hides: shown with a "check label" hint on the shopping list
 const CHECK_LABEL = /stock|sauce|tamari|gravy|curry paste|salsa|mustard|tzatziki|sausage|seasoning|chilli powder|stuffing|bacon|\bham\b|corned|corn chips|baked beans|cornflour|coleslaw|potato salad|tortillas|taco shells|rice noodles|mayonnaise|marinade|spice/i;
 const needsCheck = g => CHECK_LABEL.test(g);
@@ -7225,6 +7395,7 @@ const newMeals = () => ({ nights: [5, 6], plan: {}, ideas: starterMeals(), list:
 // holding them switch to the replacement. Past nights keep their name. Own ideas from before this had no GF tick, so they
 // start unticked (not assumed gluten free).
 function migrateStarters(m) {
+  const prevVer = m.starterVer || 1;
   const fresh = new Map(starterMeals().map(i => [i.id, i])), T = todayISO(), switched = [];
   const keep = [];
   m.ideas.forEach(i => {
@@ -7256,7 +7427,7 @@ function migrateStarters(m) {
     const i = e.ideaId && m.ideas.find(x => x.id === e.ideaId); if (i) e.title = i.title;
   });
   m.starterVer = STARTER_VER;
-  const methodNote = 'Starter recipes now include a method and a photo. They stay gluten free.';
+  const methodNote = prevVer >= 3 ? '17 new veg-packed gluten-free recipes added.' : 'Starter recipes now include a method and a photo. They stay gluten free.';
   m.gfNote = switched.length ? 'Updated for gluten free: ' + switched.map(x => `${x.from} → ${x.to} (${fmtW(x.d)})`).join(', ') + '. ' + methodNote : methodNote;
 }
 function normMeals(m) {
@@ -19086,11 +19257,33 @@ function glDeviceItems() {
   } catch (e) { }
   return out;
 }
+// 2.26.24: each day's new joke and language words as Notifications cards; swipe left clears one from Notifications only (stays on Home and in Languages)
+function nfDis() { try { const o = JSON.parse(localStorage.getItem('nfDismiss') || 'null'); return o && o.day === todayISO() ? o.keys || [] : []; } catch (e) { return []; } }
+function nfDismiss(k) { const ks = nfDis(); if (!ks.includes(k)) ks.push(k); try { localStorage.setItem('nfDismiss', JSON.stringify({ day: todayISO(), keys: ks })); } catch (e) { } }
+function glNewItems() {
+  const out = [], gone = nfDis(), card = (k, ic, t, sub, tap) => { if (!gone.includes(k)) out.push(`<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved)${tap}"><div class="ic">${ic}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${esc(sub)}</div></div></div>`); };
+  try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (Array.isArray(j) && j[0]) card('joke', '😄', j[0], 'Joke of the day · tap for the answer', "glInfo('joke')"); } } catch (e) { }
+  try { const m = langToday('mi'); if (m) card('mi', '🌿', m[0] + ' – ' + m[1], 'Te reo Māori word of the day', "go('#lang')"); } catch (e) { }
+  try { const f = langToday('fr'); if (f) card('fr', '🥖', f[0] + ' – ' + f[1], 'French word of the day', "go('#lang')"); } catch (e) { }
+  return out;
+}
+function glSwipe(e) {
+  const el = e.target.closest && e.target.closest('.glnew'); if (!el) return;
+  const t0 = e.touches[0], x0 = t0.clientX, y0 = t0.clientY; let dx = 0, dir = '';
+  glSwipe.moved = false;
+  const mv = ev => { const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0; if (!dir && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) dir = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y'; if (dir !== 'x') return; ev.preventDefault(); glSwipe.moved = true; dx = Math.min(0, ddx); el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(1 + dx / 400); };
+  const end = () => { el.removeEventListener('touchmove', mv); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.style.transition = 'transform .2s ease, opacity .2s ease';
+    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.querySelector('.glnew')) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
+    else { el.style.transform = ''; el.style.opacity = ''; }
+    setTimeout(() => { glSwipe.moved = false; }, 50); };
+  el.addEventListener('touchmove', mv, { passive: false }); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
+}
+document.addEventListener('touchstart', glSwipe, { passive: true });
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert() };
+  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems() };
 }
-function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0); } catch (e) { return 0; } }
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length; } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
@@ -19098,6 +19291,7 @@ glAlertsBody = function () {
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
   const dueU = p.dueUrgent.length || gU ? `<div class="list">${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
   const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
-    sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '');
+    sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
+    sec('New today <span class="glswipehint">swipe left to clear</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
   return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
