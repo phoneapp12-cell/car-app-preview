@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.52';
+const APP_VERSION = '2.26.53';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -15737,7 +15737,7 @@ function mbItems() {
 }
 const MB_SECS = [['dl', 'Deliveries'], ['cc', 'Click & collect'], ['bill', 'Bills by email'], ['er', 'Everyday Rewards'], ['gf', 'Gluten free']];
 function mbSections(L) {
-  return MB_SECS.map(([k, t]) => { let R = L.filter(x => x.sec === k && !x.urgent && !x.coming); if (k === 'er') R = R.sort((a, b) => String(a.end).localeCompare(String(b.end))); return R.length ? `<div class="sec">${t} <span class="glswipehint">swipe left to clear</span></div><div class="list">${R.map(x => x.html).join('')}</div>` : ''; }).join('');
+  return MB_SECS.map(([k, t]) => { let R = L.filter(x => x.sec === k && !x.urgent && !x.coming); if (k === 'er') R = R.sort((a, b) => String(a.end).localeCompare(String(b.end))); return R.length ? `<div class="sec">${t} <span class="glswipehint">swipe left to archive</span></div><div class="list">${R.map(x => x.html).join('')}</div>` : ''; }).join('');
 }
 
 /* ================= SCROLLING SUMMARY (2.23.35) =================
@@ -18585,7 +18585,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19507,8 +19507,9 @@ function SummaryPage() { // 2.26.18: the Home summary feed, now its own page. 2.
 }
 function GlAlerts() {
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + `<div id="glalerts">${glAlertsBody()}</div>
-  <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: 16 Sherwood Road, Onerahi to 4 Port Road.</div>`;
+  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + `<div id="glalerts">${glAlertsBody()}</div>
+  <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
+  <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: 16 Sherwood Road, Onerahi to 4 Port Road.</div>`);
 }
 function glWxSky(kind, day) {
   if (!day) return kind === 'clear' || kind === 'pc' ? ['#0b1438', '#312e81', '#4c1d95', 1] : kind === 'rain' || kind === 'showers' || kind === 'drizzle' || kind === 'storm' ? ['#0f172a', '#1e293b', '#334155', 1] : ['#111827', '#1f2937', '#374151', 1];
@@ -19767,6 +19768,165 @@ function nlItems() {
   return out.map(x => ({ ...x, wb: x.where === '#todo' ? waterBlock((S.todos || []).find(t => t.id === x.id)) : null })).map(x => ({ ...x, urgent: x.days !== null && x.days <= 0 && !x.wb, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.wb ? ' · 💧 ' + esc(x.wb) : x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div>${x.doing ? '<span class="pill glprog">In progress</span>' : ''}</div>` }));
 }
 function glStartedTxt(t) { if (!t.startedAt) return ''; const d = new Date(t.startedAt), today = todayISO(d) === todayISO(); return 'Started ' + (today ? fmtTime(d.toTimeString().slice(0, 5)) : fmtW(todayISO(d))); }
+/* ================= REMINDERS ON THE NOTIFICATIONS PAGE (2.26.53) =================
+   Your own reminders (Reminders page, pushed by the relay) and medication times, shown plainly: today's and the next
+   48 hours, plus any that have gone off and haven't been dealt with (they stay until Done or swiped, once, no repeats).
+   Done ticks the matching to-do if there is one. Snooze makes a one-off reminder 15 min / 1 hour / tomorrow and resyncs the push.
+   Calendar events and appointments already show on this page, so they get no second row. */
+function rmHandled() { try { const a = JSON.parse(localStorage.getItem('remHandled') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function rmHandle(k) { const a = rmHandled(); if (!a.includes(k)) a.push(k); try { localStorage.setItem('remHandled', JSON.stringify(a.slice(-300))); } catch (e) { } }
+const rmNorm = t => String(t || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+const rmMins = k => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10), +k.slice(11, 13), +k.slice(14, 16)) / 60000;
+let RM_REG = {};
+function rmOccurrences(now = new Date()) {
+  const nowK = nzStampLocal(now), out = [], gone = new Set(rmHandled());
+  const push = (o) => { const k = o.src + '|' + o.id + '|' + o.at; if (gone.has(k)) return; const d = rmMins(o.at) - rmMins(nowK); if (d > 48 * 60 || d < -7 * 1440) return; out.push(Object.assign(o, { key: k, mins: d })); };
+  (S.reminders || []).forEach(r => {
+    if (!r || !r.title || !/^\d{2}:\d{2}$/.test(r.time || '')) return;
+    if (remRepeat(r) === 'none') { push({ src: 'rem', id: r.id, title: r.title, at: r.date + 'T' + r.time, r }); return; }
+    const next = remNextDate(r, now); push({ src: 'rem', id: r.id, title: r.title, at: next + 'T' + r.time, r, rep: true });
+    const prev = remNextDate(r, new Date(now.getTime() - 24 * 3600e3)); if (prev + 'T' + r.time < nowK && prev !== next) push({ src: 'rem', id: r.id, title: r.title, at: prev + 'T' + r.time, r, rep: true, past: true });
+  });
+  try { const m = medsState(), T = todayISO();
+    m.list.filter(x => x && x.name && x.remind !== false && /^\d{2}:\d{2}$/.test(x.time || '')).forEach(x => {
+      const title = '💊 ' + x.name + (x.dose ? ' (' + x.dose + ')' : '');
+      if (!medTakenAt(x.id, T)) push({ src: 'med', id: x.id, title, at: T + 'T' + x.time, med: x });
+      else push({ src: 'med', id: x.id, title, at: addDays(T, 1) + 'T' + x.time, med: x });
+    }); } catch (e) { }
+  return out.sort((a, b) => a.at.localeCompare(b.at));
+}
+function rmTodoFor(title) { const n = rmNorm(title); return n ? (S.todos || []).find(t => t && !t.done && rmNorm(t.title) === n) || null : null; }
+function rmWhen(o) { const d = o.at.slice(0, 10), T = todayISO(), tm = fmtTime(o.at.slice(11, 16)); return (d === T ? 'Today ' : d === addDays(T, 1) ? 'Tomorrow ' : d < T ? fmtW(d) + ' ' : fmtW(d) + ' ') + tm; }
+function rmItems(now = new Date()) {
+  RM_REG = {}; const out = [];
+  rmOccurrences(now).forEach(o => {
+    const fired = o.mins <= 0, T = todayISO(), td = o.src === 'rem' ? rmTodoFor(o.title) : null;
+    if (o.rep && fired && o.mins < -24 * 60) return; // a repeating one only keeps its latest go
+    RM_REG[o.key] = o; o.todo = td;
+    const open = o.src === 'med' ? "go('#meds')" : td ? `todoForm('${td.id}')` : `remForm('${o.id}')`;
+    const k = esc(o.key);
+    const html = `<div class="row glnew remrow${fired ? ' remfired' : ''}" data-rm="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){${open}}"><div class="ic rem">${I('bell')}</div><div class="tx"><div class="t">${esc(o.title)}</div><div class="s">${fired ? 'Reminder · ' : ''}${esc(rmWhen(o))}${o.r && REM_REPEAT_LABEL[remRepeat(o.r)] ? ' · ' + REM_REPEAT_LABEL[remRepeat(o.r)] : ''}${td ? ' · on your to-do list' : ''}</div>
+      <div class="mbbtns rmbtns"><button type="button" class="btn small primary" onclick="event.stopPropagation();rmDone(this.closest('.remrow').dataset.rm)">Done</button><button type="button" class="btn small" onclick="event.stopPropagation();this.parentElement.classList.toggle('open')">Snooze</button>
+      <span class="rmsnz"><button type="button" class="btn small" onclick="event.stopPropagation();rmSnooze(this.closest('.remrow').dataset.rm,15)">15 min</button><button type="button" class="btn small" onclick="event.stopPropagation();rmSnooze(this.closest('.remrow').dataset.rm,60)">1 hour</button><button type="button" class="btn small" onclick="event.stopPropagation();rmSnooze(this.closest('.remrow').dataset.rm,'tmr')">Tomorrow</button></span></div></div></div>`;
+    out.push({ key: o.key, at: o.at, todoId: td ? td.id : '', time: o.at.slice(11, 16), date: o.at.slice(0, 10), urgent: fired || o.mins <= 60, coming: !fired && o.mins > 60 && o.at.slice(0, 10) === T, badge: fired, html });
+  });
+  return out;
+}
+async function rmDone(k) {
+  const o = RM_REG[k]; rmHandle(k);
+  try {
+    if (o && o.src === 'med') { if (!medTakenAt(o.med.id, todayISO()) && o.at.slice(0, 10) === todayISO()) await medTick(o.med.id); }
+    else if (o && o.todo && !o.todo.done) { await tick(o.todo.id); return; }
+  } catch (e) { }
+  render(); toast('Done.');
+}
+async function rmSnooze(k, by) {
+  const o = RM_REG[k]; if (!o) return; rmHandle(k);
+  let date, time;
+  if (by === 'tmr') { date = addDays(todayISO(), 1); time = o.at.slice(11, 16); }
+  else { const t = nzStampLocal(new Date(Date.now() + by * 60000)); date = t.slice(0, 10); time = t.slice(11, 16); }
+  const title = String(o.title).slice(0, 80);
+  S.reminders = (S.reminders || []).filter(r => !(r.snoozeOf === o.src + '|' + o.id && remRepeat(r) === 'none' && remKey(r) <= nzStampLocal())); // tidy old snoozes of this one
+  if (o.src === 'rem' && !o.rep) { const r = (S.reminders || []).find(x => x.id === o.id); if (r) { r.date = date; r.time = time; } }
+  else S.reminders.push({ id: uid('rem'), title, date, time, repeat: 'none', snoozeOf: o.src + '|' + o.id });
+  await save(); try { await scheduleReminders(); } catch (e) { } render();
+  toast(`Snoozed until ${by === 'tmr' ? 'tomorrow ' : ''}${fmtTime(time)}.`);
+}
+// a to-do already on this page gets the reminder time instead of a second row
+function rmAttach(html, R) {
+  return R.reduce((h, x) => x.todoId && h.includes(`'${x.todoId}'`) ? h.replace(new RegExp(`(todoForm\\('${x.todoId}'\\)[\\s\\S]*?<div class="s">)`), `$1<span class="remtag">🔔 ${esc(fmtTime(x.time))}${x.date !== todayISO() ? ' ' + esc(fmtW(x.date)) : ''}</span> `) : h, html);
+}
+
+// 2.26.53: every other Notifications row (Coming up, Urgent, In progress, From Sarah) can be swiped to the Archive too.
+// Its key is what it opens plus its title, so it stays archived while the day count changes.
+function gkDis() { try { const a = JSON.parse(localStorage.getItem('gkDismiss') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function gkDismiss(k) { const a = gkDis(); if (!a.includes(k)) a.push(k); try { localStorage.setItem('gkDismiss', JSON.stringify(a.slice(-300))); } catch (e) { } }
+function gkKey(html) { const oc = (String(html).match(/onclick="([^"]*)"/) || [])[1] || '', t = (String(html).match(/class="t">([\s\S]*?)<\/div>/) || [])[1] || ''; const str = oc + '|' + t.replace(/<[^>]+>/g, '').trim(); let h = 5381; for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0; return 'g' + h.toString(36) + str.length.toString(36); }
+function gkStamp(html, gone) { const h = String(html || ''); if (!/^\s*<(button|div) class="row(?![^"]*glnew)/.test(h)) return h; const k = gkKey(h); if (gone.includes(k)) return null; return h.replace(/^(\s*<(?:button|div)) class="row([^"]*)"/, `$1 class="row$2" data-gk="${k}"`); }
+function gkApply(P) { const g = gkDis(), obj = a => a.filter(x => { const h = gkStamp(x.html, g); if (h == null) return false; x.html = h; return true; }), str = a => a.map(h => gkStamp(h, g)).filter(h => h != null);
+  P.dueUrgent = obj(P.dueUrgent); P.coming = obj(P.coming); P.urgent = str(P.urgent); P.sarah = str(P.sarah); P.prog = str(P.prog); return P; }
+/* ================= NOTIFICATIONS ARCHIVE (2.26.53) =================
+   Swiping a row left on Notifications now archives it (nothing is deleted). Swipe the page right (not on a row) for the
+   Archive; swipe left or Back to return. On the Archive, swipe a row right to put it back. If it's no longer current
+   (paid, expired, done) it shows under 'Put back' on Notifications until swiped away again. Kept 90 days, up to 200. */
+const ARC_TYPES = { gk: 'gk', rm: 'rm', nl: 'nl', pn: 'pn', mb: 'mb', ab: 'ab', nk: 'nk', pb: 'pb' };
+function arcList() { try { const a = JSON.parse(localStorage.getItem('bellArchive') || '[]'); const cut = Date.now() - 90 * 864e5; return Array.isArray(a) ? a.filter(x => x && x.id && Date.parse(x.archivedAt) > cut) : []; } catch (e) { return []; } }
+function arcSave(a) { try { localStorage.setItem('bellArchive', JSON.stringify(a.slice(0, 200))); } catch (e) { } }
+function arcPb() { try { const a = JSON.parse(localStorage.getItem('bellPutBack') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function arcPbSave(a) { try { localStorage.setItem('bellPutBack', JSON.stringify(a.slice(0, 50))); } catch (e) { } }
+function arcUndismiss(type, key) {
+  const drop = (name, wrap) => { try { const raw = JSON.parse(localStorage.getItem(name) || 'null'); if (wrap) { if (raw && Array.isArray(raw.keys)) { raw.keys = raw.keys.filter(k => k !== key); localStorage.setItem(name, JSON.stringify(raw)); } } else if (Array.isArray(raw)) localStorage.setItem(name, JSON.stringify(raw.filter(k => k !== key))); } catch (e) { } };
+  ({ gk: () => drop('gkDismiss'), rm: () => drop('remHandled'), nl: () => drop('nlDismiss'), pn: () => drop('pnDismiss'), mb: () => drop('mbDismiss'), ab: () => drop('abDismiss'), nk: () => drop('nfDismiss', true) }[type] || (() => { }))();
+}
+function arcDismiss(type, key) { ({ gk: gkDismiss, rm: rmHandle, nl: nlDismiss, pn: pnDismiss, mb: mbDismiss, ab: abDismiss, nk: nfDismiss }[type] || (() => { }))(key); }
+// what a row says, so the Archive can show it even once the source has gone
+function arcEntryOf(el) {
+  const type = Object.keys(ARC_TYPES).find(t => el.dataset[t] != null) || 'nk', key = el.dataset[type] || '';
+  let sec = '', box = el.closest('.list, .glwarns, .glnewlist') || el.parentElement, h = box && box.previousElementSibling;
+  while (h && !h.classList.contains('sec')) h = h.previousElementSibling;
+  if (h) { const c = h.cloneNode(true); c.querySelectorAll('.glswipehint').forEach(x => x.remove()); sec = c.textContent.trim(); }
+  const tx = (sel) => { const n = el.querySelector(sel); return n ? n.textContent.replace(/\s+/g, ' ').trim().slice(0, 240) : ''; };
+  const oc = el.getAttribute('onclick') || '', m = oc.match(/go\('(#[\w\/-]+)'\)/);
+  return { id: type + '|' + key, type, key, section: sec || 'Notifications', title: tx('.t') || el.textContent.replace(/\s+/g, ' ').trim().slice(0, 120), body: tx('.s'), link: m ? m[1] : '', archivedAt: new Date().toISOString() };
+}
+function arcAdd(entry) {
+  if (entry.type === 'pb') { const pb = arcPb(), old = pb.find(x => x.id === entry.key); arcPbSave(pb.filter(x => x.id !== entry.key)); if (old) entry = Object.assign({}, old, { archivedAt: new Date().toISOString() }); else return; }
+  else arcDismiss(entry.type, entry.key);
+  arcSave([entry].concat(arcList().filter(x => x.id !== entry.id)));
+  try { const t = document.querySelector('.arctab'); if (t) t.outerHTML = arcTab(); } catch (e) { }
+  toast('Archived', 'Undo', () => arcRestore(entry.id, true), 6000);
+}
+// is it still current? (it shows in its normal section)
+function arcLive(e) { try { const html = glAlertsBody(); return html.includes(`data-${e.type}="${esc(e.key)}"`); } catch (er) { return false; } }
+function arcRestore(id, quiet) {
+  const a = arcList(), e = a.find(x => x.id === id); if (!e) return;
+  arcSave(a.filter(x => x.id !== id)); arcUndismiss(e.type, e.key);
+  if (!arcLive(e)) arcPbSave([e].concat(arcPb().filter(x => x.id !== e.id)));
+  if (!quiet) toast('Put back');
+  render(); glBellRedraw();
+}
+function arcPutBackRows() {
+  return arcPb().map(e => `<div class="row glnew arcpb" data-pb="${esc(e.id)}" role="button" tabindex="0"${e.link ? ` onclick="if(!glSwipe.moved)go('${esc(e.link)}')"` : ''}><div class="ic">↩︎</div><div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${esc(e.section)}${e.body ? ' · ' + esc(e.body) : ''}</div></div></div>`).join('');
+}
+function arcTab() { const n = arcList().length; return `<button type="button" class="arctab" onclick="pwrNav('#archive','l')" aria-label="Open archive">🗂 Archive${n ? ` <b>${n}</b>` : ''}</button>`; }
+function arcClear() { const a = arcList(); if (!a.length) return; confirmSheet('Clear the archive?', `This removes the ${plural(a.length, 'archived item')} for good. They stay hidden from Notifications.`, 'Clear', async () => { arcSave([]); render(); toast('Archive cleared.'); }); }
+function BellArchive() {
+  const a = arcList(), back = `<button class="back" onclick="pwrNav('#alerts','r')">${I('left')} Notifications</button>`;
+  const groups = {}; a.forEach(e => { const d = nzStampLocal(new Date(e.archivedAt)).slice(0, 10); (groups[d] = groups[d] || []).push(e); });
+  const T = todayISO(), lbl = d => d === T ? 'Today' : d === addDays(T, -1) ? 'Yesterday' : fmtW(d);
+  const body = a.length ? Object.keys(groups).sort().reverse().map(d => `<div class="sec">${esc(lbl(d))}</div><div class="list">${groups[d].map(e => `<div class="row arcrow" data-arc="${esc(e.id)}"><div class="tx"><div class="arcsec">${esc(e.section)}</div><div class="t">${esc(e.title)}</div>${e.body ? `<div class="s">${esc(e.body)}</div>` : ''}<div class="s arcat">Archived ${esc(fmtTime(nzStampLocal(new Date(e.archivedAt)).slice(11, 16)))}</div></div><div class="arcput">↩︎</div></div>`).join('')}</div>`).join('')
+    + `<div class="btns" style="margin-top:14px"><button type="button" class="btn small" onclick="arcClear()">Clear archive</button></div>`
+    : `<div class="card empty"><div class="t">Nothing archived</div><div class="s">Swipe a notification left to archive it. It comes here instead of being deleted.</div></div>`;
+  return pwrWrap(back + header('Archive', 'Swipe an item right to put it back on Notifications') + body + `<div class="pwrhint muted" style="text-align:center">← Swipe left to go back to Notifications · kept 90 days</div>`);
+}
+// page swipes: right on Notifications (not on a swipeable row) opens Archive; left on Archive goes back.
+// Rows on the Archive swipe right to restore.
+(function () {
+  let x0 = 0, y0 = 0, t0 = 0, on = '', row = null, dx = 0;
+  const route = () => (location.hash || '').slice(1).split('/')[0];
+  const skip = t => { if (!t.closest || t.closest('input,textarea,select,.glnew,[data-gk],button.arctab')) return true; for (let n = t; n && n !== document.body; n = n.parentElement) { const ox = getComputedStyle(n).overflowX; if ((ox === 'auto' || ox === 'scroll') && n.scrollWidth > n.clientWidth + 4) return true; } return false; };
+  document.addEventListener('touchstart', e => {
+    on = ''; row = null; dx = 0; if (e.touches.length !== 1 || sheetOpen) return; const r = route(), t = e.target;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+    if (r === 'alerts' && !skip(t) && x0 > 20) on = 'alerts';
+    else if (r === 'archive') { row = t.closest && t.closest('.arcrow'); on = 'archive'; }
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!row) return; const t = e.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0;
+    if (Math.abs(ddx) > Math.abs(ddy) && ddx > 8) { dx = ddx; row.style.transition = 'none'; row.style.transform = `translateX(${ddx}px)`; row.style.opacity = String(1 - ddx / 400); }
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (!on) return; const t = e.changedTouches[0], ddx = t.clientX - x0, ddy = t.clientY - y0, fast = Date.now() - t0 < 900, horiz = Math.abs(ddx) >= 70 && Math.abs(ddx) > Math.abs(ddy) * 2;
+    const r = row; on === 'alerts' && fast && horiz && ddx > 0 && pwrNav('#archive', 'l');
+    if (on === 'archive') {
+      if (r) { r.style.transition = 'transform .2s ease, opacity .2s ease'; if (dx > Math.min(110, r.offsetWidth * 0.3)) { r.style.transform = 'translateX(110%)'; r.style.opacity = '0'; setTimeout(() => arcRestore(r.dataset.arc), 200); } else { r.style.transform = ''; r.style.opacity = ''; if (fast && horiz && ddx < 0) pwrNav('#alerts', 'r'); } }
+      else if (fast && horiz && ddx < 0) pwrNav('#alerts', 'r');
+    }
+    on = ''; row = null;
+  }, { passive: true });
+  document.addEventListener('touchcancel', () => { if (row) { row.style.transform = ''; row.style.opacity = ''; } on = ''; row = null; }, { passive: true });
+})();
+
 function glTodoCard(t, d) {
   const doing = todoStatus(t) === 'doing';
   return `<button class="row" onclick="todoForm('${t.id}')"><div class="ic todo">${I('check')}</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list || 'To-do')}${t.due ? ' · ' + fmtW(t.due) : ''}${doing && t.startedAt ? ' · ' + glStartedTxt(t) : ''}</div></div>${doing ? progPill() : t.due ? todoDuePill(t, d) : ''}</button>`;
@@ -19846,12 +20006,12 @@ function glNewItems() {
   return out;
 }
 function glSwipe(e) {
-  const el = e.target.closest && e.target.closest('.glnew'); if (!el) return; // 2.26.32: also the 'new on your lists' cards (data-nl)
+  const el = e.target.closest && e.target.closest('.glnew, #glalerts [data-gk]'); if (!el) return; // 2.26.32: also the 'new on your lists' cards (data-nl)
   const t0 = e.touches[0], x0 = t0.clientX, y0 = t0.clientY; let dx = 0, dir = '';
   glSwipe.moved = false;
   const mv = ev => { const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0; if (!dir && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) dir = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y'; if (dir !== 'x') return; ev.preventDefault(); glSwipe.moved = true; dx = Math.min(0, ddx); el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(1 + dx / 400); };
   const end = () => { el.removeEventListener('touchmove', mv); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.style.transition = 'transform .2s ease, opacity .2s ease';
-    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; if (el.dataset.nl) nlDismiss(el.dataset.nl); else if (el.dataset.pn) pnDismiss(el.dataset.pn); else if (el.dataset.mb) mbDismiss(el.dataset.mb); else if (el.dataset.ab) abDismiss(el.dataset.ab); else nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.children.length) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
+    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; arcAdd(arcEntryOf(el)); /* 2.26.53: archive, not delete */ setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.children.length) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
     else { el.style.transform = ''; el.style.opacity = ''; }
     setTimeout(() => { glSwipe.moved = false; }, 50); };
   el.addEventListener('touchmove', mv, { passive: false }); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
@@ -19916,23 +20076,33 @@ function pnItems() {
 }
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: (() => { try { return abItems(); } catch (e) { return []; } })(), mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems(); } catch (e) { return []; } })() };
+  const P = { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: (() => { try { return abItems(); } catch (e) { return []; } })(), mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems(); } catch (e) { return []; } })() };
+  try { // 2.26.53: reminders; a to-do already here gets the time attached instead of its own row
+    const R = rmItems(), seen = P.dueUrgent.concat(P.coming).map(x => x.html).join('') + P.fresh.join('');
+    P.rm = R.filter(x => !(x.todoId && seen.includes(`'${x.todoId}'`)));
+    const A = R.filter(x => x.todoId && seen.includes(`'${x.todoId}'`));
+    if (A.length) { const fix = x => { x.html = rmAttach(x.html, A); }; P.dueUrgent.forEach(fix); P.coming.forEach(fix); P.fresh = P.fresh.map(h => rmAttach(h, A)); P.urgent = P.urgent.map(h => rmAttach(h, A)); }
+  } catch (e) { P.rm = []; }
+  try { gkApply(P); } catch (e) { }
+  return P;
 }
-function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length + p.mb.filter(x => x.badge).length; } catch (e) { return 0; } }
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length + p.mb.filter(x => x.badge).length + (p.rm || []).filter(x => x.badge).length; } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
-  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent), mbC = p.mb.filter(x => !x.urgent && x.coming);
-  const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length || abU.length || mbU.length ? `<div class="list">${mbU.map(x => x.html).join('')}${pwU.map(x => x.html).join('')}${abU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
-  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC || abN.length || mbC.length ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}${mbC.map(x => x.html).join('')}</div>` : '') +
-    sec('New on your lists <span class="glswipehint">swipe left to clear</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
+  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent), mbC = p.mb.filter(x => !x.urgent && x.coming), rmU = p.rm.filter(x => x.urgent), rmC = p.rm.filter(x => !x.urgent && x.coming), rmL = p.rm.filter(x => !x.urgent && !x.coming);
+  const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length || abU.length || mbU.length || rmU.length ? `<div class="list">${rmU.map(x => x.html).join('')}${mbU.map(x => x.html).join('')}${pwU.map(x => x.html).join('')}${abU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
+  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC || abN.length || mbC.length || rmC.length ? `<div class="list">${rmC.map(x => x.html).join('')}${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}${mbC.map(x => x.html).join('')}</div>` : '') +
+    sec('New on your lists <span class="glswipehint">swipe left to archive</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
     sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
-    sec('Power <span class="glswipehint">swipe left to clear</span>', pwN.length ? `<div class="list">${pwN.map(x => x.html).join('')}</div>` : '') +
+    sec('Power <span class="glswipehint">swipe left to archive</span>', pwN.length ? `<div class="list">${pwN.map(x => x.html).join('')}</div>` : '') +
+    sec('Put back <span class="glswipehint">swipe left to archive again</span>', arcPb().length ? `<div class="list">${arcPutBackRows()}</div>` : '') +
+    sec('Reminders <span class="glswipehint">swipe left to archive</span>', rmL.length ? `<div class="list">${rmL.map(x => x.html).join('')}</div>` : '') +
     mbSections(p.mb) +
-    sec('New today <span class="glswipehint">swipe left to clear</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
-  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + p.ab.length + p.mb.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+    sec('New today <span class="glswipehint">swipe left to archive</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
+  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + p.ab.length + p.mb.length + p.rm.length + arcPb().length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
 
 /* 2.26.48: In progress for car due items (WOF / rego / service). Stored per car+part with the due date it was for, so it clears itself when the date is renewed.
@@ -19998,7 +20168,7 @@ function carProgCards() { // bell In progress section (and recheck Coming up / U
 const AB_HEALTH = [['dentist', 'Dentist', /\b(dentist|dental)\b/i], ['chiro', 'Chiropractor', /\b(chiro|chiropract\w*|tui chiropractic)\b/i], ['doctor', 'Doctor', /\b(doctor|gp|dr\b|central family health)\b/i]];
 function abDis() { try { const a = JSON.parse(localStorage.getItem('abDismiss') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 function abDismiss(k) { const a = abDis(); if (!a.includes(k)) a.push(k); try { localStorage.setItem('abDismiss', JSON.stringify(a.slice(-200))); } catch (e) { } }
-function abNotNow(k) { abDismiss(k); render(); }
+function abNotNow(k, el) { if (el && el.dataset && el.dataset.ab != null) arcAdd(arcEntryOf(el)); else abDismiss(k); render(); } // 2.26.53: Not now archives
 function abHealthType(txt, kind) { if (kind && AB_HEALTH.some(x => x[0] === kind)) return AB_HEALTH.find(x => x[0] === kind); return AB_HEALTH.find(x => x[2].test(String(txt || ''))) || null; }
 function abLastAmt(type) { const B = (S.bills || []).filter(b => b && b.linkType === type && +b.amount > 0); return B.length ? B[B.length - 1].amount : ''; }
 let AB_REG = {};
@@ -20008,7 +20178,7 @@ function abItems() {
     if (gone.has(key) || linked.has(key)) return;
     AB_REG[key] = Object.assign({ repeat: 'none', paidBy: '', amount: abLastAmt(type), link: key, linkType: type }, pre);
     out.push({ key, days: d, urgent, html: `<div class="row glnew abrow" data-ab="${esc(key)}"><div class="ic bill">${icon}</div><div class="tx"><div class="t">Add a bill to your Budget?</div><div class="s">${title} · ${sub}</div>` +
-      `<div class="abbtns"><button type="button" class="btn primary small" onclick="event.stopPropagation();if(!glSwipe.moved)abAdd('${esc(key)}')">Add bill</button><button type="button" class="btn small" onclick="event.stopPropagation();if(!glSwipe.moved)abNotNow('${esc(key)}')">Not now</button></div></div></div>` });
+      `<div class="abbtns"><button type="button" class="btn primary small" onclick="event.stopPropagation();if(!glSwipe.moved)abAdd('${esc(key)}')">Add bill</button><button type="button" class="btn small" onclick="event.stopPropagation();if(!glSwipe.moved)abNotNow('${esc(key)}',this.closest('.glnew'))">Not now</button></div></div></div>` });
   };
   try {
     (S.cars || []).forEach(c => [['wof', 'WOF'], ['rego', 'Rego'], ['svc', 'Service']].forEach(([part, L]) => {
