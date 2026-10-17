@@ -159,6 +159,19 @@ export async function runAkahu(env, fetchImpl = fetch, now = Date.now()) {
 export async function runAkahuInsight(env) {
   const req = env.EVENTS_KV && env.AKAHU_ENC_KEY && await env.EVENTS_KV.get('akahu-insight-req'); if (!req) return 'none';
   const deb = req === 'debits';
+  if (req === 'plan') {
+    let D = null, fresh = false; const cred = await getCred(env);
+    try { const old = await open(env, await env.EVENTS_KV.get(K_DATA)); if (cred && (!old || Date.now() - Date.parse(old.at) > 3600e3)) { D = await refetch(env, cred, fetch); fresh = true; } else D = old; } catch (e) { D = await open(env, await env.EVENTS_KV.get(K_DATA)); }
+    if (!D) return 'nodata';
+    const mk = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
+    const an = Object.fromEntries(D.accounts.map(a => [a.id, a.name + ' · ' + a.bank]));
+    const g = new Map();
+    D.transactions.filter(t => !t.pair && D.accounts.find(a => a.id === t.acct && a.type !== 'CREDITCARD' && !(a.type === 'LOAN' && !a.limit))).forEach(t => { const k = (t.amount < 0 ? 'OUT ' : 'IN ') + mk(t.desc).replace(/#.*$/, '').slice(0, 36) + ' | ' + an[t.acct]; (g.get(k) || g.set(k, []).get(k)).push(t); });
+    const groups = [...g.entries()].filter(([, L]) => L.length >= 2).map(([k, L]) => { const d = L.map(t => t.date.slice(0, 10)).sort(); return { k, n: L.length, d, amt: L.sort((a, b) => a.date.localeCompare(b.date)).map(t => t.amount), type: [...new Set(L.map(t => t.type))].join('/') }; });
+    await env.EVENTS_KV.put('akahu-insight-v1', JSON.stringify({ at: new Date().toISOString(), dataAt: D.at, fresh, accounts: D.accounts.map(a => ({ n: a.name, bank: a.bank, type: a.type, bal: a.balance, avail: a.available, limit: a.limit })), groups,
+      last14: D.transactions.filter(t => Date.now() - Date.parse(t.date) < 14 * DAY && D.accounts.find(a => a.id === t.acct && a.type !== 'CREDITCARD' && !(a.type === 'LOAN' && !a.limit))).map(t => [t.date.slice(0, 10), mk(t.desc).slice(0, 36), t.amount, an[t.acct], t.pair ? 'pair' : '']) }), { expirationTtl: 1800 });
+    return 'plan';
+  }
   if (req === 'card') {
     const D = await open(env, await env.EVENTS_KV.get(K_DATA)); if (!D) return 'nodata';
     const mk = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
