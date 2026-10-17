@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.44';
+const APP_VERSION = '2.26.45';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19587,15 +19587,22 @@ function PowerPage() {
 /* 2.26.43: Ecotricity arrears (start = latest bill's Total Amount Due; + estimated use since that bill's period end; − payments ticked off on this phone after the bill was issued) */
 function ecoPays() { try { const a = JSON.parse(localStorage.getItem('ecoPays') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 function ecoPaySave(a) { try { localStorage.setItem('ecoPays', JSON.stringify(a)); } catch (e) { } }
-function ecoPayAdd(amt, date) { const a = ecoPays(), id = 'p' + Date.now(); a.push({ id, amt: Math.round(amt * 100) / 100, date }); ecoPaySave(a); render(); toast(`Payment of ${pwrD(amt)} noted`, 'Undo', () => ecoPayDel(id)); }
 function ecoPayDel(id) { ecoPaySave(ecoPays().filter(x => x.id !== id)); render(); }
-function ecoPayForm() {
-  openSheet('Payment to Ecotricity', `<div class="two">${field('Amount ($)', inp('amt', '75.00', 'inputmode="decimal"'))}${field('Paid on', inp('date', todayISO(), 'type="date" required'))}</div>`,
-    async v => { const n = Number(String(v.amt || '').replace(/[$,\s]/g, '')); if (!(n > 0) || n > 20000) return 'Please enter the amount you paid.'; if (!parseD(v.date)) return 'Please choose the date you paid.'; closeSheet(); ecoPayAdd(n, v.date); });
+function ecoBillFind() { const B = (S && S.bills) || []; return B.find(x => x && /ecotricity/i.test(x.name || '')) || B.find(x => x && /\b(power|electric|electricity)\b/i.test(x.name || '')) || null; }
+// 2.26.45: payments come from ticking off the Ecotricity bill in Bills (bill.paidDues: {due, on, amount}); only after the bill's issue date (12 Oct 2026 for the Sep bill)
+function ecoTicked(after) { const b = ecoBillFind(); if (!b || !Array.isArray(b.paidDues)) return []; return b.paidDues.filter(p => p && p.on && p.on > after).map(p => ({ src: 'bill', billId: b.id, due: p.due, date: p.on, amt: budgetAmt(p.amount != null ? p.amount : b.amount) })).filter(p => p.amt > 0); }
+async function ecoUntick(billId, due) {
+  const b = (S.bills || []).find(x => x.id === billId); if (!b || !Array.isArray(b.paidDues)) return; const s = snap();
+  b.paidDues = b.paidDues.filter(x => x && x.due !== due);
+  try { if (b.paid) { b.paid = false; delete b.paidOn; b.due = due; } else if (b.due && b.due > due && nextDue(Object.assign({}, b, { due })) === b.due) b.due = due; } catch (e) { }
+  const last = b.paidDues.reduce((m, x) => x.on > m ? x.on : m, ''); if (last) b.lastPaid = last; else delete b.lastPaid;
+  await save(); render(); toast(`${b.name} unticked for ${fmt(due)}.`, 'Undo', undoTo(s));
 }
 function pwrArrearsCard(a) {
   if (!a || a.startBalance == null) return '';
-  const after = a.issued || a.periodEnd, pays = ecoPays().filter(p => p.date > after).sort((x, y) => x.date < y.date ? -1 : 1), paid = pays.reduce((s, p) => s + p.amt, 0);
+  const after = a.issued && a.issued > '2026-10-12' ? a.issued : '2026-10-12';
+  const manual = ecoPays().filter(p => p.date > after).map(p => ({ src: 'manual', id: p.id, date: p.date, amt: p.amt }));
+  const pays = ecoTicked(after).concat(manual).sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0), paid = pays.reduce((s, p) => s + p.amt, 0);
   const owedTop = a.startBalance + (a.usedSince || 0), bal = Math.max(0, owedTop - paid), pc = owedTop > 0 ? Math.min(100, Math.round(paid / owedTop * 100)) : 100;
   const fd = iso => { try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }); } catch (e) { return iso; } };
   const wkUse = a.weeklyUse, net = wkUse != null ? 75 - wkUse : null;
@@ -19603,14 +19610,16 @@ function pwrArrearsCard(a) {
   if (bal <= 0.5) payoff = 'All paid off 🎉';
   else if (net != null && net > 0.5) { const wks = bal / net, dt = new Date(Date.now() + wks * 7 * 864e5); payoff = `At $75 a week, paid off around <b>${dt.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' })}</b> (about ${Math.ceil(wks)} weeks). That’s $75 less about ${pwrD(wkUse)} a week of power.`; }
   else if (net != null) payoff = `At $75 a week this won’t go down, because power is about ${pwrD(wkUse)} a week.`;
+  const hasBill = !!ecoBillFind();
   return `<div class="card pwrcard pwrarr"><div class="pwrh">Ecotricity arrears</div>` +
     `<div class="pgl"><div class="pglt"><span>Paid ${pwrD(paid)} of ${pwrD(owedTop)}</span><b>${pc}% to $0</b></div><div class="pgbar"><i style="width:${pc}%"></i></div></div>` +
     pwrRows([['Owed now (estimate)', `<span style="font-size:1.1rem">${pwrD(bal)}</span>`], [`${esc(a.bill)} bill balance${a.due ? ' · due ' + fd(a.due) : ''}`, pwrD(a.startBalance)],
-      [`Power used since ${fd(a.periodEnd)} (estimate)`, '+' + pwrD(a.usedSince || 0)], ['Payments you’ve ticked off', '−' + pwrD(paid)]]) +
+      [`Power used since ${fd(a.periodEnd)} (estimate)`, '+' + pwrD(a.usedSince || 0)], ['Payments ticked off', '−' + pwrD(paid)]]) +
     (payoff ? `<div class="pwrwline" style="font-weight:600">${payoff}</div>` : '') +
-    `<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="ecoPayAdd(75, todayISO())">I paid $75</button> <button class="btn small" onclick="ecoPayForm()">Other amount</button></div>` +
-    (pays.length ? `<div class="pwrpays">${pays.slice(-6).reverse().map(p => `<div><span>${fd(p.date)}</span><b>${pwrD(p.amt)}</b><button class="linkbtn" aria-label="Remove" onclick="ecoPayDel('${esc(p.id)}')">✕</button></div>`).join('')}</div>` : '') +
-    `<div class="s pwrnote">${a.carriedOver != null ? `The ${esc(a.bill)} balance includes ${pwrD(a.carriedOver)} carried over${a.lateFee ? ', a ' + pwrD(a.lateFee) + ' late fee' : ''} and ${pwrD(a.billCharges)} of charges. ` : ''}Payments are kept on this phone. Only ones after ${fd(after)} count, because earlier ones are already on the bill. When the next bill comes in, it starts from that bill’s balance.${a.gap ? ' Some days since the bill have no figures yet.' : ''}</div></div>`;
+    `<div class="pwrfrom">Payments come from ticking off Ecotricity in Bills.${hasBill ? '' : ' There’s no Ecotricity bill in Bills yet.'} <button class="linkbtn pwrgo" onclick="go('#bills')">Open Bills</button></div>` +
+    (pays.length ? `<div class="pwrpays">${pays.slice(-8).reverse().map(p => `<div><span>${fd(p.date)}${p.src === 'manual' ? ' <small class="muted">(added by hand)</small>' : ''}</span><b>${pwrD(p.amt)}</b>` +
+      (p.src === 'bill' ? `<button class="linkbtn" aria-label="Untick" title="Untick in Bills" onclick="ecoUntick('${esc(p.billId)}','${esc(p.due)}')">Untick</button>` : `<button class="linkbtn" aria-label="Remove" onclick="ecoPayDel('${esc(p.id)}')">✕</button>`) + '</div>').join('')}</div>` : `<div class="s pwrnote">No payments ticked off since ${fd(after)} yet.</div>`) +
+    `<div class="s pwrnote">${a.carriedOver != null ? `The ${esc(a.bill)} balance includes ${pwrD(a.carriedOver)} carried over${a.lateFee ? ', a ' + pwrD(a.lateFee) + ' late fee' : ''} and ${pwrD(a.billCharges)} of charges. ` : ''}Only payments after ${fd(after)} count, because earlier ones are already on the bill. When the next bill comes in, it starts from that bill’s balance.${a.gap ? ' Some days since the bill have no figures yet.' : ''}</div></div>`;
 }
 /* 2.26.43: one-time: Ecotricity paid $75 a week from the bank account ($150 a fortnight in Budget). Only this one bill is touched. */
 async function ecoBillMig() {
