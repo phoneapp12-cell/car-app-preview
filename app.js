@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.35';
+const APP_VERSION = '2.26.36';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9475,9 +9475,10 @@ function budgetCalc(b) {
   const bills = budgetBillRows(b);
   const billTot = Math.round(bills.reduce((n, x) => n + x.amount, 0) * 100) / 100;
   const spend = Math.round((b.lines || []).reduce((n, x) => n + x.amount, 0) * 100) / 100;
-  const out = Math.round((mort + billTot + spend) * 100) / 100;
+  const debt = (() => { try { return debtsPerFortnight().total; } catch (e) { return 0; } })(); // 2.26.36: Mum's debt + credit card, per pay fortnight
+  const out = Math.round((mort + billTot + spend + debt) * 100) / 100;
   const pay = budgetAmtOr0(b.pay);
-  return { pay, mort, carried, billTot, spend, out, left: Math.round((pay - out) * 100) / 100, mortgages, bills };
+  return { pay, mort, carried, billTot, spend, debt, out, left: Math.round((pay - out) * 100) / 100, mortgages, bills };
 }
 function budgetCard(b) {
   const k = budgetCalc(b);
@@ -9493,7 +9494,7 @@ function budgetCard(b) {
       <div style="flex:1;min-width:0"><div class="carname">${esc(b.name)}</div><div class="carmodel">Pay fortnight</div></div>
       <button type="button" class="iconbtn" aria-label="Edit ${esc(b.name)}" onclick="budgetForm(${jsArg(b.id)})">${I('pen')}</button></div>
     <div class="lowed"><small>${k.left < 0 ? 'Over budget' : 'Left after bills'}</small><b class="lamt">${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></div>
-    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span><span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b>${k.carried ? `<small class="carrytag">${money(k.carried)} carried</small>` : ''}</span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
+    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span>${k.debt ? `<span>Debts <b>${money(k.debt)}</b></span>` : ''}<span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b>${k.carried ? `<small class="carrytag">${money(k.carried)} carried</small>` : ''}</span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
     <div class="sec" style="margin-top:12px">This fortnight's pay</div>
     <div class="list"><div class="row"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wages</div><div class="s">Changes each pay · tap edit to update</div></div><b>${k.pay ? money(k.pay) : '—'}</b></div></div>
     <div class="sec">Three mortgages</div>
@@ -9515,10 +9516,10 @@ function Budget() {
   const needPay = !payPeriod(0);
   if (!list.length) return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) +
     (needPay ? `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday first</b><br>Budget uses the same fortnight as Bills.<div style="margin-top:10px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>` : '') +
-    empty('No budget yet', 'Add this fortnight’s pay and your three mortgages. Bills due in that date range show at their real amounts.', 'Add', 'budgetForm()') +
+    debtsCard() + empty('No budget yet', 'Add this fortnight’s pay and your three mortgages. Bills due in that date range show at their real amounts.', 'Add', 'budgetForm()') +
     `<div class="foot">${savedWhere()}</div>`;
-  return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) +
-    `<div id="budgetlist">${list.map(budgetCard).join('')}</div>
+  return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) + debtsCard() +
+    `<div class="sec">Pay fortnights</div><div id="budgetlist">${list.map(budgetCard).join('')}</div>
     <div class="btns" style="margin-top:12px"><button class="btn" onclick="budgetForm()">${I('plus')} Add a budget</button></div>
     <div class="foot">${savedWhere()}</div>`;
 }
@@ -18219,7 +18220,7 @@ function tabbar(active) {
     return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
   };
   const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
-  const reno = (() => { try { return renoOn() ? `<div class="tabgrp g-reno"><button class="${active === 'reno' ? 'on' : ''}" onclick="setTabsOpen(false);go('#reno')"><span class="w"><span style="font-size:1.3rem;line-height:1">🛠️</span></span><span class="lbl">Renovation ${window.Reno ? Reno.progress() + '%' : ''}</span></button></div>` : ''; } catch (e) { return ''; } })();
+  const reno = (() => { try { return renoOn() ? `<div class="tabgrp g-reno"><button class="${active === 'reno' ? 'on' : ''}" onclick="setTabsOpen(false);go('#reno')"><span class="w"><span style="font-size:1.3rem;line-height:1">🛠️</span></span><span class="lbl">Renovation ${window.Reno ? Reno.progress() + '%' : ''}</span></button></div>` : ''; } catch (e) { return ''; } })() + (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`; return `<div class="tabgrp g-reno2">${b('mumreno', '👵', 'Mum’s Renovation')}${b('myreno', '🔨', 'My Renovations')}${b('weekend', '🌤️', 'Days off plan')}</div>`; })();
   $('#tabbar').innerHTML = reno + groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
@@ -18246,7 +18247,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: Bills, todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: Budget, videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19007,6 +19008,129 @@ function RenoPage() {
 }
 try { if (window.Reno) Reno.init({ key: RENO_KEY, me: 'Shane', onChange: () => { if ((location.hash || '').slice(1) === 'reno') render(); } }); } catch (e) { }
 
+/* ================= 2.26.36: Days off plan, Mum's Renovation, My Renovations ================= */
+// Days off plan: calm, at most 3 picks per day off (one reno block, one house job, free time). Swap / Skip. Unfinished things quietly roll on. Never Zeus.
+const WK_HOUSE = [['🧹', 'Quick tidy-up of one room'], ['👕', 'Washing: one load, start to line'], ['🧽', 'Vacuum the main rooms'], ['🌱', 'Lawns'], ['📦', 'Sort one small spot']];
+const WK_FREE = ['Spa and a good show', 'Movie night', 'Make a track in Suno', 'A bushwalk or the beach', 'A book and a cuppa', 'Nothing planned, on purpose', 'Cook something nice (GF)'];
+function wkSt() { S.settings.wk = S.settings.wk && typeof S.settings.wk === 'object' ? S.settings.wk : { days: {}, house: 0 }; S.settings.wk.days = S.settings.wk.days || {}; return S.settings.wk; }
+function wkDay(iso) { const w = wkSt(); w.days[iso] = w.days[iso] || { sw: {}, sk: {}, dn: {} }; return w.days[iso]; }
+function wkOffDays(n = 3) {
+  let r = null; try { r = rosterState(); } catch (e) { }
+  const hasRoster = r && r.days && Object.values(r.days).some(Boolean), out = [];
+  for (let i = 0; i < 14 && out.length < n; i++) { const d = new Date(); d.setDate(d.getDate() + i); const dow = d.getDay(); const off = hasRoster ? !r.days[String(dow)] : (dow === 0 || dow === 6); if (off) out.push({ iso: todayISO(d), dow, i }); }
+  return out;
+}
+function wkRenoSources() {
+  const own = (S.myReno || []).filter(x => !x.done).sort((a, b) => (a.status === 'doing' ? 0 : 1) - (b.status === 'doing' ? 0 : 1))[0];
+  return {
+    mum: (() => { try { mumRenoReady(); const n = MumReno.next(); return n && { ic: '👵', t: 'Mum’s reno: ' + n.title, s: n.area, go: '#mumreno' }; } catch (e) { return null; } })(),
+    mill: (() => { try { const n = window.Reno && Reno.next(); return n && { ic: '🛠️', t: 'Millesha’s reno: ' + n.title, s: n.area, go: '#reno' }; } catch (e) { return null; } })(),
+    own: own ? { ic: '🔨', t: 'My reno: ' + own.title, s: own.status === 'doing' ? 'In progress' : 'Your list', go: '#myreno' } : null
+  };
+}
+function wkPlanFor(o, ord) {
+  const D = wkDay(o.iso), w = wkSt(), src = wkRenoSources(), notes = [], slots = [];
+  if (o.dow === 0) notes.push('Cleaning job until 7pm');
+  if (o.dow === 1) notes.push('At Mum’s today');
+  if (o.dow === 2 || o.dow === 3) notes.push('Gym day');
+  const order = o.dow === 1 ? ['mum', 'mill', 'own'] : (ord % 2 ? ['own', 'mill', 'mum'] : ['mill', 'own', 'mum']);
+  const avail = order.filter(k => src[k]);
+  if (o.dow !== 0 && avail.length) { const r = src[avail[(D.sw.reno || 0) % avail.length]]; slots.push({ k: 'reno', ic: r.ic, t: r.t, s: r.s + (o.dow === 1 && r.go === '#mumreno' ? ' · while you’re at Mum’s' : ''), go: r.go }); }
+  const hi = ((w.house || 0) + ord + (D.sw.house || 0)) % WK_HOUSE.length, h = WK_HOUSE[hi];
+  slots.push({ k: 'house', ic: h[0], t: h[1], s: o.dow === 0 ? 'Small one, before work' : 'House job' });
+  const fi = (Math.floor(Date.parse(o.iso) / 864e5) + (D.sw.free || 0)) % WK_FREE.length;
+  slots.push({ k: 'free', ic: '🌿', t: 'Free time: ' + WK_FREE[fi], s: o.dow === 0 ? 'After 7pm' : 'Yours, on purpose', free: true });
+  return { notes, slots: slots.filter(x => !D.sk[x.k]), skipped: slots.filter(x => D.sk[x.k]).length, D };
+}
+async function wkAct(iso, k, act) {
+  const D = wkDay(iso), w = wkSt();
+  if (act === 'swap') D.sw[k] = (D.sw[k] || 0) + 1;
+  else if (act === 'skip') D.sk[k] = true;
+  else if (act === 'unskip') D.sk = {};
+  else if (act === 'done') { D.dn[k] = !D.dn[k]; if (k === 'house') w.house = Math.max(0, (w.house || 0) + (D.dn[k] ? 1 : -1)); }
+  Object.keys(w.days).forEach(d => { if (d < todayISO(new Date(Date.now() - 7 * 864e5))) delete w.days[d]; });
+  await save(); render();
+}
+function wkDayHtml(o, ord, compact) {
+  const P = wkPlanFor(o, ord), lab = o.i === 0 ? 'Today' : o.i === 1 ? 'Tomorrow' : WDL[o.dow];
+  return `<div class="wkday"><div class="wkdh"><b>${lab}</b><span>${fmtW(o.iso)}</span>${P.notes.map(n => `<span class="wknote">${esc(n)}</span>`).join('')}</div>` +
+    P.slots.map(x => { const dn = !!P.D.dn[x.k]; return `<div class="wkslot${x.free ? ' wkfree' : ''}${dn ? ' wkdone' : ''}"><button type="button" class="wktick" aria-label="${dn ? 'Untick' : 'Done'}: ${esc(x.t)}" onclick="wkAct('${o.iso}','${x.k}','done')">${dn ? '✓' : ''}</button><span class="wkic">${x.ic}</span><div class="wktx"${x.go ? ` onclick="go('${x.go}')" role="button"` : ''}><div class="t">${esc(x.t)}</div><div class="s">${esc(x.s)}</div></div>${dn ? '' : `<span class="wkbtns"><button type="button" onclick="wkAct('${o.iso}','${x.k}','swap')" aria-label="Swap">⇄</button><button type="button" onclick="wkAct('${o.iso}','${x.k}','skip')" aria-label="Skip">✕</button></span>`}</div>`; }).join('') +
+    (P.skipped ? `<button type="button" class="wkunskip" onclick="wkAct('${o.iso}','','unskip')">Bring back ${P.skipped === 1 ? 'the skipped one' : 'skipped ones'}</button>` : '') + '</div>';
+}
+function wkHomeCard() { // top of Home on a day off: just today
+  try { const L = wkOffDays(1); if (!L.length || L[0].i !== 0) return ''; return `<div class="card wkcard"><div class="wkhead"><span>🌤️ Your day off</span><button type="button" onclick="go('#weekend')">All days off ›</button></div>${wkDayHtml(L[0], 0)}<div class="wkfoot">Up to three things. Swap or skip anything – no pressure.</div></div>`; } catch (e) { return ''; }
+}
+function WeekendPage() {
+  const L = wkOffDays(3);
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Days off plan', 'A few things for each day off – swap or skip anything') +
+    (L.length ? L.map((o, n) => `<div class="card wkcard">${wkDayHtml(o, n)}</div>`).join('') : '<div class="card empty"><div class="t">No days off in the next two weeks</div></div>') +
+    `<p class="muted" style="margin:6px 4px">Anything not done just moves on to your next day off. No overdue, no catching up.</p>`;
+}
+
+// Mum's Renovation: same engine as Millesha's, private to My App (no sync key, no share link). Areas can be added.
+const MUM_JOBS = [['clean', 'Clean'], ['mop', 'Mop ceiling'], ['speckle', 'Apply speckle (filler)'], ['sand', 'Sand'], ['ceiling', 'Paint ceiling'], ['walls', 'Paint walls'], ['floor', 'Flooring']];
+function mumAreaList() { const L = S && S.settings && Array.isArray(S.settings.mumAreas) && S.settings.mumAreas.length ? S.settings.mumAreas : ['Back hallway']; return L.map(n => ({ k: 'm' + String(n).toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20), n, e: '🏠', floorDef: 'carpet', jobs: MUM_JOBS })); }
+let MumReno = null;
+function mumRenoReady() { if (!MumReno && window.makeReno) { MumReno = makeReno({ ns: 'MumReno', store: 'mumRenoState', noteKey: 'mumRenoNote', noDeadline: true, foot: 'Private to My App. Not shared with anyone.', areas: mumAreaList }); MumReno.init({ key: '', me: 'Shane', onChange: () => { if ((location.hash || '').slice(1) === 'mumreno') render(); } }); } if (MumReno) MumReno.setAreas(mumAreaList()); return MumReno; }
+function mumAddArea() { openSheet('Add an area', field('Area name', '<input name="n" maxlength="30" placeholder="e.g. Kitchen" required>'), async v => { if (!v.n) return 'Type a name.'; S.settings.mumAreas = mumAreaList().map(a => a.n).concat(v.n.slice(0, 30)); await save(); mumRenoReady(); render(); }, 'Add'); }
+function MumRenoPage() {
+  const R = mumRenoReady();
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Mum’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, flooring') +
+    (R ? R.html() : '') + `<div class="btns" style="margin-top:12px"><button class="btn" onclick="mumAddArea()">${I('plus')} Add an area</button></div>`;
+}
+
+// My Renovations: free-form jobs with Start (date kept) and Complete, plus an optional starter checklist (collapsed).
+const MYRENO_START = { Inside: ['Paint a room', 'Patch holes and dents in walls', 'Fix squeaky doors and loose handles', 'Re-silicone the bath and shower', 'Re-grout tiles', 'Fix a dripping tap', 'Clean the oven and rangehood', 'Wash walls and skirting boards', 'Clean windows (inside)', 'Clean carpets', 'Declutter a cupboard or wardrobe', 'Clean behind the fridge and washing machine', 'Replace blown light bulbs', 'Test smoke alarms', 'Oil or polish wooden furniture', 'Tidy the linen cupboard'],
+  Outside: ['Clean the gutters', 'Wash the house exterior', 'Water-blast the deck and paths', 'Oil or stain the deck', 'Clean windows (outside)', 'Weed the garden beds', 'Spread mulch', 'Trim the hedges', 'Prune trees and shrubs', 'Clear moss off paths', 'Repair fence palings', 'Paint the fence', 'Tidy the shed or garage', 'Clean the outdoor furniture', 'Check the roof and spouting for leaks', 'Clean the BBQ'] };
+const myReno = () => (S.myReno = Array.isArray(S.myReno) ? S.myReno : []);
+async function myRenoAdd(title, side) { title = String(title || '').trim().slice(0, 80); if (!title) return; if (myReno().some(x => x.title.toLowerCase() === title.toLowerCase() && !x.done)) { toast('Already on your list.'); return; } myReno().push({ id: uid('mr'), title, side: side || '', status: 'todo', created: Date.now() }); await save(); render(); toast('Added: ' + title); }
+async function myRenoStart(id) { const x = myReno().find(j => j.id === id); if (!x) return; if (x.status === 'doing') { x.status = 'todo'; delete x.startedAt; } else { x.status = 'doing'; x.startedAt = todayISO(); } await save(); render(); }
+async function myRenoDone(id) { const x = myReno().find(j => j.id === id); if (!x) return; x.done = !x.done; x.status = x.done ? 'done' : (x.startedAt ? 'doing' : 'todo'); x.doneAt = x.done ? todayISO() : undefined; await save(); render(); }
+async function myRenoDel(id) { S.myReno = myReno().filter(j => j.id !== id); await save(); render(); }
+function MyRenoPage() {
+  const L = myReno(), open = L.filter(x => !x.done).sort((a, b) => (a.status === 'doing' ? 0 : 1) - (b.status === 'doing' ? 0 : 1)), done = L.filter(x => x.done), have = new Set(L.filter(x => !x.done).map(x => x.title.toLowerCase()));
+  const row = x => `<div class="row mrrow${x.done ? ' done' : ''}"><button type="button" class="tick" aria-label="${x.done ? 'Not done' : 'Complete'}: ${esc(x.title)}" onclick="myRenoDone('${x.id}')"><span>${I('check')}</span></button><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${x.done ? 'Done ' + fmtW(x.doneAt) : x.status === 'doing' ? 'Started ' + fmtW(x.startedAt) : (x.side || 'To do')}</div></div>${x.done ? `<button type="button" class="iconbtn" aria-label="Remove" onclick="myRenoDel('${x.id}')">${I('trash')}</button>` : `<button type="button" class="tstat ${x.status === 'doing' ? 'doing' : ''}" onclick="myRenoStart('${x.id}')">${x.status === 'doing' ? '● In progress' : '▶ Start'}</button>`}</div>`;
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('My Renovations', 'Your own house jobs, one at a time') +
+    `<form class="addbar" onsubmit="event.preventDefault();myRenoAdd(this.n.value);this.n.value=''"><input name="n" placeholder="Add a job…" maxlength="80" autocomplete="off" aria-label="New job"><button aria-label="Add">${I('plus')}</button></form>` +
+    (open.length ? `<div class="list">${open.map(row).join('')}</div>` : '<div class="card empty"><div class="t">No jobs yet</div><div class="s">Add one above, or pick from the ideas below on a motivated day.</div></div>') +
+    `<div class="sec">Ideas for motivated days</div><p class="muted" style="margin:0 4px 8px">Optional. Tap a group to see it, and add only what you want.</p>` +
+    Object.entries(MYRENO_START).map(([g, items]) => `<details class="card mrstart"><summary>${g === 'Inside' ? '🏠' : '🌳'} ${g} <span class="muted">(${items.length})</span></summary>${items.map(t => `<div class="mritem"><span>${esc(t)}</span>${have.has(t.toLowerCase()) ? '<span class="muted">Added</span>' : `<button type="button" class="btn small" onclick="myRenoAdd(${jsArg(t)},'${g}')">+ Add</button>`}</div>`).join('')}</details>`).join('') +
+    (done.length ? `<div class="sec">Done</div><div class="list">${done.map(row).join('')}</div>` : '');
+}
+
+// Debts (Budget): Mum's debt and the Rewards credit card. Blank until Shane enters his numbers; nothing invented. Private, no sharing.
+const debtsSt = () => { S.debts = S.debts && typeof S.debts === 'object' ? S.debts : {}; S.debts.mum = S.debts.mum || { owed: '', repay: '', freq: 'fortnightly', notes: '' }; S.debts.card = S.debts.card || { limit: '1000', balance: '', rate: '', due: '', min: '', pay: '' }; return S.debts; };
+const dnum = v => { const n = Number(String(v == null ? '' : v).replace(/[^\d.]/g, '')); return isFinite(n) && n > 0 ? n : 0; };
+const FREQ_PER_FN = { weekly: 2, fortnightly: 1, monthly: 12 / 26 };
+function debtsPerFortnight() { const d = debtsSt(); const mum = dnum(d.mum.repay) * (FREQ_PER_FN[d.mum.freq] || 1); const cardM = dnum(d.card.pay) || dnum(d.card.min); return { mum: Math.round(mum * 100) / 100, card: Math.round(cardM * 12 / 26 * 100) / 100, total: Math.round((mum + cardM * 12 / 26) * 100) / 100 }; }
+function addPeriods(n, freq) { const d = new Date(); if (freq === 'monthly') d.setMonth(d.getMonth() + n); else d.setDate(d.getDate() + n * (freq === 'weekly' ? 7 : 14)); return todayISO(d); }
+function debtPayoff() {
+  const d = debtsSt(), out = {};
+  const owed = dnum(d.mum.owed), rep = dnum(d.mum.repay);
+  if (owed && rep) { const n = Math.ceil(owed / rep); out.mum = `About ${n} ${d.mum.freq === 'weekly' ? 'weeks' : d.mum.freq === 'monthly' ? 'months' : 'fortnights'} – paid off around ${fmtW(addPeriods(n, d.mum.freq))}`; }
+  const B = dnum(d.card.balance), apr = dnum(d.card.rate), P = dnum(d.card.pay) || dnum(d.card.min);
+  if (B && P) { const r = apr / 1200; if (r && P <= B * r) out.card = 'At this payment the interest is as big as the payment, so the balance won’t go down.'; else { const m = r ? Math.ceil(-Math.log(1 - r * B / P) / Math.log(1 + r)) : Math.ceil(B / P); const d2 = new Date(); d2.setMonth(d2.getMonth() + m); out.card = `About ${m} month${m === 1 ? '' : 's'} – clear around ${fmtW(todayISO(d2))}${r ? ` · about ${money(Math.max(0, m * P - B))} interest` : ''}`; } }
+  return out;
+}
+function debtsCard() {
+  const d = debtsSt(), f = debtsPerFortnight(), po = debtPayoff(), blank = '<span class="muted">—</span>';
+  const v = x => dnum(x) ? money(dnum(x)) : blank;
+  return `<div class="sec">Debts</div><div class="card debtcard">
+    <button type="button" class="row" onclick="debtForm('mum')"><div class="ic bill">👵</div><div class="tx"><div class="t">Mum’s debt</div><div class="s">Owed ${v(d.mum.owed)} · repay ${v(d.mum.repay)} ${esc(d.mum.freq)}${d.mum.notes ? ' · ' + esc(d.mum.notes) : ''}</div>${po.mum ? `<div class="s debtpo">${esc(po.mum)}</div>` : (!dnum(d.mum.owed) || !dnum(d.mum.repay) ? '<div class="s debtpo">Tap to add the amount owed and repayment</div>' : '')}</div>${I('right')}</button>
+    <button type="button" class="row" onclick="debtForm('card')"><div class="ic bill">💳</div><div class="tx"><div class="t">Rewards credit card</div><div class="s">Balance ${v(d.card.balance)} of ${v(d.card.limit)} · ${dnum(d.card.rate) ? dnum(d.card.rate) + '% p.a.' : 'rate —'} · min ${v(d.card.min)}${d.card.due ? ' · due ' + fmtW(d.card.due) : ''}</div>${po.card ? `<div class="s debtpo">${esc(po.card)}</div>` : '<div class="s debtpo">Tap to add the balance, interest rate, due date and minimum payment</div>'}</div>${I('right')}</button>
+    <div class="debtfn">In each pay fortnight: ${f.total ? `<b>${money(f.total)}</b> (Mum ${money(f.mum)} · card ${money(f.card)})` : 'nothing yet'}</div></div>`;
+}
+function debtForm(k) {
+  const d = debtsSt();
+  if (k === 'mum') openSheet('Mum’s debt', field('Amount owed ($)', `<input name="owed" inputmode="decimal" value="${esc(d.mum.owed)}">`) + field('Repayment ($)', `<input name="repay" inputmode="decimal" value="${esc(d.mum.repay)}">`) +
+    field('How often', `<select name="freq">${['weekly', 'fortnightly', 'monthly'].map(x => `<option ${d.mum.freq === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`) + field('Notes (optional)', `<input name="notes" maxlength="120" value="${esc(d.mum.notes)}">`),
+    async v => { Object.assign(d.mum, { owed: v.owed, repay: v.repay, freq: v.freq, notes: v.notes }); await save(); render(); });
+  else openSheet('Rewards credit card', field('Limit ($)', `<input name="limit" inputmode="decimal" value="${esc(d.card.limit)}">`) + field('Current balance ($)', `<input name="balance" inputmode="decimal" value="${esc(d.card.balance)}">`) +
+    field('Interest rate (% a year)', `<input name="rate" inputmode="decimal" value="${esc(d.card.rate)}">`) + field('Statement due date', `<input name="due" type="date" value="${esc(d.card.due)}">`) +
+    field('Minimum payment ($ a month)', `<input name="min" inputmode="decimal" value="${esc(d.card.min)}">`) + field('What you’ll pay ($ a month, optional)', `<input name="pay" inputmode="decimal" value="${esc(d.card.pay)}">`, 'Leave blank to use the minimum'),
+    async v => { Object.assign(d.card, { limit: v.limit, balance: v.balance, rate: v.rate, due: v.due, min: v.min, pay: v.pay }); await save(); render(); });
+}
+
 function Languages() {
   const st = langSt(), s = langStreak(st);
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Languages', 'A new te reo Māori and French word each day') +
@@ -19176,7 +19300,7 @@ function glanceHome() {
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const orgZ = org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
-  const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
+  const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + (m.off ? homeTry('days off', () => wkHomeCard(), '') : '') + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
     wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + cards +
     (m.night ? entZ + asks + orgZ : orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
