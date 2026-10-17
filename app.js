@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.49';
+const APP_VERSION = '2.26.50';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4485,6 +4485,21 @@ function wireSeg(name, onPick) {
     if (onPick) { onPick(b.dataset.v); $('#sf input[type=date]').dispatchEvent(new Event('input')); }
   });
 }
+/* 2.26.50: WOF complete (passed). Clears In progress and its fixes; Sarah's app shows 'WOF passed · next due …' for 60 days. */
+function wofMarkDone(c, next) {
+  S.wofDone = S.wofDone && typeof S.wofDone === 'object' ? S.wofDone : {};
+  S.wofDone[c.id] = { passed: todayISO(), next };
+  try { delete carProgAll()[c.id + '|wof']; } catch (e) { }
+}
+function wofStatus(c) { // what Sarah's app shows: due, doing (in progress) or done (passed)
+  const e = carProg(c, 'wof');
+  if (e) return { st: 'doing', insp: e.insp || '', recheck: carRecheck(e), fixes: (e.fixes || []).map(f => ({ t: f.text, d: !!f.done })) };
+  const old = (S.carProg || {})[c.id + '|wof'];
+  if (old && old.due && c.wof && c.wof > old.due) wofMarkDone(c, c.wof); // the WOF date was renewed while in progress
+  const d = (S.wofDone || {})[c.id];
+  if (d && d.next === c.wof && d.passed && daysLeft(d.passed) >= -60) return { st: 'done', passed: d.passed };
+  return { st: 'due' };
+}
 function wofForm(id) {
   const c = getCar(id), m = +c.wofMonths || 12;
   openSheet('Got a new WOF', `<p class="muted" style="margin:-4px 0 12px">Nice one. Check the new sticker and pop in the expiry date.</p>` +
@@ -4492,7 +4507,7 @@ function wofForm(id) {
     field('New WOF expires', inp('wof', addMonths(todayISO(), m), 'type="date" required'), 'We’ve guessed today plus the interval. Change it to match the sticker.'),
     async v => {
       if (!parseD(v.wof)) return 'Please choose the new expiry date.';
-      const s = snap(); c.wof = v.wof; c.wofMonths = +v.months; await save(); render();
+      const s = snap(); c.wof = v.wof; c.wofMonths = +v.months; wofMarkDone(c, v.wof); await save(); render();
       toast(`WOF updated. Next one due ${fmt(c.wof)}.`, 'Undo', undoTo(s));
     }, 'Save');
   wireSeg('months', v => { $('#sf input[name=wof]').value = addMonths(todayISO(), +v); });
@@ -4923,6 +4938,7 @@ let sarahCarBusy = false;
 async function publishSarahCar() {
   const c = sarahCar(); if (!c || sarahCarBusy || navigator.onLine === false) return;
   const car = { name: String(c.name || "Sarah's car"), plate: SARAH_CAR_PLATE, model: [c.model].filter(Boolean).join(' '), year: String(c.year || ''), wof: c.wof || '', rego: c.rego || '', svc: c.svcDate || '', svcKm: c.svcKm || '', odo: c.odo || '' };
+  try { car.wofSt = wofStatus(c); } catch (e) { } // 2.26.50
   const sig = JSON.stringify(car);
   let last = ''; try { last = localStorage.getItem('sarahCarSent') || ''; } catch (e) { }
   if (sig === last) return;
@@ -19657,12 +19673,13 @@ function carDueSheet(carId, part) {
   const fixes = (e.fixes || []).map((f, i) => `<label class="fixrow"><input type="checkbox" name="fx_${i}" ${f.done ? 'checked' : ''}><span>${esc(f.text)}</span><button type="button" class="linkbtn" aria-label="Remove" onclick="this.closest('label').remove()">✕</button><input type="hidden" name="fxt_${i}" value="${esc(f.text)}"></label>`).join('');
   openSheet(`${esc(c.name)} ${CAR_PART_NAME[part] || ''}`,
     `<p class="muted" style="margin:0 2px 10px">Due ${due ? fmtW(due) : '—'}${c.plate ? ' · ' + esc(c.plate) : ''}</p>` +
-    field('Status', sel('st', [['', 'Not started'], ['doing', 'In progress']], carProg(c, part) ? 'doing' : '')) +
+    field('Status', sel('st', [['', 'Not started'], ['doing', 'In progress']].concat(isW ? [['done', 'Complete (passed)']] : []), carProg(c, part) ? 'doing' : ''), isW ? 'Complete asks for the new expiry date and clears the fixes.' : '') +
     (isW ? field('Inspection date', inp('insp', inspDef, 'type="date"'), 'If it failed: 28 days from this date to fix it and get the recheck.') +
       `<div class="field"><span>Fixes needed</span>${(e.fixes || []).length ? carFixesLine(e) : ''}<div class="fixlist">${fixes}</div>${area('newfix', '', 'Add fixes, one per line')}</div>` : '') +
     `<p class="muted" style="margin:6px 2px 0">In progress clears itself when you update the ${CAR_PART_NAME[part] || ''} date.</p>`,
     async v => {
       const all = carProgAll(), k = c.id + '|' + part;
+      if (v.st === 'done' && isW) { closeSheet(); setTimeout(() => wofForm(c.id), 350); return; }
       if (v.st !== 'doing') { delete all[k]; await save(); closeSheet(); render(); toast(`${c.name} ${CAR_PART_NAME[part]}: not started`); return; }
       const n = Object.assign({}, carProg(c, part) || {}, { due, at: (carProg(c, part) || {}).at || Date.now() });
       if (isW) {

@@ -3,7 +3,7 @@
    Each item merges on its own `updated` time (newest wins), so a tick on one phone and a new item on the other
    never overwrite each other. Deletes are kept as short tombstones so they don't come back. No AI, nothing logged. */
 export const SHARED_MAX_ITEMS = 500;
-import { queueShop } from './shop-notify.js';
+import { queueShop, sarahPush } from './shop-notify.js';
 const TOMBSTONE_MS = 60 * 24 * 3600 * 1000;
 const PRI = ['high', 'normal', 'low'];
 
@@ -104,14 +104,34 @@ export function cleanCar(c, now = Date.now()) {
   const o = { name: str(c.name, 60).trim(), plate: str(c.plate, 12).trim().toUpperCase(), model: str(c.model, 60).trim(), year: str(c.year, 4).trim(),
     wof: isoOk(c.wof), rego: isoOk(c.rego), svc: isoOk(c.svc), svcKm: km(c.svcKm), odo: km(c.odo), updated: Math.min(Number(c.updated) || now, now + 300000) };
   if (!o.plate) return null;
+  const w = cleanWofSt(c.wofSt); if (w) o.wofSt = w;
   return o;
+}
+// 2.26.50 / 1.11.0: WOF status from My App: due, in progress (inspection, recheck, fixes) or complete (passed, next due)
+export function cleanWofSt(w) {
+  if (!w || typeof w !== 'object' || !['due', 'doing', 'done'].includes(w.st)) return null;
+  const o = { st: w.st };
+  if (w.st === 'doing') { o.insp = isoOk(w.insp); o.recheck = isoOk(w.recheck); o.fixes = (Array.isArray(w.fixes) ? w.fixes : []).slice(0, 30).map(f => ({ t: str(f && f.t, 80).trim(), d: !!(f && f.d) })).filter(f => f.t); }
+  if (w.st === 'done') { o.passed = isoOk(w.passed); }
+  return o;
+}
+// One push to Sarah when the status turns In progress or Complete (never twice for the same WOF due date)
+export function wofNoteFor(prev, c) {
+  const w = c && c.wofSt; if (!w || (w.st !== 'doing' && w.st !== 'done')) return null;
+  const tag = w.st + '|' + (w.st === 'done' ? c.wof : (w.insp || c.wof));
+  if (prev && prev.wofNote === tag) return null;
+  const fmt = d => { const t = new Date(d + 'T12:00:00Z'); return t.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).replace(',', ''); };
+  const msg = w.st === 'doing'
+    ? { title: '\u{1F697} Your WOF is in progress', body: w.recheck ? `Recheck by ${fmt(w.recheck)}` + (w.fixes && w.fixes.length ? ` · ${w.fixes.filter(f => f.d).length} of ${w.fixes.length} fixes done` : '') : 'Shane is sorting the fixes.' }
+    : { title: 'Your WOF passed \u{1F389}', body: c.wof ? `Next due ${fmt(c.wof)}` : 'All done.' };
+  return { tag, msg: Object.assign(msg, { url: './#appts', tag: 'wof-' + tag, ttl: 24 * 3600 }) };
 }
 async function carKey(k) {
   const dig = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('shared-car-v1:' + k));
   let hex = ''; for (const b of new Uint8Array(dig)) hex += b.toString(16).padStart(2, '0');
   return 'shared-car-v1:' + hex;
 }
-export async function sharedCarRoute(body, env, now = Date.now()) {
+export async function sharedCarRoute(body, env, now = Date.now(), notifySarah = sarahPush) {
   const k = normSharedKey(body && body.key);
   if (!k) return [403, { error: 'bad_key' }];
   if (!env || !env.EVENTS_KV || typeof env.EVENTS_KV.get !== 'function') return [503, { error: 'shared_unavailable' }];
@@ -121,8 +141,13 @@ export async function sharedCarRoute(body, env, now = Date.now()) {
   if (body && body.car) {
     const c = cleanCar(body.car, now);
     if (!c) return [400, { error: 'bad_car' }];
+    const prev = cur;
+    if (prev && prev.wofNote) c.wofNote = prev.wofNote;
+    const note = wofNoteFor(prev, c);
+    if (note) c.wofNote = note.tag;
     const same = cur && JSON.stringify({ ...cur, updated: 0 }) === JSON.stringify({ ...c, updated: 0 });
     if (!same) { await env.EVENTS_KV.put(key, JSON.stringify(c)); cur = c; }
+    if (note && notifySarah) { try { await notifySarah(env, k, note.msg, now); } catch (e) { } }
   }
   return [200, { ok: true, car: cur || null, now }];
 }

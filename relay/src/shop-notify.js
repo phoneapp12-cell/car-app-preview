@@ -66,6 +66,13 @@ export async function queueShop(env, key, before, after, now = Date.now()) {
 async function sarahSubs(env, sunK) {
   try { const d = (await env.EVENTS_KV.get(SUN_KEY, { type: 'json' })) || {}; return (Array.isArray(d.subs) ? d.subs : []).filter(s => s.k === sunK); } catch (e) { return []; }
 }
+// Send one message straight to Sarah's phone(s) (her Sarah's To-do notifications). Used for WOF status changes.
+export async function sarahPush(env, key, msg, now = Date.now(), fetchImpl = fetch) {
+  if (!env || !env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return 0;
+  const subs = await sarahSubs(env, await sunHash(key)); let sent = 0;
+  for (const s of subs) if (await sendPush(s, msg, env, fetchImpl, now) === 'ok') sent++;
+  return sent;
+}
 // Every minute (with reminders): send batches that have waited a minute.
 export async function runShop(env, fetchImpl = fetch, now = Date.now()) {
   if (!env || !env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return { sent: 0 };
