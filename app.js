@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.43';
+const APP_VERSION = '2.26.44';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19494,29 +19494,44 @@ function glSwipe(e) {
   glSwipe.moved = false;
   const mv = ev => { const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0; if (!dir && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) dir = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y'; if (dir !== 'x') return; ev.preventDefault(); glSwipe.moved = true; dx = Math.min(0, ddx); el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(1 + dx / 400); };
   const end = () => { el.removeEventListener('touchmove', mv); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.style.transition = 'transform .2s ease, opacity .2s ease';
-    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; if (el.dataset.nl) nlDismiss(el.dataset.nl); else nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.querySelector('.glnew')) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
+    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; if (el.dataset.nl) nlDismiss(el.dataset.nl); else if (el.dataset.pn) pnDismiss(el.dataset.pn); else nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.querySelector('.glnew')) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
     else { el.style.transform = ''; el.style.opacity = ''; }
     setTimeout(() => { glSwipe.moved = false; }, 50); };
   el.addEventListener('touchmove', mv, { passive: false }); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
 }
 document.addEventListener('touchstart', glSwipe, { passive: true });
+/* 2.26.44: power notices (relay power doc "notices") on the Notifications page; dismissals kept on this phone */
+let pnFetchedAt = 0;
+function pnDis() { try { const a = JSON.parse(localStorage.getItem('pnDismiss') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function pnDismiss(id) { const a = pnDis(); if (!a.includes(id)) a.push(id); try { localStorage.setItem('pnDismiss', JSON.stringify(a.slice(-100))); } catch (e) { } }
+function pnItems() {
+  try { if (Date.now() - pnFetchedAt > 20 * 60e3) { pnFetchedAt = Date.now(); setTimeout(pwrFetch, 0); } } catch (e) { }
+  let N = []; try { N = (typeof PWR !== 'undefined' && PWR && Array.isArray(PWR.notices)) ? PWR.notices : []; } catch (e) { N = []; }
+  const gone = new Set(pnDis()), IC = { bill: '🧾', payment: '💵', rates: '📈', compare: '🔎', signin: '🔑' };
+  return N.filter(n => n && n.id && n.title && !gone.has(n.id)).sort((a, b) => String(b.at).localeCompare(String(a.at))).map(n => {
+    let when = ''; try { when = new Date(n.at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) { }
+    const urgent = n.level === 'urgent';
+    return { id: n.id, urgent, html: `<div class="row glnew pnrow${urgent ? ' pnurg' : ''}" data-pn="${esc(n.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('#power')"><div class="ic">${IC[n.kind] || '⚡'}</div><div class="tx"><div class="t">${esc(n.title)}</div>${n.body ? `<div class="s pnbody">${esc(n.body)}</div>` : ''}<div class="s">Power${when ? ' · ' + esc(when) : ''}</div></div></div>` };
+  });
+}
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems() };
+  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems() };
 }
-function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length; } catch (e) { return 0; } }
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length; } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
-  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent);
-  const dueU = p.dueUrgent.length || gU || nlU.length ? `<div class="list">${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
+  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent);
+  const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length ? `<div class="list">${pwU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
   const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
     sec('New on your lists <span class="glswipehint">swipe left to clear</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
     sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
+    sec('Power <span class="glswipehint">swipe left to clear</span>', pwN.length ? `<div class="list">${pwN.map(x => x.html).join('')}</div>` : '') +
     sec('New today <span class="glswipehint">swipe left to clear</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
-  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
 
 /* ================= 2.26.39: Power (SolarZero figures pushed to the relay from the box; Ecotricity ecoZER0 rates) ================= */
@@ -19526,7 +19541,7 @@ function pwrFetch() {
   if (pwrBusy) return; pwrBusy = true;
   fetch(RELAY_URL + '/power', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
     pwrBusy = false;
-    if (d && d.updatedAt && (!PWR || JSON.stringify(d) !== JSON.stringify(PWR))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (/^#(power|compare|powertime)$/.test(location.hash)) render(); }
+    if (d && d.updatedAt && (!PWR || JSON.stringify(d) !== JSON.stringify(PWR))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (/^#(power|compare|powertime|alerts)$/.test(location.hash)) render(); else glBellRedraw(); }
   }).catch(() => { pwrBusy = false; });
 }
 function pwrCost(imp, exp, days) { const c = (+imp || 0) * PWR_RATE.importBlend + PWR_RATE.daily * (days || 1) - (+exp || 0) * PWR_RATE.exportCredit; return Math.max(0, c); }
