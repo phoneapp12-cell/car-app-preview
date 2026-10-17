@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.45';
+const APP_VERSION = '2.26.46';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19114,16 +19114,22 @@ function MyRenoPage() {
 
 // Rewards credit card (Budget). Mum's debt already lives in Loans, so it isn't repeated here. Blank until Shane enters his numbers; nothing invented. Private.
 // Bills marked 'Paid by: Rewards card' still show their due dates, but in each pay fortnight they add to the card instead of being a bank outgoing.
-const debtsSt = () => { S.debts = S.debts && typeof S.debts === 'object' ? S.debts : {}; delete S.debts.mum; S.debts.card = S.debts.card || { limit: '1000', balance: '', rate: '', due: '', min: '', pay: '' }; return S.debts; };
+const debtsSt = () => { S.debts = S.debts && typeof S.debts === 'object' ? S.debts : {}; delete S.debts.mum; S.debts.card = S.debts.card || { limit: '1000', balance: '', available: '', availAt: '', rate: '', due: '', min: '', pay: '' };
+  { const c = S.debts.card; if (c.available == null) { const lim = dnum(c.limit) || 1000, owed = dnum(c.balance); c.available = owed ? String(Math.round(Math.max(0, lim - owed) * 100) / 100) : ''; c.availAt = ''; if (owed) c.availMig = true; } } // 2.26.46: owed → available, once
+  return S.debts; };
+// 2.26.46: Shane enters the AVAILABLE balance from his banking app; owed = limit − available
+const cardHasAvail = c => c && c.available !== '' && c.available != null && isFinite(Number(String(c.available).replace(/[^\d.]/g, '')));
+const cardOwed = c => { const lim = dnum(c.limit) || 1000; return cardHasAvail(c) ? Math.round(Math.max(0, lim - Number(String(c.available).replace(/[^\d.]/g, ''))) * 100) / 100 : dnum(c.balance); };
+const cardAvail = c => { const lim = dnum(c.limit) || 1000; return cardHasAvail(c) ? Math.min(lim, Number(String(c.available).replace(/[^\d.]/g, ''))) : Math.max(0, lim - dnum(c.balance)); };
 const dnum = v => { const n = Number(String(v == null ? '' : v).replace(/[^\d.]/g, '')); return isFinite(n) && n > 0 ? n : 0; };
 function cardCycle(b, bills) { // this pay fortnight: card charges, usage against the limit, and the planned payment (full balance unless he sets an amount)
   const c = debtsSt().card, limit = dnum(c.limit) || 1000, charges = Math.round((bills || []).filter(x => x.card).reduce((n, x) => n + x.amount, 0) * 100) / 100;
   let cur = false; try { const pp = payPeriod(0); cur = !!(pp && b && budgetPeriodFor(b) && budgetPeriodFor(b).start === pp.start); } catch (e) { }
-  const use = Math.round((charges + (cur ? dnum(c.balance) : 0)) * 100) / 100, pay = dnum(c.pay) ? Math.min(dnum(c.pay), use || dnum(c.pay)) : use;
+  const use = Math.round((charges + (cur ? cardOwed(c) : 0)) * 100) / 100, pay = dnum(c.pay) ? Math.min(dnum(c.pay), use || dnum(c.pay)) : use;
   return { charges, use, pay: Math.round(pay * 100) / 100, limit, warn: use >= limit * 0.8 };
 }
 function cardPayoff() {
-  const c = debtsSt().card, B = dnum(c.balance), apr = dnum(c.rate), P = dnum(c.pay) ? dnum(c.pay) * 26 / 12 : dnum(c.min);
+  const c = debtsSt().card, B = cardOwed(c), apr = dnum(c.rate), P = dnum(c.pay) ? dnum(c.pay) * 26 / 12 : dnum(c.min);
   if (!B || !P) return '';
   const r = apr / 1200; if (r && P <= B * r) return 'At this payment the interest is as big as the payment, so the balance won’t go down.';
   const m = r ? Math.ceil(-Math.log(1 - r * B / P) / Math.log(1 + r)) : Math.ceil(B / P); const d2 = new Date(); d2.setMonth(d2.getMonth() + m);
@@ -19132,20 +19138,22 @@ function cardPayoff() {
 }
 function debtsCard() {
   const c = debtsSt().card, blank = '—', v = x => dnum(x) ? money(dnum(x)) : blank;
-  let k = null; try { const pp = payPeriod(0), cb = pp && (S.budgets || []).find(x => budgetPeriodFor(x) && budgetPeriodFor(x).start === pp.start); k = cb ? budgetCalc(cb).cardK : null; if (!k && pp) { const sT = parseD(pp.start), eT = parseD(pp.end), ch = (S.bills || []).filter(x => x && x.paidBy === 'card' && !x.paid).reduce((n, x) => n + billDates(x, sT, eT).length * budgetAmt(x.amount), 0); k = { use: Math.round((ch + dnum(c.balance)) * 100) / 100 }; } } catch (e) { }
-  const onCard = (S.bills || []).filter(x => x && x.paidBy === 'card'), use = k ? k.use : dnum(c.balance), limit = dnum(c.limit) || 1000, pc = Math.min(100, Math.round(use / limit * 100)), po = cardPayoff();
+  let k = null; try { const pp = payPeriod(0), cb = pp && (S.budgets || []).find(x => budgetPeriodFor(x) && budgetPeriodFor(x).start === pp.start); k = cb ? budgetCalc(cb).cardK : null; if (!k && pp) { const sT = parseD(pp.start), eT = parseD(pp.end), ch = (S.bills || []).filter(x => x && x.paidBy === 'card' && !x.paid).reduce((n, x) => n + billDates(x, sT, eT).length * budgetAmt(x.amount), 0); k = { use: Math.round((ch + cardOwed(c)) * 100) / 100, charges: Math.round(ch * 100) / 100 }; } } catch (e) { }
+  const onCard = (S.bills || []).filter(x => x && x.paidBy === 'card'), use = k ? k.use : cardOwed(c), limit = dnum(c.limit) || 1000, pc = Math.min(100, Math.round(use / limit * 100)), po = cardPayoff(), owed = cardOwed(c), avail = cardAvail(c), planned = k && k.charges != null ? k.charges : Math.max(0, Math.round((use - owed) * 100) / 100), opc = Math.min(100, Math.round(owed / limit * 100));
+  const upd = cardHasAvail(c) ? (c.availAt ? 'Last updated ' + fmtW(c.availAt) : 'Worked out from the balance you entered before. Update it from your banking app') : '';
   return `<div class="sec">Rewards credit card</div><div class="card debtcard">
-    <button type="button" class="row" onclick="debtForm('card')"><div class="ic bill">💳</div><div class="tx"><div class="t">Rewards credit card</div><div class="s">Balance ${v(c.balance)} · ${dnum(c.rate) ? dnum(c.rate) + '% p.a.' : 'rate —'} · min ${v(c.min)}${c.due ? ' · due ' + fmtW(c.due) : ''}</div>${!dnum(c.balance) && !dnum(c.rate) && !dnum(c.min) && !c.due ? '<div class="s debtpo">Tap to add the balance, interest rate, due date and minimum payment</div>' : po ? `<div class="s debtpo">${esc(po)}</div>` : ''}</div>${I('right')}</button>
-    <div class="cardlim${use >= limit * 0.8 ? ' warn' : ''}"><div class="cardlimt"><b>${money(use)} of ${money(limit)}</b> this cycle${use >= limit ? ' · at the limit' : use >= limit * 0.8 ? ' · getting close to the limit' : ''}</div><div class="rnbar"><i style="width:${pc}%"></i></div></div>
+    <button type="button" class="row" onclick="debtForm('card')"><div class="ic bill">💳</div><div class="tx"><div class="t">Rewards credit card</div><div class="s">${cardHasAvail(c) ? `Available ${money(avail)} of ${money(limit)} · You owe ${money(owed)}` : 'Available —'} · ${dnum(c.rate) ? dnum(c.rate) + '% p.a.' : 'rate —'} · min ${v(c.min)}${c.due ? ' · due ' + fmtW(c.due) : ''}</div>${upd ? `<div class="s cardupd">${esc(upd)}</div>` : ''}${!cardHasAvail(c) && !dnum(c.balance) && !dnum(c.rate) && !dnum(c.min) && !c.due ? '<div class="s debtpo">Tap to add the available balance from your banking app, interest rate, due date and minimum payment</div>' : po ? `<div class="s debtpo">${esc(po)}</div>` : ''}</div>${I('right')}</button>
+    <div class="pgl cardpg${use >= limit * 0.8 ? ' warn' : ''}"><div class="pglt"><span>Available ${money(avail)} of ${money(limit)} · You owe ${money(owed)}</span><b>${opc}% used</b></div><div class="pgbar"><i style="width:${opc}%"></i></div></div>
+    <div class="cardlim${planned > avail ? ' warn' : ''}"><div class="cardlimt">This pay fortnight: <b>${money(planned)}</b> of bills planned on the card vs <b>${money(avail)}</b> available${planned > avail ? ' · more than is available' : avail - planned < limit * 0.2 ? ' · getting close to the limit' : ''}</div><div class="pgbar"><i style="width:${avail > 0 ? Math.min(100, Math.round(planned / avail * 100)) : 100}%"></i></div></div>
     <div class="debtfn">${onCard.length ? `${plural(onCard.length, 'bill')} on the card: ${onCard.map(x => esc(x.name)).join(', ')}.` : 'No bills on the card yet. Open a bill and choose “Paid by: Rewards card”.'} In each pay fortnight the card is one outgoing: ${dnum(c.pay) ? money(dnum(c.pay)) + ' (your set amount)' : 'the full balance'}.</div>
     <button type="button" class="row" onclick="go('#loans')"><div class="ic bill">👵</div><div class="tx"><div class="t">Mum’s debt</div><div class="s">Kept in Loans, as before</div></div>${I('right')}</button></div>`;
 }
 function debtForm() {
   const c = debtsSt().card;
-  openSheet('Rewards credit card', field('Limit ($)', `<input name="limit" inputmode="decimal" value="${esc(c.limit)}">`) + field('Current balance ($)', `<input name="balance" inputmode="decimal" value="${esc(c.balance)}">`, 'What’s on the card now, apart from the bills you move onto it') +
+  openSheet('Rewards credit card', field('Limit ($)', `<input name="limit" inputmode="decimal" value="${esc(c.limit)}">`) + field('Available balance ($)', `<input name="available" inputmode="decimal" value="${esc(c.available || '')}">`, `As shown in your banking app${c.availAt ? ' · last updated ' + fmtW(c.availAt) : ''}. What you owe is worked out as the limit minus this.`) +
     field('Interest rate (% a year)', `<input name="rate" inputmode="decimal" value="${esc(c.rate)}">`) + field('Statement due date', `<input name="due" type="date" value="${esc(c.due)}">`) +
     field('Minimum payment ($ a month)', `<input name="min" inputmode="decimal" value="${esc(c.min)}">`) + field('Planned payment each pay fortnight ($, optional)', `<input name="pay" inputmode="decimal" value="${esc(c.pay)}">`, 'Leave blank to pay the full balance each fortnight'),
-    async v => { Object.assign(c, { limit: v.limit, balance: v.balance, rate: v.rate, due: v.due, min: v.min, pay: v.pay }); await save(); render(); });
+    async v => { const av = String(v.available || '').trim(); if (av && !isFinite(Number(av.replace(/[$,\s]/g, '')))) return 'Please enter the available balance as a number, like 640.50.'; if (av !== String(c.available || '')) { c.availAt = av ? todayISO() : ''; delete c.availMig; } Object.assign(c, { limit: v.limit, available: av.replace(/[$,\s]/g, ''), rate: v.rate, due: v.due, min: v.min, pay: v.pay }); c.balance = av ? String(cardOwed(c)) : ''; await save(); render(); });
 }
 function Languages() {
   const st = langSt(), s = langStreak(st);
