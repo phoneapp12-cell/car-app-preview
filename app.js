@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.80';
+const APP_VERSION = '2.26.81';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19138,6 +19138,13 @@ function glMode(now = new Date()) {
   const workDone = !off && em != null && min >= em;
   return { night, off, start, end, h, min, dow: a.dow, morning: h < 12, workDone, beforeWork: !off && sm != null && min < sm, atWork: !off && sm != null && min >= sm && (em == null || min < em) };
 }
+// 2.26.81: while he's on a rostered shift, a countdown to finishing ('Free in 6:26', under an hour '45 min'). Roster finish time, else 6pm (Thu 7:15pm).
+function glFree(m) { m = m || glMode(); if (!m || m.off || !m.start || m.workDone) return null; const sm = hmMin(m.start); if (sm == null || m.min < sm) return null;
+  const em = m.end ? hmMin(m.end) : (m.dow === 4 ? 19 * 60 + 15 : 18 * 60); if (em == null || m.min >= em) return null;
+  const left = Math.max(1, Math.ceil(em - m.min)), h = Math.floor(left / 60), mi = left % 60;
+  return { left, end: String(Math.floor(em / 60)).padStart(2, '0') + ':' + String(em % 60).padStart(2, '0'), txt: h ? h + ':' + String(mi).padStart(2, '0') : left + ' min' }; }
+function glFreeTick() { try { const f = glFree(); document.querySelectorAll('[data-glfree]').forEach(el => { if (!f) { el.remove(); return; } el.textContent = el.dataset.glfree === 'card' ? 'Roster · free in ' + f.txt + ' · ' + fmtTime(f.end) : 'Free in ' + f.txt; }); } catch (e) { } }
+setInterval(glFreeTick, 20e3); document.addEventListener('visibilitychange', () => { if (!document.hidden) glFreeTick(); });
 function glHm(hm) { const m = hmMin(hm); if (m == null) return ''; const h = Math.floor(m / 60), mi = m % 60, h12 = h % 12 || 12; return h12 + (mi ? ':' + String(mi).padStart(2, '0') : '') + (h < 12 ? 'am' : 'pm'); }
 function glShift(m) { return m.start ? glHm(m.start) + (m.end ? '–' + glHm(m.end) : '') : ''; }
 function glBellBtn() { let n = 0; try { n = glWarnList().length; } catch (e) { } return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' active' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; }
@@ -19208,7 +19215,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { win
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
-  return `<div class="top glhead"><div class="glhome"><img src="art/i3-house.webp" alt="" width="46" height="46" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></div><div style="min-width:0;flex:1"><h1>Home</h1><div class="sub">${sub}</div>${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div>
+  return `<div class="top glhead"><div class="glhome"><img src="art/i3-house.webp" alt="" width="46" height="46" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></div><div style="min-width:0;flex:1"><h1>Home</h1><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div>
   <div class="iconrow"><button class="iconbtn" aria-label="Summary" onclick="go('#summary')">${I('news')}</button>${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div>`;
 }
 /* ---- Home status ---- */
@@ -19681,7 +19688,7 @@ function glCU() { try { return comingUpList().filter(x => x && glOk(x.name || x.
 function glTabs(m) { return m.off ? [['today', 'Today'], ['todo', 'To-do'], ['garden', 'Garden & Out'], ['bills', 'Bills'], ['calendar', 'Calendar'], ['cars', 'Cars']] : [['today', 'Today'], ['todo', 'To-do'], ['bills', 'Bills'], ['calendar', 'Calendar'], ['cars', 'Cars'], ['garden', 'Garden & Out']]; }
 function glTodayRows(m) {
   const n = m.night ? 2 : m.off ? 4 : 6, rows = [];
-  if (!m.off && !m.night && !m.workDone) rows.push(tabRow('calendar', 'Work ' + esc(glShift(m)), 'Roster' + (m.end ? ' · free from ' + esc(fmtTime(m.end)) : ''), "go('#roster')"));
+  if (!m.off && !m.night && !m.workDone) { const f = glFree(m); rows.push(tabRow('calendar', 'Work ' + esc(glShift(m)), f ? `<span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span>` : 'Roster' + (m.end ? ' · free from ' + esc(fmtTime(m.end)) : ''), "go('#roster')")); }
   const L = glCU(), k = Math.max(0, n - rows.length);
   L.slice(0, k).forEach(x => { try { rows.push(cuRowHtml(x)); } catch (e) { } });
   return { html: rows.join(''), more: Math.max(0, L.length - k) };
