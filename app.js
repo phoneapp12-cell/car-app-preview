@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.78';
+const APP_VERSION = '2.26.79';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4513,12 +4513,22 @@ function wofForm(id) {
     }, 'Save');
   wireSeg('months', v => { $('#sf input[name=wof]').value = addMonths(todayISO(), +v); });
 }
+/* 2.26.79: NZ rego (vehicle licence) prices, private passenger vehicles, for licences starting on or after 1 July 2026.
+   NZTA online prices incl. licence fee, ACC levy, the online admin fee ($8.66) and GST. At an agent the admin fee is $11.99, so $3.33 more.
+   Hybrids that run on petrol (incl. plug-in petrol hybrids) pay petrol fees. Plates checked on Rightcar 18 Oct 2026: PNU312 Haval H6 (petrol hybrid),
+   MUL27 Honda Fit (petrol hybrid), KBZ234 Honda Fit (petrol), each $181.45 for 12 months. Update this table when NZTA changes the fees. */
+const REGO_FEES = { checked: '2026-10-18', checkedTxt: '18 Oct 2026', from: '2026-07-01', src: 'https://www.nzta.govt.nz/vehicles/licensing-rego/vehicle-fees/licensing-fees/', plateSrc: 'https://rightcar.govt.nz/rego/', agentExtra: 3.33,
+  petrol: { 3: 51.85, 6: 95.06, 12: 181.45 }, diesel: { 3: 68.69, 6: 128.74, 12: 248.83 },
+  plates: { PNU312: 'petrol', MUL27: 'petrol', KBZ234: 'petrol' } };
+function regoClass(c) { const p = String((c && c.plate) || '').replace(/\s/g, '').toUpperCase(); if (REGO_FEES.plates[p]) return REGO_FEES.plates[p]; const f = String((c && (c.fuel || c.fuelType)) || ''); return /diesel|electric|\bev\b/i.test(f) && !/petrol/i.test(f) ? 'diesel' : 'petrol'; }
+function regoFees(c) { return REGO_FEES[regoClass(c)] || REGO_FEES.petrol; }
+function regoFeeNote() { return `Prices from <a href="${REGO_FEES.src}" target="_blank" rel="noopener">NZTA</a>, checked ${REGO_FEES.checkedTxt} · online price, $${REGO_FEES.agentExtra.toFixed(2)} more at an agent`; }
 function regoForm(id) {
   const c = getCar(id);
   const base = c.rego || todayISO();
   const calc = n => addMonths(base, +n);
   openSheet('Renewed rego', `<p class="muted" style="margin:-4px 0 12px">How long did you renew it for? The new rego runs on from the old expiry date${c.rego ? ` (${fmt(c.rego)})` : ''}.</p>` +
-    `<div class="field"><span>Renewed for</span>${segHtml('months', [[3, '3 months'], [6, '6 months'], [12, '12 months']], 12)}</div>` +
+    `<div class="field"><span>Renewed for</span>${(() => { const F = regoFees(c); return segHtml('months', [3, 6, 12].map(m => [m, `${m} months · ${money(F[m])}`]), 12); })()}</div><p class="muted regonote" style="margin:-4px 2px 10px;font-size:12.5px">${regoFeeNote()}</p>` +
     field('New rego expiry', inp('rego', calc(12), 'type="date" required'), 'Or pick the date shown on your new rego.'),
     async v => {
       if (!parseD(v.rego)) return 'Please choose the new expiry date.';
@@ -4803,10 +4813,11 @@ async function markPaid(id) {
     b.paidDues = b.paidDues.slice(-30);
   } catch (e) {}
   b.lastPaid = todayISO();
+  let regoMsg = ''; try { const mm = /^car\|([^|]+)\|rego$/.exec(b.linkType || ''); if (mm && b.regoMonths) { const c = getCar(mm[1]); if (c && c.rego && c.rego <= b.due) { c.rego = addMonths(c.rego, +b.regoMonths); regoMsg = ` ${c.name} rego now runs to ${fmt(c.rego)}.`; } } } catch (e) { } // 2.26.79
   const n = nextDue(b);
   if (n) b.due = n; else { b.paid = true; b.paidOn = todayISO(); }
   await save(); render();
-  toast(n ? `${b.name} paid. Next due ${fmt(n)}.` : `${b.name} marked paid.`, 'Undo', undoTo(s));
+  toast((n ? `${b.name} paid. Next due ${fmt(n)}.` : `${b.name} marked paid.`) + regoMsg, 'Undo', undoTo(s));
 }
 async function unpay(id) { const b = S.bills.find(x => x.id === id); b.paid = false; if (Array.isArray(b.paidDues)) b.paidDues = b.paidDues.filter(x => x && x.due !== b.due); delete b.paidOn; await save(); render(); }
 function billForm(id, pre) {
@@ -4833,7 +4844,7 @@ function billForm(id, pre) {
       upd.lastDue = en && v.repeat !== 'none' ? billLastDue(Object.assign({}, b, upd), Math.round(+en)) : '';
       billSetFrom(id || null, upd, v.from);
       if (id) { if (dueChanged) upd.paid = false; Object.assign(b, upd); }
-      else { const nb = Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? { link: pre.link, linkType: pre.linkType } : {}); S.bills.push(nb); if (upd._acct) { S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[nb.id] = upd._acct; } delete nb._acct; }
+      else { const nb = Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? Object.assign({ link: pre.link, linkType: pre.linkType }, pre.regoMonths ? { regoMonths: pre.regoMonths } : {}) : {}); S.bills.push(nb); if (upd._acct) { S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[nb.id] = upd._acct; } delete nb._acct; }
       if (id) delete b._acct;
       await save(); render(); toast(id ? 'Bill updated.' : 'Bill added.');
     }, id ? 'Save' : 'Add bill',
@@ -21054,6 +21065,7 @@ function abItems() {
     if (gone.has(key) || linked.has(key)) return;
     AB_REG[key] = Object.assign({ repeat: 'none', paidBy: '', amount: abLastAmt(type), link: key, linkType: type }, pre);
     out.push({ key, days: d, urgent, html: `<div class="row glnew abrow" data-ab="${esc(key)}"><div class="ic bill">${icon}</div><div class="tx"><div class="t">Add a bill to your Budget?</div><div class="s">${title} · ${sub}</div>` +
+      (pre && pre.rego ? (() => { const F = regoFees(getCar(pre.rego.car)); return `<div class="chips abrego">${[3, 6, 12].map(m => `<button type="button" class="chip" onclick="event.stopPropagation();if(!glSwipe.moved)abRego('${esc(key)}',${m})">${m} months ${money(F[m])}</button>`).join('')}</div><div class="s abregonote">${regoFeeNote()}</div>`; })() : '') +
       `<div class="abbtns"><button type="button" class="btn primary small" onclick="event.stopPropagation();if(!glSwipe.moved)abAdd('${esc(key)}')">Add bill</button><button type="button" class="btn small" onclick="event.stopPropagation();if(!glSwipe.moved)abNotNow('${esc(key)}',this.closest('.glnew'))">Not now</button></div></div></div>` });
   };
   try {
@@ -21062,7 +21074,7 @@ function abItems() {
       const e = carProg(c, part), rc = part === 'wof' && e ? carRecheck(e) : '', target = rc || due, d = daysLeft(target);
       if (!(d <= 28 || (part === 'wof' && e))) return;
       const nm = `${L} – ${c.name}${c.plate ? ' (' + c.plate + ')' : ''}`;
-      add(`car|${c.id}|${part}|${target}`, `car|${c.id}|${part}`, d, d < 0 || (!!rc && d <= 7), esc(nm), (rc ? 'Recheck by ' : 'Due ') + fmtW(target) + (d < 0 ? ` · ${-d} day${d === -1 ? '' : 's'} overdue` : ''), { name: nm, due: target }, '🚗');
+      add(`car|${c.id}|${part}|${target}`, `car|${c.id}|${part}`, d, d < 0 || (!!rc && d <= 7), esc(nm), (rc ? 'Recheck by ' : 'Due ') + fmtW(target) + (d < 0 ? ` · ${-d} day${d === -1 ? '' : 's'} overdue` : ''), Object.assign({ name: nm, due: target }, part === 'rego' ? { rego: { car: c.id, exp: target } } : {}), '🚗');
     }));
   } catch (e) { }
   try {
@@ -21081,6 +21093,9 @@ function abItems() {
   } catch (e) { }
   return out.sort((x, y) => x.days - y.days);
 }
+// 2.26.79: a rego price chip: the bill is the NZTA price, due on the rego expiry; ticking it paid moves the car's rego on by that many months
+function abRego(key, m) { if (!AB_REG[key]) abItems(); const p = AB_REG[key]; if (!p || !p.rego) return; const c = getCar(p.rego.car), F = regoFees(c), exp = p.rego.exp, nx = addMonths(exp, m);
+  billForm(null, Object.assign({}, p, { amount: F[m], due: exp, repeat: 'none', regoMonths: m, name: p.name + ' · ' + m + ' months', notes: `NZTA online price for ${m} months (checked ${REGO_FEES.checkedTxt}). Pay by ${fmt(exp)}; the new rego runs to ${fmt(nx)}.` })); }
 function abAdd(key) { const pre = AB_REG[key]; if (!pre) { abItems(); } const p = AB_REG[key]; if (p) billForm(null, p); }
 /* one-time: Sarah's car (PNU312) WOF is in progress, failed inspection Fri 16 Oct 2026 → recheck by Fri 13 Nov 2026 (editable) */
 async function pnu312Mig() {
