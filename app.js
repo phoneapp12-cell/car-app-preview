@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.36';
+const APP_VERSION = '2.26.37';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4796,6 +4796,7 @@ function billForm(id) {
     field('What’s the bill?', inp('name', b.name, 'placeholder="e.g. Power, phone, insurance" required maxlength="50"')) +
     `<div class="two">${field('Amount ($)', inp('amount', b.amount === '' ? '' : Number(b.amount).toFixed(2), 'inputmode="decimal" placeholder="0.00"'))}${field('Next due', inp('due', b.due, 'type="date" required'))}</div>` +
     field('Repeats', sel('repeat', Object.entries(REPEATS).map(([k, v]) => [k, k === 'none' ? 'Doesn’t repeat' : v]), b.repeat || 'none')) +
+    field('Paid by', sel('paidBy', [['', 'Bank account'], ['card', 'Rewards card']], b.paidBy || ''), 'On the card: still shows when it’s due, and adds to the card in your budget') +
     field('Notes', area('notes', b.notes, 'e.g. account number, paid by direct debit')) +
     (id && billInvoice(b) ? `<p class="muted" id="billinv" style="margin:4px 2px 0">${billInvoice(b).label ? esc(billInvoice(b).label) : 'Invoice ' + esc(billInvoice(b).no)} from ${esc(billInvoice(b).from || 'the email')}${billInvoice(b).amount != null ? ', ' + money(billInvoice(b).amount) : ''}${billInvoice(b).invDue ? ', due ' + esc(billInvoice(b).invDue) : ''}. Taken from the email in Outlook.</p>` : ''),
     async v => {
@@ -4804,7 +4805,7 @@ function billForm(id) {
       const amt = v.amount === '' ? 0 : Number(String(v.amount).replace(/[$,\s]/g, ''));
       if (isNaN(amt) || amt < 0) return 'Please type the amount as a number, like 65.50.';
       const dueChanged = !id || v.due !== b.due;
-      const upd = { name: v.name, amount: Math.round(amt * 100) / 100, due: v.due, repeat: v.repeat, notes: v.notes };
+      const upd = { name: v.name, amount: Math.round(amt * 100) / 100, due: v.due, repeat: v.repeat, notes: v.notes, paidBy: v.paidBy === 'card' ? 'card' : '' };
       if (dueChanged) upd.anchor = new Date(parseD(v.due)).getUTCDate();
       if (id) { if (dueChanged) upd.paid = false; Object.assign(b, upd); }
       else S.bills.push(Object.assign({ id: uid('bill'), paid: false }, upd));
@@ -9439,7 +9440,7 @@ function budgetBillRows(b) {
   if (sT == null || eT == null) return [];
   const items = [];
   (S.bills || []).filter(x => x && !x.paid && budgetAmt(x.amount) > 0 && !/\bmortgage\b/i.test(String(x.name || ''))).forEach(bill => {
-    billDates(bill, sT, eT).forEach(d => items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: budgetAmt(bill.amount), due: d, late: 0 }));
+    billDates(bill, sT, eT).forEach(d => items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: budgetAmt(bill.amount), due: d, late: 0, card: bill.paidBy === 'card' }));
   });
   // Same as Bills for the current pay: include overdue still unpaid when this is the current fortnight.
   const cur = payPeriod(0);
@@ -9447,7 +9448,7 @@ function budgetBillRows(b) {
     (S.bills || []).filter(x => x && !x.paid && budgetAmt(x.amount) > 0 && !/\bmortgage\b/i.test(String(x.name || '')) && parseD(x.due) != null && parseD(x.due) < sT)
       .forEach(bill => {
         if (items.some(it => it.id === bill.id && it.due === bill.due)) return;
-        items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: budgetAmt(bill.amount), due: bill.due, late: 1 });
+        items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: budgetAmt(bill.amount), due: bill.due, late: 1, card: bill.paidBy === 'card' });
       });
   }
   // 2.22.67: bills already paid for this fortnight stay on the budget, shown as paid
@@ -9460,12 +9461,13 @@ function budgetBillRows(b) {
       if (!(amt > 0)) return;
       const i = items.findIndex(it => it.id === bill.id && it.due === p.due);
       if (i >= 0) items.splice(i, 1);
-      items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: amt, due: p.due, late: 0, paid: 1, paidOn: p.on || p.due });
+      items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60), amount: amt, due: p.due, late: 0, paid: 1, paidOn: p.on || p.due, card: bill.paidBy === 'card' });
     });
   });
   loanPlanInRange(sT, eT).forEach(x => {
     items.push({ id: 'loan-' + x.l.id + '-' + x.d, name: 'Loan · ' + x.l.from, amount: x.amount, due: x.d, late: 0, loanId: x.l.id });
   });
+  items.forEach(it => { if (it.card) it.name += ' · on Rewards card'; });
   items.sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : a.name.localeCompare(b.name));
   return items;
 }
@@ -9473,12 +9475,12 @@ function budgetCalc(b) {
   const mortgages = budgetMortEff(b);
   const mort = Math.round(mortgages.reduce((n, x) => n + x.eff, 0) * 100) / 100, carried = Math.round(mortgages.filter(x => x.carried).reduce((n, x) => n + x.eff, 0) * 100) / 100;
   const bills = budgetBillRows(b);
-  const billTot = Math.round(bills.reduce((n, x) => n + x.amount, 0) * 100) / 100;
+  const billTot = Math.round(bills.filter(x => !x.card).reduce((n, x) => n + x.amount, 0) * 100) / 100; // 2.26.36: bills on the Rewards card count in the card payment instead
   const spend = Math.round((b.lines || []).reduce((n, x) => n + x.amount, 0) * 100) / 100;
-  const debt = (() => { try { return debtsPerFortnight().total; } catch (e) { return 0; } })(); // 2.26.36: Mum's debt + credit card, per pay fortnight
+  const cardK = (() => { try { return cardCycle(b, bills); } catch (e) { return { use: 0, pay: 0 }; } })(), debt = cardK.pay; // 2.26.36: one outgoing for the Rewards card
   const out = Math.round((mort + billTot + spend + debt) * 100) / 100;
   const pay = budgetAmtOr0(b.pay);
-  return { pay, mort, carried, billTot, spend, debt, out, left: Math.round((pay - out) * 100) / 100, mortgages, bills };
+  return { pay, mort, carried, billTot, spend, debt, cardK, out, left: Math.round((pay - out) * 100) / 100, mortgages, bills };
 }
 function budgetCard(b) {
   const k = budgetCalc(b);
@@ -9494,7 +9496,7 @@ function budgetCard(b) {
       <div style="flex:1;min-width:0"><div class="carname">${esc(b.name)}</div><div class="carmodel">Pay fortnight</div></div>
       <button type="button" class="iconbtn" aria-label="Edit ${esc(b.name)}" onclick="budgetForm(${jsArg(b.id)})">${I('pen')}</button></div>
     <div class="lowed"><small>${k.left < 0 ? 'Over budget' : 'Left after bills'}</small><b class="lamt">${k.left < 0 ? 'Over by ' + money(-k.left) : money(k.left)}</b></div>
-    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span>${k.debt ? `<span>Debts <b>${money(k.debt)}</b></span>` : ''}<span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b>${k.carried ? `<small class="carrytag">${money(k.carried)} carried</small>` : ''}</span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
+    <div class="lstats"><span>Pay <b>${k.pay ? money(k.pay) : '—'}</b></span>${k.debt || k.cardK.use ? `<span>Rewards card <b>${money(k.debt)}</b>${k.cardK.use ? `<small class="carrytag${k.cardK.warn ? ' cardwarn' : ''}">${money(k.cardK.use)} of ${money(k.cardK.limit)}</small>` : ''}</span>` : ''}<span>Mortgages <b>${k.mort ? money(k.mort) : '—'}</b>${k.carried ? `<small class="carrytag">${money(k.carried)} carried</small>` : ''}</span><span>Bills <b>${k.billTot ? money(k.billTot) : '—'}</b></span><span>Other <b>${k.spend ? money(k.spend) : '—'}</b></span></div>
     <div class="sec" style="margin-top:12px">This fortnight's pay</div>
     <div class="list"><div class="row"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wages</div><div class="s">Changes each pay · tap edit to update</div></div><b>${k.pay ? money(k.pay) : '—'}</b></div></div>
     <div class="sec">Three mortgages</div>
@@ -19098,39 +19100,41 @@ function MyRenoPage() {
     (done.length ? `<div class="sec">Done</div><div class="list">${done.map(row).join('')}</div>` : '');
 }
 
-// Debts (Budget): Mum's debt and the Rewards credit card. Blank until Shane enters his numbers; nothing invented. Private, no sharing.
-const debtsSt = () => { S.debts = S.debts && typeof S.debts === 'object' ? S.debts : {}; S.debts.mum = S.debts.mum || { owed: '', repay: '', freq: 'fortnightly', notes: '' }; S.debts.card = S.debts.card || { limit: '1000', balance: '', rate: '', due: '', min: '', pay: '' }; return S.debts; };
+// Rewards credit card (Budget). Mum's debt already lives in Loans, so it isn't repeated here. Blank until Shane enters his numbers; nothing invented. Private.
+// Bills marked 'Paid by: Rewards card' still show their due dates, but in each pay fortnight they add to the card instead of being a bank outgoing.
+const debtsSt = () => { S.debts = S.debts && typeof S.debts === 'object' ? S.debts : {}; delete S.debts.mum; S.debts.card = S.debts.card || { limit: '1000', balance: '', rate: '', due: '', min: '', pay: '' }; return S.debts; };
 const dnum = v => { const n = Number(String(v == null ? '' : v).replace(/[^\d.]/g, '')); return isFinite(n) && n > 0 ? n : 0; };
-const FREQ_PER_FN = { weekly: 2, fortnightly: 1, monthly: 12 / 26 };
-function debtsPerFortnight() { const d = debtsSt(); const mum = dnum(d.mum.repay) * (FREQ_PER_FN[d.mum.freq] || 1); const cardM = dnum(d.card.pay) || dnum(d.card.min); return { mum: Math.round(mum * 100) / 100, card: Math.round(cardM * 12 / 26 * 100) / 100, total: Math.round((mum + cardM * 12 / 26) * 100) / 100 }; }
-function addPeriods(n, freq) { const d = new Date(); if (freq === 'monthly') d.setMonth(d.getMonth() + n); else d.setDate(d.getDate() + n * (freq === 'weekly' ? 7 : 14)); return todayISO(d); }
-function debtPayoff() {
-  const d = debtsSt(), out = {};
-  const owed = dnum(d.mum.owed), rep = dnum(d.mum.repay);
-  if (owed && rep) { const n = Math.ceil(owed / rep); out.mum = `About ${n} ${d.mum.freq === 'weekly' ? 'weeks' : d.mum.freq === 'monthly' ? 'months' : 'fortnights'} – paid off around ${fmtW(addPeriods(n, d.mum.freq))}`; }
-  const B = dnum(d.card.balance), apr = dnum(d.card.rate), P = dnum(d.card.pay) || dnum(d.card.min);
-  if (B && P) { const r = apr / 1200; if (r && P <= B * r) out.card = 'At this payment the interest is as big as the payment, so the balance won’t go down.'; else { const m = r ? Math.ceil(-Math.log(1 - r * B / P) / Math.log(1 + r)) : Math.ceil(B / P); const d2 = new Date(); d2.setMonth(d2.getMonth() + m); out.card = `About ${m} month${m === 1 ? '' : 's'} – clear around ${fmtW(todayISO(d2))}${r ? ` · about ${money(Math.max(0, m * P - B))} interest` : ''}`; } }
-  return out;
+function cardCycle(b, bills) { // this pay fortnight: card charges, usage against the limit, and the planned payment (full balance unless he sets an amount)
+  const c = debtsSt().card, limit = dnum(c.limit) || 1000, charges = Math.round((bills || []).filter(x => x.card).reduce((n, x) => n + x.amount, 0) * 100) / 100;
+  let cur = false; try { const pp = payPeriod(0); cur = !!(pp && b && budgetPeriodFor(b) && budgetPeriodFor(b).start === pp.start); } catch (e) { }
+  const use = Math.round((charges + (cur ? dnum(c.balance) : 0)) * 100) / 100, pay = dnum(c.pay) ? Math.min(dnum(c.pay), use || dnum(c.pay)) : use;
+  return { charges, use, pay: Math.round(pay * 100) / 100, limit, warn: use >= limit * 0.8 };
+}
+function cardPayoff() {
+  const c = debtsSt().card, B = dnum(c.balance), apr = dnum(c.rate), P = dnum(c.pay) ? dnum(c.pay) * 26 / 12 : dnum(c.min);
+  if (!B || !P) return '';
+  const r = apr / 1200; if (r && P <= B * r) return 'At this payment the interest is as big as the payment, so the balance won’t go down.';
+  const m = r ? Math.ceil(-Math.log(1 - r * B / P) / Math.log(1 + r)) : Math.ceil(B / P); const d2 = new Date(); d2.setMonth(d2.getMonth() + m);
+  const txt = m <= 1 ? 'cleared with the next payment' : `about ${m} months to clear – around ${fmtW(todayISO(d2))}${r ? `, about ${money(Math.max(0, m * P - B))} interest` : ''}`;
+  return dnum(c.pay) ? 'At your planned payment: ' + txt + '.' : 'Plan: pay the full balance each fortnight. At the minimum only: ' + txt + '.';
 }
 function debtsCard() {
-  const d = debtsSt(), f = debtsPerFortnight(), po = debtPayoff(), blank = '<span class="muted">—</span>';
-  const v = x => dnum(x) ? money(dnum(x)) : blank;
-  return `<div class="sec">Debts</div><div class="card debtcard">
-    <button type="button" class="row" onclick="debtForm('mum')"><div class="ic bill">👵</div><div class="tx"><div class="t">Mum’s debt</div><div class="s">Owed ${v(d.mum.owed)} · repay ${v(d.mum.repay)} ${esc(d.mum.freq)}${d.mum.notes ? ' · ' + esc(d.mum.notes) : ''}</div>${po.mum ? `<div class="s debtpo">${esc(po.mum)}</div>` : (!dnum(d.mum.owed) || !dnum(d.mum.repay) ? '<div class="s debtpo">Tap to add the amount owed and repayment</div>' : '')}</div>${I('right')}</button>
-    <button type="button" class="row" onclick="debtForm('card')"><div class="ic bill">💳</div><div class="tx"><div class="t">Rewards credit card</div><div class="s">Balance ${v(d.card.balance)} of ${v(d.card.limit)} · ${dnum(d.card.rate) ? dnum(d.card.rate) + '% p.a.' : 'rate —'} · min ${v(d.card.min)}${d.card.due ? ' · due ' + fmtW(d.card.due) : ''}</div>${po.card ? `<div class="s debtpo">${esc(po.card)}</div>` : '<div class="s debtpo">Tap to add the balance, interest rate, due date and minimum payment</div>'}</div>${I('right')}</button>
-    <div class="debtfn">In each pay fortnight: ${f.total ? `<b>${money(f.total)}</b> (Mum ${money(f.mum)} · card ${money(f.card)})` : 'nothing yet'}</div></div>`;
+  const c = debtsSt().card, blank = '—', v = x => dnum(x) ? money(dnum(x)) : blank;
+  let k = null; try { const pp = payPeriod(0), cb = pp && (S.budgets || []).find(x => budgetPeriodFor(x) && budgetPeriodFor(x).start === pp.start); k = cb ? budgetCalc(cb).cardK : null; if (!k && pp) { const sT = parseD(pp.start), eT = parseD(pp.end), ch = (S.bills || []).filter(x => x && x.paidBy === 'card' && !x.paid).reduce((n, x) => n + billDates(x, sT, eT).length * budgetAmt(x.amount), 0); k = { use: Math.round((ch + dnum(c.balance)) * 100) / 100 }; } } catch (e) { }
+  const onCard = (S.bills || []).filter(x => x && x.paidBy === 'card'), use = k ? k.use : dnum(c.balance), limit = dnum(c.limit) || 1000, pc = Math.min(100, Math.round(use / limit * 100)), po = cardPayoff();
+  return `<div class="sec">Rewards credit card</div><div class="card debtcard">
+    <button type="button" class="row" onclick="debtForm('card')"><div class="ic bill">💳</div><div class="tx"><div class="t">Rewards credit card</div><div class="s">Balance ${v(c.balance)} · ${dnum(c.rate) ? dnum(c.rate) + '% p.a.' : 'rate —'} · min ${v(c.min)}${c.due ? ' · due ' + fmtW(c.due) : ''}</div>${!dnum(c.balance) && !dnum(c.rate) && !dnum(c.min) && !c.due ? '<div class="s debtpo">Tap to add the balance, interest rate, due date and minimum payment</div>' : po ? `<div class="s debtpo">${esc(po)}</div>` : ''}</div>${I('right')}</button>
+    <div class="cardlim${use >= limit * 0.8 ? ' warn' : ''}"><div class="cardlimt"><b>${money(use)} of ${money(limit)}</b> this cycle${use >= limit ? ' · at the limit' : use >= limit * 0.8 ? ' · getting close to the limit' : ''}</div><div class="rnbar"><i style="width:${pc}%"></i></div></div>
+    <div class="debtfn">${onCard.length ? `${plural(onCard.length, 'bill')} on the card: ${onCard.map(x => esc(x.name)).join(', ')}.` : 'No bills on the card yet. Open a bill and choose “Paid by: Rewards card”.'} In each pay fortnight the card is one outgoing: ${dnum(c.pay) ? money(dnum(c.pay)) + ' (your set amount)' : 'the full balance'}.</div>
+    <button type="button" class="row" onclick="go('#loans')"><div class="ic bill">👵</div><div class="tx"><div class="t">Mum’s debt</div><div class="s">Kept in Loans, as before</div></div>${I('right')}</button></div>`;
 }
-function debtForm(k) {
-  const d = debtsSt();
-  if (k === 'mum') openSheet('Mum’s debt', field('Amount owed ($)', `<input name="owed" inputmode="decimal" value="${esc(d.mum.owed)}">`) + field('Repayment ($)', `<input name="repay" inputmode="decimal" value="${esc(d.mum.repay)}">`) +
-    field('How often', `<select name="freq">${['weekly', 'fortnightly', 'monthly'].map(x => `<option ${d.mum.freq === x ? 'selected' : ''}>${x}</option>`).join('')}</select>`) + field('Notes (optional)', `<input name="notes" maxlength="120" value="${esc(d.mum.notes)}">`),
-    async v => { Object.assign(d.mum, { owed: v.owed, repay: v.repay, freq: v.freq, notes: v.notes }); await save(); render(); });
-  else openSheet('Rewards credit card', field('Limit ($)', `<input name="limit" inputmode="decimal" value="${esc(d.card.limit)}">`) + field('Current balance ($)', `<input name="balance" inputmode="decimal" value="${esc(d.card.balance)}">`) +
-    field('Interest rate (% a year)', `<input name="rate" inputmode="decimal" value="${esc(d.card.rate)}">`) + field('Statement due date', `<input name="due" type="date" value="${esc(d.card.due)}">`) +
-    field('Minimum payment ($ a month)', `<input name="min" inputmode="decimal" value="${esc(d.card.min)}">`) + field('What you’ll pay ($ a month, optional)', `<input name="pay" inputmode="decimal" value="${esc(d.card.pay)}">`, 'Leave blank to use the minimum'),
-    async v => { Object.assign(d.card, { limit: v.limit, balance: v.balance, rate: v.rate, due: v.due, min: v.min, pay: v.pay }); await save(); render(); });
+function debtForm() {
+  const c = debtsSt().card;
+  openSheet('Rewards credit card', field('Limit ($)', `<input name="limit" inputmode="decimal" value="${esc(c.limit)}">`) + field('Current balance ($)', `<input name="balance" inputmode="decimal" value="${esc(c.balance)}">`, 'What’s on the card now, apart from the bills you move onto it') +
+    field('Interest rate (% a year)', `<input name="rate" inputmode="decimal" value="${esc(c.rate)}">`) + field('Statement due date', `<input name="due" type="date" value="${esc(c.due)}">`) +
+    field('Minimum payment ($ a month)', `<input name="min" inputmode="decimal" value="${esc(c.min)}">`) + field('Planned payment each pay fortnight ($, optional)', `<input name="pay" inputmode="decimal" value="${esc(c.pay)}">`, 'Leave blank to pay the full balance each fortnight'),
+    async v => { Object.assign(c, { limit: v.limit, balance: v.balance, rate: v.rate, due: v.due, min: v.min, pay: v.pay }); await save(); render(); });
 }
-
 function Languages() {
   const st = langSt(), s = langStreak(st);
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Languages', 'A new te reo Māori and French word each day') +
