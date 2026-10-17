@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.54';
+const APP_VERSION = '2.26.55';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8305,7 +8305,7 @@ function attRow(o) {
   const ico = `<div class="ic ${o.ic}"${o.icStyle ? ` style="${o.icStyle}"` : ''}>${I(o.icon)}</div>`;
   const tx = `<div class="tx"><div class="t">${o.title}</div><div class="s">${o.sub}</div></div>`;
   const attrs = `class="row att ${o.cls || ''}" data-kind="${o.kind}"${o.date ? ` data-date="${o.date}"` : ''}`;
-  if (o.complete) return `<div ${attrs}>${o.complete}<button type="button" class="tapzone" onclick="${o.go}">${ico}${tx}${o.right || ''}</button></div>`;
+  if (o.complete) return `<div ${o.after ? attrs.replace('class="row att', 'class="row att haspack') : attrs}>${o.complete}<button type="button" class="tapzone" onclick="${o.go}">${ico}${tx}${o.right || ''}</button>${o.after || ''}</div>`;
   return `<button ${attrs} onclick="${o.go}">${ico}${tx}${o.right || I('right')}</button>`;
 }
 // A feeding job, not a spray, prune or planting reminder. Matched on the built-in job, not a new date.
@@ -8318,7 +8318,7 @@ const ATT_SOURCES = {
   mine: T => [0, 1].flatMap(d => mineItems(T + d * DAY, T + d * DAY, true).filter(e => !e.done).map(e => ({ days: d, rank: 1, sort: e.hm || '', kind: 'mine', name: `${attWhen(d)}: ${e.title}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
     html: attRow({ wx: 1, kind: 'mine', cls: 'mineatt', date: e.date, go: `calOpenDay(${T + d * DAY})`, ic: 'mine', icon: 'repeat', title: `${attWhen(d)}: ${esc(e.title)}${e.hm ? ' ' + fmtTime(e.hm) : ''}`,
       sub: `My event · ${fmtW(e.date)}${e.hm ? '' : ' · All day'}${e.notes.includes('Moved from') ? ' · ' + esc(e.notes.split(' · ').find(x => x.startsWith('Moved from'))) : ''}`,
-      complete: `<button type="button" class="tick" aria-label="Mark complete: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})"><span>${I('check')}</span></button>` }) }))),
+      complete: `<button type="button" class="tick" aria-label="Mark complete: ${esc(e.title)}" onclick="completeMine(${jsArg(e.id)},${jsArg(e.orig)})"><span>${I('check')}</span></button>`, after: (() => { try { return packLine(e.id, e.date); } catch (er) { return ''; } })() }) }))),
   // Appointments, including What's On events you added, today and the next 7 days
   appt: T => S.appts.filter(a => { const d = daysLeft(a.date); return d >= 0 && d <= ATT_WEEK && !(a.from === 'sarah' && a.done); }).map(a => { const d = daysLeft(a.date); return { days: d, rank: 1, sort: a.time || '', kind: 'appt', name: `${attDay(d, a.date)}: ${a.title}${a.time ? ' ' + fmtTime(a.time) : ''}`,
     html: attRow({ wx: 1, kind: 'appt', date: a.date, go: a.from === 'sarah' ? `apptForm('${a.id}')` : `calOpenDay(${parseD(a.date)})`, ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: `${a.from === 'sarah' ? sarahBadge({ from: 'sarah' }) : ''}${attDay(d, a.date)}: ${esc(a.title)}${a.time ? ' ' + fmtTime(a.time) : ''}`,
@@ -8386,6 +8386,7 @@ function mineForm(id, date) {
     `<p class="muted rephint" id="rephint"></p>` +
     `<div id="untilbox">${field('End date (optional)', inp('until', ev.until, 'type="date"'), 'Leave blank to keep repeating.')}</div>` +
     `<div class="two">${field('Reminder', sel('remind', [['off', 'Off'], ['day', 'On the day'], ['before', 'The day before']], ev.remind))}<div id="rtimebox">${field('At', sel('remindAt', REMIND_TIMES, ev.remindAt || (ev.remind === 'before' ? '19:00' : '07:00')))}</div></div>` +
+    (() => { const c = packCfg(ev) || { mode: 'off', at: '21:00' }; return `<div class="two">${field('Pack-the-car reminder', sel('packMode', [['off', 'Off'], ['eve', 'The night before'], ['morn', 'The morning of']], c.mode))}<div id="packtimebox">${field('At', sel('packAt', PACK_TIMES, c.at))}</div></div>`; })() +
     field('Notes', area('notes', ev.notes, 'Optional')) +
     (id && mineCompleteLabel(ev) ? `<div class="btns" style="margin-top:4px"><button type="button" class="btn" onclick="completeMine(${jsArg(id)},${jsArg((!ev.repeat || ev.repeat === 'none') ? ev.start : mineNextOrig(ev))})">${I('check')} ${esc(mineCompleteLabel(ev))}</button></div>` : '') +
     (changed.length ? `<div class="field"><span>Changed dates</span><div class="list changed">${changed.map(([d, k]) => `<div class="srow" data-changed="${d}"><div class="tx"><div class="t">${fmtW(d)}</div><div class="s">${k === 'skip' ? 'Skipped' : 'Moved to ' + fmtW(ev.moves[d])}</div></div><button type="button" class="btn small" onclick="putBack('${id}','${d}',this)">Put back</button></div>`).join('')}</div></div>` : ''),
@@ -8396,9 +8397,9 @@ function mineForm(id, date) {
       if (v.when === 'time' && !/^\d{2}:\d{2}$/.test(time)) return 'Please choose a time, or pick “All day”.';
       const until = v.repeat === 'none' ? '' : v.until;
       if (until && (!parseD(until) || until < v.start)) return 'The end date can’t be before the start date.';
-      const s = snap(), upd = { title: v.title, start: v.start, time, repeat: v.repeat, until, notes: v.notes, remind: v.remind, remindAt: v.remind === 'off' ? '' : v.remindAt };
+      const s = snap(), upd = { title: v.title, start: v.start, time, repeat: v.repeat, until, notes: v.notes, remind: v.remind, remindAt: v.remind === 'off' ? '' : v.remindAt, packCar: { mode: ['eve', 'morn'].includes(v.packMode) ? v.packMode : 'off', at: /^\d{2}:\d{2}$/.test(v.packAt || '') ? v.packAt : '21:00' } };
       if (id) Object.assign(ev, upd); else S.myEvents.push(Object.assign({ id: uid('myev'), skips: [], moves: {}, done: false, doneDates: [] }, upd));
-      await save(); render();
+      await save(); render(); try { scheduleReminders(); } catch (e) { }
       toast(id ? 'Event updated.' : `${v.title} added${v.repeat === 'none' ? '' : ' · ' + repeatText(upd).toLowerCase()}.`, 'Undo', undoTo(s));
     }, id ? 'Save' : 'Add event',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete event" onclick="deleteMine('${id}')">${I('trash')}</button>` : '');
@@ -8407,6 +8408,7 @@ function mineForm(id, date) {
     const x = { start: f.start.value, repeat: f.repeat.value, until: f.until.value };
     $('#untilbox').style.display = x.repeat === 'none' ? 'none' : '';
     $('#rtimebox').style.visibility = f.remind.value === 'off' ? 'hidden' : 'visible';
+    if (f.packMode) $('#packtimebox').style.visibility = f.packMode.value === 'off' ? 'hidden' : 'visible';
     const h = $('#rephint'); if (!parseD(x.start)) { h.textContent = ''; return; }
     const day = +x.start.slice(8), next = repeatDates(x, parseD(x.start), parseD(x.start) + 800 * DAY).slice(0, 4).map(o => fmtW(o.date));
     h.textContent = x.repeat === 'none' ? `On ${fmtLong(x.start)}.` : `${repeatText(x)}. Next: ${next.join(', ')}${next.length === 4 ? '…' : ''}` +
@@ -10260,6 +10262,7 @@ async function scheduleReminders() {
       out.sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 30).forEach(r => reminders.push(r));
     } catch (e) {}
     try { sugPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.22.62
+    try { packPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.26.55: pack the car the night before the cleaning job
     try { if ((S.settings || {}).zeusCrate !== false) { const T = todayISO(), now = nzStampLocal().slice(11, 16); reminders.push({ id: 'zeus-crate', title: '🐕 Let Zeus out of his crate', date: now >= '07:00' ? addDays(T, 1) : T, time: '07:00', repeat: 'daily' }); } } catch (e) {} // 2.22.61
     try { if ((S.settings || {}).offpeakPush === true) { const T = todayISO(), now = nzStampLocal().slice(11, 16); reminders.push({ id: 'pwr-offpeak', title: '🌙 Power’s off-peak now, until 7am. Good time for the dishwasher, washing or drier.', date: now >= '22:00' ? addDays(T, 1) : T, time: '22:00', repeat: 'daily' }); } } catch (e) {} // 2.26.47
     try { // 2.22.69: the night before gym (Tue and Wed), pack the gym bag and a towel
@@ -19771,6 +19774,52 @@ function nlItems() {
   return out.map(x => ({ ...x, wb: x.where === '#todo' ? waterBlock((S.todos || []).find(t => t.id === x.id)) : null })).map(x => ({ ...x, urgent: x.days !== null && x.days <= 0 && !x.wb, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.wb ? ' · 💧 ' + esc(x.wb) : x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div>${x.doing ? '<span class="pill glprog">In progress</span>' : ''}</div>` }));
 }
 function glStartedTxt(t) { if (!t.startedAt) return ''; const d = new Date(t.startedAt), today = todayISO(d) === todayISO(); return 'Started ' + (today ? fmtTime(d.toTimeString().slice(0, 5)) : fmtW(todayISO(d))); }
+/* ================= PACK-THE-CAR REMINDER (2.26.55) =================
+   A My event can carry a 'pack the car' reminder (the Sunday Cleaning job has one by default: 9pm the night before).
+   One push per occurrence (relay id sug-pack-<date>), no repeats. It shows as a '🧹 Pack the car' line with a tick box on
+   the event's row (Home and Notifications), not as a second row. Stored on the event: packCar { mode: 'off'|'eve'|'morn', at }. */
+const PACK_TIMES = (() => { const o = []; for (let m = 5 * 60; m <= 23 * 60 + 30; m += 30) { const v = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); o.push([v, fmtTime(v)]); } return o; })();
+function packCfg(ev) {
+  if (!ev) return null;
+  const c = ev.packCar && typeof ev.packCar === 'object' ? ev.packCar : (/cleaning job/i.test(ev.title || '') ? { mode: 'eve', at: '21:00' } : null);
+  return c && (c.mode === 'eve' || c.mode === 'morn') && /^\d{2}:\d{2}$/.test(c.at || '') ? c : null;
+}
+function packSt() { S.settings = S.settings || {}; const p = S.settings.packCar && typeof S.settings.packCar === 'object' ? S.settings.packCar : (S.settings.packCar = {}); p.done = p.done || {}; p.snz = p.snz || {}; return p; }
+const packKey = (evId, date) => evId + '~' + date;
+function packOccs(now = new Date()) {
+  const out = [], T = todayT(), st = packSt();
+  (S.myEvents || []).forEach(ev => {
+    const c = packCfg(ev); if (!c || ev.done) return;
+    repeatDates(ev, T - DAY, T + 3 * DAY).forEach(o => {
+      if (mineOccDone(ev, o.orig)) return;
+      const k = packKey(ev.id, o.date), base = (c.mode === 'eve' ? addDays(o.date, -1) : o.date) + 'T' + c.at;
+      out.push({ ev, date: o.date, orig: o.orig, key: k, at: st.snz[k] || base, base, mode: c.mode, done: !!st.done[k] });
+    });
+  });
+  return out;
+}
+function packWhenTxt(o) { const d = o.at.slice(0, 10), T = todayISO(), tm = fmtTime(o.at.slice(11, 16)); return d === T ? (o.at.slice(11, 16) >= '17:00' ? tm + ' tonight' : tm + ' today') : d === addDays(T, 1) ? tm + ' tomorrow' : fmtW(d) + ' ' + tm; }
+function packLine(evId, date) {
+  const o = packOccs().find(x => x.ev.id === evId && x.date === date); if (!o) return '';
+  const k = esc(o.key), fired = !o.done && o.at <= nzStampLocal();
+  return `<div class="packline${o.done ? ' done' : ''}${fired ? ' due' : ''}"><button type="button" class="packtick" role="checkbox" aria-checked="${o.done}" aria-label="Packed the car" onclick="event.stopPropagation();packTick('${k}')">${o.done ? I('check') : ''}</button><span class="packtx">🧹 Pack the car${o.done ? ' · done' : ' · reminder ' + esc(packWhenTxt(o))}</span>${o.done ? '' : `<span class="packsnz"><button type="button" class="linkbtn" onclick="event.stopPropagation();this.parentElement.classList.toggle('open')">Snooze</button><span class="packsnzo"><button type="button" class="btn small" onclick="event.stopPropagation();packSnooze('${k}',15)">15 min</button><button type="button" class="btn small" onclick="event.stopPropagation();packSnooze('${k}',60)">1 hour</button><button type="button" class="btn small" onclick="event.stopPropagation();packSnooze('${k}','tmr')">Tomorrow</button></span></span>`}</div>`;
+}
+async function packTick(k) {
+  const st = packSt(); if (st.done[k]) delete st.done[k]; else st.done[k] = nzStampLocal();
+  Object.keys(st.done).forEach(x => { const d = x.split('~')[1]; if (d && d < addDays(todayISO(), -14)) delete st.done[x]; });
+  await save(); try { await scheduleReminders(); } catch (e) { } render(); if (st.done[k]) toast('Car packed. 🧹');
+}
+async function packSnooze(k, by) {
+  const o = packOccs().find(x => x.key === k); if (!o) return; const st = packSt();
+  st.snz[k] = by === 'tmr' ? addDays(o.at.slice(0, 10), 1) + 'T' + o.at.slice(11, 16) : nzStampLocal(new Date(Date.now() + by * 60000));
+  await save(); try { await scheduleReminders(); } catch (e) { } render(); toast('Snoozed until ' + packWhenTxt(Object.assign({}, o, { at: st.snz[k] })) + '.');
+}
+// pushes for the relay: one per occurrence still to come
+function packPushes() {
+  const k = nzStampLocal();
+  return packOccs().filter(o => !o.done && o.at > k).slice(0, 4).map(o => ({ id: ('sug-pack-' + o.date + '-' + o.at.slice(11, 16).replace(':', '') + '-' + String(o.ev.id).replace(/[^a-z0-9]/gi, '').slice(-8)).toLowerCase(), title: `🧹 Pack the car for ${o.ev.title.toLowerCase().includes('clean') ? 'cleaning' : o.ev.title} ${o.mode === 'eve' ? 'tomorrow' : 'today'}`, date: o.at.slice(0, 10), time: o.at.slice(11, 16), repeat: 'none' }));
+}
+
 /* ================= REMINDERS ON THE NOTIFICATIONS PAGE (2.26.53) =================
    Your own reminders (Reminders page, pushed by the relay) and medication times, shown plainly: today's and the next
    48 hours, plus any that have gone off and haven't been dealt with (they stay until Done or swiped, once, no repeats).
@@ -19796,6 +19845,7 @@ function rmOccurrences(now = new Date()) {
       if (!medTakenAt(x.id, T)) push({ src: 'med', id: x.id, title, at: T + 'T' + x.time, med: x });
       else push({ src: 'med', id: x.id, title, at: addDays(T, 1) + 'T' + x.time, med: x });
     }); } catch (e) { }
+  try { packOccs(now).filter(o => !o.done).forEach(o => push({ src: 'pack', id: o.key, title: '🧹 Pack the car for ' + (/clean/i.test(o.ev.title) ? 'cleaning' : o.ev.title), at: o.at, pack: o })); } catch (e) { }
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 function rmTodoFor(title) { const n = rmNorm(title); return n ? (S.todos || []).find(t => t && !t.done && rmNorm(t.title) === n) || null : null; }
@@ -19806,17 +19856,18 @@ function rmItems(now = new Date()) {
     const fired = o.mins <= 0, T = todayISO(), td = o.src === 'rem' ? rmTodoFor(o.title) : null;
     if (o.rep && fired && o.mins < -24 * 60) return; // a repeating one only keeps its latest go
     RM_REG[o.key] = o; o.todo = td;
-    const open = o.src === 'med' ? "go('#meds')" : td ? `todoForm('${td.id}')` : `remForm('${o.id}')`;
+    const open = o.src === 'pack' ? `mineForm('${o.pack.ev.id}')` : o.src === 'med' ? "go('#meds')" : td ? `todoForm('${td.id}')` : `remForm('${o.id}')`;
     const k = esc(o.key);
     const html = `<div class="row glnew remrow${fired ? ' remfired' : ''}" data-rm="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){${open}}"><div class="ic rem">${I('bell')}</div><div class="tx"><div class="t">${esc(o.title)}</div><div class="s">${fired ? 'Reminder · ' : ''}${esc(rmWhen(o))}${o.r && REM_REPEAT_LABEL[remRepeat(o.r)] ? ' · ' + REM_REPEAT_LABEL[remRepeat(o.r)] : ''}${td ? ' · on your to-do list' : ''}</div>
       <div class="mbbtns rmbtns"><button type="button" class="btn small primary" onclick="event.stopPropagation();rmDone(this.closest('.remrow').dataset.rm)">Done</button><button type="button" class="btn small" onclick="event.stopPropagation();this.parentElement.classList.toggle('open')">Snooze</button>
       <span class="rmsnz"><button type="button" class="btn small" onclick="event.stopPropagation();rmSnooze(this.closest('.remrow').dataset.rm,15)">15 min</button><button type="button" class="btn small" onclick="event.stopPropagation();rmSnooze(this.closest('.remrow').dataset.rm,60)">1 hour</button><button type="button" class="btn small" onclick="event.stopPropagation();rmSnooze(this.closest('.remrow').dataset.rm,'tmr')">Tomorrow</button></span></div></div></div>`;
-    out.push({ key: o.key, at: o.at, todoId: td ? td.id : '', time: o.at.slice(11, 16), date: o.at.slice(0, 10), urgent: fired || o.mins <= 60, coming: !fired && o.mins > 60 && o.at.slice(0, 10) === T, badge: fired, html });
+    out.push({ key: o.key, at: o.at, packKey: o.src === 'pack' ? o.id : '', todoId: td ? td.id : '', time: o.at.slice(11, 16), date: o.at.slice(0, 10), urgent: fired || o.mins <= 60, coming: !fired && o.mins > 60 && o.at.slice(0, 10) === T, badge: fired, html });
   });
   return out;
 }
 async function rmDone(k) {
   const o = RM_REG[k]; rmHandle(k);
+  if (o && o.src === 'pack') { await packTick(o.id); return; }
   try {
     if (o && o.src === 'med') { if (!medTakenAt(o.med.id, todayISO()) && o.at.slice(0, 10) === todayISO()) await medTick(o.med.id); }
     else if (o && o.todo && !o.todo.done) { await tick(o.todo.id); return; }
@@ -19824,7 +19875,7 @@ async function rmDone(k) {
   render(); toast('Done.');
 }
 async function rmSnooze(k, by) {
-  const o = RM_REG[k]; if (!o) return; rmHandle(k);
+  const o = RM_REG[k]; if (!o) return; if (o.src === 'pack') { await packSnooze(o.id, by); return; } rmHandle(k);
   let date, time;
   if (by === 'tmr') { date = addDays(todayISO(), 1); time = o.at.slice(11, 16); }
   else { const t = nzStampLocal(new Date(Date.now() + by * 60000)); date = t.slice(0, 10); time = t.slice(11, 16); }
@@ -20085,14 +20136,16 @@ function glAlertParts() {
   const P = { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: (() => { try { return abItems(); } catch (e) { return []; } })(), mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems(); } catch (e) { return []; } })() };
   try { // 2.26.53: reminders; a to-do already here gets the time attached instead of its own row
     const R = rmItems(), seen = P.dueUrgent.concat(P.coming).map(x => x.html).join('') + P.fresh.join('');
-    P.rm = R.filter(x => !(x.todoId && seen.includes(`'${x.todoId}'`)));
+    const packOn = x => x.packKey && seen.includes(`packTick('${esc(x.packKey)}')`); // 2.26.55: on the event's row already
+    P.packBadge = R.filter(x => packOn(x) && x.badge).length;
+    P.rm = R.filter(x => !(x.todoId && seen.includes(`'${x.todoId}'`)) && !packOn(x));
     const A = R.filter(x => x.todoId && seen.includes(`'${x.todoId}'`));
     if (A.length) { const fix = x => { x.html = rmAttach(x.html, A); }; P.dueUrgent.forEach(fix); P.coming.forEach(fix); P.fresh = P.fresh.map(h => rmAttach(h, A)); P.urgent = P.urgent.map(h => rmAttach(h, A)); }
   } catch (e) { P.rm = []; }
   try { gkApply(P); } catch (e) { }
   return P;
 }
-function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length + p.mb.filter(x => x.badge).length + (p.rm || []).filter(x => x.badge).length; } catch (e) { return 0; } }
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length + p.mb.filter(x => x.badge).length + (p.rm || []).filter(x => x.badge).length + (p.packBadge || 0); } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
