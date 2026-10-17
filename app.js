@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.50';
+const APP_VERSION = '2.26.51';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14986,6 +14986,7 @@ async function refreshMail(force) {
   refreshKora(false);
   refreshEr(false);
   refreshNf(false);
+  refreshMb(false);
 }
 function mailSettingsSection() {
   const cfg = MAIL_CFG || { google: {}, microsoft: {}, offline: false };
@@ -15459,6 +15460,272 @@ function erCard() {
   return `<div class="card ercard" id="ercard"><div class="erh"><b>Countdown rewards</b><span class="muted">${all.length} offer${all.length === 1 ? '' : 's'}</span></div>
     ${show.map(p => `<a class="errow" href="${esc(p.link || p.web)}" target="_blank" rel="noopener"><div class="tx"><div class="t">${esc(p.sum)}</div><div class="s"><span class="${daysLeft(p.end) <= 2 ? 'erend soon' : 'erend'}">${endTxt(p.end)}</span>${p.boost ? ' · <span class="erboost">Boost first</span>' : ''}</div></div>${p.web && p.link ? `<span class="ermail" role="link" tabindex="0" onclick="event.preventDefault();event.stopPropagation();window.open('${esc(p.web)}','_blank','noopener')">Email</span>` : ''}</a>`).join('')}
     ${all.length > 3 ? `<button class="linkbtn" id="ermore" onclick="erMore=!erMore;render()">${erMore ? 'Less' : 'More (' + (all.length - 3) + ')'}</button>` : ''}</div>`;
+}
+
+
+/* ================= EMAIL SECTIONS ON THE NOTIFICATIONS PAGE (2.26.51) =================
+   Read on this phone from Outlook (Mail.Read) and Gmail (when connected), last 30 days, no AI. Plain keyword rules:
+   Deliveries (orders, shipping, carrier tracking), Click & collect, Bills by email (Open PDF straight from the mailbox with
+   the phone's own sign-in, nothing goes through the relay), Everyday Rewards (the same Countdown-only offers as the Home card)
+   and Gluten free. Only short parsed lines are kept on the phone. Swipe left to clear (a new status shows again). */
+let MB = null, mbBusy = false, mbAt = 0;
+const MB_DAYS = 30;
+async function loadMb() { try { const c = await kvGet('mailBell'); MB = c && Array.isArray(c.msgs) ? c : null; } catch (e) { MB = null; } }
+function mbDis() { try { const a = JSON.parse(localStorage.getItem('mbDismiss') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function mbDismiss(k) { const a = mbDis(); if (!a.includes(k)) a.push(k); try { localStorage.setItem('mbDismiss', JSON.stringify(a.slice(-300))); } catch (e) { } }
+const MB_MON = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*';
+const MB_DT = `(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}|\\d{1,2}(?:st|nd|rd|th)?\\s+${MB_MON}\\.?,?(?:\\s+\\d{4})?|${MB_MON}\\s+\\d{1,2}(?:st|nd|rd|th)?,?(?:\\s+\\d{4})?)`;
+function mbDate(s, recv) { // '8 Oct 2026', '18/09/2026', 'October 5, 2026' → ISO
+  s = String(s || '').trim().replace(/,/g, ''); const m = s.match(new RegExp(`^(${MB_MON})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+(\\d{4}))?$`, 'i'));
+  if (m) s = m[2] + ' ' + m[1] + (m[3] ? ' ' + m[3] : '');
+  try { return erDate(s, recv) || ''; } catch (e) { return ''; }
+}
+const mbClean = t => String(t || '').replace(/[\u00a0\u034f\u200b-\u200d\u2007\u00ad\u2800\u0347]/g, ' ').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+const mbHtmlText = h => { try { const d = new DOMParser().parseFromString(String(h || ''), 'text/html'); d.querySelectorAll('style,script,head').forEach(x => x.remove()); return mbClean(d.body ? d.body.textContent : ''); } catch (e) { return ''; } };
+function mbLinks(h) { // the Track / order button in the email
+  const out = { track: '', order: '' };
+  try { const d = new DOMParser().parseFromString(String(h || ''), 'text/html');
+    for (const a of d.querySelectorAll('a[href]')) { const href = a.getAttribute('href') || '', t = mbClean(a.textContent); if (!/^https:\/\//i.test(href)) continue;
+      if (!out.track && (/\btrack/i.test(t) || /track(ing)?[^a-z]/i.test(href) && !/unsubscribe|optout|privacy/i.test(href))) out.track = href;
+      if (!out.order && /(view|see|check) (your )?order|order details|order status|my orders?/i.test(t)) out.order = href; }
+  } catch (e) { }
+  return out;
+}
+// ---- fetching (Outlook / Gmail) ----
+const MB_OQ = {
+  gf: '"coeliac" OR "celiac" OR "gluten free" OR "gluten-free"',
+  cc: '"click & collect" OR "click and collect" OR "ready to collect" OR "ready for pickup" OR "ready for collection" OR "ready for pick up"',
+  dl: '"out for delivery" OR shipped OR dispatched OR "tracking number" OR delivered OR "on its way" OR "in transit"'
+};
+const MB_GQ = {
+  gf: '(coeliac OR celiac OR "gluten free" OR "gluten-free")',
+  cc: '("click & collect" OR "click and collect" OR "ready to collect" OR "ready for pickup" OR "ready for collection")',
+  dl: '(from:orders@order.temu.com OR "out for delivery" OR shipped OR dispatched OR "tracking number" OR "has been delivered" OR "in transit")',
+  bill: 'has:attachment (bill OR invoice OR statement OR renewal OR premium)'
+};
+async function mbAuthGet(p, url) {
+  let token = await mailAccess(p);
+  try { return await getJSONAuth(url, token); }
+  catch (e) { if (e && e.status === 401) { MAIL[p].expiresAt = 0; token = await mailAccess(p); return getJSONAuth(url, token); } throw e; }
+}
+const mbOMsg = (x, q) => ({ src: 'ms', id: x.id, q, from: String((x.from && x.from.emailAddress && x.from.emailAddress.address) || '').toLowerCase(), name: mbClean(x.from && x.from.emailAddress && x.from.emailAddress.name), subject: mbClean(x.subject).slice(0, 200), text: mbClean(x.bodyPreview).slice(0, 600), at: x.receivedDateTime || '', link: x.webLink || '', att: !!x.hasAttachments });
+async function mbOutlook() {
+  const G = 'https://graph.microsoft.com/v1.0/me/messages', sel = '&$select=id,subject,from,receivedDateTime,bodyPreview,webLink,hasAttachments', since = new Date(Date.now() - MB_DAYS * DAY).toISOString(), out = [];
+  for (const q of ['gf', 'cc', 'dl']) {
+    try { const d = await mbAuthGet('microsoft', G + '?$search=' + encodeURIComponent('"' + MB_OQ[q].replace(/"/g, '\\"') + '"') + '&$top=25' + sel); (d.value || []).filter(x => (x.receivedDateTime || '') >= since).forEach(x => out.push(mbOMsg(x, q))); } catch (e) { }
+  }
+  try { const d = await mbAuthGet('microsoft', G + '?$filter=' + encodeURIComponent(`hasAttachments eq true and receivedDateTime ge ${since}`) + '&$orderby=receivedDateTime desc&$top=40' + sel); (d.value || []).forEach(x => out.push(mbOMsg(x, 'bill'))); } catch (e) { }
+  // fuller text and the Track button for order / collection emails (at most 14)
+  const want = out.filter(m => (m.q === 'dl' || m.q === 'cc') && (mbDlInfo(m) || mbCcInfo(m))).slice(0, 14);
+  for (const m of want) { try { const b = await mbAuthGet('microsoft', G + '/' + encodeURIComponent(m.id) + '?$select=body'); const h = b && b.body && b.body.content || ''; const L = mbLinks(h); m.track = L.track; m.olink = L.order; m.text = mbHtmlText(h).slice(0, 1500) || m.text; } catch (e) { } }
+  return out;
+}
+async function mbGmail() {
+  const out = [], B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
+  for (const q of ['gf', 'cc', 'dl', 'bill']) {
+    let list = null; try { list = await mbAuthGet('google', B + '?maxResults=' + (q === 'dl' ? 15 : 10) + '&q=' + encodeURIComponent(MB_GQ[q] + ' newer_than:' + MB_DAYS + 'd')); } catch (e) { continue; }
+    for (const it of (list.messages || [])) {
+      try {
+        const g = await mbAuthGet('google', B + '/' + encodeURIComponent(it.id) + '?format=full');
+        const h = n => (((g.payload && g.payload.headers) || []).find(x => x.name.toLowerCase() === n) || {}).value || '';
+        let html = '', pdf = null; const walk = p => { if (!p) return; if (!html && p.mimeType === 'text/html' && p.body && p.body.data) { const b = atob(p.body.data.replace(/-/g, '+').replace(/_/g, '/')); html = new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); }
+          if (!pdf && p.filename && /\.pdf$/i.test(p.filename) && p.body && p.body.attachmentId) pdf = { aid: p.body.attachmentId, name: p.filename }; (p.parts || []).forEach(walk); }; walk(g.payload);
+        const fr = h('from'), mm = fr.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>/), L = mbLinks(html);
+        out.push({ src: 'g', id: it.id, q, from: String(mm ? mm[2] : fr).toLowerCase().trim(), name: mbClean(mm ? mm[1] : ''), subject: mbClean(h('subject')).slice(0, 200), text: (mbHtmlText(html) || mbClean(g.snippet)).slice(0, 1500), at: new Date(Number(g.internalDate)).toISOString(),
+          link: 'https://mail.google.com/mail/u/0/#all/' + it.id, att: !!pdf, pdf, track: L.track, olink: L.order });
+      } catch (e) { }
+    }
+  }
+  return out;
+}
+async function refreshMb(force) {
+  if (mbBusy || !S || (!mailConnected('microsoft') && !mailConnected('google'))) return;
+  if (!force && mbAt && Date.now() - mbAt < 30 * 60e3) return;
+  mbBusy = true;
+  try {
+    if (!MB) await loadMb();
+    const parts = await Promise.all([mailConnected('microsoft') ? mbOutlook().catch(() => null) : [], mailConnected('google') ? mbGmail().catch(() => null) : []]);
+    if (parts.every(p => p === null)) return;
+    const seen = new Map(); parts.flat().filter(Boolean).forEach(m => { const k = m.src + ':' + m.id, o = seen.get(k); if (!o) seen.set(k, m); else { o.qs = (o.qs || [o.q]).concat(m.q); if (m.text.length > o.text.length) o.text = m.text; o.track = o.track || m.track; o.olink = o.olink || m.olink; } });
+    mbAt = Date.now(); const had = JSON.stringify(MB && MB.msgs); MB = { at: mbAt, msgs: [...seen.values()].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 160) };
+    await kvSet('mailBell', MB).catch(() => { });
+    if (had !== JSON.stringify(MB.msgs)) { if (location.hash === '#alerts' && !sheetOpen) render(); else glBellRedraw(); }
+  } finally { mbBusy = false; }
+}
+// ---- pure parsers ----
+const MB_STORES = [[/chemistwarehouse/, 'Chemist Warehouse'], [/warehousestationery/, 'Warehouse Stationery'], [/thewarehouse/, 'The Warehouse'], [/mitre10/, 'Mitre 10'], [/bunnings/, 'Bunnings'], [/noelleeming/, 'Noel Leeming'], [/briscoes/, 'Briscoes'], [/kmart/, 'Kmart'], [/(woolworths|countdown)/, 'Woolworths'], [/rebelsport/, 'Rebel Sport'], [/farmers/, 'Farmers'], [/jbhifi/, 'JB Hi-Fi'], [/harveynorman/, 'Harvey Norman'], [/pbtech/, 'PB Tech'], [/torpedo7/, 'Torpedo7'], [/animates/, 'Animates'], [/petstock/, 'Petstock'], [/supercheap/, 'Supercheap Auto'], [/repco/, 'Repco'], [/smiths?city/, 'Smiths City']];
+const MB_SHOPS = [[/temu/, 'Temu'], [/aliexpress/, 'AliExpress'], [/amazon/, 'Amazon'], [/shein/, 'Shein'], [/trademe/, 'Trade Me'], [/mightyape/, 'Mighty Ape'], [/ebay/, 'eBay']].concat(MB_STORES);
+const MB_CARRIERS = [[/nzpost/, 'NZ Post'], [/courierpost/, 'CourierPost'], [/aramex/, 'Aramex'], [/nzcouriers/, 'NZ Couriers'], [/pbt/, 'PBT'], [/dhl/, 'DHL'], [/posthaste/, 'Post Haste'], [/imile/, 'iMile'], [/mainfreight/, 'Mainfreight'], [/fedex/, 'FedEx'], [/\bups\b/, 'UPS']];
+const MB_CARRIER_TXT = /\b(iMile|NZ ?Post|CourierPost|Aramex|NZ Couriers|PBT|DHL|Post ?Haste|Mainfreight|FedEx|UPS|Fastway|YunExpress|Cainiao)\b/i;
+const mbWho = (m, list) => { const f = String(m.from || ''); for (const [re, n] of list) if (re.test(f)) return n; return ''; };
+const mbName = m => { const n = String(m.name || '').replace(/\b(no[- ]?reply|noreply|do ?not ?reply|notifications?|team|accounts?|orders?)\b/gi, '').replace(/[|<>]/g, '').trim(); if (n.length >= 3) return n.slice(0, 40); const d = String(m.from || '').split('@')[1] || ''; const b = d.split('.').filter(x => !/^(mail|email|e|em|comms|post|messaging|notify|info|co|com|nz|net|org|govt|au)$/.test(x))[0] || d; return b ? b.charAt(0).toUpperCase() + b.slice(1) : 'Email'; };
+const MB_MKT = /(temuemail\.com|temuofficial|@market\.|@sales\.|dominos|pizzahut|hellpizza|ubereats|doordash|delivereasy|menulog|milkrun|everydayrewards|tldrnewsletter|store-news@|@edm\.|@promo\.|@marketing\.|^news@|newsletter|afterpay|laybuy|@deals\.|shopback)/i;
+// Click & collect
+const MB_CC = /(click\s*(?:&|and|n)\s*collect|ready (?:to|for) (?:collect|collection|pick ?-?up)|order (?:has been |is )?collected|pick ?-?up order)/i;
+function mbCcInfo(m) {
+  const t = m.subject + ' ' + String(m.text || '').slice(0, 300); if (!MB_CC.test(t) || /dominos|pizzahut|hellpizza/i.test(m.from)) return null;
+  const on = (t.match(/#\s?([A-Z0-9-]{5,})/) || t.match(/order\s*(?:no\.?|number|#|id)?\s*[:#]?\s*([A-Z]{0,4}\d{5,})/i) || [])[1]; if (!on) return null;
+  const st = /\bcollected\b/i.test(m.subject) ? 'Collected' : /cancel/i.test(m.subject) ? 'Cancelled' : /\bready\b/i.test(m.subject + ' ' + String(m.text).slice(0, 160)) ? 'Ready to collect' : 'Ordered';
+  const pk = (String(m.text || '').match(new RegExp(`(?:collect|pick ?-?up)[^.]{0,40}?(?:by|from|on|before|after)\\s+(?:\\w+day,?\\s+)?${MB_DT}`, 'i')) || [])[1];
+  return { store: mbWho(m, MB_STORES) || mbName(m), order: on, status: st, pickup: pk ? mbDate(pk, m.at) : '' };
+}
+// Deliveries
+function mbDlInfo(m) {
+  if (MB_MKT.test(m.from) || MB_CC.test(m.subject)) return null;
+  const s = m.subject, t = s + ' ' + String(m.text || '').slice(0, 400);
+  if (/waiting for your review|rate your|leave (us )?a review|how did we do/i.test(s)) return null;
+  const st = /out[- ]for[- ]delivery/i.test(t) ? 3 : /\b(?:has been|was|been|got) delivered\b|delivered notification|\bdelivery complete|\bparcel delivered|\bdelivered on\b/i.test(t) ? 4 : /\brefund(ed)?\b/i.test(s) ? 5 : /\b(shipped|dispatched|on (?:its|the) way|in transit|tracking number|has left|picked up by|packing slip|is coming)\b/i.test(t) ? 2 : /order (?:is )?(?:confirmed|received|placed)|thanks? (?:you )?for your (?:order|purchase)|order confirmation/i.test(t) ? 1 : 0;
+  if (!st) return null;
+  const T = String(m.text || '');
+  const order = ((s + ' ' + T).match(/PO-\d{3}-\d{6,}/) || [])[0] || ((t.match(/order\s*(?:#|no\.?|number|id)\s*:?\s*#?\s*([A-Z0-9][A-Z0-9-]{4,})/i) || t.match(/\border\s+([A-Z]{1,4}\d{5,})\b/) || [])[1]) || '';
+  const trk = ((T.match(/tracking (?:number|no\.?|#|id|code)\s*(?:is|:)?\s*([A-Z0-9]{8,34})\b/i) || s.match(/tracking (?:number|no\.?|#)\s*:?\s*([A-Z0-9]{8,34})\b/i) || [])[1] || '');
+  if (!order && !trk) return null;
+  const carrier = ((t.match(MB_CARRIER_TXT) || [])[1] || mbWho(m, MB_CARRIERS) || '').replace(/^NZ ?Post$/i, 'NZ Post').replace(/^Post ?Haste$/i, 'Post Haste');
+  const delayed = /\bdelay(ed|s)?\b|running late|delivery exception|unable to deliver/i.test(t);
+  const ex = T.match(new RegExp(`(?:estimated|expected|arriv\\w*|deliver\\w* (?:by|between|on|from))\\D{0,25}${MB_DT}(?:\\s*(?:-|–|to|and)\\s*${MB_DT})?`, 'i'));
+  const deliveredOn = st === 4 ? ((T.match(new RegExp(`delivered on\\s+(?:\\w+day,?\\s+)?${MB_DT}`, 'i')) || [])[1] || '') : '';
+  const items = (T.match(/\b(\d{1,3})\s+items?\b/i) || [])[1] || '';
+  const shop = mbWho(m, MB_SHOPS), isCarrier = !shop && !!mbWho(m, MB_CARRIERS);
+  return { shop: shop || (isCarrier ? '' : mbName(m)), carrierMail: isCarrier, order, trk, carrier: carrier || (isCarrier ? mbWho(m, MB_CARRIERS) : ''), st, delayed, est: ex ? [mbDate(ex[1], m.at), ex[2] ? mbDate(ex[2], m.at) : ''] : null, deliveredOn: deliveredOn ? mbDate(deliveredOn, m.at) : '', items };
+}
+// Gluten free
+const MB_GF_FROM = /(coeliac|celiac|glutenfree|gluten-free|theglutenfreefoodfestival|eatchoice\.nz|gfshop|bfree|venerdi|gfbakery)/i;
+const MB_GF_WORD = /\b(coeliacs?|celiacs?|gluten[\s-]?free)\b/i, MB_FOOD = /\b(food|bread|loaf|loaves|bak(e|ery|ing)|recipe|pizza|pasta|beer|brew|menu|restaurant|cafe|snack|lunch|dinner|eat|kitchen|festival|flour|cake|treat|biscuit|cracker|cereal)/i;
+function mbGfInfo(m) {
+  if (/everydayrewards/i.test(m.from)) return null;
+  const head = m.subject + ' ' + m.name, t = head + ' ' + String(m.text || '').slice(0, 300);
+  const ok = MB_GF_FROM.test(m.from + ' ' + m.name) || MB_GF_WORD.test(head) || (/\bGF\b/.test(m.subject) && MB_FOOD.test(t)) || (MB_GF_WORD.test(String(m.text || '').slice(0, 300)) && MB_FOOD.test(t));
+  if (!ok) return null;
+  let line = String(m.text || '').replace(/^.{0,40}?\b(dear|hi|hello|kia ora)\s+[\w.\-]+,?\s*/i, '').replace(/view (this email )?in (your )?browser|can't see images\?.*?(→|$)/gi, '').trim();
+  line = (line.split(/(?<=[.!?])\s+/)[0] || '').slice(0, 120);
+  const dm = (m.subject + ' ' + String(m.text || '').slice(0, 400)).match(new RegExp(`(?:on|from|this|until|ends?)\\s+(?:\\w+day,?\\s+)?${MB_DT}`, 'i'));
+  let ev = dm ? mbDate(dm[1], m.at) : ''; if (ev && (ev < todayISO() || daysLeft(ev) > 150)) ev = '';
+  return { who: mbName(m), line, ev };
+}
+// Bills by email
+const MB_BILL = /\b(bill|invoice|statement|renewal|revewal|rates|premium|amount due|balance due|direct debit)\b/i;
+const MB_NOTBILL = /(payslip|packing slip|receipt|engagement letter|loan|security documentation|settlement|docusign|completed:|\bquote\b|certificate|confirmation of|closure|application|thanks for your payment|payment has been processed|has been received|trust account)/i;
+function mbBillInfo(m) {
+  const s = m.subject; if (/^(re|fw|fwd):/i.test(s) || MB_MKT.test(m.from) || /payroll|novopay/i.test(m.from)) return null;
+  const t = s + ' ' + String(m.text || '');
+  if (!MB_BILL.test(s + ' ' + String(m.text || '').slice(0, 160)) || MB_NOTBILL.test(t.slice(0, 260))) return null;
+  if (!m.att && !/xero\.com/.test(m.from)) return null;
+  const xf = s.match(/\bfrom\s+(.+?)(?:\s+for\s+.+)?$/i);
+  const biller = (/xero\.com/.test(m.from) && xf ? xf[1] : (/ecotricity/.test(m.from) ? 'Ecotricity' : /kora/.test(m.from) ? 'Kora' : /sky\.co\.nz/.test(m.from) ? 'Sky' : mbName(m))).replace(/\s+T\/A\s+/i, ' – ').slice(0, 50);
+  const am = (t.match(/(?:total|balance|amount|due|owing|pay)[^$]{0,30}\$\s?([\d,]+\.\d{2})/i) || t.match(/\$\s?([\d,]+\.\d{2})\s*NZD/i) || t.match(/\$\s?([\d,]+\.\d{2})/) || [])[1];
+  const dm = t.match(new RegExp(`\\bdue(?:\\s+date)?(?:\\s+on|\\s+by)?\\s*:?\\s*(?:\\w+day,?\\s+)?${MB_DT}`, 'i')) || t.match(new RegExp(`(?:debited|paid)[^.]{0,40}?\\bon\\s+(?:\\w+day,?\\s+)?${MB_DT}`, 'i'));
+  return { biller, amount: am ? Number(am.replace(/,/g, '')) : null, due: dm ? mbDate(dm[1], m.at) : '' };
+}
+function mbBillMatch(biller) {
+  const words = String(biller || '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !/^(the|your|ltd|limited|and|for|from|inc|incorporated|new|zealand)$/.test(w));
+  if (!words.length) return null;
+  return (S.bills || []).find(b => b && words.some(w => String(b.name || '').toLowerCase().includes(w))) || null;
+}
+// ---- rows for the Notifications page ----
+const MB_ST = ['', 'Ordered', 'Shipped', 'Out for delivery', 'Delivered', 'Refunded'];
+const mbAge = at => { const t = Date.parse(at); return t ? (Date.now() - t) / 864e5 : 99; };
+const mbToday = at => { try { return new Date(at).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }) === todayISO(); } catch (e) { return false; } };
+let MB_REG = {};
+function mbOpen(k) { if (glSwipe.moved) return; const r = MB_REG[k]; if (r && r.url) window.open(r.url, '_blank', 'noopener'); }
+async function mbPdf(k) {
+  const r = MB_REG[k]; if (!r || !r.m) return; const m = r.m;
+  try {
+    let blob = null;
+    if (m.src === 'ms') {
+      const L = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(m.id) + '/attachments?$select=id,name,contentType');
+      const a = (L.value || []).find(x => /pdf/i.test(x.contentType || '') || /\.pdf$/i.test(x.name || ''));
+      if (a) { const token = await mailAccess('microsoft'); const res = await fetch('https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(m.id) + '/attachments/' + encodeURIComponent(a.id) + '/$value', { headers: { Authorization: 'Bearer ' + token } }); if (res.ok) blob = new Blob([await res.arrayBuffer()], { type: 'application/pdf' }); }
+    } else if (m.pdf) {
+      const d = await mbAuthGet('google', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(m.id) + '/attachments/' + encodeURIComponent(m.pdf.aid));
+      const b = atob(String(d.data || '').replace(/-/g, '+').replace(/_/g, '/')); blob = new Blob([Uint8Array.from(b, c => c.charCodeAt(0))], { type: 'application/pdf' });
+    }
+    if (!blob) { toast('No PDF in that email, so here’s the email.'); window.open(m.link, '_blank', 'noopener'); return; }
+    const u = URL.createObjectURL(blob), w = window.open(u, '_blank');
+    if (!w) { const a = document.createElement('a'); a.href = u; a.download = (r.biller || 'bill').replace(/[^\w -]+/g, '') + '.pdf'; document.body.appendChild(a); a.click(); a.remove(); }
+    setTimeout(() => URL.revokeObjectURL(u), 120e3);
+  } catch (e) { toast(navigator.onLine === false ? 'You’re offline. Try again with signal.' : 'Couldn’t open the PDF just now, so here’s the email.'); try { window.open(m.link, '_blank', 'noopener'); } catch (e2) { } }
+}
+function mbAddBill(k) { const r = MB_REG[k]; if (!r) return; billForm(null, { name: r.biller, amount: r.amount != null ? r.amount : '', due: r.due || '', repeat: 'none', notes: 'From email, received ' + fmtW(String(r.m.at).slice(0, 10)) }); }
+function mbRow(k, ic, title, sub, extra, url, cls = '') {
+  MB_REG[k] = Object.assign(MB_REG[k] || {}, { url });
+  return `<div class="row glnew mbrow ${cls}" data-mb="${esc(k)}" role="button" tabindex="0" onclick="mbOpen(this.dataset.mb)"><div class="ic">${ic}</div><div class="tx"><div class="t">${title}</div><div class="s">${sub}</div>${extra || ''}</div></div>`;
+}
+function mbSteps(st) { const n = Math.min(4, st); return `<div class="mbsteps">${['Ordered', 'Shipped', 'Out for delivery', 'Delivered'].map((x, i) => `<span class="${i < n ? 'on' : ''}${i === n - 1 ? ' cur' : ''}">${x}</span>`).join('')}</div>`; }
+function mbItems() {
+  const out = [], gone = new Set(mbDis()); MB_REG = {};
+  const msgs = (MB && MB.msgs || []).filter(m => mbAge(m.at) <= MB_DAYS);
+  const add = (o) => { if (!gone.has(o.key)) out.push(o); };
+  // Deliveries: group by order (or tracking), carrier emails join by tracking number
+  try {
+    const G = new Map(), byTrk = new Map();
+    msgs.map(m => ({ m, d: mbDlInfo(m) })).filter(x => x.d).sort((a, b) => String(a.m.at).localeCompare(String(b.m.at))).forEach(({ m, d }) => {
+      let k = d.order ? (d.shop || '') + '|' + d.order : 'trk|' + d.trk; if (d.trk && byTrk.has(d.trk)) k = byTrk.get(d.trk);
+      const g = G.get(k) || { k, shop: '', order: '', trk: '', carrier: '', st: 0, delayed: false, est: null, items: '', first: m.at, last: m, track: '', deliveredOn: '' };
+      g.shop = g.shop || d.shop; g.order = g.order || d.order; g.trk = d.trk || g.trk; g.carrier = d.carrier || g.carrier; g.items = d.items || g.items; g.track = m.track || g.track || ''; g.olink = m.olink || g.olink || '';
+      if (d.st === 4 || g.st !== 4) { g.st = d.st === 5 ? 5 : Math.max(g.st === 5 ? 0 : g.st, d.st); } g.delayed = d.st >= 3 ? false : d.delayed || g.delayed; if (d.est && d.est[0]) g.est = d.est; if (d.deliveredOn) g.deliveredOn = d.deliveredOn; g.last = m;
+      G.set(k, g); if (g.trk) byTrk.set(g.trk, k);
+    });
+    [...G.values()].forEach(g => {
+      const age = mbAge(g.last.at); if ((g.st === 4 || g.st === 5) && age > 2) return; if (age > 30) return;
+      const key = 'dl|' + g.k + '|' + g.st + (g.delayed ? 'd' : ''), url = g.track || g.olink || g.last.link;
+      const estTxt = g.st < 4 && g.est && g.est[0] ? 'Arriving ' + fmtW(g.est[0]) + (g.est[1] && g.est[1] !== g.est[0] ? '–' + fmtW(g.est[1]) : '') : '';
+      const stTxt = g.delayed ? 'Delayed' : MB_ST[g.st] + (g.st === 4 && g.deliveredOn ? ' ' + fmtW(g.deliveredOn) : '');
+      const sub = [esc(stTxt), g.order ? 'Order ' + esc(g.order.length > 14 ? '…' + g.order.slice(-8) : g.order) : '', g.items ? esc(g.items) + ' items' : '', estTxt ? esc(estTxt) : '', g.carrier ? esc(g.carrier) + (g.trk ? ' ' + esc(g.trk) : '') : (g.trk ? 'Tracking ' + esc(g.trk) : '')].filter(Boolean).join(' · ');
+      const btn = `<div class="mbbtns"><button type="button" class="btn small" onclick="event.stopPropagation();window.open(MB_REG['${esc(key)}'].url,'_blank','noopener')">${g.track ? 'Track' : g.olink ? 'View order' : 'Open email'}</button></div>`;
+      const ed = g.est && g.est[0] ? daysLeft(g.est[0]) : null;
+      add({ sec: 'dl', key, urgent: g.st === 3 || g.delayed, coming: g.st === 2 && ed != null && ed <= 1, badge: g.st === 3 || mbToday(g.last.at), at: g.last.at,
+        html: mbRow(key, g.st === 4 ? '✅' : g.st === 3 ? '🚚' : '📦', esc(g.shop || g.carrier || 'Parcel') + (g.st === 3 ? ' · out for delivery today' : ''), sub, (g.st <= 4 ? mbSteps(g.delayed ? Math.max(1, g.st) : g.st) : '') + btn, url, g.delayed ? 'mburg' : '') });
+    });
+  } catch (e) { }
+  // Click & collect: latest email per order wins
+  try {
+    const G = new Map();
+    msgs.map(m => ({ m, c: mbCcInfo(m) })).filter(x => x.c).sort((a, b) => String(a.m.at).localeCompare(String(b.m.at))).forEach(({ m, c }) => { const k = c.store + '|' + c.order, g = G.get(k) || {}; G.set(k, Object.assign(g, c, { pickup: c.pickup || g.pickup || '', m })); });
+    [...G.values()].forEach(g => {
+      const age = mbAge(g.m.at); if ((g.status === 'Collected' || g.status === 'Cancelled') && age > 1) return; if (g.status === 'Ordered' && age > 14) return; if (g.status === 'Ready to collect' && age > 14) return;
+      const key = 'cc|' + g.store + '|' + g.order + '|' + g.status, later = g.pickup && daysLeft(g.pickup) > 0;
+      add({ sec: 'cc', key, urgent: g.status === 'Ready to collect' && !later, coming: g.status === 'Ready to collect' && later, badge: g.status === 'Ready to collect' || mbToday(g.m.at), at: g.m.at,
+        html: mbRow(key, g.status === 'Ready to collect' ? '🛍️' : g.status === 'Collected' ? '✅' : g.status === 'Cancelled' ? '✖️' : '🧾', esc(g.store) + ' · ' + esc(g.status), ['Click & collect', 'Order ' + esc(g.order), g.pickup ? 'Pick up ' + esc(fmtW(g.pickup)) : '', esc(ago(Date.parse(g.m.at)))].filter(Boolean).join(' · '), '', g.m.link) });
+    });
+  } catch (e) { }
+  // Bills by email (Ecotricity bills that already have a Power notice aren't repeated)
+  try {
+    const pn = (() => { try { return (PWR && Array.isArray(PWR.notices) ? PWR.notices : []).filter(n => n.kind === 'bill'); } catch (e) { return []; } })();
+    const seenB = new Set();
+    msgs.filter(m => m.q === 'bill' || (m.qs || []).includes('bill') || m.att).forEach(m => {
+      const b = mbBillInfo(m); if (!b) return;
+      if (/ecotricity/i.test(b.biller) && pn.some(n => String(n.at) >= String(m.at).slice(0, 10))) return;
+      const dk = b.biller.toLowerCase() + '|' + (b.due || String(m.at).slice(0, 10)); if (seenB.has(dk)) return; seenB.add(dk);
+      const mt = mbBillMatch(b.biller);
+      const paid = mt && ((Array.isArray(mt.paidDues) && mt.paidDues.some(p => p && (p.due === b.due || (b.amount && +p.amount === b.amount && String(p.at || p.date || '') >= String(m.at).slice(0, 10))))) || (b.due && mt.due && mt.due > b.due && !mt.paid && daysLeft(b.due) < 0) || (mt.paid && mt.repeat === 'none'));
+      if (paid) return;
+      const d = b.due ? daysLeft(b.due) : null; if (d == null && mbAge(m.at) > 14) return; if (d != null && d < -21) return;
+      const key = 'bill|' + m.src + ':' + m.id; MB_REG[key] = { m, biller: b.biller, amount: b.amount, due: b.due };
+      const sub = [b.amount != null ? '$' + b.amount.toFixed(2) : '', b.due ? (d < 0 ? 'was due ' + fmtW(b.due) : d === 0 ? 'due today' : 'due ' + fmtW(b.due)) : '', 'received ' + esc(fmtW(String(m.at).slice(0, 10)))].filter(Boolean).join(' · ');
+      const btns = `<div class="mbbtns"><button type="button" class="btn small primary" onclick="event.stopPropagation();mbPdf('${esc(key)}')">${m.att ? 'Open PDF' : 'Open email'}</button>${mt ? `<button type="button" class="btn small" onclick="event.stopPropagation();go('#bills')">In Bills: ${esc(mt.name)}</button>` : `<button type="button" class="btn small" onclick="event.stopPropagation();mbAddBill('${esc(key)}')">Add bill</button>`}</div>`;
+      add({ sec: 'bill', key, urgent: d != null && d <= 3, coming: d != null && d > 3 && d <= 14, badge: mbToday(m.at), at: m.at, html: mbRow(key, '🧾', esc(b.biller), sub, btns, m.link, d != null && d < 0 ? 'mburg' : '') });
+    });
+  } catch (e) { }
+  // Everyday Rewards: the same Countdown offers as the Home card
+  try {
+    erLive().forEach(p => {
+      const key = 'er|' + p.sum.toLowerCase().slice(0, 60) + '|' + p.end, d = daysLeft(p.end);
+      add({ sec: 'er', key, end: p.end, urgent: false, coming: d <= 2, badge: mbToday(p.at), at: p.at,
+        html: mbRow(key, '🛒', esc(p.sum), (d === 0 ? 'ends today' : d === 1 ? 'ends tomorrow' : 'ends ' + esc(fmtW(p.end))) + (p.boost ? ' · <b>Boost first</b>' : ''), '', p.link || p.web) });
+    });
+  } catch (e) { }
+  // Gluten free
+  try {
+    const seenG = new Set();
+    msgs.forEach(m => { const g = mbGfInfo(m); if (!g) return; try { if (m.att && mbBillInfo(m)) return; } catch (e) { } const key = 'gf|' + m.src + ':' + m.id; if (seenG.has(m.subject)) return; seenG.add(m.subject);
+      add({ sec: 'gf', key, urgent: false, coming: false, badge: mbToday(m.at), at: m.at,
+        html: mbRow(key, '🌾', esc(g.who) + ': ' + esc(m.subject.slice(0, 90)), [g.line ? esc(g.line) : '', (g.ev ? '📅 ' + esc(fmtW(g.ev)) + ' · ' : '') + esc(fmtW(String(m.at).slice(0, 10)))].filter(Boolean).join('<br>'), '', m.link) }); });
+  } catch (e) { }
+  return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+}
+const MB_SECS = [['dl', 'Deliveries'], ['cc', 'Click & collect'], ['bill', 'Bills by email'], ['er', 'Everyday Rewards'], ['gf', 'Gluten free']];
+function mbSections(L) {
+  return MB_SECS.map(([k, t]) => { let R = L.filter(x => x.sec === k && !x.urgent && !x.coming); if (k === 'er') R = R.sort((a, b) => String(a.end).localeCompare(String(b.end))); return R.length ? `<div class="sec">${t} <span class="glswipehint">swipe left to clear</span></div><div class="list">${R.map(x => x.html).join('')}</div>` : ''; }).join('');
 }
 
 /* ================= SCROLLING SUMMARY (2.23.35) =================
@@ -18899,6 +19166,16 @@ function glRoadItems() {
 function glUpdated() { const t = Math.max(HLIGHT && HLIGHT.at || 0, ALARM && ALARM.data && ALARM.at || 0); return t ? (Date.now() - t < 90e3 ? 'updated just now' : 'updated ' + ago(t)) : ''; }
 const glTempCol = t => { const v = parseFloat(t); return !Number.isFinite(v) ? ['#e0f2fe', '#bae6fd', '#0c4a6e'] : v < 12 ? ['#dbeafe', '#93c5fd', '#1e3a8a'] : v < 17 ? ['#cffafe', '#67e8f9', '#155e75'] : v < 21 ? ['#dcfce7', '#86efac', '#14532d'] : v < 25 ? ['#fef3c7', '#fcd34d', '#78350f'] : ['#ffedd5', '#fb923c', '#7c2d12']; };
 const GL_WAVE = '<svg class="glwave" viewBox="0 0 24 12" aria-hidden="true"><path d="M0 8 C4 2 8 2 12 6 S20 11 24 4 V12 H0Z" fill="#22d3ee" opacity=".55"/><path d="M0 8 C4 2 8 2 12 6 S20 11 24 4" fill="none" stroke="#0e7490" stroke-width="1.6"/></svg>';
+// 2.26.51: Home stat tile: today's power cost (same figure as the Power hero), tinted against the daily share of the weekly budget; tap opens Power
+function glPowerTile(ic) {
+  const bolt = 'M13 2 4 14h7l-1 8 9-12h-7z';
+  let t = null, d = null; try { d = (typeof PWR !== 'undefined' && PWR) || null; t = d && d.today; if (t && t.date && t.date !== todayISO()) t = null; } catch (e) { }
+  let tc = null; try { if (t) tc = t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1); } catch (e) { tc = null; }
+  const ok = tc != null && Number.isFinite(+tc), share = (() => { try { return pwrBudget() / 7; } catch (e) { return 60 / 7; } })();
+  let up = ''; try { const ms = Date.parse(d && d.updatedAt); if (ms) up = new Date(ms).toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase(); } catch (e) { }
+  const cls = !ok ? '' : +tc > share ? ' glpwr over' : ' glpwr under';
+  return `<button type="button" class="glst${cls || ' glpwr'}" id="glpwrtile" aria-label="Power today ${ok ? '$' + (+tc).toFixed(2) : 'not known yet'}. Open Power." onclick="event.stopPropagation();go('#power')">${ic(bolt)}<b>${ok ? '$' + (+tc).toFixed(2) : '—'}</b><small>${up ? esc(up) : 'Power'}</small></button>`;
+}
 function glStatInner() {
   const m = glMode(), ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`; // 2.26.9: five equal tiles, icon over value
   const tile = (i, v, l, cls = '') => `<span class="glst${cls}">${ic(i)}<b>${esc(v)}</b><small>${esc(l)}</small></span>`;
@@ -18908,7 +19185,7 @@ function glStatInner() {
     tile('M14 14V4a2 2 0 0 0-4 0v10a4 4 0 1 0 4 0z', !tv.length ? '–' : lo === hi ? lo.toFixed(1) + '°' : `${lo.toFixed(1)}–${hi.toFixed(1)}°`, tv.length ? (tv.length === 1 ? T[0].n : tv.length + ' rooms') : 'Temps'),
     tile('M5 21V3h11v18M14 12h.01', !D ? '–' : D.length ? D.length + ' open' : 'Closed', 'Doors', D && D.length ? ' glalert' : ''),
     tile('M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z', !L ? '–' : L.length ? L.length + ' on' : 'Off', 'Lights'),
-    (() => { const uv = wxIsDay() ? wxUV() : null; return tile('M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2v2M12 20v2M2 12h2M20 12h2', uv ? `${uv.n} ${uv.words}` : 'Night', 'UV'); })(),
+    glPowerTile(ic), // 2.26.51: today's power cost replaces UV here (UV stays on the weather card)
     tile('M2 14c3-4 5-4 8 0s5 4 8 0 3-2 4-1', td.length ? (td[0].high ? '▲' : '▼') + aklTime(td[0].ms).replace(/\s?[ap]m$/i, '') : '–', 'Tide')];
   const up = glUpdated();
   let x = '';
@@ -19371,7 +19648,7 @@ function glanceHome() {
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const orgZ = org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
-  const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + (m.off ? homeTry('days off', () => wkHomeCard(), '') : '') + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
+  const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
     wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + cards +
     (m.night ? entZ + asks + orgZ : orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
@@ -19562,7 +19839,7 @@ function glSwipe(e) {
   glSwipe.moved = false;
   const mv = ev => { const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0; if (!dir && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) dir = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y'; if (dir !== 'x') return; ev.preventDefault(); glSwipe.moved = true; dx = Math.min(0, ddx); el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(1 + dx / 400); };
   const end = () => { el.removeEventListener('touchmove', mv); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.style.transition = 'transform .2s ease, opacity .2s ease';
-    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; if (el.dataset.nl) nlDismiss(el.dataset.nl); else if (el.dataset.pn) pnDismiss(el.dataset.pn); else if (el.dataset.ab) abDismiss(el.dataset.ab); else nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.children.length) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
+    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; if (el.dataset.nl) nlDismiss(el.dataset.nl); else if (el.dataset.pn) pnDismiss(el.dataset.pn); else if (el.dataset.mb) mbDismiss(el.dataset.mb); else if (el.dataset.ab) abDismiss(el.dataset.ab); else nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.children.length) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
     else { el.style.transform = ''; el.style.opacity = ''; }
     setTimeout(() => { glSwipe.moved = false; }, 50); };
   el.addEventListener('touchmove', mv, { passive: false }); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
@@ -19627,22 +19904,23 @@ function pnItems() {
 }
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: (() => { try { return abItems(); } catch (e) { return []; } })() };
+  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: (() => { try { return abItems(); } catch (e) { return []; } })(), mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems(); } catch (e) { return []; } })() };
 }
-function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length; } catch (e) { return 0; } }
+function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length + p.mb.filter(x => x.badge).length; } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
-  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent);
-  const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length || abU.length ? `<div class="list">${pwU.map(x => x.html).join('')}${abU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
-  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC || abN.length ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}</div>` : '') +
+  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent), mbC = p.mb.filter(x => !x.urgent && x.coming);
+  const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length || abU.length || mbU.length ? `<div class="list">${mbU.map(x => x.html).join('')}${pwU.map(x => x.html).join('')}${abU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
+  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC || abN.length || mbC.length ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}${mbC.map(x => x.html).join('')}</div>` : '') +
     sec('New on your lists <span class="glswipehint">swipe left to clear</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
     sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
     sec('Power <span class="glswipehint">swipe left to clear</span>', pwN.length ? `<div class="list">${pwN.map(x => x.html).join('')}</div>` : '') +
+    mbSections(p.mb) +
     sec('New today <span class="glswipehint">swipe left to clear</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
-  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + p.ab.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + p.ab.length + p.mb.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
 
 /* 2.26.48: In progress for car due items (WOF / rego / service). Stored per car+part with the due date it was for, so it clears itself when the date is renewed.
@@ -19762,7 +20040,7 @@ function pwrFetch() {
   if (pwrBusy) return; pwrBusy = true;
   fetch(RELAY_URL + '/power', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
     pwrBusy = false;
-    if (d && d.updatedAt && (!PWR || JSON.stringify(d) !== JSON.stringify(PWR))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (/^#(power|compare|powertime|alerts)$/.test(location.hash)) render(); else glBellRedraw(); }
+    if (d && d.updatedAt && (!PWR || JSON.stringify(d) !== JSON.stringify(PWR))) { PWR = d; try { localStorage.setItem('powerCache', JSON.stringify(d)); } catch (e) { } if (/^#(power|compare|powertime|alerts)$/.test(location.hash)) render(); else { glBellRedraw(); try { glStatRedraw(); } catch (e) { } } }
   }).catch(() => { pwrBusy = false; });
 }
 function pwrCost(imp, exp, days) { const c = (+imp || 0) * PWR_RATE.importBlend + PWR_RATE.daily * (days || 1) - (+exp || 0) * PWR_RATE.exportCredit; return Math.max(0, c); }
