@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.57';
+const APP_VERSION = '2.26.58';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18582,6 +18582,8 @@ function render() {
   try { if (!render.nav && !(window.event && /^(click|submit|change|input|keydown|pointerup|touchend)$/.test(window.event.type)) && glanceOn() && ((location.hash || '#home').slice(1).split('/')[0] || 'home') === 'home' && Date.now() - glTouchAt < 900) { clearTimeout(render.t); render.t = setTimeout(render, 950); return; } } catch (e) { }
   // 2.23.83: the Lights page never redraws itself; only navigation (a hash change) rebuilds it.
   if ((location.hash === '#lights' || location.hash === '#heat' || location.hash === '#alarm') && renderedHash === location.hash && !render.force) return;
+  // 2.26.58: don't wipe the Akahu keys while he's copying the second one
+  try { if (location.hash === '#settings' && renderedHash === '#settings' && !render.force && !(window.event && /^(click|change|submit)$/.test(window.event.type)) && akhHold()) return; } catch (e) { }
   renderedHash = location.hash;
   if (!skipNoteCapture) captureNoteComposer();
   const noteRoute = (location.hash || '#home').slice(1).split('/')[0];
@@ -19013,7 +19015,7 @@ async function start() {
   if ('serviceWorker' in navigator) {
     let hadController = !!navigator.serviceWorker.controller, reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (hadController && !reloading) { reloading = true; if (sheetOpen) reloadPending = true; else location.reload(); }
+      if (hadController && !reloading) { reloading = true; if (sheetOpen || (typeof akhHold === 'function' && akhHold())) reloadPending = true; else location.reload(); }
       hadController = true;
     });
     navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'go') go(e.data.hash); });
@@ -19795,25 +19797,66 @@ function akahuSettings() {
   const st = cfStat();
   if (cfKey() && st) return `<div class="sec" id="akahuset">Connect bank (Akahu)</div><div class="list"><div class="srow"><div class="tx"><div class="t">Connected as ${esc(st.name || 'you')} · ${plural(st.accounts || 0, 'account')}</div><div class="s">Read-only. The tokens are kept only on the relay, encrypted; this phone has a device key.${st.at ? ' Updated ' + esc(cfWhen(st.at)) + '.' : ''}</div></div></div>
     <div class="btns" style="padding:8px 12px 12px"><button type="button" class="btn small primary" onclick="go('#cashflow')">Open Cash flow</button><button type="button" class="btn small danger" onclick="akahuDisconnect()">Disconnect</button></div></div>`;
-  return `<div class="sec" id="akahuset">Connect bank (Akahu)</div><div class="list"><div style="padding:12px">
-    <p class="muted" style="margin:0 0 10px">For Cash flow. Paste the two tokens from your Akahu personal app (my.akahu.nz › Developers). Akahu is read-only: it can see balances and transactions, it can’t move money. They’re checked with Akahu, then kept only on the app’s relay, encrypted. They’re not saved on this phone.</p>
-    <label class="field"><span>User Access Token</span><input id="akuser" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="user_token_…"></label>
-    <label class="field"><span>App ID Token</span><input id="akapp" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="app_token_…"></label>
+  // 2.26.58: two steps, values held in memory only (never storage) so leaving the app to copy the second key loses nothing
+  if (AKH.at && Date.now() - AKH.at > 10 * 60e3) akhClear();
+  setTimeout(akhRestore, 0);
+  const pasteBtn = which => `<button type="button" class="btn small" onclick="akhPaste('${which}')">Paste</button>`;
+  const step1 = AKH.step !== 2;
+  return `<div class="sec" id="akahuset">Connect bank (Akahu)</div><div class="list"><div style="padding:12px" id="akbox">
+    <p class="muted" style="margin:0 0 10px">For Cash flow. Copy the two tokens from your Akahu personal app (my.akahu.nz › Developers). Akahu is read-only: it can see balances and transactions, it can’t move money. They’re checked with Akahu, then kept only on the app’s relay, encrypted. They’re not saved on this phone.</p>
+    ${step1 ? `<div class="akstep"><b>Step 1 of 2</b> · User Access Token</div>
+    <div class="akrow"><input id="akuser" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="user_token_…" oninput="akhInput('user', this.value)">${pasteBtn('user')}</div>
+    <p class="muted" style="margin:6px 0 0;font-size:.8rem">You can also paste both tokens here at once.</p>
     <p id="akerr" class="muted" style="color:#b91c1c;margin:4px 0 0" role="alert"></p>
-    <div class="btns" style="margin-top:8px"><button type="button" class="btn primary" id="akbtn" onclick="akahuConnect()">Connect</button></div></div></div>`;
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn primary" onclick="akhNext()">Next</button></div>`
+    : `<div class="akheld">✓ First key held · <button type="button" class="linkbtn" onclick="akhBack()">change</button></div>
+    <div class="akstep"><b>Step 2 of 2</b> · App ID Token</div>
+    <div class="akrow"><input id="akapp" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="app_token_…" oninput="akhInput('app', this.value)">${pasteBtn('app')}</div>
+    <p id="akerr" class="muted" style="color:#b91c1c;margin:4px 0 0" role="alert"></p>
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn primary" id="akbtn" onclick="akahuConnect()">Connect</button><button type="button" class="btn" onclick="akhCancel()">Cancel</button></div>`}
+    </div></div>`;
 }
+let AKH = { user: '', app: '', step: 1, at: 0 };
+function akhClear() { AKH = { user: '', app: '', step: 1, at: 0 }; }
+const akhHold = () => { if (AKH.at && Date.now() - AKH.at > 10 * 60e3) akhClear(); return !!(AKH.user || AKH.app || (document.activeElement && /^ak(user|app)$/.test(document.activeElement.id || ''))); };
+const AK_U = /user_token_[A-Za-z0-9_-]{8,}/, AK_A = /app_token_[A-Za-z0-9_-]{8,}/;
+function akhInput(which, v) {
+  const t = String(v || '').replace(/(user_token_|app_token_)/g, ' $1'), u = t.match(AK_U), a = t.match(AK_A); // inputs drop newlines, so split the two tokens apart
+  AKH.at = Date.now();
+  if (u && a) { AKH.user = u[0]; AKH.app = a[0]; AKH.step = 2; akhRedraw(); return; } // both pasted at once
+  if (which === 'user') AKH.user = u ? u[0] : t.trim(); else AKH.app = a ? a[0] : t.trim();
+  if (which === 'user' && a && !u) { AKH.app = a[0]; AKH.user = ''; }
+}
+function akhRestore() { const u = document.getElementById('akuser'), a = document.getElementById('akapp'); if (u && !u.value && AKH.user) u.value = AKH.user; if (a && !a.value && AKH.app) a.value = AKH.app; }
+function akhRedraw() { const box = document.getElementById('akahuset'); if (!box) return; const w = document.createElement('div'); w.innerHTML = akahuSettings(); box.nextElementSibling.replaceWith(w.children[1]); akhRestore(); }
+async function akhPaste(which) {
+  let t = '';
+  try { t = await navigator.clipboard.readText(); } catch (e) { t = ''; }
+  if (!t) { const el = document.getElementById(which === 'user' ? 'akuser' : 'akapp'); if (el) el.focus(); const e2 = document.getElementById('akerr'); if (e2) e2.textContent = 'Couldn’t read the clipboard. Long-press in the box and choose Paste.'; return; }
+  akhInput(which, t); akhRestore();
+  if (which === 'user' && AKH.user && AKH.step !== 2 && AK_U.test(AKH.user)) akhNext();
+}
+function akhNext() {
+  const e = document.getElementById('akerr');
+  if (!/^user_token_\S{8,}$/.test(AKH.user)) { if (e) e.textContent = 'That doesn’t look like the User Access Token. It starts with user_token_.'; return; }
+  AKH.step = 2; AKH.at = Date.now(); akhRedraw();
+}
+function akhBack() { AKH.step = 1; akhRedraw(); }
+function akhCancel() { akhClear(); akhRedraw(); if (reloadPending) location.reload(); }
 async function akahuConnect() {
-  const u = document.getElementById('akuser'), a = document.getElementById('akapp'), e = document.getElementById('akerr'), b = document.getElementById('akbtn');
-  const user = (u && u.value || '').trim(), app = (a && a.value || '').trim();
-  if (!/^user_token_\S{8,}$/.test(user) || !/^app_token_\S{8,}$/.test(app)) { if (e) e.textContent = CF_ERR.bad_tokens; return; }
+  const e = document.getElementById('akerr'), b = document.getElementById('akbtn');
+  const a0 = document.getElementById('akapp'); if (a0 && a0.value) akhInput('app', a0.value);
+  const user = AKH.user, app = AKH.app;
+  if (!/^user_token_\S{8,}$/.test(user)) { AKH.step = 1; akhRedraw(); return; }
+  if (!/^app_token_\S{8,}$/.test(app)) { if (e) e.textContent = 'That doesn’t look like the App ID Token. It starts with app_token_.'; return; }
   if (b) { b.disabled = true; b.textContent = 'Checking with Akahu…'; } if (e) e.textContent = '';
   let s, d; try { [s, d] = await cfApi('/akahu/connect', 'POST', { user, app }); } catch (er) { s = 0; d = { error: 'akahu_unavailable' }; }
   if (s === 200 && d.key) {
     try { localStorage.setItem('cfKey', d.key); localStorage.setItem('cfStatus', JSON.stringify({ name: d.name || '', accounts: d.accounts || 0, at: new Date().toISOString() })); } catch (er) { }
-    if (u) u.value = ''; if (a) a.value = ''; CF = null;
-    toast(`Connected as ${d.name || 'you'} · ${plural(d.accounts || 0, 'account')}`); render(); return;
+    akhClear(); CF = null;
+    toast(`Connected as ${d.name || 'you'} · ${plural(d.accounts || 0, 'account')}`); if (reloadPending) { location.reload(); return; } render(); return;
   }
-  if (u) u.value = ''; if (a) a.value = ''; // never leave them sitting in the page
+  // keep the held keys so he can fix just the wrong one; they stay in memory only
   if (b) { b.disabled = false; b.textContent = 'Connect'; } if (e) e.textContent = CF_ERR[d && d.error] || 'That didn’t work. Please try again.';
 }
 function akahuDisconnect() {
