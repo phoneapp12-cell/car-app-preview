@@ -1,11 +1,12 @@
-/* 2.26.25: Millesha's Renovation – shared by My App (#reno) and Millesha's own page (millesha.html).
+/* Job list v2 (2.26.29): jobs are defined here only; saved entries for removed jobs (out-prep, out-paint) are simply ignored, so nobody's other ticks are touched.
+   2.26.25: Millesha's Renovation – shared by My App (#reno) and Millesha's own page (millesha.html).
    Only this job list travels, through the relay's /reno route with its own key. Nothing else from My App is shared. */
 (function () {
   const RELAY = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/reno';
   const INSIDE = [['main', 'Main bedroom', '🛏️', 'carpet'], ['spare', 'Spare bedroom', '🛋️', 'carpet'], ['bath', 'Bathroom', '🛁', 'tiles'], ['hall', 'Hallway', '🚪', 'carpet'], ['lounge', 'Lounge', '📺', 'carpet'], ['dining', 'Dining', '🍽️', 'carpet'], ['kitchen', 'Kitchen', '🍳', 'tiles'], ['pantry', 'Pantry', '🥫', 'tiles'], ['laundry', 'Laundry', '🧺', 'tiles']];
   const AREAS = INSIDE.map(([k, n, e, f]) => ({ k, n, e, floorDef: f, jobs: [['clean', 'Clean'], ['mop', 'Mop ceiling'], ['speckle', 'Apply speckle (filler)'], ['sand', 'Sand'], ['ceiling', 'Paint ceiling (roof)'], ['walls', 'Paint walls'], ['floor', 'Flooring']] }))
-    .concat([{ k: 'out', n: 'Outside', e: '🏡', jobs: [['wash', 'House wash (walls, windows, soffits)'], ['gutters', 'Clear gutters and downpipes'], ['prep', 'Fix, scrape and sand weatherboards and trim'], ['paint', 'Paint exterior (if needed)'], ['decks', 'Clean decks and paths'], ['metal', 'Metal man (scrap metal pickup)'], ['dump', 'Dump runs']] },
-    { k: 'final', n: 'Final stage', e: '✨', final: true, jobs: [['clean', 'Final clean-up (whole house)'], ['lawns', 'Mow lawns and tidy edges']] }]);
+    .concat([{ k: 'out', n: 'Outside', e: '🏡', jobs: [['wash', 'House wash (walls, windows, soffits)'], ['gutters', 'Clear gutters and downpipes'], ['decks', 'Clean decks and paths'], ['metal', 'Metal man (scrap metal pickup)'], ['dump', 'Dump runs']] },
+    { k: 'final', n: 'Final stage', e: '✨', final: true, jobs: [['clean', 'Final clean-up'], ['lawns', 'Final lawns'], ['weed', 'Weed eating']] }]);
   const ST = { todo: 'To do', doing: 'In progress', done: 'Done' };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let key = '', me = 'Shane', onChange = () => { }, st = { items: {}, dirty: [] };
@@ -51,6 +52,7 @@
         h += `<div class="rnctl"><button type="button" class="rnchip rnall" onclick="Reno.roomDone('${a.k}')">${L.every(j => j.status === 'done') ? '↺ Untick all' : '✓ Mark room done'}</button><button type="button" class="rnchip" onclick="Reno.assignArea('${a.k}')">👤 ${ae.who ? esc(ae.who) : 'Assign area'}</button>${a.floorDef ? `<span class="rnseg"><button type="button" class="${(ae.floor || a.floorDef) === 'carpet' ? 'on' : ''}" onclick="Reno.floor('${a.k}','carpet')">Carpet</button><button type="button" class="${(ae.floor || a.floorDef) === 'tiles' ? 'on' : ''}" onclick="Reno.floor('${a.k}','tiles')">Stick-down tiles</button></span>` : ''}</div>`;
         h += L.map((j, i) => `<div class="rnjob s-${j.status}"><button type="button" class="rnst" aria-label="${j.status === 'done' ? 'Untick' : 'Tick done'}: ${esc(j.title)}" onclick="Reno.cycle('${j.id}')">${j.status === 'done' ? '✓' : i + 1}</button><button type="button" class="rnjt" onclick="Reno.edit('${j.id}')"><div class="t">${esc(j.title)}</div><div class="s"><span class="rnpill p-${j.status}">${ST[j.status]}</span>${j.status === 'done' && j.by ? ' · ticked by ' + esc(j.by) : ''}${j.who || j.areaWho ? ' · 👤 ' + esc(j.who || j.areaWho) : ''}${j.due ? ' · 📅 ' + fmtD(j.due) : ''}${j.notes ? ' · ' + esc(j.notes.slice(0, 60)) : ''}</div></button>${j.counter ? `<span class="rncnt"><b>${j.count}</b> ${j.count === 1 ? 'run' : 'runs'} done<button type="button" aria-label="Add a dump run" onclick="Reno.addRun('${j.id}')">+1</button></span>` : ''}</div>`).join('');
       }
+      else h += `<div class="rnlockl">${L.map(j => '🔒 ' + esc(j.title)).join('<br>')}</div>`;
       h += '</section>';
     });
     return `<div class="reno">${h}<p class="rnfoot">${key ? 'Shared with Millesha’s page. Changes sync in a few seconds.' : 'Not linked yet.'}</p></div>`;
@@ -103,6 +105,7 @@
 .rncd{display:flex;align-items:center;gap:12px;border:0;border-radius:18px;padding:12px 16px;text-align:left;color:#fff;width:100%}.rncdi{font-size:1.6rem}.rncdt{display:flex;flex-direction:column}.rncdt b{font-size:1.35rem;line-height:1.2}.rncdt span{font-size:.82rem;opacity:.92}
 .rncd-blue{background:linear-gradient(135deg,#0ea5e9,#2563eb)}.rncd-amber{background:linear-gradient(135deg,#f59e0b,#d97706)}.rncd-red{background:linear-gradient(135deg,#ef4444,#b91c1c)}
 .rncnt{display:flex;align-items:center;gap:6px;font-size:.78rem;color:#475569;flex:none}.rncnt b{font-size:1rem;color:#0f172a}.rncnt button{border:0;background:#1d4ed8;color:#fff;border-radius:99px;padding:6px 10px;font-weight:800;font-size:.85rem}
+.rnlockl{font-size:.85rem;color:#64748b;line-height:1.7;padding:2px 4px}
 .rnfoot{font-size:.78rem;color:#94a3b8;text-align:center;margin:4px 0 0}
 .rnsheet{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center}.rnsb{background:#fff;width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;color:#0f172a}
 .rnsb h3{margin:0;font-size:1.15rem}.rnl{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:650;color:#334155}.rnin{font:inherit;font-weight:400;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;font-size:1rem}
