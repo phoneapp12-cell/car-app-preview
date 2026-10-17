@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.34';
+const APP_VERSION = '2.26.35';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -2032,6 +2032,7 @@ function todoIsPlantFeed(t) {
   return /\bfeed/i.test(title) && /\b(strawberr|tomato|citrus|lemon|orange|mandarin|plum|peach|garden|plants?)\b/i.test(title);
 }
 function feedWarmTodo() {
+  return; // 2.26.35: feeding to-dos are no longer deleted when it's warm; they show 'Later today · after ~X' / 'Tomorrow' instead (garden rule)
   try {
     if (feedWarmBusy || !S || !Array.isArray(S.todos) || !feedTooWarm()) return;
     const open = t => t && !t.done && !isSarahTodo(t) && todoIsPlantFeed(t);
@@ -5400,6 +5401,24 @@ function todoPriRank(t) { return todoPriority(t) === 'high' ? 0 : todoPriority(t
 const todoStatus = t => t && t.done ? 'done' : t && t.status === 'doing' ? 'doing' : 'todo';
 async function todoStart(id) { const t = (S.todos || []).find(x => x.id === id); if (!t || t.done) return; const s = snap(); if (t.status === 'doing') { delete t.status; delete t.startedAt; } else { t.status = 'doing'; t.startedAt = Date.now(); } await save(); render(); toast(t.status === 'doing' ? `In progress: ${t.title}` : `${t.title} back to To do.`, 'Undo', undoTo(s)); }
 const todoStatBtn = t => t.done ? '' : `<button type="button" class="tstat ${todoStatus(t) === 'doing' ? 'doing' : ''}" onclick="todoStart('${t.id}')" aria-label="${todoStatus(t) === 'doing' ? 'In progress. Tap to set back to To do' : 'Start'}: ${esc(t.title)}">${todoStatus(t) === 'doing' ? '● In progress' : '▶ Start'}</button>`;
+// 2.26.35: garden rule for watering/feeding to-dos: not above 10° now or in the next 5 hours. While blocked, show when it'll be OK instead of overdue.
+const WATER_TASK = t => { const x = String((t && t.title) || ''); return /\b(water|watering|feed|feeding|fertili[sz]e)\b/i.test(x) && /\b(plants?|garden|lawns?|veg\w*|pots?|seedlings?|strawberr\w*|citrus|trees?|flowers?|beds?)\b/i.test(x); };
+function waterWin() { // null = no forecast (leave as normal); { ok } or { ok:false, label }
+  try {
+    const w = wxNext5(); if (!w || !num(w.now) || !num(w.maxT)) return null;
+    if (w.now <= 10 && w.maxT <= 10) return { ok: true };
+    const h = WX.data.hourly, L = wxLocalNow(), key = L.iso + 'T' + L.hm.slice(0, 2), T = [];
+    for (let i = 0; i < h.time.length; i++) { const tm = h.time[i]; if (typeof tm === 'string' && tm.slice(0, 13) > key) T.push([tm, arr(h, 'temperature_2m', i)]); }
+    for (let i = 0; i + 5 < T.length; i++) {
+      if (T[i][0].slice(0, 10) !== L.iso) break;
+      if ([0, 1, 2, 3, 4, 5].every(k => num(T[i + k][1]) && T[i + k][1] <= 10)) { let hr = +T[i][0].slice(11, 13); const ap = hr < 12 ? 'am' : 'pm'; hr = hr % 12 || 12; return { ok: false, label: `Later today · after ~${hr} ${ap}` }; }
+    }
+    return { ok: false, label: 'Tomorrow' };
+  } catch (e) { return null; }
+}
+function waterBlock(t) { if (!t || t.done || !t.due || daysLeft(t.due) > 0 || !WATER_TASK(t)) return null; const w = waterWin(); return w && !w.ok ? w.label : null; }
+const waterPill = lab => `<span class="pill waterlater">💧 ${esc(lab)}</span>`;
+const todoDuePill = (t, d) => { const b = waterBlock(t); return b ? waterPill(b) : pill(d == null ? daysLeft(t.due) : d); };
 function cmpOpenTodo(a, b) {
   return (todoStatus(a) === 'doing' ? 0 : 1) - (todoStatus(b) === 'doing' ? 0 : 1)
     || todoPriRank(a) - todoPriRank(b)
@@ -5419,7 +5438,7 @@ function Todo() {
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const row = t => todoMetaDedupe(`<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
     <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${sharedMark(t)}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
-    ${t.due && !t.done ? pill(daysLeft(t.due)) : ''}</button>${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}</div>`);
+    ${t.due && !t.done ? todoDuePill(t) : ''}</button>${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}</div>`);
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
   return banHeader('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()'), 'todo') +
@@ -19233,6 +19252,7 @@ function glDueItems() {
       if (!t || t.done || !t.due || !t.title || !glOk(t.title) || (glDueItems.nl && glDueItems.nl.has(t.id))) return;
       const d = daysLeft(t.due); if (d > 7) return;
       const doing = todoStatus(t) === 'doing'; if (doing && d > 0) return;
+      if (waterBlock(t)) { out.push({ days: 0.5, html: glTodoCard(t, d), noCount: true, todoId: t.id }); return; } // blocked by the garden rule: Coming up, not counted
       out.push({ days: d, html: glTodoCard(t, d), noCount: d > 1, todoId: t.id });
     });
   } catch (e) { }
@@ -19255,12 +19275,12 @@ function nlItems() {
   const since = nlSince(), gone = new Set(nlDis()), out = [];
   try { (S.todos || []).forEach(t => { if (t && !t.done && !isSarahTodo(t) && +t.created >= since && !gone.has(t.id) && t.title && glOk(t.title) && !(todoStatus(t) === 'doing' && !(t.due && daysLeft(t.due) <= 0))) out.push({ id: t.id, title: t.title, where: '#todo', list: t.list || 'To-do', due: t.due || '', days: t.due ? daysLeft(t.due) : null, doing: todoStatus(t) === 'doing' }); }); } catch (e) { }
   try { ((S.shop && S.shop.items) || []).forEach(x => { if (x && !x.done && !isSarahShop(x) && +x.created >= since && !gone.has(x.id) && x.name && !(x.meals && x.meals.length) && glOk(x.name)) out.push({ id: x.id, title: x.name, where: '#shopping', list: 'Shopping', due: '', days: null }); }); } catch (e) { }
-  return out.map(x => ({ ...x, urgent: x.days !== null && x.days <= 0, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div>${x.doing ? '<span class="pill glprog">In progress</span>' : ''}</div>` }));
+  return out.map(x => ({ ...x, wb: x.where === '#todo' ? waterBlock((S.todos || []).find(t => t.id === x.id)) : null })).map(x => ({ ...x, urgent: x.days !== null && x.days <= 0 && !x.wb, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.wb ? ' · 💧 ' + esc(x.wb) : x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div>${x.doing ? '<span class="pill glprog">In progress</span>' : ''}</div>` }));
 }
 function glStartedTxt(t) { if (!t.startedAt) return ''; const d = new Date(t.startedAt), today = todayISO(d) === todayISO(); return 'Started ' + (today ? fmtTime(d.toTimeString().slice(0, 5)) : fmtW(todayISO(d))); }
 function glTodoCard(t, d) {
   const doing = todoStatus(t) === 'doing';
-  return `<button class="row" onclick="todoForm('${t.id}')"><div class="ic todo">${I('check')}</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list || 'To-do')}${t.due ? ' · ' + fmtW(t.due) : ''}${doing && t.startedAt ? ' · ' + glStartedTxt(t) : ''}</div></div>${doing ? '<span class="pill glprog">In progress</span>' : ''}${t.due ? pill(d) : ''}</button>`;
+  return `<button class="row" onclick="todoForm('${t.id}')"><div class="ic todo">${I('check')}</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list || 'To-do')}${t.due ? ' · ' + fmtW(t.due) : ''}${doing && t.startedAt ? ' · ' + glStartedTxt(t) : ''}</div></div>${doing ? '<span class="pill glprog">In progress</span>' : ''}${t.due ? todoDuePill(t, d) : ''}</button>`;
 }
 function glProgItems() { // 2.26.34: In progress section (not overdue/today; those sit under Urgent)
   try { return (S.todos || []).filter(t => t && !t.done && todoStatus(t) === 'doing' && t.title && glOk(t.title) && !(t.due && daysLeft(t.due) <= 0)).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0)).map(t => glTodoCard(t, t.due ? daysLeft(t.due) : 0)); } catch (e) { return []; }
