@@ -1837,6 +1837,13 @@ html body .banwrap .banbtns .iconbtn.add{background:var(--brand)!important;color
 #glalerts .list>* .btn:not(.primary):not(.danger),#glalerts .glwarn .btn:not(.primary):not(.danger){background:#E2E8F0!important;color:#1E293B!important;border-color:#CBD5E1}
 #glalerts .list>* .btn.primary,#glalerts .glwarn .btn.primary{color:var(--onbrand)!important}
 #glalerts .list>* .btn.danger,#glalerts .glwarn .btn.danger{background:#FEE2E2!important;color:#991B1B!important}
+/* 2.26.76: new since last look: blue edge, soft blue glow and a New pill; fades after about a minute (--newage = seconds already on the page) */
+#glalerts .glisnew{position:relative}
+#glalerts .glisnew::after{content:'';position:absolute;inset:0;border-radius:14px;pointer-events:none;box-shadow:inset 5px 0 0 #2563EB,0 0 0 2px rgba(37,99,235,.6),0 4px 14px rgba(37,99,235,.4);background:rgba(37,99,235,.07);animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}
+html body #glalerts span.newpill,html body #glalerts .glisnew span.newpill{display:inline-block;background:#1D4ED8!important;color:#fff!important;font-size:.68rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:1px 7px;margin-right:6px;vertical-align:2px;animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}
+#glalerts .glwarn .newpill{align-self:flex-start;margin:0 0 2px}
+@keyframes glnewpill{to{opacity:0}}
+@media (prefers-reduced-motion:reduce){#glalerts .glisnew::after,#glalerts .newpill{animation-duration:.01s}}
 #glalerts .list>* .linkbtn,#glalerts .glwarn .linkbtn{color:#1D4ED8!important}
 #glalerts .list>* .s,#glalerts .glwarn .s,#glalerts .muted{color:#64748b!important}
 #glalerts .glwtag{color:#64748b!important;opacity:1}

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.75';
+const APP_VERSION = '2.26.76';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1144,9 +1144,8 @@ function homePick(salt, options) {
 function homeFlavorKind() {
   if (homeFlavorRoll != null) return homeFlavorRoll;
   const r = Math.random();
-  if (r < 0.10) homeFlavorRoll = 'joke';
-  else if (r < 0.20) homeFlavorRoll = 'fact';
-  else if (r < 0.30) homeFlavorRoll = 'question';
+  // 2.26.76: the joke and the fun fact live on Notifications now
+  if (r < 0.10) homeFlavorRoll = 'question';
   else homeFlavorRoll = '';
   return homeFlavorRoll;
 }
@@ -2536,7 +2535,7 @@ function nightPicks() {
   } catch (e) {}
   try { if (NF && mailConnected('microsoft')) { const f = (NF.fresh || []).slice(0, 3).map(x => x.title).filter(Boolean); if (f.length) out.push({ kind: 'netflix', text: 'New on Netflix: ' + engList(f), title: f[0] }); } } catch (e) {}
   try { const t = TOP40[0]; if (t) out.push({ kind: 'top40', text: 'Number 1 on the NZ Top 40 this week: “' + t.title + '” by ' + t.artist, title: t.title }); } catch (e) {}
-  try { const t = travelToday(); if (t) out.push({ kind: 'travel', text: 'Today’s travel spot: ' + t.name + ', ' + t.country, title: t.name }); } catch (e) {}
+  try { const t = false && travelToday(); if (t) out.push({ kind: 'travel', text: 'Today’s travel spot: ' + t.name + ', ' + t.country, title: t.name }); } catch (e) {}
   try {
     const T = todayISO(), lim = addDays(T, 3);
     upcomingEvents().filter(e => e && e.title && e.date <= lim && nightOk(e.title)).slice(0, 2)
@@ -2654,7 +2653,7 @@ function aiSumCtx() {
     if (pool.length) { const np = pool.filter(x => x.k !== 'tip'), lp = np.length ? np : []; if (lp.length) ctx.lead = lp[slot % lp.length].t; ctx.more = pool.map(x => x.t).slice(0, 8); }
     const av = sumHist().filter(x => x.phase !== sumPhaseKey()).map(x => x.t); if (av.length) ctx.avoidLines = av.slice(-15);
     ctx.varietyRule = 'Open with the lead item (in your own words), then vary the order. Use items from more. Never reuse a sentence or the same wording as any line in avoidLines.';
-    if (ws.quiet) { ctx.atWorkRule = 'He is at work now' + (ws.end ? ' until ' + ws.end : '') + '. Only work-hours things: what is due today, closures on his route home, the weather for the drive home near finish time, the coworker question, quick wins. Do NOT mention gym, tonight, evening, dinner, TV, music, movies, the spa or any after-work plans.'; try { ctx.coworkerQuestion = coworkQ(); } catch (e) { } delete ctx.mealsPlanned; }
+    if (ws.quiet) { ctx.atWorkRule = 'He is at work now' + (ws.end ? ' until ' + ws.end : '') + '. Only work-hours things: what is due today, closures on his route home, the weather for the drive home near finish time, quick wins. Do NOT mention gym, tonight, evening, dinner, TV, music, movies, the spa or any after-work plans.'; delete ctx.mealsPlanned; }
   } catch (e) {}
   try { const pr = aboutProfile(); ctx.aboutShane = pr.facts; if (pr.aboutYou.length) ctx.aboutYouAnswers = pr.aboutYou; delete ctx.facts; delete ctx.about;
     const tc = sumTouches(sumToday().min < 360 ? 4 : 2); ctx.personalTouches = tc.map(x => x.t); ctx._touchIds = tc.map(x => x.id);
@@ -2675,7 +2674,7 @@ function nightCtx(ctx) {
   delete ctx.todos; // no jobs at night
   ctx.night = true;
   ctx.interesting = nightPicks().map(x => x.text);
-  ctx.nightRule = 'It is night (after 8pm). Write a relaxed evening summary for you, built around 2 to 4 of the items in interesting (news headlines, videos, New on Netflix, the Top 40, the travel spot, local events): say what each is and why it might be worth a look tonight. Dry, cheeky jokes are fine. Never mention bills, overdue or due items, payments, invoices, the mortgage, budget, money or chores. The travel spot and New on Netflix are also shown under the summary, so only mention them in passing. Suggestions: relaxed things only (watch, read, listen, plan something fun), never a payment or a chore.';
+  ctx.nightRule = 'It is night (after 8pm). Write a relaxed evening summary for you, built around 2 to 4 of the items in interesting (news headlines, videos, New on Netflix, the Top 40, the travel spot, local events): say what each is and why it might be worth a look tonight. Dry, cheeky jokes are fine. Never mention bills, overdue or due items, payments, invoices, the mortgage, budget, money or chores. New on Netflix is also shown under the summary, so only mention it in passing. Suggestions: relaxed things only (watch, read, listen, plan something fun), never a payment or a chore.';
   return ctx;
 }
 const SUM_REUSE_MS = 3600 * 1000; // 2.26.21: a cached AI summary is reused for at most 1 hour (was 4 hours)
@@ -2911,7 +2910,7 @@ function homeSceneCard(inner, noSugs) {
   let sugs = '';
   try { sugs = noSugs ? '' : homeSugHtml(); } catch (e) { sugs = ''; }
   let nf = ''; try { nf = stripOn() ? '' : nfHtml(); } catch (e) { nf = ''; } // 2.22.87: New on Netflix, at the very bottom
-  let tr = ''; try { tr = stripOn() ? '' : sumTravelHtml(); } catch (e) { tr = ''; } // 2.22.98: today's travel spot, above Netflix
+  let tr = ''; // 2.26.76: Place of the day is a card on Notifications now
   return `<div class="card homesum wx-${scene}" id="homesum"><div class="sumshade">${body}${sugs}${tr}${nf}</div></div>`;
 }
 function homeSumFallback() {
@@ -3232,7 +3231,7 @@ function homeSumCard(bits) {
     });
     try { const ws = sumWorkState(); // 2.23.76: at work, work-hours lines; otherwise one rotating line from the wider pool
       for (let i = ps.length - 1; i >= 0; i--) if (!sumWorkOk(ps[i].replace(/<[^>]*>/g, ''), ws)) ps.splice(i, 1);
-      if (ws.quiet) { const add = []; const H = headsUpList().find(h => h.route); if (H) add.push(li(esc(dot('On your way home: ' + H.what + ', ' + H.when)))); add.push(li(esc('Ask a coworker: ' + coworkQ()))); ps.splice(Math.min(must.length, ps.length), 0, ...add); }
+      if (ws.quiet) { const add = []; const H = headsUpList().find(h => h.route); if (H) add.push(li(esc(dot('On your way home: ' + H.what + ', ' + H.when)))); /* 2.26.76: Ask a co-worker is a card on Notifications now */ ps.splice(Math.min(must.length, ps.length), 0, ...add); }
       else if (!night) { const pl = sumPool().filter(x => x.k !== 'tip'); if (pl.length) { const x = pl[(Math.floor(sumToday().min / 210) + homeSugOpenN) % pl.length]; ps.push(li(esc(dot(homeCapClause(x.t))))); } }
       try { const late = sumToday().min < 360; const tc = sumTouches(ws.quiet ? 1 : late ? 4 : 2); const at = late ? 1 : Math.min(ps.length, 3); ps.splice(at, 0, ...tc.map(x => li(esc(dot(homeCapClause(x.t)))))); if (tc.length) touchUse(tc.map(x => x.id)); } catch (e) { }
     } catch (e) {}
@@ -3796,6 +3795,7 @@ const NIGHT_CARD = {
       <div class="tx"><div class="t">${v.rank}. ${esc(v.title)}</div><div class="s">${esc(v.artist)}</div></div></button>`).join('')}</div>`;
   },
   travel: () => {
+    return ''; // 2.26.76: Place of the day is a card on Notifications now
     const p = travelToday(); if (!p || !p.name) return '';
     const first = String((p.paras && p.paras[0]) || '').split(/(?<=\.)\s/)[0];
     return homeSec('Today’s travel spot', '<a href="#travel">Open</a>') + `<div class="list" id="hometravel"><button class="row" onclick="go('#travel')"><div class="ic ev">${I('globe')}</div>
@@ -15941,9 +15941,9 @@ function stripSlides() {
   // 2.23.95: Heat pumps slide removed (heatStripSlides kept as a no-op so nothing can throw)
   try { (typeof alarmStripSlides === 'function' ? alarmStripSlides() : []).forEach(x => { try { add(...x); } catch (e) {} }); } catch (e) {}
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); add('quote', 'Quote of the day', `<p class="qsq">“${esc(q.t)}”</p><div class="qsw">${esc(q.w)}</div>`); } } catch (e) {}
-  try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (j && !jokeExpired(j)) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
-  try { const p = travelToday(); if (p && p.name) add('travel', 'Today’s travel spot', `<p class="qsq"><b>${esc(p.name)}</b>, ${esc(p.country)}</p><div class="qsw">${esc(travelKmText(travelKm(p.lat, p.lon)))} away · ${esc(sumTravelTime(p.tz))} there</div>`, "go('#travel')"); } catch (e) {}
-  try { const f = homePick(131, HOME_FACTS); if (f) add('fact', 'Did you know?', `<p class="qsq">${esc(String(f.line || f))}</p>`); } catch (e) {}
+  try { if (false && dailyJokeOn()) { const j = dailyJokeFor(); if (j && !jokeExpired(j)) add('joke', '😄 Joke of the day', `<p class="qsq">${esc(j[0])}</p><p class="qsa${stripJA ? ' on' : ''}">${stripJA ? esc(j[1]) : 'Tap for the answer'}</p>`, 'joke'); } } catch (e) {}
+  try { const p = false && travelToday(); if (p && p.name) add('travel', 'Today’s travel spot', `<p class="qsq"><b>${esc(p.name)}</b>, ${esc(p.country)}</p><div class="qsw">${esc(travelKmText(travelKm(p.lat, p.lon)))} away · ${esc(sumTravelTime(p.tz))} there</div>`, "go('#travel')"); } catch (e) {}
+  try { const f = false && homePick(131, HOME_FACTS); if (f) add('fact', 'Did you know?', `<p class="qsq">${esc(String(f.line || f))}</p>`); } catch (e) {}
   try { const c = countdownRows().filter(x => x && !/\bpay ?day\b/i.test(String(x.name || '')))[0]; if (c) add('count', 'Countdown', `<p class="qsq"><b>${esc(c.name)}</b></p><div class="qsw">${esc(cdWords(cdDays(c.date)))} · ${esc(fmtW(c.date))}</div>`, "go('#countdown')"); } catch (e) {}
   try { if (NF && mailConnected('microsoft')) { const t = todayISO(), fr = (NF.fresh || []).slice(0, 3), co = (NF.coming || []).filter(x => x.date && x.date >= t).slice(0, 2); const x = fr[0] || co[0];
     if (x) add('netflix', 'New on Netflix', `<p class="qsq">${esc(fr.map(y => y.title).join(', ') || '')}${fr.length && co.length ? '' : ''}</p>${co.length ? `<div class="qsw">Coming: ${esc(co.map(y => y.title + ' (' + fmtW(y.date) + ')').join(', '))}</div>` : ''}`, 'app:netflix'); } } catch (e) {}
@@ -16057,7 +16057,7 @@ function smartSlides() {
       const when = pt ? new Date(pt).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short' }) : '';
       add('sarah', '🎬 Sarah’s latest video', `<div class="qssv"><img class="qsthumb" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="" loading="lazy"><div><p class="qsq"><b>${esc(v.title)}</b></p><div class="qsw">${esc(when)}${isNew ? ' · <span class="qsnew">New</span>' : ''} · Tap to watch</div></div></div>`, 'url:' + v.url, isNew ? 95 : 45); } } catch (e) { }
   try { // 2.23.73: one friendly question a day for a coworker, only while at work
-    if (atWork || (work && work.phase === 'now')) add('cowork', '💬 Ask a coworker', `<p class="qsq"><b>${esc(coworkQ())}</b></p><div class="qsw">A new question tomorrow</div>`, '', 64); } catch (e) { }
+    if (false) add('cowork', '💬 Ask a coworker', `<p class="qsq"><b>${esc(coworkQ())}</b></p><div class="qsw">A new question tomorrow</div>`, '', 64); } catch (e) { }
   try { // 2.23.70: daily media picks, only real titles from the app's own lists
     const day = Math.floor(todayT() / DAY), pick = (a, n) => a.length ? a[(day + n) % a.length] : null, vs = preferFilmVideoTitles(videoSuggestions() || []).filter(v => v && v.title && v.url);
     const isVlog = v => /vlog|day (trip|in|at)|with me|explore|road trip|a fun day/i.test(v.title) || v.category === 'travel';
@@ -16794,8 +16794,8 @@ function Settings() {
   <div class="sec">Notifications page</div>
   <div class="list">
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
-   <div class="srow"><div class="tx"><div class="t">Fun fact</div><div class="s">A new fun fact each day, as its own panel on Home.</div></div><button class="switch ${factOn() ? 'on' : ''}" role="switch" aria-checked="${factOn()}" aria-label="Fun fact" id="factsw" onclick="toggleSetting('dailyFact', ${!factOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day on Notifications, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Fun fact</div><div class="s">A new fun fact each day, as a card on Notifications.</div></div><button class="switch ${factOn() ? 'on' : ''}" role="switch" aria-checked="${factOn()}" aria-label="Fun fact" id="factsw" onclick="toggleSetting('dailyFact', ${!factOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Card artwork</div><div class="s">Picture headers and illustrated icons on Coming up and Just added. Off: the plain cards.</div></div><button class="switch ${cardArtOn() ? 'on' : ''}" role="switch" aria-checked="${cardArtOn()}" aria-label="Card artwork" id="cardartsw" onclick="toggleSetting('cardArt')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
@@ -19322,13 +19322,13 @@ function glWarnList() {
   return L.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url || x.go || ''}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk)).sort((a, b) => b.pri - a.pri);
 }
 function glWarnCard(x) {
-  const cls = `glwarn ${x.red ? 'glw-red' : x.info ? 'glw-info' : 'glw-amb'}${x.route ? ' glw-route' : ''}`, inner = `<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ''}`;
+  const cls = `glwarn ${x.red ? 'glw-red' : x.info ? 'glw-info' : 'glw-amb'}${x.route ? ' glw-route' : ''}${x.isNew ? ' glisnew' : ''}`, inner = `${x.isNew ? '<span class="newpill">New</span>' : ''}<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ''}`;
   if (x.flag) return `<div class="glflagwrap"${x.gk ? ` data-gk="${esc(x.gk)}"` : ''}>${x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="go('#events')">${inner}</button>`}<button type="button" class="glunflag" onclick="evFlagToggle(${jsArg(x.flag)}, event)" aria-label="Unflag ${esc(x.what)}">Unflag</button></div>`;
   const g = x.gk ? ` data-gk="${esc(x.gk)}"` : '';
   return x.url ? `<a class="${cls}"${g} href="${esc(x.url)}" target="_blank" rel="noopener" onclick="if(glSwipe.moved)event.preventDefault()">${inner}</a>` : `<button type="button" class="${cls}"${g} onclick="if(!glSwipe.moved){${esc(x.go || '')}}">${inner}</button>`;
 }
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
-function glWarnRedraw() { try { const el = document.getElementById('glalerts'); if (el) { el.innerHTML = glAlertsBody(); glBellMarkSeen(); } } catch (e) { } glBellRedraw(); }
+function glWarnRedraw() { try { const el = document.getElementById('glalerts'); if (el) { el.innerHTML = glAlertsBody(); el.style.setProperty('--newage', bellNewAge() + 's'); glBellMarkSeen(); } } catch (e) { } glBellRedraw(); }
 function glAlertsBody() { const L = glWarnList(), hint = L.some(x => x.flag) ? '' : '<p class="muted glhint">Flag events in Events to see them here.</p>'; return (L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook, road or bridge closures and events you flag show up here.</div></div>') + hint; }
 
 /* 2.26.13: Languages. A new te reo Māori and French word or phrase each day from a fixed, hand-checked list.
@@ -19561,6 +19561,7 @@ function SummaryPage() { // 2.26.18: the Home summary feed, now its own page. 2.
 }
 function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
+  setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + `<div id="glalerts">${glAlertsBody()}</div>
   <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
@@ -19602,12 +19603,12 @@ function glTiles() {
   add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
   add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(x => !(x.cats || []).includes('Movies') && !isNightlife(x)); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
   add('nightlife', 'out', 'Nightlife', () => { const e = nightlifeSoon(7, 2); return e.length ? e.map(x => x.title).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#events')");
-  add('place', 'out', 'Place of the day', () => { const p = travelToday(); return p ? p.name + ', ' + p.country : ''; }, B('travel'), '', "go('#travel')");
+  if (false) add('place', 'out', 'Place of the day', () => { const p = travelToday(); return p ? p.name + ', ' + p.country : ''; }, B('travel'), '', "go('#travel')");
   add('recipe', 'food', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
   // 2.26.20: joke, quote and fact back as their own blue tiles, each with its own setting; tap opens a sheet
-  if (dailyJokeOn()) add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
+  if (false) add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
   if (showDailyQuote()) add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('quote')");
-  if (factOn()) add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#2563eb', '#1e3a8a'], "glInfo('fact')");
+  if (false) add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#2563eb', '#1e3a8a'], "glInfo('fact')");
   add('tvguide', 'watch', 'TV guide', () => 'TVNZ 1 · TVNZ 2 · Three', 'i3-tv', ['#b45309', '#7c2d12'], "go('#tv')");
   return T;
 }
@@ -19616,15 +19617,15 @@ function glInfo(k) { // 2.26.14: joke, quote and fact tiles used go('#home'), a 
   try { let t = '', h = '';
     if (k === 'joke') { const j = dailyJokeFor(); t = 'Joke of the day'; h = Array.isArray(j) ? `<p style="font-size:1.05rem;font-weight:700">${esc(j[0])}</p><p>${esc(j[1] || '')}</p>` : `<p>${esc(String(j && (j.t || j.q) || j || ''))}</p>`; }
     else if (k === 'quote') { const q = dailyQuoteFor(); t = 'Quote of the day'; h = q ? `<p style="font-size:1.05rem;font-weight:700">“${esc(q.t)}”</p><p class="muted">${esc(q.w || '')}</p>` : ''; }
-    else { t = 'Fun fact'; h = `<p style="font-size:1.05rem">${esc(HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length])}</p>`; }
+    else { t = 'Fun fact'; h = `<p style="font-size:1.05rem">${esc(factToday())}</p>`; }
     openSheet(t, h, null);
   } catch (e) { } }
 let glJokeOpen = false;
 function glPanels() { // 2.26.19: joke, quote and fact each as its own panel, each with its own setting
   const P = [];
-  try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (Array.isArray(j) && glOk(j[0])) P.push(`<button type="button" class="card glpanel" onclick="glJokeOpen=!glJokeOpen;const a=this.querySelector('.glpa');a.textContent=glJokeOpen?a.dataset.a:'Tap for the answer';a.classList.toggle('on',glJokeOpen)"><span class="glph">😄 Joke of the day</span><b>${esc(j[0])}</b><span class="glpa${glJokeOpen ? ' on' : ''}" data-a="${esc(j[1] || '')}">${glJokeOpen ? esc(j[1] || '') : 'Tap for the answer'}</span></button>`); } } catch (e) { }
+  try { if (false) { const j = dailyJokeFor(); if (Array.isArray(j) && glOk(j[0])) P.push(`<button type="button" class="card glpanel" onclick="glJokeOpen=!glJokeOpen;const a=this.querySelector('.glpa');a.textContent=glJokeOpen?a.dataset.a:'Tap for the answer';a.classList.toggle('on',glJokeOpen)"><span class="glph">😄 Joke of the day</span><b>${esc(j[0])}</b><span class="glpa${glJokeOpen ? ' on' : ''}" data-a="${esc(j[1] || '')}">${glJokeOpen ? esc(j[1] || '') : 'Tap for the answer'}</span></button>`); } } catch (e) { }
   try { if (showDailyQuote()) { const q = dailyQuoteFor(); if (q && glOk(q.t)) P.push(`<div class="card glpanel"><span class="glph">💬 Quote of the day</span><b>“${esc(q.t)}”</b>${q.w ? `<span class="glpa on">${esc(q.w)}</span>` : ''}</div>`); } } catch (e) { }
-  try { if (factOn()) { const f = HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length]; if (f && glOk(f)) P.push(`<div class="card glpanel"><span class="glph">💡 Fun fact</span><b>${esc(f)}</b></div>`); } } catch (e) { }
+  try { if (false) { const f = HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length]; if (f && glOk(f)) P.push(`<div class="card glpanel"><span class="glph">💡 Fun fact</span><b>${esc(f)}</b></div>`); } } catch (e) { }
   return P.length ? `<div class="glpanels">${P.join('')}</div>` : '';
 }
 function glTileHtml(t, small) {
@@ -19673,7 +19674,7 @@ function glGardenRows() {
   try { glCU().filter(x => x.kind === 'garden').slice(0, 2).forEach(x => rows.push(cuRowHtml(x))); } catch (e) { }
   if (!rows.length) rows.push(tabRow('garden', 'Garden', glGardenSafe() ? 'Cool enough to water or feed if needed' : 'Too warm to water or feed right now', "go('#garden')"));
   try { upcomingEvents().filter(e => !evDuringWork(e)).slice(0, 2).forEach(e => rows.push(tabRow('events', esc(e.title), esc((e.date ? fmtW(e.date) : '') + (e.venue ? ' · ' + e.venue : '')), "go('#events')"))); } catch (e) { }
-  try { const p = travelToday(); if (p) rows.push(tabRow('travel', 'Place of the day: ' + esc(p.name), esc(p.country), "go('#travel')")); } catch (e) { }
+  try { const p = false && travelToday(); if (p) rows.push(tabRow('travel', 'Place of the day: ' + esc(p.name), esc(p.country), "go('#travel')")); } catch (e) { }
   return rows.join('');
 }
 function glOrgBody(k, m) {
@@ -20800,9 +20801,17 @@ function glDeviceItems() {
 // 2.26.24: each day's new joke and language words as Notifications cards; swipe left clears one from Notifications only (stays on Home and in Languages)
 function nfDis() { try { const o = JSON.parse(localStorage.getItem('nfDismiss') || 'null'); return o && o.day === todayISO() ? o.keys || [] : []; } catch (e) { return []; } }
 function nfDismiss(k) { const ks = nfDis(); if (!ks.includes(k)) ks.push(k); try { localStorage.setItem('nfDismiss', JSON.stringify({ day: todayISO(), keys: ks })); } catch (e) { } }
+// 2.26.76: one fun fact a day (the same all day, not a new one each open)
+function factToday() { const L = HOME_FACTS || []; if (!L.length) return ''; const f = L[((glDay() % L.length) + L.length) % L.length]; return String(f && f.line || f || ''); }
+// at work right now, from the Work roster: a shift today, between its start and finish (finish not set: 6pm, Thursday 7:15pm). Days off: no.
+function bellAtWork() { try { const t = sumToday(homeAklParts() || {}); if (!t.work || !t.work.start) return false; const st = hmMin(t.work.start); let en = hmMin(t.work.end); if (en == null) en = +t.dow === 4 ? 19 * 60 + 15 : 18 * 60; return st != null && t.min >= st && t.min < en; } catch (e) { return false; } }
 function glNewItems() {
   const out = [], gone = nfDis(), card = (k, ic, t, sub, tap) => { if (!gone.includes(k)) out.push(`<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved)${tap}"><div class="ic">${ic}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${esc(sub)}</div></div></div>`); };
   try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (Array.isArray(j) && j[0]) card('joke', '😄', j[0], 'Joke of the day · tap for the answer', "glInfo('joke')"); } } catch (e) { }
+  // 2.26.76: the fun fact, Place of the day and (only while he's at work) Ask a co-worker moved here from Home; one each a day
+  try { if (factOn()) { const f = factToday(); if (f) card('fact', '💡', f, 'Fun fact of the day', "glInfo('fact')"); } } catch (e) { }
+  try { const p = travelToday(); if (p && p.name) { let sub = 'Place of the day'; try { sub += ' · ' + travelKmText(travelKm(p.lat, p.lon)) + ' away · ' + sumTravelTime(p.tz) + ' there'; } catch (e) { } card('place', '🌍', p.name + ', ' + p.country, sub, "go('#travel')"); } } catch (e) { }
+  try { if (bellAtWork()) card('cowork', '💬', coworkQ(), 'Ask a co-worker · shows while you’re at work · a new one tomorrow', ''); } catch (e) { }
   try { const m = langToday('mi'); if (m) card('mi', '🌿', m[0] + ' – ' + m[1], 'Te reo Māori word of the day', "go('#lang')"); } catch (e) { }
   try { const f = langToday('fr'); if (f) card('fr', '🥖', f[0] + ' – ' + f[1], 'French word of the day', "go('#lang')"); } catch (e) { }
   return out;
@@ -20901,19 +20910,40 @@ const bellNorm = h => String(h || '').replace(/<[^>]*>/g, ' ').replace(/&[a-z#0-
   .replace(/\b(\d+\s*(days?|hours?|hrs?|mins?|minutes?|weeks?)|today|tomorrow|tonight|yesterday|now|ago|left|overdue|due in|due soon|in progress)\b/g, ' ')
   .replace(/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|\b\d{1,2}:\d{2}\b/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
 const bellHash = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
-function glBellSigs(p) {
-  p = p || glAlertParts(); const L = [], add = (k, t) => L.push(k + bellHash(String(t || '')));
-  const amts = h => (bellNorm(h).match(/\$[\d,]+(\.\d+)?/g) || []).join(',');
-  p.warn.forEach(x => add('w', x.tag + '|' + x.what)); p.flags.forEach(x => add('f', x.tag + '|' + x.what));
-  p.dueUrgent.forEach(x => add('d', bellNorm(x.html))); p.coming.filter(x => !x.noCount).forEach(x => add('d', bellNorm(x.html)));
-  p.sarah.forEach(h => add('s', bellNorm(h))); if (p.garden && p.garden.count) add('g', bellNorm(p.garden.html));
-  p.fresh.forEach(h => { const m = String(h).match(/data-nk="([^"]+)"/); add('n', m ? m[1] : bellNorm(h)); });
-  p.nl.forEach(x => add('l', (x.id || '') + '|' + (x.title || '') + '|' + (x.due || '')));
-  p.pw.filter(x => x.urgent).forEach(x => add('p', x.id || bellNorm(x.html)));
-  p.mb.filter(x => x.badge).forEach(x => add('m', (x.key || '') + '|' + amts(x.html)));
-  (p.rm || []).filter(x => x.badge).forEach(x => add('r', x.key)); (p.packKeys || []).forEach(k => add('k', k));
-  return L;
+// each counted item: fn(signature, item kind, get html, set html). Warnings/flags are objects drawn by glWarnCard, so they get x.isNew instead.
+function glBellEach(p, fn) {
+  const hash = (k, t) => k + bellHash(String(t || '')), amts = h => (bellNorm(h).match(/\$[\d,]+(\.\d+)?/g) || []).join(',');
+  const objs = (L, k, key) => L.forEach(x => fn(hash(k, key(x)), x, v => { x.html = v; }));
+  const strs = (L, k, key) => L.forEach((h, i) => fn(hash(k, key(h)), null, v => { L[i] = v; }));
+  p.warn.forEach(x => fn(hash('w', x.tag + '|' + x.what), x, null)); p.flags.forEach(x => fn(hash('f', x.tag + '|' + x.what), x, null));
+  objs(p.dueUrgent, 'd', x => bellNorm(x.html)); objs(p.coming.filter(x => !x.noCount), 'd', x => bellNorm(x.html));
+  strs(p.sarah, 's', bellNorm); if (p.garden && p.garden.count) fn(hash('g', bellNorm(p.garden.html)), p.garden, v => { p.garden.html = v; });
+  strs(p.fresh, 'n', h => { const m = String(h).match(/data-nk="([^"]+)"/); return (m ? m[1] + '|' : '') + bellNorm(h); });
+  objs(p.nl, 'l', x => (x.id || '') + '|' + (x.title || '') + '|' + (x.due || ''));
+  objs(p.pw.filter(x => x.urgent), 'p', x => x.id || bellNorm(x.html));
+  objs(p.mb.filter(x => x.badge), 'm', x => (x.key || '') + '|' + amts(x.html));
+  objs((p.rm || []).filter(x => x.badge), 'r', x => x.key); (p.packKeys || []).forEach(k => fn(hash('k', k), null, null));
 }
+function glBellSigs(p) { p = p || glAlertParts(); const L = []; glBellEach(p, sg => L.push(sg)); return L; }
+/* 2.26.76: what was new when Notifications opened (or arrived while it's open) stays highlighted for that visit: a blue edge and a
+   "New" pill, fading after about a minute. Leaving the page clears it; next time they're normal. */
+let bellNewSnap = null;
+const BELL_NEW_MS = 60e3;
+function bellSnapTake(p) { try { if ((location.hash || '') !== '#alerts') return; const seen = bellSeen(), now = Date.now(), un = glBellSigs(p).filter(x => !seen[x]);
+  if (!bellNewSnap) bellNewSnap = { at: now, set: new Set() }; if (now - bellNewSnap.at < BELL_NEW_MS) un.forEach(x => bellNewSnap.set.add(x)); } catch (e) { } }
+window.addEventListener('hashchange', () => { if ((location.hash || '') !== '#alerts') bellNewSnap = null; });
+function bellMarkNew(p) {
+  const S0 = bellNewSnap; if (!S0 || !S0.set.size || Date.now() - S0.at > BELL_NEW_MS + 2000) return;
+  const pill = '<span class="newpill">New</span>';
+  glBellEach(p, (sg, x, set) => { if (!S0.set.has(sg)) return; if (x && !set) { x.isNew = true; return; } if (!set) return;
+    const h = x ? x.html : null; let v = h != null ? h : null;
+    if (v == null) return; // string items are done below
+    set(bellNewHtml(v, pill)); });
+  // string arrays (Sarah, New today) are tagged here, by their signature
+  ['sarah', 'fresh'].forEach(k => { const L = p[k] || []; L.forEach((h, i) => { const key = k === 'fresh' ? (((String(h).match(/data-nk="([^"]+)"/) || [])[1] ? (String(h).match(/data-nk="([^"]+)"/) || [])[1] + '|' : '') + bellNorm(h)) : bellNorm(h); if (S0.set.has((k === 'fresh' ? 'n' : 's') + bellHash(String(key)))) L[i] = bellNewHtml(h, pill); }); });
+}
+function bellNewHtml(h, pill) { let v = String(h || ''); if (v.includes('glisnew')) return v; v = v.replace(/class="/, 'class="glisnew '); v = /class="t">/.test(v) ? v.replace(/class="t">/, 'class="t">' + pill) : v.replace(/(<b[^>]*>)/, '$1' + pill); return v; }
+function bellNewAge() { return bellNewSnap ? Math.min(BELL_NEW_MS, Date.now() - bellNewSnap.at) / 1000 : 999; }
 function bellSeen() { try { const o = JSON.parse(localStorage.getItem('bellSeen') || 'null'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
 let bellMemo = null;
 function glBellUnseen() { if (bellMemo && Date.now() - bellMemo.at < 1500) return bellMemo.n; let n = 0; try { const seen = bellSeen(); n = glBellSigs().filter((x, i, A) => !seen[x] && A.indexOf(x) === i).length; } catch (e) { n = 0; } bellMemo = { at: Date.now(), n }; setTimeout(() => { bellMemo = null; }, 0); bellOsBadge(n); return n; } // memo lasts one render only
@@ -20927,7 +20957,7 @@ function glBellMarkSeen() {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(glBellMarkSeen, 400); });
 glBellBtn = function () { const n = glBellUnseen(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
-  const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
+  const p = glAlertParts(); try { bellSnapTake(p); bellMarkNew(p); } catch (e) { } const sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
   const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent), mbC = p.mb.filter(x => !x.urgent && x.coming), rmU = p.rm.filter(x => x.urgent), rmC = p.rm.filter(x => !x.urgent && x.coming), rmTop = new Set(p.rm.filter(x => x.urgent || x.coming).map(x => x.key.split('|')[1])), rmL = p.rm.filter(x => !x.urgent && !x.coming && !rmTop.has(x.key.split('|')[1])); /* 2.26.54: not again at the bottom */
