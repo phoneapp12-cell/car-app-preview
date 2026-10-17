@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.74';
+const APP_VERSION = '2.26.75';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18520,9 +18520,9 @@ function bottomTabs(route) {
   }
   const item = ROUTE_ITEM[route] || route || 'home';
   const cur = item === '' ? 'home' : item;
-  const over = (() => { try { return dueItems(S).filter(x => x.days < 0).length; } catch (e) { return 0; } })();
+  const bn = (() => { try { return glBellUnseen(); } catch (e) { return 0; } })(); // 2.26.75
   nav.innerHTML = b.keys.map(k => { const [full, short, ic] = btMeta(k); const on = k === cur || (k === 'more' && route === 'more');
-    return `<button type="button" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} aria-label="${esc(full)}" data-bt="${k}" onclick="btGo('${k}')"><span class="w">${sideIco(k, ic)}${k === 'home' && over ? `<span class="badge">${over}</span>` : ''}</span><span class="lbl">${esc(short)}</span></button>`; }).join('');
+    return `<button type="button" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} aria-label="${esc(full)}" data-bt="${k}" onclick="btGo('${k}')"><span class="w">${sideIco(k, ic)}${k === 'home' && bn ? `<span class="badge bellb">${bn > 9 ? '9+' : bn}</span>` : ''}</span><span class="lbl">${esc(short)}</span></button>`; }).join('');
   if (cleanOn()) { const CL = { home: 'Home', calendar: 'Plan', todo: 'Tasks', budget: 'Money', more: 'More' }; nav.querySelectorAll('button[data-bt]').forEach(x => { const l = x.querySelector('.lbl'); if (l && CL[x.dataset.bt]) l.textContent = CL[x.dataset.bt]; });
     const keys = [...nav.children]; if (keys.length === 5) { const f = document.createElement('button'); f.type = 'button'; f.className = 'clfab'; f.setAttribute('aria-label', 'Quick add'); f.innerHTML = I('plus'); f.onclick = cleanFab; nav.insertBefore(f, keys[2]); } }
   nav.style.setProperty('--btn', b.keys.length + (cleanOn() ? 1 : 0));
@@ -18587,7 +18587,8 @@ function tabbar(active) {
   const over = dueItems(S).filter(x => x.days < 0).length;
   const moreBadge = S.bills.filter(b => !b.paid && daysLeft(b.due) < 0).length + S.birthdays.filter(b => daysLeft(nextBday(b)) === 0).length;
   const listed = new Set(NAV_GROUPS.flatMap(g => g.keys));
-  const badge = k => k === 'home' && over ? `<span class="badge">${over}</span>` : k === 'more' && moreBadge && !(listed.has('bills') && listed.has('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
+  const bn = (() => { try { return glBellUnseen(); } catch (e) { return 0; } })(); // 2.26.75: new notifications, not all of them
+  const badge = k => k === 'home' && bn ? `<span class="badge bellb">${bn > 9 ? '9+' : bn}</span>` : k === 'more' && moreBadge && !(listed.has('bills') && listed.has('birthdays')) ? `<span class="badge">${moreBadge}</span>` : '';
   const meta = k => k === 'home' ? [glanceOn() ? 'Home' : 'Notifications', 'home'] : k === 'settings' ? ['Settings', 'gear'] : k === 'more' ? ['More', 'more'] : [NAV[k][2], NAV[k][0]];
   const btn = k => {
     const [l, ic] = meta(k);
@@ -19327,7 +19328,7 @@ function glWarnCard(x) {
   return x.url ? `<a class="${cls}"${g} href="${esc(x.url)}" target="_blank" rel="noopener" onclick="if(glSwipe.moved)event.preventDefault()">${inner}</a>` : `<button type="button" class="${cls}"${g} onclick="if(!glSwipe.moved){${esc(x.go || '')}}">${inner}</button>`;
 }
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
-function glWarnRedraw() { glBellRedraw(); try { const el = document.getElementById('glalerts'); if (el) el.innerHTML = glAlertsBody(); } catch (e) { } }
+function glWarnRedraw() { try { const el = document.getElementById('glalerts'); if (el) { el.innerHTML = glAlertsBody(); glBellMarkSeen(); } } catch (e) { } glBellRedraw(); }
 function glAlertsBody() { const L = glWarnList(), hint = L.some(x => x.flag) ? '' : '<p class="muted glhint">Flag events in Events to see them here.</p>'; return (L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook, road or bridge closures and events you flag show up here.</div></div>') + hint; }
 
 /* 2.26.13: Languages. A new te reo Māori and French word or phrase each day from a fixed, hand-checked list.
@@ -19559,6 +19560,7 @@ function SummaryPage() { // 2.26.18: the Home summary feed, now its own page. 2.
     `<div class="sumbar"><span id="sumupd" class="muted">${esc(upd)}</span><button type="button" class="btn small" onclick="sumRefresh(true)">${I('refresh')} Refresh</button></div>` + (body || '<div class="card empty"><div class="t">Nothing to sum up yet</div><div class="s">Check back in a moment.</div></div>');
 }
 function GlAlerts() {
+  setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + `<div id="glalerts">${glAlertsBody()}</div>
   <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
@@ -20881,7 +20883,7 @@ function glAlertParts() {
   try { // 2.26.53: reminders; a to-do already here gets the time attached instead of its own row
     const R = rmItems(), seen = P.dueUrgent.concat(P.coming).map(x => x.html).join('') + P.fresh.join('');
     const packOn = x => x.packKey && seen.includes(`packTick('${esc(x.packKey)}')`); // 2.26.55: on the event's row already
-    P.packBadge = R.filter(x => packOn(x) && x.badge).length;
+    P.packBadge = R.filter(x => packOn(x) && x.badge).length; P.packKeys = R.filter(x => packOn(x) && x.badge).map(x => x.key);
     P.rm = R.filter(x => !(x.todoId && seen.includes(`'${x.todoId}'`)) && !packOn(x));
     const A = R.filter(x => x.todoId && seen.includes(`'${x.todoId}'`));
     if (A.length) { const fix = x => { x.html = rmAttach(x.html, A); }; P.dueUrgent.forEach(fix); P.coming.forEach(fix); P.fresh = P.fresh.map(h => rmAttach(h, A)); P.urgent = P.urgent.map(h => rmAttach(h, A)); }
@@ -20890,7 +20892,40 @@ function glAlertParts() {
   return P;
 }
 function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length + p.mb.filter(x => x.badge).length + (p.rm || []).filter(x => x.badge).length + (p.packBadge || 0); } catch (e) { return 0; } }
-glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
+/* 2.26.75: the bell (and the Home tab and the app icon) count only what's new since Notifications was last looked at.
+   Each counted item gets a signature that ignores things that tick over by themselves ("3 days", "in 2 hours", clock times,
+   a roadwork's updated times), so a re-fetch or a new day doesn't make an old item count again; a real change (a new bill
+   amount, a new roadwork, a new reminder time or occurrence) gives a new signature and counts as new. Opening Notifications
+   marks everything showing as seen. Archived items are gone from the list, so they never count. */
+const bellNorm = h => String(h || '').replace(/<[^>]*>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').toLowerCase()
+  .replace(/\b(\d+\s*(days?|hours?|hrs?|mins?|minutes?|weeks?)|today|tomorrow|tonight|yesterday|now|ago|left|overdue|due in|due soon|in progress)\b/g, ' ')
+  .replace(/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|\b\d{1,2}:\d{2}\b/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+const bellHash = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+function glBellSigs(p) {
+  p = p || glAlertParts(); const L = [], add = (k, t) => L.push(k + bellHash(String(t || '')));
+  const amts = h => (bellNorm(h).match(/\$[\d,]+(\.\d+)?/g) || []).join(',');
+  p.warn.forEach(x => add('w', x.tag + '|' + x.what)); p.flags.forEach(x => add('f', x.tag + '|' + x.what));
+  p.dueUrgent.forEach(x => add('d', bellNorm(x.html))); p.coming.filter(x => !x.noCount).forEach(x => add('d', bellNorm(x.html)));
+  p.sarah.forEach(h => add('s', bellNorm(h))); if (p.garden && p.garden.count) add('g', bellNorm(p.garden.html));
+  p.fresh.forEach(h => { const m = String(h).match(/data-nk="([^"]+)"/); add('n', m ? m[1] : bellNorm(h)); });
+  p.nl.forEach(x => add('l', (x.id || '') + '|' + (x.title || '') + '|' + (x.due || '')));
+  p.pw.filter(x => x.urgent).forEach(x => add('p', x.id || bellNorm(x.html)));
+  p.mb.filter(x => x.badge).forEach(x => add('m', (x.key || '') + '|' + amts(x.html)));
+  (p.rm || []).filter(x => x.badge).forEach(x => add('r', x.key)); (p.packKeys || []).forEach(k => add('k', k));
+  return L;
+}
+function bellSeen() { try { const o = JSON.parse(localStorage.getItem('bellSeen') || 'null'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+let bellMemo = null;
+function glBellUnseen() { if (bellMemo && Date.now() - bellMemo.at < 1500) return bellMemo.n; let n = 0; try { const seen = bellSeen(); n = glBellSigs().filter((x, i, A) => !seen[x] && A.indexOf(x) === i).length; } catch (e) { n = 0; } bellMemo = { at: Date.now(), n }; setTimeout(() => { bellMemo = null; }, 0); bellOsBadge(n); return n; } // memo lasts one render only
+function bellOsBadge(n) { try { if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => { }); else if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => { }); } catch (e) { } }
+function glBellMarkSeen() {
+  try { if ((location.hash || '') !== '#alerts' || document.hidden) return; const seen = bellSeen(), now = Date.now(); let ch = false;
+    glBellSigs().forEach(x => { if (!seen[x]) { seen[x] = now; ch = true; } });
+    Object.keys(seen).forEach(k => { if (now - seen[k] > 60 * DAY) { delete seen[k]; ch = true; } });
+    if (ch) localStorage.setItem('bellSeen', JSON.stringify(seen)); bellMemo = { at: now, n: 0 }; bellOsBadge(0);
+    document.querySelectorAll('#glbell .glbadge, .badge.bellb').forEach(e => e.remove()); } catch (e) { } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(glBellMarkSeen, 400); });
+glBellBtn = function () { const n = glBellUnseen(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
 glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
