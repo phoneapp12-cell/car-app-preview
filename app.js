@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.53';
+const APP_VERSION = '2.26.54';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19273,12 +19273,15 @@ function glWarnList() {
   const L = [];
   try { wxOutlook().forEach(o => L.push({ pri: o.score >= 80 ? 90 : o.score >= 60 ? 70 : 40, red: o.score >= 80, tag: o.lbl, what: o.what, s: (o.when || '') + (o.tip ? ' · ' + o.tip : ''), go: o.go || "go('#weather')" })); } catch (e) { }
   try { glRoadItems().forEach(x => L.push({ pri: x.route ? 95 : x.closed ? 60 : 30, red: x.route || x.closed, route: x.route, tag: (x.route ? '🚗 On your commute' : '🚧 Roads near you') + ' · ' + (x.src === 'NZTA' ? 'NZTA' : 'Council'), what: x.what, s: [x.when, x.note].filter(Boolean).join(' · ').slice(0, 220), url: x.url })); } catch (e) { }
-  return L.filter(x => x.what && glOk(x.what)).sort((a, b) => b.pri - a.pri);
+  // 2.26.54: each warning (roads, weather) can be swiped to the Archive; a new status or time gives it a new key so it can come back
+  let gone = []; try { gone = gkDis(); } catch (e) { }
+  return L.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url || x.go || ''}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk)).sort((a, b) => b.pri - a.pri);
 }
 function glWarnCard(x) {
   const cls = `glwarn ${x.red ? 'glw-red' : x.info ? 'glw-info' : 'glw-amb'}${x.route ? ' glw-route' : ''}`, inner = `<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ''}`;
-  if (x.flag) return `<div class="glflagwrap">${x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="go('#events')">${inner}</button>`}<button type="button" class="glunflag" onclick="evFlagToggle(${jsArg(x.flag)}, event)" aria-label="Unflag ${esc(x.what)}">Unflag</button></div>`;
-  return x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="${esc(x.go || '')}">${inner}</button>`;
+  if (x.flag) return `<div class="glflagwrap"${x.gk ? ` data-gk="${esc(x.gk)}"` : ''}>${x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="go('#events')">${inner}</button>`}<button type="button" class="glunflag" onclick="evFlagToggle(${jsArg(x.flag)}, event)" aria-label="Unflag ${esc(x.what)}">Unflag</button></div>`;
+  const g = x.gk ? ` data-gk="${esc(x.gk)}"` : '';
+  return x.url ? `<a class="${cls}"${g} href="${esc(x.url)}" target="_blank" rel="noopener" onclick="if(glSwipe.moved)event.preventDefault()">${inner}</a>` : `<button type="button" class="${cls}"${g} onclick="if(!glSwipe.moved){${esc(x.go || '')}}">${inner}</button>`;
 }
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
 function glWarnRedraw() { glBellRedraw(); try { const el = document.getElementById('glalerts'); if (el) el.innerHTML = glAlertsBody(); } catch (e) { } }
@@ -19844,7 +19847,10 @@ function gkDismiss(k) { const a = gkDis(); if (!a.includes(k)) a.push(k); try { 
 function gkKey(html) { const oc = (String(html).match(/onclick="([^"]*)"/) || [])[1] || '', t = (String(html).match(/class="t">([\s\S]*?)<\/div>/) || [])[1] || ''; const str = oc + '|' + t.replace(/<[^>]+>/g, '').trim(); let h = 5381; for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0; return 'g' + h.toString(36) + str.length.toString(36); }
 function gkStamp(html, gone) { const h = String(html || ''); if (!/^\s*<(button|div) class="row(?![^"]*glnew)/.test(h)) return h; const k = gkKey(h); if (gone.includes(k)) return null; return h.replace(/^(\s*<(?:button|div)) class="row([^"]*)"/, `$1 class="row$2" data-gk="${k}"`); }
 function gkApply(P) { const g = gkDis(), obj = a => a.filter(x => { const h = gkStamp(x.html, g); if (h == null) return false; x.html = h; return true; }), str = a => a.map(h => gkStamp(h, g)).filter(h => h != null);
-  P.dueUrgent = obj(P.dueUrgent); P.coming = obj(P.coming); P.urgent = str(P.urgent); P.sarah = str(P.sarah); P.prog = str(P.prog); return P; }
+  P.dueUrgent = obj(P.dueUrgent); P.coming = obj(P.coming); P.urgent = str(P.urgent); P.sarah = str(P.sarah); P.prog = str(P.prog);
+  if (P.garden && P.garden.html) { const sub = ((P.garden.html.match(/class="s">([^<:]*)/) || [])[1] || '').trim(), h = gkStamp(P.garden.html.replace(/class="t">/, 'class="t">' + esc(sub) + '|'), g); /* the advice (not the temperature) is the key */
+    if (h == null) P.garden = null; else { const k = (h.match(/data-gk="([^"]+)"/) || [])[1]; if (k) P.garden.html = P.garden.html.replace(/^(\s*<(?:button|div)) class="row([^"]*)"/, `$1 class="row$2" data-gk="${k}"`); } }
+  return P; }
 /* ================= NOTIFICATIONS ARCHIVE (2.26.53) =================
    Swiping a row left on Notifications now archives it (nothing is deleted). Swipe the page right (not on a row) for the
    Archive; swipe left or Back to return. On the Archive, swipe a row right to put it back. If it's no longer current
@@ -19867,7 +19873,7 @@ function arcEntryOf(el) {
   if (h) { const c = h.cloneNode(true); c.querySelectorAll('.glswipehint').forEach(x => x.remove()); sec = c.textContent.trim(); }
   const tx = (sel) => { const n = el.querySelector(sel); return n ? n.textContent.replace(/\s+/g, ' ').trim().slice(0, 240) : ''; };
   const oc = el.getAttribute('onclick') || '', m = oc.match(/go\('(#[\w\/-]+)'\)/);
-  return { id: type + '|' + key, type, key, section: sec || 'Notifications', title: tx('.t') || el.textContent.replace(/\s+/g, ' ').trim().slice(0, 120), body: tx('.s'), link: m ? m[1] : '', archivedAt: new Date().toISOString() };
+  return { id: type + '|' + key, type, key, section: sec || 'Notifications', title: tx('.t') || tx('b') || el.textContent.replace(/\s+/g, ' ').trim().slice(0, 120), body: tx('.s') || [tx('.glwtag'), tx('b + span')].filter(Boolean).join(' · '), link: m ? m[1] : '', archivedAt: new Date().toISOString() };
 }
 function arcAdd(entry) {
   if (entry.type === 'pb') { const pb = arcPb(), old = pb.find(x => x.id === entry.key); arcPbSave(pb.filter(x => x.id !== entry.key)); if (old) entry = Object.assign({}, old, { archivedAt: new Date().toISOString() }); else return; }
@@ -20092,7 +20098,7 @@ glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
-  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent), mbC = p.mb.filter(x => !x.urgent && x.coming), rmU = p.rm.filter(x => x.urgent), rmC = p.rm.filter(x => !x.urgent && x.coming), rmL = p.rm.filter(x => !x.urgent && !x.coming);
+  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent), mbC = p.mb.filter(x => !x.urgent && x.coming), rmU = p.rm.filter(x => x.urgent), rmC = p.rm.filter(x => !x.urgent && x.coming), rmTop = new Set(p.rm.filter(x => x.urgent || x.coming).map(x => x.key.split('|')[1])), rmL = p.rm.filter(x => !x.urgent && !x.coming && !rmTop.has(x.key.split('|')[1])); /* 2.26.54: not again at the bottom */
   const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length || abU.length || mbU.length || rmU.length ? `<div class="list">${rmU.map(x => x.html).join('')}${mbU.map(x => x.html).join('')}${pwU.map(x => x.html).join('')}${abU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
   const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC || abN.length || mbC.length || rmC.length ? `<div class="list">${rmC.map(x => x.html).join('')}${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}${mbC.map(x => x.html).join('')}</div>` : '') +
     sec('New on your lists <span class="glswipehint">swipe left to archive</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
