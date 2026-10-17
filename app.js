@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.47';
+const APP_VERSION = '2.26.48';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -303,10 +303,12 @@ function rowFor(x) {
   else if (x.kind === 'health') { icon = HEALTH_ICON[x.item.kind] || 'medkit'; sub = 'Health · ' + (x.item.clinic ? esc(x.item.clinic) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
   else sub = 'To-do · ' + esc(x.todo.list || '') + ' · ' + fmtW(x.date);
-  const body = `<div class="ic ${x.kind}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div><div class="badgestack">${duePill(x.days)}${cash}</div>`;
+  const cpT = (() => { try { return x.kind === 'car' ? carProgText(x.car, x.part) : x.kind === 'todo' && x.todo && todoStatus(x.todo) === 'doing' ? 'In progress' : ''; } catch (e) { return ''; } })();
+  const body = `<div class="ic ${x.kind}">${I(icon)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${sub}</div></div><div class="badgestack">${cpT ? progPill(cpT) : duePill(x.days)}${cash}</div>`;
   // 1.82.0: a to-do in Upcoming or the overdue list can be marked done here. It stays on the to-do list.
   if (x.kind === 'todo' && x.todo) return `<div class="row"><button type="button" class="tick" aria-label="Mark complete: ${esc(x.title)}" onclick="tick('${x.todo.id}')"><span>${I('check')}</span></button><button type="button" class="tapzone" onclick="go('${x.go}')">${body}</button></div>`;
-  return `<button class="row" onclick="go('${x.go}')">${body}</button>`;
+  if (x.kind === 'car' && x.car) return `<button class="row${cpT ? ' inprog' : ''}" onclick="carDueSheet('${x.car.id}','${x.part}')">${body}</button>`;
+  return `<button class="row${cpT ? ' inprog' : ''}" onclick="go('${x.go}')">${body}</button>`;
 }
 /* 1.14.0: Home cards can be reordered and switched on or off (Home › Customise). Saved as settings.homeOrder / settings.homeHidden.
    Cards with nothing to show hide themselves. The reminder and install prompts always stay at the top. */
@@ -3932,7 +3934,8 @@ function cuRowHtml(x) {
   const t = x.ref && x.ref.todo;
   if (t && isSarahTodo(t)) h = sTodoCalInject(h.replace('<div class="t">', '<div class="t">' + sarahBadge(t)), t);
   else if (t && isMineShared(t)) h = h.replace('<div class="t">', '<div class="t"><span class="bluedot" title="Shared with Sarah"></span>');
-  if (x.pri === 0) h = h.replace('class="row', 'class="row cuhi');
+  const inprog = (() => { try { const f = x.ref || {}; return !!((f.kind === 'car' && carProg(f.car, f.part)) || (f.todo && todoStatus(f.todo) === 'doing')); } catch (e) { return false; } })();
+  if (x.pri === 0 && !inprog) h = h.replace('class="row', 'class="row cuhi');
   const cat = cuColoursOn() ? cuCat(x) : '';
   if (cat) h = h.replace('class="row', `class="row cucat cu-${cat}`);
   return h;
@@ -4373,7 +4376,7 @@ function svcCell(c) {
   return `<div><small>Service</small><span class="addsvc" role="button" onclick="event.stopPropagation();serviceForm('${c.id}',false)">+ Add service date</span></div>`;
 }
 function carTriple(c) {
-  const cell = (l, s) => s ? `<div><small>${l}</small><b>${fmt(s)}</b>${pill(daysLeft(s))}</div>` : `<div><small>${l}</small><b>Not set</b><span class="pill none">Add date</span></div>`;
+  const cell = (l, s) => s ? `<div><small>${l}</small><b>${fmt(s)}</b>${(() => { const pt = { WOF: 'wof', Rego: 'rego' }[l]; const cp = pt ? carProgText(c, pt) : ''; return cp ? progPill(cp) : pill(daysLeft(s)); })()}</div>` : `<div><small>${l}</small><b>Not set</b><span class="pill none">Add date</span></div>`;
   return `<div class="triple">${cell('WOF', c.wof)}${cell('Rego', c.rego)}${svcCell(c)}</div>`;
 }
 function Cars() {
@@ -4790,8 +4793,8 @@ async function markPaid(id) {
   toast(n ? `${b.name} paid. Next due ${fmt(n)}.` : `${b.name} marked paid.`, 'Undo', undoTo(s));
 }
 async function unpay(id) { const b = S.bills.find(x => x.id === id); b.paid = false; if (Array.isArray(b.paidDues)) b.paidDues = b.paidDues.filter(x => x && x.due !== b.due); delete b.paidOn; await save(); render(); }
-function billForm(id) {
-  const b = id ? S.bills.find(x => x.id === id) : { name: '', amount: '', due: '', repeat: 'monthly', notes: '' };
+function billForm(id, pre) {
+  const b = id ? S.bills.find(x => x.id === id) : Object.assign({ name: '', amount: '', due: '', repeat: 'monthly', notes: '' }, pre || {});
   openSheet(id ? 'Edit bill' : 'Add a bill',
     field('What’s the bill?', inp('name', b.name, 'placeholder="e.g. Power, phone, insurance" required maxlength="50"')) +
     `<div class="two">${field('Amount ($)', inp('amount', b.amount === '' ? '' : Number(b.amount).toFixed(2), 'inputmode="decimal" placeholder="0.00"'))}${field('Next due', inp('due', b.due, 'type="date" required'))}</div>` +
@@ -4808,7 +4811,7 @@ function billForm(id) {
       const upd = { name: v.name, amount: Math.round(amt * 100) / 100, due: v.due, repeat: v.repeat, notes: v.notes, paidBy: v.paidBy === 'card' ? 'card' : '' };
       if (dueChanged) upd.anchor = new Date(parseD(v.due)).getUTCDate();
       if (id) { if (dueChanged) upd.paid = false; Object.assign(b, upd); }
-      else S.bills.push(Object.assign({ id: uid('bill'), paid: false }, upd));
+      else S.bills.push(Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? { link: pre.link, linkType: pre.linkType } : {}));
       await save(); render(); toast(id ? 'Bill updated.' : 'Bill added.');
     }, id ? 'Save' : 'Add bill',
     id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete bill" onclick="deleteBill('${id}')">${I('trash')}</button>` : '');
@@ -5419,7 +5422,7 @@ function waterWin() { // null = no forecast (leave as normal); { ok } or { ok:fa
 }
 function waterBlock(t) { if (!t || t.done || !t.due || daysLeft(t.due) > 0 || !WATER_TASK(t)) return null; const w = waterWin(); return w && !w.ok ? w.label : null; }
 const waterPill = lab => `<span class="pill waterlater">💧 ${esc(lab)}</span>`;
-const todoDuePill = (t, d) => { const b = waterBlock(t); return b ? waterPill(b) : pill(d == null ? daysLeft(t.due) : d); };
+const todoDuePill = (t, d) => { if (todoStatus(t) === 'doing') return progPill(); const b = waterBlock(t); return b ? waterPill(b) : pill(d == null ? daysLeft(t.due) : d); };
 function cmpOpenTodo(a, b) {
   return (todoStatus(a) === 'doing' ? 0 : 1) - (todoStatus(b) === 'doing' ? 0 : 1)
     || todoPriRank(a) - todoPriRank(b)
@@ -18671,6 +18674,7 @@ async function start() {
   try { render(); } catch (e) { console.error('First render', e); }
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
+  try { const pn = await pnu312Mig(); if (pn) { render(); setTimeout(() => toast(pn), 2600); } } catch (e) { console.error('pnu312', e); }
   try { const en = await ecoBillMig(); if (en) { render(); setTimeout(() => toast(en, 'View', () => go('#bills')), 1200); } } catch (e) { console.error('eco75', e); }
   phoneSyncOpen();
   try { sharedStart(); } catch (e) { }
@@ -19388,6 +19392,11 @@ function glDueItems() {
       if (!glOk(name) || /\bbusy\b/i.test(name)) return;
       const t = x.ref && x.ref.todo, hi = !!(t && t.priority === 'high');
       if (k === 'todo') return; // 2.26.34: to-dos are added below (one card each)
+      if (k === 'car' && x.ref && carProg(x.ref.car, x.ref.part)) { // 2.26.48: in progress → In progress section; WOF recheck within 7 days → Coming up, overdue → Urgent
+        const cp = carProgCards().find(y => y.car.id === x.ref.car.id && y.part === x.ref.part);
+        if (cp && cp.rd != null && cp.rd <= 7) out.push({ days: cp.rd, html: cp.html, noCount: cp.rd > 1 });
+        return;
+      }
       const ok = k === 'bill' || k === 'pay' || k === 'loan' ? d <= 1 : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? false : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
       if (!ok) return;
       let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
@@ -19400,7 +19409,7 @@ function glDueItems() {
     (S.todos || []).forEach(t => {
       if (!t || t.done || !t.due || !t.title || !glOk(t.title) || (glDueItems.nl && glDueItems.nl.has(t.id))) return;
       const d = daysLeft(t.due); if (d > 7) return;
-      const doing = todoStatus(t) === 'doing'; if (doing && d > 0) return;
+      const doing = todoStatus(t) === 'doing'; if (doing) return; // 2.26.48: in progress stays in the In progress section
       if (waterBlock(t)) { out.push({ days: 0.5, html: glTodoCard(t, d), noCount: true, todoId: t.id }); return; } // blocked by the garden rule: Coming up, not counted
       out.push({ days: d, html: glTodoCard(t, d), noCount: d > 1, todoId: t.id });
     });
@@ -19422,17 +19431,20 @@ function nlDis() { try { return JSON.parse(localStorage.getItem('nlDismiss') || 
 function nlDismiss(id) { const L = nlDis().filter(Boolean); if (!L.includes(id)) L.push(id); try { localStorage.setItem('nlDismiss', JSON.stringify(L.slice(-400))); } catch (e) { } }
 function nlItems() {
   const since = nlSince(), gone = new Set(nlDis()), out = [];
-  try { (S.todos || []).forEach(t => { if (t && !t.done && !isSarahTodo(t) && +t.created >= since && !gone.has(t.id) && t.title && glOk(t.title) && !(todoStatus(t) === 'doing' && !(t.due && daysLeft(t.due) <= 0))) out.push({ id: t.id, title: t.title, where: '#todo', list: t.list || 'To-do', due: t.due || '', days: t.due ? daysLeft(t.due) : null, doing: todoStatus(t) === 'doing' }); }); } catch (e) { }
+  try { (S.todos || []).forEach(t => { if (t && !t.done && !isSarahTodo(t) && +t.created >= since && !gone.has(t.id) && t.title && glOk(t.title) && todoStatus(t) !== 'doing') out.push({ id: t.id, title: t.title, where: '#todo', list: t.list || 'To-do', due: t.due || '', days: t.due ? daysLeft(t.due) : null, doing: todoStatus(t) === 'doing' }); }); } catch (e) { }
   try { ((S.shop && S.shop.items) || []).forEach(x => { if (x && !x.done && !isSarahShop(x) && +x.created >= since && !gone.has(x.id) && x.name && !(x.meals && x.meals.length) && glOk(x.name)) out.push({ id: x.id, title: x.name, where: '#shopping', list: 'Shopping', due: '', days: null }); }); } catch (e) { }
   return out.map(x => ({ ...x, wb: x.where === '#todo' ? waterBlock((S.todos || []).find(t => t.id === x.id)) : null })).map(x => ({ ...x, urgent: x.days !== null && x.days <= 0 && !x.wb, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.wb ? ' · 💧 ' + esc(x.wb) : x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div>${x.doing ? '<span class="pill glprog">In progress</span>' : ''}</div>` }));
 }
 function glStartedTxt(t) { if (!t.startedAt) return ''; const d = new Date(t.startedAt), today = todayISO(d) === todayISO(); return 'Started ' + (today ? fmtTime(d.toTimeString().slice(0, 5)) : fmtW(todayISO(d))); }
 function glTodoCard(t, d) {
   const doing = todoStatus(t) === 'doing';
-  return `<button class="row" onclick="todoForm('${t.id}')"><div class="ic todo">${I('check')}</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list || 'To-do')}${t.due ? ' · ' + fmtW(t.due) : ''}${doing && t.startedAt ? ' · ' + glStartedTxt(t) : ''}</div></div>${doing ? '<span class="pill glprog">In progress</span>' : ''}${t.due ? todoDuePill(t, d) : ''}</button>`;
+  return `<button class="row" onclick="todoForm('${t.id}')"><div class="ic todo">${I('check')}</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.list || 'To-do')}${t.due ? ' · ' + fmtW(t.due) : ''}${doing && t.startedAt ? ' · ' + glStartedTxt(t) : ''}</div></div>${doing ? progPill() : t.due ? todoDuePill(t, d) : ''}</button>`;
 }
-function glProgItems() { // 2.26.34: In progress section (not overdue/today; those sit under Urgent)
-  try { return (S.todos || []).filter(t => t && !t.done && todoStatus(t) === 'doing' && t.title && glOk(t.title) && !(t.due && daysLeft(t.due) <= 0)).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0)).map(t => glTodoCard(t, t.due ? daysLeft(t.due) : 0)); } catch (e) { return []; }
+function glProgItems() { // 2.26.34 / 2.26.48: In progress section: every in-progress to-do (overdue too) and car due item (unless its WOF recheck is within 7 days)
+  let out = [];
+  try { out = (S.todos || []).filter(t => t && !t.done && todoStatus(t) === 'doing' && t.title && glOk(t.title)).sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0)).map(t => glTodoCard(t, t.due ? daysLeft(t.due) : 0)); } catch (e) { out = []; }
+  try { carProgCards().filter(y => !(y.rd != null && y.rd <= 7)).forEach(y => out.push(y.html)); } catch (e) { }
+  return out;
 }
 function glSarahItems() {
   const out = [], since = Date.now() - 864e5;
@@ -19503,7 +19515,7 @@ function glSwipe(e) {
   glSwipe.moved = false;
   const mv = ev => { const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0; if (!dir && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) dir = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y'; if (dir !== 'x') return; ev.preventDefault(); glSwipe.moved = true; dx = Math.min(0, ddx); el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(1 + dx / 400); };
   const end = () => { el.removeEventListener('touchmove', mv); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.style.transition = 'transform .2s ease, opacity .2s ease';
-    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; if (el.dataset.nl) nlDismiss(el.dataset.nl); else if (el.dataset.pn) pnDismiss(el.dataset.pn); else nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.querySelector('.glnew')) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
+    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; if (el.dataset.nl) nlDismiss(el.dataset.nl); else if (el.dataset.pn) pnDismiss(el.dataset.pn); else if (el.dataset.ab) abDismiss(el.dataset.ab); else nfDismiss(el.dataset.nk); setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.children.length) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
     else { el.style.transform = ''; el.style.opacity = ''; }
     setTimeout(() => { glSwipe.moved = false; }, 50); };
   el.addEventListener('touchmove', mv, { passive: false }); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
@@ -19568,7 +19580,7 @@ function pnItems() {
 }
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems() };
+  return { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: (() => { try { return abItems(); } catch (e) { return []; } })() };
 }
 function glAlertCount() { try { const p = glAlertParts(); return p.warn.length + p.dueUrgent.length + p.coming.filter(x => !x.noCount).length + p.sarah.length + p.flags.length + (p.garden && p.garden.count ? 1 : 0) + p.fresh.length + p.nl.length + p.pw.filter(x => x.urgent).length; } catch (e) { return 0; } }
 glBellBtn = function () { const n = glAlertCount(); return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' items' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; };
@@ -19576,16 +19588,118 @@ glAlertsBody = function () {
   const p = glAlertParts(), sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
-  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent);
-  const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length ? `<div class="list">${pwU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
-  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}</div>` : '') +
+  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent);
+  const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length || abU.length ? `<div class="list">${pwU.map(x => x.html).join('')}${abU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
+  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC || abN.length ? `<div class="list">${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}</div>` : '') +
     sec('New on your lists <span class="glswipehint">swipe left to clear</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
     sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
     sec('Power <span class="glswipehint">swipe left to clear</span>', pwN.length ? `<div class="list">${pwN.map(x => x.html).join('')}</div>` : '') +
     sec('New today <span class="glswipehint">swipe left to clear</span>', p.fresh.length ? `<div class="list glnewlist">${p.fresh.join('')}</div>` : '');
-  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
+  return (p.warn.length + p.dueUrgent.length + p.coming.length + p.sarah.length + p.nl.length + p.prog.length + p.pw.length + p.ab.length + (G ? 1 : 0) ? '' : '<div class="card empty"><div class="t">Nothing urgent right now</div><div class="s">Warnings, bills, car dates, birthdays, appointments, Sarah’s new items and events you flag show up here.</div></div>') + html;
 };
 
+/* 2.26.48: In progress for car due items (WOF / rego / service). Stored per car+part with the due date it was for, so it clears itself when the date is renewed.
+   WOF: after a failed inspection there are 28 days from the inspection date to fix and get the recheck. */
+const CAR_PART_NAME = { wof: 'WOF', rego: 'rego', svc: 'service' };
+function carProgAll() { S.carProg = S.carProg && typeof S.carProg === 'object' ? S.carProg : {}; return S.carProg; }
+function carPartDate(c, part) { return c ? (part === 'wof' ? c.wof : part === 'rego' ? c.rego : c.svcDate) : ''; }
+function carProg(c, part) { if (!c) return null; const e = (S.carProg || {})[c.id + '|' + part]; return e && e.due === carPartDate(c, part) ? e : null; }
+function carRecheck(e) { return e && e.insp ? addDays(e.insp, 28) : ''; }
+function progPill(txt) { return `<span class="pill progpill">${esc(txt || 'In progress')}</span>`; }
+function carProgText(c, part) {
+  const e = carProg(c, part); if (!e) return '';
+  if (part !== 'wof' || !e.insp) return 'In progress';
+  const d = daysLeft(carRecheck(e));
+  return 'In progress · ' + (d > 1 ? `recheck in ${d} days` : d === 1 ? 'recheck tomorrow' : d === 0 ? 'recheck today' : `recheck ${-d} day${d === -1 ? '' : 's'} overdue`);
+}
+function carFixesLine(e) { const F = (e && e.fixes) || []; return F.length ? progLine(F.filter(f => f.done).length, F.length, 'Fixes needed', 'pgsm') : ''; }
+function carDueSheet(carId, part) {
+  const c = getCar(carId); if (!c) return; const due = carPartDate(c, part), e = carProg(c, part) || {}, isW = part === 'wof';
+  const inspDef = e.insp || (due && due <= todayISO() ? due : todayISO());
+  const fixes = (e.fixes || []).map((f, i) => `<label class="fixrow"><input type="checkbox" name="fx_${i}" ${f.done ? 'checked' : ''}><span>${esc(f.text)}</span><button type="button" class="linkbtn" aria-label="Remove" onclick="this.closest('label').remove()">✕</button><input type="hidden" name="fxt_${i}" value="${esc(f.text)}"></label>`).join('');
+  openSheet(`${esc(c.name)} ${CAR_PART_NAME[part] || ''}`,
+    `<p class="muted" style="margin:0 2px 10px">Due ${due ? fmtW(due) : '—'}${c.plate ? ' · ' + esc(c.plate) : ''}</p>` +
+    field('Status', sel('st', [['', 'Not started'], ['doing', 'In progress']], carProg(c, part) ? 'doing' : '')) +
+    (isW ? field('Inspection date', inp('insp', inspDef, 'type="date"'), 'If it failed: 28 days from this date to fix it and get the recheck.') +
+      `<div class="field"><span>Fixes needed</span>${(e.fixes || []).length ? carFixesLine(e) : ''}<div class="fixlist">${fixes}</div>${area('newfix', '', 'Add fixes, one per line')}</div>` : '') +
+    `<p class="muted" style="margin:6px 2px 0">In progress clears itself when you update the ${CAR_PART_NAME[part] || ''} date.</p>`,
+    async v => {
+      const all = carProgAll(), k = c.id + '|' + part;
+      if (v.st !== 'doing') { delete all[k]; await save(); closeSheet(); render(); toast(`${c.name} ${CAR_PART_NAME[part]}: not started`); return; }
+      const n = Object.assign({}, carProg(c, part) || {}, { due, at: (carProg(c, part) || {}).at || Date.now() });
+      if (isW) {
+        if (v.insp && !parseD(v.insp)) return 'Please choose the inspection date.'; n.insp = v.insp || inspDef;
+        const F = []; Object.keys(v).filter(x => /^fxt_\d+$/.test(x)).forEach(x => { const i = x.slice(4); F.push({ text: v[x], done: !!v['fx_' + i] }); });
+        String(v.newfix || '').split(/\n+/).map(t => t.trim()).filter(Boolean).slice(0, 20).forEach(t => F.push({ text: t.slice(0, 80), done: false }));
+        n.fixes = F.slice(0, 30);
+      }
+      all[k] = n; await save(); closeSheet(); render(); toast(`${c.name} ${CAR_PART_NAME[part]}: in progress${isW && n.insp ? ' · recheck by ' + fmtW(carRecheck(n)) : ''}`);
+    }, 'Save', `<button type="button" class="btn" onclick="closeSheet();go('#car/${c.id}')">Open car</button>`);
+}
+async function carFixTick(carId, part, i) { const c = getCar(carId), e = carProg(c, part); if (!e || !e.fixes || !e.fixes[i]) return; e.fixes[i].done = !e.fixes[i].done; await save(); render(); }
+function carProgCards() { // bell In progress section (and recheck Coming up / Urgent)
+  const out = [];
+  (S.cars || []).forEach(c => ['wof', 'rego', 'svc'].forEach(part => {
+    const e = carProg(c, part); if (!e) return;
+    const rc = part === 'wof' ? carRecheck(e) : '', rd = rc ? daysLeft(rc) : null;
+    const F = e.fixes || [], fx = F.length ? `<div class="fixmini">${F.map((f, i) => `<button type="button" class="fixck ${f.done ? 'on' : ''}" onclick="event.stopPropagation();carFixTick('${c.id}','${part}',${i})"><span class="bx">${f.done ? '✓' : ''}</span>${esc(f.text)}</button>`).join('')}</div>${carFixesLine(e)}` : '';
+    const html = `<div class="row carprog" role="button" tabindex="0" onclick="carDueSheet('${c.id}','${part}')"><div class="ic car">${I(part === 'wof' ? 'shield' : part === 'rego' ? 'doc' : 'wrench')}</div><div class="tx"><div class="t">${esc(c.name)} ${CAR_PART_NAME[part]}</div><div class="s">${c.plate ? esc(c.plate) + ' · ' : ''}Due ${fmtW(e.due)}${rc ? ' · recheck by ' + fmtW(rc) : ''}</div>${fx}</div>${progPill(carProgText(c, part).replace('In progress · ', '') === 'In progress' ? 'In progress' : carProgText(c, part))}</div>`;
+    out.push({ car: c, part, rd, html });
+  }));
+  return out;
+}
+/* 2.26.48: 'Add a bill to your Budget?' prompts, on the Notifications page only. Never adds a bill by itself.
+   Cars: WOF / rego / service within 28 days (or a WOF marked in progress → its recheck date). Health: doctor, dentist, chiro appointments within 28 days. */
+const AB_HEALTH = [['dentist', 'Dentist', /\b(dentist|dental)\b/i], ['chiro', 'Chiropractor', /\b(chiro|chiropract\w*|tui chiropractic)\b/i], ['doctor', 'Doctor', /\b(doctor|gp|dr\b|central family health)\b/i]];
+function abDis() { try { const a = JSON.parse(localStorage.getItem('abDismiss') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function abDismiss(k) { const a = abDis(); if (!a.includes(k)) a.push(k); try { localStorage.setItem('abDismiss', JSON.stringify(a.slice(-200))); } catch (e) { } }
+function abNotNow(k) { abDismiss(k); render(); }
+function abHealthType(txt, kind) { if (kind && AB_HEALTH.some(x => x[0] === kind)) return AB_HEALTH.find(x => x[0] === kind); return AB_HEALTH.find(x => x[2].test(String(txt || ''))) || null; }
+function abLastAmt(type) { const B = (S.bills || []).filter(b => b && b.linkType === type && +b.amount > 0); return B.length ? B[B.length - 1].amount : ''; }
+let AB_REG = {};
+function abItems() {
+  const out = [], gone = new Set(abDis()), linked = new Set((S.bills || []).map(b => b && b.link).filter(Boolean)); AB_REG = {};
+  const add = (key, type, d, urgent, title, sub, pre, icon) => {
+    if (gone.has(key) || linked.has(key)) return;
+    AB_REG[key] = Object.assign({ repeat: 'none', paidBy: '', amount: abLastAmt(type), link: key, linkType: type }, pre);
+    out.push({ key, days: d, urgent, html: `<div class="row glnew abrow" data-ab="${esc(key)}"><div class="ic bill">${icon}</div><div class="tx"><div class="t">Add a bill to your Budget?</div><div class="s">${title} · ${sub}</div>` +
+      `<div class="abbtns"><button type="button" class="btn primary small" onclick="event.stopPropagation();if(!glSwipe.moved)abAdd('${esc(key)}')">Add bill</button><button type="button" class="btn small" onclick="event.stopPropagation();if(!glSwipe.moved)abNotNow('${esc(key)}')">Not now</button></div></div></div>` });
+  };
+  try {
+    (S.cars || []).forEach(c => [['wof', 'WOF'], ['rego', 'Rego'], ['svc', 'Service']].forEach(([part, L]) => {
+      const due = carPartDate(c, part); if (!due || !parseD(due)) return;
+      const e = carProg(c, part), rc = part === 'wof' && e ? carRecheck(e) : '', target = rc || due, d = daysLeft(target);
+      if (!(d <= 28 || (part === 'wof' && e))) return;
+      const nm = `${L} – ${c.name}${c.plate ? ' (' + c.plate + ')' : ''}`;
+      add(`car|${c.id}|${part}|${target}`, `car|${c.id}|${part}`, d, d < 0 || (!!rc && d <= 7), esc(nm), (rc ? 'Recheck by ' : 'Due ') + fmtW(target) + (d < 0 ? ` · ${-d} day${d === -1 ? '' : 's'} overdue` : ''), { name: nm, due: target }, '🚗');
+    }));
+  } catch (e) { }
+  try {
+    (S.health || []).forEach(p => (p.items || []).forEach(it => {
+      if (!it.apptDate || !parseD(it.apptDate)) return; const d = daysLeft(it.apptDate); if (d < 0 || d > 28) return;
+      const ht = abHealthType([it.name, it.clinic].join(' '), it.kind); if (!ht) return;
+      const who = String(p.name || '').trim(), nm = `${ht[1]} – ${who || 'Shane'}`;
+      add(`h|${p.id}|${it.id}|${it.apptDate}`, 'h|' + ht[0], d, false, esc(nm), `${it.clinic ? esc(it.clinic) + ' · ' : ''}${fmtW(it.apptDate)}`, { name: nm, due: it.apptDate }, '🩺');
+    }));
+    (S.appts || []).forEach(a => {
+      if (!a || !a.date || !parseD(a.date) || (a.from === 'sarah' && a.done)) return; const d = daysLeft(a.date); if (d < 0 || d > 28) return;
+      const ht = abHealthType([a.title, a.place].join(' '), null); if (!ht) return;
+      const who = a.from === 'sarah' || /\bsarah\b/i.test(a.title || '') ? 'Sarah' : /\bcass\b/i.test(a.title || '') ? 'Cass' : 'Shane', nm = `${ht[1]} – ${who}`;
+      add(`a|${a.id}|${a.date}`, 'h|' + ht[0], d, false, esc(nm), `${esc(a.title)} · ${fmtW(a.date)}`, { name: nm, due: a.date }, '🩺');
+    });
+  } catch (e) { }
+  return out.sort((x, y) => x.days - y.days);
+}
+function abAdd(key) { const pre = AB_REG[key]; if (!pre) { abItems(); } const p = AB_REG[key]; if (p) billForm(null, p); }
+/* one-time: Sarah's car (PNU312) WOF is in progress, failed inspection Fri 16 Oct 2026 → recheck by Fri 13 Nov 2026 (editable) */
+async function pnu312Mig() {
+  if (!S || !S.settings || S.settings.pnu312Mig) return '';
+  const c = (S.cars || []).find(x => x && String(x.plate || '').replace(/\s/g, '').toUpperCase() === 'PNU312');
+  if (!c || !c.wof) return '';
+  S.settings.pnu312Mig = true;
+  if (!carProg(c, 'wof')) carProgAll()[c.id + '|wof'] = { due: c.wof, at: Date.now(), insp: '2026-10-16', fixes: [] };
+  await save(); return `${c.name} WOF marked in progress · recheck by ${fmtW(addDays('2026-10-16', 28))}`;
+}
 /* ================= 2.26.39: Power (SolarZero figures pushed to the relay from the box; Ecotricity ecoZER0 rates) ================= */
 let PWR = (() => { try { return JSON.parse(localStorage.getItem('powerCache') || 'null'); } catch (e) { return null; } })(), pwrBusy = false;
 const PWR_RATE = { importBlend: 0.15, daily: 3.22, exportCredit: 0.092 }; // incl GST; blended import is an estimate
