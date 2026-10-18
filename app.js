@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.1';
+const APP_VERSION = '2.27.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22871,10 +22871,14 @@ function bxNav(k, how) {
   if (bxLong) { bxLong = false; return; }
   const h = '#' + (k === 'roster' ? 'work' : k);
   try {
+    // 2.27.1: navigate FIRST, then collapse. Up to 2.27.0 this rewrote the address to the new page with replaceState and then set
+    // location.hash to the same value, which is a no-op: no hashchange, so the page never changed (the row just closed).
+    // Now the sheet's history entry is dropped without touching the address, and the hash change is a real one.
+    if (history.state && history.state.btsheet) history.replaceState(null, '', location.href);
+    if (location.hash !== h) location.hash = h; else { render.nav = true; try { render(); } finally { render.nav = false; } }
     bsClose(); try { setTabsOpen(false); } catch (e) { }
-    if (history.state && history.state.btsheet) history.replaceState(null, '', h);
-    if (location.hash !== h) location.hash = h; else render();
-    setTimeout(() => { try { if (location.hash !== h) toast('Couldn’t open ' + (bxMeta(k)[0] || k) + ' (went to ' + (location.hash || '#home') + '). Tap it again.'); } catch (e) { } }, 700);
+    setTimeout(() => { try { if (renderedHash !== h) { render.nav = true; try { render(); } finally { render.nav = false; } }
+      if (renderedHash !== h) toast('Couldn’t open ' + (bxMeta(k)[0] || k) + ' (still on ' + (renderedHash || '#home') + '). Tap it again.'); } catch (e) { } }, 700);
   } catch (e) { try { toast('Second-row tab error: ' + (e && e.message || e)); } catch (x) { } }
 }
 bxGo = function (k) { bxNav(k, 'click'); };
