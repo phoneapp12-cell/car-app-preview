@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.90';
+const APP_VERSION = '2.26.91';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4029,8 +4029,8 @@ function jaAgo(at, now = Date.now()) { const m = Math.round((now - at) / 6e4); r
    short live preview and an Open link. Category label + colour on each card, jump chips above the carousel. */
 const TAB_CATS = [
   { id: 'today', name: 'Today', col: '#2563eb', keys: ['comingup', 'justadded', 'quotejoke', 'todo', 'calendar'] },
-  { id: 'money', name: 'Money', col: '#059669', keys: ['bills', 'budget', 'claims'] },
-  { id: 'home', name: 'Home & Life', col: '#d97706', keys: ['shopping', 'meals', 'ideas', 'health', 'cars', 'pets', 'birthdays'] },
+  { id: 'money', name: 'Money', col: '#059669', keys: ['bills', 'budget'] },
+  { id: 'home', name: 'Home & Life', col: '#d97706', keys: ['shopping', 'meals', 'ideas', 'health', 'claims', 'cars', 'pets', 'birthdays'] },
   { id: 'out', name: 'Out & About', col: '#7c3aed', keys: ['events', 'travel'] },
   { id: 'fun', name: 'Fun', col: '#db2777', keys: ['news', 'videos', 'tv'] }
 ];
@@ -5328,7 +5328,7 @@ function Claims() {
   const rows = claimRows(), todo = rows.filter(x => claimOpen(x.claim)), sent = rows.filter(x => x.claim && x.claim.status === 'submitted'),
     paid = rows.filter(x => x.claim && x.claim.status === 'paid'), skip = rows.filter(x => x.claim && x.claim.status === 'skip');
   const paidSum = paid.reduce((n, x) => n + Number(x.claim.paidAmt || 0), 0);
-  return header('UniMed claims', todo.length ? plural(todo.length, 'claim') + ' to make' + (sent.length ? ' · ' + sent.length + ' waiting' : '') : sent.length ? sent.length + ' waiting on UniMed' : 'All caught up', `<button class="iconbtn add" aria-label="New claim" onclick="claimSheet('new')">${I('plus')}</button>`) +
+  return `<button class="back" onclick="go('#health')">${I('left')} Health</button>` + header('UniMed claims', todo.length ? plural(todo.length, 'claim') + ' to make' + (sent.length ? ' · ' + sent.length + ' waiting' : '') : sent.length ? sent.length + ' waiting on UniMed' : 'All caught up', `<button class="iconbtn add" aria-label="New claim" onclick="claimSheet('new')">${I('plus')}</button>`) +
     `<div class="card cltipcard"><div class="cltip" style="margin:0 0 10px">${I('info')}<div>Claims are made in UniMed’s Smart Claim portal: policy, patient, provider, reason, visit date, amount paid, and a photo of the <b>itemised invoice</b> (not the EFTPOS receipt). At least $${CLAIM_MIN}. Drafts keep for 30 days there.</div></div>
       <div class="btns"><a class="btn primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a><a class="btn" href="tel:0800600666">${I('phone')} 0800 600 666</a></div>
       <div class="btns" style="margin-top:8px"><button class="btn" id="ecopen" onclick="emailClaim('new')">${I('mail')} Email claim: last 3 months of CFH, Tui Chiropractic, dentist invoices</button></div></div>` +
@@ -10521,7 +10521,7 @@ const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
-  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans', 'claims'] }, // 2.26.90: work hours, commission and wage estimate together under Money
+  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans'] }, // 2.26.91: UniMed claims live once, next to Health in People // 2.26.90: work hours, commission and wage estimate together under Money
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
@@ -18546,7 +18546,7 @@ function bottomTabs(route) {
     nav.addEventListener('pointerdown', e => { const t = e.target.closest('button'); if (!t) return; btLong = false; clearTimeout(btPress); btPress = setTimeout(() => { btLong = true; if (navigator.vibrate) try { navigator.vibrate(15); } catch (x) {} btCustomise(); }, 550); });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => nav.addEventListener(ev, () => clearTimeout(btPress)));
   }
-  const item = route === 'work' ? 'roster' : ROUTE_ITEM[route] || route || 'home';
+  const item = route === 'claims' && !b.keys.includes('claims') ? 'health' : route === 'work' ? 'roster' : ROUTE_ITEM[route] || route || 'home';
   let cur = item === '' ? 'home' : item;
   if (['power', 'compare', 'powertime', 'cashflow', 'notbills', 'work', 'roster', 'wage', 'commission'].includes(route) && !b.keys.includes(cur)) cur = ['budget', 'bills', 'cashflow'].find(k => b.keys.includes(k)) || cur; // 2.26.78: Money tabs light the Money tab
   const bn = (() => { try { return glBellUnseen(); } catch (e) { return 0; } })(); // 2.26.75
@@ -18660,6 +18660,7 @@ function render() {
   applyTheme();
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
+  if (/^#(unimed|health\/claims|money\/claims)(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#claims'); renderedHash = '#claims'; } // 2.26.91: one UniMed claims page
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   const map = { work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
