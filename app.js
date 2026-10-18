@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.83';
+const APP_VERSION = '2.26.84';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4830,7 +4830,7 @@ function billForm(id, pre) {
     field('Comes out of', sel('from', billFromOpts(), billFromVal(b)), 'For Cash flow’s before-payday check. Auto uses where it was paid from before.') +
     field('Ends after (payments, counting the next one)', inp('endn', billLeft(b) || '', 'inputmode="numeric" maxlength="3" placeholder="Keeps going"'), b.lastDue ? 'Last one ' + fmtW(b.lastDue) + '.' : 'Leave blank if it doesn’t end. Only for repeating bills.') +
     field('Notes', area('notes', b.notes, 'e.g. account number, paid by direct debit')) +
-    (id ? (() => { const r = emBill(b); return r ? `<div class="embill"><div class="muted" style="font-size:13px;margin:0 2px 6px">From ${esc(r.name || r.from || 'email')}${r.at ? ', ' + esc(fmtW(emDay(r.at))) : ''}: ${esc(r.subject)}</div>${emBtns(r)}</div>` : ''; })() : '') +
+    (id ? (() => { const r = emBill(b), rf = billRef(b); if (!r && rf) return `<div class="embill">${emBtns(null, '', rf)}</div>`; return r ? `<div class="embill"><div class="muted" style="font-size:13px;margin:0 2px 6px">From ${esc(r.name || r.from || 'email')}${r.at ? ', ' + esc(fmtW(emDay(r.at))) : ''}: ${esc(r.subject)}</div>${emBtns(r, '', rf)}</div>` : ''; })() : '') +
     (id && billInvoice(b) ? `<p class="muted" id="billinv" style="margin:4px 2px 0">${billInvoice(b).label ? esc(billInvoice(b).label) : 'Invoice ' + esc(billInvoice(b).no)} from ${esc(billInvoice(b).from || 'the email')}${billInvoice(b).amount != null ? ', ' + money(billInvoice(b).amount) : ''}${billInvoice(b).invDue ? ', due ' + esc(billInvoice(b).invDue) : ''}. Taken from the email in Outlook.</p>` : ''),
     async v => {
       if (!v.name) return 'Please give the bill a name.';
@@ -4846,7 +4846,7 @@ function billForm(id, pre) {
       upd.lastDue = en && v.repeat !== 'none' ? billLastDue(Object.assign({}, b, upd), Math.round(+en)) : '';
       billSetFrom(id || null, upd, v.from);
       if (id) { if (dueChanged) upd.paid = false; Object.assign(b, upd); }
-      else { const nb = Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? Object.assign({ link: pre.link, linkType: pre.linkType }, pre.regoMonths ? { regoMonths: pre.regoMonths } : {}) : {}); if (pre && pre.email && pre.email.id) nb.email = Object.assign({}, pre.email, { forDue: nb.due }); S.bills.push(nb); if (upd._acct) { S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[nb.id] = upd._acct; } delete nb._acct; }
+      else { const nb = Object.assign({ id: uid('bill'), paid: false }, upd, pre && pre.link ? Object.assign({ link: pre.link, linkType: pre.linkType }, pre.regoMonths ? { regoMonths: pre.regoMonths } : {}) : {}); if (pre && pre.fromTx && pre.fromTx.id) { const ft = pre.fromTx; nb.paidDues = [{ due: ft.date, on: ft.date, amount: ft.amount, tx: ft.id, fromList: true }]; nb.lastPaid = ft.date; } if (pre && pre.email && pre.email.id) nb.email = Object.assign({}, pre.email, { forDue: nb.due }); S.bills.push(nb); if (upd._acct) { S.settings.cfBillAcct = S.settings.cfBillAcct || {}; S.settings.cfBillAcct[nb.id] = upd._acct; } delete nb._acct; }
       if (id) delete b._acct;
       await save(); render(); toast(id ? 'Bill updated.' : 'Bill added.');
     }, id ? 'Save' : 'Add bill',
@@ -15312,7 +15312,7 @@ function billInvoice(b) {
 }
 function billInvoiceText(b) {
   const v = billInvoice(b);
-  return v ? (v.label ? esc(v.label) : 'Invoice ' + esc(v.no)) : '';
+  return v ? (v.label ? esc(v.label) : billRef(b) ? '' : 'Invoice ' + esc(v.no)) : ''; // 2.26.84: the number shows with Copy
 }
 async function refreshLawnInvoice(force) {
   if (lawnInvBusy || !S || !mailConnected('microsoft')) return;
@@ -15575,6 +15575,14 @@ async function mbOutlook() {
     try { const d = await mbAuthGet('microsoft', G + '?$search=' + encodeURIComponent('"' + MB_OQ[q].replace(/"/g, '\\"') + '"') + '&$top=25' + sel); (d.value || []).filter(x => (x.receivedDateTime || '') >= since).forEach(x => out.push(mbOMsg(x, q))); } catch (e) { }
   }
   try { const d = await mbAuthGet('microsoft', G + '?$filter=' + encodeURIComponent(`hasAttachments eq true and receivedDateTime ge ${since}`) + '&$orderby=receivedDateTime desc&$top=40' + sel); (d.value || []).forEach(x => out.push(mbOMsg(x, 'bill'))); } catch (e) { }
+  try { const d = await mbAuthGet('microsoft', G + '?$search=' + encodeURIComponent('"payment reference"') + '&$top=15' + sel); (d.value || []).filter(x => (x.receivedDateTime || '') >= since && !out.some(o => o.id === x.id)).forEach(x => out.push(mbOMsg(x, 'bill'))); } catch (e) { }
+  try { const old = new Map(emMsgs().map(m => [m.src + ':' + m.id, m])); let n = 0; // 2.26.84
+    for (const m of out.filter(m => m.q === 'bill')) {
+      const o = old.get('ms:' + m.id); if (o && o.inv !== undefined) { m.inv = o.inv; continue; }
+      const quick = emRefFind(m.subject, m.text); if (quick && quick.kind === 'invoice') { m.inv = quick; continue; }
+      if (!MB_BILL.test(m.subject + ' ' + m.text.slice(0, 160)) || MB_NOTBILL.test(m.subject + ' ' + m.text.slice(0, 260)) || MB_MKT.test(m.from) || n >= 12) continue;
+      n++; try { const b = await mbAuthGet('microsoft', G + '/' + encodeURIComponent(m.id) + '?$select=body'); m.inv = emRefFind(m.subject, mbHtmlText(b && b.body && b.body.content || '')) || quick || null; } catch (e) { }
+    } } catch (e) { }
   // fuller text and the Track button for order / collection emails (at most 14)
   const want = out.filter(m => (m.q === 'dl' || m.q === 'cc') && (mbDlInfo(m) || mbCcInfo(m))).slice(0, 14);
   for (const m of want) { try { const b = await mbAuthGet('microsoft', G + '/' + encodeURIComponent(m.id) + '?$select=body'); const h = b && b.body && b.body.content || ''; const L = mbLinks(h); m.track = L.track; m.olink = L.order; m.text = mbHtmlText(h).slice(0, 1500) || m.text; } catch (e) { } }
@@ -15591,7 +15599,7 @@ async function mbGmail() {
         let html = '', pdf = null; const walk = p => { if (!p) return; if (!html && p.mimeType === 'text/html' && p.body && p.body.data) { const b = atob(p.body.data.replace(/-/g, '+').replace(/_/g, '/')); html = new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); }
           if (!pdf && p.filename && /\.pdf$/i.test(p.filename) && p.body && p.body.attachmentId) pdf = { aid: p.body.attachmentId, name: p.filename }; (p.parts || []).forEach(walk); }; walk(g.payload);
         const fr = h('from'), mm = fr.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>/), L = mbLinks(html);
-        out.push({ src: 'g', id: it.id, q, from: String(mm ? mm[2] : fr).toLowerCase().trim(), name: mbClean(mm ? mm[1] : ''), subject: mbClean(h('subject')).slice(0, 200), text: (mbHtmlText(html) || mbClean(g.snippet)).slice(0, 1500), at: new Date(Number(g.internalDate)).toISOString(),
+        out.push({ src: 'g', id: it.id, q, from: String(mm ? mm[2] : fr).toLowerCase().trim(), name: mbClean(mm ? mm[1] : ''), subject: mbClean(h('subject')).slice(0, 200), text: (mbHtmlText(html) || mbClean(g.snippet)).slice(0, 1500), inv: q === 'bill' ? (emRefFind(h('subject'), mbHtmlText(html) || g.snippet) || null) : undefined, at: new Date(Number(g.internalDate)).toISOString(),
           link: 'https://mail.google.com/mail/u/0/#all/' + it.id, att: !!pdf, pdf, track: L.track, olink: L.order });
       } catch (e) { }
     }
@@ -15606,7 +15614,7 @@ async function refreshMb(force) {
     if (!MB) await loadMb();
     const parts = await Promise.all([mailConnected('microsoft') ? mbOutlook().catch(() => null) : [], mailConnected('google') ? mbGmail().catch(() => null) : []]);
     if (parts.every(p => p === null)) return;
-    const seen = new Map(); parts.flat().filter(Boolean).forEach(m => { const k = m.src + ':' + m.id, o = seen.get(k); if (!o) seen.set(k, m); else { o.qs = (o.qs || [o.q]).concat(m.q); if (m.text.length > o.text.length) o.text = m.text; o.track = o.track || m.track; o.olink = o.olink || m.olink; } });
+    const seen = new Map(); parts.flat().filter(Boolean).forEach(m => { const k = m.src + ':' + m.id, o = seen.get(k); if (!o) seen.set(k, m); else { o.qs = (o.qs || [o.q]).concat(m.q); if (m.text.length > o.text.length) o.text = m.text; o.track = o.track || m.track; o.olink = o.olink || m.olink; if (o.inv === undefined) o.inv = m.inv; } });
     mbAt = Date.now(); const had = JSON.stringify(MB && MB.msgs); MB = { at: mbAt, msgs: [...seen.values()].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 160) };
     await kvSet('mailBell', MB).catch(() => { });
     try { emLinkAll(); } catch (e) { } // 2.26.82
@@ -15670,7 +15678,7 @@ function mbBillInfo(m) {
   const s = m.subject; if (/^(re|fw|fwd):/i.test(s) || MB_MKT.test(m.from) || /payroll|novopay/i.test(m.from)) return null;
   const t = s + ' ' + String(m.text || '');
   if (!MB_BILL.test(s + ' ' + String(m.text || '').slice(0, 160)) || MB_NOTBILL.test(t.slice(0, 260))) return null;
-  if (!m.att && !/xero\.com/.test(m.from)) return null;
+  if (!m.att && !/xero\.com/.test(m.from) && !(m.inv && m.inv.kind === 'ref')) return null; // 2.26.84: e.g. 2degrees, no PDF but a payment reference
   const xf = s.match(/\bfrom\s+(.+?)(?:\s+for\s+.+)?$/i);
   const biller = (/xero\.com/.test(m.from) && xf ? xf[1] : (/ecotricity/.test(m.from) ? 'Ecotricity' : /kora/.test(m.from) ? 'Kora' : /sky\.co\.nz/.test(m.from) ? 'Sky' : mbName(m))).replace(/\s+T\/A\s+/i, ' – ').slice(0, 50);
   const am = (t.match(/(?:total|balance|amount|due|owing|pay)[^$]{0,30}\$\s?([\d,]+\.\d{2})/i) || t.match(/\$\s?([\d,]+\.\d{2})\s*NZD/i) || t.match(/\$\s?([\d,]+\.\d{2})/) || [])[1];
@@ -18611,7 +18619,7 @@ function tabbar(active) {
     return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
   };
   const pwrBtn = (() => { const l = (() => { try { const t = PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })(); return `<button class="${active === 'power' ? 'on' : ''}" ${active === 'power' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#power')"><span class="w"><span style="font-size:1.3rem;line-height:1">⚡</span></span><span class="lbl">${l}</span></button>`; })();
-  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'cashflow' ? pwrBtn : '')).join('')}</div>`).join('');
+  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
   // 2.26.78: the project pages sit under a 'Projects' heading; Power moved into Money (as a link to Money › Power)
   const reno = (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`;
     let mill = ''; try { mill = renoOn() ? b('reno', '🛠️', 'Renovation ' + (window.Reno ? Reno.progress() + '%' : '')) : ''; } catch (e) { mill = ''; }
@@ -18622,6 +18630,7 @@ function activeTab(r) {
   const item = ROUTE_ITEM[r] || r, tabs = navOrder();
   if (r === 'settings') return 'settings';
   if (r === 'power' || r === 'compare' || r === 'powertime') return 'power'; // 2.26.78: Money › Power
+  if (r === 'notbills') return 'notbills'; // 2.26.84: Money › Not bills
   if (tabs.includes(item)) return item;
   if (r === 'home' || r === 'weather' || r === 'drivers' || r === 'alerts' || !r) return 'home';
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
@@ -18645,7 +18654,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, notbills: NotBills, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -20070,7 +20079,7 @@ function cfBody(M) {
 function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
 async function cfSetMain(id) { S.settings.cfMain = id; await save(); render(); }
 async function cfRefresh() { toast('Asking the banks for the latest…'); await cfLoad(true); if (CFerr) toast(CFerr); }
-function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['power', 'Power']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
+function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['notbills', 'Not bills'], ['power', 'Power']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
 function CashFlow() {
   const head = moneyTabs('cashflow') + header('Cash flow', 'Your bank balances, and what’s left before payday');
   if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
@@ -20079,6 +20088,93 @@ function CashFlow() {
   return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : '') + (CF.example ? `<div class="callout cfex"><b>Example data</b> · not your real accounts</div>` : '') + cfBody(CF);
 }
 function cfGoSettings() { go('#settings'); setTimeout(() => { const el = document.getElementById('akahuset'); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 300); }
+
+/* ================= NOT BILLS (2.26.84) =================
+   Money › Not bills: money going out of the bank accounts and the ASB card (Akahu, read-only) that no bill has taken.
+   Left out: transfers between his own accounts, money coming in, mortgage repayments, payments a bill was marked paid
+   with (by the bank or by hand, same payee and amount within 3 days), and ones he's said aren't bills (S.settings.nbHide).
+   Payee text has card and account numbers taken out. */
+const BILL_OWN_RE = /^PAY (SHANE|ANZ BILL)\b|\bS A (& S M )?JENKINS\b|\bS JENKINS ASB TO ASB\b|^MB TRANSFER\b|^TO: *\d|^FC\d|\bTFR TO SARAH\b|^TRANSFER TO\b/i;
+function billOwnTx(t) { const x = String(t && t.desc || ''); return BILL_OWN_RE.test(x) || !!(t && t.pair && /^(KIWIBANK|ANZ|ASB|WESTPAC|BNZ)\b/i.test(x)); }
+let nbPer = 'this', nbAcct = '', nbShowHidden = false;
+const nbPayee = t => { const raw = String(t.merchant || t.desc || 'Payment'); return raw.replace(/CARD NUMBER.*$/i, '').replace(EM_BANKNO, '').replace(/\*{2,}[\s*#\d]*/g, '').replace(/#\s*\d*/g, '').replace(/\s+\b(ACCT|INV|REF|PARTICULARS|CODE)\b.*$/i, '').replace(/\b\d{4,}\b/g, '').replace(/\s+/g, ' ').trim().replace(/^(.+?) \1$/i, '$1').slice(0, 48) || 'Payment'; };
+const nbKey = t => swNorm(nbPayee(t)).slice(0, 24);
+const nbTitle = n => String(n).toLowerCase().replace(/(^|[\s\-\/&(])([a-z])/g, (x, p, c) => p + c.toUpperCase());
+function nbRange() {
+  const T = todayISO();
+  if (nbPer === '30') return { from: addDays(T, -29), to: T, label: 'Last 30 days' };
+  const p = (() => { try { return payPeriod(nbPer === 'last' ? -1 : 0); } catch (e) { return null; } })();
+  if (p && (nbPer === 'this' ? p.off === 0 : p.off === -1)) return { from: p.start, to: nbPer === 'this' ? T : p.end, label: nbPer === 'this' ? 'This fortnight' : 'Last fortnight' };
+  return nbPer === 'this' ? { from: addDays(T, -13), to: T, label: 'Last 14 days' } : { from: addDays(T, -27), to: addDays(T, -14), label: '14 to 28 days ago' };
+}
+function nbBillTx(D) { // tx ids a bill already took, and hand-ticked payments
+  const ids = new Set(), hand = [];
+  (S.bills || []).forEach(b => (Array.isArray(b && b.paidDues) ? b.paidDues : []).forEach(p => { if (!p) return; if (p.tx) ids.add(p.tx); if (Array.isArray(p.txs)) p.txs.forEach(x => ids.add(x)); if (!p.tx && p.on) hand.push({ b, p }); }));
+  return { ids, hand };
+}
+function nbAll(D) {
+  if (!D) return []; const card = cfCardAcct(D), { ids, hand } = nbBillTx(D), T = todayISO();
+  return (D.transactions || []).filter(t => { const a = D.accounts.find(x => x.id === t.acct); if (!a || !(t.amount < 0) || t.date.slice(0, 10) > T) return false;
+    if (!(cfSpendable(a) || a.type === 'CREDITCARD')) return false; if (a.type === 'LOAN' && !a.limit) return false;
+    if (ids.has(t.id) || billOwnTx(t) || (t.pair && t.cat2 === 'transfer')) return false;
+    try { if (cfMortTx(D, t)) return false; } catch (e) { }
+    if (card && a.id !== card.id && /\b(ASB\s*)?(CREDIT\s*)?CARD\s*(PAYMENT|REPAY)/i.test(t.desc)) return false; // paying the card off
+    const d = t.date.slice(0, 10), amt = -t.amount;
+    if (hand.some(({ b, p }) => Math.abs(dayGap(d, p.on)) <= 3 && Math.abs((+p.amount || 0) - amt) <= 0.5 && (() => { try { return payeeFor(b, t) > 0; } catch (e) { return false; } })())) return false;
+    return true; });
+}
+// same payee at a steady beat (weekly, fortnightly, monthly), from the whole bank history
+function nbRegular(D) {
+  const g = new Map(); nbAll(D).forEach(t => { const k = nbKey(t); if (k.length < 3) return; (g.get(k) || g.set(k, []).get(k)).push(t); });
+  const out = new Map();
+  g.forEach((L, k) => { if (L.length < 2) return; const d = [...new Set(L.map(t => t.date.slice(0, 10)))].sort(); if (d.length < 2) return;
+    const gaps = d.slice(1).map((x, i) => Math.round((parseD(x) - parseD(d[i])) / DAY)), med = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)];
+    const per = med >= 6 && med <= 8 ? 7 : med >= 13 && med <= 15 ? 14 : med >= 27 && med <= 32 ? 'm' : 0; if (!per) return;
+    const ok = gaps.filter(x => per === 'm' ? x >= 26 && x <= 33 : Math.abs(x - per) <= 2).length; if (ok < Math.max(1, Math.ceil(gaps.length * 0.7))) return;
+    out.set(k, { per, n: d.length, last: d[d.length - 1] }); });
+  return out;
+}
+const nbPerTxt = p => p === 7 ? 'weekly' : p === 14 ? 'fortnightly' : 'monthly';
+function NotBills() {
+  const head = moneyTabs('notbills') + header('Not bills', 'Money out of your bank and ASB card that isn’t one of your bills');
+  if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see this</div><div class="s">It lists what went out of your accounts and the ASB card that no bill took. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
+  if (!CF && CFmock) CF = CFmock;
+  if (!CF) { if (!CFbusy) setTimeout(() => cfLoad(), 0); return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : `<div class="card muted">Loading your accounts…</div>`); }
+  const D = CF.data, R = nbRange(), hid = new Set(S.settings.nbHide || []), reg = nbRegular(D), card = cfCardAcct(D);
+  const accts = D.accounts.filter(a => (cfSpendable(a) || a.type === 'CREDITCARD') && !(a.type === 'LOAN' && !a.limit));
+  const aName = id => { const a = D.accounts.find(x => x.id === id); return a ? (a.type === 'CREDITCARD' ? (a.bank || 'ASB') + ' card' : cfIsOrbit(a) ? 'ORBIT' : cfAName(a)) : ''; };
+  const inR = nbAll(D).filter(t => { const d = t.date.slice(0, 10); return d >= R.from && d <= R.to && (!nbAcct || t.acct === nbAcct); }).sort((a, b) => b.date.localeCompare(a.date));
+  const shown = inR.filter(t => !hid.has(t.id)), hiddenHere = inR.filter(t => hid.has(t.id)), L = nbShowHidden ? hiddenHere : shown;
+  const tot = shown.reduce((n, t) => n - t.amount, 0), regTot = shown.filter(t => reg.has(nbKey(t))).reduce((n, t) => n - t.amount, 0);
+  const segBtn = (k, l) => `<button type="button" class="${nbPer === k ? 'on' : ''}" aria-selected="${nbPer === k}" onclick="nbPer='${k}';render()">${l}</button>`;
+  const filt = `<div class="seg nbper" role="tablist">${segBtn('this', 'This fortnight')}${segBtn('last', 'Last fortnight')}${segBtn('30', '30 days')}</div>` +
+    `<div class="nbacct"><label class="muted" for="nbacct">Account</label> <select id="nbacct" onchange="nbAcct=this.value;render()"><option value="">All accounts</option>${accts.map(a => `<option value="${esc(a.id)}"${nbAcct === a.id ? ' selected' : ''}>${esc(aName(a.id))}</option>`).join('')}</select></div>`;
+  const sum = `<div class="card nbsum"><div class="nbtot">${cfMoney(tot)}</div><div class="s">${esc(R.label)} · ${esc(fmtW(R.from))} to ${esc(fmtW(R.to))} · ${plural(shown.length, 'payment')}${regTot ? ` · ${cfMoney(regTot)} looks regular` : ''}</div>${hiddenHere.length ? `<button type="button" class="linkbtn" onclick="nbShowHidden=!nbShowHidden;render()">${nbShowHidden ? 'Back to the list' : 'Show ' + plural(hiddenHere.length, 'hidden one')}</button>` : ''}</div>`;
+  const byDay = new Map(); L.forEach(t => { const d = t.date.slice(0, 10); (byDay.get(d) || byDay.set(d, []).get(d)).push(t); });
+  const row = t => { const r = reg.get(nbKey(t)), id = esc(t.id), isCard = card && t.acct === card.id;
+    return `<div class="row nbrow" data-nb="${id}"><div class="tx"><div class="t">${esc(nbTitle(nbPayee(t)))}${r ? ` <span class="nbreg">Looks regular · ${nbPerTxt(r.per)}</span>` : ''}</div><div class="s">${esc(aName(t.acct))}${isCard ? '' : ''}${t.cat ? ' · ' + esc(t.cat) : ''}</div>
+      <div class="nbbtns">${nbShowHidden ? `<button type="button" class="btn small" onclick="nbUnhide('${id}')">Put back</button>` : `<button type="button" class="btn small nbmk" onclick="nbMake('${id}')">Make this a bill</button><button type="button" class="btn small nblink" onclick="nbLink('${id}')">Link to a bill</button><button type="button" class="btn small nbno" onclick="nbHide('${id}')">Not a bill</button>`}</div></div>
+      <b class="cfamt neg">${cfMoney(t.amount)}</b></div>`; };
+  const list = L.length ? [...byDay.entries()].map(([d, ts]) => `<div class="sec">${esc(fmtW(d))}</div><div class="list">${ts.map(row).join('')}</div>`).join('') : `<div class="card muted">${nbShowHidden ? 'Nothing hidden in this period.' : 'Nothing here. Everything that went out was a bill or a transfer between your accounts.'}</div>`;
+  return head + (CF.example ? `<div class="callout cfex"><b>Example data</b> · not your real accounts</div>` : '') + filt + sum + list + `<p class="muted" style="margin:10px 4px 0;font-size:13px">Left out: transfers between your accounts, money coming in, mortgage repayments, card repayments and anything a bill was marked paid with. Bank data from Akahu, read-only.</p>`;
+}
+const nbTx = id => (CF && CF.data && CF.data.transactions || []).find(t => t.id === id);
+async function nbHide(id) { const s = snap(); S.settings.nbHide = (S.settings.nbHide || []).filter(x => x !== id).concat(id).slice(-500); await save(); render(); toast('Hidden. It won’t show here again.', 'Undo', undoTo(s)); }
+async function nbUnhide(id) { S.settings.nbHide = (S.settings.nbHide || []).filter(x => x !== id); await save(); render(); toast('Put back on the list.'); }
+function nbMake(id) { const t = nbTx(id); if (!t) return; const D = CF.data, a = D.accounts.find(x => x.id === t.acct), r = nbRegular(D).get(nbKey(t)), d = t.date.slice(0, 10), amt = r2(-t.amount);
+  const per = r ? (r.per === 7 ? 'weekly' : r.per === 14 ? 'fortnightly' : 'monthly') : 'none', next = r ? (r.per === 'm' ? addMonths(d, 1, +d.slice(8, 10)) : addDays(d, r.per)) : d;
+  billForm(null, Object.assign({ name: nbTitle(nbPayee(t)).slice(0, 50), amount: amt, due: per === 'none' ? todayISO() : next, repeat: per, notes: 'From a bank payment on ' + fmtW(d) + '.', fromTx: { id: t.id, date: d, amount: amt } },
+    a && a.type === 'CREDITCARD' ? { paidBy: 'card' } : a ? { _fromAcct: a.id } : {})); }
+function nbLink(id) { const t = nbTx(id); if (!t) return; const d = t.date.slice(0, 10), amt = r2(-t.amount);
+  const B = (S.bills || []).filter(b => b && b.due).map(b => { let p = 0; try { p = payeeFor(b, t); } catch (e) { } return { b, sc: (p > 0 ? 0 : 100) + (+b.amount ? Math.min(50, Math.abs(+b.amount - amt)) : 25) + Math.min(30, Math.abs(dayGap(d, b.due)) / 3) + (b.paid ? 40 : 0) }; }).sort((x, y) => x.sc - y.sc).slice(0, 12);
+  if (!B.length) { toast('No bills yet. Use Make this a bill instead.'); return; }
+  openSheet('Link to a bill', `<p class="muted" style="margin:0 0 10px">${esc(nbTitle(nbPayee(t)))}, ${cfMoney(t.amount)} on ${esc(fmtW(d))}. Pick the bill it paid.</p><div class="list">${B.map(({ b }) => `<button type="button" class="row" onclick="nbLinkTo('${esc(id)}','${esc(b.id)}')"><div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${b.paid ? 'Paid' : 'Due ' + esc(fmtW(b.due))}${+b.amount ? ' · ' + money(b.amount) : ''}</div></div></button>`).join('')}</div>`, null, ''); }
+async function nbLinkTo(id, bid) { const t = nbTx(id), b = (S.bills || []).find(x => x.id === bid); if (!t || !b) return; const s = snap(), d = t.date.slice(0, 10), amt = r2(-t.amount), due = b.paid ? (b.paidOn || d) : b.due;
+  b.paidDues = (Array.isArray(b.paidDues) ? b.paidDues : []).filter(x => x && !(x.due === due && !x.tx)).filter(x => x && x.tx !== t.id);
+  b.paidDues.push(Object.assign({ due, on: d, amount: amt, tx: t.id, linked: true }, +b.amount && Math.abs(amt - +b.amount) >= 0.01 ? { expected: +b.amount } : {})); b.paidDues = b.paidDues.slice(-30);
+  b.lastPaid = b.lastPaid && b.lastPaid > d ? b.lastPaid : d;
+  let msg = ''; if (!b.paid) { try { regoAdvance(b, d); } catch (e) { } const n = nextDue(b); if (n && n !== due) { b.due = n; msg = ` Next due ${fmtW(n)}.`; } else { b.paid = true; b.paidOn = d; } }
+  await save(); await closeSheet(); render(); toast(`${b.name} marked paid ${fmtW(d)}.${msg}`, 'Undo', undoTo(s)); }
 
 /* ================= REGULAR PAYMENTS + TRANSFERS TO MAKE (2.26.65) =================
    cfRegulars: automatic payments and direct debits seen in the bank (same payee, same account, weekly / fortnightly /
@@ -21126,12 +21222,46 @@ async function pnu312Mig() {
 const EM_REG = {};
 const emDay = at => { try { return new Date(at).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }); } catch (e) { return String(at).slice(0, 10); } };
 const emKey = r => r.src + ':' + r.id;
-function emRefOf(m) { return m && m.id && m.src ? { src: m.src, id: m.id, at: m.at || '', subject: String(m.subject || '').slice(0, 160), from: m.from || '', name: m.name || '', att: !!m.att, pdf: m.pdf || null, link: m.link || '' } : null; }
-function emBtns(r, cls) { if (!r) return ''; const k = emKey(r); EM_REG[k] = r; const g = "if(window.glSwipe&&glSwipe.moved)return;";
+function emRefOf(m) { return m && m.id && m.src ? { src: m.src, id: m.id, at: m.at || '', subject: String(m.subject || '').slice(0, 160), from: m.from || '', name: m.name || '', att: !!m.att, pdf: m.pdf || null, link: m.link || '', inv: emInvOf(m) || null } : null; }
+function emBtns(r, cls, ref) { if (!r) return ref ? `<div class="embtns ${cls || ''}">${emRefChip(ref)}</div>` : ''; const k = emKey(r); EM_REG[k] = r; const g = "if(window.glSwipe&&glSwipe.moved)return;";
   const lt = 'background:#E0E7FF !important;color:#1E3A8A !important;border:1px solid #A5B4FC !important;font-weight:650', dk = 'background:#1D4ED8 !important;color:#fff !important;border:1px solid #1D4ED8 !important;font-weight:650';
-  return `<div class="embtns ${cls || ''}"><button type="button" class="btn small embtn" style="${lt}" onclick="event.stopPropagation();event.preventDefault();${g}emView('${esc(k)}')">View email</button>${r.att ? `<button type="button" class="btn small embtn empdf" style="${dk}" onclick="event.stopPropagation();event.preventDefault();${g}emPdf('${esc(k)}')">Open PDF</button>` : ''}</div>`; }
+  return `<div class="embtns ${cls || ''}">${ref ? emRefChip(ref) : ''}<button type="button" class="btn small embtn" style="${lt}" onclick="event.stopPropagation();event.preventDefault();${g}emView('${esc(k)}')">View email</button>${r.att ? `<button type="button" class="btn small embtn empdf" style="${dk}" onclick="event.stopPropagation();event.preventDefault();${g}emPdf('${esc(k)}')">Open PDF</button>` : ''}</div>`; }
 function emPdf(k) { const r = EM_REG[k]; if (r) mbPdfOf(r, r.name || 'bill'); }
 const emMsgs = () => (MB && Array.isArray(MB.msgs) ? MB.msgs : []);
+/* 2.26.84: invoice and payment reference numbers from bill emails (subject, body, PDF text when it's been read).
+   Never a bank account number: anything shaped like 12-3456-1234567-00 is refused, and an account or customer number
+   only counts when the email says to use it as the payment reference. */
+const EM_BANKNO = /\b\d{2}[-\s]?\d{4}[-\s]?\d{7}[-\s]?\d{2,3}\b/;
+function emRefFind(subject, text, pdf) {
+  const S1 = String(subject || ''), T1 = (String(text || '') + ' ' + String(pdf || '')).replace(/[\u00a0\s]+/g, ' ');
+  const ok = v => { v = String(v || '').replace(/[.,;:)]+$/, '').toUpperCase(); return v.length >= 3 && v.length <= 24 && /\d/.test(v) && !EM_BANKNO.test(v) && !/^\d{2}-\d{4}-/.test(v) && !/^(19|20)\d{2}$/.test(v) ? v : ''; };
+  const pick = (re, src) => { const m = src.match(re); return m ? ok(m[1]) : ''; };
+  let no = '', kind = 'invoice';
+  for (const src of [S1, T1]) { no = pick(/\b(INV[-\s]?\d{3,10})\b/i, src).replace(/\s/, '-'); if (no) break; }
+  if (!no) no = pick(/\b(?:tax\s+)?invoice\s*(?:#|no\.?|number|num\.?)\s*:?\s*([A-Z0-9][A-Z0-9\-\/]{2,22})/i, S1 + ' ' + T1);
+  if (!no) no = pick(/\binvoice(?: is)? attached\s*:?\s*([A-Z0-9\-]*\d[A-Z0-9\-]{2,22})/i, T1); // Ecotricity: "your invoice attached: 0002201005"
+  if (!no) no = pick(/\btax invoice\s*:?\s*([A-Z0-9\-]*\d[A-Z0-9\-]{2,22})/i, S1 + ' ' + T1);
+  if (!no) { kind = 'ref';
+    no = pick(/\b(?:account|customer)\s*(?:number|no\.?|#)?\s*\(?\s*([A-Z0-9\-]{4,20})\s*\)?\s*as\s+(?:the|your)\s+(?:payment\s+)?reference/i, T1)
+      || pick(/\bpayment\s+reference\s*(?:is|:)\s*([A-Z0-9][A-Z0-9\-\/]{2,22})/i, T1)
+      || pick(/\b(?:reference|ref)\s*(?:#|no\.?|number)?\s*:\s*([A-Z0-9][A-Z0-9\-\/]{2,22})/i, S1 + ' ' + T1); }
+  return no ? { no, kind } : null;
+}
+const emInvOf = m => !m ? null : m.inv !== undefined ? m.inv : emRefFind(m.subject, m.text, m.pdfText);
+// the number for a bill: from its email (an invoice number only for that due date; a payment reference always), or the lawn invoice
+function billRef(b) {
+  if (!b) return null; const r = b.ref;
+  if (r && r.no && (r.kind === 'ref' || r.forDue === b.due || b.paid)) return r;
+  const v = (() => { try { return billInvoice(b); } catch (e) { return null; } })();
+  return v && v.no && !/^kora-/i.test(v.no) ? { no: String(v.no), kind: 'invoice', src: 'email', from: v.from || '' } : null;
+}
+const emRefLabel = r => r.kind === 'ref' ? 'Ref ' + r.no : /^\d+$/.test(r.no) ? 'Invoice ' + r.no : r.no;
+function emRefChip(r) { if (!r || !r.no) return ''; const no = String(r.no).replace(/[^A-Za-z0-9\-\/]/g, '');
+  return `<span class="emref"><span class="emrefno">${esc(emRefLabel(Object.assign({}, r, { no })))}</span><button type="button" class="btn small emcopy" style="background:#fff !important;color:#1E3A8A !important;border:1px solid #A5B4FC !important;font-weight:650" data-no="${esc(no)}" onclick="event.stopPropagation();event.preventDefault();emCopy(this.dataset.no)">Copy</button></span>`; }
+async function emCopy(no) { if (window.glSwipe && glSwipe.moved) return; no = String(no || ''); if (!no) return;
+  let done = false; try { await navigator.clipboard.writeText(no); done = true; } catch (e) { }
+  if (!done) { try { const a = document.createElement('textarea'); a.value = no; a.setAttribute('readonly', ''); a.style.position = 'fixed'; a.style.opacity = '0'; document.body.appendChild(a); a.select(); done = document.execCommand('copy'); a.remove(); } catch (e) { } }
+  toast(done ? 'Copied ' + no + '. Paste it in the bank’s reference box.' : 'Couldn’t copy. The number is ' + no + '.'); }
 // a bill's email, only while it's for this due date (a paid one-off keeps it)
 function emBill(b) { const r = b && b.email; return r && r.id && (r.forDue === b.due || b.paid) ? r : null; }
 // the NZTA rego reminder for a car (subject names the plate)
@@ -21139,6 +21269,7 @@ function emRego(carId) { const c = getCar(carId), p = billPlate(c); if (!p) retu
   if (m) return emRefOf(m); const bl = (S.bills || []).find(b => b && b.linkType === 'car|' + carId + '|rego' && !b.paid); return bl ? emBill(bl) : null; }
 function emBillScore(bill, m, info) {
   const nm = info.biller + ' ' + (m.name || '') + ' ' + (m.from || '');
+  try { const mine = billRef(bill) || (bill.ref && bill.ref.no ? bill.ref : null), its = emInvOf(m); if (mine && its && String(mine.no).toUpperCase() === its.no) return 60; } catch (e) { } // 2.26.84
   let p = 0; try { p = payeeScore(bill.name, nm); } catch (e) { p = 0; }
   if (!p && /kora/i.test(bill.name) && /kora/i.test(nm)) p = 2; if (!p && /ecotricity/i.test(bill.name) && /ecotricity/i.test(nm)) p = 2;
   if (!p) return 0;
@@ -21147,6 +21278,17 @@ function emBillScore(bill, m, info) {
   const vary = (() => { try { return billVaries(bill) || /kora|ecotricity|power/i.test(bill.name); } catch (e) { return false; } })() && mbAge(m.at) <= 40; // varying bills (power, fuel card): the latest bill email from them
   if (!(amtOk || dueOk || invOk || vary)) return 0;
   return p * 10 + (amtOk ? 5 : 0) + (dueOk ? 5 : 0) + (invOk ? 10 : 0) + (String(m.at) > '' ? 0 : 0);
+}
+// 2.26.84: put the number from each linked email on its bill (b.ref). Returns the bills that got a new number.
+function emRefsAll() {
+  const got = [], M = emMsgs();
+  (S.bills || []).forEach(b => { const r = b && emBill(b); if (!r) return;
+    const m = M.find(x => x.src === r.src && x.id === r.id), inv = m ? emInvOf(m) : r.inv; if (!inv || !inv.no) return;
+    const cur = b.ref; if (cur && cur.no === inv.no && cur.forDue === b.due) return;
+    if (!(cur && cur.no === inv.no)) got.push({ name: String(b.name || 'A bill').slice(0, 40), no: inv.no });
+    b.ref = { no: inv.no, kind: inv.kind, src: 'email', mid: r.src + ':' + r.id, from: r.name || r.from || '', at: r.at || '', forDue: b.due };
+  });
+  return got;
 }
 /* 2.26.83: the email's due date wins on a one-off bill, unless he changed the date himself (b.dueByHand).
    Repeating bills are left alone (their next due moves on by itself). Returns the bills it moved, with a bell note. */
@@ -21181,8 +21323,12 @@ function emLinkAll() {
     if (!best) return;
     used.add(emKey(best)); b.email = Object.assign(best, { forDue: b.due }, bi && bi.due ? { due: bi.due } : {}); linked.push(String(b.name || 'A bill').slice(0, 40));
   });
-  const fixed = emDueWins();
-  if (linked.length || fixed.length) {
+  const fixed = emDueWins(), refd = emRefsAll();
+  if (refd.length) { const L = (S.settings.appNotices || []).slice();
+    L.push({ id: 'emref-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Invoice numbers from the emails: ' + refd.slice(0, 6).map(x => x.name + ' ' + x.no).join(', ') + (refd.length > 6 ? ' and ' + (refd.length - 6) + ' more' : ''),
+      body: 'Tap Copy next to the number when you pay, and paste it in the bank’s reference box.' });
+    S.settings.appNotices = L.slice(-30); }
+  if (linked.length || fixed.length || refd.length) {
     if (linked.length && !S.settings.emLinkNote) { S.settings.emLinkNote = todayISO(); const L = (S.settings.appNotices || []).slice();
       L.push({ id: 'emlink-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Linked to their emails: ' + linked.slice(0, 10).join(', ') + (linked.length > 10 ? ' and ' + (linked.length - 10) + ' more' : ''), body: 'View email and Open PDF now show on these wherever they appear.' });
       S.settings.appNotices = L.slice(-30); }
@@ -21211,15 +21357,16 @@ async function emView(k) {
       subj = h('subject') || subj; from = h('from') || from; at = g.internalDate ? new Date(Number(g.internalDate)).toISOString() : at; body = txt || emPlain(html) || g.snippet || '';
     }
     let when = ''; try { when = new Date(at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch (e) { when = at; }
-    put(`<div class="emhead"><div class="emsubj">${esc(subj || '(no subject)')}</div><div class="emmeta">From ${esc(from || '')}</div><div class="emmeta">${esc(when)}</div></div><div class="embody">${esc(String(body).slice(0, 20000))}</div>`);
+    const rf = emRefFind(subj, body) || r.inv; if (rf && !r.inv) { r.inv = rf; try { const mm = emMsgs().find(x => x.src === r.src && x.id === r.id); if (mm && !mm.inv) mm.inv = rf; } catch (e) { } }
+    put(`<div class="emhead"><div class="emsubj">${esc(subj || '(no subject)')}</div><div class="emmeta">From ${esc(from || '')}</div><div class="emmeta">${esc(when)}</div>${rf ? `<div class="emmeta emrefline">${emRefChip(rf)}</div>` : ''}</div><div class="embody">${esc(String(body).slice(0, 20000))}</div>`);
   } catch (e) { put(`<p class="muted">${navigator.onLine === false ? 'You’re offline. Try again with signal.' : 'Couldn’t read that email just now.'}</p>`); }
 }
 // add the buttons to any row that names a bill (data-bill) or a car's rego (data-rego), wherever it shows
 function emDecorate(root) {
   try { (root || document).querySelectorAll('[data-bill]:not([data-emd]),[data-rego]:not([data-emd])').forEach(el => {
-    let r = null; if (el.dataset.bill) { const b = (S.bills || []).find(x => x && x.id === el.dataset.bill); r = emBill(b); } else if (el.dataset.rego) r = emRego(el.dataset.rego);
-    if (!r) return; el.setAttribute('data-emd', '1');
-    const box = document.createElement('div'); box.innerHTML = emBtns(r); const btns = box.firstElementChild;
+    let r = null, ref = null; if (el.dataset.bill) { const b = (S.bills || []).find(x => x && x.id === el.dataset.bill); r = emBill(b); ref = billRef(b); } else if (el.dataset.rego) r = emRego(el.dataset.rego);
+    if (!r && !ref) return; el.setAttribute('data-emd', '1');
+    const box = document.createElement('div'); box.innerHTML = emBtns(r, '', ref); const btns = box.firstElementChild;
     if (el.tagName === 'BUTTON' || el.tagName === 'A') { btns.classList.add('emstrip'); const cs = getComputedStyle(el); if (cs.backgroundImage && cs.backgroundImage !== 'none') btns.style.backgroundImage = cs.backgroundImage; if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') btns.style.backgroundColor = cs.backgroundColor; if (parseFloat(cs.borderLeftWidth) > 0) btns.style.borderLeft = cs.borderLeftWidth + ' ' + cs.borderLeftStyle + ' ' + cs.borderLeftColor; el.classList.add('emabove'); const w = document.createElement('div'); w.className = 'emwrap'; el.parentNode.insertBefore(w, el); w.appendChild(el); w.appendChild(btns); }
     else { el.classList.add('emhost'); const tx = el.querySelector(':scope > .tx'); (tx || el).appendChild(btns); }
   }); } catch (e) { }
@@ -21354,7 +21501,7 @@ function billLastDue(b, n) { let d = b.due; for (let i = 1; i < n && d; i++) d =
 function billLeft(b) { if (!b || !b.lastDue || !b.due || b.paid) return 0; let n = 0, d = b.due; while (d && d <= b.lastDue && n < 600) { n++; d = DD.nextDue(Object.assign({}, b, { lastDue: '' }), d); } return n; }
 const BILL_BANKS = ['ASB', 'ANZ', 'Kiwibank'];
 function billFromOpts() { const o = [['', 'Auto']].concat(BILL_BANKS.map(k => ['bank:' + k, k + ' (any account)'])); try { const D = CF && CF.data; if (D) D.accounts.filter(cfSpendable).forEach(a => o.push(['acct:' + a.id, cfAName(a)])); } catch (e) { } return o; }
-function billFromVal(b) { const a = b && b.id && (S.settings.cfBillAcct || {})[b.id]; return a ? 'acct:' + a : b && b.fromBank ? 'bank:' + b.fromBank : ''; }
+function billFromVal(b) { if (b && !b.id && b._fromAcct) return 'acct:' + b._fromAcct; const a = b && b.id && (S.settings.cfBillAcct || {})[b.id]; return a ? 'acct:' + a : b && b.fromBank ? 'bank:' + b.fromBank : ''; }
 function billSetFrom(id, upd, v) { v = String(v || ''); S.settings.cfBillAcct = S.settings.cfBillAcct || {};
   upd.fromBank = v.startsWith('bank:') ? v.slice(5) : ''; const acct = v.startsWith('acct:') ? v.slice(5) : '';
   if (id) { if (acct) S.settings.cfBillAcct[id] = acct; else delete S.settings.cfBillAcct[id]; } else if (acct) upd._acct = acct; }
@@ -21412,8 +21559,8 @@ function billAutoPay(D, quiet) {
   const usedIds = new Set(); S.bills.forEach(b => (b.paidDues || []).forEach(p => { if (p && p.tx) usedIds.add(p.tx); if (p && Array.isArray(p.txs)) p.txs.forEach(x => usedIds.add(x)); }));
   // an own transfer between his accounts. The bank's pair flag alone isn't enough (it also flags real bills like Ecotricity paid the same day as a same-sized transfer),
   // so: his own-transfer wording, or a pair whose text starts with a bank's name (KIWIBANK INSURANCE into his Kiwibank account)
-  const OWN_RE = /^PAY (SHANE|ANZ BILL)\b|\bS A (& S M )?JENKINS\b|\bS JENKINS ASB TO ASB\b|^MB TRANSFER\b|^TO: *\d|^FC\d|\bTFR TO SARAH\b|^TRANSFER TO\b/i;
-  const own = t => { const x = String(t.desc || ''); return OWN_RE.test(x) || (t.pair && /^(KIWIBANK|ANZ|ASB|WESTPAC|BNZ)\b/i.test(x)); };
+  const own = t => billOwnTx(t);
+
   const outs = txs.filter(t => t.amount < 0 && t.date.slice(0, 10) <= T);
   const done = [];
   // 2.26.80: rego bills go oldest due first, so when two cars' rego are open the earlier one takes an unmarked payment
@@ -21434,12 +21581,15 @@ function billAutoPay(D, quiet) {
       if (K.kind === 'wof' || K.kind === 'svc') return close && CAR_SHOP_PAYEE.test(x);
       if (K.kind === 'health') return close && HEALTH_PAYEE[K.h].test(x);
       return false; };
+    const myRef = (() => { const r = billRef(b); const n = r ? String(r.no).toUpperCase().replace(/[^A-Z0-9]/g, '') : ''; return n.length >= 4 ? n : ''; })();
+    const refHit = t => !!myRef && String(t.desc + ' ' + (t.merchant || '') + ' ' + (t.ref || '') + ' ' + (t.particulars || '') + ' ' + (t.code || '')).toUpperCase().replace(/[^A-Z0-9]/g, '').includes(myRef);
     for (let guard = 0; guard < 40 && !b.paid; guard++) {
       const due = b.due; if (addDays(due, -before) > T || addDays(due, after) < from) break; // not due yet, or before the bank history
       const lo = addDays(due, -before), hi = addDays(due, after);
-      const cand = outs.filter(t => { const d = t.date.slice(0, 10); if (d < lo || d > hi || usedIds.has(t.id) || not.has(t.id)) return false; const a = acc(t.acct); if (!a) return false;
+      const cand = outs.filter(t => { const d = t.date.slice(0, 10); if (d < lo || (d > hi && !(d <= addDays(due, 30) && refHit(t))) || usedIds.has(t.id) || not.has(t.id)) return false; /* 2.26.84: a payment with the bill's number can be up to 30 days late */ const a = acc(t.acct); if (!a) return false;
         if (mort) return cfMortTx(D, t) === 'asb' && (!exp || Math.abs(-t.amount - exp) <= exp * BILL_AUTO_PCT);
         if (a.type === 'LOAN' && !a.limit) return false; if (own(t)) return false;
+        if (refHit(t)) return !exp || vary || Math.abs(-t.amount - exp) <= exp * 0.5; // 2.26.84: the bill's invoice / reference number is on the payment
         if (K && kindOk(t)) return true; // 2.26.80: rego / WOF / service / health payees (bank or credit card)
         if (K && K.kind === 'rego') return false; // a rego bill only takes a rego payment
         if (!(payeeFor(b, t) > 0)) return false;
@@ -21448,7 +21598,7 @@ function billAutoPay(D, quiet) {
         const d = Object.keys(by).sort((x, y) => Math.abs(dayGap(x, due)) - Math.abs(dayGap(y, due))).find(k => Math.abs(-fnSum(by[k]) - exp) <= exp * BILL_AUTO_PCT);
         if (d) { by[d].slice(1).forEach(t => usedIds.add(t.id)); cand.push({ id: by[d][0].id, date: by[d][0].date, amount: fnSum(by[d]), desc: by[d][0].desc, merchant: '', ids: by[d].map(t => t.id) }); } }
       if (!cand.length) break;
-      const sc = t => (myPlate && (t.desc + ' ' + (t.merchant || '')).toUpperCase().replace(/\s/g, '').includes(myPlate) ? -200 : 0) + (K && exp && Math.abs(-t.amount - exp) <= 0.1 ? -100 : 0) + (K && kindOk(t) ? 0 : payeeScore(b.name, t.desc + ' ' + (t.merchant || '')) === 2 ? 0 : 100) + (vary || !exp ? 0 : Math.abs(-t.amount - exp) / exp * 50) + Math.abs(dayGap(t.date.slice(0, 10), due));
+      const sc = t => (refHit(t) ? -300 : 0) + (myPlate && (t.desc + ' ' + (t.merchant || '')).toUpperCase().replace(/\s/g, '').includes(myPlate) ? -200 : 0) + (K && exp && Math.abs(-t.amount - exp) <= 0.1 ? -100 : 0) + (K && kindOk(t) ? 0 : payeeScore(b.name, t.desc + ' ' + (t.merchant || '')) === 2 ? 0 : 100) + (vary || !exp ? 0 : Math.abs(-t.amount - exp) / exp * 50) + Math.abs(dayGap(t.date.slice(0, 10), due));
       const t = cand.sort((x, y) => sc(x) - sc(y))[0], on = t.date.slice(0, 10), amt = r2(-t.amount);
       usedIds.add(t.id);
       const inv = (() => { try { return billInvoice(b); } catch (e) { return null; } })();
