@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.99';
+const APP_VERSION = '2.27.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22546,14 +22546,15 @@ const bxMeta = k => k === 'alerts' ? ['Notifications', 'Alerts', 'bell'] : btMet
 const BX_ALL = () => [...BT_ALL().filter(k => k !== 'more'), 'alerts'].filter((k, i, a) => a.indexOf(k) === i && bxMeta(k));
 function bxKeys() { const b = btState(), ok = new Set(BX_ALL()); let L = Array.isArray(b.extra) ? b.extra.filter((k, i, a) => ok.has(k) && a.indexOf(k) === i) : []; if (L.length !== 5) { const def = BX_DEFAULT.concat(BX_ALL()).filter((k, i, a) => ok.has(k) && a.indexOf(k) === i && !L.includes(k)); L = L.concat(def).slice(0, 5); } return L; }
 let bsOpen = false, bxPress = null, bxLong = false;
-function bsShow() {
-  const nav = document.getElementById('btabs'); if (bsOpen || !nav) return;
+let bsRoute = '';
+function bsShow(again) {
+  const nav = document.getElementById('btabs'); if (bsOpen || !nav) return; bsRoute = (location.hash || '#home').slice(1).split('/')[0] || 'home';
   let el = document.getElementById('btabs2'); if (!el) { el = document.createElement('div'); el.id = 'btabs2'; document.getElementById('app').appendChild(el); }
   const route = (location.hash || '#home').slice(1).split('/')[0];
   el.innerHTML = `<div class="bxscrim" onclick="bsHide()"></div><nav class="btabs bx2" aria-label="More bottom tabs" style="--btn:5;bottom:${nav.offsetHeight}px">${bxKeys().map(k => { const [full, short, ic] = bxMeta(k); const on = k === route || (k === 'alerts' && route === 'alerts');
     return `<button type="button" class="${on ? 'on' : ''}" aria-label="${esc(full)}" data-bx="${k}" onclick="bxGo('${k}')"><span class="w">${sideIco(k, ic)}</span><span class="lbl">${esc(short)}</span></button>`; }).join('')}</nav>`;
   el.classList.add('show'); bsOpen = true; document.body.classList.add('bx-open'); nav.classList.add('bxup');
-  try { history.pushState({ btsheet: true }, '', location.href); } catch (e) { }
+  if (!again) try { history.pushState({ btsheet: true }, '', location.href); } catch (e) { }
   const row = el.querySelector('.bx2');
   row.addEventListener('contextmenu', e => e.preventDefault());
   row.addEventListener('pointerdown', e => { if (!e.target.closest('button')) return; bxLong = false; clearTimeout(bxPress); bxPress = setTimeout(() => { bxLong = true; try { navigator.vibrate && navigator.vibrate(15); } catch (x) { } bxEdit(); }, 550); });
@@ -22573,7 +22574,13 @@ function bsWireBar(nav) {
     s.done = true; clearTimeout(btPress); btLong = true; setTimeout(() => { btLong = false; }, 400); if (dy < 0) bsShow(); else bsHide(); }, { passive: true });
   nav.addEventListener('touchend', () => { s = null; }, { passive: true });
 }
-(() => { const o = bottomTabs; bottomTabs = function (route) { if (bsOpen) bsClose(); o(route); try { const nav = document.getElementById('btabs'); if (!nav) return;
+(() => { const o = bottomTabs; bottomTabs = function (route) {
+  // 2.27.0: background refreshes (weather, alerts, mail, location) call render() every few seconds on Home. That used to close
+  // the second row, often between the finger going down and the tap landing, so its tabs seemed dead. Now only a page change closes it.
+  const cur = String(route || (location.hash || '#home').slice(1)).split('/')[0], keep = bsOpen && cur === bsRoute;
+  if (bsOpen && !keep) bsClose(); o(route);
+  if (keep) { try { const el = document.getElementById('btabs2'), nav = document.getElementById('btabs'); if (!el || !el.querySelector('.bx2') || !nav) { bsOpen = false; bsShow(true); } else { nav.classList.add('bxup'); const r = el.querySelector('.bx2'); r.style.bottom = nav.offsetHeight + 'px'; } } catch (e) { } }
+  try { const nav = document.getElementById('btabs'); if (!nav) return;
   if (!nav.querySelector('.btgrab')) { const g = document.createElement('button'); g.type = 'button'; g.className = 'btgrab'; g.setAttribute('aria-label', 'Five more tabs'); g.innerHTML = '<span></span>'; g.onclick = e => { e.stopPropagation(); bsOpen ? bsHide() : bsShow(); }; nav.insertBefore(g, nav.firstChild); }
   bsWireBar(nav); } catch (e) { } }; })();
 // choose the second row's five
