@@ -2005,6 +2005,39 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 .cfok{font-weight:700;color:#047857;margin:2px 0}.cfwarn{font-weight:700;color:#b45309;margin:2px 0}.cfcard .pbar,.cfrow .pbar{margin-top:6px}.pbar.warn i{background:#dc2626}
 .cfex{background:#fef9c3;border:2px dashed #ca8a04;color:#713f12;justify-content:center}
 .akrow{display:flex;gap:8px;align-items:center}.akrow input{flex:1 1 auto;min-width:0;padding:12px;border:1px solid #cbd5e1;border-radius:12px;font:inherit;background:#fff;color:inherit}.akstep{font-size:.875rem;margin:4px 0 6px}.akheld{background:#ecfdf5;color:#065f46;font-weight:700;border-radius:10px;padding:8px 10px;margin:0 0 10px}
+/* 2.26.97 compact Home weather: icon + temp + condition, then chips, then the outlook full width */
+.glwx .glwxc.glwxc2{display:flex;flex-direction:column;align-items:stretch;gap:5px;min-height:0;padding:8px 14px 9px}
+.glwx .glwxc2 .glwxtop{position:relative;z-index:1;display:flex;align-items:center;gap:10px;min-width:0}
+.glwx .glwxc2 .glwxi svg{width:36px!important;height:36px!important}
+.glwx .glwxc2 .glwxt{font-size:1.9rem!important;line-height:1}
+.glwx .glwxc2 .glwxn{font-size:1.1rem;font-weight:800;line-height:1.2;min-width:0}
+.glwx .glwxc2 .glwxchips{position:relative;z-index:1;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.glwx .glwxc2 .glwxchips .glwxuv{align-self:center;padding:3px 9px!important;font-size:.75rem!important}
+.glwx .glwxc2 .glwxchips .sunpill{margin:0;font-size:.75rem;padding:2px 9px 2px 6px}.glwx .glwxc2 .glwxchips .sunpill b{font-size:.8125rem}
+.glwx .glwxc2 .glwxout{position:relative;z-index:1;display:block;width:100%;font-size:.9rem;line-height:1.35;font-weight:600}
+@media (max-width:380px){.glwx .glwxc.glwxc2{padding:9px 12px 10px}.glwx .glwxc2 .glwxt{font-size:1.9rem!important}}
+/* 2.26.97 bottom tabs: grab handle, swipe up for a second row of five */
+.btabs{padding-top:12px}
+.btabs .btgrab{position:absolute;top:0;left:50%;transform:translateX(-50%);width:72px;height:14px;min-height:0!important;padding:0!important;border-radius:0 0 8px 8px!important;background:transparent!important;display:flex;align-items:center;justify-content:center}
+.btabs .btgrab span{display:block;width:38px;height:4px;border-radius:4px;background:var(--ink3);opacity:.55}
+.btabs.bxup .btgrab span{opacity:.9}
+#btabs2{display:none}#btabs2.show{display:block}
+#btabs2 .bxscrim{position:fixed;inset:0;z-index:24;background:rgba(0,0,0,.18)}
+#btabs2 .btabs.bx2{position:absolute;z-index:26;padding-top:6px;padding-bottom:4px;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -6px 18px rgba(0,0,0,.12);animation:bxup .18s ease-out}
+.btabs.bxup{border-top-color:transparent;box-shadow:none}
+@keyframes bxup{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){#btabs2 .btabs.bx2{animation:none}}
+.glworkcard{margin:0 0 10px}
+.glflagwrap .flbtns{margin:6px 2px 4px}.glflagwrap .flclash{margin:0 4px 6px;font-size:.85rem}.glflagwrap:has(.flbtns) .glunflag{top:14px;transform:none}
+/* 2.26.97 pin notifications */
+#glalerts .bphost{position:relative}
+#glalerts .bpin{position:absolute;right:7px;bottom:7px;z-index:2;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;font-size:.95rem;line-height:1;background:rgba(255,255,255,.85);border:1px solid #cbd5e1;filter:grayscale(1);opacity:.65;cursor:pointer}
+#glalerts .bpin.on{filter:none;opacity:1;background:#fef3c7;border-color:#f59e0b}
+#glalerts .bellpinned{margin-bottom:6px}
+#glalerts .bellpinned>*,#glalerts .bellpinned .glwarn{box-shadow:0 0 0 2px #f59e0b,0 1px 4px rgba(0,0,0,.12)!important}
+#glalerts .bellpinned .bpwarns{margin:0;box-shadow:none!important;background:none!important}
+#glalerts .bellpinned .bpwarns>*{box-shadow:none!important}
+#glalerts .bphost:not(.glwarn):not(.tx){padding-right:44px!important}#glalerts .bphost.tx{padding-right:36px}#glalerts .glwarn.bphost{padding-right:44px!important}#glalerts .glflagwrap .glwarn.bphost{padding-right:78px!important}
 </style>
 </head>
 <body>

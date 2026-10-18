@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.96';
+const APP_VERSION = '2.26.97';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19633,7 +19633,7 @@ function glWxCard(m) {
   const out = homeTry('weather outlook', () => notifWxOutlook(nowW, next), ''), sun = homeTry('weather sun', () => wxSunMention(), ''), uv = !m.night && day ? wxUV() : null;
   const temp = num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°' : '', sky = glWxSky(nowW.kind, day);
   const fx = !day && (nowW.kind === 'clear' || nowW.kind === 'pc') ? '<span class="glstars"></span>' : ['rain', 'showers', 'drizzle', 'storm'].includes(nowW.kind) ? '<span class="glrain"></span>' : day && nowW.kind === 'clear' ? '<span class="glrays"></span>' : '';
-  return `<button type="button" class="glwxc${sky[3] ? ' gldark' : ''}" style="--s1:${sky[0]};--s2:${sky[1]};--s3:${sky[2]}" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}">${fx}<span class="glwxi">${wxIcon(nowW, 'big')}</span><span class="glwxw">${temp ? `<b class="glwxt">${temp}</b>` : ''}<b class="glwxn">${esc(nowW.words)}</b>${out ? `<span>${esc(out)}</span>` : ''}${sun ? sunPill(sun, 'glsunp') : ''}</span>${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}</button>`;
+  return `<button type="button" class="glwxc glwxc2${sky[3] ? ' gldark' : ''}" style="--s1:${sky[0]};--s2:${sky[1]};--s3:${sky[2]}" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}">${fx}<span class="glwxtop"><span class="glwxi">${wxIcon(nowW, 'big')}</span>${temp ? `<b class="glwxt">${temp}</b>` : ''}<b class="glwxn">${esc(nowW.words)}</b></span>${uv || sun ? `<span class="glwxchips">${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}${sun ? sunPill(sun, 'glsunp') : ''}</span>` : ''}${out ? `<span class="glwxout">${esc(out)}</span>` : ''}</button>`; // 2.26.97: compact, three rows
 }
 /* ---- Entertainment ---- */
 const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
@@ -19756,7 +19756,7 @@ function glQuick(m) {
   return `<div class="glgrid glg3">${Q.join('')}</div>`;
 }
 function glOrgInner() {
-  const m = glMode(), tabs = glTabs(m); if (!tabs.some(t => t[0] === glOrgTab)) glOrgTab = 'today';
+  const m = glMode(), tabs = glTabs(m); if (!tabs.some(t => t[0] === glOrgTab)) glOrgTab = tabs[0][0];
   return `<div class="glfilt" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" class="${glOrgTab === k ? 'on' : ''}" onclick="glOrgSet('${k}')">${l}</button>`).join('')}</div><div class="card glorgcard">${glOrgBody(glOrgTab, m)}</div>`;
 }
 function glanceHome() {
@@ -19775,7 +19775,7 @@ function glanceHome() {
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
     wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + homeTry('watch strip', () => hwHomeStrip(), '') + cards +
-    (m.night ? entZ + asks + orgZ : orgZ + entZ) +
+    (m.night ? entZ + asks + orgZ : homeTry('gl work', () => glWorkCard(m), '') + orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
 }
@@ -21209,7 +21209,8 @@ function glSwipe(e) {
   glSwipe.moved = false;
   const mv = ev => { const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0; if (!dir && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) dir = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y'; if (dir !== 'x') return; ev.preventDefault(); glSwipe.moved = true; dx = Math.min(0, ddx); el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(1 + dx / 400); };
   const end = () => { el.removeEventListener('touchmove', mv); el.removeEventListener('touchend', end); el.removeEventListener('touchcancel', end); el.style.transition = 'transform .2s ease, opacity .2s ease';
-    if (dx < -Math.min(110, el.offsetWidth * 0.3)) { el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; arcAdd(arcEntryOf(el)); /* 2.26.53: archive, not delete */ setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.children.length) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
+    const pinEl = el.closest('[data-pid]'), isPin = pinEl && pinEl.closest('.bellpinned'); // 2.26.97: a pinned card asks first, and is unpinned
+    if (dx < -Math.min(110, el.offsetWidth * 0.3) && (!isPin || confirm('Archive this pinned notification? It will be unpinned too.'))) { if (isPin) { try { const P = bellPins(), i = P.findIndex(p => p.id === pinEl.dataset.pid); if (i >= 0) { P.splice(i, 1); save(); } } catch (x) { } } el.style.transform = 'translateX(-110%)'; el.style.opacity = '0'; arcAdd(arcEntryOf(el)); /* 2.26.53: archive, not delete */ setTimeout(() => { const box = el.parentElement; el.remove(); if (box && !box.children.length) { const h = box.previousElementSibling; if (h && h.classList.contains('sec')) h.remove(); box.remove(); } glBellRedraw(); }, 200); }
     else { el.style.transform = ''; el.style.opacity = ''; }
     setTimeout(() => { glSwipe.moved = false; }, 50); };
   el.addEventListener('touchmove', mv, { passive: false }); el.addEventListener('touchend', end); el.addEventListener('touchcancel', end);
@@ -22513,3 +22514,132 @@ const evGcalAppts = () => (S.myEvents || []).filter(e => e && e.gcalWant && e.re
   if (dc && (ev.place || ev.endTime)) { const p = document.createElement('div'); p.className = 'muted'; p.style.marginTop = '4px'; p.textContent = [ev.time && ev.endTime ? 'Until ' + fmtTime(ev.endTime) : '', ev.place ? '📍 ' + ev.place : ''].filter(Boolean).join(' · '); dc.appendChild(p); }
   const c = evClash((ev.moves || {})[orig] || orig, ev.time, ev.endTime); if (dc && c && ev.fromEv) { const w = document.createElement('div'); w.className = 'evclash'; w.textContent = '⚠️ ' + evClashTxt(c); dc.appendChild(w); }
   const mb = document.querySelector('#sheet .minebtns'); if (mb && ev.tix) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.innerHTML = I('ticket') + ' Get tickets'; b.onclick = () => window.open(ev.tix, '_blank', 'noopener'); mb.appendChild(b); } } catch (e) { } }; })();
+
+/* ================= 2.26.97: Today moves to Notifications (daytime) =================
+   Daytime Home: no Today chip in Organise; only the Work line (with Free in) shows, and only while he's on a rostered shift.
+   The Today items (Coming up, today and overdue) are on the Notifications page under Today, without repeats. Night Home is unchanged. */
+(() => { const o = glTabs; glTabs = function (m) { const t = o(m); return m && m.night ? t : t.filter(x => x[0] !== 'today'); }; })();
+function glWorkCard(m) {
+  if (!m || m.night || m.off || m.workDone || !m.atWork) return ''; const f = glFree(m); if (!f) return '';
+  return `<div class="list glworkcard">${tabRow('calendar', 'Work ' + esc(glShift(m)), `<span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span>`, "go('#work')")}</div>`;
+}
+const bellTxt = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+function bellTodayRows(have) {
+  const rows = [], seen = new Set();
+  try { glCU().filter(x => typeof x.days === 'number' && x.days <= 0).forEach(x => { let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
+    const d = document.createElement('div'); d.innerHTML = h; const t = bellTxt((d.querySelector('.t') || d).innerHTML).slice(0, 60);
+    if (!t || seen.has(t) || have.includes(t)) return; seen.add(t); rows.push(h); }); } catch (e) { }
+  return rows;
+}
+(() => { const o = glAlertsBody; glAlertsBody = function () { const h = o();
+  try { const d = document.createElement('div'); d.innerHTML = h; const have = bellTxt([...d.querySelectorAll('.t')].map(x => x.innerHTML).join(' | '));
+    const R = bellTodayRows(have); if (!R.length) return h;
+    const sec = `<div class="sec">Today</div><div class="list belltoday">${R.join('')}</div>`;
+    const i = h.indexOf('<div class="sec">Flagged events'); return i >= 0 ? h.slice(0, i) + sec + h.slice(i) : sec + h;
+  } catch (e) { return h; } }; })();
+/* ================= 2.26.97: swipe up the bottom tabs for a second row of five =================
+   Swipe up on the bar (or tap its handle) and five more tabs slide up above the usual five, same style.
+   Swipe down, tap outside or Back folds it away. Long-press the second row (or Settings › Bottom tabs) to choose its five.
+   Saved in S.settings.bottomTabs.extra. Only vertical swipes on the bar count, so page scrolling and Android's Back swipe are left alone. */
+const BX_DEFAULT = ['bills', 'calendar', 'cars', 'health', 'alerts'];
+const bxMeta = k => k === 'alerts' ? ['Notifications', 'Alerts', 'bell'] : btMeta(k);
+const BX_ALL = () => [...BT_ALL().filter(k => k !== 'more'), 'alerts'].filter((k, i, a) => a.indexOf(k) === i && bxMeta(k));
+function bxKeys() { const b = btState(), ok = new Set(BX_ALL()); let L = Array.isArray(b.extra) ? b.extra.filter((k, i, a) => ok.has(k) && a.indexOf(k) === i) : []; if (L.length !== 5) { const def = BX_DEFAULT.concat(BX_ALL()).filter((k, i, a) => ok.has(k) && a.indexOf(k) === i && !L.includes(k)); L = L.concat(def).slice(0, 5); } return L; }
+let bsOpen = false, bxPress = null, bxLong = false;
+function bsShow() {
+  const nav = document.getElementById('btabs'); if (bsOpen || !nav) return;
+  let el = document.getElementById('btabs2'); if (!el) { el = document.createElement('div'); el.id = 'btabs2'; document.getElementById('app').appendChild(el); }
+  const route = (location.hash || '#home').slice(1).split('/')[0];
+  el.innerHTML = `<div class="bxscrim" onclick="bsHide()"></div><nav class="btabs bx2" aria-label="More bottom tabs" style="--btn:5;bottom:${nav.offsetHeight}px">${bxKeys().map(k => { const [full, short, ic] = bxMeta(k); const on = k === route || (k === 'alerts' && route === 'alerts');
+    return `<button type="button" class="${on ? 'on' : ''}" aria-label="${esc(full)}" data-bx="${k}" onclick="bxGo('${k}')"><span class="w">${sideIco(k, ic)}</span><span class="lbl">${esc(short)}</span></button>`; }).join('')}</nav>`;
+  el.classList.add('show'); bsOpen = true; document.body.classList.add('bx-open'); nav.classList.add('bxup');
+  try { history.pushState({ btsheet: true }, '', location.href); } catch (e) { }
+  const row = el.querySelector('.bx2');
+  row.addEventListener('contextmenu', e => e.preventDefault());
+  row.addEventListener('pointerdown', e => { if (!e.target.closest('button')) return; bxLong = false; clearTimeout(bxPress); bxPress = setTimeout(() => { bxLong = true; try { navigator.vibrate && navigator.vibrate(15); } catch (x) { } bxEdit(); }, 550); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => row.addEventListener(ev, () => clearTimeout(bxPress)));
+  let y0 = null; row.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });
+  row.addEventListener('touchmove', e => { if (y0 != null && e.touches[0].clientY - y0 > 30) { y0 = null; clearTimeout(bxPress); bxLong = true; setTimeout(() => { bxLong = false; }, 400); bsHide(); } }, { passive: true });
+}
+function bsClose() { const el = document.getElementById('btabs2'); if (el) { el.classList.remove('show'); el.innerHTML = ''; } bsOpen = false; document.body.classList.remove('bx-open'); const nav = document.getElementById('btabs'); if (nav) nav.classList.remove('bxup'); }
+function bsHide() { if (!bsOpen) return; bsClose(); if (history.state && history.state.btsheet) history.back(); }
+window.addEventListener('popstate', () => { if (bsOpen) bsClose(); });
+function bxGo(k) { if (bxLong) { bxLong = false; return; } const h = '#' + (k === 'roster' ? 'work' : k); bsClose(); setTabsOpen(false); if (history.state && history.state.btsheet) history.replaceState(null, '', h); location.hash = h; }
+// swipe up on the bar opens the second row; swipe down on the bar closes it; a tap still opens the tab as before
+function bsWireBar(nav) {
+  if (!nav || nav.dataset.bs) return; nav.dataset.bs = '1'; let s = null;
+  nav.addEventListener('touchstart', e => { const t = e.touches[0]; s = { x: t.clientX, y: t.clientY, done: false }; }, { passive: true });
+  nav.addEventListener('touchmove', e => { if (!s || s.done) return; const t = e.touches[0], dy = t.clientY - s.y, dx = t.clientX - s.x; if (Math.abs(dy) < 28 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+    s.done = true; clearTimeout(btPress); btLong = true; setTimeout(() => { btLong = false; }, 400); if (dy < 0) bsShow(); else bsHide(); }, { passive: true });
+  nav.addEventListener('touchend', () => { s = null; }, { passive: true });
+}
+(() => { const o = bottomTabs; bottomTabs = function (route) { if (bsOpen) bsClose(); o(route); try { const nav = document.getElementById('btabs'); if (!nav) return;
+  if (!nav.querySelector('.btgrab')) { const g = document.createElement('button'); g.type = 'button'; g.className = 'btgrab'; g.setAttribute('aria-label', 'Five more tabs'); g.innerHTML = '<span></span>'; g.onclick = e => { e.stopPropagation(); bsOpen ? bsHide() : bsShow(); }; nav.insertBefore(g, nav.firstChild); }
+  bsWireBar(nav); } catch (e) { } }; })();
+// choose the second row's five
+function bxEdit() {
+  const cur = bxKeys(), all = BX_ALL(), go = () => {
+    openSheet('Second row of tabs', `<p class="muted" style="margin:-4px 2px 8px">Swipe up on the bottom tabs to see these five. The first five stay as they are.</p>` +
+      cur.map((k, i) => field('Tab ' + (i + 1), sel('bx' + i, all.map(x => [x, bxMeta(x)[0]]), k))).join(''), async v => {
+      const L = [0, 1, 2, 3, 4].map(i => v['bx' + i]).filter(Boolean); if (new Set(L).size !== 5) return 'Pick five different tabs.';
+      const s = snap(), b = btState(); b.extra = L; await save(); render(); toast('Second row saved.', 'Undo', undoTo(s)); }, 'Save'); };
+  if (bsOpen) { bsClose(); if (history.state && history.state.btsheet) { const h = () => { window.removeEventListener('popstate', h); setTimeout(go, 0); }; window.addEventListener('popstate', h); history.back(); return; } }
+  go();
+}
+(() => { const o = bottomTabsSetting; bottomTabsSetting = function () { const h = o(); try { const ex = bxKeys().map(k => bxMeta(k)[1]).join(' · ');
+  return h.replace(/<\/div>\s*$/, `<button class="row" id="bxcustom" onclick="bxEdit()"><div class="tx"><div class="t">Second row (swipe up)</div><div class="s">${esc(ex)}</div></div>${I('right')}</button></div>`); } catch (e) { return h; } }; })();
+/* ================= 2.26.97: book flagged events =================
+   Flagged event cards (Notifications) get Add to calendar (a My event, same sheet as Events from email: day picker,
+   time, venue, reminder the day before at 7pm, Family calendar ticked, work clash line) and Get tickets / Event page
+   (opens the event's own page, nothing is bought). Once added: 'In your calendar ✓' with Undo. Unflag stays. */
+const flKey = id => 'fl|' + id;
+function flEv(x) {
+  const days = []; try { const T = todayISO(); let d = x.date < T ? T : x.date; const end = x.end && x.end > d ? x.end : d; while (d <= end && days.length < 7) { days.push(d); d = addDays(d, 1); } } catch (e) { days.push(x.date); }
+  return { name: x.title, days, time: /^\d{2}:\d{2}$/.test(x.time || '') ? x.time : '', end: '', times: [], place: x.venue || '', tix: /^https:\/\//.test(x.url || '') ? x.url : '' };
+}
+function flAdd(id) { const x = evFlags()[id]; if (!x) return; evAddSheet(flKey(id), { ev: flEv(x), m: null }); }
+async function flUndo(id) { const k = flKey(id), e = evAdded(k); if (!e) return; const s = snap(); S.myEvents = S.myEvents.filter(y => y !== e); await save(); render(); try { glWarnRedraw(); } catch (er) { } toast('Taken off your calendar.', 'Undo', undoTo(s)); }
+function flBtns(id) {
+  const x = evFlags()[id]; if (!x) return ''; const ad = evAdded(flKey(id)), ap = (() => { try { return evAppt(id); } catch (e) { return null; } })();
+  const st = 'event.stopPropagation();event.preventDefault();if(window.glSwipe&&glSwipe.moved)return;';
+  const tick = /ticket|eventfinda|ticketek|iticket|humanitix|eventbrite|ticketmaster|flicket|book/i.test(x.url || '');
+  const cl = (() => { try { return flEv(x).days.some(d => evClash(d, x.time, '')); } catch (e) { return false; } })();
+  return `<div class="mbbtns flbtns">${ad ? `<button type="button" class="btn small" onclick="${st}calOpenDay(${parseD(ad.start)})">${I('check')} In your calendar ✓</button><button type="button" class="btn small" onclick="${st}flUndo(${esc(jsArg(id))})">Undo</button>` : ap ? `<button type="button" class="btn small" onclick="${st}apptForm('${ap.id}')">${I('check')} In your calendar ✓</button>` : `<button type="button" class="btn small primary" onclick="${st}flAdd(${esc(jsArg(id))})">${I('cal')} Add to calendar</button>`}${x.url ? `<button type="button" class="btn small" onclick="${st}window.open(${esc(jsArg(x.url))},'_blank','noopener')">${I('ticket')} ${tick ? 'Get tickets' : 'Event page'}</button>` : ''}</div>${cl && !ad && !ap ? `<div class="evclash flclash">⚠️ ${esc((() => { const d = flEv(x).days.find(dd => evClash(dd, x.time, '')); return evClashTxt(evClash(d, x.time, '')) + ' on ' + fmtW(d); })())}</div>` : ''}`;
+}
+(() => { const o = glWarnCard; glWarnCard = function (x) { const h = o(x); if (!x || !x.flag) return h; try { const b = flBtns(x.flag); if (!b) return h; const i = h.indexOf('<button type="button" class="glunflag"'); return i >= 0 ? h.slice(0, i) + b + h.slice(i) : h; } catch (e) { return h; } }; })();
+/* ================= 2.26.97: pin notifications =================
+   Every card on the Notifications page gets a small 📌. Pinned cards sit in 'Pinned' at the very top until unpinned.
+   Saved in S.settings.bellPins (synced with his other settings). If the item itself has gone (paid, done, passed),
+   a saved copy of its title and line stays until he unpins it. Swiping a pinned card asks first. */
+function bellPins() { S.settings = S.settings || {}; if (!Array.isArray(S.settings.bellPins)) S.settings.bellPins = []; return S.settings.bellPins; }
+const bpHash = t => { let h = 0; for (const c of String(t)) h = (h * 31 + c.charCodeAt(0)) | 0; return (h >>> 0).toString(36); };
+const bpClean = el => { const c = el.cloneNode(true); c.querySelectorAll('.newpill, .bpin, .badge, .glbadge, .mbbtns, .embtns, .flbtns, .glunflag').forEach(x => x.remove()); return c; };
+function bpEntry(el) { const c = bpClean(el); let e = {}; try { e = arcEntryOf(c); } catch (x) { } const tag = (c.querySelector('.glwtag') || {}).textContent || ''; e.title = String(e.title || c.textContent).replace(/\s+/g, ' ').trim(); e.body = String(e.body || '').replace(/\s*·\s*$/, ''); e.stable = String(e.title).toLowerCase().slice(0, 80) + '|' + tag.replace(/·.*$/, '').trim().toLowerCase(); return e; }
+function bpIdOf(el) { const e = bpEntry(el); return e.key ? e.id : 'h|' + bpHash(e.stable); }
+const bpBtn = on => `<span role="button" tabindex="0" class="bpin${on ? ' on' : ''}" aria-label="${on ? 'Unpin' : 'Pin to the top'}" aria-pressed="${on}" onclick="bellPinTap(event,this)" onkeydown="if(event.key==='Enter')bellPinTap(event,this)">📌</span>`;
+async function bellPinTap(ev, btn) {
+  try { ev.stopPropagation(); ev.preventDefault(); } catch (e) { }
+  const el = btn.closest('[data-pid]'); if (!el) return; const id = el.dataset.pid, P = bellPins(), i = P.findIndex(p => p.id === id);
+  if (i >= 0) { P.splice(i, 1); toast('Unpinned.'); }
+  else { const e = bpEntry(el); P.unshift({ id, t: String(e.title || '').slice(0, 160), s: String(e.body || '').slice(0, 240), link: e.link || '', at: new Date().toISOString() }); if (P.length > 30) P.length = 30; toast('Pinned to the top of Notifications.'); }
+  await save(); try { glWarnRedraw(); } catch (e) { }
+}
+(() => { const o = glAlertsBody; glAlertsBody = function () { const h = o();
+  try {
+    const P = bellPins(), pinned = new Set(P.map(p => p.id)), d = document.createElement('div'); d.innerHTML = h;
+    const cards = [...d.querySelectorAll('.list > *, .glwarns > *, .glnewlist > *')].filter(el => !el.classList.contains('glmore') && !el.matches('p, .glhint'));
+    const live = new Map();
+    cards.forEach(el => { const id = bpIdOf(el); el.setAttribute('data-pid', id); const on = pinned.has(id);
+      const span = document.createElement('span'); span.innerHTML = bpBtn(on); const b = span.firstChild;
+      const host = el.matches('.glflagwrap, .glwarnwrap') ? (el.querySelector('.glwarn') || el) : el; host.classList.add('bphost'); host.appendChild(b);
+      if (on) { if (live.has(id)) el.remove(); else live.set(id, el); } });
+    if (!P.length) return d.innerHTML;
+    const box = document.createElement('div'); box.className = 'list bellpinned';
+    P.forEach(p => { const el = live.get(p.id); if (el) { if (el.matches('.glwarns > *')) { const w = document.createElement('div'); w.className = 'glwarns bpwarns'; w.appendChild(el); box.appendChild(w); } else box.appendChild(el); }
+      else { const r = document.createElement('div'); r.className = 'row glnew bpgone'; r.setAttribute('data-pid', p.id); r.setAttribute('role', 'button'); r.setAttribute('tabindex', '0'); if (p.link) r.setAttribute('onclick', `if(!glSwipe.moved)go('${String(p.link).replace(/[^#\w\/-]/g, '')}')`);
+        r.innerHTML = `<div class="ic">📌</div><div class="tx bphost"><div class="t">${esc(p.t || 'Pinned')}</div><div class="s">${esc(p.s || '')}${p.s ? ' · ' : ''}pinned ${esc(fmtW(String(p.at).slice(0, 10)))}</div></div>`; r.querySelector('.tx').insertAdjacentHTML('beforeend', bpBtn(true)); box.appendChild(r); } });
+    // tidy sections left empty
+    d.querySelectorAll('.list, .glwarns, .glnewlist').forEach(l => { if (!l.children.length) { let s = l.previousElementSibling; l.remove(); if (s && s.classList.contains('sec')) s.remove(); } });
+    const sec = document.createElement('div'); sec.className = 'sec'; sec.textContent = 'Pinned'; d.insertBefore(box, d.firstChild); d.insertBefore(sec, box);
+    return d.innerHTML;
+  } catch (e) { return h; } }; })();
