@@ -2067,6 +2067,13 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 .shchip .shadd{border-left:1px solid #cbd5e1;color:#0f766e;font-weight:700;background:#ecfdf5}
 .shmore{font-size:.75rem;color:#64748b;align-self:center}
 .emshop{margin:8px 0 10px}
+
+/* 2.27.1: second row is its own fixed layer on <body>, above everything */
+#btabs2.bxfix{display:block;position:fixed;inset:0;z-index:2147483000;pointer-events:none}
+#btabs2.bxfix .bxscrim{position:fixed;left:0;right:0;top:0;z-index:1;pointer-events:auto;touch-action:none;background:rgba(0,0,0,.18)}
+#btabs2.bxfix .btabs.bx2{position:fixed;z-index:2;pointer-events:auto;touch-action:manipulation;margin:0;transform:none;-webkit-tap-highlight-color:transparent;padding-bottom:4px}
+#btabs2.bxfix .btabs.bx2 button{pointer-events:auto;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+#btabs2.bxfix .btabs.bx2 button *{pointer-events:none}
 </style>
 </head>
 <body>
@@ -2082,6 +2089,6 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=2.27.1"></script>
 </body>
 </html>

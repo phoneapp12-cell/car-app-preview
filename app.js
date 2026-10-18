@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.0';
+const APP_VERSION = '2.27.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22859,3 +22859,73 @@ setInterval(() => { try { const hh = (location.hash || '#home').slice(1); if ((h
   if (ga && !a) ga.remove(); else if (!ga && a) { const wx = document.querySelector('.glance .glwx'); if (wx) wx.insertAdjacentHTML('beforebegin', a); else { const nw = document.getElementById('notifwx'); if (nw) nw.insertAdjacentHTML('afterend', a); } } } catch (e) { } }, 20000);
 // Settings > Places: '+ Add a place' (current spot or address)
 (() => { const o = placesSettingsRows; placesSettingsRows = function () { return `<div class="srow"><div class="tx"><div class="t">Add a place</div><div class="s">Uses where you are now, or search an address. E.g. your Sunday cleaning job.</div></div><button class="btn small primary" onclick="addPlaceHere()">${I('pin')} Add a place</button></div>` + o.apply(this, arguments); }; })();
+
+/* ================= 2.27.1: second row of bottom tabs, made robust for Android =================
+   The row is now its own position:fixed layer on <body> (not inside #app or the bar), above everything, with its own
+   backdrop just under it. A tab opens on touchend/pointerup when the finger moved under 12 px within 600 ms, so it
+   doesn't depend on 'click' (which Android can drop after a swipe). One tap can only fire once. Long-press still edits.
+   Background redraws never close or rebuild it (2.27.0). If a tab is tapped but the page doesn't open, a toast says why. */
+let bxFiredAt = 0;
+function bxNav(k, how) {
+  const now = Date.now(); if (now - bxFiredAt < 500) return; bxFiredAt = now;
+  if (bxLong) { bxLong = false; return; }
+  const h = '#' + (k === 'roster' ? 'work' : k);
+  try {
+    bsClose(); try { setTabsOpen(false); } catch (e) { }
+    if (history.state && history.state.btsheet) history.replaceState(null, '', h);
+    if (location.hash !== h) location.hash = h; else render();
+    setTimeout(() => { try { if (location.hash !== h) toast('Couldn’t open ' + (bxMeta(k)[0] || k) + ' (went to ' + (location.hash || '#home') + '). Tap it again.'); } catch (e) { } }, 700);
+  } catch (e) { try { toast('Second-row tab error: ' + (e && e.message || e)); } catch (x) { } }
+}
+bxGo = function (k) { bxNav(k, 'click'); };
+bsClose = function () {
+  const el = document.getElementById('btabs2'); if (el) el.remove();
+  bsOpen = false; document.body.classList.remove('bx-open'); const nav = document.getElementById('btabs'); if (nav) nav.classList.remove('bxup');
+};
+function bxPlace() { const el = document.getElementById('btabs2'), nav = document.getElementById('btabs'); if (!el || !nav) return; const r = nav.getBoundingClientRect(), b = Math.max(0, Math.round(window.innerHeight - r.top)) + 'px';
+  const row = el.querySelector('.bx2'), sc = el.querySelector('.bxscrim');
+  if (row) { row.style.bottom = b; row.style.left = Math.round(r.left) + 'px'; row.style.width = Math.round(r.width) + 'px'; row.style.right = 'auto'; }
+  if (sc) sc.style.bottom = b; } // the backdrop stops at the bar, so the first five stay tappable
+bsShow = function (again) {
+  const nav = document.getElementById('btabs'); if (bsOpen || !nav) return;
+  bsRoute = (location.hash || '#home').slice(1).split('/')[0] || 'home';
+  const old = document.getElementById('btabs2'); if (old) old.remove();
+  const el = document.createElement('div'); el.id = 'btabs2'; el.className = 'show bxfix';
+  const route = bsRoute;
+  el.innerHTML = `<div class="bxscrim"></div><nav class="btabs bx2" aria-label="More bottom tabs" style="--btn:5">${bxKeys().map(k => { const [full, short, ic] = bxMeta(k); const on = k === route || (k === 'roster' && route === 'work');
+    return `<button type="button" class="${on ? 'on' : ''}" aria-label="${esc(full)}" data-bx="${k}"><span class="w">${sideIco(k, ic)}</span><span class="lbl">${esc(short)}</span></button>`; }).join('')}</nav>`;
+  document.body.appendChild(el); bxPlace();
+  bsOpen = true; document.body.classList.add('bx-open'); nav.classList.add('bxup');
+  if (!again) try { history.pushState({ btsheet: true }, '', location.href); } catch (e) { }
+  const row = el.querySelector('.bx2'), scrim = el.querySelector('.bxscrim');
+  const stop = e => e.stopPropagation();
+  // backdrop: a tap (or the start of a touch) outside the row closes it; never reacts to touches on the row
+  // closes when the finger lifts, and swallows that touch so it doesn't also tap whatever is under the backdrop
+  scrim.addEventListener('touchstart', e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+  scrim.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault(); bsHide(); }, { passive: false });
+  scrim.addEventListener('click', e => { if (e.target === scrim) bsHide(); });
+  row.addEventListener('contextmenu', e => e.preventDefault());
+  let tr = null;
+  const startT = (x, y, btn) => { tr = { x, y, t: Date.now(), btn, moved: 0 }; bxLong = false; clearTimeout(bxPress);
+    if (btn) bxPress = setTimeout(() => { if (!tr || tr.moved > 12) return; bxLong = true; tr = null; try { navigator.vibrate && navigator.vibrate(15); } catch (x) { } bxEdit(); }, 550); };
+  const moveT = (x, y) => { if (!tr) return; const dx = x - tr.x, dy = y - tr.y; tr.moved = Math.max(tr.moved, Math.hypot(dx, dy)); if (tr.moved > 12) clearTimeout(bxPress);
+    if (dy > 30 && Math.abs(dy) > Math.abs(dx)) { tr = null; bsHide(); } };
+  const endT = (e) => { clearTimeout(bxPress); const s = tr; tr = null; if (!s || !s.btn || bxLong) return false;
+    if (s.moved < 12 && Date.now() - s.t < 600) { if (e && e.cancelable) e.preventDefault(); bxNav(s.btn.dataset.bx, e.type); return true; } return false; };
+  row.addEventListener('touchstart', e => { stop(e); const t = e.touches[0]; startT(t.clientX, t.clientY, e.target.closest('button[data-bx]')); }, { passive: true });
+  row.addEventListener('touchmove', e => { stop(e); const t = e.touches[0]; moveT(t.clientX, t.clientY); }, { passive: true });
+  row.addEventListener('touchend', e => { stop(e); endT(e); }, { passive: false });
+  row.addEventListener('touchcancel', e => { stop(e); clearTimeout(bxPress); tr = null; });
+  // mouse / pen (and phones that only send pointer events)
+  row.addEventListener('pointerdown', e => { stop(e); if (e.pointerType === 'touch') return; startT(e.clientX, e.clientY, e.target.closest('button[data-bx]')); });
+  row.addEventListener('pointermove', e => { if (e.pointerType !== 'touch') moveT(e.clientX, e.clientY); });
+  row.addEventListener('pointerup', e => { stop(e); if (e.pointerType !== 'touch') endT(e); });
+  // last resort: if neither of the above fired (e.g. keyboard / screen reader), a click still works
+  row.addEventListener('click', e => { const b = e.target.closest('button[data-bx]'); if (!b) return; e.preventDefault(); e.stopPropagation(); if (Date.now() - bxFiredAt > 500) bxNav(b.dataset.bx, 'click'); });
+};
+window.addEventListener('resize', () => { try { bxPlace(); } catch (e) { } });
+// bar swipe handler: ignore any touch that starts on the second row (it's outside the bar now, but be sure)
+(() => { const o = bsWireBar; bsWireBar = function (nav) { if (!nav || nav.dataset.bs) return; o(nav);
+  nav.addEventListener('touchstart', e => { if (e.target.closest && e.target.closest('#btabs2')) e.stopImmediatePropagation(); }, { capture: true, passive: true }); }; })();
+// the 2.27.0 keep-open path re-positions the row instead of rebuilding it
+(() => { const o = bottomTabs; bottomTabs = function (route) { o(route); try { if (bsOpen) { const nav = document.getElementById('btabs'); if (nav) nav.classList.add('bxup'); if (!document.getElementById('btabs2')) { bsOpen = false; bsShow(true); } else bxPlace(); } } catch (e) { } }; })();
