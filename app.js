@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.88';
+const APP_VERSION = '2.26.89';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14494,15 +14494,18 @@ async function applyPhoneSync(pack) {
   if (sheetOpen) return;
   const remote = pack && pack.data && typeof pack.data === 'object' ? pack.data : pack;
   const code = syncCode();
+  let coeFixed = '';
   phoneSyncMute = true;
   try {
     const next = normalise(foldLocalPrefs(remote, pack && pack.local));
     if (code) next.settings.syncCode = SyncLogic.formatSyncCode(code);
     S = next;
+    try { coeFixed = coeliacFix(); } catch (e) { } // 2.26.89: an older copy from sync can't bring the wrong Coeliac date back
     await kvSet('data', S);
     mirrorSyncedPrefs();
     if (!sheetOpen) render();
   } finally { phoneSyncMute = false; }
+  if (coeFixed) setTimeout(() => { save().catch(() => { }); }, 0);
 }
 async function phoneSyncPushOnce() {
   const code = syncCode();
@@ -19074,6 +19077,7 @@ async function start() {
   try { const mm = await mort3Mig(); if (mm) { render(); setTimeout(() => toast(mm, 'View', () => go('#budget')), 5500); } } catch (e) { console.error('mort3', e); }
   try { const km = await kora86Mig(); if (km) { render(); } } catch (e) { console.error('kora86', e); }
   try { const cm = await coeliac8Mig(); if (cm) { render(); setTimeout(() => toast(cm, 'View', () => go('#bills')), 2500); } } catch (e) { console.error('coeliac8', e); }
+  try { if (coeliacFix()) { await save(); render(); } } catch (e) { console.error('coeliac89', e); }
   try { const bm = await bills66Mig(); if (bm) { render(); setTimeout(() => toast(bm, 'View', () => go('#bills')), 4000); } } catch (e) { console.error('bills66', e); }
   try { const im = await insBillMig(); if (im) { render(); setTimeout(() => toast(im, 'View', () => go('#bills')), 2600); } } catch (e) { console.error('ins579', e); }
   phoneSyncOpen();
@@ -19979,7 +19983,7 @@ async function cfLoad(force) {
   try {
     const [s, d] = force ? await cfApi('/cashflow/refresh', 'POST', {}) : await cfApi('/cashflow');
     if (s === 200 && d.connected === false) { cfForget(); }
-    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); irFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { koraFeed(d.data); } catch (e) { } try { cardDetect(d.data); } catch (e) { } try { billAutoPay(d.data); } catch (e) { console.error('billAutoPay', e); } try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
+    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); irFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { koraFeed(d.data); } catch (e) { } try { cardDetect(d.data); } catch (e) { } try { billAutoPay(d.data); } catch (e) { console.error('billAutoPay', e); } try { if (coeliacFix()) save(); } catch (e) { } try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
     else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
     else CFerr = cfErrText(s, d);
@@ -21998,10 +22002,12 @@ const WG_KS = [[0, 'Not in KiwiSaver'], [3, '3% (only with an IRD-approved tempo
 const WG_END_DEF = { '4': '19:15', '0': '19:00' }; // same finishes the rest of the app uses when the roster has none (others 6pm)
 function wgSt() { S.settings = S.settings || {}; const w = S.settings.wageEst && typeof S.settings.wageEst === 'object' ? S.settings.wageEst : (S.settings.wageEst = {});
   if (!WG_CODES.includes(w.code)) w.code = 'M'; if (!WG_KS.some(k => k[0] === +w.ks)) w.ks = 3.5; w.ks = +w.ks;
-  ['rate', 'lateRate', 'commUsual'].forEach(k => { w[k] = Math.max(0, +w[k] || 0); });
+  ['rate', 'lateRate', 'commUsual', 'perDay'].forEach(k => { w[k] = Math.max(0, +w[k] || 0); });
+  if (w.commUsual > 0 && !w.perDayMig) { const n = wgRostered0(); if (n > 0 && !w.perDay) w.perDay = r2(w.commUsual / n); w.perDayMig = 1; } // 2.26.89: usual per fortnight → per rostered day
   if (!(+w.brk >= 0)) w.brk = 30; w.brk = +w.brk; if (!(+w.social >= 0)) w.social = 5; w.social = +w.social; if (w.socialPer !== 'week') w.socialPer = 'pay';
   if (!(+w.ph > 0)) w.ph = 1.5; w.arrears = +w.arrears === 1 ? 1 : 0; if (!Array.isArray(w.other)) w.other = []; if (!w.commBy || typeof w.commBy !== 'object') w.commBy = {};
   return w; }
+const wgRostered0 = () => { try { const r = rosterState(); return Object.keys(r.days || {}).filter(k => hmMin(r.days[k]) != null).length * 2; } catch (e) { return 0; } };
 const wgOn = () => { try { return wgSt().rate > 0; } catch (e) { return false; } };
 const wgTrunc = v => Math.floor(v * 100 + 1e-6) / 100;
 // PAYE for one fortnightly pay. Returns income tax and ACC separately (PAYE in the IRD tables includes both).
@@ -22030,17 +22036,36 @@ function wgHours(ws, we) { const w = wgSt(), r = rosterState(), hol = wgHolSet(w
     const h = Math.max(0, (en - st - w.brk) / 60), late = w.lateRate > 0 ? Math.max(0, Math.min(en, 24 * 60) - Math.max(st, 18 * 60)) / 60 : 0;
     out.days++; out.hrs += h; out.late += Math.min(late, h); if (hol.has(d)) { out.phHrs += h; out.ph.push(hol.get(d) + ' (' + fmtW(d) + ')'); } }
   out.hrs = r2(out.hrs); out.late = r2(out.late); out.phHrs = r2(out.phHrs); return out; }
-// Commission for a work fortnight: what he typed for that pay, else the Commission tracker total once that fortnight is
-// over, else the average of the last 3 finished fortnights in the tracker, else his usual amount.
-function wgCommAvg() { try { const c = CM(); if (!c || !c.anchor || !c.entries.length) return null; const cur = fortnightOf(c.anchor, todayISO()), first = c.entries.reduce((m, e) => e.date < m ? e.date : m, '9999'), L = [];
-  for (let st = addDays(cur.start, -14); st >= first && L.length < 3; st = addDays(st, -14)) L.push(commSum(c.entries, st, addDays(st, 13)) / 100);
-  if (!L.length) { const f0 = fortnightOf(c.anchor, first); if (f0.start < cur.start) L.push(commSum(c.entries, f0.start, f0.end) / 100); }
-  return L.length ? r2(L.reduce((n, v) => n + v, 0) / L.length) : null; } catch (e) { return null; } }
-function wgComm(payDate, wk) { const w = wgSt();
-  if (w.commBy[payDate] != null && +w.commBy[payDate] >= 0) return { amount: +w.commBy[payDate], src: 'typed' };
-  try { const c = CM(); if (c && c.entries.length && wk.end < todayISO() && c.entries.some(e => e.date >= wk.start && e.date <= wk.end)) return { amount: commSum(c.entries, wk.start, wk.end) / 100, src: 'tracker' }; } catch (e) { }
-  const a = wgCommAvg(); if (a != null) return { amount: a, src: 'avg' };
-  return { amount: w.commUsual, src: 'usual' }; }
+// 2.26.89: commission for a work fortnight = what's earned so far in the Commission tracker (entries within the work
+// dates) + a projection for the rostered days still to come (average commission per rostered day from recent tracker
+// history, else his "Usual per day"). Once the fortnight is over it's just the earned total. A future fortnight is the
+// projection only. A typed amount for that pay still wins.
+const wgRostered = (a, b) => { let n = 0; try { const r = rosterState(); for (let d = a; d <= b; d = addDays(d, 1)) if (hmMin(r.days[String(new Date(parseD(d)).getUTCDay())]) != null) n++; } catch (e) { } return n; };
+function wgPerDay() { const w = wgSt();
+  try { const c = CM(); if (c && c.entries.length) { const T = todayISO(), cur = wgWorkFor(wgPayFor0(T)), to = addDays(cur.start, -1), from = addDays(to, -41), first = c.entries.reduce((m, e) => e.date < m ? e.date : m, '9999');
+    const st = first > from ? first : from, days = st <= to ? wgRostered(st, to) : 0, tot = st <= to ? commSum(c.entries, st, to) / 100 : 0;
+    if (days >= 3 && tot > 0) return { amount: r2(tot / days), src: 'tracker', days }; } } catch (e) { }
+  return { amount: w.perDay || 0, src: 'usual', days: 0 }; }
+function wgComm(payDate, wk) { const w = wgSt(), T = todayISO(), pd = wgPerDay(), hasC = (() => { try { return CM().entries.length > 0; } catch (e) { return false; } })();
+  const earnedTo = wk.end < T ? wk.end : addDays(T, -1), todayIn = T >= wk.start && T <= wk.end;
+  let earned = 0; try { if (hasC && earnedTo >= wk.start) earned = commSum(CM().entries, wk.start, todayIn ? T : earnedTo) / 100; } catch (e) { }
+  const enteredToday = (() => { try { return todayIn && CM().entries.some(e => e.date === T); } catch (e) { return false; } })();
+  const leftFrom = todayIn ? (enteredToday ? addDays(T, 1) : T) : wk.start, left = wk.end < T ? 0 : wgRostered(leftFrom > wk.start ? leftFrom : wk.start, wk.end), proj = r2(left * pd.amount);
+  const base = { earned: r2(earned), left, proj, perDay: pd, started: wk.start <= T, ended: wk.end < T };
+  if (w.commBy[payDate] != null && +w.commBy[payDate] >= 0) return Object.assign(base, { amount: +w.commBy[payDate], src: 'typed' });
+  if (base.ended) return Object.assign(base, hasC && earned > 0 ? { amount: base.earned, src: 'earned' } : { amount: r2(wgRostered(wk.start, wk.end) * pd.amount), src: 'proj' });
+  if (!base.started) return Object.assign(base, { amount: proj, src: 'proj' });
+  return Object.assign(base, { amount: r2(base.earned + proj), src: 'sofar' }); }
+const wgPayFor0 = T => { try { const pps = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean), p = pps.find(x => wgWorkFor(wgPayFor(x)).end >= T); return p ? wgPayFor(p) : addDays(T, 7); } catch (e) { return addDays(T, 7); } };
+const wgCommAvg = () => { const p = wgPerDay(); return p.src === 'tracker' ? p.amount : null; };
+function wgCommLine(c) { if (c.src === 'typed') return 'Your amount for this pay';
+  if (c.src === 'earned') return 'Earned in the Commission tracker (fortnight finished)';
+  const pdTxt = c.perDay.amount > 0 ? `${money(c.perDay.amount)} a rostered day (${c.perDay.src === 'tracker' ? 'your recent average' : 'your usual'})` : 'no per-day amount yet';
+  if (c.src === 'sofar') return c.left ? `Earned so far ${money(c.earned)} + about ${money(c.proj)} for ${plural(c.left, 'day')} left = ${money(c.amount)}` : `Earned so far ${money(c.earned)}, no rostered days left`;
+  return `About ${pdTxt}${c.ended ? '' : ' for the rostered days'}`; }
+async function wgCommForm(payDate) { const w = wgSt(), cur = w.commBy[payDate];
+  openSheet('Commission for this pay', `<p class="muted" style="margin:0 0 10px">Type the commission for the pay on ${esc(fmtW(payDate))} if you know it. Leave it blank to go back to the Commission tracker.</p>` + field('Commission', inp('amount', cur != null ? cur : '', 'inputmode="decimal" placeholder="0.00"')),
+    async v => { const n = parseFloat(String(v.amount || '').replace(/[^\d.]/g, '')); if (String(v.amount || '').trim() === '' || !Number.isFinite(n)) delete w.commBy[payDate]; else w.commBy[payDate] = r2(n); await save(); render(); return ''; }, 'Save'); }
 function wgEst(payDate, over) { const w = Object.assign({}, wgSt(), over || {}), wk = wgWorkFor(payDate), H = wgHours(wk.start, wk.end), cm = over && over.comm != null ? { amount: over.comm, src: 'typed' } : wgComm(payDate, wk);
   const lateX = w.lateRate > 0 ? H.late * (w.lateRate - w.rate) : 0, base = H.hrs * w.rate, phX = H.phHrs * w.rate * (w.ph - 1);
   const gross = r2(base + lateX + phX + cm.amount), t = wgTax(gross, w.code), ks = wgTrunc(gross * w.ks / 100), social = r2(w.social * (w.socialPer === 'week' ? 2 : 1)), other = r2(w.other.reduce((n, o) => n + (+o.amount || 0), 0));
@@ -22055,16 +22080,16 @@ function wgGrossFor(net, over) { const w = Object.assign({}, wgSt(), over || {})
   for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (netOf(m) < net) lo = m; else hi = m; } return r2(hi); }
 function wgCalib() { try { const s = mywSt().seen.filter(x => x.a > 300), by = {}; s.forEach(x => { by[x.d] = r2((by[x.d] || 0) + x.a); });
   return Object.keys(by).sort().slice(-4).reverse().map(d => { const e = wgEst(d), g = wgGrossFor(by[d]); return { d, actual: by[d], est: wgOn() ? e.net : null, e, grossNeeded: g }; }); } catch (e) { return []; } }
-async function wgSet(k, v) { const w = wgSt(); if (['rate', 'lateRate', 'commUsual', 'social', 'brk', 'ph'].includes(k)) { const n = parseFloat(String(v).replace(/[^\d.]/g, '')); w[k] = Number.isFinite(n) && n >= 0 ? n : 0; }
+async function wgSet(k, v) { const w = wgSt(); if (['rate', 'lateRate', 'commUsual', 'perDay', 'social', 'brk', 'ph'].includes(k)) { const n = parseFloat(String(v).replace(/[^\d.]/g, '')); w[k] = Number.isFinite(n) && n >= 0 ? n : 0; }
   else if (k === 'ks') w.ks = +v; else if (k === 'arrears') w.arrears = +v ? 1 : 0; else w[k] = v; await save(); render(); }
 async function wgCommSet(payDate, v) { const w = wgSt(), n = parseFloat(String(v).replace(/[^\d.]/g, '')); if (v === '' || !Number.isFinite(n)) delete w.commBy[payDate]; else w.commBy[payDate] = r2(n); await save(); render(); }
 async function wgOtherAdd() { openSheet('Another deduction', field('What it is', inp('name', '', 'maxlength="40" placeholder="e.g. Staff purchases" required')) + field('Amount each pay', inp('amount', '', 'inputmode="decimal" placeholder="0.00" required')),
   async v => { const a = parseFloat(String(v.amount).replace(/[^\d.]/g, '')); if (!String(v.name || '').trim()) return 'Please name it.'; if (!(a > 0)) return 'Please type the amount.'; wgSt().other.push({ id: uid('wgo'), name: String(v.name).trim().slice(0, 40), amount: r2(a) }); await save(); render(); return ''; }, 'Add'); }
 async function wgOtherDel(id) { const s = snap(), w = wgSt(), o = w.other.find(x => x.id === id); w.other = w.other.filter(x => x.id !== id); await save(); render(); toast((o ? o.name : 'Deduction') + ' removed.', 'Undo', undoTo(s)); }
-async function wgUse(k, v) { const s = snap(), w = wgSt(); if (k === 'rate') w.rate = r2(v); else w.commUsual = r2(v); await save(); render(); toast(k === 'rate' ? `Hourly rate set to ${money(v)}.` : `Usual commission set to ${money(v)}.`, 'Undo', undoTo(s)); }
+async function wgUse(k, v) { const s = snap(), w = wgSt(); if (k === 'rate') w.rate = r2(v); else w.perDay = r2(v); await save(); render(); toast(k === 'rate' ? `Hourly rate set to ${money(v)}.` : `Usual commission set to ${money(v)} a rostered day.`, 'Undo', undoTo(s)); }
 function wgBreak(e) { const L = [['Hours', `${e.H.hrs} h over ${plural(e.H.days, 'shift')} × ${money(e.rate)}`, e.base]];
   if (e.lateX) L.push(['After 6pm extra', `${e.H.late} h at the late rate`, e.lateX]); if (e.phX) L.push(['Public holiday extra', esc(e.H.ph.join(', ')), e.phX]);
-  L.push(['Commission', { typed: 'what you typed', tracker: 'from the Commission tracker', avg: 'average of recent fortnights (Commission tracker)', usual: 'your usual amount' }[e.comm.src], e.comm.amount]);
+  L.push(['Commission', esc(wgCommLine(e.comm)), e.comm.amount]);
   const row = (t, s, v, neg, b) => `<div class="row"><div class="tx"><div class="t">${b ? '<b>' + t + '</b>' : t}</div>${s ? `<div class="s">${s}</div>` : ''}</div><b>${neg ? '−' : ''}${money(v)}</b></div>`;
   return L.map(x => row(x[0], x[1], x[2])).join('') + row('Gross pay', '', e.gross, 0, 1) + row('PAYE (income tax)', 'Tax code ' + esc(e.code), e.tax, 1) + row('ACC earners’ levy', '1.75%', e.acc, 1) +
     (e.sl ? row('Student loan', '12%' + (/^M/.test(e.code) ? ' over $928 a fortnight' : ''), e.sl, 1) : '') + (e.ks ? row('KiwiSaver', e.ksPct + '%', e.ks, 1) : '') + (e.social ? row('Social club', '', e.social, 1) : '') +
@@ -22081,21 +22106,55 @@ function WagePage() {
     ${num('rate', 'Hourly rate', 'Before tax. Not sure? Tap a “Rate from this pay” button under Check against your last pays.')}
     ${num('lateRate', 'After 6pm rate (optional)', 'Only if your hours after 6pm, like Thursday’s late finish, pay more. Leave blank if not.')}
     ${field('Unpaid break each shift', `<div class="moneyin"><input inputmode="numeric" value="${w.brk}" aria-label="Unpaid break minutes" onchange="wgSet('brk', this.value)"><span>min</span></div>`, 'Taken off each rostered day. Change it if your break is different.')}
-    ${num('commUsual', 'Usual commission a fortnight', wgCommAvg() != null ? 'Your Commission tracker is used instead: average of recent fortnights ' + money(wgCommAvg()) + '.' : 'Used when the Commission tracker has nothing for that fortnight.')}
+    ${num('perDay', 'Usual commission per rostered day', wgCommAvg() != null ? 'Your Commission tracker is used instead: recent average ' + money(wgCommAvg()) + ' a rostered day.' : 'Used for the days still to come when the Commission tracker has no recent history.')}
     ${field('Social club', `<div class="moneyin"><span>$</span><input inputmode="decimal" value="${w.social}" aria-label="Social club amount" onchange="wgSet('social', this.value)"></div><select style="margin-top:6px" onchange="wgSet('socialPer', this.value)">${opt('pay', 'each pay (fortnight)', w.socialPer)}${opt('week', 'each week', w.socialPer)}</select>`, 'Taken out before your pay reaches the bank.')}
     <div class="sec">Other deductions</div><div class="list">${w.other.map(o => `<div class="row"><div class="tx"><div class="t">${esc(o.name)}</div><div class="s">Each pay</div></div><b>${money(o.amount)}</b><button class="linkbtn" onclick="wgOtherDel(${jsArg(o.id)})" aria-label="Remove ${esc(o.name)}">✕</button></div>`).join('') || '<div class="row"><div class="tx"><div class="s">None</div></div></div>'}</div>
     <div class="btns" style="margin-top:8px"><button class="btn small" onclick="wgOtherAdd()">${I('plus')} Add a deduction</button></div>
     ${field('Pay covers', `<select onchange="wgSet('arrears', this.value)">${opt(0, 'the fortnight just before payday', w.arrears)}${opt(1, 'the fortnight ending a week before payday', w.arrears)}</select>`)}
     <p class="muted" style="margin:6px 2px 0">Saved on this phone with your other settings.</p></div>`;
-  const cBy = w.commBy[pd], comm = `<div class="row"><div class="tx"><div class="t">Commission this fortnight</div><div class="s">${cBy != null ? 'Your amount' : 'Leave blank to use ' + money(e.comm.amount) + ' (' + ({ tracker: 'Commission tracker', avg: 'recent average', usual: 'your usual' }[e.comm.src] || '') + ')'}</div></div><div class="moneyin wgcommin"><span>$</span><input inputmode="decimal" placeholder="${e.comm.amount.toFixed(2)}" value="${cBy != null ? cBy : ''}" aria-label="Commission this fortnight" onchange="wgCommSet(${jsArg(pd)}, this.value)"></div></div>`;
+  const c0 = e.comm, comm = `<div class="row wgcommrow"><div class="tx"><div class="t">${c0.ended ? 'Commission earned' : c0.started ? 'Commission earned so far' : 'Commission (projected)'}</div><div class="s">${esc(wgCommLine(c0))}</div>
+    <div class="s" style="margin-top:4px">${c0.started && !c0.ended ? `<a href="#commission/add">Add today’s commission</a> · ` : ''}<a href="javascript:void 0" onclick="wgCommForm(${jsArg(pd)})">${c0.src === 'typed' ? 'Change your amount' : 'Type a different amount'}</a></div></div><b>${money(c0.started && !c0.ended && c0.src !== 'typed' ? c0.earned : c0.amount)}</b></div>`;
   const est = !rosterSet ? `<div class="card muted">Add your work days in the <a href="#roster">Work roster</a> so the hours can be counted.</div>` : !wgOn() ? `<div class="card muted">Add your hourly rate (or work it out from your last pay below) to see the estimate.</div>` :
     `<div class="card"><div class="t" style="font-weight:600">Next pay ${esc(fmtW(pd))}: about ${money(e.net)}</div><div class="muted" style="margin:2px 0 8px">Estimate for work ${esc(fmtW(e.wk.start))} – ${esc(fmtW(e.wk.end))}, using your roster as it is now.</div><div class="list">${comm}${wgBreak(e)}</div></div>`;
   const cal = wgCalib(), cRows = cal.map(c => { const back = r2((c.grossNeeded - wgEst(c.d).comm.amount - wgEst(c.d).phX) / Math.max(0.01, wgEst(c.d).H.hrs)), commBack = r2(c.grossNeeded - wgEst(c.d).base - wgEst(c.d).lateX - wgEst(c.d).phX);
     return `<div class="row"><div class="tx"><div class="t">Pay ${esc(fmtW(c.d))}: ${c.est != null ? 'estimated ' + money(c.est) + ' vs actual ' : 'actual '}${money(c.actual)}</div><div class="s">${c.est != null ? (Math.abs(c.est - c.actual) < 1 ? 'Spot on' : (c.est > c.actual ? 'Estimate ' + money(c.est - c.actual) + ' high' : 'Estimate ' + money(c.actual - c.est) + ' low')) + ' · ' : ''}Gross needed about ${money(c.grossNeeded)}</div>
-      <div class="btns" style="margin-top:6px">${wgEst(c.d).H.hrs > 0 ? `<button class="btn small" onclick="wgUse('rate', ${back})">Rate from this pay: ${money(back)}/h</button>` : ''}${w.rate > 0 && commBack >= 0 ? `<button class="btn small" onclick="wgUse('comm', ${commBack})">Commission was about ${money(commBack)}</button>` : ''}</div></div></div>`; }).join('');
+      <div class="btns" style="margin-top:6px">${wgEst(c.d).H.hrs > 0 ? `<button class="btn small" onclick="wgUse('rate', ${back})">Rate from this pay: ${money(back)}/h</button>` : ''}${w.rate > 0 && commBack >= 0 && wgRostered(wgEst(c.d).wk.start, wgEst(c.d).wk.end) > 0 ? `<button class="btn small" onclick="wgUse('comm', ${r2(commBack / wgRostered(wgEst(c.d).wk.start, wgEst(c.d).wk.end))})">Commission was about ${money(commBack)} (${money(commBack / wgRostered(wgEst(c.d).wk.start, wgEst(c.d).wk.end))} a day)</button>` : ''}</div></div></div>`; }).join('');
   const calib = `<div class="sec">Check against your last pays</div><div class="list">${cRows || '<div class="row"><div class="tx"><div class="s">Your pays will show here once Cash flow has seen them in the bank.</div></div></div>'}</div>
     <p class="muted" style="margin:6px 2px 0">“Rate from this pay” works your hourly rate back from what landed, after taking off commission for that fortnight. Hours come from your roster as it is now, so a week with extra or fewer shifts will throw it out. A public holiday on a rostered day is counted at time and a half.</p>`;
   return head + est + set + calib + `<div class="foot">Tax for ${WG_TAXYEAR} (1 April 2026 – 31 March 2027), from IRD: income tax 10.5% to $15,600, 17.5% to $53,500, 30% to $78,100, 33% to $180,000, 39% above; ACC earners’ levy 1.75%; student loan 12% over $464 a week. These are estimates. Your payslip is the final word, and once the pay lands in the bank the Budget uses the real amount.</div>`;
 }
 function wgBudgetRow() { try { const T = todayISO(), pp = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean).find(p => wgPayFor(p) > T); const e = pp && wgOn() ? wgEst(wgPayFor(pp)) : null;
   return `<div class="list" style="margin-bottom:12px"><div class="row"><button class="tapzone" onclick="go('#wage')"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wage estimate</div><div class="s">${e ? `Next pay ${esc(fmtW(e.payDate))}: about ${money(e.net)} take-home (gross ${money(e.gross)})` : 'Work out your pay from your roster, commission and tax code'}</div></div></button></div></div>`; } catch (err) { return ''; } }
+/* 2.26.89: Coeliac NZ membership renewal INV-560747 ($60) is due Thu 8 Oct 2026 (the Xero email). 2.26.83's fix was
+   one-time, so if anything put 16 Oct back afterwards (an older copy of the data arriving through sync from another
+   device or tab, which also carries the "already fixed" flag, or a second Coeliac bill), it stayed wrong. This check
+   runs on every open and after every sync: it puts 8 Oct back (unless he changed the date himself after this fix),
+   folds a duplicate Coeliac bill into one, and stops once the invoice is paid. A bell note says what it found. */
+const COE_DUE = '2026-10-08', COE_INV = 'INV-560747';
+function coeliacFix() {
+  if (!S || !Array.isArray(S.bills) || todayISO() > '2026-12-31') return '';
+  const st = S.settings.coeliac89 && typeof S.settings.coeliac89 === 'object' ? S.settings.coeliac89 : null;
+  const isC = b => b && /coeliac/i.test(b.name || '') && (!(+b.amount > 0) || Math.abs(+b.amount - 60) < 0.5);
+  const paidThis = b => b && ((Array.isArray(b.paidDues) && b.paidDues.some(p => p && (p.due === COE_DUE || p.due === '2026-10-16' || (p.on && p.on >= '2026-09-30')))) || (b.paid && (b.paidOn || '') >= '2026-09-30'));
+  const all = S.bills.filter(isC); if (!all.length) return '';
+  if (all.some(paidThis)) { // paid (bank or ticked): any other open copy of the same invoice is a duplicate
+    const open = all.filter(b => !b.paid && !paidThis(b) && b.due >= '2026-10-01' && b.due <= '2026-10-31'); if (!open.length) return '';
+    S.settings.coeliacDupes = (S.settings.coeliacDupes || []).concat(open.map(b => JSON.parse(JSON.stringify(b)))).slice(-5);
+    S.bills = S.bills.filter(b => !open.includes(b)); return 'dupe-paid'; }
+  const open = all.filter(b => !b.paid && b.due && b.due >= '2026-09-30' && b.due <= '2026-10-31'); if (!open.length) return '';
+  const main = open.find(b => b.email && b.email.id) || open.find(b => b.ref && b.ref.no === COE_INV) || open[0], dupes = open.filter(b => b !== main);
+  const wrong = main.due !== COE_DUE && !(st && main.dueByHand);
+  if (!wrong && !dupes.length) return '';
+  const was = main.due, why = !S.settings.coeliac8Mig ? 'the 2.26.83 fix hadn’t run on this phone yet'
+    : dupes.length ? 'there were ' + open.length + ' Coeliac NZ bills and the earlier fix only moved one of them'
+    : main.dueByHand ? 'the date had been changed by hand afterwards'
+    : 'an older copy of your data came back through sync from another device or browser tab after the fix (it carried the old date, and the fix only ran once)';
+  if (dupes.length) { S.settings.coeliacDupes = (S.settings.coeliacDupes || []).concat(dupes.map(b => JSON.parse(JSON.stringify(b)))).slice(-5); S.bills = S.bills.filter(b => !dupes.includes(b)); }
+  if (wrong) { main.dueWas = was; main.due = COE_DUE; main.anchor = 8; main.paid = false; delete main.dueByHand;
+    if (main.email && main.email.id) { main.email.forDue = COE_DUE; main.email.due = COE_DUE; }
+    if (!main.ref) main.ref = { no: COE_INV, kind: 'inv', src: 'email', from: 'Coeliac New Zealand', forDue: COE_DUE }; }
+  S.settings.coeliac89 = { at: new Date().toISOString(), was, why, dupes: dupes.length, n: ((st && st.n) || 0) + 1 };
+  S.settings.appNotices = (S.settings.appNotices || []).filter(n => n && n.id !== 'coeliac89').concat({ id: 'coeliac89', kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(),
+    title: 'Coeliac NZ is back to due Thu 8 Oct', body: `Membership renewal ${COE_INV}, $60.00, as the email says. It was showing ${fmtW(was)} because ${why}.${dupes.length ? ' The extra copy was removed.' : ''} It’s still unpaid, so it shows as overdue. If you’ve paid it, tick it off in Bills.` }).slice(-30);
+  return 'fixed';
+}
