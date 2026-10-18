@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.85';
+const APP_VERSION = '2.26.86';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4743,7 +4743,7 @@ function Bills() {
   const row = b => {
     const d = daysLeft(b.due);
     return `<div class="row bill" data-bill="${esc(b.id)}"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}">${billIc(b.name)}
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${b.paidBy === 'card' ? '<span class="oncard">On card</span> ' : ''}${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : (billAutoLast(b) ? 'next ' : '') + 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div>${billAutoTxt(b)}</div></button>
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${b.paidBy === 'card' ? '<span class="oncard">On card</span> ' : ''}${b.cat === 'fuel' ? '<span class="billfuel">⛽ Fuel · varies</span> ' : ''}${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : (billAutoLast(b) ? 'next ' : '') + 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div>${billAutoTxt(b)}</div></button>
       <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
       ${billAutoLast(b) ? `<button class="paybtn" aria-label="Undo the bank match for ${esc(b.name)}" onclick="billAutoUndo('${b.id}')">Undo</button>` : ''}${b.paid ? (billAutoLast(b) ? '' : `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>`) : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
@@ -9509,7 +9509,7 @@ function budgetBillRows(b) {
   const items = [];
   (S.bills || []).filter(x => x && !x.paid && budgetAmt(x.amount) > 0 && !/\bmortgage\b/i.test(String(x.name || ''))).forEach(bill => {
     const ku = KORA_BILL_RE.test(String(bill.name || '')) && budgetAmt(S.settings.koraUsual), kInv = bill.invoice && bill.invoice.billDue;
-    billDates(bill, sT, eT).forEach(d => { const about = !!(ku && (!kInv || d > kInv)); items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60) + (about ? ' (about)' : ''), amount: about ? ku : budgetAmt(bill.amount), due: d, late: 0, card: bill.paidBy === 'card' }); });
+    billDates(bill, sT, eT).forEach(d => { const about = !!(ku && (!kInv || d > kInv)); items.push({ id: bill.id, name: String(bill.name || 'Bill').slice(0, 60) + (about ? ' (about, average of the last 3)' : ''), amount: about ? ku : budgetAmt(bill.amount), due: d, late: 0, card: bill.paidBy === 'card' }); });
   });
   // Same as Bills for the current pay: include overdue still unpaid when this is the current fortnight.
   const cur = payPeriod(0);
@@ -19070,6 +19070,7 @@ async function start() {
   try { if (!S.settings.acctAuto69) { const K = S.settings.billAcctKeep || {}; Object.keys(K).forEach(k => { const b = (S.bills || []).find(x => x.id === k.split('|')[0]); if (!b || !/\b(mortgage|home ?loans?)\b/i.test(b.name || '')) delete K[k]; }); S.settings.billAcctKeep = K; S.settings.acctAuto69 = true; await save(); if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => cfLoad(), 1500); } } catch (e) { console.error('acctAuto69', e); }
   try { if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => { if (!CF && !CFbusy) cfLoad(); }, 2500); } catch (e) { } // 2.26.73: bank data on open, so bills paid from the bank are marked
   try { const mm = await mort3Mig(); if (mm) { render(); setTimeout(() => toast(mm, 'View', () => go('#budget')), 5500); } } catch (e) { console.error('mort3', e); }
+  try { const km = await kora86Mig(); if (km) { render(); } } catch (e) { console.error('kora86', e); }
   try { const cm = await coeliac8Mig(); if (cm) { render(); setTimeout(() => toast(cm, 'View', () => go('#bills')), 2500); } } catch (e) { console.error('coeliac8', e); }
   try { const bm = await bills66Mig(); if (bm) { render(); setTimeout(() => toast(bm, 'View', () => go('#bills')), 4000); } } catch (e) { console.error('bills66', e); }
   try { const im = await insBillMig(); if (im) { render(); setTimeout(() => toast(im, 'View', () => go('#bills')), 2600); } } catch (e) { console.error('ins579', e); }
@@ -19976,7 +19977,7 @@ async function cfLoad(force) {
   try {
     const [s, d] = force ? await cfApi('/cashflow/refresh', 'POST', {}) : await cfApi('/cashflow');
     if (s === 200 && d.connected === false) { cfForget(); }
-    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { cardDetect(d.data); } catch (e) { } try { billAutoPay(d.data); } catch (e) { console.error('billAutoPay', e); } try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
+    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); irFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { koraFeed(d.data); } catch (e) { } try { cardDetect(d.data); } catch (e) { } try { billAutoPay(d.data); } catch (e) { console.error('billAutoPay', e); } try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
     else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
     else CFerr = cfErrText(s, d);
@@ -20064,7 +20065,7 @@ function cfBody(M) {
   } else proj = `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday</b><br>Cash flow uses the same pay fortnight as Bills and Budget.<div style="margin-top:8px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
   const main = cfMain(D), mortA = cfMortAcct(D), tags = { transfer: 'Own transfer', income: 'Income', mortgage: 'Mortgage', card: 'Card' };
   const recent = (D.transactions || []).slice(0, CFmore ? 80 : 12).map(t => { const mk = cfMortTx(D, t), sw = swIs(t); const bill = t.amount < 0 ? ((S.bills || []).find(b => cfBillTx(b, [t]).length && payeeScore(b.name, t.desc + ' ' + t.merchant) === 2) || (S.bills || []).find(b => cfBillTx(b, [t]).length && payeeFor(b, t) > 0)) : null;
-    const tag = sw ? `<span class="cftag income">Income: Sarah’s wages</span>` : mk === 'old' ? `<span class="cftag mortgage old">Mortgage (old ANZ)</span>` : mk === 'asb' ? `<span class="cftag mortgage">Mortgage (ASB)</span>` : bill ? `<span class="cftag bill">Bill: ${esc(bill.name)}</span>` : tags[t.cat2] ? `<span class="cftag ${t.cat2}">${tags[t.cat2]}</span>` : '';
+    const irk = t.amount > 0 && !sw ? IR_KEYS.find(k => irIs(k, t)) : '', tag = sw ? `<span class="cftag income">Income: Sarah’s wages</span>` : irk ? `<span class="cftag income">Income: ${esc(IR_DEF[irk].name)}</span>` : mk === 'old' ? `<span class="cftag mortgage old">Mortgage (old ANZ)</span>` : mk === 'asb' ? `<span class="cftag mortgage">Mortgage (ASB)</span>` : bill ? `<span class="cftag bill">Bill: ${esc(bill.name)}</span>` : tags[t.cat2] ? `<span class="cftag ${t.cat2}">${tags[t.cat2]}</span>` : '';
     return `<button type="button" class="row cfrow cftx" onclick="cfTxSheet(${jsArg(t.id)})"><div class="tx"><div class="t">${esc(t.merchant || t.desc)}</div><div class="s">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))}${tag ? ' · ' + tag : ''}</div></div><b class="cfamt${t.amount < 0 ? '' : ' pos'}">${cfMoney(t.amount)}</b></button>`; }).join('');
   const swL = (D.transactions || []).filter(swIs), swA = swAvg();
   try { xferSeen(D); } catch (e) { }
@@ -20072,7 +20073,8 @@ function cfBody(M) {
     <div class="card cftotal"><span>Spendable across your accounts</span><small class="muted" style="display:block;font-size:.72rem">Includes ORBIT’s free-to-draw; not the home loans or the card</small><b>${cfMoney(total)}</b></div>` +
     groups.map(G => `<div class="sec">${esc(G.g)}</div><div class="list">${G.L.map(accRow).join('')}</div>`).join('') + flow + proj + orbIntCard(D) +
     `<div class="sec">Sarah’s wages</div><div class="list"><div class="row"><div class="tx"><div class="t">${swL.length ? `${plural(swL.length, 'pay')} found · usually ${cfMoney(swA)}` : 'Not found yet'}</div><div class="s">${swL.length ? 'Last ' + esc(fmtW(swL[0].date.slice(0, 10))) + ' into ' + esc(nm2(D, swL[0].acct)) + ' · ' : ''}Payer contains: ${swRules() || '—'}</div><div class="s muted">Tap a money-in transaction below to teach it. Budget shows her pay each fortnight.</div></div></div></div>
-    <div class="sec">Recent · tap one to teach Sarah’s wages</div><div class="list">${recent}</div><div class="btns" style="margin-top:6px"><button type="button" class="btn small" onclick="CFmore=!CFmore;render()">${CFmore ? 'Show fewer' : 'Show more'}</button></div>
+    ${IR_KEYS.map(k => { const w = irSt(k), L = w.seen, last = L[L.length - 1], a = fnAvg3(L); return `<div class="sec">${esc(IR_DEF[k].name)}</div><div class="list"><div class="row"><div class="tx"><div class="t">${L.length ? `${plural(L.length, 'payment')} found · usually ${cfMoney(a)} a week` : 'Not found yet'}</div><div class="s">${last ? 'Last ' + esc(fmtW(last.d)) + (last.acct ? ' into ' + esc(nm2(D, last.acct)) : '') + ' · ' : ''}Payer contains: ${irRules(k) || '—'}</div></div></div></div>`; }).join('')}
+    <div class="sec">Recent · tap one to teach your income</div><div class="list">${recent}</div><div class="btns" style="margin-top:6px"><button type="button" class="btn small" onclick="CFmore=!CFmore;render()">${CFmore ? 'Show fewer' : 'Show more'}</button></div>
     <div class="list" style="margin-top:12px"><label class="srow"><div class="tx"><div class="t">Bills come out of</div><div class="s">Used when a bill hasn’t been paid from the bank before</div></div><select onchange="cfSetMain(this.value)">${D.accounts.filter(cfSpendable).map(a => `<option value="${esc(a.id)}"${main && main.id === a.id ? ' selected' : ''}>${esc(cfAName(a))}</option>`).join('')}</select></label>
     <label class="srow"><div class="tx"><div class="t">Mortgages (ASB) come out of</div><div class="s">${S.settings.cfMortAcct ? 'Your choice' : 'Where the ASB loan repayments came from'}. Old ANZ home-loan payments are history only.</div></div><select onchange="cfSetMort(this.value)">${D.accounts.filter(cfSpendable).map(a => `<option value="${esc(a.id)}"${mortA && mortA.id === a.id ? ' selected' : ''}>${esc(cfAName(a))}</option>`).join('')}</select></label></div>
     <div class="foot">Read-only, from Akahu (daily, or when you tap Refresh). Before-payday figures are worked out from Bills and this fortnight’s mortgages; pay isn’t counted until it lands. Bills already paid from the bank this fortnight are left out.</div>`;
@@ -20155,6 +20157,7 @@ function nbAll(D) {
   return (D.transactions || []).filter(t => { const a = D.accounts.find(x => x.id === t.acct); if (!a || !(t.amount < 0) || t.date.slice(0, 10) > T) return false;
     if (!(cfSpendable(a) || a.type === 'CREDITCARD')) return false; if (a.type === 'LOAN' && !a.limit) return false;
     if (ids.has(t.id) || billOwnTx(t) || (t.pair && t.cat2 === 'transfer')) return false;
+    if ((S.bills || []).some(b => b && billVaries(b) && budgetAmt(b.amount) > 0 && (() => { try { return payeeScore(b.name, t.desc + ' ' + (t.merchant || '')) === 2 || (KORA_BILL_RE.test(b.name) && KORA_BILL_RE.test(t.desc + ' ' + (t.merchant || ''))); } catch (e) { return false; } })())) return false; // 2.26.86: Kora / power debits are bills
     try { if (cfMortTx(D, t)) return false; } catch (e) { }
     if (card && a.id !== card.id && /\b(ASB\s*)?(CREDIT\s*)?CARD\s*(PAYMENT|REPAY)/i.test(t.desc)) return false; // paying the card off
     const d = t.date.slice(0, 10), amt = -t.amount;
@@ -20271,27 +20274,50 @@ function xferPlan(D) {
   // 2.26.68: two days past the end of next fortnight, so a repayment the Thursday after payday is planned from that pay
   // 2.26.72: and through the card's due date when that's later, so the card payment is planned too
   let cyc = null; try { cyc = cardCycleOf(T); } catch (e) { }
-  const H0 = p1 ? addDays(p1.end, 2) : p0.end, cardDue = cyc && cyc.due > H0 && dayGap(cyc.due, T) <= 45 ? cyc.due : '', H = cardDue || H0, buf = xferBuf(), ok = id => D.accounts.some(a => a.id === id && cfSpendable(a));
+  const H0 = p1 ? addDays(p1.end, 2) : p0.end, cardDue = cyc && cyc.due > H0 && dayGap(cyc.due, T) <= 45 ? cyc.due : '', H = cardDue || H0, buf = xferBuf(), buf0 = buf, ok = id => D.accounts.some(a => a.id === id && cfSpendable(a));
   const main = cfMain(D), outs = [];
-  [0, 1, 2, 3].map(o => payPeriod(o)).filter((pp, i) => pp && pp.off === i && pp.start <= H).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.toCome : []).filter(x => x.date <= H).forEach(x => outs.push({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date, acct: ok(x.acct) ? x.acct : main && main.id, card: x.kind === 'card' ? 1 : 0, due: x.date })); });
+  [0, 1, 2, 3].map(o => payPeriod(o)).filter((pp, i) => pp && pp.off === i && pp.start <= H).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.toCome : []).filter(x => x.date <= H).forEach(x => outs.push({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date, acct: ok(x.acct) ? x.acct : main && main.id, card: x.kind === 'card' ? 1 : 0, due: x.date, bid: x.kind === 'bill' ? x.id : '' })); });
   // wages landing: on the usual 14-day beat after the last pay, into the account it last landed in
   const ins = [], landTx = (isT) => (D.transactions || []).filter(isT).sort((a, b) => b.date.localeCompare(a.date))[0];
   [['Your pay', mywIs, mywSt().seen], ['Sarah’s pay', swIs, swSt().seen]].forEach(([nm, isT, seen]) => { const t = landTx(isT); if (!t) return; const amt = fnAvg3(seen); if (!amt) return;
     let d = t.date.slice(0, 10); while (d <= T) d = addDays(d, 14); for (; d <= H; d = addDays(d, 14)) ins.push({ what: nm, amount: amt, date: d, acct: t.acct }); });
+  // 2.26.86: Board and the cleaning job land weekly in the account they last landed in
+  IR_KEYS.forEach(k => { try { const w = irSt(k), L = w.seen, last = L[L.length - 1], amt = fnAvg3(L); if (!last || !amt) return; const acct = last.acct && D.accounts.some(a => a.id === last.acct) ? last.acct : null; if (!acct) return;
+    let d = last.d; while (d <= T) d = addDays(d, IR_DEF[k].per); if (dayGap(T, last.d) > 3 && dayGap(addDays(last.d, IR_DEF[k].per), T) >= -3 && !(D.transactions || []).some(t => irIs(k, t) && t.date.slice(0, 10) > last.d)) { /* due about now, not seen yet */ }
+    for (; d <= H; d = addDays(d, IR_DEF[k].per)) ins.push({ what: IR_DEF[k].name, amount: amt, date: d, acct, weekly: k }); } catch (e) { } });
   ins.sort((a, b) => a.date.localeCompare(b.date));
   const shaneIn = ins.filter(x => x.what === 'Your pay'), src = (shaneIn[0] && D.accounts.find(a => a.id === shaneIn[0].acct)) || cfOrbit(D) || main;
   outs.filter(o => o.card).forEach(o => { o.acct = src.id; }); // 2.26.72: the card is paid straight from where the pay lands
   // 2.26.66: other regular money into that account (e.g. a weekly direct credit), the smallest of its last 3, on its usual beat
-  try { cfRegularIns(D, src.id).forEach(r => { let d = r.last; while (d <= T) d = addDays(d, r.per); for (; d <= H; d = addDays(d, r.per)) ins.push({ what: r.name, amount: r.amount, date: d, acct: src.id, other: 1 }); }); ins.sort((a, b) => a.date.localeCompare(b.date)); } catch (e) { }
+  // 2.26.86: every account, not only the one pay lands in
+  try { D.accounts.filter(cfSpendable).forEach(a => cfRegularIns(D, a.id).forEach(r => { let d = r.last; while (d <= T) d = addDays(d, r.per); for (; d <= H; d = addDays(d, r.per)) ins.push({ what: r.name, amount: r.amount, date: d, acct: a.id, other: 1 }); })); ins.sort((a, b) => a.date.localeCompare(b.date)); } catch (e) { }
   const done = S.settings.xferDone || {};
   const bal = {}; D.accounts.filter(cfSpendable).forEach(a => { bal[a.id] = cfBal(a); });
   // transfers already ticked as done (until the bank shows them) count as made
   Object.values(done).forEach(x => { if (x && bal[x.from] != null && bal[x.to] != null && !x.seen) { bal[x.from] -= x.amount; bal[x.to] += x.amount; } });
-  const evts = [...outs.map(o => Object.assign({ out: 1 }, o)), ...ins.map(i => Object.assign({ inc: 1 }, i))].sort((a, b) => a.date.localeCompare(b.date) || (a.inc ? -1 : 1));
   const list = [], short = [], needs = [];
+  /* 2.26.86: same bank first. A paying account whose bank has another account with weekly money landing in it (Board into
+     Kiwibank BOARD) is funded by a weekly transfer inside that bank on the day it lands: its bills spread per week, rounded
+     up to whole dollars. Any shortfall by a due date is topped up from the same bank before ORBIT. */
+  const bankOf = id => (D.accounts.find(a => a.id === id) || {}).bank || '';
+  const weekRate = o => { const b = o.bid && (S.bills || []).find(x => x.id === o.bid), r = b ? b.repeat : 'none';
+    return r === 'weekly' ? o.amount : r === 'fortnightly' ? o.amount / 2 : r === 'monthly' ? o.amount * 12 / 52 : r === 'quarterly' ? o.amount * 4 / 52 : r === 'yearly' ? o.amount / 52 : o.amount / Math.max(1, Math.ceil(dayGap(o.due || o.date, T) / 7)); };
+  const sweeps = [];
+  [...new Set(outs.filter(o => !o.card).map(o => o.acct))].filter(id => id && id !== src.id && bankOf(id)).forEach(id => {
+    const donorIns = ins.filter(i => i.weekly && i.acct !== id && i.acct !== src.id && bankOf(i.acct) === bankOf(id)); if (!donorIns.length) return;
+    const donor = donorIns[0].acct, mine = outs.filter(o => o.acct === id), byBill = new Map(); mine.forEach(o => { const k = o.bid || o.what; if (!byBill.has(k)) byBill.set(k, o); });
+    const W = Math.ceil([...byBill.values()].reduce((n, o) => n + weekRate(o), 0) - 1e-9); if (!(W > 0)) return;
+    const names = [...new Set(mine.map(o => o.what))];
+    donorIns.filter(i => i.acct === donor).forEach(i => sweeps.push({ from: donor, to: id, amount: W, by: i.date, after: i.date, items: names.map(n => n + ' (weekly)'), first: mine.find(o => o.date > i.date) || mine[mine.length - 1], key: donor + '|' + id + '|w|' + i.date, weekly: 1 })); });
+  const evts = [...outs.map(o => Object.assign({ out: 1 }, o)), ...ins.map(i => Object.assign({ inc: 1 }, i)), ...sweeps.map(w => ({ inc: 1, acct: w.to, amount: w.amount, date: w.by, what: 'Weekly transfer' })), ...sweeps.map(w => ({ out: 1, acct: w.from, amount: w.amount, date: w.by, what: 'Weekly transfer', sweep: 1 }))].sort((a, b) => a.date.localeCompare(b.date) || (a.inc ? -1 : 1));
+  sweeps.forEach(w => list.push(w));
+  // any account's lowest point from day d to the end, with planned transfers in and out
+  const acctAt = (id, d) => { let b = bal[id] || 0; evts.forEach(e => { if (e.acct === id && e.date <= d) b += e.inc ? e.amount : -e.amount; }); list.forEach(x => { if (x.weekly || x.by > d) return; if (x.from === id) b -= x.amount; if (x.to === id) b += x.amount; }); return b; };
+  const availOf = (id, d) => Math.min(...[d, ...evts.filter(e => e.acct === id).map(e => e.date).filter(x => x > d), H].map(x => acctAt(id, x)));
   const payDates = shaneIn.map(x => x.date), nextPay = d => payDates.find(p => p > d) || '';
   // 1) what each paying account needs: when it would drop under the buffer, one top-up that covers everything due before the next pay
   [...new Set(outs.map(o => o.acct))].filter(id => id && id !== src.id).forEach(id => {
+    const buf = sweeps.some(w => w.to === id) ? 0 : buf0; // 2.26.86: a weekly-funded account only has to cover its bills
     let b = bal[id] || 0; const L = evts.filter(e => e.acct === id);
     for (let i = 0; i < L.length;) {
       const e = L[i]; if (e.inc) { b += e.amount; i++; continue; }
@@ -20308,6 +20334,10 @@ function xferPlan(D) {
   const srcAt = d => { let b = bal[src.id] || 0; srcEv.forEach(e => { if (e.date <= d) b += e.inc ? e.amount : -e.amount; }); list.forEach(x => { if (x.by <= d) b -= x.amount; }); return b; };
   const availFrom = d => Math.min(...[d, ...srcEv.map(e => e.date).filter(x => x > d), H].map(srcAt));
   needs.forEach(n => {
+    // 2.26.86: money already in the same bank first (not the weekly-funded account itself, not ORBIT)
+    try { const sb = D.accounts.filter(a => cfSpendable(a) && a.id !== n.to && a.id !== src.id && bankOf(a.id) && bankOf(a.id) === bankOf(n.to));
+      for (const a of sb) { if (n.need <= 0) break; const can = Math.floor(Math.max(0, availOf(a.id, n.by) - buf)); const take = Math.min(n.need, can); if (take >= 1) { list.push({ from: a.id, to: n.to, amount: take, by: n.by, after: '', first: n.first, items: [...new Set(n.grp.map(x => x.what))], key: a.id + '|' + n.to + '|' + n.by, same: 1 }); n.need = r2(n.need - take); } } } catch (e) { }
+    if (n.need <= 0) return;
     const amt = Math.max(0, Math.min(n.need, Math.floor((availFrom(n.by) - floor) / 10) * 10)), lastPay = [...payDates].reverse().find(p => p <= n.by && p > T) || '';
     const names = {}; n.grp.forEach(x => { names[x.what] = (names[x.what] || 0) + 1; });
     const items = Object.entries(names).map(([k, c]) => c > 1 ? k + ' ×' + c : k);
@@ -20322,11 +20352,11 @@ function xferPlan(D) {
   { const ds = [T, ...srcEv.map(e => e.date)].filter((x, i, A) => A.indexOf(x) === i).sort(); const bad = ds.find(d => srcAt(d) < floor - 0.005);
     if (bad) { const e = srcEv.find(x => x.date === bad && x.out) || { what: 'what comes out', date: bad }; short.push({ to: src.id, amount: r2(floor - srcAt(bad)), by: bad, first: e, pay: nextPay(bad), own: 1, items: [e.what] }); } }
   list.sort((a, b) => a.by.localeCompare(b.by));
-  return { list, short, src, buf, outs, ins, H, card, srcEnd: r2(srcAt(H)), srcNow: bal[src.id] || 0 };
+  return { list, short, src, buf, outs, ins, H, card, sweeps, srcEnd: r2(srcAt(H)), srcNow: bal[src.id] || 0, endOf: id => r2(acctAt(id, H)) };
 }
 function cfRegularIns(D, acctId) {
   const T = todayISO(), g = new Map();
-  (D.transactions || []).forEach(t => { if (t.acct !== acctId || !(t.amount > 0) || t.pair || t.cat2 === 'transfer' || mywIs(t) || swIs(t) || /^(INTEREST)$/.test(t.type)) return; const k = regKeyOf(t); (g.get(k) || g.set(k, []).get(k)).push(t); });
+  (D.transactions || []).forEach(t => { if (t.acct !== acctId || !(t.amount > 0) || t.pair || t.cat2 === 'transfer' || mywIs(t) || swIs(t) || irAny(t) || /^(INTEREST)$/.test(t.type)) return; const k = regKeyOf(t); (g.get(k) || g.set(k, []).get(k)).push(t); });
   const out = [];
   g.forEach(L => { if (L.length < 3) return; L.sort((a, b) => a.date.localeCompare(b.date)); const d = L.map(t => t.date.slice(0, 10)), gaps = d.slice(1).map((x, i) => Math.round((parseD(x) - parseD(d[i])) / DAY));
     const med = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)], per = med >= 6 && med <= 8 ? 7 : med >= 13 && med <= 15 ? 14 : 0; if (!per) return;
@@ -20340,7 +20370,7 @@ function xferCard(D) {
   const X = (() => { try { return xferPlan(D); } catch (e) { console.error(e); return null; } })(); if (!X) return '';
   const nm = id => { const a = D.accounts.find(x => x.id === id); return a ? (cfIsOrbit(a) ? 'ORBIT' : cfAName(a)) : ''; }, day = d => fmtW(d);
   const done = S.settings.xferDone || {};
-  const rows = X.list.filter(x => !done[x.key]).map(x => `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="xferTick(${jsArg(x.key)},${x.amount},${jsArg(x.from)},${jsArg(x.to)})"></button><div class="tx"><div class="t">Move ${cfMoney(x.amount)} from ${esc(nm(x.from))} to ${esc(nm(x.to))}</div><div class="s">${x.after ? `After pay lands ${esc(day(x.after))}, by ${esc(day(x.by))}` : `By ${esc(day(x.by))}`} · for ${esc(x.items.slice(0, 3).join(', '))}${x.items.length > 3 ? ' and ' + (x.items.length - 3) + ' more' : ''} (first one ${esc(day(x.first.date))})</div></div></div>`).join('');
+  const rows = X.list.filter(x => !done[x.key]).map(x => `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="xferTick(${jsArg(x.key)},${x.amount},${jsArg(x.from)},${jsArg(x.to)})"></button><div class="tx"><div class="t">Move ${cfMoney(x.amount)} from ${esc(nm(x.from))} to ${esc(nm(x.to))}</div><div class="s">${x.weekly ? `Weekly · ${esc(day(x.by))}, once board lands · same bank` : x.after ? `After pay lands ${esc(day(x.after))}, by ${esc(day(x.by))}` : `By ${esc(day(x.by))}${x.same ? ' · same bank' : ''}`} · for ${esc(x.items.slice(0, 3).join(', '))}${x.items.length > 3 ? ' and ' + (x.items.length - 3) + ' more' : ''}${x.weekly && x.first.date <= x.by ? '' : ` (${x.weekly ? 'next due' : 'first one'} ${esc(day(x.first.date))})`}</div></div></div>`).join('');
   // 2.26.72: the card payment, with a tick (marks it paid until the bank shows it)
   let cardRows = ''; try { const k = X.card, g = cardGoal(), cA = cfCardAcct(D); if (k && g && !g.full && cA) { const cn = cfAName(cA).replace(/^Visa Rewards$/i, 'ASB Visa');
       if (k.can > 0) cardRows += `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="cardTick(${k.can},${jsArg(k.due)})"></button><div class="tx"><div class="t">Pay ${cfMoney(k.can)} from ${esc(nm(k.from))} to ${esc(cn)} by ${esc(day(k.due))}</div><div class="s">${k.after ? `After pay lands ${esc(day(k.after))} · ` : ''}${k.short > 0 ? `part of the ${cfMoney(k.amount)} due; ${cfMoney(k.short)} would attract interest` : g.proj ? `the whole statement (about ${cfMoney(g.goal)}), so no interest` : 'the whole amount, so no interest'}</div></div></div>`;
@@ -20405,6 +20435,16 @@ function fnModel(b) {
   };
   try { income('shane', 'Your wages', mywSt().seen, budgetAmtOr0(b.pay), mywIs); } catch (e) { }
   try { income('sarah', 'Sarah’s wages', swSt().seen, 0, swIs); } catch (e) { }
+  // 2.26.86: Board and the cleaning job, weekly: what landed, plus the rest of the beat still to come (average of the last 3)
+  IR_KEYS.forEach(key => { try { const w = irSt(key), nm = IR_DEF[key].name;
+    const L = D ? txs.filter(t => irIs(key, t) && inP(dOf(t))) : [];
+    const S0 = L.length ? L.map(t => ({ id: t.id, d: dOf(t), a: t.amount })) : (!(D && covered) || !D ? w.seen.filter(x => inP(x.d)) : []);
+    S0.forEach(x => x.id && used.add(x.id));
+    const prior = w.seen.filter(x => x.d < pp.start), avg = fnAvg3(prior.length >= 3 ? prior : w.seen);
+    if (S0.length) IN.push({ key, name: nm, st: 'landed', amount: fnSum(S0, 'a'), planned: fnSum(S0, 'a'), date: S0[S0.length - 1].d, bankTx: L.length > 0, n: S0.length });
+    const beats = irBeats(key, pp.start, pp.end), left = past ? 0 : beats.filter(d => !S0.some(x => Math.abs(dayGap(x.d, d)) <= 3)).filter(d => dayGap(d, T) >= -3).length;
+    if (left > 0 && avg) IN.push({ key: key + '-exp', name: nm + (left > 1 ? ' ×' + left : '') + (S0.length ? ' (still to come)' : ''), st: 'expected', amount: r2(avg * left), planned: r2(avg * left), n: left, per: avg });
+  } catch (e) { } });
   const otherIn = D ? txs.filter(t => t.amount > 0 && inP(dOf(t)) && dOf(t) <= T && !used.has(t.id) && t.cat2 !== 'transfer' && spendAcct(t) && !(cardA && t.acct === cardA.id)) : [];
   otherIn.forEach(t => used.add(t.id));
   // ---- money out ----
@@ -20646,6 +20686,25 @@ function cardCfCard(D) { // 2.26.72: "Credit card plan", under Transfers; the sa
    last 3 pays, marked expected, until it lands. Mortgages: ANZ home loans were refinanced to ASB in Sep 2026, so old
    ANZ repayments are history only and the projection uses ASB. */
 const SW_DEFAULT = ['MINISTRY OF EDUCATIO', 'EDPAY', 'EDUCATION PAYROLL'];
+/* 2.26.86: weekly money in, kept like Sarah's wages. Board: FROM L H JENKINS, about $240 every Monday into Kiwibank BOARD.
+   Cleaning job: SMART OFFICE (his Sunday cleaning job), $64.80 every Sunday into ORBIT. Dates and amounts only are kept
+   (S.settings.incRules[key].seen), so Budget still shows them after the bank history moves on. Teach or drop payer text in Cash flow. */
+const IR_DEF = { board: { name: 'Board', rules: ['L H JENKINS'], per: 7 }, clean: { name: 'Cleaning job', rules: ['SMART OFFICE'], per: 7 } };
+const IR_KEYS = Object.keys(IR_DEF);
+function irSt(k) { S.settings = S.settings || {}; S.settings.incRules = S.settings.incRules || {}; const w = S.settings.incRules[k] || (S.settings.incRules[k] = {}); if (!Array.isArray(w.rules)) w.rules = IR_DEF[k].rules.slice(); if (!Array.isArray(w.not)) w.not = []; if (!Array.isArray(w.seen)) w.seen = []; return w; }
+function irIs(k, t) { if (!t || !(t.amount > 0)) return false; const w = irSt(k); if (w.not.includes(t.id) || mywIs(t) || swIs(t)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && swNorm(r).length >= 3 && p.includes(swNorm(r))); }
+const irAny = t => IR_KEYS.some(k => irIs(k, t));
+function irFeed(D) { try { const txs = D.transactions || [], from = txs.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10); let ch = false;
+  IR_KEYS.forEach(k => { const w = irSt(k), now = txs.filter(t => irIs(k, t)).map(t => ({ id: t.id, d: t.date.slice(0, 10), a: t.amount, acct: t.acct }));
+    const seen = [...w.seen.filter(x => x.d < from), ...now].sort((a, b) => a.d.localeCompare(b.d)).slice(-80); w.from = from;
+    if (JSON.stringify(seen) !== JSON.stringify(w.seen)) { w.seen = seen; w.at = new Date().toISOString(); ch = true; } });
+  if (ch) save(); } catch (e) { } }
+// the weekly beat: dates from the last one seen, 7 days apart (the bank sometimes posts a day or two late)
+function irBeats(k, from, to) { const w = irSt(k), L = w.seen; if (!L.length) return []; let d = L[L.length - 1].d; const per = IR_DEF[k].per, out = [];
+  while (d > from) d = addDays(d, -per); while (d < from) d = addDays(d, per); for (; d <= to; d = addDays(d, per)) out.push(d); return out; }
+function irRules(k) { const w = irSt(k); return w.rules.map(r => `<span class="cftag income">${esc(r)} <button type="button" class="linkbtn" aria-label="Remove ${esc(r)}" onclick="irDrop('${k}',${jsArg(r)})">✕</button></span>`).join(' '); }
+async function irDrop(k, r) { const w = irSt(k); w.rules = w.rules.filter(x => x !== r); if (CF && CF.data) irFeed(CF.data); await save(); render(); }
+async function irNot(k, id) { const w = irSt(k); if (!w.not.includes(id)) w.not.push(id); w.not = w.not.slice(-50); if (CF && CF.data) irFeed(CF.data); await save(); await closeSheet(); render(); toast('Left out of ' + IR_DEF[k].name + '.'); }
 function swSt() { S.settings = S.settings || {}; const w = S.settings.sarahWages && typeof S.settings.sarahWages === 'object' ? S.settings.sarahWages : (S.settings.sarahWages = {}); if (!Array.isArray(w.rules)) w.rules = SW_DEFAULT.slice(); if (!Array.isArray(w.not)) w.not = []; if (!Array.isArray(w.seen)) w.seen = []; return w; }
 const swNorm = s => String(s || '').toUpperCase().replace(/\d+/g, ' ').replace(/[^A-Z&' ]/g, ' ').replace(/\s+/g, ' ').trim();
 function swIs(t) { if (!t || !(t.amount > 0)) return false; const w = swSt(); if (w.not.includes(t.id)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && (p.includes(swNorm(r)) || ruleClose(r, p))); }
@@ -20671,6 +20730,7 @@ function swFor(b) {
 }
 function cfTxSheet(id) {
   const D = CF && CF.data; const t = D && (D.transactions || []).find(x => x.id === id); if (!t) return;
+  const irk = IR_KEYS.find(k => irIs(k, t)); if (t.amount > 0 && !swIs(t)) return irTxSheet(t, irk); // 2.26.86
   const is = swIs(t), sug = swNorm(t.desc).split(' ').slice(0, 4).join(' ');
   if (t.amount <= 0) { openSheet(esc(t.merchant || t.desc), `<p class="muted">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))} · ${esc(cfMoney(t.amount))}</p>`); return; }
   openSheet(esc(t.merchant || t.desc), `<p class="muted" style="margin:0 0 10px">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))} · <b>${esc(cfMoney(t.amount))}</b></p>` +
@@ -20680,6 +20740,15 @@ function cfTxSheet(id) {
     is ? 'Save' : 'This is Sarah’s wages',
     is ? `<button type="button" class="btn danger" style="flex:0 0 auto" onclick="swNot(${jsArg(t.id)})">Not her wages</button>` : '');
 }
+function irTxSheet(t, cur) { const D = CF && CF.data, sug = swNorm(t.desc).replace(/^FROM /, '').split(' ').slice(0, 4).join(' ');
+  openSheet(esc(t.merchant || t.desc), `<p class="muted" style="margin:0 0 10px">${esc(fmtW(t.date.slice(0, 10)))} · ${esc(nm2(D, t.acct))} · <b>${esc(cfMoney(t.amount))}</b></p>` + (cur ? `<p style="margin:0 0 10px">✓ Counted as <b>${esc(IR_DEF[cur].name)}</b>.</p>` : '') +
+    field('This money is', sel('as', [['sarah', 'Sarah’s wages'], ...IR_KEYS.map(k => [k, IR_DEF[k].name])], cur || 'board')) +
+    field('Payments where the payer text contains', inp('rule', cur ? (irSt(cur).rules.find(r => swNorm(t.desc + ' ' + (t.merchant || '')).includes(swNorm(r))) || sug) : sug, 'maxlength="40" autocapitalize="characters"'), 'Matches any money in with this text. Numbers are ignored.'),
+    async v => { const r = swNorm(v.rule); if (r.length < 3) return 'Please type at least 3 letters of the payer text.';
+      if (v.as === 'sarah') { const w = swSt(); if (!w.rules.some(x => swNorm(x) === r)) w.rules.push(r); w.not = w.not.filter(x => x !== t.id); swFeed(D); }
+      else { const k = IR_DEF[v.as] ? v.as : 'board', w = irSt(k); if (!w.rules.some(x => swNorm(x) === r)) w.rules.push(r); w.not = w.not.filter(x => x !== t.id); IR_KEYS.filter(x => x !== k).forEach(x => { const o = irSt(x); o.rules = o.rules.filter(y => swNorm(y) !== r); }); irFeed(D); }
+      await save(); render(); toast((v.as === 'sarah' ? 'Sarah’s wages' : IR_DEF[v.as].name) + ': payer contains “' + r + '”.'); }, cur ? 'Save' : 'Count it',
+    cur ? `<button type="button" class="btn danger" style="flex:0 0 auto" onclick="irNot('${cur}',${jsArg(t.id)})">Not ${esc(IR_DEF[cur].name.toLowerCase())}</button>` : ''); }
 async function swNot(id) { const w = swSt(); if (!w.not.includes(id)) w.not.push(id); w.not = w.not.slice(-50); if (CF && CF.data) swFeed(CF.data); await save(); await closeSheet(); render(); toast('Left out of Sarah’s wages.'); }
 function swRules() { const w = swSt(); return w.rules.map(r => `<span class="cftag income">${esc(r)} <button type="button" class="linkbtn" aria-label="Remove ${esc(r)}" onclick="swDrop(${jsArg(r)})">✕</button></span>`).join(' '); }
 async function swDrop(r) { const w = swSt(); w.rules = w.rules.filter(x => x !== r); if (CF && CF.data) swFeed(CF.data); await save(); render(); }
@@ -21766,6 +21835,25 @@ async function coeliac8Mig() {
   S.settings.appNotices = (S.settings.appNotices || []).filter(n => n && n.id !== 'coeliac8').concat({ id: 'coeliac8', kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(),
     title: 'Coeliac NZ is due Thu 8 Oct, as the email says', body: 'Membership renewal INV-560747, $60.00.' + (was && was !== b.due ? ' It was showing ' + fmtW(was) + '.' : '') + ' It’s still unpaid, so it shows as overdue.' }).slice(-30);
   await save(); return 'Coeliac NZ now due Thu 8 Oct, from the email';
+}
+/* 2.26.86: Kora is the fuel card (petrol), so it varies. Its estimate is the average of the last 3 Kora debits the bank
+   shows (kept as dates and amounts in S.settings.koraSeen), about $120 until there are any. One-time: fortnightly direct
+   debit from ANZ Bill Account every second Friday (next Fri 30 Oct), marked varies, category Fuel. */
+const KORA_FALLBACK = 120;
+function koraFeed(D) { try { const txs = (D.transactions || []).filter(t => t.amount < 0 && KORA_BILL_RE.test(t.desc + ' ' + (t.merchant || '')) && !t.pair).map(t => ({ d: t.date.slice(0, 10), a: r2(-t.amount) }));
+  const from = (D.transactions || []).reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10), keep = (S.settings.koraSeen || []).filter(x => x.d < from);
+  const seen = [...keep, ...txs].sort((a, b) => a.d.localeCompare(b.d)).slice(-20), L = seen.slice(-3), avg = L.length ? r2(L.reduce((n, x) => n + x.a, 0) / L.length) : KORA_FALLBACK;
+  let ch = false; if (JSON.stringify(seen) !== JSON.stringify(S.settings.koraSeen || [])) { S.settings.koraSeen = seen; ch = true; } if (S.settings.koraUsual !== avg) { S.settings.koraUsual = avg; ch = true; }
+  if (ch) save(); return avg; } catch (e) { return S.settings.koraUsual || KORA_FALLBACK; } }
+async function kora86Mig() {
+  if (!S || !S.settings || S.settings.kora86Mig) return '';
+  const k = (S.bills || []).find(x => x && KORA_BILL_RE.test(String(x.name || ''))); S.settings.kora86Mig = true;
+  if (!k) { await save(); return ''; }
+  const T = todayISO(); Object.assign(k, { repeat: 'fortnightly', varies: true, cat: 'fuel', fromBank: 'ANZ', fromAcct: 'BILL ACCOUNT', paidBy: '' });
+  if (!k.due || k.due < T) { k.due = '2026-10-30'; k.anchor = 30; k.paid = false; }
+  if (!/petrol/i.test(k.notes || '')) k.notes = ('Fuel card for petrol. Direct debit every second Friday from ANZ Bill Account. The amount varies; the estimate is the average of the last 3 debits.\n' + String(k.notes || '').replace(/^Direct debit every second Friday\.[^\n]*\n?/, '')).trim();
+  if (!S.settings.koraUsual) S.settings.koraUsual = KORA_FALLBACK; if (S.settings.cfBillAcct) delete S.settings.cfBillAcct[k.id];
+  await save(); return 'Kora set to fortnightly from ANZ Bill Account, fuel, amount varies';
 }
 /* 2.26.66: one-time: Ecotricity $75 a week going forward and Kora about $120 a fortnight (varies), both from the
    ANZ Bill Account (where the bank shows them going out). Ecotricity is paid by hand, mostly midweek, so the next one is
