@@ -202,6 +202,7 @@ const STATUS = { bad_url: 400, host_not_allowed: 403, not_found: 404, denied: 40
 
 import { hueRoute } from './hue.js';
 import { akahuRoute } from './akahu.js';
+import { healthRoute } from './health.js';
 import { heatRoute } from './heat.js';
 import { alarmRoute } from './alarm.js';
 export async function handle(request, env = {}, fetchImpl = fetch) {
@@ -432,6 +433,11 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
       if (data && data.error) return json(status, data.error, origin, env);
       return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) { return json(502, 'shared_unavailable', origin, env); }
+  }
+  if (path.startsWith('/health/')) { // 2.26.95: Huawei watch sync (webhook app posts with its sync code; My App reads with its device key)
+    const H = { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
+    try { const [status, data] = await healthRoute(path, request, env, okOrigin); return new Response(JSON.stringify(data), { status, headers: H }); }
+    catch (e) { return new Response(JSON.stringify({ error: 'health_failed' }), { status: 502, headers: H }); }
   }
   if (path === '/cashflow' || path.startsWith('/cashflow/') || path.startsWith('/akahu/')) { // 2.26.57: Akahu cash flow (app origin + device key)
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);

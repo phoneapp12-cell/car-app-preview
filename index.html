@@ -527,6 +527,12 @@ details.help ol{margin:0 0 12px}
 #toast{position:fixed;left:50%;width:calc(100% - 32px);max-width:528px;transform:translate(-50%,12px);bottom:calc(16px + var(--sab));z-index:60;background:var(--toast);color:var(--ontoast);border-radius:14px;padding:12px 14px;font-size:0.90625rem;display:flex;align-items:center;gap:10px;opacity:0;transition:.25s;pointer-events:none}
 #toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 #toast button{margin-left:auto;color:var(--toastbtn);font-weight:700;padding:4px 2px;flex:none}
+.hwbig{font-size:1.05rem;margin:6px 0 2px}.hwbig b{font-size:1.9rem;font-weight:800;margin-right:4px}
+.hwbars{display:flex;gap:6px;align-items:flex-end;height:64px;margin:8px 0 4px}.hwbar{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0}
+.hwbi{flex:1 1 0;min-height:0;width:100%;display:flex;align-items:flex-end;justify-content:center}.hwbar i{display:block;width:100%;max-width:26px;border-radius:5px 5px 2px 2px;background:var(--brand,#2563eb);opacity:.45}.hwbar.on i{opacity:1}.hwbar small{font-size:.65rem;color:var(--ink3);margin-top:2px}
+.hwbars.hr{height:44px}.hwbars.hr i{background:#e11d48}.hwbars.mini{height:30px;margin:0;width:96px;flex:none;gap:3px}.hwbars.mini small{display:none}
+.hwstrip{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;padding:10px 12px;margin:8px 0}.hwsb{flex:1;min-width:0;font-size:.9rem}.hwsb .dot{margin:0 6px;opacity:.5}
+.hwrow{margin:6px 0}.hwlab{font-size:.78rem;color:var(--ink3);margin-bottom:2px}.hwrow .akrow input{padding:9px;font-family:ui-monospace,monospace;font-size:.8rem}
 .foot{text-align:center;font-size:0.75rem;color:var(--ink3);margin:20px 0 4px;line-height:1.5}
 @media (max-width:370px){ .top h1{font-size:1.5625rem} .tile{padding:10px} .tile b{font-size:1.4375rem} .triple>div{padding:7px 7px} .triple b{font-size:0.84375rem} .triple .pill{font-size:0.6875rem;padding:3px 6px} .btn{font-size:0.875rem;padding:11px 10px} }
 /* weather */

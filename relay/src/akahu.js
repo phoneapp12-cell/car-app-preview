@@ -11,17 +11,17 @@ const DAY = 864e5;
 // 2.26.59: chunked; spreading a large ciphertext into fromCharCode overflowed the stack (bank data didn't save, connect failed)
 const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-const b64url = u8 => b64(u8).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-async function sha(s) { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return b64(new Uint8Array(h)); }
+export const b64url = u8 => b64(u8).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+export async function sha(s) { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return b64(new Uint8Array(h)); }
 async function encKey(env) {
   const raw = String(env.AKAHU_ENC_KEY || ''); if (!raw) throw new Error('no_key');
   let bytes; try { bytes = unb64(raw.trim()); } catch (e) { bytes = null; }
   if (!bytes || bytes.length < 32) bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw)));
   return crypto.subtle.importKey('raw', bytes.slice(0, 32), 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
-async function seal(env, obj) { const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await encKey(env), new TextEncoder().encode(JSON.stringify(obj))); return JSON.stringify({ v: 1, iv: b64(iv), ct: b64(new Uint8Array(ct)) }); }
-async function open(env, s) { if (!s) return null; try { const o = JSON.parse(s); const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(o.iv) }, await encKey(env), unb64(o.ct)); return JSON.parse(new TextDecoder().decode(pt)); } catch (e) { return null; } }
-const eq = (a, b) => { a = String(a || ''); b = String(b || ''); if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; };
+export async function seal(env, obj) { const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await encKey(env), new TextEncoder().encode(JSON.stringify(obj))); return JSON.stringify({ v: 1, iv: b64(iv), ct: b64(new Uint8Array(ct)) }); }
+export async function open(env, s) { if (!s) return null; try { const o = JSON.parse(s); const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(o.iv) }, await encKey(env), unb64(o.ct)); return JSON.parse(new TextDecoder().decode(pt)); } catch (e) { return null; } }
+export const eq = (a, b) => { a = String(a || ''); b = String(b || ''); if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; };
 
 const safeMsg = m => String(m || '').replace(/(user|app)_token_[A-Za-z0-9_-]+/g, '$1_token_…').replace(/[^\w .,:;'’()\/-]/g, ' ').slice(0, 160).trim();
 async function akahu(cred, path, fetchImpl, method = 'GET') {
@@ -84,11 +84,11 @@ export async function fetchAll(cred, fetchImpl, now = Date.now()) {
   txs.sort((a, b) => b.date.localeCompare(a.date));
   return { at: new Date(now).toISOString(), accounts, transactions: categorise(accounts, txs) };
 }
-async function rate(env, name, max, ttl) {
+export async function rate(env, name, max, ttl) {
   const kv = env.EVENTS_KV; const k = K_RL + ':' + name + ':' + Math.floor(Date.now() / (ttl * 1000));
   const n = Number(await kv.get(k)) || 0; if (n >= max) return false; await kv.put(k, String(n + 1), { expirationTtl: Math.max(60, ttl * 2) }); return true;
 }
-async function getCred(env) { return open(env, await env.EVENTS_KV.get(K_CRED)); }
+export async function getCred(env) { return open(env, await env.EVENTS_KV.get(K_CRED)); }
 async function authed(env, request) { const cred = await getCred(env); if (!cred) return { cred: null, ok: false }; const key = request.headers.get('X-Cash-Key') || ''; return { cred, ok: !!key && eq(await sha(key), cred.keyHash) }; }
 async function refetch(env, cred, fetchImpl) { const data = await fetchAll(cred, fetchImpl); await env.EVENTS_KV.put(K_DATA, await seal(env, data)); return data; }
 const pubStatus = (cred, data) => ({ connected: true, name: cred.name || '', accounts: data ? data.accounts.length : cred.accounts || 0, at: data ? data.at : '', manualAt: cred.manualAt || '' });

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.94';
+const APP_VERSION = '2.26.95';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8887,6 +8887,7 @@ function Health(arg, iid) {
   const chips = missing.length ? `<div class="chips hpeople">${missing.map(n => `<button class="chip" data-name="${n}" onclick="quickPerson('${n}')">${I('plus')} ${n}</button>`).join('')}</div>` : '';
   const nClaim = (() => { try { return claimRows().filter(x => claimOpen(x.claim)).length; } catch (e) { return 0; } })();
   return header('Health', S.health.length ? plural(S.health.length, 'person', 'people') : 'Dentist, doctor, check-ups and more', addBtn('Add a person', 'personForm()')) +
+    homeTry('watch', () => hwHealthCard(), '') +
     `<button class="row card hclaimlink" id="hclaims" onclick="go('#claims')"><div class="ic health">${I('medkit')}</div><div style="flex:1;min-width:0"><div class="t">UniMed claims</div><div class="s">${nClaim ? plural(nClaim, 'claim') + ' to make' : 'Smart Claim helper: details, invoice photos, status'}</div></div>${I('right')}</button>` +
     (S.health.length ? S.health.map(p => {
       const next = healthNext(p).slice(0, 3);
@@ -12582,17 +12583,22 @@ function sleepRate(v) {
 }
 function Sleep() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
-  const head = back + header('Sleep', 'Worked out from when you use My App');
-  const n = sleepNights(), rl = Object.fromEntries(SLEEP_RATES.map(x => [x[0], x[2] + ' ' + x[1]]));
-  if (!n.length) return head + `<div class="card empty"><div class="t">Learning your nights</div><div class="s">From now on My App notes when you open it and put it away. After a night or two, your sleep shows here. The morning check-in on Notifications adds how it felt.</div></div>`;
+  // 2.26.95: nights from the Huawei watch win; the app-use estimate fills nights the watch didn't send
+  const W = (() => { try { if (hwOn()) setTimeout(() => hwRefresh(), 0); return hwNights(); } catch (e) { return []; } })();
+  const wd = new Set(W.map(x => x.day)), rates = sleepRates();
+  const n = W.map(x => Object.assign(x, { rate: rates[x.day] || '' })).concat(sleepNights().filter(x => !wd.has(x.day))).sort((a, b) => b.day.localeCompare(a.day));
+  const head = back + header('Sleep', W.length ? 'From your Huawei watch' + (n.length > W.length ? ', and when you use My App' : '') : 'Worked out from when you use My App');
+  const rl = Object.fromEntries(SLEEP_RATES.map(x => [x[0], x[2] + ' ' + x[1]]));
+  if (!n.length) return head + `<div class="card empty"><div class="t">Learning your nights</div><div class="s">${hwOn() ? 'Your watch’s sleep shows here once your phone sends it. Until then, ' : 'From now on '}My App notes when you open it and put it away. After a night or two, your sleep shows here. The morning check-in on Notifications adds how it felt.</div></div>`;
   const wk = n.slice(0, 7), avg = ms => durTxt(ms.reduce((t, x) => t + x, 0) / ms.length);
   const avgMin = list => { const v = list.map(x => { const m = nzMin(x); return m < 12 * 60 ? m + 1440 : m; }); const m = Math.round(v.reduce((t, x) => t + x, 0) / v.length) % 1440; return (Math.floor(m / 60) % 12 || 12) + ':' + String(m % 60).padStart(2, '0') + (Math.floor(m / 60) < 12 ? 'am' : 'pm'); };
   const avgWake = list => { const v = list.map(nzMin); const m = Math.round(v.reduce((t, x) => t + x, 0) / v.length); return (Math.floor(m / 60) % 12 || 12) + ':' + String(m % 60).padStart(2, '0') + (Math.floor(m / 60) < 12 ? 'am' : 'pm'); };
+  const ww = wk.filter(x => x.watch && x.stages && x.stages.deep);
   const top = `<div class="card"><div class="t" style="font-weight:800;margin-bottom:6px">Last ${wk.length} night${wk.length === 1 ? '' : 's'}</div>
-    <div class="s">Average ${avg(wk.map(x => x.total))} a night. Usually down around ${avgMin(wk.map(x => x.start))} and up around ${avgWake(wk.map(x => x.end))}.</div></div>`;
-  const rows = n.slice(0, 14).map(x => `<div class="row" style="padding:8px 0;align-items:center"><div style="flex:1"><div class="t" style="font-weight:700">${esc(fmtW ? fmtW(x.day) : x.day)}</div>
-    <div class="s">${nzHM(x.start)} to ${nzHM(x.end)} · ${durTxt(x.main)}${x.parts > 1 ? ' (' + durTxt(x.total) + ' total, in ' + x.parts + ' goes)' : ''}</div></div><div class="s">${esc(rl[x.rate] || '')}</div></div>`).join('');
-  return head + top + `<div class="card">${rows}</div><div class="foot">Only uses times My App was open, so a late scroll in another app won’t show. Kept on this phone only.</div>`;
+    <div class="s">Average ${avg(wk.map(x => x.total))} asleep a night. Usually down around ${avgMin(wk.map(x => x.start))} and up around ${avgWake(wk.map(x => x.end))}.${ww.length ? ' Deep sleep about ' + hwMins(ww.reduce((t, x) => t + x.stages.deep, 0) / ww.length) + ' a night.' : ''}</div></div>`;
+  const rows = n.slice(0, 14).map(x => `<div class="row" style="padding:8px 0;align-items:center"><div style="flex:1"><div class="t" style="font-weight:700">${esc(fmtW ? fmtW(x.day) : x.day)}${x.watch ? ' <span class="pill none" style="font-size:.7rem">⌚ watch</span>' : ''}</div>
+    <div class="s">${nzHM(x.start)} to ${nzHM(x.end)} · ${durTxt(x.main)}${x.watch ? ' asleep' : ''}${x.parts > 1 ? ' (' + durTxt(x.total) + ' total, in ' + x.parts + ' goes)' : ''}</div>${x.watch && x.stages ? `<div class="s">${esc(hwStageTxt(x.stages))}</div>` : ''}</div><div class="s">${esc(rl[x.rate] || '')}</div></div>`).join('');
+  return head + top + `<div class="card">${rows}</div><div class="foot">${W.length ? 'Watch nights come from Huawei Health through Health Connect. Other nights only use times My App was open.' : 'Only uses times My App was open, so a late scroll in another app won’t show.'} The morning check-in is kept on this phone only.</div>`;
 }
 /* 2.22.41: Gym. A picture guide to common gym machines (photos from the public-domain Free Exercise DB,
    github.com/yuhonas/free-exercise-db, saved in img/gym). Tap a photo to see the end of the move. Tick
@@ -16867,6 +16873,7 @@ function Settings() {
    <b>Android may delay background reminders if you don’t open the app for a while.</b> Opening it every few days keeps them coming.</div></div>
 
   ${akahuSettings()}
+  ${hwSettings()}
   <div class="sec">Commission</div>
   <div class="list" id="commsettings">
    <div class="srow"><div class="tx"><div class="t">Pay fortnight starts</div><div class="s">${S.commission.anchor ? `Mondays. This pay fortnight: ${commRange(curFortnight())}.` : 'Not set up yet. Pick the Monday your pay fortnight started.'}</div></div><button class="btn small" onclick="anchorForm()">${S.commission.anchor ? 'Change' : 'Set up'}</button></div>
@@ -19767,7 +19774,7 @@ function glanceHome() {
   const orgZ = org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
-    wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + cards +
+    wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + homeTry('watch strip', () => hwHomeStrip(), '') + cards +
     (m.night ? entZ + asks + orgZ : orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
@@ -19980,6 +19987,114 @@ function akahuDisconnect() {
   });
 }
 function cfWhen(iso) { const t = Date.parse(iso); if (!t) return ''; const d = nzStampLocal(new Date(t)); return (d.slice(0, 10) === todayISO() ? 'today ' : fmtW(d.slice(0, 10)) + ' ') + fmtTime(d.slice(11, 16)); }
+/* 2.26.95: Huawei watch sync. Huawei Health → Health Sync → Health Connect → HC Webhook (Android app) → relay
+   /health/in → here. The relay keeps one summary per day (steps, sleep, heart rate); My App reads it with the
+   same device key as the bank link (cfKey). The sync code is made by the relay, shown once in memory here (never
+   saved on the phone) and only its hash is kept on the relay. Watch summaries are cached on this phone only
+   (localStorage hwData), never in synced data, so nothing reaches Monique's Helper or Sarah. */
+let HW = null, HWbusy = false, HWtry = 0, HWcode = null, HWerr = '';
+function hwData() { if (HW) return HW; try { HW = JSON.parse(localStorage.getItem('hwData') || 'null'); } catch (e) { HW = null; } return HW; }
+function hwOn() { const d = hwData(); return !!(d && d.connected); }
+function hwList() { const d = hwData(); return d && Array.isArray(d.list) ? d.list : []; }
+function hwDay(date) { return hwList().find(x => x.date === date) || null; }
+function hwSave(d) { d.got = Date.now(); HW = d; try { localStorage.setItem('hwData', JSON.stringify(d)); } catch (e) { } }
+async function hwRefresh(force) {
+  if (HWbusy || !RELAY_URL || !cfKey() || navigator.onLine === false) return;
+  const d = hwData();
+  if (!force && ((d && Date.now() - (d.got || 0) < 15 * 60e3) || Date.now() - HWtry < 2 * 60e3)) return;
+  HWbusy = true; HWtry = Date.now();
+  try { const [s, r] = await cfApi('/health/daily?days=60'); if (s === 200 && r && typeof r === 'object') { const was = JSON.stringify(hwList()) + (d && d.lastAt); hwSave(r); if (force || was !== JSON.stringify(r.list || []) + r.lastAt) hwRepaint(); } }
+  catch (e) { } finally { HWbusy = false; }
+}
+function hwRepaint() {
+  try { const r = (location.hash || '#home').slice(1).split('/')[0] || 'home'; if (sheetOpen) return;
+    if (r === 'settings') { hwRedraw(); return; }
+    if (['sleep', 'health', 'home'].includes(r)) render(); } catch (e) { }
+}
+const hwNum = n => Number(n || 0).toLocaleString('en-NZ');
+const hwHM = iso => nzHM(Date.parse(iso));
+const hwMins = m => { m = Math.round(m || 0); const h = Math.floor(m / 60); return h ? h + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '') : m + 'm'; };
+function hwLast(n) { const out = []; for (let i = n - 1; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5), k = nzISO(d.getTime()); out.push({ date: k, x: hwDay(k) }); } return out; }
+// small bar chart: [{label, v}] → bars scaled to the biggest
+function hwBars(items, cls = '', base = 0) {
+  const mx = Math.max(base + 1, ...items.map(i => i.v || 0)), sc = v => (v - base) / (mx - base);
+  return `<div class="hwbars ${cls}" role="img" aria-label="${esc(items.map(i => i.label + ' ' + (i.v ? hwNum(i.v) : 'none')).join(', '))}">${items.map(i => `<div class="hwbar${i.today ? ' on' : ''}"><span class="hwbi"><i style="height:${i.v ? Math.max(6, Math.round(sc(i.v) * 100)) : 0}%"></i></span><small>${esc(i.label)}</small></div>`).join('')}</div>`;
+}
+const HW_DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+function hwStepsWeek() { const T = nzISO(Date.now()); return hwLast(7).map(o => ({ label: HW_DOW[new Date(o.date + 'T12:00:00').getDay()], v: o.x && o.x.steps || 0, today: o.date === T })); }
+// Health page card: today's steps and the week, resting heart rate for two weeks
+function hwHealthCard() {
+  if (!hwOn()) return '';
+  setTimeout(() => hwRefresh(), 0);
+  const T = nzISO(Date.now()), td = hwDay(T), wk = hwStepsWeek(), wv = wk.filter(x => x.v);
+  const hr = hwLast(14).map(o => ({ label: HW_DOW[new Date(o.date + 'T12:00:00').getDay()], v: o.x && o.x.hr && o.x.hr.rest || 0, today: o.date === T, est: o.x && o.x.hr && o.x.hr.restEst }));
+  const hv = hr.filter(x => x.v), hrT = td && td.hr;
+  const avg = a => Math.round(a.reduce((t, x) => t + x.v, 0) / a.length);
+  return `<div class="card hwcard" id="hwhealth"><div class="t" style="font-weight:800">⌚ From your watch</div>
+    <div class="hwbig"><b>${td && td.steps != null ? hwNum(td.steps) : '–'}</b> steps today</div>
+    ${hwBars(wk)}<div class="s">${wv.length ? `Average ${hwNum(avg(wv))} a day over the last ${plural(wv.length, 'day')}.` : 'No steps yet this week.'}</div>
+    ${hv.length ? `<div class="t" style="font-weight:700;margin-top:12px">Resting heart rate</div>
+    <div class="s">${hrT && hrT.rest ? `${hrT.rest} bpm today${hrT.restEst ? ' (worked out from the day’s readings)' : ''}` : 'Not in yet today'}${hrT && hrT.min ? ` · range ${hrT.min}–${hrT.max}, average ${hrT.avg}` : ''}. Two-week average ${avg(hv)} bpm.</div>
+    ${hwBars(hr, 'hr', Math.max(0, Math.min(...hv.map(x => x.v)) - 6))}` : ''}
+    <div class="s" style="margin-top:8px;opacity:.75">${esc(hwStatusLine())}</div></div>`;
+}
+function hwStatusLine() { const d = hwData(); if (!d || !d.connected) return ''; return d.lastAt ? 'Last from the watch ' + cfWhen(d.lastAt) + '.' : 'Waiting for the first sync from your phone.'; }
+// Home strip (only once data has arrived)
+function hwHomeStrip() {
+  if (!hwOn()) return ''; setTimeout(() => hwRefresh(), 0);
+  const td = hwDay(nzISO(Date.now())); if (!td) return '';
+  const sl = td.sleep, hr = td.hr && td.hr.rest;
+  const bits = [td.steps != null ? `👟 <b>${hwNum(td.steps)}</b> steps` : '', sl ? `😴 ${hwMins(sl.mins)} sleep` : '', hr ? `❤️ ${hr} resting` : ''].filter(Boolean).map(b => `<span style="white-space:nowrap">${b}</span>`);
+  if (!bits.length) return '';
+  return `<button type="button" class="card hwstrip" onclick="go('#health')"><span class="hwsb">${bits.join('<span class="dot">·</span>')}</span>${hwBars(hwStepsWeek(), 'mini')}</button>`;
+}
+// Sleep page: watch nights (keyed by the morning) win over the app-use estimate
+function hwNights() { return hwList().filter(x => x.sleep && x.sleep.mins > 0).map(x => ({ day: x.date, start: Date.parse(x.sleep.start), end: Date.parse(x.sleep.end), main: x.sleep.mins * 60000, total: (x.sleep.total || x.sleep.mins) * 60000, bed: (x.sleep.bed || x.sleep.mins) * 60000, parts: x.sleep.parts || 1, stages: x.sleep.stages || null, watch: true })); }
+function hwStageTxt(st) { if (!st) return ''; return [['deep', 'deep'], ['light', 'light'], ['rem', 'REM'], ['awake', 'awake']].filter(([k]) => st[k] > 0).map(([k, l]) => hwMins(st[k]) + ' ' + l).join(' · '); }
+// Settings card
+function hwSettings() {
+  const st = hwData(), on = st && st.connected, key = cfKey();
+  setTimeout(() => hwRefresh(), 0);
+  if (HWcode && Date.now() - HWcode.at > 15 * 60e3) HWcode = null;
+  const row = (label, val, id, secret) => `<div class="hwrow"><div class="hwlab">${label}</div><div class="akrow"><input readonly id="${id}" value="${esc(val)}" ${secret ? 'type="password"' : ''} autocomplete="off" spellcheck="false" onfocus="this.select()">${secret ? `<button type="button" class="btn small" onclick="const e=document.getElementById('${id}');e.type=e.type==='password'?'text':'password'">Show</button>` : ''}<button type="button" class="btn small" onclick="hwCopy('${id}')">Copy</button></div></div>`;
+  let body;
+  if (!key) body = `<p class="muted" style="margin:0">Uses the same secure device key as the bank link. Connect the bank (above) on this phone first, then come back here.</p>`;
+  else if (HWcode) body = `<p class="muted" style="margin:0 0 8px"><b>Your sync code is shown once.</b> In HC Webhook, add a webhook with this address, then add a custom header with this name and value.</p>
+    ${row('Webhook URL', HWcode.url, 'hwurl')}${row('Header name', 'Authorization', 'hwhn')}${row('Header value', 'Bearer ' + HWcode.token, 'hwhv', true)}
+    <details class="help" style="margin-top:6px"><summary>No header option?</summary><p class="muted" style="margin:6px 0">Use this single address instead (the code is part of it):</p>${row('Address with code', HWcode.url + '?token=' + HWcode.token, 'hwone', true)}</details>
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn primary small" onclick="hwDone()">Done, I’ve pasted them</button></div>`;
+  else if (on) body = `<div class="t">${st.lastAt ? 'Syncing · last from the watch ' + esc(cfWhen(st.lastAt)) : 'Waiting for the first sync from your phone'}</div>
+    <div class="s" style="margin-top:2px">${st.lastAt && st.lastTypes && st.lastTypes.length ? 'Last brought: ' + esc(st.lastTypes.map(x => ({ steps: 'steps', sleep: 'sleep', heart_rate: 'heart rate', resting_heart_rate: 'resting heart rate' })[x] || x).join(', ')) + '. ' : ''}Code made ${esc(cfWhen(st.created))}. Steps, sleep and heart rate are kept as one summary a day on the relay, encrypted.</div>
+    ${st.lastAt && Date.now() - Date.parse(st.lastAt) > 6 * 3600e3 ? `<div class="s" style="margin-top:4px">Nothing for a while. Open HC Webhook and tap Sync now, and check battery saving is off for Huawei Health, Health Sync and HC Webhook.</div>` : ''}
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn small" onclick="hwRefresh(true)">Check now</button><button type="button" class="btn small" onclick="hwNewCode()">New sync code</button><button type="button" class="btn small danger" onclick="hwOff()">Turn off</button></div>`;
+  else body = `<p class="muted" style="margin:0 0 8px">Brings your daily steps, sleep and heart rate from your Huawei watch into My App, through Health Sync, Health Connect and HC Webhook on your phone. Only a daily summary is kept.</p>
+    <div class="btns"><button type="button" class="btn primary small" id="hwmk" onclick="hwNewCode()">Create sync code</button></div>`;
+  return `<div class="sec" id="hwset">Huawei watch sync</div><div class="list"><div style="padding:12px" id="hwbox">${body}
+    ${HWerr ? `<p class="muted" style="color:#b91c1c;margin:6px 0 0" role="alert">${esc(HWerr)}</p>` : ''}
+    <details class="help" style="margin-top:10px"><summary>Phone setup steps</summary><ol class="steps">
+      <li>Huawei Health: Me › Privacy management. Turn on <b>HUAWEI Health Kit</b> and data syncing.</li>
+      <li>Health Sync: source <b>Huawei Health</b>, destination <b>Health Connect</b>. Tick steps, sleep and heart rate.</li>
+      <li>HC Webhook: allow steps, sleep, heart rate and resting heart rate in Health Connect. Add a webhook with the URL and header above. Sync every 30 minutes.</li>
+      <li>Phone Settings › Apps: battery set to <b>Unrestricted</b> for Huawei Health, Health Sync and HC Webhook.</li></ol></details></div></div>`;
+}
+function hwRedraw() { const box = document.getElementById('hwset'); if (!box || !box.nextElementSibling) return; const w = document.createElement('div'); w.innerHTML = hwSettings(); box.nextElementSibling.replaceWith(w.children[1]); }
+async function hwCopy(id) { const el = document.getElementById(id); if (!el) return; const ok = await copyText(el.value); toast(ok ? 'Copied.' : 'Couldn’t copy on this phone. Long-press the box and choose Copy.'); }
+function hwDone() { HWcode = null; hwRefresh(true); hwRedraw(); toast('Saved. Steps show once your phone sends them.'); }
+const HW_ERR = { no_key: 'This phone needs the bank link’s device key first.', unauthorised: 'The relay didn’t recognise this phone’s key. Reconnect the bank link on this phone, then try again.', rate_limited: 'Too many tries. Wait an hour and try again.', forbidden_origin: 'Open My App from its icon and try again.', not_configured: 'Watch sync isn’t set up on the relay yet.' };
+async function hwNewCode() {
+  const go2 = async () => { HWerr = ''; let s = 0, d = {}; try { [s, d] = await cfApi('/health/token', 'POST', {}); } catch (e) { s = 0; }
+    if (s === 200 && d.token) { HWcode = { token: d.token, url: d.url, at: Date.now() }; const cur = hwData() || {}; hwSave(Object.assign({}, cur, { connected: true, created: d.created, lastAt: cur.lastAt || '' })); }
+    else HWerr = s === 0 ? 'Couldn’t reach the relay. Check you’re online, then try again.' : HW_ERR[d.error] || 'Something went wrong on the relay. Try again in a minute.';
+    hwRedraw(); };
+  if (hwOn()) confirmSheet('Make a new sync code?', 'The old code stops working straight away. You’ll paste the new one into HC Webhook.', 'New code', go2); else go2();
+}
+function hwOff() {
+  confirmSheet('Turn off watch sync?', 'Stops the sync code and deletes the watch summaries on the relay. You can set it up again any time.', 'Turn off', async () => {
+    let s = 0; try { [s] = await cfApi('/health/revoke', 'POST', {}); } catch (e) { }
+    if (s === 200) { HWcode = null; HW = null; try { localStorage.removeItem('hwData'); } catch (e) { } toast('Watch sync turned off.'); } else toast('Couldn’t reach the relay. Try again.');
+    render();
+  });
+}
 async function cfLoad(force) {
   if (CFmock) { CF = CFmock; return; }
   if (CFbusy || !cfKey()) return; CFbusy = true; CFerr = '';
