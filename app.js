@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.98';
+const APP_VERSION = '2.26.99';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22731,3 +22731,124 @@ async function shFill(out, getBody) {
   } catch (e) { } }; })();
 // keep the Gmail email's HTML too, so View email can find the shop links
 (() => { const o = mbAuthGet; mbAuthGet = async function (p, url) { const d = await o(p, url); try { if (p === 'google' && /\/messages\/[^/?]+\?format=full/.test(url) && d && d.payload) { const id = decodeURIComponent(url.split('/messages/')[1].split('?')[0]); let html = ''; const walk = q => { if (!q || html) return; if (q.mimeType === 'text/html' && q.body && q.body.data) { const b = atob(q.body.data.replace(/-/g, '+').replace(/_/g, '/')); html = new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); } (q.parts || []).forEach(walk); }; walk(d.payload); if (html) Object.values(EM_REG).forEach(r => { if (r.src === 'g' && r.id === id) r._html = html; }); } } catch (e) { } return d; }; })();
+
+/* ================= 2.26.99: Add this place (from GPS, or by address) =================
+   Before: a new place could only be named from a prompt that waited for two location readings 3+ minutes apart and
+   only showed on the night-time Home, so in the day (e.g. at the Sunday cleaning job) there was no way to add it.
+   Now: 'Add this place' on Home whenever the phone is somewhere not saved, and '+ Add a place' in Settings > Places.
+   It reads the location right then; if that fails (not allowed, timed out, too rough) it says so and offers an
+   address search (OpenStreetMap). Types: Work – cleaning job (Smart Office), Gym, Mum's, Shop, Friend's, Other. */
+const PL_TYPES = [['clean', 'Work – cleaning job'], ['gym', 'Gym'], ['mum', 'Mum’s'], ['shop', 'Shop'], ['friend', 'Friend’s place'], ['other', 'Other']];
+const PL_DEFNAME = { clean: 'Cleaning job (Smart Office)', gym: 'Gym', mum: 'Mum’s', shop: '', friend: '', other: '' };
+let plBusy = false;
+function plGetFix() {
+  return new Promise(res => {
+    if (!navigator.geolocation) return res({ err: 'This phone or browser can’t share your location.' });
+    let done = false; const fin = r => { if (!done) { done = true; res(r); } };
+    setTimeout(() => fin({ err: 'Your location took too long to come through.' }), 22000);
+    navigator.geolocation.getCurrentPosition(pos => {
+      const lat = +pos.coords.latitude, lon = +pos.coords.longitude, acc = Number.isFinite(+pos.coords.accuracy) ? Math.round(+pos.coords.accuracy) : null;
+      if (!validLL(lat, lon)) return fin({ err: 'Couldn’t read your location.' });
+      try { rememberFix(pos); } catch (e) { }
+      fin({ lat, lon, acc });
+    }, err => fin({ err: err && err.code === 1 ? 'Location isn’t allowed for My App. You can allow it in the phone’s site settings, or search the address below.' : err && err.code === 3 ? 'Your location took too long to come through.' : 'Couldn’t get your location just now.' }),
+    { enableHighAccuracy: true, maximumAge: 60 * 1000, timeout: 20000 });
+  });
+}
+async function plRevGeo(lat, lon) {
+  try { const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=${lat}&lon=${lon}`, { headers: { 'Accept-Language': 'en-NZ' } }); if (!r.ok) return '';
+    const d = await r.json(), a = d.address || {}; const st = [a.house_number, a.road].filter(Boolean).join(' '); const sub = a.suburb || a.neighbourhood || a.village || a.town || a.city || '';
+    return [d.name && d.name !== a.road ? d.name : '', st, sub].filter(Boolean).join(', ') || String(d.display_name || '').split(',').slice(0, 3).join(','); } catch (e) { return ''; }
+}
+async function plSearch(q) {
+  const u = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=nz&viewbox=173.9,-35.4,174.8,-36.1&q=${encodeURIComponent(q)}`;
+  const r = await fetch(u, { headers: { 'Accept-Language': 'en-NZ' } }); if (!r.ok) throw new Error('search ' + r.status);
+  return (await r.json()).map(x => ({ lat: +x.lat, lon: +x.lon, label: String(x.display_name || '').split(',').slice(0, 4).join(',') })).filter(x => validLL(x.lat, x.lon)).filter((x, i, a) => a.findIndex(y => y.label === x.label) === i);
+}
+// the place already saved within 150 m of here, if any (so it's renamed rather than duplicated)
+function plNear(lat, lon) { return customPlaces().find(p => metresBetween(lat, lon, p.lat, p.lon) <= PLACE_CUSTOM_M) || null; }
+async function addPlaceHere(preType) {
+  if (plBusy) return; plBusy = true;
+  try {
+    plSheet(null, preType, 'Finding where you are…');
+    const f = await plGetFix();
+    if (!sheetOpen || !document.getElementById('plform')) return;
+    if (f.err) { plSetLoc(null, /search/i.test(f.err) ? f.err : f.err + ' Search the address instead:'); return; }
+    if (f.acc != null && f.acc > 300) { plSetLoc(null, `Your location is rough just now (about ${f.acc} m). Try again outside, or search the address:`, f); return; }
+    plSetLoc(f, ''); const where = await plRevGeo(f.lat, f.lon); const w = document.getElementById('plwhere'); if (w && where && PL_CUR === f) w.textContent = '📍 ' + where + (f.acc != null ? ` (±${f.acc} m)` : '');
+    if (PL_CUR === f) PL_CUR.addr = where;
+  } finally { plBusy = false; }
+}
+let PL_CUR = null;
+function plSetLoc(f, msg, rough) {
+  PL_CUR = f; const w = document.getElementById('plwhere'), m = document.getElementById('plmsg'), s = document.getElementById('plsearch');
+  if (w) w.textContent = f ? '📍 Your current spot' + (f.acc != null ? ` (±${f.acc} m)` : '') + (f.label ? ': ' + f.label : '') : '';
+  if (m) { m.textContent = msg || ''; m.style.display = msg ? 'block' : 'none'; }
+  if (s) s.style.display = f && !msg ? 'none' : 'block';
+  const ub = document.getElementById('plrough'); if (ub) { ub.style.display = rough ? 'inline-flex' : 'none'; ub.onclick = () => { plSetLoc(Object.assign({}, rough), ''); }; }
+  const sw = document.getElementById('plswap'); if (sw) sw.style.display = f && !msg ? 'inline' : 'none';
+}
+function plSheet(fix, preType, msg) {
+  const type = preType || (new Date().getDay() === 0 ? 'clean' : 'other');
+  openSheet('Add this place',
+    `<div id="plform"><div class="plwhere" id="plwhere" style="font-weight:600;margin:0 0 4px"></div>
+     <div class="formerr" id="plmsg" style="display:none;background:#fff7ed;color:#9a3412;border-color:#fdba74"></div>
+     <button type="button" class="btn small" id="plrough" style="display:none;margin:4px 0">Use it anyway</button>
+     <a href="#" id="plswap" style="display:none;font-size:.85rem" onclick="event.preventDefault();plSetLoc(null,'');document.getElementById('plq').focus()">Not right? Search the address</a>
+     <div id="plsearch" style="display:none;margin:6px 0">${field('Address or place', `<span style="display:flex;gap:6px"><input id="plq" type="search" placeholder="e.g. 12 Bank Street, Whangārei" autocomplete="off" style="flex:1"><button type="button" class="btn small" id="plgo">Search</button></span>`)}
+       <div id="plres"></div></div>
+     <div class="seg plseg" id="pltype" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">${PL_TYPES.map(([k, l]) => `<button type="button" class="chip${k === type ? ' on' : ''}" data-k="${k}">${esc(l)}</button>`).join('')}</div>
+     <input type="hidden" name="ptype" value="${type}">
+     ${field('Name', inp('name', PL_DEFNAME[type] || '', 'placeholder="e.g. Smart Office" maxlength="40" required'), 'Within about 150 m counts as being there. Saved on this phone and in backups.')}
+     <div class="muted" id="plcleannote" style="font-size:.8rem;${type === 'clean' ? '' : 'display:none'}">Linked to your Sunday cleaning job (Smart Office pay on Sundays).</div></div>`,
+    async v => {
+      const name = placeNameClean(v.name); if (!name) return 'Please type a name.';
+      const f = PL_CUR; if (!f || !validLL(+f.lat, +f.lon)) return 'No location yet. Wait for it, or search the address and tap a result.';
+      const lat = Math.round(+f.lat * 1e6) / 1e6, lon = Math.round(+f.lon * 1e6) / 1e6, kind = v.ptype || 'other';
+      const s0 = snap();
+      if (kind === 'gym' || /^gym$/i.test(name)) S.settings.gym = { lat, lon, acc: f.acc != null ? f.acc : null, at: Date.now() };
+      else {
+        const list = Array.isArray(S.settings.places) ? S.settings.places.slice() : [], near = plNear(lat, lon);
+        const rec = { id: near ? near.id : uid('pl'), name, lat, lon, at: Date.now(), kind, addr: f.addr || f.label || '' };
+        if (kind === 'clean') rec.link = 'clean';
+        S.settings.places = near ? list.map(x => x && x.id === near.id ? Object.assign({}, x, rec) : x) : list.concat([rec]);
+      }
+      writeNewSpot(null); await save(); render();
+      return () => toast('Saved ' + name + '.' + (kind === 'clean' ? ' Linked to your Sunday cleaning job.' : ''), 'Undo', undoTo(s0));
+    }, 'Save place');
+  const fm = document.getElementById('sf'); if (!fm) return;
+  const nf = fm.querySelector('[name=name]'), ht = fm.querySelector('[name=ptype]');
+  fm.querySelectorAll('#pltype .chip').forEach(b => b.onclick = () => {
+    fm.querySelectorAll('#pltype .chip').forEach(x => x.classList.toggle('on', x === b)); const k = b.dataset.k; ht.value = k;
+    if (!nf.value.trim() || Object.values(PL_DEFNAME).includes(nf.value.trim())) nf.value = PL_DEFNAME[k] || '';
+    const cn = document.getElementById('plcleannote'); if (cn) cn.style.display = k === 'clean' ? '' : 'none'; });
+  const q = document.getElementById('plq'), go = document.getElementById('plgo'), res = document.getElementById('plres');
+  const run = async () => { const t = q.value.trim(); if (t.length < 3) { res.textContent = 'Type a bit more of the address.'; return; } res.textContent = 'Searching…';
+    try { const r = await plSearch(t); if (!r.length) { res.textContent = 'Nothing found. Try the street and suburb, e.g. “Bank Street, Whangārei”.'; return; }
+      res.innerHTML = r.map((x, i) => `<button type="button" class="btn small plpick" data-i="${i}" style="display:block;width:100%;text-align:left;margin:4px 0;white-space:normal">${esc(x.label)}</button>`).join('');
+      res.querySelectorAll('.plpick').forEach(b => b.onclick = () => { const x = r[+b.dataset.i]; plSetLoc({ lat: x.lat, lon: x.lon, acc: null, label: x.label, addr: x.label }, ''); res.innerHTML = ''; });
+    } catch (e) { res.textContent = 'Couldn’t search just now (no internet?). Try again in a moment.'; } };
+  if (go) go.onclick = run; if (q) q.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); run(); } });
+  if (fix) plSetLoc(fix, ''); else { const m = document.getElementById('plmsg'), w = document.getElementById('plwhere'); if (w) w.textContent = msg || ''; if (m) m.style.display = 'none'; }
+}
+// the old 'Name this place' prompt now opens the same sheet with the spot it saw (or reads it again)
+namePlaceForm = function () { const o = newSpotReady(); if (o) { plSheet({ lat: +o.lat, lon: +o.lon, acc: o.acc != null ? Math.round(o.acc) : null }, ''); plRevGeo(+o.lat, +o.lon).then(a => { if (a && PL_CUR) { PL_CUR.addr = a; const w = document.getElementById('plwhere'); if (w) w.textContent = '📍 ' + a; } }); } else addPlaceHere(); };
+// Home: an obvious 'Add this place' while the phone is somewhere not saved (day and night), dismissable per spot
+function plHomeAsk() {
+  try {
+    if (!hereFix || Date.now() - hereFix.at > 15 * 60 * 1000 || (hereFix.acc != null && hereFix.acc > 300)) return '';
+    if (Number.isFinite(hereFix.speed) && hereFix.speed > NEWSPOT_DRIVE_MS) return '';
+    if (placeHere()) return ''; if (placeSkipped(hereFix.lat, hereFix.lon)) return '';
+    if (SAVED_PLACES.concat(customPlaces()).some(p => metresBetween(hereFix.lat, hereFix.lon, p.lat, p.lon) <= 400)) return '';
+    return `<div class="gymask" id="placeask">${I('pin')}<button type="button" class="gymsave" onclick="addPlaceHere()">📍 Somewhere new? Add this place</button><button type="button" class="gymx" aria-label="Don’t ask about this spot" onclick="skipNewSpot()">${I('x')}</button></div>`;
+  } catch (e) { return ''; }
+}
+placeAskHtml = function () { return plHomeAsk(); };
+(() => { const o = glanceHome; glanceHome = function () { let h = o.apply(this, arguments);
+  try { if (!/id="placeask"/.test(h)) { const a = plHomeAsk(); if (a) h = h.replace('<div class="glwx">', a + '<div class="glwx">'); } } catch (e) { }
+  return h; }; })();
+// keep the Home row in step with new readings (the old code looked for a weather strip that the new Home doesn't have)
+setInterval(() => { try { const hh = (location.hash || '#home').slice(1); if ((hh !== 'home' && hh !== '') || sheetOpen) return; const ga = document.getElementById('placeask'), a = plHomeAsk();
+  if (ga && !a) ga.remove(); else if (!ga && a) { const wx = document.querySelector('.glance .glwx'); if (wx) wx.insertAdjacentHTML('beforebegin', a); else { const nw = document.getElementById('notifwx'); if (nw) nw.insertAdjacentHTML('afterend', a); } } } catch (e) { } }, 20000);
+// Settings > Places: '+ Add a place' (current spot or address)
+(() => { const o = placesSettingsRows; placesSettingsRows = function () { return `<div class="srow"><div class="tx"><div class="t">Add a place</div><div class="s">Uses where you are now, or search an address. E.g. your Sunday cleaning job.</div></div><button class="btn small primary" onclick="addPlaceHere()">${I('pin')} Add a place</button></div>` + o.apply(this, arguments); }; })();
