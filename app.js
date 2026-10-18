@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.95';
+const APP_VERSION = '2.26.96';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4483,7 +4483,7 @@ function wireSeg(name, onPick) {
   const box = document.querySelector(`[data-seg="${name}"]`), hid = document.querySelector(`input[name="${name}"]`);
   box.querySelectorAll('button').forEach(b => b.onclick = () => {
     box.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); hid.value = b.dataset.v;
-    if (onPick) { onPick(b.dataset.v); $('#sf input[type=date]').dispatchEvent(new Event('input')); }
+    if (onPick) { onPick(b.dataset.v); const di = $('#sf input[type=date]'); if (di) di.dispatchEvent(new Event('input')); }
   });
 }
 /* 2.26.50: WOF complete (passed). Clears In progress and its fixes; Sarah's app shows 'WOF passed · next due …' for 60 days. */
@@ -14849,7 +14849,7 @@ let gcalBusy = false, gcalAgain = false, gcalTimer = 0;
 function gcalSoon() { clearTimeout(gcalTimer); gcalTimer = setTimeout(() => gcalSync().catch(() => {}), 1500); }
 async function gcalSync() {
   if (!S || !S.settings) return;
-  const map = gcalMap(), want = (S.appts || []).filter(a => a && a.gcalWant && parseD(a.date));
+  const map = gcalMap(), want = (S.appts || []).filter(a => a && a.gcalWant && parseD(a.date)).concat((() => { try { return evGcalAppts(); } catch (e) { return []; } })()); // 2.26.96: + My events from email
   const ids = new Set(want.map(a => a.id)), gone = Object.keys(map).filter(k => !ids.has(k));
   if (!want.some(a => !map[a.id] || map[a.id].h !== JSON.stringify(gcalBody(a))) && !gone.length) return;
   if (!gcalReady() || navigator.onLine === false) return;
@@ -22278,3 +22278,238 @@ function coeliacFix() {
 }
 // 2.26.90: Money › Work: hours (roster), Commission and Wage estimate side by side
 function workTabs(cur) { return `<div class="seg worktabs" role="tablist">${[['hours', 'Hours', 'work'], ['comm', 'Commission', 'commission'], ['wage', 'Wage estimate', 'wage']].map(([k, t, h]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${h}')">${t}</button>`).join('')}</div>`; }
+/* ================= 2.26.96: EVENTS FROM EMAIL =================
+   Festivals, expos, markets, workshops and the like found in the mail scan (Outlook / Gmail, read-only).
+   Pulls the name, day(s), time, venue and the ticket link out of the email. Never buys anything: Get tickets just opens the link.
+   Add to calendar makes a My event (place, reminder, Family Google calendar). No sport. Clashes with the work roster are flagged. */
+const EV_STRONG_I = /\b(festivals?|expo|fair|workshops?|seminars?|exhibitions?|open day|market day|night markets?|farmers'? markets?|craft markets?|makers'? markets?|christmas markets?|save the date|masterclass|cooking class(es)?|demonstrations?|conference|tasting|gala|concerts?|gigs?|live music)\b/i, EV_SHOWRE = /\b[A-Z][a-z]+ (Show|Market)\b/;
+const EV_STRONG = { test: t => EV_STRONG_I.test(t) || EV_SHOWRE.test(t) };
+const EV_NOTSPORT = /\b(breakers|36ers|warriors|blues|chiefs|hurricanes|highlanders|crusaders|phoenix|marathon|half marathon|fun run|race day|tournament|championships?|regatta|grand prix|fixtures?|season tickets?)\b|\b[A-Z][\w']+(?:\s[A-Z0-9][\w']*)*\s+v(?:s)?\.?\s+[A-Z]/;
+const EV_SALE = /\b(\d+\s?% off|sale|clearance|deals?|discount|black friday|cyber monday)\b/i;
+const EV_MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+const EV_WD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const EV_VENUE = /\b((?:[A-Z][\w'’&.-]*\s+){0,5}(?:Events? Centre|Event Center|Centre|Center|Hall|Showgrounds|Stadium|Arena|Domain|Theatre|Theater|Library|Church|Marae|Club|Clubrooms|Pavilion|Racecourse|Gardens|Museum|Gallery|Forum North|Town Basin|Hotel|Lodge|Winery|Vineyard|Brewery|Market Place|Square|Park|Wharf|Quay|Reserve))\b(?:,\s*([A-Z][a-zā]+(?:\s(?:Central|North|South|East|West|City))?))?/;
+function evUnwrap(href) {
+  let u = String(href || '').trim();
+  for (let i = 0; i < 4; i++) {
+    let p; try { p = new URL(u); } catch (e) { return ''; }
+    const nx = /safelinks\.protection\.outlook\.com$/i.test(p.hostname) ? p.searchParams.get('url') : (p.searchParams.get('RDRCTS') || p.searchParams.get('redirect') || p.searchParams.get('redirect_url') || (/^(l|lnk|click|links?|track|t|e)\./i.test(p.hostname) || /google\.com$/i.test(p.hostname) && p.pathname === '/url' ? p.searchParams.get('url') || p.searchParams.get('u') || p.searchParams.get('q') : ''));
+    if (!nx) break;
+    u = /^https?:\/\//i.test(nx) ? nx : /^[\w-]+(\.[\w-]+)+\//.test(nx) ? 'https://' + nx : u; if (u !== nx && !/^https:\/\/[\w-]+(\.[\w-]+)+\//.test(u)) break;
+  }
+  return /^https:\/\//i.test(u) ? u : '';
+}
+// pick the booking link: an anchor whose text says tickets / book / register, else a known ticketing site
+function evTixLink(html, text) {
+  const L = [];
+  try { const d = new DOMParser().parseFromString(String(html || ''), 'text/html'); d.querySelectorAll('a[href]').forEach(a => L.push([mbClean(a.textContent), a.getAttribute('href') || ''])); } catch (e) { }
+  String(text || '').replace(/([^\n<>]{2,60})<(https?:\/\/[^>\s]+)>/g, (_, t, h) => { L.push([mbClean(t), h]); return ''; }); // plain-text bodies: "Buy Tickets<https://…>"
+  const bad = /unsubscribe|optout|opt-out|privacy|preferences|profile|facebook|instagram|twitter|tiktok|youtube|linkedin|mailto:/i;
+  const site = /(eventfinda|ticketek|iticket|humanitix|eventbrite|ticketmaster|ticketfairy|flicket|trybooking|tixx|moshtix|undertheradar|patronbase|ticketdirect|eventfinda\.co\.nz)/i;
+  let best = '';
+  for (const [t, h] of L) { const u = evUnwrap(h); if (!u || bad.test(u)) continue; if (/\b(get|buy|grab|book|secure)\b[^.]{0,20}\btickets?\b|\btickets?\b|\bbook (now|here|tickets|your)|\bregister\b|\brsvp\b/i.test(t)) { best = u; if (site.test(u)) return u; } }
+  if (best) return best;
+  for (const [, h] of L) { const u = evUnwrap(h); if (u && site.test(u) && !bad.test(u)) return u; }
+  return '';
+}
+const evPad = n => String(n).padStart(2, '0');
+// all dates written in the text, with whether a weekday / year was given
+function evDates(text, recvISO) {
+  const out = [], t = String(text || ''), r = new Date(recvISO || Date.now());
+  const ymd = (d, mo, y) => { if (!y) { y = r.getFullYear(); if (mo < r.getMonth() + 1 - 2) y++; } const iso = `${y}-${evPad(mo)}-${evPad(d)}`; const dt = new Date(Date.UTC(y, mo - 1, d)); return dt.getUTCMonth() === mo - 1 ? iso : ''; };
+  const WD = '(?:(mon|tue|wed|thu|fri|sat|sun)[a-z]*\\.?,?\\s+)?';
+  const MON = '(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?';
+  // "Sat 31 Oct – Sun 1 Nov 2026", "31 October 2026", "1-2 November", "1st & 2nd Nov"
+  const re = new RegExp(`\\b${WD}(\\d{1,2})(?:st|nd|rd|th)?(?:\\s*(?:-|–|—|&|and|to)\\s*${WD}(\\d{1,2})(?:st|nd|rd|th)?)?\\s+${MON}(?:,?\\s+(20\\d\\d))?\\b`, 'gi');
+  let m; while ((m = re.exec(t))) {
+    const mo = EV_MON[m[5].toLowerCase()], y = m[6] ? +m[6] : 0, a = ymd(+m[2], mo, y); if (!a) continue;
+    const okWd = (w, iso) => !w || EV_WD[new Date(parseD(iso)).getUTCDay()] === w.toLowerCase().slice(0, 3);
+    if (!okWd(m[1], a)) continue;
+    const o = { iso: a, wd: !!m[1], yr: !!y, at: m.index, days: [a] };
+    if (m[4]) { const b = ymd(+m[4], mo, y); if (b && b > a && okWd(m[3], b)) { for (let d = a; d <= b && o.days.length < 7; d = addDays(d, 1)) if (d !== a) o.days.push(d); o.range = true; } }
+    out.push(o);
+  }
+  // "October 31, 2026" / "Saturday, October 31"
+  const re2 = new RegExp(`\\b${WD}${MON}\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(20\\d\\d))?\\b`, 'gi');
+  while ((m = re2.exec(t))) { const a = ymd(+m[3], EV_MON[m[2].toLowerCase()], m[4] ? +m[4] : 0); if (a && (!m[1] || EV_WD[new Date(parseD(a)).getUTCDay()] === m[1].toLowerCase().slice(0, 3))) out.push({ iso: a, wd: !!m[1], yr: !!m[4], at: m.index, days: [a] }); }
+  return out.sort((x, y) => x.at - y.at);
+}
+const evHm = (h, mi, ap) => { h = +h; mi = +(mi || 0); if (h > 12 || mi > 59) return ''; if (/pm/i.test(ap) && h < 12) h += 12; if (/am/i.test(ap) && h === 12) h = 0; return evPad(h) + ':' + evPad(mi); };
+function evTimes(text) {
+  const t = String(text || ''), out = [];
+  const re = /\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?\s*(?:-|–|—|to|until|till)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b(\s*\(([^)]{2,30})\))?/gi; let m;
+  while ((m = re.exec(t))) { const ap1 = m[3] || (+m[1] <= +m[4] && +m[1] < 12 ? m[6] : (/pm/i.test(m[6]) ? 'am' : 'pm')); const s = evHm(m[1], m[2], ap1), e = evHm(m[4], m[5], m[6]); if (s && e && e > s) out.push({ s, e, label: (m[8] || '').trim(), at: m.index }); }
+  if (!out.length) { const r1 = /\b(?:at|from|starts?(?: at)?|doors(?: open)?(?: at)?)\s+(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/gi; while ((m = r1.exec(t))) { const s = evHm(m[1], m[2], m[3]); if (s) out.push({ s, e: '', label: '', at: m.index }); } }
+  return out;
+}
+const evNameRe = /(?:^|[\s:,!?(])((?:the\s+|The\s+)?(?:(?:[A-Z0-9][\w'’&.-]*|of|and|&|de|la)\s+){0,6}(?:Festival|Expo|Fair|Market|Markets|Workshop|Seminar|Show|Conference|Exhibition|Masterclass|Concert|Gala|Open Day|Night Market|Tasting))(?:\s+(20\d\d))?\b/;
+// pure: subject + body text (+ html for the links) → one event, or null
+function evParse(subject, text, html, recvISO) {
+  subject = mbClean(subject); const body = String(text || ''), flat = mbClean(body);
+  const head = subject + ' ' + flat.slice(0, 1500);
+  if (isSport(head) || EV_NOTSPORT.test(subject) || EV_NOTSPORT.test(flat.slice(0, 400))) return null;
+  if (!EV_STRONG.test(subject + ' ' + flat.slice(0, 2500))) return null;
+  if (EV_SALE.test(subject) && !/\b(festival|expo|fair|workshop|market day|night market|show)\b/i.test(subject)) return null;
+  const today = todayISO(), cand = evDates(flat, recvISO).filter(d => d.days[d.days.length - 1] >= today && daysLeft(d.iso) <= 300 && d.iso !== String(recvISO || '').slice(0, 10));
+  if (!cand.length) return null;
+  const pick = cand.find(d => d.wd && d.yr) || cand.find(d => d.wd) || cand.find(d => d.range) || (cand.length === 1 || cand.every(d => d.iso === cand[0].iso) ? cand[0] : null);
+  if (!pick) return null;
+  let days = pick.days.slice(); cand.forEach(d => d.days.forEach(x => { if (x > days[0] && daysLeft(x) - daysLeft(days[0]) <= 3 && !days.includes(x) && d.wd) days.push(x); })); days = days.sort().filter(d => d >= today).slice(0, 7);
+  if (!days.length) return null;
+  // time: near the date if possible; "main" session wins
+  const win = flat.slice(Math.max(0, pick.at - 80), pick.at + 400), T = evTimes(win).length ? evTimes(win) : evTimes(flat);
+  const tm = T.find(x => /main|general|open|festival/i.test(x.label)) || T.reduce((b, x) => (!b || (x.e && hmMin(x.e) - hmMin(x.s) > (b.e ? hmMin(b.e) - hmMin(b.s) : 0)) ? x : b), null);
+  // venue: labelled first, then a place name near the date
+  let place = ''; const lab = flat.match(/\b(?:venue|location|where)\s*[:\-–]\s*([^.|•\n]{3,80}?)(?=\s{2,}|\s[-–|•]|[.!]|$| (?:When|Date|Time|Tickets?)\b)/i);
+  if (lab) place = lab[1].trim(); else { const v = win.match(EV_VENUE) || flat.match(EV_VENUE); if (v) place = (v[1] + (v[2] ? ', ' + v[2] : '')).replace(/^(?:at|the|day\)|main day\))\s+/i, '').trim(); }
+  if (place && /^(The\s+)?(Centre|Center|Hall|Park|Club|Square|Reserve)$/i.test(place)) place = '';
+  // name: from the subject, else the body
+  let nm = (subject.match(evNameRe) || flat.match(evNameRe) || [])[1] || '';
+  nm = nm.replace(/^the\s+/i, '').trim();
+  if (nm) { const yr = flat.match(new RegExp(nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+(20\\d\\d)', 'i')); if (yr && !/20\d\d$/.test(nm)) nm += ' ' + yr[1]; }
+  if (!nm) nm = subject.replace(/^(re|fw|fwd):\s*/i, '').replace(/[!?]+$/, '').slice(0, 70);
+  return { name: nm.slice(0, 80), days, time: tm ? tm.s : '', end: tm ? tm.e : '', times: T.slice(0, 4).map(x => ({ s: x.s, e: x.e, label: x.label })), place: place.slice(0, 80), tix: evTixLink(html, body) };
+}
+// quick look at a scan message (subject + preview) before fetching its body
+const evLikely = m => { const t = String(m.subject || '') + ' ' + String(m.text || '').slice(0, 600); return !/^(re|fw|fwd):/i.test(m.subject || '') || /festival|expo/i.test(m.subject || '') ? EV_STRONG.test(t) && !isSport(t) && !EV_NOTSPORT.test(String(m.subject || '')) && !(MB_MKT.test(m.from) && !MB_GF_FROM.test(m.from)) && !(m.q === 'bill' && m.att) : false; };
+MB_OQ.ev = '"festival" OR "expo" OR "workshop" OR "save the date" OR "seminar" OR "open day" OR "night market" OR "market day" OR "masterclass"';
+MB_GQ.ev = '(festival OR expo OR workshop OR "save the date" OR seminar OR "open day" OR "night market" OR "market day" OR masterclass)';
+// fetch bodies (at most 10 new ones a scan) and keep only the parsed event on the message
+async function evFill(out, getBody) {
+  const old = new Map(emMsgs().map(m => [m.src + ':' + m.id, m])); let n = 0;
+  for (const m of out) {
+    if (m.ev !== undefined) continue;
+    const o = old.get(m.src + ':' + m.id); if (o && o.ev !== undefined) { m.ev = o.ev; continue; }
+    if (!evLikely(m)) continue;
+    if (n >= 10) continue; n++;
+    try { const b = await getBody(m); m.ev = b ? evParse(m.subject, b.text, b.html, m.at) : null; } catch (e) { }
+  }
+}
+(() => {
+  const oO = mbOutlook, oG = mbGmail;
+  mbOutlook = async function () {
+    const out = await oO(); const G = 'https://graph.microsoft.com/v1.0/me/messages', sel = '&$select=id,subject,from,receivedDateTime,bodyPreview,webLink,hasAttachments', since = new Date(Date.now() - MB_DAYS * DAY).toISOString();
+    try { const d = await mbAuthGet('microsoft', G + '?$search=' + encodeURIComponent('"' + MB_OQ.ev.replace(/"/g, '\\"') + '"') + '&$top=25' + sel); (d.value || []).filter(x => (x.receivedDateTime || '') >= since && !out.some(o => o.id === x.id)).forEach(x => out.push(mbOMsg(x, 'ev'))); } catch (e) { }
+    await evFill(out, async m => { const b = await mbAuthGet('microsoft', G + '/' + encodeURIComponent(m.id) + '?$select=body'); const h = b && b.body && b.body.content || ''; return /html/i.test((b && b.body && b.body.contentType) || 'html') ? { html: h, text: emPlain(h) } : { html: '', text: h }; });
+    return out;
+  };
+  mbGmail = async function () {
+    const out = await oG(), B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
+    try { const list = await mbAuthGet('google', B + '?maxResults=10&q=' + encodeURIComponent(MB_GQ.ev + ' newer_than:' + MB_DAYS + 'd'));
+      for (const it of (list.messages || [])) { if (out.some(o => o.id === it.id)) continue; try { const g = await mbAuthGet('google', B + '/' + encodeURIComponent(it.id) + '?format=metadata&metadataHeaders=From&metadataHeaders=Subject'); const h = n => (((g.payload && g.payload.headers) || []).find(x => x.name.toLowerCase() === n) || {}).value || ''; const fr = h('from'), mm = fr.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>/);
+        out.push({ src: 'g', id: it.id, q: 'ev', from: String(mm ? mm[2] : fr).toLowerCase().trim(), name: mbClean(mm ? mm[1] : ''), subject: mbClean(h('subject')).slice(0, 200), text: mbClean(g.snippet).slice(0, 600), at: new Date(Number(g.internalDate)).toISOString(), link: 'https://mail.google.com/mail/u/0/#all/' + it.id, att: false }); } catch (e) { } } } catch (e) { }
+    await evFill(out, async m => { const g = await mbAuthGet('google', B + '/' + encodeURIComponent(m.id) + '?format=full'); let html = '', txt = ''; const dec = s => { const b = atob(String(s).replace(/-/g, '+').replace(/_/g, '/')); return new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); }; const walk = p => { if (!p) return; if (p.body && p.body.data) { if (!html && p.mimeType === 'text/html') html = dec(p.body.data); if (!txt && p.mimeType === 'text/plain') txt = dec(p.body.data); } (p.parts || []).forEach(walk); }; walk(g.payload); return { html, text: html ? emPlain(html) : txt }; });
+    return out;
+  };
+})();
+// ---- the events found (one per event, newest email wins) ----
+const evKeyOf = e => 'ev|' + e.days[0] + '|' + String(e.name || '').toLowerCase().replace(/\b(the|20\d\d|auckland|whang[aā]rei|wellington|christchurch|arnott'?s|nz|new zealand)\b/g, ' ').replace(/[^a-z0-9 ]/g, '').trim().split(/\s+/).slice(-3).join(' ');
+function evMailList() {
+  const msgs = emMsgs().filter(m => m && m.ev && Array.isArray(m.ev.days) && m.ev.days.length).sort((a, b) => String(b.at).localeCompare(String(a.at))), seen = new Map();
+  msgs.forEach(m => { const e = m.ev, last = e.days[e.days.length - 1]; if (last < todayISO()) return; const k = evKeyOf(e); const o = seen.get(k);
+    if (!o) seen.set(k, { key: k, ev: Object.assign({}, e), m, n: 1 }); else { o.n++; ['time', 'end', 'place', 'tix'].forEach(f => { if (!o.ev[f] && e[f]) o.ev[f] = e[f]; }); if (!(o.ev.times || []).length && (e.times || []).length) o.ev.times = e.times; } });
+  return [...seen.values()].sort((a, b) => a.ev.days[0].localeCompare(b.ev.days[0]));
+}
+const evAdded = k => (S.myEvents || []).find(e => e && e.fromEv === k) || null;
+let EV_REG = {};
+// work clash: rostered on that weekday, and the event's hours overlap the shift (all-day events: any shift)
+function evClash(iso, s, e) {
+  try { const r = rosterState(), dow = String(new Date(parseD(iso)).getUTCDay()), st = r.days[dow]; if (hmMin(st) == null) return null;
+    const en = r.ends[dow] || WG_END_DEF[dow] || '18:00'; const a = hmMin(s), b = hmMin(e) != null ? hmMin(e) : (a != null ? a + 60 : null);
+    if (a != null && !(a < hmMin(en) && b > hmMin(st))) return null;
+    return { st, en };
+  } catch (x) { return null; }
+}
+const evClashTxt = c => c ? `Clashes with work: you’re rostered ${fmtTime(c.st)}–${fmtTime(c.en)}` : '';
+const evmWhen = e => { const d = e.days; return (d.length > 1 ? fmtW(d[0]) + ' – ' + fmtW(d[d.length - 1]) : fmtW(d[0])) + (e.time ? ' · ' + fmtTime(e.time) + (e.end ? '–' + fmtTime(e.end) : '') : ''); };
+function evCardHtml(x, where) {
+  const e = x.ev, k = x.key, ad = evAdded(k); EV_REG[k] = x;
+  const cl = e.days.map(d => evClash(d, e.time, e.end)).filter(Boolean), clAll = cl.length === e.days.length;
+  const r = emRefOf(x.m); const emk = r ? emKey(r) : ''; if (r) EM_REG[emk] = r;
+  const st = 'event.stopPropagation();event.preventDefault();if(window.glSwipe&&glSwipe.moved)return;';
+  const btns = `<div class="mbbtns evbtns">${ad ? `<button type="button" class="btn small" onclick="${st}calOpenDay(${parseD(ad.start)})">${I('check')} In your calendar</button>` : `<button type="button" class="btn small primary" onclick="${st}evAddSheet('${esc(k)}')">${I('cal')} Add to calendar</button>`}${e.tix ? `<button type="button" class="btn small" onclick="${st}evTix('${esc(k)}')">${I('ticket')} Get tickets</button>` : ''}${emk ? `<button type="button" class="btn small embtn" onclick="${st}emView('${esc(emk)}')">View email</button>` : ''}${ad ? '' : `<button type="button" class="btn small" onclick="${st}evNo('${esc(k)}')">Not interested</button>`}</div>`;
+  const sub = ['Event from email', esc(evmWhen(e)), e.place ? esc(e.place) : ''].filter(Boolean).join(' · ') + (cl.length ? `<br><span class="evclash">⚠️ ${esc(clAll ? evClashTxt(cl[0]) : (e.days.length > 1 ? 'Some days clash with work: ' + e.days.filter(d => evClash(d, e.time, e.end)).map(d => fmtW(d)).join(', ') : evClashTxt(cl[0])))}</span>` : '');
+  return `<div class="row glnew mbrow evrow" data-mb="${esc(k)}" data-date="${e.days[0]}" role="button" tabindex="0" onclick="if(window.glSwipe&&glSwipe.moved)return;evAddSheet('${esc(k)}')"><div class="ic">🎟️</div><div class="tx"><div class="t">${esc(e.name)}</div><div class="s">${sub}</div>${btns}</div></div>`;
+}
+function evTix(k) { const x = EV_REG[k] || evMailList().find(y => y.key === k); if (!x || !x.ev.tix) return; window.open(x.ev.tix, '_blank', 'noopener'); toast('Opened the ticket page. Nothing is bought unless you buy it there.'); }
+function evNo(k) { mbDismiss(k); try { glBellRedraw(); } catch (e) { } render(); toast('Hidden. You won’t see this event again.', 'Undo', () => { try { localStorage.setItem('mbDismiss', JSON.stringify(mbDis().filter(x => x !== k))); } catch (e) { } render(); }); }
+// bell: one card per event, in Coming up when it's within 14 days
+(() => { const o = mbItems; mbItems = function () {
+  const out = o(), gone = new Set(mbDis()), evIds = new Set();
+  try { evMailList().forEach(x => { x.m && evIds.add(x.m.src + ':' + x.m.id); if (gone.has(x.key) || evAdded(x.key)) return; const d = daysLeft(x.ev.days[0]);
+    out.push({ sec: 'ev', key: x.key, urgent: false, coming: d <= 14, badge: mbToday(x.m.at), at: x.m.at, html: evCardHtml(x, 'bell') }); });
+    emMsgs().forEach(m => { if (m.ev) evIds.add(m.src + ':' + m.id); });
+  } catch (e) { }
+  // the same email isn't shown again under Gluten free
+  return out.filter(x => !(x.sec === 'gf' && evIds.has(String(x.key).slice(3))));
+}; })();
+MB_SECS.unshift(['ev', 'Events from email']);
+// Coming up (Home): events from email not yet added (added ones show as My events)
+CU_EXTRA.mailEv = T => { const gone = new Set(mbDis()); return evMailList().filter(x => !gone.has(x.key) && !evAdded(x.key)).map(x => { const d = daysLeft(x.ev.days[0]); return { days: d, rank: 1, sort: x.ev.time || '', kind: 'mailev', name: x.ev.name,
+  html: attRow({ kind: 'mailev', date: x.ev.days[0], go: `evAddSheet('${esc(x.key)}')`, ic: 'ev', icon: 'ticket', title: esc(x.ev.name) + (x.ev.time ? ' ' + fmtTime(x.ev.time) : ''), sub: 'Event from email' + (x.ev.days.length > 1 ? ' · ' + x.ev.days.length + ' days' : '') + (x.ev.place ? ' · ' + esc(x.ev.place) : '') + (x.ev.days.some(dd => evClash(dd, x.ev.time, x.ev.end)) ? ' · ⚠️ work' : '') }) }; }).filter(x => x.days >= 0); };
+// Events page: From your email, at the top
+(() => { const o = Events; Events = function () { const h = o(); let L = []; try { const gone = new Set(mbDis()); L = evMailList().filter(x => !gone.has(x.key)); } catch (e) { }
+  if (!L.length) return h; const blk = `<div class="sec">From your email</div><div class="list evmail">${L.map(x => evCardHtml(x, 'events')).join('')}</div>`;
+  const i = h.indexOf('<div class="card" id="towncard"'); return i >= 0 ? h.slice(0, i) + blk + h.slice(i) : blk + h; }; })();
+// ---- Add to calendar (My event with place, reminder, Family calendar) ----
+function evAddSheet(k, pre) {
+  const x = pre ? { key: k, ev: pre.ev, m: pre.m } : (EV_REG[k] || evMailList().find(y => y.key === k)); if (!x) return;
+  const e = x.ev, ad = evAdded(k); if (ad) { toast(`Already in your calendar for ${fmtW(ad.start)}.`, 'Open', () => calOpenDay(parseD(ad.start))); return; }
+  const days = e.days && e.days.length ? e.days : [todayISO()], multi = days.length > 1;
+  const times = (e.times || []).filter(t => t.s);
+  const notes = [e.tix ? 'Tickets: ' + e.tix : '', x.m ? 'From email: ' + String(x.m.subject || '').slice(0, 120) + (x.m.at ? ' (' + fmtW(String(x.m.at).slice(0, 10)) + ')' : '') : ''].filter(Boolean).join('\n');
+  openSheet('Add to calendar',
+    field('Title', inp('title', e.name || '', 'required maxlength="80"')) +
+    (multi ? `<div class="field"><span>Which day?</span>${segHtml('day', days.map(d => [d, fmtW(d)]), days[0])}</div>` : field('Date', inp('day', days[0], 'type="date" required'))) +
+    `<div class="field"><span>Time</span>${segHtml('when', [['allday', 'All day'], ['time', 'At a time']], e.time ? 'time' : 'allday')}</div>` +
+    `<div id="evtimebox" style="${e.time ? '' : 'display:none'}">${times.length > 1 ? `<div class="chips evtimes">${times.map(t => `<button type="button" class="chip" data-s="${t.s}" data-e="${t.e}">${fmtTime(t.s)}${t.e ? '–' + fmtTime(t.e) : ''}${t.label ? ' ' + esc(t.label) : ''}</button>`).join('')}</div>` : ''}<div class="two">${field('Starts', inp('time', e.time || '', 'type="time"'))}${field('Ends (optional)', inp('end', e.end || '', 'type="time"'))}</div></div>` +
+    `<p class="evclash" id="evclash" style="display:none"></p>` +
+    field('Place', inp('place', e.place || '', 'maxlength="100" placeholder="Optional"')) +
+    `<div class="two">${field('Reminder', sel('remind', [['off', 'Off'], ['day', 'On the day'], ['before', 'The day before']], 'before'))}<div id="evrtime">${field('At', sel('remindAt', REMIND_TIMES, '19:00'))}</div></div>` +
+    gcalCheckRow(true) + field('Notes', area('notes', notes, 'Optional')) +
+    (e.tix ? `<p class="muted" style="margin:4px 2px 0">Adding it doesn’t buy tickets. Use Get tickets if you want to go.</p>` : ''),
+    async v => {
+      if (!v.title) return 'Please give the event a title.';
+      if (!parseD(v.day)) return 'Please choose the day.';
+      const time = v.when === 'time' ? v.time : ''; if (v.when === 'time' && !/^\d{2}:\d{2}$/.test(time)) return 'Please choose a start time, or pick “All day”.';
+      const end = time && /^\d{2}:\d{2}$/.test(v.end || '') && v.end > time ? v.end : '';
+      const s = snap(), ev = { id: uid('myev'), skips: [], moves: {}, done: false, doneDates: [], title: v.title, start: v.day, time, endTime: end, repeat: 'none', until: '', place: v.place || '', notes: v.notes || '', remind: v.remind, remindAt: v.remind === 'off' ? '' : v.remindAt, packCar: { mode: 'off', at: '21:00' }, fromEv: k, gcalWant: !!v.gcal, tix: e.tix || '', email: x.m ? emRefOf(x.m) : null };
+      S.myEvents.push(ev); await save(); render(); try { scheduleReminders(); } catch (er) { }
+      const c = evClash(v.day, time, end);
+      toast(`${v.title} added for ${fmtW(v.day)}.${c ? ' Heads up: you’re rostered on.' : ''}`, 'Undo', undoTo(s));
+      if (ev.gcalWant) gcalAfterTick(ev);
+    }, 'Add to calendar', e.tix ? `<button type="button" class="btn" onclick="window.open(${jsArg(e.tix)},'_blank','noopener')">${I('ticket')} Get tickets</button>` : '');
+  const f = $('#sf');
+  const upd = () => { const c = evClash(f.day.value, f.when.value === 'time' ? f.time.value : '', f.when.value === 'time' ? f.end.value : ''); const p = $('#evclash'); p.style.display = c ? '' : 'none'; p.textContent = c ? '⚠️ ' + evClashTxt(c) + ' on ' + fmtW(f.day.value) + '.' : ''; $('#evrtime').style.visibility = f.remind.value === 'off' ? 'hidden' : 'visible'; };
+  if (multi) { const bx = f.querySelector('[data-seg="day"]'); bx.querySelectorAll('button').forEach(b => b.onclick = () => { bx.querySelectorAll('button').forEach(y => y.classList.remove('on')); b.classList.add('on'); f.day.value = b.dataset.v; upd(); }); }
+  wireSeg('when', w => { $('#evtimebox').style.display = w === 'time' ? '' : 'none'; if (w === 'time' && !f.time.value) f.time.value = '10:00'; upd(); });
+  f.querySelectorAll('.evtimes .chip').forEach(b => b.onclick = () => { f.time.value = b.dataset.s; f.end.value = b.dataset.e || ''; upd(); });
+  f.querySelectorAll('input,select').forEach(i => { i.addEventListener('input', upd); i.addEventListener('change', upd); });
+  f.remind.addEventListener('change', () => { if (f.remind.value === 'before' && f.remindAt.value === '07:00') f.remindAt.value = '19:00'; if (f.remind.value === 'day' && f.remindAt.value === '19:00') f.remindAt.value = '07:00'; upd(); });
+  upd();
+}
+// View email › Add to calendar, for any email: prefilled from the dates in it
+function emCal(k) {
+  const r = EM_REG[k]; if (!r) return; const b = r._body || {};
+  let e = null; try { e = evParse(b.subject || r.subject, b.text || r.text || '', b.html || '', r.at) || null; } catch (x) { }
+  if (!e) { let ds = []; try { ds = evDates(mbClean((b.subject || r.subject || '') + ' ' + (b.text || '')), r.at).filter(d => d.iso >= todayISO()); } catch (x) { }
+    const T = (() => { try { return evTimes(mbClean(b.text || '')); } catch (x) { return []; } })();
+    e = { name: String(b.subject || r.subject || '').replace(/^(re|fw|fwd):\s*/i, '').slice(0, 80), days: ds.length ? [ds[0].iso].concat(ds[0].days.slice(1)) : [todayISO()], time: T[0] ? T[0].s : '', end: T[0] ? T[0].e : '', times: T.slice(0, 4), place: '', tix: (() => { try { return evTixLink(b.html || '', b.text || ''); } catch (x) { return ''; } })() }; }
+  const m = emMsgs().find(x => x.src === r.src && x.id === r.id) || Object.assign({}, r);
+  const key = e.days && e.days.length && e.name ? evKeyOf(e) : 'ev|' + r.src + ':' + r.id;
+  closeSheet().then(() => evAddSheet(key, { ev: e, m }));
+}
+(() => { const o = emView; emView = async function (k) {
+  const p = o(k); // add the button once the sheet is open, then keep the body for prefilling
+  try { const bt = document.querySelector('#sf .btns'); if (bt && !bt.querySelector('.emcal')) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn emcal'; b.innerHTML = I('cal') + ' Add to calendar'; b.onclick = () => emCal(k); bt.insertBefore(b, bt.firstChild); } } catch (e) { }
+  await p; try { const r = EM_REG[k], el = document.querySelector('#emview'); if (r && el) { const s = el.querySelector('.emsubj'), bd = el.querySelector('.embody'); r._body = { subject: s ? s.textContent : r.subject, text: bd ? bd.textContent : '', html: r._html || '' }; } } catch (e) { }
+}; })();
+// emView reads the body as text; keep the HTML too so the ticket link can be found
+(() => { const o = mbAuthGet; mbAuthGet = async function (p, url) { const d = await o(p, url); try { if (p === 'microsoft' && /\/me\/messages\/[^/?]+\?\$select=subject,from,receivedDateTime,body,bodyPreview/.test(url) && d && d.body) { const id = decodeURIComponent(url.split('/me/messages/')[1].split('?')[0]); Object.values(EM_REG).forEach(r => { if (r.src === 'ms' && r.id === id) r._html = d.body.content || ''; }); } } catch (e) { } return d; }; })();
+// Family Google calendar: My events added from email (one-off) go there too
+(() => { const ob = gcalBody; gcalBody = function (a) { const b = ob(a); if (a && /^\d{2}:\d{2}$/.test(a.time || '') && /^\d{2}:\d{2}$/.test(a.endTime || '') && a.endTime > a.time) b.end = { dateTime: `${a.date}T${a.endTime}:00`, timeZone: 'Pacific/Auckland' }; return b; }; })();
+const evGcalAppts = () => (S.myEvents || []).filter(e => e && e.gcalWant && e.repeat === 'none' && parseD(e.start)).map(e => ({ id: e.id, title: e.title, date: (e.moves || {})[e.start] || e.start, time: e.time || '', endTime: e.endTime || '', place: e.place || '', notes: [e.notes || ''].filter(Boolean).join('\n'), gcalWant: true }));
+(() => { const o = mineSheet; mineSheet = function (id, orig) { o(id, orig); try { const ev = getMine(id); if (!ev) return; const dc = document.querySelector('#sheet .dcard');
+  if (dc && (ev.place || ev.endTime)) { const p = document.createElement('div'); p.className = 'muted'; p.style.marginTop = '4px'; p.textContent = [ev.time && ev.endTime ? 'Until ' + fmtTime(ev.endTime) : '', ev.place ? '📍 ' + ev.place : ''].filter(Boolean).join(' · '); dc.appendChild(p); }
+  const c = evClash((ev.moves || {})[orig] || orig, ev.time, ev.endTime); if (dc && c && ev.fromEv) { const w = document.createElement('div'); w.className = 'evclash'; w.textContent = '⚠️ ' + evClashTxt(c); dc.appendChild(w); }
+  const mb = document.querySelector('#sheet .minebtns'); if (mb && ev.tix) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.innerHTML = I('ticket') + ' Get tickets'; b.onclick = () => window.open(ev.tix, '_blank', 'noopener'); mb.appendChild(b); } } catch (e) { } }; })();
