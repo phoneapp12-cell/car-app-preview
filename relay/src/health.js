@@ -8,6 +8,30 @@
    heart-rate buckets and two weeks of sleep sessions are kept only so resent or edited records replace, not add.
    One KV write per delivery. */
 import { sha, seal, open, eq, b64url, rate, getCred } from './akahu.js';
+import { shanePush } from './shop-notify.js';
+/* 2.27.5: one push when today's steps reach his goal (and 10,000 if the goal is lower). My App sends the goal and the
+   on/off switch (/health/prefs). At most 3 a day, none from 10pm to 8am (NZ). Kept: goal, switch, today's sent list. */
+const K_PREF = 'health-prefs-v1';
+export function stepPushes(pref, steps, nzNow) {
+  if (!pref || pref.push === false || !(steps > 0)) return [];
+  const g = pref.goal > 0 ? pref.goal : 8000, st = pref.sent && pref.sent.date === nzNow.date ? pref.sent : { date: nzNow.date, keys: [], n: 0 };
+  if (nzNow.min < 480 || nzNow.min >= 1320) return [];
+  const want = [g].concat(g < 10000 ? [10000] : []).filter(m => steps >= m && !st.keys.includes(m));
+  const fmt = n => Number(n).toLocaleString('en-NZ');
+  return want.slice(0, Math.max(0, 3 - st.n)).slice(-1).map(m => ({ m, msg: m === g
+    ? { title: '\u{1F45F} Step goal reached', body: `${fmt(steps)} steps today. Nice work!`, url: '#watch', tag: 'steps-' + nzNow.date, ttl: 6 * 3600 }
+    : { title: '\u{1F45F} 10,000 steps today', body: `${fmt(steps)} and counting. Great going!`, url: '#watch', tag: 'steps-' + nzNow.date, ttl: 6 * 3600 } }));
+}
+async function stepPushRun(env, D, now = Date.now()) {
+  let pref = null; try { pref = JSON.parse(await env.EVENTS_KV.get(K_PREF) || 'null'); } catch (e) { pref = null; }
+  const z = nz(now), d = D.days[z.date]; const todo = stepPushes(pref, d && d.steps, z); if (!todo.length) return 0;
+  const g = pref.goal > 0 ? pref.goal : 8000;
+  pref.sent = pref.sent && pref.sent.date === z.date ? pref.sent : { date: z.date, keys: [], n: 0 };
+  // a bigger milestone also covers the smaller ones, so they don't come through later
+  [g, 10000].filter(m => m <= todo[0].m || (d.steps >= m)).forEach(m => { if (!pref.sent.keys.includes(m)) pref.sent.keys.push(m); });
+  pref.sent.n++; await env.EVENTS_KV.put(K_PREF, JSON.stringify(pref));
+  return shanePush(env, todo[0].msg, now);
+}
 const K_CRED = 'health-cred-v1', K_DATA = 'health-data-v1';
 const KEEP_DAYS = 400, KEEP_HR = 3, KEEP_SESS = 14, MAX_BODY = 4e6;
 const NZ = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -144,11 +168,19 @@ export async function healthRoute(path, request, env, okOrigin) {
     const D = await getData(env), types = applyPayload(D, p);
     D.lastAt = new Date().toISOString(); D.posts = (D.posts || 0) + 1; if (types.length) D.lastTypes = types;
     await env.EVENTS_KV.put(K_DATA, await seal(env, D));
+    if (types.includes('steps')) { try { await stepPushRun(env, D); } catch (e) { } }
     return [200, { ok: true, types }];
   }
   if (!okOrigin) return [403, { error: 'forbidden_origin' }];
   if (!(await appOk(env, request))) { if (!(await rate(env, 'health-badkey', 30, 3600))) return [429, { error: 'rate_limited' }]; return [401, { error: request.headers.get('X-Cash-Key') ? 'unauthorised' : 'no_key' }]; }
   const hc = await getHCred(env);
+  if (path === '/health/prefs' && request.method === 'POST') { // 2.27.5: step goal and push on/off from My App
+    let b = {}; try { b = await request.json(); } catch (e) { b = {}; }
+    const goal = Math.round(Number(b && b.goal)); if (!(goal >= 1000 && goal <= 50000)) return [400, { error: 'bad_goal' }];
+    let pref = null; try { pref = JSON.parse(await env.EVENTS_KV.get(K_PREF) || 'null'); } catch (e) { pref = null; }
+    pref = Object.assign(pref || {}, { goal, push: b.push !== false, at: new Date().toISOString() });
+    await env.EVENTS_KV.put(K_PREF, JSON.stringify(pref)); return [200, { ok: true, goal: pref.goal, push: pref.push }];
+  }
   if (path === '/health/status' && request.method === 'GET') return [200, status(hc, await getData(env))];
   if (path === '/health/daily' && request.method === 'GET') { const D = await getData(env); return [200, Object.assign(status(hc, D), { list: publicDays(D, Number(url.searchParams.get('days')) || 30) })]; }
   if (path === '/health/token' && request.method === 'POST') { // new sync code (replaces any old one); shown once
@@ -158,7 +190,7 @@ export async function healthRoute(path, request, env, okOrigin) {
     return [200, { ok: true, token: tok, url: url.origin + '/health/in', created: cred.created }];
   }
   if (path === '/health/revoke' && request.method === 'POST') { // stop syncing and delete the watch data
-    await env.EVENTS_KV.delete(K_CRED); await env.EVENTS_KV.delete(K_DATA);
+    await env.EVENTS_KV.delete(K_CRED); await env.EVENTS_KV.delete(K_DATA); await env.EVENTS_KV.delete(K_PREF);
     return [200, { ok: true, connected: false }];
   }
   return [404, { error: 'not_found' }];

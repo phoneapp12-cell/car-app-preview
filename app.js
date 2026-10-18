@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.4';
+const APP_VERSION = '2.27.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5534,7 +5534,7 @@ function todoForm(id, pre) {
     `<div class="two">${field('List', sel('list', (S.lists.includes(t.list) || !t.list ? S.lists : S.lists.concat(t.list)).map(l => [l, l]), t.list))}${field('Priority', sel('priority', [['high', 'High'], ['normal', 'Normal'], ['low', 'Low']], todoPriority(t)))}</div>` +
     field('Due date', inp('due', t.due, 'type="date"'), 'Optional') +
     field('Notes', area('notes', t.notes)) +
-    (isSarahTodo(t) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 0">${sarahBadge(t)} Sarah added this in her app. Changes and ticks here go back to her.</p>` :
+    (id && (isSarahTodo(t) || isMineShared(t)) ? sarahMoveBtn(id) : '') + (isSarahTodo(t) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 0">${sarahBadge(t)} Sarah added this in her app. Changes and ticks here go back to her.</p>` :
       isMineShared(t) ? `<p class="muted" id="sharednote" style="margin:4px 2px 0">Shared with Sarah. Changes and ticks here go to her list too.</p>` :
       `<label class="gfcheck sharebox"><input type="checkbox" name="share"><span><b>${id ? 'Share with Sarah' : 'Also add to Sarah’s list'}</b><small>It shows on her list with a blue S. She can tick it off too.</small></span></label>`) +
     (id ? todoStepsBlock(t, 'sheet') : '') +
@@ -8120,7 +8120,7 @@ function brandDetail(b) {
 function shopEdit(id) {
   const x = S.shop.items.find(i => i.id === id); if (!x) return;
   openSheet('Edit item', field('Item', inp('name', x.name, 'required maxlength="120"')) +
-    (isSarahShop(x) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 8px">${sarahBadge({ from: 'sarah' })} Sarah added this in her app. Changes, ticks and deletes here go back to her.</p>${x.brand ? brandDetail(x.brand) : ''}` :
+    ((isSarahShop(x) || isMineShared(x)) ? sarahMoveBtn(id) : '') + (isSarahShop(x) ? `<p class="muted" id="sarahnote" style="margin:4px 2px 8px">${sarahBadge({ from: 'sarah' })} Sarah added this in her app. Changes, ticks and deletes here go back to her.</p>${x.brand ? brandDetail(x.brand) : ''}` :
       isMineShared(x) ? `<p class="muted" id="sharednote" style="margin:4px 2px 8px">Shared with Sarah. Changes and ticks here go to her list too.</p>` :
       `<label class="gfcheck sharebox"><input type="checkbox" name="share"><span><b>Share with Sarah</b><small>It goes on her Shopping list with a blue S.</small></span></label>`) + (x.meals.length ? `<p class="muted" style="margin:-4px 0 8px">For ${esc(x.meals.join(', '))}</p>` : ''),
     async v => { if (!v.name) return 'Please type the item.'; x.name = v.name; const sh = v.share === 'on' && !isSarahShop(x) && !x.sharedS; if (sh) x.sharedS = true; await save(); render(); if (sh) toast('Shared with Sarah.'); }, 'Save',
@@ -8887,7 +8887,7 @@ function Health(arg, iid) {
   const chips = missing.length ? `<div class="chips hpeople">${missing.map(n => `<button class="chip" data-name="${n}" onclick="quickPerson('${n}')">${I('plus')} ${n}</button>`).join('')}</div>` : '';
   const nClaim = (() => { try { return claimRows().filter(x => claimOpen(x.claim)).length; } catch (e) { return 0; } })();
   return header('Health', S.health.length ? plural(S.health.length, 'person', 'people') : 'Dentist, doctor, check-ups and more', addBtn('Add a person', 'personForm()')) +
-    homeTry('watch', () => hwHealthCard(), '') +
+    homeTry('watch', () => hwHealthLink(), '') +
     `<button class="row card hclaimlink" id="hclaims" onclick="go('#claims')"><div class="ic health">${I('medkit')}</div><div style="flex:1;min-width:0"><div class="t">UniMed claims</div><div class="s">${nClaim ? plural(nClaim, 'claim') + ' to make' : 'Smart Claim helper: details, invoice photos, status'}</div></div>${I('right')}</button>` +
     (S.health.length ? S.health.map(p => {
       const next = healthNext(p).slice(0, 3);
@@ -10455,6 +10455,7 @@ function More() {
     pets: () => petsMoreSub(),
     garden: () => gardenMoreSub(),
     health: () => healthMoreSub(),
+    watch: () => { try { return hwWatchSub(); } catch (e) { return 'Steps, sleep and heart rate'; } },
     bridge: () => 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3],
     bills: () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…',
     birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
@@ -10496,7 +10497,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
   tv: ['tv', 'tv', 'TV guide', 'TV'],
-  meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], about: ['info', 'about', 'About you', 'About'],
+  meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], watch: ['heart', 'health', 'Watch', 'Watch'], about: ['info', 'about', 'About you', 'About'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], cashflow: ['coins', 'loan', 'Cash flow', 'Cash flow'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
@@ -10523,7 +10524,7 @@ const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[
 const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans'] }, // 2.26.91: UniMed claims live once, next to Health in People // 2.26.90: work hours, commission and wage estimate together under Money
-  { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
+  { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'watch', 'claims', 'about'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] }, // 2.26.94: its own heading like the other groups
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge', 'roadworks'] },
@@ -18671,7 +18672,7 @@ function render() {
   if (/^#(unimed|health\/claims|money\/claims)(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#claims'); renderedHash = '#claims'; } // 2.26.91: one UniMed claims page
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19775,7 +19776,7 @@ function glanceHome() {
   const orgZ = org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
-    wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + homeTry('watch strip', () => hwHomeStrip(), '') + cards +
+    wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + /* 2.27.5: watch figures are off Home (Health › Watch, updates on Notifications) */ cards +
     (m.night ? entZ + asks + orgZ : homeTry('gl work', () => glWorkCard(m), '') + orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
@@ -23154,3 +23155,132 @@ function stickRows() {
 }
 function isoOf(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 (() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const T = stickRows(); return T.length ? T.concat(L) : L; } catch (e) { return L; } }; })();
+/* ================= 2.27.5: watch updates on Notifications, and its own Watch page =================
+   Off Home at Shane's request: Health › Watch (#watch) has today's figures and the 7- and 30-day averages; the bell
+   (Notifications) gets the updates: last night's sleep, step milestones, streaks and a best day, a weekly recap on the first
+   day off, and a resting heart rate that's clearly off his usual (gentle, just factual). Everything comes from the watch
+   data the relay already has (never made up); no data, no card. Kind words only: a short night gets 'go easy today' or
+   nothing, never advice about bedtimes, late nights, work or anything else. Settings › Watch: notifications on/off,
+   step goal (8,000, or one of 6k–12k, or his own recent average), and the step-goal push (relay; max 3 a day, none 10pm–8am). */
+const hwSet = () => (S.settings || {});
+const hwCardsOn = () => hwSet().watchCards !== false, hwPushOn = () => hwSet().watchPush !== false;
+function hwRecent(n, before) { const out = []; const end = before || nzISO(Date.now()); for (let i = 1; i <= n; i++) { const k = addDays(end, -i), x = hwDay(k); if (x) out.push(x); } return out; }
+function hwAvgSteps(n, before) { const L = hwRecent(n, before).filter(x => x.steps >= 500); return L.length >= 3 ? Math.round(L.reduce((a, x) => a + x.steps, 0) / L.length) : null; }
+function hwGoal() { const g = hwSet().stepGoal; if (g === 'avg') { const a = hwAvgSteps(14); return a ? Math.min(15000, Math.max(4000, Math.round(a / 500) * 500)) : 8000; } const n = Number(g); return n >= 1000 && n <= 50000 ? n : 8000; }
+function hwAvgSleep(n, before) { const L = hwRecent(n, before).filter(x => x.sleep && x.sleep.mins > 120); return L.length >= 3 ? Math.round(L.reduce((a, x) => a + x.sleep.mins, 0) / L.length) : null; }
+function hwRestUsual(before) { const L = hwRecent(14, before).filter(x => x.hr && x.hr.rest && !x.hr.restEst).map(x => x.hr.rest).sort((a, b) => a - b); return L.length >= 7 ? L[Math.floor(L.length / 2)] : null; }
+function hwStreak(goal) { const T = nzISO(Date.now()); let n = 0, d = T; const td = hwDay(T); if (!(td && td.steps >= goal)) d = addDays(T, -1); for (; ;) { const x = hwDay(d); if (x && x.steps >= goal) { n++; d = addDays(d, -1); } else break; if (n > 400) break; } return n; }
+const hwDeepRem = st => !st ? '' : [['deep', 'deep'], ['rem', 'REM']].filter(([k]) => st[k] > 0).map(([k, l]) => hwMins(st[k]) + ' ' + l).join(' · ');
+const hwK = (k, x) => 'hw-' + k + '-' + x;
+function hwCards() {
+  if (!hwOn() || !hwCardsOn()) return []; setTimeout(() => hwRefresh(), 0);
+  const T = nzISO(Date.now()), td = hwDay(T), goal = hwGoal(), L = [];
+  const card = (k, ic, t, s) => L.push({ k, ic, t, s });
+  // last night's sleep (the watch files a night under the morning it ended)
+  const sl = td && td.sleep;
+  if (sl && sl.mins > 60 && nzISO(Date.parse(sl.end)) === T) {
+    const avg = hwAvgSleep(7, T), when = `${hwHM(sl.start)}–${hwHM(sl.end)}`, st = hwDeepRem(sl.stages);
+    if (sl.mins < 360) card(hwK('sleep', T), '😴', `Short one last night, ${hwMins(sl.mins)}`, 'Go easy today.');
+    else card(hwK('sleep', T), '😴', (sl.mins >= 420 ? 'Great sleep last night, ' : 'Last night: ') + hwMins(sl.mins), [when, st, avg ? (sl.mins >= avg + 15 ? `more than your 7-day average (${hwMins(avg)})` : `7-day average ${hwMins(avg)}`) : ''].filter(Boolean).join(' · '));
+  }
+  // steps: the biggest milestone reached today (5,000 · goal · 10,000)
+  const s = td && td.steps || 0, ms = [...new Set([5000, goal, 10000])].sort((a, b) => a - b).filter(m => s >= m), m = ms[ms.length - 1];
+  if (m) card(hwK('steps', T + '-' + m), '👟', m === goal ? `Step goal reached: ${hwNum(goal)}` : `${hwNum(m)} steps today`, m === goal ? `${hwNum(s)} so far. Nice work!` : m < goal ? `${hwNum(s)} so far · ${hwNum(goal - s)} to your ${hwNum(goal)} goal` : `${hwNum(s)} so far. Great going!`);
+  // streaks and a best day
+  const n = hwStreak(goal); if (n >= 3) card(hwK('streak', T + '-' + n), '🔥', `${n} days in a row over ${hwNum(goal)} steps`, 'Keep it rolling.');
+  const prev = hwRecent(400, T).filter(x => x.steps > 0);
+  if (prev.length >= 14 && s >= goal && s > Math.max(...prev.map(x => x.steps))) card(hwK('best', T), '🏆', `Best day yet: ${hwNum(s)} steps`, 'Your most since the watch started syncing.');
+  // weekly recap on the first day off after work days
+  try { const a = homeAklParts(new Date()) || {}, r = rosterState(), off = !r.days[String(a.dow)], wasWork = !!r.days[String((a.dow + 6) % 7)];
+    const wk = hwRecent(7, T); const st7 = wk.filter(x => x.steps > 0);
+    if (off && wasWork && st7.length >= 4) { const avg = Math.round(st7.reduce((t, x) => t + x.steps, 0) / st7.length), hit = st7.filter(x => x.steps >= goal).length, best = st7.reduce((a, b) => b.steps > a.steps ? b : a), sa = hwAvgSleep(7, T);
+      card(hwK('week', T), '📊', 'Your week from the watch', [`${hwNum(avg)} steps a day`, hit ? `goal on ${hit} of ${st7.length} days` : '', `best ${hwNum(best.steps)} on ${WDL[new Date(best.date + 'T12:00:00').getDay()].slice(0, 3)}`, sa ? `sleep ${hwMins(sa)} a night` : ''].filter(Boolean).join(' · ') + '. Enjoy your day off!'); } } catch (e) { }
+  // resting heart rate, only when it's clearly away from his usual (7+ bpm), measured by the watch (not estimated)
+  const hr = td && td.hr, us = hwRestUsual(T);
+  if (hr && hr.rest && !hr.restEst && us && Math.abs(hr.rest - us) >= 7) card(hwK('hr', T), '❤️', `Resting heart rate ${hr.rest} today`, `${hr.rest > us ? 'A little above' : 'A little below'} your usual ${us} bpm. Just so you know.`);
+  const gone = nfDis();
+  return L.filter(c => !gone.includes(c.k)).map(c => `<div class="row glnew" data-nk="${c.k}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('#watch')"><div class="ic">${c.ic}</div><div class="tx"><div class="t">${esc(c.t)}</div><div class="s">${esc(c.s)} · Watch</div></div></div>`);
+}
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const W = hwCards(); return W.length ? W.concat(L) : L; } catch (e) { return L; } }; })();
+// swipe-archive of a watch card sticks (same store as For you rows)
+(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^hw-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
+// Summary page (not Home): at most one short kind line, no figures
+function hwCheer() {
+  if (!hwOn() || !hwCardsOn()) return ''; const T = nzISO(Date.now()), td = hwDay(T); if (!td) return '';
+  const goal = hwGoal(), L = [];
+  if (td.steps >= goal) L.push('Step goal done today. Nice work!');
+  else if (td.steps > 0 && goal - td.steps <= 1500) L.push('Nearly at your step goal for today.');
+  if (td.sleep && td.sleep.mins >= 420 && nzISO(Date.parse(td.sleep.end)) === T) L.push('Good sleep last night.');
+  if (hwStreak(goal) >= 3) L.push('Your step streak is still going.');
+  return L.length ? L[Math.floor(Date.now() / 600e3) % L.length] : '';
+}
+(() => { const o = homeSumCard; homeSumCard = function (bits) { try { const c = hwCheer(); if (c && (!bits || bits.length < 4)) bits = (bits || []).concat([{ kind: 'watch', text: c }]); } catch (e) { } return o.call(this, bits); }; })();
+// goal and push switch to the relay (for the step-goal push), when they change and once a day
+async function hwPrefsSync(force) { try { if (!hwOn() || !cfKey()) return; const tag = hwGoal() + '|' + hwPushOn() + '|' + todayISO(); if (!force && localStorage.getItem('hwPref') === tag) return;
+  const [s] = await cfApi('/health/prefs', 'POST', { goal: hwGoal(), push: hwPushOn() }); if (s === 200) localStorage.setItem('hwPref', tag); } catch (e) { } }
+setTimeout(() => hwPrefsSync(), 8000);
+// Health page: a short line that opens the Watch page
+function hwWatchSub() { const td = hwDay(nzISO(Date.now())); return hwOn() ? (td && td.steps != null ? hwNum(td.steps) + ' steps today' : 'Waiting for today’s data') : 'Steps, sleep and heart rate'; }
+function hwHealthLink() { if (!hwOn()) return ''; return `<button class="row card" id="hwlink" onclick="go('#watch')"><div class="ic health">${I('heart')}</div><div style="flex:1;min-width:0"><div class="t">⌚ Watch</div><div class="s">${esc(hwWatchSub())} · averages, trends and streaks</div></div>${I('right')}</button>`; }
+function hwStats(n) { const L = hwRecent(n, addDays(nzISO(Date.now()), 1)); const st = L.filter(x => x.steps > 0), sl = L.filter(x => x.sleep && x.sleep.mins > 120), hr = L.filter(x => x.hr && x.hr.rest);
+  const av = (a, f) => a.length ? Math.round(a.reduce((t, x) => t + f(x), 0) / a.length) : null;
+  return { steps: av(st, x => x.steps), sleep: av(sl, x => x.sleep.mins), rest: av(hr, x => x.hr.rest), lo: hr.length ? Math.min(...hr.map(x => x.hr.min || x.hr.rest)) : null, hi: hr.length ? Math.max(...hr.map(x => x.hr.max || x.hr.rest)) : null,
+    best: st.length ? st.reduce((a, b) => b.steps > a.steps ? b : a) : null, nSt: st.length, nSl: sl.length, nHr: hr.length }; }
+function WatchPage() {
+  if (!hwOn()) return header('Watch', 'Huawei watch') + `<div class="card"><p>Connect your watch in Settings › Watch to see steps, sleep and heart rate here.</p><button class="btn" onclick="go('#settings')">Open Settings</button></div>`;
+  setTimeout(() => hwRefresh(), 0);
+  const T = nzISO(Date.now()), td = hwDay(T) || {}, goal = hwGoal(), w = hwStats(7), m = hwStats(30), streak = hwStreak(goal);
+  const dow = d => HW_DOW[new Date(d + 'T12:00:00').getDay()];
+  const days = n => { const out = []; for (let i = n - 1; i >= 0; i--) { const k = addDays(T, -i); out.push({ k, x: hwDay(k) }); } return out; };
+  const stepBars = hwBars(days(7).map(o => ({ label: dow(o.k), v: o.x && o.x.steps || 0, today: o.k === T })));
+  const sleepBars = hwBars(days(7).map(o => ({ label: dow(o.k), v: o.x && o.x.sleep ? o.x.sleep.mins : 0, today: o.k === T })), 'sl');
+  const hrD = days(14).map(o => ({ label: dow(o.k), v: o.x && o.x.hr && o.x.hr.rest || 0, today: o.k === T })), hv = hrD.filter(x => x.v);
+  const step30 = hwBars(days(30).map(o => ({ label: '', v: o.x && o.x.steps || 0, today: o.k === T })), 'mini');
+  const cell = (b, s) => `<div class="hwcell"><b>${b}</b><small>${s}</small></div>`, dash = '–';
+  const sl = td.sleep;
+  let longest = 0; { let run = 0; days(60).forEach(o => { if (o.x && o.x.steps >= goal) { run++; longest = Math.max(longest, run); } else run = 0; }); }
+  return header('Watch', 'From your Huawei watch') +
+    `<div class="card hwcard"><div class="t" style="font-weight:800">Today</div><div class="hwgrid">${cell(td.steps != null ? hwNum(td.steps) : dash, 'steps · goal ' + hwNum(goal))}${cell(sl ? hwMins(sl.mins) : dash, 'sleep last night')}${cell(td.hr && td.hr.rest ? td.hr.rest + ' bpm' : dash, 'resting HR' + (td.hr && td.hr.restEst ? ' (estimate)' : ''))}</div>
+     ${sl ? `<div class="s">${hwHM(sl.start)}–${hwHM(sl.end)}${hwStageTxt(sl.stages) ? ' · ' + esc(hwStageTxt(sl.stages)) : ''}</div>` : ''}${td.hr && td.hr.min ? `<div class="s">Heart rate today ${td.hr.min}–${td.hr.max} bpm, average ${td.hr.avg}</div>` : ''}</div>` +
+    `<div class="card hwcard"><div class="t" style="font-weight:800">Averages</div><div class="hwtab"><div></div><b>7 days</b><b>30 days</b>
+      <span>Steps</span><span>${w.steps != null ? hwNum(w.steps) : dash}</span><span>${m.steps != null ? hwNum(m.steps) : dash}</span>
+      <span>Sleep</span><span>${w.sleep != null ? hwMins(w.sleep) : dash}</span><span>${m.sleep != null ? hwMins(m.sleep) : dash}</span>
+      <span>Resting HR</span><span>${w.rest != null ? w.rest + ' bpm' : dash}</span><span>${m.rest != null ? m.rest + ' bpm' : dash}</span>
+      <span>HR range</span><span>${w.lo != null ? w.lo + '–' + w.hi : dash}</span><span>${m.lo != null ? m.lo + '–' + m.hi : dash}</span></div>
+      <div class="s" style="margin-top:6px">${m.nSt ? `From ${plural(m.nSt, 'day')} of steps in the last 30.` : 'No steps in yet.'}</div></div>` +
+    `<div class="card hwcard"><div class="t" style="font-weight:800">Steps this week</div>${stepBars}<div class="t" style="font-weight:700;margin-top:10px">Last 30 days</div>${step30}
+      <div class="hwgrid">${cell(m.best ? hwNum(m.best.steps) : dash, m.best ? 'best day · ' + esc(fmtW(m.best.date)) : 'best day')}${cell(streak ? plural(streak, 'day') : dash, 'current streak over goal')}${cell(longest ? plural(longest, 'day') : dash, 'longest streak (60 days)')}</div></div>` +
+    `<div class="card hwcard"><div class="t" style="font-weight:800">Sleep this week</div>${sleepBars}</div>` +
+    (hv.length ? `<div class="card hwcard"><div class="t" style="font-weight:800">Resting heart rate · 2 weeks</div>${hwBars(hrD, 'hr', Math.max(0, Math.min(...hv.map(x => x.v)) - 6))}</div>` : '') +
+    `<div class="s" style="margin:6px 4px;opacity:.75">${esc(hwStatusLine())} Updates go to Notifications.</div>`;
+}
+async function hwSetGoal(v) { S.settings = S.settings || {}; S.settings.stepGoal = v === 'avg' ? 'avg' : Number(v); await save(); hwPrefsSync(true); render(); toast('Step goal: ' + (v === 'avg' ? 'your recent average (' + hwNum(hwGoal()) + ')' : hwNum(hwGoal())) + '.'); }
+async function hwToggle(k) { S.settings = S.settings || {}; S.settings[k] = S.settings[k] === false; await save(); if (k === 'watchPush') hwPrefsSync(true); render(); }
+function hwPrefRows() { const g = hwSet().stepGoal, cur = g === 'avg' ? 'avg' : String(hwGoal());
+  const opts = [['6000', '6,000'], ['7000', '7,000'], ['8000', '8,000'], ['10000', '10,000'], ['12000', '12,000'], ['avg', 'My recent average']];
+  const sw = (k, on, t, sub) => `<div class="srow"><div class="tx"><div class="t">${t}</div><div class="s">${sub}</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${t}" onclick="hwToggle('${k}')"></button></div>`;
+  return sw('watchCards', hwCardsOn(), 'Watch updates on Notifications', 'Last night’s sleep, step milestones, streaks, a weekly recap on your first day off.') +
+    `<div class="srow"><div class="tx"><div class="t">Daily step goal</div><div class="s">${g === 'avg' ? 'Your last two weeks: ' + hwNum(hwGoal()) : 'Used for milestones and streaks'}</div></div><select onchange="hwSetGoal(this.value)" aria-label="Daily step goal">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${l}</option>`).join('')}</select></div>` +
+    sw('watchPush', hwPushOn(), 'Phone notification when you reach it', 'At most 3 a day, none between 10pm and 8am.'); }
+(() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { return hwOn() ? h + `<div class="list" id="hwprefs">${hwPrefRows()}</div>` : h; } catch (e) { return h; } }; })();
+/* ================= 2.27.5: move a shared item between Sarah's lists =================
+   'Move to…' on any shared item (her to-dos and Shopping items, and his ones shared with her): pick one of her lists and it
+   moves there in both apps through the usual shared sync (only the list changes, so it never counts as a tick). Her lists:
+   Home and Shopping (her app always has these) plus any other list one of her shared items is on (her private items and
+   empty private lists never reach this phone). Shopping ↔ to-do moves turn it into a shopping item or a to-do here too. */
+function sarahListNames() { const L = ['Home', 'Shopping']; try { SH.items().forEach(v => { const l = String(v.list || '').trim(); if (l && l !== 'Appointments' && !L.some(x => x.toLowerCase() === l.toLowerCase())) L.push(l); }); } catch (e) { } return L; }
+const sarahMoveBtn = id => `<div class="btns" style="margin:2px 0 8px"><button type="button" class="btn small" id="smove" onclick="sarahMoveSheet(${jsArg(id)})">⋯ Move to another of Sarah’s lists</button></div>`;
+function sarahMoveView(id) { try { return SH.items().find(v => v && v.id === id && !v._appt && !v._mine && !v._hitem) || null; } catch (e) { return null; } }
+async function sarahMoveSheet(id) {
+  const v = sarahMoveView(id); if (!v) { toast('Only shared items can move between Sarah’s lists.'); return; }
+  const cur = String(v.list || ''), L = sarahListNames().filter(l => l.toLowerCase() !== cur.toLowerCase());
+  if (sheetOpen) await closeSheet();
+  openSheet('Move to…', `<p class="muted" style="margin:-4px 2px 10px">“${esc(v.title)}” is on Sarah’s <b>${esc(cur || 'Home')}</b> list. It moves in her app too.</p><div class="list">${L.map(l => `<button type="button" class="row" onclick="sarahMove(${jsArg(id)},${jsArg(l)})"><div class="tx"><div class="t">${esc(l)}</div></div>${I('right')}</button>`).join('')}</div>`);
+}
+async function sarahMove(id, list) {
+  const v = sarahMoveView(id); if (!v) return; const s0 = snap();
+  const x = { id, title: v.title, list, due: v.due || '', notes: v.notes || '', priority: v.priority || 'normal', done: !!v.done, doneAt: v.doneAt, created: v.created, by: SH.by(v), ...(v.brand && isSarahShopList(list) ? { brand: v.brand } : {}) };
+  try { SH.update(v, x); } catch (e) { toast('Couldn’t move that one.'); return; }
+  await save(); await closeSheet(); render(); try { sharedSoon(500); } catch (e) { }
+  toast(`Moved to Sarah’s ${list} list.`, 'Undo', undoTo(s0));
+}

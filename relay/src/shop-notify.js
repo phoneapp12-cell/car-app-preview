@@ -79,6 +79,13 @@ export async function queueTicks(env, key, before, after, now = Date.now()) {
   if (!queued) return { queued: 0 };
   e.seen = e.seen.slice(-SEEN_MAX); await store(env, doc); return { queued };
 }
+// 2.27.5: Shane's phone push address(es), whichever shared list they're under (for the watch step-goal pushes)
+export async function shanePush(env, msg, now = Date.now(), fetchImpl = fetch) {
+  if (!env || !env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return 0;
+  const doc = await load(env), seen = new Set(); let sent = 0;
+  for (const h of Object.keys(doc)) for (const s of ((doc[h] && doc[h].subs && doc[h].subs.shane) || [])) { if (seen.has(s.id)) continue; seen.add(s.id); if (await sendPush(s, msg, env, fetchImpl, now) === 'ok') sent++; }
+  return sent;
+}
 async function sarahSubs(env, sunK) {
   try { const d = (await env.EVENTS_KV.get(SUN_KEY, { type: 'json' })) || {}; return (Array.isArray(d.subs) ? d.subs : []).filter(s => s.k === sunK); } catch (e) { return []; }
 }
