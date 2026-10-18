@@ -7,6 +7,8 @@
  *   RNZ Country    https://www.rnz.co.nz/rss/country.xml
  *   RNZ New Zealand https://www.rnz.co.nz/rss/national.xml  (NZ-wide news)
  *   NZ Herald (NZ section) https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/nz/?outputType=xml
+ *   NZ Herald Northern Advocate https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/news/?outputType=xml&_website=northern-advocate (2.27.4)
+ *   The same story from RNZ and the Herald shows once (RNZ kept: not paywalled). See sameStory().
  * Any story whose headline or summary is about courts, crime, violence, deaths or sexual matters is dropped
  * (BLOCK below). Headline, link, time and source name only. No article body, nothing invented, no AI.
  * Two sections (2.23.6): local (Northland, up to 7 days old) and New Zealand (up to 3 days old).
@@ -22,15 +24,17 @@ export const NEWS_FEEDS = [
   { id: 'indepth', name: 'RNZ In Depth', url: 'https://www.rnz.co.nz/rss/in-depth.xml' },
   { id: 'country', name: 'RNZ Country', url: 'https://www.rnz.co.nz/rss/country.xml' },
   { id: 'national', name: 'RNZ New Zealand', url: 'https://www.rnz.co.nz/rss/national.xml' },
-  { id: 'herald', name: 'NZ Herald', url: 'https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/nz/?outputType=xml', host: 'www.nzherald.co.nz' }
+  { id: 'herald', name: 'NZ Herald', url: 'https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/nz/?outputType=xml', host: 'www.nzherald.co.nz' },
+  // 2.27.4: NZ Herald's Northern Advocate (Whangārei / Northland) news. Only stories that name a Northland place.
+  { id: 'heraldnorth', name: 'NZ Herald', url: 'https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/news/?outputType=xml&_website=northern-advocate', host: 'www.nzherald.co.nz', local: true, sportOut: true }
 ];
-const KV_KEY = 'rnz-news-v4';
+const KV_KEY = 'rnz-news-v5';
 const TTL = 10 * 60 * 1000;
 const MAX_ITEMS = 12;
 const MAX_ALL = 24;
 // Courts, crime, violence, deaths, sexual matters. Matched on headline + summary, whole words.
 export const BLOCK = new RegExp('\\b(' + [
-  'courts?', 'courtroom', 'trials?', 'retrial', 'jury', 'sentenc\\w*', 'judges?', 'judicial review', 'jail\\w*', 'prisons?', 'prisoners?', 'inmates?',
+  'courts?', 'courtroom', 'criminal\\w*', 'trials?', 'retrial', 'jury', 'sentenc\\w*', 'judges?', 'judicial review', 'jail\\w*', 'prisons?', 'prisoners?', 'inmates?',
   'charged', 'charges? laid', 'facing charges', 'accused', 'guilty', 'convict\\w*', 'acquit\\w*', 'plead\\w*', 'pleaded', 'bail', 'parole',
   'murder\\w*', 'homicides?', 'manslaughter', 'kill\\w*', 'death of', 'deaths?', 'died', 'dies', 'dead', 'bod(y|ies) found', 'remains found', 'coroner\\w*', 'inquest',
   'stab\\w*', 'shooting', 'shootings', 'shooters?', 'shot dead', 'shot', 'gunm[ae]n', 'guns?', 'firearms?', 'armed', 'weapons?', 'assault\\w*', 'attack\\w*', 'violen\\w*', 'brawl\\w*', 'fight(s|ing)? (broke|outside)',
@@ -69,6 +73,13 @@ function clean(s) {
   return decode(String(s || '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 }
 
+// 2.27.4: the Herald carries a lot of sport (the app drops sport too; this keeps the feed's room for other stories)
+export const SPORT_RE = /\b(sport|sports|rugby|npc|super rugby|all blacks|black ferns|league|nrl|warriors|netball|silver ferns|cricket|black caps|white ferns|football|soccer|a-league|phoenix|basketball|breakers|tall blacks|tennis|golf|golfer|motorsport|supercars|speedway|f1|formula one|olympic\w*|commonwealth games|hockey|rowing|cycling|triathlon|marathon|boxing|ufc|mma|surfing champs?|yachting|america'?s cup|sailgp|horse racing|trots|harness|fixture|semi-?finals?|try-scoring|wicket|innings)\b/i;
+// 2.27.4: same story from two outlets? Compare headline words (lower case, macrons off, short and common words out,
+// plural s off). Same if at least 3 words are shared and they make up 60% or more of the shorter headline.
+const STOP = new Set('the a an and or of to in on for at by with from as is are was were be been has have had it its this that new nz zealand says say said after over into up out about more than not but will can could would after amid first how why what who when where'.split(' '));
+export function storyWords(t) { return [...new Set(String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w)).map(w => w.length > 4 ? w.replace(/(ies)$/, 'y').replace(/s$/, '') : w))]; }
+export function sameStory(a, b) { const A = storyWords(a), B = new Set(storyWords(b)); if (!A.length || !B.size) return false; const n = A.filter(w => B.has(w)).length; return n >= 3 && n / Math.min(A.length, B.size) >= 0.6; }
 export function isLocalStory(title, description, url) {
   const blob = (title + ' ' + description + ' ' + url).toLowerCase();
   if (PLACES.some(p => blob.includes(p))) return true;
@@ -102,6 +113,7 @@ export function parseRss(xml, feed) {
     if (/no longer available|feed not found/i.test(title)) continue;
     if (feed.local && !isLocalStory(title, description, url)) continue;
     if (isBlocked(title, description)) continue;
+    if (feed.host === 'www.nzherald.co.nz' && (/\bquiz\b/i.test(title) || SPORT_RE.test(title) || /\/sport\//.test(url))) continue;
     if (seen.has(url)) continue;
     seen.add(url);
     items.push({ title, url, published: new Date(publishedMs).toISOString(), src: feed.name, local: !!feed.local });
@@ -133,7 +145,7 @@ function mixSources(all) {
   return mixed;
 }
 export function mergeFeeds(parts, now = Date.now(), prev = null) {
-  const local = [], nz = [], urls = new Set(), titles = new Set();
+  const local = [], nz = [], urls = new Set(), titles = new Set(), kept = [];
   let localOk = false, nzOk = false;
   parts.forEach(p => {
     if (p.local) localOk = true; else nzOk = true;
@@ -144,6 +156,8 @@ export function mergeFeeds(parts, now = Date.now(), prev = null) {
       if (!(age <= (isLocal ? LOCAL_DAYS : NZ_DAYS) * 864e5)) return;
       const t = x.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
       if (urls.has(x.url) || titles.has(t)) return;
+      if (kept.some(y => sameStory(y, x.title))) return; // RNZ feeds come first, so RNZ's copy is the one kept
+      kept.push(x.title);
       urls.add(x.url); titles.add(t);
       (isLocal ? local : nz).push({ ...x, local: isLocal });
     });

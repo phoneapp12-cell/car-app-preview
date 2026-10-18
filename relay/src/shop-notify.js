@@ -63,6 +63,22 @@ export async function queueShop(env, key, before, after, now = Date.now()) {
   return { queued };
 }
 
+// 2.27.4: shared to-dos Sarah has just ticked off (not done before this sync, done now, ticked by her). Not Shopping or Appointments.
+export function newSarahTicks(before, after) {
+  const was = new Map((before || []).map(x => [x && x.id, x]));
+  return (after || []).filter(x => { if (!x || x.deleted || !x.done || x.doneBy !== 'sarah' || /^(shopping|appointments)$/i.test(String(x.list || '').trim())) return false;
+    const b = was.get(x.id); return b && !b.deleted && !b.done; });
+}
+export async function queueTicks(env, key, before, after, now = Date.now()) {
+  const fresh = newSarahTicks(before, after); if (!fresh.length) return { queued: 0 };
+  const h = await listHash(key), doc = await load(env), e = entry(doc, h);
+  if (e.pref && e.pref.ticks === false) return { queued: 0 };
+  const tk = 'tick:'; const seen = new Set(e.seen); let queued = 0;
+  for (const x of fresh) { const id = tk + x.id + ':' + (x.doneAt || x.updated); if (seen.has(id)) continue; seen.add(id); e.seen.push(id);
+    const q = e.q.ticks = e.q.ticks || { at: now, items: [] }; if (q.items.length < ITEMS_MAX) q.items.push(String(x.title || '').slice(0, 80)); else q.more = (q.more || 0) + 1; queued++; }
+  if (!queued) return { queued: 0 };
+  e.seen = e.seen.slice(-SEEN_MAX); await store(env, doc); return { queued };
+}
 async function sarahSubs(env, sunK) {
   try { const d = (await env.EVENTS_KV.get(SUN_KEY, { type: 'json' })) || {}; return (Array.isArray(d.subs) ? d.subs : []).filter(s => s.k === sunK); } catch (e) { return []; }
 }
@@ -81,6 +97,7 @@ export async function runShop(env, fetchImpl = fetch, now = Date.now()) {
     const e = entry(doc, h);
     for (const to of WHO) {
       const q = e.q[to]; if (!q || now - q.at < BATCH_MS) continue;
+      if (to === 'shane' && e.pref && e.pref.shop === false) { delete e.q[to]; changed = true; continue; }
       const from = to === 'shane' ? 'sarah' : 'shane';
       const labels = q.items.concat(q.more ? [`${q.more} more`] : []);
       const subs = to === 'sarah' ? await sarahSubs(env, e.sun) : (e.subs.shane || []);
@@ -89,6 +106,14 @@ export async function runShop(env, fetchImpl = fetch, now = Date.now()) {
       for (const s of subs) { const r = await sendPush(s, msg, env, fetchImpl, now); if (r === 'ok') sent++; else if (r === 'gone') gone.add(s.id); }
       if (to === 'shane' && gone.size) e.subs.shane = (e.subs.shane || []).filter(s => !gone.has(s.id));
       delete e.q[to]; changed = true; // one try per batch; the item is on the list either way
+    }
+    const t = e.q.ticks;
+    if (t && now - t.at >= BATCH_MS) {
+      const labels = t.items.concat(t.more ? [`${t.more} more`] : []), gone = new Set();
+      const msg = { title: '\u2705 Sarah ticked off' + (labels.length > 1 ? ` ${labels.length} to-dos` : ''), body: shopBody(labels), url: '#alerts', tag: 'tick-' + t.at, ttl: 24 * 3600 };
+      if (!(e.pref && e.pref.ticks === false)) for (const s of (e.subs.shane || [])) { const r = await sendPush(s, msg, env, fetchImpl, now); if (r === 'ok') sent++; else if (r === 'gone') gone.add(s.id); }
+      if (gone.size) e.subs.shane = (e.subs.shane || []).filter(s => !gone.has(s.id));
+      delete e.q.ticks; changed = true;
     }
   }
   if (changed) await store(env, doc);
@@ -113,6 +138,8 @@ export async function sharedPushRoute(path, body, env, now = Date.now()) {
     if (limited(now)) return [429, { error: 'too_many' }];
     const sub = cleanSub(body && body.subscription); if (!sub) return [400, { error: 'bad_subscription' }];
     const prevId = typeof body.previous === 'string' ? await hash16(body.previous) : '';
+    const pref = { shop: body.shop !== false, ticks: body.ticks !== false }, prefCh = JSON.stringify(e.pref || { shop: true, ticks: true }) !== JSON.stringify(pref);
+    e.pref = pref; if (prefCh) await store(env, doc);
     const old = list.find(s => s.id === id);
     if (old && old.keys.p256dh === sub.keys.p256dh && old.keys.auth === sub.keys.auth && !prevId) return [200, { subscribed: true, same: true }];
     e.subs[who] = list.filter(s => s.id !== id && s.id !== prevId).concat([{ id, endpoint: sub.endpoint, keys: sub.keys, at: now }]).slice(-SUBS_MAX);

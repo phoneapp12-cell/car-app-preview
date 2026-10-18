@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.3';
+const APP_VERSION = '2.27.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5394,7 +5394,7 @@ async function sharedSync() {
     const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 15000);
     let d;
     try {
-      const r = await fetch(SHARED_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, items: sent }), signal: ctl.signal });
+      const r = await fetch(SHARED_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, items: sent, from: 'shane' }), signal: ctl.signal });
       if (!r.ok) throw new Error('http ' + r.status);
       d = await r.json();
     } finally { clearTimeout(to); }
@@ -5409,7 +5409,7 @@ async function sharedSync() {
       if (s.deleted) { if (local) { SH.remove(s.id); changed = true; } delete st.snap[s.id]; return; }
       if (!SH.want(s)) return;
       if (!local) { SH.add(s); changed = true; }
-      else if (sharedHash(local) !== sharedHash(s)) { SH.update(local, s); changed = true; }
+      else if (sharedHash(local) !== sharedHash(s)) { try { stickNote(local, s); } catch (e) { } SH.update(local, s); changed = true; }
       st.snap[s.id] = sharedHash(s);
     });
     // queued deletes the list no longer holds: done
@@ -10344,11 +10344,11 @@ async function scheduleReminders() {
    Settings > Shopping pushes can switch it off. */
 async function shopPushReg(sub) {
   if (!sub || !RELAY_URL || typeof SHARED_KEY === 'undefined') return;
-  const off = (S.settings || {}).shopPush === false, ep = sub.endpoint, k = 'shopPushReg', was = localStorage.getItem(k) || '';
+  const shopOn = (S.settings || {}).shopPush !== false, tickOn = (S.settings || {}).sarahTicks !== false, off = !shopOn && !tickOn, ep = sub.endpoint, k = 'shopPushReg', was = localStorage.getItem(k) || '';
   if (off) { if (was) { try { await pushPost('/shared-push/unsubscribe', { key: SHARED_KEY, who: 'shane', endpoint: ep }); localStorage.removeItem(k); } catch (e) { } } return; }
-  const tag = ep.slice(-24) + '|' + todayISO(); if (was === tag) return;
+  const tag = ep.slice(-24) + '|' + todayISO() + '|' + (shopOn ? 1 : 0) + (tickOn ? 1 : 0); if (was === tag) return;
   const prev = was && !ep.endsWith(was.split('|')[0]) ? localStorage.getItem('shopPushEp') || undefined : undefined;
-  await pushPost('/shared-push/subscribe', { key: SHARED_KEY, who: 'shane', subscription: sub.toJSON(), ...(prev ? { previous: prev } : {}) });
+  await pushPost('/shared-push/subscribe', { key: SHARED_KEY, who: 'shane', subscription: sub.toJSON(), shop: shopOn, ticks: tickOn, ...(prev ? { previous: prev } : {}) });
   localStorage.setItem(k, tag); localStorage.setItem('shopPushEp', ep);
 }
 async function enableReminderPush() {
@@ -22632,10 +22632,16 @@ async function bellPinTap(ev, btn) {
   else { const e = bpEntry(el), tm = ((el.querySelector('.tick') || { getAttribute: () => '' }).getAttribute('onclick') || '').match(/tick\('([^']+)'\)/); P.unshift({ id, t: String(e.title || '').slice(0, 160), s: String(e.body || '').slice(0, 240), link: e.link || '', at: new Date().toISOString(), todo: tm ? tm[1] : '' }); if (P.length > 30) P.length = 30; toast('Pinned to the top of Notifications.'); }
   await save(); try { glWarnRedraw(); } catch (e) { }
 }
+// 2.27.4: For you today goes in before the pins, so its cards get a 📌 too
+(() => { const o = glAlertsBody; glAlertsBody = function () { let h = o.apply(this, arguments);
+  try { const f = bfHtml(); if (!f) return h; let i = h.indexOf('<div class="list glnewlist glnewtop');
+    if (i >= 0) { let e = bfEndOf(h, i); if (e > 0) { const mb = h.slice(e).match(/^\s*<button class="linkbtn glnewmore"[\s\S]*?<\/button>/); if (mb) e += mb[0].length; h = h.slice(0, e) + f + h.slice(e); } }
+    else { const j = h.search(/<div class="sec/); h = j >= 0 ? h.slice(0, j) + `<div class="sec">For you today</div>` + f + h.slice(j) : h + f; }
+  } catch (e) { } return h; }; })();
 (() => { const o = glAlertsBody; glAlertsBody = function () { const h = o();
   try {
     const P = bellPins(), pinned = new Set(P.map(p => p.id)), d = document.createElement('div'); d.innerHTML = h;
-    const cards = [...d.querySelectorAll('.list > *, .glwarns > *, .glnewlist > *')].filter(el => !el.classList.contains('glmore') && !el.matches('p, .glhint'));
+    const cards = [...d.querySelectorAll('.list > *, .glwarns > *, .glnewlist > *, .bfrest > *')].filter(el => !el.classList.contains('glmore') && !el.matches('p, .glhint, .bfrest'));
     const live = new Map();
     cards.forEach(el => { const id = bpIdOf(el); el.setAttribute('data-pid', id); const on = pinned.has(id);
       const span = document.createElement('span'); span.innerHTML = bpBtn(on); const b = span.firstChild;
@@ -22947,19 +22953,21 @@ window.addEventListener('resize', () => { try { bxPlace(); } catch (e) { } });
 const BF_TYPES = [
   ['quote', '💬', 'Quote of the day'], ['netflix', '🎬', 'New on Netflix'], ['prime', '📺', 'New on Prime Video'], ['sky', '📡', 'Sky Starter'],
   ['recipe', '🌾', 'GF recipe pick'], ['top40', '🎵', 'NZ Top 40'], ['blogs', '📰', 'Blogs for you'], ['videos', '▶️', 'Videos for you'],
-  ['sarah', '🌅', 'Sarah’s videos'], ['local', '📍', 'Local news'], ['nz', '🇳🇿', 'NZ news'], ['world', '🌍', 'World news'], ['games', '🎮', 'Games']
+  ['sarah', '🌅', 'Sarah’s videos'], ['local', '📍', 'Local news'], ['nz', '🇳🇿', 'NZ news'], ['world', '🌍', 'World news'], ['games', '🎮', 'Games'], ['suno', '🎹', 'Suno tip']
 ];
 const bfOn = k => !(S && S.settings && S.settings.bellFeeds && S.settings.bellFeeds[k] === false);
 async function bfToggle(k) { const o = Object.assign({}, S.settings.bellFeeds || {}); o[k] = !bfOn(k); S.settings.bellFeeds = o; await save(); render(); }
 function bfSettingsRows() {
-  return `<div class="srow"><div class="tx"><div class="t">For you today</div><div class="s">A few of these each day under New today on Notifications, cycling. Show more lists the rest. No sport.</div></div></div>` +
+  return `<div class="srow"><div class="tx"><div class="t">Just in</div><div class="s">New cards float to the top (under Pinned) for 24 hours, or until you open or archive them.</div></div><button class="switch ${(S.settings || {}).bellJustIn !== false ? 'on' : ''}" role="switch" aria-checked="${(S.settings || {}).bellJustIn !== false}" aria-label="Just in" onclick="bfSet('bellJustIn')"></button></div>` +
+    `<div class="srow"><div class="tx"><div class="t">✅ When Sarah ticks off a to-do</div><div class="s">A card here, plus a phone notification if notifications are on. Only to-dos she shares with you (her private ones never leave her phone). Not shopping or appointments.</div></div><button class="switch ${stickOn() ? 'on' : ''}" role="switch" aria-checked="${stickOn()}" aria-label="When Sarah ticks off a to-do" onclick="bfSet('sarahTicks')"></button></div>` +
+    `<div class="srow"><div class="tx"><div class="t">For you today</div><div class="s">A few of these each day under New today on Notifications, cycling. Show more lists the rest. No sport.</div></div></div>` +
     BF_TYPES.map(([k, ic, l]) => `<div class="srow"><div class="tx"><div class="t">${ic} ${esc(l)}</div></div><button class="switch ${bfOn(k) ? 'on' : ''}" role="switch" aria-checked="${bfOn(k)}" aria-label="${esc(l)}" onclick="bfToggle('${k}')"></button></div>`).join('');
 }
 // relay recs, cached on the phone for 12 h
-const RECS = {}; ['top40', 'games', 'topics', 'world'].forEach(k => { try { RECS[k] = JSON.parse(localStorage.getItem('recs-' + k) || 'null'); } catch (e) { RECS[k] = null; } });
+const RECS = {}; ['top40', 'games', 'topics', 'world', 'suno'].forEach(k => { try { RECS[k] = JSON.parse(localStorage.getItem('recs-' + k) || 'null'); } catch (e) { RECS[k] = null; } });
 async function loadRecs(force) {
   if (!RELAY_URL || navigator.onLine === false) return; let got = false;
-  for (const k of ['top40', 'games', 'topics', 'world']) {
+  for (const k of ['top40', 'games', 'topics', 'world', 'suno']) {
     if (!force && RECS[k] && Date.now() - (RECS[k].at || 0) < 12 * 3600e3) continue;
     try { const r = await fetch(RELAY_URL + '/recs?k=' + k, { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items)) { RECS[k] = { at: Date.now(), data: d }; got = true; try { localStorage.setItem('recs-' + k, JSON.stringify(RECS[k])); } catch (e) { } } } catch (e) { }
   }
@@ -22992,6 +23000,35 @@ function bfOpen(id) { const x = BF_REG[id]; if (!x) return; if (x.app) { openStr
 const bfH = s => { let h = 5381; for (const c of String(s)) h = (h * 33 ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
 const bfWhenSky = ms => { try { const d = new Date(ms), t = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(d); return t; } catch (e) { return ''; } };
 const bfRecent = (iso, days) => { const t = Date.parse(iso || ''); return Number.isFinite(t) && Date.now() - t <= days * 864e5; };
+/* 2.27.4: Suno tips, one a day. Each is from Suno's own pages: suno.com/llms.txt (Suno's feature overview), the Help Center
+   and release notes (linked as 'Learn more'). Plan notes (Pro/Premier) are as Suno states them. */
+const SUNO_OV = 'https://suno.com/llms.txt', SUNO_HELP = 'https://help.suno.com';
+const SUNO_TIPS = [
+  ['Use Custom Mode for control', 'Write or paste your own lyrics, set a detailed Style of Music and a title, instead of one quick prompt.', SUNO_OV],
+  ['Mark the song’s sections', 'In the lyrics, put tags like [Intro], [Verse], [Chorus], [Bridge] and [Outro] in square brackets, so Suno follows your structure.', 'https://suno.com/hub/how-to-make-a-song'],
+  ['Describe the sound in plain words', 'Style of Music can be a rich sentence: the mood, the instruments, the structure and the texture you want.', SUNO_OV],
+  ['Exclude what you don’t want', 'Custom Mode › Advanced Options › Exclude: list instruments or styles to leave out, e.g. “piano” (Pro/Premier).', 'https://help.suno.com/en/articles/3161921'],
+  ['Steer the singer', 'Suno’s tip: add [female vocals] in the lyrics and put “male vocals” in Exclude Styles.', 'https://suno.com/release-notes/exclude-styles'],
+  ['Make it instrumental', 'Toggle Instrumental for a track with no vocals, on any plan.', SUNO_OV],
+  ['Extend a song you like', 'Extend adds more music to the start, middle or end. Use Quick Extend, then “Get Whole Song” to join it up.', SUNO_OV],
+  ['Try a Cover', 'Cover re-imagines a song in a new genre or style while keeping its core.', SUNO_OV],
+  ['Keep a voice across songs', 'Personas (now in Voices) carry a track’s voice and vibe into new songs (Pro/Premier).', SUNO_OV],
+  ['Start from a playlist', 'Inspire: make a playlist of songs you love and Suno uses their mood, tempo and instruments for a new song.', SUNO_OV],
+  ['Use the Creative Sliders', 'Weirdness (Safe to Chaos) and Style Influence (Loose to Strong); Audio Influence too when you start from an upload.', SUNO_OV],
+  ['Let Suno build the style prompt', 'Type a rough idea in the style box and use prompt enhancement to expand it into a full style prompt.', SUNO_OV],
+  ['My Taste', 'Tap the magic-wand in the style field for a style prompt built from what you make and listen to (all plans).', SUNO_OV],
+  ['Tidy it in the Song Editor', 'Crop sections, add fade-in/fade-out and make alternate takes after it’s generated.', SUNO_OV],
+  ['Remaster an older song', 'Remaster gives any song you’ve made a fuller, cleaner mix, whichever model made it.', SUNO_OV],
+  ['Get the stems', 'Split a track into up to 12 stems (vocals, drums, bass…) to solo, mute or download (Pro/Premier).', SUNO_OV],
+  ['Export for other apps', 'Download as MP3, WAV, tempo-locked WAV or MIDI.', SUNO_OV],
+  ['Write lyrics with Suno', 'Write with Suno makes lyrics from a topic; pick ReMi for edgier lines or the classic style, then edit before you generate.', SUNO_OV],
+  ['Start from a hum or riff', 'Upload a recorded hum, a guitar riff or a rough demo and create from it.', SUNO_OV],
+  ['Simple Mode for a quick idea', 'One sentence like “a dreamy lo-fi track about late-night drives” gives a finished song, usually two versions.', SUNO_OV],
+  ['Rate your results', 'Thumbs up / thumbs down on your tracks helps Suno give you better results.', 'https://help.suno.com/en/articles/3161921'],
+  ['Fix tempo drift in Studio', 'In Suno Studio, set a manual BPM to lock the project to a steady tempo.', SUNO_OV],
+  ['Keep Extends together', 'Use Workspaces to group tracks while you work, e.g. all the Extends of one song.', SUNO_OV],
+  ['Add vocals to an instrumental', 'Add Vocals layers sung lyrics over an instrumental you uploaded or made (Pro/Premier).', SUNO_OV]
+];
 function bfItems(k) {
   const L = [], add = (key, o) => { const id = 'bf-' + k + '-' + bfH(key); BF_REG[id] = o; L.push(Object.assign({ id }, o)); };
   try {
@@ -23009,6 +23046,10 @@ function bfItems(k) {
     else if (k === 'sarah') { const v = currentSarahVideo(); if (v && v.id && bfRecent(v.published, 14)) add(v.id, { t: v.title, s: 'Sarah Jenkins · ' + fmtW(String(v.published).slice(0, 10)), thumb: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg', url: v.url, btns: [['Watch', 'open']] }); }
     else if (k === 'local' || k === 'nz') { (newsSec(k) || []).filter(newsOk).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: (k === 'local' ? 'Northland' : 'New Zealand') + ' · ' + newsWhen(x.published), url: newsUrl(x.url), btns: [['Read', 'open']] })); }
     else if (k === 'world') { const d = RECS.world && RECS.world.data; ((d && d.items) || []).filter(x => bfRecent(x.published, 2) && newsOk(x)).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: 'BBC News · ' + newsWhen(x.published), url: x.url, btns: [['Read', 'open']] })); }
+    else if (k === 'suno') { // 2.27.4: a new Suno release note (last 10 days, once each), else today's tip from the built-in list
+      const ro = "event.stopPropagation();window.open('https://suno.com/create','_blank','noopener')", d = RECS.suno && RECS.suno.data;
+      ((d && d.items) || []).filter(x => bfRecent(x.published, 10)).slice(0, 1).forEach(x => add(x.url, { t: 'New on Suno: ' + x.title, s: 'Suno release notes · ' + fmtW(String(x.published).slice(0, 10)), url: x.url, btns: [['Read', 'open'], ['Open Suno', ro]] }));
+      const T = SUNO_TIPS[(glDay() + 3) % SUNO_TIPS.length]; add('tip' + T[0], { t: T[0], s: T[1], url: T[2], btns: [['Open Suno', ro], ['Learn more', 'open']] }); }
     else if (k === 'games') { const d = RECS.games && RECS.games.data; const g = ((d && d.items) || []).filter(x => x.score >= 84 && !isSport(x.name)); const pc = g.filter(x => x.platform === 'PC'), sw = g.filter(x => x.platform === 'Switch'); const mix = [], nm = {}; for (let i = 0; i < 6; i++) [pc[i], sw[i]].forEach(x => { if (!x) return; const n = x.name.toLowerCase(); if (nm[n]) { if (!nm[n].platform.includes(x.platform)) nm[n].platform += ' + ' + x.platform; return; } nm[n] = x = Object.assign({}, x); mix.push(x); });
       mix.slice(0, 4).forEach(x => add(x.url, { t: x.name, s: `${x.platform} · OpenCritic ${x.score}${x.released ? ' · out ' + x.released : ''}`, thumb: x.img, url: x.url, btns: [['Reviews & stores', 'open']] })); }
   } catch (e) { }
@@ -23038,16 +23079,78 @@ function bfHtml() {
 function bfEndOf(h, i) { // index just past the element that opens at i
   const re = /<(\/?)div\b[^>]*>/g; re.lastIndex = i; let d = 0, m; while ((m = re.exec(h))) { d += m[1] ? -1 : 1; if (d === 0) return re.lastIndex; } return -1;
 }
-(() => { const o = glAlertsBody; glAlertsBody = function () { let h = o.apply(this, arguments);
-  try { const f = bfHtml(); if (!f) return h; let i = h.indexOf('<div class="list glnewlist glnewtop');
-    if (i >= 0) { let e = bfEndOf(h, i); if (e > 0) { const mb = h.slice(e).match(/^\s*<button class="linkbtn glnewmore"[\s\S]*?<\/button>/); if (mb) e += mb[0].length; h = h.slice(0, e) + f + h.slice(e); } }
-    else { const j = h.search(/<div class="sec/); h = j >= 0 ? h.slice(0, j) + `<div class="sec">For you today</div>` + f + h.slice(j) : h + f; }
-  } catch (e) { } return h; }; })();
 // Home (day only): the tiles that now live on Notifications are left off; the night feed is unchanged
 (() => { const o = glTiles; const MOVED = { netflix: 'netflix', prime: 'prime', videos: 'videos', sarah: 'sarah', top40: 'top40', recipe: 'recipe', quote: 'quote', localnews: 'local', nznews: 'nz' };
   glTiles = function () { const T = o.apply(this, arguments); try { if (glMode().night) return T; return T.filter(t => !(MOVED[t.k] && bfOn(MOVED[t.k]))); } catch (e) { return T; } }; })();
 (() => { const o = glPanels; glPanels = function () { try { if (!glMode().night && bfOn('quote')) return ''; } catch (e) { } return o.apply(this, arguments); }; })();
 // swipe-left (archive) on a For-you row: it stays gone (kept on this phone, last 400)
 function bfGone() { try { return JSON.parse(localStorage.getItem('bfGone') || '[]'); } catch (e) { return []; } }
-(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^bf-/.test(k)) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
+(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^(bf|stick)-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
 (() => { const o = nfDis; nfDis = function () { const a = o.apply(this, arguments); try { return a.concat(bfGone()); } catch (e) { return a; } }; })();
+/* ================= 2.27.4: Just in (new notifications up top for a while) =================
+   A card that's new on the Notifications page (email, event, bill, reminder, To-do, Sarah's ticks, For you today …) floats
+   into 'Just in' at the top (under Pinned) for 24 hours from when it first showed up, or until he taps it or archives it,
+   whichever comes first. Then it goes back to its usual section and order. The everyday cards (joke, fun fact, place,
+   word of the day, co-worker question, quote) are new every day by design and already sit at the top, so they stay put.
+   At most 8 at a time (newest first); first-seen times stay on this phone ('bellFirst', 30 days). */
+const JI_MS = 24 * 3600e3, JI_MAX = 8, JI_DAILY = /^(joke|fact|place|cowork|mi|fr|bf-quote-.*)$/;
+function jiLoad() { try { const o = JSON.parse(localStorage.getItem('bellFirst') || 'null'); return o && typeof o === 'object' && o.m ? o : null; } catch (e) { return null; } }
+function jiKey(el) { const c = bpClean(el); c.querySelectorAll('.jiage').forEach(x => x.remove()); const n = s => String(s || '').replace(/\s+/g, ' ').replace(/\d+/g, '#').trim().toLowerCase(); const t = (n((c.querySelector('.t, b') || c).textContent) + (el.dataset.nk ? '' : ' ~ ' + n((c.querySelector('.s') || {}).textContent).slice(0, 60))).slice(0, 180);
+  return (el.dataset.nk || (/^h\|/.test(el.dataset.pid || '') ? '' : el.dataset.pid) || 'x') + '|' + t; }
+function jiOpened(k) { try { const o = jiLoad(); if (!o) return; o.op = o.op || {}; o.op[k] = Date.now(); localStorage.setItem('bellFirst', JSON.stringify(o)); } catch (e) { } }
+document.addEventListener('click', ev => { try { const el = ev.target.closest && ev.target.closest('#glalerts [data-jik]'); if (!el || ev.target.closest('.bpin')) return; jiOpened(el.dataset.jik); } catch (e) { } }, true);
+(() => { const o = glAlertsBody; glAlertsBody = function () { const h = o();
+  try {
+    if ((S.settings || {}).bellJustIn === false) return h;
+    const d = document.createElement("div"), now = Date.now(); d.innerHTML = h;
+    const pinBox = d.querySelector('.bellpinned');
+    const cards = [...d.querySelectorAll('[data-pid]')].filter(el => !(pinBox && pinBox.contains(el)) && !el.closest('.bfrest'));
+    let st = jiLoad(); if (!st) st = { m: {}, op: {}, seed: now + 3 * 60e3 }; st.op = st.op || {}; const first = now < (st.seed || 0); // first 3 minutes on this version: what's there (or loads in) is the starting point, not new
+    const pick = [];
+    cards.forEach(el => { const k = jiKey(el); el.setAttribute('data-jik', k); if (!(k in st.m)) st.m[k] = first ? 0 : now;
+      const nk = el.dataset.nk || ''; if (JI_DAILY.test(nk)) return; const t = st.m[k];
+      if (t && now - t < JI_MS && !st.op[k] && !(nfDis() || []).includes(nk)) pick.push([t, el]); });
+    Object.keys(st.m).forEach(k => { if (st.m[k] && now - st.m[k] > 30 * DAY) delete st.m[k]; });
+    Object.keys(st.op).forEach(k => { if (now - st.op[k] > 3 * DAY) delete st.op[k]; });
+    const ks = Object.keys(st.m); if (ks.length > 1500) ks.slice(0, ks.length - 1500).forEach(k => delete st.m[k]);
+    try { localStorage.setItem('bellFirst', JSON.stringify(st)); } catch (e) { }
+    if (!pick.length) return d.innerHTML;
+    pick.sort((a, b) => b[0] - a[0]);
+    const box = document.createElement('div'); box.className = 'list jilist';
+    pick.slice(0, JI_MAX).forEach(([t, el]) => {
+      const fromWarn = el.parentElement && el.parentElement.matches('.glwarns');
+      el.classList.add('jirow'); const tt = el.querySelector('.t') || el.querySelector('b');
+      if (tt && !el.querySelector('.newpill')) tt.insertAdjacentHTML('afterbegin', '<span class="newpill">New</span>');
+      const ag = el.querySelector('.tx') || el; const m = Math.round((now - t) / 60000);
+      if (!/^stick-/.test(el.dataset.nk || '')) ag.insertAdjacentHTML('beforeend', `<div class="jiage">${m < 60 ? (m < 2 ? 'just now' : m + ' min ago') : Math.round(m / 60) + ' h ago'}</div>`);
+      if (fromWarn) { const w = document.createElement('div'); w.className = 'glwarns'; w.appendChild(el); box.appendChild(w); } else box.appendChild(el); });
+    d.querySelectorAll('.list, .glwarns, .glnewlist').forEach(l => { if (l !== box && !l.children.length && !l.closest('.jilist')) { let s0 = l.previousElementSibling; const nx = l.nextElementSibling; l.remove(); if (s0 && s0.classList.contains('sec') && !(nx && nx.matches('.list, .glwarns, .glnewlist') && nx.children.length)) s0.remove(); if (nx && nx.classList.contains('glnewmore') && !nx.classList.contains('bfmore')) nx.remove(); } });
+    const sec = document.createElement('div'); sec.className = 'sec jisec'; sec.innerHTML = 'Just in <span class="glswipehint">up here for 24 h, or until you open it</span>';
+    const after = pinBox ? pinBox.nextSibling : d.firstChild;
+    d.insertBefore(sec, after); d.insertBefore(box, sec.nextSibling);
+    return d.innerHTML;
+  } catch (e) { return h; } }; })();
+async function bfSet(k) { S.settings = S.settings || {}; S.settings[k] = S.settings[k] === false; await save(); render(); if (k === 'sarahTicks') { try { localStorage.removeItem('shopPushReg'); scheduleReminders(); } catch (e) { } } }
+/* ================= 2.27.4: Sarah ticked off a to-do =================
+   When Sarah ticks off a shared to-do in Sarah's To-do (1.12.0 tells the relay it was her), the next sync here shows
+   '✅ Sarah ticked off: <task>' at the top of New today, with the time and list. Only shared to-dos (her private ones never
+   leave her phone), only the title (no notes), not Shopping (bought items) or Appointments. Kept 48 hours; swipe to archive.
+   The relay also sends this phone a push (same address as the shopping pushes), batched over about a minute.
+   Settings › Notifications page › 'When Sarah ticks off a to-do' turns both off. */
+const stickOn = () => (S.settings || {}).sarahTicks !== false;
+const STICK_SKIP = /^(shopping|appointments)$/i;
+function sticks() { try { const L = JSON.parse(localStorage.getItem('sarahTicks') || '[]'); return Array.isArray(L) ? L : []; } catch (e) { return []; } }
+function stickNote(local, s) {
+  if (!s || !s.done || local.done || s.doneBy !== 'sarah' || STICK_SKIP.test(String(s.list || '')) || local._appt) return;
+  const L = sticks().filter(x => x.id !== s.id && Date.now() - x.at < 7 * DAY);
+  L.unshift({ id: s.id, t: String(s.title || '').slice(0, 120), l: String(s.list || ''), at: Math.min(Number(s.doneAt) || Date.now(), Date.now()), by: s.by === 'shane' ? 'shane' : 'sarah' });
+  localStorage.setItem('sarahTicks', JSON.stringify(L.slice(0, 40)));
+}
+function stickRows() {
+  if (!stickOn()) return []; const gone = nfDis();
+  return sticks().filter(x => Date.now() - x.at < 48 * 3600e3).map(x => { const k = 'stick-' + x.id; if (gone.includes(k)) return '';
+    const d = new Date(x.at), tm = d.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase(), day = todayISO() === isoOf(d) ? 'Today' : fmtW(isoOf(d));
+    return `<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){todoFilter='All';go('#todo')}"><div class="ic">✅</div><div class="tx"><div class="t">Sarah ticked off: ${esc(x.t)}</div><div class="s">${esc(day)} ${esc(tm)} · ${esc(x.l || 'To-do')}${x.by === 'shane' ? ' · you asked her' : ''}</div></div></div>`; }).filter(Boolean);
+}
+function isoOf(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const T = stickRows(); return T.length ? T.concat(L) : L; } catch (e) { return L; } }; })();

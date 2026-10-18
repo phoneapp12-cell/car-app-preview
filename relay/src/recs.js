@@ -9,6 +9,7 @@
  * Checked live 18 Oct 2026: every source returned current items. */
 import { decode, get } from './events.js';
 import { parseBlogFeed } from './blogs.js';
+import { isBlocked, sameStory, SPORT_RE } from './news.js';
 
 const TTL = 12 * 3600 * 1000;
 const UA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36';
@@ -62,12 +63,28 @@ async function build(k, f) {
     const fld = (b, n) => { const m = new RegExp('<' + n + '\\b[^>]*>([\\s\\S]*?)<\\/' + n + '>', 'i').exec(b); return m ? ent(m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' ')) : ''; };
     const items = [...String(xml).matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(m => m[1]).map(b => { const u = fld(b, 'link').split('?')[0], t = Date.parse(fld(b, 'pubDate')); return { title: fld(b, 'title'), url: /^https:\/\/www\.bbc\.(co\.uk|com)\//.test(u) ? u : '', published: Number.isFinite(t) ? new Date(t).toISOString() : '', summary: fld(b, 'description').slice(0, 220), source: 'BBC News' }; })
       .filter(x => x.title && x.url && x.published).slice(0, 25);
-    if (!items.length) throw new Error('world_changed'); return { items }; }
+    // 2.27.4: NZ Herald World too; a story BBC already has shows once (BBC kept). Court/violence/sexual and sport dropped here as well.
+    try { const hx = await get('https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/world/?outputType=xml', f, { headers: { 'user-agent': UA } });
+      [...String(hx).matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(m => m[1]).forEach(b => { const u = fld(b, 'link').trim(), t = Date.parse(fld(b, 'pubDate')), title = fld(b, 'title').trim(), sm = fld(b, 'description').slice(0, 220);
+        if (!title || !/^https:\/\/www\.nzherald\.co\.nz\//.test(u) || !Number.isFinite(t) || /\/sport\//.test(u) || SPORT_RE.test(title) || isBlocked(title, sm)) return;
+        if (items.some(y => sameStory(y.title, title))) return;
+        items.push({ title, url: u, published: new Date(t).toISOString(), summary: sm, source: 'NZ Herald' }); });
+    } catch (e) { /* BBC alone */ }
+    items.sort((a, b) => b.published.localeCompare(a.published));
+    if (!items.length) throw new Error('world_changed'); return { items: items.slice(0, 35) }; }
+  if (k === 'suno') { // 2.27.4: Suno's own release notes page (no RSS): title, date, kind (New Feature / Improvement …), link
+    const h = String(await get('https://suno.com/release-notes', f, { headers: { 'user-agent': UA } })), seen = new Set(), items = [];
+    for (const m of h.matchAll(/href="\/release-notes\/([a-z0-9-]+)"[^>]*>([\s\S]{0,1200}?)<button/g)) {
+      if (seen.has(m[1])) continue; const parts = m[2].replace(/<[^>]+>/g, '|').split('|').map(x => ent(x).trim()).filter(Boolean);
+      const di = parts.findIndex(x => /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(x)); if (di < 1) continue; const t = Date.parse(parts[di] + ' 12:00 UTC'); if (!Number.isFinite(t)) continue;
+      seen.add(m[1]); items.push({ title: parts.slice(0, di).join(' ').slice(0, 140), kind: parts[di + 1] || '', published: new Date(t).toISOString(), url: 'https://suno.com/release-notes/' + m[1] });
+      if (items.length >= 12) break; }
+    if (!items.length) throw new Error('suno_changed'); return { items }; }
   throw new Error('bad_kind');
 }
 export async function getRecs(k, env = {}, fetchImpl = fetch, now = Date.now()) {
-  if (!/^(top40|games|topics|world)$/.test(k || '')) throw new Error('bad_kind');
-  const key = 'recs-v1-' + k, ok = c => c && c.data && now - c.at < TTL;
+  if (!/^(top40|games|topics|world|suno)$/.test(k || '')) throw new Error('bad_kind');
+  const key = (k === 'world' ? 'recs-v2-' : 'recs-v1-') + k, ok = c => c && c.data && now - c.at < TTL;
   if (ok(mem[k])) return mem[k].data;
   if (env.EVENTS_KV) { try { const c = await env.EVENTS_KV.get(key, { type: 'json' }); if (ok(c)) { mem[k] = c; return c.data; } } catch (e) { } }
   const data = Object.assign({ checked: new Date(now).toISOString() }, await build(k, fetchImpl));

@@ -3,7 +3,7 @@
    Each item merges on its own `updated` time (newest wins), so a tick on one phone and a new item on the other
    never overwrite each other. Deletes are kept as short tombstones so they don't come back. No AI, nothing logged. */
 export const SHARED_MAX_ITEMS = 500;
-import { queueShop, sarahPush } from './shop-notify.js';
+import { queueShop, queueTicks, sarahPush } from './shop-notify.js';
 const TOMBSTONE_MS = 60 * 24 * 3600 * 1000;
 const PRI = ['high', 'normal', 'low'];
 
@@ -53,7 +53,7 @@ export function cleanItem(x, now = Date.now()) {
   return {
     id, title, list: str(x.list, 24).trim() || 'To-do', due: /^\d{4}-\d{2}-\d{2}$/.test(String(x.due || '')) ? x.due : '',
     notes: str(x.notes, 1000), priority: PRI.includes(x.priority) ? x.priority : 'normal', done: !!x.done,
-    doneAt: x.done ? Number(x.doneAt) || updated : 0, created: Number(x.created) || updated, by: x.by === 'shane' ? 'shane' : 'sarah', updated,
+    doneAt: x.done ? Number(x.doneAt) || updated : 0, ...(x.done && (x.doneBy === 'sarah' || x.doneBy === 'shane') ? { doneBy: x.doneBy } : {}), created: Number(x.created) || updated, by: x.by === 'shane' ? 'shane' : 'sarah', updated,
     ...(cleanBrand(x.brand) ? { brand: cleanBrand(x.brand) } : {}),
     ...(x.list === 'Appointments' && cleanAppt(x.appt) ? { appt: cleanAppt(x.appt) } : {}),
     ...(x.list === 'Appointments' && cleanClaim(x.claim) ? { claim: cleanClaim(x.claim) } : {})
@@ -84,13 +84,17 @@ export async function sharedTodoRoute(body, env, now = Date.now()) {
   let cur = null;
   try { cur = await env.EVENTS_KV.get(key, { type: 'json' }); } catch (e) { cur = null; }
   const items = cur && Array.isArray(cur.items) ? cur.items : [];
-  const inc = body && Array.isArray(body.items) ? body.items : [];
+  const from = body && (body.from === 'sarah' || body.from === 'shane') ? body.from : '';
+  // 2.27.4 / 1.12.0: whoever sends a newly ticked item ticked it (only when the phone says who it is)
+  const inc = (body && Array.isArray(body.items) ? body.items : []).map(x => x && typeof x === 'object' && x.done && !x.doneBy && from ? Object.assign({}, x, { doneBy: from }) : x);
   if (inc.length > SHARED_MAX_ITEMS) return [413, { error: 'too_many' }];
   const m = mergeItems(items, inc, now);
   let rev = cur && Number(cur.rev) || 0;
   if (m.changed) { rev += 1; await env.EVENTS_KV.put(key, JSON.stringify({ rev, updatedAt: new Date(now).toISOString(), items: m.items })); }
   // 2.26.49 / 1.10.0: new Shopping items -> one push to the other person (batched about a minute). Never blocks the sync.
   if (m.changed && cur && items.length) { try { await queueShop(env, k, items, m.items, now); } catch (e) { } }
+  // 2.27.4 / 1.12.0: Sarah ticked off a shared to-do -> one push to Shane (batched about a minute)
+  if (m.changed && cur && items.length) { try { await queueTicks(env, k, items, m.items, now); } catch (e) { } }
   return [200, { ok: true, rev, items: m.items, now }];
 }
 
