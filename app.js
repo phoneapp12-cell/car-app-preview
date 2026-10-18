@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.2';
+const APP_VERSION = '2.27.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16829,6 +16829,7 @@ function Settings() {
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day on Notifications, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Fun fact</div><div class="s">A new fun fact each day, as a card on Notifications.</div></div><button class="switch ${factOn() ? 'on' : ''}" role="switch" aria-checked="${factOn()}" aria-label="Fun fact" id="factsw" onclick="toggleSetting('dailyFact', ${!factOn()})"></button></div>
+   ${homeTry('bell feeds settings', () => bfSettingsRows(), '')}
    <div class="srow"><div class="tx"><div class="t">Card artwork</div><div class="s">Picture headers and illustrated icons on Coming up and Just added. Off: the plain cards.</div></div><button class="switch ${cardArtOn() ? 'on' : ''}" role="switch" aria-checked="${cardArtOn()}" aria-label="Card artwork" id="cardartsw" onclick="toggleSetting('cardArt')"></button></div>
    <div class="srow"><div class="tx"><div class="t">Colour-code Coming up</div><div class="s">Tints each row by type: bills, car, pets, birthdays, events, health, to-dos, gym, holidays.</div></div><button class="switch ${cuColoursOn() ? 'on' : ''}" role="switch" aria-checked="${cuColoursOn()}" aria-label="Colour-code Coming up" id="cucolsw" onclick="toggleSetting('cuColours', ${!cuColoursOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Show email strip</div><div class="s">The important-mail line under the weather. Turning it off only hides it: Roadworks, Netflix, Kora and invoice emails are still read.</div></div><button class="switch ${mailStripOn() ? 'on' : ''}" role="switch" aria-checked="${mailStripOn()}" aria-label="Show email strip" id="mailsw" onclick="toggleSetting('mailStrip', ${!mailStripOn()})"></button></div>
@@ -22933,3 +22934,120 @@ window.addEventListener('resize', () => { try { bxPlace(); } catch (e) { } });
   nav.addEventListener('touchstart', e => { if (e.target.closest && e.target.closest('#btabs2')) e.stopImmediatePropagation(); }, { capture: true, passive: true }); }; })();
 // the 2.27.0 keep-open path re-positions the row instead of rebuilding it
 (() => { const o = bottomTabs; bottomTabs = function (route) { o(route); try { if (bsOpen) { const nav = document.getElementById('btabs'); if (nav) nav.classList.add('bxup'); if (!document.getElementById('btabs2')) { bsOpen = false; bsShow(true); } else bxPlace(); } } catch (e) { } }; })();
+
+/* ================= 2.27.3: "For you today" feeds on Notifications (under New today) =================
+   Quote, New on Netflix / Prime Video NZ / Sky Starter, a gluten free recipe pick, NZ Top 40 new entries, blogs on his
+   topics, video picks, Sarah's videos, Local / NZ / World news and top-rated PC + Switch games. A few types a day,
+   cycling (3 shown, 'Show more' for the rest), each with a small label. Only real items from these sources:
+     Netflix – his Netflix emails · Prime – relay /prime (Flicks guide) · Sky Starter – the Sky EPG the TV guide already
+     reads (Starter channels only, 'premiere' / 'new series' listings) · Top 40 – relay /recs?k=top40 (Official Aotearoa
+     Music Charts new entries) · Blogs – /recs?k=topics · World – /recs?k=world (BBC) · Games – /recs?k=games (OpenCritic)
+     · Local/NZ news – the existing /news · Videos, Sarah, recipe, quote – what My App already has.
+   No sport anywhere; news keeps the usual court / violence / sexual filter. Each type can be turned off in Settings. */
+const BF_TYPES = [
+  ['quote', '💬', 'Quote of the day'], ['netflix', '🎬', 'New on Netflix'], ['prime', '📺', 'New on Prime Video'], ['sky', '📡', 'Sky Starter'],
+  ['recipe', '🌾', 'GF recipe pick'], ['top40', '🎵', 'NZ Top 40'], ['blogs', '📰', 'Blogs for you'], ['videos', '▶️', 'Videos for you'],
+  ['sarah', '🌅', 'Sarah’s videos'], ['local', '📍', 'Local news'], ['nz', '🇳🇿', 'NZ news'], ['world', '🌍', 'World news'], ['games', '🎮', 'Games']
+];
+const bfOn = k => !(S && S.settings && S.settings.bellFeeds && S.settings.bellFeeds[k] === false);
+async function bfToggle(k) { const o = Object.assign({}, S.settings.bellFeeds || {}); o[k] = !bfOn(k); S.settings.bellFeeds = o; await save(); render(); }
+function bfSettingsRows() {
+  return `<div class="srow"><div class="tx"><div class="t">For you today</div><div class="s">A few of these each day under New today on Notifications, cycling. Show more lists the rest. No sport.</div></div></div>` +
+    BF_TYPES.map(([k, ic, l]) => `<div class="srow"><div class="tx"><div class="t">${ic} ${esc(l)}</div></div><button class="switch ${bfOn(k) ? 'on' : ''}" role="switch" aria-checked="${bfOn(k)}" aria-label="${esc(l)}" onclick="bfToggle('${k}')"></button></div>`).join('');
+}
+// relay recs, cached on the phone for 12 h
+const RECS = {}; ['top40', 'games', 'topics', 'world'].forEach(k => { try { RECS[k] = JSON.parse(localStorage.getItem('recs-' + k) || 'null'); } catch (e) { RECS[k] = null; } });
+async function loadRecs(force) {
+  if (!RELAY_URL || navigator.onLine === false) return; let got = false;
+  for (const k of ['top40', 'games', 'topics', 'world']) {
+    if (!force && RECS[k] && Date.now() - (RECS[k].at || 0) < 12 * 3600e3) continue;
+    try { const r = await fetch(RELAY_URL + '/recs?k=' + k, { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items)) { RECS[k] = { at: Date.now(), data: d }; got = true; try { localStorage.setItem('recs-' + k, JSON.stringify(RECS[k])); } catch (e) { } } } catch (e) { }
+  }
+  if (got && (location.hash || '') === '#alerts' && !sheetOpen) render();
+}
+setTimeout(() => loadRecs(), 6000); setInterval(() => loadRecs(), 6 * 3600e3);
+// Sky Starter: premieres / new series on Starter channels, picked up while the TV guide reads the Sky EPG (no extra download)
+const SKY_STARTER = new Set(['sky.4', 'sky.5', 'sky.6', 'sky.11', 'sky.12', 'sky.13', 'sky.16', 'sky.19', 'sky.21', 'sky.23', 'sky.24', 'sky.70', 'sky.83']);
+const SKY_NEW_RE = /^\s*(?:season \d+ premiere|series premiere|season premiere|new series|new season|premiere)\b[:.!\s-]*/i;
+let SKYNEW = null; try { SKYNEW = JSON.parse(localStorage.getItem('skyNew') || 'null'); } catch (e) { SKYNEW = null; }
+let skyAcc = null;
+(() => { const oR = tvReadFeed, oT = tvTake;
+  tvReadFeed = async function (url, timeout) { const sky = url === TV_SKY_EPG; if (sky) skyAcc = {}; try { const r = await oR(url, timeout);
+      if (sky && skyAcc) { const items = Object.values(skyAcc).sort((a, b) => a.start - b.start).slice(0, 30); SKYNEW = { at: Date.now(), items }; try { localStorage.setItem('skyNew', JSON.stringify(SKYNEW)); } catch (e) { } }
+      return r; } finally { if (sky) skyAcc = null; } };
+  tvTake = function (attrs, body, now, acc) {
+    try { if (skyAcc) { const ch = (/\bchannel="([^"]+)"/.exec(attrs) || [])[1];
+      if (ch && SKY_STARTER.has(ch)) { const desc = tvUnesc((/<desc\b[^>]*>([\s\S]*?)<\/desc>/.exec(body) || [])[1] || '');
+        if (SKY_NEW_RE.test(desc)) { const start = tvStamp((/\bstart="([^"]+)"/.exec(attrs) || [])[1]);
+          if (start != null && start > now - 3600e3 && start < now + 7 * 864e5) { const title = tvUnesc((/<title\b[^>]*>([\s\S]*?)<\/title>/.exec(body) || [])[1] || '').replace(/\s+/g, ' ').trim();
+            const cats = [...body.matchAll(/<category\b[^>]*>([\s\S]*?)<\/category>/g)].map(m => m[1]).join(' ');
+            if (title && !/sport/i.test(cats) && !isSport(title + ' ' + desc) && (!skyAcc[title] || skyAcc[title].start > start)) {
+              const chName = { 'sky.4': 'Sky Open', 'sky.5': 'Sky 5', 'sky.6': 'Vibe', 'sky.11': 'Sky Comedy', 'sky.12': 'Bravo', 'sky.13': 'eden', 'sky.16': 'TLC', 'sky.19': 'Whakaata Māori', 'sky.21': 'HGTV', 'sky.23': 'TVNZ DUKE', 'sky.24': 'Rush', 'sky.70': 'Discovery', 'sky.83': 'Face TV' }[ch] || '';
+              skyAcc[title] = { title, ch: chName, start, what: (desc.match(SKY_NEW_RE) || [''])[0].replace(/[:.\s-]+$/, ''), desc: desc.replace(SKY_NEW_RE, '').slice(0, 160), icon: ((/<icon\s+src="(https:\/\/images\.skyone\.co\.nz\/[^"]+)"/.exec(body) || [])[1] || '') }; } } } } } } catch (e) { }
+    return oT(attrs, body, now, acc); };
+})();
+// ---- the items, per type: [{ id, t, s, thumb, tap, btns }] ----
+const BF_REG = {};
+function bfOpen(id) { const x = BF_REG[id]; if (!x) return; if (x.app) { openStreamApp(x.app); return; } if (x.url) window.open(x.url, '_blank', 'noopener'); }
+const bfH = s => { let h = 5381; for (const c of String(s)) h = (h * 33 ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
+const bfWhenSky = ms => { try { const d = new Date(ms), t = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(d); return t; } catch (e) { return ''; } };
+const bfRecent = (iso, days) => { const t = Date.parse(iso || ''); return Number.isFinite(t) && Date.now() - t <= days * 864e5; };
+function bfItems(k) {
+  const L = [], add = (key, o) => { const id = 'bf-' + k + '-' + bfH(key); BF_REG[id] = o; L.push(Object.assign({ id }, o)); };
+  try {
+    if (k === 'quote') { if (!showDailyQuote()) return L; const q = dailyQuoteFor(); if (q && q.t) add('q' + q.t, { t: '“' + q.t + '”', s: q.w || '', tap: "glInfo('quote')" }); }
+    else if (k === 'netflix') { if (NF && mailConnected('microsoft')) (NF.fresh || []).slice(0, 4).forEach(x => x.title && add(x.title, { t: x.title, s: 'Just added', app: 'netflix', url: x.link || '', btns: [['Watch', 'open']] })); }
+    else if (k === 'prime') { const P = primeList(); if (P) { P.fresh.forEach(x => add(x.title, { t: x.title, s: 'Added ' + fmtW(x.date), app: 'prime', btns: [['Watch', 'open']] })); P.coming.forEach(x => add(x.title, { t: x.title, s: 'Coming ' + fmtW(x.date), app: 'prime', btns: [['Watch', 'open']] })); } }
+    else if (k === 'sky') { ((SKYNEW && SKYNEW.items) || []).filter(x => x.start > Date.now() - 3600e3).slice(0, 6).forEach(x => add(x.title + x.ch, { t: x.title, s: [x.what, x.ch, bfWhenSky(x.start)].filter(Boolean).join(' · '), thumb: x.icon, url: 'https://www.sky.co.nz/tvguide', btns: [['TV guide', 'open']] })); }
+    else if (k === 'recipe') { const r = glPickRecipe(); if (r && !/\b(wheat|regular (pasta|bread)|flour tortilla|couscous|barley|rye)\b/i.test(r.title)) { let nt = ''; try { const n = mealNights().filter(d => [5, 6].includes(new Date(d + 'T12:00:00').getDay()))[0]; if (n) nt = 'for ' + fmtW(n); } catch (e) { } add(r.id || r.title, { t: r.title, s: ['Gluten free', nt].filter(Boolean).join(' · '), tap: `go('#recipe/${esc(r.id)}')`, btns: [['Add to meal plan', `planRecipeForm(${jsArg(r.id)})`], ['Shopping list', `recipeToShop(${jsArg(r.id)})`]] }); } }
+    else if (k === 'top40') { const d = RECS.top40 && RECS.top40.data; ((d && d.items) || []).filter(x => x.isNew || x.re).forEach(x => { const yt = TOP40.find(y => y.title.toLowerCase() === x.title.toLowerCase()); add(x.title + x.artist, { t: x.title + ' – ' + x.artist, s: (x.isNew ? 'New entry' : 'Back in the chart') + ' at #' + x.rank + (d.week ? ' · week to ' + d.week : ''), thumb: x.cover, url: yt ? yt.url : 'https://www.youtube.com/results?search_query=' + encodeURIComponent(x.title + ' ' + x.artist), btns: [['Listen', 'open']] }); }); }
+    else if (k === 'blogs') { const d = RECS.topics && RECS.topics.data; const seen = {}; ((d && d.items) || []).filter(x => bfRecent(x.published, 10) && !isSport(x.title + ' ' + (x.summary || ''))).sort((a, b) => String(b.published).localeCompare(String(a.published)))
+        .forEach(x => { if ((seen[x.topic] = (seen[x.topic] || 0) + 1) > 2) return; add(x.url, { t: x.title, s: x.topic + ' · ' + x.source, url: x.url, btns: [['Read', 'open']] }); });
+      // one per topic first, so the day's three aren't all one blog
+      L.sort((a, b) => (L.filter(y => y.s.split(' · ')[0] === a.s.split(' · ')[0]).indexOf(a)) - (L.filter(y => y.s.split(' · ')[0] === b.s.split(' · ')[0]).indexOf(b))); }
+    else if (k === 'videos') { homeVideoPicks().filter(v => v && v.id && v.category !== 'sarah' && !isSport(v.title)).slice(0, 4).forEach(v => add(v.id, { t: v.title, s: v.channel || v.reason || '', thumb: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg', url: 'https://www.youtube.com/watch?v=' + v.id, btns: [['Watch', 'open']] })); }
+    else if (k === 'sarah') { const v = currentSarahVideo(); if (v && v.id && bfRecent(v.published, 14)) add(v.id, { t: v.title, s: 'Sarah Jenkins · ' + fmtW(String(v.published).slice(0, 10)), thumb: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg', url: v.url, btns: [['Watch', 'open']] }); }
+    else if (k === 'local' || k === 'nz') { (newsSec(k) || []).filter(newsOk).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: (k === 'local' ? 'Northland' : 'New Zealand') + ' · ' + newsWhen(x.published), url: newsUrl(x.url), btns: [['Read', 'open']] })); }
+    else if (k === 'world') { const d = RECS.world && RECS.world.data; ((d && d.items) || []).filter(x => bfRecent(x.published, 2) && newsOk(x)).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: 'BBC News · ' + newsWhen(x.published), url: x.url, btns: [['Read', 'open']] })); }
+    else if (k === 'games') { const d = RECS.games && RECS.games.data; const g = ((d && d.items) || []).filter(x => x.score >= 84 && !isSport(x.name)); const pc = g.filter(x => x.platform === 'PC'), sw = g.filter(x => x.platform === 'Switch'); const mix = [], nm = {}; for (let i = 0; i < 6; i++) [pc[i], sw[i]].forEach(x => { if (!x) return; const n = x.name.toLowerCase(); if (nm[n]) { if (!nm[n].platform.includes(x.platform)) nm[n].platform += ' + ' + x.platform; return; } nm[n] = x = Object.assign({}, x); mix.push(x); });
+      mix.slice(0, 4).forEach(x => add(x.url, { t: x.name, s: `${x.platform} · OpenCritic ${x.score}${x.released ? ' · out ' + x.released : ''}`, thumb: x.img, url: x.url, btns: [['Reviews & stores', 'open']] })); }
+  } catch (e) { }
+  return L.filter(x => x.t);
+}
+function bfRow(type, x) {
+  const [k, ic, label] = type; const st = 'event.stopPropagation();if(window.glSwipe&&glSwipe.moved)return;';
+  const tap = x.tap || (x.url || x.app ? `bfOpen('${x.id}')` : '');
+  const th = x.thumb ? `<img src="${esc(x.thumb)}" alt="" decoding="async" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${ic}'))">` : ic;
+  const b = (x.btns || []).map(([l, fn]) => `<button type="button" class="btn small${fn === 'open' ? ' primary' : ''}" onclick="${st}${fn === 'open' ? `bfOpen('${x.id}')` : esc(fn)}">${esc(l)}</button>`).join('');
+  return `<div class="row glnew bfrow" data-nk="${x.id}" role="button" tabindex="0" onclick="if(!glSwipe.moved){${esc(tap)}}"><div class="ic${x.thumb ? ' bfth' : ''}">${th}</div><div class="tx"><div class="bflbl">${esc(label)}</div><div class="t">${esc(x.t)}</div>${x.s ? `<div class="s">${esc(x.s)}</div>` : ''}${b ? `<div class="bfbtns">${b}</div>` : ''}</div></div>`;
+}
+// rotate: each day starts at a different type, so a handful of types lead each day
+function bfHtml() {
+  const gone = nfDis(); const types = BF_TYPES.filter(t => bfOn(t[0]));
+  const groups = types.map(t => ({ t, items: bfItems(t[0]).filter(x => !gone.includes(x.id)) })).filter(g => g.items.length);
+  if (!groups.length) return '';
+  const off = ((glDay() % groups.length) + groups.length) % groups.length, ord = groups.slice(off).concat(groups.slice(0, off));
+  const lead = ord.slice(0, 3).map(g => bfRow(g.t, g.items[0]));
+  const rest = ord.map((g, i) => (i < 3 ? g.items.slice(1, 3) : g.items.slice(0, 3)).map(x => bfRow(g.t, x)).join('')).join('');
+  const nRest = ord.reduce((n, g, i) => n + (i < 3 ? Math.min(2, g.items.length - 1) : Math.min(3, g.items.length)), 0);
+  const all = !!window.bellFeedsAll;
+  return `<div class="bfwrap"><div class="bfhead">For you today</div><div class="list glnewlist bflist">${lead.join('')}<div class="bfrest"${all ? '' : ' hidden'}>${rest}</div></div>` +
+    (nRest ? `<button class="linkbtn glnewmore bfmore" onclick="window.bellFeedsAll=!window.bellFeedsAll;const r=this.previousElementSibling.querySelector('.bfrest');r.hidden=!window.bellFeedsAll;this.textContent=window.bellFeedsAll?'Show fewer':'Show ${nRest} more'">${all ? 'Show fewer' : `Show ${nRest} more`}</button>` : '') + `</div>`;
+}
+// put it under New today on the bell (right after New today's list and its Show more)
+function bfEndOf(h, i) { // index just past the element that opens at i
+  const re = /<(\/?)div\b[^>]*>/g; re.lastIndex = i; let d = 0, m; while ((m = re.exec(h))) { d += m[1] ? -1 : 1; if (d === 0) return re.lastIndex; } return -1;
+}
+(() => { const o = glAlertsBody; glAlertsBody = function () { let h = o.apply(this, arguments);
+  try { const f = bfHtml(); if (!f) return h; let i = h.indexOf('<div class="list glnewlist glnewtop');
+    if (i >= 0) { let e = bfEndOf(h, i); if (e > 0) { const mb = h.slice(e).match(/^\s*<button class="linkbtn glnewmore"[\s\S]*?<\/button>/); if (mb) e += mb[0].length; h = h.slice(0, e) + f + h.slice(e); } }
+    else { const j = h.search(/<div class="sec/); h = j >= 0 ? h.slice(0, j) + `<div class="sec">For you today</div>` + f + h.slice(j) : h + f; }
+  } catch (e) { } return h; }; })();
+// Home (day only): the tiles that now live on Notifications are left off; the night feed is unchanged
+(() => { const o = glTiles; const MOVED = { netflix: 'netflix', prime: 'prime', videos: 'videos', sarah: 'sarah', top40: 'top40', recipe: 'recipe', quote: 'quote', localnews: 'local', nznews: 'nz' };
+  glTiles = function () { const T = o.apply(this, arguments); try { if (glMode().night) return T; return T.filter(t => !(MOVED[t.k] && bfOn(MOVED[t.k]))); } catch (e) { return T; } }; })();
+(() => { const o = glPanels; glPanels = function () { try { if (!glMode().night && bfOn('quote')) return ''; } catch (e) { } return o.apply(this, arguments); }; })();
+// swipe-left (archive) on a For-you row: it stays gone (kept on this phone, last 400)
+function bfGone() { try { return JSON.parse(localStorage.getItem('bfGone') || '[]'); } catch (e) { return []; } }
+(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^bf-/.test(k)) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
+(() => { const o = nfDis; nfDis = function () { const a = o.apply(this, arguments); try { return a.concat(bfGone()); } catch (e) { return a; } }; })();

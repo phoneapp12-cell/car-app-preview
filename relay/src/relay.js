@@ -48,6 +48,7 @@ import { getDrive } from './drive.js';
 import { getStoreBusy } from './busy.js';
 import { getLocalNews } from './news.js';
 import { getBlogs } from './blogs.js';
+import { getRecs } from './recs.js';
 import { getPodcasts } from './podcasts.js';
 import { pushRoute } from './push.js';
 import { sunshineRoute } from './sunshine.js';
@@ -374,6 +375,12 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     try { const data = await getTides(fetchImpl); return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=21600' } }); }
     catch (e) { return json(502, 'tides_unavailable', origin, env); }
+  }
+  if (path === '/recs') { // 2.27.3: Top 40 new entries, top-rated PC/Switch games, topic blogs, world news (12 h cache)
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try { const data = await getRecs(new URL(request.url).searchParams.get('k'), env, fetchImpl); return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } }); }
+    catch (e) { return json(e.message === 'bad_kind' ? 400 : 502, 'recs_unavailable', origin, env); }
   }
   if (path === '/prime') {
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
