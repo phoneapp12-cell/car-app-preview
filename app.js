@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.7';
+const APP_VERSION = '2.27.8';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9489,11 +9489,12 @@ function normBudgets(list) {
       pay,
       mortgages: budgetMortgagesOf(b),
       landed: b.landed && typeof b.landed === 'object' ? b.landed : undefined, // 2.26.72: wages as they landed in the bank
+      payDropped: budgetAmt(b.payDropped) || undefined, // 2.27.8: an old typed pay set aside for the wage estimate (one tap brings it back)
       lines: (Array.isArray(b.lines) ? b.lines : []).filter(x => x && typeof x === 'object' && budgetAmt(x.amount) > 0)
         .map(x => ({ id: String(x.id || uid('bl')), name: String(x.name || 'Spending').slice(0, 60), amount: budgetAmt(x.amount) })),
       auto: !!b.auto
     };
-  }).filter(b => b.auto || b.pay > 0 || b.mortgages.some(m => m.amount > 0) || b.lines.length);
+  }).filter(b => b.auto || b.pay > 0 || b.payDropped > 0 || b.mortgages.some(m => m.amount > 0) || b.lines.length);
 }
 const getBudget = id => (S.budgets || []).find(b => b.id === id);
 // Bills due in this budget's payday fortnight, using the same dates and amounts as Bills.
@@ -9554,7 +9555,7 @@ function budgetCalc(b) {
   const cardK = (() => { try { return cardCycle(b, bills); } catch (e) { return { use: 0, pay: 0 }; } })(), debt = cardK.pay; // 2.26.36: one outgoing for the Rewards card
   const orbit = (() => { try { return orbFor(b); } catch (e) { return null; } })(), oAmt = orbit ? orbit.amount : 0; // 2.26.60
   const out = Math.round((mort + billTot + spend + debt + oAmt) * 100) / 100;
-  const LS = b.landed && b.landed.shane, LZ = b.landed && b.landed.sarah, pay = LS && LS.a > 0 ? LS.a : budgetAmtOr0(b.pay); // 2.26.72: actual once landed
+  const LS = b.landed && b.landed.shane, LZ = b.landed && b.landed.sarah, pay = LS && LS.a > 0 ? LS.a : budgetAmtOr0(b.pay) > 0 ? budgetAmtOr0(b.pay) : budgetWageExp(b); // 2.26.72: actual once landed; 2.27.8: else the wage estimate (same as Money in)
   const sarah = (() => { try { return LZ && LZ.a > 0 ? { amount: LZ.a, expected: false, n: 1, dates: [LZ.d] } : swFor(b); } catch (e) { return null; } })(), sAmt = sarah ? sarah.amount : 0; // 2.26.59: Sarah's wages from Cash flow
   return { pay, sarah, orbit, mort, carried, billTot, spend, debt, cardK, out, left: Math.round((pay + sAmt - out) * 100) / 100, mortgages, bills };
 }
@@ -9641,7 +9642,7 @@ function budgetForm(id) {
   }
   openSheet(id ? 'Edit budget' : 'Add a budget',
     periodField +
-    moneyField('This fortnight’s pay', 'pay', Math.round((b.pay || 0) * 100), '0.00', 'Leave blank to expect the average of your last 3 pays from the bank. It switches to the real amount when it lands.') +
+    moneyField('This fortnight’s pay', 'pay', Math.round((b.pay || 0) * 100), '0.00', 'Leave blank to use your Wage estimate (roster + commission, the payslip once it’s in). Only type an amount to override it. It switches to the real amount when it lands.') +
     morts.map((m, n) => moneyField(m.name, 'mamt' + n, Math.round((m.amount || 0) * 100), '0.00', n === 0 ? 'Type each mortgage for this fortnight. Leave blank if you don’t know it yet.' : '')).join(''),
     async v => {
       const cents = parseCents(v.pay);
@@ -20557,10 +20558,11 @@ function fnModel(b) {
     const L = D ? txs.filter(t => isT(t) && inPay(dOf(t))) : [], keptL = b.landed && b.landed[key] && b.landed[key].a > 0 && !(D && covered) ? [{ d: b.landed[key].d, a: b.landed[key].a }] : [];
     const S0 = L.length ? L.map(t => ({ id: t.id, d: dOf(t), a: t.amount })) : seen.filter(x => inPay(x.d)).length ? seen.filter(x => inPay(x.d)) : keptL;
     S0.forEach(x => x.id && used.add(x.id));
-    let est = 0; try { if (key === 'shane' && !(typed > 0) && wgOn() && !past) est = wgEst(wgPayFor(pp)).net; } catch (e) { } // 2.26.88: wage estimate from the roster
+    let est = 0, estComm = '', noRate = false; try { if (key === 'shane' && !(typed > 0) && !past) { if (wgOn()) { const e = wgEst(wgPayFor(pp)); est = e.net; estComm = e.comm && e.comm.src || ''; } else noRate = true; } } catch (e) { } // 2.26.88 / 2.27.8: wage estimate (roster + commission, payslip when it covers the fortnight)
     const exp = typed > 0 ? typed : est > 0 ? est : fnAvg3(seen.filter(x => x.d < pp.start).length ? seen.filter(x => x.d < pp.start) : seen);
     if (S0.length) IN.push({ key, name, st: 'landed', amount: fnSum(S0, 'a'), planned: typed > 0 ? typed : fnSum(S0, 'a'), date: S0[S0.length - 1].d, bankTx: L.length > 0 });
-    else if (!past && exp) IN.push({ key, name, st: 'expected', amount: exp, planned: exp, typed: typed > 0, est: est > 0 && !(typed > 0) });
+    else if (!past && exp) IN.push({ key, name, st: 'expected', amount: exp, planned: exp, typed: typed > 0, est: est > 0 && !(typed > 0), estComm, noRate: noRate && !(est > 0), bid: b.id, dropped: key === 'shane' && !(typed > 0) && b.payDropped > 0 ? b.payDropped : 0 });
+    else if (!past && key === 'shane' && noRate) IN.push({ key, name, st: 'none', amount: 0, planned: 0, noRate: true });
     else if (past && typed > 0 && !covered) IN.push({ key, name, st: 'planned', amount: typed, planned: typed, typed: true });
     else if (exp || typed) IN.push({ key, name, st: 'none', amount: 0, planned: exp });
   };
@@ -20649,7 +20651,8 @@ function budgetLandedSync() { try { let ch = 0; (S.budgets || []).forEach(b => {
 function fnCurModel() { const pp = payPeriod(0); return pp ? fnModel(fnBudgetFor(pp)) : null; }
 const FN_ST = { paid: x => `<span class="fnst paid">Paid ✓</span> ${esc(fmtW(x.date))}${x.bank ? '' : ' · marked paid'}`, due: x => `<span class="fnst due">Due</span> ${esc(fmtW(x.date))}`, overdue: x => `<span class="fnst over">Overdue</span> was due ${esc(fmtW(x.date))}`,
   about: x => `<span class="fnst about">About</span> ${esc(fmtW(x.date))}`, setaside: () => `<span class="fnst due">Set aside</span>`, planned: () => `<span class="fnst">Planned</span>`, nomatch: x => `<span class="fnst">Not seen in the bank</span>${x.date ? ' · ' + esc(fmtW(x.date)) : ''}`,
-  landed: x => `<span class="fnst paid">Landed ✓</span> ${esc(fmtW(x.date))}`, expected: x => `<span class="fnst about">Expected</span>${x.typed ? ' · your amount' : x.est ? ' · <a href="#wage">wage estimate</a>' : ' · average of the last 3'}`, none: () => `<span class="fnst">None this fortnight</span>` };
+  landed: x => `<span class="fnst paid">Landed ✓</span> ${esc(fmtW(x.date))}`, expected: x => `<span class="fnst about">Expected</span>${x.typed ? ` · your amount${x.key === 'shane' && x.bid ? ` · <button type="button" class="linkbtn" onclick="budgetUseEst(${jsArg(x.bid)})">Use wage estimate</button>` : ''}` : x.est ? ` · from <a href="#wage">wage estimate</a> (${x.estComm === 'email' ? 'commission confirmed by payslip' : x.estComm === 'typed' ? 'your commission amount' : 'commission estimated'})` : ' · average of the last 3 pays'}${x.noRate ? '<br><a href="#wage">Set your hourly rate in Wage estimate</a>' : ''}${x.dropped ? `<br><small class="muted">Your typed ${money(x.dropped)} was replaced by this. <button type="button" class="linkbtn" onclick="budgetUseTyped(${jsArg(x.bid)})">Use ${money(x.dropped)} instead</button></small>` : ''}`,
+  none: x => `<span class="fnst">None this fortnight</span>${x && x.noRate ? ' · <a href="#wage">Set your hourly rate in Wage estimate</a>' : ''}` };
 function fnAcctName(id) { try { const a = CF && CF.data && CF.data.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; } catch (e) { return ''; } }
 
 /* ================= ORBIT + CREDIT CARD (2.26.60) =================
@@ -23492,3 +23495,15 @@ function cpCard() {
 (() => { const o = wgComm; wgComm = function (payDate, wk) { const r = o.apply(this, arguments); try { if (r.src === 'typed') return r;
   const s = (CM().slips || []).find(x => !x.mine && x.from === wk.start && x.to === wk.end); if (s) return Object.assign(r, { amount: r2(s.cents / 100), earned: r2(s.cents / 100), src: 'email', ended: true, left: 0, proj: 0 }); } catch (e) { } return r; }; })();
 (() => { const o = wgCommLine; wgCommLine = function (c) { return c && c.src === 'email' ? 'From your Noel Leeming commission payslip (email)' : o.apply(this, arguments); }; })();
+
+/* 2.27.8: Budget "Your wages" follows Money › Work › Wage estimate (net pay for that pay date: roster hours + commission,
+   the email payslip when it covers that work fortnight). A typed pay is only an explicit override. The old typed
+   amounts on current and future budgets were set aside once (kept as payDropped, one tap brings them back). No hourly
+   rate: average of the last 3 landed pays, with a "Set your hourly rate" line. Cash flow reads the same model. */
+function budgetWageExp(b) { try { const M = fnModel(b), x = M && M.IN.find(y => y.key === 'shane'); return x && x.st !== 'landed' ? (+x.amount || 0) : 0; } catch (e) { return 0; } }
+async function budgetUseEst(id) { const b = getBudget(id); if (!b) return; const sn = snap(); b.pay = 0; delete b.payDropped; await save(); render(); toast('Using your wage estimate.', 'Undo', undoTo(sn)); }
+async function budgetUseTyped(id) { const b = getBudget(id); if (!b || !(b.payDropped > 0)) return; const sn = snap(); b.pay = b.payDropped; delete b.payDropped; await save(); render(); toast(`Using your ${money(b.pay)} again.`, 'Undo', undoTo(sn)); }
+function wageOverMig() { try { if (!S || !S.settings || S.settings.wageMig278) return; const T = todayISO(); let n = 0;
+  (S.budgets || []).forEach(b => { if (b.pay > 0 && (!b.end || b.end >= T)) { b.payDropped = b.pay; b.pay = 0; n++; } });
+  S.settings.wageMig278 = 1; save(); } catch (e) { } }
+(() => { const o = fnModel; fnModel = function () { wageOverMig(); return o.apply(this, arguments); }; })();
