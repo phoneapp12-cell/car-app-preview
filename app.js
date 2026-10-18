@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.5';
+const APP_VERSION = '2.27.6';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23284,3 +23284,84 @@ async function sarahMove(id, list) {
   await save(); await closeSheet(); render(); try { sharedSoon(500); } catch (e) { }
   toast(`Moved to Sarah’s ${list} list.`, 'Undo', undoTo(s0));
 }
+/* ================= 2.27.6: Coach (encouragement from the watch) =================
+   One 'Coach' card on Notifications a day (two at most), made from rules and his own watch data, no AI calls.
+   Sleep: only celebrates (steady wake times, deep sleep up, a run of good nights); now and then (at most one every 3 days)
+   an optional wind-down idea. Never about bedtimes, how late it is, medication or work hours. Fitness: gym days
+   (Tue/Wed after work: a cheer on the day, a well done once it's logged), steps up on last week, and on a day off with
+   decent weather a bushwalk or beach idea (or the garden). Never walking Zeus, no sport. Motivation: small goals
+   ('600 more steps beats yesterday'), the week so far. Resting heart rate: only when it's trending down (good news).
+   Settings › Watch › Coach tips (on by default). */
+const hwCoachOn = () => hwSet().watchCoach !== false;
+const COACH_SLEEP_TIPS = [
+  'Idea for after the spa: keep the lamps low for the rest of the evening. Dim light helps your body wind down.',
+  'A warm spa then a cool room is a good combo: the drop in body temperature afterwards helps you drift off.',
+  'A cool bedroom, around 18°, tends to help deeper sleep. Worth a try on the warmer nights.',
+  'Night mode and lower brightness on screens in the evening is an easy win for sleep.',
+  'If you nod off on the couch, having the bedroom ready (cool, dark, quiet) makes moving there an easy one.',
+  'Gentle calf and leg stretches in the evening can help settle restless legs.'
+];
+const COACH_WALKS = ['a bushwalk up Mt Manaia', 'the Whangārei Falls loop', 'a wander around Parihaka', 'the Abbey Caves track', 'Smugglers Bay at Bream Head'];
+const COACH_BEACH = ['Ocean Beach', 'Pataua', 'Smugglers Bay', 'Woolleys Bay'];
+function coachSleepTipOk(T) { try { const o = JSON.parse(localStorage.getItem('coachSleepTip') || 'null'); return !o || o.date === T || (Date.parse(T) - Date.parse(o.date)) >= 3 * 864e5; } catch (e) { return true; } }
+function coachIdeas() {
+  const T = nzISO(Date.now()), td = hwDay(T) || {}, goal = hwGoal(), a = homeAklParts(new Date()) || {}, dow = a.dow, hr = (a.min || 0) / 60, day = glDay(), pick = L => L[day % L.length];
+  const C = []; const add = (cat, pri, ic, t, s) => C.push({ cat, pri, ic, t, s });
+  const days = n => { const o = []; for (let i = 1; i <= n; i++) { const x = hwDay(addDays(T, -i)); if (x) o.push(x); } return o; };
+  // sleep, celebrating only
+  const nights = days(7).concat(td.sleep ? [td] : []).filter(x => x.sleep && x.sleep.mins > 120);
+  const recent = [td, ...days(6)].filter(x => x && x.sleep && x.sleep.mins > 120).slice(0, 5);
+  if (recent.length >= 5) { const w = recent.map(x => nzMin(Date.parse(x.sleep.end))).filter(Number.isFinite); const spread = Math.max(...w) - Math.min(...w);
+    if (w.length >= 5 && spread <= 45) add('sleep', 2, '🌙', 'Steady sleep this week', `You’ve woken within ${spread < 20 ? '20 minutes' : spread + ' minutes'} of the same time five days running. That rhythm is one of the best things for good sleep.`); }
+  const deep = L => { const v = L.map(x => x.sleep.stages && x.sleep.stages.deep).filter(n => n > 0); return v.length >= 2 ? v.reduce((t, n) => t + n, 0) / v.length : null; };
+  const d3 = deep(nights.slice(-3)), d7 = deep(days(10).slice(3).filter(x => x.sleep && x.sleep.mins > 120));
+  if (d3 && d7 && d3 >= d7 * 1.1 && d3 - d7 >= 6) add('sleep', 2, '🌙', 'Deep sleep’s up', `${hwMins(d3)} of deep sleep a night lately, up from ${hwMins(d7)}. Nice.`);
+  const good = [td, ...days(6)].filter(Boolean); let run = 0; for (const x of good) { if (x.sleep && x.sleep.mins >= 420) run++; else break; }
+  if (run >= 3) add('sleep', 2, '🌙', `${run} good nights in a row`, 'Seven hours or more each night. Your body will thank you.');
+  // fitness: gym Tue/Wed after work
+  const gymLog = (() => { try { return gymState().log || []; } catch (e) { return []; } })(), loggedOn = d => gymLog.some(e => e.d === d);
+  const wkStart = addDays(T, -((dow + 6) % 7)), sessions = [...new Set(gymLog.filter(e => e.d >= wkStart && e.d <= T).map(e => e.d))].length;
+  if ((dow === 2 || dow === 3) && loggedOn(T)) add('fit', 1, '🏋️', 'Gym done. Well done!', sessions > 1 ? `That’s ${sessions} sessions this week.` : 'Every session adds up.');
+  else if (dow === 2 || dow === 3) add('fit', 1, '🏋️', 'Gym day today', hr < 15 ? 'You’ve got this after work.' : 'You’ve got this. Even a short session counts.');
+  else if ((dow === 3 || dow === 4) && loggedOn(addDays(T, -1))) add('fit', 1, '🏋️', 'Nice work at the gym yesterday', sessions > 1 ? `${sessions} sessions so far this week.` : 'That one counts.');
+  // steps up on last week (positive only)
+  const s7 = days(7).filter(x => x.steps > 0), p7 = days(14).slice(7).filter(x => x.steps > 0), av = L => L.reduce((t, x) => t + x.steps, 0) / L.length;
+  if (s7.length >= 5 && p7.length >= 5) { const up = Math.round((av(s7) / av(p7) - 1) * 100); if (up >= 5) add('fit', 2, '📈', `Steps up ${up}% on last week`, `${hwNum(Math.round(av(s7)))} a day, up from ${hwNum(Math.round(av(p7)))}. Keep it going.`); }
+  // day off: weather-aware outdoor idea, or the garden
+  try { const r = rosterState(); if (!r.days[String(dow)] && hr < 16) { const w = wxDays().find(x => x.iso === todayISO());
+    if (w && w.code != null && w.code < 51 && !(w.rain >= 40) && !(w.gust >= 50)) { if (w.hi >= 21) add('fit', 3, '🏖️', 'Beach weather today', `Up to ${Math.round(w.hi)}°. A walk along ${pick(COACH_BEACH)} would be a nice way to get some steps in.`);
+      else add('fit', 3, '🌿', 'Good day to get outside', `Dry, up to ${Math.round(w.hi)}°. Maybe ${pick(COACH_WALKS)}?`); }
+    else if (w && w.code != null && w.code < 61 && !(w.rain >= 60)) add('fit', 4, '🌱', 'The garden counts too', 'Weeding, digging and carrying are great all-round movement.'); } } catch (e) { }
+  // motivation: small goals and the week so far
+  const yd = hwDay(addDays(T, -1)); if (yd && yd.steps > 0 && td.steps > 0 && hr >= 14 && hr < 21 && td.steps < yd.steps && yd.steps - td.steps <= 1500) { const n = Math.ceil((yd.steps - td.steps + 1) / 100) * 100; add('mot', 1, '👟', `${hwNum(n)} more steps beats yesterday`, `You’re on ${hwNum(td.steps)}, yesterday was ${hwNum(yd.steps)}.`); }
+  const wk = []; for (let d = wkStart; d < T; d = addDays(d, 1)) { const x = hwDay(d); if (x && x.steps > 0) wk.push(x); }
+  const hit = wk.filter(x => x.steps >= goal).length; if (wk.length >= 3 && hit >= 2) add('mot', 3, '⭐', 'Your week so far', `Step goal on ${hit} of ${wk.length} days. Good going.`);
+  // resting heart rate trending down (good news only)
+  const hrv = L => { const v = L.map(x => x.hr && !x.hr.restEst && x.hr.rest).filter(n => n > 0); return v.length >= 4 ? v.reduce((t, n) => t + n, 0) / v.length : null; };
+  const h7 = hrv(days(7)), h21 = hrv(days(28).slice(7)); if (h7 && h21 && h21 - h7 >= 2) add('hr', 2, '❤️', 'Resting heart rate trending down', `${Math.round(h7)} bpm this week, from ${Math.round(h21)} before. That usually means your fitness is building.`);
+  // an optional sleep idea, at most one every 3 days
+  if (coachSleepTipOk(T)) add('tip', 5, '💡', 'Sleep idea', COACH_SLEEP_TIPS[Math.floor(day / 3) % COACH_SLEEP_TIPS.length]);
+  return C;
+}
+function coachCards() {
+  if (!hwOn() || !hwCoachOn()) return []; const T = nzISO(Date.now()); if (!hwDay(T) && !hwDay(addDays(T, -1))) return [];
+  const C = coachIdeas(); if (!C.length) return [];
+  // one card from what's happening (rotating which kind leads each day), and a sleep idea as a second some days
+  const kinds = ['fit', 'mot', 'sleep', 'hr'], d = glDay(), order = kinds.slice(d % 4).concat(kinds.slice(0, d % 4));
+  const main = C.filter(c => c.cat !== 'tip').sort((a, b) => a.pri - b.pri || order.indexOf(a.cat) - order.indexOf(b.cat))[0];
+  const out = main ? [main] : []; const tip = C.find(c => c.cat === 'tip');
+  if (tip && (!main || main.cat !== 'sleep') && (out.length < 2) && d % 3 === 0) out.push(tip); else if (tip && !main) out.push(tip);
+  if (out.some(c => c.cat === 'tip')) try { const o = JSON.parse(localStorage.getItem('coachSleepTip') || 'null'); if (!o || o.date !== T) localStorage.setItem('coachSleepTip', JSON.stringify({ date: T })); } catch (e) { }
+  const gone = nfDis();
+  return out.slice(0, 2).map((c, i) => ({ c, k: hwK('coach', T + '-' + c.cat + '-' + bfH(c.t)) })).filter(o => !gone.includes(o.k)).map(({ c, k }) =>
+    `<div class="row glnew coachrow" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('#watch')"><div class="ic">${c.ic}</div><div class="tx"><div class="bflbl">Coach</div><div class="t">${esc(c.t)}</div><div class="s">${esc(c.s)}</div></div></div>`);
+}
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const W = coachCards(); return W.length ? W.concat(L) : L; } catch (e) { return L; } }; })();
+// Summary page line: a coach line (no figures) joins the watch lines
+(() => { const o = hwCheer; hwCheer = function () { const base = o.apply(this, arguments); try { if (!hwOn() || !hwCoachOn()) return base; const a = homeAklParts(new Date()) || {}, L = base ? [base] : [];
+  if (a.dow === 2 || a.dow === 3) L.push('Gym day today. You’ve got this.');
+  const C = coachIdeas(); if (C.some(c => /^Steps up/.test(c.t))) L.push('Your steps are up on last week.'); if (C.some(c => /trending down/.test(c.t))) L.push('Your resting heart rate is trending the right way.');
+  if (C.some(c => c.cat === 'sleep')) L.push('Your sleep’s been looking good.');
+  return L.length ? L[Math.floor(Date.now() / 600e3) % L.length] : ''; } catch (e) { return base; } }; })();
+(() => { const o = hwPrefRows; hwPrefRows = function () { const h = o.apply(this, arguments); const on = hwCoachOn();
+  return h + `<div class="srow"><div class="tx"><div class="t">Coach tips</div><div class="s">One encouraging card a day on Notifications: sleep, fitness and motivation from your watch. Ideas only, never nagging.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Coach tips" onclick="hwToggle('watchCoach')"></button></div>`; }; })();
