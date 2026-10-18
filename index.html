@@ -1917,7 +1917,7 @@ html body .nbbtns .btn.nbno{background:#fff !important;color:#374151 !important;
 #emview .emmeta{font-size:13px;opacity:.75;margin-top:2px;word-break:break-word}
 #emview .embody{white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.45;max-height:55vh;overflow:auto}
 #glalerts .glisnew{position:relative}
-#glalerts .glisnew::after{content:'';position:absolute;inset:0;border-radius:14px;pointer-events:none;box-shadow:inset 5px 0 0 #2563EB,0 0 0 2px rgba(37,99,235,.6),0 4px 14px rgba(37,99,235,.4);background:rgba(37,99,235,.07);animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}
+#glalerts .glisnew::after{content:'';position:absolute;inset:0;border-radius:14px;pointer-events:none;box-shadow:inset 0 0 0 2px rgba(37,99,235,.75);background:rgba(37,99,235,.07);animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}
 html body #glalerts span.newpill,html body #glalerts .glisnew span.newpill{display:inline-block;background:#1D4ED8!important;color:#fff!important;font-size:.68rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:1px 7px;margin-right:6px;vertical-align:2px;animation:glnewpill 2s ease forwards;animation-delay:calc(60s - var(--newage, 0s))}
 #glalerts .glwarn .newpill{align-self:flex-start;margin:0 0 2px}
 @keyframes glnewpill{to{opacity:0}}
@@ -2034,10 +2034,39 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 #glalerts .bpin{position:absolute;right:7px;bottom:7px;z-index:2;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;font-size:.95rem;line-height:1;background:rgba(255,255,255,.85);border:1px solid #cbd5e1;filter:grayscale(1);opacity:.65;cursor:pointer}
 #glalerts .bpin.on{filter:none;opacity:1;background:#fef3c7;border-color:#f59e0b}
 #glalerts .bellpinned{margin-bottom:6px}
-#glalerts .bellpinned>*,#glalerts .bellpinned .glwarn{box-shadow:0 0 0 2px #f59e0b,0 1px 4px rgba(0,0,0,.12)!important}
-#glalerts .bellpinned .bpwarns{margin:0;box-shadow:none!important;background:none!important}
-#glalerts .bellpinned .bpwarns>*{box-shadow:none!important}
+/* 2.26.98: every bell card is one rounded rectangle. Flagged events: the wrapper is the card (event + buttons inside).
+   Pinned: one orange border on the card itself; the New ring isn't drawn on top of it. */
+#glalerts .glflagwrap{background:#fff!important;border-radius:14px!important;box-shadow:0 1px 4px rgba(0,0,0,.12)!important;margin:0 0 8px!important;padding:0 0 2px!important;border:0!important}
+#glalerts .glflagwrap>.glwarn{box-shadow:none!important;background:transparent!important;margin:0!important;border-radius:14px 14px 0 0!important}
+#glalerts .glflagwrap .flbtns{padding:0 10px 8px;margin:0!important}#glalerts .glflagwrap .flclash{padding:0 12px 8px;margin:0!important}
+#glalerts .glflagwrap>.glisnew::after{display:none}
+#glalerts .glflagwrap:has(>.glisnew){box-shadow:inset 0 0 0 2px rgba(37,99,235,.75),0 1px 4px rgba(0,0,0,.12)!important;background:#f3f6ff!important}
+#glalerts .bellpinned>:not(.bpwarns),#glalerts .bellpinned .bpwarns>*{outline:2px solid #f59e0b!important;outline-offset:-2px;border-radius:14px!important;box-shadow:0 1px 4px rgba(0,0,0,.12)!important}
+#glalerts .bellpinned .glisnew::after,#glalerts .bellpinned .glflagwrap>.glwarn::after{display:none}
+#glalerts .bellpinned .glflagwrap:has(>.glisnew){background:#fff!important}
+#glalerts .bellpinned .bpwarns{margin:0 0 8px!important;padding:0!important;width:100%;outline:0!important;box-shadow:none!important;background:none!important;border:0!important;gap:0}
+#glalerts .bellpinned .bpwarns>*{margin:0!important}
+#glalerts .row .scalbtn{background:#e6f4f1!important;color:#0f766e!important;border-color:#99d5c9!important}
 #glalerts .bphost:not(.glwarn):not(.tx){padding-right:44px!important}#glalerts .bphost.tx{padding-right:36px}#glalerts .glwarn.bphost{padding-right:44px!important}#glalerts .glflagwrap .glwarn.bphost{padding-right:78px!important}
+/* 2.26.98 bell to-do rows (Today and Pinned): one tick, one line */
+#glalerts .row.att:has(>.tick){flex-wrap:nowrap!important;align-items:center}
+#glalerts .row.att>.tick{flex:none;order:0}
+#glalerts .row.att>.tapzone{flex:1 1 auto;min-width:0;width:auto}
+#glalerts .row.att>.scalbtn{flex:none}
+#glalerts .row.att:has(>.tick) .tapzone>.ic.todo{display:none}
+#glalerts .row.att.isdone .tapzone .t{text-decoration:line-through;opacity:.6}
+#glalerts .row.att:has(>.tick){padding-right:10px!important;gap:8px}#glalerts .row.att:has(>.tick)>.bpin{position:static;flex:none;align-self:center}#glalerts .row.att:has(>.tick)>.scalbtn{align-self:center!important;margin:0!important}
+#glalerts .row.att .badgestack{flex:none}#glalerts .row.att:has(>.tick)>.scalbtn{margin-left:4px!important}#glalerts .bpgone.isdone .t{text-decoration:line-through;opacity:.65}
+
+/* 2.26.98: Shop / Buy buttons and product chips on emails */
+.shbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.shchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.shchip{display:inline-flex;align-items:stretch;border:1px solid #cbd5e1;border-radius:999px;background:#fff;overflow:hidden;max-width:100%}
+.shchip button{border:0;background:none;font:inherit;font-size:.8rem;color:#1e293b;padding:5px 10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shchip .shname b{color:#0f766e;font-weight:800}
+.shchip .shadd{border-left:1px solid #cbd5e1;color:#0f766e;font-weight:700;background:#ecfdf5}
+.shmore{font-size:.75rem;color:#64748b;align-self:center}
+.emshop{margin:8px 0 10px}
 </style>
 </head>
 <body>

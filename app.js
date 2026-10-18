@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.97';
+const APP_VERSION = '2.26.98';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22614,14 +22614,14 @@ function flBtns(id) {
 function bellPins() { S.settings = S.settings || {}; if (!Array.isArray(S.settings.bellPins)) S.settings.bellPins = []; return S.settings.bellPins; }
 const bpHash = t => { let h = 0; for (const c of String(t)) h = (h * 31 + c.charCodeAt(0)) | 0; return (h >>> 0).toString(36); };
 const bpClean = el => { const c = el.cloneNode(true); c.querySelectorAll('.newpill, .bpin, .badge, .glbadge, .mbbtns, .embtns, .flbtns, .glunflag').forEach(x => x.remove()); return c; };
-function bpEntry(el) { const c = bpClean(el); let e = {}; try { e = arcEntryOf(c); } catch (x) { } const tag = (c.querySelector('.glwtag') || {}).textContent || ''; e.title = String(e.title || c.textContent).replace(/\s+/g, ' ').trim(); e.body = String(e.body || '').replace(/\s*·\s*$/, ''); e.stable = String(e.title).toLowerCase().slice(0, 80) + '|' + tag.replace(/·.*$/, '').trim().toLowerCase(); return e; }
+function bpEntry(el) { const c = bpClean(el); let e = {}; try { e = arcEntryOf(c); } catch (x) { } const tag = (c.querySelector('.glwtag') || {}).textContent || ''; e.title = String(e.title || c.textContent).replace(/\s+/g, ' ').trim(); e.body = String(e.body || '').replace(/\s*·\s*$/, ''); e.stable = String(e.title).toLowerCase().slice(0, 80) + '|' + tag.replace(/·.*$/, '').trim().toLowerCase(); try { const c2 = c.cloneNode(true); c2.querySelectorAll('.sbadge, .bluedot').forEach(x => x.remove()); const t2 = (c2.querySelector('.t') || c2.querySelector('b') || c2).textContent.replace(/\s+/g, ' ').trim(); if (t2) e.title = t2.slice(0, 160); } catch (x) { } return e; } // 2.26.98: shown title without the S badge (id unchanged)
 function bpIdOf(el) { const e = bpEntry(el); return e.key ? e.id : 'h|' + bpHash(e.stable); }
 const bpBtn = on => `<span role="button" tabindex="0" class="bpin${on ? ' on' : ''}" aria-label="${on ? 'Unpin' : 'Pin to the top'}" aria-pressed="${on}" onclick="bellPinTap(event,this)" onkeydown="if(event.key==='Enter')bellPinTap(event,this)">📌</span>`;
 async function bellPinTap(ev, btn) {
   try { ev.stopPropagation(); ev.preventDefault(); } catch (e) { }
   const el = btn.closest('[data-pid]'); if (!el) return; const id = el.dataset.pid, P = bellPins(), i = P.findIndex(p => p.id === id);
   if (i >= 0) { P.splice(i, 1); toast('Unpinned.'); }
-  else { const e = bpEntry(el); P.unshift({ id, t: String(e.title || '').slice(0, 160), s: String(e.body || '').slice(0, 240), link: e.link || '', at: new Date().toISOString() }); if (P.length > 30) P.length = 30; toast('Pinned to the top of Notifications.'); }
+  else { const e = bpEntry(el), tm = ((el.querySelector('.tick') || { getAttribute: () => '' }).getAttribute('onclick') || '').match(/tick\('([^']+)'\)/); P.unshift({ id, t: String(e.title || '').slice(0, 160), s: String(e.body || '').slice(0, 240), link: e.link || '', at: new Date().toISOString(), todo: tm ? tm[1] : '' }); if (P.length > 30) P.length = 30; toast('Pinned to the top of Notifications.'); }
   await save(); try { glWarnRedraw(); } catch (e) { }
 }
 (() => { const o = glAlertsBody; glAlertsBody = function () { const h = o();
@@ -22636,10 +22636,98 @@ async function bellPinTap(ev, btn) {
     if (!P.length) return d.innerHTML;
     const box = document.createElement('div'); box.className = 'list bellpinned';
     P.forEach(p => { const el = live.get(p.id); if (el) { if (el.matches('.glwarns > *')) { const w = document.createElement('div'); w.className = 'glwarns bpwarns'; w.appendChild(el); box.appendChild(w); } else box.appendChild(el); }
-      else { const r = document.createElement('div'); r.className = 'row glnew bpgone'; r.setAttribute('data-pid', p.id); r.setAttribute('role', 'button'); r.setAttribute('tabindex', '0'); if (p.link) r.setAttribute('onclick', `if(!glSwipe.moved)go('${String(p.link).replace(/[^#\w\/-]/g, '')}')`);
-        r.innerHTML = `<div class="ic">📌</div><div class="tx bphost"><div class="t">${esc(p.t || 'Pinned')}</div><div class="s">${esc(p.s || '')}${p.s ? ' · ' : ''}pinned ${esc(fmtW(String(p.at).slice(0, 10)))}</div></div>`; r.querySelector('.tx').insertAdjacentHTML('beforeend', bpBtn(true)); box.appendChild(r); } });
+      else { const td = p.todo ? (S.todos || []).find(t => t && t.id === p.todo) : null; const r = document.createElement('div'); r.className = 'row glnew bpgone' + (td && td.done ? ' isdone' : ''); r.setAttribute('data-pid', p.id); r.setAttribute('role', 'button'); r.setAttribute('tabindex', '0'); if (p.link) r.setAttribute('onclick', `if(!glSwipe.moved)go('${String(p.link).replace(/[^#\w\/-]/g, '')}')`);
+        r.innerHTML = `<div class="ic">${td && td.done ? '✅' : '📌'}</div><div class="tx bphost"><div class="t">${esc(p.t || 'Pinned')}</div><div class="s">${td && td.done ? 'Done ✓ · ' : ''}${esc(p.s || '')}${p.s ? ' · ' : ''}pinned ${esc(fmtW(String(p.at).slice(0, 10)))}</div></div>`; r.querySelector('.tx').insertAdjacentHTML('beforeend', bpBtn(true)); box.appendChild(r); } });
     // tidy sections left empty
     d.querySelectorAll('.list, .glwarns, .glnewlist').forEach(l => { if (!l.children.length) { let s = l.previousElementSibling; l.remove(); if (s && s.classList.contains('sec')) s.remove(); } });
     const sec = document.createElement('div'); sec.className = 'sec'; sec.textContent = 'Pinned'; d.insertBefore(box, d.firstChild); d.insertBefore(sec, box);
     return d.innerHTML;
   } catch (e) { return h; } }; })();
+/* ================= 2.26.98: Shop / Buy buttons on emails =================
+   For shop and promo emails My App shows (bell cards, View email, Everyday Rewards): the main 'Shop now' / 'Buy now' link,
+   up to 3 products with prices, and 'Add to shopping list' for food items (gluten free noted). Outlook safe-links are
+   unwrapped and utm_/tracking bits dropped where that's safe; a shop's own click-tracking links are kept as they are
+   (they only work through the shop). Opening a link never buys anything. Not on bills, invoices, orders or sport. */
+const SH_CTA = /^(shop( now| online| here| the (sale|range|deals?|collection)| all| deals?| more deals| today)?|buy( it)? now|buy|view (the )?(deal|deals|offer|product|item|range)|hot deals|see (the )?(deal|deals|range|more)|get (it|yours|the deal|deal)( now)?|grab (it|yours|the deal|a deal)( now)?|order (now|online|today)|discover more|browse (now|the range))[!.›»→ ]*$/i;
+const SH_BAD = /unsubscribe|optout|opt-out|privacy|preferences|manage|update (your )?details|view (this email |it )?(online|in (your )?browser)|can't see|facebook|instagram|tiktok|youtube|twitter|linkedin|pinterest|review|app store|google play|mailto:|terms|conditions|contact us|help|faq|logo|careers/i;
+const SH_GENERIC = /^(women'?s|men'?s|kids'?|outdoor|home|sale|new|primate|custom|clearance( deals)?|shop more deals|hot deals|shop|more|image|banner|hero|\d+%? ?off)$/i;
+const SH_GROCERY = /\b(kimchi|sauerkraut|pesto|bread|loaf|wraps?|milk|cheese|yoghurt|yogurt|butter|eggs?|sauce|cereal|muesli|granola|oats|biscuits?|crackers?|cookies?|pasta|noodles|rice|flour|snacks?|chips|crisps|chocolate|coffee|tea|juice|kombucha|honey|jam|spread|peanut butter|meat|chicken|beef|lamb|pork|sausages?|bacon|fish|salmon|tuna|fruit|apples?|bananas?|vegetables?|veggies|salad|soup|stock|spices?|seasoning|pizza bases?|tortillas?|cake mix|muffins?|ice cream|frozen|beer|cider|wine)\b/i;
+const SH_NOTFOOD = /\b(maker|machine|appliance|blender|mixer|fridge|freezer|cooler|cooker|kettle|toaster|oven|fryer|grill|bbq|jug|bottle|cup|mug|plate|bowl|tray|container|kogan|breville|sunbeam|kmart|shirt|dress|shoes?|toy|lego|game|book)\b/i;
+function shClean(u) {
+  u = evUnwrap(u) || ''; if (!u) return '';
+  try { const x = new URL(u); [...x.searchParams.keys()].forEach(k => { if (/^(utm_|mc_|_hs|hsa_|fbclid$|gclid$|dclid$|msclkid$|_ke$|sc_|vero_|mkt_tok$|trk$|cmp_?id$|_kx$)/i.test(k)) x.searchParams.delete(k); }); return x.toString(); } catch (e) { return u; }
+}
+const shPrice = t => { const m = String(t || '').match(/\$\s?(\d{1,5}(?:,\d{3})*(?:\.\d{2})?)/); return m ? '$' + m[1] : ''; };
+// pure-ish: html + subject + sender → { cta:{url,label}, products:[{name,price,url,food}], food }
+function shParse(html, subject, from) {
+  subject = mbClean(subject);
+  if (!html || isSport(subject)) return null;
+  let doc; try { doc = new DOMParser().parseFromString(String(html), 'text/html'); } catch (e) { return null; }
+  doc.querySelectorAll('style,script,head').forEach(x => x.remove());
+  const A = [...doc.querySelectorAll('a[href]')].map(a => { const img = a.querySelector('img'); return { a, text: mbClean(a.textContent), alt: mbClean(img ? img.getAttribute('alt') || '' : ''), href: a.getAttribute('href') || '' }; })
+    .filter(x => /^https:\/\//i.test(x.href) || /safelinks/.test(x.href)).filter(x => !SH_BAD.test(x.text + ' ' + x.alt) && !SH_BAD.test(evUnwrap(x.href) || x.href));
+  if (!A.length) return null;
+  let cta = null; const c1 = A.find(x => SH_CTA.test(x.text) && !/^shop$/i.test(x.text)) || A.find(x => SH_CTA.test(x.alt)) || A.find(x => SH_CTA.test(x.text));
+  if (c1) cta = { url: shClean(c1.href), label: /buy/i.test(c1.text) ? 'Buy' : 'Shop' };
+  // products: a named link (text or picture alt) with a price close by
+  const P = [], seen = new Set();
+  A.forEach(x => { let name = (x.text && !SH_CTA.test(x.text) ? x.text : x.alt).replace(/^image of\s+/i, '').trim();
+    if (!name || name.length < 4 || name.length > 90 || SH_GENERIC.test(name) || /^https?:|www\./i.test(name) || SH_CTA.test(name)) return;
+    const k = name.toLowerCase(); if (seen.has(k)) return;
+    let n = x.a, price = ''; for (let i = 0; i < 5 && n && !price; i++) { n = n.parentElement; if (!n) break; const t = mbClean(n.textContent); if (t.length > 400) break; price = shPrice(t.slice(Math.max(0, t.toLowerCase().indexOf(k.slice(0, 12))))); }
+    if (/\b(sale|deals?|clearance|% off)\b/i.test(name)) return; seen.add(k); P.push({ name: name.slice(0, 70), price, url: shClean(x.href), food: SH_GROCERY.test(name) && !SH_NOTFOOD.test(name) }); });
+  const products = P.filter(p => p.url).slice(0, 12);
+  // no 'Shop now' text (picture-only emails): the first picture or named link that isn't a menu word
+  if (!cta) { const fp = A.find(x => x.a.querySelector('img') && !SH_GENERIC.test(x.alt)) || A.find(x => x.text && !SH_GENERIC.test(x.text)); cta = fp ? { url: shClean(fp.href), label: 'Shop' } : null; }
+  if (!cta && !products.length) return null;
+  const words = s => String(s).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 3 && !/^(only|from|with|this|that|your|sale|deal|deals|save|summer|winter|yes|please)$/.test(w));
+  const sw = new Set(words(subject)); const hit = products.find(p => words(p.name).filter(w => sw.has(w)).length >= 2);
+  const gf = MB_GF_FROM.test(from || '') || MB_GF_WORD.test(subject + ' ' + doc.body.textContent.slice(0, 3000));
+  return { cta, buy: hit ? { name: hit.name, price: hit.price || shPrice(subject), url: hit.url } : null, products: products.slice(0, 3), more: Math.max(0, products.length - 3), food: products.some(p => p.food), gf };
+}
+// which emails get them: not bills / invoices / orders / deliveries / events / sport
+function shOk(m) { try { if (!m || isSport(m.subject || '')) return false; if (m.q === 'bill' || (m.qs || []).includes('bill') || (m.att && mbBillInfo(m)) || m.inv) return false; if (mbDlInfo(m) || mbCcInfo(m)) return false; if (m.ev && m.ev.days) return false; return true; } catch (e) { return false; } }
+const SH_REG = {};
+function shBtns(sh, key) {
+  if (!sh) return ''; SH_REG[key] = sh; const st = 'event.stopPropagation();event.preventDefault();if(window.glSwipe&&glSwipe.moved)return;';
+  const main = sh.buy ? `<button type="button" class="btn small primary shbtn" onclick="${st}shOpen('${esc(key)}','buy')">🛒 Buy${sh.buy.price ? ' ' + esc(sh.buy.price) : ''}</button>` : sh.cta ? `<button type="button" class="btn small primary shbtn" onclick="${st}shOpen('${esc(key)}','cta')">🛍️ Shop</button>` : '';
+  const chips = (sh.products || []).filter(p => !(sh.buy && p.name === sh.buy.name) || (sh.products || []).length > 1).map((p, i) => `<span class="shchip"><button type="button" class="shname" onclick="${st}shOpen('${esc(key)}',${i})">${esc(p.name.length > 34 ? p.name.slice(0, 32) + '…' : p.name)}${p.price ? ` <b>${esc(p.price)}</b>` : ''}</button>${p.food ? `<button type="button" class="shadd" aria-label="Add ${esc(p.name)} to shopping list" onclick="${st}shList('${esc(key)}',${i})">+ List</button>` : ''}</span>`).join('');
+  return main || chips ? `<div class="mbbtns shbtns">${main}</div>${chips ? `<div class="shchips">${chips}${sh.more ? `<span class="shmore">+${sh.more} more in the email</span>` : ''}</div>` : ''}` : '';
+}
+function shOpen(key, which) { const sh = SH_REG[key]; if (!sh) return; const u = which === 'buy' ? sh.buy && sh.buy.url : which === 'cta' ? sh.cta && sh.cta.url : (sh.products[which] || {}).url; if (!u) return; window.open(u, '_blank', 'noopener'); toast('Opened the shop’s page. Nothing is bought unless you buy it there.'); }
+async function shList(key, i) { const sh = SH_REG[key], p = sh && sh.products[i]; if (!p) return; const nm = p.name.replace(/\s+/g, ' ').trim() + (sh.gf && !/gluten/i.test(p.name) ? ' (gluten free)' : ''); const s = snap(); const n = addToShop([nm], ''); await save(); toast(n ? `${nm} added to Shopping.` : 'That’s already on your Shopping list.', n ? 'Undo' : '', n ? undoTo(s) : null); }
+// scan: fetch the body of shown, shop-like emails (at most 8 new a scan) and keep only the parsed buttons
+const shLikely = m => shOk(m) && (MB_MKT.test(m.from || '') || MB_GF_FROM.test(m.from || '') || /\b(shop|buy|sale|% off|deal|new in|order|offer|save)\b/i.test((m.subject || '') + ' ' + String(m.text || '').slice(0, 300)));
+async function shFill(out, getBody) {
+  const old = new Map(emMsgs().map(m => [m.src + ':' + m.id, m])); let n = 0;
+  for (const m of out) { if (m.shop !== undefined) continue; const o = old.get(m.src + ':' + m.id); if (o && o.shop !== undefined) { m.shop = o.shop; continue; }
+    if (!shLikely(m) || !mbGfInfo(m)) continue; if (n >= 8) continue; n++;
+    try { const b = await getBody(m); m.shop = b && b.html ? shParse(b.html, m.subject, m.from) : null; } catch (e) { } }
+}
+(() => { const oO = mbOutlook, oG = mbGmail;
+  mbOutlook = async function () { const out = await oO(); await shFill(out, async m => { const b = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(m.id) + '?$select=body'); return { html: b && b.body && /html/i.test(b.body.contentType || '') ? b.body.content : '' }; }); return out; };
+  mbGmail = async function () { const out = await oG(); await shFill(out, async m => { const g = await mbAuthGet('google', 'https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent(m.id) + '?format=full'); let html = ''; const walk = p => { if (!p || html) return; if (p.mimeType === 'text/html' && p.body && p.body.data) { const b = atob(p.body.data.replace(/-/g, '+').replace(/_/g, '/')); html = new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); } (p.parts || []).forEach(walk); }; walk(g.payload); return { html }; }); return out; };
+})();
+// bell cards: Gluten free (and any other email card) with a parsed shop result
+(() => { const o = mbItems; mbItems = function () { const out = o();
+  try { const byId = new Map(emMsgs().map(m => [m.src + ':' + m.id, m]));
+    out.forEach(x => { if (x.sec !== 'gf') return; const m = byId.get(String(x.key).slice(3)); if (!m || !m.shop || !shOk(m)) return; const b = shBtns(m.shop, 'sh|' + m.src + ':' + m.id); if (!b) return;
+      x.html = x.html.replace(/<\/div><\/div>$/, b + '</div></div>'); }); } catch (e) { }
+  return out; }; })();
+// Everyday Rewards: Shop at Woolworths + Add to shopping list for the offer
+(() => { const o = mbItems; mbItems = function () { const out = o();
+  try { out.forEach(x => { if (x.sec !== 'er') return; const p = erLive().find(q => 'er|' + q.sum.toLowerCase().slice(0, 60) + '|' + q.end === x.key); if (!p) return; const key = 'sh|' + x.key, url = p.link || 'https://www.woolworths.co.nz/';
+      const item = (p.sum.match(/\bon\s+(?:any\s+)?(.{3,50}?)(?:\s+(?:until|when|this|at|in)\b|[.,]|$)/i) || [])[1] || '';
+      SH_REG[key] = { cta: { url, label: 'Shop' }, products: item && SH_GROCERY.test(item) ? [{ name: item.replace(/^\d+\s*x\s*/i, ''), price: '', url, food: true }] : [], gf: false };
+      const st = 'event.stopPropagation();event.preventDefault();if(window.glSwipe&&glSwipe.moved)return;';
+      const b = `<div class="mbbtns shbtns"><button type="button" class="btn small primary shbtn" onclick="${st}shOpen('${esc(key)}','cta')">🛍️ Shop</button>${SH_REG[key].products.length ? `<button type="button" class="btn small" onclick="${st}shList('${esc(key)}',0)">+ Shopping list</button>` : ''}</div>`;
+      x.html = x.html.replace(/<\/div><\/div>$/, b + '</div></div>'); }); } catch (e) { }
+  return out; }; })();
+// View email: Shop / Buy / products under the email, once it's loaded
+(() => { const o = emView; emView = async function (k) { await o(k);
+  try { const r = EM_REG[k], el = document.getElementById('emview'); if (!r || !el || el.querySelector('.shbtns')) return; const m = emMsgs().find(x => x.src === r.src && x.id === r.id) || r;
+    if (!shOk(Object.assign({}, m, { inv: r.inv || m.inv }))) return; const html = r._html || ''; const sh = m.shop || (html ? shParse(html, r.subject, r.from) : null); if (!sh) return;
+    const b = shBtns(sh, 'sh|' + k); if (!b) return; const hd = el.querySelector('.emhead'); const box = document.createElement('div'); box.className = 'emshop'; box.innerHTML = b; (hd || el).after ? (hd ? hd.after(box) : el.prepend(box)) : el.prepend(box);
+  } catch (e) { } }; })();
+// keep the Gmail email's HTML too, so View email can find the shop links
+(() => { const o = mbAuthGet; mbAuthGet = async function (p, url) { const d = await o(p, url); try { if (p === 'google' && /\/messages\/[^/?]+\?format=full/.test(url) && d && d.payload) { const id = decodeURIComponent(url.split('/messages/')[1].split('?')[0]); let html = ''; const walk = q => { if (!q || html) return; if (q.mimeType === 'text/html' && q.body && q.body.data) { const b = atob(q.body.data.replace(/-/g, '+').replace(/_/g, '/')); html = new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); } (q.parts || []).forEach(walk); }; walk(d.payload); if (html) Object.values(EM_REG).forEach(r => { if (r.src === 'g' && r.id === id) r._html = html; }); } } catch (e) { } return d; }; })();
