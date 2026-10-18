@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.89';
+const APP_VERSION = '2.26.90';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9213,7 +9213,7 @@ function commRemindCard() {
     <button class="btn small" onclick="toggleCommRemind()">${I('bell')} Turn on</button></div>`;
 }
 function Commission(arg) {
-  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`, c = CM(), T = todayISO();
+  const back = '', c = CM(), T = todayISO(); // 2.26.90: Money › Work tabs replace the back button
   if (!c.anchor) {
     return back + header('Commission', 'Paid fortnightly · Mon to Sun') +
       `<div class="card" id="commsetup"><div class="t" style="font-weight:750;font-size:1.0625rem">When did your current pay fortnight start?</div>
@@ -10502,7 +10502,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
-  roster: ['clock', 'roster', 'Work roster', 'Roster'],
+  roster: ['clock', 'roster', 'Work hours', 'Work'],
   roadworks: ['wrench', 'rw', 'Roadworks', 'Roadworks'],
   travel: ['globe', 'ev', 'Travel', 'Travel'],
   sleep: ['moon', 'roster', 'Sleep', 'Sleep'],
@@ -10520,8 +10520,8 @@ const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'roster', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
-  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'commission', 'loans', 'claims'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
+  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans', 'claims'] }, // 2.26.90: work hours, commission and wage estimate together under Money
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
   { id: 'cars', title: '', keys: ['cars'] },
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
@@ -18481,7 +18481,7 @@ function Roster() {
       `<div class="rostertimes"><label class="rt"><span>Start</span><input type="time" aria-label="${name} start" value="${esc(days[k] || '')}" onchange="setRosterDay('${k}', this.value)"></label>` +
       `<label class="rt"><span>Finish</span><input type="time" aria-label="${name} finish" value="${esc(ends[k] || '')}" onchange="setRosterEnd('${k}', this.value)"${days[k] ? '' : ' disabled'}></label></div></div>`;
   }).join('');
-  return header('Work roster', 'The days and times you start and finish') +
+  return header('Work hours', 'Your roster: the days and times you start and finish') +
     `<div class="list" id="rosterlist">${rows}</div>` +
     `<div class="list" style="margin-top:12px"><div class="row"><button class="tapzone" onclick="go('#wage')"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wage estimate</div><div class="s">Your take-home pay worked out from these hours</div></div></button></div></div>` +
     '<div class="foot">Only a day with a start time counts as a work day. Days with no start are your days off. The summary uses the start for drive time and the finish to tell you when you knock off.</div>';
@@ -18546,9 +18546,9 @@ function bottomTabs(route) {
     nav.addEventListener('pointerdown', e => { const t = e.target.closest('button'); if (!t) return; btLong = false; clearTimeout(btPress); btPress = setTimeout(() => { btLong = true; if (navigator.vibrate) try { navigator.vibrate(15); } catch (x) {} btCustomise(); }, 550); });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => nav.addEventListener(ev, () => clearTimeout(btPress)));
   }
-  const item = ROUTE_ITEM[route] || route || 'home';
+  const item = route === 'work' ? 'roster' : ROUTE_ITEM[route] || route || 'home';
   let cur = item === '' ? 'home' : item;
-  if (['power', 'compare', 'powertime', 'cashflow'].includes(route) && !b.keys.includes(cur)) cur = ['budget', 'bills', 'cashflow'].find(k => b.keys.includes(k)) || cur; // 2.26.78: Money tabs light the Money tab
+  if (['power', 'compare', 'powertime', 'cashflow', 'notbills', 'work', 'roster', 'wage', 'commission'].includes(route) && !b.keys.includes(cur)) cur = ['budget', 'bills', 'cashflow'].find(k => b.keys.includes(k)) || cur; // 2.26.78: Money tabs light the Money tab
   const bn = (() => { try { return glBellUnseen(); } catch (e) { return 0; } })(); // 2.26.75
   nav.innerHTML = b.keys.map(k => { const [full, short, ic] = btMeta(k); const on = k === cur || (k === 'more' && route === 'more');
     return `<button type="button" class="${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} aria-label="${esc(full)}" data-bt="${k}" onclick="btGo('${k}')"><span class="w">${sideIco(k, ic)}${k === 'home' && bn ? `<span class="badge bellb">${bn > 9 ? '9+' : bn}</span>` : ''}</span><span class="lbl">${esc(short)}</span></button>`; }).join('');
@@ -18621,10 +18621,10 @@ function tabbar(active) {
   const meta = k => k === 'home' ? [glanceOn() ? 'Home' : 'Notifications', 'home'] : k === 'settings' ? ['Settings', 'gear'] : k === 'more' ? ['More', 'more'] : [NAV[k][2], NAV[k][0]];
   const btn = k => {
     const [l, ic] = meta(k);
-    return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
+    return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k === 'roster' ? 'work' : k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
   };
   const pwrBtn = (() => { const l = (() => { try { const t = PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })(); return `<button class="${active === 'power' ? 'on' : ''}" ${active === 'power' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#power')"><span class="w"><span style="font-size:1.3rem;line-height:1">⚡</span></span><span class="lbl">${l}</span></button>`; })();
-  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
+  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'commission' ? `<button class="${active === 'wage' ? 'on' : ''}" ${active === 'wage' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#wage')"><span class="w"><span style="font-size:1.3rem;line-height:1">💵</span></span><span class="lbl">Wage estimate</span></button>` : '') + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
   // 2.26.78: the project pages sit under a 'Projects' heading; Power moved into Money (as a link to Money › Power)
   const reno = (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`;
     let mill = ''; try { mill = renoOn() ? b('reno', '🛠️', 'Renovation ' + (window.Reno ? Reno.progress() + '%' : '')) : ''; } catch (e) { mill = ''; }
@@ -18636,7 +18636,8 @@ function activeTab(r) {
   if (r === 'settings') return 'settings';
   if (r === 'power' || r === 'compare' || r === 'powertime') return 'power'; // 2.26.78: Money › Power
   if (r === 'notbills') return 'notbills'; // 2.26.84: Money › Not bills
-  if (r === 'wage') { const t = navOrder(); return t.includes('budget') ? 'budget' : 'more'; } // 2.26.88: Money › Budget › Wage estimate
+  if (r === 'wage') return 'wage'; // 2.26.90: Money › Work › Wage estimate
+  if (r === 'work' || r === 'roster') return 'roster'; // 2.26.90: Money › Work
   if (tabs.includes(item)) return item;
   if (r === 'home' || r === 'weather' || r === 'drivers' || r === 'alerts' || !r) return 'home';
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
@@ -18659,12 +18660,13 @@ function render() {
   applyTheme();
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
+  if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
-    page = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
+    page = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? moneyTabs('work') + workTabs('comm') + Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   } catch (e) {
     console.error('Render', e);
     page = renderFallback(r, e);
@@ -19710,7 +19712,7 @@ function glCU() { try { return comingUpList().filter(x => x && glOk(x.name || x.
 function glTabs(m) { return m.off ? [['today', 'Today'], ['todo', 'To-do'], ['garden', 'Garden & Out'], ['bills', 'Bills'], ['calendar', 'Calendar'], ['cars', 'Cars']] : [['today', 'Today'], ['todo', 'To-do'], ['bills', 'Bills'], ['calendar', 'Calendar'], ['cars', 'Cars'], ['garden', 'Garden & Out']]; }
 function glTodayRows(m) {
   const n = m.night ? 2 : m.off ? 4 : 6, rows = [];
-  if (!m.off && !m.night && !m.workDone) { const f = glFree(m); rows.push(tabRow('calendar', 'Work ' + esc(glShift(m)), f ? `<span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span>` : 'Roster' + (m.end ? ' · free from ' + esc(fmtTime(m.end)) : ''), "go('#roster')")); }
+  if (!m.off && !m.night && !m.workDone) { const f = glFree(m); rows.push(tabRow('calendar', 'Work ' + esc(glShift(m)), f ? `<span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span>` : 'Roster' + (m.end ? ' · free from ' + esc(fmtTime(m.end)) : ''), "go('#work')")); }
   const L = glCU(), k = Math.max(0, n - rows.length);
   L.slice(0, k).forEach(x => { try { rows.push(cuRowHtml(x)); } catch (e) { } });
   return { html: rows.join(''), more: Math.max(0, L.length - k) };
@@ -20088,7 +20090,7 @@ function cfBody(M) {
 function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
 async function cfSetMain(id) { S.settings.cfMain = id; await save(); render(); }
 async function cfRefresh() { toast('Asking the banks for the latest…'); await cfLoad(true); if (CFerr) toast(CFerr); }
-function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['notbills', 'Not bills'], ['power', 'Power']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
+function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['notbills', 'Not bills'], ['work', 'Work'], ['power', 'Power']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
 function CashFlow() {
   const head = moneyTabs('cashflow') + header('Cash flow', 'Your bank balances, and what’s left before payday');
   if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
@@ -22096,7 +22098,7 @@ function wgBreak(e) { const L = [['Hours', `${e.H.hrs} h over ${plural(e.H.days,
     wgSt().other.map(o => row(esc(o.name), '', +o.amount || 0, 1)).join('') + row('Take-home (estimate)', '', e.net, 0, 1); }
 function WagePage() {
   const w = wgSt(), T = todayISO(), pps = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean), nextPP = pps.find(p => wgPayFor(p) > T) || pps[pps.length - 1];
-  const head = moneyTabs('budget') + header('Wage estimate', 'Your take-home pay worked out from your roster, commission and tax code');
+  const head = moneyTabs('work') + workTabs('wage') + header('Wage estimate', 'Your take-home pay worked out from your roster, commission and tax code');
   if (!nextPP) return head + `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday first</b><br>The estimate uses the same pay fortnights as Bills.<div style="margin-top:10px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
   const pd = wgPayFor(nextPP), e = wgEst(pd), r = rosterState(), rosterSet = Object.keys(r.days || {}).length > 0, opt = (v, l, cur) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(l)}</option>`;
   const num = (k, label, hint, ph) => field(label, `<div class="moneyin"><span>$</span><input inputmode="decimal" placeholder="${ph || '0.00'}" value="${w[k] ? w[k] : ''}" aria-label="${esc(label)}" onchange="wgSet('${k}', this.value)"></div>`, hint);
@@ -22114,7 +22116,7 @@ function WagePage() {
     <p class="muted" style="margin:6px 2px 0">Saved on this phone with your other settings.</p></div>`;
   const c0 = e.comm, comm = `<div class="row wgcommrow"><div class="tx"><div class="t">${c0.ended ? 'Commission earned' : c0.started ? 'Commission earned so far' : 'Commission (projected)'}</div><div class="s">${esc(wgCommLine(c0))}</div>
     <div class="s" style="margin-top:4px">${c0.started && !c0.ended ? `<a href="#commission/add">Add today’s commission</a> · ` : ''}<a href="javascript:void 0" onclick="wgCommForm(${jsArg(pd)})">${c0.src === 'typed' ? 'Change your amount' : 'Type a different amount'}</a></div></div><b>${money(c0.started && !c0.ended && c0.src !== 'typed' ? c0.earned : c0.amount)}</b></div>`;
-  const est = !rosterSet ? `<div class="card muted">Add your work days in the <a href="#roster">Work roster</a> so the hours can be counted.</div>` : !wgOn() ? `<div class="card muted">Add your hourly rate (or work it out from your last pay below) to see the estimate.</div>` :
+  const est = !rosterSet ? `<div class="card muted">Add your work days in the <a href="#work">Work roster</a> so the hours can be counted.</div>` : !wgOn() ? `<div class="card muted">Add your hourly rate (or work it out from your last pay below) to see the estimate.</div>` :
     `<div class="card"><div class="t" style="font-weight:600">Next pay ${esc(fmtW(pd))}: about ${money(e.net)}</div><div class="muted" style="margin:2px 0 8px">Estimate for work ${esc(fmtW(e.wk.start))} – ${esc(fmtW(e.wk.end))}, using your roster as it is now.</div><div class="list">${comm}${wgBreak(e)}</div></div>`;
   const cal = wgCalib(), cRows = cal.map(c => { const back = r2((c.grossNeeded - wgEst(c.d).comm.amount - wgEst(c.d).phX) / Math.max(0.01, wgEst(c.d).H.hrs)), commBack = r2(c.grossNeeded - wgEst(c.d).base - wgEst(c.d).lateX - wgEst(c.d).phX);
     return `<div class="row"><div class="tx"><div class="t">Pay ${esc(fmtW(c.d))}: ${c.est != null ? 'estimated ' + money(c.est) + ' vs actual ' : 'actual '}${money(c.actual)}</div><div class="s">${c.est != null ? (Math.abs(c.est - c.actual) < 1 ? 'Spot on' : (c.est > c.actual ? 'Estimate ' + money(c.est - c.actual) + ' high' : 'Estimate ' + money(c.actual - c.est) + ' low')) + ' · ' : ''}Gross needed about ${money(c.grossNeeded)}</div>
@@ -22158,3 +22160,5 @@ function coeliacFix() {
     title: 'Coeliac NZ is back to due Thu 8 Oct', body: `Membership renewal ${COE_INV}, $60.00, as the email says. It was showing ${fmtW(was)} because ${why}.${dupes.length ? ' The extra copy was removed.' : ''} It’s still unpaid, so it shows as overdue. If you’ve paid it, tick it off in Bills.` }).slice(-30);
   return 'fixed';
 }
+// 2.26.90: Money › Work: hours (roster), Commission and Wage estimate side by side
+function workTabs(cur) { return `<div class="seg worktabs" role="tablist">${[['hours', 'Hours', 'work'], ['comm', 'Commission', 'commission'], ['wage', 'Wage estimate', 'wage']].map(([k, t, h]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${h}')">${t}</button>`).join('')}</div>`; }
