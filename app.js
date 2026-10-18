@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.84';
+const APP_VERSION = '2.26.85';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -298,7 +298,7 @@ const area = (name, val, ph = '') => `<textarea name="${name}" placeholder="${es
 function rowFor(x) {
   let icon = 'todo', sub, cash = '';
   if (x.kind === 'car') { icon = { wof: 'shield', rego: 'doc', svc: 'wrench' }[x.part]; sub = (x.car.plate ? esc(x.car.plate) + ' · ' : '') + 'Due ' + fmtW(x.date); }
-  else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = 'Due ' + fmtW(x.date) + (x.date === x.bill.due && billInvoice(x.bill) ? ' · ' + billInvoiceText(x.bill) : ''); cash = moneyBadge(x.bill.amount, x.bill.name); }
+  else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = (x.bill.paidBy === 'card' ? '<span class="oncard">On card</span> ' : '') + 'Due ' + fmtW(x.date) + (x.date === x.bill.due && billInvoice(x.bill) ? ' · ' + billInvoiceText(x.bill) : ''); cash = moneyBadge(x.bill.amount, x.bill.name); }
   else if (x.kind === 'pet') { icon = 'paw'; sub = 'Pet · ' + esc(careEvery(x.care)) + ' · Due ' + fmtW(x.date); }
   else if (x.kind === 'health') { icon = HEALTH_ICON[x.item.kind] || 'medkit'; sub = 'Health · ' + (x.item.clinic ? esc(x.item.clinic) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
@@ -4743,7 +4743,7 @@ function Bills() {
   const row = b => {
     const d = daysLeft(b.due);
     return `<div class="row bill" data-bill="${esc(b.id)}"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}">${billIc(b.name)}
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : (billAutoLast(b) ? 'next ' : '') + 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div>${billAutoTxt(b)}</div></button>
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${b.paidBy === 'card' ? '<span class="oncard">On card</span> ' : ''}${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : (billAutoLast(b) ? 'next ' : '') + 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div>${billAutoTxt(b)}</div></button>
       <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
       ${billAutoLast(b) ? `<button class="paybtn" aria-label="Undo the bank match for ${esc(b.name)}" onclick="billAutoUndo('${b.id}')">Undo</button>` : ''}${b.paid ? (billAutoLast(b) ? '' : `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>`) : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
@@ -4826,7 +4826,7 @@ function billForm(id, pre) {
     field('What’s the bill?', inp('name', b.name, 'placeholder="e.g. Power, phone, insurance" required maxlength="50"')) +
     `<div class="two">${field('Amount ($)', inp('amount', b.amount === '' ? '' : Number(b.amount).toFixed(2), 'inputmode="decimal" placeholder="0.00"'))}${field('Next due', inp('due', b.due, 'type="date" required'))}</div>` +
     field('Repeats', sel('repeat', Object.entries(REPEATS).map(([k, v]) => [k, k === 'none' ? 'Doesn’t repeat' : v]), b.repeat || 'none')) +
-    field('Paid by', sel('paidBy', [['', 'Bank account'], ['card', 'Rewards card']], b.paidBy || ''), 'On the card: still shows when it’s due, and adds to the card in your budget') +
+    field('Paid by', sel('paidBy', [['', 'Bank account'], ['card', 'Put on credit card (ASB)']], b.paidBy || ''), 'On the card: no transfer out of ORBIT for it. It goes into the card payment for that statement, so the money stays in ORBIT longer.') +
     field('Comes out of', sel('from', billFromOpts(), billFromVal(b)), 'For Cash flow’s before-payday check. Auto uses where it was paid from before.') +
     field('Ends after (payments, counting the next one)', inp('endn', billLeft(b) || '', 'inputmode="numeric" maxlength="3" placeholder="Keeps going"'), b.lastDue ? 'Last one ' + fmtW(b.lastDue) + '.' : 'Leave blank if it doesn’t end. Only for repeating bills.') +
     field('Notes', area('notes', b.notes, 'e.g. account number, paid by direct debit')) +
@@ -4840,6 +4840,7 @@ function billForm(id, pre) {
       const dueChanged = !id || v.due !== b.due;
       const upd = { name: v.name, amount: Math.round(amt * 100) / 100, due: v.due, repeat: v.repeat, notes: v.notes, paidBy: v.paidBy === 'card' ? 'card' : '' };
       if (dueChanged) upd.anchor = new Date(parseD(v.due)).getUTCDate();
+      if (id && b.paidBy === 'card' && upd.paidBy !== 'card') upd.cardNo = true; else if (upd.paidBy === 'card') upd.cardNo = false; // 2.26.85: his choice beats the card check
       if (id ? dueChanged : (pre && pre.email && v.due !== pre.due)) upd.dueByHand = true; // 2.26.83: his own date wins over the email's
       // 2.26.63: ends after N payments → the last due date; comes out of a bank or account
       const en = String(v.endn || '').trim(); if (en && !(Math.round(+en) >= 1 && Math.round(+en) <= 600)) return 'Please type how many payments are left as a number, like 10, or leave it blank.';
@@ -9535,7 +9536,7 @@ function budgetBillRows(b) {
   loanPlanInRange(sT, eT).forEach(x => {
     items.push({ id: 'loan-' + x.l.id + '-' + x.d, name: 'Loan · ' + x.l.from, amount: x.amount, due: x.d, late: 0, loanId: x.l.id });
   });
-  items.forEach(it => { if (it.card) it.name += ' · on Rewards card'; });
+  items.forEach(it => { if (it.card) { const pd = (() => { try { return cardPayFor(it.due); } catch (e) { return null; } })(); it.name += pd ? ' · on card, paid ' + fmtW(pd.due) : ' · on card'; it.cardPay = pd ? pd.due : ''; } }); // 2.26.85
   items.sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : a.name.localeCompare(b.name));
   return items;
 }
@@ -9586,7 +9587,7 @@ function budgetCard(b) {
     <div class="sec">Money out <a href="#bills" style="font-weight:650">Open Bills</a></div>
     <div class="list">${outRows || `<div class="card muted" style="margin:0">${payPeriod(0) ? 'No bills or payments this fortnight.' : 'Set your payday in Bills so this fortnight’s bills can show here.'}</div>`}</div>
     ${budgetCardNext(b, M)}
-    ${M.cardBills.length ? `<p class="muted" style="margin:6px 2px 0">On the Rewards card: ${M.cardBills.map(x => esc(x.name.replace(/ · on Rewards card$/, '')) + ' ' + money(x.amount)).join(', ')} (paid through the ASB card payment).</p>` : ''}
+    ${M.cardBills.length ? `<p class="muted" style="margin:6px 2px 0">On the Rewards card: ${M.cardBills.map(x => esc(x.name.replace(/ · on (Rewards )?card.*$/, '')) + ' ' + money(x.amount)).join(', ')} (paid through the ASB card payment).</p>` : ''}
     <div class="sec">Three mortgages · ASB</div>
     <p class="muted" style="margin:-4px 2px 8px">Type each amount for this fortnight. Paid ✓ when the ASB repayment shows in the bank.</p>
     <div class="list">${mortRows}</div>
@@ -19975,7 +19976,7 @@ async function cfLoad(force) {
   try {
     const [s, d] = force ? await cfApi('/cashflow/refresh', 'POST', {}) : await cfApi('/cashflow');
     if (s === 200 && d.connected === false) { cfForget(); }
-    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { billAutoPay(d.data); } catch (e) { console.error('billAutoPay', e); } try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
+    else if (s === 200 && d.data) { CF = d; try { localStorage.setItem('cfStatus', JSON.stringify({ name: d.name, accounts: d.accounts, at: d.at })); } catch (e) { } cfFeedCard(d.data); swFeed(d.data); mywFeed(d.data); orbFeed(d.data); cardFeedPays(d.data); try { cardDetect(d.data); } catch (e) { } try { billAutoPay(d.data); } catch (e) { console.error('billAutoPay', e); } try { budgetLandedSync(); } catch (e) { } try { billAcctCheck(d.data); } catch (e) { } }
     else if (s === 401) { CFerr = 'This phone’s bank link key isn’t valid any more. Connect again in Settings.'; cfForget(); }
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
     else CFerr = cfErrText(s, d);
@@ -20096,8 +20097,45 @@ function cfGoSettings() { go('#settings'); setTimeout(() => { const el = documen
    Payee text has card and account numbers taken out. */
 const BILL_OWN_RE = /^PAY (SHANE|ANZ BILL)\b|\bS A (& S M )?JENKINS\b|\bS JENKINS ASB TO ASB\b|^MB TRANSFER\b|^TO: *\d|^FC\d|\bTFR TO SARAH\b|^TRANSFER TO\b/i;
 function billOwnTx(t) { const x = String(t && t.desc || ''); return BILL_OWN_RE.test(x) || !!(t && t.pair && /^(KIWIBANK|ANZ|ASB|WESTPAC|BNZ)\b/i.test(x)); }
-let nbPer = 'this', nbAcct = '', nbShowHidden = false;
-const nbPayee = t => { const raw = String(t.merchant || t.desc || 'Payment'); return raw.replace(/CARD NUMBER.*$/i, '').replace(EM_BANKNO, '').replace(/\*{2,}[\s*#\d]*/g, '').replace(/#\s*\d*/g, '').replace(/\s+\b(ACCT|INV|REF|PARTICULARS|CODE)\b.*$/i, '').replace(/\b\d{4,}\b/g, '').replace(/\s+/g, ' ').trim().replace(/^(.+?) \1$/i, '$1').slice(0, 48) || 'Payment'; };
+let nbPer = 'this', nbAcct = '', nbShowHidden = false, nbCatF = '';
+/* 2.26.85: categories. Each payment gets one from the payee text (and Akahu's own category or merchant when there is one).
+   He can change one (S.settings.nbCatOne[txId]) or say always for that payee (S.settings.nbCatAlways[payeeKey]). */
+const NB_CATS = [
+  ['super', 'Supermarket', '#DCFCE7', '#166534', /woolworths|countdown|new ?world|pak ?n ?save|paknsave|fresh ?choice|four ?square|super ?value|bin inn|food ?mart|supermarket|grocer|farro|moore wilson|night ?n ?day/i],
+  ['fuel', 'Fuel', '#FEF3C7', '#92400E', /(^|\s)Z(\s|$)|\bz energy\b|\bbp\b|mobil|\bgull\b|waitomo|caltex|\bnpd\b|allied petrol|challenge|\bfuel|petrol|service station|\bkora\b/i],
+  ['food', 'Takeaways & cafés', '#FFE4E6', '#9F1239', /uber ?eats|doordash|delivereasy|menulog|\bcaf[eé]\b|coffee|espresso|takeaway|burger|pizza|domino|mcdonald|\bkfc\b|subway|carl'?s jr|wendy'?s|sushi|bakery|restaurant|\bbar\b|\bpub\b|fish ?(and|&|n) ?chips|\bthai\b|indian|chinese|kebab|noodle|dumpling|bistro|eatery|\bdairy\b/i],
+  ['health', 'Pharmacy & health', '#E0F2FE', '#075985', /chemist|pharmacy|unichem|unimed|southern cross|doctor|medical|health|dental|dentist|physio|chiro|optometr|specsavers|hospital|clinic|\bcfh\b|radiology|laborator/i],
+  ['hardware', 'Hardware & garden', '#FFEDD5', '#9A3412', /bunnings|mitre ?10|placemakers|\bitm\b|hammer hardware|garden|nursery|palmers|kings plant|plant ?barn|carters|plumbing world|resene|dulux|hardware/i],
+  ['shop', 'Shopping', '#EDE9FE', '#5B21B6', /kmart|the warehouse|warehouse stationery|\bwarehouse\b|noel leeming|briscoes|farmers|harvey norman|jb ?hi|smiths city|hallensteins|glassons|cotton on|torpedo7|trade ?me|mighty ?ape|temu|shein|aliexpress|ebay|spotlight|stevens|typo|appliance|^sp\s|whitcoulls|paper ?plus|dollar|postie|ezibuy|life ?style|bed ?bath/i],
+  ['online', 'Subscriptions & online', '#E0E7FF', '#3730A3', /google|apple\.com|itunes|netflix|spotify|disney|\bneon\b|sky (network|tv|go)|amazon|prime video|microsoft|xbox|playstation|steam|youtube|openai|chatgpt|cursor|suno|paypal|patreon|adobe|dropbox|icloud|subscription|audible|kindle|segpay|ccbill/i],
+  ['pets', 'Pets', '#FCE7F3', '#9D174D', /animates|pet ?stop|pet ?direct|\bvet\b|vets\b|veterinar|pet (food|shop)|purina|\bpets?\b/i],
+  ['car', 'Car & transport', '#E2E8F0', '#334155', /vtnz|\baa\b|nz transport|waka kotahi|nzta|repco|supercheap|parking|wilson park|\btoll|bee ?card|\bbus\b|taxi|\buber\b|car ?wash|tyre|beaurepaires|mechanic|automotive|\bauto\b|panel ?beat|smart ?park|\bwof\b/i],
+  ['fun', 'Entertainment', '#FAE8FF', '#86198F', /cinema|hoyts|movie|ticketek|ticketmaster|eventfinda|bowling|museum|\bzoo\b|concert|theatre|lotto|arcade|mini ?golf/i],
+  ['cash', 'Cash', '#F1F5F9', '#0F172A', /\batm\b|cash withdrawal|cash ?out|withdrawal/i],
+  ['other', 'Other', '#F3F4F6', '#374151', null]];
+const NB_CAT = Object.fromEntries(NB_CATS.map(c => [c[0], c]));
+// Akahu's own category names, when the relay passes them on
+const NB_AKAHU = [[/supermarket|grocer/i, 'super'], [/fuel|petrol|service station/i, 'fuel'], [/cafe|restaurant|takeaway|fast food|bar|pub|dining|food/i, 'food'], [/pharmac|medical|health|dental|doctor/i, 'health'],
+  [/hardware|garden|home improvement/i, 'hardware'], [/department|clothing|retail|shopping|electronics/i, 'shop'], [/subscription|digital|software|streaming|online/i, 'online'], [/pet|vet/i, 'pets'],
+  [/automotive|parking|transport|taxi|vehicle/i, 'car'], [/entertainment|cinema|events|lotter/i, 'fun'], [/cash|atm/i, 'cash']];
+function nbCatAuto(t) { const x = nbPayee(t) + ' ' + String(t.merchant || '') + ' ' + String(t.desc || '');
+  for (const c of NB_CATS) if (c[4] && c[4].test(x)) return c[0];
+  const ak = String(t.cat || ''); if (ak) for (const [re, k] of NB_AKAHU) if (re.test(ak)) return k;
+  return 'other'; }
+function nbCatOf(t) { const one = (S.settings.nbCatOne || {})[t.id]; if (one && NB_CAT[one]) return one; const al = (S.settings.nbCatAlways || {})[nbKey(t)]; if (al && NB_CAT[al]) return al; return nbCatAuto(t); }
+const nbChip = (k, extra) => { const c = NB_CAT[k] || NB_CAT.other; return `<span class="nbcat" style="background:${c[2]} !important;color:${c[3]} !important"${extra || ''}>${esc(c[1])}</span>`; };
+function nbCatPick(id) { const t = nbTx(id); if (!t) return; const cur = nbCatOf(t), who = nbTitle(nbPayee(t));
+  openSheet('Category', `<p class="muted" style="margin:0 0 10px">${esc(who)}, ${cfMoney(t.amount)} on ${esc(fmtW(t.date.slice(0, 10)))}</p><div class="nbcatpick">${NB_CATS.map(c => `<label class="nbcatopt"><input type="radio" name="cat" value="${c[0]}"${c[0] === cur ? ' checked' : ''}> ${nbChip(c[0])}</label>`).join('')}</div>` +
+    `<label class="nbalways"><input type="checkbox" name="always" value="1"${(S.settings.nbCatAlways || {})[nbKey(t)] ? ' checked' : ''}> Always use this for ${esc(who)}</label>`,
+    async v => { const k = NB_CAT[v.cat] ? v.cat : 'other', s0 = snap(), key = nbKey(t);
+      S.settings.nbCatOne = Object.assign({}, S.settings.nbCatOne); S.settings.nbCatAlways = Object.assign({}, S.settings.nbCatAlways);
+      if (v.always) { S.settings.nbCatAlways[key] = k; delete S.settings.nbCatOne[t.id];
+        // one-off picks for this payee give way to the new rule
+        (CF && CF.data && CF.data.transactions || []).forEach(x => { if (nbKey(x) === key) delete S.settings.nbCatOne[x.id]; }); }
+      else { if (S.settings.nbCatAlways[key] && S.settings.nbCatAlways[key] !== k) { /* keep the rule, this one is different */ } S.settings.nbCatOne[t.id] = k; }
+      const ks = Object.keys(S.settings.nbCatOne); if (ks.length > 600) ks.slice(0, ks.length - 600).forEach(x => delete S.settings.nbCatOne[x]);
+      await save(); setTimeout(() => { render(); toast(v.always ? `${who} is always ${NB_CAT[k][1]} now.` : `Set to ${NB_CAT[k][1]}.`, 'Undo', undoTo(s0)); }, 0); }, 'Save'); }
+const nbPayee = t => { const raw = String(t.merchant || t.desc || 'Payment'); return raw.replace(/CARD NUMBER.*$/i, '').replace(EM_BANKNO, '').replace(/\*{2,}[\s*#\d]*/g, '').replace(/#\s*\d*/g, '').replace(/\s+\b(USD|AUD|EUR|GBP)\s+[\d.,]+.*$/i, '').replace(/\s+\b(ACCT|INV|REF|PARTICULARS|CODE)\b.*$/i, '').replace(/\b\d{4,}\b/g, '').replace(/\s+/g, ' ').trim().replace(/^(.+?) \1$/i, '$1').slice(0, 48) || 'Payment'; };
 const nbKey = t => swNorm(nbPayee(t)).slice(0, 24);
 const nbTitle = n => String(n).toLowerCase().replace(/(^|[\s\-\/&(])([a-z])/g, (x, p, c) => p + c.toUpperCase());
 function nbRange() {
@@ -20144,19 +20182,25 @@ function NotBills() {
   const accts = D.accounts.filter(a => (cfSpendable(a) || a.type === 'CREDITCARD') && !(a.type === 'LOAN' && !a.limit));
   const aName = id => { const a = D.accounts.find(x => x.id === id); return a ? (a.type === 'CREDITCARD' ? (a.bank || 'ASB') + ' card' : cfIsOrbit(a) ? 'ORBIT' : cfAName(a)) : ''; };
   const inR = nbAll(D).filter(t => { const d = t.date.slice(0, 10); return d >= R.from && d <= R.to && (!nbAcct || t.acct === nbAcct); }).sort((a, b) => b.date.localeCompare(a.date));
-  const shown = inR.filter(t => !hid.has(t.id)), hiddenHere = inR.filter(t => hid.has(t.id)), L = nbShowHidden ? hiddenHere : shown;
+  const shownAll = inR.filter(t => !hid.has(t.id)), hiddenHere = inR.filter(t => hid.has(t.id));
+  const byCat = new Map(); shownAll.forEach(t => { const k = nbCatOf(t); byCat.set(k, (byCat.get(k) || 0) - t.amount); });
+  if (nbCatF && !byCat.has(nbCatF)) nbCatF = '';
+  const shown = nbCatF ? shownAll.filter(t => nbCatOf(t) === nbCatF) : shownAll, L = nbShowHidden ? hiddenHere : shown;
+  const allTot = shownAll.reduce((n, t) => n - t.amount, 0);
+  const catCard = byCat.size ? `<div class="card nbcats"><div class="nbcath">By category</div>${[...byCat.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => { const c = NB_CAT[k], pc = allTot > 0 ? Math.round(v / allTot * 100) : 0;
+    return `<button type="button" class="nbcatrow${nbCatF === k ? ' on' : ''}" aria-pressed="${nbCatF === k}" onclick="nbCatF=nbCatF==='${k}'?'':'${k}';render()"><span class="nbcatl">${nbChip(k)}</span><span class="nbcatbar"><i style="width:${Math.max(2, pc)}%;background:${c[3]}"></i></span><span class="nbcatv">${cfMoney(v)} <small>${pc}%</small></span></button>`; }).join('')}${nbCatF ? `<button type="button" class="linkbtn" onclick="nbCatF='';render()">Showing ${esc(NB_CAT[nbCatF][1])} only · Show all</button>` : '<div class="s muted" style="margin-top:4px">Tap a category to see just those.</div>'}</div>` : '';
   const tot = shown.reduce((n, t) => n - t.amount, 0), regTot = shown.filter(t => reg.has(nbKey(t))).reduce((n, t) => n - t.amount, 0);
   const segBtn = (k, l) => `<button type="button" class="${nbPer === k ? 'on' : ''}" aria-selected="${nbPer === k}" onclick="nbPer='${k}';render()">${l}</button>`;
   const filt = `<div class="seg nbper" role="tablist">${segBtn('this', 'This fortnight')}${segBtn('last', 'Last fortnight')}${segBtn('30', '30 days')}</div>` +
     `<div class="nbacct"><label class="muted" for="nbacct">Account</label> <select id="nbacct" onchange="nbAcct=this.value;render()"><option value="">All accounts</option>${accts.map(a => `<option value="${esc(a.id)}"${nbAcct === a.id ? ' selected' : ''}>${esc(aName(a.id))}</option>`).join('')}</select></div>`;
-  const sum = `<div class="card nbsum"><div class="nbtot">${cfMoney(tot)}</div><div class="s">${esc(R.label)} · ${esc(fmtW(R.from))} to ${esc(fmtW(R.to))} · ${plural(shown.length, 'payment')}${regTot ? ` · ${cfMoney(regTot)} looks regular` : ''}</div>${hiddenHere.length ? `<button type="button" class="linkbtn" onclick="nbShowHidden=!nbShowHidden;render()">${nbShowHidden ? 'Back to the list' : 'Show ' + plural(hiddenHere.length, 'hidden one')}</button>` : ''}</div>`;
+  const sum = `<div class="card nbsum"><div class="nbtot">${cfMoney(tot)}</div><div class="s">${nbCatF ? esc(NB_CAT[nbCatF][1]) + ' · ' : ''}${esc(R.label)} · ${esc(fmtW(R.from))} to ${esc(fmtW(R.to))} · ${plural(shown.length, 'payment')}${regTot ? ` · ${cfMoney(regTot)} looks regular` : ''}</div>${hiddenHere.length ? `<button type="button" class="linkbtn" onclick="nbShowHidden=!nbShowHidden;render()">${nbShowHidden ? 'Back to the list' : 'Show ' + plural(hiddenHere.length, 'hidden one')}</button>` : ''}</div>`;
   const byDay = new Map(); L.forEach(t => { const d = t.date.slice(0, 10); (byDay.get(d) || byDay.set(d, []).get(d)).push(t); });
   const row = t => { const r = reg.get(nbKey(t)), id = esc(t.id), isCard = card && t.acct === card.id;
-    return `<div class="row nbrow" data-nb="${id}"><div class="tx"><div class="t">${esc(nbTitle(nbPayee(t)))}${r ? ` <span class="nbreg">Looks regular · ${nbPerTxt(r.per)}</span>` : ''}</div><div class="s">${esc(aName(t.acct))}${isCard ? '' : ''}${t.cat ? ' · ' + esc(t.cat) : ''}</div>
+    return `<div class="row nbrow" data-nb="${id}"><div class="tx"><div class="t">${esc(nbTitle(nbPayee(t)))}${r ? ` <span class="nbreg">Looks regular · ${nbPerTxt(r.per)}</span>` : ''}</div><div class="s nbsub"><button type="button" class="nbcatbtn" aria-label="Change category" onclick="event.stopPropagation();nbCatPick('${id}')">${nbChip(nbCatOf(t))}<span class="nbcatedit">▾</span></button> ${esc(aName(t.acct))}</div>
       <div class="nbbtns">${nbShowHidden ? `<button type="button" class="btn small" onclick="nbUnhide('${id}')">Put back</button>` : `<button type="button" class="btn small nbmk" onclick="nbMake('${id}')">Make this a bill</button><button type="button" class="btn small nblink" onclick="nbLink('${id}')">Link to a bill</button><button type="button" class="btn small nbno" onclick="nbHide('${id}')">Not a bill</button>`}</div></div>
       <b class="cfamt neg">${cfMoney(t.amount)}</b></div>`; };
   const list = L.length ? [...byDay.entries()].map(([d, ts]) => `<div class="sec">${esc(fmtW(d))}</div><div class="list">${ts.map(row).join('')}</div>`).join('') : `<div class="card muted">${nbShowHidden ? 'Nothing hidden in this period.' : 'Nothing here. Everything that went out was a bill or a transfer between your accounts.'}</div>`;
-  return head + (CF.example ? `<div class="callout cfex"><b>Example data</b> · not your real accounts</div>` : '') + filt + sum + list + `<p class="muted" style="margin:10px 4px 0;font-size:13px">Left out: transfers between your accounts, money coming in, mortgage repayments, card repayments and anything a bill was marked paid with. Bank data from Akahu, read-only.</p>`;
+  return head + (CF.example ? `<div class="callout cfex"><b>Example data</b> · not your real accounts</div>` : '') + filt + sum + catCard + list + `<p class="muted" style="margin:10px 4px 0;font-size:13px">Left out: transfers between your accounts, money coming in, mortgage repayments, card repayments and anything a bill was marked paid with. Bank data from Akahu, read-only.</p>`;
 }
 const nbTx = id => (CF && CF.data && CF.data.transactions || []).find(t => t.id === id);
 async function nbHide(id) { const s = snap(); S.settings.nbHide = (S.settings.nbHide || []).filter(x => x !== id).concat(id).slice(-500); await save(); render(); toast('Hidden. It won’t show here again.', 'Undo', undoTo(s)); }
@@ -20498,6 +20542,26 @@ function orbIntCard(D) {
   const L = x.ints.slice(-3).reverse();
   return `<div class="sec">ORBIT interest</div><div class="list"><div class="row cfrow"><div class="tx"><div class="t">Next on ${esc(fmtW(x.next))}: about ${cfMoney(x.est)}</div><div class="s">${L.length ? 'Charged ' + L.map(i => esc(fmtW(i.d)) + ' ' + cfMoney(i.a)).join(' · ') : 'No interest charge in the bank data yet'}${x.how ? ' · estimate from ' + x.how : ''}</div></div></div></div>`;
 }
+// 2.26.85: the card payment a charge on day d goes into: the next statement on or after d, paid 'gap' days later
+function cardPayFor(d) { const k = cardDays(); if (!d) return null; const st = cardStmts(d).find(x => x >= d); return st ? { stmt: st, due: addDays(st, k.gap) } : null; }
+function cardPrevStmt(stmt) { return cardStmts(stmt).filter(x => x < stmt).pop() || addDays(stmt, -30); }
+// card bills in one statement (charged after the last statement, up to this one), and ones that roll into the next
+function cardBillsFor(g) { if (!g) return { inc: [], next: [] }; const prev = cardPrevStmt(g.stmt), nx = cardPayFor(addDays(g.stmt, 1));
+  let inc = [], next = []; try { inc = budgetBillRows({ start: addDays(prev, 1), end: g.stmt }).filter(x => x.card); next = nx ? budgetBillRows({ start: addDays(g.stmt, 1), end: g.due > todayISO() ? g.due : addDays(g.stmt, 14) }).filter(x => x.card) : []; } catch (e) { }
+  return { inc, next, nextDue: nx ? nx.due : '' }; }
+/* 2.26.85: a bill the bank shows being paid on the ASB card goes on the card (paidBy 'card'), over the follow-the-bank rule.
+   Not when he's set it back to Bank account himself (b.cardNo). One quiet bell note lists them. */
+function cardDetect(D) {
+  try { const a = cfCardAcct(D); if (!a) return []; const txs = D.transactions || [], moved = [];
+    (S.bills || []).forEach(b => { if (!b || b.paidBy === 'card' || b.cardNo || b.paid && b.repeat === 'none' || billIsMort(b)) return;
+      const ids = new Set(); (b.paidDues || []).forEach(p => { if (p && p.tx) ids.add(p.tx); (p && p.txs || []).forEach(x => ids.add(x)); });
+      let L = txs.filter(t => ids.has(t.id));
+      if (!L.length) L = txs.filter(t => t.amount < 0 && t.cat2 !== 'transfer' && (() => { try { return payeeFor(b, t) > 0; } catch (e) { return false; } })());
+      const last = L.sort((x, y) => y.date.localeCompare(x.date))[0]; if (!last || last.acct !== a.id) return;
+      b.paidBy = 'card'; delete b.fromAcct; b.fromBank = ''; if (S.settings.cfBillAcct) delete S.settings.cfBillAcct[b.id]; moved.push(String(b.name || 'A bill').slice(0, 40)); });
+    if (moved.length) { const L = (S.settings.appNotices || []).slice(); L.push({ id: 'oncard-' + Date.now(), kind: 'bill', src: 'Bills', go: '#cashflow', at: new Date().toISOString(), title: 'On the credit card now: ' + moved.slice(0, 8).join(', ') + (moved.length > 8 ? ' and ' + (moved.length - 8) + ' more' : ''),
+      body: 'The bank shows these paid on the ASB card, so they go into the card payment, not a transfer from ORBIT. Change one back in the bill’s Paid by.' }); S.settings.appNotices = L.slice(-30); save(); }
+    return moved; } catch (e) { return []; } }
 function cardFeedPays(D) { try { const a = cfCardAcct(D); if (!a) return; const c = debtsSt().card, L = (D.transactions || []).filter(t => t.acct === a.id && t.amount > 0).map(t => ({ d: t.date.slice(0, 10), a: t.amount, from: (D.transactions.find(x => x.id === t.pair) || {}).acct || '' })).sort((p, q) => p.d.localeCompare(q.d)).slice(-12);
   const nd = cardNextDue(); if (nd && c.due !== nd) { c.due = nd; save(); }
   // what was owed at the end of the last statement day: owed now, with everything after that day undone
@@ -20556,7 +20620,7 @@ function cardCfCard(D) { // 2.26.72: "Credit card plan", under Transfers; the sa
   else {
     if (g.proj) { const canNow = xc ? xc.nowCan >= owed - 0.005 : false, payAt = xc && xc.after ? xc.after : '';
       status += `<div class="s">Statement on ${esc(fmtW(g.stmt))} · currently ${cfMoney(owed)}${owed > 0 ? (canNow ? ' — can pay that now if you like' : payAt ? ` — you could pay it once pay lands ${esc(fmtW(payAt))}, if you like` : '') : ''}</div>`;
-      status += `<div class="s">Projected statement about ${cfMoney(g.goal)}${g.adds.length ? ' (with ' + esc(g.adds.map(x => x.name.replace(/ · on Rewards card$/, '') + ' ' + money(x.amount)).join(', ')) + ' still to go on it)' : ''}</div>`; }
+      status += `<div class="s">Projected statement about ${cfMoney(g.goal)}${g.adds.length ? ' (with ' + esc(g.adds.map(x => x.name.replace(/ · on (Rewards )?card.*$/, '') + ' ' + money(x.amount)).join(', ')) + ' still to go on it)' : ''}</div>`; }
     else status += `<div class="s">Statement ${esc(fmtW(g.stmt))}: ${g.about ? 'about ' : ''}${cfMoney(g.goal)}${g.paid ? ' · ' + cfMoney(g.paid) + ' paid' : ''}</div>`;
     if (g.pend) status += `<div class="s">${cfMoney(g.pend)} ticked as paid, counted until the bank shows it</div>`;
     if (!xc || xc.short <= 0.005) status += `<div class="cfok">Pay in full: ${cfMoney(g.left)} by ${esc(fmtW(g.due))}${xc ? ' ✔ affordable' : ''}</div>${xc ? `<div class="s">From ${esc(nm(xc.from))}${xc.after ? ' after pay lands ' + esc(fmtW(xc.after)) : ''}, after everything else that’s due. It’s in Transfers to make.</div>` : ''}`;
@@ -20564,6 +20628,10 @@ function cardCfCard(D) { // 2.26.72: "Credit card plan", under Transfers; the sa
     if (g.min) status += `<div class="s">Minimum ${g.proj || g.about ? 'about ' : ''}${cfMoney(g.min)} (the greater of 3% or $10)</div>`;
     status += `<div class="s muted">Paying the full statement by the due date means no interest on purchases.</div>`;
   }
+  try { if (g) { const cb = cardBillsFor(g); // 2.26.85: card bills in this payment, and ones that roll into the next
+    if (cb.inc.length) status += `<div class="cfcardbills"><div class="s"><b>Card bills in the ${esc(fmtW(g.due))} payment</b></div>${cb.inc.map(x => `<div class="s">· ${esc(x.name.replace(/ · on (Rewards )?card.*$/, ''))} ${money(x.amount)} <span class="muted">${x.paid ? 'charged' : 'due'} ${esc(fmtW(x.paid ? (x.paidOn || x.due) : x.due))}</span></div>`).join('')}</div>`;
+    if (cb.next.length) status += `<div class="s">Rolls into the next payment (${esc(fmtW(cb.nextDue))}): ${esc(cb.next.map(x => x.name.replace(/ · on (Rewards )?card.*$/, '') + ' ' + money(x.amount)).join(', '))}</div>`; } } catch (e) { }
+  status += `<div class="s cfexpl">Keeps money in ORBIT longer to save interest; pay in full by due date to stay interest-free.</div>`;
   return `<div class="sec">Credit card plan</div><div class="card cfcard">
     <div class="row cfrow"><div class="tx"><div class="t">${esc(cfAName(a))}${g ? ` · due ${esc(fmtW(g.due))}` : ''}</div><div class="s">You owe ${cfMoney(owed)} · ${cfMoney(a.available || 0)} available of ${cfMoney(lim)}</div><div class="pbar"><i style="width:${Math.min(100, Math.round(100 * owed / lim))}%"></i></div></div></div>
     <div style="padding:0 12px 10px">${status}
