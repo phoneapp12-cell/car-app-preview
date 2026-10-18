@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.93';
+const APP_VERSION = '2.26.94';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10523,7 +10523,7 @@ const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans'] }, // 2.26.91: UniMed claims live once, next to Health in People // 2.26.90: work hours, commission and wage estimate together under Money
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'claims', 'about'] },
-  { id: 'cars', title: '', keys: ['cars'] },
+  { id: 'cars', title: 'Cars', keys: ['cars'] }, // 2.26.94: its own heading like the other groups
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
   { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge', 'roadworks'] },
   { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts', 'radio', 'travel'] }
