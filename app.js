@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.86';
+const APP_VERSION = '2.26.87';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20245,7 +20245,7 @@ function cfRegulars(D) {
     if (!gaps.length) return; const med = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)];
     const per = med >= 6 && med <= 8 ? 7 : med >= 13 && med <= 15 ? 14 : med >= 27 && med <= 34 ? 'm' : 0; if (!per) return;
     const ok = gaps.filter(x => per === 'm' ? x >= 26 && x <= 34 : Math.abs(x - per) <= 2).length; if (ok < Math.max(1, Math.ceil(gaps.length * 0.7)) || (per === 7 && L.length < 3 && !L.every(t => t.type === 'STANDING ORDER'))) return;
-    const am = L.slice(-3).map(t => -t.amount), avg = r2(am.reduce((n, v) => n + v, 0) / am.length), last = -L[L.length - 1].amount, varies = Math.max(...am) - Math.min(...am) > Math.max(1, avg * 0.25);
+    const am = L.slice(-3).map(t => -t.amount), avg = varAvg3(L.map(t => -t.amount)), last = -L[L.length - 1].amount, varies = Math.max(...am) - Math.min(...am) > Math.max(1, avg * 0.25);
     const ld = d[d.length - 1], span = per === 'm' ? 31 : per; if ((parseD(T) - parseD(ld)) / DAY > span * 1.6) return; // stopped
     const name = String(L[L.length - 1].merchant || L[L.length - 1].desc).replace(/CARD NUMBER.*$/i, '').replace(/\s*\d[\d\s-]{3,}.*$/, '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase()).slice(0, 40) || 'Regular payment';
     const tk = cfToks(name);
@@ -21840,9 +21840,13 @@ async function coeliac8Mig() {
    shows (kept as dates and amounts in S.settings.koraSeen), about $120 until there are any. One-time: fortnightly direct
    debit from ANZ Bill Account every second Friday (next Fri 30 Oct), marked varies, category Fuel. */
 const KORA_FALLBACK = 120;
+/* 2.26.87: average for bills whose amount varies (Kora and the like): skip tiny debits (under $10, or under a quarter of the
+   median of recent debits) and average the last 3 that are left. Amounts in date order, oldest first. */
+function varAvg3(am) { const A = am.map(Number).filter(v => v > 0); if (!A.length) return 0; const R = A.slice(-8).sort((a, b) => a - b), med = R.length % 2 ? R[(R.length - 1) / 2] : (R[R.length / 2 - 1] + R[R.length / 2]) / 2;
+  let Q = A.filter(v => v >= 10 && v >= med * 0.25); if (!Q.length) Q = A; Q = Q.slice(-3); return r2(Q.reduce((n, v) => n + v, 0) / Q.length); }
 function koraFeed(D) { try { const txs = (D.transactions || []).filter(t => t.amount < 0 && KORA_BILL_RE.test(t.desc + ' ' + (t.merchant || '')) && !t.pair).map(t => ({ d: t.date.slice(0, 10), a: r2(-t.amount) }));
   const from = (D.transactions || []).reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10), keep = (S.settings.koraSeen || []).filter(x => x.d < from);
-  const seen = [...keep, ...txs].sort((a, b) => a.d.localeCompare(b.d)).slice(-20), L = seen.slice(-3), avg = L.length ? r2(L.reduce((n, x) => n + x.a, 0) / L.length) : KORA_FALLBACK;
+  const seen = [...keep, ...txs].sort((a, b) => a.d.localeCompare(b.d)).slice(-20), avg = seen.length ? varAvg3(seen.map(x => x.a)) : KORA_FALLBACK;
   let ch = false; if (JSON.stringify(seen) !== JSON.stringify(S.settings.koraSeen || [])) { S.settings.koraSeen = seen; ch = true; } if (S.settings.koraUsual !== avg) { S.settings.koraUsual = avg; ch = true; }
   if (ch) save(); return avg; } catch (e) { return S.settings.koraUsual || KORA_FALLBACK; } }
 async function kora86Mig() {
@@ -21851,7 +21855,7 @@ async function kora86Mig() {
   if (!k) { await save(); return ''; }
   const T = todayISO(); Object.assign(k, { repeat: 'fortnightly', varies: true, cat: 'fuel', fromBank: 'ANZ', fromAcct: 'BILL ACCOUNT', paidBy: '' });
   if (!k.due || k.due < T) { k.due = '2026-10-30'; k.anchor = 30; k.paid = false; }
-  if (!/petrol/i.test(k.notes || '')) k.notes = ('Fuel card for petrol. Direct debit every second Friday from ANZ Bill Account. The amount varies; the estimate is the average of the last 3 debits.\n' + String(k.notes || '').replace(/^Direct debit every second Friday\.[^\n]*\n?/, '')).trim();
+  if (!/petrol/i.test(k.notes || '')) k.notes = ('Fuel card for petrol. Direct debit every second Friday from ANZ Bill Account. The amount varies; the estimate is the average of the last 3 debits (tiny ones skipped).\n' + String(k.notes || '').replace(/^Direct debit every second Friday\.[^\n]*\n?/, '')).trim();
   if (!S.settings.koraUsual) S.settings.koraUsual = KORA_FALLBACK; if (S.settings.cfBillAcct) delete S.settings.cfBillAcct[k.id];
   await save(); return 'Kora set to fortnightly from ANZ Bill Account, fuel, amount varies';
 }
