@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.6';
+const APP_VERSION = '2.27.7';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -298,7 +298,7 @@ const area = (name, val, ph = '') => `<textarea name="${name}" placeholder="${es
 function rowFor(x) {
   let icon = 'todo', sub, cash = '';
   if (x.kind === 'car') { icon = { wof: 'shield', rego: 'doc', svc: 'wrench' }[x.part]; sub = (x.car.plate ? esc(x.car.plate) + ' · ' : '') + 'Due ' + fmtW(x.date); }
-  else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = (x.bill.paidBy === 'card' ? '<span class="oncard">On card</span> ' : '') + 'Due ' + fmtW(x.date) + (x.date === x.bill.due && billInvoice(x.bill) ? ' · ' + billInvoiceText(x.bill) : ''); cash = moneyBadge(x.bill.amount, x.bill.name); }
+  else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = (x.bill.paidBy === 'card' ? '<span class="oncard">On credit card</span> ' : '') + 'Due ' + fmtW(x.date) + (x.date === x.bill.due && billInvoice(x.bill) ? ' · ' + billInvoiceText(x.bill) : ''); cash = moneyBadge(x.bill.amount, x.bill.name); }
   else if (x.kind === 'pet') { icon = 'paw'; sub = 'Pet · ' + esc(careEvery(x.care)) + ' · Due ' + fmtW(x.date); }
   else if (x.kind === 'health') { icon = HEALTH_ICON[x.item.kind] || 'medkit'; sub = 'Health · ' + (x.item.clinic ? esc(x.item.clinic) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'driver') { icon = 'idcard'; sub = (x.part === 'aa' ? 'AA expires ' : 'Licence expires ') + fmtW(x.date); }
@@ -4743,7 +4743,7 @@ function Bills() {
   const row = b => {
     const d = daysLeft(b.due);
     return `<div class="row bill" data-bill="${esc(b.id)}"><button class="tapzone" onclick="billForm('${b.id}')" aria-label="Edit ${esc(b.name)}">${billIc(b.name)}
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${b.paidBy === 'card' ? '<span class="oncard">On card</span> ' : ''}${b.cat === 'fuel' ? '<span class="billfuel">⛽ Fuel · varies</span> ' : ''}${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : (billAutoLast(b) ? 'next ' : '') + 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div>${billAutoTxt(b)}</div></button>
+      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">${b.paidBy === 'card' ? '<span class="oncard">On credit card</span> ' : ''}${b.cat === 'fuel' ? '<span class="billfuel">⛽ Fuel · varies</span> ' : ''}${REPEATS[b.repeat] || 'One-off'}${b.lastDue && !b.paid ? ' · ' + plural(billLeft(b), 'payment') + ' left' : ''}${b.fromBank ? ' · ' + esc(b.fromBank) : ''} · ${b.paid ? 'paid ' + fmt(b.paidOn || b.due) : (billAutoLast(b) ? 'next ' : '') + 'due ' + fmtW(b.due)}${!b.paid && billInvoice(b) ? ' · ' + billInvoiceText(b) : ''}</div>${billAutoTxt(b)}</div></button>
       <div class="right badgestack">${b.paid ? '<span class="pill paid">Paid ✓</span>' : duePill(d)}${moneyBadge(b.amount, b.name)}
       ${billAutoLast(b) ? `<button class="paybtn" aria-label="Undo the bank match for ${esc(b.name)}" onclick="billAutoUndo('${b.id}')">Undo</button>` : ''}${b.paid ? (billAutoLast(b) ? '' : `<button class="paybtn" onclick="unpay('${b.id}')">Undo</button>`) : `<button class="paybtn" onclick="markPaid('${b.id}')">Mark paid</button>`}</div></div>`;
   };
@@ -9104,8 +9104,12 @@ const commOpenSet = new Set();
 function normComm(c) {
   c = c && typeof c === 'object' ? c : {};
   const entries = (Array.isArray(c.entries) ? c.entries : []).filter(e => e && parseD(e.date) != null && Number.isFinite(+e.cents) && Math.round(+e.cents) !== 0)
-    .map(e => ({ id: e.id || uid('comm'), date: e.date, cents: Math.round(+e.cents), note: String(e.note || '').slice(0, 80) }));
+    .map(e => Object.assign({ id: e.id || uid('comm'), date: e.date, cents: Math.round(+e.cents), note: String(e.note || '').slice(0, 80) }, e.src === 'email' ? { src: 'email', slip: String(e.slip || '').slice(0, 10) } : {}));
   const out = { anchor: isMonday(c.anchor) ? c.anchor : '', entries, remind: c.remind === true };
+  // 2.27.7: commission payslips read from email (period, total, when it arrived) and the hand-typed entries a payslip replaced (kept for Undo/restore)
+  out.slips = (Array.isArray(c.slips) ? c.slips : []).filter(x => x && parseD(x.from) != null && parseD(x.to) != null && Number.isFinite(+x.cents)).map(x => ({ from: x.from, to: x.to, cents: Math.round(+x.cents), got: String(x.got || '').slice(0, 25), mid: String(x.mid || '').slice(0, 200), late: Math.round(+x.late || 0), mine: x.mine === true, days: Object.fromEntries(Object.entries(x.days && typeof x.days === 'object' ? x.days : {}).filter(([k, v]) => parseD(k) != null && Number.isFinite(+v)).slice(0, 40).map(([k, v]) => [k, Math.round(+v)])) })).slice(-30);
+  out.replaced = (Array.isArray(c.replaced) ? c.replaced : []).filter(e => e && parseD(e.date) != null && Number.isFinite(+e.cents)).map(e => ({ id: e.id || uid('comm'), date: e.date, cents: Math.round(+e.cents), note: String(e.note || '').slice(0, 80), slip: String(e.slip || '').slice(0, 10) })).slice(-200);
+  if (c.mailAt) out.mailAt = +c.mailAt || 0;
   // A goal is only kept when one was already stored. Nothing here invents a target.
   if (Number.isFinite(+c.goalCents) && Math.round(+c.goalCents) > 0) out.goalCents = Math.min(Math.round(+c.goalCents), 100000000);
   return out;
@@ -9557,7 +9561,7 @@ function budgetCalc(b) {
 // 2.26.72: on the latest budget, a pointer to the next ASB card payment when it falls in a later fortnight (same amount as Cash flow)
 function budgetCardNext(b, M) { try { if (!M || !M.pp || M.OUT.some(x => x.kind === 'card' && x.st !== 'paid')) return ''; const latest = (S.budgets || []).reduce((m, x) => x.start > (m ? m.start : '') ? x : m, null); if (!latest || latest.id !== b.id) return '';
   const g = cardGoal(); if (!g || g.full || g.due <= M.pp.end) return ''; const pp = [0, 1, 2, 3, 4].map(o => payPeriod(o)).find(p => p && p.start <= g.due && g.due <= p.end);
-  return `<p class="muted" style="margin:6px 2px 0">💳 Next ASB card payment: ${g.proj ? 'about ' : ''}${money(g.left)} due ${esc(fmtW(g.due))}${pp ? ', in the ' + esc(budgetRangeLabel(pp.start, pp.end)) + ' fortnight' : ''}. <a href="#cashflow">Card plan ›</a></p>`; } catch (e) { return ''; } }
+  return `<p class="muted" style="margin:6px 2px 0">💳 Next ASB credit card payment: ${g.proj ? 'about ' : ''}${money(g.left)} due ${esc(fmtW(g.due))}${pp ? ', in the ' + esc(budgetRangeLabel(pp.start, pp.end)) + ' fortnight' : ''}. <a href="#cashflow">Card plan ›</a></p>`; } catch (e) { return ''; } }
 function budgetCard(b) {
   // 2.26.64: plan vs actual from the one engine (fnModel). Mortgages and set-aside lines stay typed here.
   const k = budgetCalc(b), M = fnModel(b) || { IN: [], OUT: [], evBy: {}, cardBills: [] };
@@ -9574,7 +9578,7 @@ function budgetCard(b) {
   const lines = (b.lines || []).map(x => `<div class="row" data-bline="${esc(x.id)}"><div class="tx"><div class="t">${esc(x.name)}</div><div class="s">${M.past ? 'Planned' : 'Set aside'}</div></div><b>${money(x.amount)}</b>
       <button type="button" class="iconbtn" aria-label="Delete ${esc(x.name)}" onclick="budgetLineDelete(${jsArg(b.id)},${jsArg(x.id)})">${I('trash')}</button></div>`).join('');
   const evList = Object.entries(M.evBy || {}).sort((p, q) => q[1] - p[1]);
-  const evRow = M.has && (M.cur || M.past) ? `<div class="sec">Everyday spending so far</div><div class="list"><div class="row"><div class="tx"><div class="t">From the bank, not in the plan</div><div class="s">${evList.length ? evList.map(([c, v]) => esc(c) + ' ' + money(v)).join(' · ') : 'Nothing yet'}${M.onCard ? `<br>Plus ${money(M.onCard)} on the ASB card (paid off through the card payment)` : ''}</div></div><b>${money(M.everyday)}</b></div></div>` : '';
+  const evRow = M.has && (M.cur || M.past) ? `<div class="sec">Everyday spending so far</div><div class="list"><div class="row"><div class="tx"><div class="t">From the bank, not in the plan</div><div class="s">${evList.length ? evList.map(([c, v]) => esc(c) + ' ' + money(v)).join(' · ') : 'Nothing yet'}${M.onCard ? `<br>Plus ${money(M.onCard)} on the ASB credit card (paid off through the card payment)` : ''}</div></div><b>${money(M.everyday)}</b></div></div>` : '';
   const big = M.past ? M.leftNow : M.end;
   return `<div class="carcard loancard budgetcard" data-budget="${esc(b.id)}">
     <div class="carhead"><div class="carpic loanpic">${I('cash')}</div>
@@ -9588,7 +9592,7 @@ function budgetCard(b) {
     <div class="sec">Money out <a href="#bills" style="font-weight:650">Open Bills</a></div>
     <div class="list">${outRows || `<div class="card muted" style="margin:0">${payPeriod(0) ? 'No bills or payments this fortnight.' : 'Set your payday in Bills so this fortnight’s bills can show here.'}</div>`}</div>
     ${budgetCardNext(b, M)}
-    ${M.cardBills.length ? `<p class="muted" style="margin:6px 2px 0">On the Rewards card: ${M.cardBills.map(x => esc(x.name.replace(/ · on (Rewards )?card.*$/, '')) + ' ' + money(x.amount)).join(', ')} (paid through the ASB card payment).</p>` : ''}
+    ${M.cardBills.length ? `<p class="muted" style="margin:6px 2px 0">On the Rewards card: ${M.cardBills.map(x => esc(x.name.replace(/ · on (Rewards )?card.*$/, '')) + ' ' + money(x.amount)).join(', ')} (paid through the ASB credit card payment).</p>` : ''}
     <div class="sec">Three mortgages · ASB</div>
     <p class="muted" style="margin:-4px 2px 8px">Type each amount for this fortnight. Paid ✓ when the ASB repayment shows in the bank.</p>
     <div class="list">${mortRows}</div>
@@ -19861,7 +19865,7 @@ function glDueItems() {
     });
   } catch (e) { }
   // 2.26.60: ASB card due in 3 days or less, until it's paid in full (one gentle row, no push)
-  try { const g = !cardDays().dueGuess && cardGoal(); if (g && !g.full) { const d = daysLeft(g.due); if (d >= 0 && d <= 3) out.push({ days: Math.max(1, d), noCount: true, html: `<button class="row" onclick="go('#cashflow')"><div class="ic bill">💳</div><div class="tx"><div class="t">ASB card due ${d === 0 ? 'today' : d === 1 ? 'tomorrow' : fmtW(g.due)}</div><div class="s">${g.paid ? 'Part paid ' + money(g.paid) + ' · ' : ''}${money(g.left)} to pay it off in full</div></div><span class="pill">${d === 0 ? 'Today' : d + (d === 1 ? ' day' : ' days')}</span></button>` }); } } catch (e) { }
+  try { const g = !cardDays().dueGuess && cardGoal(); if (g && !g.full) { const d = daysLeft(g.due); if (d >= 0 && d <= 3) out.push({ days: Math.max(1, d), noCount: true, html: `<button class="row" onclick="go('#cashflow')"><div class="ic bill">💳</div><div class="tx"><div class="t">ASB credit card due ${d === 0 ? 'today' : d === 1 ? 'tomorrow' : fmtW(g.due)}</div><div class="s">${g.paid ? 'Part paid ' + money(g.paid) + ' · ' : ''}${money(g.left)} to pay it off in full</div></div><span class="pill">${d === 0 ? 'Today' : d + (d === 1 ? ' day' : ' days')}</span></button>` }); } } catch (e) { }
   // 2.26.31: birthdays from the Birthdays list, 28 days ahead. Today → Urgent; 1–28 days → Coming up; only 0–7 days count toward the bell badge.
   try {
     (S.birthdays || []).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 28 && glOk(x.b.name)).forEach(x => {
@@ -20167,7 +20171,7 @@ function cfPlan(D, pp) {
 function cfBody(M) {
   const D = M.data, pp = payPeriod(0), T = todayISO();
   const order = a => cfIsOrbit(a) ? 1 : a.type === 'LOAN' ? 40 : a.type === 'CREDITCARD' ? 30 + (/ASB/i.test(a.bank) ? 0 : 1) : /ASB/i.test(a.bank) ? 0 : /ANZ/i.test(a.bank) ? 10 : /kiwi/i.test(a.bank) ? 20 : 25;
-  const grp = a => cfIsOrbit(a) ? 'Revolving (ORBIT)' : a.type === 'LOAN' ? 'Loans' : a.type === 'CREDITCARD' ? (a.bank || 'Credit') + ' card' : a.bank || 'Other';
+  const grp = a => cfIsOrbit(a) ? 'Revolving (ORBIT)' : a.type === 'LOAN' ? 'Loans' : a.type === 'CREDITCARD' ? (a.bank || 'Credit') + ' credit card' : a.bank || 'Other';
   const A = [...D.accounts].sort((a, b) => order(a) - order(b) || cfBal(b) - cfBal(a)), groups = [];
   A.forEach(a => { const g = grp(a); let G = groups.find(x => x.g === g); if (!G) groups.push(G = { g, L: [] }); G.L.push(a); });
   const card = cfCardAcct(D);
@@ -20211,7 +20215,7 @@ async function cfRefresh() { toast('Asking the banks for the latest…'); await 
 function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['notbills', 'Not bills'], ['work', 'Work'], ['power', 'Power']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
 function CashFlow() {
   const head = moneyTabs('cashflow') + header('Cash flow', 'Your bank balances, and what’s left before payday');
-  if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
+  if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB credit card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
   if (!CF && CFmock) CF = CFmock;
   if (!CF) { if (!CFbusy) setTimeout(() => cfLoad(), 0); return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : `<div class="card muted">Loading your accounts…</div>`); }
   return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : '') + (CF.example ? `<div class="callout cfex"><b>Example data</b> · not your real accounts</div>` : '') + cfBody(CF);
@@ -20303,13 +20307,13 @@ function nbRegular(D) {
 }
 const nbPerTxt = p => p === 7 ? 'weekly' : p === 14 ? 'fortnightly' : 'monthly';
 function NotBills() {
-  const head = moneyTabs('notbills') + header('Not bills', 'Money out of your bank and ASB card that isn’t one of your bills');
-  if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see this</div><div class="s">It lists what went out of your accounts and the ASB card that no bill took. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
+  const head = moneyTabs('notbills') + header('Not bills', 'Money out of your bank and ASB credit card that isn’t one of your bills');
+  if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see this</div><div class="s">It lists what went out of your accounts and the ASB credit card that no bill took. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
   if (!CF && CFmock) CF = CFmock;
   if (!CF) { if (!CFbusy) setTimeout(() => cfLoad(), 0); return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : `<div class="card muted">Loading your accounts…</div>`); }
   const D = CF.data, R = nbRange(), hid = new Set(S.settings.nbHide || []), reg = nbRegular(D), card = cfCardAcct(D);
   const accts = D.accounts.filter(a => (cfSpendable(a) || a.type === 'CREDITCARD') && !(a.type === 'LOAN' && !a.limit));
-  const aName = id => { const a = D.accounts.find(x => x.id === id); return a ? (a.type === 'CREDITCARD' ? (a.bank || 'ASB') + ' card' : cfIsOrbit(a) ? 'ORBIT' : cfAName(a)) : ''; };
+  const aName = id => { const a = D.accounts.find(x => x.id === id); return a ? (a.type === 'CREDITCARD' ? (a.bank || 'ASB') + ' credit card' : cfIsOrbit(a) ? 'ORBIT' : cfAName(a)) : ''; };
   const inR = nbAll(D).filter(t => { const d = t.date.slice(0, 10); return d >= R.from && d <= R.to && (!nbAcct || t.acct === nbAcct); }).sort((a, b) => b.date.localeCompare(a.date));
   const shownAll = inR.filter(t => !hid.has(t.id)), hiddenHere = inR.filter(t => hid.has(t.id));
   const byCat = new Map(); shownAll.forEach(t => { const k = nbCatOf(t); byCat.set(k, (byCat.get(k) || 0) - t.amount); });
@@ -20498,7 +20502,7 @@ function xferCard(D) {
   const done = S.settings.xferDone || {};
   const rows = X.list.filter(x => !done[x.key]).map(x => `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="xferTick(${jsArg(x.key)},${x.amount},${jsArg(x.from)},${jsArg(x.to)})"></button><div class="tx"><div class="t">Move ${cfMoney(x.amount)} from ${esc(nm(x.from))} to ${esc(nm(x.to))}</div><div class="s">${x.weekly ? `Weekly · ${esc(day(x.by))}, once board lands · same bank` : x.after ? `After pay lands ${esc(day(x.after))}, by ${esc(day(x.by))}` : `By ${esc(day(x.by))}${x.same ? ' · same bank' : ''}`} · for ${esc(x.items.slice(0, 3).join(', '))}${x.items.length > 3 ? ' and ' + (x.items.length - 3) + ' more' : ''}${x.weekly && x.first.date <= x.by ? '' : ` (${x.weekly ? 'next due' : 'first one'} ${esc(day(x.first.date))})`}</div></div></div>`).join('');
   // 2.26.72: the card payment, with a tick (marks it paid until the bank shows it)
-  let cardRows = ''; try { const k = X.card, g = cardGoal(), cA = cfCardAcct(D); if (k && g && !g.full && cA) { const cn = cfAName(cA).replace(/^Visa Rewards$/i, 'ASB Visa');
+  let cardRows = ''; try { const k = X.card, g = cardGoal(), cA = cfCardAcct(D); if (k && g && !g.full && cA) { const cn = (/^(ASB )?Visa Rewards$/i.test(cfAName(cA)) ? 'ASB credit card' : cfAName(cA)) /* 2.27.7: shown as 'ASB credit card' */;
       if (k.can > 0) cardRows += `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="cardTick(${k.can},${jsArg(k.due)})"></button><div class="tx"><div class="t">Pay ${cfMoney(k.can)} from ${esc(nm(k.from))} to ${esc(cn)} by ${esc(day(k.due))}</div><div class="s">${k.after ? `After pay lands ${esc(day(k.after))} · ` : ''}${k.short > 0 ? `part of the ${cfMoney(k.amount)} due; ${cfMoney(k.short)} would attract interest` : g.proj ? `the whole statement (about ${cfMoney(g.goal)}), so no interest` : 'the whole amount, so no interest'}</div></div></div>`;
       if (g.proj && g.owedNow > 0 && k.nowCan >= g.owedNow - 0.005 && g.left > 0) cardRows += `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="cardTick(${Math.min(g.owedNow, g.left)},${jsArg(k.due)})"></button><div class="tx"><div class="t">Optional: pay ${cfMoney(Math.min(g.owedNow, g.left))} now from ${esc(nm(k.from))} to ${esc(cn)}</div><div class="s">What’s on the card today, before the ${esc(day(g.stmt))} statement. Only if you’d like it cleared early.</div></div></div>`;
     } } catch (e) { }
@@ -20605,9 +20609,9 @@ function fnModel(b) {
       const pays = (debtsSt().card.akPays || []).slice(-1)[0], payA = (pays && acc(pays.from) && cfSpendable(acc(pays.from)) ? pays.from : main && main.id);
       const paidAmt = g && g.due === k.due ? g.paid : fnSum(paidTx.map(t => ({ amount: t.amount })));
       const lastPay = ((debtsSt().card.akPays || []).filter(p => g && p.d > g.stmt).pop() || {}).d || k.due;
-      if (g && g.due === k.due && g.full) OUT.push({ kind: 'card', name: 'ASB card payment', st: 'paid', amount: paidAmt, planned: g.goal, date: lastPay, bank: true });
-      else { if (paidAmt > 0) OUT.push({ kind: 'card', name: 'ASB card payment (paid so far)', st: 'paid', amount: paidAmt, planned: paidAmt, date: lastPay, bank: true });
-        const left = g && g.due === k.due ? g.left : k.pay; if (left > 0) OUT.push({ kind: 'card', name: 'ASB card payment', st: past ? 'nomatch' : k.due < T ? 'overdue' : 'due', amount: left, planned: left, date: k.due, acct: payA, goal: 'in full' }); }
+      if (g && g.due === k.due && g.full) OUT.push({ kind: 'card', name: 'ASB credit card payment', st: 'paid', amount: paidAmt, planned: g.goal, date: lastPay, bank: true });
+      else { if (paidAmt > 0) OUT.push({ kind: 'card', name: 'ASB credit card payment (paid so far)', st: 'paid', amount: paidAmt, planned: paidAmt, date: lastPay, bank: true });
+        const left = g && g.due === k.due ? g.left : k.pay; if (left > 0) OUT.push({ kind: 'card', name: 'ASB credit card payment', st: past ? 'nomatch' : k.due < T ? 'overdue' : 'due', amount: left, planned: left, date: k.due, acct: payA, goal: 'in full' }); }
       // the card payments from the bank are transfers already; nothing else to exclude
   } } catch (e) { }
   try { const o = orbFor(b); if (o) { const oa = D && cfOrbit(D); OUT.push({ kind: 'orbit', name: 'ORBIT interest (1st)', st: o.about ? (past ? 'nomatch' : 'about') : 'paid', amount: o.amount, planned: o.amount, date: o.date, acct: oa ? oa.id : '', bank: !o.about });
@@ -20636,7 +20640,7 @@ function fnModel(b) {
 function fnSummary(M) {
   if (!M) return '';
   const a = fmtW(M.pp.start).replace(/^\w+ /, ''), z = fmtW(M.pp.end).replace(/^\w+ /, ''), rng = a.split(' ')[1] === z.split(' ')[1] ? a.split(' ')[0] + '–' + z : a + '–' + z;
-  return `${M.cur ? 'This fortnight' : 'Fortnight'} (${esc(rng)}): ${money(M.inSoFar)} in, ${money(M.outSoFar)} out, ${money(M.toPay)} still to pay${(() => { const c = (M.toCome || []).find(x => x.kind === 'card'); return c ? ' (incl. ASB card ' + money(c.amount) + ' due ' + esc(fmtW(c.date)) + ')' : ''; })()} · you should end with about ${M.end < 0 ? '−' + money(-M.end) : money(M.end)}.`;
+  return `${M.cur ? 'This fortnight' : 'Fortnight'} (${esc(rng)}): ${money(M.inSoFar)} in, ${money(M.outSoFar)} out, ${money(M.toPay)} still to pay${(() => { const c = (M.toCome || []).find(x => x.kind === 'card'); return c ? ' (incl. ASB credit card ' + money(c.amount) + ' due ' + esc(fmtW(c.date)) + ')' : ''; })()} · you should end with about ${M.end < 0 ? '−' + money(-M.end) : money(M.end)}.`;
 }
 // 2.26.72: on each bank refresh, every budget whose wages have landed keeps the actual amounts and dates (b.landed); the typed pay stays as the plan
 function budgetLandedSync() { try { let ch = 0; (S.budgets || []).forEach(b => { const M = fnModel(b); if (!M || !M.has) return; const L = Object.assign({}, b.landed || {});
@@ -20727,7 +20731,7 @@ function cardDetect(D) {
       const last = L.sort((x, y) => y.date.localeCompare(x.date))[0]; if (!last || last.acct !== a.id) return;
       b.paidBy = 'card'; delete b.fromAcct; b.fromBank = ''; if (S.settings.cfBillAcct) delete S.settings.cfBillAcct[b.id]; moved.push(String(b.name || 'A bill').slice(0, 40)); });
     if (moved.length) { const L = (S.settings.appNotices || []).slice(); L.push({ id: 'oncard-' + Date.now(), kind: 'bill', src: 'Bills', go: '#cashflow', at: new Date().toISOString(), title: 'On the credit card now: ' + moved.slice(0, 8).join(', ') + (moved.length > 8 ? ' and ' + (moved.length - 8) + ' more' : ''),
-      body: 'The bank shows these paid on the ASB card, so they go into the card payment, not a transfer from ORBIT. Change one back in the bill’s Paid by.' }); S.settings.appNotices = L.slice(-30); save(); }
+      body: 'The bank shows these paid on the ASB credit card, so they go into the card payment, not a transfer from ORBIT. Change one back in the bill’s Paid by.' }); S.settings.appNotices = L.slice(-30); save(); }
     return moved; } catch (e) { return []; } }
 function cardFeedPays(D) { try { const a = cfCardAcct(D); if (!a) return; const c = debtsSt().card, L = (D.transactions || []).filter(t => t.acct === a.id && t.amount > 0).map(t => ({ d: t.date.slice(0, 10), a: t.amount, from: (D.transactions.find(x => x.id === t.pair) || {}).acct || '' })).sort((p, q) => p.d.localeCompare(q.d)).slice(-12);
   const nd = cardNextDue(); if (nd && c.due !== nd) { c.due = nd; save(); }
@@ -23365,3 +23369,126 @@ function coachCards() {
   return L.length ? L[Math.floor(Date.now() / 600e3) % L.length] : ''; } catch (e) { return base; } }; })();
 (() => { const o = hwPrefRows; hwPrefRows = function () { const h = o.apply(this, arguments); const on = hwCoachOn();
   return h + `<div class="srow"><div class="tx"><div class="t">Coach tips</div><div class="s">One encouraging card a day on Notifications: sleep, fitness and motivation from your watch. Ideas only, never nagging.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Coach tips" onclick="hwToggle('watchCoach')"></button></div>`; }; })();
+
+/* ================= 2.27.7: COMMISSION FROM EMAIL =================
+   Noel Leeming payroll (nlg-payroll@nlg.co.nz) emails "Your Commission Payslip from Noel Leeming" each pay fortnight
+   with a PDF "Salesperson commission report" (period Mon–Sun, one row per day, TOTAL column). Read on the phone with
+   the Outlook (Mail.Read) or Gmail (read-only) sign-in already used for bills; nothing is sent anywhere.
+   Only the period, each day's total and the payslip total are kept. Item lists, references and anything else in the
+   PDF are never stored.
+   Email wins: the payslip is payroll's own figure, so for the days it covers it replaces hand-typed entries (they're
+   kept and can be put back with "Use mine instead"). Days before the period (late-settled sales) go in as one entry on
+   the first day of the period, so each fortnight adds up to exactly what the payslip pays. */
+const CP_FROM = 'nlg-payroll@nlg.co.nz', CP_SUBJ = /commission payslip/i, CP_MAX_AGE = 6 * 3600e3;
+let cpBusy = false;
+function cpParse(text) {
+  const t = String(text || ''), P = t.match(/\bFOR\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+to\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  if (!P) return null;
+  const iso = (d, m, y) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const from = iso(P[1], P[2], P[3]), to = iso(P[4], P[5], P[6]);
+  const num = s => { const neg = /-$/.test(s), v = Math.round(parseFloat(s.replace(/[,-]/g, '')) * 100); return neg ? -v : v; };
+  const NUM = /^[\d,]+\.\d\d-?$/, days = {}; let sum = 0, total = null, rows = 0;
+  for (const line of t.split('\n')) {
+    const tok = line.trim().split(/\s+/); if (!tok[0]) continue;
+    const dm = tok[0].match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+    if (dm && tok.length === 9 && tok.slice(1).every(x => NUM.test(x))) { const d = iso(dm[1], dm[2], '20' + dm[3]), c = num(tok[8]); days[d] = (days[d] || 0) + c; sum += c; rows++; }
+    else if (!dm && total == null && rows && tok.length === 8 && tok.every(x => NUM.test(x))) total = num(tok[7]);
+  }
+  if (!rows || from > to || (total != null && total !== sum)) return null; // didn't read cleanly: don't guess
+  return { from, to, cents: sum, days };
+}
+const cpSlipFor = iso => (CM().slips || []).find(x => !x.mine && iso >= x.from && iso <= x.to);
+function cpApply(r, meta) {
+  const c = CM(); c.slips = c.slips || []; c.replaced = c.replaced || [];
+  const old = c.slips.find(x => x.to === r.to && x.from === r.from);
+  if (old && old.mine) return null; // he chose his own entries for this fortnight
+  if (old && old.cents === r.cents && old.mid === (meta.mid || old.mid)) return null;
+  c.entries = c.entries.filter(e => !(e.src === 'email' && e.slip === r.to));
+  const mine = c.entries.filter(e => e.src !== 'email' && e.date >= r.from && e.date <= r.to);
+  if (mine.length) { c.replaced = c.replaced.filter(e => e.slip !== r.to).concat(mine.map(e => Object.assign({}, e, { slip: r.to }))); c.entries = c.entries.filter(e => !mine.includes(e)); }
+  let late = 0; const lateDays = [];
+  Object.keys(r.days).sort().forEach(d => { const v = r.days[d]; if (!v) return;
+    if (d < r.from) { late += v; lateDays.push(d); return; }
+    if (d > r.to) return;
+    c.entries.push({ id: uid('comm'), date: d, cents: v, note: 'Noel Leeming payslip', src: 'email', slip: r.to }); });
+  if (late) c.entries.push({ id: uid('comm'), date: r.from, cents: late, note: `Earlier sales settled (${fmt(lateDays[0])}${lateDays.length > 1 ? ' – ' + fmt(lateDays[lateDays.length - 1]) : ''})`.slice(0, 80), src: 'email', slip: r.to });
+  const s = { from: r.from, to: r.to, cents: r.cents, got: meta.got || new Date().toISOString(), mid: meta.mid || '', late, days: r.days };
+  c.slips = c.slips.filter(x => !(x.to === r.to && x.from === r.from)).concat([s]).sort((a, b) => a.to < b.to ? -1 : 1).slice(-30);
+  return { slip: s, replaced: mine.reduce((n, e) => n + e.cents, 0), n: mine.length };
+}
+async function cpPdfFromOutlook(id) {
+  const L = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,name,contentType');
+  const a = (L.value || []).find(x => /\.pdf$/i.test(x.name || '') || /pdf/i.test(x.contentType || '')); if (!a) return null;
+  const token = await mailAccess('microsoft'), res = await fetch('https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(id) + '/attachments/' + encodeURIComponent(a.id) + '/$value', { headers: { Authorization: 'Bearer ' + token } });
+  return res.ok ? new Uint8Array(await res.arrayBuffer()) : null;
+}
+async function cpFindMail(sinceISO) {
+  const out = [];
+  if (mailConnected('microsoft')) { try {
+    const d = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages?$filter=' + encodeURIComponent(`receivedDateTime ge ${sinceISO} and from/emailAddress/address eq '${CP_FROM}'`) + '&$orderby=receivedDateTime desc&$top=10&$select=id,subject,receivedDateTime,hasAttachments');
+    (d.value || []).filter(m => CP_SUBJ.test(m.subject || '') && m.hasAttachments).forEach(m => out.push({ src: 'ms', id: m.id, got: m.receivedDateTime })); } catch (e) { } }
+  if (mailConnected('google')) { try {
+    const B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages', days = Math.max(1, Math.ceil((Date.now() - Date.parse(sinceISO)) / 864e5));
+    const list = await mbAuthGet('google', B + '?maxResults=10&q=' + encodeURIComponent(`from:${CP_FROM} subject:(commission payslip) has:attachment newer_than:${days}d`));
+    for (const it of (list.messages || [])) out.push({ src: 'g', id: it.id }); } catch (e) { } }
+  return out;
+}
+async function cpPdfFromGmail(id) {
+  const B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages', g = await mbAuthGet('google', B + '/' + encodeURIComponent(id) + '?format=full');
+  let aid = null; const walk = p => { if (!p || aid) return; if (/\.pdf$/i.test(p.filename || '') && p.body && p.body.attachmentId) aid = p.body.attachmentId; (p.parts || []).forEach(walk); }; walk(g.payload);
+  if (!aid) return null;
+  const d = await mbAuthGet('google', B + '/' + encodeURIComponent(id) + '/attachments/' + encodeURIComponent(aid)), b = atob(String(d.data || '').replace(/-/g, '+').replace(/_/g, '/'));
+  return { u: Uint8Array.from(b, ch => ch.charCodeAt(0)), got: g.internalDate ? new Date(+g.internalDate).toISOString() : '' };
+}
+async function refreshCommMail(force) {
+  if (cpBusy || !S || !S.commission || !(mailConnected('microsoft') || mailConnected('google'))) return;
+  const c = CM(); if (!force && c.mailAt && Date.now() - c.mailAt < CP_MAX_AGE) return;
+  cpBusy = true; let got = [];
+  try {
+    const last = (c.slips || []).reduce((m, x) => x.got > m ? x.got : m, '');
+    const since = new Date(last ? Math.min(Date.parse(last) - 864e5, Date.now() - 20 * 864e5) : Date.now() - 45 * 864e5).toISOString().replace(/\.\d+Z$/, 'Z');
+    const seen = new Set((c.slips || []).map(x => x.mid).filter(Boolean));
+    for (const m of (await cpFindMail(since)).slice(0, 6)) {
+      const mid = m.src + ':' + m.id; if (seen.has(mid)) continue;
+      try { let u = null, at = m.got || '';
+        if (m.src === 'ms') u = await cpPdfFromOutlook(m.id); else { const r = await cpPdfFromGmail(m.id); if (r) { u = r.u; at = r.got; } }
+        if (!u) continue;
+        const r = cpParse(await pdfText(u)); if (!r) continue;
+        const a = cpApply(r, { mid, got: at }); if (a) got.push(a); } catch (e) { }
+    }
+    c.mailAt = Date.now(); await save();
+  } catch (e) { } finally { cpBusy = false; }
+  if (got.length) { try { render(); } catch (e) { }
+    const a = got.sort((x, y) => x.slip.to < y.slip.to ? 1 : -1)[0];
+    toast(`Commission payslip from email: ${centsMoney(a.slip.cents)} for ${fmt(a.slip.from)} – ${fmt(a.slip.to)}.${a.n ? ' It replaces what you typed for those days.' : ''}`); }
+  return got;
+}
+(() => { const o = refreshKora; refreshKora = function (force) { const r = o.apply(this, arguments); try { refreshCommMail(force).catch(() => { }); } catch (e) { } return r; }; })();
+async function cpCheckNow() { if (!(mailConnected('microsoft') || mailConnected('google'))) { toast('Connect Outlook or Gmail in Settings first.'); return; }
+  toast('Checking your email for commission payslips…'); const g = await refreshCommMail(true); if (g && !g.length) toast('No new commission payslips. You’re up to date.'); }
+async function cpUseMine(to) { const c = CM(), s = (c.slips || []).find(x => x.to === to); if (!s) return; const sn = snap();
+  c.entries = c.entries.filter(e => !(e.src === 'email' && e.slip === to)).concat((c.replaced || []).filter(e => e.slip === to).map(e => { const x = Object.assign({}, e); delete x.slip; return x; }));
+  c.replaced = (c.replaced || []).filter(e => e.slip !== to); s.mine = true; await save(); render();
+  toast(`Using your own entries for ${fmt(s.from)} – ${fmt(s.to)}.`, 'Undo', undoTo(sn)); }
+async function cpUseEmail(to) { const c = CM(), s = (c.slips || []).find(x => x.to === to); if (!s) return; const sn = snap(); s.mine = false;
+  c.slips = c.slips.filter(x => x !== s); cpApply({ from: s.from, to: s.to, cents: s.cents, days: s.days || {} }, { mid: s.mid, got: s.got }); await save(); render();
+  toast(`Using the payslip for ${fmt(s.from)} – ${fmt(s.to)}.`, 'Undo', undoTo(sn)); }
+function cpCard() {
+  const c = CM(), on = mailConnected('microsoft') || mailConnected('google'), sl = (c.slips || []).slice().sort((a, b) => a.to < b.to ? 1 : -1);
+  if (!on && !sl.length) return `<div class="card cpcard"><div class="tx"><b>📧 Commission from email</b><div class="muted">Connect Outlook in Settings › Email and your Noel Leeming commission payslips come in by themselves.</div></div></div>`;
+  const rows = sl.slice(0, 3).map(s => { const rep = (c.replaced || []).filter(e => e.slip === s.to), rc = rep.reduce((n, e) => n + e.cents, 0);
+    return `<div class="srow"><div class="tx"><div class="t">${esc(fmt(s.from))} – ${esc(fmt(s.to))} <span class="tag fromem">${s.mine ? 'Your entries' : 'From email'}</span></div>
+      <div class="s">Noel Leeming payslip${s.late ? ` · incl. ${centsMoney(s.late)} from earlier sales` : ''}${rep.length ? ` · replaced your ${centsMoney(rc)} <button class="linkbtn" onclick="cpUseMine(${jsArg(s.to)})">Use mine instead</button>` : ''}${s.mine ? ` · <button class="linkbtn" onclick="cpUseEmail(${jsArg(s.to)})">Use payslip</button>` : ''}</div></div><b class="v">${centsMoney(s.cents)}</b></div>`; }).join('');
+  return `<div class="sec">From your payslip emails</div><div class="list cpcard">${rows || '<div class="srow"><div class="tx"><div class="s">No commission payslips found yet. They come from nlg-payroll@nlg.co.nz.</div></div></div>'}</div>
+    <div class="muted" style="margin:6px 4px 0;font-size:0.78125rem">Noel Leeming payroll’s figures replace typed entries for the days a payslip covers, so nothing’s counted twice. ${on ? `<button class="linkbtn" onclick="cpCheckNow()">Check email now</button>` : ''}</div>`;
+}
+(() => { const o = Commission; Commission = function () { const h = o.apply(this, arguments); try { if (!CM().anchor) return h; const i = h.indexOf('<div class="sec">Totals</div>'); return i < 0 ? h : h.slice(0, i) + cpCard() + h.slice(i); } catch (e) { return h; } }; })();
+(() => { const o = commEntryLine; commEntryLine = function (e) { const h = o.apply(this, arguments); return e && e.src === 'email' ? h.replace('<span class="cn">', '<span class="cn"><span class="tag fromem">From email</span> ') : h; }; })();
+(() => { const o = commForm; commForm = function (id, date) { const r = o.apply(this, arguments); try { const sf = $('#sf'), di = sf && sf.querySelector('input[name=date]'); if (!di) return r;
+  const p = document.createElement('p'); p.className = 'muted cpnote'; p.style.margin = '6px 2px 0';
+  const upd = () => { const s = cpSlipFor(di.value); p.textContent = s ? `Your payslip from email already covers ${fmt(di.value)} (${fmt(s.from)} – ${fmt(s.to)}). Anything you add here is counted on top.` : ''; p.style.display = s ? '' : 'none'; };
+  di.closest('.field, label') ? di.closest('.field, label').after(p) : di.after(p); di.addEventListener('input', upd); di.addEventListener('change', upd); upd(); } catch (e) { } return r; }; })();
+// Wage estimate: a payslip that matches the work fortnight exactly is used as the commission for that pay
+(() => { const o = wgComm; wgComm = function (payDate, wk) { const r = o.apply(this, arguments); try { if (r.src === 'typed') return r;
+  const s = (CM().slips || []).find(x => !x.mine && x.from === wk.start && x.to === wk.end); if (s) return Object.assign(r, { amount: r2(s.cents / 100), earned: r2(s.cents / 100), src: 'email', ended: true, left: 0, proj: 0 }); } catch (e) { } return r; }; })();
+(() => { const o = wgCommLine; wgCommLine = function (c) { return c && c.src === 'email' ? 'From your Noel Leeming commission payslip (email)' : o.apply(this, arguments); }; })();
