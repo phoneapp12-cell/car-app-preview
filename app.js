@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.26.87';
+const APP_VERSION = '2.26.88';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9610,7 +9610,7 @@ function Budget() {
     (needPay ? `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday first</b><br>Budget uses the same fortnight as Bills.<div style="margin-top:10px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>` : '') +
     debtsCard() + empty('No budget yet', 'Add this fortnight’s pay and your three mortgages. Bills due in that date range show at their real amounts.', 'Add', 'budgetForm()') +
     `<div class="foot">${savedWhere()}</div>`;
-  return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) + debtsCard() +
+  return header('Budget', sub, addBtn('Add a budget', 'budgetForm()')) + debtsCard() + wgBudgetRow() +
     `<div class="sec">Pay fortnights</div><div id="budgetlist">${list.map(budgetCard).join('')}</div>
     <div class="btns" style="margin-top:12px"><button class="btn" onclick="budgetForm()">${I('plus')} Add a budget</button></div>
     <div class="foot">${savedWhere()}</div>`;
@@ -18480,6 +18480,7 @@ function Roster() {
   }).join('');
   return header('Work roster', 'The days and times you start and finish') +
     `<div class="list" id="rosterlist">${rows}</div>` +
+    `<div class="list" style="margin-top:12px"><div class="row"><button class="tapzone" onclick="go('#wage')"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wage estimate</div><div class="s">Your take-home pay worked out from these hours</div></div></button></div></div>` +
     '<div class="foot">Only a day with a start time counts as a work day. Days with no start are your days off. The summary uses the start for drive time and the finish to tell you when you knock off.</div>';
 }
 async function setRosterEnd(day, value) {
@@ -18632,6 +18633,7 @@ function activeTab(r) {
   if (r === 'settings') return 'settings';
   if (r === 'power' || r === 'compare' || r === 'powertime') return 'power'; // 2.26.78: Money › Power
   if (r === 'notbills') return 'notbills'; // 2.26.84: Money › Not bills
+  if (r === 'wage') { const t = navOrder(); return t.includes('budget') ? 'budget' : 'more'; } // 2.26.88: Money › Budget › Wage estimate
   if (tabs.includes(item)) return item;
   if (r === 'home' || r === 'weather' || r === 'drivers' || r === 'alerts' || !r) return 'home';
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
@@ -18655,7 +18657,7 @@ function render() {
   applyTextSize();
   renderedDay = todayISO(); extReg = [];
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, notbills: NotBills, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -20280,7 +20282,7 @@ function xferPlan(D) {
   // wages landing: on the usual 14-day beat after the last pay, into the account it last landed in
   const ins = [], landTx = (isT) => (D.transactions || []).filter(isT).sort((a, b) => b.date.localeCompare(a.date))[0];
   [['Your pay', mywIs, mywSt().seen], ['Sarah’s pay', swIs, swSt().seen]].forEach(([nm, isT, seen]) => { const t = landTx(isT); if (!t) return; const amt = fnAvg3(seen); if (!amt) return;
-    let d = t.date.slice(0, 10); while (d <= T) d = addDays(d, 14); for (; d <= H; d = addDays(d, 14)) ins.push({ what: nm, amount: amt, date: d, acct: t.acct }); });
+    let d = t.date.slice(0, 10); while (d <= T) d = addDays(d, 14); for (; d <= H; d = addDays(d, 14)) { let a = amt; try { if (nm === 'Your pay' && wgOn()) a = wgEst(d).net || amt; } catch (e) { } ins.push({ what: nm, amount: a, date: d, acct: t.acct }); } }); // 2.26.88: wage estimate
   // 2.26.86: Board and the cleaning job land weekly in the account they last landed in
   IR_KEYS.forEach(k => { try { const w = irSt(k), L = w.seen, last = L[L.length - 1], amt = fnAvg3(L); if (!last || !amt) return; const acct = last.acct && D.accounts.some(a => a.id === last.acct) ? last.acct : null; if (!acct) return;
     let d = last.d; while (d <= T) d = addDays(d, IR_DEF[k].per); if (dayGap(T, last.d) > 3 && dayGap(addDays(last.d, IR_DEF[k].per), T) >= -3 && !(D.transactions || []).some(t => irIs(k, t) && t.date.slice(0, 10) > last.d)) { /* due about now, not seen yet */ }
@@ -20427,9 +20429,10 @@ function fnModel(b) {
     const L = D ? txs.filter(t => isT(t) && inPay(dOf(t))) : [], keptL = b.landed && b.landed[key] && b.landed[key].a > 0 && !(D && covered) ? [{ d: b.landed[key].d, a: b.landed[key].a }] : [];
     const S0 = L.length ? L.map(t => ({ id: t.id, d: dOf(t), a: t.amount })) : seen.filter(x => inPay(x.d)).length ? seen.filter(x => inPay(x.d)) : keptL;
     S0.forEach(x => x.id && used.add(x.id));
-    const exp = typed > 0 ? typed : fnAvg3(seen.filter(x => x.d < pp.start).length ? seen.filter(x => x.d < pp.start) : seen);
+    let est = 0; try { if (key === 'shane' && !(typed > 0) && wgOn() && !past) est = wgEst(wgPayFor(pp)).net; } catch (e) { } // 2.26.88: wage estimate from the roster
+    const exp = typed > 0 ? typed : est > 0 ? est : fnAvg3(seen.filter(x => x.d < pp.start).length ? seen.filter(x => x.d < pp.start) : seen);
     if (S0.length) IN.push({ key, name, st: 'landed', amount: fnSum(S0, 'a'), planned: typed > 0 ? typed : fnSum(S0, 'a'), date: S0[S0.length - 1].d, bankTx: L.length > 0 });
-    else if (!past && exp) IN.push({ key, name, st: 'expected', amount: exp, planned: exp, typed: typed > 0 });
+    else if (!past && exp) IN.push({ key, name, st: 'expected', amount: exp, planned: exp, typed: typed > 0, est: est > 0 && !(typed > 0) });
     else if (past && typed > 0 && !covered) IN.push({ key, name, st: 'planned', amount: typed, planned: typed, typed: true });
     else if (exp || typed) IN.push({ key, name, st: 'none', amount: 0, planned: exp });
   };
@@ -20518,7 +20521,7 @@ function budgetLandedSync() { try { let ch = 0; (S.budgets || []).forEach(b => {
 function fnCurModel() { const pp = payPeriod(0); return pp ? fnModel(fnBudgetFor(pp)) : null; }
 const FN_ST = { paid: x => `<span class="fnst paid">Paid ✓</span> ${esc(fmtW(x.date))}${x.bank ? '' : ' · marked paid'}`, due: x => `<span class="fnst due">Due</span> ${esc(fmtW(x.date))}`, overdue: x => `<span class="fnst over">Overdue</span> was due ${esc(fmtW(x.date))}`,
   about: x => `<span class="fnst about">About</span> ${esc(fmtW(x.date))}`, setaside: () => `<span class="fnst due">Set aside</span>`, planned: () => `<span class="fnst">Planned</span>`, nomatch: x => `<span class="fnst">Not seen in the bank</span>${x.date ? ' · ' + esc(fmtW(x.date)) : ''}`,
-  landed: x => `<span class="fnst paid">Landed ✓</span> ${esc(fmtW(x.date))}`, expected: x => `<span class="fnst about">Expected</span>${x.typed ? ' · your amount' : ' · average of the last 3'}`, none: () => `<span class="fnst">None this fortnight</span>` };
+  landed: x => `<span class="fnst paid">Landed ✓</span> ${esc(fmtW(x.date))}`, expected: x => `<span class="fnst about">Expected</span>${x.typed ? ' · your amount' : x.est ? ' · <a href="#wage">wage estimate</a>' : ' · average of the last 3'}`, none: () => `<span class="fnst">None this fortnight</span>` };
 function fnAcctName(id) { try { const a = CF && CF.data && CF.data.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; } catch (e) { return ''; } }
 
 /* ================= ORBIT + CREDIT CARD (2.26.60) =================
@@ -21976,3 +21979,123 @@ function PowerTimePage() {
   document.addEventListener('touchcancel', () => { on = false; }, { passive: true });
 })();
 
+
+/* ================= WAGE ESTIMATE (2.26.88) =================
+   Expected pay worked out from the Work roster (start/finish per weekday), an hourly rate, commission (the Commission
+   tracker when it has entries, else his usual amount), and his tax code, KiwiSaver %, student loan, social club and any
+   other deductions. Tax figures for the 2026–27 tax year (1 April 2026 to 31 March 2027), checked on ird.govt.nz:
+   income tax 10.5% to $15,600, 17.5% to $53,500, 30% to $78,100, 33% to $180,000, 39% over (IR340 April 2026 tables);
+   ACC earners' levy 1.75% on earnings up to $156,641 a year ($6,024 a fortnight) (ird.govt.nz/acclevy, IR335);
+   IETC (ME codes) $520 a year for income $24,000–$66,000, less 13c a dollar over $66,000, nil after $70,000;
+   student loan 12% of pay over $464 a week ($928 a fortnight) on main codes, 12% of all pay on secondary codes;
+   secondary codes flat rates incl ACC: SB 12.25%, S 19.25%, SH 31.75%, ST 34.75%, SA 40.75%;
+   KiwiSaver employee rates 3.5% (default), 4%, 6%, 8%, 10%. Once the pay lands, the bank amount replaces the estimate. */
+const WG_TAXYEAR = '2026–27', WG_ACC = 0.0175, WG_ACC_MAX = 156641, WG_SL_WEEK = 464;
+const WG_BANDS = [[15600, 0.105], [53500, 0.175], [78100, 0.30], [180000, 0.33], [Infinity, 0.39]];
+const WG_SEC = { SB: 0.1225, S: 0.1925, SH: 0.3175, ST: 0.3475, SA: 0.4075 };
+const WG_CODES = ['M', 'M SL', 'ME', 'ME SL', 'SB', 'SB SL', 'S', 'S SL', 'SH', 'SH SL', 'ST', 'ST SL', 'SA', 'SA SL'];
+const WG_KS = [[0, 'Not in KiwiSaver'], [3, '3% (only with an IRD-approved temporary reduction)'], [3.5, '3.5% (default)'], [4, '4%'], [6, '6%'], [8, '8%'], [10, '10%']];
+const WG_END_DEF = { '4': '19:15', '0': '19:00' }; // same finishes the rest of the app uses when the roster has none (others 6pm)
+function wgSt() { S.settings = S.settings || {}; const w = S.settings.wageEst && typeof S.settings.wageEst === 'object' ? S.settings.wageEst : (S.settings.wageEst = {});
+  if (!WG_CODES.includes(w.code)) w.code = 'M'; if (!WG_KS.some(k => k[0] === +w.ks)) w.ks = 3.5; w.ks = +w.ks;
+  ['rate', 'lateRate', 'commUsual'].forEach(k => { w[k] = Math.max(0, +w[k] || 0); });
+  if (!(+w.brk >= 0)) w.brk = 30; w.brk = +w.brk; if (!(+w.social >= 0)) w.social = 5; w.social = +w.social; if (w.socialPer !== 'week') w.socialPer = 'pay';
+  if (!(+w.ph > 0)) w.ph = 1.5; w.arrears = +w.arrears === 1 ? 1 : 0; if (!Array.isArray(w.other)) w.other = []; if (!w.commBy || typeof w.commBy !== 'object') w.commBy = {};
+  return w; }
+const wgOn = () => { try { return wgSt().rate > 0; } catch (e) { return false; } };
+const wgTrunc = v => Math.floor(v * 100 + 1e-6) / 100;
+// PAYE for one fortnightly pay. Returns income tax and ACC separately (PAYE in the IRD tables includes both).
+function wgTax(gross, code) {
+  const c = String(code || 'M'), base = c.replace(/ SL$/, ''), sl = / SL$/.test(c), g = Math.max(0, gross);
+  const acc = wgTrunc(Math.min(g, WG_ACC_MAX / 26) * WG_ACC);
+  let tax;
+  if (WG_SEC[base]) tax = wgTrunc(g * (WG_SEC[base] - WG_ACC)); // flat secondary rate, the ACC part shown on its own
+  else { const A = g * 26; let t = 0, lo = 0; for (const [hi, r] of WG_BANDS) { if (A > lo) t += (Math.min(A, hi) - lo) * r; lo = hi; }
+    if (base === 'ME') { const ietc = A < 24000 ? 0 : A <= 66000 ? 520 : Math.max(0, 520 - (A - 66000) * 0.13); t -= ietc; }
+    tax = wgTrunc((t + Math.min(A, WG_ACC_MAX) * WG_ACC) / 26) - acc; }
+  const slAmt = sl ? wgTrunc(WG_SEC[base] ? g * 0.12 : Math.max(0, g - WG_SL_WEEK * 2) * 0.12) : 0;
+  return { tax: r2(tax), acc, paye: r2(tax + acc), sl: slAmt };
+}
+// The work fortnight a pay covers: the commission fortnight (Monday anchor) that ends before payday, or else the 14 days
+// ending the Sunday before payday; a week earlier when he says pay is a week behind.
+function wgWorkFor(payDate) { const w = wgSt(); let end;
+  try { const a = CM() && CM().anchor; if (a) { let f = fortnightOf(a, payDate); if (f.end >= payDate) f = fortnightOf(a, addDays(f.start, -1)); end = f.end; } } catch (e) { }
+  if (!end) { end = addDays(payDate, -1); while (new Date(parseD(end)).getUTCDay() !== 0) end = addDays(end, -1); }
+  if (w.arrears) end = addDays(end, -7);
+  return { start: addDays(end, -13), end }; }
+function wgHolSet(a, b) { const s = new Map(); try { for (let y = +a.slice(0, 4); y <= +b.slice(0, 4); y++) (nzHolidays(y) || []).forEach(h => s.set(h.date, h.name)); } catch (e) { } try { PWR_NL_ANNIV.forEach(d => s.set(d, 'Auckland Anniversary Day')); } catch (e) { } return s; }
+function wgHours(ws, we) { const w = wgSt(), r = rosterState(), hol = wgHolSet(ws, we), out = { days: 0, hrs: 0, late: 0, phHrs: 0, ph: [], rows: [] };
+  for (let d = ws; d <= we; d = addDays(d, 1)) { const k = String(new Date(parseD(d)).getUTCDay()), st = hmMin(r.days[k]); if (st == null) continue;
+    const en = hmMin((r.ends || {})[k] || WG_END_DEF[k] || '18:00'); if (en == null || en <= st) continue;
+    const h = Math.max(0, (en - st - w.brk) / 60), late = w.lateRate > 0 ? Math.max(0, Math.min(en, 24 * 60) - Math.max(st, 18 * 60)) / 60 : 0;
+    out.days++; out.hrs += h; out.late += Math.min(late, h); if (hol.has(d)) { out.phHrs += h; out.ph.push(hol.get(d) + ' (' + fmtW(d) + ')'); } }
+  out.hrs = r2(out.hrs); out.late = r2(out.late); out.phHrs = r2(out.phHrs); return out; }
+// Commission for a work fortnight: what he typed for that pay, else the Commission tracker total once that fortnight is
+// over, else the average of the last 3 finished fortnights in the tracker, else his usual amount.
+function wgCommAvg() { try { const c = CM(); if (!c || !c.anchor || !c.entries.length) return null; const cur = fortnightOf(c.anchor, todayISO()), first = c.entries.reduce((m, e) => e.date < m ? e.date : m, '9999'), L = [];
+  for (let st = addDays(cur.start, -14); st >= first && L.length < 3; st = addDays(st, -14)) L.push(commSum(c.entries, st, addDays(st, 13)) / 100);
+  if (!L.length) { const f0 = fortnightOf(c.anchor, first); if (f0.start < cur.start) L.push(commSum(c.entries, f0.start, f0.end) / 100); }
+  return L.length ? r2(L.reduce((n, v) => n + v, 0) / L.length) : null; } catch (e) { return null; } }
+function wgComm(payDate, wk) { const w = wgSt();
+  if (w.commBy[payDate] != null && +w.commBy[payDate] >= 0) return { amount: +w.commBy[payDate], src: 'typed' };
+  try { const c = CM(); if (c && c.entries.length && wk.end < todayISO() && c.entries.some(e => e.date >= wk.start && e.date <= wk.end)) return { amount: commSum(c.entries, wk.start, wk.end) / 100, src: 'tracker' }; } catch (e) { }
+  const a = wgCommAvg(); if (a != null) return { amount: a, src: 'avg' };
+  return { amount: w.commUsual, src: 'usual' }; }
+function wgEst(payDate, over) { const w = Object.assign({}, wgSt(), over || {}), wk = wgWorkFor(payDate), H = wgHours(wk.start, wk.end), cm = over && over.comm != null ? { amount: over.comm, src: 'typed' } : wgComm(payDate, wk);
+  const lateX = w.lateRate > 0 ? H.late * (w.lateRate - w.rate) : 0, base = H.hrs * w.rate, phX = H.phHrs * w.rate * (w.ph - 1);
+  const gross = r2(base + lateX + phX + cm.amount), t = wgTax(gross, w.code), ks = wgTrunc(gross * w.ks / 100), social = r2(w.social * (w.socialPer === 'week' ? 2 : 1)), other = r2(w.other.reduce((n, o) => n + (+o.amount || 0), 0));
+  const net = r2(gross - t.paye - t.sl - ks - social - other);
+  return { payDate, wk, H, base: r2(base), lateX: r2(lateX), phX: r2(phX), comm: cm, gross, tax: t.tax, acc: t.acc, paye: t.paye, sl: t.sl, ks, social, other, net, code: w.code, ksPct: w.ks, rate: w.rate }; }
+// Pay date for a budget fortnight: payday, moved by how early the bank pay usually lands (0–2 days).
+function wgLag() { try { const s = mywSt().seen, x = s[s.length - 1]; if (!x) return 0; const st = fnPayStart(x.d, true); return st && st > x.d ? Math.min(2, dayGap(st, x.d)) : 0; } catch (e) { return 0; } }
+const wgPayFor = pp => addDays(pp.start, -wgLag());
+// Back-solve: the gross that gives this take-home under his current settings (net rises with gross, so halve the gap).
+function wgGrossFor(net, over) { const w = Object.assign({}, wgSt(), over || {}); let lo = 0, hi = 20000;
+  const netOf = g => { const t = wgTax(g, w.code); return g - t.paye - t.sl - wgTrunc(g * w.ks / 100) - w.social * (w.socialPer === 'week' ? 2 : 1) - w.other.reduce((n, o) => n + (+o.amount || 0), 0); };
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (netOf(m) < net) lo = m; else hi = m; } return r2(hi); }
+function wgCalib() { try { const s = mywSt().seen.filter(x => x.a > 300), by = {}; s.forEach(x => { by[x.d] = r2((by[x.d] || 0) + x.a); });
+  return Object.keys(by).sort().slice(-4).reverse().map(d => { const e = wgEst(d), g = wgGrossFor(by[d]); return { d, actual: by[d], est: wgOn() ? e.net : null, e, grossNeeded: g }; }); } catch (e) { return []; } }
+async function wgSet(k, v) { const w = wgSt(); if (['rate', 'lateRate', 'commUsual', 'social', 'brk', 'ph'].includes(k)) { const n = parseFloat(String(v).replace(/[^\d.]/g, '')); w[k] = Number.isFinite(n) && n >= 0 ? n : 0; }
+  else if (k === 'ks') w.ks = +v; else if (k === 'arrears') w.arrears = +v ? 1 : 0; else w[k] = v; await save(); render(); }
+async function wgCommSet(payDate, v) { const w = wgSt(), n = parseFloat(String(v).replace(/[^\d.]/g, '')); if (v === '' || !Number.isFinite(n)) delete w.commBy[payDate]; else w.commBy[payDate] = r2(n); await save(); render(); }
+async function wgOtherAdd() { openSheet('Another deduction', field('What it is', inp('name', '', 'maxlength="40" placeholder="e.g. Staff purchases" required')) + field('Amount each pay', inp('amount', '', 'inputmode="decimal" placeholder="0.00" required')),
+  async v => { const a = parseFloat(String(v.amount).replace(/[^\d.]/g, '')); if (!String(v.name || '').trim()) return 'Please name it.'; if (!(a > 0)) return 'Please type the amount.'; wgSt().other.push({ id: uid('wgo'), name: String(v.name).trim().slice(0, 40), amount: r2(a) }); await save(); render(); return ''; }, 'Add'); }
+async function wgOtherDel(id) { const s = snap(), w = wgSt(), o = w.other.find(x => x.id === id); w.other = w.other.filter(x => x.id !== id); await save(); render(); toast((o ? o.name : 'Deduction') + ' removed.', 'Undo', undoTo(s)); }
+async function wgUse(k, v) { const s = snap(), w = wgSt(); if (k === 'rate') w.rate = r2(v); else w.commUsual = r2(v); await save(); render(); toast(k === 'rate' ? `Hourly rate set to ${money(v)}.` : `Usual commission set to ${money(v)}.`, 'Undo', undoTo(s)); }
+function wgBreak(e) { const L = [['Hours', `${e.H.hrs} h over ${plural(e.H.days, 'shift')} × ${money(e.rate)}`, e.base]];
+  if (e.lateX) L.push(['After 6pm extra', `${e.H.late} h at the late rate`, e.lateX]); if (e.phX) L.push(['Public holiday extra', esc(e.H.ph.join(', ')), e.phX]);
+  L.push(['Commission', { typed: 'what you typed', tracker: 'from the Commission tracker', avg: 'average of recent fortnights (Commission tracker)', usual: 'your usual amount' }[e.comm.src], e.comm.amount]);
+  const row = (t, s, v, neg, b) => `<div class="row"><div class="tx"><div class="t">${b ? '<b>' + t + '</b>' : t}</div>${s ? `<div class="s">${s}</div>` : ''}</div><b>${neg ? '−' : ''}${money(v)}</b></div>`;
+  return L.map(x => row(x[0], x[1], x[2])).join('') + row('Gross pay', '', e.gross, 0, 1) + row('PAYE (income tax)', 'Tax code ' + esc(e.code), e.tax, 1) + row('ACC earners’ levy', '1.75%', e.acc, 1) +
+    (e.sl ? row('Student loan', '12%' + (/^M/.test(e.code) ? ' over $928 a fortnight' : ''), e.sl, 1) : '') + (e.ks ? row('KiwiSaver', e.ksPct + '%', e.ks, 1) : '') + (e.social ? row('Social club', '', e.social, 1) : '') +
+    wgSt().other.map(o => row(esc(o.name), '', +o.amount || 0, 1)).join('') + row('Take-home (estimate)', '', e.net, 0, 1); }
+function WagePage() {
+  const w = wgSt(), T = todayISO(), pps = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean), nextPP = pps.find(p => wgPayFor(p) > T) || pps[pps.length - 1];
+  const head = moneyTabs('budget') + header('Wage estimate', 'Your take-home pay worked out from your roster, commission and tax code');
+  if (!nextPP) return head + `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday first</b><br>The estimate uses the same pay fortnights as Bills.<div style="margin-top:10px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
+  const pd = wgPayFor(nextPP), e = wgEst(pd), r = rosterState(), rosterSet = Object.keys(r.days || {}).length > 0, opt = (v, l, cur) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(l)}</option>`;
+  const num = (k, label, hint, ph) => field(label, `<div class="moneyin"><span>$</span><input inputmode="decimal" placeholder="${ph || '0.00'}" value="${w[k] ? w[k] : ''}" aria-label="${esc(label)}" onchange="wgSet('${k}', this.value)"></div>`, hint);
+  const set = `<div class="card wgset"><div class="sec" style="margin-top:0">Your details</div>
+    ${field('Tax code', `<select onchange="wgSet('code', this.value)">${WG_CODES.map(c => opt(c, c + (c === 'M' ? ' (main job)' : c === 'ME' ? ' (main job, independent earner credit)' : / SL$/.test(c) ? ' (with student loan)' : ''), w.code)).join('')}</select>`, 'It’s on your payslip.')}
+    ${field('KiwiSaver', `<select onchange="wgSet('ks', this.value)">${WG_KS.map(k => opt(k[0], k[1], w.ks)).join('')}</select>`)}
+    ${num('rate', 'Hourly rate', 'Before tax. Not sure? Tap a “Rate from this pay” button under Check against your last pays.')}
+    ${num('lateRate', 'After 6pm rate (optional)', 'Only if your hours after 6pm, like Thursday’s late finish, pay more. Leave blank if not.')}
+    ${field('Unpaid break each shift', `<div class="moneyin"><input inputmode="numeric" value="${w.brk}" aria-label="Unpaid break minutes" onchange="wgSet('brk', this.value)"><span>min</span></div>`, 'Taken off each rostered day. Change it if your break is different.')}
+    ${num('commUsual', 'Usual commission a fortnight', wgCommAvg() != null ? 'Your Commission tracker is used instead: average of recent fortnights ' + money(wgCommAvg()) + '.' : 'Used when the Commission tracker has nothing for that fortnight.')}
+    ${field('Social club', `<div class="moneyin"><span>$</span><input inputmode="decimal" value="${w.social}" aria-label="Social club amount" onchange="wgSet('social', this.value)"></div><select style="margin-top:6px" onchange="wgSet('socialPer', this.value)">${opt('pay', 'each pay (fortnight)', w.socialPer)}${opt('week', 'each week', w.socialPer)}</select>`, 'Taken out before your pay reaches the bank.')}
+    <div class="sec">Other deductions</div><div class="list">${w.other.map(o => `<div class="row"><div class="tx"><div class="t">${esc(o.name)}</div><div class="s">Each pay</div></div><b>${money(o.amount)}</b><button class="linkbtn" onclick="wgOtherDel(${jsArg(o.id)})" aria-label="Remove ${esc(o.name)}">✕</button></div>`).join('') || '<div class="row"><div class="tx"><div class="s">None</div></div></div>'}</div>
+    <div class="btns" style="margin-top:8px"><button class="btn small" onclick="wgOtherAdd()">${I('plus')} Add a deduction</button></div>
+    ${field('Pay covers', `<select onchange="wgSet('arrears', this.value)">${opt(0, 'the fortnight just before payday', w.arrears)}${opt(1, 'the fortnight ending a week before payday', w.arrears)}</select>`)}
+    <p class="muted" style="margin:6px 2px 0">Saved on this phone with your other settings.</p></div>`;
+  const cBy = w.commBy[pd], comm = `<div class="row"><div class="tx"><div class="t">Commission this fortnight</div><div class="s">${cBy != null ? 'Your amount' : 'Leave blank to use ' + money(e.comm.amount) + ' (' + ({ tracker: 'Commission tracker', avg: 'recent average', usual: 'your usual' }[e.comm.src] || '') + ')'}</div></div><div class="moneyin wgcommin"><span>$</span><input inputmode="decimal" placeholder="${e.comm.amount.toFixed(2)}" value="${cBy != null ? cBy : ''}" aria-label="Commission this fortnight" onchange="wgCommSet(${jsArg(pd)}, this.value)"></div></div>`;
+  const est = !rosterSet ? `<div class="card muted">Add your work days in the <a href="#roster">Work roster</a> so the hours can be counted.</div>` : !wgOn() ? `<div class="card muted">Add your hourly rate (or work it out from your last pay below) to see the estimate.</div>` :
+    `<div class="card"><div class="t" style="font-weight:600">Next pay ${esc(fmtW(pd))}: about ${money(e.net)}</div><div class="muted" style="margin:2px 0 8px">Estimate for work ${esc(fmtW(e.wk.start))} – ${esc(fmtW(e.wk.end))}, using your roster as it is now.</div><div class="list">${comm}${wgBreak(e)}</div></div>`;
+  const cal = wgCalib(), cRows = cal.map(c => { const back = r2((c.grossNeeded - wgEst(c.d).comm.amount - wgEst(c.d).phX) / Math.max(0.01, wgEst(c.d).H.hrs)), commBack = r2(c.grossNeeded - wgEst(c.d).base - wgEst(c.d).lateX - wgEst(c.d).phX);
+    return `<div class="row"><div class="tx"><div class="t">Pay ${esc(fmtW(c.d))}: ${c.est != null ? 'estimated ' + money(c.est) + ' vs actual ' : 'actual '}${money(c.actual)}</div><div class="s">${c.est != null ? (Math.abs(c.est - c.actual) < 1 ? 'Spot on' : (c.est > c.actual ? 'Estimate ' + money(c.est - c.actual) + ' high' : 'Estimate ' + money(c.actual - c.est) + ' low')) + ' · ' : ''}Gross needed about ${money(c.grossNeeded)}</div>
+      <div class="btns" style="margin-top:6px">${wgEst(c.d).H.hrs > 0 ? `<button class="btn small" onclick="wgUse('rate', ${back})">Rate from this pay: ${money(back)}/h</button>` : ''}${w.rate > 0 && commBack >= 0 ? `<button class="btn small" onclick="wgUse('comm', ${commBack})">Commission was about ${money(commBack)}</button>` : ''}</div></div></div>`; }).join('');
+  const calib = `<div class="sec">Check against your last pays</div><div class="list">${cRows || '<div class="row"><div class="tx"><div class="s">Your pays will show here once Cash flow has seen them in the bank.</div></div></div>'}</div>
+    <p class="muted" style="margin:6px 2px 0">“Rate from this pay” works your hourly rate back from what landed, after taking off commission for that fortnight. Hours come from your roster as it is now, so a week with extra or fewer shifts will throw it out. A public holiday on a rostered day is counted at time and a half.</p>`;
+  return head + est + set + calib + `<div class="foot">Tax for ${WG_TAXYEAR} (1 April 2026 – 31 March 2027), from IRD: income tax 10.5% to $15,600, 17.5% to $53,500, 30% to $78,100, 33% to $180,000, 39% above; ACC earners’ levy 1.75%; student loan 12% over $464 a week. These are estimates. Your payslip is the final word, and once the pay lands in the bank the Budget uses the real amount.</div>`;
+}
+function wgBudgetRow() { try { const T = todayISO(), pp = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean).find(p => wgPayFor(p) > T); const e = pp && wgOn() ? wgEst(wgPayFor(pp)) : null;
+  return `<div class="list" style="margin-bottom:12px"><div class="row"><button class="tapzone" onclick="go('#wage')"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wage estimate</div><div class="s">${e ? `Next pay ${esc(fmtW(e.payDate))}: about ${money(e.net)} take-home (gross ${money(e.gross)})` : 'Work out your pay from your roster, commission and tax code'}</div></div></button></div></div>`; } catch (err) { return ''; } }
