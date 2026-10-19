@@ -1,4 +1,5 @@
 import { parseCinema, localEvents, CINEMA_SCHEDULE } from './local.js';
+import { getCinema, toScheduleItems } from './cinema.js';
 import { getNightlife } from './nightlife.js';
 /* Local events for the Due Dates app: Whangārei District Council "What's On", plus Event Cinemas and local markets (local.js).
  *
@@ -223,7 +224,11 @@ export async function getFeed(env, fetchImpl = fetch, now = Date.now()) {
     state = await building;
   }
   const feed = toFeed(state, now);
-  const extra = localEvents(state && state.movies, nzToday(now));
+  // 2.27.10: movies from Event Cinemas' own sessions JSON (Kinoafisha stays as the fallback)
+  let cinema = null;
+  try { cinema = await getCinema(env, fetchImpl, now); } catch (e) { cinema = null; }
+  const ecItems = cinema && cinema.movies && cinema.movies.some(m => m.sessions && m.sessions.length) ? toScheduleItems(cinema) : null;
+  const extra = localEvents(ecItems ? { items: ecItems, ec: true } : state && state.movies, nzToday(now));
   const ids = new Set(feed.events.map(e => e.id));
   for (const e of extra) if (!ids.has(e.id)) feed.events.push(e);
   // 2.23.15: nightlife and evening shows from Eventfinda (skipping any the council already lists that night)
@@ -232,10 +237,11 @@ export async function getFeed(env, fetchImpl = fetch, now = Date.now()) {
   const tkey = e => e.date + '|' + String(e.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 30);
   const have = new Set(feed.events.map(tkey));
   for (const e of night) if (!ids.has(e.id) && !have.has(tkey(e))) feed.events.push(e);
-  feed.sources = [feed.source, { name: 'Eventfinda (gigs, comedy, theatre, nightlife)', url: 'https://www.eventfinda.co.nz/whatson/events/whangarei' }];
+  feed.sources = [feed.source, { name: 'Eventfinda (gigs, comedy, theatre, nightlife, markets)', url: 'https://www.eventfinda.co.nz/whatson/events/whangarei' }, { name: 'Event Cinemas Whangārei', url: 'https://www.eventcinemas.co.nz/cinema/whangarei' }];
   feed.events.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99') || a.title.localeCompare(b.title));
   feed.events = feed.events.slice(0, 700);
   feed.count = feed.events.length;
+  if (cinema && Array.isArray(cinema.movies)) feed.cinema = { at: new Date(cinema.at).toISOString(), name: cinema.name, address: cinema.address, url: cinema.url, sessionsUrl: cinema.sessionsUrl, movies: cinema.movies };
   mem = { readAt: now, feed };
   return feed;
 }

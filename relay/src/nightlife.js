@@ -12,7 +12,9 @@ export const EF_FEEDS = [
   ['whangarei-district/comedy', 1, 'Comedy'],
   ['northland/comedy', 1, 'Comedy'],
   ['whangarei-district/theatre', 1, 'Theatre'],
-  ['whangarei-district/whatson', 3, '']
+  ['whangarei-district/whatson', 3, ''],
+  ['whangarei-district/markets-fairs', 1, 'Markets'], // 2.27.10: markets and fairs (day or night)
+  ['northland/markets-fairs', 1, 'Markets']
 ];
 const KV_KEY = 'ef-night-v1';
 const MAX_AGE = 6 * 3600 * 1000;
@@ -58,6 +60,15 @@ export function nightPick(items, today) {
     if (seen.has(x.guid) || x.date < today || x.date > until) continue;
     if (!NEAR.test(x.town + ' ' + x.venue)) continue;
     const hay = x.title + ' ' + x.desc;
+    if (x.cat === 'Markets') { // markets: any time of day; evening ones are night markets
+      if (KIDS.test(hay) || /\b(sport|tournament|race|marathon)\b/i.test(hay)) continue;
+      seen.add(x.guid);
+      const night = x.time && x.time >= '16:00';
+      out.push({ id: 'ef-' + x.guid + '-' + x.date, title: x.title, url: x.url, date: x.date, end: '', time: x.time, endTime: x.endTime, timeKnown: !!x.time && !x.regular,
+        venue: x.venue, desc: x.regular ? ('Regular event, check the dates on the page. ' + x.desc).slice(0, 320) : x.desc,
+        cats: night ? ['Nightlife', 'Night market', 'Markets'] : ['Markets'], cost: '', src: 'Eventfinda' });
+      continue;
+    }
     const evening = x.time && x.time >= '17:00';
     if (!x.cat && !(evening && NIGHT_WORDS.test(hay))) continue; // general What's On: evening nightlife-type things only
     if (!evening) continue; // afternoon jazz, matinees etc. aren't nightlife

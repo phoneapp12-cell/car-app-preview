@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.9';
+const APP_VERSION = '2.27.10';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23721,3 +23721,168 @@ function bkSettingsRows() {
     A.map(a => `<div class="srow"><div class="tx"><div class="t">${esc(bkAcctName(a))}</div><div class="s">${esc(a.type === 'CREDITCARD' ? 'Credit card' : a.type === 'LOAN' ? 'Loan' : a.type === 'SAVINGS' ? 'Savings' : 'Account')}</div></div>${sw(!p.off.includes(a.id), bkAcctName(a), `bkSet('off', ${jsArg(a.id)})`)}</div>`).join('') : '');
 }
 (() => { const o = bfSettingsRows; bfSettingsRows = function () { let h = o.apply(this, arguments); try { h += bkSettingsRows(); } catch (e) { } return h; }; })();
+
+/* ================= 2.27.10: Event Cinemas Whangārei in one card, plus "new at the cinema" and new local events in Notifications =================
+   Movies come from Event Cinemas' own sessions JSON (relay /events → cinema; cinema 503, 18 James Street, read twice a day).
+   The Events page and Home "What's on" show one collapsible Event Cinemas card instead of a card per film per day.
+   Notifications: a film newly added to the line-up (now showing or coming soon) → "New at Event Cinemas: <title>";
+   a new nightlife event (gigs, comedy, DJ, quiz, theatre), market or Whangārei District Council event → a card.
+   First run marks everything already listed as seen. More than 5 new at once = one card with a list. No sport.
+   Not repeated for events he's flagged, added, or that came from his email. Nightlife during a shift isn't suggested. */
+const LN_KEEP = 7 * 864e5;
+const isMovieEv = e => !!(e && Array.isArray(e.cats) && e.cats.includes('Movies'));
+function cineData() { try { const c = EVS && EVS.data && EVS.data.cinema; return c && Array.isArray(c.movies) ? c : null; } catch (e) { return null; } }
+function lnPref() { S.settings = S.settings || {}; const p = S.settings.localN && typeof S.settings.localN === 'object' ? S.settings.localN : (S.settings.localN = {});
+  ['cinema', 'nightlife', 'markets', 'council'].forEach(k => { if (p[k] == null) p[k] = true; }); return p; }
+function lnSt() { try { const o = JSON.parse(localStorage.getItem('localNotif') || 'null'); if (o && typeof o === 'object') { o.cin = Array.isArray(o.cin) ? o.cin : []; o.ev = Array.isArray(o.ev) ? o.ev : []; o.notes = Array.isArray(o.notes) ? o.notes : []; o.seeded = o.seeded || {}; return o; } } catch (e) { }
+  return { seeded: {}, cin: [], ev: [], notes: [] }; }
+function lnSave(o) { o.notes = o.notes.filter(n => Date.now() - n.at < LN_KEEP).slice(-60); o.cin = o.cin.slice(-600); o.ev = o.ev.slice(-1500); try { localStorage.setItem('localNotif', JSON.stringify(o)); } catch (e) { } }
+// same event, other source or another week: same first words of the title
+const lnKey = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\b20\d\d\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(w => !/^(the|a|an)$/.test(w)).slice(0, 4).join(' ');
+function lnType(e) {
+  if (!e || isMovieEv(e) || isSilverFestival(e)) return '';
+  if (isSport([e.title, (e.cats || []).join(' '), e.desc].join(' '))) return '';
+  if ((e.cats || []).includes('Markets') || /\bmarkets?\b|\bbazaar\b/i.test(e.title)) return 'markets';
+  if (isNightlife(e)) return 'nightlife';
+  if (/^wdc-/.test(e.id || '') || /wdc\.govt\.nz/.test(e.url || '')) return 'council';
+  return '';
+}
+const LN_T = { cinema: ['🎬', 'New at Event Cinemas'], nightlife: ['🎶', 'New nightlife'], markets: ['🧺', 'New market'], council: ['🏛️', 'New council event'] };
+function lnMailKeys() { const s = new Set(); try { evMailList().forEach(x => { s.add(lnKey(x.ev.name)); }); } catch (e) { } try { (S.myEvents || []).forEach(x => x && s.add(lnKey(x.title))); } catch (e) { } return s; }
+function lnDetect() {
+  if (!EVS || !EVS.data || !Array.isArray(EVS.data.events)) return 0;
+  const st = lnSt(), now = Date.now(), cinNotes = []; let n = 0;
+  // cinema line-up
+  const c = cineData();
+  if (c && c.movies.length) {
+    const seen = new Set(st.cin), fresh = c.movies.filter(m => m && m.id && !seen.has(m.id));
+    c.movies.forEach(m => m && m.id && seen.add(m.id)); st.cin = [...seen];
+    if (!st.seeded.cin) st.seeded.cin = true;
+    else if (fresh.length) { const items = fresh.map(m => ({ k: 'cin', id: m.id, title: m.title, rating: m.rating || '', poster: m.poster || '', url: m.url || '', soon: !!m.soon, released: m.released || '', ses: (m.sessions || []).slice(0, 12), mins: m.mins || 0 }));
+      if (items.length > 5) cinNotes.push({ id: 'cg' + now.toString(36), at: now, kind: 'cinema', items }); else items.forEach(it => cinNotes.push({ id: 'c' + it.id, at: now, kind: 'cinema', items: [it] })); n += items.length; }
+  }
+  // local events
+  const T = todayISO(), seenE = new Set(st.ev), groups = {}, mail = lnMailKeys();
+  upcomingEvents().forEach(e => { const ty = lnType(e); if (!ty) return; const k = lnKey(e.title); if (!k || seenE.has(k)) return; seenE.add(k);
+    if (!st.seeded.ev) return;
+    if (e.date < T || evFlagged(e.id) || evAppt(e.id) || mail.has(lnKey(e.title))) return;
+    if (ty === 'nightlife' && evDuringWork(e)) return; // not suggested during a shift
+    (groups[ty] = groups[ty] || []).push({ k: 'ev', ty, id: e.id, key: k, title: e.title, date: e.date, end: e.end || '', time: e.time || '', endTime: e.endTime || '', venue: e.venue || '', url: /^https:\/\//.test(e.url || '') ? e.url : '', cost: e.cost || '', sub: (e.cats || []).filter(x => x !== 'Nightlife')[0] || '' });
+  });
+  st.ev = [...seenE]; st.seeded.ev = true;
+  const all = Object.keys(groups).flatMap(ty => groups[ty]);
+  if (all.length > 5) st.notes.push({ id: 'eg' + now.toString(36), at: now, kind: 'events', items: all });
+  else all.forEach(it => st.notes.push({ id: 'e' + String(it.id).replace(/[^A-Za-z0-9-]/g, '').slice(0, 40), at: now, kind: it.ty, items: [it] }));
+  st.notes.push(...cinNotes); // films show first
+  n += all.length; lnSave(st); if (n) { try { glBellRedraw(); } catch (e) { } } return n;
+}
+(() => { const o = refreshEvents; refreshEvents = async function () { const r = await o.apply(this, arguments); try { lnDetect(); } catch (e) { } return r; }; })();
+setTimeout(() => { try { if (!EVS) loadEvs(); lnDetect(); } catch (e) { } }, 2500);
+// ---- session helpers ----
+const cineT = t => fmtTime(String(t).slice(11, 16));
+function cineNext(m) { // today's remaining sessions, else the next day that has some
+  const now = new Date(), T = todayISO(), hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const S2 = (m.sessions || m.ses || []).filter(s => s && s.t && (s.t.slice(0, 10) > T || (s.t.slice(0, 10) === T && s.t.slice(11, 16) > hm)));
+  if (!S2.length) return null; const d = S2[0].t.slice(0, 10); return { d, list: S2.filter(s => s.t.slice(0, 10) === d) };
+}
+function cineWhen(m) {
+  const n = cineNext(m);
+  if (n) { const dl = daysLeft(n.d); return (dl === 0 ? 'Today' : dl === 1 ? 'Tomorrow' : fmtW(n.d)) + ' ' + n.list.slice(0, 5).map(s => cineT(s.t)).join(', ') + (n.list.length > 5 ? ' +' + (n.list.length - 5) : ''); }
+  if (m.soon && m.released) return 'Opens ' + fmtW(m.released);
+  return 'No sessions listed this week';
+}
+function cineFind(id) { const c = cineData(); const m = c && c.movies.find(x => x.id === id); if (m) return m; const st = lnSt(); for (const n of st.notes) for (const it of n.items) if (it.k === 'cin' && it.id === id) return Object.assign({ sessions: it.ses }, it); return null; }
+function cineAdd(id) {
+  const m = cineFind(+id); if (!m) return; const n = cineNext(m), mins = m.mins || 120;
+  const end = s => { const a = hmMin(s.t.slice(11, 16)) + mins; return a < 1440 ? String(Math.floor(a / 60)).padStart(2, '0') + ':' + String(a % 60).padStart(2, '0') : ''; };
+  const times = n ? n.list.slice(0, 8).map(s => ({ s: s.t.slice(11, 16), e: end(s), label: s.scr || '' })) : [];
+  const ev = { name: m.title, days: [n ? n.d : (m.released && m.released >= todayISO() ? m.released : todayISO())], time: times[0] ? times[0].s : '', end: times[0] ? times[0].e : '', times, place: 'Event Cinemas, 18 James Street', tix: n ? n.list[0].url : (m.url || '') };
+  closeSheet().then(() => evAddSheet('cin|' + m.id, { ev, m: null }));
+}
+function cineOpen(u) { if (!/^https:\/\/www\.eventcinemas\.co\.nz\//.test(u || '')) u = 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions'; window.open(u, '_blank', 'noopener'); }
+const cineStop = 'event.stopPropagation();event.preventDefault();if(window.glSwipe&&glSwipe.moved)return;';
+function cineBtns(m, full = true) {
+  const ad = evAdded('cin|' + m.id), n = cineNext(m);
+  return `<div class="mbbtns cinebtns">${ad ? `<button type="button" class="btn small" onclick="${cineStop}calOpenDay(${parseD(ad.start)})">${I('check')} In your calendar</button>` : `<button type="button" class="btn small primary" onclick="${cineStop}cineAdd(${m.id})">${I('cal')} Add to calendar</button>`}
+    <button type="button" class="btn small" onclick="${cineStop}cineOpen(${jsArg(n ? n.list[0].url : m.url)})">${I('ticket')} ${n ? 'Get tickets' : 'Details'}</button>${n && full ? `<button type="button" class="btn small" onclick="${cineStop}cineOpen(${jsArg(m.url)})">Sessions ${I('ext')}</button>` : ''}</div>`;
+}
+const cinePoster = (m, w = 46) => m.poster ? `<img class="cinepost" src="${esc(m.poster)}" alt="" width="${w}" height="${Math.round(w * 1.48)}" loading="lazy" decoding="async">` : `<div class="cinepost none">🎬</div>`;
+const cineRate = m => m.rating && m.rating !== 'TBC' ? `<span class="cinerate">${esc(m.rating)}</span>` : '';
+function cineRow(m) {
+  return `<div class="cinerow">${cinePoster(m)}<div class="tx"><div class="t"><a href="${esc(m.url || 'https://www.eventcinemas.co.nz/cinema/whangarei')}" target="_blank" rel="noopener">${esc(m.title)}</a> ${cineRate(m)}</div><div class="s">${esc(cineWhen(m))}${m.mins ? ' · ' + Math.floor(m.mins / 60) + 'h ' + (m.mins % 60) + 'm' : ''}</div>${cineBtns(m, false)}</div></div>`;
+}
+function cineCard(q = '', open = false) {
+  const c = cineData(); if (!c) return '';
+  const qq = String(q || '').trim().toLowerCase(), hit = m => !qq || m.title.toLowerCase().includes(qq);
+  const now = c.movies.filter(m => !m.soon && hit(m)), soon = c.movies.filter(m => m.soon && hit(m));
+  if (!now.length && !soon.length) return '';
+  const tonight = now.filter(m => { const n = cineNext(m); return n && daysLeft(n.d) === 0; });
+  return `<details class="card cinecard"${open ? ' open' : ''}><summary><div class="cinehead"><div class="cinelogo">🎬</div><div class="tx"><div class="t">Event Cinemas Whangārei</div>
+    <div class="s">${plural(now.length, 'film')} showing${soon.length ? ' · ' + soon.length + ' coming soon' : ''}${tonight.length ? ' · ' + tonight.length + ' still on today' : ''} · 18 James Street</div>
+    <div class="cinestrip">${now.slice(0, 7).map(m => cinePoster(m, 30)).join('')}</div></div><span class="cinechev">${I('right')}</span></div></summary>
+    <div class="cinelist">${now.map(cineRow).join('')}</div>
+    ${soon.length ? `<details class="cinesoon"><summary>Coming soon (${soon.length})</summary>${soon.map(cineRow).join('')}</details>` : ''}
+    <div class="cinefoot"><a href="${esc(c.sessionsUrl || 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions')}" target="_blank" rel="noopener">All sessions on eventcinemas.co.nz ${I('ext')}</a><br><span class="muted">From Event Cinemas, updated ${esc(ago(Date.parse(c.at)))}. Times can change, so check before you go.</span></div></details>`;
+}
+// Events page: one cinema card, not a card per film per day
+(() => { const o = evList; evList = function () {
+  const c = cineData(); if (!c) return o.apply(this, arguments);
+  const u = upcomingEvents; let h = '';
+  if (evCat === 'Movies') return cineCard(evQuery, true) || `<div class="card empty"><div class="t">No films match</div></div>`;
+  upcomingEvents = () => u().filter(e => !isMovieEv(e));
+  try { h = o.apply(this, arguments); } finally { upcomingEvents = u; }
+  const cc = cineCard(evQuery); return cc ? cc + h.replace(/^<div class="card empty"><div class="t">No events match<\/div>.*$/s, '') : h;
+}; })();
+// Home "What's on": the films collapse into one row
+(() => { const o = homeEvents; homeEvents = function () {
+  const c = cineData(); if (!c) return o.apply(this, arguments);
+  const u = upcomingEvents; let h = '';
+  upcomingEvents = () => u().filter(e => !isMovieEv(e));
+  try { h = o.apply(this, arguments); } finally { upcomingEvents = u; }
+  const cc = cineCard(''); if (!cc) return h; const i = h.indexOf('<div class="list">');
+  return i >= 0 ? h.slice(0, i) + cc + h.slice(i) : h + cc;
+}; })();
+// ---- Notifications cards ----
+function lnEvAdd(id) {
+  const st = lnSt(); let it = null; st.notes.forEach(n => n.items.forEach(x => { if (x.k === 'ev' && x.id === id) it = x; }));
+  const e = evById(id) || it; if (!e) return;
+  const tix = /(eventfinda|ticketek|iticket|humanitix|eventbrite|ticketmaster|flicket|trybooking|tixx|moshtix|undertheradar|patronbase|ticketdirect)/i.test(e.url || '') ? e.url : '';
+  const days = [e.date < todayISO() ? todayISO() : e.date];
+  evAddSheet('lev|' + (it ? it.key : lnKey(e.title)), { ev: { name: String(e.title).slice(0, 80), days, time: e.time || '', end: e.endTime || '', times: [], place: String(e.venue || '').slice(0, 100), tix }, m: null });
+}
+function lnEvLine(it, mini) {
+  const e = evById(it.id) || it, key = 'lev|' + it.key, ad = evAdded(key) || evAppt(it.id), cl = e.time ? evClash(e.date, e.time, e.endTime) : evClash(e.date, '', '');
+  const when = (daysLeft(e.date) === 0 ? 'Today' : daysLeft(e.date) === 1 ? 'Tomorrow' : fmtW(e.date)) + (e.time ? ' · ' + fmtTime(e.time) : '');
+  const s = [esc(when), e.venue ? esc(String(e.venue).split(',').slice(0, 2).join(',')) : '', it.sub && it.ty === 'nightlife' ? esc(it.sub) : '', e.cost ? esc(e.cost) : ''].filter(Boolean).join(' · ');
+  const tix = it.ty !== 'markets' && /(eventfinda|ticketek|iticket|humanitix|eventbrite|ticketmaster|flicket|tixx|moshtix|undertheradar)/i.test(e.url || '');
+  const btns = `<div class="mbbtns">${ad ? `<button type="button" class="btn small" onclick="${cineStop}${ad.start ? `calOpenDay(${parseD(ad.start)})` : `go('#calendar')`}">${I('check')} In your calendar</button>` : `<button type="button" class="btn small primary" onclick="${cineStop}lnEvAdd(${jsArg(it.id)})">${I('cal')} Add to calendar</button>`}${e.url ? `<button type="button" class="btn small" onclick="${cineStop}window.open(${jsArg(e.url)},'_blank','noopener')">${tix ? I('ticket') + ' Get tickets' : 'Details ' + I('ext')}</button>` : ''}</div>`;
+  return { s: s + (cl ? `<br><span class="evclash">⚠️ ${esc(evClashTxt(cl))}</span>` : ''), btns };
+}
+function lnRows() {
+  const p = lnPref(), gone = nfDis(), st = lnSt(), ok = it => it.k === 'cin' ? p.cinema : p[it.ty] && (it.end || it.date) >= todayISO();
+  return st.notes.filter(n => Date.now() - n.at < LN_KEEP).slice().reverse().map(n => {
+    const k = 'ln-' + n.id; if (gone.includes(k)) return ''; const L = n.items.filter(ok); if (!L.length) return '';
+    if (L.length === 1) { const it = L[0];
+      if (it.k === 'cin') { const m = cineFind(it.id) || it; return `<div class="row glnew lnrow" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){cineAdd(${it.id})}">${cinePoster(m, 40)}<div class="tx"><div class="t">New at Event Cinemas: ${esc(m.title)} ${cineRate(m)}</div><div class="s">${m.soon ? 'Coming soon · ' : ''}${esc(cineWhen(m))}</div>${cineBtns(m)}</div></div>`; }
+      const x = lnEvLine(it), T = LN_T[it.ty];
+      return `<div class="row glnew lnrow" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){lnEvAdd(${jsArg(it.id)})}"><div class="ic">${T[0]}</div><div class="tx"><div class="t">${T[1]}: ${esc(it.title)}</div><div class="s">${x.s}</div>${x.btns}</div></div>`; }
+    const cin = L.every(i => i.k === 'cin');
+    const cnt = {}; L.forEach(i => { const t = i.k === 'cin' ? 'cinema' : i.ty; cnt[t] = (cnt[t] || 0) + 1; });
+    const title = cin ? `${L.length} new at Event Cinemas` : `${L.length} new local events`;
+    const sub = cin ? L.slice(0, 4).map(i => i.title).join(', ') + (L.length > 4 ? '…' : '') : Object.keys(cnt).map(t => cnt[t] + ' ' + ({ nightlife: 'nightlife', markets: cnt[t] > 1 ? 'markets' : 'market', council: 'council', cinema: 'film' + (cnt[t] > 1 ? 's' : '') })[t]).join(' · ');
+    return `<div class="row glnew lnrow" data-nk="${k}"><div class="ic">${cin ? '🎬' : '📣'}</div><div class="tx"><div class="t">${esc(title)}</div><div class="s">${esc(sub)}</div>
+      <details class="bankgrp lngrp" onclick="event.stopPropagation()"><summary>Show all ${L.length}</summary>${L.map(i => {
+        if (i.k === 'cin') { const m = cineFind(i.id) || i; return `<div class="bankli">${cinePoster(m, 30)}<div><div><b>${esc(m.title)}</b> ${cineRate(m)}</div><small>${esc(cineWhen(m))}</small>${cineBtns(m)}</div></div>`; }
+        const x = lnEvLine(i); return `<div class="bankli"><span>${LN_T[i.ty][0]}</span><div><div><b>${esc(i.title)}</b></div><small>${x.s}</small>${x.btns}</div></div>`; }).join('')}</details></div></div>`;
+  }).filter(Boolean);
+}
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const R = lnRows(); return R.length ? R.concat(L) : L; } catch (e) { return L; } }; })();
+(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^ln-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
+// Settings › Notifications: one switch per type
+async function lnSet(k) { const p = lnPref(); p[k] = !p[k]; await save(); render(); }
+function lnSettingsRows() {
+  const p = lnPref(), sw = (on, lab, call) => `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(lab)}" onclick="${call}"></button>`;
+  const R = [['cinema', '🎬 New at Event Cinemas', 'A film added to the Whangārei line-up, now showing or coming soon.'], ['nightlife', '🎶 New nightlife', 'Gigs, live music, comedy, DJ and quiz nights around Whangārei and Northland. Not ones during your shift.'], ['markets', '🧺 New markets', 'Growers’, night, craft and weekend markets.'], ['council', '🏛️ New council events', 'Whangārei District Council’s What’s On. No sport.']];
+  return R.map(([k, t, s], i) => `<div class="srow"${i ? '' : ' id="lnset"'}><div class="tx"><div class="t">${t}</div><div class="s">${s}</div></div>${sw(p[k], t.replace(/^\S+\s/, ''), `lnSet('${k}')`)}</div>`).join('');
+}
+(() => { const o = bfSettingsRows; bfSettingsRows = function () { let h = o.apply(this, arguments); try { h += lnSettingsRows(); } catch (e) { } return h; }; })();

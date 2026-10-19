@@ -29,7 +29,7 @@ export function parseCinema(html) {
   return out;
 }
 
-function movieEvents(items, today) {
+function movieEvents(items, today, ec = false) {
   const limit = addDays(today, 60), byDate = {};
   for (const m of items || []) { if (m.date >= today && m.date <= limit) (byDate[m.date] = byDate[m.date] || []).push(m); }
   const days = Object.keys(byDate).sort();
@@ -39,7 +39,7 @@ function movieEvents(items, today) {
   for (const d of days) for (const m of byDate[d]) {
     const times = [...new Set(m.times)].sort();
     add({
-      id: 'mov-' + slug(m.title) + '-' + d, title: m.title, url: CINEMA_HOME, date: d, end: '',
+      id: 'mov-' + slug(m.title) + '-' + d, title: m.title, url: m.url || CINEMA_HOME, date: d, end: '',
       time: times[0], endTime: times.length > 1 ? times[times.length - 1] : '', timeKnown: true,
       venue: 'Event Cinemas, 18 James Street',
       desc: 'Sessions this day: ' + times.map(niceTime).join(', ') + '. Times change, so check Event Cinemas before you go.',
@@ -47,7 +47,7 @@ function movieEvents(items, today) {
     });
   }
   // The schedule page lists every film for one day and only highlights the rest, so keep that day's films up for the week.
-  if (full && byDate[full].length >= 4) {
+  if (!ec && full && byDate[full].length >= 4) {
     for (let i = 1; i <= 6; i++) {
       const d = addDays(full, i); if (d > limit) break;
       for (const m of byDate[full]) add({
@@ -94,5 +94,5 @@ export function localEvents(movies, today) {
     desc: 'Sunday morning market. Check it’s on, and the time, before you go.',
     cats: ['Markets'], cost: ''
   }));
-  return [...movieEvents(movies && movies.items, today), ...dated, ...growers, ...tiki];
+  return [...movieEvents(movies && movies.items, today, !!(movies && movies.ec)), ...dated, ...growers, ...tiki];
 }
