@@ -5,6 +5,7 @@
    Connecting again needs that key, or tokens for the same Akahu user. Bank data is cached encrypted too.
    Akahu refreshes from the banks daily; we read it once a day (cron) and on 'Refresh' (at most once an hour). */
 const API = 'https://api.akahu.io/v1';
+import { bankPushRun, cleanBankPref, K_BPREF } from './bank-notify.js';
 const K_CRED = 'akahu-cred-v1', K_DATA = 'akahu-data-v1', K_RL = 'akahu-rl-v1', K_DIAG = 'akahu-diag-v1';
 const DAY = 864e5;
 
@@ -90,7 +91,10 @@ export async function rate(env, name, max, ttl) {
 }
 export async function getCred(env) { return open(env, await env.EVENTS_KV.get(K_CRED)); }
 async function authed(env, request) { const cred = await getCred(env); if (!cred) return { cred: null, ok: false }; const key = request.headers.get('X-Cash-Key') || ''; return { cred, ok: !!key && eq(await sha(key), cred.keyHash) }; }
-async function refetch(env, cred, fetchImpl) { const data = await fetchAll(cred, fetchImpl); await env.EVENTS_KV.put(K_DATA, await seal(env, data)); return data; }
+async function refetch(env, cred, fetchImpl) { let old = null; try { old = await open(env, await env.EVENTS_KV.get(K_DATA)); } catch (e) { }
+  const data = await fetchAll(cred, fetchImpl); await env.EVENTS_KV.put(K_DATA, await seal(env, data));
+  try { await bankPushRun(env, old, data, Date.now(), fetchImpl); } catch (e) { } // 2.27.9: push for new money in / out
+  return data; }
 const pubStatus = (cred, data) => ({ connected: true, name: cred.name || '', accounts: data ? data.accounts.length : cred.accounts || 0, at: data ? data.at : '', manualAt: cred.manualAt || '' });
 
 // returns [status, body]
@@ -132,6 +136,8 @@ export async function akahuRoute(path, request, env, fetchImpl = fetch) {
     if (!data) { try { data = await refetch(env, cred, fetchImpl); } catch (e) { return [e.code === 'akahu_rejected' ? 401 : 502, { error: e.code || 'akahu_error', step: e.step || '', status: e.status || 0, akahu: e.msg || '' }]; } }
     return [200, Object.assign(pubStatus(cred, data), { data })];
   }
+  if (path === '/cashflow/prefs' && request.method === 'POST') { // 2.27.9: bank push settings (no account numbers; Akahu account ids only)
+    const p = cleanBankPref(body); await env.EVENTS_KV.put(K_BPREF, JSON.stringify(p)); return [200, { ok: true, pref: p }]; }
   if (path === '/cashflow/refresh' && request.method === 'POST') {
     const last = Date.parse(cred.manualAt || '') || 0;
     if (Date.now() - last < 3600e3) return [429, { error: 'too_soon', next: new Date(last + 3600e3).toISOString() }];
@@ -151,6 +157,12 @@ export async function runAkahu(env, fetchImpl = fetch, now = Date.now()) {
   const age = data ? now - Date.parse(data.at) : Infinity;
   const hr = Number(new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', hourCycle: 'h23' }).format(new Date(now)));
   const pend = cred.pending && now - cred.pending > 8 * 60e3;
+  // 2.27.9: five light check-ins a day (9am, 12, 3pm, 6pm, 9pm NZ) so money in/out shows within a few hours: ask Akahu to
+  // refresh from the banks (it ignores this inside its 15-minute rest period), then read it ~10 minutes later (pending)
+  if (!cred.pending && [9, 12, 15, 18, 21].includes(hr) && age > 150 * 60e3 && now - (Date.parse(cred.autoAt || '') || 0) > 150 * 60e3) {
+    cred.autoAt = new Date(now).toISOString(); cred.pending = now; await env.EVENTS_KV.put(K_CRED, await seal(env, cred));
+    try { await akahu(cred, '/refresh', fetchImpl, 'POST'); } catch (e) { } return 'asked';
+  }
   if (!(pend || (age > 20 * 3600e3 && hr >= 6))) return 'fresh';
   if (pend) { delete cred.pending; await env.EVENTS_KV.put(K_CRED, await seal(env, cred)); }
   await refetch(env, cred, fetchImpl); return 'fetched';

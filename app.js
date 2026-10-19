@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.8';
+const APP_VERSION = '2.27.9';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23507,3 +23507,217 @@ function wageOverMig() { try { if (!S || !S.settings || S.settings.wageMig278) r
   (S.budgets || []).forEach(b => { if (b.pay > 0 && (!b.end || b.end >= T)) { b.payDropped = b.pay; b.pay = 0; n++; } });
   S.settings.wageMig278 = 1; save(); } catch (e) { } }
 (() => { const o = fnModel; fnModel = function () { wageOverMig(); return o.apply(this, arguments); }; })();
+
+/* ================= 2.27.9: APPOINTMENTS FROM EMAIL =================
+   Booking confirmations, reminders, reschedules and cancellations (doctor, dentist, chiro, physio, vet, optometrist,
+   hair, car service/WOF, bank/lawyer meetings; Cliniko, Vensa, ManageMyHealth, HealthLink, Timely, Fresha, SimplyBook…)
+   found in Outlook / Gmail (read-only, last 60 days). Only the provider, day, time and who it's with are kept: never
+   codes, logins, links to portals or anything else. No clear date = no card. Newest email for a provider wins; a
+   cancellation marks the card, a reschedule replaces the old time. Add to calendar reuses the Events-from-email sheet
+   (My App calendar, reminder the day before at 7pm, work clash warning). Already in a calendar = "In your calendar ✓". */
+const AP_DAYS = 60, AP_MAX_AGE = 2 * 3600e3;
+const AP_FROM = /cliniko|vensa|managemyhealth|healthlink|gettimely|timely|fresha|simplybook|setmore|halaxy|nookal|bookwell|mindbody|zandaHealth|indici|dental|dentist|chiro|physio|vet\b|vets|veterinar|optom|specsavers|medical|health|clinic|barber|hair|salon|aa\.co\.nz|vtnz|tyre|mechanic|auto|motors|lawyer|law\b|legal|bank|asb|anz|kiwibank|westpac/i;
+const AP_SUBJ = /\b(appointments?|booking|booked|reservation confirmed|your visit|consultation|reschedul\w*|cancel+ed|cancellation)\b/i;
+const AP_NOT = /\b(invoice|receipt|statement|newsletter|sale|% off|promo|deal|hasn'?t seen you|book online today|due for|is due|webinar|unsubscribe)\b/i;
+const AP_KIND = [[/dental|dentist|orthodont/i, '🦷', 'Dentist', true], [/chiro/i, '🦴', 'Chiropractor', true], [/physio/i, '🦴', 'Physio', true], [/optom|specsavers|eye/i, '👓', 'Optometrist', true],
+  [/\bvet|veterinar|animal/i, '🐾', 'Vet', false], [/barber|hair|salon/i, '💇', 'Haircut', false], [/\bwof\b|vtnz|tyre|mechanic|service centre|auto|motors|\baa\b/i, '🚗', 'Car', false],
+  [/lawyer|law\b|legal|solicitor/i, '⚖️', 'Lawyer', false], [/bank|asb|anz|kiwibank|westpac|mortgage/i, '🏦', 'Bank', false],
+  [/medical|health|doctor|\bgp\b|clinic|nurse|vensa|managemyhealth|healthlink|indici|family health/i, '🩺', 'Doctor', true]];
+const apKindOf = s => AP_KIND.find(k => k[0].test(s)) || [null, '📅', 'Appointment', false];
+// pure: subject + body text + sender → { prov, date, time, with, kind: 'confirm'|'resched'|'cancel' } or null
+function apParse(subject, text, from, fromName, recvISO) {
+  subject = mbClean(subject); const flat = mbClean(text), all = subject + ' ' + flat;
+  if (!/\bappointments?\b|\bbook(ing|ed)\b|\breservation\b|\bconsultation\b|\bvisit\b/i.test(all)) return null;
+  if (/\b(invoice|receipt|statement of account)\b/i.test(subject)) return null;
+  const recv = String(recvISO || new Date().toISOString()).slice(0, 10), r = new Date(recvISO || Date.now());
+  const kind = /\bcancel+ed\b|\bcancellation\b(?!\s+(policy|fee|notice))/i.test(subject) || /\b(has been|was|is now|been) cancel+ed\b/i.test(flat.slice(0, 300)) ? 'cancel' : /\brescheduled\b|\b(has been|was) (moved|changed)\b|\bnew (date|time)\b/i.test(subject + ' ' + flat.slice(0, 400)) ? 'resched' : 'confirm';
+  // dates: written ("Fri, 5 Jun 2026", "Tuesday 8 September") or NZ numeric ("Tuesday 08/09/26")
+  const C = [];
+  try { evDates(flat, recvISO).forEach(d => C.push({ iso: d.iso, at: d.at, wd: d.wd })); } catch (e) { }
+  const reN = /\b(?:(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+)?(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/gi; let m;
+  while ((m = reN.exec(flat))) { const y = m[4].length === 2 ? 2000 + +m[4] : +m[4], mo = +m[3], d = +m[2]; const dt = new Date(Date.UTC(y, mo - 1, d)); if (dt.getUTCMonth() !== mo - 1) continue;
+    const iso = `${y}-${evPad(mo)}-${evPad(d)}`; if (m[1] && EV_WD[dt.getUTCDay()] !== m[1].toLowerCase().slice(0, 3)) continue; C.push({ iso, at: m.index, wd: !!m[1] }); }
+  // the date that goes with the appointment: after "appointment … on", else the first on/after the day it was sent
+  const ok = C.filter(c => c.iso >= recv && c.iso <= addDays(recv, 400)).sort((a, b) => a.at - b.at); if (!ok.length) return null;
+  const anchor = flat.search(/\bappointments?\b|\bbook(ing|ed)\b|\bvisit\b/i), pick = ok.find(c => anchor >= 0 && c.at >= anchor - 120) || ok[0];
+  // time: "at 10:00am", "at 2:30PM", "3:15pm" near the date
+  const win = flat.slice(Math.max(0, pick.at - 40), pick.at + 160); let time = '';
+  const tm = win.match(/\b(\d{1,2})(?:[:.](\d{2}))\s*(am|pm)\b/i) || win.match(/\bat\s+(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/i) || win.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/i) || win.match(/\b(?:at\s+)?([01]?\d|2[0-3])[:.]([0-5]\d)\b(?!\s*\/)/);
+  if (tm) time = tm[3] ? evHm(tm[1], tm[2], tm[3]) : evPad(+tm[1]) + ':' + tm[2];
+  // who it's with
+  const wm = flat.match(/\bwith\s+((?:Dr\.?\s+)?[A-Z][a-z'’-]+(?:\s+(?:de|van|von|du|le|la)\s+[A-Z][a-z'’-]+|\s+[A-Z][a-z'’-]+){0,2})\b/);
+  let withWho = wm ? wm[1].replace(/\s+(is|on|at|for)$/i, '') : '';
+  if (/^(Us|You|Our|The|Your)\b/.test(withWho)) withWho = '';
+  // provider: "… for Tikipunga Dental Centre", "… - Tui Chiropractic", "at Tui Chiropractic", then the sender's name
+  const ORG = "((?:[A-Z][\\w'’&.-]*\\s+){0,4}(?:Dental(?: Centre| Clinic| Care)?|Dentists?|Chiropractic|Physio(?:therapy)?|Medical(?: Centre)?|Family Health|Health(?: Centre)?|Clinic|Veterinary(?: Clinic| Centre)?|Vets?|Optometrists?|Specsavers|Barbers?|Hair(?: Salon| Studio)?|Salon|VTNZ|Tyres?|Auto(?:motive)?|Motors|Law|Lawyers|Legal|Bank|ASB|ANZ|Kiwibank|Westpac))\\b";
+  const om = subject.match(new RegExp('\\b(?:for|from|at|-|–)\\s+' + ORG)) || flat.match(new RegExp('\\b(?:at|for|from|with)\\s+' + ORG)) || subject.match(new RegExp(ORG)) || flat.match(new RegExp(ORG));
+  let prov = om ? om[1].trim() : '';
+  if (!prov) { const nm = String(fromName || '').replace(/\b(no-?reply|noreply|notifications?|team|reception|admin|info)\b/gi, '').trim(); prov = nm && !/@/.test(nm) ? nm : String(from || '').split('@')[1] || ''; prov = prov.replace(/\.(co\.nz|com|nz|org)$/i, ''); }
+  if (!prov || /^(cliniko|vensa|timely|fresha|simplybook|gmail|outlook)$/i.test(prov)) return null;
+  const k = apKindOf(prov + ' ' + from + ' ' + subject);
+  return { prov: prov.slice(0, 60), date: pick.iso, time, with: withWho.slice(0, 40), kind, icon: k[1], type: k[2], health: !!k[3] };
+}
+let apBusy = false;
+const apSt = () => { try { const o = JSON.parse(localStorage.getItem('apMail') || '{}'); return o && typeof o === 'object' ? Object.assign({ at: 0, msgs: {} }, o) : { at: 0, msgs: {} }; } catch (e) { return { at: 0, msgs: {} }; } };
+const apSave = o => { try { const ks = Object.keys(o.msgs).sort((a, b) => String(o.msgs[b].at).localeCompare(String(o.msgs[a].at))).slice(0, 200); o.msgs = Object.fromEntries(ks.map(k => [k, o.msgs[k]])); localStorage.setItem('apMail', JSON.stringify(o)); } catch (e) { } };
+const apLikely = m => { const s = String(m.subject || ''), t = s + ' ' + String(m.text || '').slice(0, 400); if (AP_NOT.test(s) || (MB_MKT.test(m.from || '') && !AP_FROM.test(m.from || ''))) return false; return AP_SUBJ.test(s) || (AP_FROM.test(m.from || '') && /\bappointment|\bbooking|\bbooked/i.test(t)); };
+async function apScanOutlook(st) {
+  const G = 'https://graph.microsoft.com/v1.0/me/messages', sel = '&$select=id,subject,from,receivedDateTime,bodyPreview,webLink', since = new Date(Date.now() - AP_DAYS * DAY).toISOString(), out = [];
+  for (const q of ['"appointment" OR "appointments" OR "your booking" OR "booking confirmed" OR "booking confirmation"', '"rescheduled" OR "cancelled" OR "consultation" OR "your visit"']) {
+    try { const d = await mbAuthGet('microsoft', G + '?$search=' + encodeURIComponent('"' + q.replace(/"/g, '\\"') + '"') + '&$top=40' + sel); (d.value || []).filter(x => (x.receivedDateTime || '') >= since).forEach(x => { const m = mbOMsg(x, 'ap'); if (!out.some(o => o.id === m.id)) out.push(m); }); } catch (e) { } }
+  let n = 0;
+  for (const m of out) { const k = 'ms:' + m.id; if (st.msgs[k]) continue; if (!apLikely(m)) { st.msgs[k] = { at: m.at, ap: null }; continue; } if (n++ >= 12) break;
+    try { const b = await mbAuthGet('microsoft', G + '/' + encodeURIComponent(m.id) + '?$select=body'); const h = b && b.body && b.body.content || '', txt = /html/i.test((b && b.body && b.body.contentType) || 'html') ? emPlain(h) : h;
+      st.msgs[k] = { at: m.at, ap: apParse(m.subject, txt, m.from, m.name, m.at), m: emRefOf(m) }; } catch (e) { } }
+}
+async function apScanGmail(st) {
+  const B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages'; let n = 0;
+  let list = null; try { list = await mbAuthGet('google', B + '?maxResults=25&q=' + encodeURIComponent(`(appointment OR "your booking" OR "booking confirmed" OR rescheduled OR consultation) newer_than:${AP_DAYS}d -category:promotions`)); } catch (e) { return; }
+  for (const it of (list.messages || [])) { const k = 'g:' + it.id; if (st.msgs[k]) continue; if (n++ >= 12) break;
+    try { const g = await mbAuthGet('google', B + '/' + encodeURIComponent(it.id) + '?format=full'); const h = nm => (((g.payload && g.payload.headers) || []).find(x => x.name.toLowerCase() === nm) || {}).value || '';
+      const fr = h('from'), mm = fr.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>/), m = { src: 'g', id: it.id, q: 'ap', from: String(mm ? mm[2] : fr).toLowerCase().trim(), name: mbClean(mm ? mm[1] : ''), subject: mbClean(h('subject')).slice(0, 200), text: mbClean(g.snippet).slice(0, 600), at: new Date(Number(g.internalDate)).toISOString(), link: 'https://mail.google.com/mail/u/0/#all/' + it.id, att: false };
+      if (!apLikely(m) || /calendar-notification@google\.com/i.test(m.from)) { st.msgs[k] = { at: m.at, ap: null }; continue; }
+      let html = '', txt = ''; const dec = s => { const b = atob(String(s).replace(/-/g, '+').replace(/_/g, '/')); return new TextDecoder().decode(Uint8Array.from(b, c => c.charCodeAt(0))); };
+      const walk = p => { if (!p) return; if (p.body && p.body.data) { if (!html && p.mimeType === 'text/html') html = dec(p.body.data); if (!txt && p.mimeType === 'text/plain') txt = dec(p.body.data); } (p.parts || []).forEach(walk); }; walk(g.payload);
+      st.msgs[k] = { at: m.at, ap: apParse(m.subject, html ? emPlain(html) : txt, m.from, m.name, m.at), m: emRefOf(m) }; } catch (e) { } }
+}
+async function refreshAp(force) {
+  if (apBusy || !S || (!mailConnected('microsoft') && !mailConnected('google'))) return;
+  const st = apSt(); if (!force && st.at && Date.now() - st.at < AP_MAX_AGE) return;
+  apBusy = true; const before = JSON.stringify(apList().map(x => x.key + x.a.kind));
+  try { if (mailConnected('microsoft')) await apScanOutlook(st); if (mailConnected('google')) await apScanGmail(st); st.at = Date.now(); apSave(st); } finally { apBusy = false; }
+  if (before !== JSON.stringify(apList().map(x => x.key + x.a.kind))) { try { if (location.hash === '#alerts' && !sheetOpen) render(); else glBellRedraw(); } catch (e) { } }
+}
+(() => { const o = refreshMb; refreshMb = async function (force) { const r = await o.apply(this, arguments); try { await refreshAp(force); } catch (e) { } return r; }; })();
+const apProvKey = p => String(p || '').toLowerCase().replace(/\b(the|centre|center|clinic|ltd|limited|nz)\b/g, ' ').replace(/[^a-z0-9 ]/g, '').trim().split(/\s+/).slice(0, 3).join(' ');
+// one per provider + day, newest email wins; a newer reschedule for the same provider replaces the old day
+function apList(all) {
+  const st = apSt(), rows = Object.entries(st.msgs).filter(([, v]) => v && v.ap && v.m).map(([k, v]) => ({ k, a: v.ap, m: v.m, at: v.at })).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  const by = new Map(), res = new Map();
+  rows.forEach(x => { const pk = apProvKey(x.a.prov), key = 'ap|' + pk + '|' + x.a.date;
+    if (x.a.kind === 'resched' && !res.has(pk)) res.set(pk, { at: x.at, date: x.a.date });
+    if (!by.has(key)) by.set(key, Object.assign({ key }, x)); });
+  const T = todayISO();
+  return [...by.values()].filter(x => { const r = res.get(apProvKey(x.a.prov)); return !(r && r.date !== x.a.date && String(r.at) > String(x.at)); })
+    .filter(x => all || x.a.date >= T).sort((a, b) => (a.a.date + a.a.time).localeCompare(b.a.date + b.a.time));
+}
+// already in a calendar? My events / appointments / Google & Outlook calendars, same day and same time or the provider in the title
+function apInCal(x) {
+  try { const a = x.a, ad = evAdded(x.key); if (ad) return { start: ad.start };
+    const toks = cfToks(a.prov + ' ' + (a.with || '') + ' ' + a.type).concat(a.type === 'Dentist' ? ['dentist', 'dental'] : a.type === 'Chiropractor' ? ['chiro', 'chiropractor'] : []);
+    const hit = (title, time) => { const t = String(title || '').toLowerCase(); return (a.time && time && String(time).slice(0, 5) === a.time) || toks.some(w => t.includes(w)) || /appointment|appt/.test(t) && (!a.time || !time); };
+    if ((S.myEvents || []).some(e => e && e.start === a.date && hit(e.title, e.time))) return { start: a.date };
+    if ((S.appts || []).some(e => e && e.date === a.date && hit(e.title, e.time))) return { start: a.date };
+    const t0 = parseD(a.date); if ((extEvents(t0, t0) || []).some(e => e.date === a.date && hit(e.title, e.sort))) return { start: a.date };
+  } catch (e) { } return null;
+}
+let AP_REG = {};
+function apEv(x) { const a = x.a; return { name: a.type === 'Appointment' ? a.prov : `${a.type}${a.with ? ' – ' + a.with : ''}`, days: [a.date], time: a.time, end: a.time ? (() => { const mm = hmMin(a.time) + 60; return evPad(Math.floor(mm / 60) % 24) + ':' + evPad(mm % 60); })() : '', times: [], place: a.prov, tix: '' }; }
+function apAdd(k) { const x = AP_REG[k] || apList().find(y => y.key === k); if (!x) return; evAddSheet(k, { ev: apEv(x), m: x.m }); }
+function apCardHtml(x) {
+  const a = x.a, k = x.key, inc = apInCal(x), cancel = a.kind === 'cancel'; AP_REG[k] = x;
+  const r = x.m, emk = r ? emKey(r) : ''; if (r) EM_REG[emk] = r;
+  const st = 'event.stopPropagation();event.preventDefault();if(window.glSwipe&&glSwipe.moved)return;';
+  const cl = !cancel && evClash(a.date, a.time, apEv(x).end);
+  const when = fmtW(a.date) + (a.time ? ' · ' + fmtTime(a.time) : '');
+  const btns = `<div class="mbbtns evbtns">${cancel ? '' : inc ? `<button type="button" class="btn small" onclick="${st}calOpenDay(${parseD(inc.start)})">${I('check')} In your calendar ✓</button>` : `<button type="button" class="btn small primary" onclick="${st}apAdd('${esc(k)}')">${I('cal')} Add to calendar</button>`}${emk ? `<button type="button" class="btn small embtn" onclick="${st}emView('${esc(emk)}')">View email</button>` : ''}${a.health && !cancel ? `<button type="button" class="btn small" onclick="${st}go('#claims')">UniMed claim</button>` : ''}</div>`;
+  const sub = [cancel ? '<b>Cancelled</b>' : a.kind === 'resched' ? 'Rescheduled' : 'Appointment from email', esc(when), esc(a.prov)].join(' · ') + (cl ? `<br><span class="evclash">⚠️ ${esc(evClashTxt(cl))}</span>` : '');
+  const title = (cancel ? '<s>' : '') + esc(a.type === 'Appointment' ? a.prov : a.type + (a.with ? ' with ' + a.with : '')) + (cancel ? '</s>' : '');
+  return `<div class="row glnew mbrow evrow aprow" data-mb="${esc(k + '|' + a.kind)}" data-date="${a.date}" role="button" tabindex="0" onclick="if(window.glSwipe&&glSwipe.moved)return;${cancel ? '' : inc ? `calOpenDay(${parseD(inc.start)})` : `apAdd('${esc(k)}')`}"><div class="ic">${a.icon}</div><div class="tx"><div class="t">${title}</div><div class="s">${sub}</div>${btns}</div></div>`;
+}
+(() => { const o = mbItems; mbItems = function () { const out = o(), gone = new Set(mbDis());
+  try { apList().forEach(x => { if (gone.has(x.key + '|' + x.a.kind)) return; const d = daysLeft(x.a.date); if (x.a.kind === 'cancel' && mbAge(x.at) > 3) return;
+    out.push({ sec: 'ap', key: x.key + '|' + x.a.kind, urgent: false, coming: d <= 14, badge: mbToday(x.at), at: x.at, html: apCardHtml(x) }); }); } catch (e) { }
+  return out; }; })();
+MB_SECS.unshift(['ap', 'Appointments from email']);
+// the day before (from noon) and the morning of: one "Upcoming appointments" card (email ones and ones in his calendar)
+function apUpRows() {
+  const now = new Date(), T = todayISO(), tm = addDays(T, 1), h = now.getHours(), L = [];
+  try { apList().filter(x => x.a.kind !== 'cancel').forEach(x => { if (x.a.date === T && h < 18 || x.a.date === tm && h >= 12) L.push({ d: x.a.date, t: x.a.time, n: (x.a.type === 'Appointment' ? x.a.prov : x.a.type + (x.a.with ? ' with ' + x.a.with : '')) + (x.a.type !== 'Appointment' ? ' · ' + x.a.prov : '') }); }); } catch (e) { }
+  try { (S.appts || []).forEach(a => { if (a && (a.date === T && h < 18 || a.date === tm && h >= 12) && !L.some(y => y.d === a.date && y.t === (a.time || ''))) L.push({ d: a.date, t: a.time || '', n: a.title }); }); } catch (e) { }
+  if (!L.length) return [];
+  const k = 'apup-' + L.map(x => x.d + x.t).join('_'); if (nfDis().includes(k)) return [];
+  L.sort((a, b) => (a.d + a.t).localeCompare(b.d + b.t));
+  return [`<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){calOpenDay(${parseD(L[0].d)})}"><div class="ic">📅</div><div class="tx"><div class="t">Upcoming ${L.length > 1 ? 'appointments' : 'appointment'}</div><div class="s">${L.map(x => `${x.d === T ? 'Today' : 'Tomorrow'}${x.t ? ' ' + esc(fmtTime(x.t)) : ''}: ${esc(x.n)}`).join('<br>')}</div></div></div>`];
+}
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const U = apUpRows(); return U.length ? U.concat(L) : L; } catch (e) { return L; } }; })();
+
+/* ================= 2.27.9: MONEY IN / OUT ON NOTIFICATIONS =================
+   New transactions in any linked account (from the relay's masked Akahu summaries: account id, amount, date, payee
+   text) become cards on Notifications, into Just in. Friendly account names, what it is when known (Your pay landed,
+   Sarah's pay landed, Board, Kora paid, Mortgage paid, a bill paid) and the Not bills category. Own transfers are one
+   Transfer card. More than 5 new in one sync = one summary card with the list folded away. Never account numbers or
+   tokens: payee text has long number runs taken out. First run (and a newly linked account) only learns what's there.
+   Phone pushes are sent by the relay (money in, and out over the threshold, none 10pm–8am). */
+const BK_KEEP = 7 * 864e5;
+const bkSt = () => { try { const o = JSON.parse(localStorage.getItem('bankNotif') || '{}'); return Object.assign({ seeded: false, seen: [], accts: [], notes: [] }, o && typeof o === 'object' ? o : {}); } catch (e) { return { seeded: false, seen: [], accts: [], notes: [] }; } };
+const bkSave = o => { try { o.seen = o.seen.slice(-4000); o.notes = o.notes.filter(n => Date.now() - n.at < BK_KEEP).slice(-80); localStorage.setItem('bankNotif', JSON.stringify(o)); } catch (e) { } };
+function bkPref() { S.settings = S.settings || {}; const p = S.settings.bankN && typeof S.settings.bankN === 'object' ? S.settings.bankN : (S.settings.bankN = {});
+  if (p.cards == null) p.cards = true; if (p.push == null) p.push = true; if (p.inPush == null) p.inPush = true; if (!Number.isFinite(+p.outOver)) p.outOver = 100; if (!Array.isArray(p.off)) p.off = []; return p; }
+const bkAcctName = a => !a ? 'Bank' : a.type === 'CREDITCARD' ? (a.bank || 'ASB') + ' credit card' : cfIsOrbit(a) ? 'ORBIT' : cfAName(a);
+const bkMask = s => String(s || '').replace(/[*#]+/g, ' ').replace(/\b\d[\d\s-]{2,}\d\b/g, '').replace(/\b\d{3,}\b/g, '').replace(/\s+/g, ' ').trim();
+const bkPayee = t => { let p = ''; try { p = nbTitle(bkMask(nbPayee(t))); } catch (e) { p = nbTitle(bkMask(t.merchant || t.desc)); } return p.slice(0, 40); };
+function bkSnap(t, D) { const a = (D.accounts || []).find(x => x.id === t.acct); return { id: t.id, acct: t.acct, an: bkAcctName(a), card: !!(a && a.type === 'CREDITCARD'), amt: r2(+t.amount || 0), d: String(t.date || '').slice(0, 10), p: bkPayee(t), c2: t.cat2 || '', cat: t.cat || '', desc: bkMask(t.desc).slice(0, 80), merchant: bkMask(t.merchant).slice(0, 60) }; }
+function bankDetect(D) {
+  if (!D || !Array.isArray(D.transactions)) return 0;
+  const st = bkSt(), seen = new Set(st.seen), known = new Set(st.accts), txs = D.transactions.filter(t => t && t.id);
+  if (!st.seeded) { st.seen = txs.map(t => t.id); st.accts = (D.accounts || []).map(a => a.id); st.seeded = true; bkSave(st); return 0; }
+  (D.accounts || []).forEach(a => { if (!known.has(a.id)) { txs.filter(t => t.acct === a.id).forEach(t => seen.add(t.id)); known.add(a.id); } }); // newly linked: no history flood
+  const cut = addDays(todayISO(), -10), fresh = txs.filter(t => !seen.has(t.id) && String(t.date).slice(0, 10) >= cut);
+  txs.forEach(t => seen.add(t.id)); st.seen = [...seen]; st.accts = [...known];
+  if (!fresh.length) { bkSave(st); return 0; }
+  // own transfers: the two legs make one item
+  const byId = new Map(txs.map(t => [t.id, t])), used = new Set(), items = [];
+  fresh.sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(t => { if (used.has(t.id)) return; used.add(t.id);
+    if (t.cat2 === 'transfer' && t.pair && byId.has(t.pair)) { const o = byId.get(t.pair); used.add(o.id); const out = t.amount < 0 ? t : o, inn = t.amount < 0 ? o : t;
+      items.push({ k: 'xfer', id: t.id, amt: r2(Math.abs(t.amount)), d: String(t.date).slice(0, 10), from: bkSnap(out, D), to: bkSnap(inn, D) }); }
+    else items.push({ k: t.amount > 0 ? 'in' : 'out', id: t.id, amt: r2(Math.abs(t.amount)), d: String(t.date).slice(0, 10), t: bkSnap(t, D) }); });
+  const at = Date.now();
+  if (items.length > 5) st.notes.push({ id: 'g' + at.toString(36), at, items });
+  else items.forEach(it => st.notes.push({ id: it.id, at, items: [it] }));
+  bkSave(st); try { glBellRedraw(); } catch (e) { } return items.length;
+}
+(() => { const o = cfLoad; cfLoad = async function () { const r = await o.apply(this, arguments); try { if (CF && CF.data && !CFmock) bankDetect(CF.data); } catch (e) { } return r; }; })();
+// what it is, when we know: pays, board, bills (by the payments a bill took), mortgage, card payment
+function bkLabel(it) {
+  const t = it.t; if (!t) return '';
+  const tx = Object.assign({}, t, { amount: it.k === 'in' ? it.amt : -it.amt, desc: t.desc, merchant: t.merchant, date: t.d });
+  try { if (it.k === 'in') { if (mywIs(tx)) return 'Your pay landed'; if (swIs(tx)) return 'Sarah’s pay landed'; for (const k of IR_KEYS) if (irIs(k, tx)) return IR_DEF[k].name + ' landed'; return ''; } } catch (e) { }
+  try { const b = (S.bills || []).find(b => (Array.isArray(b && b.paidDues) ? b.paidDues : []).some(p => p && (p.tx === t.id || (Array.isArray(p.txs) && p.txs.includes(t.id))))); if (b) return (KORA_BILL_RE.test(b.name) ? 'Kora' : b.name) + ' paid'; } catch (e) { }
+  if (KORA_BILL_RE.test(t.desc + ' ' + t.merchant)) return 'Kora paid';
+  if (t.c2 === 'mortgage' || /\bmortgage\b|home ?loan/i.test(t.desc)) return 'Mortgage paid';
+  return '';
+}
+function bkCat(it) { try { if (it.k !== 'out' || !it.t) return ''; const k = nbCatOf({ id: it.t.id, desc: it.t.desc, merchant: it.t.merchant, cat: it.t.cat, amount: -it.amt }); return k && k !== 'other' ? nbChip(k) : ''; } catch (e) { return ''; } }
+function bkLine(it) {
+  if (it.k === 'xfer') return { ic: '🔁', t: `${money(it.amt)} transfer`, s: `${esc(it.from.an)} → ${esc(it.to.an)}${it.to.card ? ' · ASB credit card payment' : ''}` };
+  const t = it.t, lab = bkLabel(it), cat = bkCat(it);
+  return { ic: it.k === 'in' ? '⬇️' : '⬆️', t: `${money(it.amt)} ${it.k} · ${esc(t.an)}${t.p ? ' · ' + (it.k === 'in' ? 'from ' : '') + esc(t.p) : ''}`, s: [lab ? `<b>${esc(lab)}</b>` : '', cat].filter(Boolean).join(' ') };
+}
+function bankRows() {
+  const p = bkPref(); if (!p.cards) return [];
+  const gone = nfDis(), off = new Set(p.off), st = bkSt();
+  const keep = it => it.k === 'xfer' ? !(off.has(it.from.acct) && off.has(it.to.acct)) : !off.has(it.t.acct);
+  return st.notes.filter(n => Date.now() - n.at < BK_KEEP).slice().reverse().map(n => { const k = 'bank-' + n.id; if (gone.includes(k)) return ''; const L = n.items.filter(keep); if (!L.length) return '';
+    const when = (() => { const d = new Date(n.at); return (todayISO() === isoOf(d) ? 'Today' : fmtW(isoOf(d))) + ' ' + d.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase(); })();
+    if (L.length === 1) { const x = bkLine(L[0]); return `<div class="row glnew bankrow" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#cashflow')}"><div class="ic">${x.ic}</div><div class="tx"><div class="t">${x.t}</div><div class="s">${x.s ? x.s + ' · ' : ''}${esc(fmtW(L[0].d))} · seen ${esc(when)}</div></div></div>`; }
+    const tin = L.filter(i => i.k === 'in').reduce((a, i) => a + i.amt, 0), tout = L.filter(i => i.k === 'out').reduce((a, i) => a + i.amt, 0), nx = L.filter(i => i.k === 'xfer').length;
+    return `<div class="row glnew bankrow" data-nk="${k}"><div class="ic">💳</div><div class="tx"><div class="t">${L.length} new bank transactions</div><div class="s">${[tin ? money(tin) + ' in' : '', tout ? money(tout) + ' out' : '', nx ? plural(nx, 'transfer') : ''].filter(Boolean).join(' · ')} · seen ${esc(when)}</div>
+      <details class="bankgrp" onclick="event.stopPropagation()"><summary>Show all ${L.length}</summary>${L.map(i => { const x = bkLine(i); return `<div class="bankli"><span>${x.ic}</span><div><div>${x.t}</div>${x.s ? `<small>${x.s}</small>` : ''}</div></div>`; }).join('')}</details></div></div>`; }).filter(Boolean);
+}
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = bankRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
+(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^(bank|apup)-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
+// Settings › Notifications page
+async function bkSet(k, v) { const p = bkPref(); if (k === 'off') { p.off = p.off.includes(v) ? p.off.filter(x => x !== v) : p.off.concat(v); } else if (k === 'outOver') p.outOver = v === '' ? null : Math.max(0, Math.round(+v || 0)); else p[k] = !p[k];
+  await save(); render(); bkPrefsSync(); }
+async function bkPrefsSync() { try { if (!cfKey()) return; const p = bkPref(); await cfApi('/cashflow/prefs', 'POST', { on: p.cards && p.push, inPush: p.inPush, outOver: p.outOver == null ? null : p.outOver, off: p.off }); } catch (e) { } }
+function bkSettingsRows() {
+  const p = bkPref(), sw = (on, lab, call) => `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="${esc(lab)}" onclick="${call}"></button>`;
+  const A = (() => { try { return (CF && CF.data && CF.data.accounts) || []; } catch (e) { return []; } })();
+  return `<div class="srow" id="bankset"><div class="tx"><div class="t">💳 Money in and out</div><div class="s">A card when money goes in or out of your linked bank accounts (checked a few times a day). Own transfers show once. More than 5 at once = one card.</div></div>${sw(p.cards, 'Money in and out cards', "bkSet('cards')")}</div>` +
+    (p.cards ? `<div class="srow"><div class="tx"><div class="t">Phone notifications</div><div class="s">None 10pm–8am.</div></div>${sw(p.push, 'Bank phone notifications', "bkSet('push')")}</div>` +
+    (p.push ? `<div class="srow"><div class="tx"><div class="t">For money in</div></div>${sw(p.inPush, 'Push for money in', "bkSet('inPush')")}</div>
+      <div class="srow"><div class="tx"><div class="t">For money out over</div><div class="s">Blank = never for money out.</div></div><div class="moneyin" style="max-width:110px"><span>$</span><input style="width:72px" inputmode="decimal" aria-label="Push for money out over" value="${p.outOver == null ? '' : p.outOver}" onchange="bkSet('outOver', this.value)"></div></div>` : '') +
+    A.map(a => `<div class="srow"><div class="tx"><div class="t">${esc(bkAcctName(a))}</div><div class="s">${esc(a.type === 'CREDITCARD' ? 'Credit card' : a.type === 'LOAN' ? 'Loan' : a.type === 'SAVINGS' ? 'Savings' : 'Account')}</div></div>${sw(!p.off.includes(a.id), bkAcctName(a), `bkSet('off', ${jsArg(a.id)})`)}</div>`).join('') : '');
+}
+(() => { const o = bfSettingsRows; bfSettingsRows = function () { let h = o.apply(this, arguments); try { h += bkSettingsRows(); } catch (e) { } return h; }; })();
