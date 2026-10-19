@@ -51,11 +51,48 @@ function stageName(v) {
   if (/awake|out_of_bed|out of bed/.test(s)) return 'awake'; if (/sleep/.test(s)) return 'asleep';
   return '';
 }
-function blank() { return { v: 1, days: {}, sess: {}, hrB: {}, stB: {}, lastAt: '', lastTypes: [], posts: 0 }; }
+function blank() { return { v: 2, days: {}, sess: {}, hrB: {}, stB: {}, stR: {}, org: [], lastAt: '', lastTypes: [], posts: 0 }; }
+/* 2.27.11: steps were too high (15,516 in My App vs 10,098 on the watch). Health Connect holds steps from more than one app
+   (Health Sync writing the Huawei watch's steps, plus the phone's own step counter), and raw records were added together
+   whatever app wrote them. Now raw records are kept per app (data_origin) and per interval (a resend or edit replaces),
+   split at NZ midnight, and the day uses ONE app: Health Sync / Huawei when it's there (matches the Huawei Health total),
+   otherwise the highest app in each hour (never a sum of apps). Daily totals (HC Webhook 'Daily' resolution) are Health
+   Connect's own de-duplicated total and replace the day. Sleep and heart rate also prefer Health Sync / Huawei. */
+const KEEP_RAW = 8;
+const PREF_RE = /healthsync|huawei|hihealth/i;
+const NZ_OFF = iso => { for (const h of [13, 12]) { const c = Date.parse(iso + 'T00:00:00Z') - h * 3600e3, z = nz(c); if (z.date === iso && z.min === 0) return c; } return Date.parse(iso + 'T00:00:00Z') - 13 * 3600e3; };
+export const nzStart = NZ_OFF;
+function orgIdx(D, pkg) { pkg = String(pkg || '').replace(/[^\w.:-]/g, '').slice(0, 80); if (!pkg) return -1; D.org = D.org || []; let i = D.org.indexOf(pkg); if (i < 0) { if (D.org.length >= 30) return -1; D.org.push(pkg); i = D.org.length - 1; } return i; }
+const originOf = r => r && r.metadata && typeof r.metadata.data_origin === 'string' ? r.metadata.data_origin : '';
+// split [s,e) at NZ midnights -> [[date, s, e], ...]
+function nzPieces(s, e) {
+  const out = []; let a = s;
+  for (let i = 0; i < 10 && a < e; i++) { const d = nz(a).date, nx = NZ_OFF(addDays(d, 1)); const b = Math.min(e, nx); out.push([d, a, b]); a = b; }
+  return out.length ? out : [[nz(s).date, s, e]];
+}
+// one app per day: Health Sync / Huawei if present, else the highest app in each hour
+export function stepPick(D, k) {
+  const R = D.stR && D.stR[k]; if (!R || !R.full || !R.r) return null;
+  const tot = {}, hours = {};
+  for (const [key, c] of Object.entries(R.r)) { const [oi, s] = key.split(':'); tot[oi] = (tot[oi] || 0) + c; const h = Math.floor(Number(s) / 3600); (hours[h] = hours[h] || {})[oi] = (hours[h][oi] || 0) + c; }
+  const ois = Object.keys(tot); if (!ois.length) return null;
+  const name = oi => (D.org || [])[oi] || 'unknown', by = {}; ois.forEach(oi => by[name(oi)] = tot[oi]);
+  const pref = ois.filter(oi => PREF_RE.test(name(oi)) && tot[oi] > 0).sort((a, b) => tot[b] - tot[a]);
+  if (pref.length) return { steps: tot[pref[0]], how: 'origin', used: name(pref[0]), by };
+  if (ois.length === 1) return { steps: tot[ois[0]], how: 'origin', used: name(ois[0]), by };
+  let n = 0; Object.values(hours).forEach(H => { n += Math.max(...Object.values(H)); });
+  return { steps: n, how: 'max', used: '', by };
+}
+// sleep: the same night from two apps counts once (Health Sync / Huawei first, else the longer one)
+function sleepDedupe(list, D) {
+  const L = Object.values(list || {}).filter(x => x && x.m > 0).sort((a, b) => (PREF_RE.test((D.org || [])[b.o] || '') - PREF_RE.test((D.org || [])[a.o] || '')) || b.m - a.m), keep = [];
+  for (const x of L) { if (keep.some(y => Math.min(x.e, y.e) - Math.max(x.s, y.s) > 0.5 * Math.min(x.e - x.s, y.e - y.s))) continue; keep.push(x); }
+  return keep;
+}
 const day = (D, k) => D.days[k] || (D.days[k] = {});
 
-function sleepSummary(list) {
-  const L = Object.values(list || {}).filter(x => x && x.m > 0); if (!L.length) return null;
+function sleepSummary(list, D) {
+  const L = D ? sleepDedupe(list, D) : Object.values(list || {}).filter(x => x && x.m > 0); if (!L.length) return null;
   const main = L.reduce((a, b) => b.m > a.m ? b : a);
   const asleep = x => x.st ? (x.st.light || 0) + (x.st.deep || 0) + (x.st.rem || 0) + (x.st.asleep || 0) || x.m - (x.st.awake || 0) : x.m;
   const out = { start: new Date(main.s).toISOString(), end: new Date(main.e).toISOString(), bed: main.m, mins: asleep(main), total: L.reduce((n, x) => n + asleep(x), 0), parts: L.length };
@@ -81,21 +118,49 @@ export function applyPayload(D, p, now = Date.now()) {
   const seen = new Set(), touchedHr = new Set(), touchedSl = new Set(), touchedSt = new Set();
   const idOf = r => String((r && r.metadata && r.metadata.id) || (r && r.uuid) || '').slice(0, 80);
   // steps: daily totals (the default 'Daily' resolution) replace; short buckets are summed by their start time
-  (Array.isArray(p.steps) ? p.steps : []).slice(0, 5000).forEach(r => {
+  D.stR = D.stR || {}; D.org = D.org || [];
+  if (!(D.v >= 2)) { // first run of 2.27.11: recent days were added up across apps; they're rebuilt when the phone resends them
+    const td = nz(now).date; for (let i = 0; i < KEEP_RAW; i++) { const k = addDays(td, -i); if (D.days[k] && D.days[k].steps != null && !D.days[k].stepsFull) D.stR[k] = { since: now, full: false, r: {} }; }
+    D.v = 2;
+  }
+  const rawFirst = {}, rawN = {};
+  (Array.isArray(p.steps) ? p.steps : []).slice(0, 20000).forEach(r => {
     const s = t(r.start_time), e = t(r.end_time), c = int(r.count); if (!Number.isFinite(s) || !(c >= 0) || c > 200000) return;
+    const oi = orgIdx(D, originOf(r));
+    if (oi >= 0) { // raw record (Full resolution): kept per app and interval, split at NZ midnight
+      seen.add('steps'); const P = nzPieces(s, Number.isFinite(e) && e > s ? e : s), len = Math.max(1, (Number.isFinite(e) && e > s ? e : s) - s); let left = c;
+      P.forEach(([k, a, b], i) => {
+        if (k < addDays(nz(now).date, -(KEEP_RAW - 1)) || k > nz(now).date) return; // older days stay as they were
+        const n = i === P.length - 1 ? left : Math.round(c * (b - a) / len); left -= n;
+        let R = D.stR[k];
+        if (!R) { const had = D.days[k] && D.days[k].steps != null && !D.days[k].stepsFull; R = D.stR[k] = { since: now, full: !had, r: {} }; }
+        R.r[oi + ':' + Math.round(a / 1000) + ':' + Math.round((b - a) / 1000)] = n;
+        rawFirst[k] = Math.min(rawFirst[k] == null ? Infinity : rawFirst[k], a); rawN[k] = (rawN[k] || 0) + 1; touchedSt.add(k);
+        day(D, k).stepsAt = new Date(now).toISOString();
+      });
+      return;
+    }
     seen.add('steps'); const z = nz(s), d = day(D, z.date);
     if (Number.isFinite(e) && e - s >= 3 * 3600e3) {
-      if (z.min === 0) { d.steps = c; d.stepsFull = 1; } else if (!d.stepsFull) d.steps = Math.max(d.steps || 0, c);
+      if (z.min === 0) { d.steps = c; d.stepsFull = 1; touchedSt.add(z.date); } else if (!d.stepsFull) d.steps = Math.max(d.steps || 0, c);
     } else {
-      const B = D.stB[z.date] || (D.stB[z.date] = {}); B[String(s) + (r.uuid ? '|' + idOf(r).slice(0, 12) : '')] = c; touchedSt.add(z.date);
+      const B = D.stB[z.date] || (D.stB[z.date] = {}); B[String(s)] = c; touchedSt.add(z.date); // N-minute buckets: a resent bucket replaces (HC Webhook adds up all apps inside a bucket)
     }
     d.stepsAt = new Date(now).toISOString();
   });
   (Array.isArray(p.daily_totals) ? p.daily_totals : []).slice(0, 400).forEach(r => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')) || !(int(r.steps) >= 0)) return;
-    seen.add('steps'); const d = day(D, r.date); d.steps = int(r.steps); d.stepsFull = 1; d.stepsAt = new Date(now).toISOString();
+    seen.add('steps'); const d = day(D, r.date); d.steps = int(r.steps); d.stepsFull = 1; d.stSrc = { how: 'daily' }; d.stepsAt = new Date(now).toISOString();
   });
-  touchedSt.forEach(k => { const d = day(D, k); if (!d.stepsFull) d.steps = Object.values(D.stB[k]).reduce((a, b) => a + b, 0); });
+  // a resend of the whole day (manual sync with a time range) completes a day that was being rebuilt
+  Object.keys(rawFirst).forEach(k => { const R = D.stR[k]; if (R && !R.full && rawN[k] >= 10 && rawFirst[k] < R.since - 4 * 3600e3) { R.full = true; } });
+  touchedSt.forEach(k => {
+    const d = day(D, k), pk = stepPick(D, k), R = D.stR[k];
+    if (pk) { d.steps = pk.steps; d.stSrc = { how: pk.how, used: pk.used, by: pk.by }; return; }
+    if (d.stepsFull) { d.stSrc = { how: 'daily' }; return; }
+    if (R && !R.full && Object.keys(R.r).length) { const by = {}; Object.entries(R.r).forEach(([key, c]) => { const nm = D.org[key.split(':')[0]] || 'unknown'; by[nm] = (by[nm] || 0) + c; }); d.stSrc = { how: 'rebuild', by }; return; }
+    if (D.stB[k]) { d.steps = Object.values(D.stB[k]).reduce((a, b) => a + b, 0); d.stSrc = { how: 'buckets' }; }
+  });
   // sleep sessions: kept by record id for two weeks so a resend replaces; filed under the morning they ended
   (Array.isArray(p.sleep) ? p.sleep : []).slice(0, 200).forEach(r => {
     const e = t(r.session_end_time || r.end_time), dur = int(r.duration_seconds);
@@ -108,21 +173,25 @@ export function applyPayload(D, p, now = Date.now()) {
       Object.keys(st).forEach(n => st[n] = Math.round(st[n])); if (!Object.keys(st).length) st = null;
     }
     Object.keys(D.sess).forEach(dk => { if (D.sess[dk][id] && dk !== k) { delete D.sess[dk][id]; touchedSl.add(dk); } });
-    (D.sess[k] || (D.sess[k] = {}))[id] = { s, e, m: Math.round((e - s) / 60000), st }; touchedSl.add(k);
+    (D.sess[k] || (D.sess[k] = {}))[id] = { s, e, m: Math.round((e - s) / 60000), st, o: orgIdx(D, originOf(r)) }; touchedSl.add(k);
   });
   (Array.isArray(p.deleted) ? p.deleted : []).forEach(x => { if (!x || !/sleep/i.test(String(x.type || ''))) return; Object.keys(D.sess).forEach(dk => { if (D.sess[dk][x.id]) { delete D.sess[dk][x.id]; touchedSl.add(dk); } }); });
-  touchedSl.forEach(k => { const sm = sleepSummary(D.sess[k]); if (sm) day(D, k).sleep = sm; else if (D.days[k]) delete D.days[k].sleep; });
+  touchedSl.forEach(k => { const sm = sleepSummary(D.sess[k], D); if (sm) day(D, k).sleep = sm; else if (D.days[k]) delete D.days[k].sleep; });
   // heart rate: minute buckets (avg, min, max) for a few days, rolled up per day
   (Array.isArray(p.heart_rate) ? p.heart_rate : []).slice(0, 30000).forEach(r => {
     const ms = t(r.time), a = Number(r.avg != null ? r.avg : r.bpm); if (!Number.isFinite(ms) || !(a >= 25 && a <= 240)) return;
     const lo = Number.isFinite(Number(r.min)) ? Number(r.min) : a, hi = Number.isFinite(Number(r.max)) ? Number(r.max) : a;
     seen.add('heart_rate'); const k = nz(ms).date, B = D.hrB[k] || (D.hrB[k] = {});
-    B[Math.floor(ms / 60000)] = [Math.round(a * 10) / 10, Math.round(lo), Math.round(hi)]; touchedHr.add(k);
+    const oi = orgIdx(D, originOf(r)), pref = PREF_RE.test(D.org[oi] || ''), mk = Math.floor(ms / 60000), old = B[mk];
+    if (old && old[3] != null && PREF_RE.test(D.org[old[3]] || '') && !pref && old[3] !== oi) return; // keep the watch's reading for that minute
+    B[mk] = [Math.round(a * 10) / 10, Math.round(lo), Math.round(hi)].concat(oi >= 0 ? [oi] : []); touchedHr.add(k);
   });
   touchedHr.forEach(k => { const h = hrSummary(D.hrB[k]); const d = day(D, k), rest = d.hr && d.hr.restSrc === 'watch' ? { rest: d.hr.rest, restSrc: 'watch' } : {}; d.hr = Object.assign(h || {}, rest); });
   (Array.isArray(p.resting_heart_rate) ? p.resting_heart_rate : []).slice(0, 400).forEach(r => {
     const ms = t(r.time), b = int(r.bpm); if (!Number.isFinite(ms) || !(b >= 25 && b <= 200)) return;
-    seen.add('resting_heart_rate'); const d = day(D, nz(ms).date); d.hr = Object.assign(d.hr || {}, { rest: b, restSrc: 'watch' });
+    seen.add('resting_heart_rate'); const d = day(D, nz(ms).date), oi = orgIdx(D, originOf(r)), pref = PREF_RE.test(D.org[oi] || '');
+    if (d.hr && d.hr.restSrc === 'watch' && d.hr.restPref && !pref) return; // Health Sync / Huawei's resting rate wins
+    d.hr = Object.assign(d.hr || {}, { rest: b, restSrc: 'watch', restPref: pref ? 1 : 0 });
   });
   // tidy: summaries ~400 days, sessions two weeks, heart-rate buckets three days
   const today = nz(now).date, cut = (n) => addDays(today, -n);
@@ -130,6 +199,7 @@ export function applyPayload(D, p, now = Date.now()) {
   Object.keys(D.sess).forEach(k => { if (k < cut(KEEP_SESS)) delete D.sess[k]; });
   Object.keys(D.hrB).forEach(k => { if (k < cut(KEEP_HR)) delete D.hrB[k]; });
   Object.keys(D.stB).forEach(k => { if (k < cut(KEEP_HR)) delete D.stB[k]; });
+  Object.keys(D.stR).forEach(k => { if (k < cut(KEEP_RAW - 1)) delete D.stR[k]; });
   return [...seen];
 }
 export function publicDays(D, n = 30, now = Date.now()) {
@@ -137,6 +207,7 @@ export function publicDays(D, n = 30, now = Date.now()) {
   return Object.keys(D.days).filter(k => k >= from).sort().map(k => {
     const d = D.days[k], o = { date: k };
     if (d.steps != null) o.steps = d.steps;
+    if (d.stSrc) o.stSrc = { how: d.stSrc.how, used: d.stSrc.used || '', by: d.stSrc.by || null };
     if (d.sleep) o.sleep = d.sleep;
     if (d.hr) { const h = d.hr; o.hr = { rest: h.rest != null ? h.rest : h.restEst != null ? h.restEst : null, restEst: h.rest == null, min: h.min, max: h.max, avg: h.avg }; }
     return o;

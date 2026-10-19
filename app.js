@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.10';
+const APP_VERSION = '2.27.11';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20081,7 +20081,7 @@ function hwSettings() {
     <details class="help" style="margin-top:10px"><summary>Phone setup steps</summary><ol class="steps">
       <li>Huawei Health: Me › Privacy management. Turn on <b>HUAWEI Health Kit</b> and data syncing.</li>
       <li>Health Sync: source <b>Huawei Health</b>, destination <b>Health Connect</b>. Tick steps, sleep and heart rate.</li>
-      <li>HC Webhook: allow steps, sleep, heart rate and resting heart rate in Health Connect. Add a webhook with the URL and header above. Sync every 30 minutes.</li>
+      <li>HC Webhook: allow steps, sleep, heart rate and resting heart rate in Health Connect. Add a webhook with the URL and header above. Sync every 30 minutes. Set Steps to <b>Full</b> resolution, so each app’s steps stay separate and only the watch’s are counted.</li>
       <li>Phone Settings › Apps: battery set to <b>Unrestricted</b> for Huawei Health, Health Sync and HC Webhook.</li></ol></details></div></div>`;
 }
 function hwRedraw() { const box = document.getElementById('hwset'); if (!box || !box.nextElementSibling) return; const w = document.createElement('div'); w.innerHTML = hwSettings(); box.nextElementSibling.replaceWith(w.children[1]); }
@@ -23886,3 +23886,23 @@ function lnSettingsRows() {
   return R.map(([k, t, s], i) => `<div class="srow"${i ? '' : ' id="lnset"'}><div class="tx"><div class="t">${t}</div><div class="s">${s}</div></div>${sw(p[k], t.replace(/^\S+\s/, ''), `lnSet('${k}')`)}</div>`).join('');
 }
 (() => { const o = bfSettingsRows; bfSettingsRows = function () { let h = o.apply(this, arguments); try { h += lnSettingsRows(); } catch (e) { } return h; }; })();
+
+/* 2.27.11: Settings › Huawei watch sync › Step source: which app's steps the relay used for today (it never adds apps together now). */
+const HW_APPS = { 'nl.appyhapps.healthsync': 'Health Sync (Huawei watch)', 'com.huawei.health': 'Huawei Health', 'com.huawei.hihealth': 'Huawei Health', 'com.google.android.apps.fitness': 'Google Fit', 'com.sec.android.app.shealth': 'Samsung Health', 'com.google.android.apps.healthdata': 'Health Connect (phone)', 'android': 'Phone', 'com.mi.health': 'Mi Fitness', 'com.fitbit.FitbitMobile': 'Fitbit', 'com.garmin.android.apps.connectmobile': 'Garmin Connect', 'com.strava': 'Strava' };
+const hwAppName = p => HW_APPS[p] || (/huawei/i.test(p) ? 'Huawei Health' : /healthsync/i.test(p) ? 'Health Sync' : String(p || 'an app').replace(/^(com|nl|net|org)\./, ''));
+function hwStepSrcLine() {
+  const T = nzISO(Date.now()), td = hwDay(T), x = (td && td.stSrc ? td : hwList().slice().reverse().find(y => y.stSrc)) || null, src = x && x.stSrc;
+  const when = x && x.date !== T ? ' (' + fmtW(x.date) + ')' : ' today';
+  const others = by => { const L = Object.entries(by || {}).filter(([p]) => p !== src.used).map(([p, n]) => esc(hwAppName(p)) + ' ' + hwNum(n)); return L.length ? ` Not added: ${L.join(', ')}.` : ''; };
+  const fix = 'In HC Webhook set Steps to <b>Full</b> resolution, then run one manual sync for the last 7 days.';
+  let t;
+  if (!src) t = 'Shows after the next sync from your phone.';
+  else if (src.how === 'origin') t = `<b>${esc(hwAppName(src.used))}</b> · ${hwNum(x.steps)} steps${when}.${others(src.by)}`;
+  else if (src.how === 'max') t = `No Huawei / Health Sync steps found, so it uses the highest app each hour (never adds apps together).${others(src.by)}`;
+  else if (src.how === 'daily') t = `Health Connect’s daily total (all apps, using Health Connect’s app priority). If it’s higher than your watch: ${fix}`;
+  else if (src.how === 'buckets') t = `HC Webhook time buckets, which add every app together. ${fix}`;
+  else if (src.how === 'rebuild') t = `Rebuilding${when}: this figure was added up across apps before the fix. In HC Webhook, run one manual sync for the last 7 days and it corrects itself.`;
+  else t = '';
+  return t ? `<div class="s hwsrc" style="margin-top:4px">👟 <b>Step source:</b> ${t}</div>` : '';
+}
+(() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { if (!hwOn()) return h; const i = h.indexOf('<div class="btns" style="margin-top:8px"><button type="button" class="btn small" onclick="hwRefresh(true)">'); if (i < 0) return h; return h.slice(0, i) + hwStepSrcLine() + h.slice(i); } catch (e) { return h; } }; })();
