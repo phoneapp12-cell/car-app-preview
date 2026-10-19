@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.11';
+const APP_VERSION = '2.27.12';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20411,7 +20411,7 @@ function xferPlan(D) {
   // wages landing: on the usual 14-day beat after the last pay, into the account it last landed in
   const ins = [], landTx = (isT) => (D.transactions || []).filter(isT).sort((a, b) => b.date.localeCompare(a.date))[0];
   [['Your pay', mywIs, mywSt().seen], ['Sarah’s pay', swIs, swSt().seen]].forEach(([nm, isT, seen]) => { const t = landTx(isT); if (!t) return; const amt = fnAvg3(seen); if (!amt) return;
-    let d = t.date.slice(0, 10); while (d <= T) d = addDays(d, 14); for (; d <= H; d = addDays(d, 14)) { let a = amt; try { if (nm === 'Your pay' && wgOn()) a = wgEst(d).net || amt; } catch (e) { } ins.push({ what: nm, amount: a, date: d, acct: t.acct }); } }); // 2.26.88: wage estimate
+    let d = t.date.slice(0, 10); if (nm === 'Your pay') { d = myWed(d); while (d < T || t.date.slice(0, 10) >= addDays(d, -3)) d = addDays(d, 14); } else while (d <= T) d = addDays(d, 14); for (; d <= H; d = addDays(d, 14)) { let a = amt; try { if (nm === 'Your pay' && wgOn()) a = wgEst(d).net || amt; } catch (e) { } ins.push({ what: nm, amount: a, date: d, acct: t.acct }); } }); // 2.26.88: wage estimate
   // 2.26.86: Board and the cleaning job land weekly in the account they last landed in
   IR_KEYS.forEach(k => { try { const w = irSt(k), L = w.seen, last = L[L.length - 1], amt = fnAvg3(L); if (!last || !amt) return; const acct = last.acct && D.accounts.some(a => a.id === last.acct) ? last.acct : null; if (!acct) return;
     let d = last.d; while (d <= T) d = addDays(d, IR_DEF[k].per); if (dayGap(T, last.d) > 3 && dayGap(addDays(last.d, IR_DEF[k].per), T) >= -3 && !(D.transactions || []).some(t => irIs(k, t) && t.date.slice(0, 10) > last.d)) { /* due about now, not seen yet */ }
@@ -22201,7 +22201,7 @@ function wgEst(payDate, over) { const w = Object.assign({}, wgSt(), over || {}),
   return { payDate, wk, H, base: r2(base), lateX: r2(lateX), phX: r2(phX), comm: cm, gross, tax: t.tax, acc: t.acc, paye: t.paye, sl: t.sl, ks, social, other, net, code: w.code, ksPct: w.ks, rate: w.rate }; }
 // Pay date for a budget fortnight: payday, moved by how early the bank pay usually lands (0–2 days).
 function wgLag() { try { const s = mywSt().seen, x = s[s.length - 1]; if (!x) return 0; const st = fnPayStart(x.d, true); return st && st > x.d ? Math.min(2, dayGap(st, x.d)) : 0; } catch (e) { return 0; } }
-const wgPayFor = pp => addDays(pp.start, -wgLag());
+const wgPayFor = pp => myLandFor(pp); // 2.27.12: the Wednesday his pay lands
 // Back-solve: the gross that gives this take-home under his current settings (net rises with gross, so halve the gap).
 function wgGrossFor(net, over) { const w = Object.assign({}, wgSt(), over || {}); let lo = 0, hi = 20000;
   const netOf = g => { const t = wgTax(g, w.code); return g - t.paye - t.sl - wgTrunc(g * w.ks / 100) - w.social * (w.socialPer === 'week' ? 2 : 1) - w.other.reduce((n, o) => n + (+o.amount || 0), 0); };
@@ -22223,7 +22223,7 @@ function wgBreak(e) { const L = [['Hours', `${e.H.hrs} h over ${plural(e.H.days,
     (e.sl ? row('Student loan', '12%' + (/^M/.test(e.code) ? ' over $928 a fortnight' : ''), e.sl, 1) : '') + (e.ks ? row('KiwiSaver', e.ksPct + '%', e.ks, 1) : '') + (e.social ? row('Social club', '', e.social, 1) : '') +
     wgSt().other.map(o => row(esc(o.name), '', +o.amount || 0, 1)).join('') + row('Take-home (estimate)', '', e.net, 0, 1); }
 function WagePage() {
-  const w = wgSt(), T = todayISO(), pps = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean), nextPP = pps.find(p => wgPayFor(p) > T) || pps[pps.length - 1];
+  const w = wgSt(), T = todayISO(), pps = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean), nextPP = pps.find(p => myPending(p, T)) || pps[pps.length - 1];
   const head = moneyTabs('work') + workTabs('wage') + header('Wage estimate', 'Your take-home pay worked out from your roster, commission and tax code');
   if (!nextPP) return head + `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday first</b><br>The estimate uses the same pay fortnights as Bills.<div style="margin-top:10px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
   const pd = wgPayFor(nextPP), e = wgEst(pd), r = rosterState(), rosterSet = Object.keys(r.days || {}).length > 0, opt = (v, l, cur) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(l)}</option>`;
@@ -22251,7 +22251,7 @@ function WagePage() {
     <p class="muted" style="margin:6px 2px 0">“Rate from this pay” works your hourly rate back from what landed, after taking off commission for that fortnight. Hours come from your roster as it is now, so a week with extra or fewer shifts will throw it out. A public holiday on a rostered day is counted at time and a half.</p>`;
   return head + est + set + calib + `<div class="foot">Tax for ${WG_TAXYEAR} (1 April 2026 – 31 March 2027), from IRD: income tax 10.5% to $15,600, 17.5% to $53,500, 30% to $78,100, 33% to $180,000, 39% above; ACC earners’ levy 1.75%; student loan 12% over $464 a week. These are estimates. Your payslip is the final word, and once the pay lands in the bank the Budget uses the real amount.</div>`;
 }
-function wgBudgetRow() { try { const T = todayISO(), pp = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean).find(p => wgPayFor(p) > T); const e = pp && wgOn() ? wgEst(wgPayFor(pp)) : null;
+function wgBudgetRow() { try { const T = todayISO(), pp = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean).find(p => myPending(p, T)); const e = pp && wgOn() ? wgEst(wgPayFor(pp)) : null;
   return `<div class="list" style="margin-bottom:12px"><div class="row"><button class="tapzone" onclick="go('#wage')"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wage estimate</div><div class="s">${e ? `Next pay ${esc(fmtW(e.payDate))}: about ${money(e.net)} take-home (gross ${money(e.gross)})` : 'Work out your pay from your roster, commission and tax code'}</div></div></button></div></div>`; } catch (err) { return ''; } }
 /* 2.26.89: Coeliac NZ membership renewal INV-560747 ($60) is due Thu 8 Oct 2026 (the Xero email). 2.26.83's fix was
    one-time, so if anything put 16 Oct back afterwards (an older copy of the data arriving through sync from another
@@ -23384,23 +23384,54 @@ function coachCards() {
    the first day of the period, so each fortnight adds up to exactly what the payslip pays. */
 const CP_FROM = 'nlg-payroll@nlg.co.nz', CP_SUBJ = /commission payslip/i, CP_MAX_AGE = 6 * 3600e3;
 let cpBusy = false;
-function cpParse(text) {
-  const t = String(text || ''), P = t.match(/\bFOR\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+to\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
-  if (!P) return null;
-  const iso = (d, m, y) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  const from = iso(P[1], P[2], P[3]), to = iso(P[4], P[5], P[6]);
-  const num = s => { const neg = /-$/.test(s), v = Math.round(parseFloat(s.replace(/[,-]/g, '')) * 100); return neg ? -v : v; };
-  const NUM = /^[\d,]+\.\d\d-?$/, days = {}; let sum = 0, total = null, rows = 0;
-  for (const line of t.split('\n')) {
-    const tok = line.trim().split(/\s+/); if (!tok[0]) continue;
-    const dm = tok[0].match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
-    if (dm && tok.length === 9 && tok.slice(1).every(x => NUM.test(x))) { const d = iso(dm[1], dm[2], '20' + dm[3]), c = num(tok[8]); days[d] = (days[d] || 0) + c; sum += c; rows++; }
-    else if (!dm && total == null && rows && tok.length === 8 && tok.every(x => NUM.test(x))) total = num(tok[7]);
-  }
-  if (!rows || from > to || (total != null && total !== sum)) return null; // didn't read cleanly: don't guess
-  return { from, to, cents: sum, days };
+// 2.27.12: tolerant payslip reader (other date formats, minus signs, $ signs, table layouts; payroll total if rows are off)
+const CP_MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+function cpYr(y) { y = +y; return y < 100 ? 2000 + y : y; }
+function cpIso(d, m, y) { d = +d; m = +m; y = cpYr(y); if (!(d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 2020 && y <= 2100)) return ''; return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
+function cpPeriod(t, hint) {
+  const D = '(\\d{1,2})[\\/.\\-](\\d{1,2})[\\/.\\-](\\d{2,4})', M = '(\\d{1,2})(?:st|nd|rd|th)?\\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?,?\\s+(\\d{4})';
+  const tries = [new RegExp('\\b(?:FOR|PERIOD(?:\\s+FROM)?|FROM|PAY\\s+PERIOD:?|WEEK\\s+ENDING)?\\s*' + D + '\\s*(?:to|until|-|–|—)\\s*' + D, 'i'), new RegExp(M + '\\s*(?:to|until|-|–|—)\\s*' + M, 'i')];
+  let m = t.match(tries[0]); if (m) { const a = cpIso(m[1], m[2], m[3]), b = cpIso(m[4], m[5], m[6]); if (a && b && a <= b && dayGap(b, a) <= 31) return { from: a, to: b }; }
+  m = t.match(tries[1]); if (m) { const a = cpIso(m[1], CP_MON[m[2].toLowerCase()], m[3]), b = cpIso(m[4], CP_MON[m[5].toLowerCase()], m[6]); if (a && b && a <= b && dayGap(b, a) <= 31) return { from: a, to: b }; }
+  // the attachment name: "Commission Payslip Ending 18-10-2026.pdf" (a fortnight ending that Sunday)
+  const h = String(hint || '').match(/end(?:ing|ed)?\s*(\d{1,2})[\/.\-_ ](\d{1,2})[\/.\-_ ](\d{2,4})/i); if (h) { const b = cpIso(h[1], h[2], h[3]); if (b) return { from: addDays(b, -13), to: b, fromName: true }; }
+  return null; }
+const CP_MONEY = /^\(?-?\d[\d,]*\.\d\d-?\)?$/;
+const cpNum = s => { const neg = /-$|^\(?-|^\(.*\)$/.test(s), v = Math.round(parseFloat(s.replace(/[(),\-]/g, '')) * 100); return neg ? -v : v; };
+const cpDate = s => { const m = String(s).match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/); return m ? cpIso(m[1], m[2], m[3]) : ''; };
+function cpToks(line) { return line.replace(/\$\s*/g, '').replace(/(\d\.\d\d)\s+-(?=\s|$)/g, '$1-').trim().split(/\s+/).filter(Boolean); }
+function cpParse(text, hint) {
+  const t = String(text || '').replace(/[\u2212\u2012]/g, '-').replace(/\u00a0/g, ' '), P = cpPeriod(t, hint); if (!P) return null;
+  const { from, to } = P; let days = {}, sum = 0, total = null, rows = 0, width = 0;
+  const addRow = (d, nums) => { const c = cpNum(nums[nums.length - 1]); days[d] = (days[d] || 0) + c; sum += c; rows++; if (!width) width = nums.length; };
+  // 1) one table row per line: date then only money columns, TOTAL last; the totals line follows the last row
+  for (const line of t.split(/\r?\n/)) { const tok = cpToks(line); if (!tok.length) continue; const d = cpDate(tok[0]), rest = tok.slice(1);
+    if (d && total == null && rest.length >= 3 && rest.every(x => CP_MONEY.test(x)) && (!width || rest.length === width)) addRow(d, rest);
+    else if (!d && rows && total == null && tok.length >= 3 && tok.every(x => CP_MONEY.test(x)) && (!width || tok.length === width)) total = cpNum(tok[tok.length - 1]); }
+  // 2) the PDF text came out in one stream (cells not on their own lines): date + N money values, totals = N more
+  if (!rows || (total != null && total !== sum)) { const tok = cpToks(t.replace(/\r?\n/g, ' ')); const runs = [];
+    for (let i = 0; i < tok.length; i++) { const d = cpDate(tok[i]); if (!d) continue; let j = i + 1; while (j < tok.length && CP_MONEY.test(tok[j])) j++; if (j - i - 1 >= 3) runs.push({ d, nums: tok.slice(i + 1, j) }); else if (runs.length) break; i = j - 1; }
+    const W = runs.length > 1 ? runs[0].nums.length : 0;
+    if (W && runs.every((r, k) => r.nums.length === W || (k === runs.length - 1 && r.nums.length === 2 * W))) { const d2 = {}; let s2 = 0, tot2 = null;
+      runs.forEach((r, k) => { const c = cpNum(r.nums[W - 1]); d2[r.d] = (d2[r.d] || 0) + c; s2 += c; if (r.nums.length === 2 * W) tot2 = cpNum(r.nums[2 * W - 1]); });
+      if (tot2 == null || tot2 === s2) { days = d2; sum = s2; rows = runs.length; total = tot2; } } }
+  if (rows && (total == null || total === sum)) return { from, to, cents: sum, days };
+  // 3) the table didn't add up / couldn't be read, but payroll's own total is there: use it (all on the first day)
+  const T = total != null ? total : (() => { const m = t.match(/\btotal(?:\s+commission)?(?:\s+payable)?\s*:?\s*\$?\s*(-?[\d,]+\.\d\d-?)/i); return m ? cpNum(m[1]) : null; })();
+  if (T != null && Math.abs(T) < 5000000) return { from, to, cents: T, days: { [from]: T }, approx: true };
+  return null;
 }
 const cpSlipFor = iso => (CM().slips || []).find(x => !x.mine && iso >= x.from && iso <= x.to);
+// 2.27.12: payslip <-> work fortnight by overlap (most of both), not exact dates
+function cpOv(a1, b1, a2, b2) { const a = a1 > a2 ? a1 : a2, b = b1 < b2 ? b1 : b2; return b < a ? 0 : dayGap(b, a) + 1; }
+function cpSlipForWork(wk) { if (!wk) return null; const len = dayGap(wk.end, wk.start) + 1; let best = null, bo = 0;
+  (CM().slips || []).forEach(x => { if (x.mine) return; const o = cpOv(x.from, x.to, wk.start, wk.end), sl = dayGap(x.to, x.from) + 1;
+    if (o > bo && o >= Math.ceil(len * 0.6) && o >= Math.ceil(sl * 0.6)) { best = x; bo = o; } }); return best; }
+// 2.27.12: his pay lands on the Wednesday nearest the Bills payday (afternoon/evening), and counts as still to come until the bank shows it
+function myWed(d) { if (!d) return d; let x = 3 - new Date(parseD(d)).getUTCDay(); if (x > 3) x -= 7; if (x < -3) x += 7; return addDays(d, x); }
+function myLandFor(pp) { return pp && pp.start ? myWed(pp.start) : ''; }
+function myPending(pp, T) { const land = myLandFor(pp); if (!land) return false; if (land > T) return true; if (land < addDays(T, -3)) return false;
+  try { return !(mywSt().seen || []).some(x => x.d >= addDays(land, -3) && x.d <= addDays(land, 3)); } catch (e) { return land >= T; } }
 function cpApply(r, meta) {
   const c = CM(); c.slips = c.slips || []; c.replaced = c.replaced || [];
   const old = c.slips.find(x => x.to === r.to && x.from === r.from);
@@ -23493,7 +23524,7 @@ function cpCard() {
   di.closest('.field, label') ? di.closest('.field, label').after(p) : di.after(p); di.addEventListener('input', upd); di.addEventListener('change', upd); upd(); } catch (e) { } return r; }; })();
 // Wage estimate: a payslip that matches the work fortnight exactly is used as the commission for that pay
 (() => { const o = wgComm; wgComm = function (payDate, wk) { const r = o.apply(this, arguments); try { if (r.src === 'typed') return r;
-  const s = (CM().slips || []).find(x => !x.mine && x.from === wk.start && x.to === wk.end); if (s) return Object.assign(r, { amount: r2(s.cents / 100), earned: r2(s.cents / 100), src: 'email', ended: true, left: 0, proj: 0 }); } catch (e) { } return r; }; })();
+  const s = cpSlipForWork(wk); if (s) return Object.assign(r, { amount: r2(s.cents / 100), earned: r2(s.cents / 100), src: 'email', ended: true, left: 0, proj: 0 }); } catch (e) { } return r; }; })();
 (() => { const o = wgCommLine; wgCommLine = function (c) { return c && c.src === 'email' ? 'From your Noel Leeming commission payslip (email)' : o.apply(this, arguments); }; })();
 
 /* 2.27.8: Budget "Your wages" follows Money › Work › Wage estimate (net pay for that pay date: roster hours + commission,
