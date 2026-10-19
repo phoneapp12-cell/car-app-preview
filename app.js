@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.12';
+const APP_VERSION = '2.27.13';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20407,14 +20407,14 @@ function xferPlan(D) {
   let cyc = null; try { cyc = cardCycleOf(T); } catch (e) { }
   const H0 = p1 ? addDays(p1.end, 2) : p0.end, cardDue = cyc && cyc.due > H0 && dayGap(cyc.due, T) <= 45 ? cyc.due : '', H = cardDue || H0, buf = xferBuf(), buf0 = buf, ok = id => D.accounts.some(a => a.id === id && cfSpendable(a));
   const main = cfMain(D), outs = [];
-  [0, 1, 2, 3].map(o => payPeriod(o)).filter((pp, i) => pp && pp.off === i && pp.start <= H).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.toCome : []).filter(x => x.date <= H).forEach(x => outs.push({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date, acct: ok(x.acct) ? x.acct : main && main.id, card: x.kind === 'card' ? 1 : 0, due: x.date, bid: x.kind === 'bill' ? x.id : '' })); });
+  [0, 1, 2, 3].map(o => payPeriod(o)).filter((pp, i) => pp && pp.off === i && pp.start <= H).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.toCome : []).filter(x => x.date <= H).forEach(x => outs.push({ what: x.name, amount: x.amount, date: x.date < T ? T : x.date, acct: ok(x.acct) ? x.acct : main && main.id, card: x.kind === 'card' ? 1 : 0, cpart: x.cpart || '', cdue: x.cdue || '', due: x.date, bid: x.kind === 'bill' ? x.id : '' })); });
   // wages landing: on the usual 14-day beat after the last pay, into the account it last landed in
   const ins = [], landTx = (isT) => (D.transactions || []).filter(isT).sort((a, b) => b.date.localeCompare(a.date))[0];
   [['Your pay', mywIs, mywSt().seen], ['Sarah’s pay', swIs, swSt().seen]].forEach(([nm, isT, seen]) => { const t = landTx(isT); if (!t) return; const amt = fnAvg3(seen); if (!amt) return;
-    let d = t.date.slice(0, 10); if (nm === 'Your pay') { d = myWed(d); while (d < T || t.date.slice(0, 10) >= addDays(d, -3)) d = addDays(d, 14); } else while (d <= T) d = addDays(d, 14); for (; d <= H; d = addDays(d, 14)) { let a = amt; try { if (nm === 'Your pay' && wgOn()) a = wgEst(d).net || amt; } catch (e) { } ins.push({ what: nm, amount: a, date: d, acct: t.acct }); } }); // 2.26.88: wage estimate
+    incDates(nm === 'Your pay' ? 'shane' : 'sarah', addDays(T, -1), H, t.date.slice(0, 10)).filter(d => t.date.slice(0, 10) < addDays(d, -3)).forEach(d => { let a = amt, comm = ''; try { if (nm === 'Your pay' && wgOn()) { const e = wgEst(d); a = e.net || amt; comm = e.comm && e.comm.src || ''; } } catch (e) { } ins.push({ what: nm, amount: a, date: d, acct: t.acct, comm }); }); }); // 2.26.88: wage estimate · 2.27.12: on the day it lands (his Wednesday, Sarah's Tuesday)
   // 2.26.86: Board and the cleaning job land weekly in the account they last landed in
   IR_KEYS.forEach(k => { try { const w = irSt(k), L = w.seen, last = L[L.length - 1], amt = fnAvg3(L); if (!last || !amt) return; const acct = last.acct && D.accounts.some(a => a.id === last.acct) ? last.acct : null; if (!acct) return;
-    let d = last.d; while (d <= T) d = addDays(d, IR_DEF[k].per); if (dayGap(T, last.d) > 3 && dayGap(addDays(last.d, IR_DEF[k].per), T) >= -3 && !(D.transactions || []).some(t => irIs(k, t) && t.date.slice(0, 10) > last.d)) { /* due about now, not seen yet */ }
+    let d = incSnap(k, last.d); while (d < T || d <= addDays(last.d, 3)) d = addDays(d, IR_DEF[k].per); // 2.27.12: today counts until it lands (Board ~11pm Tuesday) if (dayGap(T, last.d) > 3 && dayGap(addDays(last.d, IR_DEF[k].per), T) >= -3 && !(D.transactions || []).some(t => irIs(k, t) && t.date.slice(0, 10) > last.d)) { /* due about now, not seen yet */ }
     for (; d <= H; d = addDays(d, IR_DEF[k].per)) ins.push({ what: IR_DEF[k].name, amount: amt, date: d, acct, weekly: k }); } catch (e) { } });
   ins.sort((a, b) => a.date.localeCompare(b.date));
   const shaneIn = ins.filter(x => x.what === 'Your pay'), src = (shaneIn[0] && D.accounts.find(a => a.id === shaneIn[0].acct)) || cfOrbit(D) || main;
@@ -20476,14 +20476,18 @@ function xferPlan(D) {
     if (amt < n.need) { const np = payDates.find(p => p > T && availFrom(p) - floor >= n.need - amt) || ''; short.push({ to: n.to, amount: n.need - amt, by: n.by, first: n.first, pay: np, items }); }
   });
   // 2.26.72: the card payment comes from what's left once the bills are covered; any part that can't be paid is shown, not planned
-  let card = null; { const e = srcEv.find(x => x.card); if (e) { const full = e.amount, can = Math.max(0, Math.min(full, Math.floor((availFrom(e.date) - floor + full) * 100) / 100));
+  // 2.27.12: each planned card payment (fortnightly part-payments and the top-up before the due date), earliest first. A part-payment
+  // ORBIT can't cover moves into the top-up; whatever the top-up can't cover is the shortfall (would attract interest).
+  let card = null; const cardPlan = []; srcEv.filter(x => x.card).forEach(e => { const full = e.amount, can = Math.max(0, Math.min(full, Math.floor((availFrom(e.date) - floor + full) * 100) / 100));
       const nowOk = availFrom(T) - floor + full >= full - 0.005, after = nowOk ? '' : (payDates.filter(p => p > T && p <= e.date).find(p => availFrom(p) - floor + full >= Math.min(full, can) - 0.005) || '');
-      e.amount = can; card = { amount: full, can: r2(can), short: r2(full - can), due: e.due || e.date, after, from: src.id, nowCan: Math.max(0, r2(availFrom(T) - floor + can)) }; } }
+      e.amount = can; let moved = 0; if (e.cpart === 'part' && can < full - 0.005) { const top = srcEv.find(y => y.card && y.cpart === 'top' && y.cdue === e.cdue && y.date >= e.date); if (top) { top.amount = r2(top.amount + full - can); moved = r2(full - can); } }
+      const it = { amount: full, can: r2(can), short: moved ? 0 : r2(full - can), moved, due: e.due || e.date, date: e.date, kind: e.cpart || 'top', cdue: e.cdue || e.due || e.date, what: e.what, after, from: src.id, nowCan: Math.max(0, r2(availFrom(T) - floor + can)) };
+      cardPlan.push(it); if (!card && it.kind !== 'part') card = it; });
   // 3) the source itself going under before pay lands (e.g. a standing order out of ORBIT)
   { const ds = [T, ...srcEv.map(e => e.date)].filter((x, i, A) => A.indexOf(x) === i).sort(); const bad = ds.find(d => srcAt(d) < floor - 0.005);
     if (bad) { const e = srcEv.find(x => x.date === bad && x.out) || { what: 'what comes out', date: bad }; short.push({ to: src.id, amount: r2(floor - srcAt(bad)), by: bad, first: e, pay: nextPay(bad), own: 1, items: [e.what] }); } }
   list.sort((a, b) => a.by.localeCompare(b.by));
-  return { list, short, src, buf, outs, ins, H, card, sweeps, srcEnd: r2(srcAt(H)), srcNow: bal[src.id] || 0, endOf: id => r2(acctAt(id, H)) };
+  return { list, short, src, buf, outs, ins, H, card, cardPlan, sweeps, srcEnd: r2(srcAt(H)), srcNow: bal[src.id] || 0, endOf: id => r2(acctAt(id, H)) };
 }
 function cfRegularIns(D, acctId) {
   const T = todayISO(), g = new Map();
@@ -20503,10 +20507,7 @@ function xferCard(D) {
   const done = S.settings.xferDone || {};
   const rows = X.list.filter(x => !done[x.key]).map(x => `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="xferTick(${jsArg(x.key)},${x.amount},${jsArg(x.from)},${jsArg(x.to)})"></button><div class="tx"><div class="t">Move ${cfMoney(x.amount)} from ${esc(nm(x.from))} to ${esc(nm(x.to))}</div><div class="s">${x.weekly ? `Weekly · ${esc(day(x.by))}, once board lands · same bank` : x.after ? `After pay lands ${esc(day(x.after))}, by ${esc(day(x.by))}` : `By ${esc(day(x.by))}${x.same ? ' · same bank' : ''}`} · for ${esc(x.items.slice(0, 3).join(', '))}${x.items.length > 3 ? ' and ' + (x.items.length - 3) + ' more' : ''}${x.weekly && x.first.date <= x.by ? '' : ` (${x.weekly ? 'next due' : 'first one'} ${esc(day(x.first.date))})`}</div></div></div>`).join('');
   // 2.26.72: the card payment, with a tick (marks it paid until the bank shows it)
-  let cardRows = ''; try { const k = X.card, g = cardGoal(), cA = cfCardAcct(D); if (k && g && !g.full && cA) { const cn = (/^(ASB )?Visa Rewards$/i.test(cfAName(cA)) ? 'ASB credit card' : cfAName(cA)) /* 2.27.7: shown as 'ASB credit card' */;
-      if (k.can > 0) cardRows += `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="cardTick(${k.can},${jsArg(k.due)})"></button><div class="tx"><div class="t">Pay ${cfMoney(k.can)} from ${esc(nm(k.from))} to ${esc(cn)} by ${esc(day(k.due))}</div><div class="s">${k.after ? `After pay lands ${esc(day(k.after))} · ` : ''}${k.short > 0 ? `part of the ${cfMoney(k.amount)} due; ${cfMoney(k.short)} would attract interest` : g.proj ? `the whole statement (about ${cfMoney(g.goal)}), so no interest` : 'the whole amount, so no interest'}</div></div></div>`;
-      if (g.proj && g.owedNow > 0 && k.nowCan >= g.owedNow - 0.005 && g.left > 0) cardRows += `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="cardTick(${Math.min(g.owedNow, g.left)},${jsArg(k.due)})"></button><div class="tx"><div class="t">Optional: pay ${cfMoney(Math.min(g.owedNow, g.left))} now from ${esc(nm(k.from))} to ${esc(cn)}</div><div class="s">What’s on the card today, before the ${esc(day(g.stmt))} statement. Only if you’d like it cleared early.</div></div></div>`;
-    } } catch (e) { }
+  let cardRows = ''; try { cardRows = cardXferRows(D, X, nm, day); } catch (e) { } // 2.27.12: every planned card payment (part-payments + top-up)
   const dn = Object.values(done).filter(x => x && !x.seen).length;
   const sh = X.short.map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${cfMoney(s.amount)} ${s.own ? 'over its limit' : 'short'} for ${esc(s.first.what)} on ${esc(day(s.first.date))}${s.pay && s.pay > s.first.date ? ` · there isn’t enough spare until pay lands ${esc(day(s.pay))}, so move it then or ask the bank about timing` : s.pay ? ` · move it after pay lands ${esc(day(s.pay))}` : ' · no pay expected before then'}</div>`).join('');
   return `<div class="sec">Transfers to make · as at ${esc(day(todayISO()))}</div><div class="card xfcard">
@@ -20561,7 +20562,7 @@ function fnModel(b) {
     let est = 0, estComm = '', noRate = false; try { if (key === 'shane' && !(typed > 0) && !past) { if (wgOn()) { const e = wgEst(wgPayFor(pp)); est = e.net; estComm = e.comm && e.comm.src || ''; } else noRate = true; } } catch (e) { } // 2.26.88 / 2.27.8: wage estimate (roster + commission, payslip when it covers the fortnight)
     const exp = typed > 0 ? typed : est > 0 ? est : fnAvg3(seen.filter(x => x.d < pp.start).length ? seen.filter(x => x.d < pp.start) : seen);
     if (S0.length) IN.push({ key, name, st: 'landed', amount: fnSum(S0, 'a'), planned: typed > 0 ? typed : fnSum(S0, 'a'), date: S0[S0.length - 1].d, bankTx: L.length > 0 });
-    else if (!past && exp) IN.push({ key, name, st: 'expected', amount: exp, planned: exp, typed: typed > 0, est: est > 0 && !(typed > 0), estComm, noRate: noRate && !(est > 0), bid: b.id, dropped: key === 'shane' && !(typed > 0) && b.payDropped > 0 ? b.payDropped : 0 });
+    else if (!past && exp) IN.push({ key, name, st: 'expected', amount: exp, planned: exp, date: incExpDate(key, pp), late: incLate(key, incExpDate(key, pp)), typed: typed > 0, est: est > 0 && !(typed > 0), estComm, noRate: noRate && !(est > 0), bid: b.id, dropped: key === 'shane' && !(typed > 0) && b.payDropped > 0 ? b.payDropped : 0 });
     else if (!past && key === 'shane' && noRate) IN.push({ key, name, st: 'none', amount: 0, planned: 0, noRate: true });
     else if (past && typed > 0 && !covered) IN.push({ key, name, st: 'planned', amount: typed, planned: typed, typed: true });
     else if (exp || typed) IN.push({ key, name, st: 'none', amount: 0, planned: exp });
@@ -20576,7 +20577,7 @@ function fnModel(b) {
     const prior = w.seen.filter(x => x.d < pp.start), avg = fnAvg3(prior.length >= 3 ? prior : w.seen);
     if (S0.length) IN.push({ key, name: nm, st: 'landed', amount: fnSum(S0, 'a'), planned: fnSum(S0, 'a'), date: S0[S0.length - 1].d, bankTx: L.length > 0, n: S0.length });
     const beats = irBeats(key, pp.start, pp.end), left = past ? 0 : beats.filter(d => !S0.some(x => Math.abs(dayGap(x.d, d)) <= 3)).filter(d => dayGap(d, T) >= -3).length;
-    if (left > 0 && avg) IN.push({ key: key + '-exp', name: nm + (left > 1 ? ' ×' + left : '') + (S0.length ? ' (still to come)' : ''), st: 'expected', amount: r2(avg * left), planned: r2(avg * left), n: left, per: avg });
+    if (left > 0 && avg) { const nx = beats.filter(d => !S0.some(x => Math.abs(dayGap(x.d, d)) <= 3)).filter(d => dayGap(d, T) >= -3)[0] || ''; IN.push({ key: key + '-exp', irk: key, name: nm + (left > 1 ? ' ×' + left : '') + (S0.length ? ' (still to come)' : ''), st: 'expected', amount: r2(avg * left), planned: r2(avg * left), n: left, per: avg, date: nx, late: nx ? incLate(key, nx) : false }); }
   } catch (e) { } });
   const otherIn = D ? txs.filter(t => t.amount > 0 && inP(dOf(t)) && dOf(t) <= T && !used.has(t.id) && t.cat2 !== 'transfer' && spendAcct(t) && !(cardA && t.acct === cardA.id)) : [];
   otherIn.forEach(t => used.add(t.id));
@@ -20606,6 +20607,14 @@ function fnModel(b) {
     // the matched repayment lines are no longer everyday spending
     if (D) txs.filter(t => cfMortTx(D, t) === 'asb' && inP(dOf(t))).forEach(t => { const k = t.desc.replace(/(principal|interest)\b.*$/i, '').replace(/\s+/g, ' ').trim(); if (used.has('m' + k + dOf(t))) used.add(t.id); });
   } catch (e) { }
+  // 2.27.12: the card plan: a part-payment the day after each of his pays, then a top-up before the due date (statement − paid since it)
+  let cardPl = null; try { cardPl = cardPlanList(); } catch (e) { cardPl = null; }
+  if (cardPl) { try { const pays = (debtsSt().card.akPays || []).slice(-1)[0], payA = (pays && acc(pays.from) && cfSpendable(acc(pays.from)) ? pays.from : (D && cfOrbit(D) ? cfOrbit(D).id : main && main.id));
+    cardPl.items.filter(x => inP(x.date)).forEach(x => { const nm = x.kind === 'part' ? 'ASB credit card part-payment' : 'ASB credit card top-up (pay in full)';
+      if (x.st === 'paid') OUT.push({ kind: 'card', cpart: x.kind, cdue: x.due, name: nm, st: 'paid', amount: x.amount, planned: x.amount, date: x.paidOn || x.date, bank: !x.tick });
+      else if (x.st === 'skipped' || x.st === 'covered') OUT.push({ kind: 'card', cpart: x.kind, cdue: x.due, name: nm, st: x.st, amount: 0, planned: 0, date: x.date });
+      else if (x.amount > 0) OUT.push({ kind: 'card', cpart: x.kind, cdue: x.due, name: nm + (x.about ? ' (about)' : ''), st: past ? 'nomatch' : x.date < T ? 'overdue' : x.about ? 'about' : 'due', amount: x.amount, planned: x.amount, date: x.date, acct: payA, goal: x.kind === 'top' ? 'in full' : 'part' }); });
+  } catch (e) { } } else {
   // ASB card payment: once, in the fortnight with the due date. Goal: in full.
   try { const k = cardCycle(b, bills); if (k.due) { const g = cardGoal({ due: k.due, stmt: cardStmtBefore(k.due) }), paidTx = D && cardA ? txs.filter(t => t.acct === cardA.id && t.amount > 0 && inP(dOf(t))) : [];
       const pays = (debtsSt().card.akPays || []).slice(-1)[0], payA = (pays && acc(pays.from) && cfSpendable(acc(pays.from)) ? pays.from : main && main.id);
@@ -20616,6 +20625,7 @@ function fnModel(b) {
         const left = g && g.due === k.due ? g.left : k.pay; if (left > 0) OUT.push({ kind: 'card', name: 'ASB credit card payment', st: past ? 'nomatch' : k.due < T ? 'overdue' : 'due', amount: left, planned: left, date: k.due, acct: payA, goal: 'in full' }); }
       // the card payments from the bank are transfers already; nothing else to exclude
   } } catch (e) { }
+  }
   try { const o = orbFor(b); if (o) { const oa = D && cfOrbit(D); OUT.push({ kind: 'orbit', name: 'ORBIT interest (1st)', st: o.about ? (past ? 'nomatch' : 'about') : 'paid', amount: o.amount, planned: o.amount, date: o.date, acct: oa ? oa.id : '', bank: !o.about });
       if (D && !o.about) txs.filter(t => t.amount < 0 && inP(dOf(t)) && (t.type === 'INTEREST' || /\bDR\.?\s?INT\b/i.test(t.desc))).forEach(t => used.add(t.id)); } } catch (e) { }
   try { if (D) cfRegulars(D).forEach(r => regOccIn(r, pp.start > T ? pp.start : T, pp.end).forEach(d => OUT.push({ kind: 'reg', key: r.key, name: r.name, st: 'due', amount: r.amount, planned: r.amount, date: d, acct: r.acct, reg: 1, varies: r.varies }))); } catch (e) { }
@@ -22201,7 +22211,7 @@ function wgEst(payDate, over) { const w = Object.assign({}, wgSt(), over || {}),
   return { payDate, wk, H, base: r2(base), lateX: r2(lateX), phX: r2(phX), comm: cm, gross, tax: t.tax, acc: t.acc, paye: t.paye, sl: t.sl, ks, social, other, net, code: w.code, ksPct: w.ks, rate: w.rate }; }
 // Pay date for a budget fortnight: payday, moved by how early the bank pay usually lands (0–2 days).
 function wgLag() { try { const s = mywSt().seen, x = s[s.length - 1]; if (!x) return 0; const st = fnPayStart(x.d, true); return st && st > x.d ? Math.min(2, dayGap(st, x.d)) : 0; } catch (e) { return 0; } }
-const wgPayFor = pp => myLandFor(pp); // 2.27.12: the Wednesday his pay lands
+const wgPayFor = pp => myLandFor(pp); // 2.27.12: the day his pay lands (Wednesday afternoon/evening), not the Bills payday itself
 // Back-solve: the gross that gives this take-home under his current settings (net rises with gross, so halve the gap).
 function wgGrossFor(net, over) { const w = Object.assign({}, wgSt(), over || {}); let lo = 0, hi = 20000;
   const netOf = g => { const t = wgTax(g, w.code); return g - t.paye - t.sl - wgTrunc(g * w.ks / 100) - w.social * (w.socialPer === 'week' ? 2 : 1) - w.other.reduce((n, o) => n + (+o.amount || 0), 0); };
@@ -23384,54 +23394,8 @@ function coachCards() {
    the first day of the period, so each fortnight adds up to exactly what the payslip pays. */
 const CP_FROM = 'nlg-payroll@nlg.co.nz', CP_SUBJ = /commission payslip/i, CP_MAX_AGE = 6 * 3600e3;
 let cpBusy = false;
-// 2.27.12: tolerant payslip reader (other date formats, minus signs, $ signs, table layouts; payroll total if rows are off)
-const CP_MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
-function cpYr(y) { y = +y; return y < 100 ? 2000 + y : y; }
-function cpIso(d, m, y) { d = +d; m = +m; y = cpYr(y); if (!(d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 2020 && y <= 2100)) return ''; return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
-function cpPeriod(t, hint) {
-  const D = '(\\d{1,2})[\\/.\\-](\\d{1,2})[\\/.\\-](\\d{2,4})', M = '(\\d{1,2})(?:st|nd|rd|th)?\\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?,?\\s+(\\d{4})';
-  const tries = [new RegExp('\\b(?:FOR|PERIOD(?:\\s+FROM)?|FROM|PAY\\s+PERIOD:?|WEEK\\s+ENDING)?\\s*' + D + '\\s*(?:to|until|-|–|—)\\s*' + D, 'i'), new RegExp(M + '\\s*(?:to|until|-|–|—)\\s*' + M, 'i')];
-  let m = t.match(tries[0]); if (m) { const a = cpIso(m[1], m[2], m[3]), b = cpIso(m[4], m[5], m[6]); if (a && b && a <= b && dayGap(b, a) <= 31) return { from: a, to: b }; }
-  m = t.match(tries[1]); if (m) { const a = cpIso(m[1], CP_MON[m[2].toLowerCase()], m[3]), b = cpIso(m[4], CP_MON[m[5].toLowerCase()], m[6]); if (a && b && a <= b && dayGap(b, a) <= 31) return { from: a, to: b }; }
-  // the attachment name: "Commission Payslip Ending 18-10-2026.pdf" (a fortnight ending that Sunday)
-  const h = String(hint || '').match(/end(?:ing|ed)?\s*(\d{1,2})[\/.\-_ ](\d{1,2})[\/.\-_ ](\d{2,4})/i); if (h) { const b = cpIso(h[1], h[2], h[3]); if (b) return { from: addDays(b, -13), to: b, fromName: true }; }
-  return null; }
-const CP_MONEY = /^\(?-?\d[\d,]*\.\d\d-?\)?$/;
-const cpNum = s => { const neg = /-$|^\(?-|^\(.*\)$/.test(s), v = Math.round(parseFloat(s.replace(/[(),\-]/g, '')) * 100); return neg ? -v : v; };
-const cpDate = s => { const m = String(s).match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/); return m ? cpIso(m[1], m[2], m[3]) : ''; };
-function cpToks(line) { return line.replace(/\$\s*/g, '').replace(/(\d\.\d\d)\s+-(?=\s|$)/g, '$1-').trim().split(/\s+/).filter(Boolean); }
-function cpParse(text, hint) {
-  const t = String(text || '').replace(/[\u2212\u2012]/g, '-').replace(/\u00a0/g, ' '), P = cpPeriod(t, hint); if (!P) return null;
-  const { from, to } = P; let days = {}, sum = 0, total = null, rows = 0, width = 0;
-  const addRow = (d, nums) => { const c = cpNum(nums[nums.length - 1]); days[d] = (days[d] || 0) + c; sum += c; rows++; if (!width) width = nums.length; };
-  // 1) one table row per line: date then only money columns, TOTAL last; the totals line follows the last row
-  for (const line of t.split(/\r?\n/)) { const tok = cpToks(line); if (!tok.length) continue; const d = cpDate(tok[0]), rest = tok.slice(1);
-    if (d && total == null && rest.length >= 3 && rest.every(x => CP_MONEY.test(x)) && (!width || rest.length === width)) addRow(d, rest);
-    else if (!d && rows && total == null && tok.length >= 3 && tok.every(x => CP_MONEY.test(x)) && (!width || tok.length === width)) total = cpNum(tok[tok.length - 1]); }
-  // 2) the PDF text came out in one stream (cells not on their own lines): date + N money values, totals = N more
-  if (!rows || (total != null && total !== sum)) { const tok = cpToks(t.replace(/\r?\n/g, ' ')); const runs = [];
-    for (let i = 0; i < tok.length; i++) { const d = cpDate(tok[i]); if (!d) continue; let j = i + 1; while (j < tok.length && CP_MONEY.test(tok[j])) j++; if (j - i - 1 >= 3) runs.push({ d, nums: tok.slice(i + 1, j) }); else if (runs.length) break; i = j - 1; }
-    const W = runs.length > 1 ? runs[0].nums.length : 0;
-    if (W && runs.every((r, k) => r.nums.length === W || (k === runs.length - 1 && r.nums.length === 2 * W))) { const d2 = {}; let s2 = 0, tot2 = null;
-      runs.forEach((r, k) => { const c = cpNum(r.nums[W - 1]); d2[r.d] = (d2[r.d] || 0) + c; s2 += c; if (r.nums.length === 2 * W) tot2 = cpNum(r.nums[2 * W - 1]); });
-      if (tot2 == null || tot2 === s2) { days = d2; sum = s2; rows = runs.length; total = tot2; } } }
-  if (rows && (total == null || total === sum)) return { from, to, cents: sum, days };
-  // 3) the table didn't add up / couldn't be read, but payroll's own total is there: use it (all on the first day)
-  const T = total != null ? total : (() => { const m = t.match(/\btotal(?:\s+commission)?(?:\s+payable)?\s*:?\s*\$?\s*(-?[\d,]+\.\d\d-?)/i); return m ? cpNum(m[1]) : null; })();
-  if (T != null && Math.abs(T) < 5000000) return { from, to, cents: T, days: { [from]: T }, approx: true };
-  return null;
-}
+// cpParse (the payslip PDF reader) is in the 2.27.12 section at the end: it copes with more layouts and date formats
 const cpSlipFor = iso => (CM().slips || []).find(x => !x.mine && iso >= x.from && iso <= x.to);
-// 2.27.12: payslip <-> work fortnight by overlap (most of both), not exact dates
-function cpOv(a1, b1, a2, b2) { const a = a1 > a2 ? a1 : a2, b = b1 < b2 ? b1 : b2; return b < a ? 0 : dayGap(b, a) + 1; }
-function cpSlipForWork(wk) { if (!wk) return null; const len = dayGap(wk.end, wk.start) + 1; let best = null, bo = 0;
-  (CM().slips || []).forEach(x => { if (x.mine) return; const o = cpOv(x.from, x.to, wk.start, wk.end), sl = dayGap(x.to, x.from) + 1;
-    if (o > bo && o >= Math.ceil(len * 0.6) && o >= Math.ceil(sl * 0.6)) { best = x; bo = o; } }); return best; }
-// 2.27.12: his pay lands on the Wednesday nearest the Bills payday (afternoon/evening), and counts as still to come until the bank shows it
-function myWed(d) { if (!d) return d; let x = 3 - new Date(parseD(d)).getUTCDay(); if (x > 3) x -= 7; if (x < -3) x += 7; return addDays(d, x); }
-function myLandFor(pp) { return pp && pp.start ? myWed(pp.start) : ''; }
-function myPending(pp, T) { const land = myLandFor(pp); if (!land) return false; if (land > T) return true; if (land < addDays(T, -3)) return false;
-  try { return !(mywSt().seen || []).some(x => x.d >= addDays(land, -3) && x.d <= addDays(land, 3)); } catch (e) { return land >= T; } }
 function cpApply(r, meta) {
   const c = CM(); c.slips = c.slips || []; c.replaced = c.replaced || [];
   const old = c.slips.find(x => x.to === r.to && x.from === r.from);
@@ -23449,53 +23413,6 @@ function cpApply(r, meta) {
   const s = { from: r.from, to: r.to, cents: r.cents, got: meta.got || new Date().toISOString(), mid: meta.mid || '', late, days: r.days };
   c.slips = c.slips.filter(x => !(x.to === r.to && x.from === r.from)).concat([s]).sort((a, b) => a.to < b.to ? -1 : 1).slice(-30);
   return { slip: s, replaced: mine.reduce((n, e) => n + e.cents, 0), n: mine.length };
-}
-async function cpPdfFromOutlook(id) {
-  const L = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,name,contentType');
-  const a = (L.value || []).find(x => /\.pdf$/i.test(x.name || '') || /pdf/i.test(x.contentType || '')); if (!a) return null;
-  const token = await mailAccess('microsoft'), res = await fetch('https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(id) + '/attachments/' + encodeURIComponent(a.id) + '/$value', { headers: { Authorization: 'Bearer ' + token } });
-  return res.ok ? new Uint8Array(await res.arrayBuffer()) : null;
-}
-async function cpFindMail(sinceISO) {
-  const out = [];
-  if (mailConnected('microsoft')) { try {
-    const d = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages?$filter=' + encodeURIComponent(`receivedDateTime ge ${sinceISO} and from/emailAddress/address eq '${CP_FROM}'`) + '&$orderby=receivedDateTime desc&$top=10&$select=id,subject,receivedDateTime,hasAttachments');
-    (d.value || []).filter(m => CP_SUBJ.test(m.subject || '') && m.hasAttachments).forEach(m => out.push({ src: 'ms', id: m.id, got: m.receivedDateTime })); } catch (e) { } }
-  if (mailConnected('google')) { try {
-    const B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages', days = Math.max(1, Math.ceil((Date.now() - Date.parse(sinceISO)) / 864e5));
-    const list = await mbAuthGet('google', B + '?maxResults=10&q=' + encodeURIComponent(`from:${CP_FROM} subject:(commission payslip) has:attachment newer_than:${days}d`));
-    for (const it of (list.messages || [])) out.push({ src: 'g', id: it.id }); } catch (e) { } }
-  return out;
-}
-async function cpPdfFromGmail(id) {
-  const B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages', g = await mbAuthGet('google', B + '/' + encodeURIComponent(id) + '?format=full');
-  let aid = null; const walk = p => { if (!p || aid) return; if (/\.pdf$/i.test(p.filename || '') && p.body && p.body.attachmentId) aid = p.body.attachmentId; (p.parts || []).forEach(walk); }; walk(g.payload);
-  if (!aid) return null;
-  const d = await mbAuthGet('google', B + '/' + encodeURIComponent(id) + '/attachments/' + encodeURIComponent(aid)), b = atob(String(d.data || '').replace(/-/g, '+').replace(/_/g, '/'));
-  return { u: Uint8Array.from(b, ch => ch.charCodeAt(0)), got: g.internalDate ? new Date(+g.internalDate).toISOString() : '' };
-}
-async function refreshCommMail(force) {
-  if (cpBusy || !S || !S.commission || !(mailConnected('microsoft') || mailConnected('google'))) return;
-  const c = CM(); if (!force && c.mailAt && Date.now() - c.mailAt < CP_MAX_AGE) return;
-  cpBusy = true; let got = [];
-  try {
-    const last = (c.slips || []).reduce((m, x) => x.got > m ? x.got : m, '');
-    const since = new Date(last ? Math.min(Date.parse(last) - 864e5, Date.now() - 20 * 864e5) : Date.now() - 45 * 864e5).toISOString().replace(/\.\d+Z$/, 'Z');
-    const seen = new Set((c.slips || []).map(x => x.mid).filter(Boolean));
-    for (const m of (await cpFindMail(since)).slice(0, 6)) {
-      const mid = m.src + ':' + m.id; if (seen.has(mid)) continue;
-      try { let u = null, at = m.got || '';
-        if (m.src === 'ms') u = await cpPdfFromOutlook(m.id); else { const r = await cpPdfFromGmail(m.id); if (r) { u = r.u; at = r.got; } }
-        if (!u) continue;
-        const r = cpParse(await pdfText(u)); if (!r) continue;
-        const a = cpApply(r, { mid, got: at }); if (a) got.push(a); } catch (e) { }
-    }
-    c.mailAt = Date.now(); await save();
-  } catch (e) { } finally { cpBusy = false; }
-  if (got.length) { try { render(); } catch (e) { }
-    const a = got.sort((x, y) => x.slip.to < y.slip.to ? 1 : -1)[0];
-    toast(`Commission payslip from email: ${centsMoney(a.slip.cents)} for ${fmt(a.slip.from)} – ${fmt(a.slip.to)}.${a.n ? ' It replaces what you typed for those days.' : ''}`); }
-  return got;
 }
 (() => { const o = refreshKora; refreshKora = function (force) { const r = o.apply(this, arguments); try { refreshCommMail(force).catch(() => { }); } catch (e) { } return r; }; })();
 async function cpCheckNow() { if (!(mailConnected('microsoft') || mailConnected('google'))) { toast('Connect Outlook or Gmail in Settings first.'); return; }
@@ -23937,3 +23854,260 @@ function hwStepSrcLine() {
   return t ? `<div class="s hwsrc" style="margin-top:4px">👟 <b>Step source:</b> ${t}</div>` : '';
 }
 (() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { if (!hwOn()) return h; const i = h.indexOf('<div class="btns" style="margin-top:8px"><button type="button" class="btn small" onclick="hwRefresh(true)">'); if (i < 0) return h; return h.slice(0, i) + hwStepSrcLine() + h.slice(i); } catch (e) { return h; } }; })();
+
+/* ================= 2.27.12: PAY-DAY TIMING, PAYSLIP COMMISSION MATCH, FORTNIGHTLY CARD PLAN =================
+   When money lands (from Shane): his pay Wednesday afternoon/evening (fortnightly), Sarah's (MINISTRY OF EDUCATIO) on a
+   Tuesday (fortnightly, the week set by the last pay the bank showed), Board (L H JENKINS into Kiwibank BOARD) Tuesday
+   night about 11pm (weekly). Expected lines carry that date and only say Late once the usual time has gone (his pay: after
+   Wednesday; Sarah's: after Tuesday; Board: the next morning, as it lands in quiet hours). With no payday set in Bills,
+   the pay fortnights default to his Wednesdays (from the last pay seen, else from his commission fortnight).
+   Payslip: the email payslip is used for a pay when its dates cover most of that pay's work fortnight (not only an exact match).
+   Card: after each pay, a part-payment from ORBIT (default: what went on the card since the last statement or part-payment),
+   then before the due date a top-up = statement balance − what's been paid since the statement, so it's still paid in full. */
+const INC_DOW = { shane: 3, sarah: 2, board: 2 }, INC_PER = { shane: 14, sarah: 14, board: 7, clean: 7 };
+function incDow(k) { const o = S.settings && S.settings.incDow && S.settings.incDow[k]; return Number.isInteger(o) && o >= 0 && o <= 6 ? o : INC_DOW[k]; }
+const dowOf = d => new Date(parseD(d)).getUTCDay();
+function snapDow(d, dow) { if (!d || dow == null) return d; let x = dow - dowOf(d); if (x > 3) x -= 7; if (x < -3) x += 7; return addDays(d, x); }
+const incSnap = (k, d) => snapDow(d, incDow(k));
+function myLandFor(pp) { return pp && pp.start ? incSnap('shane', pp.start) : ''; }
+// a pay is still to come until the bank shows it (it lands in the evening, so payday itself still counts)
+function myPending(pp, T) { const land = myLandFor(pp); if (!land) return false; if (land > T) return true; if (land < addDays(T, -3)) return false;
+  try { return !(mywSt().seen || []).some(x => x.d >= addDays(land, -3) && x.d <= addDays(land, 3)); } catch (e) { return land >= T; } }
+function myPayGuess() { try { const s = mywSt().seen || []; if (s.length) return snapDow(s[s.length - 1].d, incDow('shane')); } catch (e) { }
+  try { const a = CM() && CM().anchor; if (a) return addDays(a, 16); } catch (e) { } return ''; }
+(() => { const o = paydays; paydays = function () { const r = o.apply(this, arguments); if (r) return r;
+  try { const g = myPayGuess(); if (!g) return null; const T = todayT(), from = T - 420 * DAY, to = T + 420 * DAY, a = parseD(g), k = Math.ceil((a - from) / (14 * DAY));
+    const ds = repeatDates({ start: isoT(a - k * 14 * DAY), repeat: 'fortnightly' }, from, to).map(x => x.date); if (!ds.length) return null; if (ds[0] > todayISO()) ds.unshift(addDays(ds[0], -14)); return ds; } catch (e) { return null; } }; })();
+// the landing dates after 'after' up to 'to'
+function incDates(k, after, to, hint) { const per = INC_PER[k]; let base = '';
+  if (k === 'shane') { const ds = paydays(); if (ds) return [...new Set(ds.map(d => incSnap('shane', d)))].filter(d => d > after && d <= to).sort(); base = hint || ((mywSt().seen || []).slice(-1)[0] || {}).d; }
+  else if (k === 'sarah') base = ((swSt().seen || []).slice(-1)[0] || {}).d || hint;
+  else base = ((irSt(k).seen || []).slice(-1)[0] || {}).d || hint;
+  if (!base || !per) return []; let d = incSnap(k, base); while (d > after) d = addDays(d, -per); while (d <= after) d = addDays(d, per); const out = []; for (; d <= to; d = addDays(d, per)) out.push(d); return out; }
+function incExpDate(k, pp) { try { if (k === 'shane') return myLandFor(pp); if (k === 'sarah') return incDates('sarah', addDays(pp.start, -1), pp.end)[0] || ''; } catch (e) { } return ''; }
+function incLate(k, d) { if (!d) return false; const cut = k === 'board' ? addDays(d, 1) + 'T09:00:00' : d + 'T23:59:59'; return Date.now() > new Date(cut).getTime(); }
+const incWhen = (k, d) => !d ? '' : k === 'shane' ? fmtW(d) + ' afternoon/evening' : k === 'board' ? fmtW(d) + ' night, about 11pm' : fmtW(d);
+// Board's weekly beat on his Tuesday (the bank sometimes shows it a day later)
+(() => { const o = irBeats; irBeats = function (k, from, to) { if (!INC_DOW[k]) return o.apply(this, arguments); return incDates(k, addDays(from, -1), to); }; })();
+(() => { const o = FN_ST.expected; FN_ST.expected = x => { let h = o(x); try { if (x && x.date) { const w = incWhen(x.irk || x.key, x.date);
+  h = h.replace('<span class="fnst about">Expected</span>', x.late ? `<span class="fnst over">Late</span> was expected ${esc(w)}` : `<span class="fnst about">Expected</span> ${esc(w)}`); } } catch (e) { } return h; }; })();
+FN_ST.skipped = x => `<span class="fnst">Not seen in the bank</span>${x && x.date ? ' · ' + esc(fmtW(x.date)) : ''} · the top-up covers it`;
+FN_ST.covered = () => `<span class="fnst paid">Nothing more to pay</span> · the part-payments cover the statement`;
+
+// ---- payslip ↔ work fortnight: overlap, not exact ----
+const ovDays = (a1, b1, a2, b2) => { const a = a1 > a2 ? a1 : a2, b = b1 < b2 ? b1 : b2; return b < a ? 0 : dayGap(b, a) + 1; };
+function cpSlipForWork(wk) { if (!wk) return null; const len = dayGap(wk.end, wk.start) + 1; let best = null, bo = 0;
+  (CM().slips || []).forEach(x => { if (x.mine) return; const o = ovDays(x.from, x.to, wk.start, wk.end), sl = dayGap(x.to, x.from) + 1;
+    if (o > bo && o >= Math.ceil(len * 0.6) && o >= Math.ceil(sl * 0.6)) { best = x; bo = o; } }); return best; }
+
+// ---- fortnightly card plan ----
+function cardPart() { const c = debtsSt().card, p = c.part && typeof c.part === 'object' ? c.part : (c.part = {});
+  if (!['spend', 'pct', 'amt', 'off'].includes(p.mode)) p.mode = 'spend'; if (!(+p.pct > 0 && +p.pct <= 100)) p.pct = 50; if (!(+p.amt >= 0)) p.amt = 0; return p; }
+function cardPlanList() {
+  const D = CF && CF.data; if (!D) return null; const cA = cfCardAcct(D); if (!cA) return null;
+  const T = todayISO(), c = debtsSt().card, part = cardPart(), H = addDays(T, 56), dOf = t => t.date.slice(0, 10);
+  const txs = (D.transactions || []).filter(t => t.acct === cA.id), spendTx = txs.filter(t => t.amount < 0);
+  const first = txs.reduce((m, t) => dOf(t) < m ? dOf(t) : m, T), win = Math.max(7, Math.min(28, dayGap(T, first)));
+  const actual = (a, b) => r2(spendTx.filter(t => dOf(t) > a && dOf(t) <= b).reduce((n, t) => n - t.amount, 0)); // (a, b]
+  const billsIn = (a, b, paidToo) => { if (b < a) return 0; try { return fnSum(budgetBillRows({ start: a, end: b }).filter(x => x.card && (paidToo || !x.paid))); } catch (e) { return 0; } };
+  const sd = Math.max(0, (actual(addDays(T, -win), T) - billsIn(addDays(T, -win + 1), T, true)) / win); // everyday card spending a day, card bills apart
+  const spend = (a, b) => { if (b <= T) return { v: actual(a, b), about: false }; const a2 = a > T ? a : T; return { v: r2((a < T ? actual(a, T) : 0) + sd * dayGap(b, a2) + billsIn(addDays(a2, 1), b)), about: true }; };
+  const owedNow = Math.max(0, r2((cA.limit || 1000) - (cA.available || 0)));
+  const real = (c.akPays || []).map(p => ({ d: p.d, a: p.a })).concat(cardPend(c).map(t => ({ d: t.d, a: t.a, tick: 1 }))).sort((x, y) => x.d.localeCompare(y.d)), used = new Set();
+  const cycles = []; { let cy = cardCycleOf(addDays(T, -20)); for (let i = 0; cy && cy.stmt <= H && i < 6; i++) { cycles.push(cy); cy = cardCycleOf(addDays(cy.due, 1)); } }
+  if (!cycles.length) return null;
+  const cyFor = d => cycles.find(cy => cy.due >= d) || null;
+  const items = [];
+  // part-payments: the day after each of his pays (Thursday), skipped when the top-up is only days away
+  const lands = part.mode === 'off' ? [] : incDates('shane', addDays(T, -21), H);
+  let anchor = '';
+  lands.forEach(P => { const pd = addDays(P, 1), cy = cyFor(pd); if (!cy) return; const prevSt = cycles.map(x => x.stmt).concat(cardPrevStmt(cycles[0].stmt)).filter(x => x <= P).sort().pop() || '';
+    const from = [prevSt, anchor].filter(Boolean).sort().pop() || addDays(P, -14);
+    if (dayGap(cy.due, pd) <= 3) return; // the top-up is due within a few days: it covers this
+    const hit = real.filter(p => !used.has(p) && p.d >= P && p.d <= addDays(pd, 3));
+    if (hit.length) { hit.forEach(p => used.add(p)); anchor = P; items.push({ kind: 'part', date: pd, paidOn: hit[hit.length - 1].d, amount: r2(hit.reduce((n, p) => n + p.a, 0)), st: 'paid', tick: hit.every(p => p.tick), due: cy.due, stmt: cy.stmt, from, to: P }); return; }
+    let amt = 0, about = false;
+    if (part.mode === 'spend') { const s = spend(from, P); amt = s.v; about = s.about; }
+    else if (part.mode === 'amt') amt = +part.amt || 0;
+    else { const g = cardGoal(cy); amt = r2((g ? g.goal : owedNow) * part.pct / 100); about = !g || !g.sb; }
+    amt = Math.max(0, Math.round(amt * 100) / 100);
+    if (pd < addDays(T, -3)) { items.push({ kind: 'part', date: pd, amount: 0, st: 'skipped', due: cy.due, stmt: cy.stmt, from, to: P }); return; }
+    if (amt >= 5) { anchor = P; items.push({ kind: 'part', date: pd < T ? T : pd, amount: amt, about, st: 'planned', due: cy.due, stmt: cy.stmt, from, to: P }); } });
+  // top-ups: statement balance − paid since the statement − part-payments still planned before the due date
+  cycles.forEach(cy => { if (cy.due < addDays(T, -16)) return; const g = cardGoal(cy); if (!g) return;
+    const plannedAfter = fnSum(items.filter(x => x.st === 'planned' && x.kind === 'part' && x.date > cy.stmt && x.date <= cy.due));
+    let bal, balAbout, paidSince;
+    if (cy.stmt <= T) { bal = g.goal; balAbout = !g.sb || g.about; paidSince = g.paid; }
+    else { const plannedBefore = fnSum(items.filter(x => x.st === 'planned' && x.date > T && x.date <= cy.stmt)); const s = spend(T, cy.stmt);
+      bal = Math.max(0, r2(owedNow + s.v - plannedBefore)); balAbout = true; paidSince = 0; }
+    const date = addDays(cy.due, -1) < T ? T : addDays(cy.due, -1);
+    if (cy.due < T && !g.full) return; // a past due date: nothing to plan any more
+    if (cy.stmt <= T && g.full) { const last = real.filter(p => p.d > cy.stmt && p.d <= (cy.due < T ? T : cy.due)).pop(); items.push({ kind: 'top', date: last ? last.d : date, paidOn: last ? last.d : '', amount: r2(Math.max(0, g.paid - fnSum(items.filter(x => x.kind === 'part' && x.st === 'paid' && x.due === cy.due)))), st: 'paid', tick: g.pend > 0, due: cy.due, stmt: cy.stmt, bal, balAbout, paidSince, full: true }); return; }
+    const amt = Math.max(0, r2(bal - paidSince - plannedAfter));
+    items.push({ kind: 'top', date, amount: amt, about: balAbout && cy.stmt > T, st: amt > 0.005 ? 'planned' : 'covered', due: cy.due, stmt: cy.stmt, bal, balAbout, paidSince, plannedAfter }); });
+  items.sort((a, b) => a.date.localeCompare(b.date) || (a.kind === 'part' ? -1 : 1));
+  return { items, cycles, sd: r2(sd), part, owedNow };
+}
+// Transfers to make: one tickable row per planned card payment up to the plan's end
+function cardXferRows(D, X, nm, day) {
+  const cA = cfCardAcct(D); if (!cA || !X) return ''; const cn = /^(ASB )?Visa Rewards$/i.test(cfAName(cA)) ? 'ASB credit card' : cfAName(cA), T = todayISO();
+  const P = (X.cardPlan || []).filter(k => k.amount > 0.005 || k.short > 0); if (!P.length) return '';
+  return P.map(k => { const pay = k.can, why = k.kind === 'part' ? `part-payment after your pay${k.moved ? ` · ${cfMoney(k.moved)} of it moves to the top-up (not enough spare before then)` : ''}` : `top-up so the statement is paid in full by ${esc(day(k.cdue))}${k.short > 0 ? ` · ${cfMoney(k.short)} short, would attract interest` : ', so no interest'}`;
+    if (!(pay > 0.005)) return `<div class="cftip">⚠️ Card ${k.kind === 'part' ? 'part-payment' : 'top-up'} ${esc(day(k.date))}: ${esc(nm(k.from))} can’t spare ${cfMoney(k.amount)}${k.kind === 'part' ? ' — it moves to the top-up' : ''}.</div>`;
+    return `<div class="row xfrow"><button type="button" class="packtick" role="checkbox" aria-checked="false" aria-label="Done" onclick="cardTick(${pay},${jsArg(k.cdue)})"></button><div class="tx"><div class="t">Pay ${cfMoney(pay)} from ${esc(nm(k.from))} to ${esc(cn)} ${k.date <= T ? 'today' : 'on ' + esc(day(k.date))}</div><div class="s">${k.after ? `After pay lands ${esc(day(k.after))} · ` : ''}${why}</div></div></div>`; }).join('');
+}
+function cardPlanCard(D) {
+  const a = cfCardAcct(D); if (!a) return ''; const pl = cardPlanList(); if (!pl) return '';
+  const X = (() => { try { return xferPlan(D); } catch (e) { return null; } })(), T = todayISO(), part = pl.part, lim = a.limit || 1000, owed = pl.owedNow, k = cardDays();
+  const fromNm = (() => { const id = X && X.src && X.src.id, x = id && D.accounts.find(y => y.id === id); return x ? (cfIsOrbit(x) ? 'ORBIT' : cfAName(x)) : 'ORBIT'; })();
+  const XP = (X && X.cardPlan) || [], xOf = it => XP.find(z => z.date === (it.date < T ? T : it.date) && z.kind === it.kind && z.cdue === it.due);
+  const th = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : (n % 10 < 4 ? n % 10 : 0)]);
+  const shown = pl.items.filter(x => x.date >= addDays(T, -10) && x.date <= addDays(T, 45)).slice(0, 6);
+  const rows = shown.map(it => { const z = xOf(it), lab = it.kind === 'part' ? 'Part-payment' : 'Top-up (pay in full)';
+    const st = it.st === 'paid' ? `<span class="fnst paid">Paid ✓</span> ${esc(fmtW(it.paidOn || it.date))}${it.tick ? ' · ticked, waiting for the bank' : ''}` : it.st === 'skipped' ? FN_ST.skipped(it) : it.st === 'covered' ? FN_ST.covered() : z && z.short > 0.005 ? `<span class="fnst over">Short ${cfMoney(z.short)}</span> ${esc(fmtW(it.date))}` : `<span class="fnst ${it.about ? 'about' : 'due'}">${it.about ? 'About' : 'Planned'}</span> ${esc(fmtW(it.date))}`;
+    const how = it.kind === 'part' ? (part.mode === 'spend' ? `card spending ${esc(fmtW(addDays(it.from, 1)))} – ${esc(fmtW(it.to))}` : part.mode === 'pct' ? `${part.pct}% of the statement` : 'your set amount')
+      : `statement ${esc(fmtW(it.stmt))} ${it.balAbout ? 'about ' : ''}${cfMoney(it.bal)}${it.paidSince ? ' − ' + cfMoney(it.paidSince) + ' paid' : ''}${it.plannedAfter ? ' − ' + cfMoney(it.plannedAfter) + ' part-payment' : ''} · due ${esc(fmtW(it.due))}`;
+    const amt = it.st === 'paid' ? it.amount : z ? z.can : it.amount;
+    return `<div class="row cfrow"><div class="tx"><div class="t">${lab}: ${it.about && it.st !== 'paid' ? 'about ' : ''}${cfMoney(amt)}${it.st !== 'paid' && it.st !== 'skipped' && it.st !== 'covered' ? ' from ' + esc(fromNm) : ''}</div><div class="s">${st} · ${how}</div></div></div>`; }).join('');
+  // where possible: what can't be covered, and the most that can
+  const shorts = XP.filter(z => z.kind !== 'part' && z.short > 0.005);
+  let warn = shorts.map(z => `<div class="cfwarn">⚠️ ${esc(fromNm)} can’t cover the full payoff by ${esc(fmtW(z.cdue))}: ${cfMoney(z.short)} short. The most you can pay is ${cfMoney(z.can)}; the rest would attract interest.</div>`).join('');
+  const next = pl.items.find(x => x.kind === 'top' && x.due >= T);
+  if (next && next.st !== 'paid' && part.mode !== 'off') { const planned = r2(next.paidSince + fnSum(pl.items.filter(x => x.kind === 'part' && x.st === 'planned' && x.due === next.due && x.date > next.stmt)) + next.amount);
+    if (planned < next.bal - 0.5) warn += `<div class="cfwarn">⚠️ The plan pays ${cfMoney(planned)} of the ${cfMoney(next.bal)} statement by ${esc(fmtW(next.due))}. Pay the rest too to avoid interest.</div>`; }
+  const mode = part.mode === 'off' ? 'Off: the whole statement by the due date only' : part.mode === 'pct' ? `${part.pct}% of the statement after each pay` : part.mode === 'amt' ? `${cfMoney(+part.amt || 0)} after each pay` : 'what went on the card since the last statement or part-payment (default)';
+  return `<div class="sec">Credit card plan</div><div class="card cfcard" id="cardplan">
+    <div class="row cfrow"><div class="tx"><div class="t">${esc(/^(ASB )?Visa Rewards$/i.test(cfAName(a)) ? 'ASB credit card' : cfAName(a))}${next ? ` · next due ${esc(fmtW(next.due))}` : ''}</div><div class="s">You owe ${cfMoney(owed)} · ${cfMoney(a.available || 0)} available of ${cfMoney(lim)}</div><div class="pbar"><i style="width:${Math.min(100, Math.round(100 * owed / lim))}%"></i></div></div></div>
+    <div style="padding:0 12px 4px"><div class="s"><b>Each fortnight:</b> part-payment from ${esc(fromNm)} the day after your Wednesday pay: ${esc(mode)}. <b>Before the due date:</b> a top-up of the statement minus what’s been paid since it, so it’s paid in full.</div></div>
+    ${rows}${warn ? `<div style="padding:4px 12px">${warn}</div>` : ''}
+    <div style="padding:6px 12px 10px"><div class="s muted">Paying part each fortnight takes it out of ORBIT a little sooner, so it slightly reduces the interest-free benefit (a little more ORBIT interest).</div>
+    <div class="s" style="margin-top:6px">Statement on the ${th(k.stmt)} · due ${k.gap} days later · <button type="button" class="linkbtn" onclick="cardPartForm()">Fortnightly amount</button> · <button type="button" class="linkbtn" onclick="cardDaysForm()">Dates</button></div></div></div>`;
+}
+(() => { const o = cardCfCard; cardCfCard = function (D) { try { const h = cardPlanCard(D); if (h) return h; } catch (e) { console.error(e); } return o.apply(this, arguments); }; })();
+async function cardPartForm() { const p = cardPart();
+  openSheet('Fortnightly card payments', `<p class="muted" style="margin:0 0 10px">After each pay, part of the card is paid from ORBIT. Before the due date the rest of the statement is topped up, so it’s still paid in full.</p>` +
+    field('Each fortnight, pay', sel('mode', [['spend', 'What went on the card since the last statement or part-payment'], ['pct', 'A % of the statement'], ['amt', 'A set amount'], ['off', 'Nothing: the whole statement by the due date']], p.mode)) +
+    field('Percent (for “A % of the statement”)', inp('pct', String(p.pct), 'inputmode="decimal" maxlength="5"')) +
+    field('Amount $ (for “A set amount”)', inp('amt', p.amt ? String(p.amt) : '', 'inputmode="decimal" placeholder="0.00"')),
+    async v => { const mode = ['spend', 'pct', 'amt', 'off'].includes(v.mode) ? v.mode : 'spend', pct = +String(v.pct || '').replace(/[%\s]/g, ''), amt = +String(v.amt || '').replace(/[$,\s]/g, '');
+      if (mode === 'pct' && !(pct > 0 && pct <= 100)) return 'Please type a percent from 1 to 100.'; if (mode === 'amt' && !(amt > 0 && amt <= 100000)) return 'Please type the amount as a number, like 250.';
+      p.mode = mode; if (pct > 0 && pct <= 100) p.pct = pct; if (mode === 'amt') p.amt = r2(amt); await save(); render(); toast('Card plan saved.'); }); }
+// Settings › Connect bank: the card plan setting
+(() => { const o = akahuSettings; akahuSettings = function () { const h = o.apply(this, arguments); try { if (!cfKey() && !CFmock) return h; const p = cardPart();
+  const m = p.mode === 'off' ? 'Off' : p.mode === 'pct' ? p.pct + '% of the statement' : p.mode === 'amt' ? money(+p.amt || 0) : 'Card spending since the last statement';
+  return h + `<div class="sec">Credit card plan</div><div class="list"><div class="srow" role="button" tabindex="0" onclick="cardPartForm()"><div class="tx"><div class="t">Fortnightly part-payment</div><div class="s">${esc(m)} · paid from ORBIT after each pay, then topped up before the due date so it’s paid in full</div></div>${I('right')}</div></div>`; } catch (e) { return h; } }; })();
+// Bell: a reminder the day before and on the day of each planned card payment
+function cardBellRows() { try { const pl = cardPlanList(); if (!pl) return []; const T = todayISO(), gone = nfDis();
+  return pl.items.filter(x => x.st === 'planned' && x.amount > 0.005 && x.date >= T && x.date <= addDays(T, 1)).map(x => { const k = 'cardpay-' + x.kind + '-' + x.date; if (gone.includes(k)) return '';
+    return `<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#cashflow')}"><div class="ic">💳</div><div class="tx"><div class="t">${x.date === T ? 'Today' : 'Tomorrow'}: pay ${x.about ? 'about ' : ''}${money(x.amount)} to the ASB credit card from ORBIT</div><div class="s">${x.kind === 'part' ? 'Fortnightly part-payment after your pay' : 'Top-up so the ' + esc(fmtW(x.stmt)) + ' statement is paid in full by ' + esc(fmtW(x.due))} · tick it in Cash flow › Transfers to make</div></div></div>`; }).filter(Boolean); } catch (e) { return []; } }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = cardBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
+(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^cardpay-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
+// Settings › Notifications › money in: when each lands
+(() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { return h.replace('None 10pm–8am.', 'None 10pm–8am. Your pay lands Wednesday afternoon/evening and Sarah’s on Tuesday (fortnightly); Board about 11pm Tuesday (weekly), so it shows here the next morning without a buzz.'); } catch (e) { return h; } }; })();
+
+/* ================= 2.27.12 (cont.): tolerant commission payslip reading =================
+   What broke the commission (Wage estimate, Budget's Wage estimate row, Cash flow): the "next pay" was the first Bills
+   payday strictly after today, moved back by how early the bank showed the last pay. With his pay landing a day or two
+   before the Bills payday (or a Monday/Tuesday payday beat), that date was today (Tue 20 Oct), so the 21 Oct pay was
+   skipped and the 4 Nov pay (work fortnight 19 Oct – 1 Nov, no payslip yet) was shown instead. Cash flow had the same
+   "on or before today = gone" step. The payslip was also only used when its dates matched the work fortnight exactly.
+   Fixed above (pay = the Wednesday it lands, pending until the bank shows it; overlap match) and here: the PDF reader
+   copes with other date formats, minus signs and table layouts, other subject lines and senders at nlg.co.nz. */
+const CP_SUBJ2 = /commission\s*pay\s*-?\s*slip|pay\s*-?\s*slip\b.*\bcommission|commission\s+(statement|report|advice)/i;
+const CP_FROM2 = /@(?:[a-z0-9-]+\.)*(?:nlg|noelleeming)\.co\.nz$/i;
+const CP_MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+function cpYr(y) { y = +y; return y < 100 ? 2000 + y : y; }
+function cpIso(d, m, y) { d = +d; m = +m; y = cpYr(y); if (!(d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 2020 && y <= 2100)) return ''; return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
+function cpPeriod(t, hint) {
+  const D = '(\\d{1,2})[\\/.\\-](\\d{1,2})[\\/.\\-](\\d{2,4})', M = '(\\d{1,2})(?:st|nd|rd|th)?\\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?,?\\s+(\\d{4})';
+  const tries = [new RegExp('\\b(?:FOR|PERIOD(?:\\s+FROM)?|FROM|PAY\\s+PERIOD:?|WEEK\\s+ENDING)?\\s*' + D + '\\s*(?:to|until|-|–|—)\\s*' + D, 'i'), new RegExp(M + '\\s*(?:to|until|-|–|—)\\s*' + M, 'i')];
+  let m = t.match(tries[0]); if (m) { const a = cpIso(m[1], m[2], m[3]), b = cpIso(m[4], m[5], m[6]); if (a && b && a <= b && dayGap(b, a) <= 31) return { from: a, to: b }; }
+  m = t.match(tries[1]); if (m) { const a = cpIso(m[1], CP_MON[m[2].toLowerCase()], m[3]), b = cpIso(m[4], CP_MON[m[5].toLowerCase()], m[6]); if (a && b && a <= b && dayGap(b, a) <= 31) return { from: a, to: b }; }
+  // the attachment name: "Commission Payslip Ending 18-10-2026.pdf" (a fortnight ending that Sunday)
+  const h = String(hint || '').match(/end(?:ing|ed)?\s*(\d{1,2})[\/.\-_ ](\d{1,2})[\/.\-_ ](\d{2,4})/i); if (h) { const b = cpIso(h[1], h[2], h[3]); if (b) return { from: addDays(b, -13), to: b, fromName: true }; }
+  return null; }
+const CP_MONEY = /^\(?-?\d[\d,]*\.\d\d-?\)?$/;
+const cpNum = s => { const neg = /-$|^\(?-|^\(.*\)$/.test(s), v = Math.round(parseFloat(s.replace(/[(),\-]/g, '')) * 100); return neg ? -v : v; };
+const cpDate = s => { const m = String(s).match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/); return m ? cpIso(m[1], m[2], m[3]) : ''; };
+function cpToks(line) { return line.replace(/\$\s*/g, '').replace(/(\d\.\d\d)\s+-(?=\s|$)/g, '$1-').trim().split(/\s+/).filter(Boolean); }
+function cpParse(text, hint) {
+  const t = String(text || '').replace(/[\u2212\u2012]/g, '-').replace(/\u00a0/g, ' '), P = cpPeriod(t, hint); if (!P) return null;
+  const { from, to } = P; let days = {}, sum = 0, total = null, rows = 0, width = 0;
+  const addRow = (d, nums) => { const c = cpNum(nums[nums.length - 1]); days[d] = (days[d] || 0) + c; sum += c; rows++; if (!width) width = nums.length; };
+  // 1) one table row per line: date then only money columns, TOTAL last; the totals line follows the last row
+  for (const line of t.split(/\r?\n/)) { const tok = cpToks(line); if (!tok.length) continue; const d = cpDate(tok[0]), rest = tok.slice(1);
+    if (d && total == null && rest.length >= 3 && rest.every(x => CP_MONEY.test(x)) && (!width || rest.length === width)) addRow(d, rest);
+    else if (!d && rows && total == null && tok.length >= 3 && tok.every(x => CP_MONEY.test(x)) && (!width || tok.length === width)) total = cpNum(tok[tok.length - 1]); }
+  // 2) the PDF text came out in one stream (cells not on their own lines): date + N money values, totals = N more
+  if (!rows || (total != null && total !== sum)) { const tok = cpToks(t.replace(/\r?\n/g, ' ')); const runs = [];
+    for (let i = 0; i < tok.length; i++) { const d = cpDate(tok[i]); if (!d) continue; let j = i + 1; while (j < tok.length && CP_MONEY.test(tok[j])) j++; if (j - i - 1 >= 3) runs.push({ d, nums: tok.slice(i + 1, j) }); else if (runs.length) break; i = j - 1; }
+    const W = runs.length > 1 ? runs[0].nums.length : 0;
+    if (W && runs.every((r, k) => r.nums.length === W || (k === runs.length - 1 && r.nums.length === 2 * W))) { const d2 = {}; let s2 = 0, tot2 = null;
+      runs.forEach((r, k) => { const c = cpNum(r.nums[W - 1]); d2[r.d] = (d2[r.d] || 0) + c; s2 += c; if (r.nums.length === 2 * W) tot2 = cpNum(r.nums[2 * W - 1]); });
+      if (tot2 == null || tot2 === s2) { days = d2; sum = s2; rows = runs.length; total = tot2; } } }
+  if (rows && (total == null || total === sum)) return { from, to, cents: sum, days };
+  // 3) the table didn't add up / couldn't be read, but payroll's own total is there: use it (all on the first day)
+  const T = total != null ? total : (() => { const m = t.match(/\btotal(?:\s+commission)?(?:\s+payable)?\s*:?\s*\$?\s*(-?[\d,]+\.\d\d-?)/i); return m ? cpNum(m[1]) : null; })();
+  if (T != null && Math.abs(T) < 5000000) return { from, to, cents: T, days: { [from]: T }, approx: true };
+  return null;
+}
+// same payslip again (the mailbox can give it a different id): nothing to do
+(() => { const o = cpApply; cpApply = function (r, meta) { try { const old = (CM().slips || []).find(x => x.from === r.from && x.to === r.to);
+  if (old && !old.mine && old.cents === r.cents) { if (meta && meta.mid && !old.mid) old.mid = meta.mid; return null; } } catch (e) { } return o.apply(this, arguments); }; })();
+const cpIsPdf = u => !!(u && u.length > 4 && u[0] === 0x25 && u[1] === 0x50 && u[2] === 0x44 && u[3] === 0x46); // %PDF
+async function cpPdfFromOutlook(id) {
+  const L = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,name,contentType,size');
+  const A = (L.value || []).filter(x => /\.pdf$/i.test(x.name || '') || /pdf/i.test(x.contentType || '') || (/octet-stream/i.test(x.contentType || '') && !/\.(txt|html?|png|jpe?g|gif)$/i.test(x.name || '')));
+  A.sort((a, b) => (/\.pdf$/i.test(b.name || '') ? 1 : 0) - (/\.pdf$/i.test(a.name || '') ? 1 : 0));
+  for (const a of A.slice(0, 3)) { const token = await mailAccess('microsoft'), res = await fetch('https://graph.microsoft.com/v1.0/me/messages/' + encodeURIComponent(id) + '/attachments/' + encodeURIComponent(a.id) + '/$value', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) continue; const u = new Uint8Array(await res.arrayBuffer()); if (cpIsPdf(u)) return { u, name: a.name || '' }; }
+  return null; }
+async function cpPdfFromGmail(id) {
+  const B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages', g = await mbAuthGet('google', B + '/' + encodeURIComponent(id) + '?format=full');
+  let aid = null, name = ''; const walk = p => { if (!p || aid) return; if ((/\.pdf$/i.test(p.filename || '') || /pdf/i.test(p.mimeType || '')) && p.body && p.body.attachmentId) { aid = p.body.attachmentId; name = p.filename || ''; } (p.parts || []).forEach(walk); }; walk(g.payload);
+  if (!aid) return null;
+  const d = await mbAuthGet('google', B + '/' + encodeURIComponent(id) + '/attachments/' + encodeURIComponent(aid)), b = atob(String(d.data || '').replace(/-/g, '+').replace(/_/g, '/'));
+  const u = Uint8Array.from(b, ch => ch.charCodeAt(0)); return cpIsPdf(u) ? { u, name, got: g.internalDate ? new Date(+g.internalDate).toISOString() : '' } : null; }
+async function cpFindMail(sinceISO) {
+  const out = [], seenAt = new Set(), push = m => { const k = String(m.got || '').slice(0, 19); if (k && seenAt.has(k)) return; if (k) seenAt.add(k); out.push(m); };
+  if (mailConnected('microsoft')) {
+    const S1 = '&$top=15&$select=id,subject,receivedDateTime,hasAttachments,from', ok = m => m && m.hasAttachments && CP_SUBJ2.test(m.subject || '') && (!m.receivedDateTime || m.receivedDateTime >= sinceISO);
+    try { const d = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages?$filter=' + encodeURIComponent(`receivedDateTime ge ${sinceISO} and from/emailAddress/address eq '${CP_FROM}'`) + '&$orderby=receivedDateTime desc' + S1);
+      (d.value || []).filter(ok).forEach(m => push({ src: 'ms', id: m.id, got: m.receivedDateTime })); } catch (e) { }
+    // other senders at Noel Leeming / NLG, and when the filter isn't allowed on this mailbox
+    try { const d = await mbAuthGet('microsoft', 'https://graph.microsoft.com/v1.0/me/messages?$search=' + encodeURIComponent('"commission payslip"') + S1);
+      (d.value || []).filter(m => ok(m) && CP_FROM2.test(((m.from || {}).emailAddress || {}).address || '')).forEach(m => push({ src: 'ms', id: m.id, got: m.receivedDateTime })); } catch (e) { } }
+  if (mailConnected('google')) { try {
+    const B = 'https://gmail.googleapis.com/gmail/v1/users/me/messages', days = Math.max(1, Math.ceil((Date.now() - Date.parse(sinceISO)) / 864e5));
+    const list = await mbAuthGet('google', B + '?maxResults=10&q=' + encodeURIComponent(`from:(nlg.co.nz OR noelleeming.co.nz) (subject:"commission payslip" OR subject:"commission pay slip" OR (subject:payslip subject:commission)) has:attachment newer_than:${days}d`));
+    for (const it of (list.messages || [])) out.push({ src: 'g', id: it.id }); } catch (e) { } }
+  out.sort((a, b) => String(b.got || '').localeCompare(String(a.got || ''))); return out; }
+async function refreshCommMail(force) {
+  if (cpBusy || !S || !S.commission || !(mailConnected('microsoft') || mailConnected('google'))) return;
+  const c = CM(); if (!force && c.mailAt && Date.now() - c.mailAt < CP_MAX_AGE) return;
+  cpBusy = true; let got = [];
+  try {
+    const last = (c.slips || []).reduce((m, x) => x.got > m ? x.got : m, '');
+    const since = new Date(last ? Math.min(Date.parse(last) - 864e5, Date.now() - 20 * 864e5) : Date.now() - 45 * 864e5).toISOString().replace(/\.\d+Z$/, 'Z');
+    const seen = new Set((c.slips || []).map(x => x.mid).filter(Boolean)), seenAt = new Set((c.slips || []).map(x => String(x.got || '').slice(0, 19)).filter(Boolean));
+    for (const m of (await cpFindMail(since)).slice(0, 8)) {
+      const mid = m.src + ':' + m.id; if (seen.has(mid) || (m.got && seenAt.has(String(m.got).slice(0, 19)))) continue;
+      try { let r0 = null, at = m.got || '';
+        if (m.src === 'ms') r0 = await cpPdfFromOutlook(m.id); else { r0 = await cpPdfFromGmail(m.id); if (r0 && r0.got) at = r0.got; }
+        if (!r0) continue;
+        const r = cpParse(await pdfText(r0.u), r0.name); if (!r) continue;
+        const a = cpApply(r, { mid, got: at }); if (a) got.push(a); } catch (e) { }
+    }
+    c.mailAt = Date.now(); await save();
+  } catch (e) { } finally { cpBusy = false; }
+  if (got.length) { try { render(); } catch (e) { }
+    const a = got.sort((x, y) => x.slip.to < y.slip.to ? 1 : -1)[0];
+    toast(`Commission payslip from email: ${centsMoney(a.slip.cents)} for ${fmt(a.slip.from)} – ${fmt(a.slip.to)}.${a.n ? ' It replaces what you typed for those days.' : ''}`); }
+  return got;
+}
+// Bell: a card payment the bank (Akahu) shows as made, for a day
+function cardPaidBellRows() { try { const pl = cardPlanList(); if (!pl) return []; const T = todayISO(), gone = nfDis();
+  return pl.items.filter(x => x.st === 'paid' && !x.tick && x.paidOn && x.paidOn >= addDays(T, -1) && x.amount > 0.005).map(x => { const k = 'cardpaid-' + x.kind + '-' + x.paidOn; if (gone.includes(k)) return '';
+    return `<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#cashflow')}"><div class="ic">✅</div><div class="tx"><div class="t">Paid ✓ ${money(x.amount)} to the ASB credit card</div><div class="s">${x.kind === 'part' ? 'Fortnightly part-payment' : 'Top-up for the ' + esc(fmtW(x.stmt)) + ' statement'} · seen in the bank ${esc(fmtW(x.paidOn))}</div></div></div>`; }).filter(Boolean); } catch (e) { return []; } }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = cardPaidBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
+(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^cardpaid-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();

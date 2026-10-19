@@ -1,14 +1,15 @@
-// 2.27.12 regression test (commission): the commission payslip reader (cpParse) and the payslip ↔ work fortnight match.
+// 2.27.12 regression test: the commission payslip reader (cpParse) and the payslip ↔ work fortnight match.
 // Run: node tests/payslip-parse.test.mjs. Amounts are invented; no real payslip is kept in this repo.
 import fs from 'fs'; import assert from 'assert/strict';
 const src = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
-const a = src.indexOf('// 2.27.12: tolerant payslip reader'), b = src.indexOf('function myPending');
-assert.ok(a > 0 && b > a, 'payslip reader found in app.js');
+const a = src.indexOf('const CP_SUBJ2'), b = src.indexOf('// same payslip again');
+const ov = src.slice(src.indexOf('const ovDays'), src.indexOf('// ---- fortnightly card plan ----'));
+assert.ok(a > 0 && b > a && ov.length > 50, 'payslip reader found in app.js');
 const DAY = 864e5, parseD = s => Date.parse(s + 'T00:00:00Z'), dayGap = (x, y) => Math.round((parseD(x) - parseD(y)) / DAY);
 const addDays = (s, n) => new Date(parseD(s) + n * DAY).toISOString().slice(0, 10);
 let SLIPS = []; const CM = () => ({ slips: SLIPS });
-const api = new Function('dayGap', 'addDays', 'CM', 'parseD', src.slice(a, b) + '; return { cpParse, cpSlipForWork, myLandFor };')(dayGap, addDays, CM, parseD);
-const { cpParse, cpSlipForWork, myLandFor } = api;
+const api = new Function('dayGap', 'addDays', 'CM', src.slice(a, b) + ov + '; return { cpParse, cpSlipForWork, CP_SUBJ2, CP_FROM2 };')(dayGap, addDays, CM);
+const { cpParse, cpSlipForWork, CP_SUBJ2, CP_FROM2 } = api;
 let n = 0; const ok = (name, f) => { f(); n++; console.log('ok', name); };
 const HEAD = 'Noel Leeming   SALESPERSON COMMISSION REPORT   October 19, 2026, 7:27:29 AM   Page 1\n FOR 5/10/2026 to 18/10/2026\n SALESPERSON:\nBRANCH:\n';
 const COLS = ' DATE   TURNOVER   SFM   SALES   TS AND PP   TS AND PP   SPIVs   BONUS   TOTAL\nEX GST   EX GST   COMMISSION   EX GST   COMMISSION   COMMISSION\n';
@@ -26,7 +27,8 @@ ok('month-name period', () => assert.equal(cpParse(pdfjsText.replace('FOR 5/10/2
 ok('no period in the text: from the attachment name', () => { const r = cpParse(pdfjsText.replace(/ FOR 5\/10\/2026 to 18\/10\/2026\n/, ''), 'Commission Payslip Ending 18-10-2026.pdf'); assert.equal(r.from, '2026-10-05'); assert.equal(r.to, '2026-10-18'); assert.equal(r.cents, 105000); });
 ok('rows that do not add up: payroll total is used', () => { const r = cpParse(pdfjsText.replace('1,012.50\n', '1,000.00\n')); assert.equal(r.cents, 105000); assert.equal(r.approx, true); });
 ok('nothing readable: null (never guesses)', () => assert.equal(cpParse('Hello\nNo table here'), null));
-ok('his pay lands on the Wednesday nearest the Bills payday', () => { ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-24'].forEach(d => assert.equal(myLandFor({ start: d }), '2026-10-21', d)); });
+ok('subject and sender variants', () => { ['Your Commission Payslip from Noel Leeming', 'Commission Pay Slip – Noel Leeming', 'Your payslip (commission) is ready', 'Commission statement'].forEach(s => assert.ok(CP_SUBJ2.test(s), s));
+  assert.ok(!CP_SUBJ2.test('Your Noel Leeming order has shipped')); ['nlg-payroll@nlg.co.nz', 'payroll@noelleeming.co.nz', 'no-reply@mail.nlg.co.nz'].forEach(x => assert.ok(CP_FROM2.test(x), x)); assert.ok(!CP_FROM2.test('x@fakenlg.co.nz.evil.com')); });
 ok('Wed 21 Oct pay uses the 5-18 Oct payslip ($799.87)', () => { SLIPS = [{ from: '2026-10-05', to: '2026-10-18', cents: 79987 }, { from: '2026-09-21', to: '2026-10-04', cents: 50000 }];
   assert.equal(cpSlipForWork({ start: '2026-10-05', end: '2026-10-18' }).cents, 79987); assert.equal(cpSlipForWork({ start: '2026-10-06', end: '2026-10-19' }).cents, 79987); });
 ok('payslip matches the work fortnight by overlap, not exact dates', () => {
