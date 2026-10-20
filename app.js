@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.21';
+const APP_VERSION = '2.27.22';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13491,7 +13491,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-18'
+// VIDEO_LIST_UPDATED = '2026-10-21'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -13509,7 +13509,7 @@ const VIDEO_CATS = [
 ];
 const VIDEOS = [
   { id: 'TD74a5g5rp0', title: 'Everything Apple announced in under 10 mins - Welcome Home 2026', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=TD74a5g5rp0', reason: 'Linus Tech Tips sums up everything Apple announced at Welcome Home 2026 in under ten minutes.' },
-  { id: 'QVv3mQzlrN0', title: 'Apple Homeview Impressions: Not Convinced!', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=QVv3mQzlrN0', reason: 'MKBHD’s first impressions of Apple Homeview, and why he isn’t sold on it yet.' },
+  { id: 'b2tjnxX8IHU', title: 'Did Google just dethrone OpenAI and Anthropic?', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=b2tjnxX8IHU', reason: 'Fireship asks whether Google has just pulled ahead of OpenAI and Anthropic in AI.' },
   { id: 'scwlR0QHGOk', title: 'The NEW Tesla Roadster: My Honest Reaction', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=scwlR0QHGOk', reason: 'MKBHD gives his honest reaction to the new Tesla Roadster.' },
   { id: 'qqhIp0OaZWI', title: 'NVIDIA RTX Spark 7 Good and Bad Things', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=qqhIp0OaZWI', reason: 'Linus Tech Tips runs through the good and bad points of the new NVIDIA RTX Spark.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
@@ -13519,9 +13519,9 @@ const VIDEOS = [
   { id: 'hbGkK4VgU60', title: 'Spring Jobs for Root Crops, Fruit Trees and Tomatoes | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=hbGkK4VgU60', reason: 'Spring jobs for root crops, fruit trees and tomatoes, well timed for a New Zealand spring.' },
   { id: 'CkAg3RLv1-E', title: 'Top Tips for Citrus Success! | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=CkAg3RLv1-E', reason: 'Gardening Australia’s top tips for healthier citrus trees.' },
   { id: 'mkA-AAJRIcM', title: '8 Crops You Should Plant in October ASAP', channel: 'Epic Gardening', category: 'garden', url: 'https://www.youtube.com/watch?v=mkA-AAJRIcM', reason: 'Eight crops worth planting in October, right on time for spring in New Zealand.' },
-  { id: 'WM_mlF9MH6k', title: 'I let my tomato seeds rot to save them...', channel: 'Epic Gardening', category: 'garden', url: 'https://www.youtube.com/watch?v=WM_mlF9MH6k', reason: 'A tomato seed trick that helps you save seed for next season.' },
+  { id: 'M8T7lLChcVA', title: 'Chop and Prop: Make cuttings as you prune! | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=M8T7lLChcVA', reason: 'Gardening Australia shows how to turn your spring pruning offcuts into new plants from cuttings.' },
   { id: '9_l_xMvI7YY', title: 'Planning feels productive, but it\'s not', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=9_l_xMvI7YY', reason: 'Ali Abdaal on why planning can feel like progress when it isn’t, and what to do instead.' },
-  { id: 'I8Om2suIykU', title: 'One of the most underrated skills: knowing when to ignore advice', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=I8Om2suIykU', reason: 'Why knowing which advice to skip saves time and focus.' },
+  { id: 'BNRfzI6E1Es', title: 'Brutally Honest Advice About Productivity in 26 Minutes', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=BNRfzI6E1Es', reason: 'Ali Abdaal’s straight-talking productivity advice, all in 26 minutes.' },
   { id: 'MBPHU7aaklM', title: 'Success Is Hard Until You Build Systems Like This', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=MBPHU7aaklM', reason: 'How building simple systems makes big goals easier to stick with.' },
   { id: 'K8AMhj-ImMI', title: 'If you’re ambitious but inconsistent, please watch this', channel: 'Ali Abdaal', category: 'time', url: 'https://www.youtube.com/watch?v=K8AMhj-ImMI', reason: 'Ali Abdaal on staying consistent when ambition alone is not enough.' },
   { id: '5tJryO1CYkc', title: 'What\'s for dinner? | Low FODMAP + Gluten Free Recipes | Cook with me!', channel: 'Becky Excell', category: 'cook', url: 'https://www.youtube.com/watch?v=5tJryO1CYkc', reason: 'Becky Excell cooks gluten-free, low FODMAP dinner ideas with you.' },
@@ -14271,7 +14271,7 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 18 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
+    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 21 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
 }
 
 
