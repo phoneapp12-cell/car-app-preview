@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.16';
+const APP_VERSION = '2.27.17';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10333,6 +10333,7 @@ async function scheduleReminders() {
       const w = waterRemindAt();
       if (w && (S.settings || {}).waterPlants !== false) reminders.push({ id: 'sug-water', title: "💧 Water the plants. It's 10° or under for the next 5 hours.", date: w.date, time: w.time, repeat: 'none' });
     } catch (e) {}
+    try { bedPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.27.17: bedtime nudges on work nights (he asked; not held back by quiet hours)
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay) return '';
       if (!reminders.length) { /* still clear the relay below once we have a subscription */ }
@@ -24140,3 +24141,37 @@ const cfDateChips = h => String(h).replace(/>([^<]*)</g, (m, t) => '>' + t.repla
 (() => { const o = xferCard; xferCard = function () { const h = o.apply(this, arguments); try { return cfDateChips(h); } catch (e) { return h; } }; })();
 (() => { const o = cardPlanCard; cardPlanCard = function () { const h = o.apply(this, arguments); try { return h ? cfDateChips(h) : h; } catch (e) { return h; } }; })();
 (() => { try { const st = document.createElement('style'); st.textContent = '.cfdate{font-weight:700;background:rgba(214,120,40,.16);color:inherit;padding:0 5px;border-radius:6px;white-space:nowrap}'; document.head.appendChild(st); } catch (e) { } })();
+
+/* ================= 2.27.17: bedtime nudges on work nights =================
+   Shane asked for these: after midnight, only when the day after midnight is a work day in the Work roster. From the start
+   time (default 12:00am) about every 45 minutes until 3:00am, gentle at first and firmer as it gets later. Each is a push
+   (scheduled on the relay like reminders, so it comes even with the app closed; he asked for them in quiet hours) and a
+   bell card. 'Going to bed' stops the rest of that night. Settings › Notifications page: on/off and the start time. */
+const BED_LINES = [
+  (w, h) => `🌙 It’s past midnight and you’ve got work at ${w}. Heading to bed now gets you about ${h} of sleep.`,
+  (w, h) => `🌙 Still up? Work’s at ${w}. Bed now still gives you about ${h}. Time to start winding down.`,
+  (w, h) => `😴 It’s getting late. Work at ${w}, so bed now means about ${h}. Phone down soon?`,
+  (w, h) => `😴 Okay, it’s really time now. Work at ${w} and you’re down to about ${h} if you go now.`,
+  (w, h) => `⏰ Last nudge, promise. It’s 3am and work’s at ${w}. Bed right now gets you about ${h}. Go on, off you go.`];
+const bedOn = () => (S.settings || {}).bedNudge !== false;
+const bedStart = () => { const v = (S.settings || {}).bedStart; return /^(2[23]|0[0-2]):(00|30)$/.test(v || '') ? v : '00:00'; };
+const bedRel = hm => { const m = hmMin(hm); return m >= 12 * 60 ? m - 1440 : m; }; // minutes from midnight (11pm = -60)
+const fmtHM = m => { const h = Math.floor(m / 60), mm = m % 60; return (h % 12 || 12) + (mm ? ':' + String(mm).padStart(2, '0') : '') + (h < 12 ? 'am' : 'pm'); };
+const bedHrs = m => { const h = Math.max(0, Math.floor(m / 30) / 2); return (h % 1 ? Math.floor(h) + '½' : String(h)) + (h === 1 ? ' hour' : ' hours'); };
+// the nudges for the night before work day D (YYYY-MM-DD): [{id, at: 'YYYY-MM-DDTHH:MM', title, n}]
+function bedNight(D) { try { if (!bedOn()) return []; const r = rosterState(), st = hmMin((r.days || {})[String(new Date(parseD(D)).getUTCDay())]); if (st == null) return [];
+  if (((S.settings || {}).bedDone || '') === D) return []; const wake = st - 60, out = [];
+  for (let m = bedRel(bedStart()), n = 0; m <= 180 && n < 8; m += 45, n++) { const date = m < 0 ? addDays(D, -1) : D, mm = (m + 1440) % 1440, hm = String(Math.floor(mm / 60)).padStart(2, '0') + ':' + String(mm % 60).padStart(2, '0');
+    const lv = Math.min(BED_LINES.length - 1, Math.round(n * (BED_LINES.length - 1) / Math.max(1, Math.floor((180 - bedRel(bedStart())) / 45))));
+    out.push({ id: 'bed-' + D + '-' + n, at: date + 'T' + hm, date, time: hm, n, title: BED_LINES[lv](fmtHM(st), bedHrs(wake - m)) }); }
+  return out; } catch (e) { return []; } }
+function bedPushes() { const now = nzStampLocal(), T = now.slice(0, 10), out = []; for (let i = 0; i < 4; i++) bedNight(addDays(T, i)).forEach(x => { if (x.at > now) out.push({ id: x.id, title: x.title, date: x.date, time: x.time, repeat: 'none' }); }); return out.slice(0, 12); }
+async function bedGoing(D) { S.settings.bedDone = D; await save(); try { await scheduleReminders(); } catch (e) { } render(); toast('Night night. No more nudges tonight.'); }
+function bedBellRows() { try { const now = nzStampLocal(), T = now.slice(0, 10), gone = nfDis(); let L = [];
+  [T, addDays(T, 1)].forEach(D => { const ago = nzStampLocal(new Date(Date.now() - 4 * 3600e3)), N = bedNight(D).filter(x => x.at <= now && x.at >= ago); if (N.length) L = [N[N.length - 1]]; });
+  return L.filter(x => !gone.includes(x.id) && x.at >= addDays(T, -1)).map(x => `<div class="row glnew" data-nk="${esc(x.id)}"><div class="ic">🛏️</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s"><button type="button" class="btn small primary" onclick="bedGoing(${jsArg(x.id.slice(4, 14))})">Going to bed</button></div></div></div>`); } catch (e) { return []; } }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = bedBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
+async function bedSet(k, v) { S.settings = S.settings || {}; if (k === 'on') S.settings.bedNudge = !bedOn(); else S.settings.bedStart = v; await save(); try { await scheduleReminders(); } catch (e) { } render(); }
+(() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const opt = (v, l) => `<option value="${v}"${bedStart() === v ? ' selected' : ''}>${l}</option>`;
+  return h + `<div class="srow"><div class="tx"><div class="t">Bedtime nudges on work nights</div><div class="s">Only when you’ve got work the next day (Work roster). About every 45 min until 3am, push and bell, even in quiet hours.</div></div><button class="switch ${bedOn() ? 'on' : ''}" role="switch" aria-checked="${bedOn()}" aria-label="Bedtime nudges on work nights" onclick="bedSet('on')"></button></div>` +
+    `<div class="srow"><div class="tx"><div class="t">Bedtime nudges start</div></div><select onchange="bedSet('start', this.value)">${opt('22:30', '10:30pm')}${opt('23:00', '11:00pm')}${opt('23:30', '11:30pm')}${opt('00:00', '12:00am')}${opt('00:30', '12:30am')}${opt('01:00', '1:00am')}</select></div>`; } catch (e) { return h; } }; })();
