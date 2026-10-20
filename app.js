@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.22';
+const APP_VERSION = '2.27.23';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5189,7 +5189,8 @@ async function ecLoad() {
   if (ecBusy) return; ecBusy = true; ecErr = '';
   try {
     const parts = await Promise.all([ecOutlook().catch(e => { ecErr = 'Outlook could not be read just now.'; return []; }), ecGmail().catch(() => [])]);
-    ecList = parts.flat().sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    await refreshSc(true).catch(() => { }); const sc = scSt().msgs; // 2.27.23: Sarah's claim emails, once each
+    ecList = parts.flat().filter(m => !(m.box === 'outlook' && sc[m.id])).concat(scList()).sort((a, b) => String(b.at).localeCompare(String(a.at)));
   } finally { ecBusy = false; }
 }
 async function ecBytes(m, a) {
@@ -5225,10 +5226,8 @@ function ecParse(text) {
 function ecSheetHtml() {
   if (!mailConnected('microsoft') && !mailConnected('google')) return `<p class="muted">Connect Outlook (or Gmail) in Settings › Email first. The app reads mail on this phone only.</p>`;
   if (ecBusy || !ecList) return `<p class="muted" id="ecwait">Looking through the last 3 months of email…</p>`;
-  if (!ecList.length) return `<p class="muted" id="ecnone">No invoice PDFs from Central Family Health, Tui Chiropractic or a dentist in the last 3 months${mailConnected('google') ? ' (Outlook and Gmail checked)' : ' (Outlook checked)'}.</p>${ecErr ? `<p class="muted">${esc(ecErr)}</p>` : ''}`;
-  return `<div class="list" id="eclist">${ecList.flatMap((m, i) => m.pdfs.map((a, j) => `<div class="row ecrow"><div class="ic health">${I('doc')}</div><div class="tx" style="flex:1;min-width:0"><div class="t">${esc(ecProviderName(m.src, m))}</div>
-    <div class="s">${esc(fmtW(String(m.at).slice(0, 10)))} · ${esc(m.subject)}</div><div class="s ecpdf">${esc(a.name)}</div></div>
-    <div class="ecbtns"><button type="button" class="btn small" aria-label="Preview PDF" onclick="ecPreview(${i},${j})">${I('eye')} View</button><button type="button" class="btn small primary" onclick="ecPick(${i},${j})">Use</button></div></div>`)).join('')}</div>
+  if (!ecList.length) return `<p class="muted" id="ecnone">No invoice PDFs from Central Family Health, Tui Chiropractic or a dentist, and no claim emails from Sarah, in the last 3 months${mailConnected('google') ? ' (Outlook and Gmail checked)' : ' (Outlook checked)'}.</p>${ecErr ? `<p class="muted">${esc(ecErr)}</p>` : ''}`;
+  return `<div class="list" id="eclist">${ecList.flatMap((m, i) => (m.pdfs.length ? m.pdfs : [null]).map((a, j) => ecRowHtml(m, a, `ecPreview(${i},${j})`, `ecPick(${i},${j})`))).join('')}</div>
     <p class="muted" style="font-size:0.8125rem;margin:8px 2px 0">Read from ${mailConnected('google') ? 'Outlook and Gmail' : 'Outlook'} on this phone. Nothing is sent.</p>`;
 }
 async function emailClaim(ref) {
@@ -5236,29 +5235,85 @@ async function emailClaim(ref) {
   openSheet('Claim from an email', `<div id="ecbox">${ecSheetHtml()}</div>`, null);
   if (!ecList && (mailConnected('microsoft') || mailConnected('google'))) { await ecLoad(); const b = document.getElementById('ecbox'); if (b) b.innerHTML = ecSheetHtml(); }
 }
-async function ecFetch(i, j) {
-  const m = ecList[i], a = m && m.pdfs[j]; if (!a) return null;
-  if (!a.data) { toast('Opening the PDF…'); a.bytes = await ecBytes(m, a); a.data = await u8ToDataUrl(a.bytes); }
+const ecImgOnly = a => !!a && !ecIsPdf(a) && ecIsImg(a);
+function ecRowHtml(m, a, view, use) {
+  const sar = m.src && m.src.k === 'sarah', t = sar ? 'Sarah’s claim email' : ecProviderName(m.src, m);
+  return `<div class="row ecrow"><div class="ic health">${I(a && ecImgOnly(a) ? 'image' : sar ? 'mail' : 'doc')}</div><div class="tx" style="flex:1;min-width:0"><div class="t">${esc(t)}</div>
+    <div class="s">${esc(fmtW(String(m.at).slice(0, 10)))} · ${esc(m.subject)}</div><div class="s ecpdf">${a ? esc(a.name) : 'No PDF or photo attached'}</div></div>
+    <div class="ecbtns">${a ? `<button type="button" class="btn small" aria-label="Preview" onclick="${view}">${I('eye')} View</button><button type="button" class="btn small primary" onclick="${use}">Use</button>` : m.link ? `<a class="btn small" href="${esc(m.link)}" target="_blank" rel="noopener">Open email</a>` : ''}</div></div>`;
+}
+async function ecFetchM(m, a) {
+  if (!m || !a) return null;
+  if (!a.data) { const img = ecImgOnly(a); toast(img ? 'Opening the photo…' : 'Opening the PDF…'); a.bytes = await ecBytes(m, a);
+    a.data = img ? await clPhCompress(new File([a.bytes], a.name || 'photo.jpg', { type: a.type || 'image/jpeg' })) : await u8ToDataUrl(a.bytes); }
   return { m, a };
 }
-async function ecPreview(i, j) { try { const x = await ecFetch(i, j); if (x) pdfView(x.a.data, x.a.name); } catch (e) { toast('That PDF could not be opened.'); } }
-async function ecPick(i, j) {
-  let x; try { x = await ecFetch(i, j); } catch (e) { toast('That PDF could not be read.'); return; }
+const ecFetch = (i, j) => { const m = ecList[i]; return ecFetchM(m, m && m.pdfs[j]); };
+function imgView(data, name) {
+  const el = document.createElement('div'); el.className = 'phview'; el.id = 'phview';
+  el.innerHTML = `<img src="${data}" alt="Claim photo"><div class="pvbar"><a class="btn" href="${data}" download="${esc(String(name || 'photo').replace(/\.[a-z0-9]+$/i, '') + '.jpg')}">${I('download')} Save</a><button type="button" class="btn primary" id="pvclose">Close</button></div>`;
+  document.body.appendChild(el); el.querySelector('#pvclose').onclick = () => el.remove();
+}
+async function ecPreviewM(m, a) { try { const x = await ecFetchM(m, a); if (x) (ecImgOnly(a) ? imgView : pdfView)(x.a.data, x.a.name); } catch (e) { toast('That file could not be opened.'); } }
+const ecPreview = (i, j) => { const m = ecList[i]; return ecPreviewM(m, m && m.pdfs[j]); };
+const ecPick = (i, j) => { const m = ecList[i]; return ecPickM(m, m && m.pdfs[j]); };
+async function ecPickM(m0, a0) {
+  let x; try { x = await ecFetchM(m0, a0); } catch (e) { toast('That file could not be read.'); return; }
   if (!x) return;
-  const { m, a } = x, got = Object.assign(ecParse(m.text), ecParse(await pdfText(x.a.bytes)));
+  const { m, a } = x, img = ecImgOnly(a), sar = m.src && m.src.k === 'sarah', got = Object.assign(ecParse(m.text), img ? {} : ecParse(await pdfText(x.a.bytes)));
   const pid = uid('ph'); await clPhPut(pid, a.data);
   const ref = ecCtx ? ecCtx.ref : 'new', base = Object.assign(claimNorm({}), (claimCtx(ref) || {}).claim || {});
   const v = ecCtx && ecCtx.vals;
   const c = claimNorm(Object.assign(base, v ? { patient: claimPatient(v), provider: v.provider, reason: v.reason, date: v.date, amount: v.amount, notes: v.notes, status: v.status } : {}, {
-    provider: ecProviderName(m.src, m), reason: (v && v.reason) || m.src.reason, date: got.date || String(m.at).slice(0, 10), amount: got.amount || (v && v.amount) || '',
-    patient: (v && claimPatient(v)) || base.patient || 'Shane', notes: [(v && v.notes) || base.notes, 'From email: ' + m.subject + ' (' + fmtW(String(m.at).slice(0, 10)) + ')'].filter(Boolean).join('\n'),
-    photos: ((ecCtx && ecCtx.photos) || base.photos || []).concat([{ id: pid, up: false, pdf: true, name: a.name }]), updated: Date.now() }));
+    provider: sar ? (v && v.provider) || base.provider || '' : ecProviderName(m.src, m), reason: (v && v.reason) || m.src.reason || base.reason || '', date: got.date || String(m.at).slice(0, 10), amount: got.amount || (v && v.amount) || '',
+    patient: (v && claimPatient(v)) || base.patient || (sar ? 'Sarah' : 'Shane'), notes: [(v && v.notes) || base.notes, 'From email: ' + m.subject + ' (' + fmtW(String(m.at).slice(0, 10)) + ')'].filter(Boolean).join('\n'),
+    photos: ((ecCtx && ecCtx.photos) || base.photos || []).concat([img ? { id: pid, up: false, name: a.name } : { id: pid, up: false, pdf: true, name: a.name }]), updated: Date.now() }));
   const cx = claimCtx(ref); if (!cx) return;
   await cx.save(c, true);
   const nref = ref === 'new' ? 'c:' + S.claims[S.claims.length - 1].id : ref;
   claimSheet(nref);
   toast(got.amount ? `Filled in from the email: ${claimMoney(c.amount)} on ${fmtW(c.date)}.` : 'Filled in from the email. Please check the amount.');
 }
+/* 2.27.23: Sarah's claim emails. Any email from Sarah (sarah.jenkins@outlook.co.nz) with "claim" or "claims" in the subject, last 3 months,
+   read from Outlook on this phone with the same Mail.Read sign-in as Email claim. Only these emails are kept ('scMail'): date, subject,
+   Outlook link and the PDF / photo attachment names. Nothing else of Sarah's mail. Shows on UniMed claims, in Email claim and on the bell. */
+const SC_FROM = 'sarah.jenkins@outlook.co.nz', SC_SRC = { k: 'sarah', provider: '', reason: '' };
+const ecIsImg = a => /^image\/(jpe?g|png|heic|heif|webp|gif)/i.test(String(a.contentType || a.type || a.mimeType || '')) || /\.(jpe?g|png|heic|heif|webp)$/i.test(String(a.name || a.filename || ''));
+const scSt = () => { try { const o = JSON.parse(localStorage.getItem('scMail') || '{}'); return o && o.msgs ? o : { at: 0, msgs: {} }; } catch (e) { return { at: 0, msgs: {} }; } };
+let scBusy = false, scMemo = { s: '', L: [] };
+async function refreshSc(force) {
+  if (scBusy || !S || !mailConnected('microsoft')) return;
+  const st = scSt(); if (!force && st.at && Date.now() - st.at < 30 * 60e3) return;
+  scBusy = true; const before = Object.keys(st.msgs).sort().join();
+  try {
+    const G = 'https://graph.microsoft.com/v1.0/me/messages', msgs = {};
+    const d = await mbAuthGet('microsoft', G + '?$filter=' + encodeURIComponent(`receivedDateTime ge ${ecSince().toISOString()} and from/emailAddress/address eq '${SC_FROM}'`) + '&$orderby=receivedDateTime desc&$top=50&$select=id,subject,receivedDateTime,webLink,hasAttachments');
+    for (const x of (d.value || []).filter(x => /claim/i.test(x.subject || ''))) {
+      const o = st.msgs[x.id]; let atts = o ? o.atts : [];
+      if (!o && x.hasAttachments) { try { const a = await mbAuthGet('microsoft', G + '/' + encodeURIComponent(x.id) + '/attachments?$select=id,name,contentType,size,isInline');
+        atts = (a.value || []).filter(y => !y.isInline && (ecIsPdf(y) || ecIsImg(y))).map(y => ({ id: y.id, name: String(y.name || 'attachment').slice(0, 120), type: y.contentType || '', size: y.size || 0 })); } catch (e) { continue; } }
+      msgs[x.id] = { subject: String(x.subject).slice(0, 200), at: x.receivedDateTime, link: x.webLink || '', atts };
+    }
+    localStorage.setItem('scMail', JSON.stringify({ at: Date.now(), msgs }));
+  } catch (e) { } finally { scBusy = false; }
+  if (before !== Object.keys(scSt().msgs).sort().join()) { try { if ((location.hash === '#alerts' || location.hash === '#claims') && !sheetOpen) render(); else glBellRedraw(); } catch (e) { } }
+}
+function scList() {
+  const raw = localStorage.getItem('scMail') || ''; if (raw === scMemo.s) return scMemo.L;
+  const L = Object.entries(scSt().msgs).map(([id, v]) => ({ box: 'outlook', id, subject: v.subject || '', name: 'Sarah', addr: SC_FROM, at: v.at, text: '', link: v.link || '', src: SC_SRC, pdfs: (v.atts || []).map(a => Object.assign({}, a)) }))
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  scMemo = { s: raw, L }; return L;
+}
+const scFind = id => scList().find(m => m.id === id);
+function scView(id, j) { const m = scFind(id); if (m) ecPreviewM(m, m.pdfs[j]); }
+function scUse(id, j) { const m = scFind(id); if (!m) return; ecCtx = { ref: 'new', vals: null, photos: [] }; ecPickM(m, m.pdfs[j]); }
+function scClaimsHtml() {
+  if (!mailConnected('microsoft')) return '';
+  setTimeout(() => refreshSc().catch(() => { }), 300);
+  const L = scList(); if (!L.length) return '';
+  return `<div class="sec">From Sarah’s claim emails</div><div class="list" id="scclaims">${L.flatMap(m => (m.pdfs.length ? m.pdfs : [null]).map((a, j) => ecRowHtml(m, a, `scView('${esc(m.id)}',${j})`, `scUse('${esc(m.id)}',${j})`))).join('')}</div>`;
+}
+(() => { const o = refreshMb; refreshMb = async function (force) { const r = await o.apply(this, arguments); try { await refreshSc(force); } catch (e) { } return r; }; })();
 async function pdfView(data, name) {
   const el = document.createElement('div'); el.className = 'phview'; el.id = 'phview';
   el.innerHTML = `<div class="pdfpv" id="pdfpv"><p class="muted" style="color:#fff">Loading preview…</p></div><div class="pvbar"><button type="button" class="btn" id="pvopen">${I('doc')} Open PDF</button>${navigator.share ? `<button type="button" class="btn" id="pvshare">${I('share')} Share</button>` : ''}<a class="btn" href="${data}" download="${esc(name)}">${I('download')} Save</a><button type="button" class="btn primary" id="pvclose">Close</button></div>`;
@@ -5331,7 +5386,7 @@ function Claims() {
   return `<button class="back" onclick="go('#health')">${I('left')} Health</button>` + header('UniMed claims', todo.length ? plural(todo.length, 'claim') + ' to make' + (sent.length ? ' · ' + sent.length + ' waiting' : '') : sent.length ? sent.length + ' waiting on UniMed' : 'All caught up', `<button class="iconbtn add" aria-label="New claim" onclick="claimSheet('new')">${I('plus')}</button>`) +
     `<div class="card cltipcard"><div class="cltip" style="margin:0 0 10px">${I('info')}<div>Claims are made in UniMed’s Smart Claim portal: policy, patient, provider, reason, visit date, amount paid, and a photo of the <b>itemised invoice</b> (not the EFTPOS receipt). At least $${CLAIM_MIN}. Drafts keep for 30 days there.</div></div>
       <div class="btns"><a class="btn primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a><a class="btn" href="tel:0800600666">${I('phone')} 0800 600 666</a></div>
-      <div class="btns" style="margin-top:8px"><button class="btn" id="ecopen" onclick="emailClaim('new')">${I('mail')} Email claim: last 3 months of CFH, Tui Chiropractic, dentist invoices</button></div></div>` +
+      <div class="btns" style="margin-top:8px"><button class="btn" id="ecopen" onclick="emailClaim('new')">${I('mail')} Email claim: last 3 months of CFH, Tui Chiropractic, dentist invoices</button></div></div>` + scClaimsHtml() +
     `<div class="sec">To claim</div>` + (todo.length ? `<div class="list" id="claimtodo">${todo.map(claimRowHtml).join('')}</div>` : `<div class="card empty"><div class="t">Nothing to claim</div><div class="s">Health appointments (yours and Sarah’s) show here after the visit. Tap + for anything else.</div></div>`) +
     (sent.length ? `<div class="sec">Submitted</div><div class="list">${sent.map(claimRowHtml).join('')}</div>` : '') +
     (paid.length ? `<details class="spast"><summary>Paid (${paid.length}${paidSum ? ' · ' + claimMoney(paidSum.toFixed(2)) + ' back' : ''})</summary><div class="list">${paid.map(claimRowHtml).join('')}</div></details>` : '') +
@@ -23603,6 +23658,13 @@ function apCardHtml(x) {
     out.push({ sec: 'ap', key: x.key + '|' + x.a.kind, urgent: false, coming: d <= 14, badge: mbToday(x.at), at: x.at, html: apCardHtml(x) }); }); } catch (e) { }
   return out; }; })();
 MB_SECS.unshift(['ap', 'Appointments from email']);
+// 2.27.23: Sarah's claim emails (last 14 days) on the bell; new ones float into Just in
+(() => { const o = mbItems; mbItems = function () { const out = o(), gone = new Set(mbDis());
+  try { scList().forEach(m => { const k = 'sc|' + m.id; if (gone.has(k) || mbAge(m.at) > 14) return; const n = m.pdfs.length;
+    out.push({ sec: 'sc', key: k, urgent: false, coming: false, badge: mbToday(m.at), at: m.at,
+      html: `<div class="row glnew mbrow scrow" data-mb="${esc(k)}" role="button" tabindex="0" onclick="if(window.glSwipe&&glSwipe.moved)return;go('#claims')"><div class="ic health">${I('mail')}</div><div class="tx"><div class="t">Sarah’s claim email</div><div class="s">${esc(fmtW(String(m.at).slice(0, 10)))} · ${esc(m.subject)} · ${n ? plural(n, 'attachment') + ', ready for UniMed' : 'no attachment'}</div></div></div>` }); }); } catch (e) { }
+  return out; }; })();
+MB_SECS.unshift(['sc', 'UniMed claim emails']);
 // the day before (from noon) and the morning of: one "Upcoming appointments" card (email ones and ones in his calendar)
 function apUpRows() {
   const now = new Date(), T = todayISO(), tm = addDays(T, 1), h = now.getHours(), L = [];
