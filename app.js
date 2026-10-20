@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.18';
+const APP_VERSION = '2.27.19';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23087,7 +23087,8 @@ function bfRow(type, x) {
   const tap = x.tap || (x.url || x.app ? `bfOpen('${x.id}')` : '');
   const th = x.thumb ? `<img src="${esc(x.thumb)}" alt="" decoding="async" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${ic}'))">` : ic;
   const b = (x.btns || []).map(([l, fn]) => `<button type="button" class="btn small${fn === 'open' ? ' primary' : ''}" onclick="${st}${fn === 'open' ? `bfOpen('${x.id}')` : esc(fn)}">${esc(l)}</button>`).join('');
-  return `<div class="row glnew bfrow" data-nk="${x.id}" role="button" tabindex="0" onclick="if(!glSwipe.moved){${esc(tap)}}"><div class="ic${x.thumb ? ' bfth' : ''}">${th}</div><div class="tx"><div class="bflbl">${esc(label)}</div><div class="t">${esc(x.t)}</div>${x.s ? `<div class="s">${esc(x.s)}</div>` : ''}${b ? `<div class="bfbtns">${b}</div>` : ''}</div></div>`;
+  const bl = k === 'blogs' && x.url ? ` data-blogu="${esc(x.url)}" data-blogt="${esc(x.t)}" data-blogs="${esc(String(x.s || '').split(' · ').pop())}"` : ''; // 2.27.19: long-press flags it
+  return `<div class="row glnew bfrow" data-nk="${x.id}"${bl} role="button" tabindex="0" onclick="if(!glSwipe.moved){${esc(tap)}}"><div class="ic${x.thumb ? ' bfth' : ''}">${th}</div><div class="tx"><div class="bflbl">${esc(label)}</div><div class="t">${bl && blogFlagged(x.url) ? '<span class="flagmark">🚩 </span>' : ''}${esc(x.t)}</div>${x.s ? `<div class="s">${esc(x.s)}</div>` : ''}${b ? `<div class="bfbtns">${b}</div>` : ''}</div></div>`;
 }
 // rotate: each day starts at a different type, so a handful of types lead each day
 function bfHtml() {
@@ -24185,7 +24186,7 @@ async function blogFlagToggle(u, t, src) { if (!u) return; S.settings.blogFlags 
   if (i >= 0) { L.splice(i, 1); toast('Unflagged'); } else { L.unshift({ u, t: String(t || u).slice(0, 200), s: String(src || '').slice(0, 80), at: new Date().toISOString() }); L.splice(60); toast('Flagged, saved to Notifications'); }
   await save(); render(); }
 async function blogUnflag(u) { S.settings.blogFlags = blogFlags().filter(f => f.u !== u); await save(); render(); toast('Unflagged'); }
-function blogLpTarget(el) { const a = el && el.closest && el.closest('a[data-blogu], a[href]'); if (!a) return null; if (a.dataset.blogu) return a; return a.querySelector('.ic.blog') ? a : null; }
+function blogLpTarget(el) { const a = el && el.closest && el.closest('[data-blogu], a[href]'); if (!a) return null; if (a.dataset.blogu) return a; return a.querySelector('.ic.blog') ? a : null; }
 (() => { let tm = null, x0 = 0, y0 = 0, fired = 0;
   const clear = () => { if (tm) { clearTimeout(tm); tm = null; } };
   document.addEventListener('pointerdown', ev => { const a = blogLpTarget(ev.target); clear(); if (!a) return; x0 = ev.clientX; y0 = ev.clientY;
@@ -24197,7 +24198,7 @@ function blogLpTarget(el) { const a = el && el.closest && el.closest('a[data-blo
   document.addEventListener('click', ev => { if (fired && Date.now() - fired < 1500 && blogLpTarget(ev.target)) { ev.preventDefault(); ev.stopImmediatePropagation(); fired = 0; } }, true);
   document.addEventListener('dblclick', ev => { if (fired && Date.now() - fired < 1500) { ev.stopImmediatePropagation(); } }, true);
   document.addEventListener('contextmenu', ev => { if (blogLpTarget(ev.target)) ev.preventDefault(); }, true); })();
-(() => { try { const st = document.createElement('style'); st.textContent = 'a[data-blogu]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.bfflag a{color:inherit}'; document.head.appendChild(st); } catch (e) { } })();
+(() => { try { const st = document.createElement('style'); st.textContent = '[data-blogu]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.bfflag a{color:inherit}'; document.head.appendChild(st); } catch (e) { } })();
 (() => { const o = glAlertsBody; glAlertsBody = function () { const h = o.apply(this, arguments); try { const F = blogFlags(); if (!F.length) return h;
   const d = document.createElement('div'); d.innerHTML = h; let box = d.querySelector('.bellpinned');
   if (!box) { const sec = document.createElement('div'); sec.className = 'sec'; sec.textContent = 'Pinned'; box = document.createElement('div'); box.className = 'list bellpinned'; const ji = d.querySelector('.jilist'), after = ji ? ji.nextSibling : d.firstChild; d.insertBefore(sec, after); d.insertBefore(box, sec.nextSibling); }
