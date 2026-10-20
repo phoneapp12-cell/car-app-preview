@@ -22984,7 +22984,7 @@ const BF_TYPES = [
 const bfOn = k => !(S && S.settings && S.settings.bellFeeds && S.settings.bellFeeds[k] === false);
 async function bfToggle(k) { const o = Object.assign({}, S.settings.bellFeeds || {}); o[k] = !bfOn(k); S.settings.bellFeeds = o; await save(); render(); }
 function bfSettingsRows() {
-  return `<div class="srow"><div class="tx"><div class="t">Just in</div><div class="s">New cards sit at the very top until you open, tap or swipe them.</div></div><button class="switch ${(S.settings || {}).bellJustIn !== false ? 'on' : ''}" role="switch" aria-checked="${(S.settings || {}).bellJustIn !== false}" aria-label="Just in" onclick="bfSet('bellJustIn')"></button></div>` +
+  return `<div class="srow"><div class="tx"><div class="t">Just in</div><div class="s">New cards sit at the very top until you open, tap or swipe them, or have seen them on two visits to this page.</div></div><button class="switch ${(S.settings || {}).bellJustIn !== false ? 'on' : ''}" role="switch" aria-checked="${(S.settings || {}).bellJustIn !== false}" aria-label="Just in" onclick="bfSet('bellJustIn')"></button></div>` +
     `<div class="srow"><div class="tx"><div class="t">✅ When Sarah ticks off a to-do</div><div class="s">A card here, plus a phone notification if notifications are on. Only to-dos she shares with you (her private ones never leave her phone). Not shopping or appointments.</div></div><button class="switch ${stickOn() ? 'on' : ''}" role="switch" aria-checked="${stickOn()}" aria-label="When Sarah ticks off a to-do" onclick="bfSet('sarahTicks')"></button></div>` +
     `<div class="srow"><div class="tx"><div class="t">For you today</div><div class="s">A few of these each day under New today on Notifications, cycling. Show more lists the rest. No sport.</div></div></div>` +
     BF_TYPES.map(([k, ic, l]) => `<div class="srow"><div class="tx"><div class="t">${ic} ${esc(l)}</div></div><button class="switch ${bfOn(k) ? 'on' : ''}" role="switch" aria-checked="${bfOn(k)}" aria-label="${esc(l)}" onclick="bfToggle('${k}')"></button></div>`).join('');
@@ -23124,6 +23124,11 @@ const JI_MS = Infinity, JI_MAX = 15, // 2.27.15: unread stays at the very top (n
 function jiLoad() { try { const o = JSON.parse(localStorage.getItem('bellFirst') || 'null'); return o && typeof o === 'object' && o.m ? o : null; } catch (e) { return null; } }
 function jiKey(el) { const c = bpClean(el); c.querySelectorAll('.jiage').forEach(x => x.remove()); const n = s => String(s || '').replace(/\s+/g, ' ').replace(/\d+/g, '#').trim().toLowerCase(); const t = (n((c.querySelector('.t, b') || c).textContent) + (el.dataset.nk ? '' : ' ~ ' + n((c.querySelector('.s') || {}).textContent).slice(0, 60))).slice(0, 180);
   return (el.dataset.nk || (/^h\|/.test(el.dataset.pid || '') ? '' : el.dataset.pid) || 'x') + '|' + t; }
+// 2.27.15: visits to Notifications (a fresh open, at least a minute after the last one counted); a card shown in Just in on two visits counts as read
+function jiVisitTick() { try { if (location.hash !== '#alerts' || document.hidden) return; const v = JSON.parse(localStorage.getItem('bellVisit') || '{"n":0,"at":0}'); if (Date.now() - (v.at || 0) < 60e3) return; v.n = (v.n || 0) + 1; v.at = Date.now(); localStorage.setItem('bellVisit', JSON.stringify(v)); } catch (e) { } }
+const jiVisitN = () => { try { return JSON.parse(localStorage.getItem('bellVisit') || '{}').n || 0; } catch (e) { return 0; } };
+let jiLastHash = location.hash; window.addEventListener('hashchange', () => { if (location.hash === '#alerts' && jiLastHash !== '#alerts') jiVisitTick(); jiLastHash = location.hash; });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) jiVisitTick(); }); jiVisitTick();
 function jiAllRead() { try { const o = jiLoad(); if (!o) return; o.op = o.op || {}; const now = Date.now(); document.querySelectorAll('#glalerts .jilist [data-jik]').forEach(el => { o.op[el.dataset.jik] = now; }); localStorage.setItem('bellFirst', JSON.stringify(o)); render(); } catch (e) { } }
 function jiOpened(k) { try { const o = jiLoad(); if (!o) return; o.op = o.op || {}; o.op[k] = Date.now(); localStorage.setItem('bellFirst', JSON.stringify(o)); } catch (e) { } }
 document.addEventListener('click', ev => { try { const el = ev.target.closest && ev.target.closest('#glalerts [data-jik]'); if (!el || ev.target.closest('.bpin')) return; jiOpened(el.dataset.jik); } catch (e) { } }, true);
@@ -23137,7 +23142,9 @@ document.addEventListener('click', ev => { try { const el = ev.target.closest &&
     const pick = [];
     cards.forEach(el => { const k = jiKey(el); el.setAttribute('data-jik', k); if (!(k in st.m)) st.m[k] = first ? 0 : now;
       const nk = el.dataset.nk || ''; if (JI_DAILY.test(nk)) return; const t = st.m[k];
-      if (t && now - t < JI_MS && !st.op[k] && !(nfDis() || []).includes(nk)) pick.push([t, el]); });
+      if (t && now - t < JI_MS && !st.op[k] && !(nfDis() || []).includes(nk)) { st.vs = st.vs || {}; const V = jiVisitN(), seen = (st.vs[k] = st.vs[k] || []);
+        if (seen.filter(x => x !== V).length >= 2) { st.op[k] = now; delete st.vs[k]; return; } if (location.hash === '#alerts' && V && !seen.includes(V)) seen.push(V); pick.push([t, el]); } });
+    if (st.vs) Object.keys(st.vs).forEach(k => { if (!(k in st.m) || st.op[k]) delete st.vs[k]; });
     Object.keys(st.m).forEach(k => { if (st.m[k] && now - st.m[k] > 60 * DAY) delete st.m[k]; });
     Object.keys(st.op).forEach(k => { if (now - st.op[k] > 61 * DAY) delete st.op[k]; });
     const ks = Object.keys(st.m); if (ks.length > 1500) ks.slice(0, ks.length - 1500).forEach(k => delete st.m[k]);
@@ -23154,7 +23161,7 @@ document.addEventListener('click', ev => { try { const el = ev.target.closest &&
       if (fromWarn) { const w = document.createElement('div'); w.className = 'glwarns'; w.appendChild(el); tgt.appendChild(w); } else tgt.appendChild(el); });
     if (box._more) { const n = box._more.children.length; box._more.style.display = 'none'; box.appendChild(box._more); box.insertAdjacentHTML('beforeend', `<button type="button" class="linkbtn jimorebtn" style="margin:6px 12px" onclick="const m=this.previousElementSibling;const o=m.style.display==='none';m.style.display=o?'':'none';this.textContent=o?'Show fewer':'Show ${n} more new'">Show ${n} more new</button>`); }
     d.querySelectorAll('.list, .glwarns, .glnewlist').forEach(l => { if (l !== box && !l.children.length && !l.closest('.jilist')) { let s0 = l.previousElementSibling; const nx = l.nextElementSibling; l.remove(); if (s0 && s0.classList.contains('sec') && !(nx && nx.matches('.list, .glwarns, .glnewlist') && nx.children.length)) s0.remove(); if (nx && nx.classList.contains('glnewmore') && !nx.classList.contains('bfmore')) nx.remove(); } });
-    const sec = document.createElement('div'); sec.className = 'sec jisec'; sec.innerHTML = `Just in <span class="glswipehint">up here until you open or swipe it</span> <button type="button" class="linkbtn" style="float:right;font-size:13px" onclick="jiAllRead()">Mark all read</button>`;
+    const sec = document.createElement('div'); sec.className = 'sec jisec'; sec.innerHTML = `Just in <span class="glswipehint">up here until you open or swipe it, or you’ve seen it on two visits</span> <button type="button" class="linkbtn" style="float:right;font-size:13px" onclick="jiAllRead()">Mark all read</button>`;
     const after = d.firstChild; // 2.27.15: very top, above Pinned
     d.insertBefore(sec, after); d.insertBefore(box, sec.nextSibling);
     return d.innerHTML;
