@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.17';
+const APP_VERSION = '2.27.18';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6591,7 +6591,7 @@ function updBlogs() {
 function blogRow(p) {
   const when = blogWhen(p.published);
   const sub = [p.blog, when].filter(Boolean).join(' · ');
-  return `<a class="row" href="${esc(p.url)}" target="_blank" rel="noopener"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">${esc(p.title)}</div><div class="s">${esc(sub)}</div>${p.summary ? `<div class="s">${esc(p.summary)}</div>` : ''}</div></a>`;
+  return `<a class="row" href="${esc(p.url)}" target="_blank" rel="noopener" data-blogu="${esc(p.url)}" data-blogt="${esc(p.title)}" data-blogs="${esc(p.blog || '')}"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">${blogFlagged(p.url) ? '<span class="flagmark">🚩 </span>' : ''}${esc(p.title)}</div><div class="s">${esc(sub)}</div>${p.summary ? `<div class="s">${esc(p.summary)}</div>` : ''}</div></a>`;
 }
 function blogFailRow(b) {
   return `<button class="row" onclick="refreshBlogs(true)"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Couldn’t load this blog.</div></div></button>`;
@@ -24175,3 +24175,31 @@ async function bedSet(k, v) { S.settings = S.settings || {}; if (k === 'on') S.s
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const opt = (v, l) => `<option value="${v}"${bedStart() === v ? ' selected' : ''}>${l}</option>`;
   return h + `<div class="srow"><div class="tx"><div class="t">Bedtime nudges on work nights</div><div class="s">Only when you’ve got work the next day (Work roster). About every 45 min until 3am, push and bell, even in quiet hours.</div></div><button class="switch ${bedOn() ? 'on' : ''}" role="switch" aria-checked="${bedOn()}" aria-label="Bedtime nudges on work nights" onclick="bedSet('on')"></button></div>` +
     `<div class="srow"><div class="tx"><div class="t">Bedtime nudges start</div></div><select onchange="bedSet('start', this.value)">${opt('22:30', '10:30pm')}${opt('23:00', '11:00pm')}${opt('23:30', '11:30pm')}${opt('00:00', '12:00am')}${opt('00:30', '12:30am')}${opt('01:00', '1:00am')}</select></div>`; } catch (e) { return h; } }; })();
+
+/* ================= 2.27.17: long-press a blog post to flag it (Notifications › Pinned › Flagged blogs) =================
+   About half a second on a blog card or link (home feed, For you today) flags it; again unflags. The press doesn't open the
+   link, and a short tap, double-tap or swipe works as before. Flags live in S.settings.blogFlags (synced with settings). */
+const blogFlags = () => { const L = (S && S.settings && S.settings.blogFlags); return Array.isArray(L) ? L : []; };
+const blogFlagged = u => !!u && blogFlags().some(f => f.u === u);
+async function blogFlagToggle(u, t, src) { if (!u) return; S.settings.blogFlags = blogFlags(); const L = S.settings.blogFlags, i = L.findIndex(f => f.u === u);
+  if (i >= 0) { L.splice(i, 1); toast('Unflagged'); } else { L.unshift({ u, t: String(t || u).slice(0, 200), s: String(src || '').slice(0, 80), at: new Date().toISOString() }); L.splice(60); toast('Flagged, saved to Notifications'); }
+  await save(); render(); }
+async function blogUnflag(u) { S.settings.blogFlags = blogFlags().filter(f => f.u !== u); await save(); render(); toast('Unflagged'); }
+function blogLpTarget(el) { const a = el && el.closest && el.closest('a[data-blogu], a[href]'); if (!a) return null; if (a.dataset.blogu) return a; return a.querySelector('.ic.blog') ? a : null; }
+(() => { let tm = null, x0 = 0, y0 = 0, fired = 0;
+  const clear = () => { if (tm) { clearTimeout(tm); tm = null; } };
+  document.addEventListener('pointerdown', ev => { const a = blogLpTarget(ev.target); clear(); if (!a) return; x0 = ev.clientX; y0 = ev.clientY;
+    tm = setTimeout(() => { tm = null; fired = Date.now(); try { navigator.vibrate && navigator.vibrate(20); } catch (e) { }
+      const u = a.dataset.blogu || a.href, t = a.dataset.blogt || ((a.querySelector('.t') || a).textContent || '').replace('🚩', '').trim(), sc = a.dataset.blogs || ((a.querySelector('.s') || {}).textContent || '').split(' · ')[0];
+      blogFlagToggle(u, t, sc); }, 500); }, true);
+  document.addEventListener('pointermove', ev => { if (tm && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) clear(); }, true);
+  ['pointerup', 'pointercancel', 'scroll'].forEach(n => document.addEventListener(n, clear, true));
+  document.addEventListener('click', ev => { if (fired && Date.now() - fired < 1500 && blogLpTarget(ev.target)) { ev.preventDefault(); ev.stopImmediatePropagation(); fired = 0; } }, true);
+  document.addEventListener('dblclick', ev => { if (fired && Date.now() - fired < 1500) { ev.stopImmediatePropagation(); } }, true);
+  document.addEventListener('contextmenu', ev => { if (blogLpTarget(ev.target)) ev.preventDefault(); }, true); })();
+(() => { try { const st = document.createElement('style'); st.textContent = 'a[data-blogu]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.bfflag a{color:inherit}'; document.head.appendChild(st); } catch (e) { } })();
+(() => { const o = glAlertsBody; glAlertsBody = function () { const h = o.apply(this, arguments); try { const F = blogFlags(); if (!F.length) return h;
+  const d = document.createElement('div'); d.innerHTML = h; let box = d.querySelector('.bellpinned');
+  if (!box) { const sec = document.createElement('div'); sec.className = 'sec'; sec.textContent = 'Pinned'; box = document.createElement('div'); box.className = 'list bellpinned'; const ji = d.querySelector('.jilist'), after = ji ? ji.nextSibling : d.firstChild; d.insertBefore(sec, after); d.insertBefore(box, sec.nextSibling); }
+  box.insertAdjacentHTML('beforeend', `<div class="row bfflaghead"><div class="tx"><div class="t">🚩 Flagged blogs</div></div></div>` + F.map(f => `<div class="row glnew bfflag" data-nk="blogflag-${esc(f.u.slice(-60))}"><div class="ic">🚩</div><div class="tx"><div class="t"><a href="${esc(f.u)}" target="_blank" rel="noopener">${esc(f.t)}</a></div><div class="s">${esc(f.s ? f.s + ' · ' : '')}flagged ${esc(fmtW(String(f.at).slice(0, 10)))} · <a href="${esc(f.u)}" target="_blank" rel="noopener">Open</a></div></div><button type="button" class="btn small" onclick="blogUnflag(${jsArg(f.u)})">Unflag</button></div>`).join(''));
+  return d.innerHTML; } catch (e) { return h; } }; })();
