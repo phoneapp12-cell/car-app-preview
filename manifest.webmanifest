@@ -18,9 +18,11 @@
     { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
+  "share_target": { "action": "./share-photo", "method": "POST", "enctype": "multipart/form-data", "params": { "title": "title", "text": "text", "files": [{ "name": "photos", "accept": ["image/*"] }] } },
   "shortcuts": [
     { "name": "Cars", "url": "./#cars", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Bills", "url": "./#bills", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Photos", "url": "./#photos", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "To-do", "url": "./#todo", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Bridge", "short_name": "Bridge", "description": "Lifting bridge – Dave Culham Drive", "url": "./#bridge", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ]

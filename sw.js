@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '2.27.19';
+const VERSION = '2.27.20';
 const CACHE = 'due-dates-' + VERSION;
 const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['./reno.js', 'art/i3-house.webp', 'art/cu-banner.webp', 'art/ja-banner.webp', 'art/i3-bill.webp', 'art/i3-car.webp', 'art/i3-bday.webp', 'art/i3-health.webp', 'art/i3-dentist.webp', 'art/i3-hol.webp', 'art/i3-ev.webp', 'art/i3-todo.webp', 'art/i3-shop.webp', 'art/i3-sarah.webp', 'art/i3-news.webp', 'art/i3-radio.webp', 'art/i3-travel.webp', 'art/i3-weather.webp', 'art/i3-money.webp', 'art/i3-gym.webp', 'art/i3-fuel.webp', 'art/i3-cal.webp', 'art/i3-plate.webp', 'art/i3-bin.webp', 'art/i3-rewards.webp', 'art/i3-tv.webp', 'art/i3-garden.webp', 'art/i3-pet.webp', 'art/dog.webp', './', './index.html', './app.js', './app.js?v=' + VERSION, './sync-logic.js', './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest', './data/tides-whangarei.json',
@@ -30,6 +30,19 @@ self.addEventListener('activate', e => {
   })());
 });
 
+// 2.27.20: Android Share → My App (manifest share_target). Photos go straight into this phone's IndexedDB (never uploaded);
+// the app downscales them next time it opens, then asks for tags.
+self.addEventListener('fetch', e => {
+  const u = new URL(e.request.url);
+  if (e.request.method !== 'POST' || u.origin !== location.origin || !/\/share-photo$/.test(u.pathname)) return;
+  e.respondWith((async () => {
+    try { const fd = await e.request.formData(), files = fd.getAll('photos').filter(f => f && f.type && /^image\//.test(f.type));
+      const db = await new Promise((ok, no) => { const r = indexedDB.open('myPhotos', 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('p')) r.result.createObjectStore('p', { keyPath: 'id' }); }; r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+      await new Promise((ok, no) => { const t = db.transaction('p', 'readwrite'), st = t.objectStore('p'); files.forEach((f, i) => st.put({ id: 'ph-' + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6), blob: f, thumb: null, raw: true, shared: true, title: '', note: String(fd.get('text') || fd.get('title') || '').slice(0, 2000), tags: [], added: Date.now(), name: f.name || '' })); t.oncomplete = ok; t.onerror = () => no(t.error); });
+    } catch (err) { }
+    return Response.redirect(new URL('./#photos/tag', self.registration.scope).href, 303);
+  })());
+});
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;

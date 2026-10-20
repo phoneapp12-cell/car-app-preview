@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.19';
+const APP_VERSION = '2.27.20';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10511,6 +10511,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
+  photos: ['image', 'blog', 'Photos', 'Photos'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
   roster: ['clock', 'roster', 'Work hours', 'Work'],
@@ -10531,7 +10532,7 @@ const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'reminders', 'meds', 'sleep', 'gym', 'diary', 'countdown', 'notes', 'photos'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans'] }, // 2.26.91: UniMed claims live once, next to Health in People // 2.26.90: work hours, commission and wage estimate together under Money
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'watch', 'claims', 'about'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] }, // 2.26.94: its own heading like the other groups
@@ -18681,7 +18682,7 @@ function render() {
   if (/^#(unimed|health\/claims|money\/claims)(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#claims'); renderedHash = '#claims'; } // 2.26.91: one UniMed claims page
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -24204,3 +24205,89 @@ function blogLpTarget(el) { const a = el && el.closest && el.closest('[data-blog
   if (!box) { const sec = document.createElement('div'); sec.className = 'sec'; sec.textContent = 'Pinned'; box = document.createElement('div'); box.className = 'list bellpinned'; const ji = d.querySelector('.jilist'), after = ji ? ji.nextSibling : d.firstChild; d.insertBefore(sec, after); d.insertBefore(box, sec.nextSibling); }
   box.insertAdjacentHTML('beforeend', `<div class="row bfflaghead"><div class="tx"><div class="t">🚩 Flagged blogs</div></div></div>` + F.map(f => `<div class="row glnew bfflag" data-nk="blogflag-${esc(f.u.slice(-60))}"><div class="ic">🚩</div><div class="tx"><div class="t"><a href="${esc(f.u)}" target="_blank" rel="noopener">${esc(f.t)}</a></div><div class="s">${esc(f.s ? f.s + ' · ' : '')}flagged ${esc(fmtW(String(f.at).slice(0, 10)))} · <a href="${esc(f.u)}" target="_blank" rel="noopener">Open</a></div></div><button type="button" class="btn small" onclick="blogUnflag(${jsArg(f.u)})">Unflag</button></div>`).join(''));
   return d.innerHTML; } catch (e) { return h; } }; })();
+
+/* ================= 2.27.20: Photos (bookmarked photos and screenshots, on this phone only) =================
+   Images live in IndexedDB 'myPhotos' (downscaled to 1600px JPEG 0.85 + a 320px thumbnail). Never uploaded or synced.
+   Tags, note, title and date added per photo. Android Share → My App lands here too (sw.js share target). */
+const PH_DB = 'myPhotos';
+function phDb() { return phDb.p || (phDb.p = new Promise((ok, no) => { const r = indexedDB.open(PH_DB, 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('p')) r.result.createObjectStore('p', { keyPath: 'id' }); }; r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); })); }
+async function phTx(mode, fn) { const db = await phDb(); return new Promise((ok, no) => { const t = db.transaction('p', mode), st = t.objectStore('p'); let out; Promise.resolve(fn(st)).then(v => { out = v; }); t.oncomplete = () => ok(out); t.onerror = () => no(t.error); }); }
+const phReq = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+let PH = null, PHurl = {}, phFilter = '', phQ = '';
+async function phLoad() { try { const L = await phTx('readonly', st => phReq(st.getAll())); for (const x of L) if (x.raw) { await phFix(x); } PH = (await phTx('readonly', st => phReq(st.getAll()))).sort((a, b) => b.added - a.added); } catch (e) { PH = []; } return PH; }
+const phThumb = x => PHurl[x.id] || (PHurl[x.id] = x.thumb ? URL.createObjectURL(x.thumb) : '');
+async function phScale(blob, max, q) { const bm = await createImageBitmap(blob); const k = Math.min(1, max / Math.max(bm.width, bm.height)), w = Math.round(bm.width * k), h = Math.round(bm.height * k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(bm, 0, 0, w, h); try { bm.close(); } catch (e) { } return new Promise(ok => c.toBlob(b => ok(b), 'image/jpeg', q)); }
+async function phFix(x) { try { const img = await phScale(x.blob, 1600, 0.85), thumb = await phScale(x.blob, 320, 0.75); Object.assign(x, { blob: img, thumb, raw: false }); await phTx('readwrite', st => st.put(x)); } catch (e) { } }
+async function phAddFiles(files, from) { const ids = []; for (const f of [...(files || [])].filter(f => /^image\//.test(f.type))) { try { const img = await phScale(f, 1600, 0.85), thumb = await phScale(f, 320, 0.75);
+    const x = { id: uid('ph'), blob: img, thumb, title: '', note: '', tags: [], added: Date.now(), name: f.name || '' }; await phTx('readwrite', st => st.put(x)); ids.push(x.id); } catch (e) { } }
+  await phLoad(); render(); if (ids.length) phTagSheet(ids); return ids; }
+const phTags = () => [...new Set((PH || []).flatMap(x => x.tags || []))].sort((a, b) => a.localeCompare(b));
+const phGet = id => (PH || []).find(x => x.id === id);
+async function phSave(x) { await phTx('readwrite', st => st.put(x)); }
+function phPick() { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.multiple = true; i.onchange = () => phAddFiles(i.files); i.click(); }
+function phTagList() { return `<datalist id="phtags">${phTags().map(t => `<option value="${esc(t)}">`).join('')}</datalist>`; }
+function phTagSheet(ids) { openSheet(ids.length > 1 ? `Tag ${ids.length} photos` : 'Tag it', phTagList() + field('Tags (comma between)', `<input name="tags" list="phtags" autocomplete="off" placeholder="receipt, ideas">`) + field('Note', '<textarea name="note" rows="3"></textarea>') + (ids.length === 1 ? field('Title (optional)', inp('title', '')) : ''),
+  async v => { const tg = String(v.tags || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean); for (const id of ids) { const x = phGet(id); if (!x) continue; x.tags = [...new Set([...(x.tags || []), ...tg])]; if (v.note) x.note = String(v.note).slice(0, 4000); if (v.title) x.title = String(v.title).slice(0, 120); await phSave(x); } render(); toast('Saved'); }); }
+function PhotosPage() {
+  if (!PH) { phLoad().then(() => { if (/^#photos/.test(location.hash)) render(); }); return header('Photos', 'Bookmarked photos and screenshots, kept on this phone only') + '<p class="muted">Loading…</p>'; }
+  const q = phQ.toLowerCase(), L = PH.filter(x => (!phFilter || (x.tags || []).includes(phFilter)) && (!q || [x.title, x.note, ...(x.tags || [])].join(' ').toLowerCase().includes(q)));
+  const chips = phTags().map(t => `<button type="button" class="chip${phFilter === t ? ' on' : ''}" onclick="phFilter=phFilter===${esc(jsArg(t))}?'':${esc(jsArg(t))};render()">${esc(t)}</button>`).join('');
+  return header('Photos', 'Bookmarked photos and screenshots, kept on this phone only') +
+    `<div class="btns" style="margin-bottom:10px"><button class="btn primary" onclick="phPick()">${I('image')} Add photos</button></div>
+    <input class="phsearch" type="search" placeholder="Search title, note or tags" value="${esc(phQ)}" oninput="phQ=this.value;clearTimeout(window.phT);window.phT=setTimeout(()=>{render();const s=document.querySelector('.phsearch');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length)}},350)">
+    ${chips ? `<div class="phchips">${chips}</div>` : ''}
+    ${L.length ? `<div class="phgrid">${L.map(x => `<button type="button" class="phcell" onclick="phView(${esc(jsArg(x.id))})"><img src="${phThumb(x)}" alt="${esc(x.title || 'Photo')}" loading="lazy">${(x.tags || []).length ? `<span>${esc(x.tags.slice(0, 2).join(', '))}</span>` : ''}</button>`).join('')}</div>` : `<p class="muted">${PH.length ? 'Nothing matches.' : 'No photos yet. Tap Add photos, or Share a photo to My App from your gallery.'}</p>`}`;
+}
+function phView(id) { const x = phGet(id); if (!x) return; const url = URL.createObjectURL(x.blob); let ov = document.getElementById('phview'); if (ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'phview';
+  const tagsH = () => (x.tags || []).map(t => `<span class="chip on">${esc(t)} <b role="button" aria-label="Remove ${esc(t)}" data-rm="${esc(t)}">×</b></span>`).join('');
+  ov.innerHTML = `<div class="phtop"><button type="button" class="btn small" data-a="close">${I('left')} Back</button><span style="flex:1"></span><button type="button" class="btn small" data-a="share">Share</button><button type="button" class="btn small" data-a="todo">Set as to-do</button><button type="button" class="btn small danger" data-a="del">Delete</button></div>
+    <div class="phzoom"><img src="${url}" alt=""></div>
+    <div class="phmeta"><input class="phtitle" placeholder="Title (optional)" value="${esc(x.title || '')}"><div class="s muted">Added ${esc(fmtW(nzStampLocal(new Date(x.added)).slice(0, 10)))}</div>
+    <div class="phchips phtg">${tagsH()}</div>${phTagList()}<input class="phaddtag" list="phtags" placeholder="Add a tag" autocomplete="off">
+    <textarea class="phnote" rows="3" placeholder="Note">${esc(x.note || '')}</textarea></div>`;
+  document.body.appendChild(ov);
+  const img = ov.querySelector('.phzoom img'), P = new Map(); let sc = 1, tx = 0, ty = 0, d0 = 0, s0 = 1;
+  const ap = () => { img.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`; };
+  const z = ov.querySelector('.phzoom'); z.addEventListener('pointerdown', e => { P.set(e.pointerId, e); z.setPointerCapture(e.pointerId); if (P.size === 2) { const [a, b] = [...P.values()]; d0 = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); s0 = sc; } });
+  z.addEventListener('pointermove', e => { const o = P.get(e.pointerId); if (!o) return; if (P.size === 2) { P.set(e.pointerId, e); const [a, b] = [...P.values()]; sc = Math.max(1, Math.min(6, s0 * Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / (d0 || 1))); } else if (sc > 1) { tx += e.clientX - o.clientX; ty += e.clientY - o.clientY; P.set(e.pointerId, e); } ap(); });
+  ['pointerup', 'pointercancel'].forEach(n => z.addEventListener(n, e => { P.delete(e.pointerId); if (sc <= 1.02) { sc = 1; tx = ty = 0; ap(); } }));
+  z.addEventListener('dblclick', () => { sc = sc > 1 ? 1 : 2.5; tx = ty = 0; ap(); });
+  const close = () => { ov.remove(); URL.revokeObjectURL(url); render(); };
+  ov.querySelector('.phtitle').onchange = e => { x.title = e.target.value.slice(0, 120); phSave(x); };
+  ov.querySelector('.phnote').onchange = e => { x.note = e.target.value.slice(0, 4000); phSave(x); };
+  const ti = ov.querySelector('.phaddtag'); const addT = () => { const t = ti.value.trim().toLowerCase().replace(/,/g, ''); if (!t) return; x.tags = [...new Set([...(x.tags || []), t])]; ti.value = ''; phSave(x); ov.querySelector('.phtg').innerHTML = tagsH(); };
+  ti.onchange = addT; ti.onkeydown = e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addT(); } };
+  ov.querySelector('.phtg').onclick = e => { const t = e.target.dataset && e.target.dataset.rm; if (!t) return; x.tags = (x.tags || []).filter(y => y !== t); phSave(x); ov.querySelector('.phtg').innerHTML = tagsH(); };
+  ov.querySelector('.phtop').onclick = async e => { const a = e.target.closest('[data-a]'); if (!a) return; const k = a.dataset.a;
+    if (k === 'close') close();
+    else if (k === 'share') { try { const f = new File([x.blob], (x.title || 'photo').replace(/[^\w-]+/g, '-').slice(0, 40) + '.jpg', { type: 'image/jpeg' }); if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: x.title || 'Photo', text: x.note || '' }); else toast('Sharing photos isn’t available here.'); } catch (er) { } }
+    else if (k === 'todo') { S.todos = S.todos || []; S.todos.push({ id: uid('todo'), title: (x.title || x.note || 'Photo').split('\n')[0].slice(0, 80), list: (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home'), due: '', notes: (x.note || '') + '\n📷 Photo: #photos/' + x.id, priority: 'normal', done: false, created: Date.now(), photo: x.id }); await save(); toast('Added to To-do', 'Open', () => { ov.remove(); go('#todo'); }); }
+    else if (k === 'del') confirmSheet('Delete this photo?', 'It’s only stored on this phone.', 'Delete', async () => { await closeSheet(); const keep = Object.assign({}, x); await phTx('readwrite', st => st.delete(x.id)); ov.remove(); await phLoad(); render();
+      toast('Photo deleted', 'Undo', async () => { await phSave(keep); delete PHurl[keep.id]; await phLoad(); render(); }); }); };
+}
+// #photos/<id> (from a to-do link) opens that photo; #photos/tag after Android Share asks for tags
+window.addEventListener('hashchange', phRoute); setTimeout(phRoute, 800);
+async function phRoute() { const m = (location.hash || '').match(/^#photos\/(.+)$/); if (!m) return; await phLoad(); history.replaceState(history.state, '', '#photos'); render();
+  if (m[1] === 'tag') { const ids = PH.filter(x => x.shared).map(x => x.id); for (const id of ids) { const x = phGet(id); delete x.shared; await phSave(x); } if (ids.length) phTagSheet(ids); } else if (phGet(m[1])) phView(m[1]); }
+// storage line + export (a plain .zip, store-only: JPEGs don't shrink further)
+async function phUsage() { try { const L = PH || await phLoad(); return { n: L.length, bytes: L.reduce((n, x) => n + (x.blob ? x.blob.size : 0) + (x.thumb ? x.thumb.size : 0), 0) }; } catch (e) { return { n: 0, bytes: 0 }; } }
+const phCrcT = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const phCrc = u => { let c = 0xFFFFFFFF; for (let i = 0; i < u.length; i++) c = phCrcT[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function phZip(files) { const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  for (const f of files) { const d = new Uint8Array(await f.blob.arrayBuffer()), nm = enc.encode(f.name), crc = phCrc(d), h = new DataView(new ArrayBuffer(30));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [14, crc, 4], [18, d.length, 4], [22, d.length, 4], [26, nm.length, 2]].forEach(([o, v, s]) => s === 4 ? h.setUint32(o, v, true) : h.setUint16(o, v, true));
+    const c = new DataView(new ArrayBuffer(46)); [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [16, crc, 4], [20, d.length, 4], [24, d.length, 4], [28, nm.length, 2], [42, off, 4]].forEach(([o, v, s]) => s === 4 ? c.setUint32(o, v, true) : c.setUint16(o, v, true));
+    parts.push(h.buffer, nm, d); cen.push(c.buffer, nm); off += 30 + nm.length + d.length; }
+  const cs = cen.reduce((n, b) => n + b.byteLength, 0), e = new DataView(new ArrayBuffer(22)); [[0, 0x06054b50, 4], [8, files.length, 2], [10, files.length, 2], [12, cs, 4], [16, off, 4]].forEach(([o, v, s]) => s === 4 ? e.setUint32(o, v, true) : e.setUint16(o, v, true));
+  return new Blob([...parts, ...cen, e.buffer], { type: 'application/zip' }); }
+async function phExport() { const L = await phLoad(); if (!L.length) return toast('No photos to export.'); toast('Making the zip…');
+  const files = L.map((x, i) => ({ name: String(i + 1).padStart(3, '0') + '-' + ((x.title || (x.tags || []).join('-') || 'photo').replace(/[^\w-]+/g, '-').slice(0, 40)) + '.jpg', blob: x.blob }));
+  files.push({ name: 'photos.json', blob: new Blob([JSON.stringify(L.map((x, i) => ({ file: files[i].name, title: x.title, note: x.note, tags: x.tags, added: new Date(x.added).toISOString() })), null, 1)], { type: 'application/json' }) });
+  const z = await phZip(files), name = 'my-app-photos-' + todayISO() + '.zip', f = new File([z], name, { type: 'application/zip' });
+  try { if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: 'My App photos' }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(z); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); }
+(() => { const o = Settings; Settings = function () { const h = o.apply(this, arguments); try { setTimeout(async () => { const el = document.getElementById('phuse'); if (!el) return; const u = await phUsage(); el.textContent = `${u.n} photo${u.n === 1 ? '' : 's'} · ${(u.bytes / 1048576).toFixed(1)} MB on this phone`; }, 0);
+  return h + `<div class="sec">Photos</div><div class="list"><div class="srow"><div class="tx"><div class="t">Storage used</div><div class="s" id="phuse">Working it out…</div></div></div><div class="srow" role="button" tabindex="0" onclick="phExport()"><div class="tx"><div class="t">Export all photos</div><div class="s">A .zip with every photo and a list of titles, notes and tags</div></div>${I('right')}</div></div>`; } catch (e) { return h; } }; })();
+(() => { try { const st = document.createElement('style'); st.textContent = `.phgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.phcell{position:relative;padding:0;border:0;border-radius:10px;overflow:hidden;aspect-ratio:1;background:#0001}.phcell img{width:100%;height:100%;object-fit:cover;display:block}.phcell span{position:absolute;left:0;right:0;bottom:0;font-size:11px;color:#fff;background:#0008;padding:2px 5px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.phchips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.phchips .chip{border:1px solid #0003;border-radius:14px;padding:3px 10px;background:#fff;font-size:13px}.phchips .chip.on{background:#0F766E;color:#fff;border-color:#0F766E}.phsearch{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid #0003;font-size:16px}#phview{position:fixed;inset:0;z-index:9999;background:#111;color:#fff;display:flex;flex-direction:column}#phview .phtop{display:flex;gap:6px;padding:10px;padding-top:max(10px,env(safe-area-inset-top))}.phzoom{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none}.phzoom img{max-width:100%;max-height:100%;transform-origin:center}.phmeta{padding:10px;background:#1b1b1b;max-height:40vh;overflow:auto}.phmeta input,.phmeta textarea{width:100%;box-sizing:border-box;margin-top:6px;padding:8px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;font-size:16px}.phmeta .chip b{margin-left:4px;cursor:pointer}`; document.head.appendChild(st); } catch (e) { } })();
