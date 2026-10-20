@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.20';
+const APP_VERSION = '2.27.21';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20474,6 +20474,10 @@ function xferPlan(D) {
   try { D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && a.id !== src.id && /anz/i.test(a.bank || cfAName(a)) && !/bill/i.test(cfAName(a)) && (bal[a.id] || 0) < -0.005).forEach(a => { // 2.27.14
     const need = ceil10(-(bal[a.id] || 0)), by = payDates.find(p => availFrom(p) - floor >= need) || payDates[payDates.length - 1] || T;
     needs.push({ to: a.id, need, by, first: { what: 'overdrawn, back to $0', date: by }, grp: [{ what: 'overdrawn ' + cfMoney(-(bal[a.id] || 0)) + ', back to $0' }], od: 1 }); }); needs.sort((a, b) => a.by.localeCompare(b.by)); } catch (e) { }
+  // 2.27.21: priority — (1) mortgages, (2) other bills and transfers (incl. an overdraft back to $0), (3) the card, with what's left
+  srcEv.forEach(e => { if (e.card) { e.full = e.amount; e.amount = 0; } });
+  const isMort = n => (n.grp || []).some(x => /mortgage/i.test(x.what || '')) || /mortgage/i.test(((D.accounts.find(a => a.id === n.to) || {}).name) || cfAName(D.accounts.find(a => a.id === n.to) || {}) || '');
+  needs.sort((a, b) => (isMort(b) ? 1 : 0) - (isMort(a) ? 1 : 0) || a.by.localeCompare(b.by));
   needs.forEach(n => {
     // 2.26.86: money already in the same bank first (not the weekly-funded account itself, not ORBIT)
     try { const sb = D.accounts.filter(a => cfSpendable(a) && a.id !== n.to && a.id !== src.id && bankOf(a.id) && bankOf(a.id) === bankOf(n.to));
@@ -20488,9 +20492,9 @@ function xferPlan(D) {
   // 2.26.72: the card payment comes from what's left once the bills are covered; any part that can't be paid is shown, not planned
   // 2.27.12: each planned card payment (fortnightly part-payments and the top-up before the due date), earliest first. A part-payment
   // ORBIT can't cover moves into the top-up; whatever the top-up can't cover is the shortfall (would attract interest).
-  let card = null; const cardPlan = []; srcEv.filter(x => x.card).forEach(e => { const full = e.amount, can = Math.max(0, Math.min(full, Math.floor((availFrom(e.date) - floor + full) * 100) / 100));
+  let card = null; const cardPlan = []; srcEv.filter(x => x.card).forEach(e => { const full = e.full != null ? e.full : e.amount; e.amount = full; const can = Math.max(0, Math.min(full, Math.floor((availFrom(e.date) - floor + full) * 100) / 100));
       const nowOk = availFrom(T) - floor + full >= full - 0.005, after = nowOk ? '' : (payDates.filter(p => p > T && p <= e.date).find(p => availFrom(p) - floor + full >= Math.min(full, can) - 0.005) || '');
-      e.amount = can; let moved = 0; if (e.cpart === 'part' && can < full - 0.005) { const top = srcEv.find(y => y.card && y.cpart === 'top' && y.cdue === e.cdue && y.date >= e.date); if (top) { top.amount = r2(top.amount + full - can); moved = r2(full - can); } }
+      e.amount = can; let moved = 0; if (e.cpart === 'part' && can < full - 0.005) { const top = srcEv.find(y => y.card && y.cpart === 'top' && y.cdue === e.cdue && y.date >= e.date); if (top) { top.full = r2((top.full != null ? top.full : top.amount) + full - can); moved = r2(full - can); } }
       const it = { amount: full, can: r2(can), short: moved ? 0 : r2(full - can), moved, due: e.due || e.date, date: e.date, kind: e.cpart || 'top', cdue: e.cdue || e.due || e.date, what: e.what, after, from: src.id, nowCan: Math.max(0, r2(availFrom(T) - floor + can)) };
       cardPlan.push(it); if (!card && it.kind !== 'part') card = it; });
   // 3) the source itself going under before pay lands (e.g. a standing order out of ORBIT)
@@ -20519,7 +20523,7 @@ function xferCard(D) {
   // 2.26.72: the card payment, with a tick (marks it paid until the bank shows it)
   let cardRows = ''; try { cardRows = cardXferRows(D, X, nm, day); } catch (e) { } // 2.27.12: every planned card payment (part-payments + top-up)
   const dn = Object.values(done).filter(x => x && !x.seen).length;
-  const sh = X.short.map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${cfMoney(s.amount)} ${s.own ? (cfIsOrbit(D.accounts.find(a => a.id === s.to)) ? `under the ${cfMoney(orbMin())} it keeps free` : 'over its limit') : 'short'} for ${esc(s.first.what)} on ${esc(day(s.first.date))}${s.pay && s.pay > s.first.date ? ` · there isn’t enough spare until pay lands ${esc(day(s.pay))}, so move it then or ask the bank about timing` : s.pay ? ` · move it after pay lands ${esc(day(s.pay))}` : ' · no pay expected before then'}</div>`).join('');
+  const sh = X.short.map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${cfMoney(s.amount)} ${s.own ? (cfIsOrbit(D.accounts.find(a => a.id === s.to)) ? `under the ${cfMoney(orbMin())} it keeps free` : 'over its limit') : 'short'} for ${esc(s.items && s.items.length > 1 ? s.items.slice(0, 4).join(', ') + ' (to next pay)' : s.first.what)} on ${esc(day(s.first.date))}${s.pay && s.pay > s.first.date ? ` · there isn’t enough spare until pay lands ${esc(day(s.pay))}, so move it then or ask the bank about timing` : s.pay ? ` · move it after pay lands ${esc(day(s.pay))}` : ' · no pay expected before then'}</div>`).join('');
   return `<div class="sec">Transfers to make · as at ${esc(day(todayISO()))}</div><div class="card xfcard">
     ${rows}${cardRows}${rows || cardRows ? '' : (sh ? '' : `<div class="cfok">Nothing to move. Every paying account covers what’s coming out until ${esc(day(X.H))}.</div>`)}${sh ? `<div class="cftips" style="margin-top:6px">${sh}</div>` : ''}
     <div class="s muted" style="margin-top:6px">Keeps ${cfMoney(X.buf)} in each paying account${cfIsOrbit(X.src) ? ` and ${cfMoney(orbMin())} free in ORBIT` : ''} · <button type="button" class="linkbtn" onclick="xferBufForm()">change</button>. Money into ${esc(nm(X.src.id))}: ${X.ins.filter(i => i.acct === X.src.id).map(i => esc(i.what) + ' about ' + cfMoney(i.amount) + ' ' + esc(day(i.date))).join(', ') || 'none expected'}. Covers everything still to come up to ${esc(day(X.H))}${cfIsOrbit(X.src) ? `, leaving about ${cfMoney(X.srcEnd)} free in ORBIT` : ''}.${dn ? ` ${plural(dn, 'transfer')} ticked done, counted until the bank shows ${dn > 1 ? 'them' : 'it'}.` : ''}</div></div>`;
