@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.13';
+const APP_VERSION = '2.27.14';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9507,7 +9507,10 @@ function budgetPeriodFor(b) {
   if (b && b.start && b.end && parseD(b.start) != null && parseD(b.end) != null) return { start: b.start, end: b.end, next: b.next || '' };
   return payPeriod(0);
 }
+function ecoFix() { try { const w = +S.settings.ecoWeek > 0 ? +S.settings.ecoWeek : 75, T = todayISO(); (S.bills || []).forEach(b => { if (!b || !/ecotricity/i.test(b.name || '')) return; // 2.27.14: paid $75 a week, not the emailed total
+  if (b.repeat !== 'weekly' || +b.amount !== w) { b.repeat = 'weekly'; b.amount = w; b.paidBy = ''; b.paid = false; } if (b.due && b.due < addDays(T, -6)) { let d = b.due; while (d < addDays(T, -6)) d = addDays(d, 7); b.due = d; } }); } catch (e) { } }
 function budgetBillRows(b) {
+  ecoFix();
   const pp = budgetPeriodFor(b);
   if (!pp) return [];
   const sT = parseD(pp.start), eT = parseD(pp.end);
@@ -20399,8 +20402,10 @@ function regSheet(key) {
 async function regIgnore(key) { S.settings.regIgnore = (S.settings.regIgnore || []).concat(key).slice(-100); cfRegulars.c = null; await save(); await closeSheet(); render(); toast('Ignored. It won’t count as still to come.'); }
 // ---- transfers to make ----
 const xferBuf = () => { const v = +S.settings.xferBuffer; return v >= 0 && v <= 1000 ? v : 20; };
+const orbMin = () => { const v = +S.settings.orbitMin; return v >= 0 && v <= 5000 ? v : 100; }; // 2.27.14: ORBIT always keeps this much free
 const ceil10 = v => Math.ceil(v / 10 - 1e-9) * 10;
 function xferPlan(D) {
+  ecoFix();
   const T = todayISO(), p0 = payPeriod(0), p1 = payPeriod(1); if (!D || !p0) return null;
   // 2.26.68: two days past the end of next fortnight, so a repayment the Thursday after payday is planned from that pay
   // 2.26.72: and through the card's due date when that's later, so the card payment is planned too
@@ -20461,9 +20466,12 @@ function xferPlan(D) {
   });
   needs.sort((a, b) => a.by.localeCompare(b.by));
   // 2) fund them from the account the pay lands in, never taking it under $0 (ORBIT: under its limit) at any point before the end
-  const srcEv = evts.filter(e => e.acct === src.id), floor = cfIsOrbit(src) ? 0 : buf;
+  const srcEv = evts.filter(e => e.acct === src.id), floor = cfIsOrbit(src) ? orbMin() : buf;
   const srcAt = d => { let b = bal[src.id] || 0; srcEv.forEach(e => { if (e.date <= d) b += e.inc ? e.amount : -e.amount; }); list.forEach(x => { if (x.by <= d) b -= x.amount; }); return b; };
   const availFrom = d => Math.min(...[d, ...srcEv.map(e => e.date).filter(x => x > d), H].map(srcAt));
+  try { D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && a.id !== src.id && /anz/i.test(a.bank || cfAName(a)) && !/bill/i.test(cfAName(a)) && (bal[a.id] || 0) < -0.005).forEach(a => { // 2.27.14
+    const need = ceil10(-(bal[a.id] || 0)), by = payDates.find(p => availFrom(p) - floor >= need) || payDates[payDates.length - 1] || T;
+    needs.push({ to: a.id, need, by, first: { what: 'overdrawn, back to $0', date: by }, grp: [{ what: 'overdrawn ' + cfMoney(-(bal[a.id] || 0)) + ', back to $0' }], od: 1 }); }); needs.sort((a, b) => a.by.localeCompare(b.by)); } catch (e) { }
   needs.forEach(n => {
     // 2.26.86: money already in the same bank first (not the weekly-funded account itself, not ORBIT)
     try { const sb = D.accounts.filter(a => cfSpendable(a) && a.id !== n.to && a.id !== src.id && bankOf(a.id) && bankOf(a.id) === bankOf(n.to));
@@ -20472,7 +20480,7 @@ function xferPlan(D) {
     const amt = Math.max(0, Math.min(n.need, Math.floor((availFrom(n.by) - floor) / 10) * 10)), lastPay = [...payDates].reverse().find(p => p <= n.by && p > T) || '';
     const names = {}; n.grp.forEach(x => { names[x.what] = (names[x.what] || 0) + 1; });
     const items = Object.entries(names).map(([k, c]) => c > 1 ? k + ' ×' + c : k);
-    if (amt > 0) list.push({ from: src.id, to: n.to, amount: amt, by: n.by, after: lastPay, first: n.first, items, key: src.id + '|' + n.to + '|' + n.by });
+    if (amt > 0) list.push({ from: src.id, to: n.to, amount: amt, by: n.by, after: lastPay, first: n.first, items, key: src.id + '|' + n.to + '|' + n.by, od: n.od ? 1 : 0 });
     if (amt < n.need) { const np = payDates.find(p => p > T && availFrom(p) - floor >= n.need - amt) || ''; short.push({ to: n.to, amount: n.need - amt, by: n.by, first: n.first, pay: np, items }); }
   });
   // 2.26.72: the card payment comes from what's left once the bills are covered; any part that can't be paid is shown, not planned
@@ -20509,17 +20517,17 @@ function xferCard(D) {
   // 2.26.72: the card payment, with a tick (marks it paid until the bank shows it)
   let cardRows = ''; try { cardRows = cardXferRows(D, X, nm, day); } catch (e) { } // 2.27.12: every planned card payment (part-payments + top-up)
   const dn = Object.values(done).filter(x => x && !x.seen).length;
-  const sh = X.short.map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${cfMoney(s.amount)} ${s.own ? 'over its limit' : 'short'} for ${esc(s.first.what)} on ${esc(day(s.first.date))}${s.pay && s.pay > s.first.date ? ` · there isn’t enough spare until pay lands ${esc(day(s.pay))}, so move it then or ask the bank about timing` : s.pay ? ` · move it after pay lands ${esc(day(s.pay))}` : ' · no pay expected before then'}</div>`).join('');
+  const sh = X.short.map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${cfMoney(s.amount)} ${s.own ? (cfIsOrbit(D.accounts.find(a => a.id === s.to)) ? `under the ${cfMoney(orbMin())} it keeps free` : 'over its limit') : 'short'} for ${esc(s.first.what)} on ${esc(day(s.first.date))}${s.pay && s.pay > s.first.date ? ` · there isn’t enough spare until pay lands ${esc(day(s.pay))}, so move it then or ask the bank about timing` : s.pay ? ` · move it after pay lands ${esc(day(s.pay))}` : ' · no pay expected before then'}</div>`).join('');
   return `<div class="sec">Transfers to make · as at ${esc(day(todayISO()))}</div><div class="card xfcard">
     ${rows}${cardRows}${rows || cardRows ? '' : (sh ? '' : `<div class="cfok">Nothing to move. Every paying account covers what’s coming out until ${esc(day(X.H))}.</div>`)}${sh ? `<div class="cftips" style="margin-top:6px">${sh}</div>` : ''}
-    <div class="s muted" style="margin-top:6px">Keeps ${cfMoney(X.buf)} in each paying account · <button type="button" class="linkbtn" onclick="xferBufForm()">change</button>. Money into ${esc(nm(X.src.id))}: ${X.ins.filter(i => i.acct === X.src.id).map(i => esc(i.what) + ' about ' + cfMoney(i.amount) + ' ' + esc(day(i.date))).join(', ') || 'none expected'}. Covers everything still to come up to ${esc(day(X.H))}${cfIsOrbit(X.src) ? `, leaving about ${cfMoney(X.srcEnd)} free in ORBIT` : ''}.${dn ? ` ${plural(dn, 'transfer')} ticked done, counted until the bank shows ${dn > 1 ? 'them' : 'it'}.` : ''}</div></div>`;
+    <div class="s muted" style="margin-top:6px">Keeps ${cfMoney(X.buf)} in each paying account${cfIsOrbit(X.src) ? ` and ${cfMoney(orbMin())} free in ORBIT` : ''} · <button type="button" class="linkbtn" onclick="xferBufForm()">change</button>. Money into ${esc(nm(X.src.id))}: ${X.ins.filter(i => i.acct === X.src.id).map(i => esc(i.what) + ' about ' + cfMoney(i.amount) + ' ' + esc(day(i.date))).join(', ') || 'none expected'}. Covers everything still to come up to ${esc(day(X.H))}${cfIsOrbit(X.src) ? `, leaving about ${cfMoney(X.srcEnd)} free in ORBIT` : ''}.${dn ? ` ${plural(dn, 'transfer')} ticked done, counted until the bank shows ${dn > 1 ? 'them' : 'it'}.` : ''}</div></div>`;
 }
 async function xferTick(key, amount, from, to) { S.settings.xferDone = S.settings.xferDone || {}; S.settings.xferDone[key] = { at: new Date().toISOString(), amount, from, to }; await save(); render(); toast('Marked done. It stays hidden until the bank shows it.'); }
 // a ticked transfer is dropped once the bank shows money arriving in that account for that amount (or more) after it was ticked
 function xferSeen(D) { try { const dn = S.settings.xferDone || {}; let ch = false;
   Object.entries(dn).forEach(([k, x]) => { if (!x) return; const hit = (D.transactions || []).some(t => t.acct === x.to && t.amount >= x.amount - 0.01 && Date.parse(t.date) >= Date.parse(x.at) - DAY);
     if (hit || Date.now() - Date.parse(x.at) > 10 * DAY) { delete dn[k]; ch = true; } }); if (ch) save(); } catch (e) { } }
-function xferBufForm() { openSheet('Buffer in each account', field('Keep this much in each paying account ($)', inp('buf', String(xferBuf()), 'inputmode="decimal"')), async v => { const n = +String(v.buf).replace(/[$,\s]/g, ''); if (!(n >= 0 && n <= 1000)) return 'Please type an amount from 0 to 1000.'; S.settings.xferBuffer = n; await save(); render(); }); }
+function xferBufForm() { openSheet('Buffer in each account', field('Keep this much in each paying account ($)', inp('buf', String(xferBuf()), 'inputmode="decimal"')) + field('Always keep this much free in ORBIT ($)', inp('orb', String(orbMin()), 'inputmode="decimal"')), async v => { const n = +String(v.buf).replace(/[$,\s]/g, ''); if (!(n >= 0 && n <= 1000)) return 'Please type an amount from 0 to 1000.'; S.settings.xferBuffer = n; const o = +String(v.orb == null ? '' : v.orb).replace(/[$,\s]/g, ''); if (String(v.orb || '').trim() !== '') { if (!(o >= 0 && o <= 5000)) return 'Please type the ORBIT amount from 0 to 5000.'; S.settings.orbitMin = o; } await save(); render(); }); }
 
 /* ================= ONE FORTNIGHT, ONE STORY (2.26.64) =================
    fnModel(b) is the single engine for a pay fortnight, used by Budget and Cash flow alike:
@@ -21557,7 +21565,7 @@ function emBillScore(bill, m, info) {
   if (!p) return 0;
   const amt = +bill.amount || 0, amtOk = info.amount != null && amt > 0 && Math.abs(info.amount - amt) <= 0.01, dueOk = !!info.due && info.due === bill.due;
   const inv = bill.invoice && bill.invoice.no, invOk = !!inv && (m.subject + ' ' + m.text).includes(String(inv));
-  const vary = (() => { try { return billVaries(bill) || /kora|ecotricity|power/i.test(bill.name); } catch (e) { return false; } })() && mbAge(m.at) <= 40; // varying bills (power, fuel card): the latest bill email from them
+  const vary = (() => { try { return /ecotricity/i.test(bill.name) && bill.repeat === 'weekly' ? false : billVaries(bill) || /kora|ecotricity|power/i.test(bill.name); } catch (e) { return false; } })() && mbAge(m.at) <= 40; // varying bills (power, fuel card): the latest bill email from them
   if (!(amtOk || dueOk || invOk || vary)) return 0;
   return p * 10 + (amtOk ? 5 : 0) + (dueOk ? 5 : 0) + (invOk ? 10 : 0) + (String(m.at) > '' ? 0 : 0);
 }
@@ -23997,11 +24005,15 @@ async function cardPartForm() { const p = cardPart();
   const m = p.mode === 'off' ? 'Off' : p.mode === 'pct' ? p.pct + '% of the statement' : p.mode === 'amt' ? money(+p.amt || 0) : 'Card spending since the last statement';
   return h + `<div class="sec">Credit card plan</div><div class="list"><div class="srow" role="button" tabindex="0" onclick="cardPartForm()"><div class="tx"><div class="t">Fortnightly part-payment</div><div class="s">${esc(m)} · paid from ORBIT after each pay, then topped up before the due date so it’s paid in full</div></div>${I('right')}</div></div>`; } catch (e) { return h; } }; })();
 // Bell: a reminder the day before and on the day of each planned card payment
-function cardBellRows() { try { const pl = cardPlanList(); if (!pl) return []; const T = todayISO(), gone = nfDis();
-  return pl.items.filter(x => x.st === 'planned' && x.amount > 0.005 && x.date >= T && x.date <= addDays(T, 1)).map(x => { const k = 'cardpay-' + x.kind + '-' + x.date; if (gone.includes(k)) return '';
+function cardBellRows() { try { const pl = cardPlanList(); if (!pl) return []; const T = todayISO(), gone = nfDis(), X = (() => { try { return xferPlan(CF.data); } catch (e) { return null; } })(), XP = (X && X.cardPlan) || [];
+  return pl.items.filter(x => x.st === 'planned' && x.amount > 0.005 && x.date >= T && x.date <= addDays(T, 1)).map(x => { const z = XP.find(k => k.date === x.date && k.kind === x.kind); if (z) x = Object.assign({}, x, { amount: z.can }); if (!(x.amount > 0.005)) return ''; const k = 'cardpay-' + x.kind + '-' + x.date; if (gone.includes(k)) return '';
     return `<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#cashflow')}"><div class="ic">💳</div><div class="tx"><div class="t">${x.date === T ? 'Today' : 'Tomorrow'}: pay ${x.about ? 'about ' : ''}${money(x.amount)} to the ASB credit card from ORBIT</div><div class="s">${x.kind === 'part' ? 'Fortnightly part-payment after your pay' : 'Top-up so the ' + esc(fmtW(x.stmt)) + ' statement is paid in full by ' + esc(fmtW(x.due))} · tick it in Cash flow › Transfers to make</div></div></div>`; }).filter(Boolean); } catch (e) { return []; } }
+function odBellRows() { try { const D = CF && CF.data; if (!D) return []; const X = xferPlan(D), T = todayISO(), gone = nfDis(), done = S.settings.xferDone || {}, nm = id => cfAName(D.accounts.find(a => a.id === id) || {});
+  return X.list.filter(x => x.od && !done[x.key] && x.by <= addDays(T, 1)).map(x => { const k = 'odfix-' + x.key; if (gone.includes(k)) return '';
+    return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#cashflow')}"><div class="ic">🏦</div><div class="tx"><div class="t">${x.by <= T ? 'Today' : 'Tomorrow'}: move ${money(x.amount)} from ${esc(nm(x.from))} to ${esc(nm(x.to))}</div><div class="s">It’s overdrawn; this brings it back to $0 · tick it in Cash flow › Transfers to make</div></div></div>`; }).filter(Boolean); } catch (e) { return []; } }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = odBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
 (() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = cardBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
-(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^cardpay-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
+(() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^(cardpay|odfix)-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
 // Settings › Notifications › money in: when each lands
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { return h.replace('None 10pm–8am.', 'None 10pm–8am. Your pay lands Wednesday afternoon/evening and Sarah’s on Tuesday (fortnightly); Board about 11pm Tuesday (weekly), so it shows here the next morning without a buzz.'); } catch (e) { return h; } }; })();
 
@@ -24111,3 +24123,10 @@ function cardPaidBellRows() { try { const pl = cardPlanList(); if (!pl) return [
     return `<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#cashflow')}"><div class="ic">✅</div><div class="tx"><div class="t">Paid ✓ ${money(x.amount)} to the ASB credit card</div><div class="s">${x.kind === 'part' ? 'Fortnightly part-payment' : 'Top-up for the ' + esc(fmtW(x.stmt)) + ' statement'} · seen in the bank ${esc(fmtW(x.paidOn))}</div></div></div>`; }).filter(Boolean); } catch (e) { return []; } }
 (() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = cardPaidBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
 (() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^cardpaid-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
+
+/* 2.27.14: dates in Cash flow (plan lines, warnings, money in) as a chip */
+const CF_DATE_RE = /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/g;
+const cfDateChips = h => String(h).replace(/>([^<]*)</g, (m, t) => '>' + t.replace(CF_DATE_RE, '<b class="cfdate">$&</b>') + '<');
+(() => { const o = xferCard; xferCard = function () { const h = o.apply(this, arguments); try { return cfDateChips(h); } catch (e) { return h; } }; })();
+(() => { const o = cardPlanCard; cardPlanCard = function () { const h = o.apply(this, arguments); try { return h ? cfDateChips(h) : h; } catch (e) { return h; } }; })();
+(() => { try { const st = document.createElement('style'); st.textContent = '.cfdate{font-weight:700;background:rgba(214,120,40,.16);color:inherit;padding:0 5px;border-radius:6px;white-space:nowrap}'; document.head.appendChild(st); } catch (e) { } })();
