@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.24';
+const APP_VERSION = '2.27.25';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20270,53 +20270,62 @@ function cfBody(M) {
     <label class="srow"><div class="tx"><div class="t">Mortgages (ASB) come out of</div><div class="s">${S.settings.cfMortAcct ? 'Your choice' : 'Where the ASB loan repayments came from'}. Old ANZ home-loan payments are history only.</div></div><select onchange="cfSetMort(this.value)">${D.accounts.filter(cfSpendable).map(a => `<option value="${esc(a.id)}"${mortA && mortA.id === a.id ? ' selected' : ''}>${esc(cfAName(a))}</option>`).join('')}</select></label></div>
     <div class="foot">Read-only, from Akahu (daily, or when you tap Refresh). Before-payday figures are worked out from Bills and this fortnight’s mortgages; pay isn’t counted until it lands. Bills already paid from the bank this fortnight are left out.</div>`;
 }
-/* 2.27.24: Itemised fortnight, budget style. For this and next Bills-pay fortnight: money in by source (with the board left after
-   the insurance transfer), money out by the account it comes from (each bill, date, amount, subtotal), transfers between
-   accounts, the ASB credit card, then total in, total out and what's left. Same figures as fnModel / Budget; estimates are labelled. */
+/* 2.27.25: Itemised week by week (Wed–Tue), budget style. Each week: money in on the day it lands (bank, then expected),
+   bills due by the account they come from with subtotals, the ASB card, what's held back for bills due next week before
+   money lands, the transfers to make that week (from → to, amount, what for), shortfalls, and what's left.
+   Bills: fnModel (same as Budget). Money in and transfers: the bank plus xferPlan. Estimates are labelled. */
+const ciWeekStart = d => { let x = d, k = 0; while (new Date(parseD(x)).getUTCDay() !== 3 && k++ < 7) x = addDays(x, -1); return x; };
 function cfItemised(D) {
   if (!D) return '';
   const X = (() => { try { return xferPlan(D); } catch (e) { return null; } })(), nm = id => id ? fnAcctNameD(D, id) : 'Account not known yet';
   const T = todayISO(), m = v => cfMoney(v), chip = d => d ? `<b class="cfdate">${esc(fmtW(d))}</b>` : '';
-  const stT = x => x.st === 'paid' ? '<span class="fnst paid">Paid ✓</span>' : x.st === 'landed' ? '<span class="fnst paid">Landed ✓</span>' : x.st === 'overdue' ? '<span class="fnst over">Overdue</span>' : x.st === 'about' ? '<span class="fnst about">Estimate</span>' : x.st === 'expected' ? `<span class="fnst about">${x.typed ? 'Expected' : 'Estimate'}</span>` : x.st === 'setaside' ? '<span class="fnst due">Set aside</span>' : x.st === 'due' ? '<span class="fnst due">Due</span>' : x.st === 'nomatch' ? '<span class="fnst">Not seen in bank</span>' : x.st === 'planned' ? '<span class="fnst">Planned</span>' : '';
+  const stT = x => x.st === 'paid' ? '<span class="fnst paid">Paid ✓</span>' : x.st === 'landed' ? '<span class="fnst paid">Landed ✓</span>' : x.st === 'overdue' ? '<span class="fnst over">Overdue</span>' : x.st === 'about' || x.st === 'est' ? '<span class="fnst about">Estimate</span>' : x.st === 'setaside' ? '<span class="fnst due">Set aside</span>' : x.st === 'due' ? '<span class="fnst due">Due</span>' : x.st === 'nomatch' ? '<span class="fnst">Not seen in bank</span>' : x.st === 'planned' ? '<span class="fnst">Planned</span>' : '';
   const row = (t, sub, amt, cls) => `<div class="row ciRow${cls ? ' ' + cls : ''}"><div class="tx"><div class="t">${t}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div><b class="cfamt">${amt}</b></div>`;
   const sec = (title, total, body, open) => `<details class="ciSec"${open ? ' open' : ''}><summary><span>${title}</span><b>${total}</b></summary><div class="list">${body}</div></details>`;
-  const one = (off) => {
-    const pp = payPeriod(off); if (!pp || pp.off !== off) return '';
-    const M = fnModel(fnBudgetFor(pp)); if (!M) return '';
-    const inP = d => d >= pp.start && d <= pp.end;
-    // money in
-    const ins = M.IN.filter(x => x.st === 'landed' || x.st === 'expected' || x.st === 'planned').sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-    let inRows = ins.map(x => row(esc(x.name === 'Your wages' ? 'Your pay' : x.name === 'Sarah’s wages' ? 'Sarah’s pay' : x.name), `${chip(x.date)} ${stT(x)}${x.key === 'board' || x.irk === 'board' || x.key === 'board-exp' ? ' · L H JENKINS → ' + esc(nm((irSt('board').seen.slice(-1)[0] || {}).acct)) : ''}`, m(x.amount))).join('');
-    if (M.otherIn > 0) inRows += row('Other money in', `${plural(M.otherInN, 'payment')} from the bank · landed`, m(M.otherIn));
-    const bl = X && X.boardLeft ? X.boardLeft.filter(x => inP(x.after)) : [];
-    if (bl.length) inRows += bl.map(x => row(`↳ Board left after insurance`, `${chip(x.by)} from ${esc(nm(x.from))} to ${esc(nm(x.to))} · <span class="fnst about">Estimate</span> · part of Board above, not extra`, `<span class="muted">${m(x.amount)}</span>`, 'ciSub')).join('');
-    else if (X && off === 0) inRows += row('↳ Board left after insurance', 'Nothing spare in BOARD after the insurance transfer and Kiwibank’s bills this fortnight', '<span class="muted">$0</span>', 'ciSub');
-    // money out, by account (card separately)
-    const outs = M.OUT.filter(x => x.kind !== 'card' && x.amount > 0 && x.st !== 'skipped' && x.st !== 'covered');
-    const by = new Map(); outs.forEach(x => { const k = x.acct || ''; (by.get(k) || by.set(k, []).get(k)).push(x); });
+  const card = cfCardAcct(D), spend = id => { const a = D.accounts.find(x => x.id === id); return a && cfSpendable(a); };
+  // all bills, mortgages and card payments from this and the next two pay fortnights (one model, no double counting)
+  const OUT = [], seenK = new Set();
+  [0, 1, 2].map(o => payPeriod(o)).filter((pp, i) => pp && pp.off === i).forEach(pp => { const M = fnModel(fnBudgetFor(pp)); (M ? M.OUT : []).forEach(x => { if (!(x.amount > 0) || x.st === 'skipped' || x.st === 'covered') return; const k = x.kind + '|' + (x.id || x.key || x.name) + '|' + x.date; if (seenK.has(k)) return; seenK.add(k); OUT.push(Object.assign({}, x, { date: x.st === 'overdue' ? T : x.date, was: x.st === 'overdue' ? x.date : '' })); }); });
+  // money in: what the bank shows (from the start of this week), then what's expected (each on its own day)
+  const W0 = ciWeekStart(T), H = X ? X.H : addDays(W0, 27), INS = [];
+  const kind = t => mywIs(t) ? ['shane', 'Your pay'] : swIs(t) ? ['sarah', 'Sarah’s pay'] : (() => { const k = IR_KEYS.find(k => irIs(k, t)); return k ? [k, IR_DEF[k].name] : ['other', 'Other money in']; })();
+  (D.transactions || []).filter(t => t.amount > 0 && t.date.slice(0, 10) >= W0 && t.date.slice(0, 10) <= T && spend(t.acct) && !(card && t.acct === card.id) && !t.pair && t.cat2 !== 'transfer' && !billOwnTx(t))
+    .forEach(t => { const [k, n] = kind(t); INS.push({ k, name: n, date: t.date.slice(0, 10), amount: t.amount, acct: t.acct, st: 'landed' }); });
+  const xk = w => w === 'Your pay' ? 'shane' : w === 'Sarah’s pay' ? 'sarah' : (IR_KEYS.find(k => IR_DEF[k].name === w) || 'other');
+  (X ? X.ins : []).forEach(i => { const k = xk(i.what); if (i.date < T || INS.some(x => x.k === k && k !== 'other' && Math.abs(dayGap(x.date, i.date)) <= 3)) return; INS.push({ k, name: i.what, date: i.date, amount: i.amount, acct: i.acct, st: 'est' }); });
+  const XL = X ? X.list : [], SH = X ? X.short : [], od = D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && cfBal(a) < -0.005);
+  const weeks = []; for (let w = W0; w <= H && weeks.length < 5; w = addDays(w, 7)) weeks.push(w);
+  const one = (ws, wi) => {
+    const we = addDays(ws, 6), inW = d => d >= ws && d <= we;
+    const wIn = INS.filter(x => inW(x.date)).sort((a, b) => a.date.localeCompare(b.date));
+    const inRows = wIn.map(x => row(esc(x.name), `${chip(x.date)} ${stT(x)} · into ${esc(nm(x.acct))}`, m(x.amount))).join('');
+    const wOut = OUT.filter(x => inW(x.date)), bills = wOut.filter(x => x.kind !== 'card'), cards = wOut.filter(x => x.kind === 'card');
+    const by = new Map(); bills.forEach(x => { const k = x.acct || ''; (by.get(k) || by.set(k, []).get(k)).push(x); });
     const ord = k => { const a = D.accounts.find(y => y.id === k); return !a ? 9 : cfIsOrbit(a) ? 0 : /bill/i.test(a.name || '') ? 1 : /kiwi/i.test(a.bank || '') ? 2 : /anz/i.test(a.bank || '') ? 3 : 4; };
-    const outHtml = [...by.entries()].sort((a, b) => ord(a[0]) - ord(b[0])).map(([k, L]) => { L.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-      const sub = fnSum(L); return `<div class="ciAcct">${esc(nm(k))}</div>` + L.map(x => row(esc(x.name) + (x.reg ? ' <small class="muted">(detected)</small>' : ''), `${chip(x.date)} ${stT(x)}${x.varies ? ' · varies' : ''}`, m(x.amount))).join('') + row(`<b>Subtotal · ${esc(nm(k))}</b>`, '', `<b>${m(sub)}</b>`, 'fntot'); }).join('');
-    const ev = M.everyday > 0 ? row('Everyday spending so far', `${plural(M.evN, 'payment')} from the bank that weren’t bills, up to ${chip(T < pp.end ? T : pp.end)}`, m(M.everyday)) : '';
-    // transfers between accounts (still to make, from the transfer plan)
-    const xs = X ? X.list.filter(x => inP(x.by)).sort((a, b) => a.by.localeCompare(b.by)) : [];
-    const xHtml = xs.map(x => row(`${esc(nm(x.from))} → ${esc(nm(x.to))}`, `${chip(x.by)} · ${x.lb ? 'Board left after insurance, shared out mortgages first, card last · estimate' : x.weekly ? 'Weekly, for ' + esc(x.items.slice(0, 3).join(', ')) : 'For ' + esc(x.items.slice(0, 3).join(', ')) + (x.items.length > 3 ? ' and ' + (x.items.length - 3) + ' more' : '')}`, m(x.amount))).join('');
-    // the card
-    const cards = M.OUT.filter(x => x.kind === 'card' && x.st !== 'skipped' && x.st !== 'covered' && x.amount > 0);
-    const cHtml = cards.map(x => row(esc(x.name), `${chip(x.date)} ${stT(x)} · from ${esc(nm(x.acct || (X && X.src && X.src.id)))}`, m(x.amount))).join('');
-    const totIn = r2(M.inPlan), totOut = r2(M.outSoFar + M.toPay), left = r2(totIn - totOut);
-    const title = `${off === 0 ? 'This fortnight' : 'Next fortnight'} · ${esc(fmtW(pp.start))} – ${esc(fmtW(pp.end))}`;
-    return `<details class="ciFn"${off === 0 ? ' open' : ''}><summary>${title}</summary>` +
-      sec('Money in', m(totIn), inRows || row('Nothing expected yet', '', '$0'), true) +
-      sec('Money out by account', m(fnSum(outs) + (M.everyday || 0)), (outHtml || row('No bills this fortnight', '', '$0')) + ev, true) +
-      sec('Transfers between accounts', xs.length ? plural(xs.length, 'transfer') : 'none', xHtml || row(off === 0 ? 'No transfers still to make' : 'None planned yet', 'Transfers move money between your own accounts, so they don’t change the totals', ''), false) +
-      sec('ASB credit card', m(fnSum(cards)), cHtml || row('No card payment this fortnight', '', '$0'), true) +
-      `<div class="list ciTot">${row('<b>Total in</b>', '', `<b>${m(totIn)}</b>`)}${row('<b>Total out</b>', 'Bills, mortgages, card and spending so far', `<b>${m(totOut)}</b>`)}${row(`<b>What’s left</b>`, left < 0 ? '⚠️ Short for this fortnight' : 'Estimate until everything has landed and been paid', `<b class="${left < 0 ? 'neg' : 'pos'}">${m(left)}</b>`, 'fntot')}</div></details>`;
+    const outHtml = [...by.entries()].sort((a, b) => ord(a[0]) - ord(b[0])).map(([k, L]) => { L.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      return `<div class="ciAcct">${esc(nm(k))}</div>` + L.map(x => row(esc(x.name) + (x.reg ? ' <small class="muted">(detected)</small>' : ''), `${chip(x.date)} ${stT(x)}${x.was ? ' · was due ' + esc(fmtW(x.was)) : ''}${x.varies ? ' · varies' : ''}`, m(x.amount))).join('') + row(`<b>Subtotal · ${esc(nm(k))}</b>`, '', `<b>${m(fnSum(L))}</b>`, 'fntot'); }).join('');
+    const cHtml = cards.map(x => row(esc(x.name), `${chip(x.date)} ${stT(x)} · last, from what’s left`, m(x.amount))).join('');
+    // held back: next week's bills due before any money lands that week
+    const nx = addDays(ws, 7), nxe = addDays(nx, 6), firstIn = (INS.filter(x => x.date >= nx && x.date <= nxe).map(x => x.date).sort()[0]) || addDays(nxe, 1);
+    const hold = OUT.filter(x => x.kind !== 'card' && x.date >= nx && x.date < firstIn && x.st !== 'paid'), holdT = fnSum(hold);
+    const xs = XL.filter(x => inW(x.by) || (wi === 0 && x.by < ws)).sort((a, b) => a.by.localeCompare(b.by));
+    const purpose = x => x.od ? 'Overdrawn, back to $0 (before the card)' : x.lb ? 'Board left after the insurance transfer, for bills (mortgages first)' : x.weekly ? 'Weekly, for ' + esc(x.items.join(', ')) : 'For ' + esc(x.items.slice(0, 4).join(', ')) + (x.items.length > 4 ? ' and ' + (x.items.length - 4) + ' more' : '');
+    const xHtml = xs.map(x => row(`${esc(nm(x.from))} → ${esc(nm(x.to))}`, `${chip(x.by)}${x.after && x.after !== x.by ? ' · once money lands ' + esc(fmtW(x.after)) : ''} · ${purpose(x)}${x.lb || x.weekly ? ' · estimate' : ''}`, m(x.amount))).join('');
+    const sh = SH.filter(s => inW(s.first && s.first.date || s.by) || (wi === 0 && (s.first && s.first.date || s.by) < ws)).map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${m(s.amount)} ${s.own ? 'under' : 'short'} for ${esc(s.items && s.items.length ? s.items.slice(0, 3).join(', ') : s.first.what)} on ${esc(fmtW(s.first.date || s.by))}${s.pay ? ` · enough lands ${esc(fmtW(s.pay))}` : ' · no money expected before then'}</div>`).join('');
+    const odH = wi === 0 && od.length ? `<div class="cftip">Overdrawn now: ${od.map(a => `${esc(nm(a.id))} ${m(cfBal(a))}`).join(', ')}. Each is put back to at least $0 by a transfer below, before the card.</div>` : '';
+    const tin = fnSum(wIn), tout = r2(fnSum(bills) + fnSum(cards)), left = r2(tin - tout);
+    const title = `Week ${esc(fmtW(ws))} – ${esc(fmtW(we))}${wi === 0 ? ' · this week' : ''}`;
+    return `<details class="ciFn"${wi === 0 ? ' open' : ''}><summary>${title}<span class="ciSum">${m(tin)} in · ${m(tout)} out</span></summary>` + (odH || sh ? `<div class="cftips">${odH}${sh}</div>` : '') +
+      sec('Money in', m(tin), inRows || row('Nothing lands this week', '', '$0'), true) +
+      sec('Bills due by account', m(fnSum(bills)), outHtml || row('No bills this week', '', '$0'), true) +
+      (cHtml ? sec('ASB credit card', m(fnSum(cards)), cHtml, true) : '') +
+      sec('Transfers to make this week', xs.length ? plural(xs.length, 'transfer') : 'none', xHtml || row('No transfers this week', 'Moves between your own accounts don’t change the totals', ''), true) +
+      `<div class="list ciTot">${row('<b>In this week</b>', '', `<b>${m(tin)}</b>`)}${row('<b>Out this week</b>', 'Bills, mortgages and card', `<b>${m(tout)}</b>`)}${holdT ? row('Held back for next week', `${hold.map(x => esc(x.name) + ' ' + esc(fmtW(x.date))).slice(0, 4).join(', ')}, due before money lands`, m(holdT)) : ''}${row('<b>What’s left</b>', 'After this week’s bills' + (holdT ? ' and what’s held back' : ''), `<b class="${left - holdT < 0 ? 'neg' : 'pos'}">${m(r2(left - holdT))}</b>`, 'fntot')}</div></details>`;
   };
-  const h = one(0) + one(1); if (!h) return '';
-  return `<div class="sec">Itemised by fortnight · budget style</div><div class="card ciCard">${h}<div class="s muted" style="margin-top:6px">Real bank data from Akahu and your Bills. Anything marked Estimate or Expected hasn’t happened yet. Tap a heading to fold it.</div></div>`;
+  const h = weeks.map(one).join(''); if (!h) return '';
+  return `<div class="sec">Week by week · budget style</div><div class="card ciCard">${h}<div class="s muted" style="margin-top:6px">Weeks run Wednesday to Tuesday. Money is only used from the day it lands; bills before then come from what’s already in the account. Real bank data from Akahu and your Bills; Estimate means it hasn’t happened yet. Tap a heading to fold it.</div></div>`;
 }
-(() => { try { const st = document.createElement('style'); st.textContent = '.ciCard{padding:10px 12px}.ciFn{margin:4px 0 10px}.ciFn>summary{font-weight:800;font-size:1.02rem;padding:8px 2px;cursor:pointer}.ciSec{margin:6px 0;border-top:1px solid rgba(127,127,127,.2)}.ciSec>summary{display:flex;justify-content:space-between;gap:8px;font-weight:700;padding:8px 2px;cursor:pointer}.ciAcct{font-weight:800;margin:10px 4px 2px;font-size:.92rem;color:var(--accent,#B4530A)}.ciSub .t{font-weight:500;padding-left:6px}.ciTot{margin-top:8px}.ciRow .s{line-height:1.6}'; document.head.appendChild(st); } catch (e) { } })();
+(() => { try { const st = document.createElement('style'); st.textContent = '.ciCard{padding:10px 12px}.ciFn{margin:4px 0 10px}.ciFn>summary{font-weight:800;font-size:1.02rem;padding:8px 2px;cursor:pointer}.ciSum{display:block;font-weight:600;font-size:.85rem;opacity:.75;margin-left:18px}.ciSec{margin:6px 0;border-top:1px solid rgba(127,127,127,.2)}.ciSec>summary{display:flex;justify-content:space-between;gap:8px;font-weight:700;padding:8px 2px;cursor:pointer}.ciAcct{font-weight:800;margin:10px 4px 2px;font-size:.92rem;color:var(--accent,#B4530A)}.ciSub .t{font-weight:500;padding-left:6px}.ciTot{margin-top:8px}.ciRow .s{line-height:1.6}'; document.head.appendChild(st); } catch (e) { } })();
 function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
 async function cfSetMain(id) { S.settings.cfMain = id; await save(); render(); }
 async function cfRefresh() { toast('Asking the banks for the latest…'); await cfLoad(true); if (CFerr) toast(CFerr); }
@@ -20554,11 +20563,17 @@ function xferPlan(D) {
   // any account's lowest point from day d to the end, with planned transfers in and out
   const acctAt = (id, d) => { let b = bal[id] || 0; evts.forEach(e => { if (e.acct === id && e.date <= d) b += e.inc ? e.amount : -e.amount; }); list.forEach(x => { if (x.weekly || x.by > d) return; if (x.from === id) b -= x.amount; if (x.to === id) b += x.amount; }); return b; };
   const availOf = (id, d) => Math.min(...[d, ...evts.filter(e => e.acct === id).map(e => e.date).filter(x => x > d), H].map(x => acctAt(id, x)));
-  const payDates = shaneIn.map(x => x.date), nextPay = d => payDates.find(p => p > d) || '';
+  // 2.27.25: week by week. Money is usable from the day it lands in the source (his pay, Sarah's, cleaning, or board left over the
+  // day after it lands in BOARD), and a group of bills never runs past the next Wednesday, so transfers are planned each week.
+  const boardIn = ins.filter(i => i.weekly === 'board' && i.acct && i.acct !== src.id).map(i => addDays(i.date, 1));
+  const payDates = [...new Set(ins.filter(i => i.acct === src.id).map(i => i.date).concat(boardIn))].filter(d => d > T).sort();
+  const nextWed = d => { let x = addDays(d, 1), k = 0; while (new Date(parseD(x)).getUTCDay() !== 3 && k++ < 7) x = addDays(x, 1); return x; };
+  const nextPay = d => { const p = payDates.find(q => q > d) || '', w = nextWed(d); return !p || w < p ? w : p; };
+  const odIds = new Set(D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && a.id !== src.id && (bal[a.id] || 0) < -0.005).map(a => a.id)); // 2.27.25: overdrawn (ORBIT is revolving, never)
   // 1) what each paying account needs: when it would drop under the buffer, one top-up that covers everything due before the next pay
   [...new Set(outs.map(o => o.acct))].filter(id => id && id !== src.id).forEach(id => {
     const buf = sweeps.some(w => w.to === id) ? 0 : buf0; // 2.26.86: a weekly-funded account only has to cover its bills
-    let b = bal[id] || 0; const L = evts.filter(e => e.acct === id);
+    let b = odIds.has(id) ? 0 : bal[id] || 0; const L = evts.filter(e => e.acct === id); // an overdrawn account is first put back to $0 (below)
     for (let i = 0; i < L.length;) {
       const e = L[i]; if (e.inc) { b += e.amount; i++; continue; }
       if (b - e.amount >= buf - 0.005) { b -= e.amount; i++; continue; }
@@ -20573,8 +20588,8 @@ function xferPlan(D) {
   const srcEv = evts.filter(e => e.acct === src.id), floor = cfIsOrbit(src) ? orbMin() : buf;
   const srcAt = d => { let b = bal[src.id] || 0; srcEv.forEach(e => { if (e.date <= d) b += e.inc ? e.amount : -e.amount; }); list.forEach(x => { if (x.by > d) return; if (x.from === src.id) b -= x.amount; else if (x.to === src.id) b += x.amount; }); return b; }; // 2.27.24: only money into / out of the source (same-bank moves aren't ORBIT's)
   const availFrom = d => Math.min(...[d, ...srcEv.map(e => e.date).filter(x => x > d), H].map(srcAt));
-  try { D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && a.id !== src.id && /anz/i.test(a.bank || cfAName(a)) && !/bill/i.test(cfAName(a)) && (bal[a.id] || 0) < -0.005).forEach(a => { // 2.27.14
-    const need = ceil10(-(bal[a.id] || 0)), by = payDates.find(p => availFrom(p) - floor >= need) || payDates[payDates.length - 1] || T;
+  try { D.accounts.filter(a => odIds.has(a.id)).forEach(a => { // 2.27.14 · 2.27.25: every overdrawn account but ORBIT, as soon as there's money for it
+    const need = ceil10(-(bal[a.id] || 0)), by = [T, ...payDates].find(p => availFrom(p) - floor >= need) || payDates[payDates.length - 1] || T;
     needs.push({ to: a.id, need, by, first: { what: 'overdrawn, back to $0', date: by }, grp: [{ what: 'overdrawn ' + cfMoney(-(bal[a.id] || 0)) + ', back to $0' }], od: 1 }); }); needs.sort((a, b) => a.by.localeCompare(b.by)); } catch (e) { }
   // 2.27.21: priority — (1) mortgages, (2) other bills and transfers (incl. an overdraft back to $0), (3) the card, with what's left
   srcEv.forEach(e => { if (e.card) { e.full = e.amount; e.amount = 0; } });
