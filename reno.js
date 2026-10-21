@@ -7,7 +7,7 @@ function makeReno(cfg) { // 2.26.36: one engine for every renovation list (Mille
   const INSIDE = [['main', 'Main bedroom', '🛏️', 'carpet'], ['spare', 'Spare bedroom', '🛋️', 'carpet'], ['bath', 'Bathroom', '🛁', 'tiles'], ['hall', 'Hallway', '🚪', 'carpet'], ['lounge', 'Lounge', '📺', 'carpet'], ['dining', 'Dining', '🍽️', 'carpet'], ['kitchen', 'Kitchen', '🍳', 'tiles'], ['pantry', 'Pantry', '🥫', 'tiles'], ['laundry', 'Laundry', '🧺', 'tiles']];
   let AREAS = cfg.areas ? cfg.areas() : INSIDE.map(([k, n, e, f]) => ({ k, n, e, floorDef: f, jobs: [['clean', 'Clean'], ['mop', 'Mop ceiling'], ['speckle', 'Apply speckle (filler)'], ['sand', 'Sand'], ['ceiling', 'Paint ceiling (roof)'], ['walls', 'Paint walls'], ['floor', 'Flooring']] }))
     .concat([{ k: 'out', n: 'Outside', e: '🏡', jobs: [['wash', 'House wash (walls, windows, soffits)'], ['gutters', 'Clear gutters and downpipes'], ['decks', 'Clean decks and paths'], ['metal', 'Metal man (scrap metal pickup)'], ['dump', 'Dump runs']] },
-    { k: 'final', n: 'Final stage', e: '✨', final: true, jobs: [['clean', 'Final clean-up'], ['lawns', 'Final lawns'], ['weed', 'Weed eating']] }]);
+    { k: 'final', n: 'Final stage', e: '✨', final: true, jobs: [['clean', 'Final clean-up'], ['switches', 'Check light switches (make sure they are all working)'], ['lawns', 'Final lawns'], ['weed', 'Weed eating']] }]);
   const ST = { todo: 'To do', doing: 'In progress', done: 'Done' };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let key = '', me = 'Shane', onChange = () => { }, st = { items: {}, dirty: [] };
