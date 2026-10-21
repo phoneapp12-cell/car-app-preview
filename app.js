@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.32';
+const APP_VERSION = '2.27.33';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24573,3 +24573,50 @@ function carTimeProg(c) { try { const P = [['WOF', c.wof, (+c.wofMonths || 12) *
 async function progToggle() { S.settings = S.settings || {}; S.settings.progLines = !progOn(); await save(); render(); }
 (() => { const o = rwSettings; rwSettings = function () { const h = o.apply(this, arguments), on = progOn();
   return `<div class="sec">Progress lines</div><div class="list"><div class="srow"><div class="tx"><div class="t">Show progress lines</div><div class="s">Thin % bars on To-do, Notifications, Bills, Cash flow, Shopping, Watch, UniMed claims and Cars.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show progress lines" onclick="progToggle()"></button></div></div>` + h; }; })();
+
+/* ================= 2.27.33: TICK EFFECTS — soft tick sound, hand-drawn tick drawing itself, sparkle dust, slow 3 s fade =================
+   The tick still saves straight away (the original handlers run untouched); only the visual removal waits. A copy of the row
+   stays where it was and fades out; the real row (moved to Done) is hidden until the fade ends. Untick during the fade cancels it. */
+const TFX_MS = 3000, tfxOn = k => !(S && S.settings && S.settings[k] === false), tfxCalm = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+let tfxAC = null; const tfxFades = [];
+document.addEventListener('pointerdown', () => { try { if (!tfxAC && tfxOn('tickSound')) { const C = window.AudioContext || window.webkitAudioContext; if (C) tfxAC = new C(); } if (tfxAC && tfxAC.state === 'suspended') tfxAC.resume(); } catch (e) { } }, { capture: true, passive: true });
+function tfxSound() { try { if (!tfxOn('tickSound') || !tfxAC) return; const a = tfxAC, t = a.currentTime, g = a.createGain(); g.connect(a.destination);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  [[1320, 0], [1980, 0.045]].forEach(([f, d]) => { const o = a.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(f, t + d); o.frequency.exponentialRampToValueAtTime(f * 1.25, t + d + 0.08); o.connect(g); o.start(t + d); o.stop(t + d + 0.2); }); } catch (e) { } }
+function tfxDraw(btn) { try { if (!tfxOn('tickFx')) return; const r = btn.getBoundingClientRect(), calm = tfxCalm(), sz = Math.max(30, Math.min(56, r.width * 1.5)), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const w = document.createElement('div'); w.className = 'tfxw' + (calm ? ' calm' : ''); w.style.cssText = `left:${cx}px;top:${cy}px`;
+  w.innerHTML = `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" aria-hidden="true"><path pathLength="1" d="M4.6 12.9c1.1.6 2.3 1.9 3.4 3.3.6.8 1.1 1.6 1.5 2.3.3-.6 1.4-2.9 3.3-5.6 1.9-2.7 4.3-5.5 6.9-7.4"/></svg>` +
+    (calm ? '' : Array.from({ length: 14 }, (_, i) => { const a = i / 14 * 6.283 + Math.random() * 0.5, d = sz * (0.5 + Math.random() * 0.6), c = ['#fbbf24', '#fde68a', '#f9a8d4', '#c4b5fd', '#a7f3d0', '#fff7d6'][i % 6];
+      return `<i style="--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 6}px;--c:${c};--s:${3 + Math.random() * 4}px;animation-delay:${Math.random() * 120}ms"></i>`; }).join(''));
+  document.body.appendChild(w); setTimeout(() => w.remove(), 1300); return w; } catch (e) { } }
+const tfxSel = '.tick,.packtick,[role="checkbox"]', tfxCall = /^(markPaid|xferTick|cardTick|shopTick|tick|medTick|completeMine|myRenoDone|toggleCooked|todoStepTick)\(/;
+const tfxRowOf = b => b.closest('.row,.xfrow');
+const tfxIsDone = (b, row) => b.getAttribute('aria-checked') === 'true' || (row && row.classList.contains('done')) || /^(Mark not done|Untick|Not done)/i.test(b.getAttribute('aria-label') || '');
+function tfxEnd(f, quick) { const i = tfxFades.indexOf(f); if (i >= 0) tfxFades.splice(i, 1); clearTimeout(f.timer); try { f.clone.remove(); } catch (e) { }
+  document.querySelectorAll('.tfxhide').forEach(el => { if (el.getAttribute('data-tfxk') === f.key) { el.classList.remove('tfxhide'); if (!quick) el.classList.add('tfxin'); } }); }
+document.addEventListener('click', e => { try {
+  const b = e.target && e.target.closest && e.target.closest('button'); if (!b) return; const key = b.getAttribute('onclick') || ''; if (!(b.matches(tfxSel) || tfxCall.test(key)) || !tfxCall.test(key) && !b.matches(tfxSel)) return;
+  const row = tfxRowOf(b), old = tfxFades.find(f => f.key === key);
+  if (old) { tfxEnd(old, true); return; } // untick during the fade: put it back now
+  if (tfxIsDone(b, row) || (row && row.classList.contains('tfxclone'))) return;
+  tfxSound(); const w = tfxDraw(b);
+  if (!row || !tfxOn('tickFx') || tfxCalm() || /^todoStepTick\(/.test(key)) return; // steps stay in place; calm mode moves at once
+  const par = row.parentElement; if (!par || !par.className) return;
+  const cls = '.' + String(par.className).trim().split(/\s+/).join('.'), all = [...document.querySelectorAll(cls)];
+  const clone = row.cloneNode(true); clone.classList.add('tfxclone', 'done'); clone.removeAttribute('id'); clone.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+  if (!/^(tick|shopTick)\(/.test(key)) clone.style.pointerEvents = 'none'; else clone.querySelectorAll('button').forEach(x => { if (x.getAttribute('onclick') !== key) x.style.pointerEvents = 'none'; });
+  const f = { key, w, clone, cls, cIdx: all.indexOf(par), rIdx: [...par.children].indexOf(row), at: Date.now() };
+  f.timer = setTimeout(() => tfxEnd(f), TFX_MS + 600); tfxFades.push(f);
+} catch (e2) { } }, true);
+function tfxApply() { tfxFades.slice().forEach(f => { try {
+  const par = [...document.querySelectorAll(f.cls)][f.cIdx], el = Date.now() - f.at; if (el > TFX_MS) return tfxEnd(f);
+  const m = [...document.querySelectorAll('button')].filter(x => x.getAttribute('onclick') === f.key && !x.closest('.tfxclone')).map(tfxRowOf).filter(Boolean);
+  if (m.some(r => r.parentElement === par && !r.classList.contains('done'))) return tfxEnd(f, true); // it stayed where it was
+  m.forEach(r => { r.classList.add('tfxhide'); r.setAttribute('data-tfxk', f.key); });
+  if (!par) return; if (!f.clone.isConnected) { f.clone.style.animationDelay = -el + 'ms'; par.insertBefore(f.clone, par.children[f.rIdx] || null); }
+  if (f.w && f.w.isConnected) { const tb = [...f.clone.querySelectorAll('button')].find(x => x.getAttribute('onclick') === f.key); if (tb) { const r = tb.getBoundingClientRect(); f.w.style.left = r.left + r.width / 2 + 'px'; f.w.style.top = r.top + r.height / 2 + 'px'; } }
+} catch (e) { } }); }
+(() => { const o = render; render = function () { const r = o.apply(this, arguments); try { if (tfxFades.length) tfxApply(); } catch (e) { } return r; }; })();
+async function tfxToggle(k) { S.settings = S.settings || {}; S.settings[k] = !tfxOn(k); await save(); render(); }
+(() => { const o = rwSettings; rwSettings = function () { const h = o.apply(this, arguments), row = (k, t, d) => `<div class="srow"><div class="tx"><div class="t">${t}</div><div class="s">${d}</div></div><button class="switch ${tfxOn(k) ? 'on' : ''}" role="switch" aria-checked="${tfxOn(k)}" aria-label="${t}" onclick="tfxToggle('${k}')"></button></div>`;
+  return `<div class="sec">Ticking things off</div><div class="list">${row('tickSound', 'Tick sound', 'A soft tick when you tick something off.')}${row('tickFx', 'Tick effects', 'A drawn tick, a little sparkle, and the item fades out over 3 seconds.')}</div>` + h; }; })();
