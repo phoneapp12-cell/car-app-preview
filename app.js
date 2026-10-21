@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.28';
+const APP_VERSION = '2.27.29';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5783,7 +5783,7 @@ function calSearchHits(q) {
   const fut = hits.filter(e => parseD(e.date) >= T), past = hits.filter(e => parseD(e.date) < T).reverse();
   return [...fut, ...past].slice(0, 60);
 }
-const calType = e => ({ appt: 'Appointment', mine: 'My event', ext: 'Family calendar', bday: 'Birthday', meal: 'Meal', hol: 'Holiday', pet: 'Pet', health: 'Health', garden: 'Garden' })[e.src] || (e.time === 'Bill' ? 'Bill' : e.time === 'To-do' ? 'To-do' : 'Due date');
+const calType = e => ({ reg: 'My week', appt: 'Appointment', mine: 'My event', ext: 'Family calendar', bday: 'Birthday', meal: 'Meal', hol: 'Holiday', pet: 'Pet', health: 'Health', garden: 'Garden' })[e.src] || (e.time === 'Bill' ? 'Bill' : e.time === 'To-do' ? 'To-do' : 'Due date');
 function calSearchHtml() {
   const q = calQ.trim(); if (calFold(q).length < 2) return '';
   const hits = calSearchHits(q), T = todayT();
@@ -16878,6 +16878,7 @@ function Settings() {
   return `<button class="back" onclick="go('#more')">${I('left')} More</button>
   <div class="top" style="padding-top:0"><div><h1>Settings</h1><div class="sub">Appearance, sync, reminders, mail, calendars and backup</div></div></div>
   ${syncSettingsRow()}
+  ${(() => { try { return rwSettings(); } catch (e) { return ''; } })()}
   ${websiteSettingsRow()}
   <div class="sec" id="appearance">Appearance</div>
   ${homeLayoutPicker()}
@@ -19871,7 +19872,7 @@ function weekItems() {
   try { calItems(T0, T0 + 6 * DAY).forEach(e => { if (!out[e.date] || !glOk(e.title)) return;
       const type = e.src !== 'due' ? e.src : e.time === 'To-do' ? 'todo' : e.time === 'Bill' ? 'bill' : e.time === 'Loan' ? 'loan' : /^(WOF|Rego|Service|AA|Licence)$/.test(e.time) ? 'car' : 'due';
       const timed = /^\d{1,2}:\d{2}/.test(String(e.sort || '')) || /\d(am|pm)|:\d\d/i.test(String(e.time || ''));
-      add(e.date, { type, title: e.title, time: timed ? e.time : (type === 'todo' || type === 'bill' || type === 'loan' ? '' : e.time), sort: e.sort || '', line: e.notes ? String(e.notes).slice(0, 60) : e.tag && e.src === 'ext' ? e.tag : '', sarah: !!e.sarah, color: e.src === 'ext' && e.color ? e.color : '', go: e.go }); }); } catch (e) { }
+      add(e.date, { type, ic: e.icon || '', color2: e.src === 'reg' ? e.color : '', title: e.title, time: timed ? e.time : (type === 'todo' || type === 'bill' || type === 'loan' ? '' : e.time), sort: e.sort || '', line: e.notes ? String(e.notes).slice(0, 60) : e.tag && e.src === 'ext' ? e.tag : '', sarah: !!e.sarah, color: e.src === 'ext' && e.color ? e.color : '', go: e.go }); }); } catch (e) { }
   // pays and money in, on their usual day (estimate until it lands)
   try { [['shane', 'Your pay', () => mywSt().seen], ['sarah', 'Sarah’s pay', () => swSt().seen], ...IR_KEYS.map(k => [k, IR_DEF[k].name, () => irSt(k).seen])].forEach(([k, nm, sf]) => { const seen = sf() || [], a = fnAvg3(seen);
       const landed = seen.filter(x => out[x.d]).map(x => x.d);
@@ -19885,7 +19886,7 @@ function weekItems() {
 }
 function weekOverview() {
   const D = weekItems(), T = todayISO();
-  const card = it => { const [ic, col] = WK_TYPE[it.type] || WK_TYPE.due, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
+  const card = it => { const [ic0, col0] = WK_TYPE[it.type] || WK_TYPE.due, ic = it.ic || ic0, col = it.color2 || col0, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
     return `<button type="button" class="wkcard" style="--wc:${esc(it.color || col)}" onclick="if(window.glSwipe&&glSwipe.moved)return;${oc}"><div class="wkh"><span class="wkt">${it.sarah ? sarahBadge({ from: 'sarah' }) + ' ' : ''}${esc(it.title)}</span><span class="wki">${ic}</span></div>${it.time ? `<div class="wktm">${esc(it.time)}</div>` : ''}${it.line || it.warn ? `<div class="wkb">${it.line ? `<div>${esc(it.line)}</div>` : ''}${it.warn ? `<div class="wkwarn">⚠️ ${esc(it.warn)}</div>` : ''}</div>` : ''}</button>`; };
   const cols = Object.keys(D).sort().map(d => { const dt = new Date(parseD(d));
     return `<div class="wkcol${d === T ? ' wktoday' : ''}"><div class="wkday"><div><span class="wkdn">${d === T ? 'Today' : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getUTCDay()]}</span><span class="wkdd">${dt.getUTCDate()}</span></div><button type="button" class="wkadd" aria-label="Add on ${esc(fmtW(d))}" onclick="wkAdd('${d}')">+</button></div>${D[d].map(card).join('') || '<div class="wkfree">Nothing on</div>'}</div>`; }).join('');
@@ -19893,6 +19894,39 @@ function weekOverview() {
 }
 function wkAdd(d) { openSheet('Add on ' + fmtW(d), `<div class="btns" style="flex-direction:column;gap:8px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>todoForm(null,{due:'${d}'}))">☑️ To-do for this day</button><button type="button" class="btn" onclick="closeSheet().then(()=>mineForm(null,'${d}'))">📅 Event on this day</button></div>`, null, ''); }
 (() => { try { const st = document.createElement('style'); st.textContent = '.wkscroll{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;margin:0 -2px;touch-action:pan-x pan-y}.wkcol{flex:0 0 40%;min-width:140px;scroll-snap-align:start;background:var(--card,#fff);border-radius:14px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}.wktoday{outline:2.5px solid #F59E0B;background:rgba(245,158,11,.08)}.wkday{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px}.wkdn{display:block;font-size:.78rem;font-weight:700;opacity:.75;text-transform:uppercase}.wkdd{font-size:1.4rem;font-weight:800}.wktoday .wkdd{color:#DC2626}.wkadd{width:30px;height:30px;border-radius:50%;border:0;background:#F59E0B;color:#111;font-size:1.25rem;font-weight:800;line-height:1}.wkcard{display:block;width:100%;text-align:left;border:0;padding:0;margin:0 0 8px;border-radius:10px;overflow:hidden;background:var(--card,#fff);box-shadow:0 1px 3px rgba(0,0,0,.12);font:inherit;color:inherit}.wkh{display:flex;gap:4px;justify-content:space-between;background:var(--wc);color:#fff;padding:6px 7px 2px;font-weight:700;font-size:.86rem;line-height:1.2}.wktm{background:var(--wc);color:#fff;padding:0 7px 6px;font-size:.78rem;opacity:.95}.wkb{padding:5px 7px;font-size:.78rem;line-height:1.3}.wkwarn{color:#DC2626;font-weight:700;margin-top:2px}.wkfree{font-size:.8rem;opacity:.6;padding:6px 2px}.wklinks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}.wklinks a{font-size:.82rem;padding:4px 10px;border-radius:999px;background:rgba(127,127,127,.12);color:inherit;text-decoration:none}'; document.head.appendChild(st); } catch (e) { } })();
+
+/* ================= 2.27.29: My week (regular weekly items) =================
+   Gym, Mum's and the cleaning job as weekly cards on This week and the Calendar. Settings › My week: days, times, on/off,
+   add or remove. Only cards: no calendar events, no reminders. S.settings.regWeek = [{ id, name, icon, color, days:[0-6], start, end, on }] */
+const RW_DEF = [{ id: 'gym', name: 'Gym', icon: '🏋️', color: '#7C3AED', days: [2, 3], start: '18:00', end: '20:00', on: true },
+  { id: 'mum', name: 'Mum’s', icon: '👵', color: '#DB2777', days: [1], start: '18:00', end: '20:00', on: true },
+  { id: 'clean', name: 'Cleaning job (Smart Office)', icon: '🧽', color: '#0D9488', days: [0], start: '', end: '19:00', on: true }];
+const RW_DN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function rwList() { S.settings = S.settings || {}; if (!Array.isArray(S.settings.regWeek)) S.settings.regWeek = RW_DEF.map(x => Object.assign({}, x, { days: x.days.slice() })); return S.settings.regWeek; }
+const rwTime = x => x.start && x.end ? fmtTime(x.start) + ' – ' + fmtTime(x.end) : x.start ? 'from ' + fmtTime(x.start) : x.end ? 'until ' + fmtTime(x.end) : '';
+(() => { const o = calItems; calItems = function (fromT, toT) { const L = o.apply(this, arguments);
+  try { const R = rwList().filter(x => x && x.on !== false && x.days && x.days.length); if (R.length && toT - fromT <= 62 * DAY) { for (let t = fromT; t <= toT; t += DAY) { const dw = new Date(t).getUTCDay();
+      R.filter(x => x.days.includes(dw)).forEach(x => L.push({ src: 'reg', title: x.name, date: isoT(t), time: rwTime(x) || 'Weekly', sort: x.start || x.end || '', color: x.color, icon: x.icon, tag: 'My week', go: "go('#settings');setTimeout(()=>{const e=document.getElementById('rwset');e&&e.scrollIntoView({block:'start'})},300)" })); }
+    L.sort((a, b) => parseD(a.date) - parseD(b.date) || String(a.sort || '').localeCompare(String(b.sort || ''))); } } catch (e) { }
+  return L; }; })();
+function rwSettings() {
+  const L = rwList();
+  return `<div class="sec" id="rwset">My week</div><div class="list">${L.map(x => `<div class="srow"><div class="tx" role="button" onclick="rwForm('${esc(x.id)}')"><div class="t">${esc(x.icon || '')} ${esc(x.name)}</div><div class="s">${esc((x.days || []).slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => RW_DN[d]).join(', ') || 'No days')}${rwTime(x) ? ' · ' + esc(rwTime(x)) : ''} · tap to change</div></div><button class="switch ${x.on !== false ? 'on' : ''}" role="switch" aria-checked="${x.on !== false}" aria-label="${esc(x.name)}" onclick="rwToggle('${esc(x.id)}')"></button></div>`).join('')}
+    <div class="srow"><div class="tx"><div class="t">Regular weekly items</div><div class="s">Shown on Home › This week and in the Calendar. No events or reminders are made.</div></div><button class="btn small" onclick="rwForm('')">${I('plus')} Add</button></div></div>`;
+}
+async function rwToggle(id) { const x = rwList().find(y => y.id === id); if (!x) return; x.on = x.on === false; await save(); render(); }
+function rwForm(id) {
+  const x = id ? rwList().find(y => y.id === id) : { id: '', name: '', icon: '📌', color: '#2563EB', days: [], start: '', end: '', on: true }; if (!x) return;
+  const days = [1, 2, 3, 4, 5, 6, 0].map(d => `<label style="display:inline-flex;gap:4px;align-items:center;margin:0 10px 6px 0"><input type="checkbox" name="d${d}" value="1"${x.days.includes(d) ? ' checked' : ''}> ${RW_DN[d]}</label>`).join('');
+  openSheet(id ? 'Change ' + esc(x.name) : 'Add a weekly item', field('Name', inp('name', x.name, 'maxlength="40"')) + field('Icon (an emoji)', inp('icon', x.icon, 'maxlength="4"')) +
+    `<div class="field"><span>Days</span><div>${days}</div></div>` + field('Starts (leave blank if not known)', inp('start', x.start, 'type="time"')) + field('Ends', inp('end', x.end, 'type="time"')) + field('Colour', inp('color', x.color, 'type="color"')),
+    async v => { if (!v.name) return 'Please give it a name.'; const ds = [0, 1, 2, 3, 4, 5, 6].filter(d => v['d' + d]); if (!ds.length) return 'Pick at least one day.';
+      const hm = t => /^([01]\d|2[0-3]):[0-5]\d$/.test(t || '') ? t : '';
+      const y = Object.assign(id ? x : { id: uid('rw'), on: true }, { name: v.name.slice(0, 40), icon: String(v.icon || '').slice(0, 4), color: /^#[0-9a-f]{6}$/i.test(v.color || '') ? v.color : '#2563EB', days: ds, start: hm(v.start), end: hm(v.end) });
+      if (!id) rwList().push(y); await save(); render(); }, 'Save',
+    id ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Remove" onclick="rwDel('${esc(id)}')">${I('trash')}</button>` : '');
+}
+async function rwDel(id) { const s0 = snap(); S.settings.regWeek = rwList().filter(y => y.id !== id); await save(); await closeSheet(); render(); toast('Removed from My week.', 'Undo', undoTo(s0)); }
 
 /* ================= 2.26.4: no sport anywhere =================
    Shane doesn't want sport: it's filtered out of the TV guide and TV picks, news, events and nightlife, videos,
