@@ -1,0 +1,76 @@
+/* 2.27.40: Northpower power outages (Whangārei and Kaipara lines company) for My App's bell page.
+ * Source: Northpower's public Outages Centre page (outages.northpower.nz). Its robots.txt allows all, and its terms allow
+ * viewing and reproducing content for informational, non-commercial use with acknowledgement; the app credits Northpower.
+ * Read about every 20 minutes on the 10-minute cron; the outage list embedded in the page is slimmed (no map shapes)
+ * and kept in KV. GET /outages returns it. Onerahi outages also become pushes through the phone's reminder list:
+ * unplanned ones straight away, planned ones at 6pm the day before and 7am on the day. */
+import { cacheGet, cachePut } from './kvguard.js';
+export const OUT_KEY = 'outages-v1';
+const PAGE = 'https://outages.northpower.nz/';
+const GAP = 19 * 60;
+const unesc = s => s.replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+// Livewire wraps values as [value, {s: ...}]; unwrap them.
+export function unwrap(v) {
+  if (Array.isArray(v)) { if (v.length === 2 && v[1] && typeof v[1] === 'object' && !Array.isArray(v[1]) && 's' in v[1] && Object.keys(v[1]).length <= 3) return unwrap(v[0]); return v.map(unwrap); }
+  if (v && typeof v === 'object') { const o = {}; for (const k of Object.keys(v)) if (k !== 'geometry') o[k] = unwrap(v[k]); return o; }
+  return v;
+}
+const iso = v => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) ? v : null);
+const list = (L, k) => (Array.isArray(L) ? L : []).map(x => x && x[k]).filter(Boolean);
+function slim(o, kind) {
+  const loc = (o && o.location) || {};
+  return { id: String(o.caseNumber || o.id || o.incidentNumber || o.title || '').slice(0, 40), kind, area: String(o.title || o.localityDescription || '').slice(0, 80),
+    where: String(o.localityDescription || '').slice(0, 160), cause: String(o.shutdownReason || o.cause || o.faultCause || o.reason || '').slice(0, 80),
+    start: iso(o.outageStartDate) || iso(o.startDate) || iso(o.createdDate), end: iso(o.outageEndDate) || iso(o.estimatedRestorationDate) || iso(o.estimatedRestoreTime) || iso(o.etr) || null,
+    status: String(o.publicStatus || o.status || '').slice(0, 40), msg: o.statusMessage ? String(o.statusMessage).slice(0, 160) : '', customers: +o.customerCount || null,
+    suburbs: list(loc.icpsBySuburb, 'suburb').slice(0, 12), roads: list(loc.icpsByRoad, 'road').slice(0, 30), zone: list(loc.icpsByZoneSub, 'zoneSub').slice(0, 4) };
+}
+// Pure: page HTML in, { planned, unplanned, updated } out (null if the list isn't there).
+export function parsePage(html) {
+  let i = 0;
+  while ((i = html.indexOf('wire:snapshot="', i)) >= 0) {
+    const s = i + 15, e = html.indexOf('"', s); if (e < 0) break; i = e;
+    const raw = html.slice(s, e); if (raw.indexOf('unplannedElectricityOutages&quot;') < 0 || raw.indexOf('plannedElectricityOutages&quot;:') < 0) continue;
+    let d; try { d = unwrap(JSON.parse(unesc(raw)).data); } catch (er) { continue; }
+    const P = d.plannedElectricityOutages, U = d.unplannedElectricityOutages;
+    const planned = [], seen = new Set();
+    const flat = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v).flat() : []);
+    for (const o of flat(P)) { if (!o || typeof o !== 'object') continue; const x = slim(o, 'planned'); const k = x.id + x.start; if (!seen.has(k)) { seen.add(k); planned.push(x); } }
+    const unplanned = flat(U).filter(o => o && typeof o === 'object').map(o => slim(o, 'unplanned'));
+    const meta = d.plannedElectricityOutageMeta || {};
+    const os = (d.outageState && (Array.isArray(d.outageState) ? d.outageState[0] : d.outageState)) || {}, om = os.plannedElectricityOutagesMeta || {};
+    return { planned, unplanned, updated: iso(meta.lastUpdated) || iso(om.lastUpdated) || null };
+  }
+  return null;
+}
+export async function runOutages(env, fetchImpl = fetch, now = Date.now(), force = false) {
+  const kv = env && env.EVENTS_KV; if (!kv) return null;
+  if (!force && await cacheGet('outages-at')) return null; await cachePut('outages-at', { at: now }, GAP);
+  const c = new AbortController(), t = setTimeout(() => c.abort(), 20000);
+  let html; try { const r = await fetchImpl(PAGE, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; due-dates-relay; personal outage alerts)' }, signal: c.signal }); if (!r.ok) throw new Error('http ' + r.status); html = await r.text(); } finally { clearTimeout(t); }
+  const got = parsePage(html); if (!got) throw new Error('no outage list');
+  let prev = null; try { prev = JSON.parse(await kv.get(OUT_KEY) || 'null'); } catch (e) { }
+  // Unplanned outages that have gone from the list are kept a few hours as restored.
+  const restored = ((prev && prev.unplanned) || []).filter(o => o.status !== 'Restored' && !got.unplanned.some(u => u.id === o.id)).map(o => ({ ...o, status: 'Restored', restoredAt: new Date(now).toISOString() }));
+  const keepR = ((prev && prev.restored) || []).concat(restored).filter(o => now - Date.parse(o.restoredAt || 0) < 6 * 3600e3).slice(-20);
+  const rec = { planned: got.planned, unplanned: got.unplanned, restored: keepR, updated: got.updated, source: 'Northpower Outages Centre' };
+  await kv.put(OUT_KEY, JSON.stringify(rec));
+  return rec;
+}
+export async function getOutages(env) { try { return JSON.parse(await env.EVENTS_KV.get(OUT_KEY) || 'null'); } catch (e) { return null; } }
+// Onerahi test: his suburb or street. (Tamaterau shares the Onerahi zone substation but isn't his street.)
+export const isOnerahi = o => (o.suburbs || []).some(s => /onerahi/i.test(s)) || (o.roads || []).some(r => /sherwood road/i.test(r)) || /onerahi/i.test(o.area || '');
+const nzParts = ms => Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+const clock = ms => new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
+const day = (ms, n = 0) => { const p = nzParts(ms + n * 86400e3); return `${p.year}-${p.month}-${p.day}`; };
+// Pure: outage record + phone's setting in, one-off reminders out (ids 'out-...').
+export function outageReminders(rec, pref, now) {
+  if (!rec || pref === 'off') return [];
+  const out = [], cid = s => String(s).replace(/[^a-z0-9]/gi, '').slice(0, 30);
+  for (const o of rec.unplanned || []) if (isOnerahi(o)) { const p = nzParts(now);
+    out.push({ id: 'out-u-' + cid(o.id), title: ('⚡ Power outage in ' + (o.area || 'Onerahi') + (o.end ? ', back about ' + clock(Date.parse(o.end)) : '')).slice(0, 80), date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}`, repeat: 'none' }); }
+  for (const o of rec.planned || []) { if (!isOnerahi(o) || !o.start) continue; const s = Date.parse(o.start); if (s < now) continue; const d = day(s), t = clock(s) + (o.end ? '–' + clock(Date.parse(o.end)) : '');
+    out.push({ id: 'out-b-' + cid(o.id + d), title: ('🔌 Planned power cut tomorrow in ' + o.area + ', ' + t).slice(0, 80), date: day(s, -1), time: '18:00', repeat: 'none' });
+    out.push({ id: 'out-m-' + cid(o.id + d), title: ('🔌 Planned power cut today in ' + o.area + ', ' + t).slice(0, 80), date: d, time: '07:00', repeat: 'none' }); }
+  return out.slice(0, 12);
+}

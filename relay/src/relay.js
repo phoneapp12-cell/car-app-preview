@@ -208,6 +208,7 @@ import { healthRoute } from './health.js';
 import { heatRoute } from './heat.js';
 import { alarmRoute } from './alarm.js';
 import { fuelRoute } from './fuel.js';
+import { getOutages, runOutages } from './outages.js';
 export async function handle(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get('Origin') || '';
   const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
@@ -227,6 +228,12 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   if (path.startsWith('/hue/')) { // 2.23.79: Philips Hue
     try { return await hueRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }
     catch (e) { return json(502, 'hue_unavailable', origin, env); }
+  }
+  if (path === '/outages') { // 2.27.40: Northpower outages (current, planned, recently restored)
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try { let d = await getOutages(env); if (!d) d = await runOutages(env, fetchImpl, Date.now(), true); return new Response(JSON.stringify(d || { planned: [], unplanned: [], restored: [] }), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
+    catch (e) { return json(502, 'outages_unavailable', origin, env); }
   }
   if (path === '/fuel') { // 2.27.36: Marsden Point terminal gate prices (BP and Z public lists), 30 days
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);

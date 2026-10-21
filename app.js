@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.39';
+const APP_VERSION = '2.27.40';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10401,7 +10401,7 @@ async function scheduleReminders() {
     if (!sub) return reminders.length ? 'fail' : '';
     try { shopPushReg(sub); } catch (e) { }
     if (!reminders.length && !S.settings.remOnRelay && !(S.settings.tvLinks || []).length) return '';
-    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined) });
+    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined), outages: (typeof outPref === 'function' ? outPref() : undefined) });
     const on = reminders.length > 0 || (S.settings.tvLinks || []).length > 0;
     if (!!S.settings.remOnRelay !== on) { S.settings.remOnRelay = on; await save(); }
     return '';
@@ -21315,7 +21315,14 @@ function gkApply(P) { const g = gkDis(), obj = a => a.filter(x => { const h = gk
    Archive; swipe left or Back to return. On the Archive, swipe a row right to put it back. If it's no longer current
    (paid, expired, done) it shows under 'Put back' on Notifications until swiped away again. Kept 90 days, up to 200. */
 const ARC_TYPES = { gk: 'gk', rm: 'rm', nl: 'nl', pn: 'pn', mb: 'mb', ab: 'ab', nk: 'nk', pb: 'pb' };
-function arcList() { try { const a = JSON.parse(localStorage.getItem('bellArchive') || '[]'); const cut = Date.now() - 90 * 864e5; return Array.isArray(a) ? a.filter(x => x && x.id && Date.parse(x.archivedAt) > cut) : []; } catch (e) { return []; } }
+/* 2.27.40: archived items are deleted 5 days after they were archived. Items that were already in the archive when this
+   came in (or had no time) start their 5 days from the update, so nothing vanished straight away. */
+const ARC_KEEP = 5 * 864e5;
+function arcList() { try { let a = JSON.parse(localStorage.getItem('bellArchive') || '[]'); if (!Array.isArray(a)) return [];
+  let g = localStorage.getItem('arcGrace'), ch = false; if (!g) { g = new Date().toISOString(); localStorage.setItem('arcGrace', g); }
+  a = a.filter(x => x && x.id); a.forEach(x => { if (!x.archivedAt || !Date.parse(x.archivedAt)) { x.archivedAt = new Date().toISOString(); ch = true; } });
+  const gm = Date.parse(g), now = Date.now(), keep = a.filter(x => now - Math.max(Date.parse(x.archivedAt), gm) < ARC_KEEP);
+  if (ch || keep.length !== a.length) arcSave(keep); return keep; } catch (e) { return []; } }
 function arcSave(a) { try { localStorage.setItem('bellArchive', JSON.stringify(a.slice(0, 200))); } catch (e) { } }
 function arcPb() { try { const a = JSON.parse(localStorage.getItem('bellPutBack') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 function arcPbSave(a) { try { localStorage.setItem('bellPutBack', JSON.stringify(a.slice(0, 50))); } catch (e) { } }
@@ -21360,9 +21367,9 @@ function BellArchive() {
   const groups = {}; a.forEach(e => { const d = nzStampLocal(new Date(e.archivedAt)).slice(0, 10); (groups[d] = groups[d] || []).push(e); });
   const T = todayISO(), lbl = d => d === T ? 'Today' : d === addDays(T, -1) ? 'Yesterday' : fmtW(d);
   const body = a.length ? Object.keys(groups).sort().reverse().map(d => `<div class="sec">${esc(lbl(d))}</div><div class="list">${groups[d].map(e => `<div class="row arcrow" data-arc="${esc(e.id)}"><div class="tx"><div class="arcsec">${esc(e.section)}</div><div class="t">${esc(e.title)}</div>${e.body ? `<div class="s">${esc(e.body)}</div>` : ''}<div class="s arcat">Archived ${esc(fmtTime(nzStampLocal(new Date(e.archivedAt)).slice(11, 16)))}</div></div><div class="arcput">↩︎</div></div>`).join('')}</div>`).join('')
-    + `<div class="btns" style="margin-top:14px"><button type="button" class="btn small" onclick="arcClear()">Clear archive</button></div>`
+    + `<div class="s muted" style="margin-top:10px">Items are deleted after 5 days.</div><div class="btns" style="margin-top:14px"><button type="button" class="btn small" onclick="arcClear()">Clear archive</button></div>`
     : `<div class="card empty"><div class="t">Nothing archived</div><div class="s">Swipe a notification left to archive it. It comes here instead of being deleted.</div></div>`;
-  return pwrWrap(back + header('Archive', 'Swipe an item right to put it back on Notifications') + body + `<div class="pwrhint muted" style="text-align:center">← Swipe left to go back to Notifications · kept 90 days</div>`);
+  return pwrWrap(back + header('Archive', 'Swipe an item right to put it back on Notifications') + body + `<div class="pwrhint muted" style="text-align:center">← Swipe left to go back to Notifications · Items are deleted after 5 days</div>`);
 }
 // page swipes: right on Notifications (not on a swipeable row) opens Archive; left on Archive goes back.
 // Rows on the Archive swipe right to restore.
@@ -24889,3 +24896,64 @@ TvGuide = function () { setTimeout(epgInit, 0);
   tvLinks().forEach(l => { if (l.ch !== '*') { const n = tvChName(l.ch); if (n && l.cn && n !== l.cn) x = x.split('Every episode · ' + esc(l.cn)).join('Every episode · ' + esc(n)); } }); return x; } catch (e) { return h; } }; })();
 // Keep the grid's scroll position when the TV page re-renders (guide refreshes, flags).
 (() => { const o = updTv; updTv = function () { const sc = document.getElementById('epgsc'); if (sc && sc.dataset.on && sc.isConnected) tvScrollX = sc.scrollLeft; return o.apply(this, arguments); }; })();
+
+// ---- 2.27.40: meal ideas pause once the week is planned ----
+/* When every cook night this week (Mon to Sun; his meal-planner nights, Fri and Sat by default) has a meal planned,
+   meal and dinner ideas stop for the rest of the week: home ideas, AI ideas, and so the 💡 sug- pushes built from them.
+   Next week they come back until that week is planned too. Planned-meal reminders themselves are untouched. */
+function mealWeekDone() { try { const m = M() || {}, plan = m.plan || {}, T = todayISO(), dow = new Date(T + 'T12:00:00').getDay(), mon = addDays(T, -((dow + 6) % 7));
+  const nights = Array.isArray(m.nights) && m.nights.length ? m.nights : [5, 6];
+  return nights.every(n => { const e = plan[addDays(mon, (n + 6) % 7)]; return !!(e && String(e.title || '').trim()); }); } catch (e) { return false; } }
+const MEAL_IDEA_RE = /\b(dinner|tea tonight|pizza|meals?|cook(ing)?|cook night|recipes?|takeaways?|supper|roast|curry|stir[- ]?fry|bbq|barbecue)\b/i;
+const isMealIdea = x => !!x && (['cooknight', 'pizza'].includes(x.id || x.k) || MEAL_IDEA_RE.test(String(x.t || x.text || '') + ' ' + String(x.title || '')));
+const mealGate = L => { try { return Array.isArray(L) && mealWeekDone() ? L.filter(x => !isMealIdea(x)) : L; } catch (e) { return L; } };
+(() => { const o = homeSuggestions; homeSuggestions = function () { return mealGate(o.apply(this, arguments)); }; })();
+(() => { const o = aiSugList; aiSugList = function () { return mealGate(o.apply(this, arguments)); }; })();
+(() => { const o = sumTouchCands; sumTouchCands = function () { return mealGate(o.apply(this, arguments)); }; })();
+
+// ---- 2.27.40: Northpower power outages ----
+/* The relay reads Northpower's public Outages Centre (outages.northpower.nz) about every 20 minutes and keeps current,
+   planned and just-restored outages. Bell cards: Onerahi (or 16 Sherwood Road) first, then current, then planned by time.
+   Pushes (relay side, through the reminder list): a current unplanned Onerahi outage straight away, and a planned Onerahi
+   outage at 6pm the day before and 7am on the day. Northpower's terms allow informational use with acknowledgement, and
+   linking needs their consent, so the credit is plain text. */
+const OUT_URL = RELAY_URL + '/outages';
+let OUTG = null, outBusy = false; try { OUTG = JSON.parse(localStorage.getItem('outages') || 'null'); } catch (e) { }
+const outOn = () => (S.settings || {}).outAlerts !== false;
+const outScope = () => (S.settings || {}).outScope === 'all' ? 'all' : 'onerahi';
+function outPref() { return outOn() ? outScope() : 'off'; }
+const outHome = o => (o.suburbs || []).some(x => /onerahi/i.test(x)) || (o.roads || []).some(x => /sherwood road/i.test(x)) || /onerahi/i.test(o.area || '');
+const OUT_KAIPARA = /\b(dargaville|maungaturoto|te kopuru|mareretu|taipuha|kaiwaka|mangawhai|ruawai|paparoa|matakohe|kaihu|tinopai|pouto|baylys|aratapu|tangowahine|kirikopuni|tangiteroria|batley|whakapirau|hakaru|oneriri|tanoa|otamatea)\b/i;
+const outWhg = o => !OUT_KAIPARA.test([o.area].concat(o.suburbs || [], o.zone || []).join(' ')) || (o.suburbs || []).some(x => !OUT_KAIPARA.test(x));
+async function outRefresh(force) {
+  if (outBusy || !outOn() || (!force && OUTG && Date.now() - (OUTG.got || 0) < 15 * 60e3)) return; outBusy = true;
+  try { const r = await fetch(OUT_URL, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); if (d && Array.isArray(d.planned)) { OUTG = Object.assign(d, { got: Date.now() }); localStorage.setItem('outages', JSON.stringify(OUTG)); if (/^#?(alerts)?$/.test(location.hash)) render(); } } } catch (e) { }
+  outBusy = false;
+}
+setTimeout(() => outRefresh(false), 6000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') outRefresh(false); });
+function outList() {
+  if (!OUTG) return []; const now = Date.now(), sc = outScope();
+  const L = [].concat((OUTG.unplanned || []).map(o => ({ ...o, st: 'Current' })), (OUTG.restored || []).map(o => ({ ...o, st: 'Restored' })),
+    (OUTG.planned || []).filter(o => !o.end || Date.parse(o.end) > now).map(o => ({ ...o, st: o.start && Date.parse(o.start) <= now ? 'Current' : 'Planned' })));
+  return L.filter(o => sc === 'all' ? outWhg(o) || outHome(o) : outHome(o))
+    .sort((a, b) => (outHome(b) - outHome(a)) || ((a.st === 'Current' ? 0 : a.st === 'Restored' ? 1 : 2) - (b.st === 'Current' ? 0 : b.st === 'Restored' ? 1 : 2)) || String(a.start || '').localeCompare(String(b.start || '')));
+}
+const outT = v => { if (!v) return ''; const d = new Date(v), iso = nzStampLocal(d).slice(0, 10), T = todayISO(); return (iso === T ? 'Today' : iso === addDays(T, 1) ? 'Tomorrow' : fmtW(iso)) + ' ' + d.toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).replace(' ', ''); };
+function outLine(o) { return [o.cause, o.start ? 'From ' + outT(o.start) : '', o.end ? (o.st === 'Planned' ? 'until ' : 'restore est. ') + (o.start && nzStampLocal(new Date(o.start)).slice(0, 10) === nzStampLocal(new Date(o.end)).slice(0, 10) ? outT(o.end).replace(/^\S+ /, '') : outT(o.end)) : '', o.st].filter(Boolean).join(' · '); }
+function outCard(o, k) { const ic = o.st === 'Restored' ? '✅' : o.st === 'Current' ? '⚡' : '🔌';
+  return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!glSwipe.moved){outSheet()}"><div class="ic">${ic}</div><div class="tx"><div class="t">${o.st === 'Planned' ? 'Planned power cut' : o.st === 'Restored' ? 'Power restored' : 'Power outage'}: ${esc(o.area)}${outHome(o) ? ' <b>(Onerahi)</b>' : ''}</div><div class="s">${esc(outLine(o))}${o.where && o.where !== o.area ? ' · ' + esc(o.where) : ''}</div></div></div>`; }
+function outBellRows() { try { if (!outOn()) return []; const D = nfDis(), T = todayISO(), L = outList(); if (!L.length) return [];
+  const near = L.filter(o => o.st !== 'Planned' || outHome(o) || (o.start && nzStampLocal(new Date(o.start)).slice(0, 10) <= addDays(T, 1)));
+  const rows = near.map(o => { const k = 'out-' + String(o.id).replace(/[^a-z0-9]/gi, '') + '-' + o.st[0] + '-' + String(o.start || '').slice(0, 10); return D.includes(k) ? '' : outCard(o, k); }).filter(Boolean);
+  const more = L.length - near.length;
+  if (more > 0 && !D.includes('out-more-' + T)) rows.push(`<div class="row glnew" data-nk="out-more-${T}" role="button" tabindex="0" onclick="if(!glSwipe.moved){outSheet()}"><div class="ic">🔌</div><div class="tx"><div class="t">${plural(more, 'more planned power cut')} in the next 2 weeks</div><div class="s">${outScope() === 'all' ? 'Around Whangārei' : 'Onerahi'} · tap to see them · Source: Northpower Outages Centre</div></div></div>`);
+  return rows; } catch (e) { return []; } }
+function outSheet() { const L = outList();
+  openSheet('Power outages', (L.length ? `<div class="list">${L.map(o => outCard(o, 'x').replace(/ data-nk="x" role="button" tabindex="0" onclick="[^"]*"/, '')).join('')}</div>` : '<div class="s">No current or planned outages ' + (outScope() === 'all' ? 'around Whangārei' : 'in Onerahi') + '.</div>')
+    + `<div class="s muted" style="margin-top:10px">Source: Northpower Outages Centre${OUTG && OUTG.updated ? ', updated ' + esc(outT(OUTG.updated)) : ''}. Checked about every 20 minutes.</div>`, null); }
+async function outSetScope(v) { S.settings.outScope = v; await save(); await setupBackground(); render(); outRefresh(true); }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = outBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
+(() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = outOn(), sc = outScope();
+  return h + `<div class="srow"><div class="tx"><div class="t">Power outage alerts</div><div class="s">Northpower current and planned outages on the bell page. Buzzes for an Onerahi outage: straight away if unplanned, the evening before and the morning of if planned.</div>${on ? `<div style="margin-top:8px;display:flex;gap:8px"><button type="button" class="btn small ${sc === 'onerahi' ? 'primary' : ''}" onclick="outSetScope('onerahi')">Onerahi only</button><button type="button" class="btn small ${sc === 'all' ? 'primary' : ''}" onclick="outSetScope('all')">All Whangārei</button></div>` : ''}</div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Power outage alerts" onclick="toggleSetting('outAlerts')"></button></div>`; } catch (e) { return h; } }; })();
+
