@@ -1,0 +1,32 @@
+# Copy of .github/workflows/tv-guide.yml. Add it on GitHub (Add file > Create new file, path .github/workflows/tv-guide.yml); the box token cannot create workflows.
+# 2.27.37: TV guide for My App, two weeks ahead where the guides go that far.
+# Twice a day: trim the public i.mjh.nz Freeview NZ and Sky XMLTV guides to the app's channels (sport dropped)
+# and publish one JSON file per NZ day on the tv-data branch (replaced each run, no history kept).
+name: TV guide data
+on:
+  schedule:
+    - cron: '20 4,16 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: tv-guide
+jobs:
+  trim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Trim guides
+        run: python3 tools/tv-trim.py "$RUNNER_TEMP/tvout"
+      - name: Publish to tv-data
+        run: |
+          cd "$RUNNER_TEMP/tvout"
+          git init -q -b tv-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tv
+          git commit -qm "TV guide $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" tv-data
