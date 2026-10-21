@@ -340,7 +340,7 @@ function scheduleNext(item, now) {
 export function cleanReminder(r, now = Date.now()) {
   if (!r || typeof r !== 'object') return null;
   const id = String(r.id || '');
-  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug|tv)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
+  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug|tv|bed|pwr)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
   const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
   if (!title) return null;
   const date = String(r.date || ''), time = String(r.time || '');
