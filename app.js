@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.25';
+const APP_VERSION = '2.27.26';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20274,6 +20274,9 @@ function cfBody(M) {
    bills due by the account they come from with subtotals, the ASB card, what's held back for bills due next week before
    money lands, the transfers to make that week (from → to, amount, what for), shortfalls, and what's left.
    Bills: fnModel (same as Budget). Money in and transfers: the bank plus xferPlan. Estimates are labelled. */
+/* 2.27.26: Sarah's pay (Tuesday) is kept for the next week's budget: usable from the following Monday, for the bills Monday to Friday
+   (Tue 27 Oct → Mon 2 to Fri 6 Nov). In Wed–Tue weeks it's money in for the week holding that Monday. */
+const swUse = d => { let x = addDays(d, 1), k = 0; while (new Date(parseD(x)).getUTCDay() !== 1 && k++ < 7) x = addDays(x, 1); return x; };
 const ciWeekStart = d => { let x = d, k = 0; while (new Date(parseD(x)).getUTCDay() !== 3 && k++ < 7) x = addDays(x, -1); return x; };
 function cfItemised(D) {
   if (!D) return '';
@@ -20290,15 +20293,18 @@ function cfItemised(D) {
   const W0 = ciWeekStart(T), H = X ? X.H : addDays(W0, 27), INS = [];
   const kind = t => mywIs(t) ? ['shane', 'Your pay'] : swIs(t) ? ['sarah', 'Sarah’s pay'] : (() => { const k = IR_KEYS.find(k => irIs(k, t)); return k ? [k, IR_DEF[k].name] : ['other', 'Other money in']; })();
   (D.transactions || []).filter(t => t.amount > 0 && t.date.slice(0, 10) >= W0 && t.date.slice(0, 10) <= T && spend(t.acct) && !(card && t.acct === card.id) && !t.pair && t.cat2 !== 'transfer' && !billOwnTx(t))
-    .forEach(t => { const [k, n] = kind(t); INS.push({ k, name: n, date: t.date.slice(0, 10), amount: t.amount, acct: t.acct, st: 'landed' }); });
+    .forEach(t => { const [k, n] = kind(t); if (k === 'sarah') return; INS.push({ k, name: n, date: t.date.slice(0, 10), amount: t.amount, acct: t.acct, st: 'landed' }); });
+  (D.transactions || []).filter(t => swIs(t) && t.date.slice(0, 10) >= addDays(W0, -7) && t.date.slice(0, 10) <= T && swUse(t.date.slice(0, 10)) >= W0).forEach(t => { const d = t.date.slice(0, 10); INS.push({ k: 'sarah', name: 'Sarah’s pay', date: swUse(d), landed: d, amount: t.amount, acct: t.acct, st: 'landed' }); });
   const xk = w => w === 'Your pay' ? 'shane' : w === 'Sarah’s pay' ? 'sarah' : (IR_KEYS.find(k => IR_DEF[k].name === w) || 'other');
-  (X ? X.ins : []).forEach(i => { const k = xk(i.what); if (i.date < T || INS.some(x => x.k === k && k !== 'other' && Math.abs(dayGap(x.date, i.date)) <= 3)) return; INS.push({ k, name: i.what, date: i.date, amount: i.amount, acct: i.acct, st: 'est' }); });
+  (X ? X.ins : []).forEach(i => { const k = xk(i.what); if (i.date < T || INS.some(x => x.k === k && k !== 'other' && Math.abs(dayGap(x.date, i.date)) <= 3)) return; INS.push({ k, name: i.what, date: i.date, landed: i.landed, amount: i.amount, acct: i.acct, st: i.bank ? 'landed' : 'est' }); });
   const XL = X ? X.list : [], SH = X ? X.short : [], od = D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && cfBal(a) < -0.005);
   const weeks = []; for (let w = W0; w <= H && weeks.length < 5; w = addDays(w, 7)) weeks.push(w);
   const one = (ws, wi) => {
     const we = addDays(ws, 6), inW = d => d >= ws && d <= we;
     const wIn = INS.filter(x => inW(x.date)).sort((a, b) => a.date.localeCompare(b.date));
-    const inRows = wIn.map(x => row(esc(x.name), `${chip(x.date)} ${stT(x)} · into ${esc(nm(x.acct))}`, m(x.amount))).join('');
+    const cover = x => `Mon ${esc(fmtW(x.date).replace(/^\w+ /, ''))} – ${esc(fmtW(addDays(x.date, 4)))}`;
+    const kept = INS.filter(x => x.k === 'sarah' && x.landed && inW(x.landed) && !inW(x.date)).map(x => row('Sarah’s pay, kept for next week', `${chip(x.landed)} ${stT(x)} · into ${esc(nm(x.acct))} · for bills ${cover(x)} · not counted this week`, `<span class="muted">${m(x.amount)}</span>`, 'ciSub')).join('');
+    const inRows = wIn.map(x => x.k === 'sarah' && x.landed ? row('Sarah’s pay (kept from last week)', `${chip(x.date)} ${stT(x)}${x.st === 'landed' ? '' : ''} · landed ${esc(fmtW(x.landed))} · for bills ${cover(x)} · in ${esc(nm(x.acct))}`, m(x.amount)) : row(esc(x.name), `${chip(x.date)} ${stT(x)} · into ${esc(nm(x.acct))}`, m(x.amount))).join('') + kept;
     const wOut = OUT.filter(x => inW(x.date)), bills = wOut.filter(x => x.kind !== 'card'), cards = wOut.filter(x => x.kind === 'card');
     const by = new Map(); bills.forEach(x => { const k = x.acct || ''; (by.get(k) || by.set(k, []).get(k)).push(x); });
     const ord = k => { const a = D.accounts.find(y => y.id === k); return !a ? 9 : cfIsOrbit(a) ? 0 : /bill/i.test(a.name || '') ? 1 : /kiwi/i.test(a.bank || '') ? 2 : /anz/i.test(a.bank || '') ? 3 : 4; };
@@ -20529,7 +20535,7 @@ function xferPlan(D) {
   // wages landing: on the usual 14-day beat after the last pay, into the account it last landed in
   const ins = [], landTx = (isT) => (D.transactions || []).filter(isT).sort((a, b) => b.date.localeCompare(a.date))[0];
   [['Your pay', mywIs, mywSt().seen], ['Sarah’s pay', swIs, swSt().seen]].forEach(([nm, isT, seen]) => { const t = landTx(isT); if (!t) return; const amt = fnAvg3(seen); if (!amt) return;
-    incDates(nm === 'Your pay' ? 'shane' : 'sarah', addDays(T, -1), H, t.date.slice(0, 10)).filter(d => t.date.slice(0, 10) < addDays(d, -3)).forEach(d => { let a = amt, comm = ''; try { if (nm === 'Your pay' && wgOn()) { const e = wgEst(d); a = e.net || amt; comm = e.comm && e.comm.src || ''; } } catch (e) { } ins.push({ what: nm, amount: a, date: d, acct: t.acct, comm }); }); }); // 2.26.88: wage estimate · 2.27.12: on the day it lands (his Wednesday, Sarah's Tuesday)
+    incDates(nm === 'Your pay' ? 'shane' : 'sarah', addDays(T, -1), H, t.date.slice(0, 10)).filter(d => t.date.slice(0, 10) < addDays(d, -3)).forEach(d => { let a = amt, comm = ''; try { if (nm === 'Your pay' && wgOn()) { const e = wgEst(d); a = e.net || amt; comm = e.comm && e.comm.src || ''; } } catch (e) { } ins.push(nm === 'Sarah’s pay' ? { what: nm, amount: a, date: swUse(d), landed: d, acct: t.acct, kept: 1 } : { what: nm, amount: a, date: d, acct: t.acct, comm }); }); }); // 2.27.26: Sarah's pay usable from the Monday after it lands · 2.26.88: wage estimate · 2.27.12: on the day it lands (his Wednesday, Sarah's Tuesday)
   // 2.26.86: Board and the cleaning job land weekly in the account they last landed in
   IR_KEYS.forEach(k => { try { const w = irSt(k), L = w.seen, last = L[L.length - 1], amt = fnAvg3(L); if (!last || !amt) return; const acct = last.acct && D.accounts.some(a => a.id === last.acct) ? last.acct : null; if (!acct) return;
     let d = incSnap(k, last.d); while (d < T || d <= addDays(last.d, 3)) d = addDays(d, IR_DEF[k].per); // 2.27.12: today counts until it lands (Board ~11pm Tuesday) if (dayGap(T, last.d) > 3 && dayGap(addDays(last.d, IR_DEF[k].per), T) >= -3 && !(D.transactions || []).some(t => irIs(k, t) && t.date.slice(0, 10) > last.d)) { /* due about now, not seen yet */ }
@@ -20542,6 +20548,8 @@ function xferPlan(D) {
   try { D.accounts.filter(cfSpendable).forEach(a => cfRegularIns(D, a.id).forEach(r => { let d = r.last; while (d <= T) d = addDays(d, r.per); for (; d <= H; d = addDays(d, r.per)) ins.push({ what: r.name, amount: r.amount, date: d, acct: a.id, other: 1 }); })); ins.sort((a, b) => a.date.localeCompare(b.date)); } catch (e) { }
   const done = S.settings.xferDone || {};
   const bal = {}; D.accounts.filter(cfSpendable).forEach(a => { bal[a.id] = cfBal(a); });
+  // 2.27.26: Sarah's pay that has landed but whose Monday hasn't come yet is held back (out of the balance, back in on that Monday)
+  try { (D.transactions || []).filter(t => swIs(t) && t.date.slice(0, 10) >= addDays(T, -7) && swUse(t.date.slice(0, 10)) > T && bal[t.acct] != null).forEach(t => { const d = t.date.slice(0, 10); bal[t.acct] -= t.amount; ins.push({ what: 'Sarah’s pay', amount: t.amount, date: swUse(d), landed: d, acct: t.acct, kept: 1, bank: 1 }); }); ins.sort((a, b) => a.date.localeCompare(b.date)); } catch (e) { }
   // transfers already ticked as done (until the bank shows them) count as made
   Object.values(done).forEach(x => { if (x && bal[x.from] != null && bal[x.to] != null && !x.seen) { bal[x.from] -= x.amount; bal[x.to] += x.amount; } });
   const list = [], short = [], needs = [];
