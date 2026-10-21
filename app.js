@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.35';
+const APP_VERSION = '2.27.36';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10390,6 +10390,7 @@ async function scheduleReminders() {
       const w = waterRemindAt();
       if (w && (S.settings || {}).waterPlants !== false) reminders.push({ id: 'sug-water', title: "💧 Water the plants. It's 10° or under for the next 5 hours.", date: w.date, time: w.time, repeat: 'none' });
     } catch (e) {}
+    try { tvPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.27.36: flagged TV shows, 10 min before
     try { bedPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.27.17: bedtime nudges on work nights (he asked; not held back by quiet hours)
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay) return '';
@@ -24659,3 +24660,92 @@ async function caNewKey() { if (!confirm('Make a new key? The Alexa skill stops 
       <div class="srow"><div class="tx"><div class="t">Skill key (RELAY_CARS_KEY)</div><div class="s" style="word-break:break-all">${caShow ? esc(k) : '••••••••••••' + esc(k.slice(-4))} · <button type="button" class="linkbtn" onclick="caShow=!caShow;render()">${caShow ? 'hide' : 'show'}</button> · <button type="button" class="linkbtn" onclick="caNewKey()">new key</button></div></div><button class="btn small" onclick="caCopy('key')">Copy</button></div>
       <div class="srow"><div class="tx"><div class="s">${at ? 'Last sent ' + esc(cfWhen(new Date(at).toISOString())) + '. ' : ''}Sent after any car change and when the app opens. Only names, plates, models, colours, rego, WOF and service dates/km. No money.</div></div></div>`; }
   return `<div class="sec">Alexa</div><div class="list"><div class="srow"><div class="tx"><div class="t">Share car dates with Alexa</div><div class="s">Lets your Car Due Dates skill show what the Cars tab knows, so you only enter dates once.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Share car dates with Alexa" onclick="caToggle()"></button></div>${x}</div>` + h; }; })();
+
+/* ================= 2.27.36: Fuel card (Marsden Point terminal 91) + TV guide reminders =================
+   Fuel: the relay reads BP's and Z's public terminal gate price lists (Fuel Industry Act 2020) once a day from 6am and
+   keeps 30 days. Wholesale price incl. taxes, not the pump price. Nothing from Gaspy is read; Open Gaspy just opens
+   the app or gaspy.nz. A daily bell note (Settings › Daily fuel price note, on by default) only after a fresh read today.
+   TV: tap 🔔 on a programme coming up; the relay pushes 'Starting in 10 min…' 10 minutes before (works with the app
+   closed when notifications are on), and it shows on the bell page. Passed shows drop off. Sport is already filtered out. */
+const FUEL_URL = RELAY_URL + '/fuel';
+let FUEL = null, fuelBusy = false;
+try { FUEL = JSON.parse(localStorage.getItem('fuel') || 'null'); } catch (e) { FUEL = null; }
+async function fuelRefresh(force) {
+  if (fuelBusy || (!force && FUEL && Date.now() - (FUEL.got || 0) < 3 * 3600e3 && FUEL.day === todayISO())) return;
+  fuelBusy = true;
+  try { const r = await fetch(FUEL_URL, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); if (d && Array.isArray(d.days)) { FUEL = Object.assign(d, { got: Date.now() }); localStorage.setItem('fuel', JSON.stringify(FUEL)); const h = (location.hash || '#home').slice(1); if (!sheetOpen && (h === 'cars' || h === 'home' || h === '')) render(); } } } catch (e) { }
+  fuelBusy = false;
+}
+setTimeout(() => fuelRefresh(false), 5000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fuelRefresh(false); });
+const fuelSrc = ['bp91', 'z91'];
+const fuelMean = e => { const v = fuelSrc.map(k => e[k]).filter(x => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+const fuelDiff = (a, b) => { const v = fuelSrc.filter(k => a[k] > 0 && b[k] > 0).map(k => a[k] - b[k]); return v.length ? v.reduce((x, y) => x + y, 0) / v.length : null; };
+function fuelStats() {
+  const D = (FUEL && Array.isArray(FUEL.days) ? FUEL.days : []).filter(e => fuelMean(e)); if (!D.length) return null;
+  const last = D[D.length - 1], prev = D.length > 1 ? D[D.length - 2] : null, wk = D.slice().reverse().find(e => e.d <= addDays(last.d, -7)) || (D.length > 1 && D[0] !== last ? D[0] : null);
+  return { last, now: fuelMean(last), day: prev ? fuelDiff(last, prev) : null, dayFrom: prev && prev.d, wk: wk ? fuelDiff(last, wk) : null, wkFrom: wk && wk.d, series: D.map(fuelMean), fresh: FUEL.day === todayISO() };
+}
+const fuelC = v => (Math.round(v * 10) / 10).toFixed(1) + 'c';
+function fuelArrow(d) { if (d == null) return '<span class="muted">–</span>'; const r = Math.round(d * 10) / 10; if (Math.abs(r) < 0.5) return '<b style="color:#64748B">→ steady</b>'; return r < 0 ? `<b style="color:#15803D">↓ ${fuelC(-r)}</b>` : `<b style="color:#B91C1C">↑ ${fuelC(r)}</b>`; }
+function fuelSpark(s) { if (s.length < 2) return ''; const W = 120, H = 30, lo = Math.min(...s), hi = Math.max(...s), sp = hi - lo || 1;
+  const pts = s.map((v, i) => `${(i / (s.length - 1) * W).toFixed(1)},${(H - 3 - (v - lo) / sp * (H - 6)).toFixed(1)}`).join(' ');
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-label="30-day trend" style="display:block"><polyline points="${pts}" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`; }
+function openGaspy() { const web = 'https://www.gaspy.nz/';
+  if (/Android/i.test(navigator.userAgent)) location.href = 'intent://#Intent;package=nz.hwem.gaspy;S.browser_fallback_url=' + encodeURIComponent(web) + ';end';
+  else window.open(web, '_blank', 'noopener'); }
+function fuelCard() {
+  const st = fuelStats(), L = st && st.last;
+  const src = L ? [L.bp91 ? `BP ${fuelC(L.bp91)}${L.bpEff ? ' (from ' + fmt(L.bpEff) + ')' : ''}` : '', L.z91 ? `Z ${fuelC(L.z91)}${L.zEff ? ' (from ' + fmt(L.zEff) + ')' : ''}` : ''].filter(Boolean).join(' · ') : '';
+  const body = st ? `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div><div style="font-size:26px;font-weight:800">${fuelC(st.now)}<small style="font-size:13px;font-weight:600"> /L · 91</small></div>
+      <div class="s">Since yesterday ${fuelArrow(st.day)} · 7 days ${fuelArrow(st.wk)}</div></div>${fuelSpark(st.series)}</div>
+      <div class="s" style="margin-top:6px">${esc(src)}${L.bp95 || L.z95 ? ' · 95: ' + [L.bp95 ? 'BP ' + fuelC(L.bp95) : '', L.z95 ? 'Z ' + fuelC(L.z95) : ''].filter(Boolean).join(', ') : ''}</div>`
+    : `<div class="s">${fuelBusy ? 'Checking today’s price…' : 'No price yet. The relay reads the BP and Z lists each morning from 6am.'}</div>`;
+  return `<div class="sec">⛽ Fuel · Marsden Point</div><div class="carcard" style="padding:14px">${body}
+    <div class="s" style="margin-top:8px">Terminal (wholesale) price, not the pump price. Kora saves 10c+/L at Mobil and Waitomo.</div>
+    <div style="margin-top:10px;display:flex;gap:8px"><button type="button" class="btn small primary" onclick="openGaspy()">Open Gaspy</button><button type="button" class="btn small" onclick="fuelRefresh(true).then(render)">Refresh</button></div></div>`;
+}
+(() => { const o = Cars; Cars = function () { const h = o.apply(this, arguments); try { const f = fuelCard(), i = h.indexOf('<div class="callout blue">'); return i > 0 ? h.slice(0, i) + f + h.slice(i) : h + f; } catch (e) { return h; } }; })();
+(() => { const o = HOME_CARD.cars; if (!o) return; HOME_CARD.cars = function () { const h = o.apply(this, arguments); try { const st = fuelStats(); if (!h || !st) return h;
+  return h + `<div class="list"><button class="row" onclick="go('#cars')"><div class="ic">⛽</div><div class="tx"><div class="t">91 at Marsden Point ${fuelC(st.now)}/L</div><div class="s">Today ${fuelArrow(st.day)} · 7 days ${fuelArrow(st.wk)} · wholesale</div></div></button></div>`; } catch (e) { return h; } }; })();
+function fuelNoteText(st) { const n = v => fuelC(Math.abs(v)).replace('.0c', 'c'), r = v => v == null ? 0 : Math.round(v);
+  if (r(st.wk) <= -3) return `91 is down ${n(st.wk)} this week at Marsden Point, a good time to fill up.`;
+  if (r(st.day) >= 3) return `91 is up ${n(st.day)} since yesterday at Marsden Point, fill up sooner rather than later.`;
+  if (r(st.wk) >= 3) return `91 is up ${n(st.wk)} this week at Marsden Point, fill up sooner rather than later.`;
+  if (r(st.day) <= -3) return `91 is down ${n(st.day)} since yesterday at Marsden Point.`;
+  if (st.day == null && st.wk == null) return `91 is ${fuelC(st.now)} a litre at Marsden Point today. The daily change shows from tomorrow.`;
+  return `91 is steady at Marsden Point, ${fuelC(st.now)} a litre.`; }
+function fuelBellRows() { try { if ((S.settings || {}).fuelNote === false) return []; const st = fuelStats(); if (!st || !st.fresh || nzStampLocal().slice(11, 13) < '06') return [];
+  const k = 'fuel-' + todayISO(); if (nfDis().includes(k)) return [];
+  return [`<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#cars')}"><div class="ic">⛽</div><div class="tx"><div class="t">${esc(fuelNoteText(st))}</div><div class="s">Terminal (wholesale) price, not the pump price · Kora saves 10c+/L at Mobil and Waitomo</div></div></div>`]; } catch (e) { return []; } }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = fuelBellRows().concat(tvBellRows()); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
+(() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = (S.settings || {}).fuelNote !== false;
+  return h + `<div class="srow"><div class="tx"><div class="t">Daily fuel price note</div><div class="s">Once a day after the morning check of the Marsden Point 91 price. Bell page only, no buzz.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Daily fuel price note" onclick="toggleSetting('fuelNote')"></button></div>`; } catch (e) { return h; } }; })();
+
+// ---- TV guide reminders ----
+const tvFlags = () => { const L = S && S.settings && S.settings.tvFlags; return Array.isArray(L) ? L.filter(f => f && f.u > Date.now()) : []; };
+const tvFk = (ch, s) => ch + '|' + s;
+const tvFlagged = k => tvFlags().some(f => f.k === k);
+const tvChName = id => (TV_CHANNELS.find(c => c.id === id) || {}).name || '';
+async function tvFlagToggle(ch, s) {
+  S.settings.tvFlags = tvFlags(); const L = S.settings.tvFlags, k = tvFk(ch, s), i = L.findIndex(f => f.k === k);
+  if (i >= 0) { L.splice(i, 1); toast('Reminder removed'); }
+  else { const p = ((TV && TV.data && TV.data.slots && TV.data.slots[ch]) || []).find(x => x.start === s); if (!p || p.start <= Date.now() || isSport(p.title + ' ' + (p.cats || []).join(' '))) return;
+    L.push({ k, t: String(p.title).slice(0, 120), ch, cn: tvChName(ch), s: p.start, u: p.until }); L.sort((a, b) => a.s - b.s); }
+  await save(); let r = ''; try { r = await scheduleReminders(); } catch (e) { r = 'fail'; }
+  if (i < 0) toast(r === 'need' || r === 'unsupported' ? 'Flagged. Turn on notifications for a push; it’ll still show on the bell page.' : r === 'fail' ? 'Flagged. Couldn’t reach the reminder service; it’ll show on the bell page.' : 'Reminder set for 10 min before.');
+  render(); }
+function tvPushes() { const now = Date.now(); return tvFlags().filter(f => f.s - 600000 > now + 60000).slice(0, 20).map(f => { const at = nzStampLocal(new Date(f.s - 600000)), tail = ` on ${f.cn} at ${tvClock(f.s)}`, head = '📺 Starting in 10 min: ';
+  const room = 80 - head.length - tail.length, t = f.t.length > room ? f.t.slice(0, Math.max(8, room - 1)) + '…' : f.t;
+  return { id: 'tv-' + String(f.ch).replace(/[^\w]/g, '') + '-' + f.s, title: (head + t + tail).slice(0, 80), date: at.slice(0, 10), time: at.slice(11, 16), repeat: 'none' }; }); }
+function tvBellRows() { const now = Date.now(), gone = nfDis();
+  return tvFlags().filter(f => now >= f.s - 600000 && !gone.includes('tvf-' + f.k)).map(f => `<div class="row glnew" data-nk="${esc('tvf-' + f.k)}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#tv')}"><div class="ic">📺</div><div class="tx"><div class="t">${now < f.s ? 'Starting in ' + Math.max(1, Math.round((f.s - now) / 60000)) + ' min' : 'On now'}: ${esc(f.t)} on ${esc(f.cn)} at ${esc(tvClock(f.s))}</div><div class="s">Flagged in the TV guide</div></div></div>`); }
+function tvFlagBtn(ch, p) { const on = tvFlagged(tvFk(ch, p.start));
+  return `<button type="button" class="btn small${on ? ' primary' : ''}" aria-pressed="${on}" aria-label="${on ? 'Remove reminder' : 'Remind me 10 min before'}" onclick="event.stopPropagation();tvFlagToggle(${jsArg(ch)},${p.start})">${on ? '🔔 Set' : '🔕 Remind'}</button>`; }
+function tvComingUp() { const now = Date.now(), chans = tvMore ? TV_CHANNELS : TV_CHANNELS.filter(ch => TV_HOME_SHORT.has(ch.id));
+  const rows = chans.map(ch => { const N = ((TV && TV.data && TV.data.slots && TV.data.slots[ch.id]) || []).filter(p => p.start > now).slice(0, 3); if (!N.length) return '';
+    return `<div class="row" style="display:block"><div class="t" style="font-weight:700;margin-bottom:4px">${esc(ch.name)}</div>${N.map(p => `<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><div class="s" style="flex:1;min-width:0">${tvFlagged(tvFk(ch.id, p.start)) ? '🔔 ' : ''}<b>${esc(tvClock(p.start))}</b> ${esc(p.title)}</div>${tvFlagBtn(ch.id, p)}</div>`).join('')}</div>`; }).filter(Boolean);
+  return `<div class="sec">Coming up · tap Remind for a heads-up 10 min before</div>` + (rows.length ? `<div class="list">${rows.join('')}</div>` : '<p class="muted">Nothing listed yet. The guide covers the next few hours.</p>'); }
+function tvFlaggedList() { const L = tvFlags(); return `<div class="sec">My flagged shows</div>` + (L.length ? `<div class="list">${L.map(f => `<div class="row"><div class="ic">🔔</div><div class="tx"><div class="t">${esc(f.t)}</div><div class="s">${esc(f.cn)} · ${esc(tvClock(f.s))}${f.s <= Date.now() ? ' · on now' : ''}</div></div><button type="button" class="btn small" onclick="tvFlagToggle(${jsArg(f.ch)},${f.s})">Unflag</button></div>`).join('')}</div>` : '<p class="muted">No shows flagged. Tap Remind on anything coming up.</p>'); }
+(() => { const o = TvGuide; TvGuide = function () { const h = o.apply(this, arguments); try { const i = h.lastIndexOf('<div class="foot">'); const x = tvFlaggedList() + tvComingUp(); return i > 0 ? h.slice(0, i) + x + h.slice(i) : h + x; } catch (e) { return h; } }; })();
+setTimeout(() => { try { if (S && S.settings && Array.isArray(S.settings.tvFlags)) { const L = tvFlags(); if (L.length !== S.settings.tvFlags.length) { S.settings.tvFlags = L; save(); } } } catch (e) { } }, 6000);

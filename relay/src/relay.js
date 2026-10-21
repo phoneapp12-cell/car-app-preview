@@ -207,6 +207,7 @@ import { akahuRoute } from './akahu.js';
 import { healthRoute } from './health.js';
 import { heatRoute } from './heat.js';
 import { alarmRoute } from './alarm.js';
+import { fuelRoute } from './fuel.js';
 export async function handle(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get('Origin') || '';
   const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
@@ -226,6 +227,12 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   if (path.startsWith('/hue/')) { // 2.23.79: Philips Hue
     try { return await hueRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }
     catch (e) { return json(502, 'hue_unavailable', origin, env); }
+  }
+  if (path === '/fuel') { // 2.27.36: Marsden Point terminal gate prices (BP and Z public lists), 30 days
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try { const data = await fuelRoute(env, fetchImpl); return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
+    catch (e) { return json(502, 'fuel_unavailable', origin, env); }
   }
   if (path === '/' || path === '/health') {
     if (request.method !== 'GET' && request.method !== 'HEAD') return json(405, 'method_not_allowed', origin, env);

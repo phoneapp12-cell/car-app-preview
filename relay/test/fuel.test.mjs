@@ -1,0 +1,21 @@
+// 2.27.36: Marsden Point terminal 91 from Z's public TGP list, history merge and the /fuel route.
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { readList, addDay } from '../src/fuel.js';
+import { handle } from '../src/relay.js';
+const pdf = await readFile(new URL('./fixtures/z-tgp-20261021.pdf', import.meta.url));
+const z = await readList(pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.length), /Regular 91/i, /Premium 95/i);
+assert.deepEqual(z, { eff: '2026-10-21', p91: 327.11, p95: 343.91 });
+let rec = addDay(null, '2026-10-20', { z: { eff: '2026-10-14', p91: 339.92 }, bp: null, errs: {} }, 1);
+rec = addDay(rec, '2026-10-21', { z, bp: null, errs: {} }, 2);
+assert.equal(rec.days.length, 2); assert.equal(rec.day, '2026-10-21');
+const store = new Map(), env = { ALLOWED_ORIGIN: 'https://phoneapp12-cell.github.io', EVENTS_KV: { get: async k => store.get(k) ?? null, put: async (k, v) => { store.set(k, v); } } };
+const fake = async url => { url = String(url);
+  if (url.includes('terminal-gate-pricing')) return new Response('<a href="https://x.s3.amazonaws.com/public/TGP-Price-20261021.pdf">list</a>');
+  if (url.endsWith('TGP-Price-20261021.pdf')) return new Response(pdf);
+  return new Response('no', { status: 403 }); };
+const res = await handle(new Request('https://r.example/fuel', { headers: { Origin: env.ALLOWED_ORIGIN } }), env, fake);
+const d = await res.json(); assert.equal(res.status, 200); assert.equal(d.days[0].z91, 327.11); assert.ok(!d.days[0].bp91);
+const bad = await handle(new Request('https://r.example/fuel', { headers: { Origin: 'https://evil.example' } }), env, fake);
+assert.equal(bad.status, 403);
+console.log('fuel: 5 checks passed');

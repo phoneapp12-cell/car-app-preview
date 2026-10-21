@@ -9,6 +9,7 @@ import { runSunshine } from './sunshine.js';
 import { runShop } from './shop-notify.js';
 import { runAkahu, runAkahuInsight } from './akahu.js';
 import { runHealthDiag } from './health.js';
+import { runFuel } from './fuel.js';
 const CLOSURES_CRON = '5-59/10 * * * *';
 const REMIND_CRON = '* * * * *'; // reminders: the minute the phone asked for (not the bridge 7 am hold)
 export default {
@@ -22,5 +23,6 @@ export default {
     try { await refreshSarah(env, fetch, Date.now(), { push: true }); } catch (e) { /* events list is already saved */ }
     try { await runSunshine(env, fetch, Date.now()); } catch (e) { /* sunshine notes wait for the next check */ }
     try { await runAkahu(env, fetch, Date.now()); } catch (e) { /* bank data waits for the next check */ }
+    try { await runFuel(env, fetch, Date.now()); } catch (e) { /* 2.27.36: terminal fuel prices, once a day from 6am */ }
   })())
 };
