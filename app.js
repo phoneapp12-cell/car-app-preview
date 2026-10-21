@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.31';
+const APP_VERSION = '2.27.32';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4385,7 +4385,7 @@ function Cars() {
     (S.cars.length ? S.cars.map(c => `<div class="carcard" role="button" tabindex="0" onclick="go('#car/${c.id}')"><div class="carhead">
       ${carPic(c, true)}
       <div style="flex:1;min-width:0"><div class="carname">${esc(c.name)}</div><div class="carmodel">${esc(carSub(c))}</div></div>
-      ${c.plate ? `<span class="plate">${esc(c.plate)}</span>` : ''}</div>${photoBtns('car', c.id)}${carTriple(c)}</div>`).join('')
+      ${c.plate ? `<span class="plate">${esc(c.plate)}</span>` : ''}</div>${photoBtns('car', c.id)}${carTriple(c)}${carTimeProg(c)}</div>`).join('')
       : empty('No cars yet', 'Add a car to keep track of its WOF, rego and servicing.', 'Add a car', 'carForm()')) +
     `<div class="callout blue">${I('info')}<div>NZTA won’t renew rego unless the WOF is current, so the app warns you when the WOF runs out first.</div></div>` +
     driversSection();
@@ -4792,7 +4792,7 @@ function Bills() {
       <div class="muted">${pp.off < 0 ? 'Bills that were due' : 'To pay before the next payday'}</div><div class="amt" id="paytotal">${money(tot)}</div>
       <div class="muted">${countLabel}${late ? ` · <b style="color:var(--onbrand)">${late} overdue</b>` : ''} · next payday ${fmtW(pp.next)}</div>
       <div class="muted billsub">${reg.length ? `Your regular bills average ${money(avg)} a fortnight. ` : ''}${hasLoanPlans ? 'Loan repayment plans are included. ' : ''}<button class="linkbtn" id="paychange" onclick="paydayForm()">Change payday</button></div></div>
-      <div class="sec">Due ${pp.off === 0 ? 'this pay' : pp.off === 1 ? 'next pay' : pp.off === -1 ? 'last pay' : fmtW(pp.start) + ' to ' + fmtW(pp.end)}</div>
+      ${pp.off === 0 ? billsPayProg(pp, items) : ''}<div class="sec">Due ${pp.off === 0 ? 'this pay' : pp.off === 1 ? 'next pay' : pp.off === -1 ? 'last pay' : fmtW(pp.start) + ' to ' + fmtW(pp.end)}</div>
       ${items.length ? `<div class="list" id="paylist">${items.map(prow).join('')}</div>` : `<div class="card muted" id="paylist">No bills due ${pp.off < 0 ? 'in that pay' : 'in this pay'}.</div>`}`;
   }
   const body = showPay
@@ -5386,7 +5386,7 @@ function Claims() {
   return `<button class="back" onclick="go('#health')">${I('left')} Health</button>` + header('UniMed claims', todo.length ? plural(todo.length, 'claim') + ' to make' + (sent.length ? ' · ' + sent.length + ' waiting' : '') : sent.length ? sent.length + ' waiting on UniMed' : 'All caught up', `<button class="iconbtn add" aria-label="New claim" onclick="claimSheet('new')">${I('plus')}</button>`) +
     `<div class="card cltipcard"><div class="cltip" style="margin:0 0 10px">${I('info')}<div>Claims are made in UniMed’s Smart Claim portal: policy, patient, provider, reason, visit date, amount paid, and a photo of the <b>itemised invoice</b> (not the EFTPOS receipt). At least $${CLAIM_MIN}. Drafts keep for 30 days there.</div></div>
       <div class="btns"><a class="btn primary" href="${UNIMED_URL}" target="_blank" rel="noopener">${I('share')} Open Smart Claim</a><a class="btn" href="tel:0800600666">${I('phone')} 0800 600 666</a></div>
-      <div class="btns" style="margin-top:8px"><button class="btn" id="ecopen" onclick="emailClaim('new')">${I('mail')} Email claim: last 3 months of CFH, Tui Chiropractic, dentist invoices</button></div></div>` + scClaimsHtml() +
+      <div class="btns" style="margin-top:8px"><button class="btn" id="ecopen" onclick="emailClaim('new')">${I('mail')} Email claim: last 3 months of CFH, Tui Chiropractic, dentist invoices</button></div></div>` + scClaimsHtml() + claimsProg(todo.length, sent.length, paid.length) +
     `<div class="sec">To claim</div>` + (todo.length ? `<div class="list" id="claimtodo">${todo.map(claimRowHtml).join('')}</div>` : `<div class="card empty"><div class="t">Nothing to claim</div><div class="s">Health appointments (yours and Sarah’s) show here after the visit. Tap + for anything else.</div></div>`) +
     (sent.length ? `<div class="sec">Submitted</div><div class="list">${sent.map(claimRowHtml).join('')}</div>` : '') +
     (paid.length ? `<details class="spast"><summary>Paid (${paid.length}${paidSum ? ' · ' + claimMoney(paidSum.toFixed(2)) + ' back' : ''})</summary><div class="list">${paid.map(claimRowHtml).join('')}</div></details>` : '') +
@@ -5544,7 +5544,7 @@ function Todo() {
     ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
     <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="Add a to-do${todoFilter !== 'All' ? ' to ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="todoshare"> Also add to Sarah’s list</label>
-    ${todoListProg(todoFilter)}
+    ${todoTodayProg()}${todoListProg(todoFilter)}
     ${open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">All done. Good as gold!</div></div>' : empty('Nothing on your list', 'Type a to-do above and tap +, or add one with a due date.', 'Add a to-do', 'todoForm()'))}
     ${done.length ? `<div class="sec">Done <button onclick="clearDone()">Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}`;
 }
@@ -6395,10 +6395,12 @@ function copyStepsFrom(src) {
   return out.length ? out : null;
 }
 // 2.26.39: the renovation-style progress line (thin bar, '% done', 'x of y'), used anywhere with tickable items. Done items always count.
-function progLine(done, total, what, cls) {
+function progOn() { return !(S.settings && S.settings.progLines === false); }
+function progLine(done, total, what, cls, o) {
+  if (!progOn()) return ''; o = o || {};
   total = Math.max(0, total | 0); done = Math.min(total, Math.max(0, done | 0)); if (!total) return '';
-  const p = Math.round(done / total * 100);
-  return `<div class="pgl${p === 100 ? ' pgfull' : ''}${cls ? ' ' + cls : ''}"><div class="pglt"><span>${what ? esc(what) : 'Progress'}</span><b>${p === 100 ? '🎉 ' : ''}${p}% done · ${done} of ${total}</b></div><div class="pgbar"><i style="width:${p}%"></i></div></div>`;
+  const p = Math.round(done / total * 100), f = o.fmt || (n => n);
+  return `<div class="pgl${p === 100 ? ' pgfull' : ''}${cls ? ' ' + cls : ''}"><div class="pglt"><span>${what ? esc(what) : 'Progress'}</span><b>${p === 100 && !o.noParty ? '🎉 ' : ''}${o.label || p + '% ' + (o.word || 'done') + ' · ' + f(done) + ' of ' + f(total)}</b></div><div class="pgbar"><i style="width:${p}%"></i></div></div>`;
 }
 function todoListProg(f) { // 2.26.39: All = every to-do on every list, ticked out of total (ticked ones count even when hidden).
   const L = (S.todos || []).filter(t => t && (f === 'All' || t.list === f));
@@ -17272,7 +17274,7 @@ function diaryGroups(iso) {
   const by = {
     appt: diaryAppts(iso), todo: diaryTodos(iso), bill: diaryBills(iso), meal: diaryMeals(iso),
     bday: diaryBirthdays(iso), rem: diaryReminders(iso), comm: diaryComm(iso), car: diaryCars(iso),
-    pet: diaryPets(iso), health: diaryHealth(iso), garden: diaryGarden(iso), event: diaryEvents(iso)
+    pet: diaryPets(iso), health: diaryHealth(iso), garden: diaryGarden(iso), event: [] /* 2.27.32: local events taken out of the Diary (still on Events and the Calendar) */
   };
   return DIARY_KINDS.filter(([k]) => by[k] && by[k].length).map(([k, label]) => ({ label, items: by[k] }));
 }
@@ -17305,7 +17307,7 @@ function Diary() {
     `<div class="seg diaryseg" role="group" aria-label="Diary view"><button type="button" class="${day ? 'on' : ''}" aria-pressed="${day}" onclick="diarySetMode('day')">Day</button><button type="button" class="${day ? '' : 'on'}" aria-pressed="${!day}" onclick="diarySetMode('week')">Week</button></div>` +
     backToday +
     `<div class="diarybook"><div class="diaryspine" aria-hidden="true"><span></span><span></span><span></span></div><div class="diarypages">${inner}</div></div>` +
-    `<div class="foot">Appointments, to-dos, bills, meals, birthdays, reminders, commission, cars, pets, health, garden and local events already on this phone. Nothing new is fetched for this page.</div>`;
+    `<div class="foot">Appointments, to-dos, bills, meals, birthdays, reminders, commission, cars, pets, health and garden already on this phone. Local events are on the Events page. Nothing new is fetched for this page.</div>`;
 }
 
 
@@ -19687,7 +19689,7 @@ function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
-  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + `<div id="glalerts">${glAlertsBody()}</div>
+  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + `<div id="glalerts">${glAlertsBody()}</div>
   <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: 16 Sherwood Road, Onerahi to 4 Port Road.</div>`);
 }
@@ -20179,7 +20181,7 @@ function hwHealthCard() {
   const hv = hr.filter(x => x.v), hrT = td && td.hr;
   const avg = a => Math.round(a.reduce((t, x) => t + x.v, 0) / a.length);
   return `<div class="card hwcard" id="hwhealth"><div class="t" style="font-weight:800">⌚ From your watch</div>
-    <div class="hwbig"><b>${td && td.steps != null ? hwNum(td.steps) : '–'}</b> steps today</div>${hwStepTag(td)}
+    <div class="hwbig"><b>${td && td.steps != null ? hwNum(td.steps) : '–'}</b> steps today</div>${hwStepTag(td)}${stepsProg(td)}
     ${hwBars(wk)}<div class="s">${wv.length ? `Average ${hwNum(avg(wv))} a day over the last ${plural(wv.length, 'day')}.` : 'No steps yet this week.'}</div>
     ${hv.length ? `<div class="t" style="font-weight:700;margin-top:12px">Resting heart rate</div>
     <div class="s">${hrT && hrT.rest ? `${hrT.rest} bpm today${hrT.restEst ? ' (worked out from the day’s readings)' : ''}` : 'Not in yet today'}${hrT && hrT.min ? ` · range ${hrT.min}–${hrT.max}, average ${hrT.avg}` : ''}. Two-week average ${avg(hv)} bpm.</div>
@@ -20760,7 +20762,7 @@ function xferCard(D) {
   const dn = Object.values(done).filter(x => x && !x.seen).length;
   const sh = X.short.map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${cfMoney(s.amount)} ${s.own ? (cfIsOrbit(D.accounts.find(a => a.id === s.to)) ? `under the ${cfMoney(orbMin())} it keeps free` : 'over its limit') : 'short'} for ${esc(s.items && s.items.length > 1 ? s.items.slice(0, 4).join(', ') + ' (to next pay)' : s.first.what)} on ${esc(day(s.first.date))}${s.pay && s.pay > s.first.date ? ` · there isn’t enough spare until pay lands ${esc(day(s.pay))}, so move it then or ask the bank about timing` : s.pay ? ` · move it after pay lands ${esc(day(s.pay))}` : ' · no pay expected before then'}</div>`).join('');
   return `<div class="sec">Transfers to make · as at ${esc(day(todayISO()))}</div><div class="card xfcard">
-    ${rows}${cardRows}${rows || cardRows ? '' : (sh ? '' : `<div class="cfok">Nothing to move. Every paying account covers what’s coming out until ${esc(day(X.H))}.</div>`)}${sh ? `<div class="cftips" style="margin-top:6px">${sh}</div>` : ''}
+    ${xferProg(X)}${rows}${cardRows}${rows || cardRows ? '' : (sh ? '' : `<div class="cfok">Nothing to move. Every paying account covers what’s coming out until ${esc(day(X.H))}.</div>`)}${sh ? `<div class="cftips" style="margin-top:6px">${sh}</div>` : ''}
     <div class="s muted" style="margin-top:6px">Keeps ${cfMoney(X.buf)} in each paying account${cfIsOrbit(X.src) ? ` and ${cfMoney(orbMin())} free in ORBIT` : ''} · <button type="button" class="linkbtn" onclick="xferBufForm()">change</button>. Money into ${esc(nm(X.src.id))}: ${X.ins.filter(i => i.acct === X.src.id).map(i => esc(i.what) + ' about ' + cfMoney(i.amount) + ' ' + esc(day(i.date))).join(', ') || 'none expected'}. Covers everything still to come up to ${esc(day(X.H))}${cfIsOrbit(X.src) ? `, leaving about ${cfMoney(X.srcEnd)} free in ORBIT` : ''}.${dn ? ` ${plural(dn, 'transfer')} ticked done, counted until the bank shows ${dn > 1 ? 'them' : 'it'}.` : ''}</div></div>`;
 }
 async function xferTick(key, amount, from, to) { S.settings.xferDone = S.settings.xferDone || {}; S.settings.xferDone[key] = { at: new Date().toISOString(), amount, from, to }; await save(); render(); toast('Marked done. It stays hidden until the bank shows it.'); }
@@ -23520,7 +23522,7 @@ function WatchPage() {
   const sl = td.sleep;
   let longest = 0; { let run = 0; days(60).forEach(o => { if (o.x && o.x.steps >= goal) { run++; longest = Math.max(longest, run); } else run = 0; }); }
   return header('Watch', 'From your Huawei watch') +
-    `<div class="card hwcard"><div class="t" style="font-weight:800">Today</div><div class="hwgrid">${cell(td.steps != null ? hwNum(td.steps) : dash, 'steps · goal ' + hwNum(goal))}${cell(sl ? hwMins(sl.mins) : dash, 'sleep last night')}${cell(td.hr && td.hr.rest ? td.hr.rest + ' bpm' : dash, 'resting HR' + (td.hr && td.hr.restEst ? ' (estimate)' : ''))}</div>${hwStepTag(td)}
+    `<div class="card hwcard"><div class="t" style="font-weight:800">Today</div><div class="hwgrid">${cell(td.steps != null ? hwNum(td.steps) : dash, 'steps · goal ' + hwNum(goal))}${cell(sl ? hwMins(sl.mins) : dash, 'sleep last night')}${cell(td.hr && td.hr.rest ? td.hr.rest + ' bpm' : dash, 'resting HR' + (td.hr && td.hr.restEst ? ' (estimate)' : ''))}</div>${hwStepTag(td)}${stepsProg(td)}
      ${sl ? `<div class="s">${hwHM(sl.start)}–${hwHM(sl.end)}${hwStageTxt(sl.stages) ? ' · ' + esc(hwStageTxt(sl.stages)) : ''}</div>` : ''}${td.hr && td.hr.min ? `<div class="s">Heart rate today ${td.hr.min}–${td.hr.max} bpm, average ${td.hr.avg}</div>` : ''}</div>` +
     `<div class="card hwcard"><div class="t" style="font-weight:800">Averages</div><div class="hwtab"><div></div><b>7 days</b><b>30 days</b>
       <span>Steps</span><span>${w.steps != null ? hwNum(w.steps) : dash}</span><span>${m.steps != null ? hwNum(m.steps) : dash}</span>
@@ -24553,3 +24555,21 @@ async function phExport() { const L = await phLoad(); if (!L.length) return toas
 (() => { const o = Settings; Settings = function () { const h = o.apply(this, arguments); try { setTimeout(async () => { const el = document.getElementById('phuse'); if (!el) return; const u = await phUsage(); el.textContent = `${u.n} photo${u.n === 1 ? '' : 's'} · ${(u.bytes / 1048576).toFixed(1)} MB on this phone`; }, 0);
   return h + `<div class="sec">Photos</div><div class="list"><div class="srow"><div class="tx"><div class="t">Storage used</div><div class="s" id="phuse">Working it out…</div></div></div><div class="srow" role="button" tabindex="0" onclick="phExport()"><div class="tx"><div class="t">Export all photos</div><div class="s">A .zip with every photo and a list of titles, notes and tags</div></div>${I('right')}</div></div>`; } catch (e) { return h; } }; })();
 (() => { try { const st = document.createElement('style'); st.textContent = `.phgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.phcell{position:relative;padding:0;border:0;border-radius:10px;overflow:hidden;aspect-ratio:1;background:#0001}.phcell img{width:100%;height:100%;object-fit:cover;display:block}.phcell span{position:absolute;left:0;right:0;bottom:0;font-size:11px;color:#fff;background:#0008;padding:2px 5px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.phchips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.phchips .chip{border:1px solid #0003;border-radius:14px;padding:3px 10px;background:#fff;font-size:13px}.phchips .chip.on{background:#0F766E;color:#fff;border-color:#0F766E}.phsearch{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid #0003;font-size:16px}#phview{position:fixed;inset:0;z-index:9999;background:#111;color:#fff;display:flex;flex-direction:column}#phview .phtop{display:flex;gap:6px;padding:10px;padding-top:max(10px,env(safe-area-inset-top))}.phzoom{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none}.phzoom img{max-width:100%;max-height:100%;transform-origin:center}.phmeta{padding:10px;background:#1b1b1b;max-height:40vh;overflow:auto}.phmeta input,.phmeta textarea{width:100%;box-sizing:border-box;margin-top:6px;padding:8px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;font-size:16px}.phmeta .chip b{margin-left:4px;cursor:pointer}`; document.head.appendChild(st); } catch (e) { } })();
+
+/* ================= 2.27.32: MORE PROGRESS LINES (same thin bar as To-do / Renovations; real counts, hidden when there's nothing to count) ================= */
+function todoTodayProg() { const T = todayISO(), isT = ms => ms && nzStampLocal(new Date(ms)).slice(0, 10) === T;
+  const L = (S.todos || []).filter(t => t && (t.done ? isT(t.doneAt) : t.due && daysLeft(t.due) <= 0));
+  return progLine(L.filter(t => t.done).length, L.length, 'Today’s to-dos'); }
+function bellReadProg() { try { const seen = bellSeen(), A = glBellSigs().filter((x, i, A) => A.indexOf(x) === i); return progLine(A.filter(x => seen[x]).length, A.length, 'Notifications read', 'pgsm', { word: 'read' }); } catch (e) { return ''; } }
+function billsPayProg(pp, items) { try { if (!pp) return ''; const paid = (S.bills || []).reduce((n, b) => n + (Array.isArray(b.paidDues) ? b.paidDues.filter(x => x && x.due >= pp.start && x.due <= pp.end).length : 0), 0);
+  const open = items.filter(x => x.kind === 'bill' && !x.late).length; return progLine(paid, paid + open, 'Bills paid this fortnight', 'pgsm', { word: 'paid' }); } catch (e) { return ''; } }
+function xferProg(X) { try { const done = S.settings.xferDone || {}, by = X.list.map(x => x.by).filter(Boolean).sort()[0]; if (!by) return ''; const L = X.list.filter(x => x.by === by);
+  return progLine(L.filter(x => done[x.key]).length, L.length, 'Transfers on payday · ' + fmtW(by), 'pgsm'); } catch (e) { return ''; } }
+function claimsProg(todo, sent, paid) { return progLine(sent + paid, todo + sent + paid, 'Claims sent or refunded', 'pgsm', { word: 'sent' }); }
+function stepsProg(td) { try { const g = hwGoal(), s = td && td.steps; if (!g || s == null) return ''; return progLine(Math.min(s, g), g, 'Step goal', 'pgsm', { label: `${Math.min(100, Math.round(s / g * 100))}% · ${hwNum(s)} of ${hwNum(g)}` }); } catch (e) { return ''; } }
+function carTimeProg(c) { try { const P = [['WOF', c.wof, (+c.wofMonths || 12) * 30.44], ['Rego', c.rego, 365], ['Service', c.svcDate, 365]].filter(x => x[1] && !isNaN(parseD(x[1]))).map(x => ({ n: x[0], d: daysLeft(x[1]), cyc: Math.round(x[2]) })).sort((a, b) => a.d - b.d);
+  const x = P[0]; if (!x) return ''; const left = Math.max(0, Math.min(x.cyc, x.d));
+  return progLine(left, x.cyc, `Next: ${x.n} ${x.d < 0 ? 'overdue' : x.d === 0 ? 'due today' : 'in ' + plural(x.d, 'day')}`, 'pgsm cartime', { noParty: 1, label: `${Math.round(left / x.cyc * 100)}% time left` }); } catch (e) { return ''; } }
+async function progToggle() { S.settings = S.settings || {}; S.settings.progLines = !progOn(); await save(); render(); }
+(() => { const o = rwSettings; rwSettings = function () { const h = o.apply(this, arguments), on = progOn();
+  return `<div class="sec">Progress lines</div><div class="list"><div class="srow"><div class="tx"><div class="t">Show progress lines</div><div class="s">Thin % bars on To-do, Notifications, Bills, Cash flow, Shopping, Watch, UniMed claims and Cars.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Show progress lines" onclick="progToggle()"></button></div></div>` + h; }; })();
