@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.42';
+const APP_VERSION = '2.27.43';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13550,7 +13550,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-21'
+// VIDEO_LIST_UPDATED = '2026-10-22'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -13569,7 +13569,7 @@ const VIDEO_CATS = [
 const VIDEOS = [
   { id: 'TD74a5g5rp0', title: 'Everything Apple announced in under 10 mins - Welcome Home 2026', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=TD74a5g5rp0', reason: 'Linus Tech Tips sums up everything Apple announced at Welcome Home 2026 in under ten minutes.' },
   { id: 'b2tjnxX8IHU', title: 'Did Google just dethrone OpenAI and Anthropic?', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=b2tjnxX8IHU', reason: 'Fireship asks whether Google has just pulled ahead of OpenAI and Anthropic in AI.' },
-  { id: 'scwlR0QHGOk', title: 'The NEW Tesla Roadster: My Honest Reaction', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=scwlR0QHGOk', reason: 'MKBHD gives his honest reaction to the new Tesla Roadster.' },
+  { id: 'ULWD2IAfH1c', title: 'iPhone Duo Review: I See Why Apple Took Its Time', channel: 'CNET', category: 'tech', url: 'https://www.youtube.com/watch?v=ULWD2IAfH1c', reason: 'CNET reviews the iPhone Duo, Apple’s new foldable iPhone that’s out this week.' },
   { id: 'qqhIp0OaZWI', title: 'NVIDIA RTX Spark 7 Good and Bad Things', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=qqhIp0OaZWI', reason: 'Linus Tech Tips runs through the good and bad points of the new NVIDIA RTX Spark.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
   { id: '2_XNm1xE0Y4', title: 'PB Live: Headphones & Audio - Showcase & Sale', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=2_XNm1xE0Y4', reason: 'A PB Tech live showcase of headphones and audio gear on sale.' },
@@ -14330,7 +14330,7 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 21 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
+    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 22 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
 }
 
 
