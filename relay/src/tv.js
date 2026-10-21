@@ -34,5 +34,7 @@ export async function seriesFor(links, fetchImpl = fetch, now = Date.now()) {
   if (!links || !links.length) return [];
   const idx = await getJson('index', fetchImpl), want = [0, 1, 2].map(i => nzDay(now + i * 86400e3)).filter(d => (idx.days || []).includes(d));
   const days = []; for (const d of want) { try { days.push(await getJson(d, fetchImpl)); } catch (e) { } }
-  return seriesReminders(links, days, idx.names || {}, now);
+  const names = Object.assign({}, idx.names || {}), today = nzDay(now); // 2.27.38: Sky renames by date (ids unchanged)
+  for (const [k, v] of Object.entries(idx.renames || {})) if (Array.isArray(v) && today >= v[0]) names[k] = v[1];
+  return seriesReminders(links, days, names, now);
 }

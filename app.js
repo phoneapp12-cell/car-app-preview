@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.37';
+const APP_VERSION = '2.27.38';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24740,7 +24740,7 @@ async function tvdWarm() { await tvdIndex(false); const T = todayISO(); await tv
 setTimeout(tvdWarm, 4000);
 const tvdProgs = (d, ch) => ((TVD.days[d] && TVD.days[d].ch && TVD.days[d].ch[ch]) || []).map(p => ({ start: p[0] * 1000, until: p[1] * 1000, title: p[2], cats: p[3] ? String(p[3]).split('/') : [], desc: p[4] || '' }));
 // Genre colours: EPG categories first, then words in the title or description.
-function tvGenre(p) { const c = (p.cats || []).join(' '), t = (p.title || '') + ' ' + (p.desc || '');
+function tvGenre(p) { const c = (p.cats || []).join(' '), t = (p.title || '') + ' ' + (p.desc || ''); if (/advert|shopping|infomercial/i.test(c + ' ' + (p.title || ''))) return '';
   if (/news|current affairs/i.test(c) || /\b(news|current affairs|1news|newshub|seven sharp|q\+a|the hui|te karere|breakfast|sunday|60 minutes|the project)\b/i.test(p.title || '')) return 'news';
   if (/\b(movie|film)s?\b/i.test(c) || /\b(movie|feature film)\b/i.test(t)) return 'movie';
   if (/comedy|sitcom/i.test(c) || /\b(comedy|sitcom|stand-?up)\b/i.test(t)) return 'comedy';
@@ -24762,7 +24762,7 @@ const tvNorm = t => String(t || '').toLowerCase().replace(/\([^)]*\)/g, ' ').rep
 const tvLinkOf = (ch, title) => { const n = tvNorm(title); return tvLinks().find(l => l.n === n && (l.ch === '*' || l.ch === ch)) || null; };
 const tvFk = (ch, s) => ch + '|' + s;
 const tvFlagged = k => tvFlags().some(f => f.k === k);
-const tvChName = id => (TV_CHANNELS.find(c => c.id === id) || {}).name || '';
+let tvChName = id => (TV_CHANNELS.find(c => c.id === id) || {}).name || '';
 function tvFind(ch, s) { const a = ((TV && TV.data && TV.data.slots && TV.data.slots[ch]) || []).find(x => x.start === s); if (a) return a;
   for (const d of Object.keys(TVD.days)) { const p = tvdProgs(d, ch).find(x => x.start === s); if (p) return p; } return null; }
 function tvLinksSend() { return tvLinks().map(l => ({ n: l.n, t: l.t, ch: l.ch })); }
@@ -24808,3 +24808,82 @@ function tvFlaggedList() { const L = tvFlags(), K = tvLinks();
 (() => { const o = TvGuide; TvGuide = function () { let h = o.apply(this, arguments); try { const j = h.indexOf('<div class="sec">What’s on TV'); if (j > 0) h = h.slice(0, j) + tvLegend() + h.slice(j);
   const i = h.lastIndexOf('<div class="foot">'); const x = tvComingUp() + tvFlaggedList(); return i > 0 ? h.slice(0, i) + x + h.slice(i) : h + x; } catch (e) { return h; } }; })();
 setTimeout(() => { try { if (S && S.settings && Array.isArray(S.settings.tvFlags)) { const L = tvFlags(); if (L.length !== S.settings.tvFlags.length) { S.settings.tvFlags = L; save(); } } } catch (e) { } }, 6000);
+
+/* ================= 2.27.38: TV guide as a grid (like Sky's TV Guide) =================
+   Day tabs, a time bar (‹ › about an hour), one row per channel with a sticky number/logo column, programme blocks sized
+   by length in one sideways-scrolling timeline, and a 'now' line. Only blocks near the visible time window are drawn
+   (redrawn per ~3-hour step while scrolling), so it stays smooth. Tap a block for details and Remind options.
+   Channel names follow Sky's 22 Oct changes; flags and series links are kept by channel id, so they carry over. */
+const EPG_PX = 5, EPG_CH_W = 64, EPG_STEP = 180 * EPG_PX * 60000 / 60000; // 5 px a minute; redraw window step = 3 hours
+const TV_RADIO = /^sky\.(31[1-3]|42[1-3])$/, TV_SKIPCH = new Set(['sky.62', 'sky.63']);
+const TV_RENAME = { 'sky.5': ['2026-10-22', 'Sky Justice'], 'sky.6': ['2026-10-22', 'Sky Suspect'], 'sky.83': ['2026-10-22', 'Channel 83'] };
+let tvScrollX = null, tvScrollDay = '', epgRaf = 0, epgWin = null;
+tvChName = function (id) { const r = TV_RENAME[id] || (TVD.idx && TVD.idx.renames && TVD.idx.renames[id]); if (r && todayISO() >= r[0]) return r[1];
+  return (TVD.idx && TVD.idx.names && TVD.idx.names[id]) || (TV_CHANNELS.find(c => c.id === id) || {}).name || ''; };
+const tvNum = id => String((TVD.idx && TVD.idx.lcn && TVD.idx.lcn[id]) || ({ 'mjh-tvnz-1': 1, 'mjh-tvnz-2': 2, 'mjh-three': 3 })[id] || String(id).replace(/\D/g, '') || '');
+const epgChans = () => TV_CHANNELS.filter(c => !TV_RADIO.test(c.id) && !TV_SKIPCH.has(c.id)).sort((a, b) => (+tvNum(a.id) || 999) - (+tvNum(b.id) || 999));
+function nzMidnight(d) { const [Y, M, D] = d.split('-').map(Number); let t = Date.UTC(Y, M - 1, D) - 13 * 3600e3;
+  for (let i = 0; i < 3; i++) { const s = nzStampLocal(new Date(t)), [a, b] = s.split('T'), [y, m, dd] = a.split('-').map(Number), [h, mi] = b.split(':').map(Number); t += Date.UTC(Y, M - 1, D) - Date.UTC(y, m - 1, dd, h, mi); } return t; }
+const epgDay = () => { const T = todayISO(), D = (TVD.idx && TVD.idx.days) || [T]; return tvDay && tvDay >= T && D.includes(tvDay) ? tvDay : T; };
+function epgProgs(d, ch) { let L = TVD.days[d] ? tvdProgs(d, ch) : (d === todayISO() ? ((TV && TV.data && TV.data.slots && TV.data.slots[ch]) || []) : []);
+  return L.filter(p => p.until > p.start && !isSport(p.title + ' ' + (p.cats || []).join(' '))); }
+const epgClock = ms => tvClock(ms).replace(/\s?([ap])\.?m\.?/i, (m, a) => ' ' + a.toUpperCase() + 'M');
+function epgBlocks(d, ch, x0, x1, t0) { return epgProgs(d, ch).map(p => { const a = Math.max(0, (p.start - t0) / 60000 * EPG_PX), b = Math.min(1440 * EPG_PX + 300, (p.until - t0) / 60000 * EPG_PX);
+  if (b <= x0 || a >= x1 || b - a < 2) return ''; const mk = tvMark(ch, p);
+  return `<button type="button" class="epgb${tvgCls(p)}" style="left:${a.toFixed(0)}px;width:${Math.max(2, b - a - 2).toFixed(0)}px" onclick="epgTap(${jsArg(ch)},${p.start})"><span class="t">${mk}${esc(p.title)}</span><span class="s">${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}</span></button>`; }).join(''); }
+function epgPaint(force) { const sc = document.getElementById('epgsc'); if (!sc) return; const d = sc.dataset.day, t0 = +sc.dataset.t0, w = sc.clientWidth || 360;
+  const k = Math.floor(Math.max(0, sc.scrollLeft - EPG_CH_W) / (EPG_STEP)); if (!force && epgWin === d + ':' + k) return; epgWin = d + ':' + k;
+  const x0 = k * EPG_STEP - w, x1 = (k + 1) * EPG_STEP + 2 * w;
+  sc.querySelectorAll('.epgtrack[data-ch]').forEach(tr => { tr.innerHTML = epgBlocks(d, tr.dataset.ch, x0, x1, t0); }); }
+function epgLabel() { const sc = document.getElementById('epgsc'), el = document.getElementById('epgtime'); if (!sc || !el) return; const t = +sc.dataset.t0 + (sc.scrollLeft + 8) / EPG_PX * 60000; el.textContent = epgClock(t); }
+function epgInit(tries = 0) { const sc = document.getElementById('epgsc'); if (!sc || sc.dataset.on) { if (!sc && tries < 20) setTimeout(() => epgInit(tries + 1), 60); return; }
+  if (!sc.clientWidth && tries < 20) return void setTimeout(() => epgInit(tries + 1), 60); sc.dataset.on = '1';
+  const d = sc.dataset.day, t0 = +sc.dataset.t0, now = Date.now();
+  if (tvScrollX == null || tvScrollDay !== d) { const tod = d === todayISO() ? now : t0 + (now - nzMidnight(todayISO())); tvScrollX = Math.max(0, (tod - t0) / 60000 * EPG_PX - 30 * EPG_PX); tvScrollDay = d; }
+  sc.scrollLeft = tvScrollX; if (Math.abs(sc.scrollLeft - tvScrollX) > 2) requestAnimationFrame(() => { sc.scrollLeft = tvScrollX; epgWin = null; epgPaint(true); epgLabel(); }); epgWin = null; epgPaint(true); epgLabel();
+  sc.addEventListener('scroll', () => { if (!sc.isConnected || !sc.clientWidth) return; tvScrollX = sc.scrollLeft; if (!epgRaf) epgRaf = requestAnimationFrame(() => { epgRaf = 0; epgPaint(false); epgLabel(); }); }, { passive: true }); }
+function epgJump(dir) { const sc = document.getElementById('epgsc'); if (sc) sc.scrollBy({ left: dir * 60 * EPG_PX, behavior: 'smooth' }); }
+function epgSetDay(d) { tvDay = d; tvScrollX = null; tvdDay(d).then(x => { if (x && epgDay() === d) updTv(); }); updTv(); }
+function epgTap(ch, s) { const p = tvFind(ch, s) || epgProgs(epgDay(), ch).find(x => x.start === s); if (!p) return;
+  const lk = tvLinkOf(ch, p.title), fl = tvFlagged(tvFk(ch, s)), fut = p.start > Date.now(), g = tvGenre(p);
+  const b = (js, l, pri) => `<button type="button" class="btn${pri ? ' primary' : ''}" style="width:100%;margin:4px 0" onclick="closeSheet();${js}">${l}</button>`;
+  const acts = lk ? b(`tvLinkRemove(${jsArg(lk.n)},${jsArg(lk.ch)})`, '🔁 Remove series link') : fl ? b(`tvFlagToggle(${jsArg(ch)},${s})`, '🔔 Remove reminder') :
+    (fut ? b(`tvPick(${jsArg(ch)},${s},'one')`, '🔔 Just this one', true) : '') + b(`tvPick(${jsArg(ch)},${s},'ch')`, '🔁 Every episode on ' + esc(tvChName(ch))) + b(`tvPick(${jsArg(ch)},${s},'any')`, '🔁 Every episode, any channel');
+  openSheet(esc(p.title), `<p class="muted" style="margin:0 0 6px">${esc(tvNum(ch))} ${esc(tvChName(ch))} · ${esc(fmtW(nzStampLocal(new Date(p.start)).slice(0, 10)))} · ${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}${g ? ' · ' + { news: 'News', movie: 'Movie', comedy: 'Comedy', life: 'Lifestyle / factual' }[g] : ''}</p>
+    ${p.desc ? `<p style="margin:0 0 10px">${esc(p.desc)}${p.desc.length >= 110 ? '…' : ''}</p>` : ''}${acts}`, null); }
+// tvPick worked only on shows still to come; series links can start from one that's on now.
+(() => { const o = tvPick; tvPick = function (ch, s, how) { if (how !== 'one' && !tvFind(ch, s)) { const p = epgProgs(epgDay(), ch).find(x => x.start === s); if (p) { const n = tvNorm(p.title), c = how === 'any' ? '*' : ch;
+  S.settings.tvLinks = tvLinks().filter(l => !(l.n === n && (l.ch === c || c === '*'))); S.settings.tvLinks.push({ n, t: String(p.title).replace(/\s*\([^)]*\)\s*$/, '').slice(0, 120), ch: c, cn: c === '*' ? 'any channel' : tvChName(ch) }); return tvResync('🔁 Series linked: every episode gets a reminder 10 min before.'); } }
+  return o.apply(this, arguments); }; })();
+(() => { const o = tvFind; tvFind = function (ch, s) { return o(ch, s) || (() => { for (const d of Object.keys(TVD.days)) { const p = epgProgs(d, ch).find(x => x.start === s); if (p) return p; } return null; })(); }; })();
+(() => { try { const st = document.createElement('style'); st.textContent = `
+.epgdays{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0 -2px 6px;padding:2px}.epgdays button{flex:0 0 auto;border:0;background:transparent;color:var(--ink);padding:6px 10px;border-radius:10px;line-height:1.15;font-size:12px;opacity:.75}
+.epgdays button b{display:block;font-size:14px}.epgdays button.on{opacity:1;background:var(--brand);color:#fff}
+.epgbar{display:flex;align-items:center;gap:8px;background:#0b1846;color:#fff;border-radius:12px 12px 0 0;padding:6px 8px}.epgbar button{background:transparent;border:0;color:#fff;font-size:22px;line-height:1;padding:2px 10px}.epgbar #epgtime{flex:1;text-align:center;font-weight:700}
+.epgsc{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;border:1px solid var(--line);border-top:0;border-radius:0 0 12px 12px;background:var(--card);position:relative}
+.epgin{position:relative}.epgrow{display:flex;height:60px;border-top:1px solid var(--line);contain:layout paint}.epgrow.hr{height:24px;border-top:0}
+.epgch{position:sticky;left:0;z-index:3;flex:0 0 ${EPG_CH_W}px;width:${EPG_CH_W}px;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:700}
+.epgch img{width:44px;height:26px;object-fit:contain}.epgch .nb{min-width:30px;padding:3px 6px;border-radius:8px;background:var(--brand);color:#fff;text-align:center;font-size:12px}
+.epgtrack{position:relative;flex:0 0 auto}.epgb{position:absolute;top:3px;bottom:3px;display:flex;flex-direction:column;justify-content:center;gap:2px;text-align:left;padding:4px 8px;border:0;border-radius:6px;background:var(--soft,#f1f5f9);color:var(--ink);overflow:hidden;overflow:clip;white-space:nowrap;font:inherit}
+.epgb .t,.epgb .s{position:sticky;left:${EPG_CH_W + 6}px;align-self:flex-start;max-width:100%}
+.epgb .t{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis}.epgb .s{font-size:11.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis}
+.epghr{position:absolute;top:4px;font-size:11px;opacity:.7;transform:translateX(4px)}.epgnow{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;pointer-events:none}`; document.head.appendChild(st); } catch (e) { } })();
+function epgGrid() { const d = epgDay(), T = todayISO(), t0 = nzMidnight(d), W = 1440 * EPG_PX + 300, chans = epgChans(), now = Date.now();
+  const loaded = !!TVD.days[d]; if (!loaded && !TVD.busy[d]) tvdDay(d).then(x => { if (x) updTv(); });
+  const D = ((TVD.idx && TVD.idx.days) || [T]).filter(x => x >= T);
+  const tabs = `<div class="epgdays" role="tablist">${D.map(x => { const dt = new Date(parseD(x)); return `<button type="button" role="tab" class="${x === d ? 'on' : ''}" aria-selected="${x === d}" onclick="epgSetDay('${x}')">${x === T ? 'Today' : esc(dt.toLocaleDateString('en-NZ', { weekday: 'short', timeZone: 'UTC' }))}<b>${esc(dt.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', timeZone: 'UTC' }))}</b></button>`; }).join('')}</div>`;
+  const hrs = Array.from({ length: 48 }, (_, i) => `<span class="epghr" style="left:${i * 30 * EPG_PX}px">${esc(epgClock(t0 + i * 1800e3))}</span>`).join('');
+  const nowX = now > t0 && now < t0 + 86400e3 ? `<div class="epgnow" style="left:${(EPG_CH_W + (now - t0) / 60000 * EPG_PX).toFixed(0)}px"></div>` : '';
+  const logos = (TVD.idx && TVD.idx.logos) || {};
+  const rows = chans.map(c => `<div class="epgrow"><div class="epgch">${logos[c.id] ? `<img src="${esc(logos[c.id])}" alt="${esc(tvChName(c.id))}" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="${logos[c.id] ? '' : 'nb'}">${esc(tvNum(c.id).padStart(3, '0'))}</span></div><div class="epgtrack" data-ch="${esc(c.id)}" style="width:${W}px"></div></div>`).join('');
+  return tabs + tvCover() + `<div class="epgbar"><span style="font-size:12px;opacity:.8">Channels</span><button type="button" aria-label="Back an hour" onclick="epgJump(-1)">‹</button><span id="epgtime"></span><button type="button" aria-label="Forward an hour" onclick="epgJump(1)">›</button></div>
+    <div class="epgsc" id="epgsc" data-day="${d}" data-t0="${t0}"><div class="epgin" style="width:${W + EPG_CH_W}px">${nowX}<div class="epgrow hr"><div class="epgch" style="height:24px"></div><div class="epgtrack" style="width:${W}px">${hrs}</div></div>${rows}</div></div>
+    ${!loaded && d !== T ? `<p class="muted">${TVD.fail[d] ? 'Couldn’t load that day of the guide.' : 'Loading the guide…'}</p>` : ''}`; }
+TvGuide = function () { setTimeout(epgInit, 0);
+  return header('TV guide', 'Two weeks ahead, where the guides go that far') + tvLegend() + epgGrid() + tvFlaggedList() +
+    `<div class="foot">Freeview and Sky guides (via i.mjh.nz), refreshed twice a day. Sport isn’t shown. Tap a show for details and reminders.</div>`; };
+// Names in the lists follow the channel id, so Sky's renames show up on old flags and links too.
+(() => { const o = tvFlaggedList; tvFlaggedList = function () { const h = o.apply(this, arguments); try { let x = h; tvFlags().forEach(f => { const n = tvChName(f.ch); if (n && f.cn && n !== f.cn) x = x.split(esc(f.cn) + ' · ').join(esc(n) + ' · '); });
+  tvLinks().forEach(l => { if (l.ch !== '*') { const n = tvChName(l.ch); if (n && l.cn && n !== l.cn) x = x.split('Every episode · ' + esc(l.cn)).join('Every episode · ' + esc(n)); } }); return x; } catch (e) { return h; } }; })();
+// Keep the grid's scroll position when the TV page re-renders (guide refreshes, flags).
+(() => { const o = updTv; updTv = function () { const sc = document.getElementById('epgsc'); if (sc && sc.dataset.on && sc.isConnected) tvScrollX = sc.scrollLeft; return o.apply(this, arguments); }; })();
