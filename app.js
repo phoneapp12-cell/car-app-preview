@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.38';
+const APP_VERSION = '2.27.39';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24766,7 +24766,7 @@ let tvChName = id => (TV_CHANNELS.find(c => c.id === id) || {}).name || '';
 function tvFind(ch, s) { const a = ((TV && TV.data && TV.data.slots && TV.data.slots[ch]) || []).find(x => x.start === s); if (a) return a;
   for (const d of Object.keys(TVD.days)) { const p = tvdProgs(d, ch).find(x => x.start === s); if (p) return p; } return null; }
 function tvLinksSend() { return tvLinks().map(l => ({ n: l.n, t: l.t, ch: l.ch })); }
-async function tvResync(msgOk) { await save(); let r = ''; try { r = await scheduleReminders(); } catch (e) { r = 'fail'; }
+async function tvResync(msgOk) { await save(); try { render(); } catch (e) { } let r = ''; // 2.27.39: the grid updates straight away; the relay sync follows try { r = await scheduleReminders(); } catch (e) { r = 'fail'; }
   if (msgOk) toast(r === 'need' || r === 'unsupported' ? 'Saved. Turn on notifications for a push; it’ll still show on the bell page.' : r === 'fail' ? 'Saved. Couldn’t reach the reminder service; it’ll show on the bell page.' : msgOk);
   render(); }
 function tvFlagToggle(ch, s) { const k = tvFk(ch, s);
@@ -24829,8 +24829,8 @@ function epgProgs(d, ch) { let L = TVD.days[d] ? tvdProgs(d, ch) : (d === todayI
   return L.filter(p => p.until > p.start && !isSport(p.title + ' ' + (p.cats || []).join(' '))); }
 const epgClock = ms => tvClock(ms).replace(/\s?([ap])\.?m\.?/i, (m, a) => ' ' + a.toUpperCase() + 'M');
 function epgBlocks(d, ch, x0, x1, t0) { return epgProgs(d, ch).map(p => { const a = Math.max(0, (p.start - t0) / 60000 * EPG_PX), b = Math.min(1440 * EPG_PX + 300, (p.until - t0) / 60000 * EPG_PX);
-  if (b <= x0 || a >= x1 || b - a < 2) return ''; const mk = tvMark(ch, p);
-  return `<button type="button" class="epgb${tvgCls(p)}" style="left:${a.toFixed(0)}px;width:${Math.max(2, b - a - 2).toFixed(0)}px" onclick="epgTap(${jsArg(ch)},${p.start})"><span class="t">${mk}${esc(p.title)}</span><span class="s">${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}</span></button>`; }).join(''); }
+  if (b <= x0 || a >= x1 || b - a < 2) return ''; const lk = !!tvLinkOf(ch, p.title), fl = !lk && tvFlagged(tvFk(ch, p.start)); // 2.27.39: badge + gold outline
+  return `<button type="button" class="epgb${tvgCls(p)}${lk || fl ? ' epgf' : ''}" style="left:${a.toFixed(0)}px;width:${Math.max(2, b - a - 2).toFixed(0)}px" onclick="epgTap(${jsArg(ch)},${p.start})"${lk ? ' aria-label="Series linked: ' + esc(p.title) + '"' : fl ? ' aria-label="Reminder set: ' + esc(p.title) + '"' : ''}><span class="epgbx">${lk ? '<span class="epgbadge" title="Series link">🔁</span>' : fl ? '<span class="epgbadge" title="Reminder set">🔔</span>' : ''}<span class="epgtx"><span class="t">${esc(p.title)}</span><span class="s">${lk ? '<b class="epglab">Series</b>' : fl ? '<b class="epglab">Reminder</b>' : ''}${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}</span></span></span></button>`; }).join(''); }
 function epgPaint(force) { const sc = document.getElementById('epgsc'); if (!sc) return; const d = sc.dataset.day, t0 = +sc.dataset.t0, w = sc.clientWidth || 360;
   const k = Math.floor(Math.max(0, sc.scrollLeft - EPG_CH_W) / (EPG_STEP)); if (!force && epgWin === d + ':' + k) return; epgWin = d + ':' + k;
   const x0 = k * EPG_STEP - w, x1 = (k + 1) * EPG_STEP + 2 * w;
@@ -24865,7 +24865,9 @@ function epgTap(ch, s) { const p = tvFind(ch, s) || epgProgs(epgDay(), ch).find(
 .epgch{position:sticky;left:0;z-index:3;flex:0 0 ${EPG_CH_W}px;width:${EPG_CH_W}px;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:700}
 .epgch img{width:44px;height:26px;object-fit:contain}.epgch .nb{min-width:30px;padding:3px 6px;border-radius:8px;background:var(--brand);color:#fff;text-align:center;font-size:12px}
 .epgtrack{position:relative;flex:0 0 auto}.epgb{position:absolute;top:3px;bottom:3px;display:flex;flex-direction:column;justify-content:center;gap:2px;text-align:left;padding:4px 8px;border:0;border-radius:6px;background:var(--soft,#f1f5f9);color:var(--ink);overflow:hidden;overflow:clip;white-space:nowrap;font:inherit}
-.epgb .t,.epgb .s{position:sticky;left:${EPG_CH_W + 6}px;align-self:flex-start;max-width:100%}
+.epgbx{position:sticky;left:${EPG_CH_W + 4}px;align-self:flex-start;display:flex;align-items:center;gap:6px;max-width:100%;min-width:0}.epgtx{display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden}
+.epgf{box-shadow:inset 0 0 0 4px #F59E0B,0 0 12px 3px rgba(245,158,11,.85)!important;z-index:1}.epgbadge{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#F59E0B;color:#111!important;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;box-shadow:0 0 0 2px #fff}
+.epgb{padding-left:4px!important}.epglab{display:inline-block;margin-right:5px;padding:0 5px;border-radius:4px;background:#F59E0B;color:#111!important;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
 .epgb .t{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis}.epgb .s{font-size:11.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis}
 .epghr{position:absolute;top:4px;font-size:11px;opacity:.7;transform:translateX(4px)}.epgnow{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;pointer-events:none}`; document.head.appendChild(st); } catch (e) { } })();
 function epgGrid() { const d = epgDay(), T = todayISO(), t0 = nzMidnight(d), W = 1440 * EPG_PX + 300, chans = epgChans(), now = Date.now();
