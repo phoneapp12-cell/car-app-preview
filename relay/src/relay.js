@@ -1,4 +1,5 @@
 import { renoRoute } from './reno.js';
+import { carsAlexaRoute } from './cars-alexa.js';
 import { sharedTodoRoute, sharedCarRoute, sharedPhotoRoute } from './shared-todo.js';
 import { sharedPushRoute } from './shop-notify.js';
 import { brandsRoute } from './brands.js';
@@ -466,6 +467,18 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     if (!body || typeof body !== 'object' || !body.updatedAt) return json(400, 'bad_request', origin, env);
     await env.EVENTS_KV.put('power-v1', JSON.stringify(body));
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: H });
+  }
+  if (path === '/cars/alexa') { // E1: car dates for the Alexa skill. Writes need the app's Origin; the skill reads with the key alone.
+    const H = { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
+    const m = request.method; let key = request.headers.get('X-Cars-Key') || '', body = null;
+    if (m === 'GET') { if (!key) key = new URL(request.url).searchParams.get('k') || ''; }
+    else if (m === 'PUT' || m === 'POST' || m === 'DELETE') {
+      if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+      try { const raw = await request.text(); if (raw.length > 20000) return json(413, 'too_large', origin, env); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
+      key = key || (body && body.key) || '';
+    } else return json(405, 'method_not_allowed', origin, env);
+    try { const [status, data] = await carsAlexaRoute(m !== 'GET' && body && body.off ? 'DELETE' : m, key, body, env); return new Response(JSON.stringify(data), { status, headers: H }); }
+    catch (e) { return json(502, 'cars_unavailable', origin, env); }
   }
   if (path === '/reno') { // 2.26.25: Millesha's Renovation (own key, own list)
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);

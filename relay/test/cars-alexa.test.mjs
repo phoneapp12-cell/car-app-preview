@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { handle } from '../src/relay.js';
+const store = new Map();
+const env = { ALLOWED_ORIGIN: 'https://phoneapp12-cell.github.io', EVENTS_KV: { get: async k => store.get(k) ?? null, put: async (k, v) => { store.set(k, v); }, delete: async k => { store.delete(k); } } };
+const KEY = 'a'.repeat(20) + 'B_-9'.repeat(6), O = { Origin: 'https://phoneapp12-cell.github.io', 'Content-Type': 'application/json' };
+const req = (m, h, b, q = '') => handle(new Request('https://x.dev/cars/alexa' + q, { method: m, headers: h, body: b ? JSON.stringify(b) : undefined }), env);
+const cars = [{ id: 'shane', nickname: "Shane's car", plate: 'mul27', model: 'Honda Fit', colour: 'Silver', regoExpiry: '2026-12-25', wofExpiry: '2027-09-25', nextService: { date: null, odometerKm: '105,000' }, cost: 99, notes: 'x' },
+  { id: 'sarah', wofExpiry: '2026-10-16', wofInProgress: { recheck: '2026-11-13', fixesDone: 1, fixesTotal: 3 } }, { id: 'evil', regoExpiry: '2026-01-01' }];
+let r = await req('POST', { 'Content-Type': 'application/json' }, { key: KEY, cars }); assert.equal(r.status, 403, 'no origin, no write');
+r = await req('POST', O, { key: 'short', cars }); assert.equal(r.status, 403, 'short key refused');
+r = await req('POST', O, { key: KEY, cars }); assert.equal(r.status, 200); assert.equal((await r.json()).cars, 2);
+assert.ok([...store.keys()][0].startsWith('cars-alexa-v1:') && ![...store.keys()][0].includes(KEY), 'stored under a hash');
+r = await req('GET', { 'X-Cars-Key': KEY }); assert.equal(r.status, 200, 'GET works on the key alone (no Origin)');
+const d = await r.json(); const sh = d.cars.find(c => c.id === 'shane');
+assert.equal(sh.plate, 'MUL27'); assert.equal(sh.nextService.odometerKm, 105000); assert.equal(sh.cost, undefined); assert.equal(sh.notes, undefined);
+assert.deepEqual(d.cars.find(c => c.id === 'sarah').wofInProgress, { recheck: '2026-11-13', fixesDone: 1, fixesTotal: 3 });
+r = await req('GET', {}, null, '?k=' + KEY); assert.equal(r.status, 200, '?k= also works');
+r = await req('GET', { 'X-Cars-Key': 'b'.repeat(48) }); assert.equal(r.status, 404, 'other key sees nothing');
+r = await req('POST', O, { key: KEY, off: true }); assert.equal(r.status, 200); r = await req('GET', { 'X-Cars-Key': KEY }); assert.equal(r.status, 404, 'switch off deletes');
+console.log('cars-alexa relay tests passed');

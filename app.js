@@ -24620,3 +24620,42 @@ function tfxApply() { tfxFades.slice().forEach(f => { try {
 async function tfxToggle(k) { S.settings = S.settings || {}; S.settings[k] = !tfxOn(k); await save(); render(); }
 (() => { const o = rwSettings; rwSettings = function () { const h = o.apply(this, arguments), row = (k, t, d) => `<div class="srow"><div class="tx"><div class="t">${t}</div><div class="s">${d}</div></div><button class="switch ${tfxOn(k) ? 'on' : ''}" role="switch" aria-checked="${tfxOn(k)}" aria-label="${t}" onclick="tfxToggle('${k}')"></button></div>`;
   return `<div class="sec">Ticking things off</div><div class="list">${row('tickSound', 'Tick sound', 'A soft tick when you tick something off.')}${row('tickFx', 'Tick effects', 'A drawn tick, a little sparkle, and the item fades out over 3 seconds.')}</div>` + h; }; })();
+
+/* ================= E1 (local, not shipped): SHARE CAR DATES WITH ALEXA =================
+   Off by default. When on, a small plain summary of the Cars tab (nickname, plate, model, colour, rego, WOF, WOF recheck
+   progress, last and next service) goes to the relay under this phone's own random key. The Alexa skill reads it with that key.
+   No money, notes or anything else. The key lives only on this phone (localStorage) and is shown only here in Settings. */
+const CA_URL = RELAY_DEFAULT + '/cars/alexa';
+const caOn = () => localStorage.getItem('carShareOn') === '1';
+function caKey() { let k = localStorage.getItem('carShareKey') || ''; if (!/^[A-Za-z0-9_-]{40,128}$/.test(k)) { const b = crypto.getRandomValues(new Uint8Array(36)); k = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); localStorage.setItem('carShareKey', k); } return k; }
+const caId = c => { const n = String((c && c.name) || ''); return /sarah/i.test(n) ? 'sarah' : /shane/i.test(n) ? 'shane' : /cass/i.test(n) ? 'cass' : ''; };
+function caSummary() {
+  const out = [];
+  (S.cars || []).forEach(c => { const id = caId(c); if (!id || out.some(o => o.id === id)) return;
+    const ls = sortedServices(c)[0], num = v => { const n = Number(String(v || '').replace(/\D/g, '')); return n > 0 ? n : null; }, d = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null;
+    const o = { id, nickname: { sarah: "Sarah's car", shane: "Shane's car", cass: "Cass's car" }[id], plate: c.plate || '', model: [c.year, c.model].filter(Boolean).join(' '), colour: c.colour || '',
+      regoExpiry: d(c.rego), wofExpiry: d(c.wof), odometerKm: num(c.odo),
+      lastService: ls || c.lastService ? { date: d(ls ? ls.date : c.lastService), odometerKm: ls ? num(ls.km) : null } : null,
+      nextService: c.svcDate || c.svcKm ? { date: d(c.svcDate), odometerKm: num(c.svcKm) } : null };
+    try { const e = carProg(c, 'wof'); if (e) { const F = e.fixes || []; o.wofInProgress = { recheck: carRecheck(e) || null, fixesDone: F.filter(f => f.done).length, fixesTotal: F.length }; } } catch (e) { }
+    out.push(o); });
+  return out;
+}
+let caTimer = null;
+async function caPublish(force) { try { if (!caOn() || !S) return; const cars = caSummary(); if (!cars.length) return; const sig = JSON.stringify(cars);
+  if (!force && localStorage.getItem('carShareSig') === sig && Date.now() - (+localStorage.getItem('carShareAt') || 0) < 12 * 3600e3) return;
+  const r = await fetch(CA_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: caKey(), cars, updatedAt: Date.now() }) });
+  if (r.ok) { localStorage.setItem('carShareSig', sig); localStorage.setItem('carShareAt', String(Date.now())); } } catch (e) { /* tries again after the next change or open */ } }
+(() => { const o = save; save = async function () { const r = await o.apply(this, arguments); try { if (caOn()) { clearTimeout(caTimer); caTimer = setTimeout(() => caPublish(false), 2500); } } catch (e) { } return r; }; })();
+setTimeout(() => caPublish(false), 8000); // on app open
+async function caToggle() { if (caOn()) { localStorage.setItem('carShareOn', '0'); try { await fetch(CA_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: caKey(), off: true }) }); } catch (e) { } localStorage.removeItem('carShareSig'); toast('Car dates are no longer shared with Alexa.'); }
+  else { localStorage.setItem('carShareOn', '1'); caKey(); await caPublish(true); toast('Car dates shared with Alexa.'); } render(); }
+let caShow = false;
+async function caCopy(what) { const ok = await copyText(what === 'url' ? CA_URL : caKey()); toast(ok ? (what === 'url' ? 'Address copied.' : 'Key copied. Paste it into the skill’s config.js.') : 'Couldn’t copy. Long-press to select it instead.'); }
+async function caNewKey() { if (!confirm('Make a new key? The Alexa skill stops reading car dates until you paste the new key into its config.js.')) return; try { await fetch(CA_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: caKey(), off: true }) }); } catch (e) { } localStorage.removeItem('carShareKey'); localStorage.removeItem('carShareSig'); caKey(); await caPublish(true); render(); }
+(() => { const o = rwSettings; rwSettings = function () { const h = o.apply(this, arguments), on = caOn(); let x = '';
+  if (on) { const k = caKey(), at = +localStorage.getItem('carShareAt') || 0;
+    x = `<div class="srow"><div class="tx"><div class="t">Skill address (RELAY_CARS_URL)</div><div class="s" style="word-break:break-all">${esc(CA_URL)}</div></div><button class="btn small" onclick="caCopy('url')">Copy</button></div>
+      <div class="srow"><div class="tx"><div class="t">Skill key (RELAY_CARS_KEY)</div><div class="s" style="word-break:break-all">${caShow ? esc(k) : '••••••••••••' + esc(k.slice(-4))} · <button type="button" class="linkbtn" onclick="caShow=!caShow;render()">${caShow ? 'hide' : 'show'}</button> · <button type="button" class="linkbtn" onclick="caNewKey()">new key</button></div></div><button class="btn small" onclick="caCopy('key')">Copy</button></div>
+      <div class="srow"><div class="tx"><div class="s">${at ? 'Last sent ' + esc(cfWhen(new Date(at).toISOString())) + '. ' : ''}Sent after any car change and when the app opens. Only names, plates, models, colours, rego, WOF and service dates/km. No money.</div></div></div>`; }
+  return `<div class="sec">Alexa</div><div class="list"><div class="srow"><div class="tx"><div class="t">Share car dates with Alexa</div><div class="s">Lets your Car Due Dates skill show what the Cars tab knows, so you only enter dates once.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Share car dates with Alexa" onclick="caToggle()"></button></div>${x}</div>` + h; }; })();
