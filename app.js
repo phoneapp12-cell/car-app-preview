@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.26';
+const APP_VERSION = '2.27.27';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20292,11 +20292,16 @@ function cfItemised(D) {
   // money in: what the bank shows (from the start of this week), then what's expected (each on its own day)
   const W0 = ciWeekStart(T), H = X ? X.H : addDays(W0, 27), INS = [];
   const kind = t => mywIs(t) ? ['shane', 'Your pay'] : swIs(t) ? ['sarah', 'Sarah’s pay'] : (() => { const k = IR_KEYS.find(k => irIs(k, t)); return k ? [k, IR_DEF[k].name] : ['other', 'Other money in']; })();
-  (D.transactions || []).filter(t => t.amount > 0 && t.date.slice(0, 10) >= W0 && t.date.slice(0, 10) <= T && spend(t.acct) && !(card && t.acct === card.id) && !t.pair && t.cat2 !== 'transfer' && !billOwnTx(t))
+  (D.transactions || []).filter(t => t.amount > 0 && !dionTx(t) && t.date.slice(0, 10) >= W0 && t.date.slice(0, 10) <= T && spend(t.acct) && !(card && t.acct === card.id) && !t.pair && t.cat2 !== 'transfer' && !billOwnTx(t))
     .forEach(t => { const [k, n] = kind(t); if (k === 'sarah') return; INS.push({ k, name: n, date: t.date.slice(0, 10), amount: t.amount, acct: t.acct, st: 'landed' }); });
-  (D.transactions || []).filter(t => swIs(t) && t.date.slice(0, 10) >= addDays(W0, -7) && t.date.slice(0, 10) <= T && swUse(t.date.slice(0, 10)) >= W0).forEach(t => { const d = t.date.slice(0, 10); INS.push({ k: 'sarah', name: 'Sarah’s pay', date: swUse(d), landed: d, amount: t.amount, acct: t.acct, st: 'landed' }); });
+  (D.transactions || []).filter(t => swIs(t) && t.date.slice(0, 10) >= addDays(W0, -7) && t.date.slice(0, 10) <= T && swUse(t.date.slice(0, 10)) >= W0).forEach(t => { const d = t.date.slice(0, 10); INS.push({ k: 'sarah', name: 'Sarah’s pay', date: swUse(d), landed: d, amount: t.amount, acct: t.acct, st: 'landed', add: swUse(d) > T }); });
+  const DION = (D.transactions || []).filter(t => dionTx(t) && t.date.slice(0, 10) >= W0 && t.date.slice(0, 10) <= T);
+  // 2.27.27: start from the real balances now (Akahu): every account you can spend from, overdrawn ones included; ORBIT = free to draw less its floor.
+  // Money that has landed and bills that are paid are already in those balances, so only what's still to land / to pay moves it.
+  const opening = r2(D.accounts.filter(cfSpendable).reduce((n, a) => n + cfBal(a), 0) - (cfOrbit(D) ? orbMin() : 0) - fnSum(INS.filter(x => x.add && x.st === 'landed')));
+  let carry = opening;
   const xk = w => w === 'Your pay' ? 'shane' : w === 'Sarah’s pay' ? 'sarah' : (IR_KEYS.find(k => IR_DEF[k].name === w) || 'other');
-  (X ? X.ins : []).forEach(i => { const k = xk(i.what); if (i.date < T || INS.some(x => x.k === k && k !== 'other' && Math.abs(dayGap(x.date, i.date)) <= 3)) return; INS.push({ k, name: i.what, date: i.date, landed: i.landed, amount: i.amount, acct: i.acct, st: i.bank ? 'landed' : 'est' }); });
+  (X ? X.ins : []).forEach(i => { const k = xk(i.what); if (i.date < T || INS.some(x => x.k === k && k !== 'other' && Math.abs(dayGap(x.date, i.date)) <= 3)) return; INS.push({ k, name: i.what, date: i.date, landed: i.landed, amount: i.amount, acct: i.acct, st: i.bank ? 'landed' : 'est', add: true }); });
   const XL = X ? X.list : [], SH = X ? X.short : [], od = D.accounts.filter(a => cfSpendable(a) && !cfIsOrbit(a) && cfBal(a) < -0.005);
   const weeks = []; for (let w = W0; w <= H && weeks.length < 5; w = addDays(w, 7)) weeks.push(w);
   const one = (ws, wi) => {
@@ -20304,7 +20309,8 @@ function cfItemised(D) {
     const wIn = INS.filter(x => inW(x.date)).sort((a, b) => a.date.localeCompare(b.date));
     const cover = x => `Mon ${esc(fmtW(x.date).replace(/^\w+ /, ''))} – ${esc(fmtW(addDays(x.date, 4)))}`;
     const kept = INS.filter(x => x.k === 'sarah' && x.landed && inW(x.landed) && !inW(x.date)).map(x => row('Sarah’s pay, kept for next week', `${chip(x.landed)} ${stT(x)} · into ${esc(nm(x.acct))} · for bills ${cover(x)} · not counted this week`, `<span class="muted">${m(x.amount)}</span>`, 'ciSub')).join('');
-    const inRows = wIn.map(x => x.k === 'sarah' && x.landed ? row('Sarah’s pay (kept from last week)', `${chip(x.date)} ${stT(x)}${x.st === 'landed' ? '' : ''} · landed ${esc(fmtW(x.landed))} · for bills ${cover(x)} · in ${esc(nm(x.acct))}`, m(x.amount)) : row(esc(x.name), `${chip(x.date)} ${stT(x)} · into ${esc(nm(x.acct))}`, m(x.amount))).join('') + kept;
+    const inRows = wIn.map(x => x.k === 'sarah' && x.landed ? row('Sarah’s pay (kept from last week)', `${chip(x.date)} ${stT(x)}${x.st === 'landed' ? '' : ''} · landed ${esc(fmtW(x.landed))} · for bills ${cover(x)} · in ${esc(nm(x.acct))}`, m(x.amount)) : row(esc(x.name), `${chip(x.date)} ${stT(x)}${x.st === 'landed' ? (x.k === 'clean' ? ' · already spent' : ' · in your balance') : ''} · into ${esc(nm(x.acct))}`, m(x.amount))).join('') + kept +
+      DION.filter(t => inW(t.date.slice(0, 10))).map(t => row('From Dion · not income', `${chip(t.date.slice(0, 10))} · left out of money in and totals`, `<span class="muted">${m(t.amount)}</span>`, 'ciSub')).join('');
     const wOut = OUT.filter(x => inW(x.date)), bills = wOut.filter(x => x.kind !== 'card'), cards = wOut.filter(x => x.kind === 'card');
     const by = new Map(); bills.forEach(x => { const k = x.acct || ''; (by.get(k) || by.set(k, []).get(k)).push(x); });
     const ord = k => { const a = D.accounts.find(y => y.id === k); return !a ? 9 : cfIsOrbit(a) ? 0 : /bill/i.test(a.name || '') ? 1 : /kiwi/i.test(a.bank || '') ? 2 : /anz/i.test(a.bank || '') ? 3 : 4; };
@@ -20319,17 +20325,19 @@ function cfItemised(D) {
     const xHtml = xs.map(x => row(`${esc(nm(x.from))} → ${esc(nm(x.to))}`, `${chip(x.by)}${x.after && x.after !== x.by ? ' · once money lands ' + esc(fmtW(x.after)) : ''} · ${purpose(x)}${x.lb || x.weekly ? ' · estimate' : ''}`, m(x.amount))).join('');
     const sh = SH.filter(s => inW(s.first && s.first.date || s.by) || (wi === 0 && (s.first && s.first.date || s.by) < ws)).map(s => `<div class="cftip">⚠️ ${esc(nm(s.to))} ${s.own ? 'goes' : 'is'} ${m(s.amount)} ${s.own ? 'under' : 'short'} for ${esc(s.items && s.items.length ? s.items.slice(0, 3).join(', ') : s.first.what)} on ${esc(fmtW(s.first.date || s.by))}${s.pay ? ` · enough lands ${esc(fmtW(s.pay))}` : ' · no money expected before then'}</div>`).join('');
     const odH = wi === 0 && od.length ? `<div class="cftip">Overdrawn now: ${od.map(a => `${esc(nm(a.id))} ${m(cfBal(a))}`).join(', ')}. Each is put back to at least $0 by a transfer below, before the card.</div>` : '';
-    const tin = fnSum(wIn), tout = r2(fnSum(bills) + fnSum(cards)), left = r2(tin - tout);
+    const tin = fnSum(wIn), tout = r2(fnSum(bills) + fnSum(cards)), start = carry, toLand = fnSum(wIn.filter(x => x.add)), toPay = r2(fnSum(wOut.filter(x => x.st !== 'paid'))), left = r2(start + toLand - toPay); carry = left;
     const title = `Week ${esc(fmtW(ws))} – ${esc(fmtW(we))}${wi === 0 ? ' · this week' : ''}`;
     return `<details class="ciFn"${wi === 0 ? ' open' : ''}><summary>${title}<span class="ciSum">${m(tin)} in · ${m(tout)} out</span></summary>` + (odH || sh ? `<div class="cftips">${odH}${sh}</div>` : '') +
       sec('Money in', m(tin), inRows || row('Nothing lands this week', '', '$0'), true) +
       sec('Bills due by account', m(fnSum(bills)), outHtml || row('No bills this week', '', '$0'), true) +
       (cHtml ? sec('ASB credit card', m(fnSum(cards)), cHtml, true) : '') +
       sec('Transfers to make this week', xs.length ? plural(xs.length, 'transfer') : 'none', xHtml || row('No transfers this week', 'Moves between your own accounts don’t change the totals', ''), true) +
-      `<div class="list ciTot">${row('<b>In this week</b>', '', `<b>${m(tin)}</b>`)}${row('<b>Out this week</b>', 'Bills, mortgages and card', `<b>${m(tout)}</b>`)}${holdT ? row('Held back for next week', `${hold.map(x => esc(x.name) + ' ' + esc(fmtW(x.date))).slice(0, 4).join(', ')}, due before money lands`, m(holdT)) : ''}${row('<b>What’s left</b>', 'After this week’s bills' + (holdT ? ' and what’s held back' : ''), `<b class="${left - holdT < 0 ? 'neg' : 'pos'}">${m(r2(left - holdT))}</b>`, 'fntot')}</div></details>`;
+      `<div class="list ciTot">${row('<b>In this week</b>', 'All money in, landed or not', `<b>${m(tin)}</b>`)}${row('<b>Out this week</b>', 'Bills, mortgages, loans and card', `<b>${m(tout)}</b>`)}${row(wi === 0 ? 'Opening balance now' : 'Carried from last week', wi === 0 ? `All your accounts from the bank (overdrawn ones included)${cfOrbit(D) ? `, ORBIT’s free-to-draw less the ${m(orbMin())} it keeps` : ''}${INS.some(x => x.add && x.st === 'landed') ? ', less Sarah’s pay kept for next week' : ''}` : '', m(start))}${row('Still to land', 'Landed money is already in the balance', m(toLand))}${row('Still to pay', 'Paid bills are already out of the balance', m(toPay))}${holdT ? row('Held back for next week', `${hold.map(x => esc(x.name) + ' ' + esc(fmtW(x.date))).slice(0, 4).join(', ')}, due before money lands`, m(holdT)) : ''}${row('<b>What’s left</b>', 'Balance + still to land − still to pay' + (holdT ? ' − held back' : ''), `<b class="${left - holdT < 0 ? 'neg' : 'pos'}">${m(r2(left - holdT))}</b>`, 'fntot')}</div></details>`;
   };
   const h = weeks.map(one).join(''); if (!h) return '';
-  return `<div class="sec">Week by week · budget style</div><div class="card ciCard">${h}<div class="s muted" style="margin-top:6px">Weeks run Wednesday to Tuesday. Money is only used from the day it lands; bills before then come from what’s already in the account. Real bank data from Akahu and your Bills; Estimate means it hasn’t happened yet. Tap a heading to fold it.</div></div>`;
+  const noPlan = (S.loans || []).filter(l => { try { return loanCalc(l).owed > 0 && !(l.planCents > 0); } catch (e) { return false; } });
+  const loanNote = noPlan.map(l => `<div class="cftip">${esc(/mum/i.test(l.from) ? 'Mum’s loan' : l.from + '’s loan')}: set a repayment amount in <a href="#loans">Loans</a></div>`).join('');
+  return `<div class="sec">Week by week · budget style</div><div class="card ciCard">${loanNote ? `<div class="cftips">${loanNote}</div>` : ''}${h}<div class="s muted" style="margin-top:6px">Weeks run Wednesday to Tuesday. Money is only used from the day it lands; bills before then come from what’s already in the account. Real bank data from Akahu and your Bills; Estimate means it hasn’t happened yet. Tap a heading to fold it.</div></div>`;
 }
 (() => { try { const st = document.createElement('style'); st.textContent = '.ciCard{padding:10px 12px}.ciFn{margin:4px 0 10px}.ciFn>summary{font-weight:800;font-size:1.02rem;padding:8px 2px;cursor:pointer}.ciSum{display:block;font-weight:600;font-size:.85rem;opacity:.75;margin-left:18px}.ciSec{margin:6px 0;border-top:1px solid rgba(127,127,127,.2)}.ciSec>summary{display:flex;justify-content:space-between;gap:8px;font-weight:700;padding:8px 2px;cursor:pointer}.ciAcct{font-weight:800;margin:10px 4px 2px;font-size:.92rem;color:var(--accent,#B4530A)}.ciSub .t{font-weight:500;padding-left:6px}.ciTot{margin-top:8px}.ciRow .s{line-height:1.6}'; document.head.appendChild(st); } catch (e) { } })();
 function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
@@ -20341,6 +20349,7 @@ function CashFlow() {
   if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB credit card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
   if (!CF && CFmock) CF = CFmock;
   if (!CF) { if (!CFbusy) setTimeout(() => cfLoad(), 0); return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : `<div class="card muted">Loading your accounts…</div>`); }
+  if (!CFmock && !CFbusy && Date.now() - (window.__cfGot || 0) > 20 * 60e3) { window.__cfGot = Date.now(); setTimeout(() => cfLoad(), 0); } // 2.27.27: re-read the latest balances (the relay reads the bank at 9, 12, 3, 6 and 9) when it's been a while
   return head + (CFerr ? `<div class="card muted">${esc(CFerr)}</div>` : '') + (CF.example ? `<div class="callout cfex"><b>Example data</b> · not your real accounts</div>` : '') + cfBody(CF);
 }
 function cfGoSettings() { go('#settings'); setTimeout(() => { const el = document.getElementById('akahuset'); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 300); }
@@ -20640,7 +20649,7 @@ function xferPlan(D) {
 }
 function cfRegularIns(D, acctId) {
   const T = todayISO(), g = new Map();
-  (D.transactions || []).forEach(t => { if (t.acct !== acctId || !(t.amount > 0) || t.pair || t.cat2 === 'transfer' || mywIs(t) || swIs(t) || irAny(t) || /^(INTEREST)$/.test(t.type)) return; const k = regKeyOf(t); (g.get(k) || g.set(k, []).get(k)).push(t); });
+  (D.transactions || []).forEach(t => { if (t.acct !== acctId || !(t.amount > 0) || dionTx(t) || t.pair || t.cat2 === 'transfer' || mywIs(t) || swIs(t) || irAny(t) || /^(INTEREST)$/.test(t.type)) return; const k = regKeyOf(t); (g.get(k) || g.set(k, []).get(k)).push(t); });
   const out = [];
   g.forEach(L => { if (L.length < 3) return; L.sort((a, b) => a.date.localeCompare(b.date)); const d = L.map(t => t.date.slice(0, 10)), gaps = d.slice(1).map((x, i) => Math.round((parseD(x) - parseD(d[i])) / DAY));
     const med = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)], per = med >= 6 && med <= 8 ? 7 : med >= 13 && med <= 15 ? 14 : 0; if (!per) return;
@@ -20679,7 +20688,9 @@ function xferBufForm() { openSheet('Buffer in each account', field('Keep this mu
    With no bank data it falls back to what's typed in Budget and Bills. Nothing is made up. */
 const MYW_DEFAULT = ['NLG WAGES', 'NOEL LEEMING'];
 function mywSt() { S.settings = S.settings || {}; const w = S.settings.myWages && typeof S.settings.myWages === 'object' ? S.settings.myWages : (S.settings.myWages = {}); if (!Array.isArray(w.rules)) w.rules = MYW_DEFAULT.slice(); if (!Array.isArray(w.seen)) w.seen = []; return w; }
-function mywIs(t) { if (!t || !(t.amount > 0)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return mywSt().rules.some(r => r && (p.includes(swNorm(r)) || ruleClose(r, p))); }
+// 2.27.27: money from Dion is never income (payer or particulars)
+const dionTx = t => !!t && t.amount > 0 && /\bdion/i.test(String(t.desc || '') + ' ' + String(t.merchant || ''));
+function mywIs(t) { if (!t || !(t.amount > 0) || dionTx(t)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return mywSt().rules.some(r => r && (p.includes(swNorm(r)) || ruleClose(r, p))); }
 // 2.26.72: a payer rule also matches with small slips or a cut-off name (2.26.70 matching). Every real word of the rule must be there; a lone short word (WAGES, EDPAY) only matches exactly.
 function ruleClose(rule, text) { try { const ws = String(rule || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !PAYEE_COMMON.test(w)); if (!ws.length || (ws.length < 2 && ws[0].length < 7)) return false;
   const xs = String(text || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter(x => x.length >= 4); return ws.every(w => xs.some(x => wordClose(w, x))); } catch (e) { return false; } }
@@ -20728,7 +20739,7 @@ function fnModel(b) {
     const beats = irBeats(key, pp.start, pp.end), left = past ? 0 : beats.filter(d => !S0.some(x => Math.abs(dayGap(x.d, d)) <= 3)).filter(d => dayGap(d, T) >= -3).length;
     if (left > 0 && avg) { const nx = beats.filter(d => !S0.some(x => Math.abs(dayGap(x.d, d)) <= 3)).filter(d => dayGap(d, T) >= -3)[0] || ''; IN.push({ key: key + '-exp', irk: key, name: nm + (left > 1 ? ' ×' + left : '') + (S0.length ? ' (still to come)' : ''), st: 'expected', amount: r2(avg * left), planned: r2(avg * left), n: left, per: avg, date: nx, late: nx ? incLate(key, nx) : false }); }
   } catch (e) { } });
-  const otherIn = D ? txs.filter(t => t.amount > 0 && inP(dOf(t)) && dOf(t) <= T && !used.has(t.id) && t.cat2 !== 'transfer' && spendAcct(t) && !(cardA && t.acct === cardA.id)) : [];
+  const otherIn = D ? txs.filter(t => t.amount > 0 && !dionTx(t) && inP(dOf(t)) && dOf(t) <= T && !used.has(t.id) && t.cat2 !== 'transfer' && spendAcct(t) && !(cardA && t.acct === cardA.id)) : [];
   otherIn.forEach(t => used.add(t.id));
   // ---- money out ----
   const st = (date, amount) => past ? 'nomatch' : date < T ? 'overdue' : 'due';
@@ -20740,6 +20751,7 @@ function fnModel(b) {
     const m = D && bill ? txs.find(t => t.amount < 0 && !used.has(t.id) && spendAcct(t) && t.cat2 !== 'transfer' && dOf(t) >= addDays(x.due, -7) && dOf(t) <= addDays(x.due, 3) && dOf(t) <= T && (Math.abs(-t.amount - x.amount) <= 0.5 || (payeeFor(bill, t) > 0 && Math.abs(-t.amount - x.amount) <= x.amount * 0.1))) : null;
     if (m) { used.add(m.id); Object.assign(it, { st: 'paid', amount: -m.amount, date: dOf(m), bank: true, acct: m.acct }); }
     else if (x.paid) Object.assign(it, { st: 'paid', date: x.paidOn || x.due, manual: true });
+    else if (x.loanId) Object.assign(it, { st: st(x.due), acct: (D && cfOrbit(D) ? cfOrbit(D).id : main && main.id), late: x.late }); // 2.27.27: loan plan (Mum) from ORBIT
     else Object.assign(it, { st: st(x.due), acct: bill ? ((S.settings.cfBillAcct || {})[bill.id] || (D && billBankAcct(D, bill)) || (D && (cfBillTx(bill, txs.filter(spendAcct))[0] || {}).acct) || (main && main.id)) : main && main.id, late: x.late });
     OUT.push(it);
   });
@@ -20985,7 +20997,7 @@ const SW_DEFAULT = ['MINISTRY OF EDUCATIO', 'EDPAY', 'EDUCATION PAYROLL'];
 const IR_DEF = { board: { name: 'Board', rules: ['L H JENKINS'], per: 7 }, clean: { name: 'Cleaning job', rules: ['SMART OFFICE'], per: 7 } };
 const IR_KEYS = Object.keys(IR_DEF);
 function irSt(k) { S.settings = S.settings || {}; S.settings.incRules = S.settings.incRules || {}; const w = S.settings.incRules[k] || (S.settings.incRules[k] = {}); if (!Array.isArray(w.rules)) w.rules = IR_DEF[k].rules.slice(); if (!Array.isArray(w.not)) w.not = []; if (!Array.isArray(w.seen)) w.seen = []; return w; }
-function irIs(k, t) { if (!t || !(t.amount > 0)) return false; const w = irSt(k); if (w.not.includes(t.id) || mywIs(t) || swIs(t)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && swNorm(r).length >= 3 && p.includes(swNorm(r))); }
+function irIs(k, t) { if (!t || !(t.amount > 0) || dionTx(t)) return false; const w = irSt(k); if (w.not.includes(t.id) || mywIs(t) || swIs(t)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && swNorm(r).length >= 3 && p.includes(swNorm(r))); }
 const irAny = t => IR_KEYS.some(k => irIs(k, t));
 function irFeed(D) { try { const txs = D.transactions || [], from = txs.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10); let ch = false;
   IR_KEYS.forEach(k => { const w = irSt(k), now = txs.filter(t => irIs(k, t)).map(t => ({ id: t.id, d: t.date.slice(0, 10), a: t.amount, acct: t.acct }));
@@ -21000,7 +21012,7 @@ async function irDrop(k, r) { const w = irSt(k); w.rules = w.rules.filter(x => x
 async function irNot(k, id) { const w = irSt(k); if (!w.not.includes(id)) w.not.push(id); w.not = w.not.slice(-50); if (CF && CF.data) irFeed(CF.data); await save(); await closeSheet(); render(); toast('Left out of ' + IR_DEF[k].name + '.'); }
 function swSt() { S.settings = S.settings || {}; const w = S.settings.sarahWages && typeof S.settings.sarahWages === 'object' ? S.settings.sarahWages : (S.settings.sarahWages = {}); if (!Array.isArray(w.rules)) w.rules = SW_DEFAULT.slice(); if (!Array.isArray(w.not)) w.not = []; if (!Array.isArray(w.seen)) w.seen = []; return w; }
 const swNorm = s => String(s || '').toUpperCase().replace(/\d+/g, ' ').replace(/[^A-Z&' ]/g, ' ').replace(/\s+/g, ' ').trim();
-function swIs(t) { if (!t || !(t.amount > 0)) return false; const w = swSt(); if (w.not.includes(t.id)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && (p.includes(swNorm(r)) || ruleClose(r, p))); }
+function swIs(t) { if (!t || !(t.amount > 0) || dionTx(t)) return false; const w = swSt(); if (w.not.includes(t.id)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && (p.includes(swNorm(r)) || ruleClose(r, p))); }
 // keep the found pays (date + amount only) so Budget has them without the bank data in memory
 function swFeed(D) {
   try { const w = swSt(), txs = D.transactions || [], from = txs.reduce((m, t) => t.date < m ? t.date : m, '9999').slice(0, 10);
