@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.27';
+const APP_VERSION = '2.27.28';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19838,7 +19838,9 @@ function glanceHome() {
   const wx = `<div class="glwx">${homeTry('gl weather', () => glWxCard(m), '') || homeTry('weather strip', () => notifWxStrip(), '')}${tk}</div>`; // 2.26.52: small Onerahi tide strip taken off Home (Tides page and the Tide tile stay)
   const ent = homeTry('gl ent', () => glEntInner(), ''), org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
-  const orgZ = org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
+  const wk = homeTry('week overview', () => weekOverview(), ''); // 2.27.28: the week overview replaces the Organise tabs; the shortcut tiles stay
+  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><a href="#calendar">Calendar ›</a></div>${wk}${quick}<div class="wklinks"><a href="#todo">To-do</a><a href="#bills">Bills</a><a href="#cars">Cars</a><a href="#garden">Garden</a><a href="#events">Events</a><a href="#cashflow">Cash flow</a></div>`
+    : org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
     wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + /* 2.27.5: watch figures are off Home (Health › Watch, updates on Notifications) */ cards +
@@ -19846,6 +19848,51 @@ function glanceHome() {
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
 }
+
+/* ================= 2.27.28: Home week overview (Homechart style) =================
+   Seven day columns from today, swiped sideways (about 2½ visible). Each item is a colour-coded card: icon, time, and a
+   person / place line; tap opens it. Real data only: the Work roster (with Leave by from the relay's travel time, as the
+   commute banner), everything the Calendar shows (Google / Outlook with Busy hidden, Sarah's pink S, to-dos, bills, loan
+   plans, car and licence dates, birthdays, appointments, health, garden, pets, meals, holidays), pays and money in on their
+   usual days, and Cash flow transfers to make. '+' on a day adds a to-do or an event for that day. */
+const WK_TYPE = { work: ['💼', '#EA580C'], pay: ['💰', '#15803D'], xfer: ['↔️', '#0F766E'], todo: ['☑️', '#2563EB'], bill: ['🧾', '#DC2626'], loan: ['🤝', '#B45309'], car: ['🚗', '#0891B2'],
+  bday: ['🎂', 'var(--bday)'], appt: ['📅', 'var(--appt)'], ext: ['📆', 'var(--ext)'], hol: ['🎉', 'var(--hol)'], health: ['🩺', 'var(--health)'], garden: ['🌱', 'var(--garden)'], pet: ['🐾', 'var(--pet)'], meal: ['🍽️', 'var(--meal)'], mine: ['⭐', 'var(--mine)'], due: ['📌', 'var(--due)'] };
+let WK_GO = [];
+function weekItems() {
+  const T = todayISO(), T0 = parseD(T), out = {}; WK_GO = [];
+  const add = (d, it) => { (out[d] = out[d] || []).push(it); };
+  for (let i = 0; i < 7; i++) out[addDays(T, i)] = [];
+  // work, from the roster, with Leave by when the relay has a travel time
+  try { const r = rosterState(), n = DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds) ? Math.round(DRIVE.seconds / 60) : 0;
+    Object.keys(out).forEach(d => { const k = String(new Date(parseD(d)).getUTCDay()), st = (r.days || {})[k], en = (r.ends || {})[k]; if (!st) return;
+      const sm = hmMin(st), leave = n >= 1 && n <= 180 && sm != null ? fmtTime(hmFromMin(sm - n)) : '';
+      add(d, { type: 'work', title: 'Work', time: fmtTime(st) + (en ? ' – ' + fmtTime(en) : ''), sort: st, line: '📍 Work', warn: leave ? 'Leave by ' + leave + (d === T ? '' : ' (today’s traffic)') : '', go: "go('#work')" }); }); } catch (e) { }
+  // everything the Calendar shows
+  try { calItems(T0, T0 + 6 * DAY).forEach(e => { if (!out[e.date] || !glOk(e.title)) return;
+      const type = e.src !== 'due' ? e.src : e.time === 'To-do' ? 'todo' : e.time === 'Bill' ? 'bill' : e.time === 'Loan' ? 'loan' : /^(WOF|Rego|Service|AA|Licence)$/.test(e.time) ? 'car' : 'due';
+      const timed = /^\d{1,2}:\d{2}/.test(String(e.sort || '')) || /\d(am|pm)|:\d\d/i.test(String(e.time || ''));
+      add(e.date, { type, title: e.title, time: timed ? e.time : (type === 'todo' || type === 'bill' || type === 'loan' ? '' : e.time), sort: e.sort || '', line: e.notes ? String(e.notes).slice(0, 60) : e.tag && e.src === 'ext' ? e.tag : '', sarah: !!e.sarah, color: e.src === 'ext' && e.color ? e.color : '', go: e.go }); }); } catch (e) { }
+  // pays and money in, on their usual day (estimate until it lands)
+  try { [['shane', 'Your pay', () => mywSt().seen], ['sarah', 'Sarah’s pay', () => swSt().seen], ...IR_KEYS.map(k => [k, IR_DEF[k].name, () => irSt(k).seen])].forEach(([k, nm, sf]) => { const seen = sf() || [], a = fnAvg3(seen);
+      const landed = seen.filter(x => out[x.d]).map(x => x.d);
+      [...new Set(landed.concat(incDates(k, addDays(T, -1), addDays(T, 6))))].forEach(d => { if (!out[d]) return; const got = seen.filter(x => x.d === d).reduce((n, x) => n + x.a, 0);
+        add(d, { type: 'pay', title: nm, time: got ? 'Landed ✓' : k === 'board' ? 'about 11pm' : k === 'shane' ? 'afternoon' : '', sort: '23:00', line: got ? money(got) : a ? 'about ' + money(a) + ' (estimate)' : '', go: "go('#cashflow')" }); }); }); } catch (e) { }
+  // transfers to make (Cash flow)
+  try { const D = CF && CF.data; if (D) { const X = xferPlan(D), nmA = id => fnAcctNameD(D, id), done = S.settings.xferDone || {};
+      X.list.filter(x => out[x.by] && !done[x.key]).forEach(x => add(x.by, { type: 'xfer', title: 'Move ' + cfMoney(x.amount), time: '', sort: '08:00', line: nmA(x.from) + ' → ' + nmA(x.to), go: "go('#cashflow')" })); } } catch (e) { }
+  Object.values(out).forEach(L => L.sort((a, b) => (a.sort ? 0 : 1) - (b.sort ? 0 : 1) || String(a.sort).localeCompare(String(b.sort))));
+  return out;
+}
+function weekOverview() {
+  const D = weekItems(), T = todayISO();
+  const card = it => { const [ic, col] = WK_TYPE[it.type] || WK_TYPE.due, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
+    return `<button type="button" class="wkcard" style="--wc:${esc(it.color || col)}" onclick="if(window.glSwipe&&glSwipe.moved)return;${oc}"><div class="wkh"><span class="wkt">${it.sarah ? sarahBadge({ from: 'sarah' }) + ' ' : ''}${esc(it.title)}</span><span class="wki">${ic}</span></div>${it.time ? `<div class="wktm">${esc(it.time)}</div>` : ''}${it.line || it.warn ? `<div class="wkb">${it.line ? `<div>${esc(it.line)}</div>` : ''}${it.warn ? `<div class="wkwarn">⚠️ ${esc(it.warn)}</div>` : ''}</div>` : ''}</button>`; };
+  const cols = Object.keys(D).sort().map(d => { const dt = new Date(parseD(d));
+    return `<div class="wkcol${d === T ? ' wktoday' : ''}"><div class="wkday"><div><span class="wkdn">${d === T ? 'Today' : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getUTCDay()]}</span><span class="wkdd">${dt.getUTCDate()}</span></div><button type="button" class="wkadd" aria-label="Add on ${esc(fmtW(d))}" onclick="wkAdd('${d}')">+</button></div>${D[d].map(card).join('') || '<div class="wkfree">Nothing on</div>'}</div>`; }).join('');
+  return `<div class="wkscroll" id="wkscroll">${cols}</div>`;
+}
+function wkAdd(d) { openSheet('Add on ' + fmtW(d), `<div class="btns" style="flex-direction:column;gap:8px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>todoForm(null,{due:'${d}'}))">☑️ To-do for this day</button><button type="button" class="btn" onclick="closeSheet().then(()=>mineForm(null,'${d}'))">📅 Event on this day</button></div>`, null, ''); }
+(() => { try { const st = document.createElement('style'); st.textContent = '.wkscroll{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;margin:0 -2px;touch-action:pan-x pan-y}.wkcol{flex:0 0 40%;min-width:140px;scroll-snap-align:start;background:var(--card,#fff);border-radius:14px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}.wktoday{outline:2.5px solid #F59E0B;background:rgba(245,158,11,.08)}.wkday{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px}.wkdn{display:block;font-size:.78rem;font-weight:700;opacity:.75;text-transform:uppercase}.wkdd{font-size:1.4rem;font-weight:800}.wktoday .wkdd{color:#DC2626}.wkadd{width:30px;height:30px;border-radius:50%;border:0;background:#F59E0B;color:#111;font-size:1.25rem;font-weight:800;line-height:1}.wkcard{display:block;width:100%;text-align:left;border:0;padding:0;margin:0 0 8px;border-radius:10px;overflow:hidden;background:var(--card,#fff);box-shadow:0 1px 3px rgba(0,0,0,.12);font:inherit;color:inherit}.wkh{display:flex;gap:4px;justify-content:space-between;background:var(--wc);color:#fff;padding:6px 7px 2px;font-weight:700;font-size:.86rem;line-height:1.2}.wktm{background:var(--wc);color:#fff;padding:0 7px 6px;font-size:.78rem;opacity:.95}.wkb{padding:5px 7px;font-size:.78rem;line-height:1.3}.wkwarn{color:#DC2626;font-weight:700;margin-top:2px}.wkfree{font-size:.8rem;opacity:.6;padding:6px 2px}.wklinks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}.wklinks a{font-size:.82rem;padding:4px 10px;border-radius:999px;background:rgba(127,127,127,.12);color:inherit;text-decoration:none}'; document.head.appendChild(st); } catch (e) { } })();
 
 /* ================= 2.26.4: no sport anywhere =================
    Shane doesn't want sport: it's filtered out of the TV guide and TV picks, news, events and nightlife, videos,
