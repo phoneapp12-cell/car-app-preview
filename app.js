@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.36';
+const APP_VERSION = '2.27.37';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10393,15 +10393,16 @@ async function scheduleReminders() {
     try { tvPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.27.36: flagged TV shows, 10 min before
     try { bedPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.27.17: bedtime nudges on work nights (he asked; not held back by quiet hours)
     if (!sub) {
-      if (!reminders.length && !S.settings.remOnRelay) return '';
+      if (!reminders.length && !S.settings.remOnRelay && !(S.settings.tvLinks || []).length) return '';
       if (!reminders.length) { /* still clear the relay below once we have a subscription */ }
       else sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey() });
+      if (!sub && (S.settings.tvLinks || []).length) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey() });
     }
     if (!sub) return reminders.length ? 'fail' : '';
     try { shopPushReg(sub); } catch (e) { }
-    if (!reminders.length && !S.settings.remOnRelay) return '';
-    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders });
-    const on = reminders.length > 0;
+    if (!reminders.length && !S.settings.remOnRelay && !(S.settings.tvLinks || []).length) return '';
+    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined) });
+    const on = reminders.length > 0 || (S.settings.tvLinks || []).length > 0;
     if (!!S.settings.remOnRelay !== on) { S.settings.remOnRelay = on; await save(); }
     return '';
   } catch (e) { return 'fail'; }
@@ -24722,30 +24723,88 @@ function fuelBellRows() { try { if ((S.settings || {}).fuelNote === false) retur
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = (S.settings || {}).fuelNote !== false;
   return h + `<div class="srow"><div class="tx"><div class="t">Daily fuel price note</div><div class="s">Once a day after the morning check of the Marsden Point 91 price. Bell page only, no buzz.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Daily fuel price note" onclick="toggleSetting('fuelNote')"></button></div>`; } catch (e) { return h; } }; })();
 
-// ---- TV guide reminders ----
+// ---- TV guide reminders (2.27.36) + 2.27.37: two-week guide, series links, genre colours ----
+/* The guide's day files come from the repo's tv-data branch: a GitHub Action trims the public i.mjh.nz Freeview NZ and
+   Sky guides twice a day to these channels (sport dropped). The relay reads the same files about hourly and schedules
+   'Starting in 10 min' pushes for series-linked episodes, so they arrive with the app closed (notifications on). */
+const TVD_URL = 'https://raw.githubusercontent.com/phoneapp12-cell/car-app-preview/tv-data/tv/';
+let TVD = { idx: null, days: {}, busy: {}, fail: {} }, tvDay = '';
+try { TVD.idx = JSON.parse(localStorage.getItem('tvidx') || 'null'); } catch (e) { }
+async function tvdIndex(force) { if (!force && TVD.idx && Date.now() - (TVD.idx.got || 0) < 3 * 3600e3) return TVD.idx;
+  try { const r = await fetch(TVD_URL + 'index.json?t=' + Math.floor(Date.now() / 600000), { cache: 'no-store' }); if (r.ok) { TVD.idx = Object.assign(await r.json(), { got: Date.now() }); TVD.days = {}; localStorage.setItem('tvidx', JSON.stringify(TVD.idx)); } } catch (e) { }
+  return TVD.idx; }
+async function tvdDay(d) { if (TVD.days[d]) return TVD.days[d]; if (TVD.busy[d] || Date.now() - (TVD.fail[d] || 0) < 300000) return null; TVD.busy[d] = true;
+  try { const r = await fetch(TVD_URL + d + '.json?t=' + ((TVD.idx && TVD.idx.at) || 0)); if (r.ok) TVD.days[d] = await r.json(); else TVD.fail[d] = Date.now(); } catch (e) { TVD.fail[d] = Date.now(); }
+  TVD.busy[d] = false; return TVD.days[d] || null; }
+async function tvdWarm() { await tvdIndex(false); const T = todayISO(); await tvdDay(T); if (tvDay && tvDay !== T) await tvdDay(tvDay); const h = (location.hash || '').slice(1); if (h === 'tv' && !sheetOpen) updTv(); }
+setTimeout(tvdWarm, 4000);
+const tvdProgs = (d, ch) => ((TVD.days[d] && TVD.days[d].ch && TVD.days[d].ch[ch]) || []).map(p => ({ start: p[0] * 1000, until: p[1] * 1000, title: p[2], cats: p[3] ? String(p[3]).split('/') : [], desc: p[4] || '' }));
+// Genre colours: EPG categories first, then words in the title or description.
+function tvGenre(p) { const c = (p.cats || []).join(' '), t = (p.title || '') + ' ' + (p.desc || '');
+  if (/news|current affairs/i.test(c) || /\b(news|current affairs|1news|newshub|seven sharp|q\+a|the hui|te karere|breakfast|sunday|60 minutes|the project)\b/i.test(p.title || '')) return 'news';
+  if (/\b(movie|film)s?\b/i.test(c) || /\b(movie|feature film)\b/i.test(t)) return 'movie';
+  if (/comedy|sitcom/i.test(c) || /\b(comedy|sitcom|stand-?up)\b/i.test(t)) return 'comedy';
+  if (/factual|documentar|lifestyle|garden|home|nature|science|arts|hobb|cook|food|travel|informational|educational|motoring|history|diy/i.test(c) || /\b(garden(ing)?|renovat\w*|cook(ing)?|baking|diy|documentary|wildlife|antiques?|craft|fishing|travel|home makeover)\b/i.test(t)) return 'life';
+  return ''; }
+const tvgCls = p => { const g = tvGenre(p); return g ? ' tvg tvg-' + g : ''; };
+(() => { try { const st = document.createElement('style'); st.textContent = `.tvg-comedy{background:#1D4ED8!important}.tvg-news{background:#B91C1C!important}.tvg-movie{background:#FACC15!important}.tvg-life{background:#BBF7D0!important}
+.tvg-comedy,.tvg-comedy *,.tvg-news,.tvg-news *{color:#fff!important}.tvg-movie,.tvg-movie *,.tvg-life,.tvg-life *{color:#111!important}
+.tvg .btn{background:#fff!important;color:#111!important;border-color:#fff!important}.tvlegend{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}.tvlegend span{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px}
+.tvdays{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px}.tvdays button{flex:0 0 auto}.tvep{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin:3px 0}`; document.head.appendChild(st); } catch (e) { } })();
+const tvLegend = () => `<div class="tvlegend" aria-label="Colour key"><span class="tvg-comedy">Comedy</span><span class="tvg-movie">Movies</span><span class="tvg-news">News</span><span class="tvg-life">Lifestyle, garden, factual</span></div>`;
+// Live 'on now' rows get the colours too.
+(() => { const o = tvGuideBody; tvGuideBody = function () { let h = o.apply(this, arguments); try { const now = Date.now(); TV_CHANNELS.forEach(ch => { const it = tvOn(ch.id, now); if (!it) return; const g = tvgCls(it); if (!g) return;
+  const needle = `<div class="row"><div class="ic tv">${I('tv')}</div><div class="tx"><div class="t">${esc(ch.name)}</div>`; h = h.replace(needle, needle.replace('class="row"', 'class="row' + g + '"')); }); } catch (e) { } return h; }; })();
+
 const tvFlags = () => { const L = S && S.settings && S.settings.tvFlags; return Array.isArray(L) ? L.filter(f => f && f.u > Date.now()) : []; };
+const tvLinks = () => { const L = S && S.settings && S.settings.tvLinks; return Array.isArray(L) ? L : []; };
+const tvNorm = t => String(t || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/^(new|premiere|final)\s*:\s*/, '').replace(/[^a-z0-9\u00c0-\u024f]+/g, ' ').trim().slice(0, 80);
+const tvLinkOf = (ch, title) => { const n = tvNorm(title); return tvLinks().find(l => l.n === n && (l.ch === '*' || l.ch === ch)) || null; };
 const tvFk = (ch, s) => ch + '|' + s;
 const tvFlagged = k => tvFlags().some(f => f.k === k);
 const tvChName = id => (TV_CHANNELS.find(c => c.id === id) || {}).name || '';
-async function tvFlagToggle(ch, s) {
-  S.settings.tvFlags = tvFlags(); const L = S.settings.tvFlags, k = tvFk(ch, s), i = L.findIndex(f => f.k === k);
-  if (i >= 0) { L.splice(i, 1); toast('Reminder removed'); }
-  else { const p = ((TV && TV.data && TV.data.slots && TV.data.slots[ch]) || []).find(x => x.start === s); if (!p || p.start <= Date.now() || isSport(p.title + ' ' + (p.cats || []).join(' '))) return;
-    L.push({ k, t: String(p.title).slice(0, 120), ch, cn: tvChName(ch), s: p.start, u: p.until }); L.sort((a, b) => a.s - b.s); }
-  await save(); let r = ''; try { r = await scheduleReminders(); } catch (e) { r = 'fail'; }
-  if (i < 0) toast(r === 'need' || r === 'unsupported' ? 'Flagged. Turn on notifications for a push; it’ll still show on the bell page.' : r === 'fail' ? 'Flagged. Couldn’t reach the reminder service; it’ll show on the bell page.' : 'Reminder set for 10 min before.');
+function tvFind(ch, s) { const a = ((TV && TV.data && TV.data.slots && TV.data.slots[ch]) || []).find(x => x.start === s); if (a) return a;
+  for (const d of Object.keys(TVD.days)) { const p = tvdProgs(d, ch).find(x => x.start === s); if (p) return p; } return null; }
+function tvLinksSend() { return tvLinks().map(l => ({ n: l.n, t: l.t, ch: l.ch })); }
+async function tvResync(msgOk) { await save(); let r = ''; try { r = await scheduleReminders(); } catch (e) { r = 'fail'; }
+  if (msgOk) toast(r === 'need' || r === 'unsupported' ? 'Saved. Turn on notifications for a push; it’ll still show on the bell page.' : r === 'fail' ? 'Saved. Couldn’t reach the reminder service; it’ll show on the bell page.' : msgOk);
   render(); }
+function tvFlagToggle(ch, s) { const k = tvFk(ch, s);
+  if (tvFlagged(k)) { S.settings.tvFlags = tvFlags().filter(f => f.k !== k); toast('Reminder removed'); return tvResync(''); }
+  const p = tvFind(ch, s); if (!p || p.start <= Date.now() || isSport(p.title + ' ' + (p.cats || []).join(' '))) return;
+  const L = tvLinkOf(ch, p.title); if (L) return tvLinkRemove(L.n, L.ch);
+  const b = (v, l) => `<button type="button" class="btn${v === 'one' ? ' primary' : ''}" style="width:100%;margin:4px 0" onclick="closeSheet();tvPick(${jsArg(ch)},${s},'${v}')">${l}</button>`;
+  openSheet('Remind me', `<p class="muted" style="margin:0 0 8px">${esc(p.title)} · ${esc(tvChName(ch))} · ${esc(fmtW(nzStampLocal(new Date(p.start)).slice(0, 10)))} ${esc(tvClock(p.start))}</p>${b('one', 'Just this one')}${b('ch', '🔁 Every episode on ' + esc(tvChName(ch)))}${b('any', '🔁 Every episode, any channel')}`, null); }
+async function tvPick(ch, s, how) { const p = tvFind(ch, s); if (!p) return; S.settings.tvFlags = tvFlags();
+  if (how === 'one') { S.settings.tvFlags.push({ k: tvFk(ch, s), t: String(p.title).slice(0, 120), ch, cn: tvChName(ch), s: p.start, u: p.until }); S.settings.tvFlags.sort((a, b) => a.s - b.s); return tvResync('Reminder set for 10 min before.'); }
+  const n = tvNorm(p.title), c = how === 'any' ? '*' : ch; S.settings.tvLinks = tvLinks().filter(l => !(l.n === n && (l.ch === c || c === '*'))); S.settings.tvLinks.push({ n, t: String(p.title).replace(/\s*\([^)]*\)\s*$/, '').slice(0, 120), ch: c, cn: c === '*' ? 'any channel' : tvChName(ch) });
+  S.settings.tvFlags = S.settings.tvFlags.filter(f => !(tvNorm(f.t) === n && (c === '*' || f.ch === c))); return tvResync('🔁 Series linked: every episode gets a reminder 10 min before.'); }
+async function tvLinkRemove(n, ch) { if (!confirm('Remove this series link? Its future reminders are cancelled.')) return; S.settings.tvLinks = tvLinks().filter(l => !(l.n === n && l.ch === ch)); toast('Series link removed'); return tvResync(''); }
 function tvPushes() { const now = Date.now(); return tvFlags().filter(f => f.s - 600000 > now + 60000).slice(0, 20).map(f => { const at = nzStampLocal(new Date(f.s - 600000)), tail = ` on ${f.cn} at ${tvClock(f.s)}`, head = '📺 Starting in 10 min: ';
   const room = 80 - head.length - tail.length, t = f.t.length > room ? f.t.slice(0, Math.max(8, room - 1)) + '…' : f.t;
   return { id: 'tv-' + String(f.ch).replace(/[^\w]/g, '') + '-' + f.s, title: (head + t + tail).slice(0, 80), date: at.slice(0, 10), time: at.slice(11, 16), repeat: 'none' }; }); }
-function tvBellRows() { const now = Date.now(), gone = nfDis();
-  return tvFlags().filter(f => now >= f.s - 600000 && !gone.includes('tvf-' + f.k)).map(f => `<div class="row glnew" data-nk="${esc('tvf-' + f.k)}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#tv')}"><div class="ic">📺</div><div class="tx"><div class="t">${now < f.s ? 'Starting in ' + Math.max(1, Math.round((f.s - now) / 60000)) + ' min' : 'On now'}: ${esc(f.t)} on ${esc(f.cn)} at ${esc(tvClock(f.s))}</div><div class="s">Flagged in the TV guide</div></div></div>`); }
-function tvFlagBtn(ch, p) { const on = tvFlagged(tvFk(ch, p.start));
-  return `<button type="button" class="btn small${on ? ' primary' : ''}" aria-pressed="${on}" aria-label="${on ? 'Remove reminder' : 'Remind me 10 min before'}" onclick="event.stopPropagation();tvFlagToggle(${jsArg(ch)},${p.start})">${on ? '🔔 Set' : '🔕 Remind'}</button>`; }
-function tvComingUp() { const now = Date.now(), chans = tvMore ? TV_CHANNELS : TV_CHANNELS.filter(ch => TV_HOME_SHORT.has(ch.id));
-  const rows = chans.map(ch => { const N = ((TV && TV.data && TV.data.slots && TV.data.slots[ch.id]) || []).filter(p => p.start > now).slice(0, 3); if (!N.length) return '';
-    return `<div class="row" style="display:block"><div class="t" style="font-weight:700;margin-bottom:4px">${esc(ch.name)}</div>${N.map(p => `<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><div class="s" style="flex:1;min-width:0">${tvFlagged(tvFk(ch.id, p.start)) ? '🔔 ' : ''}<b>${esc(tvClock(p.start))}</b> ${esc(p.title)}</div>${tvFlagBtn(ch.id, p)}</div>`).join('')}</div>`; }).filter(Boolean);
-  return `<div class="sec">Coming up · tap Remind for a heads-up 10 min before</div>` + (rows.length ? `<div class="list">${rows.join('')}</div>` : '<p class="muted">Nothing listed yet. The guide covers the next few hours.</p>'); }
-function tvFlaggedList() { const L = tvFlags(); return `<div class="sec">My flagged shows</div>` + (L.length ? `<div class="list">${L.map(f => `<div class="row"><div class="ic">🔔</div><div class="tx"><div class="t">${esc(f.t)}</div><div class="s">${esc(f.cn)} · ${esc(tvClock(f.s))}${f.s <= Date.now() ? ' · on now' : ''}</div></div><button type="button" class="btn small" onclick="tvFlagToggle(${jsArg(f.ch)},${f.s})">Unflag</button></div>`).join('')}</div>` : '<p class="muted">No shows flagged. Tap Remind on anything coming up.</p>'); }
-(() => { const o = TvGuide; TvGuide = function () { const h = o.apply(this, arguments); try { const i = h.lastIndexOf('<div class="foot">'); const x = tvFlaggedList() + tvComingUp(); return i > 0 ? h.slice(0, i) + x + h.slice(i) : h + x; } catch (e) { return h; } }; })();
+function tvBellRows() { try { const now = Date.now(), gone = nfDis(), T = todayISO(), seen = new Set(), out = [];
+  const add = (k, t, cn, s) => { if (seen.has(k) || gone.includes('tvf-' + k)) return; seen.add(k); out.push(`<div class="row glnew" data-nk="${esc('tvf-' + k)}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#tv')}"><div class="ic">📺</div><div class="tx"><div class="t">${now < s ? 'Starting in ' + Math.max(1, Math.round((s - now) / 60000)) + ' min' : 'On now'}: ${esc(t)} on ${esc(cn)} at ${esc(tvClock(s))}</div><div class="s">${tvLinkOf(k.split('|')[0], t) ? '🔁 Series link' : 'Flagged in the TV guide'}</div></div></div>`); };
+  tvFlags().filter(f => now >= f.s - 600000).forEach(f => add(f.k, f.t, f.cn, f.s));
+  if (tvLinks().length) TV_CHANNELS.forEach(ch => tvdProgs(T, ch.id).forEach(p => { if (now >= p.start - 600000 && now < p.until && tvLinkOf(ch.id, p.title)) add(tvFk(ch.id, p.start), p.title, ch.name, p.start); }));
+  return out; } catch (e) { return []; } }
+function tvFlagBtn(ch, p) { const lk = tvLinkOf(ch, p.title), on = lk || tvFlagged(tvFk(ch, p.start));
+  return `<button type="button" class="btn small${on ? ' primary' : ''}" aria-pressed="${!!on}" aria-label="${lk ? 'Series linked; tap to remove' : on ? 'Remove reminder' : 'Remind me 10 min before'}" onclick="event.stopPropagation();tvFlagToggle(${jsArg(ch)},${p.start})">${lk ? '🔁 Linked' : on ? '🔔 Set' : '🔕 Remind'}</button>`; }
+const tvMark = (ch, p) => tvLinkOf(ch, p.title) ? '🔁 ' : tvFlagged(tvFk(ch, p.start)) ? '🔔 ' : '';
+function tvDayPicker() { const ix = TVD.idx, T = todayISO(), D = ((ix && ix.days) || [T]).filter(d => d >= T); const cur = tvDay && D.includes(tvDay) ? tvDay : T;
+  return `<div class="tvdays" role="tablist">${D.map(d => `<button type="button" role="tab" class="btn small${d === cur ? ' primary' : ''}" aria-selected="${d === cur}" onclick="tvDay='${d}';updTv()">${d === T ? 'Today' : d === addDays(T, 1) ? 'Tomorrow' : esc(fmtW(d))}</button>`).join('')}</div>`; }
+function tvCover() { const ix = TVD.idx; if (!ix || !ix.chUntil) return ''; const v = Object.values(ix.chUntil).sort(), most = v[Math.floor(v.length / 2)], max = v[v.length - 1];
+  return `<p class="muted" style="margin:0 0 6px">Guide covers up to ${esc(fmtW(most))}${max > most ? ` (some channels, like ${esc(Object.keys(ix.chUntil).filter(k => ix.chUntil[k] === max).map(tvChName).filter(Boolean).slice(0, 2).join(' and ') || 'Three')}, to ${esc(fmtW(max))})` : ''}. That’s as far ahead as the Freeview and Sky guides go.</p>`; }
+function tvComingUp() { const now = Date.now(), T = todayISO(), d = tvDay && tvDay >= T ? tvDay : T, chans = tvMore ? TV_CHANNELS : TV_CHANNELS.filter(ch => TV_HOME_SHORT.has(ch.id));
+  const loaded = !!TVD.days[d]; if (!loaded && !TVD.busy[d]) tvdDay(d).then(x => { if (x) updTv(); });
+  const rows = chans.map(ch => { let N = loaded ? tvdProgs(d, ch.id) : (d === T ? ((TV && TV.data && TV.data.slots && TV.data.slots[ch.id]) || []) : []);
+    N = N.filter(p => p.start > now && !isSport(p.title + ' ' + (p.cats || []).join(' '))); if (d === T) N = N.slice(0, 4); if (!N.length) return '';
+    return `<div class="row" style="display:block"><div class="t" style="font-weight:700;margin-bottom:4px">${esc(ch.name)}</div>${N.map(p => `<div class="tvep${tvgCls(p)}"><div class="s" style="flex:1;min-width:0">${tvMark(ch.id, p)}<b>${esc(tvClock(p.start))}</b> ${esc(p.title)}</div>${tvFlagBtn(ch.id, p)}</div>`).join('')}</div>`; }).filter(Boolean);
+  return `<div class="sec">${d === T ? 'Coming up today' : esc(fmtW(d))} · tap Remind for a heads-up 10 min before</div>` + tvDayPicker() + tvCover() +
+    (rows.length ? `<div class="list">${rows.join('')}</div>` : `<p class="muted">${loaded || d === T ? 'Nothing listed for these channels.' : (TVD.fail[d] ? 'Couldn’t load that day of the guide.' : 'Loading the guide…')}</p>`); }
+function tvFlaggedList() { const L = tvFlags(), K = tvLinks();
+  return `<div class="sec">My flagged shows</div>` + (L.length ? `<div class="list">${L.map(f => `<div class="row"><div class="ic">🔔</div><div class="tx"><div class="t">${esc(f.t)}</div><div class="s">${esc(f.cn)} · ${esc(fmtW(nzStampLocal(new Date(f.s)).slice(0, 10)))} ${esc(tvClock(f.s))}${f.s <= Date.now() ? ' · on now' : ''}</div></div><button type="button" class="btn small" onclick="tvFlagToggle(${jsArg(f.ch)},${f.s})">Unflag</button></div>`).join('')}</div>` : '<p class="muted">No single shows flagged.</p>') +
+    `<div class="sec">Series links</div>` + (K.length ? `<div class="list">${K.map(l => `<div class="row"><div class="ic">🔁</div><div class="tx"><div class="t">${esc(l.t)}</div><div class="s">Every episode · ${esc(l.cn || tvChName(l.ch) || 'any channel')}</div></div><button type="button" class="btn small" onclick="tvLinkRemove(${jsArg(l.n)},${jsArg(l.ch)})">Remove</button></div>`).join('')}</div>` : '<p class="muted">No series links. Tap Remind, then Every episode.</p>'); }
+(() => { const o = TvGuide; TvGuide = function () { let h = o.apply(this, arguments); try { const j = h.indexOf('<div class="sec">What’s on TV'); if (j > 0) h = h.slice(0, j) + tvLegend() + h.slice(j);
+  const i = h.lastIndexOf('<div class="foot">'); const x = tvComingUp() + tvFlaggedList(); return i > 0 ? h.slice(0, i) + x + h.slice(i) : h + x; } catch (e) { return h; } }; })();
 setTimeout(() => { try { if (S && S.settings && Array.isArray(S.settings.tvFlags)) { const L = tvFlags(); if (L.length !== S.settings.tvFlags.length) { S.settings.tvFlags = L; save(); } } } catch (e) { } }, 6000);

@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""2.27.37: trim the public i.mjh.nz XMLTV guides (Freeview NZ + Sky) to My App's channels, drop sport,
+and write one small JSON file per New Zealand day plus index.json. Run by .github/workflows/tv-guide.yml
+twice a day; the output goes to the tv-data branch, which the app and the relay read. Nothing else is fetched."""
+import gzip, io, json, os, re, sys, time, urllib.request, xml.etree.ElementTree as ET
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+HERE = os.path.dirname(os.path.abspath(__file__))
+CH = json.load(open(os.path.join(HERE, 'tv-channels.json')))
+IDS = {c['id']: c for c in CH}
+SPORT = re.compile(open(os.path.join(HERE, 'sport-re.txt')).read().strip(), re.I)  # the app's SPORT_RE
+RACING = re.compile(r'^(racing|horse racing|trots)$', re.I)
+FEEDS = {'freeview': 'https://i.mjh.nz/nz/epg.xml.gz', 'sky': 'https://i.mjh.nz/SkyGo/epg.xml.gz'}
+NZ = ZoneInfo('Pacific/Auckland')
+OUT = sys.argv[1] if len(sys.argv) > 1 else 'out'
+now = time.time()
+def stamp(s):
+    m = re.match(r'(\d{14})\s*([+-]\d{4})?', s or '')
+    if not m: return None
+    dt = datetime.strptime(m.group(1), '%Y%m%d%H%M%S')
+    off = m.group(2) or '+0000'
+    tz = timezone(timedelta(hours=int(off[0] + off[1:3]), minutes=int(off[0] + off[3:5])))
+    return int(dt.replace(tzinfo=tz).timestamp())
+days, until, chu = {}, {}, {}
+for feed, url in FEEDS.items():
+    req = urllib.request.Request(url, headers={'User-Agent': 'car-app-preview tv-trim (personal guide, twice a day)'})
+    data = urllib.request.urlopen(req, timeout=180).read()
+    last = ''
+    for ev, el in ET.iterparse(io.BytesIO(gzip.decompress(data)), events=('end',)):
+        if el.tag != 'programme': continue
+        ch = el.get('channel')
+        if ch in IDS and IDS[ch]['feed'] == feed:
+            s, u = stamp(el.get('start')), stamp(el.get('stop'))
+            title = re.sub(r'\s+', ' ', (el.findtext('title') or '')).strip()
+            cats = [re.sub(r'\s+', ' ', c.text or '').strip() for c in el.findall('category') if (c.text or '').strip()]
+            desc = re.sub(r'\s+', ' ', (el.findtext('desc') or '')).strip()
+            if s and u and u > now - 3600 and title and not SPORT.search(title + ' ' + ' '.join(cats)) and not any(RACING.match(c) for c in cats):
+                d = datetime.fromtimestamp(s, NZ).strftime('%Y-%m-%d')
+                days.setdefault(d, {}).setdefault(ch, []).append([s, u, title[:120], '/'.join(dict.fromkeys(cats))[:60], desc[:110]])
+                last = max(last, d); chu[ch] = max(chu.get(ch, ''), d)
+        el.clear()
+    until[feed] = last
+os.makedirs(os.path.join(OUT, 'tv'), exist_ok=True)
+today = datetime.fromtimestamp(now, NZ).strftime('%Y-%m-%d')
+keep = sorted(d for d in days if d >= today)[:16]
+for d in keep:
+    for L in days[d].values(): L.sort()
+    json.dump({'d': d, 'ch': days[d]}, open(os.path.join(OUT, 'tv', d + '.json'), 'w'), separators=(',', ':'), ensure_ascii=False)
+json.dump({'at': int(now), 'days': keep, 'until': until, 'chUntil': chu, 'names': {k: v['name'] for k, v in IDS.items()}, 'source': 'https://i.mjh.nz (Freeview NZ and Sky guides)'}, open(os.path.join(OUT, 'tv', 'index.json'), 'w'), separators=(',', ':'))
+print('days', keep, 'until', until)

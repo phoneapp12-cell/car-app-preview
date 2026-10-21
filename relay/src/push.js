@@ -1,3 +1,5 @@
+import { seriesFor, cleanLinks } from './tv.js';
+import { cacheGet, cachePut } from './kvguard.js';
 /* Push notifications for bridge closures (Web Push, no third-party service).
  *
  * The app subscribes with the browser's own push service (Chrome uses Google's FCM endpoint) and sends
@@ -338,7 +340,7 @@ function scheduleNext(item, now) {
 export function cleanReminder(r, now = Date.now()) {
   if (!r || typeof r !== 'object') return null;
   const id = String(r.id || '');
-  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
+  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug|tv)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
   const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
   if (!title) return null;
   const date = String(r.date || ''), time = String(r.time || '');
@@ -375,7 +377,7 @@ export async function migrateReminders(env, previousEndpoint, nextEndpoint) {
   await saveRem(env, book);
 }
 
-export async function setReminders(env, rawSub, list, now = Date.now()) {
+export async function setReminders(env, rawSub, list, now = Date.now(), opts = {}) {
   const sub = cleanSub(rawSub);
   if (!sub) throw new Error('bad_subscription');
   const id = await subId(sub.endpoint);
@@ -402,7 +404,10 @@ export async function setReminders(env, rawSub, list, now = Date.now()) {
     }
     seen.add(c.id); items.push(c);
   }
-  if (items.length) book[id] = { items }; else delete book[id];
+  // 2.27.37: TV series links. Kept with this phone's reminders; matching episodes are added here and on the hourly check.
+  const links = opts.tvLinks !== undefined ? cleanLinks(opts.tvLinks) : ((book[id] && book[id].tvLinks) || []);
+  if (links.length) { try { for (const r of await seriesFor(links, opts.fetchImpl || fetch, now)) { if (items.length >= MAX_REMS) break; const c = cleanReminder(r, now); if (c && !seen.has(c.id)) { seen.add(c.id); items.push(c); } } } catch (e) { /* the hourly check tries again */ } }
+  if (items.length || links.length) book[id] = links.length ? { items, tvLinks: links } : { items }; else delete book[id];
   await saveRem(env, book);
   if (!items.length) {
     const again = await loadSubs(env);
@@ -412,6 +417,17 @@ export async function setReminders(env, rawSub, list, now = Date.now()) {
   return { saved: items.length };
 }
 
+// 2.27.37: about hourly, add newly listed episodes for each phone's TV series links (no duplicates, nothing already passed).
+export async function runTvSeries(env, fetchImpl = fetch, now = Date.now()) {
+  if (!env.EVENTS_KV) return 0;
+  if (await cacheGet('tvser-at')) return 0; await cachePut('tvser-at', { at: now }, 55 * 60);
+  const book = await loadRem(env); let added = 0;
+  for (const id of Object.keys(book)) { const e = book[id], links = e && Array.isArray(e.tvLinks) ? e.tvLinks : []; if (!links.length) continue;
+    const items = Array.isArray(e.items) ? e.items : (e.items = []), have = new Set(items.map(x => x && x.id));
+    for (const r of await seriesFor(links, fetchImpl, now)) { if (items.length >= MAX_REMS) break; const c = cleanReminder(r, now); if (c && !have.has(c.id)) { have.add(c.id); items.push(c); added++; } } }
+  if (added) await saveRem(env, book);
+  return added;
+}
 export async function runReminders(env, fetchImpl = fetch, now = Date.now()) {
   if (!env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return { sent: 0 };
   const book = await loadRem(env);
@@ -474,7 +490,7 @@ export async function pushRoute(path, body, env, fetchImpl = fetch, now = Date.n
   }
   if (path === '/push/unsubscribe') return [200, await unsubscribe(env, body && body.endpoint)];
   if (path === '/push/reminders') {
-    try { return [200, await setReminders(env, body && body.subscription, body && body.reminders, now)]; }
+    try { return [200, await setReminders(env, body && body.subscription, body && body.reminders, now, { tvLinks: body && body.tvLinks, fetchImpl })]; }
     catch (e) { return [400, { error: 'bad_subscription' }]; }
   }
   if (limited(now)) return [429, { error: 'too_many' }];

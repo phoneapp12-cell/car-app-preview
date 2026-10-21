@@ -3,7 +3,7 @@ import { handle } from './relay.js';
 import { guardKV } from './kvguard.js';
 import { scheduled } from './events.js';
 import { scheduledClosures } from './closures.js';
-import { runAlerts, runReminders } from './push.js';
+import { runAlerts, runReminders, runTvSeries } from './push.js';
 import { refreshSarah } from './sarah.js';
 import { runSunshine } from './sunshine.js';
 import { runShop } from './shop-notify.js';
@@ -23,6 +23,7 @@ export default {
     try { await refreshSarah(env, fetch, Date.now(), { push: true }); } catch (e) { /* events list is already saved */ }
     try { await runSunshine(env, fetch, Date.now()); } catch (e) { /* sunshine notes wait for the next check */ }
     try { await runAkahu(env, fetch, Date.now()); } catch (e) { /* bank data waits for the next check */ }
+    try { await runTvSeries(env, fetch, Date.now()); } catch (e) { /* 2.27.37: TV series links, about hourly */ }
     try { await runFuel(env, fetch, Date.now()); } catch (e) { /* 2.27.36: terminal fuel prices, once a day from 6am */ }
   })())
 };
