@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.30';
+const APP_VERSION = '2.27.31';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20179,7 +20179,7 @@ function hwHealthCard() {
   const hv = hr.filter(x => x.v), hrT = td && td.hr;
   const avg = a => Math.round(a.reduce((t, x) => t + x.v, 0) / a.length);
   return `<div class="card hwcard" id="hwhealth"><div class="t" style="font-weight:800">⌚ From your watch</div>
-    <div class="hwbig"><b>${td && td.steps != null ? hwNum(td.steps) : '–'}</b> steps today</div>
+    <div class="hwbig"><b>${td && td.steps != null ? hwNum(td.steps) : '–'}</b> steps today</div>${hwStepTag(td)}
     ${hwBars(wk)}<div class="s">${wv.length ? `Average ${hwNum(avg(wv))} a day over the last ${plural(wv.length, 'day')}.` : 'No steps yet this week.'}</div>
     ${hv.length ? `<div class="t" style="font-weight:700;margin-top:12px">Resting heart rate</div>
     <div class="s">${hrT && hrT.rest ? `${hrT.rest} bpm today${hrT.restEst ? ' (worked out from the day’s readings)' : ''}` : 'Not in yet today'}${hrT && hrT.min ? ` · range ${hrT.min}–${hrT.max}, average ${hrT.avg}` : ''}. Two-week average ${avg(hv)} bpm.</div>
@@ -23520,7 +23520,7 @@ function WatchPage() {
   const sl = td.sleep;
   let longest = 0; { let run = 0; days(60).forEach(o => { if (o.x && o.x.steps >= goal) { run++; longest = Math.max(longest, run); } else run = 0; }); }
   return header('Watch', 'From your Huawei watch') +
-    `<div class="card hwcard"><div class="t" style="font-weight:800">Today</div><div class="hwgrid">${cell(td.steps != null ? hwNum(td.steps) : dash, 'steps · goal ' + hwNum(goal))}${cell(sl ? hwMins(sl.mins) : dash, 'sleep last night')}${cell(td.hr && td.hr.rest ? td.hr.rest + ' bpm' : dash, 'resting HR' + (td.hr && td.hr.restEst ? ' (estimate)' : ''))}</div>
+    `<div class="card hwcard"><div class="t" style="font-weight:800">Today</div><div class="hwgrid">${cell(td.steps != null ? hwNum(td.steps) : dash, 'steps · goal ' + hwNum(goal))}${cell(sl ? hwMins(sl.mins) : dash, 'sleep last night')}${cell(td.hr && td.hr.rest ? td.hr.rest + ' bpm' : dash, 'resting HR' + (td.hr && td.hr.restEst ? ' (estimate)' : ''))}</div>${hwStepTag(td)}
      ${sl ? `<div class="s">${hwHM(sl.start)}–${hwHM(sl.end)}${hwStageTxt(sl.stages) ? ' · ' + esc(hwStageTxt(sl.stages)) : ''}</div>` : ''}${td.hr && td.hr.min ? `<div class="s">Heart rate today ${td.hr.min}–${td.hr.max} bpm, average ${td.hr.avg}</div>` : ''}</div>` +
     `<div class="card hwcard"><div class="t" style="font-weight:800">Averages</div><div class="hwtab"><div></div><b>7 days</b><b>30 days</b>
       <span>Steps</span><span>${w.steps != null ? hwNum(w.steps) : dash}</span><span>${m.steps != null ? hwNum(m.steps) : dash}</span>
@@ -23542,6 +23542,18 @@ function hwPrefRows() { const g = hwSet().stepGoal, cur = g === 'avg' ? 'avg' : 
   return sw('watchCards', hwCardsOn(), 'Watch updates on Notifications', 'Last night’s sleep, step milestones, streaks, a weekly recap on your first day off.') +
     `<div class="srow"><div class="tx"><div class="t">Daily step goal</div><div class="s">${g === 'avg' ? 'Your last two weeks: ' + hwNum(hwGoal()) : 'Used for milestones and streaks'}</div></div><select onchange="hwSetGoal(this.value)" aria-label="Daily step goal">${opts.map(([v, l]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${l}</option>`).join('')}</select></div>` +
     sw('watchPush', hwPushOn(), 'Phone notification when you reach it', 'At most 3 a day, none between 10pm and 8am.'); }
+/* 2.27.31: a small line under today's steps saying where they came from and when they last synced (NZ time). */
+function hwStepTag(td) {
+  const src = td && td.stSrc; if (!td || td.steps == null) return '';
+  const at = td.stepsAt || (hwData() || {}).lastAt, sy = at ? ' · synced ' + esc(cfWhen(at)) : '';
+  const w = src && src.used && /healthsync|huawei|hihealth/i.test(src.used);
+  let t = 'Steps from your phone sync';
+  if (src && src.how === 'origin' && w) t = 'Steps from Huawei watch';
+  else if (src && src.how === 'fill') t = `Steps from Huawei watch (${hwNum(src.watch)}), with phone counts for hours the watch hadn’t sent yet, never added together`;
+  else if (src && (src.how === 'origin' || src.how === 'max')) t = 'Steps from your phone, not the watch (no watch steps came through)';
+  else if (src && (src.how === 'daily' || src.how === 'buckets')) t = 'Steps from Health Connect’s total (may include the phone)';
+  return `<div class="s hwtag" style="margin-top:2px">👟 ${t}${sy}</div>`;
+}
 (() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { return hwOn() ? h + `<div class="list" id="hwprefs">${hwPrefRows()}</div>` : h; } catch (e) { return h; } }; })();
 /* ================= 2.27.5: move a shared item between Sarah's lists =================
    'Move to…' on any shared item (her to-dos and Shopping items, and his ones shared with her): pick one of her lists and it
@@ -24107,7 +24119,7 @@ function lnSettingsRows() {
 
 /* 2.27.11: Settings › Huawei watch sync › Step source: which app's steps the relay used for today (it never adds apps together now). */
 const HW_APPS = { 'nl.appyhapps.healthsync': 'Health Sync (Huawei watch)', 'com.huawei.health': 'Huawei Health', 'com.huawei.hihealth': 'Huawei Health', 'com.google.android.apps.fitness': 'Google Fit', 'com.sec.android.app.shealth': 'Samsung Health', 'com.google.android.apps.healthdata': 'Health Connect (phone)', 'android': 'Phone', 'com.mi.health': 'Mi Fitness', 'com.fitbit.FitbitMobile': 'Fitbit', 'com.garmin.android.apps.connectmobile': 'Garmin Connect', 'com.strava': 'Strava' };
-const hwAppName = p => HW_APPS[p] || (/huawei/i.test(p) ? 'Huawei Health' : /healthsync/i.test(p) ? 'Health Sync' : String(p || 'an app').replace(/^(com|nl|net|org)\./, ''));
+const hwAppName = p => HW_APPS[p] || (/^com\.android\.healthconnect\.phone/i.test(p) ? 'Phone (Health Connect step counter)' : /huawei/i.test(p) ? 'Huawei Health' : /healthsync/i.test(p) ? 'Health Sync' : String(p || 'an app').replace(/^(com|nl|net|org)\./, ''));
 function hwStepSrcLine() {
   const T = nzISO(Date.now()), td = hwDay(T), x = (td && td.stSrc ? td : hwList().slice().reverse().find(y => y.stSrc)) || null, src = x && x.stSrc;
   const when = x && x.date !== T ? ' (' + fmtW(x.date) + ')' : ' today';
@@ -24116,6 +24128,7 @@ function hwStepSrcLine() {
   let t;
   if (!src) t = 'Shows after the next sync from your phone.';
   else if (src.how === 'origin') t = `<b>${esc(hwAppName(src.used))}</b> · ${hwNum(x.steps)} steps${when}.${others(src.by)}`;
+  else if (src.how === 'fill') t = `<b>${esc(hwAppName(src.used))}</b> ${hwNum(src.watch)}, plus the phone’s count for hours the watch hadn’t sent yet (each hour uses one or the other, never both) · ${hwNum(x.steps)} steps${when}.`;
   else if (src.how === 'max') t = `No Huawei / Health Sync steps found, so it uses the highest app each hour (never adds apps together).${others(src.by)}`;
   else if (src.how === 'daily') t = `Health Connect’s daily total (all apps, using Health Connect’s app priority). If it’s higher than your watch: ${fix}`;
   else if (src.how === 'buckets') t = `HC Webhook time buckets, which add every app together. ${fix}`;

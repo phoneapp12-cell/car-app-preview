@@ -78,7 +78,10 @@ export function stepPick(D, k) {
   const ois = Object.keys(tot); if (!ois.length) return null;
   const name = oi => (D.org || [])[oi] || 'unknown', by = {}; ois.forEach(oi => by[name(oi)] = tot[oi]);
   const pref = ois.filter(oi => PREF_RE.test(name(oi)) && tot[oi] > 0).sort((a, b) => tot[b] - tot[a]);
-  if (pref.length) return { steps: tot[pref[0]], how: 'origin', used: name(pref[0]), by };
+  // 2.27.31: Health Sync often leaves hours empty or short (the watch reaches Huawei Health late). Each hour takes the watch,
+  // or the phone when the phone counted more that hour; the two are never added together.
+  if (pref.length) { const w = pref[0]; let n = 0; Object.values(hours).forEach(H => { n += Math.max(...Object.values(H)); });
+    return n > tot[w] ? { steps: n, how: 'fill', used: name(w), watch: tot[w], by } : { steps: tot[w], how: 'origin', used: name(w), by }; }
   if (ois.length === 1) return { steps: tot[ois[0]], how: 'origin', used: name(ois[0]), by };
   let n = 0; Object.values(hours).forEach(H => { n += Math.max(...Object.values(H)); });
   return { steps: n, how: 'max', used: '', by };
@@ -156,7 +159,7 @@ export function applyPayload(D, p, now = Date.now()) {
   Object.keys(rawFirst).forEach(k => { const R = D.stR[k]; if (R && !R.full && rawN[k] >= 10 && rawFirst[k] < R.since - 4 * 3600e3) { R.full = true; } });
   touchedSt.forEach(k => {
     const d = day(D, k), pk = stepPick(D, k), R = D.stR[k];
-    if (pk) { d.steps = pk.steps; d.stSrc = { how: pk.how, used: pk.used, by: pk.by }; return; }
+    if (pk) { d.steps = pk.steps; d.stSrc = { how: pk.how, used: pk.used, by: pk.by }; if (pk.watch != null) d.stSrc.watch = pk.watch; return; }
     if (d.stepsFull) { d.stSrc = { how: 'daily' }; return; }
     if (R && !R.full && Object.keys(R.r).length) { const by = {}; Object.entries(R.r).forEach(([key, c]) => { const nm = D.org[key.split(':')[0]] || 'unknown'; by[nm] = (by[nm] || 0) + c; }); d.stSrc = { how: 'rebuild', by }; return; }
     if (D.stB[k]) { d.steps = Object.values(D.stB[k]).reduce((a, b) => a + b, 0); d.stSrc = { how: 'buckets' }; }
@@ -206,8 +209,8 @@ export function publicDays(D, n = 30, now = Date.now()) {
   const from = addDays(nz(now).date, -Math.max(1, Math.min(KEEP_DAYS, n)) + 1);
   return Object.keys(D.days).filter(k => k >= from).sort().map(k => {
     const d = D.days[k], o = { date: k };
-    if (d.steps != null) o.steps = d.steps;
-    if (d.stSrc) o.stSrc = { how: d.stSrc.how, used: d.stSrc.used || '', by: d.stSrc.by || null };
+    if (d.steps != null) o.steps = d.steps; if (d.stepsAt) o.stepsAt = d.stepsAt;
+    if (d.stSrc) o.stSrc = { how: d.stSrc.how, used: d.stSrc.used || '', by: d.stSrc.by || null }; if (d.stSrc && d.stSrc.watch != null) o.stSrc.watch = d.stSrc.watch;
     if (d.sleep) o.sleep = d.sleep;
     if (d.hr) { const h = d.hr; o.hr = { rest: h.rest != null ? h.rest : h.restEst != null ? h.restEst : null, restEst: h.rest == null, min: h.min, max: h.max, avg: h.avg }; }
     return o;
@@ -237,6 +240,7 @@ export async function healthRoute(path, request, env, okOrigin) {
     let p; try { const raw = await request.text(); if (raw.length > MAX_BODY) return [413, { error: 'too_large' }]; p = raw ? JSON.parse(raw) : {}; } catch (e) { return [400, { error: 'bad_json' }]; }
     if (!p || typeof p !== 'object' || Array.isArray(p)) return [400, { error: 'bad_json' }];
     const D = await getData(env), types = applyPayload(D, p);
+    try { const st = Array.isArray(p.steps) ? p.steps : [], o = {}; st.forEach(r => { const k = originOf(r) || '(none)'; o[k] = (o[k] || 0) + 1; }); D.lastShape = { at: new Date().toISOString(), steps: st.length, daily: Array.isArray(p.daily_totals) ? p.daily_totals.length : 0, origins: o, first: st.length ? String(st[0].start_time || '').slice(0, 25) : '', last: st.length ? String(st[st.length - 1].end_time || '').slice(0, 25) : '' }; } catch (e) { }
     D.lastAt = new Date().toISOString(); D.posts = (D.posts || 0) + 1; if (types.length) D.lastTypes = types;
     await env.EVENTS_KV.put(K_DATA, await seal(env, D));
     if (types.includes('steps')) { try { await stepPushRun(env, D); } catch (e) { } }
@@ -265,4 +269,15 @@ export async function healthRoute(path, request, env, okOrigin) {
     return [200, { ok: true, connected: false }];
   }
   return [404, { error: 'not_found' }];
+}
+
+// 2.27.31: owner-triggered step diagnosis (no token, no samples): per-day steps, which app each came from, last payload shape. Kept 30 minutes.
+export async function runHealthDiag(env) {
+  if (!env.EVENTS_KV || !env.AKAHU_ENC_KEY) return 'off'; const req = await env.EVENTS_KV.get('health-diag-req'); if (!req) return 'none';
+  await env.EVENTS_KV.delete('health-diag-req'); const D = await getData(env), td = nz(Date.now()).date, out = { at: new Date().toISOString(), lastAt: D.lastAt, lastTypes: D.lastTypes, posts: D.posts, org: D.org, lastShape: D.lastShape || null, days: [] };
+  for (let i = 0; i < 4; i++) { const k = addDays(td, -i), d = D.days[k] || {}, R = D.stR && D.stR[k], per = {};
+    if (R && R.r) Object.entries(R.r).forEach(([key, c]) => { const [oi, s0, len] = key.split(':'); const nm = (D.org || [])[oi] || oi; const x = per[nm] || (per[nm] = { n: 0, steps: 0, first: Infinity, last: 0 }); x.n++; x.steps += c; const hh = Math.floor(nz(+s0 * 1000).min / 60); (x.h || (x.h = {}))[hh] = (x.h[hh] || 0) + c; x.first = Math.min(x.first, +s0 * 1000); x.last = Math.max(x.last, (+s0 + +len) * 1000); });
+    Object.values(per).forEach(x => { x.first = x.first === Infinity ? '' : new Date(x.first).toISOString(); x.last = x.last ? new Date(x.last).toISOString() : ''; });
+    out.days.push({ date: k, steps: d.steps, stepsFull: d.stepsFull || 0, stSrc: d.stSrc || null, stepsAt: d.stepsAt || '', raw: R ? { full: R.full, since: R.since ? new Date(R.since).toISOString() : '', per } : null, buckets: D.stB && D.stB[k] ? Object.keys(D.stB[k]).length : 0 }); }
+  await env.EVENTS_KV.put('health-diag', JSON.stringify(out), { expirationTtl: 1800 }); return 'done';
 }
