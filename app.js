@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.41';
+const APP_VERSION = '2.27.42';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24926,7 +24926,7 @@ const outHome = o => (o.suburbs || []).some(x => /onerahi/i.test(x)) || (o.roads
 const OUT_KAIPARA = /\b(dargaville|maungaturoto|te kopuru|mareretu|taipuha|kaiwaka|mangawhai|ruawai|paparoa|matakohe|kaihu|tinopai|pouto|baylys|aratapu|tangowahine|kirikopuni|tangiteroria|batley|whakapirau|hakaru|oneriri|tanoa|otamatea)\b/i;
 const outWhg = o => !OUT_KAIPARA.test([o.area].concat(o.suburbs || [], o.zone || []).join(' ')) || (o.suburbs || []).some(x => !OUT_KAIPARA.test(x));
 async function outRefresh(force) {
-  if (outBusy || (!outOn() && !(typeof netOn === 'function' && netOn())) || (!force && OUTG && Date.now() - (OUTG.got || 0) < 15 * 60e3)) return; outBusy = true;
+  if (outBusy || (!outOn() && !(typeof netOn === 'function' && netOn())) || (!force && OUTG && Array.isArray(OUTG.net) && Date.now() - (OUTG.got || 0) < 10 * 60e3)) return; outBusy = true;
   try { const r = await fetch(OUT_URL, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); if (d && Array.isArray(d.planned)) { OUTG = Object.assign(d, { got: Date.now() }); localStorage.setItem('outages', JSON.stringify(OUTG)); if (/^#?(alerts)?$/.test(location.hash)) render(); } } } catch (e) { }
   outBusy = false;
 }
@@ -24968,12 +24968,14 @@ function netList() { if (!OUTG || !Array.isArray(OUTG.net)) return []; const now
     .map(o => ({ ...o, st: o.done ? (o.prov === '2degrees' ? 'Resolved' : 'Restored') : cur(o) ? 'Current' : 'Planned' }))
     .sort((a, b) => (!!b.onerahi - !!a.onerahi) || (['Current', 'Restored', 'Resolved', 'Planned'].indexOf(a.st) - ['Current', 'Restored', 'Resolved', 'Planned'].indexOf(b.st)) || String(a.start || '').localeCompare(String(b.start || ''))); }
 function netCard(o, k) { const ic = o.done ? '✅' : o.type === 'Mobile' ? '📶' : '🌐', when = [o.start ? (o.st === 'Planned' ? 'From ' : 'Since ') + outT(o.start) : '', o.end ? (o.st === 'Current' ? 'fix est. ' : 'until ') + outT(o.end) : ''].filter(Boolean).join(' ');
-  return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!glSwipe.moved){netSheet()}"><div class="ic">${ic}</div><div class="tx"><div class="t">${esc(o.prov)} ${esc(o.type.toLowerCase())} ${o.st === 'Planned' ? 'maintenance' : o.done ? 'outage fixed' : 'outage'}: ${esc(String(o.area || '').split(',').slice(0, 3).join(','))}${o.onerahi ? ' <b>(Onerahi)</b>' : ''}</div><div class="s">${esc([o.st === 'Current' ? 'Current' : o.st, o.status && o.status !== o.st ? o.status : '', when].filter(Boolean).join(' · '))}${o.desc ? ' · ' + esc(o.desc) : ''} · Source: ${esc(o.prov)}</div></div></div>`; }
+  return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!glSwipe.moved){netSheet()}"><div class="ic">${ic}</div><div class="tx"><div class="t">${o.st === 'Planned' ? 'Planned: ' : ''}${esc(o.prov)} ${esc(o.type.toLowerCase())} ${o.st === 'Planned' ? 'work' : o.done ? 'outage fixed' : 'outage'}: ${esc(String(o.area || '').split(',').slice(0, 3).join(','))}${o.onerahi ? ' <b>(Onerahi)</b>' : ''}</div><div class="s">${esc([o.st === 'Current' ? 'Current' : o.st, o.status && o.status !== o.st ? o.status : '', when].filter(Boolean).join(' · '))}${o.desc ? ' · ' + esc(o.desc) : ''} · Source: ${esc(o.prov)}</div></div></div>`; }
 function netBellRows() { try { if (!netOn()) return []; const D = nfDis(); return netList().map(o => { const k = 'outn-' + String(o.id).replace(/[^a-z0-9]/gi, '') + '-' + o.st[0]; return D.includes(k) ? '' : netCard(o, k); }).filter(Boolean); } catch (e) { return []; } }
 function netSheet() { const L = netList(), ok = (OUTG && OUTG.netOk) || {};
   openSheet('Internet & mobile outages', (L.length ? `<div class="list">${L.map(o => netCard(o, 'x').replace(/ data-nk="x" role="button" tabindex="0" onclick="[^"]*"/, '')).join('')}</div>` : '<div class="s">No internet or mobile outages listed around Whangārei.</div>')
     + `<div class="s muted" style="margin-top:10px">Sources: Northpower Fibre (Northpower Outages Centre) and 2degrees network status${ok.d2 === false ? ' (2degrees didn’t answer on the last check)' : ''}. Checked about every 20 minutes. One NZ, Spark and Chorus don’t offer a list the app can use.</div>`, null); }
 (() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = netBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = netOn();
-  return h + `<div class="srow"><div class="tx"><div class="t">Internet & mobile outage alerts</div><div class="s">Northpower Fibre and 2degrees outages around Whangārei on the bell page. Buzzes only for a current unplanned outage.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Internet and mobile outage alerts" onclick="toggleSetting('netAlerts').then(() => outRefresh(true))"></button></div>`; } catch (e) { return h; } }; })();
+  return h + `<div class="srow"><div class="tx"><div class="t">Internet & mobile outage alerts</div><div class="s">Northpower Fibre and 2degrees outages around Whangārei on the bell page. Buzzes straight away for an unplanned outage; planned work at 6pm the day before (6pm the same day if it starts in the evening) and 7am on the day.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Internet and mobile outage alerts" onclick="toggleSetting('netAlerts').then(() => outRefresh(true))"></button></div>`; } catch (e) { return h; } }; })();
+// 2.27.42: the bell page re-checks outages when it opens (a copy saved before 2.27.41 had no internet/mobile list).
+window.addEventListener('hashchange', () => { if (/^#alerts/.test(location.hash)) outRefresh(false); });
 

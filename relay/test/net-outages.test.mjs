@@ -17,5 +17,18 @@ const net = netMerge([{ id: 'F1', area: 'Onerahi', suburbs: ['Onerahi'], status:
 ok(net.find(o => o.id === 'npfF1').onerahi && net.find(o => o.id === 'npfOLD').status === 'Restored', 'fibre item + restored');
 ok(netCurrent(net.find(o => o.id === 'npfF1'), now) && !netCurrent(d[1], now), 'current test');
 const rem = netReminders({ net }, now);
-ok(rem.length === 2 && rem.every(r => r.id.startsWith('out-n-') && cleanReminder(r, now)), 'pushes only for current unplanned, ids accepted');
+ok(rem.filter(r => r.id.startsWith('out-n-')).length === 2 && rem.every(r => cleanReminder(r, now)), 'unplanned pushes for current ones only, ids accepted');
 console.log(`net outages: ${n} checks passed`);
+{ // 2.27.42: planned work pushes
+  const at = Date.parse('2026-10-22T07:55:00+13:00'), net = [
+    { id: 'd2a', prov: '2degrees', type: 'Mobile', kind: 'planned', area: 'Northland', start: '2026-10-22T22:00:00+13:00', end: '2026-10-23T06:00:00+13:00' },
+    { id: 'd2b', prov: '2degrees', type: 'Internet', kind: 'planned', area: 'Northland, Kamo', start: '2026-10-24T09:00:00+13:00', end: '2026-10-24T12:00:00+13:00' },
+    { id: 'd2c', prov: '2degrees', type: 'Mobile', kind: 'planned', area: 'Northland', start: '2026-10-25T00:00:00+13:00', end: '2026-10-25T06:00:00+13:00' }];
+  const r = netReminders({ net }, at), by = k => r.filter(x => x.id.includes(k));
+  let m = 0; const ok2 = (c, s) => { assert.ok(c, s); m++; };
+  ok2(by('d2a').length === 1 && by('d2a')[0].date === '2026-10-22' && by('d2a')[0].time === '18:00' && /tonight/.test(by('d2a')[0].title), 'evening start: 6pm same day only (7am passed)');
+  ok2(by('d2b').length === 2 && by('d2b').some(x => x.date === '2026-10-23' && x.time === '18:00') && by('d2b').some(x => x.date === '2026-10-24' && x.time === '07:00'), 'daytime: 6pm before + 7am on the day');
+  ok2(by('d2c').length === 1 && by('d2c')[0].date === '2026-10-24', 'early start: evening before only');
+  ok2(r.every(x => x.id.startsWith('out-p') && cleanReminder(x, at)), 'out- ids accepted');
+  console.log(`planned net pushes: ${m} checks passed`);
+}

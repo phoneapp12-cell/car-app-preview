@@ -121,8 +121,16 @@ export function netMerge(fibre, d2, prevNet, now) {
 // Current = unplanned and not resolved (or a planned one under way). Whangārei generally = all kept items (Northland only).
 export const netCurrent = (o, now) => !o.done && (o.kind === 'unplanned' || (o.start && Date.parse(o.start) <= now && (!o.end || Date.parse(o.end) > now)));
 export function netReminders(rec, now) {
-  const out = [];
-  for (const o of (rec && rec.net) || []) { if (o.done || o.kind !== 'unplanned') continue; const p = nzParts(now);
-    out.push({ id: 'out-n-' + String(o.id).replace(/[^a-z0-9]/gi, '').slice(0, 40), title: ('📶 ' + o.prov + ' ' + o.type.toLowerCase() + ' outage: ' + String(o.area || 'Whangārei').split(',').slice(0, 2).join(',')).slice(0, 80), date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}`, repeat: 'none' }); }
-  return out.slice(0, 6);
+  const out = [], cid = v => String(v).replace(/[^a-z0-9]/gi, '').slice(0, 30), where = o => String(o.area || 'Whangārei').split(',').slice(0, 2).join(',');
+  for (const o of (rec && rec.net) || []) { if (o.done) continue;
+    if (o.kind === 'unplanned') { const p = nzParts(now); out.push({ id: 'out-n-' + cid(o.id), title: ('📶 ' + o.prov + ' ' + o.type.toLowerCase() + ' outage: ' + where(o)).slice(0, 80), date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}`, repeat: 'none' }); continue; }
+    // 2.27.42: planned work, like planned power: 6pm the day before and 7am on the day. Work that starts from 6pm gets its
+    // 'tonight' push at 6pm that day instead; work starting before 8am gets only the evening-before push.
+    if (!o.start) continue; const s = Date.parse(o.start); if (!(s > now)) continue; const p = nzParts(s), d = day(s), hm = p.hour + ':' + p.minute, t = clock(s) + (o.end ? '–' + clock(Date.parse(o.end)) : '');
+    const what = o.prov + ' ' + o.type.toLowerCase() + ' work';
+    const add = (k, date, time, title) => { const due = Date.parse(nzLocalIso(date + 'T' + time + ':00')); if (due > now - 60e3 && due < s) out.push({ id: 'out-p' + k + '-' + cid(o.id + d), title: title.slice(0, 80), date, time, repeat: 'none' }); };
+    if (hm >= '18:00') add('e', d, '18:00', '🛠 Planned tonight: ' + what + ', ' + where(o) + ', ' + t);
+    else add('b', day(s, -1), '18:00', '🛠 Planned tomorrow: ' + what + ', ' + where(o) + ', ' + t);
+    if (hm >= '08:00') add('m', d, '07:00', '🛠 Planned today: ' + what + ', ' + where(o) + ', ' + t); }
+  return out.slice(0, 12);
 }
