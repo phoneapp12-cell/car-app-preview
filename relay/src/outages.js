@@ -32,14 +32,15 @@ export function parsePage(html) {
     const s = i + 15, e = html.indexOf('"', s); if (e < 0) break; i = e;
     const raw = html.slice(s, e); if (raw.indexOf('unplannedElectricityOutages&quot;') < 0 || raw.indexOf('plannedElectricityOutages&quot;:') < 0) continue;
     let d; try { d = unwrap(JSON.parse(unesc(raw)).data); } catch (er) { continue; }
-    const P = d.plannedElectricityOutages, U = d.unplannedElectricityOutages;
+    const P = d.plannedElectricityOutages, U = d.unplannedElectricityOutages, F = d.unplannedFibreOutages;
     const planned = [], seen = new Set();
     const flat = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v).flat() : []);
     for (const o of flat(P)) { if (!o || typeof o !== 'object') continue; const x = slim(o, 'planned'); const k = x.id + x.start; if (!seen.has(k)) { seen.add(k); planned.push(x); } }
     const unplanned = flat(U).filter(o => o && typeof o === 'object').map(o => slim(o, 'unplanned'));
     const meta = d.plannedElectricityOutageMeta || {};
     const os = (d.outageState && (Array.isArray(d.outageState) ? d.outageState[0] : d.outageState)) || {}, om = os.plannedElectricityOutagesMeta || {};
-    return { planned, unplanned, updated: iso(meta.lastUpdated) || iso(om.lastUpdated) || null };
+    const fibre = flat(F).filter(o => o && typeof o === 'object').map(o => slim(o, 'unplanned'));
+    return { planned, unplanned, fibre, updated: iso(meta.lastUpdated) || iso(om.lastUpdated) || null };
   }
   return null;
 }
@@ -53,7 +54,10 @@ export async function runOutages(env, fetchImpl = fetch, now = Date.now(), force
   // Unplanned outages that have gone from the list are kept a few hours as restored.
   const restored = ((prev && prev.unplanned) || []).filter(o => o.status !== 'Restored' && !got.unplanned.some(u => u.id === o.id)).map(o => ({ ...o, status: 'Restored', restoredAt: new Date(now).toISOString() }));
   const keepR = ((prev && prev.restored) || []).concat(restored).filter(o => now - Date.parse(o.restoredAt || 0) < 6 * 3600e3).slice(-20);
-  const rec = { planned: got.planned, unplanned: got.unplanned, restored: keepR, updated: got.updated, source: 'Northpower Outages Centre' };
+  // 2.27.41: internet and mobile. Northpower Fibre's unplanned outages come in the same page; 2degrees' public outage list is separate.
+  let d2 = null; try { d2 = await fetch2d(fetchImpl); } catch (e) { d2 = null; }
+  const net = netMerge(got.fibre || [], d2 === null ? ((prev && prev.net) || []).filter(o => o.prov === '2degrees') : d2, (prev && prev.net) || [], now);
+  const rec = { planned: got.planned, unplanned: got.unplanned, restored: keepR, net, netOk: { npf: true, d2: d2 !== null }, updated: got.updated, source: 'Northpower Outages Centre' };
   await kv.put(OUT_KEY, JSON.stringify(rec));
   return rec;
 }
@@ -73,4 +77,52 @@ export function outageReminders(rec, pref, now) {
     out.push({ id: 'out-b-' + cid(o.id + d), title: ('🔌 Planned power cut tomorrow in ' + o.area + ', ' + t).slice(0, 80), date: day(s, -1), time: '18:00', repeat: 'none' });
     out.push({ id: 'out-m-' + cid(o.id + d), title: ('🔌 Planned power cut today in ' + o.area + ', ' + t).slice(0, 80), date: d, time: '07:00', repeat: 'none' }); }
   return out.slice(0, 12);
+}
+
+// ---- 2.27.41: internet and mobile outages ----
+/* Northpower Fibre (Whangārei's fibre network) unplanned outages, from the same Northpower page, and 2degrees' published
+   outage list (api.2degrees.nz/outages/publishedOutages, the list their public Network status page shows; their site terms
+   allow use for your own non-commercial purposes). Only Northland items are kept. One NZ (terms bar copying content
+   without consent), Spark (captcha) and Chorus (outage API needs a login key) aren't used. */
+const D2_URL = 'https://api.2degrees.nz/outages/publishedOutages';
+const WHG = { lat: -35.7251, lng: 174.3237 };
+const NORTH_RE = /\b(whang[aā]rei|onerahi|northland|tamaterau|parua bay|ngunguru|tutukaka|hikurangi|ruakaka|one tree point|maungatapere)\b/i; // place names that are only in Northland; others go by map point
+const kmFrom = (a, b) => { const r = x => x * Math.PI / 180, dl = r(b.lat - a.lat), dg = r(b.lng - a.lng), h = Math.sin(dl / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dg / 2) ** 2; return 12742 * Math.asin(Math.sqrt(h)); };
+// NZ local time with no zone ("2026-10-22T22:00:00") to an ISO time with the right NZ offset.
+export function nzLocalIso(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return null; if (/(Z|[+-]\d{2}:?\d{2})$/.test(v)) return v;
+  const base = Date.parse(v.slice(0, 19) + 'Z'); let ms = base - 13 * 3600e3;
+  for (let i = 0; i < 2; i++) { const p = nzParts(ms), loc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute); ms = ms + (base - loc); }
+  const off = Math.round((base - ms) / 60e3), sg = off >= 0 ? '+' : '-', a = Math.abs(off);
+  return v.slice(0, 19) + sg + String(Math.floor(a / 60)).padStart(2, '0') + ':' + String(a % 60).padStart(2, '0');
+}
+const hash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36); };
+const D2_STATUS = { implement: 'In progress', review: 'In progress', closed: 'Resolved', resolved: 'Resolved', 'in progress': 'Under repair', 'on hold': 'Under repair', 'under observation': 'Monitoring', scheduled: 'Scheduled' };
+// Pure: 2degrees list in, Northland items out.
+export function parse2d(list) {
+  return (Array.isArray(list) ? list : []).filter(o => o && typeof o === 'object').filter(o => { const g = o.geoLocation || {}; return NORTH_RE.test(String(o.location || '')) || (Number.isFinite(g.latitude) && kmFrom(WHG, { lat: g.latitude, lng: g.longitude }) <= 30); })
+    .map(o => { const cats = (o.categories || []).map(c => String(c).toLowerCase()), mob = cats.some(c => c.includes('mobile')), bb = cats.some(c => c.includes('broadband'));
+      const st = D2_STATUS[String(o.status || '').toLowerCase()] || String(o.status || '').slice(0, 30), loc = String(o.location || '').slice(0, 200);
+      return { id: 'd2' + hash([o.type, o.startTime, loc].join('|')), prov: '2degrees', type: mob && bb ? 'Internet & mobile' : mob ? 'Mobile' : 'Internet', kind: /unplanned/i.test(o.type) ? 'unplanned' : 'planned',
+        area: loc, status: st, start: nzLocalIso(o.startTime), end: nzLocalIso(o.endTime), desc: String(o.description || '').slice(0, 200), done: st === 'Resolved' }; });
+}
+async function fetch2d(fetchImpl) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), 15000);
+  try { const r = await fetchImpl(D2_URL, { headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; due-dates-relay; personal outage alerts)' }, signal: c.signal }); if (!r.ok) throw new Error('http ' + r.status); return parse2d(await r.json()); } finally { clearTimeout(t); }
+}
+// Pure: fibre (slimmed Northpower items) + 2degrees -> one list; fibre outages that vanish are kept 6 hours as restored.
+export function netMerge(fibre, d2, prevNet, now) {
+  const f = fibre.map(o => ({ id: 'npf' + String(o.id).replace(/[^a-z0-9]/gi, '').slice(0, 30), prov: 'Northpower Fibre', type: 'Internet', kind: 'unplanned', area: o.area || o.where, status: o.status || 'Current', start: o.start, end: o.end, desc: o.cause || o.msg || '', onerahi: isOnerahi(o), done: false }));
+  const gone = (prevNet || []).filter(o => o.prov === 'Northpower Fibre' && !o.done && !f.some(x => x.id === o.id)).map(o => ({ ...o, status: 'Restored', done: true, restoredAt: new Date(now).toISOString() }));
+  const keep = (prevNet || []).filter(o => o.prov === 'Northpower Fibre' && o.done && now - Date.parse(o.restoredAt || 0) < 6 * 3600e3 && !f.some(x => x.id === o.id));
+  const d = (d2 || []).map(o => ({ ...o, onerahi: /onerahi/i.test(o.area || '') }));
+  return f.concat(gone, keep, d).slice(0, 40);
+}
+// Current = unplanned and not resolved (or a planned one under way). Whangārei generally = all kept items (Northland only).
+export const netCurrent = (o, now) => !o.done && (o.kind === 'unplanned' || (o.start && Date.parse(o.start) <= now && (!o.end || Date.parse(o.end) > now)));
+export function netReminders(rec, now) {
+  const out = [];
+  for (const o of (rec && rec.net) || []) { if (o.done || o.kind !== 'unplanned') continue; const p = nzParts(now);
+    out.push({ id: 'out-n-' + String(o.id).replace(/[^a-z0-9]/gi, '').slice(0, 40), title: ('📶 ' + o.prov + ' ' + o.type.toLowerCase() + ' outage: ' + String(o.area || 'Whangārei').split(',').slice(0, 2).join(',')).slice(0, 80), date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}`, repeat: 'none' }); }
+  return out.slice(0, 6);
 }

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.40';
+const APP_VERSION = '2.27.41';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10401,7 +10401,7 @@ async function scheduleReminders() {
     if (!sub) return reminders.length ? 'fail' : '';
     try { shopPushReg(sub); } catch (e) { }
     if (!reminders.length && !S.settings.remOnRelay && !(S.settings.tvLinks || []).length) return '';
-    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined), outages: (typeof outPref === 'function' ? outPref() : undefined) });
+    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined), outages: (typeof outPref === 'function' ? outPref() : undefined), netOutages: (typeof netOn === 'function' ? (netOn() ? 'on' : 'off') : undefined) });
     const on = reminders.length > 0 || (S.settings.tvLinks || []).length > 0;
     if (!!S.settings.remOnRelay !== on) { S.settings.remOnRelay = on; await save(); }
     return '';
@@ -24926,7 +24926,7 @@ const outHome = o => (o.suburbs || []).some(x => /onerahi/i.test(x)) || (o.roads
 const OUT_KAIPARA = /\b(dargaville|maungaturoto|te kopuru|mareretu|taipuha|kaiwaka|mangawhai|ruawai|paparoa|matakohe|kaihu|tinopai|pouto|baylys|aratapu|tangowahine|kirikopuni|tangiteroria|batley|whakapirau|hakaru|oneriri|tanoa|otamatea)\b/i;
 const outWhg = o => !OUT_KAIPARA.test([o.area].concat(o.suburbs || [], o.zone || []).join(' ')) || (o.suburbs || []).some(x => !OUT_KAIPARA.test(x));
 async function outRefresh(force) {
-  if (outBusy || !outOn() || (!force && OUTG && Date.now() - (OUTG.got || 0) < 15 * 60e3)) return; outBusy = true;
+  if (outBusy || (!outOn() && !(typeof netOn === 'function' && netOn())) || (!force && OUTG && Date.now() - (OUTG.got || 0) < 15 * 60e3)) return; outBusy = true;
   try { const r = await fetch(OUT_URL, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); if (d && Array.isArray(d.planned)) { OUTG = Object.assign(d, { got: Date.now() }); localStorage.setItem('outages', JSON.stringify(OUTG)); if (/^#?(alerts)?$/.test(location.hash)) render(); } } } catch (e) { }
   outBusy = false;
 }
@@ -24956,4 +24956,24 @@ async function outSetScope(v) { S.settings.outScope = v; await save(); await set
 (() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = outBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = outOn(), sc = outScope();
   return h + `<div class="srow"><div class="tx"><div class="t">Power outage alerts</div><div class="s">Northpower current and planned outages on the bell page. Buzzes for an Onerahi outage: straight away if unplanned, the evening before and the morning of if planned.</div>${on ? `<div style="margin-top:8px;display:flex;gap:8px"><button type="button" class="btn small ${sc === 'onerahi' ? 'primary' : ''}" onclick="outSetScope('onerahi')">Onerahi only</button><button type="button" class="btn small ${sc === 'all' ? 'primary' : ''}" onclick="outSetScope('all')">All Whangārei</button></div>` : ''}</div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Power outage alerts" onclick="toggleSetting('outAlerts')"></button></div>`; } catch (e) { return h; } }; })();
+
+// ---- 2.27.41: internet and mobile outages ----
+/* From the same relay check (about every 20 minutes): Northpower Fibre unplanned outages (Whangārei's fibre network) and
+   2degrees' published mobile and broadband outages, Northland only. One NZ, Spark and Chorus aren't used (terms, captcha,
+   login key). Onerahi first, then current, then planned. Pushes (relay side, out-n- ids): current unplanned outages only. */
+const netOn = () => (S.settings || {}).netAlerts !== false;
+function netList() { if (!OUTG || !Array.isArray(OUTG.net)) return []; const now = Date.now();
+  const cur = o => !o.done && (o.kind === 'unplanned' || (o.start && Date.parse(o.start) <= now && (!o.end || Date.parse(o.end) > now)));
+  return OUTG.net.filter(o => o && (o.done ? (o.restoredAt ? now - Date.parse(o.restoredAt) < 6 * 3600e3 : o.start && now - Date.parse(o.start) < 24 * 3600e3) : (!o.end || Date.parse(o.end) > now)))
+    .map(o => ({ ...o, st: o.done ? (o.prov === '2degrees' ? 'Resolved' : 'Restored') : cur(o) ? 'Current' : 'Planned' }))
+    .sort((a, b) => (!!b.onerahi - !!a.onerahi) || (['Current', 'Restored', 'Resolved', 'Planned'].indexOf(a.st) - ['Current', 'Restored', 'Resolved', 'Planned'].indexOf(b.st)) || String(a.start || '').localeCompare(String(b.start || ''))); }
+function netCard(o, k) { const ic = o.done ? '✅' : o.type === 'Mobile' ? '📶' : '🌐', when = [o.start ? (o.st === 'Planned' ? 'From ' : 'Since ') + outT(o.start) : '', o.end ? (o.st === 'Current' ? 'fix est. ' : 'until ') + outT(o.end) : ''].filter(Boolean).join(' ');
+  return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!glSwipe.moved){netSheet()}"><div class="ic">${ic}</div><div class="tx"><div class="t">${esc(o.prov)} ${esc(o.type.toLowerCase())} ${o.st === 'Planned' ? 'maintenance' : o.done ? 'outage fixed' : 'outage'}: ${esc(String(o.area || '').split(',').slice(0, 3).join(','))}${o.onerahi ? ' <b>(Onerahi)</b>' : ''}</div><div class="s">${esc([o.st === 'Current' ? 'Current' : o.st, o.status && o.status !== o.st ? o.status : '', when].filter(Boolean).join(' · '))}${o.desc ? ' · ' + esc(o.desc) : ''} · Source: ${esc(o.prov)}</div></div></div>`; }
+function netBellRows() { try { if (!netOn()) return []; const D = nfDis(); return netList().map(o => { const k = 'outn-' + String(o.id).replace(/[^a-z0-9]/gi, '') + '-' + o.st[0]; return D.includes(k) ? '' : netCard(o, k); }).filter(Boolean); } catch (e) { return []; } }
+function netSheet() { const L = netList(), ok = (OUTG && OUTG.netOk) || {};
+  openSheet('Internet & mobile outages', (L.length ? `<div class="list">${L.map(o => netCard(o, 'x').replace(/ data-nk="x" role="button" tabindex="0" onclick="[^"]*"/, '')).join('')}</div>` : '<div class="s">No internet or mobile outages listed around Whangārei.</div>')
+    + `<div class="s muted" style="margin-top:10px">Sources: Northpower Fibre (Northpower Outages Centre) and 2degrees network status${ok.d2 === false ? ' (2degrees didn’t answer on the last check)' : ''}. Checked about every 20 minutes. One NZ, Spark and Chorus don’t offer a list the app can use.</div>`, null); }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = netBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
+(() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = netOn();
+  return h + `<div class="srow"><div class="tx"><div class="t">Internet & mobile outage alerts</div><div class="s">Northpower Fibre and 2degrees outages around Whangārei on the bell page. Buzzes only for a current unplanned outage.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Internet and mobile outage alerts" onclick="toggleSetting('netAlerts').then(() => outRefresh(true))"></button></div>`; } catch (e) { return h; } }; })();
 
