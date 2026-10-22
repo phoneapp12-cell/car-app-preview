@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.73';
+const APP_VERSION = '2.27.74';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10537,6 +10537,7 @@ function More() {
     news: () => newsMoreSub(),
     tv: () => 'TVNZ 1, TVNZ 2, Three and Sky Starter',
     meals: () => mealsMoreSub(),
+    food: () => 'Meal planner, recipes and shopping',
     recipes: () => plural(visibleIdeas().length, 'recipe') + (M().ideas.some(i => i.fav && !i.hidden) ? ` · ${M().ideas.filter(i => i.fav && !i.hidden).length} favourites` : ''),
     shopping: () => shopMoreSub(),
     pets: () => petsMoreSub(),
@@ -10605,7 +10606,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   lights: ['bulb', 'garden', 'Lights', 'Lights'],
   heat: ['sun', 'garden', 'Heat pumps', 'Heat'],
   alarm: ['shield', 'garden', 'Alarm', 'Alarm'],
-  media: ['play', 'vid', 'Entertainment', 'Entertain'] // 2.27.51
+  media: ['play', 'vid', 'Entertainment', 'Entertain'], // 2.27.51
+  food: ['meal', 'meal', 'Meals', 'Meals'] // 2.27.74: Meals page (planner, recipes, shopping). #meals stays the planner so old links keep working
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -10615,8 +10617,9 @@ const NAV_GROUPS = [
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans'] }, // 2.26.91: UniMed claims live once, next to Health in People // 2.26.90: work hours, commission and wage estimate together under Money
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'watch', 'claims', 'about'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] }, // 2.26.94: its own heading like the other groups
-  { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
+  { id: 'life', title: 'Home life', keys: ['shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
   { id: 'near', title: 'Nearby', keys: ['bridge', 'roadworks'] }, // 2.27.52: Travel is on the Media page
+  { id: 'food', title: '', keys: ['food'] }, // 2.27.74: Meal planner and Recipes open from the Meals page
   { id: 'media', title: '', keys: ['media'] } // 2.27.51: Media stands on its own; TV, videos, Top 40, blogs, podcasts, radio, news and events open from its page
 ];
 function navOrder() {
@@ -18695,7 +18698,7 @@ function btMeta(k) {
   if (k === 'more') return ['More (opens the side menu)', 'More', 'more'];
   const n = NAV[k]; return n ? [n[2].replace('&amp;', '&'), n[3], n[0]] : null;
 }
-const BT_ALL = () => ['home', 'media', ...NAV_DEFAULT, 'weather', 'settings', 'more'].filter((k, i, a) => btMeta(k) && a.indexOf(k) === i);
+const BT_ALL = () => ['home', 'media', 'food', ...NAV_DEFAULT.filter(k => k !== 'meals' && k !== 'recipes'), 'weather', 'settings', 'more'].filter((k, i, a) => btMeta(k) && a.indexOf(k) === i);
 function btState() {
   S.settings = S.settings || {};
   const b = S.settings.bottomTabs && typeof S.settings.bottomTabs === 'object' ? S.settings.bottomTabs : (S.settings.bottomTabs = { on: false, keys: BT_DEFAULT.slice() });
@@ -18767,6 +18770,12 @@ function btCustomise() {
   }, 'Save');
   btWireDrag();
 }
+async function btAddFood() { // 2.27.74: same as Entertainment's button
+  const s = snap(), b = btState();
+  if (b.keys.includes('food')) { if (!b.on) { b.on = true; await save(); render(); } toast('Meals is on your bottom tabs.'); return; }
+  if (b.keys.length >= BT_MAX) { toast('Six tabs is the most. Remove one, then add Meals.'); btCustomise(); return; }
+  const i = b.keys.indexOf('more'); b.keys.splice(i < 0 ? b.keys.length : i, 0, 'food'); b.on = true; await save(); render(); toast('Meals added to your bottom tabs.', 'Undo', undoTo(s));
+}
 async function btAddMedia() { // 2.27.64: one tap from the Entertainment page
   const s = snap(), b = btState();
   if (b.keys.includes('media')) { if (!b.on) { b.on = true; await save(); render(); } toast('Entertainment is on your bottom tabs.'); return; }
@@ -18781,9 +18790,9 @@ function bottomTabsSetting() {
 }
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
-const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
+const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'food', meals: 'food', recipes: 'food' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather', media: 'tv' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather', media: 'tv' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -18842,7 +18851,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19961,6 +19970,19 @@ function MediaPage() {
     `<div class="foot">Events from Whangārei District Council, Eventfinda and Event Cinemas.</div>`;
 }
 
+/* ---- 2.27.74: Meals page (#food): Meal planner, Recipes and Shopping list as tiles, like Entertainment. All recipes are gluten free. */
+function FoodPage() {
+  const un = x => String(x || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, '’').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  const T = [], add = (k, title, fn, art, go) => { let x = ''; try { x = un(fn()); } catch (e) { } T.push({ k, cat: 'food', title, s: x.slice(0, 70), art, grad: ['#f97316', '#be123c'], go }); };
+  add('planner', 'Meal planner', () => mealsMoreSub(), 'art/meals-banner.webp', "go('#meals')");
+  add('recipes', 'Recipes', () => { const r = glPickRecipe(); return r ? 'GF idea: ' + r.title : plural(visibleIdeas().length, 'recipe'); }, 'i3-plate', "go('#recipes')");
+  add('shopping', 'Shopping list', () => { const n = S.shop.items.filter(x => !x.done).length; return n ? plural(n, 'item') : 'Nothing on the list'; }, 'art/shopping-banner.webp', "go('#shopping')");
+  const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('food'); } catch (e) { return true; } })();
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header(`<span style="display:inline-flex;align-items:center;gap:10px"><img src="art/i3-plate.webp" alt="" width="40" height="40" style="width:40px;height:40px;object-fit:contain" onerror="this.remove()">Meals</span>`, 'Plan, cook and shop · all gluten free') +
+    (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddFood()">${I('plus')} Add to bottom bar</button>`) + `<div class="glgrid">${T.map(t => glTileHtml(t, false)).join('')}</div>`;
+}
+(() => { const bk = `<button class="back" onclick="go('#food')">${I('left')} Meals</button>`; const o1 = Meals, o2 = Recipes;
+  Meals = function (a) { return a === 'ideas' ? Recipes() : bk + o1.apply(this, arguments); }; Recipes = function () { return bk + o2.apply(this, arguments); }; })();
 /* ---- 2.27.62: Concerts page (#concerts), opened from the Concerts tile. Whangārei first, then Auckland, each grouped by month.
    Rows: name, venue, date and start time (or time TBC). Tap opens the Eventfinda / ticket page. No sport; Whangārei ones skip his shifts. */
 function evListSecs() {
