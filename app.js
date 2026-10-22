@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.64';
+const APP_VERSION = '2.27.65';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13492,7 +13492,7 @@ function Events() {
     (up.length ? `<label class="search">${I('search')}<input id="evq" type="search" placeholder="Search events" value="${esc(evQuery)}" aria-label="Search events" oninput="evQuery=this.value;document.getElementById('evlist').innerHTML=evList()"></label>
       ${cats.length ? `<div class="chips scroll">${['All', ...cats].map(c => `<button class="chip ${c === evCat ? 'on' : ''}" onclick="setEvCat(${jsArg(c)})">${esc(c)}</button>`).join('')}</div>` : ''}
       <div id="evlist">${evList()}</div>`
-      : `<div class="card empty"><div class="t">No events listed for the next 60 days</div><div class="s">Have a look at ${src} for anything new.</div></div>`) +
+      : `<div class="card empty"><div class="t">Nothing listed right now</div><div class="s">Have a look at ${src} for anything new.</div></div>`) +
     `<div class="foot">Events from ${src}. Movies and markets are added alongside the council’s list. Check times and details with the organiser before you go.<br>Updated ${ago(EVS.data.updated ? Date.parse(EVS.data.updated) : EVS.at)}</div>`;
 }
 async function addEvent(id) {
@@ -19775,7 +19775,7 @@ function glTiles() {
   add('posts', 'read', 'Your posts', () => { const p = postsSorted(); return p.length ? p[0].title : ''; }, 'i3-idea', ['#ca8a04', '#9a3412'], "go('#blogging/mine')");
   add('localnews', 'read', 'Local news', () => { const n = (newsSec('local') || []).filter(newsOk); return n.length ? n[0].title : ''; }, B('news'), '', "go('#news')");
   add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
-  add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(x => !(x.cats || []).includes('Movies') && !isNightlife(x)); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
+  add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(evPlain); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
   add('concerts', 'out', 'Concerts', () => { const G = mdEvGroups(), e = G.akl[0] || G.concerts[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), e.date ? fmtW(e.date) : ''].filter(Boolean).join(' · ') : ''; }, 'i3-radio', ['#7c3aed', '#1e1b4b'], "go('#concerts')"); // 2.27.62
   add('nightlife', 'out', 'Nightlife', () => { const e = mdEvGroups().nightlife[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), (e.date ? fmtW(e.date) : '') + (e.time ? ' ' + fmtTime(e.time) : '')].filter(Boolean).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#nightlife')"); // 2.27.63: own page
   add('place', 'fun', 'Travel', () => { const p = travelToday(); return p ? 'Place of the day: ' + p.name + ', ' + p.country : 'Places to go'; }, B('travel'), '', "go('#travel')");
@@ -24328,6 +24328,10 @@ function cineCard(q = '', open = false) {
   const cc = cineCard(''); if (!cc) return h; const i = h.indexOf('<div class="list">');
   return i >= 0 ? h.slice(0, i) + cc + h.slice(i) : h + cc;
 }; })();
+// 2.27.65: Events leaves out what Concerts, Movies and Nightlife show (same classifier, so nothing is in two places)
+const evPlain = e => { try { const c = mdEvCat(e); return c === 'markets' || c === 'other'; } catch (x) { return true; } };
+function evPlainRun(fn, self, args) { const u = upcomingEvents, cd = cineData; upcomingEvents = () => u().filter(evPlain); cineData = () => null; try { return fn.apply(self, args); } finally { upcomingEvents = u; cineData = cd; } }
+(() => { const oE = Events, oL = evList; Events = function () { return evPlainRun(oE, this, arguments); }; evList = function () { return evPlainRun(oL, this, arguments); }; })();
 // ---- Notifications cards ----
 function lnEvAdd(id) {
   const st = lnSt(); let it = null; st.notes.forEach(n => n.items.forEach(x => { if (x.k === 'ev' && x.id === id) it = x; }));
