@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.57';
+const APP_VERSION = '2.27.58';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12486,7 +12486,7 @@ const WDC_WHATSON = 'https://www.wdc.govt.nz/Events/Whats-On';
 let EVS = null, evBusy = false, evFailed = false, evQuery = '', evCat = 'All';
 function loadEvs() { try { const e = JSON.parse(localStorage.getItem('events') || 'null'); EVS = e && e.at && e.data && Array.isArray(e.data.events) ? e : null; } catch (x) { EVS = null; } }
 async function refreshEvents(force = false) {
-  const thin = EVS && (!(EVS.data.events || []).some(e => (e.cats || []).includes('Movies')) || !EVS.data.sources); // 2.23.15: older saved lists have no nightlife
+  const thin = EVS && (!(EVS.data.events || []).some(e => (e.cats || []).includes('Movies')) || !EVS.data.sources || !EVS.data.akl); // 2.23.15; 2.27.58 Auckland concerts: older saved lists have no nightlife
   if (evBusy || (!force && EVS && Date.now() - EVS.at < EV_MAX_AGE && !thin)) return;
   if (!RELAY_URL) { evFailed = true; updEvents(); return; }
   evBusy = true; if (force) updEvents();
@@ -19836,24 +19836,36 @@ function mdConcertRow(e) {
   const u = /^https:\/\//.test(e.url || '') ? e.url : '';
   return tabRow('events', esc(e.title), esc(ven) + '<br>' + esc((e.date ? fmtW(e.date) : 'Date TBC') + ' · ' + tm), u ? `window.open('${esc(u)}','_blank','noopener')` : "go('#events')");
 }
-const MD_EV = [['concerts', '🎸 Concerts'], ['nightlife', '🌙 Whangārei nightlife'], ['movies', '🎬 Movies at Event Cinemas'], ['markets', '🧺 Markets'], ['other', '📌 Other']];
+const MD_EV = [['akl', '🎤 Auckland concerts', 'concerts'], ['concerts', '🎸 Whangārei concerts', 'nightlife', 'wconc'], ['nightlife', '🌙 Nightlife', 'nightlife', 'night'], ['movies', '🎬 Movies at Event Cinemas'], ['markets', '🧺 Markets'], ['other', '📌 Other']];
+let mdNl = 'wconc'; // 2.27.58: Nightlife tab inner chips: Whangārei concerts / Nightlife
 function mdEvRow(e) {
   const when = (e.date ? fmtW(e.date) : '') + (e.time ? ' · ' + fmtTime(e.time) : ''), ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',') : '';
   const u = /^https:\/\//.test(e.url || '') ? e.url : '';
   return tabRow('events', esc(e.title), esc([when, ven].filter(Boolean).join(' · ')), u ? `window.open('${esc(u)}','_blank','noopener')` : "go('#events')");
 }
+// 2.27.58: Auckland concerts from the relay (Eventfinda Auckland gig guide, major venues and real concerts only). Not filtered by shifts; no sport.
+function mdAkl() { try { const T = todayISO(); return ((EVS && EVS.data && EVS.data.akl) || []).filter(e => e && e.title && e.date >= T && !isSport([e.title, e.desc].join(' '))); } catch (e) { return []; } }
 function mdEvGroups() {
-  const G = { concerts: [], nightlife: [], movies: [], markets: [], other: [] };
+  const G = { akl: mdAkl(), concerts: [], nightlife: [], movies: [], markets: [], other: [] };
   try { upcomingEvents().forEach(e => { if (isSport([e.title, (e.cats || []).join(' '), e.desc].join(' '))) return; const c = mdEvCat(e); if ((c === 'concerts' || c === 'nightlife') && evDuringWork(e)) return; G[c].push(e); }); } catch (e) { }
   return G;
 }
+const MD_GRAD = { akl: ['#7c3aed', '#1e1b4b'], concerts: ['#db2777', '#7c2d12'], nightlife: ['#6d28d9', '#0f172a'] };
+function mdEvTile(e, k) {
+  const ven = e.venue ? String(e.venue).split(',')[0].trim() : 'Venue TBC', tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC';
+  const s = [ven, e.date ? fmtW(e.date) : 'Date TBC', tm].join(' · '), u = /^https:\/\//.test(e.url || '') ? e.url : '', g = MD_GRAD[k] || MD_GRAD.nightlife;
+  const tag = k === 'akl' ? 'AUCKLAND' : k === 'concerts' ? 'CONCERT' : ((e.cats || []).find(c => c !== 'Nightlife') || 'NIGHTLIFE').toUpperCase();
+  return `<button type="button" class="gltile glic" style="--a:${g[0]};--b:${g[1]}" onclick="${u ? esc(`window.open('${u.replace(/'/g, '%27')}','_blank','noopener')`) : "go('#events')"}" aria-label="${esc(e.title + ': ' + s)}"><img src="art/i3-${k === 'nightlife' ? 'moon' : 'radio'}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltag">${esc(tag)}</span><span class="gltt">${esc(e.title)}<small>${esc(s)}</small></span></button>`;
+}
+const mdTiles = (L, k) => L.length ? `<div class="glgrid">${L.map(e => mdEvTile(e, k)).join('')}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>';
+const mdGo = (f, n) => `mdFilt='${f}';${n ? `mdNl='${n}';` : ''}render()`;
 function mdEvents() {
   const G = mdEvGroups();
-  return MD_EV.map(([k, t]) => {
+  return MD_EV.map(([k, t, f, n]) => {
     let body = '';
     if (k === 'movies') body = homeTry('md cinema', () => cineCard(), '') || (G.movies.length ? `<div class="list">${G.movies.slice(0, 6).map(mdEvRow).join('')}</div>` : '');
-    else if (G[k].length) body = `<div class="list">${G[k].slice(0, 6).map(k === 'concerts' ? mdConcertRow : mdEvRow).join('')}</div>` + (G[k].length > 6 ? (k === 'concerts' || k === 'nightlife' ? `<button type="button" class="glmore" onclick="mdFilt='${k}';render()">See all ${G[k].length} ›</button>` : `<button type="button" class="glmore" onclick="go('#events')">+${G[k].length - 6} more on Events ›</button>`) : '');
-    return `<div class="glzone"><span>${t}</span>${k === 'concerts' || k === 'nightlife' ? `<a href="javascript:void 0" onclick="mdFilt='${k}';render()">${k === 'concerts' ? 'Concerts' : 'Nightlife'} tab ›</a>` : ''}</div>` + (body || '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
+    else if (G[k].length) body = `<div class="list">${G[k].slice(0, 6).map(f ? mdConcertRow : mdEvRow).join('')}</div>` + (G[k].length > 6 ? (f ? `<button type="button" class="glmore" onclick="${mdGo(f, n)}">See all ${G[k].length} ›</button>` : `<button type="button" class="glmore" onclick="go('#events')">+${G[k].length - 6} more on Events ›</button>`) : '');
+    return `<div class="glzone"><span>${t}</span>${f ? `<a href="javascript:void 0" onclick="${mdGo(f, n)}">${f === 'concerts' ? 'Concerts' : 'Nightlife'} tab ›</a>` : ''}</div>` + (body || '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
   }).join('');
 }
 function MediaPage() {
@@ -19864,13 +19876,16 @@ function MediaPage() {
   if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
   const list = mdFilt === 'all' ? all : all.filter(t => t.cat === mdFilt);
   const filt = `<div class="glfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';render()">${c[1]}</button>`).join('')}</div>`;
-  if (mdFilt === 'concerts' || mdFilt === 'nightlife') { const L = mdEvGroups()[mdFilt];
-    return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Entertainment', mdFilt === 'concerts' ? 'Concerts around Whangārei and Northland' : 'Whangārei nightlife, outside your shifts') + filt +
-      (L.length ? `<div class="list">${L.map(mdConcertRow).join('')}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>') + `<div class="foot">From Eventfinda and Whangārei District Council. No sport.</div>`; }
+  const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
+  if (mdFilt === 'concerts') return back + header('Entertainment', 'Auckland concerts') + filt + mdTiles(mdEvGroups().akl, 'akl') +
+    `<div class="foot">Auckland concerts from Eventfinda (eventfinda.co.nz), Auckland gig guide: major venues and concerts only. Tap a tile for tickets. Check details before you go. No sport.</div>`;
+  if (mdFilt === 'nightlife') { const G = mdEvGroups(), sub = `<div class="glfilt" role="toolbar">${[['wconc', 'Whangārei concerts'], ['night', 'Nightlife']].map(c => `<button type="button" class="${mdNl === c[0] ? 'on' : ''}" onclick="mdNl='${c[0]}';render()">${c[1]}</button>`).join('')}</div>`;
+    return back + header('Entertainment', mdNl === 'wconc' ? 'Whangārei and Northland concerts, outside your shifts' : 'Whangārei nightlife, outside your shifts') + filt + sub +
+      (mdNl === 'wconc' ? mdTiles(G.concerts, 'concerts') : mdTiles(G.nightlife, 'nightlife')) + `<div class="foot">From Eventfinda and Whangārei District Council. No sport.</div>`; }
   const ev = mdFilt === 'all' || mdFilt === 'out' ? `<div class="glzone"><span>🎟️ Events</span><a href="#events">All events ›</a></div>` + mdEvents() : '';
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + filt +
+  return back + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + filt +
     /* 2.27.54: TV tonight hero removed at Shane's request */ (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
-    `<div class="foot">Events: Whangārei District Council, Eventfinda and Event Cinemas. No sport.</div>`;
+    `<div class="foot">Events: Whangārei District Council, Eventfinda (including Auckland concerts) and Event Cinemas. No sport.</div>`;
 }
 
 /* ---- 2.27.55: Movies page. Only Event Cinemas Whangārei (relay /events → cinema, from Event Cinemas' own sessions and coming-soon data).

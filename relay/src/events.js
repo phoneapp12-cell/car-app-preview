@@ -1,6 +1,7 @@
 import { parseCinema, localEvents, CINEMA_SCHEDULE } from './local.js';
 import { getCinema, toScheduleItems } from './cinema.js';
 import { getNightlife } from './nightlife.js';
+import { getAkl } from './akl.js';
 /* Local events for the Due Dates app: Whangārei District Council "What's On", plus Event Cinemas and local markets (local.js).
  *
  * Source: https://www.wdc.govt.nz/Events/Whats-On (official council listing; robots.txt allows it).
@@ -241,6 +242,7 @@ export async function getFeed(env, fetchImpl = fetch, now = Date.now()) {
   feed.events.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99') || a.title.localeCompare(b.title));
   feed.events = feed.events.slice(0, 700);
   feed.count = feed.events.length;
+  try { feed.akl = await getAkl(env, fetchImpl, now); } catch (e) { feed.akl = []; } // 2.27.58: Auckland concerts (Eventfinda)
   if (cinema && Array.isArray(cinema.movies)) feed.cinema = { at: new Date(cinema.at).toISOString(), name: cinema.name, address: cinema.address, url: cinema.url, sessionsUrl: cinema.sessionsUrl, movies: cinema.movies };
   mem = { readAt: now, feed };
   return feed;
