@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.78';
+const APP_VERSION = '2.27.79';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19964,9 +19964,10 @@ function mdEvents(only) {
 function MediaPage() {
   setTimeout(() => { try { refreshEvents(); refreshNews(); } catch (e) { } }, 0);
   const all = homeTry('md tiles', () => glTiles().filter(t => MEDIA_TILES.has(t.k)), []), have = new Set(all.map(t => t.cat));
-  const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).flatMap(c => c[0] === 'out' ? [c] : [c]); // 2.27.63: Concerts and Nightlife are tiles with their own pages // 2.27.57: own tabs
+  const mdOrd = (() => { let w = false; try { w = !!glMode().atWork; } catch (e) { } return w ? ['fun', 'read', 'listen', 'watch', 'out'] : ['watch', 'listen', 'read', 'fun', 'out']; })(), mdRank = c => { const i = mdOrd.indexOf(c); return i < 0 ? 99 : i; }; // 2.27.79: noisy first off work, quiet first on shift
+  const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).flatMap(c => c[0] === 'out' ? [c] : [c]).sort((x, y) => x[0] === 'all' ? -1 : y[0] === 'all' ? 1 : mdRank(x[0]) - mdRank(y[0])); // 2.27.63: Concerts and Nightlife are tiles with their own pages // 2.27.57: own tabs
     if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
-  const list = mdFilt === 'all' ? all : all.filter(t => t.cat === mdFilt);
+  const list = mdFilt === 'all' ? all.map((t, i) => [t, i]).sort((x, y) => mdRank(x[0].cat) - mdRank(y[0].cat) || x[1] - y[1]).map(x => x[0]) : all.filter(t => t.cat === mdFilt);
   const filt = `<div class="glfilt mdfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';hab('tab:${c[0]}');render()">${c[1]}</button>`).join('')}</div>`;
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
   const ev = mdFilt === 'out' ? mdEvents(['markets', 'other']) : ''; // 2.27.63: the rest have their own tiles and pages
