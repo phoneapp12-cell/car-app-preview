@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.77';
+const APP_VERSION = '2.27.78';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23700,9 +23700,6 @@ function bfEndOf(h, i) { // index just past the element that opens at i
   const re = /<(\/?)div\b[^>]*>/g; re.lastIndex = i; let d = 0, m; while ((m = re.exec(h))) { d += m[1] ? -1 : 1; if (d === 0) return re.lastIndex; } return -1;
 }
 // Home (day only): the tiles that now live on Notifications are left off; the night feed is unchanged
-(() => { const o = glTiles; const MOVED = { netflix: 'netflix', prime: 'prime', videos: 'videos', sarah: 'sarah', recipe: 'recipe', quote: 'quote', localnews: 'local', nznews: 'nz' };
-  glTiles = function () { const T = o.apply(this, arguments); try { if (glMode().night) return T; return T.filter(t => !(MOVED[t.k] && bfOn(MOVED[t.k]))); } catch (e) { return T; } }; })();
-(() => { const o = glPanels; glPanels = function () { try { if (!glMode().night && bfOn('quote')) return ''; } catch (e) { } return o.apply(this, arguments); }; })();
 // swipe-left (archive) on a For-you row: it stays gone (kept on this phone, last 400)
 function bfGone() { try { return JSON.parse(localStorage.getItem('bfGone') || '[]'); } catch (e) { return []; } }
 (() => { const o = arcEntryOf; arcEntryOf = function (el) { try { const k = el && el.dataset && el.dataset.nk; if (k && /^(bf|stick)-/.test(k) && el.isConnected && /translateX\(-110%\)/.test(el.style.transform || '')) { const g = bfGone(); if (!g.includes(k)) g.push(k); localStorage.setItem('bfGone', JSON.stringify(g.slice(-400))); } } catch (e) { } return o.apply(this, arguments); }; })();
