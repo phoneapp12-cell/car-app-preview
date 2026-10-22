@@ -616,6 +616,22 @@ details.rwm .pill.rwmnew{background:var(--amberbg);color:var(--amber);flex:none}
 .vthumbbox{width:112px;height:63px;border-radius:10px;overflow:hidden;flex:none;background:#111;position:relative}
 .vthumbbox .vthumb{width:100%;height:100%;border-radius:0;display:block}
 .vthumbbox iframe{position:absolute;left:0;top:0;width:100%;height:100%;border:0;background:#111}
+/* 2.27.61: Videos wall */
+.vwall{display:grid;grid-template-columns:1fr 1fr;gap:12px;grid-auto-flow:dense}
+.vwfeat{grid-column:1/-1;background:#fff;border-radius:16px;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.vwbig{position:relative;border-radius:12px;overflow:hidden;cursor:pointer}
+.vwbig .vthumbbox{width:100%;height:auto;aspect-ratio:16/9;border-radius:12px;display:block}
+.vwbig .vthumbbox.playing+.vwplay{display:none}
+.vwplay{position:absolute;left:50%;top:50%;width:36px;height:36px;transform:translate(-50%,-50%);border-radius:50%;border:2px solid #fff;color:#fff;background:rgba(15,23,42,.35);padding:7px;box-sizing:border-box;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.vwbig .vwplay{width:64px;height:64px;padding:14px;background:#fff;color:#7c3aed;border:0}
+.vwinfo{padding:10px 6px 4px}.vwinfo .t{font-weight:800;font-size:1.05rem;color:#0f172a}
+.vwinfo .s{color:#475569}.vwdesc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:4px}
+.vwlinks{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.vwtile{display:block;border:0;padding:6px;background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.16);font:inherit;text-align:left;border-top:3px solid #a78bfa}
+.vwimg{position:relative;display:block;border-radius:8px;overflow:hidden;aspect-ratio:16/9;background:#111}
+.vwimg .vthumb{width:100%;height:100%;object-fit:cover;display:block}
+.vwt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:.8rem;font-weight:700;color:#1e293b;margin-top:6px;line-height:1.25}
+@media (min-width:720px){.vwall{grid-template-columns:1fr 2fr 1fr}.vwfeat{grid-column:2;grid-row:1/span 3}}
 .ytopen{display:inline-flex;align-items:center;gap:4px;margin-top:4px;color:var(--brand);font-weight:700;font-size:0.8125rem;line-height:1.3}
 .ytopen svg.i{width:15px;height:15px}
 .row.vrow{align-items:center;cursor:pointer}
@@ -2136,6 +2152,6 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.27.60"></script>
+<script src="app.js?v=2.27.61"></script>
 </body>
 </html>

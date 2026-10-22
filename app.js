@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.60';
+const APP_VERSION = '2.27.61';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14343,15 +14343,32 @@ function Videos() {
   const body = !cats.length
     ? `<div class="card empty" id="videonone"><div class="t">No categories yet</div><div class="s">Add a category to see videos.</div></div>`
     : list.length
-      ? `<div class="list" id="videolist">${list.map(v => videoRow(v, true)).join('')}</div>`
+      ? videoWall(list)
       : curated
         ? `<div class="card empty" id="videonone"><div class="t">No videos left today</div><div class="s">Skipped videos come back tomorrow.</div></div>`
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Swipe a video left to skip it for today. Another from this category takes its place.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 22 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
+    `<div class="foot">Tap a picture to play it at the top. “Skip for today” under the main video swaps it for another from this category.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 22 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
 }
 
+
+/* 2.27.61: Videos as a video wall. Featured video full width (16:9) with a big play button, title and two-line description,
+   then a 2-column grid (3 columns with the featured one in the middle on wider screens). Real YouTube thumbnails only.
+   Tap the featured picture to play it in place; tap a tile to make it the featured one and play it. Sarah's new video leads when it's new. */
+let vFeatId = '';
+const VW_PLAY = '<span class="vwplay" aria-hidden="true"><svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M9 7l8 5-8 5z" fill="currentColor"/></svg></span>';
+function videoWall(list) {
+  let L = list.slice();
+  try { const sv = currentSarahVideo(); if (sv && /^[A-Za-z0-9_-]{11}$/.test(sv.id || '') && Date.now() - Date.parse(sv.published || 0) < 14 * 864e5 && !L.some(v => v.id === sv.id)) L.unshift({ id: sv.id, title: sv.title, channel: 'Sarah Jenkins', sarah: true }); } catch (e) { }
+  const f = L.find(v => v.id === vFeatId) || L[0], rest = L.filter(v => v !== f);
+  const why = v => { try { return v.sarah ? 'Sarah’s new video' : videoReason(v); } catch (e) { return ''; } };
+  const feat = `<div class="vwfeat"><div class="vwbig" onclick="playInlineVideo(${jsArg(f.id)},${jsArg(f.title)})" role="button" aria-label="Play ${esc(f.title)}">${videoThumbBox(f.id)}${VW_PLAY}</div>
+    <div class="vwinfo"><div class="t">${esc(f.title)}</div><div class="s">${esc(f.channel || '')}</div><div class="s vwdesc">${esc(why(f))}</div>
+    <div class="vwlinks">${videoOpenLink(f.id)}${f.sarah ? '' : `<button type="button" class="btn small" onclick="skipVideo(${jsArg(f.id)})">Skip for today</button>`}</div></div></div>`;
+  return `<div class="vwall" id="videowall">${feat}${rest.map(v => `<button type="button" class="vwtile" onclick="vwFeature(${jsArg(v.id)},${jsArg(v.title)})" aria-label="${esc(v.title)}"><span class="vwimg">${videoThumb(v.id)}${VW_PLAY}</span><span class="vwt">${esc(v.title)}</span></button>`).join('')}</div>`;
+}
+function vwFeature(id, title) { vFeatId = id; stopInlineVideo(); render(); try { const w = document.getElementById('videowall'); if (w) w.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { } setTimeout(() => playInlineVideo(id, title), 60); }
 
 /* ================= TOP 40 ================= */
 // New Zealand Official Top 40 singles, chart week 16 October to 22 October 2026.
