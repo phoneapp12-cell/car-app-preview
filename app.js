@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.69';
+const APP_VERSION = '2.27.70';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16731,13 +16731,16 @@ async function travelImgFail(img) {
   } catch (e) {}
   box.classList.add('noimg');
 }
-function Travel() {
-  const p = travelToday(), now = new Date(), c = travelClock(p.tz, now), km = travelKm(p.lat, p.lon);
-  const tmr = travelToday(addDays(nzTodayISO(), 1));
-  setTimeout(() => { clearInterval(travelTick); travelTick = setInterval(travelPaintClock, 1000); }, 0);
+// 2.27.70: Place of the day is a swipeable history: today first, then every earlier day back to the start of the cycle.
+// The pick is fixed by date (TRAVEL_ORDER, unchanged since TRAVEL_START), so earlier days are rebuilt, not stored.
+let travelAt = 0;
+const travelDays = () => { const t = nzTodayISO(), n = Math.max(0, Math.round((parseD(t) - parseD(TRAVEL_START)) / DAY)); return Array.from({ length: n + 1 }, (_, i) => addDays(t, -i)); };
+function travelCardHtml(i) {
+  const D = travelDays(); travelAt = Math.max(0, Math.min(D.length - 1, i)); const iso = D[travelAt];
+  const p = travelToday(iso), now = new Date(), c = travelClock(p.tz, now), km = travelKm(p.lat, p.lon);
   const maps = 'https://www.google.com/maps/search/?api=1&query=' + p.lat + ',' + p.lon;
-  return header('Travel', 'Somewhere new in the world every day') +
-    `<div class="card trcard" id="travelcard">
+  const lbl = (travelAt ? fmtW(iso) : 'Today') + ' · ' + (travelAt + 1) + ' of ' + D.length;
+  return `<div class="trnav" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px"><button type="button" class="btn small" aria-label="Newer place" ${travelAt ? '' : 'disabled'} onclick="travelGo(-1)">‹ Newer</button><span class="muted" style="font-size:.85rem;font-weight:650">${esc(lbl)}</span><button type="button" class="btn small" aria-label="Older place" ${travelAt < D.length - 1 ? '' : 'disabled'} onclick="travelGo(1)">Older ›</button></div>
       <div class="trphoto" data-wiki="${esc(p.wiki)}"><img src="${esc(p.img)}" alt="${esc(p.name)}, ${esc(p.country)}" loading="eager" referrerpolicy="no-referrer" onerror="travelImgFail(this)"><div class="trnoimg">${I('globe')}<span>${esc(p.name)}</span></div></div>
       <div class="trcredit muted">Photo: ${esc(p.credit)} · <a href="https://commons.wikimedia.org/wiki/${esc(p.file)}" target="_blank" rel="noopener">source</a></div>
       <h2 class="trname" id="trname">${esc(p.name)}</h2><div class="muted trcountry">${esc(p.country)}</div>
@@ -16747,9 +16750,21 @@ function Travel() {
       </div>
       <p class="muted trdiff" style="margin-top:8px;margin-bottom:0">${esc(travelDiffText(p.tz, now))}</p>
       <div class="trtext">${p.paras.map(x => `<p>${esc(x)}</p>`).join('')}</div>
-      <div class="btns"><a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a><a class="btn" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wiki)}" target="_blank" rel="noopener">${I('ext')} Read more</a></div>
-    </div>
-    <div class="foot">A new place each day at midnight NZ time, ${TRAVEL.length} places before any repeat. Tomorrow: somewhere in ${esc(tmr.country)}. Distances are straight-line from ${esc(ME().homeLabel)}.</div>`;
+      <div class="btns"><a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a><a class="btn" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wiki)}" target="_blank" rel="noopener">${I('ext')} Read more</a></div>`;
+}
+function travelGo(d) { const el = document.getElementById('travelcard'); if (!el) return; const n = travelAt + d; if (n < 0 || n >= travelDays().length) return; el.innerHTML = travelCardHtml(n); try { travelPaintClock(); } catch (e) { } }
+function travelSwipeInit() {
+  const el = document.getElementById('travelcard'); if (!el || el.dataset.sw) return; el.dataset.sw = 1; let x0 = null, y0 = 0;
+  el.addEventListener('touchstart', e => { const t = e.touches[0]; x0 = e.touches.length === 1 ? t.clientX : null; y0 = t.clientY; }, { passive: true });
+  el.addEventListener('touchend', e => { if (x0 == null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > 1.8 * Math.abs(dy)) travelGo(dx < 0 ? 1 : -1); }, { passive: true }); // swipe left = older, right = newer
+}
+function Travel() {
+  const tmr = travelToday(addDays(nzTodayISO(), 1));
+  setTimeout(() => { clearInterval(travelTick); travelTick = setInterval(travelPaintClock, 1000); travelSwipeInit(); }, 0);
+  return header('Travel', 'Somewhere new in the world every day') +
+    `<div class="card trcard" id="travelcard" style="touch-action:pan-y">${travelCardHtml(0)}</div>
+    <div class="foot">A new place each day at midnight NZ time, ${TRAVEL.length} places before any repeat. Swipe or use the arrows for earlier days. Tomorrow: somewhere in ${esc(tmr.country)}. Distances are straight-line from ${esc(ME().homeLabel)}.</div>`;
 }
 // 2.22.98: one app-written line in the Home summary (no AI), same daily pick as the Travel tab. The place opens Travel.
 function sumTravelTime(tz, now = new Date()) {
