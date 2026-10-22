@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.76';
+const APP_VERSION = '2.27.77';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19832,7 +19832,7 @@ function glTiles() {
   add('netflix', 'watch', 'New on Netflix', () => { const f = NF && mailConnected('microsoft') ? (NF.fresh || []) : []; return f.length ? f.slice(0, 2).map(x => x.title).join(', ') : ''; }, B('ideas'), '', "go('#netflix')");
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#prime')");
   add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
-  add('videos', 'watch', 'Videos', () => (glFirst(HOME_CARD.videos()) || {}).t, B('tv'), '', "go('#videos')");
+  add('videos', 'watch', 'Videos', () => { let t = ''; try { const sv = currentSarahVideo(); const l = preferFilmVideoTitles(videoSuggestions() || []); const v = (sv ? [sv] : []).concat(l || []).find(x => x && x.title && glOk(x.title) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(x.title)); t = v ? v.title : ''; } catch (e) { } return t || 'Your video categories'; }, B('tv'), '', "go('#videos')");
   add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "glSarahOpen()");
   add('lang', 'fun', 'Word of the day', () => { const m = langToday('mi'), f = langToday('fr'); return `${m[0]} · ${f[0]}`; }, 'i3-idea', ['#0d9488', '#1d4ed8'], "go('#lang')"); // 2.26.13
   add('top40', 'listen', 'Top 40 NZ', () => { const t = (typeof TOP40 !== 'undefined' && TOP40[0]) || null; return t ? '#1 ' + t.title + ' · ' + t.artist : 'This week’s NZ chart'; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
