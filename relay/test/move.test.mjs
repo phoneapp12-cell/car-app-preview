@@ -27,7 +27,7 @@ ok(!store.has('move-v1:' + id) && !store.has('move-v1:' + id + ':0'), 'parcel de
 [s, j] = await call('/move/status', OLD); ok(j.moved > 0, 'moved time recorded');
 // grace: github.io still works for 3 days, then private routes refuse it; shared routes keep working
 let r2 = await handle(new Request('https://relay.example/power', { headers: { Origin: OLD, 'X-Cash-Key': APPKEY } }), env); ok(r2.status !== 403, 'old address still works during grace');
-store.set('moved-v1', JSON.stringify({ at: Date.now() - 4 * 86400e3 }));
+store.set('moved-v1', JSON.stringify({ at: Date.now() - 31 * 86400e3 }));
 r2 = await handle(new Request('https://relay.example/power', { headers: { Origin: OLD, 'X-Cash-Key': APPKEY } }), env); ok(r2.status === 403, 'after grace, old address refused on private routes');
 r2 = await handle(new Request('https://relay.example/power', { headers: { Origin: NEW, 'X-Cash-Key': APPKEY } }), env); ok(r2.status !== 403 && r2.status !== 401, 'new address fine');
 r2 = await handle(new Request('https://relay.example/sarah', { headers: { Origin: OLD } }), env, async () => new Response('<feed></feed>')); ok(r2.status !== 403, "Sarah's routes still open to github.io");

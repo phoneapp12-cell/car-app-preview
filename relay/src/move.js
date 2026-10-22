@@ -7,7 +7,7 @@ import { b64url } from './akahu.js';
 export const OLD_ORIGIN = 'https://phoneapp12-cell.github.io';
 export const NEW_ORIGIN = 'https://shane-my-app.pages.dev';
 export const K_MOVED = 'moved-v1';
-export const MOVE_GRACE_MS = 3 * 86400e3; // github.io keeps working on private routes for 3 days after the move
+export const MOVE_GRACE_MS = 30 * 86400e3; // 2.27.49: github.io keeps working on private routes for 30 days after the move (room to bring missing items across)
 const TTL = 7200, MAX_CHUNKS = 40, CHUNK_MAX = 6 * 1024 * 1024;
 const K = id => 'move-v1:' + id;
 const okId = id => /^[A-Za-z0-9_-]{22,64}$/.test(String(id || ''));

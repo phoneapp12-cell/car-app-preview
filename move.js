@@ -10,7 +10,7 @@
   var CHUNK = 4 * 1024 * 1024;
   var isOld = location.hostname === OLD_HOST, isNew = location.origin === NEW;
   var ls = function (k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } };
-  var SKIP_LS = /^(moveStarted|movedTo|movedClean|movedBannerHidden|moveJustDone|shopPushReg|shopPushEp)$/;
+  var SKIP_LS = /^(moveStarted|movedTo|movedClean|movedBannerHidden|moveJustDone|mergeDone|mergeHide|mergeAt|oldPushEp|shopPushReg|shopPushEp)$/;
 
   // mail sign-in started on the new address returns to the old one (the address Google/Microsoft know); pass it on
   if (isOld) {
@@ -80,6 +80,20 @@
     if (btn) btn.disabled = true;
     try {
       say('Packing your data…');
+      var url = await packAndSend('move', say);
+      ls('moveStarted', String(Date.now()));
+      var w = window.open(url, '_blank', 'noopener');
+      say('Ready. The new My App is opening in Chrome. If it didn’t open, tap “Open new My App”.');
+      var link = document.getElementById('mvopen'); if (link) { link.href = url; link.style.display = ''; }
+      if (!w) { /* popup blocked: the link above does it */ }
+    } catch (e) {
+      say(e && e.status === 401 ? 'The relay didn’t recognise this phone’s device key. Nothing was moved.' : 'That didn’t work (' + (e && e.message || 'error') + '). Nothing was lost; try again.', true);
+    } finally { if (btn) btn.disabled = false; }
+  }
+  // 2.27.49: pack everything on this phone, encrypt it with a fresh key and hand the ciphertext to the relay; returns the new address link
+  async function packAndSend(kind, say) {
+    say = say || function () { };
+    {
       var plain = new TextEncoder().encode(JSON.stringify(await packAll()));
       var zip = await pipe(plain, new CompressionStream('gzip'));
       var raw = crypto.getRandomValues(new Uint8Array(32)), iv = crypto.getRandomValues(new Uint8Array(12));
@@ -89,15 +103,8 @@
       say('Sending it securely…');
       var id = (await post('/move/start', { chunks: parts.length }, { key: true })).id;
       for (var p = 0; p < parts.length; p++) { await post('/move/put?id=' + encodeURIComponent(id) + '&i=' + p, parts[p], { key: true, text: true }); say('Sending it securely… ' + Math.round((p + 1) / parts.length * 100) + '%'); }
-      ls('moveStarted', String(Date.now()));
-      var url = NEW + '/#move=' + id + '.' + b64u(raw);
-      var w = window.open(url, '_blank', 'noopener');
-      say('Ready. The new My App is opening in Chrome. If it didn’t open, tap “Open new My App”.');
-      var link = document.getElementById('mvopen'); if (link) { link.href = url; link.style.display = ''; }
-      if (!w) { /* popup blocked: the link above does it */ }
-    } catch (e) {
-      say(e && e.status === 401 ? 'The relay didn’t recognise this phone’s device key. Nothing was moved.' : 'That didn’t work (' + (e && e.message || 'error') + '). Nothing was lost; try again.', true);
-    } finally { if (btn) btn.disabled = false; }
+      return NEW + '/#' + kind + '=' + id + '.' + b64u(raw);
+    }
   }
   // after the new copy confirms: stop this old copy's pushes and offline worker; keep its data as a fallback
   var within = function (p, ms) { return Promise.race([p, new Promise(function (ok) { setTimeout(ok, ms); })]); };
@@ -137,6 +144,11 @@
     var go = document.getElementById('mvgo'); if (go) go.onclick = startMove;
     var hide = document.getElementById('mvhide'); if (hide) hide.onclick = function () { el.remove(); ls('movedBannerHidden', '1'); };
   }
+  async function bringFromOld() {
+    if (!ls('cfKey')) { overlay('This old copy hasn’t got My App’s device key, so it can’t send anything.', true, 'Bring missing items across'); return; }
+    try { overlay('Packing your items…', false, 'Bring missing items across'); var url = await packAndSend('merge', function (t) { overlay(t, false, 'Bring missing items across'); }); location.replace(url); }
+    catch (e) { overlay('That didn’t work (' + (e && e.message || 'error') + '). Nothing was changed. Try again from the new My App.', true, 'Bring missing items across'); }
+  }
   async function oldAddress() {
     if (!/^\/car-app-preview\/?(index\.html)?$/.test(location.pathname)) return;
     var moved = 0; try { moved = (await post('/move/status', {})).moved || 0; } catch (e) { }
@@ -162,7 +174,7 @@
           (S.indexes || []).forEach(function (ix) { try { st.createIndex(ix.name, ix.keyPath, { unique: ix.unique, multiEntry: ix.multiEntry }); } catch (e) { } });
         });
       };
-      var db = await req(open);
+      var db = await withinMs(req(open), 15000, 'storage busy'); // 2.27.49: never hang on a busy store
       for (var s = 0; s < D.stores.length; s++) {
         var S = D.stores[s]; if (!db.objectStoreNames.contains(S.name)) continue;
         await new Promise(function (ok, no) {
@@ -174,10 +186,93 @@
       db.close();
     }
   }
-  function overlay(text, bad) {
+  var withinMs = function (p, ms, what) { return Promise.race([p, new Promise(function (ok, no) { setTimeout(function () { no(new Error(what || 'timeout')); }, ms); })]); };
+  var idOf = function (x) { return x && typeof x === 'object' && (x.id != null ? 'i:' + x.id : null); };
+  // add old records whose id this copy hasn't got; for other values only fill gaps
+  function mergeData(cur, old) {
+    var added = {};
+    if (!cur || typeof cur !== 'object') return { d: old, added: { all: 1 } };
+    Object.keys(old || {}).forEach(function (k) {
+      var a = cur[k], b = old[k];
+      if (a === undefined || a === null) { cur[k] = b; if (Array.isArray(b) && b.length) added[k] = b.length; return; }
+      if (Array.isArray(a) && Array.isArray(b)) {
+        var have = new Set(a.map(idOf).filter(Boolean)), n = 0;
+        b.forEach(function (x) { var i = idOf(x); if (i && !have.has(i)) { a.push(x); have.add(i); n++; } });
+        if (n) added[k] = n;
+      } else if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && k !== 'settings') {
+        Object.keys(b).forEach(function (kk) { if (a[kk] === undefined) a[kk] = b[kk]; });
+      }
+    });
+    return { d: cur, added: added };
+  }
+  async function mergeAll(data) {
+    var keys = Object.keys(data.ls || {}), summary = {};
+    for (var i = 0; i < keys.length; i++) if (!SKIP_LS.test(keys[i]) && ls(keys[i]) === null) ls(keys[i], data.ls[keys[i]]);
+    var have = (await indexedDB.databases()).map(function (d) { return d.name; });
+    for (var d = 0; d < (data.idb || []).length; d++) {
+      var D = data.idb[d], exists = have.indexOf(D.name) >= 0;
+      var open = exists ? indexedDB.open(D.name) : indexedDB.open(D.name, D.version);
+      if (!exists) open.onupgradeneeded = (function (D, open) { return function () { var db = open.result; D.stores.forEach(function (S) { var o = {}; if (S.keyPath !== null && S.keyPath !== undefined) o.keyPath = S.keyPath; if (S.autoIncrement) o.autoIncrement = true; var st = db.createObjectStore(S.name, o); (S.indexes || []).forEach(function (ix) { try { st.createIndex(ix.name, ix.keyPath, { unique: ix.unique, multiEntry: ix.multiEntry }); } catch (e) { } }); }); }; })(D, open);
+      var db = await withinMs(req(open), 15000, 'storage busy');
+      for (var s = 0; s < D.stores.length; s++) {
+        var S0 = D.stores[s]; if (!db.objectStoreNames.contains(S0.name)) continue;
+        var curKeys = await req(db.transaction(S0.name).objectStore(S0.name).getAllKeys());
+        var curSet = new Set(curKeys.map(function (k) { return JSON.stringify(k); }));
+        var mainData = D.name === 'due-dates' && S0.name === 'kv';
+        var cur = mainData ? await req(db.transaction(S0.name).objectStore(S0.name).get('data')) : null;
+        await new Promise(function (ok, no) {
+          var tx = db.transaction(S0.name, 'readwrite'), st = tx.objectStore(S0.name);
+          S0.rows.forEach(function (row) {
+            if (mainData && row[0] === 'data') { var m = mergeData(cur, des(row[1])); Object.keys(m.added).forEach(function (k) { summary[k] = (summary[k] || 0) + m.added[k]; }); if (Object.keys(m.added).length) { m.d.updatedAt = new Date().toISOString(); st.put(m.d, 'data'); } return; }
+            if (curSet.has(JSON.stringify(row[0]))) return; // this copy already has it: keep the newer one here
+            var v = des(row[1]); if (st.keyPath !== null && st.keyPath !== undefined) st.put(v); else st.put(v, row[0]); summary[D.name] = (summary[D.name] || 0) + 1;
+          });
+          tx.oncomplete = function () { ok(); }; tx.onerror = function () { no(tx.error); };
+        });
+      }
+      db.close();
+    }
+    return summary;
+  }
+  async function newAddressMerge(id, rawKey) {
+    var T = 'Bring missing items across';
+    try {
+      overlay('Fetching your items…', false, T);
+      var meta = await post('/move/get?id=' + encodeURIComponent(id), {}), parts = [];
+      for (var i = 0; i < meta.n; i++) parts.push((await post('/move/get?id=' + encodeURIComponent(id) + '&i=' + i, {})).c);
+      var ct = parts.join(''), dot = ct.indexOf('.');
+      var key = await crypto.subtle.importKey('raw', unb64u(rawKey), 'AES-GCM', false, ['decrypt']);
+      var zip = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(ct.slice(0, dot)) }, key, unb64u(ct.slice(dot + 1))));
+      var data = JSON.parse(new TextDecoder().decode(await pipe(zip, new DecompressionStream('gzip'))));
+      overlay('Adding what’s missing…', false, T);
+      var sum = await mergeAll(data);
+      try { await post('/move/done', { id: id }, { key: true }); } catch (e) { }
+      ls('mergeDone', String(Date.now())); ls('mergeAt', String(Date.now())); // the open My App window reloads with the merged data
+      try { history.replaceState(null, '', location.pathname); } catch (e) { }
+      var names = { birthdays: 'birthdays', bills: 'bills', todos: 'to-dos', appts: 'appointments', pets: 'pets', notes: 'notes', ideas: 'ideas', loans: 'loans', countdowns: 'countdowns', myEvents: 'events', health: 'health items', 'claim-photos': 'claim photos', 'strip-photos': 'photos' };
+      var bits = Object.keys(sum).filter(function (k) { return names[k]; }).map(function (k) { return sum[k] + ' ' + names[k]; });
+      overlay((bits.length ? 'Added ' + bits.join(', ') + '.' : 'Nothing was missing.') + ' Nothing already in the new My App was changed. You can close this tab and go back to My App.', false, T);
+      setTimeout(function () { location.replace(NEW + '/'); }, 6000);
+    } catch (e) {
+      overlay(e && e.status === 404 ? 'That link has already been used or has run out. Tap Bring missing items across again.' : 'That didn’t finish (' + (e && e.message || 'error') + '). Nothing was lost. Try again.', true, T);
+    }
+  }
+  function mergeBanner() {
+    try { if (typeof S === 'undefined' || !S || !Array.isArray(S.birthdays)) return; } catch (e) { return; }
+    if (S.birthdays.length || ls('mergeDone') || ls('mergeHide') || !ls('cfKey') || document.getElementById('mgban')) return;
+    var el = document.createElement('div'); el.id = 'mgban';
+    el.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:9999;background:#0F766E;color:#fff;border-radius:14px;padding:14px;box-shadow:0 6px 24px rgba(0,0,0,.25);font:15px/1.4 system-ui,sans-serif';
+    el.innerHTML = '<b style="font-size:16px">Some items didn’t come across</b><p style="margin:6px 0">Your birthdays (and anything else missing) are still in the old My App. One tap brings across only what’s missing. Nothing here is replaced.</p>'
+      + '<button type="button" id="mggo" style="background:#fff;color:#0F766E;border:0;border-radius:10px;padding:9px 14px;font-weight:700">Bring missing items across</button> '
+      + '<button type="button" id="mghide" style="background:transparent;color:#fff;border:1px solid #fff;border-radius:10px;padding:8px 12px;margin-left:4px">Not now</button>';
+    document.body.appendChild(el);
+    document.getElementById('mggo').onclick = function () { window.open('https://' + OLD_HOST + '/car-app-preview/#bring', '_blank'); el.remove(); };
+    document.getElementById('mghide').onclick = function () { el.remove(); ls('mergeHide', '1'); };
+  }
+  function overlay(text, bad, title) {
     var el = document.getElementById('mvover');
     if (!el) { el = document.createElement('div'); el.id = 'mvover'; el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#F4F6F5;color:#111;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font:17px/1.5 system-ui,sans-serif'; document.body.appendChild(el); }
-    el.innerHTML = '<div><div style="font-size:20px;font-weight:700;margin-bottom:8px">My App is moving in</div><p id="mvtxt"></p></div>';
+    el.innerHTML = '<div><div style="font-size:20px;font-weight:700;margin-bottom:8px">' + (title || 'My App is moving in') + '</div><p id="mvtxt"></p></div>';
     var t = document.getElementById('mvtxt'); t.textContent = text; t.style.color = bad ? '#b91c1c' : '';
   }
   async function newAddressMove(id, rawKey) {
@@ -212,6 +307,19 @@
     document.getElementById('mvhide').onclick = function () { el.remove(); ls('moveJustDone', null); };
   }
 
+  if (isNew && /^#merge=/.test(location.hash)) {
+    window.__MOVING = true;
+    var mm = location.hash.slice(7).split('.');
+    var run2 = function () { newAddressMerge(mm[0], mm[1] || ''); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run2); else run2();
+    return;
+  }
+  if (isOld && location.hash === '#bring') {
+    window.__MOVING = true;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bringFromOld); else bringFromOld();
+    return;
+  }
+  if (isNew) window.addEventListener('storage', function (e) { if (e.key === 'mergeAt' && e.newValue) location.reload(); });
   if (isNew && /^#move=/.test(location.hash)) {
     window.__MOVING = true;
     var m = location.hash.slice(6).split('.');
@@ -222,6 +330,7 @@
   var later = function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(fn, 800); }); else setTimeout(fn, 800); };
   if (isOld) later(oldAddress);
   if (isNew && ls('moveJustDone')) later(newAddressWelcome);
+  if (isNew) { later(function () { setTimeout(mergeBanner, 3000); }); }
   // 2.27.47: once the new copy can get notifications, stop the old copy's push address on the relay
   async function dropOldPush() {
     var ep = ls('oldPushEp'); if (!ep || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
