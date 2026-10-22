@@ -148,6 +148,7 @@
   async function unpackAll(data) {
     var keys = Object.keys(data.ls || {});
     for (var i = 0; i < keys.length; i++) if (!SKIP_LS.test(keys[i])) ls(keys[i], data.ls[keys[i]]);
+    if (data.ls && data.ls.shopPushEp) ls('oldPushEp', data.ls.shopPushEp); // the old copy's push address, dropped once this copy has its own
     for (var d = 0; d < (data.idb || []).length; d++) {
       var D = data.idb[d];
       await new Promise(function (ok) { var r = indexedDB.deleteDatabase(D.name); r.onsuccess = r.onerror = function () { ok(); }; r.onblocked = function () { setTimeout(ok, 1500); }; });
@@ -221,4 +222,13 @@
   var later = function (fn) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(fn, 800); }); else setTimeout(fn, 800); };
   if (isOld) later(oldAddress);
   if (isNew && ls('moveJustDone')) later(newAddressWelcome);
+  // 2.27.47: once the new copy can get notifications, stop the old copy's push address on the relay
+  async function dropOldPush() {
+    var ep = ls('oldPushEp'); if (!ep || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    try { var reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); var sub = reg && reg.pushManager && await reg.pushManager.getSubscription(); if (!sub || sub.endpoint === ep) return; } catch (e) { return; }
+    try { await post('/push/unsubscribe', { endpoint: ep }); } catch (e) { }
+    try { if (typeof SHARED_KEY !== 'undefined') await post('/shared-push/unsubscribe', { key: SHARED_KEY, who: 'shane', endpoint: ep }); } catch (e) { }
+    ls('oldPushEp', null);
+  }
+  if (isNew) { later(dropOldPush); setInterval(dropOldPush, 60000); }
 })();

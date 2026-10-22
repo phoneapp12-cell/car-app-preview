@@ -8,7 +8,7 @@
 export const CAP_RSS = 'https://alerts.metservice.com/cap/rss';
 const TTL = 5 * 60 * 1000;
 const KV_KEY = 'metservice-alerts-v1';
-const POINTS = [[-35.7251, 174.3237], [-35.7495, 174.3646]]; // Whangārei city, Onerahi
+const POINTS = [[-35.7251, 174.3237], [-35.75, 174.36]]; // Whangārei city, Onerahi (suburb level)
 let mem = null;
 
 const decode = s => String(s || '')

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.46';
+const APP_VERSION = '2.27.47';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -875,7 +875,7 @@ function engList(arr) {
 // 1.77.0: the same facts, as warm bullet points. Rain or sun only if Whangārei weather is already loaded
 // and the app’s own words say so. At most two real to-dos or ideas that fit that weather. One or two
 // real video titles from the list he already has, for the forecast or for early spring. No television.
-// English only. No gluten foods are suggested (he has coeliac disease).
+// English only. No gluten foods are suggested (his food rule).
 // 1.78.0: roadworks stay on their own card and are not repeated in this summary. Each bullet has a warm
 // tint. The weather line and any overdue line are highlighted a little more.
 // 1.80.0: once Gmail or Outlook is connected, one line covers mail from the last 2 hours
@@ -2398,11 +2398,15 @@ function homeSuggestions() {
    fallback whenever the AI is slow, offline or fails. Nothing is stored on the relay. */
 /* 2.23.90: About Shane. A compact profile for the summary (AI and plain), plus 1–2 personal touches per refresh,
    picked for the time, day and weather, never the same touch twice within 24 hours. */
-const SHANE_PROFILE = 'Shane, 52, lives at Onerahi near the beaches (Whangārei). Wife Sarah (51, teacher aide at Raurimu Avenue School, makes sunset YouTube videos); daughters Millesha and Cass; granddaughter Aranea; niece-in-law Monique; dog Zeus. Works at Noel Leeming, 4 Port Rd Whangārei: 8:30 start, Thursday till 7:15pm, other days 6pm (days off from the roster). Gym Tue/Wed after work; Monday evening at his mum’s; Sunday cleaning job till 7pm. Cooks Fri/Sat; coeliac so everything gluten free; loves pizza, Turkish Delight, an occasional merlot. Dinner 8–9pm, spa about 10–11pm, TV and AI music (Suno) in the evenings. Loves bushwalks, gardening, movies, books and tech (Hue, Tapo, heat pumps, Alexa/Google). Favourite colour blue. Night owl; watches TVNZ Breakfast.';
+// 2.27.47: Shane's profile, addresses, family and health notes live in his own synced settings (S.settings.me),
+// loaded once from the relay with the device key (/me). Nothing personal is kept in this public code.
+const ME_DEF = { v: 0, profile: '', facts: [], home: null, work: null, homeLabel: 'home', workLabel: 'work', homeStreet: '', sarahEmail: '', ownRe: '', boardRule: '' };
+function ME() { const m = (typeof S !== 'undefined' && S && S.settings && S.settings.me) || {}; return Object.assign({}, ME_DEF, m); }
+const meFacts = () => { const f = ME().facts; return Array.isArray(f) ? f : []; };
 function aboutProfile() {
   let ans = [];
   try { ans = (aboutState().answers || []).filter(x => x && x.qid !== 'mood' && x.text && x.text !== '(skipped)').slice(-8).map(x => (aboutAsk(aboutQ(x.qid)) || x.qid) + ' ' + String(x.text).slice(0, 60)); } catch (e) { }
-  return { facts: SHANE_PROFILE, aboutYou: ans };
+  return { facts: ME().profile, aboutYou: ans };
 }
 function touchHist() { try { return (JSON.parse(localStorage.getItem('sumTouch') || '[]') || []).filter(x => x && Date.now() - x.at < 864e5); } catch (e) { return []; } }
 // 2.23.91: touches are fixed per summary slot (phase), so re-renders show the same 1–2 instead of using them up.
@@ -2466,11 +2470,6 @@ function sumTouches(n) {
   return pick.slice(0, n);
 }
 let AI_SUM = null, aiSumOpen = -1, aiSumBusy = false;
-const AI_FACTS = ['52, wife Sarah, daughters Millesha and Cass, granddaughter Aranea', 'Dog Zeus. Walking him is already on the to-do list, so never suggest a walk with him',
-  'Coeliac: food ideas must be gluten free', 'Loves pizza, Turkish Delight, merlot now and then, cooking on Fri and Sat nights',
-  'Likes gym (Tue and Wed after work), gardening, bushwalks, beaches, movies, books, AI music like Suno, tech',
-  'Monday evenings at his mum\u2019s; Sunday cleaning job until 7pm; spa around 10 to 11pm; dinner 8 to 9pm on weekdays',
-  'Works at Noel Leeming Superstore, Whang\u0101rei; night owl', 'Likes tips on tidying, sorting and organising'];
 // 2.22.97: the summary is written for right now. Part of day (2.23.8): night 9 pm to 4:59 am, morning 5 am to 11:59, afternoon 12 to 4:59 pm,
 // evening 5 to 8:59 pm. Work and the Sunday cleaning job are described as still to come, on now or done.
 const sumPod = min => min < 300 ? 'night' : min < 720 ? 'morning' : min < 1020 ? 'afternoon' : min < 1260 ? 'evening' : 'night'; // 2.23.8: midnight to 4:59am is night
@@ -2488,7 +2487,7 @@ function sumToday(a) {
 }
 // Changes when the part of day changes, or work / the cleaning job moves from to-come to done: a saved summary isn't reused across it.
 function sumPhaseKey() { const t = sumToday(); let n = 'D'; try { n = homeNight() ? 'N' : 'D'; } catch (e) {} const w = sumWorkState(t); return [todayISO(), t.pod, t.work ? t.work.phase : '-', t.clean ? t.clean.phase : '-', n, 's' + Math.floor(t.min / 210), t.min >= 720 && t.min < 810 ? 'L' : '', w.endsSoon ? 'E' : ''].join('|'); } // 2.23.76: also a new slot about every 3.5 hours, at lunch and 30 min before finish
-// 2.23.76: at work (roster shift on, or at 4 Port Road). After-work things wait until 30 minutes before the shift ends.
+// 2.23.76: at work (roster shift on, or at his work place). After-work things wait until 30 minutes before the shift ends.
 function sumWorkState(t) {
   t = t || sumToday(); let where = ''; try { where = placeHere() || ''; } catch (e) { }
   const en = t.work ? hmMin(t.work.end) : null, atWork = where === 'work' || !!(t.work && t.work.phase === 'now');
@@ -2637,7 +2636,7 @@ function aiSumCtx() {
   } catch (e) {}
   try { const hb = useHabits(); if (hb.length) ctx.habits = hb; } catch (e) {}
   try { ctx.knowMe = knowState().asked.filter(x => x.a && x.a !== '(skipped)').slice(-12).map(x => x.q + ' ' + x.a); } catch (e) {}
-  ctx.facts = AI_FACTS;
+  ctx.facts = meFacts();
   try { // 2.23.59: exact day facts for today and tomorrow, so suggestions never put gym or work on the wrong day
     const f0 = sugDayFacts(0), f1 = sugDayFacts(1);
     ctx.todayFacts = f0.line; ctx.tomorrowFacts = f1.line;
@@ -5274,15 +5273,15 @@ async function ecPickM(m0, a0) {
   claimSheet(nref);
   toast(got.amount ? `Filled in from the email: ${claimMoney(c.amount)} on ${fmtW(c.date)}.` : 'Filled in from the email. Please check the amount.');
 }
-/* 2.27.23: Sarah's claim emails. Any email from Sarah (sarah.jenkins@outlook.co.nz) with "claim" or "claims" in the subject, last 3 months,
+/* 2.27.23: Sarah's claim emails. Any email from Sarah (her address is in his settings) with "claim" or "claims" in the subject, last 3 months,
    read from Outlook on this phone with the same Mail.Read sign-in as Email claim. Only these emails are kept ('scMail'): date, subject,
    Outlook link and the PDF / photo attachment names. Nothing else of Sarah's mail. Shows on UniMed claims, in Email claim and on the bell. */
-const SC_FROM = 'sarah.jenkins@outlook.co.nz', SC_SRC = { k: 'sarah', provider: '', reason: '' };
+let SC_FROM = ''; const SC_SRC = { k: 'sarah', provider: '', reason: '' };
 const ecIsImg = a => /^image\/(jpe?g|png|heic|heif|webp|gif)/i.test(String(a.contentType || a.type || a.mimeType || '')) || /\.(jpe?g|png|heic|heif|webp)$/i.test(String(a.name || a.filename || ''));
 const scSt = () => { try { const o = JSON.parse(localStorage.getItem('scMail') || '{}'); return o && o.msgs ? o : { at: 0, msgs: {} }; } catch (e) { return { at: 0, msgs: {} }; } };
 let scBusy = false, scMemo = { s: '', L: [] };
 async function refreshSc(force) {
-  if (scBusy || !S || !mailConnected('microsoft')) return;
+  SC_FROM = ME().sarahEmail || ''; if (scBusy || !S || !SC_FROM || !mailConnected('microsoft')) return;
   const st = scSt(); if (!force && st.at && Date.now() - st.at < 30 * 60e3) return;
   scBusy = true; const before = Object.keys(st.msgs).sort().join();
   try {
@@ -5945,7 +5944,7 @@ const RELAY_URL = (() => {
   return RELAY_DEFAULT;
 })().replace(/\/+$/, '');
 // 2.27.45: these relay routes now need My App's device key (X-Cash-Key), so add it to every call to them
-const RELAY_KEYED_RE = /^\/(ai(\/|$)|power$|sarah\/seen$|shared-push\/|push\/)/;
+const RELAY_KEYED_RE = /^\/(me$|ai(\/|$)|power$|sarah\/seen$|shared-push\/|push\/)/;
 (() => {
   if (typeof window === 'undefined' || !window.fetch || window.__relayKeyed) return; window.__relayKeyed = true;
   const f0 = window.fetch.bind(window);
@@ -6954,7 +6953,7 @@ function Radio() {
 // ideas: [{ id, title, tag, ingr: [..], link, notes, fav, hidden, builtin }], list: to-do list for shopping }
 const MEAL_TAGS = ['Quick', 'BBQ', 'Slow cook', 'Oven bake', 'Budget', 'Takeaway-style'];
 const MEAL_WEEKS = 4, MEAL_GAP = 21; // plan shows about 4 weeks; Suggest avoids meals planned within 3 weeks either side
-// Shane has coeliac disease: every starter is written gluten free (explicit GF products, cornflour, rice noodles, corn tortillas).
+// Food rule: every starter is written gluten free (explicit GF products, cornflour, rice noodles, corn tortillas).
 // Each starter is { title, tag, ingr, notes, serves, time, image, method }. The id comes from the title, so keep titles stable (see MEAL_REPLACED). v2.0.0 adds a method (steps with °C and minutes or hours) and a photo in images/.
 const MEAL_STARTERS = [
   {
@@ -10717,10 +10716,10 @@ const BR_NEAR_M = 2000, CLS_MAX_AGE = 3 * 3600 * 1000;
 let CLS = null, clsBusy = false, clsFailed = false;
 let brNear = null, brDist = null, brLocBusy = false, brLocAt = 0; // location is only kept in memory while the app is open
 // Saved places Shane named. The summary says welcome home or back at work, never the street.
-// Home: 16 Sherwood Road, Onerahi. Work: 4 Port Road, Whangārei. House points from OpenStreetMap.
+// 2.27.47: the points come from his own settings (meApply), not this code.
 const SAVED_PLACES = [
-  { id: 'home', lat: -35.7495414, lon: 174.3646323 },
-  { id: 'work', lat: -35.7300535, lon: 174.3273886 }
+  { id: 'home', lat: NaN, lon: NaN },
+  { id: 'work', lat: NaN, lon: NaN }
 ];
 const PLACE_NEAR_M = 400;
 /* 2.22.30: a gym spot, saved from the phone's own location when he taps "Save this spot as your gym".
@@ -13370,7 +13369,7 @@ async function knowFetch() {
   if (knowBusy || knowTried === homeSugOpenN || navigator.onLine === false) return;
   knowBusy = true; knowTried = homeSugOpenN;
   try {
-    const d = await knowPost('/ai/ask', { facts: AI_FACTS, known: knowKnown(), asked: k.asked.map(x => x.q) });
+    const d = await knowPost('/ai/ask', { facts: meFacts(), known: knowKnown(), asked: k.asked.map(x => x.q) });
     const seen = new Set(k.asked.map(x => knowNorm(x.q)));
     if (!d || !d.q || !Array.isArray(d.choices) || d.choices.length < 2 || seen.has(knowNorm(d.q))) return;
     k.pending = { q: String(d.q).slice(0, 140), choices: d.choices.slice(0, 5).map(x => String(x).slice(0, 40)), day: T };
@@ -13407,7 +13406,7 @@ async function knowAnswer(ans) {
   if (ans === '(skipped)') { knowSwap(); return; }
   const el = document.getElementById('knowcard'); if (el) el.innerHTML = `<div class="t" style="font-weight:800;margin-bottom:4px">Getting to know you</div><div class="s muted">Thinking…</div>`;
   try {
-    const d = await knowPost('/ai/reply', { q: p.q, a: ans, facts: AI_FACTS, known: knowKnown(), tabs: knowTabs() });
+    const d = await knowPost('/ai/reply', { q: p.q, a: ans, facts: meFacts(), known: knowKnown(), tabs: knowTabs() });
     k.reply = { say: String(d.say || '').slice(0, 400), tab: d.tab || '', tabLabel: d.tabLabel || '', day: T };
   } catch (e) { k.reply = { say: 'Thanks, noted. That’ll help shape your summary and suggestions.', tab: '', day: T }; }
   await save(); knowSwap();
@@ -13752,7 +13751,7 @@ async function addVideoCat(id) {
   const v = document.getElementById('view'); if (v) v.scrollTop = 0;
   toast(cat.name + ' added.');
 }
-// Food topics are always searched gluten-free. He has coeliac disease.
+// Food topics are always searched gluten-free (his food rule).
 function isFoodTopic(s) {
   return /\b(food|cook(?:ing)?|recipe|recipes|bake|baking|bread|dinner|lunch|breakfast|meal|meals|cake|cakes|pasta|pizza|soup|salad|dessert|biscuit|biscuits|cookie|cookies|pastry|gluten|coeliac|celiac|noodle|noodles|chicken|beef|pork|lamb|fish|pie|pies|muffin|muffins|pancake|pancakes|roast|stew|curry|sandwich|sandwiches|flour)\b/i.test(String(s || ''));
 }
@@ -16483,7 +16482,7 @@ function nfPaint() {
    Just for fun: one place in the world each day, picked by the NZ date from a built-in list (no repeats until
    the list has gone round). Photo from Wikimedia Commons (credited), written notes, distance from home and the
    live local time there. No AI and nothing stored. */
-const TRAVEL_HOME = { lat: -35.7495414, lon: 174.3646323 }; // 16 Sherwood Road, Onerahi (OpenStreetMap)
+const TRAVEL_HOME = { lat: -35.7251, lon: 174.3237 }; // Whangārei until his own home point loads (meApply)
 // [name, country, lat, lon, time zone, photo, credit, Commons file page, Wikipedia article, paragraphs]
 const TRAVEL = [["Machu Picchu","Peru",-13.1633,-72.5456,"America/Lima","https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/Machu_Picchu%2C_2023_%28012%29.jpg/960px-Machu_Picchu%2C_2023_%28012%29.jpg","Draceane, CC BY-SA 4.0, Wikimedia Commons","File:Machu_Picchu,_2023_(012).jpg","Machu Picchu",["Machu Picchu sits on a mountain ridge about 2,430 metres above sea level in the Andes of southern Peru, above the Urubamba River valley and around 80 km northwest of Cusco.","It was built by the Inca in the 15th century, probably as an estate for the emperor Pachacuti. Its dry-stone walls are fitted so tightly that no mortar was needed.","The site was largely unknown to the outside world until Hiram Bingham publicised it in 1911. It became a UNESCO World Heritage Site in 1983, and many visitors still arrive on foot along the Inca Trail."]],
 ["Taj Mahal","India",27.175,78.0419,"Asia/Kolkata","https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Taj_Mahal_%28Edited%29.jpeg/960px-Taj_Mahal_%28Edited%29.jpeg","Yann; edited by Jim Carter, CC BY-SA 4.0, Wikimedia Commons","File:Taj_Mahal_(Edited).jpeg","Taj Mahal",["The Taj Mahal stands on the south bank of the Yamuna River in Agra, in the northern Indian state of Uttar Pradesh.","The Mughal emperor Shah Jahan had it built as a mausoleum for his wife Mumtaz Mahal, who died in 1631. It blends Persian, Islamic and Indian styles, with white marble inlaid with semi-precious stones.","Work took around 20 years and thousands of craftspeople. It is a UNESCO World Heritage Site and one of the most visited buildings in the world."]],
@@ -16689,7 +16688,7 @@ function Travel() {
       <div class="trtext">${p.paras.map(x => `<p>${esc(x)}</p>`).join('')}</div>
       <div class="btns"><a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a><a class="btn" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wiki)}" target="_blank" rel="noopener">${I('ext')} Read more</a></div>
     </div>
-    <div class="foot">A new place each day at midnight NZ time, ${TRAVEL.length} places before any repeat. Tomorrow: somewhere in ${esc(tmr.country)}. Distances are straight-line from 16 Sherwood Road, Onerahi.</div>`;
+    <div class="foot">A new place each day at midnight NZ time, ${TRAVEL.length} places before any repeat. Tomorrow: somewhere in ${esc(tmr.country)}. Distances are straight-line from ${esc(ME().homeLabel)}.</div>`;
 }
 // 2.22.98: one app-written line in the Home summary (no AI), same daily pick as the Travel tab. The place opens Travel.
 function sumTravelTime(tz, now = new Date()) {
@@ -19278,8 +19277,8 @@ function glSetBook(v) { try { localStorage.setItem('readingBook', String(v || ''
 /* 2.26.11: where Shane is, for the greeting line only. Uses the fix the app already reads (checkHere: only when the browser
    already allows location, never prompts). Stays on the phone: nothing is sent to the relay or saved anywhere. */
 const GL_SPOTS = [
-  { k: 'home', lat: -35.7495414, lon: 174.3646323, r: 200 }, // 16 Sherwood Road, Onerahi
-  { k: 'work', lat: -35.7300535, lon: 174.3273886, r: 200 }, // 4 Port Road, Whangārei
+  { k: 'home', lat: NaN, lon: NaN, r: 200 }, // from his settings (meApply)
+  { k: 'work', lat: NaN, lon: NaN, r: 200 },
   { k: 'beach', lat: -35.7563, lon: 174.3585, r: 600 }, // Onerahi foreshore and beach
   { k: 'beach', lat: -35.8391, lon: 174.4597, r: 1200 }, // Ocean Beach
   { k: 'beach', lat: -35.6127, lon: 174.5160, r: 1200 }, // Tutukaka harbour
@@ -19709,7 +19708,7 @@ function GlAlerts() {
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + `<div id="glalerts">${glAlertsBody()}</div>
   <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
-  <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: 16 Sherwood Road, Onerahi to 4 Port Road.</div>`);
+  <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
 }
 function glWxSky(kind, day) {
   if (!day) return kind === 'clear' || kind === 'pc' ? ['#0b1438', '#312e81', '#4c1d95', 1] : kind === 'rain' || kind === 'showers' || kind === 'drizzle' || kind === 'storm' ? ['#0f172a', '#1e293b', '#334155', 1] : ['#111827', '#1f2937', '#374151', 1];
@@ -20461,7 +20460,8 @@ function cfGoSettings() { go('#settings'); setTimeout(() => { const el = documen
    Left out: transfers between his own accounts, money coming in, mortgage repayments, payments a bill was marked paid
    with (by the bank or by hand, same payee and amount within 3 days), and ones he's said aren't bills (S.settings.nbHide).
    Payee text has card and account numbers taken out. */
-const BILL_OWN_RE = /^PAY (SHANE|ANZ BILL)\b|\bS A (& S M )?JENKINS\b|\bS JENKINS ASB TO ASB\b|^MB TRANSFER\b|^TO: *\d|^FC\d|\bTFR TO SARAH\b|^TRANSFER TO\b/i;
+const BILL_OWN_BASE = '^PAY (SHANE|ANZ BILL)\\b|^MB TRANSFER\\b|^TO: *\\d|^FC\\d|\\bTFR TO SARAH\\b|^TRANSFER TO\\b';
+let BILL_OWN_RE = new RegExp(BILL_OWN_BASE, 'i'); // 2.27.47: his family's bank names are added from his settings (meApply)
 function billOwnTx(t) { const x = String(t && t.desc || ''); return BILL_OWN_RE.test(x) || !!(t && t.pair && /^(KIWIBANK|ANZ|ASB|WESTPAC|BNZ)\b/i.test(x)); }
 let nbPer = 'this', nbAcct = '', nbShowHidden = false, nbCatF = '';
 /* 2.26.85: categories. Each payment gets one from the payee text (and Akahu's own category or merchant when there is one).
@@ -20600,7 +20600,7 @@ function cfRegulars(D) {
   const T = todayISO(), card = cfCardAcct(D), ign = new Set(S.settings.regIgnore || []), g = new Map();
   (D.transactions || []).forEach(t => { const a = D.accounts.find(x => x.id === t.acct);
     if (!(t.amount < 0) || !a || !cfSpendable(a) || (card && t.acct === card.id) || t.pair || cfMortTx(D, t) || /^(INTEREST|FEE|LOAN)$/.test(t.type) || /\bDR\.?\s?INT\b|interest|overdraft fee/i.test(t.desc)) return;
-    if (/^PAY (SHANE|ANZ BILL)\b|\bS A (& S M )?JENKINS\b|\bS JENKINS ASB TO ASB\b/i.test(t.desc)) return; // money between your own accounts
+    if (/^PAY (SHANE|ANZ BILL)\b/i.test(t.desc) || meOwnRe().test(t.desc)) return; // money between your own accounts
     const k = regKeyOf(t); (g.get(k) || g.set(k, []).get(k)).push(t); });
   const out = [];
   g.forEach((L, key) => {
@@ -21107,10 +21107,10 @@ function cardCfCard(D) { // 2.26.72: "Credit card plan", under Transfers; the sa
    last 3 pays, marked expected, until it lands. Mortgages: ANZ home loans were refinanced to ASB in Sep 2026, so old
    ANZ repayments are history only and the projection uses ASB. */
 const SW_DEFAULT = ['MINISTRY OF EDUCATIO', 'EDPAY', 'EDUCATION PAYROLL'];
-/* 2.26.86: weekly money in, kept like Sarah's wages. Board: FROM L H JENKINS, about $240 every Monday into Kiwibank BOARD.
+/* 2.26.86: weekly money in, kept like Sarah's wages. Board: from the boarder's name (in his settings), about $240 every Monday into Kiwibank BOARD.
    Cleaning job: SMART OFFICE (his Sunday cleaning job), $64.80 every Sunday into ORBIT. Dates and amounts only are kept
    (S.settings.incRules[key].seen), so Budget still shows them after the bank history moves on. Teach or drop payer text in Cash flow. */
-const IR_DEF = { board: { name: 'Board', rules: ['L H JENKINS'], per: 7 }, clean: { name: 'Cleaning job', rules: ['SMART OFFICE'], per: 7 } };
+const IR_DEF = { board: { name: 'Board', rules: [], per: 7 }, clean: { name: 'Cleaning job', rules: ['SMART OFFICE'], per: 7 } };
 const IR_KEYS = Object.keys(IR_DEF);
 function irSt(k) { S.settings = S.settings || {}; S.settings.incRules = S.settings.incRules || {}; const w = S.settings.incRules[k] || (S.settings.incRules[k] = {}); if (!Array.isArray(w.rules)) w.rules = IR_DEF[k].rules.slice(); if (!Array.isArray(w.not)) w.not = []; if (!Array.isArray(w.seen)) w.seen = []; return w; }
 function irIs(k, t) { if (!t || !(t.amount > 0) || dionTx(t)) return false; const w = irSt(k); if (w.not.includes(t.id) || mywIs(t) || swIs(t)) return false; const p = swNorm(t.desc + ' ' + (t.merchant || '')); return w.rules.some(r => r && swNorm(r).length >= 3 && p.includes(swNorm(r))); }
@@ -24172,7 +24172,7 @@ function hwStepSrcLine() {
 
 /* ================= 2.27.12: PAY-DAY TIMING, PAYSLIP COMMISSION MATCH, FORTNIGHTLY CARD PLAN =================
    When money lands (from Shane): his pay Wednesday afternoon/evening (fortnightly), Sarah's (MINISTRY OF EDUCATIO) on a
-   Tuesday (fortnightly, the week set by the last pay the bank showed), Board (L H JENKINS into Kiwibank BOARD) Tuesday
+   Tuesday (fortnightly, the week set by the last pay the bank showed), Board (the boarder's payments into Kiwibank BOARD) Tuesday
    night about 11pm (weekly). Expected lines carry that date and only say Late once the usual time has gone (his pay: after
    Wednesday; Sarah's: after Tuesday; Board: the next morning, as it lands in quiet hours). With no payday set in Bills,
    the pay fortnights default to his Wednesdays (from the last pay seen, else from his commission fortnight).
@@ -24934,7 +24934,7 @@ const mealGate = L => { try { return Array.isArray(L) && mealWeekDone() ? L.filt
 
 // ---- 2.27.40: Northpower power outages ----
 /* The relay reads Northpower's public Outages Centre (outages.northpower.nz) about every 20 minutes and keeps current,
-   planned and just-restored outages. Bell cards: Onerahi (or 16 Sherwood Road) first, then current, then planned by time.
+   planned and just-restored outages. Bell cards: Onerahi (or his street) first, then current, then planned by time.
    Pushes (relay side, through the reminder list): a current unplanned Onerahi outage straight away, and a planned Onerahi
    outage at 6pm the day before and 7am on the day. Northpower's terms allow informational use with acknowledgement, and
    linking needs their consent, so the credit is plain text. */
@@ -24943,7 +24943,7 @@ let OUTG = null, outBusy = false; try { OUTG = JSON.parse(localStorage.getItem('
 const outOn = () => (S.settings || {}).outAlerts !== false;
 const outScope = () => (S.settings || {}).outScope === 'all' ? 'all' : 'onerahi';
 function outPref() { return outOn() ? outScope() : 'off'; }
-const outHome = o => (o.suburbs || []).some(x => /onerahi/i.test(x)) || (o.roads || []).some(x => /sherwood road/i.test(x)) || /onerahi/i.test(o.area || '');
+const outHome = o => { const st = String(ME().homeStreet || '').toLowerCase(); return (o.suburbs || []).some(x => /onerahi/i.test(x)) || (!!st && (o.roads || []).some(x => String(x).toLowerCase().includes(st))) || /onerahi/i.test(o.area || ''); };
 const OUT_KAIPARA = /\b(dargaville|maungaturoto|te kopuru|mareretu|taipuha|kaiwaka|mangawhai|ruawai|paparoa|matakohe|kaihu|tinopai|pouto|baylys|aratapu|tangowahine|kirikopuni|tangiteroria|batley|whakapirau|hakaru|oneriri|tanoa|otamatea)\b/i;
 const outWhg = o => !OUT_KAIPARA.test([o.area].concat(o.suburbs || [], o.zone || []).join(' ')) || (o.suburbs || []).some(x => !OUT_KAIPARA.test(x));
 async function outRefresh(force) {
@@ -25086,3 +25086,31 @@ function smsSettings() {
 }
 (() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { return h + smsSettings(); } catch (e) { return h; } }; })();
 
+
+/* 2.27.47: personal details from his own settings. meApply fills the home/work points and bank name rules;
+   meLoad fetches the profile once from the relay (device key) when this phone hasn't got it yet. */
+let meOwnCache = null;
+function meOwnRe() { const r = ME().ownRe || ''; if (!meOwnCache || meOwnCache.src !== r) { let re = /$^/; try { if (r) re = new RegExp(r, 'i'); } catch (e) { } meOwnCache = { src: r, re }; } return meOwnCache.re; }
+let meApplied = '';
+function meApply() {
+  try {
+    const m = ME(), sig = JSON.stringify([m.home, m.work, m.ownRe, m.boardRule]); if (sig === meApplied) return; meApplied = sig;
+    const pt = (o, p) => { if (p && isFinite(p.lat) && isFinite(p.lon)) { o.lat = +p.lat; o.lon = +p.lon; } };
+    SAVED_PLACES.forEach(o => pt(o, o.id === 'home' ? m.home : o.id === 'work' ? m.work : null));
+    GL_SPOTS.forEach(o => { if (o.k === 'home') pt(o, m.home); else if (o.k === 'work') pt(o, m.work); });
+    pt(TRAVEL_HOME, m.home);
+    BILL_OWN_RE = new RegExp(BILL_OWN_BASE + (m.ownRe ? '|' + m.ownRe : ''), 'i');
+    if (m.boardRule && !IR_DEF.board.rules.includes(m.boardRule)) IR_DEF.board.rules.push(m.boardRule);
+  } catch (e) { }
+}
+async function meLoad() {
+  try {
+    if (!S || !S.settings) return; meApply();
+    if (S.settings.me && S.settings.me.v >= 1) return;
+    if (!localStorage.getItem('cfKey')) return;
+    const r = await fetch(RELAY_URL + '/me', { cache: 'no-store' }); if (!r.ok) return;
+    const j = await r.json(); if (!j || !j.me || typeof j.me !== 'object') return;
+    S.settings.me = j.me; meApply(); await save(); render();
+  } catch (e) { }
+}
+(() => { let n = 0; const t = setInterval(() => { n++; if (typeof S !== 'undefined' && S && S.settings) { if (n === 1 || n % 30 === 0) meLoad(); else meApply(); } if (n > 600) clearInterval(t); }, 1000); })();

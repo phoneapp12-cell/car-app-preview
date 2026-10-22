@@ -63,7 +63,10 @@ export async function runOutages(env, fetchImpl = fetch, now = Date.now(), force
 }
 export async function getOutages(env) { try { return JSON.parse(await env.EVENTS_KV.get(OUT_KEY) || 'null'); } catch (e) { return null; } }
 // Onerahi test: his suburb or street. (Tamaterau shares the Onerahi zone substation but isn't his street.)
-export const isOnerahi = o => (o.suburbs || []).some(s => /onerahi/i.test(s)) || (o.roads || []).some(r => /sherwood road/i.test(r)) || /onerahi/i.test(o.area || '');
+// 2.27.47: his street comes from the HOME_STREET Worker secret (setHomeStreet), not this public code
+let HOME_ST = null;
+export function setHomeStreet(st) { const t = String(st || '').trim(); HOME_ST = t ? new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i') : null; }
+export const isOnerahi = o => (o.suburbs || []).some(s => /onerahi/i.test(s)) || (!!HOME_ST && (o.roads || []).some(r => HOME_ST.test(r))) || /onerahi/i.test(o.area || '');
 const nzParts = ms => Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
 const clock = ms => new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
 const day = (ms, n = 0) => { const p = nzParts(ms + n * 86400e3); return `${p.year}-${p.month}-${p.day}`; };

@@ -1,11 +1,11 @@
 /* 2.26.0: /traffic. Live NZTA (Waka Kotahi) highway events from the public TREIS feature layer (closures, crashes,
    roadworks, hazards), within ~25 km of Whangārei. Each event is tagged when it's within 1.5 km of Shane's commute
-   (Sherwood Rd, Onerahi → Riverside Dr → Te Matau ā Pohe → Port Rd). Cache API for 10 minutes; no KV writes.
+   (Onerahi → Riverside Dr → Te Matau ā Pohe → Port Rd). Cache API for 10 minutes; no KV writes.
    Only what NZTA publishes is returned; an empty list stays empty. */
 import { cacheGet, cachePut } from './kvguard.js';
 const LAYER = 'https://services.arcgis.com/XTtANUDT8Va4DLwI/arcgis/rest/services/NZTA_Highway_Information_TREIS_Feature_Layer_View/FeatureServer/';
 const C_LAT = -35.7251, C_LON = 174.3237, KM = 25;
-export const COMMUTE = [[-35.7495, 174.3646], [-35.7440, 174.3560], [-35.7350, 174.3450], [-35.7300, 174.3380], [-35.7262, 174.3310], [-35.7300, 174.3270], [-35.7375, 174.3255]];
+export const COMMUTE = [[-35.748, 174.362], [-35.7440, 174.3560], [-35.7350, 174.3450], [-35.7300, 174.3380], [-35.7262, 174.3310], [-35.7300, 174.3270], [-35.7375, 174.3255]];
 const km = (a, b, c, d) => { const R = 6371, r = Math.PI / 180, x = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 2 * R * Math.asin(Math.min(1, Math.sqrt(x))); };
 function pts(g) { const o = []; if (g && typeof g.x === 'number') o.push([g.y, g.x]); (g && g.paths || []).forEach(p => (p || []).forEach(xy => xy && xy.length >= 2 && o.push([xy[1], xy[0]]))); return o; }
 function q(layer) {

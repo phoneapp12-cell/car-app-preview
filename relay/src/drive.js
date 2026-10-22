@@ -1,10 +1,10 @@
 /* Live driving time from home to work. Fixed coordinates only.
    Bing Maps driving route with current traffic, using the public directions page.
    The reply is seconds, never a street. */
-const HOME = '-35.7495414,174.3646323';
-const WORK = '-35.7300535,174.3273886';
-
-export async function getDrive(fetchImpl = fetch) {
+// 2.27.47: the exact points are Worker secrets (HOME_LATLON, WORK_LATLON), not in this public code. Fallbacks are suburb-level.
+export async function getDrive(fetchImpl = fetch, env = {}) {
+  const HOME = /^-?\d+\.\d+,-?\d+\.\d+$/.test(env.HOME_LATLON || '') ? env.HOME_LATLON : '-35.75,174.36';
+  const WORK = /^-?\d+\.\d+,-?\d+\.\d+$/.test(env.WORK_LATLON || '') ? env.WORK_LATLON : '-35.73,174.33';
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 12000);
   try {

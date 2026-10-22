@@ -209,7 +209,7 @@ import { smsRoute } from './sms.js';
 import { moveRoute, oldOriginRetired } from './move.js';
 import { appOk } from './health.js';
 import { allow, blocked, fail } from './ratelimit.js';
-import { sha as sha256b64, eq as ctEq } from './akahu.js';
+import { sha as sha256b64, eq as ctEq, seal as sealMe, open as openMe } from './akahu.js';
 import { smsPushNow } from './push.js';
 import { heatRoute } from './heat.js';
 import { alarmRoute } from './alarm.js';
@@ -225,7 +225,7 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     await fail('key', request, 3600); } catch (e) { } }
   return res;
 }
-const PRIVATE_RE = /^\/(cashflow|akahu\/|health\/(?!upload)|sms\/(list|key|test|clear|revoke)|power$|ai(\/|$)|sarah\/seen$|push\/|shared-push\/|sync$|alarm\/|hue\/|heat\/|cars\/alexa|move\/start|move\/put)/;
+const PRIVATE_RE = /^\/(cashflow|akahu\/|health\/(?!upload)|sms\/(list|key|test|clear|revoke)|power$|ai(\/|$)|sarah\/seen$|push\/|shared-push\/|sync$|me$|alarm\/|hue\/|heat\/|cars\/alexa|move\/start|move\/put)/;
 const devKeyOk = async (env, request) => { try { return await appOk(env, request); } catch (e) { return false; } };
 async function handleInner(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get('Origin') || '';
@@ -238,6 +238,16 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
   // 2.27.46: once My App has moved to its own address (plus 3 days' grace), the shared github.io address can no longer
   // use My App's private routes. Sarah's To-do, Monique's Helper and Millesha's page keep their own routes.
   if (PRIVATE_RE.test(path) && await oldOriginRetired(env, origin)) return json(403, 'forbidden_origin', origin, env);
+  if (path === '/me') { // 2.27.47: Shane's private profile (addresses, family, health notes) for My App; sealed in KV, device key only
+    if (request.method !== 'GET') return json(405, 'method_not_allowed', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    if (!(await devKeyOk(env, request))) return json(401, 'no_key', origin, env);
+    const kv = env.EVENTS_KV; let me = null;
+    try { me = await openMe(env, await kv.get('me-v1')); } catch (e) { me = null; }
+    if (!me) { const p = await kv.get('me-plain-v1'); if (p) { try { me = JSON.parse(p); await kv.put('me-v1', await sealMe(env, me)); await kv.delete('me-plain-v1'); } catch (e) { } } }
+    if (!me) return json(404, 'not_found', origin, env);
+    return new Response(JSON.stringify({ me }), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+  }
   if (path.startsWith('/move/')) {
     if (!(await allow('move', request, 120, 3600))) return json(429, 'rate_limited', origin, env);
     let st = 500, data = { error: 'move_failed' };
@@ -324,7 +334,7 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     try {
-      const data = await getDrive(fetchImpl);
+      const data = await getDrive(fetchImpl, env);
       return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     } catch (e) { return json(502, 'drive_unavailable', origin, env); }
   }
