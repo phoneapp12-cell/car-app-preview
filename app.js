@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.80';
+const APP_VERSION = '2.27.81';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19926,10 +19926,15 @@ function mdIsConcert(e) {
   if (MD_CONCERT_W.test(t)) return !MD_PUB.test(v) || /\bconcert\b/i.test(t);
   return live && MD_CONCERT_VENUE.test(v) && !MD_PUB.test(v);
 }
+// 2.27.81: big Auckland shows (major venues) get a gold highlight and BIG SHOW badge.
+const MD_BIG_VEN = /eden park|western springs|go media|mt\.? ?smart|mount smart|spark arena|trusts arena/i;
+const mdBig = e => !!(e && MD_BIG_VEN.test(String(e.venue || '')));
+const MD_BIG_B = '<span class="bigb">BIG SHOW</span>';
 function mdConcertRow(e) {
   const tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC', ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',') : 'Venue TBC';
   const u = /^https:\/\//.test(e.url || '') ? e.url : '';
-  return tabRow('events', esc(e.title), esc(ven) + '<br>' + esc((e.date ? fmtW(e.date) : 'Date TBC') + ' · ' + tm), u ? `window.open('${esc(u)}','_blank','noopener')` : "go('#events')");
+  const big = mdBig(e) && /auckland/i.test(String(e.venue || '') + ' ' + (e.cats || []).join(' '));
+  return tabRow('events', esc(e.title) + (big ? ' ' + MD_BIG_B : ''), esc(ven) + '<br>' + esc((e.date ? fmtW(e.date) : 'Date TBC') + ' · ' + tm), u ? `window.open('${esc(u)}','_blank','noopener')` : "go('#events')");
 }
 const MD_EV = [['akl', '🎤 Auckland concerts', 'concerts'], ['concerts', '🎸 Whangārei concerts', 'wconc'], ['nightlife', '🌙 Nightlife', 'nightlife'], ['movies', '🎬 Movies at Event Cinemas'], ['markets', '🧺 Markets'], ['other', '📌 Other']];
 function mdEvRow(e) {
@@ -19960,7 +19965,8 @@ function mdEvTile(e, k) {
   const ven = e.venue ? String(e.venue).split(',')[0].trim() : 'Venue TBC', tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC';
   const s = [ven, e.date ? fmtW(e.date) : 'Date TBC', tm].join(' · '), u = /^https:\/\//.test(e.url || '') ? e.url : '', g = MD_GRAD[k] || MD_GRAD.nightlife;
   const tag = k === 'akl' ? 'AUCKLAND' : k === 'concerts' ? 'CONCERT' : ((e.cats || []).find(c => c !== 'Nightlife') || 'NIGHTLIFE').toUpperCase();
-  return `<button type="button" class="gltile glic" style="--a:${g[0]};--b:${g[1]}" onclick="hab('tap:${k}',${esc(JSON.stringify(ven))});hab('tapt:${k}',${esc(JSON.stringify(String(e.title).slice(0, 60)))});${u ? esc(`window.open('${u.replace(/'/g, '%27')}','_blank','noopener')`) : "go('#events')"}" aria-label="${esc(e.title + ': ' + s)}"><img src="art/i3-${k === 'nightlife' ? 'moon' : 'radio'}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltag">${esc(tag)}</span><span class="gltt">${esc(e.title)}<small>${esc(s)}</small></span></button>`;
+  const big = k === 'akl' && mdBig(e);
+  return `<button type="button" class="gltile glic${big ? ' bigt' : ''}" style="--a:${g[0]};--b:${g[1]}" onclick="hab('tap:${k}',${esc(JSON.stringify(ven))});hab('tapt:${k}',${esc(JSON.stringify(String(e.title).slice(0, 60)))});${u ? esc(`window.open('${u.replace(/'/g, '%27')}','_blank','noopener')`) : "go('#events')"}" aria-label="${esc(e.title + ': ' + s)}"><img src="art/i3-${k === 'nightlife' ? 'moon' : 'radio'}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltag">${esc(tag)}</span>${big ? MD_BIG_B : ''}<span class="gltt">${esc(e.title)}<small>${esc(s)}</small></span></button>`;
 }
 const mdTiles = (L, k) => L.length ? `<div class="glgrid">${L.map(e => mdEvTile(e, k)).join('')}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>';
 const mdGo = f => f === 'concerts' || f === 'wconc' ? "go('#concerts')" : "go('#nightlife')";
@@ -20022,7 +20028,7 @@ function evListSecs() {
   const row = (e, k) => { const ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',').trim() : 'Venue TBC', tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC', u = /^https:\/\//.test(e.url || '') ? e.url : '';
     return `<button class="row" onclick="${esc(`hab('tap:${k}',${JSON.stringify(ven.split(',')[0])});hab('tapt:${k}',${JSON.stringify(String(e.title).slice(0, 60))});` + (u ? `window.open('${u.replace(/'/g, '%27')}','_blank','noopener')` : "go('#events')"))}"><div class="tx"><div class="t">${esc(e.title)}${k === 'nightlife' ? (t => t ? ` <span class="cinerate">${esc(t)}</span>` : '')((e.cats || []).find(c => c !== 'Nightlife') || '') : ''}</div><div class="s">${esc(ven)}</div><div class="s">${esc((e.date ? fmtW(e.date) : 'Date TBC') + ' · ' + tm)}</div></div>${I('ext')}</button>`; };
   const sec = (title, L, k) => `<div class="glzone"><span>${title}</span><span>${L.length}</span></div>` + (L.length ? (() => { let out = '', cur = ''; L.forEach(e => { const m = String(e.date || '').slice(0, 7); if (m !== cur) { if (cur) out += '</div>'; cur = m; out += `<div class="muted" style="margin:10px 4px 4px;font-weight:700">${m ? MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4) : 'Date TBC'}</div><div class="list">`; } out += row(e, k); }); return out + '</div>'; })() : '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
-  return sec;
+  sec.row = row; return sec;
 }
 function NightlifePage() { // 2.27.63: same list style as Concerts
   setTimeout(() => { try { refreshEvents(); } catch (e) { } }, 0);
@@ -20032,9 +20038,9 @@ function NightlifePage() { // 2.27.63: same list style as Concerts
 }
 function ConcertsPage() {
   setTimeout(() => { try { refreshEvents(); } catch (e) { } }, 0);
-  const sec = evListSecs(), G = mdEvGroups();
+  const sec = evListSecs(), row = sec.row, G = mdEvGroups();
   return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('Concerts', 'Whangārei and Auckland') +
-    sec('🎸 Whangārei', G.concerts, 'concerts') + sec('🎤 Auckland', G.akl, 'akl') +
+    sec('🎸 Whangārei', G.concerts, 'concerts') + (B => (B.length ? `<div class="glzone"><span>🌟 Big shows in Auckland</span><span>${B.length}</span></div><div class="list bigl">` + B.map(e => row(e, 'akl')).join('').replace(/<div class="t">/g, '<div class="t">' + MD_BIG_B + ' ') + '</div>' : '') + sec('🎤 Auckland', G.akl.filter(e => !mdBig(e)), 'akl'))(G.akl.filter(mdBig)) +
     `<div class="foot">From Eventfinda (eventfinda.co.nz), Whangārei District Council and the Eden Park and Auckland Stadiums websites. Whangārei concerts during your shifts are left out. Times can change, so check before you go. No sport.</div>`;
 }
 
