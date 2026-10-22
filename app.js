@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.67';
+const APP_VERSION = '2.27.68';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -25272,7 +25272,10 @@ function accItems() {
     (d.active || []).forEach(x => L.push({ pri: x.commute ? 97 : 88, red: true, route: !!x.commute, tag: (x.commute ? '🚗 On your commute' : '🚗 Crash') + ' · NZTA', what: 'Crash: ' + road(x) + (place(x) ? ', ' + place(x) : ''), s: [aff(x), x.start ? 'Reported ' + accT(+x.start) : '', x.until].filter(Boolean).join(' · ') + ' · Map ›', url: accMap(x), accId: x.id }));
     (d.cleared || []).forEach(x => L.push({ pri: 20, info: true, tag: '✅ Cleared · NZTA', what: 'Crash: ' + road(x) + (place(x) ? ', ' + place(x) : ''), s: 'Cleared ' + accT(x.clearedAt), url: accMap(x), accId: x.id }));
   }
-  if (polOn()) (d.police || []).forEach(x => { const crash = x.kind === 'crash', fresh = Date.now() - Date.parse(x.at) < (crash ? 12 : 72) * 3600e3; if (!fresh) return;
+  if (polOn()) (d.police || []).forEach(x => { if (x.kind === 'road') { if (Date.now() - Date.parse(x.cleared ? x.clearedAt : x.at) > (x.cleared ? 3 : 12) * 3600e3) return;
+      L.push(x.cleared ? { pri: 20, info: true, tag: '✅ Cleared · NZ Police', what: String(x.label || '').replace(/^Crash – [^:]+:/, 'Crash – road reopened:'), s: 'Reopened ' + accT(x.clearedAt) + ' · Police release › · NZ Police', url: x.clearUrl || x.url }
+        : { pri: 90, red: true, tag: '🚓 Crash · NZ Police', what: x.label, s: accT(x.at) + ' · Police release › · NZ Police', url: x.url }); return; }
+    const crash = x.kind === 'crash', fresh = Date.now() - Date.parse(x.at) < (crash ? 12 : 72) * 3600e3; if (!fresh) return;
     L.push({ pri: crash ? (x.near ? 86 : 50) : 35, red: crash && x.near, info: !crash, tag: crash ? '🚓 Police · roads' : '🚓 Police update', what: x.title, s: accT(x.at) + ' · NZ Police', url: x.url }); });
   return L;
 }

@@ -23,12 +23,46 @@ export function parsePolice(xml, now = Date.now()) {
     const title = ent(g(/<title>([\s\S]*?)<\/title>/)).replace(/\s+/g, ' ').trim(), url = g(/<link>([\s\S]*?)<\/link>/), gid = g(/<guid[^>]*>(\d+)/), at = Date.parse(g(/<pubDate>([\s\S]*?)<\/pubDate>/)) || 0;
     if (!title || !/^https:\/\/www\.police\.govt\.nz\/news\/release\//.test(url) || !gid || !at || now - at > 7 * 864e5) continue;
     const body = ent(ent(g(/<description>([\s\S]*?)<\/description>/))).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    const rd = polRoad(title, body); if (rd) { out.push({ id: 'pol-' + gid, url, at: new Date(at).toISOString(), ...rd }); continue; }
     if (POL_DENY.test(title) || POL_DENY.test(body.slice(0, 400))) continue;
     const crash = POL_CRASH.test(title + ' ' + body.slice(0, 400));
     if (!crash && !POL_KEEP.test(title + ' ' + body.slice(0, 300))) continue;
     out.push({ id: 'pol-' + gid, title: title.slice(0, 140), url, at: new Date(at).toISOString(), kind: crash ? 'crash' : 'update', near: POL_NEAR.test(title + ' ' + body.slice(0, 600)) });
   }
-  return out;
+  // A later "reopened" release clears the earlier closure card for the same road/place
+  out.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const res = [];
+  for (const x of out) {
+    if (x.kind === 'road' && x.reopen) { const m = res.filter(y => y.kind === 'road' && !y.cleared && Date.parse(y.at) <= Date.parse(x.at) && (x.sh ? y.sh === x.sh : y.where === x.where));
+      if (m.length) { m.forEach(y => { y.cleared = true; y.clearedAt = x.at; y.clearUrl = x.url; }); continue; }
+      res.push({ ...x, cleared: true, clearedAt: x.at }); continue; }
+    res.push(x);
+  }
+  return res.reverse();
+}
+// 2.27.68: crash releases that close, block, divert or delay a road near Whangārei. Never their title: our own neutral label,
+// road/place pulled only from the release text, no death/injury/condition wording or names.
+const POL_CRIME = /\b(court|arrest\w*|charg\w*|sentenc\w*|homicide|murder\w*|manslaughter|assault\w*|violen\w*|stab\w*|shoot\w*|firearm\w*|gun\w*|weapon\w*|sexual|rape|indecent|drug\w*|meth\w*|cannabis|burglar\w*|robber\w*|theft|stolen|ram[- ]raid\w*|fled|fleeing|pursuit|gang\w*|kidnap\w*|abduct\w*|warrant|name release|named)\b/i;
+const POL_RCRASH = /\b(crash\w*|collision|vehicle (?:incident|accident)|rolled|rollover|crash scene)\b/i;
+const POL_SHUT = /\b(road (?:is |has been |remains )?(?:closed|blocked)|roads? closures?|closed (?:the|a|both)|(?:is|are|remains?|been) closed|closes?|blocked|blocking|cordon\w*)\b/i;
+const POL_DIV = /\b(diversions?|detours?|diverted)\b/i, POL_DLY = /\b(delays?|delayed|traffic management|single lane|stop\/go|lane closures?)\b/i;
+const POL_OPEN = /\b(re-?opened|now (?:re)?open|has (?:now )?reopened|open again|cleared|lanes? (?:are |have )?(?:open|reopened))\b/i;
+const PLACES = ['Whangārei', 'Onerahi', 'Kamo', 'Tikipunga', 'Maunu', 'Kensington', 'Raumanga', 'Morningside', 'Otangarei', 'Maungatapere', 'Maungakaramea', 'Hikurangi', 'Ruakaka', 'Waipu', 'One Tree Point', 'Marsden Point', 'Parua Bay', 'Tamaterau', 'Ngunguru', 'Tutukaka', 'Matapouri', 'Portland', 'Titoki', 'Poroti', 'Kaiwaka', 'Mangawhai', 'Whakapara', 'Kauri', 'Springs Flat', 'Glenbervie', 'Brynderwyn', 'Oakleigh', 'Otaika', 'Kioreroa', 'Port Whangārei', 'Pataua', 'Whareora', 'Kara', 'Ōakura', 'Helena Bay', 'Ruatangata', 'Kokopu', 'Purua', 'Towai', 'Langs Beach', 'Uretiti'];
+const plRe = n => new RegExp('\\b' + n.replace(/ā/g, '[aā]').replace(/Ō/g, '[OŌ]') + '\\b', 'i');
+function polRoad(title, body) {
+  const t = title + ' . ' + body.slice(0, 1500);
+  if (!POL_RCRASH.test(t) || POL_CRIME.test(title) || POL_CRIME.test(body.slice(0, 400))) return null;
+  const reopen = POL_OPEN.test(t), shut = POL_SHUT.test(t), div = POL_DIV.test(t), dly = POL_DLY.test(t);
+  if (!shut && !div && !dly && !reopen) return null;
+  const sm = t.match(/\b(?:State Highway|SH) ?(\d{1,2})\b/i), sh = sm ? 'SH' + sm[1] : '';
+  const rm = t.match(/\b((?:[A-Z][a-zāēīōū]+ ){1,2}(?:Road|Rd|Street|St|Drive|Avenue|Ave|Highway|Hill|Bay Road))\b/);
+  const road = sh || (rm && !/State Highway/.test(rm[1]) ? rm[1].replace(/\bRd$/, 'Road') : '');
+  const place = (PLACES.find(n => n !== 'Whangārei' && plRe(n).test(t)) || (plRe('Whangārei').test(t) ? 'Whangārei' : ''));
+  if (!place && !POL_NEAR.test(t)) return null; // only near Whangārei
+  const where = [road, place].filter(Boolean).join(', ') || 'near Whangārei';
+  const aff = shut ? 'road closed' : div ? 'diversion in place' : dly ? 'delays' : 'road reopened';
+  return { kind: 'road', sh, where, reopen: reopen && !/\b(remains? closed|still closed|expected to (?:remain|be) closed)\b/i.test(t), near: true,
+    label: 'Crash – ' + aff + ': ' + where, title: 'Crash – ' + aff + ': ' + where };
 }
 async function getPolice(fetchImpl) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), 15000);
@@ -57,8 +91,8 @@ export function crashReminders(rec, pref, now, polOn = true) {
   if (!rec || !pref || pref === 'off') return [];
   // Police crash / road closure releases near Whangārei, last 6 hours, unless NZTA already has that road
   const roads = (rec.active || []).map(x => String(x.where || '').toLowerCase().replace(/state highway /g, 'sh ').replace(/\s+/g, '')).join('|');
-  const pol = !polOn ? [] : (rec.police || []).filter(x => x.kind === 'crash' && x.near && now - Date.parse(x.at) < 6 * 3600e3 && (pref === 'all' || /onerahi/i.test(x.title)))
-    .filter(x => { const m = x.title.toLowerCase().match(/(?:sh|state highway) ?(\d+)/); return !(m && roads.includes('sh' + m[1])); })
+  const pol = !polOn ? [] : (rec.police || []).filter(x => (x.kind === 'crash' || (x.kind === 'road' && !x.cleared)) && x.near && now - Date.parse(x.at) < 6 * 3600e3 && (pref === 'all' || /onerahi/i.test(x.title)))
+    .filter(x => { const m = String(x.sh || x.title).toLowerCase().match(/(?:sh|state highway) ?(\d+)/); return !(m && roads.includes('sh' + m[1])); })
     .map(x => { const q = nzParts(Date.parse(x.at) > now - 600e3 ? Date.parse(x.at) : now); return { id: x.id, title: ('🚓 ' + x.title).slice(0, 80), date: `${q.year}-${q.month}-${q.day}`, time: `${q.hour}:${q.minute}`, repeat: 'none' }; });
   const p = nzParts(now), cid = s => String(s).replace(/[^a-z0-9]/gi, '').slice(0, 30);
   return (rec.active || []).filter(x => pref === 'all' || x.commute || /onerahi/i.test(x.where + ' ' + x.desc)).slice(0, 6).map(x => {
