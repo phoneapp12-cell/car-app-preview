@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.65';
+const APP_VERSION = '2.27.66';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16370,6 +16370,40 @@ async function loadPrime(force) {
   try { const r = await fetch(RELAY_URL + '/prime', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items) && d.items.length) { PRIME = { checked: new Date().toISOString(), source: d.source, items: d.items }; try { localStorage.setItem('primeNew', JSON.stringify(PRIME)); } catch (e) { } if (location.hash === '#home' || !location.hash) render(); } } catch (e) { }
 }
 setTimeout(() => loadPrime(), 4000); setInterval(() => loadPrime(), 6 * 3600e3);
+
+/* 2.27.66: New on Netflix and New on Prime Video pages. A tap opens that exact title in the app (Android intent, web as fallback).
+   Netflix ids come from the links in Netflix's own emails. Prime Video's sources (Flicks, ottpath) give no Prime ids, and Prime's
+   search pages are closed to robots, so Prime titles open Prime Video's search for the title (marked "search"). */
+function openStreamUrl(k, url) {
+  const a = STREAM_APPS[k]; if (!a || !/^https:\/\/www\.(netflix|primevideo)\.com\//.test(url)) return;
+  if (/Android/i.test(navigator.userAgent)) { const u = new URL(url); location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;package=${a.pkg};S.browser_fallback_url=${encodeURIComponent(url)};end`; return; }
+  window.open(url, '_blank', 'noopener');
+}
+function streamRow(k, x, sub) {
+  const id = k === 'netflix' ? (/^\d{5,10}$/.test(x.nfid || '') ? x.nfid : '') : '';
+  const url = id ? 'https://www.netflix.com/title/' + id : k === 'netflix' ? 'https://www.netflix.com/search?q=' + encodeURIComponent(x.title) : 'https://www.primevideo.com/search/ref=atv_nb_sr?phrase=' + encodeURIComponent(x.title);
+  const pic = x.img && /^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(x.img) ? `<img src="${esc(x.img)}" alt="" style="width:64px;height:36px;object-fit:cover;border-radius:6px;flex:none" loading="lazy" onerror="this.remove()">` : '';
+  const type = /\(Season \d+\)$/.test(x.title) ? 'Series' : '';
+  return `<button class="row" onclick="${esc(`openStreamUrl('${k}',${JSON.stringify(url)})`)}">${pic}<div class="tx"><div class="t">${esc(x.title)}${id ? '' : ' <span class="cinerate">search</span>'}</div><div class="s">${esc([type, sub].filter(Boolean).join(' · '))}</div></div>${I('ext')}</button>`;
+}
+function NetflixPage() {
+  try { refreshNf(); } catch (e) { }
+  const head = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('New on Netflix', 'From Netflix’s emails to you · NZ');
+  const F = NF && mailConnected('microsoft') ? (NF.fresh || []) : [], C = NF && mailConnected('microsoft') ? (NF.coming || []) : [];
+  const fr = F.map(x => streamRow('netflix', x, x.at ? 'Added ' + fmtW(todayISO(new Date(x.at))) : '')).join(''), co = C.map(x => streamRow('netflix', x, x.date ? 'Coming ' + fmtW(x.date) : '')).join('');
+  return head + `<div class="glzone"><span>🎬 New</span></div>` + (fr ? `<div class="list">${fr}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>') +
+    (co ? `<div class="glzone"><span>🍿 Coming soon</span></div><div class="list">${co}</div>` : '') +
+    `<div class="foot">Titles and links from Netflix’s “New on Netflix” emails in your Outlook. Tap to open it in the Netflix app. “search” means the email didn’t link that title, so it opens a Netflix search.</div>`;
+}
+function PrimePage() {
+  try { loadPrime(); } catch (e) { }
+  const head = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('New on Prime Video', 'Prime Video NZ');
+  const t = todayISO(), ok = x => x && x.title && /^\d{4}-\d\d-\d\d$/.test(x.date || ''), L = PRIME && Array.isArray(PRIME.items) ? PRIME.items.filter(ok) : [];
+  const fr = L.filter(x => x.date <= t && daysLeft(x.date) >= -31).sort((a, b) => b.date.localeCompare(a.date)), co = L.filter(x => x.date > t).sort((a, b) => a.date.localeCompare(b.date));
+  return head + `<div class="glzone"><span>📺 New</span><span>${fr.length}</span></div>` + (fr.length ? `<div class="list">${fr.map(x => streamRow('prime', x, 'Added ' + fmtW(x.date))).join('')}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>') +
+    (co.length ? `<div class="glzone"><span>🍿 Coming soon</span><span>${co.length}</span></div><div class="list">${co.map(x => streamRow('prime', x, 'From ' + fmtW(x.date))).join('')}</div>` : '') +
+    `<div class="foot">Titles and NZ dates from ${esc(PRIME && PRIME.source || 'flicks.co.nz')}. Tap to search for it in the Prime Video app.</div>`;
+}
 /* Tap hands off to the installed app: Android intent with the web page as fallback; elsewhere the https universal link. */
 const STREAM_APPS = { netflix: { web: 'https://www.netflix.com/', pkg: 'com.netflix.mediaclient' }, prime: { web: 'https://www.primevideo.com/', pkg: 'com.amazon.avod.thirdpartyclient' } };
 function openStreamApp(k) {
@@ -16386,9 +16420,12 @@ function nfTitle(s) {
 }
 // Pure: one email's text in, its titles out. Nothing is added that the email doesn't name.
 function nfParseBody(raw) {
+  const ids = {}, img = {}; // 2.27.66: Netflix title ids and posters from the email's own links (…netflix.com/title/<id>)
+  try { String(raw || '').replace(/\[([^\]\n]{1,300})\]\s*<([^>\s]+)>/g, (m0, t, u) => { let d = u; try { d = decodeURIComponent(u); } catch (e) { } const id = (d.match(/netflix\.com\/title\/(\d{5,10})/) || [])[1]; if (!id) return m0;
+    if (/^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(t)) { if (!img[id]) img[id] = t; } else { const tt = nfTitle(t); if (tt && !ids[tt]) ids[tt] = id; } return m0; }); } catch (e) { }
   const lines = String(raw || '').replace(/\r/g, '').replace(/<(https?|mailto):[^>\s]*>/gi, '').replace(/[\u2007\u034f\u200b-\u200d\u00ad]/g, '')
     .split('\n').map(l => l.replace(/[ \t]+/g, ' ').trim());
-  const out = { list: [], added: '' };
+  const out = { list: [], added: '', ids, img };
   const i = lines.findIndex(l => /^new on netflix$/i.test(l));
   if (i >= 0) {
     for (let k = i + 1; k < lines.length; k++) {
@@ -16452,12 +16489,13 @@ async function nfFetch(token) {
     if (!body) continue;
     if (body.added && /just added|added something/i.test(x.subject)) add(fresh, body.added, x);
     if (!gotList && body.list.length) { gotList = true; body.list.forEach(t => add(fresh, t, x)); }
+    [...fresh, ...coming].forEach(f => { const id = f.nfid || body.ids[f.title] || body.ids[f.title.replace(/ \(Season \d+\)$/, '')]; if (id && !f.nfid) { f.nfid = id; if (body.img[id]) f.img = body.img[id]; } });
   }
-  return { at: Date.now(), fresh: fresh.slice(0, 5), coming, newest: mails[0] ? mails[0].at : 0, count: mails.length };
+  return { v: 2, at: Date.now(), fresh: fresh.slice(0, 5), coming, newest: mails[0] ? mails[0].at : 0, count: mails.length };
 }
 async function refreshNf(force) {
   if (nfBusy || !mailConnected('microsoft')) return;
-  if (!force && NF && Date.now() - NF.at < NF_MAX_AGE) return;
+  if (!force && NF && NF.v === 2 && Date.now() - NF.at < NF_MAX_AGE) return;
   nfBusy = true;
   try {
     let token = await mailAccess('microsoft'), got;
@@ -18788,7 +18826,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19761,8 +19799,8 @@ function glPickRecipe() { try { const L = visibleIdeas().filter(i => i && i.titl
 function glTiles() {
   const B = n => `art/${n}-banner.webp`, T = [];
   const add = (k, cat, title, fn, art, grad, go) => { try { const s = fn(); if (s && glOk(s) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(String(s))) T.push({ k, cat, title, s: String(s).slice(0, 70), art, grad, go }); } catch (e) { } };
-  add('netflix', 'watch', 'New on Netflix', () => { const f = NF && mailConnected('microsoft') ? (NF.fresh || []) : []; return f.length ? f.slice(0, 2).map(x => x.title).join(', ') : ''; }, B('ideas'), '', "go('#tv')");
-  add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#tv')");
+  add('netflix', 'watch', 'New on Netflix', () => { const f = NF && mailConnected('microsoft') ? (NF.fresh || []) : []; return f.length ? f.slice(0, 2).map(x => x.title).join(', ') : ''; }, B('ideas'), '', "go('#netflix')");
+  add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#prime')");
   add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
   add('videos', 'watch', 'Videos', () => (glFirst(HOME_CARD.videos()) || {}).t, B('tv'), '', "go('#videos')");
   add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "glSarahOpen()");
