@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.59';
+const APP_VERSION = '2.27.60';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5563,7 +5563,7 @@ async function tick(id) {
   const t = S.todos.find(x => x.id === id); if (!t) return;
   const s = snap();
   t.done = !t.done;
-  if (t.done) { t.doneAt = Date.now(); delete t.status; delete t.startedAt; } else delete t.doneAt;
+  if (t.done) { t.doneAt = Date.now(); delete t.status; delete t.startedAt; try { hab('todo:done'); } catch (e) { } } else delete t.doneAt;
   await save();
   if (sheetOpen) await closeSheet();
   render();
@@ -8086,7 +8086,7 @@ function addToShop(names, meal) {
     const k = mNorm(g), had = open.get(k);
     if (had) { if (meal && !had.meals.includes(meal)) had.meals.push(meal); return; }
     const it = { id: uid('shop'), name: g.slice(0, 120), done: false, created: Date.now() + n, meals: meal ? [meal] : [] };
-    S.shop.items.push(it); open.set(k, it); n++;
+    S.shop.items.push(it); open.set(k, it); n++; try { hab('shop:' + k, g.slice(0, 60)); } catch (e) { } // 2.27.60
   });
   return n;
 }
@@ -16926,6 +16926,8 @@ function Settings() {
   </div>
   <div class="sec" style="font-size:.8rem;opacity:.8">Classic layout</div>
   <div class="list">
+   <div class="srow"><div class="tx"><div class="t">Habit suggestions</div><div class="s">Up to 3 ideas on Notifications based on what you usually open, add and when. Learned on this phone only.</div></div><button class="switch ${habOn() ? 'on' : ''}" role="switch" aria-checked="${habOn()}" aria-label="Habit suggestions" onclick="toggleSetting('habits')"></button></div>
+   <div class="srow"><div class="tx"><div class="t">Clear what My App has learned</div><div class="s">Forgets your habits and any “Don’t suggest this” choices.</div></div><button class="btn small" onclick="habClear()">Clear</button></div>
    <div class="srow"><div class="tx"><div class="t">Just added</div><div class="s">The card of things added in the last two days, under Coming up.</div></div><button class="switch ${justAddedOn() ? 'on' : ''}" role="switch" aria-checked="${justAddedOn()}" aria-label="Just added" id="jasw" onclick="toggleSetting('justAdded', ${!justAddedOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Rotating strip</div><div class="s">Quote, joke, travel spot, fact, next countdown, Netflix, Prime Video and Countdown rewards in one small card that changes every 6 seconds. Swipe to move, tap to open. Off: the old separate cards.</div></div><button class="switch ${stripOn() ? 'on' : ''}" role="switch" aria-checked="${stripOn()}" aria-label="Rotating strip" id="qstripsw" onclick="toggleSetting('qjStrip')"></button></div>
    <div class="srow"><div class="tx"><div class="t">My photos in the strip</div><div class="s">Add your own photos one at a time. They stay on this phone only. One shows at a time and changes every few hours.</div></div><button class="btn small" id="myphbtn" onclick="myPhManage()">${MYPH.length ? 'Photos (' + MYPH.length + ')' : 'Add photo'}</button></div>
@@ -18762,6 +18764,7 @@ function render() {
   if (/^#(unimed|health\/claims|money\/claims)(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#claims'); renderedHash = '#claims'; } // 2.26.91: one UniMed claims page
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
+  try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
   const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, movies: MoviesPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
@@ -19711,7 +19714,7 @@ function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
-  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + `<div id="glalerts">${glAlertsBody()}</div>
+  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + `<div id="habsug">${habCards()}</div><div id="glalerts">${glAlertsBody()}</div>
   <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
 }
@@ -19854,7 +19857,7 @@ function mdEvTile(e, k) {
   const ven = e.venue ? String(e.venue).split(',')[0].trim() : 'Venue TBC', tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC';
   const s = [ven, e.date ? fmtW(e.date) : 'Date TBC', tm].join(' · '), u = /^https:\/\//.test(e.url || '') ? e.url : '', g = MD_GRAD[k] || MD_GRAD.nightlife;
   const tag = k === 'akl' ? 'AUCKLAND' : k === 'concerts' ? 'CONCERT' : ((e.cats || []).find(c => c !== 'Nightlife') || 'NIGHTLIFE').toUpperCase();
-  return `<button type="button" class="gltile glic" style="--a:${g[0]};--b:${g[1]}" onclick="${u ? esc(`window.open('${u.replace(/'/g, '%27')}','_blank','noopener')`) : "go('#events')"}" aria-label="${esc(e.title + ': ' + s)}"><img src="art/i3-${k === 'nightlife' ? 'moon' : 'radio'}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltag">${esc(tag)}</span><span class="gltt">${esc(e.title)}<small>${esc(s)}</small></span></button>`;
+  return `<button type="button" class="gltile glic" style="--a:${g[0]};--b:${g[1]}" onclick="hab('tap:${k}',${esc(JSON.stringify(ven))});hab('tapt:${k}',${esc(JSON.stringify(String(e.title).slice(0, 60)))});${u ? esc(`window.open('${u.replace(/'/g, '%27')}','_blank','noopener')`) : "go('#events')"}" aria-label="${esc(e.title + ': ' + s)}"><img src="art/i3-${k === 'nightlife' ? 'moon' : 'radio'}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltag">${esc(tag)}</span><span class="gltt">${esc(e.title)}<small>${esc(s)}</small></span></button>`;
 }
 const mdTiles = (L, k) => L.length ? `<div class="glgrid">${L.map(e => mdEvTile(e, k)).join('')}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>';
 const mdGo = f => `mdFilt='${f}';render()`;
@@ -19874,7 +19877,7 @@ function MediaPage() {
   if (!cats.some(c => c[0] === 'concerts')) { const i = cats.findIndex(c => c[0] === 'fun'); cats.splice(i < 0 ? cats.length : i, 0, ['concerts', 'Concerts'], ['nightlife', 'Nightlife'], ['wconc', 'Whangārei concerts']); }
   if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
   const list = mdFilt === 'all' ? all : all.filter(t => t.cat === mdFilt);
-  const filt = `<div class="glfilt mdfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';render()">${c[1]}</button>`).join('')}</div>`;
+  const filt = `<div class="glfilt mdfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';hab('tab:${c[0]}');render()">${c[1]}</button>`).join('')}</div>`;
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
   if (mdFilt === 'concerts') return back + header('Entertainment', 'Auckland concerts') + filt + mdTiles(mdEvGroups().akl, 'akl') +
     `<div class="foot">Auckland concerts from Eventfinda (eventfinda.co.nz), Auckland gig guide: major venues and concerts only. Tap a tile for tickets. Check details before you go. No sport.</div>`;
@@ -19918,6 +19921,68 @@ function MoviesPage() {
     `<div class="glzone"><span>🍿 Coming soon</span></div>` + (soon || '<div class="muted" style="margin:0 4px 10px">Nothing listed as coming soon right now</div>') +
     `<div class="foot">From Event Cinemas (eventcinemas.co.nz), updated ${esc(ago(Date.parse(c.at)))}. Tap a time to book. Times can change, so check before you go.</div>`;
 }
+/* ================= 2.27.60: habit suggestions (on this phone only) =================
+   Lightweight counts in localStorage 'habits' (never synced, never sent): pages opened, Entertainment tabs, concert taps,
+   shopping items added and to-dos ticked, each with hour of day, weekday and whether it was a roster day off.
+   Score = frequency (log) × recency (halves about every 2 weeks) × time match (this hour ±1, or this weekday) × day type match,
+   less 30% for each "Not now". Up to 3 "Suggested for you" cards on Notifications only, never pushes, only real data in the app.
+   Never: sport, walking Zeus/pets, bedtime, teeth, medication, lateness or work hours. */
+const habOn = () => !(S && S.settings && S.settings.habits === false);
+function habSt() { try { const o = JSON.parse(localStorage.getItem('habits') || 'null'); if (o && typeof o === 'object' && o.k) { o.sup = o.sup || {}; o.ban = o.ban || {}; o.nn = o.nn || {}; return o; } } catch (e) { } return { k: {}, sup: {}, ban: {}, nn: {} }; }
+function habSave(o) { try { localStorage.setItem('habits', JSON.stringify(o)); } catch (e) { } }
+const habOff = () => { try { return !!glMode().off; } catch (e) { return false; } };
+function hab(key, extra) {
+  try { if (!habOn() || !key) return; const o = habSt(), d = new Date(), e = o.k[key] || (o.k[key] = { n: 0, t: 0, h: {}, d: {}, o: 0, w: 0, x: [], v: {} });
+    if (Date.now() - e.t < 20000) return; // one count per visit
+    e.n++; e.t = Date.now(); e.h[d.getHours()] = (e.h[d.getHours()] || 0) + 1; e.d[d.getDay()] = (e.d[d.getDay()] || 0) + 1; habOff() ? e.o++ : e.w++;
+    e.x = (e.x || []).concat(Date.now()).slice(-8); if (extra) { const v = String(extra).slice(0, 60); e.v[v] = (e.v[v] || 0) + 1; }
+    const ks = Object.keys(o.k); if (ks.length > 300) ks.sort((a, b) => o.k[a].t - o.k[b].t).slice(0, ks.length - 300).forEach(k => delete o.k[k]);
+    habSave(o);
+  } catch (e) { }
+}
+function habScore(e, mode) {
+  if (!e || !e.n) return 0; const d = new Date(), hr = d.getHours(), days = (Date.now() - e.t) / 864e5;
+  const tm = mode === 'day' ? (e.d[d.getDay()] || 0) / e.n : ((e.h[hr] || 0) + 0.5 * ((e.h[(hr + 23) % 24] || 0) + (e.h[(hr + 1) % 24] || 0))) / e.n;
+  const dt = (habOff() ? e.o : e.w) / Math.max(1, e.o + e.w);
+  return Math.log2(1 + e.n) * Math.pow(0.5, days / 14) * (0.3 + tm) * (0.5 + dt);
+}
+const HAB_PAGES = { podcasts: 'Podcasts', radio: 'Radio', tv: 'the TV guide', videos: 'Videos', top40: 'the Top 40', blogging: 'Blogs', news: 'the news', media: 'Entertainment', travel: 'Travel', lang: 'Word of the day', bills: 'Bills', cashflow: 'Cash flow', budget: 'Budget' };
+const habHr = h => (h % 12 || 12) + (h < 12 ? 'am' : 'pm');
+function habCands() {
+  const o = habSt(), K = o.k, C = [], d = new Date(), hr = d.getHours(), today = todayISO();
+  const add = (id, sc, icon, title, why, btn, act) => { if (sc > 0 && !o.ban[id] && !o.ban[id.split(':')[0]] && !(o.sup[id] > Date.now()) && !isSport(title)) C.push({ id, sc: sc * Math.pow(0.7, o.nn[id] || 0), icon, title, why, btn, act }); };
+  // films: he opens Movies often; a session later today when he's off or finished work
+  try { const e = K['page:movies'], m = glMode(); if (e && e.n >= 2 && (m.off || m.workDone || hr >= 17)) {
+    const L = mvShowing().filter(x => x.ses[0].t.slice(0, 10) === today && !isSport(x.m.title)), c = cineData(), nw = L.find(x => x.m.released && daysLeft(x.m.released) >= -14) || L[0];
+    if (nw) add('movie:' + nw.m.id, habScore(e) + 1, '🎬', `${nw.m.title} at Event Cinemas, ${cineT(nw.ses[0].t)} today`, `Because you often open Movies${e.o > e.w ? ' on your days off' : ' in the evening'}`, 'See times', "go('#movies')"); } } catch (e) { }
+  // concerts: the venue he taps most, next concert there he hasn't opened
+  try { const e = K['tap:akl']; if (e && e.n >= 2) { const v = Object.keys(e.v).sort((a, b) => e.v[b] - e.v[a])[0], seen = new Set(Object.keys(K['tapt:akl'] ? K['tapt:akl'].v : {}));
+    const c = mdAkl().find(x => String(x.venue || '').split(',')[0].trim() === v && !seen.has(String(x.title).slice(0, 60)) && /^https:\/\//.test(x.url || ''));
+    if (c) add('akl:' + c.id, habScore(e, 'day') + 0.8, '🎤', `${c.title}, ${v}, ${fmtW(c.date)}`, `Because you often look at concerts at ${v}`, 'Tickets', `window.open('${c.url.replace(/'/g, '%27')}','_blank','noopener')`); } } catch (e) { }
+  // shopping: an item he adds at a steady interval, due again and not on the list
+  try { const open = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
+    Object.keys(K).filter(k => k.startsWith('shop:')).forEach(k => { const e = K[k], x = e.x || []; if (x.length < 3) return; const name = k.slice(5); if (open.has(name)) return;
+      const gap = (x[x.length - 1] - x[0]) / (x.length - 1) / 864e5, since = (Date.now() - x[x.length - 1]) / 864e5; if (gap < 2 || since < gap * 0.9) return;
+      const nm = Object.keys(e.v)[0] || name; add('shop:' + name, 1 + Math.min(2, since / gap) * 0.7, '🛒', `Add ${nm} to shopping?`, `You usually add it every ${Math.round(gap)} days; last time was ${Math.round(since)} days ago`, 'Add', `habAddShop(${JSON.stringify(nm)})`); }); } catch (e) { }
+  // a page he usually opens around this hour (podcasts, radio, bills and so on), not opened yet today
+  try { Object.keys(HAB_PAGES).forEach(p => { const e = K['page:' + p]; if (!e || e.n < 3 || todayISO(new Date(e.t)) === today) return;
+    const near = (e.h[hr] || 0) + (e.h[(hr + 23) % 24] || 0) + (e.h[(hr + 1) % 24] || 0); if (near < 3) return;
+    add('page:' + p, habScore(e), '✨', `Open ${HAB_PAGES[p]}?`, `You usually open ${HAB_PAGES[p]} around ${habHr(hr)}${e.o > e.w * 2 && habOff() ? ' on days off' : ''}`, 'Open', `go('#${p}')`); }); } catch (e) { }
+  // Friday/Saturday cook night: a gluten free recipe if he looks at recipes then
+  try { const e = K['page:recipes'], wd = d.getDay(); if (e && (wd === 5 || wd === 6) && hr >= 14 && ((e.d[5] || 0) + (e.d[6] || 0)) >= 2) { const r = glPickRecipe();
+    if (r) add('recipe:' + today, habScore(e, 'day') + 0.5, '🍳', `Cook night: ${r.title}`, 'Because you often look at recipes on Fridays and Saturdays (all gluten free)', 'Recipes', "go('#recipes')"); } } catch (e) { }
+  return C.sort((a, b) => b.sc - a.sc).slice(0, 3);
+}
+function habCards() {
+  if (!habOn()) return ''; let L = []; try { L = habCands(); } catch (e) { L = []; } if (!L.length) return '';
+  return `<div class="glzone"><span>💡 Suggested for you</span></div>` + L.map(c => `<div class="card habcard" style="padding:12px 14px;margin-bottom:10px"><div class="t" style="font-weight:700">${c.icon} ${esc(c.title)}</div><div class="s muted" style="margin:3px 0 8px">${esc(c.why)}</div>
+    <div class="btns"><button type="button" class="btn primary small" onclick="habAct('${esc(c.id)}');${esc(c.act)}">${esc(c.btn)}</button><button type="button" class="btn small" onclick="habNot('${esc(c.id)}',0)">Not now</button><button type="button" class="btn small" onclick="habNot('${esc(c.id)}',1)">Don’t suggest this</button></div></div>`).join('');
+}
+function habRedraw() { try { const el = document.getElementById('habsug'); if (el) el.innerHTML = habCards(); } catch (e) { } }
+function habAct(id) { try { const o = habSt(); o.sup[id] = Date.now() + 864e5; o.nn[id] = Math.max(0, (o.nn[id] || 0) - 1); habSave(o); } catch (e) { } }
+function habNot(id, ban) { try { const o = habSt(); if (ban) o.ban[id.split(':')[0] === 'shop' || id.startsWith('page:') ? id : id.split(':')[0]] = 1; else { o.sup[id] = Date.now() + 864e5; o.nn[id] = (o.nn[id] || 0) + 1; } habSave(o); } catch (e) { } habRedraw(); toast(ban ? 'Okay, I won’t suggest that again.' : 'Okay, not today.'); }
+async function habAddShop(n) { try { const k = addToShop([n]); await save(); toast(k ? 'Added ' + n + ' to shopping.' : 'Already on the list.'); } catch (e) { } habRedraw(); }
+function habClear() { try { localStorage.removeItem('habits'); } catch (e) { } toast('Cleared what My App has learned.'); render(); }
 /* ---- Organise ---- */
 function glGardenSafe() { try { const w = wxNext5(); return !!(w && num(w.now) && num(w.maxT) && w.now <= 10 && w.maxT <= 10); } catch (e) { return false; } }
 const glGardenOkText = t => glGardenSafe() || !/\b(water|watering|feed|feeding|fertili[sz]e|liquid feed)\b/i.test(String(t || ''));
