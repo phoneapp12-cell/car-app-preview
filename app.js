@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.47';
+const APP_VERSION = '2.27.48';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4965,7 +4965,7 @@ async function publishSarahCar() {
   if (sig === last) return;
   sarahCarBusy = true;
   try {
-    const r = await fetch(SHARED_URL.replace(/\/shared-todo$/, '/shared-car'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, car: Object.assign({ updated: Date.now() }, car) }) });
+    const r = await fetch(SHARED_URL.replace(/\/shared-todo$/, '/shared-car'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: sharedKey(), car: Object.assign({ updated: Date.now() }, car) }) });
     if (r.ok) try { localStorage.setItem('sarahCarSent', sig); } catch (e) { }
   } catch (e) { } finally { sarahCarBusy = false; }
 }
@@ -5016,7 +5016,7 @@ async function clPhCompress(file) {
 }
 async function clPhRemote(id) {
   try {
-    const r = await fetch(CL_PHOTO_URL(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, id }) });
+    const r = await fetch(CL_PHOTO_URL(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: sharedKey(), id }) });
     if (!r.ok) return null; const d = await r.json();
     if (d && typeof d.data === 'string' && d.data.startsWith('data:image/')) { await clPhPut(id, d.data).catch(() => { }); return d.data; }
   } catch (e) { }
@@ -5024,7 +5024,7 @@ async function clPhRemote(id) {
 }
 async function clPhUpload(id) {
   const data = await clPhGet(id); if (!data || data.length > CL_PHOTO_MAX) return false;
-  try { const r = await fetch(CL_PHOTO_URL(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, id, data }) }); return r.ok; } catch (e) { return false; }
+  try { const r = await fetch(CL_PHOTO_URL(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: sharedKey(), id, data }) }); return r.ok; } catch (e) { return false; }
 }
 async function clPhLoad(p) { let d = await clPhGet(p.id); if (!d && p.up) d = await clPhRemote(p.id); return d || null; }
 // Sends any photos not yet on the relay (shared claims only). Returns true if any changed.
@@ -5398,7 +5398,8 @@ const keepShared = old => { if (S && S.settings && old && old.settings) old.sett
    (add, tick, edit, delete, undo) are spotted by comparing with that note and queued, so they work offline
    and are sent when there's signal. Each item merges on its own time stamp; nothing is duplicated. */
 const SHARED_URL = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/shared-todo';
-const SHARED_KEY = 'sArgfZGJrHxJN9I319FJeFLhFshrHsRU2xDFnnLL'; // only opens this one shared list
+// 2.27.48: this phone's own shared-list key (from the relay with the device key, kept only on this phone). No key lives in this code.
+function sharedKey() { try { return localStorage.getItem('sharedKey') || ''; } catch (e) { return ''; } }
 const SHARED_FIELDS = ['title', 'list', 'due', 'notes', 'priority', 'done'];
 const sharedHash = t => JSON.stringify(SHARED_FIELDS.map(k => k === 'done' ? !!t[k] : String(t[k] == null ? '' : t[k])).concat(t.brand ? [brandKey(t.brand)] : []).concat(t.appt ? [apptKey(t.appt)] : []).concat(t.claim ? [claimKey(claimNorm(t.claim))] : []));
 const apptKey = a => JSON.stringify([a.type || '', a.time || '', a.place || '']);
@@ -5448,7 +5449,7 @@ async function sharedSync() {
     const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 15000);
     let d;
     try {
-      const r = await fetch(SHARED_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, items: sent, from: 'shane' }), signal: ctl.signal });
+      const r = await fetch(SHARED_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: sharedKey(), items: sent, from: 'shane' }), signal: ctl.signal });
       if (!r.ok) throw new Error('http ' + r.status);
       d = await r.json();
     } finally { clearTimeout(to); }
@@ -5944,11 +5945,14 @@ const RELAY_URL = (() => {
   return RELAY_DEFAULT;
 })().replace(/\/+$/, '');
 // 2.27.45: these relay routes now need My App's device key (X-Cash-Key), so add it to every call to them
-const RELAY_KEYED_RE = /^\/(me$|ai(\/|$)|power$|sarah\/seen$|shared-push\/|push\/)/;
+const RELAY_KEYED_RE = /^\/(pair\/(shane|code|cancel|unlink|status)$|me$|ai(\/|$)|power$|sarah\/seen$|shared-push\/|push\/)/;
 (() => {
   if (typeof window === 'undefined' || !window.fetch || window.__relayKeyed) return; window.__relayKeyed = true;
   const f0 = window.fetch.bind(window);
+  const SHARED_PATHS = /^\/(shared-todo|shared-photo|shared-car|shared-push\/|sunshine\/|brands|prices)/;
   window.fetch = (u, o) => {
+    // 2.27.48: no shared-list key on this phone yet: don't send a keyless call (it would only count as a wrong key)
+    try { if (typeof u === 'string' && u.startsWith(RELAY_URL + '/') && SHARED_PATHS.test(u.slice(RELAY_URL.length)) && o && typeof o.body === 'string' && /"key":""/.test(o.body)) return Promise.resolve(new Response('{"error":"no_key"}', { status: 403, headers: { 'Content-Type': 'application/json' } })); } catch (e) { }
     try {
       if (typeof u === 'string' && u.startsWith(RELAY_URL + '/') && RELAY_KEYED_RE.test(u.slice(RELAY_URL.length).split('?')[0])) {
         const k = localStorage.getItem('cfKey') || '';
@@ -8117,7 +8121,7 @@ async function wwRefresh() {
   if (!need.length) return;
   wwBusy = true; let changed = false, pending = false;
   try {
-    const r = await fetch(RELAY_URL + '/prices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: SHARED_KEY, items: need.slice(0, 25).map(x => ({ q: x.name, brand: wwBrand(x) })) }) });
+    const r = await fetch(RELAY_URL + '/prices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: sharedKey(), items: need.slice(0, 25).map(x => ({ q: x.name, brand: wwBrand(x) })) }) });
     const d = await r.json().catch(() => null);
     if (r.ok && d && Array.isArray(d.items)) d.items.forEach((it, i) => {
       const x = need[i]; if (!x || !it) return;
@@ -10425,12 +10429,12 @@ async function scheduleReminders() {
    ('Sarah added to shopping: Milk, Bread'). This hands the relay the phone's push address (once a day, or when it changes).
    Settings > Shopping pushes can switch it off. */
 async function shopPushReg(sub) {
-  if (!sub || !RELAY_URL || typeof SHARED_KEY === 'undefined') return;
+  if (!sub || !RELAY_URL || !sharedKey()) return;
   const shopOn = (S.settings || {}).shopPush !== false, tickOn = (S.settings || {}).sarahTicks !== false, off = !shopOn && !tickOn, ep = sub.endpoint, k = 'shopPushReg', was = localStorage.getItem(k) || '';
-  if (off) { if (was) { try { await pushPost('/shared-push/unsubscribe', { key: SHARED_KEY, who: 'shane', endpoint: ep }); localStorage.removeItem(k); } catch (e) { } } return; }
+  if (off) { if (was) { try { await pushPost('/shared-push/unsubscribe', { key: sharedKey(), who: 'shane', endpoint: ep }); localStorage.removeItem(k); } catch (e) { } } return; }
   const tag = ep.slice(-24) + '|k2|' + todayISO() + '|' + (shopOn ? 1 : 0) + (tickOn ? 1 : 0); if (was === tag) return;
   const prev = was && !ep.endsWith(was.split('|')[0]) ? localStorage.getItem('shopPushEp') || undefined : undefined;
-  await pushPost('/shared-push/subscribe', { key: SHARED_KEY, who: 'shane', subscription: sub.toJSON(), shop: shopOn, ticks: tickOn, ...(prev ? { previous: prev } : {}) });
+  await pushPost('/shared-push/subscribe', { key: sharedKey(), who: 'shane', subscription: sub.toJSON(), shop: shopOn, ticks: tickOn, ...(prev ? { previous: prev } : {}) });
   localStorage.setItem(k, tag); localStorage.setItem('shopPushEp', ep);
 }
 async function enableReminderPush() {
@@ -25114,3 +25118,44 @@ async function meLoad() {
   } catch (e) { }
 }
 (() => { let n = 0; const t = setInterval(() => { n++; if (typeof S !== 'undefined' && S && S.settings) { if (n === 1 || n % 30 === 0) meLoad(); else meApply(); } if (n > 600) clearInterval(t); }, 1000); })();
+
+/* 2.27.48: shared-list keys. This phone fetches its own key once (device key), and Settings › Sarah's To-do makes a
+   one-time link/code for Sarah's phone (24 hours, single use). The old shared key stops working once both phones are
+   linked, or on 5 Nov 2026. Codes are shown here only; Shane sends them himself. */
+let PAIRST = null, PAIRCODE = null, pairGetBusy = false;
+async function sharedKeyEnsure() {
+  if (sharedKey() || pairGetBusy || !localStorage.getItem('cfKey')) return; pairGetBusy = true;
+  try {
+    const r = await fetch(RELAY_URL + '/pair/shane', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' });
+    const j = r.ok ? await r.json() : null;
+    if (j && /^st_[A-Za-z0-9_-]{40,}$/.test(j.key || '')) { localStorage.setItem('sharedKey', j.key); localStorage.removeItem('shopPushReg'); try { sharedSync(); } catch (e) { } try { scheduleReminders(); } catch (e) { } }
+  } catch (e) { } finally { pairGetBusy = false; }
+}
+(() => { let n = 0; const t = setInterval(() => { n++; if (typeof S !== 'undefined' && S && S.settings) { sharedKeyEnsure(); if (sharedKey()) clearInterval(t); } if (n > 300) clearInterval(t); }, 2000); })();
+async function pairCall(path) { const r = await fetch(RELAY_URL + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' }); const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && j.error) || 'http_' + r.status); return j; }
+async function pairStatus(force) { if (PAIRST && !force && Date.now() - PAIRST.got < 60000) return; try { PAIRST = Object.assign(await pairCall('/pair/status'), { got: Date.now() }); } catch (e) { PAIRST = { err: 1, got: Date.now() }; } if (location.hash === '#settings' && !sheetOpen) render(); }
+const PAIR_LINK = c => 'https://phoneapp12-cell.github.io/sarahs-todo/#pair=' + c;
+async function pairMake() { try { PAIRCODE = await pairCall('/pair/code'); await pairStatus(true); render(); } catch (e) { toast('Couldn’t make a link just now. Try again in a moment.'); } }
+async function pairCopy() { if (PAIRCODE) { const ok = await copyText(PAIR_LINK(PAIRCODE.code)); toast(ok ? 'Link copied. Send it to Sarah.' : 'Couldn’t copy.'); } }
+async function pairShare() { if (!PAIRCODE) return; try { await navigator.share({ title: 'Link Sarah’s To-do', text: 'Tap this on your phone to link your To-do with my My App (works once, for 24 hours):', url: PAIR_LINK(PAIRCODE.code) }); } catch (e) { } }
+async function pairCancel() { try { await pairCall('/pair/cancel'); } catch (e) { } PAIRCODE = null; await pairStatus(true); render(); }
+function pairUnlink() { confirmSheet('Unlink Sarah’s phone?', 'Her To-do stops syncing with yours until you make her a new link.', 'Unlink', async () => { try { await pairCall('/pair/unlink'); } catch (e) { } await pairStatus(true); render(); }); }
+function pairSettings() {
+  if (!localStorage.getItem('cfKey')) return '';
+  pairStatus(false);
+  const st = PAIRST || {}, cut = 'Thursday 5 November';
+  let body;
+  if (st.err) body = `<p class="muted" style="margin:0">Couldn’t check just now.</p>`;
+  else if (!PAIRST) body = `<p class="muted" style="margin:0">Checking…</p>`;
+  else if (st.sarahAt) body = `<p style="margin:0 0 8px">✓ Sarah’s phone is linked (${esc(fmt(isoT(todayT(new Date(st.sarahAt)))))}). ${st.legacyOpen ? `The old shared key stops working on ${cut}.` : 'The old shared key no longer works.'}</p>
+    <div class="btns"><button type="button" class="btn small" onclick="pairMake()">New link for Sarah</button><button type="button" class="btn small danger" onclick="pairUnlink()">Unlink her phone</button></div>`;
+  else body = `<p style="margin:0 0 8px">Sarah’s phone isn’t linked yet. Make a link, then send it to her. She taps it once. ${st.legacyOpen ? `Until then her list keeps syncing the old way, until ${cut}.` : 'Her list is paused until she links.'}</p>
+    <div class="btns"><button type="button" class="btn primary small" onclick="pairMake()">Make a link for Sarah</button></div>`;
+  if (PAIRCODE && PAIRCODE.exp > Date.now()) body += `<div style="margin-top:10px;padding:10px;border-radius:10px;background:var(--soft,#EEF5F3)">
+    <div class="muted" style="font-size:0.8125rem">Code (works once, until ${esc(new Date(PAIRCODE.exp).toLocaleString('en-NZ', { weekday: 'short', hour: 'numeric', minute: '2-digit' }))})</div>
+    <div style="font:700 1.375rem/1.3 ui-monospace,monospace;letter-spacing:2px;user-select:text;-webkit-user-select:text">${esc(PAIRCODE.code)}</div>
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn primary small" onclick="pairShare()">Send to Sarah</button><button type="button" class="btn small" onclick="pairCopy()">Copy link</button><button type="button" class="btn small" onclick="pairCancel()">Cancel code</button></div>
+    <p class="muted" style="margin:6px 0 0;font-size:0.8125rem">Or she can open her To-do, tap Enter code and type it.</p></div>`;
+  return `<div class="sec" id="pairset">Sarah’s To-do</div><div class="list"><div style="padding:12px">${body}</div></div>`;
+}
+(() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { return h + pairSettings(); } catch (e) { return h; } }; })();

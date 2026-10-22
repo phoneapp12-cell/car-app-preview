@@ -109,7 +109,7 @@
           var sub = regs[i].pushManager && await within(regs[i].pushManager.getSubscription(), 5000);
           if (sub) {
             try { await post('/push/unsubscribe', { endpoint: sub.endpoint }); } catch (e) { }
-            try { if (typeof SHARED_KEY !== 'undefined') await post('/shared-push/unsubscribe', { key: SHARED_KEY, who: 'shane', endpoint: sub.endpoint }); } catch (e) { }
+            try { if (ls('sharedKey')) await post('/shared-push/unsubscribe', { key: ls('sharedKey'), who: 'shane', endpoint: sub.endpoint }); } catch (e) { }
             await within(sub.unsubscribe(), 5000);
           }
         } catch (e) { }
@@ -227,7 +227,7 @@
     var ep = ls('oldPushEp'); if (!ep || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     try { var reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); var sub = reg && reg.pushManager && await reg.pushManager.getSubscription(); if (!sub || sub.endpoint === ep) return; } catch (e) { return; }
     try { await post('/push/unsubscribe', { endpoint: ep }); } catch (e) { }
-    try { if (typeof SHARED_KEY !== 'undefined') await post('/shared-push/unsubscribe', { key: SHARED_KEY, who: 'shane', endpoint: ep }); } catch (e) { }
+    try { if (ls('sharedKey')) await post('/shared-push/unsubscribe', { key: ls('sharedKey'), who: 'shane', endpoint: ep }); } catch (e) { }
     ls('oldPushEp', null);
   }
   if (isNew) { later(dropOldPush); setInterval(dropOldPush, 60000); }

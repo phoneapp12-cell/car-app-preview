@@ -207,6 +207,7 @@ import { akahuRoute } from './akahu.js';
 import { healthRoute } from './health.js';
 import { smsRoute } from './sms.js';
 import { moveRoute, oldOriginRetired } from './move.js';
+import { sharedAuth, pairRoute, SHARED_RE } from './pair.js';
 import { appOk } from './health.js';
 import { allow, blocked, fail } from './ratelimit.js';
 import { sha as sha256b64, eq as ctEq, seal as sealMe, open as openMe } from './akahu.js';
@@ -216,16 +217,16 @@ import { alarmRoute } from './alarm.js';
 import { fuelRoute } from './fuel.js';
 import { getOutages, runOutages } from './outages.js';
 // 2.27.45: routes that take a key in the body or header get a per-IP limit on wrong keys (30 an hour).
-const KEYED_RE = /^\/(cars\/alexa|shared-todo|shared-photo|shared-car|reno|sync|sunshine\/|shared-push\/|brands)/;
+const KEYED_RE = /^\/(cars\/alexa|shared-todo|shared-photo|shared-car|reno|sync|sunshine\/|shared-push\/|brands|prices|pair\/redeem)/;
 export async function handle(request, env = {}, fetchImpl = fetch) {
   const p0 = new URL(request.url).pathname.replace(/\/+$/, '') || '/', keyed = KEYED_RE.test(p0) && request.method !== 'OPTIONS';
   if (keyed && await blocked('key', request, 30, 3600)) return json(429, 'rate_limited', request.headers.get('Origin') || '', env);
   const res = await handleInner(request, env, fetchImpl);
-  if (keyed && (res.status === 401 || res.status === 403 || res.status === 404)) { try { // 404 = no record for that key (a guess)
+  if (keyed && (res.status === 401 || res.status === 403 || res.status === 404) && !res.headers.get('X-Key-Retired')) { try { // 404 = no record for that key (a guess)
     await fail('key', request, 3600); } catch (e) { } }
   return res;
 }
-const PRIVATE_RE = /^\/(cashflow|akahu\/|health\/(?!upload)|sms\/(list|key|test|clear|revoke)|power$|ai(\/|$)|sarah\/seen$|push\/|shared-push\/|sync$|me$|alarm\/|hue\/|heat\/|cars\/alexa|move\/start|move\/put)/;
+const PRIVATE_RE = /^\/(cashflow|akahu\/|health\/(?!upload)|sms\/(list|key|test|clear|revoke)|power$|ai(\/|$)|sarah\/seen$|push\/|shared-push\/|sync$|me$|pair\/(shane|code|cancel|unlink|status)$|alarm\/|hue\/|heat\/|cars\/alexa|move\/start|move\/put)/;
 const devKeyOk = async (env, request) => { try { return await appOk(env, request); } catch (e) { return false; } };
 async function handleInner(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get('Origin') || '';
@@ -238,6 +239,22 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
   // 2.27.46: once My App has moved to its own address (plus 3 days' grace), the shared github.io address can no longer
   // use My App's private routes. Sarah's To-do, Monique's Helper and Millesha's page keep their own routes.
   if (PRIVATE_RE.test(path) && await oldOriginRetired(env, origin)) return json(403, 'forbidden_origin', origin, env);
+  if (path.startsWith('/pair/')) { // 2.27.48: per-device shared-list keys
+    if (path === '/pair/redeem' && !(await allow('pair', request, 20, 3600))) return json(429, 'rate_limited', origin, env);
+    let st = 500, data = { error: 'pair_failed' };
+    try { [st, data] = await pairRoute(path, request, env, okOrigin); } catch (e) { }
+    return new Response(JSON.stringify(data), { status: st, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+  }
+  // 2.27.48: shared-list routes take a per-device key (or the old key during the grace period); swap it for the internal list id
+  if (SHARED_RE.test(path) && request.method === 'POST' && env.SHARED_NS) {
+    let raw = '', body = null; try { raw = await request.text(); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
+    if (body && typeof body === 'object' && typeof body.key === 'string' && body.key) {
+      const a = await sharedAuth(env, body.key);
+      if (!a.ok) return new Response(JSON.stringify({ error: a.retired ? 'key_retired' : 'bad_key' }), { status: 403, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', ...(a.retired ? { 'X-Key-Retired': '1' } : {}) } }); // a retired old key isn't a guess, so it doesn't count toward the lockout
+      body.key = env.SHARED_NS; raw = JSON.stringify(body);
+    }
+    request = new Request(request.url, { method: 'POST', headers: request.headers, body: raw });
+  }
   if (path === '/me') { // 2.27.47: Shane's private profile (addresses, family, health notes) for My App; sealed in KV, device key only
     if (request.method !== 'GET') return json(405, 'method_not_allowed', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
