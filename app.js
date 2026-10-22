@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.56';
+const APP_VERSION = '2.27.57';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19842,23 +19842,31 @@ function mdEvRow(e) {
   const u = /^https:\/\//.test(e.url || '') ? e.url : '';
   return tabRow('events', esc(e.title), esc([when, ven].filter(Boolean).join(' · ')), u ? `window.open('${esc(u)}','_blank','noopener')` : "go('#events')");
 }
-function mdEvents() {
+function mdEvGroups() {
   const G = { concerts: [], nightlife: [], movies: [], markets: [], other: [] };
   try { upcomingEvents().forEach(e => { if (isSport([e.title, (e.cats || []).join(' '), e.desc].join(' '))) return; const c = mdEvCat(e); if ((c === 'concerts' || c === 'nightlife') && evDuringWork(e)) return; G[c].push(e); }); } catch (e) { }
+  return G;
+}
+function mdEvents() {
+  const G = mdEvGroups();
   return MD_EV.map(([k, t]) => {
     let body = '';
     if (k === 'movies') body = homeTry('md cinema', () => cineCard(), '') || (G.movies.length ? `<div class="list">${G.movies.slice(0, 6).map(mdEvRow).join('')}</div>` : '');
-    else if (G[k].length) body = `<div class="list">${G[k].slice(0, 6).map(k === 'concerts' ? mdConcertRow : mdEvRow).join('')}</div>` + (G[k].length > 6 ? `<button type="button" class="glmore" onclick="go('#events')">+${G[k].length - 6} more on Events ›</button>` : '');
-    return `<div class="glzone"><span>${t}</span></div>` + (body || '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
+    else if (G[k].length) body = `<div class="list">${G[k].slice(0, 6).map(k === 'concerts' ? mdConcertRow : mdEvRow).join('')}</div>` + (G[k].length > 6 ? (k === 'concerts' || k === 'nightlife' ? `<button type="button" class="glmore" onclick="mdFilt='${k}';render()">See all ${G[k].length} ›</button>` : `<button type="button" class="glmore" onclick="go('#events')">+${G[k].length - 6} more on Events ›</button>`) : '');
+    return `<div class="glzone"><span>${t}</span>${k === 'concerts' || k === 'nightlife' ? `<a href="javascript:void 0" onclick="mdFilt='${k}';render()">${k === 'concerts' ? 'Concerts' : 'Nightlife'} tab ›</a>` : ''}</div>` + (body || '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
   }).join('');
 }
 function MediaPage() {
   setTimeout(() => { try { refreshEvents(); refreshNews(); } catch (e) { } }, 0);
   const all = homeTry('md tiles', () => glTiles().filter(t => MEDIA_TILES.has(t.k)), []), have = new Set(all.map(t => t.cat));
-  const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0]));
+  const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).flatMap(c => c[0] === 'out' ? [c, ['concerts', 'Concerts'], ['nightlife', 'Nightlife']] : [c]); // 2.27.57: own tabs
+  if (!cats.some(c => c[0] === 'concerts')) { const i = cats.findIndex(c => c[0] === 'fun'); cats.splice(i < 0 ? cats.length : i, 0, ['concerts', 'Concerts'], ['nightlife', 'Nightlife']); }
   if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
   const list = mdFilt === 'all' ? all : all.filter(t => t.cat === mdFilt);
   const filt = `<div class="glfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';render()">${c[1]}</button>`).join('')}</div>`;
+  if (mdFilt === 'concerts' || mdFilt === 'nightlife') { const L = mdEvGroups()[mdFilt];
+    return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Entertainment', mdFilt === 'concerts' ? 'Concerts around Whangārei and Northland' : 'Whangārei nightlife, outside your shifts') + filt +
+      (L.length ? `<div class="list">${L.map(mdConcertRow).join('')}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>') + `<div class="foot">From Eventfinda and Whangārei District Council. No sport.</div>`; }
   const ev = mdFilt === 'all' || mdFilt === 'out' ? `<div class="glzone"><span>🎟️ Events</span><a href="#events">All events ›</a></div>` + mdEvents() : '';
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + filt +
     /* 2.27.54: TV tonight hero removed at Shane's request */ (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
