@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.54';
+const APP_VERSION = '2.27.55';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12500,7 +12500,7 @@ async function refreshEvents(force = false) {
 function updEvents() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if (h === 'events' || h === 'media' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
+  if (h === 'events' || h === 'media' || h === 'movies' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
     const v = $('#view'), top = v.scrollTop, q = document.activeElement && document.activeElement.id === 'evq';
     render(); v.scrollTop = top;
     if (q) { const i = document.getElementById('evq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -18762,7 +18762,7 @@ function render() {
   if (/^#(unimed|health\/claims|money\/claims)(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#claims'); renderedHash = '#claims'; } // 2.26.91: one UniMed claims page
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, movies: MoviesPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19737,7 +19737,7 @@ function glTiles() {
   const add = (k, cat, title, fn, art, grad, go) => { try { const s = fn(); if (s && glOk(s) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(String(s))) T.push({ k, cat, title, s: String(s).slice(0, 70), art, grad, go }); } catch (e) { } };
   add('netflix', 'watch', 'New on Netflix', () => { const f = NF && mailConnected('microsoft') ? (NF.fresh || []) : []; return f.length ? f.slice(0, 2).map(x => x.title).join(', ') : ''; }, B('ideas'), '', "go('#tv')");
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#tv')");
-  add('movies', 'watch', 'Movies', () => { const e = upcomingEvents().filter(x => (x.cats || []).includes('Movies')); return e.length ? e[0].title : ''; }, B('events'), '', "go('#events')");
+  add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
   add('videos', 'watch', 'Videos', () => (glFirst(HOME_CARD.videos()) || {}).t, B('tv'), '', "go('#videos')");
   add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "glSarahOpen()");
   add('lang', 'fun', 'Word of the day', () => { const m = langToday('mi'), f = langToday('fr'); return `${m[0]} · ${f[0]}`; }, 'i3-idea', ['#0d9488', '#1d4ed8'], "go('#lang')"); // 2.26.13
@@ -19846,6 +19846,38 @@ function MediaPage() {
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + filt +
     /* 2.27.54: TV tonight hero removed at Shane's request */ (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
     `<div class="foot">Events: Whangārei District Council, Eventfinda and Event Cinemas. No sport.</div>`;
+}
+
+/* ---- 2.27.55: Movies page. Only Event Cinemas Whangārei (relay /events → cinema, from Event Cinemas' own sessions and coming-soon data).
+   Now showing: each film with its sessions by day for the next 5 days. Coming soon: films with their release dates. */
+const mvNow = () => { const d = new Date(); return todayISO() + 'T' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+function mvShowing() {
+  const c = cineData(); if (!c) return [];
+  const n = mvNow(), last = (() => { const d = new Date(); d.setDate(d.getDate() + 4); return todayISO(d); })();
+  return c.movies.filter(m => !m.soon).map(m => ({ m, ses: (m.sessions || []).filter(x => x && x.t >= n && x.t.slice(0, 10) <= last) })).filter(x => x.ses.length)
+    .sort((a, b) => a.ses[0].t.localeCompare(b.ses[0].t));
+}
+function mvDayLbl(d) { const k = daysLeft(d); return k === 0 ? 'Today' : k === 1 ? 'Tomorrow' : fmtW(d); }
+function mvTileSub() {
+  const L = mvShowing(); if (!L.length) return '';
+  const f = L[0], t = f.ses[0].t; return f.m.title + ' · ' + mvDayLbl(t.slice(0, 10)).replace('Today', 'today').replace('Tomorrow', 'tomorrow') + ' ' + cineT(t);
+}
+function MoviesPage() {
+  setTimeout(() => { try { refreshEvents(); } catch (e) { } }, 0);
+  const c = cineData(), head = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('Movies', 'Event Cinemas Whangārei · 18 James Street');
+  if (!c) return head + `<div class="card empty"><div class="t">Movie times aren’t loaded yet</div><div class="s">Check back in a moment, or see <a href="https://www.eventcinemas.co.nz/cinema/whangarei/sessions" target="_blank" rel="noopener">eventcinemas.co.nz</a>.</div></div>`;
+  const link = (m, inner) => `<a href="${esc(/^https:\/\/www\.eventcinemas\.co\.nz\//.test(m.url || '') ? m.url : 'https://www.eventcinemas.co.nz/cinema/whangarei')}" target="_blank" rel="noopener">${inner}</a>`;
+  const meta = m => [m.rating && m.rating !== 'TBC' ? m.rating : '', m.mins ? Math.floor(m.mins / 60) + 'h ' + (m.mins % 60) + 'm' : ''].filter(Boolean).join(' · ');
+  const now = mvShowing().map(({ m, ses }) => {
+    const by = {}; ses.forEach(x => { (by[x.t.slice(0, 10)] = by[x.t.slice(0, 10)] || []).push(x); });
+    const days = Object.keys(by).sort().map(d => `<div class="s" style="margin-top:4px"><b>${esc(mvDayLbl(d))}</b> ${by[d].map(x => /^https:\/\/www\.eventcinemas\.co\.nz\//.test(x.url || '') && !x.full ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(cineT(x.t))}</a>` : `<span${x.full ? ' class="muted"' : ''}>${esc(cineT(x.t))}${x.full ? ' (full)' : ''}</span>`).join(' · ')}</div>`).join('');
+    return `<div class="card cinerow">${cinePoster(m)}<div class="tx"><div class="t">${link(m, esc(m.title))}</div>${meta(m) ? `<div class="s muted">${esc(meta(m))}</div>` : ''}${days}</div></div>`;
+  }).join('');
+  const soon = c.movies.filter(m => m.soon).sort((a, b) => String(a.released || '9').localeCompare(String(b.released || '9'))).map(m =>
+    `<div class="card cinerow">${cinePoster(m, 40)}<div class="tx"><div class="t">${link(m, esc(m.title))}</div><div class="s">${m.released ? 'From ' + esc(fmtW(m.released)) : 'Date to be confirmed'}${meta(m) ? ' · ' + esc(meta(m)) : ''}</div></div></div>`).join('');
+  return head + `<div class="glzone"><span>🎬 Now showing</span><span>next 5 days</span></div>` + (now || '<div class="muted" style="margin:0 4px 10px">No sessions listed for the next few days</div>') +
+    `<div class="glzone"><span>🍿 Coming soon</span></div>` + (soon || '<div class="muted" style="margin:0 4px 10px">Nothing listed as coming soon right now</div>') +
+    `<div class="foot">From Event Cinemas (eventcinemas.co.nz), updated ${esc(ago(Date.parse(c.at)))}. Tap a time to book. Times can change, so check before you go.</div>`;
 }
 /* ---- Organise ---- */
 function glGardenSafe() { try { const w = wxNext5(); return !!(w && num(w.now) && num(w.maxT) && w.now <= 10 && w.maxT <= 10); } catch (e) { return false; } }
