@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.63';
+const APP_VERSION = '2.27.64';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10604,7 +10604,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   lights: ['bulb', 'garden', 'Lights', 'Lights'],
   heat: ['sun', 'garden', 'Heat pumps', 'Heat'],
   alarm: ['shield', 'garden', 'Alarm', 'Alarm'],
-  media: ['play', 'vid', 'Entertainment', 'Fun'] // 2.27.51
+  media: ['play', 'vid', 'Entertainment', 'Entertain'] // 2.27.51
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -18641,7 +18641,7 @@ function btMeta(k) {
   if (k === 'more') return ['More (opens the side menu)', 'More', 'more'];
   const n = NAV[k]; return n ? [n[2].replace('&amp;', '&'), n[3], n[0]] : null;
 }
-const BT_ALL = () => ['home', ...NAV_DEFAULT, 'weather', 'settings', 'more'].filter((k, i, a) => btMeta(k) && a.indexOf(k) === i);
+const BT_ALL = () => ['home', 'media', ...NAV_DEFAULT, 'weather', 'settings', 'more'].filter((k, i, a) => btMeta(k) && a.indexOf(k) === i);
 function btState() {
   S.settings = S.settings || {};
   const b = S.settings.bottomTabs && typeof S.settings.bottomTabs === 'object' ? S.settings.bottomTabs : (S.settings.bottomTabs = { on: false, keys: BT_DEFAULT.slice() });
@@ -18712,6 +18712,12 @@ function btCustomise() {
     const s = snap(), b = btState(); b.keys = btDraft.slice(0, BT_MAX); b.on = true; await save(); render(); toast('Bottom tabs saved.', 'Undo', undoTo(s));
   }, 'Save');
   btWireDrag();
+}
+async function btAddMedia() { // 2.27.64: one tap from the Entertainment page
+  const s = snap(), b = btState();
+  if (b.keys.includes('media')) { if (!b.on) { b.on = true; await save(); render(); } toast('Entertainment is on your bottom tabs.'); return; }
+  if (b.keys.length >= BT_MAX) { toast('Six tabs is the most. Remove one, then add Entertainment.'); btCustomise(); return; }
+  const i = b.keys.indexOf('more'); b.keys.splice(i < 0 ? b.keys.length : i, 0, 'media'); b.on = true; await save(); render(); toast('Entertainment added to your bottom tabs.', 'Undo', undoTo(s));
 }
 async function toggleBottomTabs() { const s = snap(), b = btState(); b.on = !b.on; await save(); render(); toast(b.on ? 'Bottom tabs on. Long-press one to change them.' : 'Bottom tabs off.', 'Undo', undoTo(s)); }
 function bottomTabsSetting() {
@@ -19897,7 +19903,8 @@ function MediaPage() {
   const filt = `<div class="glfilt mdfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';hab('tab:${c[0]}');render()">${c[1]}</button>`).join('')}</div>`;
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
   const ev = mdFilt === 'out' ? mdEvents(['markets', 'other']) : ''; // 2.27.63: the rest have their own tiles and pages
-  return back + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + filt +
+  const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('media'); } catch (e) { return true; } })();
+  return back + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddMedia()">${I('plus')} Add to bottom bar</button>`) + filt +
     /* 2.27.54: TV tonight hero removed at Shane's request */ (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
     `<div class="foot">Events from Whangārei District Council, Eventfinda and Event Cinemas.</div>`;
 }
