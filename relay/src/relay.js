@@ -206,6 +206,7 @@ import { hueRoute } from './hue.js';
 import { akahuRoute } from './akahu.js';
 import { healthRoute } from './health.js';
 import { smsRoute } from './sms.js';
+import { moveRoute, oldOriginRetired } from './move.js';
 import { appOk } from './health.js';
 import { allow, blocked, fail } from './ratelimit.js';
 import { sha as sha256b64, eq as ctEq } from './akahu.js';
@@ -224,6 +225,7 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     await fail('key', request, 3600); } catch (e) { } }
   return res;
 }
+const PRIVATE_RE = /^\/(cashflow|akahu\/|health\/(?!upload)|sms\/(list|key|test|clear|revoke)|power$|ai(\/|$)|sarah\/seen$|push\/|shared-push\/|sync$|alarm\/|hue\/|heat\/|cars\/alexa|move\/start|move\/put)/;
 const devKeyOk = async (env, request) => { try { return await appOk(env, request); } catch (e) { return false; } };
 async function handleInner(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get('Origin') || '';
@@ -232,6 +234,15 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
 
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: okOrigin ? 204 : 403, headers: corsHeaders(origin, env) });
+  }
+  // 2.27.46: once My App has moved to its own address (plus 3 days' grace), the shared github.io address can no longer
+  // use My App's private routes. Sarah's To-do, Monique's Helper and Millesha's page keep their own routes.
+  if (PRIVATE_RE.test(path) && await oldOriginRetired(env, origin)) return json(403, 'forbidden_origin', origin, env);
+  if (path.startsWith('/move/')) {
+    if (!(await allow('move', request, 120, 3600))) return json(429, 'rate_limited', origin, env);
+    let st = 500, data = { error: 'move_failed' };
+    try { [st, data] = await moveRoute(path, request, env, origin); } catch (e) { }
+    return new Response(JSON.stringify(data), { status: st, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
   }
   if (path.startsWith('/alarm/')) {
     try { return await alarmRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }

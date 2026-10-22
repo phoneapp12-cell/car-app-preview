@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.45';
+const APP_VERSION = '2.27.46';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14507,7 +14507,7 @@ function setSyncCode(code) {
 function syncBundle() {
   let dailyQuote = null, theme = null, textSize = null;
   try { dailyQuote = localStorage.getItem('dailyQuote'); theme = localStorage.getItem('theme'); textSize = localStorage.getItem('textSize'); } catch (e) { }
-  const data = Object.assign({}, S);
+  const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46
   return { data, local: { dailyQuote, theme, textSize } };
 }
 function foldLocalPrefs(d, local) {
@@ -14703,7 +14703,7 @@ function stopSync() {
     toast('Sync is off on this phone.');
   });
 }
-const WEBSITE_ADDRESS = 'phoneapp12-cell.github.io/car-app-preview';
+const WEBSITE_ADDRESS = (location.host + location.pathname.replace(/\/index\.html$/, '').replace(/\/+$/, '')) || 'shane-my-app.pages.dev'; // 2.27.46: whichever address this copy runs on
 function websiteSettingsRow() {
   return `<div class="list" id="websiterow" style="margin-top:10px"><div class="srow" style="flex-wrap:wrap">
     <div class="tx" style="flex-basis:100%"><div class="t">On a computer, open</div>
@@ -14854,7 +14854,7 @@ async function mailSignIn(provider) {
     return;
   }
   const pkce = await makePkce();
-  const state = b64urlBytes(crypto.getRandomValues(new Uint8Array(16))) + '.' + provider;
+  const state = (window.MOVE_STATE_PREFIX || '') + b64urlBytes(crypto.getRandomValues(new Uint8Array(16))) + '.' + provider;
   try { localStorage.setItem('ddMailPkce', JSON.stringify({ verifier: pkce.verifier, state, provider, at: Date.now() })); }
   catch (e) { toast('This browser won’t keep the sign-in step. Try Chrome.'); return; }
   const u = new URL(c.authorize);
@@ -14887,7 +14887,7 @@ async function gcalConnect() {
   const cfg = await mailConfig(), c = cfg.google || {};
   if (!c.clientId) { toast('Google sign-in isn’t set up on the calendar link service yet.'); return; }
   const pkce = await makePkce();
-  const state = b64urlBytes(crypto.getRandomValues(new Uint8Array(16))) + '.gcal.google';
+  const state = (window.MOVE_STATE_PREFIX || '') + b64urlBytes(crypto.getRandomValues(new Uint8Array(16))) + '.gcal.google';
   try { localStorage.setItem('ddMailPkce', JSON.stringify({ verifier: pkce.verifier, state, provider: 'google', cal: true, back: location.hash || '#home', at: Date.now() })); } catch (e) { toast('This browser won’t keep the sign-in step.'); return; }
   const u = new URL(c.authorize);
   Object.entries({ client_id: c.clientId, redirect_uri: MAIL_REDIRECT, response_type: 'code', scope: GCAL_SCOPE, state, code_challenge: pkce.challenge, code_challenge_method: 'S256', access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' }).forEach(([k, v]) => u.searchParams.set(k, v));
@@ -17061,7 +17061,8 @@ async function requestPersist() { try { if (navigator.storage && navigator.stora
 
 /* ---------- backup ---------- */
 function backupBlob() {
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data: S }, null, 2)], { type: 'application/json' });
+  const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -19185,7 +19186,7 @@ async function start() {
   refreshClosures(); if (location.hash === '#bridge') refreshBridgeTraffic(); // 2.26.19: closures always load for Notifications
   checkBridgeLoc(true);
   checkHere(true);
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && !localStorage.getItem('movedTo')) { // 2.27.46: the retired old address stays switched off
     let hadController = !!navigator.serviceWorker.controller, reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (hadController && !reloading) { reloading = true; if (sheetOpen || (typeof akhHold === 'function' && akhHold())) reloadPending = true; else location.reload(); }
@@ -19227,7 +19228,7 @@ async function start() {
     updBridge(); checkBridgeLoc(); checkHere();
   }, 60 * 1000);
 }
-start();
+if (!window.__MOVING) start(); // 2.27.46: the new address unpacks a move first (move.js)
 
 /* ================= 2.26.0: Glance Home (Settings › Appearance › Home layout › Glance, the default) =================
    Locked night layout and the day layouts Shane approved. Same data as before, laid out for a quick look:

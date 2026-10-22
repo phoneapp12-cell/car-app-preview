@@ -10,6 +10,7 @@
   "observability": { "enabled": false, "logs": { "enabled": false, "invocation_logs": false } },
   "vars": {
     "ALLOWED_ORIGIN": "https://phoneapp12-cell.github.io",
+    "EXTRA_ORIGINS": "https://shane-my-app.pages.dev",
     // Public half of the push (VAPID) key. The private half is the Worker secret VAPID_PRIVATE_JWK.
     "VAPID_PUBLIC": "BEsNn0TcOiNQqSE7AbDFgYGL_v45EEm-mma2_6DtecoG5c7ZvwZ7lKpAXOQry7cqfvWM0JTjtPPdK93arc0VXMU"
   },
