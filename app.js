@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.51';
+const APP_VERSION = '2.27.52';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10615,7 +10615,7 @@ const NAV_GROUPS = [
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'watch', 'claims', 'about'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] }, // 2.26.94: its own heading like the other groups
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
-  { id: 'near', title: 'Nearby', keys: ['bridge', 'roadworks', 'travel'] },
+  { id: 'near', title: 'Nearby', keys: ['bridge', 'roadworks'] }, // 2.27.52: Travel is on the Media page
   { id: 'media', title: '', keys: ['media'] } // 2.27.51: Media stands on its own; TV, videos, Top 40, blogs, podcasts, radio, news and events open from its page
 ];
 function navOrder() {
@@ -19751,10 +19751,10 @@ function glTiles() {
   add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
   add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(x => !(x.cats || []).includes('Movies') && !isNightlife(x)); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
   add('nightlife', 'out', 'Nightlife', () => { const e = nightlifeSoon(7, 2); return e.length ? e.map(x => x.title).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#events')");
-  if (false) add('place', 'out', 'Place of the day', () => { const p = travelToday(); return p ? p.name + ', ' + p.country : ''; }, B('travel'), '', "go('#travel')");
+  add('place', 'fun', 'Travel', () => { const p = travelToday(); return p ? 'Place of the day: ' + p.name + ', ' + p.country : 'Places to go'; }, B('travel'), '', "go('#travel')");
   add('recipe', 'food', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
   // 2.26.20: joke, quote and fact back as their own blue tiles, each with its own setting; tap opens a sheet
-  if (false) add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
+  if (dailyJokeOn()) add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
   if (showDailyQuote()) add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('quote')");
   if (false) add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#2563eb', '#1e3a8a'], "glInfo('fact')");
   add('tvguide', 'watch', 'TV guide', () => 'TVNZ 1 · TVNZ 2 · Three', 'i3-tv', ['#b45309', '#7c2d12'], "go('#tv')");
@@ -19809,7 +19809,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'sarah', 'top40', 'radio', 'podcasts', 'blogs', 'posts', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide']);
+const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'sarah', 'top40', 'radio', 'podcasts', 'blogs', 'posts', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'place']); // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
