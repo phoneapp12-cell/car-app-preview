@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.43';
+const APP_VERSION = '2.27.44';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10401,7 +10401,7 @@ async function scheduleReminders() {
     if (!sub) return reminders.length ? 'fail' : '';
     try { shopPushReg(sub); } catch (e) { }
     if (!reminders.length && !S.settings.remOnRelay && !(S.settings.tvLinks || []).length) return '';
-    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined), outages: (typeof outPref === 'function' ? outPref() : undefined), netOutages: (typeof netOn === 'function' ? (netOn() ? 'on' : 'off') : undefined) });
+    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined), outages: (typeof outPref === 'function' ? outPref() : undefined), netOutages: (typeof netOn === 'function' ? (netOn() ? 'on' : 'off') : undefined), sms: (typeof smsOn === 'function' ? (smsOn() ? 'on' : 'off') : undefined) });
     const on = reminders.length > 0 || (S.settings.tvLinks || []).length > 0;
     if (!!S.settings.remOnRelay !== on) { S.settings.remOnRelay = on; await save(); }
     return '';
@@ -20846,7 +20846,7 @@ function fnModel(b) {
     const m = D && bill ? txs.find(t => t.amount < 0 && !used.has(t.id) && spendAcct(t) && t.cat2 !== 'transfer' && dOf(t) >= addDays(x.due, -7) && dOf(t) <= addDays(x.due, 3) && dOf(t) <= T && (Math.abs(-t.amount - x.amount) <= 0.5 || (payeeFor(bill, t) > 0 && Math.abs(-t.amount - x.amount) <= x.amount * 0.1))) : null;
     if (m) { used.add(m.id); Object.assign(it, { st: 'paid', amount: -m.amount, date: dOf(m), bank: true, acct: m.acct }); }
     else if (x.paid) Object.assign(it, { st: 'paid', date: x.paidOn || x.due, manual: true });
-    else if (x.loanId) Object.assign(it, { st: st(x.due), acct: (D && cfOrbit(D) ? cfOrbit(D).id : main && main.id), late: x.late }); // 2.27.27: loan plan (Mum) from ORBIT
+    else if (x.loanId) Object.assign(it, { st: st(x.due), acct: cfLoanAcct(D, x.loanId, main), late: x.late }); // 2.27.44: Mum's loan from ANZ Bill Account (other loans ORBIT)
     else Object.assign(it, { st: st(x.due), acct: bill ? ((S.settings.cfBillAcct || {})[bill.id] || (D && billBankAcct(D, bill)) || (D && (cfBillTx(bill, txs.filter(spendAcct))[0] || {}).acct) || (main && main.id)) : main && main.id, late: x.late });
     OUT.push(it);
   });
@@ -20929,6 +20929,11 @@ function fnAcctName(id) { try { const a = CF && CF.data && CF.data.accounts.find
    statement or due date, so he sets Statement day and Due day (defaults from his last card payment). */
 const cfIsOrbit = a => !!(a && a.type === 'LOAN' && a.limit > 0);
 const cfOrbit = D => (D.accounts || []).find(cfIsOrbit) || null;
+// 2.27.44: Mum's loan repayment comes out of the ANZ Bill Account (Shane, 22 Oct). Other loan plans stay on ORBIT.
+function cfLoanAcct(D, loanId, main) {
+  try { const l = getLoan(loanId); if (D && l && /\bmum\b|\bmother\b/i.test(l.from || '')) { const a = billBankAcct(D, { fromBank: 'ANZ', fromAcct: 'BILL ACCOUNT', name: '', amount: 0 }); if (a) return a; } } catch (e) { }
+  return D && cfOrbit(D) ? cfOrbit(D).id : main && main.id;
+}
 const first1 = (iso, k = 1) => { const [y, m] = iso.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + k, 1)); return d.toISOString().slice(0, 10); };
 function orbSt() { S.settings = S.settings || {}; const o = S.settings.orbitInt && typeof S.settings.orbitInt === 'object' ? S.settings.orbitInt : (S.settings.orbitInt = {}); if (!Array.isArray(o.seen)) o.seen = []; return o; }
 function cfOrbitInt(D) {
@@ -24978,4 +24983,90 @@ function netSheet() { const L = netList(), ok = (OUTG && OUTG.netOk) || {};
   return h + `<div class="srow"><div class="tx"><div class="t">Internet & mobile outage alerts</div><div class="s">Northpower Fibre and 2degrees outages around Whangārei on the bell page. Buzzes straight away for an unplanned outage; planned work at 6pm the day before (6pm the same day if it starts in the evening) and 7am on the day.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Internet and mobile outage alerts" onclick="toggleSetting('netAlerts').then(() => outRefresh(true))"></button></div>`; } catch (e) { return h; } }; })();
 // 2.27.42: the bell page re-checks outages when it opens (a copy saved before 2.27.41 had no internet/mobile list).
 window.addEventListener('hashchange', () => { if (/^#alerts/.test(location.hash)) outRefresh(false); });
+
+// ---- 2.27.44: appointment and delivery texts ----
+/* SMS to URL Forwarder (open source, F-Droid) on Shane's phone posts each incoming text to the relay's /sms/in with a
+   forwarding key made here. The relay drops anything that looks like a code and anything that isn't an appointment or
+   delivery text, and keeps only a short record for 14 days. The key is shown once, here, and never kept on the phone. */
+const SMS_APP = 'https://f-droid.org/packages/tech.bogomolov.incomingsmsgateway/';
+let SMSX = null, SMScode = null, SMSerr = '', smsBusy = false; try { SMSX = JSON.parse(localStorage.getItem('smsData') || 'null'); } catch (e) { }
+const smsOn = () => !!(SMSX && SMSX.connected) && (S.settings || {}).smsAlerts !== false;
+const smsGone = () => { try { return JSON.parse(localStorage.getItem('smsGone') || '[]'); } catch (e) { return []; } };
+function smsHide(id) { const g = smsGone(); if (!g.includes(id)) g.push(id); try { localStorage.setItem('smsGone', JSON.stringify(g.slice(-200))); } catch (e) { } glBellRedraw(); render(); }
+async function smsRefresh(force) {
+  if (smsBusy || !cfKey() || (!force && SMSX && Date.now() - (SMSX.got || 0) < 5 * 60e3) || (!force && !(SMSX && SMSX.connected))) return; smsBusy = true;
+  try { const [st, d] = await cfApi('/sms/list'); if (st === 200 && d) { SMSX = Object.assign(d, { got: Date.now() }); localStorage.setItem('smsData', JSON.stringify(SMSX)); if (/^#?(alerts|settings)?$/.test(location.hash)) render(); } } catch (e) { }
+  smsBusy = false;
+}
+setTimeout(() => smsRefresh(false), 7000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') smsRefresh(false); });
+window.addEventListener('hashchange', () => { if (/^#alerts/.test(location.hash)) smsRefresh(false); });
+function smsLive(x) { const now = Date.now(), at = Date.parse(x.at) || now, T = todayISO();
+  if (smsGone().includes(x.id)) return false;
+  if (x.kind === 'parcel') return now - at < (x.status === 'Delivered' ? 1 : 3) * 864e5;
+  return x.date ? x.date >= T : now - at < 3 * 864e5; }
+function smsWhen(x) { if (!x.date && !x.time) return ''; return [x.date ? (x.date === todayISO() ? 'Today' : x.date === addDays(todayISO(), 1) ? 'Tomorrow' : fmtW(x.date)) : '', x.time ? new Date('2000-01-01T' + x.time + ':00').toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' }).replace(' ', '') : ''].filter(Boolean).join(' '); }
+function smsAddCal(id) { const x = ((SMSX && SMSX.items) || []).find(i => i.id === id); if (!x) return;
+  const title = (x.summary.match(/\b(dr\.? [a-z]+|dentist|dental|wof|warrant of fitness|physio|optometrist|vet|car service|haircut|barber)\b/i) || [''])[0];
+  apptForm(null, x.date || todayISO(), { title: (title ? title.replace(/^./, c => c.toUpperCase()) + ' appointment' : 'Appointment') + (x.from && !/^\+?\d+$/.test(x.from) ? ' (' + x.from + ')' : ''), time: x.time || '', notes: x.summary });
+  smsHide(id); }
+function smsCard(x) {
+  if (x.kind === 'parcel') return `<div class="row glnew" data-nk="sms-${esc(x.id)}"><div class="ic">📦</div><div class="tx"><div class="t">Delivery text${x.carrier ? ': ' + esc(x.carrier) : ''} · ${esc(x.status)}</div><div class="s">${x.scam ? '<b>This looks like a scam text (a payment or details link that isn’t the carrier’s). Don’t tap its link.</b> ' : ''}${esc(x.summary)}${x.tracking ? ' · Tracking ' + esc(x.tracking) : ''}</div>
+    <div class="btns" style="margin-top:6px">${x.trackUrl ? `<a class="btn small primary" href="${esc(x.trackUrl)}" target="_blank" rel="noopener">Track parcel</a>` : ''}<button type="button" class="btn small" onclick="smsHide(${jsArg(x.id)})">Done</button></div></div></div>`;
+  const w = smsWhen(x);
+  return `<div class="row glnew" data-nk="sms-${esc(x.id)}"><div class="ic">📅</div><div class="tx"><div class="t">Appointment text${x.from ? ' from ' + esc(x.from) : ''}${w ? ' · ' + esc(w) : ''}</div><div class="s">${esc(x.summary)}</div>
+    <div class="btns" style="margin-top:6px">${x.date || x.time ? `<button type="button" class="btn small primary" onclick="smsAddCal(${jsArg(x.id)})">Add to calendar</button>` : ''}<button type="button" class="btn small" onclick="smsHide(${jsArg(x.id)})">Done</button></div></div></div>`; }
+function smsBellRows() { try { if (!smsOn()) return []; return ((SMSX && SMSX.items) || []).filter(smsLive).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 8).map(smsCard); } catch (e) { return []; } }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = smsBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
+const SMS_ERR = { no_key: 'This phone needs the bank link’s device key first.', unauthorised: 'The relay didn’t recognise this phone’s key. Reconnect the bank link on this phone, then try again.', rate_limited: 'Too many tries. Wait an hour and try again.' };
+async function smsNewKey() {
+  const go2 = async () => { SMSerr = ''; let st = 0, d = {}; try { [st, d] = await cfApi('/sms/key', 'POST', {}); } catch (e) { st = 0; }
+    if (st === 200 && d.key) { SMScode = { key: d.key, url: d.url, at: Date.now() }; SMSX = Object.assign({}, SMSX || {}, { connected: true, created: d.created, items: (SMSX && SMSX.items) || [] }); localStorage.setItem('smsData', JSON.stringify(SMSX)); if (S.settings.smsAlerts === undefined) { S.settings.smsAlerts = true; await save(); } setupBackground().catch(() => {}); }
+    else SMSerr = st === 0 ? 'Couldn’t reach the relay. Check you’re online, then try again.' : SMS_ERR[d.error] || 'Something went wrong on the relay. Try again in a minute.';
+    smsRedraw(); };
+  if (SMSX && SMSX.connected) confirmSheet('Make a new forwarding key?', 'The old key stops working straight away. You’ll paste the new address into SMS to URL Forwarder.', 'New key', go2); else go2();
+}
+async function smsTest() {
+  let msg = '';
+  try { const [st, d] = await cfApi('/sms/test', 'POST', {}); msg = st === 200 && d.ok ? 'Relay OK: a sample delivery text is kept and a sample bank code is dropped.' : st === 200 && !d.connected ? 'Set up a forwarding key first.' : 'The relay check didn’t pass. Try again in a minute.';
+    if (SMScode) { const r = await fetch(SMScode.url + '?k=' + encodeURIComponent(SMScode.key), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'My App', text: 'My App test' }) }); msg += r.ok ? ' Forwarding key works.' : ' The forwarding key was refused.'; }
+    else if (SMSX && SMSX.lastAt) msg += ' Last text from your phone: ' + cfWhen(SMSX.lastAt) + '.';
+    else msg += ' Nothing from your phone yet. Press Test in SMS to URL Forwarder too.'; } catch (e) { msg = 'Couldn’t reach the relay. Check you’re online.'; }
+  toast(msg, null, null, 7000); smsRefresh(true);
+}
+function smsOff() { confirmSheet('Turn off text messages?', 'Stops the forwarding key and deletes the saved appointment and delivery texts on the relay. Uninstall SMS to URL Forwarder too if you like.', 'Turn off', async () => {
+  try { await cfApi('/sms/revoke', 'POST', {}); } catch (e) { } SMScode = null; SMSX = { connected: false, items: [] }; localStorage.setItem('smsData', JSON.stringify(SMSX)); setupBackground().catch(() => {}); smsRedraw(); toast('Text messages turned off.'); }); }
+function smsDone() { SMScode = null; smsRefresh(true); smsRedraw(); toast('Saved. Appointment and delivery texts will show on Notifications.'); }
+function smsRedraw() { const b = document.getElementById('smsset'); if (!b || !b.nextElementSibling) return; const w = document.createElement('div'); w.innerHTML = smsSettings(); b.nextElementSibling.replaceWith(w.children[1]); }
+async function smsCopy(id) { const el = document.getElementById(id); if (!el) return; const ok = await copyText(el.value); toast(ok ? 'Copied.' : 'Couldn’t copy on this phone. Long-press the box and choose Copy.'); }
+const SMS_NOTE = 'Codes are never kept: any text that looks like a one-time code, PIN or verification message is dropped straight away. Only appointment and booking texts and delivery and parcel texts are used; every other text is dropped unread. What’s kept (sender, a short summary, the date or time, carrier and tracking) is encrypted on the relay and deleted after 14 days.';
+const SMS_STEPS = `<ol class="steps">
+      <li>Install <b>SMS to URL Forwarder</b> from F-Droid: <a href="${SMS_APP}" target="_blank" rel="noopener">f-droid.org/packages/tech.bogomolov.incomingsmsgateway</a>. It isn’t on the Play Store because Google doesn’t allow SMS-forwarding apps there. If Play Protect warns you, choose <b>Install anyway</b>.</li>
+      <li>Open it and allow <b>SMS</b> and <b>notifications</b>.</li>
+      <li>Tap <b>+</b> to add a rule. Sender: <b>*</b> (all senders). Webhook URL: paste the <b>Forwarding address</b> above (the key is part of it).</li>
+      <li>Leave the message template as it is, tap <b>Save</b>, then tap <b>Test</b> on the rule. It should say it was sent.</li>
+      <li>Phone Settings › Apps › SMS to URL Forwarder › Battery: set to <b>Unrestricted</b>, so texts still come through when the phone is asleep.</li>
+      <li>Come back here, tap <b>Test</b>, then <b>Done, I’ve pasted it</b>.</li></ol>
+    <p class="muted" style="margin:6px 0 0">Business texts (appointments, couriers) arrive as normal SMS, so Google Messages’ RCS chats can stay on. Texts sent as RCS chats aren’t forwarded.</p>`;
+function smsSettings() {
+  const on = SMSX && SMSX.connected, key = cfKey(), al = (S.settings || {}).smsAlerts !== false;
+  setTimeout(() => smsRefresh(false), 0);
+  if (SMScode && Date.now() - SMScode.at > 15 * 60e3) SMScode = null;
+  const row = (label, val, id, secret) => `<div class="hwrow"><div class="hwlab">${label}</div><div class="akrow"><input readonly id="${id}" value="${esc(val)}" ${secret ? 'type="password"' : ''} autocomplete="off" spellcheck="false" onfocus="this.select()">${secret ? `<button type="button" class="btn small" onclick="const e=document.getElementById('${id}');e.type=e.type==='password'?'text':'password'">Show</button>` : ''}<button type="button" class="btn small" onclick="smsCopy('${id}')">Copy</button></div></div>`;
+  let body;
+  if (!key) body = `<p class="muted" style="margin:0">Uses the same secure device key as the bank link. Connect the bank on this phone first, then come back here.</p>`;
+  else if (SMScode) body = `<p class="muted" style="margin:0 0 8px"><b>Your forwarding key is shown once.</b> Paste the forwarding address into SMS to URL Forwarder.</p>
+    ${row('Forwarding address', SMScode.url + '?k=' + SMScode.key, 'smsone', true)}${row('Forwarding URL', SMScode.url, 'smsurl')}${row('Key', SMScode.key, 'smskey', true)}
+    <details class="help" style="margin-top:6px"><summary>Using a header instead?</summary><p class="muted" style="margin:6px 0">Use the Forwarding URL, and add the header <b>Authorization</b> with the value <b>Bearer</b>, a space, then the key.</p></details>
+    <details class="help" open style="margin-top:6px"><summary>Phone setup steps</summary>${SMS_STEPS}</details>
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn small" onclick="smsTest()">Test</button><button type="button" class="btn primary small" onclick="smsDone()">Done, I’ve pasted it</button></div>`;
+  else if (on) body = `<div class="srow" style="padding:0"><div class="tx"><div class="t">Appointment and delivery texts</div><div class="s">${SMSX.lastAt ? 'Last text from your phone ' + esc(cfWhen(SMSX.lastAt)) : 'Waiting for the first text from your phone'}. Key made ${esc(cfWhen(SMSX.created))}.</div></div><button class="switch ${al ? 'on' : ''}" role="switch" aria-checked="${al}" aria-label="Appointment and delivery texts" onclick="toggleSetting('smsAlerts')"></button></div>
+    <details class="help" style="margin-top:8px"><summary>Phone setup steps</summary><p class="muted" style="margin:6px 0">The forwarding key was shown once when it was made. If you need it again, tap New key and paste the new address.</p>${SMS_STEPS}</details>
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn small" onclick="smsTest()">Test</button><button type="button" class="btn small" onclick="smsNewKey()">New key</button><button type="button" class="btn small danger" onclick="smsOff()">Turn off</button></div>`;
+  else body = `<p class="muted" style="margin:0 0 8px">Off. Brings appointment and booking texts (doctor, dentist, WOF, car service) and delivery texts (NZ Post, CourierPost, Aramex, DHL and others) onto Notifications, through a small forwarding app on your phone.</p>
+    <div class="btns"><button type="button" class="btn primary small" onclick="smsNewKey()">Set up</button></div>`;
+  return `<div class="sec" id="smsset">Text messages</div><div class="list"><div style="padding:12px">${body}
+    ${SMSerr ? `<p class="muted" style="color:#b91c1c;margin:6px 0 0" role="alert">${esc(SMSerr)}</p>` : ''}<p class="muted" style="margin:10px 0 0">${SMS_NOTE}</p></div></div>`;
+}
+(() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { return h + smsSettings(); } catch (e) { return h; } }; })();
 

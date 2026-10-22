@@ -220,7 +220,7 @@ export function publicDays(D, n = 30, now = Date.now()) {
 async function getHCred(env) { try { return JSON.parse(await env.EVENTS_KV.get(K_CRED) || 'null'); } catch (e) { return null; } }
 async function getData(env) { return (await open(env, await env.EVENTS_KV.get(K_DATA))) || blank(); }
 // My App proves itself with its device key: the bank link's key, or the key that made the current sync code
-async function appOk(env, request) {
+export async function appOk(env, request) {
   const key = request.headers.get('X-Cash-Key') || ''; if (!key || key.length > 200) return false;
   const h = await sha(key), hc = await getHCred(env), ak = await getCred(env);
   return !!((hc && hc.appKeyHash && eq(h, hc.appKeyHash)) || (ak && ak.keyHash && eq(h, ak.keyHash)));

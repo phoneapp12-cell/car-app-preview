@@ -341,7 +341,7 @@ function scheduleNext(item, now) {
 export function cleanReminder(r, now = Date.now()) {
   if (!r || typeof r !== 'object') return null;
   const id = String(r.id || '');
-  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug|tv|bed|pwr|out)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
+  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug|tv|bed|pwr|out|sms)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
   const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
   if (!title) return null;
   const date = String(r.date || ''), time = String(r.time || '');
@@ -410,9 +410,11 @@ export async function setReminders(env, rawSub, list, now = Date.now(), opts = {
   if (links.length) { try { for (const r of await seriesFor(links, opts.fetchImpl || fetch, now)) { if (items.length >= MAX_REMS) break; const c = cleanReminder(r, now); if (c && !seen.has(c.id)) { seen.add(c.id); items.push(c); } } } catch (e) { /* the hourly check tries again */ } }
   // 2.27.40: power outage pushes (Onerahi), from the relay's last Northpower read.
   const outPref = ['onerahi', 'all', 'off'].includes(opts.outages) ? opts.outages : ((book[id] && book[id].outPref) || '');
+  const smsPref = ['on', 'off'].includes(opts.sms) ? opts.sms : ((book[id] && book[id].smsPref) || '');
   const netPref = ['on', 'off'].includes(opts.netOutages) ? opts.netOutages : ((book[id] && book[id].netPref) || '');
   if ((outPref && outPref !== 'off') || netPref === 'on') { try { const rec = await getOutages(env); for (const r of (outPref && outPref !== 'off' ? outageReminders(rec, outPref, now) : []).concat(netPref === 'on' ? netReminders(rec, now) : [])) { if (items.length >= MAX_REMS) break; const c = cleanReminder(r, now); if (c && !seen.has(c.id)) { seen.add(c.id); items.push(c); } } } catch (e) { } }
-  if (items.length || links.length || outPref || netPref) { book[id] = { items }; if (links.length) book[id].tvLinks = links; if (outPref) book[id].outPref = outPref; if (netPref) book[id].netPref = netPref; } else delete book[id];
+  if (smsPref === 'on' && book[id] && Array.isArray(book[id].items)) for (const x of book[id].items) { if (x && /^sms-/.test(x.id) && !seen.has(x.id) && items.length < MAX_REMS) { const c = cleanReminder(x, now); if (c) { seen.add(c.id); items.push(c); } } }
+  if (items.length || links.length || outPref || netPref || smsPref) { book[id] = { items }; if (smsPref) book[id].smsPref = smsPref; if (links.length) book[id].tvLinks = links; if (outPref) book[id].outPref = outPref; if (netPref) book[id].netPref = netPref; } else delete book[id];
   await saveRem(env, book);
   if (!items.length) {
     const again = await loadSubs(env);
@@ -439,6 +441,13 @@ export async function applyOutages(env, rec, now = Date.now()) {
   for (const id of Object.keys(book)) { const e = book[id]; const po = e && e.outPref && e.outPref !== 'off', pn = e && e.netPref === 'on'; if (!po && !pn) continue;
     const items = Array.isArray(e.items) ? e.items : (e.items = []), have = new Set(items.map(x => x && x.id));
     for (const r of (po ? outageReminders(rec, e.outPref, now) : []).concat(pn ? netReminders(rec, now) : [])) { if (items.length >= MAX_REMS) break; const c = cleanReminder(r, now); if (c && !have.has(c.id)) { have.add(c.id); items.push(c); added++; } } }
+  if (added) await saveRem(env, book); return added;
+}
+// 2.27.44: a kept appointment or delivery text becomes a push (sms- id, due now) on phones with text alerts on.
+export async function smsPushNow(env, list, now = Date.now()) {
+  if (!env.EVENTS_KV || !Array.isArray(list) || !list.length) return 0; const book = await loadRem(env); let added = 0;
+  for (const id of Object.keys(book)) { const e = book[id]; if (!e || e.smsPref !== 'on') continue; const items = Array.isArray(e.items) ? e.items : (e.items = []), have = new Set(items.map(x => x && x.id));
+    for (const r of list) { if (items.length >= MAX_REMS) break; const c = cleanReminder(r, now); if (c && !have.has(c.id)) { have.add(c.id); items.push(c); added++; } } }
   if (added) await saveRem(env, book); return added;
 }
 export async function runReminders(env, fetchImpl = fetch, now = Date.now()) {
@@ -503,7 +512,7 @@ export async function pushRoute(path, body, env, fetchImpl = fetch, now = Date.n
   }
   if (path === '/push/unsubscribe') return [200, await unsubscribe(env, body && body.endpoint)];
   if (path === '/push/reminders') {
-    try { return [200, await setReminders(env, body && body.subscription, body && body.reminders, now, { tvLinks: body && body.tvLinks, outages: body && body.outages, netOutages: body && body.netOutages, fetchImpl })]; }
+    try { return [200, await setReminders(env, body && body.subscription, body && body.reminders, now, { tvLinks: body && body.tvLinks, outages: body && body.outages, netOutages: body && body.netOutages, sms: body && body.sms, fetchImpl })]; }
     catch (e) { return [400, { error: 'bad_subscription' }]; }
   }
   if (limited(now)) return [429, { error: 'too_many' }];
