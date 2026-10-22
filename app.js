@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.79';
+const APP_VERSION = '2.27.80';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12599,6 +12599,7 @@ async function loadAklConcerts(force) {
       AKLC = { at: Date.now(), dated: d.dated || [], spark: d.spark || [] };
       try { localStorage.setItem('aklConcerts', JSON.stringify(AKLC)); } catch (e) {}
       const el = document.getElementById('aklcard'); if (el) el.outerHTML = aklConcertsCard();
+      try { if (/^#(concerts|media)$/.test(location.hash) && !sheetOpen) render(); } catch (e) { } // 2.27.80
     }
   } catch (e) {} finally { aklcBusy = false; }
 }
@@ -19937,7 +19938,18 @@ function mdEvRow(e) {
   return tabRow('events', esc(e.title), esc([when, ven].filter(Boolean).join(' · ')), u ? `window.open('${esc(u)}','_blank','noopener')` : "go('#events')");
 }
 // 2.27.58: Auckland concerts from the relay (Eventfinda Auckland gig guide, major venues and real concerts only). Not filtered by shifts; no sport.
-function mdAkl() { try { const T = todayISO(); return ((EVS && EVS.data && EVS.data.akl) || []).filter(e => e && e.title && e.date >= T && !(e.date === T && e.time && e.time < mvNow().slice(11)) && !isSport([e.title, e.desc].join(' '))); } catch (e) { return []; } }
+// 2.27.80: plus the big stadium shows (Eden Park, Western Springs, Go Media) from the venues' own pages (relay /concerts), which Eventfinda's gig guide doesn't carry.
+function mdAkl() {
+  try {
+    const T = todayISO(), nk = t => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!AKLC || Date.now() - AKLC.at > 12 * 3600 * 1000) setTimeout(() => { try { loadAklConcerts(); } catch (e) { } }, 0);
+    const ef = ((EVS && EVS.data && EVS.data.akl) || []).filter(e => e && e.title && e.date >= T && !(e.date === T && e.time && e.time < mvNow().slice(11)) && !isSport([e.title, e.desc].join(' ')));
+    const has = (x) => ef.some(e => e.date === x.date && (nk(e.title).includes(nk(x.title).split(' ').slice(0, 2).join(' ')) || nk(x.title).includes(nk(e.title))));
+    const big = ((AKLC && AKLC.dated) || []).filter(x => x && x.title && x.date && x.date >= T && !isSport(x.title) && !has(x))
+      .map(x => ({ id: 'aklv-' + nk(x.title).replace(/ /g, '-') + '-' + x.date, title: x.title, date: x.date, time: '', timeKnown: false, venue: x.venue + ', Auckland', url: x.url, cats: ['Concert', 'Auckland'], src: 'venue' }));
+    return ef.concat(big).sort((a, b) => a.date.localeCompare(b.date) || (a.time || '99').localeCompare(b.time || '99'));
+  } catch (e) { return []; }
+}
 function mdEvGroups() {
   const G = { akl: mdAkl(), concerts: [], nightlife: [], movies: [], markets: [], other: [] };
   try { upcomingEvents().forEach(e => { if (isSport([e.title, (e.cats || []).join(' '), e.desc].join(' '))) return; const c = mdEvCat(e); if ((c === 'concerts' || c === 'nightlife') && evDuringWork(e)) return; G[c].push(e); }); } catch (e) { }
@@ -20023,7 +20035,7 @@ function ConcertsPage() {
   const sec = evListSecs(), G = mdEvGroups();
   return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('Concerts', 'Whangārei and Auckland') +
     sec('🎸 Whangārei', G.concerts, 'concerts') + sec('🎤 Auckland', G.akl, 'akl') +
-    `<div class="foot">From Eventfinda (eventfinda.co.nz) and Whangārei District Council. Whangārei concerts during your shifts are left out. Times can change, so check before you go. No sport.</div>`;
+    `<div class="foot">From Eventfinda (eventfinda.co.nz), Whangārei District Council and the Eden Park and Auckland Stadiums websites. Whangārei concerts during your shifts are left out. Times can change, so check before you go. No sport.</div>`;
 }
 
 /* ---- 2.27.55: Movies page. Only Event Cinemas Whangārei (relay /events → cinema, from Event Cinemas' own sessions and coming-soon data).
