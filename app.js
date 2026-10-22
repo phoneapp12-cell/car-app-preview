@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.74';
+const APP_VERSION = '2.27.75';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -25160,7 +25160,7 @@ function epgProgs(d, ch) { let L = TVD.days[d] ? tvdProgs(d, ch) : (d === todayI
 const epgClock = ms => tvClock(ms).replace(/\s?([ap])\.?m\.?/i, (m, a) => ' ' + a.toUpperCase() + 'M');
 function epgBlocks(d, ch, x0, x1, t0) { const L = epgProgs(d, ch); if (!L.length && TVD.days[d]) return `<span class="epgnone">No listings</span>`; return L.map(p => { const a = Math.max(0, (p.start - t0) / 60000 * EPG_PX), b = Math.min(1440 * EPG_PX + 300, (p.until - t0) / 60000 * EPG_PX);
   if (b <= x0 || a >= x1 || b - a < 2) return ''; const lk = !!tvLinkOf(ch, p.title), fl = !lk && tvFlagged(tvFk(ch, p.start)); // 2.27.39: badge + gold outline
-  return `<button type="button" class="epgb${tvgCls(p)}${lk || fl ? ' epgf' : ''}" style="left:${a.toFixed(0)}px;width:${Math.max(2, b - a - 2).toFixed(0)}px" onclick="${p.start <= Date.now() && p.until > Date.now() && TV_WATCH[ch] ? `tvWatch(${jsArg(ch)})` : `epgTap(${jsArg(ch)},${p.start})`}"${lk ? ' aria-label="Series linked: ' + esc(p.title) + '"' : fl ? ' aria-label="Reminder set: ' + esc(p.title) + '"' : ''}><span class="epgbx">${lk ? '<span class="epgbadge" title="Series link">🔁</span>' : fl ? '<span class="epgbadge" title="Reminder set">🔔</span>' : ''}<span class="epgtx"><span class="t">${esc(p.title)}</span><span class="s">${lk ? '<b class="epglab">Series</b>' : fl ? '<b class="epglab">Reminder</b>' : ''}${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}</span></span></span></button>`; }).join(''); }
+  return `<button type="button" class="epgb${tvgCls(p)}${lk || fl ? ' epgf' : ''}" style="left:${a.toFixed(0)}px;width:${Math.max(2, b - a - 2).toFixed(0)}px" data-ch="${esc(ch)}" data-s="${p.start}" onclick="epgClick(${jsArg(ch)},${p.start})"${lk ? ' aria-label="Series linked: ' + esc(p.title) + '"' : fl ? ' aria-label="Reminder set: ' + esc(p.title) + '"' : ''}><span class="epgbx">${lk ? '<span class="epgbadge" title="Series link">🔁</span>' : fl ? '<span class="epgbadge" title="Reminder set">🔔</span>' : ''}<span class="epgtx"><span class="t">${esc(p.title)}</span><span class="s">${lk ? '<b class="epglab">Series</b>' : fl ? '<b class="epglab">Reminder</b>' : ''}${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}</span></span></span></button>`; }).join(''); }
 function epgPaint(force) { const sc = document.getElementById('epgsc'); if (!sc) return; const d = sc.dataset.day, t0 = +sc.dataset.t0, w = sc.clientWidth || 360;
   const k = Math.floor(Math.max(0, sc.scrollLeft - EPG_CH_W) / (EPG_STEP)); if (!force && epgWin === d + ':' + k) return; epgWin = d + ':' + k;
   const x0 = k * EPG_STEP - w, x1 = (k + 1) * EPG_STEP + 2 * w;
@@ -25182,8 +25182,21 @@ function epgInit(tries = 0) { const sc = document.getElementById('epgsc'); if (!
   if (!sc.clientWidth && tries < 20) return void setTimeout(() => epgInit(tries + 1), 60); sc.dataset.on = '1';
   const d = sc.dataset.day, t0 = +sc.dataset.t0, now = Date.now();
   if (tvScrollX == null || tvScrollDay !== d) { const tod = d === todayISO() ? now : t0 + (now - nzMidnight(todayISO())); tvScrollX = Math.max(0, (tod - t0) / 60000 * EPG_PX - 30 * EPG_PX); tvScrollDay = d; }
+  try { epgHoldWire(sc); } catch (e) { }
   sc.scrollLeft = tvScrollX; if (Math.abs(sc.scrollLeft - tvScrollX) > 2) requestAnimationFrame(() => { sc.scrollLeft = tvScrollX; epgWin = null; epgPaint(true); epgLabel(); }); epgWin = null; epgPaint(true); epgLabel();
   sc.addEventListener('scroll', () => { if (!sc.isConnected || !sc.clientWidth) return; tvScrollX = sc.scrollLeft; if (!epgRaf) epgRaf = requestAnimationFrame(() => { epgRaf = 0; epgPaint(false); epgLabel(); }); }, { passive: true }); }
+// 2.27.75: tap a show to watch it in the channel's app (no app: details); hold about half a second for details, bookmark and reminders
+let epgSupp = false, epgHold = null;
+function epgClick(ch, s) { if (epgSupp) return; if (TV_WATCH[ch]) tvWatch(ch); else epgTap(ch, s); }
+function epgHoldWire(sc) {
+  const stop = () => { if (epgHold) { clearTimeout(epgHold.t); epgHold = null; } };
+  sc.addEventListener('contextmenu', e => { if (e.target.closest('.epgb')) e.preventDefault(); });
+  sc.addEventListener('pointerdown', e => { const b = e.target.closest('.epgb'); stop(); if (!b) return;
+    epgHold = { x: e.clientX, y: e.clientY, t: setTimeout(() => { epgHold = null; epgSupp = true; try { if (navigator.vibrate) navigator.vibrate(15); } catch (x) { } epgTap(b.dataset.ch, +b.dataset.s); }, 500) }; });
+  sc.addEventListener('pointermove', e => { if (epgHold && Math.hypot(e.clientX - epgHold.x, e.clientY - epgHold.y) > 10) stop(); }, { passive: true });
+  sc.addEventListener('scroll', stop, { passive: true });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(k => sc.addEventListener(k, () => { stop(); if (epgSupp) setTimeout(() => { epgSupp = false; }, 450); }));
+}
 function epgJump(dir) { const sc = document.getElementById('epgsc'); if (sc) sc.scrollBy({ left: dir * 60 * EPG_PX, behavior: 'smooth' }); }
 function epgSetDay(d) { tvDay = d; tvScrollX = null; tvdDay(d).then(x => { if (x && epgDay() === d) updTv(); }); updTv(); }
 function epgTap(ch, s) { const p = tvFind(ch, s) || epgProgs(epgDay(), ch).find(x => x.start === s); if (!p) return;
@@ -25212,7 +25225,7 @@ function epgTap(ch, s) { const p = tvFind(ch, s) || epgProgs(epgDay(), ch).find(
 .epgf{box-shadow:inset 0 0 0 4px #F59E0B,0 0 12px 3px rgba(245,158,11,.85)!important;z-index:1}.epgbadge{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#F59E0B;color:#111!important;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;box-shadow:0 0 0 2px #fff}
 .epgb{padding-left:4px!important}.epglab{display:inline-block;margin-right:5px;padding:0 5px;border-radius:4px;background:#F59E0B;color:#111!important;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
 .epgb .t{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis}.epgb .s{font-size:11.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis}
-.epghr{position:absolute;top:4px;font-size:11px;opacity:.7;transform:translateX(4px)}.epgnow{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;pointer-events:none}.epgnone{position:sticky;left:${EPG_CH_W + 8}px;display:inline-block;line-height:60px;font-size:12px;opacity:.6;padding-left:8px}`; document.head.appendChild(st); } catch (e) { } })();
+.epghr{position:absolute;top:4px;font-size:11px;opacity:.7;transform:translateX(4px)}.epgnow{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;pointer-events:none}.epgb{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.epgnone{position:sticky;left:${EPG_CH_W + 8}px;display:inline-block;line-height:60px;font-size:12px;opacity:.6;padding-left:8px}`; document.head.appendChild(st); } catch (e) { } })();
 function epgGrid() { const d = epgDay(), T = todayISO(), t0 = nzMidnight(d), W = 1440 * EPG_PX + 300, chans = epgChans(), now = Date.now();
   const loaded = !!TVD.days[d]; if (!loaded && !TVD.busy[d]) tvdDay(d).then(x => { if (x) updTv(); });
   const D = ((TVD.idx && TVD.idx.days) || [T]).filter(x => x >= T);
@@ -25225,8 +25238,8 @@ function epgGrid() { const d = epgDay(), T = todayISO(), t0 = nzMidnight(d), W =
     <div class="epgsc" id="epgsc" data-day="${d}" data-t0="${t0}"><div class="epgin" style="width:${W + EPG_CH_W}px">${nowX}<div class="epgrow hr"><div class="epgch" style="height:24px"></div><div class="epgtrack" style="width:${W}px">${hrs}</div></div>${rows}</div></div>
     ${!loaded && d !== T ? `<p class="muted">${TVD.fail[d] ? 'Couldn’t load that day of the guide.' : 'Loading the guide…'}</p>` : ''}`; }
 TvGuide = function () { setTimeout(epgInit, 0);
-  return header('TV guide', 'Two weeks ahead, where the guides go that far') + tvLegend() + epgGrid() + tvFlaggedList() +
-    `<div class="foot">Freeview and Sky guides (via i.mjh.nz), refreshed twice a day. Sport isn’t shown. Tap a show for details and reminders.</div>`; };
+  return header('TV guide', 'Two weeks ahead, where the guides go that far') + tvLegend() + epgGrid() + `<p class="muted" style="margin:6px 2px 10px;font-size:.85rem">Tap to watch · Hold to bookmark or set a reminder</p>` + tvFlaggedList() +
+    `<div class="foot">Freeview and Sky guides (via i.mjh.nz), refreshed twice a day. Sport isn’t shown.</div>`; };
 // Names in the lists follow the channel id, so Sky's renames show up on old flags and links too.
 (() => { const o = tvFlaggedList; tvFlaggedList = function () { const h = o.apply(this, arguments); try { let x = h; tvFlags().forEach(f => { const n = tvChName(f.ch); if (n && f.cn && n !== f.cn) x = x.split(esc(f.cn) + ' · ').join(esc(n) + ' · '); });
   tvLinks().forEach(l => { if (l.ch !== '*') { const n = tvChName(l.ch); if (n && l.cn && n !== l.cn) x = x.split('Every episode · ' + esc(l.cn)).join('Every episode · ' + esc(n)); } }); return x; } catch (e) { return h; } }; })();
