@@ -14,6 +14,13 @@ RENAMES = {'sky.5': ('2026-10-22', 'Sky Justice'), 'sky.6': ('2026-10-22', 'Sky 
 meta = {}
 SPORT = re.compile(open(os.path.join(HERE, 'sport-re.txt')).read().strip(), re.I)  # the app's SPORT_RE
 RACING = re.compile(r'^(racing|horse racing|trots)$', re.I)
+# 2.27.71: the Sky guide stopped updating these channels (its file is from 1 Oct), but the Freeview guide carries them,
+# so their programmes come from Freeview under the same app ids (names, numbers and logos still from Sky).
+ALIAS = {'mjh-prime': 'sky.4', 'mjh-bravo': 'sky.12', 'mjh-eden': 'sky.13', 'mjh-maori-tv': 'sky.19', 'mjh-sky-hgtv': 'sky.21', 'mjh-tvnz-duke': 'sky.23',
+         'mjh-rush-nz': 'sky.24', 'mjh-mood-1290': 'sky.25', 'mjh-mood-1289': 'sky.26', 'mjh-parliament-tv': 'sky.86', 'mjh-al-jazeera': 'sky.90',
+         'mjh-shine-tv': 'sky.201', 'mjh-hope-channel': 'sky.204', 'mjh-firstlight': 'sky.206', 'mjh-tvnz-1-plus1': 'sky.501', 'mjh-tvnz-2-plus1': 'sky.502',
+         'mjh-three-plus1': 'sky.503', 'mjh-tvnz-duke-plus1': 'sky.504'}
+ALIASED = set(ALIAS.values())
 FEEDS = {'freeview': 'https://i.mjh.nz/nz/epg.xml.gz', 'sky': 'https://i.mjh.nz/SkyGo/epg.xml.gz'}
 NZ = ZoneInfo('Pacific/Auckland')
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'out'
@@ -38,7 +45,9 @@ for feed, url in FEEDS.items():
             el.clear(); continue
         if el.tag != 'programme': continue
         ch = el.get('channel')
-        if ch in IDS and IDS[ch]['feed'] == feed:
+        if feed == 'freeview' and ch in ALIAS: ch = ALIAS[ch]
+        elif feed == 'sky' and ch in ALIASED: ch = None
+        if ch in IDS and (IDS[ch]['feed'] == feed or ch in ALIASED):
             s, u = stamp(el.get('start')), stamp(el.get('stop'))
             title = re.sub(r'\s+', ' ', (el.findtext('title') or '')).strip()
             cats = [re.sub(r'\s+', ' ', c.text or '').strip() for c in el.findall('category') if (c.text or '').strip()]

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.70';
+const APP_VERSION = '2.27.71';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19821,10 +19821,9 @@ function glTiles() {
   add('videos', 'watch', 'Videos', () => (glFirst(HOME_CARD.videos()) || {}).t, B('tv'), '', "go('#videos')");
   add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "glSarahOpen()");
   add('lang', 'fun', 'Word of the day', () => { const m = langToday('mi'), f = langToday('fr'); return `${m[0]} · ${f[0]}`; }, 'i3-idea', ['#0d9488', '#1d4ed8'], "go('#lang')"); // 2.26.13
-  add('top40', 'listen', 'Top 40 NZ', () => { const f = glFirst(NIGHT_CARD.top40()); return f ? '#1 ' + f.t : ''; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
+  add('top40', 'listen', 'Top 40 NZ', () => { const t = (typeof TOP40 !== 'undefined' && TOP40[0]) || null; return t ? '#1 ' + t.title + ' · ' + t.artist : 'This week’s NZ chart'; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
   add('radio', 'listen', 'Radio', () => (glFirst(HOME_CARD.radio()) || {}).t || 'NZ stations, live', 'i3-radio', ['#16a34a', '#065f46'], "go('#radio')");
   add('podcasts', 'listen', 'Podcasts', () => (glFirst(HOME_CARD.podcasts()) || {}).t, 'i3-phone', ['#9333ea', '#4c1d95'], "go('#podcasts')");
-  add('suno', 'fun', 'AI music idea', () => GL_SUNO[(glDay() + glOpenN) % GL_SUNO.length], 'i3-radio', ['#a21caf', '#581c87'], "go('#notes')");
   add('blogs', 'read', 'Blogs', () => (glFirst(HOME_CARD.blogging()) || {}).t, 'i3-note', ['#0d9488', '#155e75'], "go('#blogging')");
   add('posts', 'read', 'Your posts', () => { const p = postsSorted(); return p.length ? p[0].title : ''; }, 'i3-idea', ['#ca8a04', '#9a3412'], "go('#blogging/mine')");
   add('localnews', 'read', 'Local news', () => { const n = (newsSec('local') || []).filter(newsOk); return n.length ? n[0].title : ''; }, B('news'), '', "go('#news')");
@@ -19890,7 +19889,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'sarah', 'top40', 'radio', 'podcasts', 'blogs', 'posts', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'place', 'lang', 'suno', 'recipe', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
+const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'sarah', 'top40', 'radio', 'podcasts', 'blogs', 'posts', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'place', 'lang', 'recipe', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
@@ -23661,7 +23660,7 @@ function bfEndOf(h, i) { // index just past the element that opens at i
   const re = /<(\/?)div\b[^>]*>/g; re.lastIndex = i; let d = 0, m; while ((m = re.exec(h))) { d += m[1] ? -1 : 1; if (d === 0) return re.lastIndex; } return -1;
 }
 // Home (day only): the tiles that now live on Notifications are left off; the night feed is unchanged
-(() => { const o = glTiles; const MOVED = { netflix: 'netflix', prime: 'prime', videos: 'videos', sarah: 'sarah', top40: 'top40', recipe: 'recipe', quote: 'quote', localnews: 'local', nznews: 'nz' };
+(() => { const o = glTiles; const MOVED = { netflix: 'netflix', prime: 'prime', videos: 'videos', sarah: 'sarah', recipe: 'recipe', quote: 'quote', localnews: 'local', nznews: 'nz' };
   glTiles = function () { const T = o.apply(this, arguments); try { if (glMode().night) return T; return T.filter(t => !(MOVED[t.k] && bfOn(MOVED[t.k]))); } catch (e) { return T; } }; })();
 (() => { const o = glPanels; glPanels = function () { try { if (!glMode().night && bfOn('quote')) return ''; } catch (e) { } return o.apply(this, arguments); }; })();
 // swipe-left (archive) on a For-you row: it stays gone (kept on this phone, last 400)
@@ -25138,14 +25137,26 @@ const epgDay = () => { const T = todayISO(), D = (TVD.idx && TVD.idx.days) || [T
 function epgProgs(d, ch) { let L = TVD.days[d] ? tvdProgs(d, ch) : (d === todayISO() ? ((TV && TV.data && TV.data.slots && TV.data.slots[ch]) || []) : []);
   return L.filter(p => p.until > p.start && !isSport(p.title + ' ' + (p.cats || []).join(' '))); }
 const epgClock = ms => tvClock(ms).replace(/\s?([ap])\.?m\.?/i, (m, a) => ' ' + a.toUpperCase() + 'M');
-function epgBlocks(d, ch, x0, x1, t0) { return epgProgs(d, ch).map(p => { const a = Math.max(0, (p.start - t0) / 60000 * EPG_PX), b = Math.min(1440 * EPG_PX + 300, (p.until - t0) / 60000 * EPG_PX);
+function epgBlocks(d, ch, x0, x1, t0) { const L = epgProgs(d, ch); if (!L.length && TVD.days[d]) return `<span class="epgnone">No listings</span>`; return L.map(p => { const a = Math.max(0, (p.start - t0) / 60000 * EPG_PX), b = Math.min(1440 * EPG_PX + 300, (p.until - t0) / 60000 * EPG_PX);
   if (b <= x0 || a >= x1 || b - a < 2) return ''; const lk = !!tvLinkOf(ch, p.title), fl = !lk && tvFlagged(tvFk(ch, p.start)); // 2.27.39: badge + gold outline
-  return `<button type="button" class="epgb${tvgCls(p)}${lk || fl ? ' epgf' : ''}" style="left:${a.toFixed(0)}px;width:${Math.max(2, b - a - 2).toFixed(0)}px" onclick="epgTap(${jsArg(ch)},${p.start})"${lk ? ' aria-label="Series linked: ' + esc(p.title) + '"' : fl ? ' aria-label="Reminder set: ' + esc(p.title) + '"' : ''}><span class="epgbx">${lk ? '<span class="epgbadge" title="Series link">🔁</span>' : fl ? '<span class="epgbadge" title="Reminder set">🔔</span>' : ''}<span class="epgtx"><span class="t">${esc(p.title)}</span><span class="s">${lk ? '<b class="epglab">Series</b>' : fl ? '<b class="epglab">Reminder</b>' : ''}${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}</span></span></span></button>`; }).join(''); }
+  return `<button type="button" class="epgb${tvgCls(p)}${lk || fl ? ' epgf' : ''}" style="left:${a.toFixed(0)}px;width:${Math.max(2, b - a - 2).toFixed(0)}px" onclick="${p.start <= Date.now() && p.until > Date.now() && TV_WATCH[ch] ? `tvWatch(${jsArg(ch)})` : `epgTap(${jsArg(ch)},${p.start})`}"${lk ? ' aria-label="Series linked: ' + esc(p.title) + '"' : fl ? ' aria-label="Reminder set: ' + esc(p.title) + '"' : ''}><span class="epgbx">${lk ? '<span class="epgbadge" title="Series link">🔁</span>' : fl ? '<span class="epgbadge" title="Reminder set">🔔</span>' : ''}<span class="epgtx"><span class="t">${esc(p.title)}</span><span class="s">${lk ? '<b class="epglab">Series</b>' : fl ? '<b class="epglab">Reminder</b>' : ''}${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}</span></span></span></button>`; }).join(''); }
 function epgPaint(force) { const sc = document.getElementById('epgsc'); if (!sc) return; const d = sc.dataset.day, t0 = +sc.dataset.t0, w = sc.clientWidth || 360;
   const k = Math.floor(Math.max(0, sc.scrollLeft - EPG_CH_W) / (EPG_STEP)); if (!force && epgWin === d + ':' + k) return; epgWin = d + ':' + k;
   const x0 = k * EPG_STEP - w, x1 = (k + 1) * EPG_STEP + 2 * w;
   sc.querySelectorAll('.epgtrack[data-ch]').forEach(tr => { tr.innerHTML = epgBlocks(d, tr.dataset.ch, x0, x1, t0); }); }
-function epgLabel() { const sc = document.getElementById('epgsc'), el = document.getElementById('epgtime'); if (!sc || !el) return; const t = +sc.dataset.t0 + (sc.scrollLeft + 8) / EPG_PX * 60000; el.textContent = epgClock(t); }
+function epgLabel() { const sc = document.getElementById('epgsc'), el = document.getElementById('epgtime'); if (!sc || !el) return; const now = Date.now(), t0 = +sc.dataset.t0;
+  if (now > t0 && now < t0 + 86400e3) { el.textContent = 'Now ' + epgClock(now); const ln = sc.querySelector('.epgnow'); if (ln) ln.style.left = (EPG_CH_W + (now - t0) / 60000 * EPG_PX).toFixed(1) + 'px'; } // 2.27.71: live clock and now-line
+  else el.textContent = epgClock(t0 + (sc.scrollLeft + 8) / EPG_PX * 60000); }
+setInterval(() => { try { if (!document.hidden) epgLabel(); } catch (e) { } }, 30000);
+document.addEventListener('visibilitychange', () => { try { if (!document.hidden) epgLabel(); } catch (e) { } });
+// 2.27.71: tap a channel (or a show that's on now) to watch it in the channel's own app. Channels with no app do nothing.
+const TV_APPS = { tvnz: ['TVNZ+', 'nz.co.tvnz.ondemand.phone.android'], three: ['ThreeNow', 'com.mediaworks.android'], sky: ['Sky Go', 'nz.co.skygo'] };
+const TV_WATCH = { 'mjh-tvnz-1': ['tvnz', 'https://www.tvnz.co.nz/player/channel/tvnz-1'], 'mjh-tvnz-2': ['tvnz', 'https://www.tvnz.co.nz/player/channel/tvnz-2'], 'sky.23': ['tvnz', 'https://www.tvnz.co.nz/player/channel/tvnz-duke'],
+  'mjh-three': ['three', 'https://www.threenow.co.nz/live-tv-guide/three'], 'sky.12': ['three', 'https://www.threenow.co.nz/live-tv-guide/bravo'], 'sky.13': ['three', 'https://www.threenow.co.nz/live-tv'], 'sky.24': ['three', 'https://www.threenow.co.nz/live-tv'], 'sky.21': ['three', 'https://www.threenow.co.nz/live-tv'],
+  'sky.4': ['sky', 'https://www.skygo.co.nz/'], 'sky.5': ['sky', 'https://www.skygo.co.nz/'], 'sky.6': ['sky', 'https://www.skygo.co.nz/'], 'sky.11': ['sky', 'https://www.skygo.co.nz/'], 'sky.16': ['sky', 'https://www.skygo.co.nz/'], 'sky.70': ['sky', 'https://www.skygo.co.nz/'], 'sky.101': ['sky', 'https://www.skygo.co.nz/'], 'sky.103': ['sky', 'https://www.skygo.co.nz/'] };
+function tvWatch(ch) { const w = TV_WATCH[ch]; if (!w) return; const a = TV_APPS[w[0]], url = w[1];
+  if (/Android/i.test(navigator.userAgent)) { const u = new URL(url); location.href = `intent://${u.host}${u.pathname}#Intent;scheme=https;package=${a[1]};S.browser_fallback_url=${encodeURIComponent(url)};end`; return; }
+  window.open(url, '_blank', 'noopener'); }
 function epgInit(tries = 0) { const sc = document.getElementById('epgsc'); if (!sc || sc.dataset.on) { if (!sc && tries < 20) setTimeout(() => epgInit(tries + 1), 60); return; }
   if (!sc.clientWidth && tries < 20) return void setTimeout(() => epgInit(tries + 1), 60); sc.dataset.on = '1';
   const d = sc.dataset.day, t0 = +sc.dataset.t0, now = Date.now();
@@ -25157,8 +25168,9 @@ function epgSetDay(d) { tvDay = d; tvScrollX = null; tvdDay(d).then(x => { if (x
 function epgTap(ch, s) { const p = tvFind(ch, s) || epgProgs(epgDay(), ch).find(x => x.start === s); if (!p) return;
   const lk = tvLinkOf(ch, p.title), fl = tvFlagged(tvFk(ch, s)), fut = p.start > Date.now(), g = tvGenre(p);
   const b = (js, l, pri) => `<button type="button" class="btn${pri ? ' primary' : ''}" style="width:100%;margin:4px 0" onclick="closeSheet();${js}">${l}</button>`;
-  const acts = lk ? b(`tvLinkRemove(${jsArg(lk.n)},${jsArg(lk.ch)})`, '🔁 Remove series link') : fl ? b(`tvFlagToggle(${jsArg(ch)},${s})`, '🔔 Remove reminder') :
-    (fut ? b(`tvPick(${jsArg(ch)},${s},'one')`, '🔔 Just this one', true) : '') + b(`tvPick(${jsArg(ch)},${s},'ch')`, '🔁 Every episode on ' + esc(tvChName(ch))) + b(`tvPick(${jsArg(ch)},${s},'any')`, '🔁 Every episode, any channel');
+  const wt = TV_WATCH[ch] ? b(`tvWatch(${jsArg(ch)})`, '▶ Watch on ' + TV_APPS[TV_WATCH[ch][0]][0], !fut) : '';
+  const acts = wt + (lk ? b(`tvLinkRemove(${jsArg(lk.n)},${jsArg(lk.ch)})`, '🔁 Remove series link') : fl ? b(`tvFlagToggle(${jsArg(ch)},${s})`, '🔔 Remove reminder') :
+    (fut ? b(`tvPick(${jsArg(ch)},${s},'one')`, '🔔 Just this one', true) : '') + b(`tvPick(${jsArg(ch)},${s},'ch')`, '🔁 Every episode on ' + esc(tvChName(ch))) + b(`tvPick(${jsArg(ch)},${s},'any')`, '🔁 Every episode, any channel'));
   openSheet(esc(p.title), `<p class="muted" style="margin:0 0 6px">${esc(tvNum(ch))} ${esc(tvChName(ch))} · ${esc(fmtW(nzStampLocal(new Date(p.start)).slice(0, 10)))} · ${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}${g ? ' · ' + { news: 'News', movie: 'Movie', comedy: 'Comedy', life: 'Lifestyle / factual' }[g] : ''}</p>
     ${p.desc ? `<p style="margin:0 0 10px">${esc(p.desc)}${p.desc.length >= 110 ? '…' : ''}</p>` : ''}${acts}`, null); }
 // tvPick worked only on shows still to come; series links can start from one that's on now.
@@ -25179,7 +25191,7 @@ function epgTap(ch, s) { const p = tvFind(ch, s) || epgProgs(epgDay(), ch).find(
 .epgf{box-shadow:inset 0 0 0 4px #F59E0B,0 0 12px 3px rgba(245,158,11,.85)!important;z-index:1}.epgbadge{flex:0 0 auto;width:28px;height:28px;border-radius:50%;background:#F59E0B;color:#111!important;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;box-shadow:0 0 0 2px #fff}
 .epgb{padding-left:4px!important}.epglab{display:inline-block;margin-right:5px;padding:0 5px;border-radius:4px;background:#F59E0B;color:#111!important;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
 .epgb .t{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis}.epgb .s{font-size:11.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis}
-.epghr{position:absolute;top:4px;font-size:11px;opacity:.7;transform:translateX(4px)}.epgnow{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;pointer-events:none}`; document.head.appendChild(st); } catch (e) { } })();
+.epghr{position:absolute;top:4px;font-size:11px;opacity:.7;transform:translateX(4px)}.epgnow{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:2;pointer-events:none}.epgnone{position:sticky;left:${EPG_CH_W + 8}px;display:inline-block;line-height:60px;font-size:12px;opacity:.6;padding-left:8px}`; document.head.appendChild(st); } catch (e) { } })();
 function epgGrid() { const d = epgDay(), T = todayISO(), t0 = nzMidnight(d), W = 1440 * EPG_PX + 300, chans = epgChans(), now = Date.now();
   const loaded = !!TVD.days[d]; if (!loaded && !TVD.busy[d]) tvdDay(d).then(x => { if (x) updTv(); });
   const D = ((TVD.idx && TVD.idx.days) || [T]).filter(x => x >= T);
@@ -25187,7 +25199,7 @@ function epgGrid() { const d = epgDay(), T = todayISO(), t0 = nzMidnight(d), W =
   const hrs = Array.from({ length: 48 }, (_, i) => `<span class="epghr" style="left:${i * 30 * EPG_PX}px">${esc(epgClock(t0 + i * 1800e3))}</span>`).join('');
   const nowX = now > t0 && now < t0 + 86400e3 ? `<div class="epgnow" style="left:${(EPG_CH_W + (now - t0) / 60000 * EPG_PX).toFixed(0)}px"></div>` : '';
   const logos = (TVD.idx && TVD.idx.logos) || {};
-  const rows = chans.map(c => `<div class="epgrow"><div class="epgch">${logos[c.id] ? `<img src="${esc(logos[c.id])}" alt="${esc(tvChName(c.id))}" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="${logos[c.id] ? '' : 'nb'}">${esc(tvNum(c.id).padStart(3, '0'))}</span></div><div class="epgtrack" data-ch="${esc(c.id)}" style="width:${W}px"></div></div>`).join('');
+  const rows = chans.map(c => `<div class="epgrow"><div class="epgch"${TV_WATCH[c.id] ? ` role="button" tabindex="0" style="cursor:pointer" aria-label="Watch ${esc(tvChName(c.id))} on ${TV_APPS[TV_WATCH[c.id][0]][0]}" onclick="tvWatch(${jsArg(c.id)})"` : ''}>${logos[c.id] ? `<img src="${esc(logos[c.id])}" alt="${esc(tvChName(c.id))}" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ''}<span class="${logos[c.id] ? '' : 'nb'}">${esc(tvNum(c.id).padStart(3, '0'))}</span></div><div class="epgtrack" data-ch="${esc(c.id)}" style="width:${W}px"></div></div>`).join('');
   return tabs + tvCover() + `<div class="epgbar"><span style="font-size:12px;opacity:.8">Channels</span><button type="button" aria-label="Back an hour" onclick="epgJump(-1)">‹</button><span id="epgtime"></span><button type="button" aria-label="Forward an hour" onclick="epgJump(1)">›</button></div>
     <div class="epgsc" id="epgsc" data-day="${d}" data-t0="${t0}"><div class="epgin" style="width:${W + EPG_CH_W}px">${nowX}<div class="epgrow hr"><div class="epgch" style="height:24px"></div><div class="epgtrack" style="width:${W}px">${hrs}</div></div>${rows}</div></div>
     ${!loaded && d !== T ? `<p class="muted">${TVD.fail[d] ? 'Couldn’t load that day of the guide.' : 'Loading the guide…'}</p>` : ''}`; }
