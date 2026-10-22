@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.66';
+const APP_VERSION = '2.27.67';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10419,7 +10419,7 @@ async function scheduleReminders() {
     if (!sub) return reminders.length ? 'fail' : '';
     try { shopPushReg(sub); } catch (e) { }
     if (!reminders.length && !S.settings.remOnRelay && !(S.settings.tvLinks || []).length) return '';
-    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined), outages: (typeof outPref === 'function' ? outPref() : undefined), netOutages: (typeof netOn === 'function' ? (netOn() ? 'on' : 'off') : undefined), sms: (typeof smsOn === 'function' ? (smsOn() ? 'on' : 'off') : undefined) });
+    await pushPost('/push/reminders', { subscription: sub.toJSON(), reminders, tvLinks: (typeof tvLinksSend === 'function' ? tvLinksSend() : undefined), outages: (typeof outPref === 'function' ? outPref() : undefined), crashes: (typeof accPref === 'function' ? accPref() : undefined), police: (typeof polOn === 'function' ? (polOn() ? 'on' : 'off') : undefined), netOutages: (typeof netOn === 'function' ? (netOn() ? 'on' : 'off') : undefined), sms: (typeof smsOn === 'function' ? (smsOn() ? 'on' : 'off') : undefined) });
     const on = reminders.length > 0 || (S.settings.tvLinks || []).length > 0;
     if (!!S.settings.remOnRelay !== on) { S.settings.remOnRelay = on; await save(); }
     return '';
@@ -19774,7 +19774,7 @@ function SummaryPage() { // 2.26.18: the Home summary feed, now its own page. 2.
 function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
-  setTimeout(() => { try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
+  setTimeout(() => { try { accLoad(); } catch (e) { } try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + `<div id="habsug">${habCards()}</div><div id="glalerts">${glAlertsBody()}</div>
   <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
@@ -25243,6 +25243,48 @@ async function outSetScope(v) { S.settings.outScope = v; await save(); await set
 (() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = outBellRows(); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = outOn(), sc = outScope();
   return h + `<div class="srow"><div class="tx"><div class="t">Power outage alerts</div><div class="s">Northpower current and planned outages on the bell page. Buzzes for an Onerahi outage: straight away if unplanned, the evening before and the morning of if planned.</div>${on ? `<div style="margin-top:8px;display:flex;gap:8px"><button type="button" class="btn small ${sc === 'onerahi' ? 'primary' : ''}" onclick="outSetScope('onerahi')">Onerahi only</button><button type="button" class="btn small ${sc === 'all' ? 'primary' : ''}" onclick="outSetScope('all')">All Whangārei</button></div>` : ''}</div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Power outage alerts" onclick="toggleSetting('outAlerts')"></button></div>`; } catch (e) { return h; } }; })();
+
+// ---- 2.27.67: local crashes and road incidents (NZTA) and NZ Police Northland updates ----
+/* The relay reads NZTA Waka Kotahi's TREIS highway events (state highways within ~25 km of Whangārei) and NZ Police's
+   Northland district news about every 20 minutes. Bell: "Crash: <road>" cards (map link), cleared ones for 3 hours;
+   Police cards show the release's own title only (strictly filtered on the relay: no courts, crime, violence, deaths or injuries).
+   Pushes (relay side): one per new crash in or around Whangārei (or on his route / Onerahi only, if he picks that); Police crash
+   and road-closure releases near Whangārei push too, unless NZTA already has that road. Other Police updates are bell-only. */
+let ACC = null, accBusy = false, accTry = 0; try { ACC = JSON.parse(localStorage.getItem('crashes') || 'null'); } catch (e) { }
+const accOn = () => (S.settings || {}).accAlerts !== false;
+const accScope = () => (S.settings || {}).accScope === 'route' ? 'route' : 'all';
+function accPref() { return accOn() ? accScope() : 'off'; }
+const polOn = () => (S.settings || {}).polAlerts !== false;
+async function accLoad(force) {
+  if (!RELAY_URL || accBusy || navigator.onLine === false || (!force && Date.now() - accTry < 5 * 60e3)) return;
+  accBusy = true; accTry = Date.now();
+  try { const r = await fetch(RELAY_URL + '/crashes', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.active)) { ACC = { at: Date.now(), d }; try { localStorage.setItem('crashes', JSON.stringify(ACC)); } catch (e) { } glWarnRedraw(); } } catch (e) { }
+  finally { accBusy = false; }
+}
+setTimeout(() => accLoad(), 5000); setInterval(() => accLoad(), 20 * 60e3);
+const accT = v => { const t = typeof v === 'number' ? v : Date.parse(v || ''); if (!t) return ''; const d = new Date(t); return fmtTime(String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')) + (todayISO(d) === todayISO() ? '' : ' ' + fmtW(todayISO(d))); };
+const accMap = x => Number.isFinite(x.lat) && Number.isFinite(x.lon) ? `https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lon}` : 'https://www.journeys.nzta.govt.nz/traffic/regions/northland';
+function accItems() {
+  const d = ACC && ACC.d; if (!d) return [];
+  const L = [], road = x => String(x.where || '').split(/[,;]/)[0].trim() || 'State highway near Whangārei', place = x => String(x.where || '').split(/[,;]/).slice(1).join(',').trim();
+  const aff = x => x.closed ? 'Road closed' : /delay|lane|detour|single|stop\/go|diversion/i.test([x.desc, x.impact, x.comments].join(' ')) ? 'Delays' : '';
+  if (accOn()) {
+    (d.active || []).forEach(x => L.push({ pri: x.commute ? 97 : 88, red: true, route: !!x.commute, tag: (x.commute ? '🚗 On your commute' : '🚗 Crash') + ' · NZTA', what: 'Crash: ' + road(x) + (place(x) ? ', ' + place(x) : ''), s: [aff(x), x.start ? 'Reported ' + accT(+x.start) : '', x.until].filter(Boolean).join(' · ') + ' · Map ›', url: accMap(x), accId: x.id }));
+    (d.cleared || []).forEach(x => L.push({ pri: 20, info: true, tag: '✅ Cleared · NZTA', what: 'Crash: ' + road(x) + (place(x) ? ', ' + place(x) : ''), s: 'Cleared ' + accT(x.clearedAt), url: accMap(x), accId: x.id }));
+  }
+  if (polOn()) (d.police || []).forEach(x => { const crash = x.kind === 'crash', fresh = Date.now() - Date.parse(x.at) < (crash ? 12 : 72) * 3600e3; if (!fresh) return;
+    L.push({ pri: crash ? (x.near ? 86 : 50) : 35, red: crash && x.near, info: !crash, tag: crash ? '🚓 Police · roads' : '🚓 Police update', what: x.title, s: accT(x.at) + ' · NZ Police', url: x.url }); });
+  return L;
+}
+(() => { const o = glWarnList; glWarnList = function () { const L = o.apply(this, arguments); try { const A = accItems(); if (!A.length) return L; const ids = new Set(A.map(x => x.accId).filter(Boolean));
+  const keep = L.filter(x => !(x.tag && /NZTA/.test(x.tag) && [...ids].some(id => { const t = ((TRAFFIC && TRAFFIC.data && TRAFFIC.data.items) || []).find(i => i.id === id); return t && x.what && x.what.includes(t.where || t.desc); })));
+  let gone = []; try { gone = gkDis(); } catch (e) { }
+  const add = A.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk));
+  return keep.concat(add).sort((a, b) => b.pri - a.pri); } catch (e) { return L; } }; })();
+async function accSetScope(v) { S.settings.accScope = v; await save(); await setupBackground(); render(); }
+(() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = accOn(), sc = accScope(), po = polOn();
+  return h + `<div class="srow"><div class="tx"><div class="t">Local crash alerts</div><div class="s">Crashes and road incidents on state highways in and around Whangārei, from NZTA Waka Kotahi, on the bell page. One buzz per new crash.</div>${on ? `<div style="margin-top:8px;display:flex;gap:8px"><button type="button" class="btn small ${sc === 'all' ? 'primary' : ''}" onclick="accSetScope('all')">All Whangārei</button><button type="button" class="btn small ${sc === 'route' ? 'primary' : ''}" onclick="accSetScope('route')">My route only</button></div>` : ''}</div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Local crash alerts" onclick="toggleSetting('accAlerts')"></button></div>`
+    + `<div class="srow"><div class="tx"><div class="t">Police updates (Northland)</div><div class="s">NZ Police Northland news on the bell page: crashes and road closures, scams, missing people and safety or weather advice. No court, crime or injury stories. Only crashes and road closures near Whangārei buzz.</div></div><button class="switch ${po ? 'on' : ''}" role="switch" aria-checked="${po}" aria-label="Police updates (Northland)" onclick="toggleSetting('polAlerts')"></button></div>`; } catch (e) { return h; } }; })();
 
 // ---- 2.27.41: internet and mobile outages ----
 /* From the same relay check (about every 20 minutes): Northpower Fibre unplanned outages (Whangārei's fibre network) and

@@ -1,5 +1,6 @@
 import { seriesFor, cleanLinks } from './tv.js';
 import { getOutages, outageReminders, netReminders } from './outages.js';
+import { getCrashes, crashReminders } from './crashes.js';
 import { cacheGet, cachePut } from './kvguard.js';
 /* Push notifications for bridge closures (Web Push, no third-party service).
  *
@@ -412,9 +413,13 @@ export async function setReminders(env, rawSub, list, now = Date.now(), opts = {
   const outPref = ['onerahi', 'all', 'off'].includes(opts.outages) ? opts.outages : ((book[id] && book[id].outPref) || '');
   const smsPref = ['on', 'off'].includes(opts.sms) ? opts.sms : ((book[id] && book[id].smsPref) || '');
   const netPref = ['on', 'off'].includes(opts.netOutages) ? opts.netOutages : ((book[id] && book[id].netPref) || '');
+  const accPref = ['all', 'route', 'off'].includes(opts.crashes) ? opts.crashes : ((book[id] && book[id].accPref) || ''); // 2.27.67
+  const accSent = ((book[id] && book[id].accSent) || []).slice();
+  if (accPref && accPref !== 'off') { try { const rec = await getCrashes(env), sent = new Set(accSent); for (const r of crashReminders(rec, accPref, now, (opts.police || (book[id] && book[id].polPref) || 'on') !== 'off')) { if (items.length >= MAX_REMS || sent.has(r.id)) continue; const c = cleanReminder(r, now); if (c && !seen.has(c.id)) { seen.add(c.id); items.push(c); accSent.push(r.id); } } } catch (e) { } }
   if ((outPref && outPref !== 'off') || netPref === 'on') { try { const rec = await getOutages(env); for (const r of (outPref && outPref !== 'off' ? outageReminders(rec, outPref, now) : []).concat(netPref === 'on' ? netReminders(rec, now) : [])) { if (items.length >= MAX_REMS) break; const c = cleanReminder(r, now); if (c && !seen.has(c.id)) { seen.add(c.id); items.push(c); } } } catch (e) { } }
   if (smsPref === 'on' && book[id] && Array.isArray(book[id].items)) for (const x of book[id].items) { if (x && /^sms-/.test(x.id) && !seen.has(x.id) && items.length < MAX_REMS) { const c = cleanReminder(x, now); if (c) { seen.add(c.id); items.push(c); } } }
-  if (items.length || links.length || outPref || netPref || smsPref) { book[id] = { items }; if (smsPref) book[id].smsPref = smsPref; if (links.length) book[id].tvLinks = links; if (outPref) book[id].outPref = outPref; if (netPref) book[id].netPref = netPref; } else delete book[id];
+  const polPref = ['on', 'off'].includes(opts.police) ? opts.police : ((book[id] && book[id].polPref) || 'on');
+  if (items.length || links.length || outPref || netPref || smsPref || accPref) { book[id] = { items }; if (accPref) { book[id].accPref = accPref; book[id].polPref = polPref; book[id].accSent = accSent.slice(-80); } if (smsPref) book[id].smsPref = smsPref; if (links.length) book[id].tvLinks = links; if (outPref) book[id].outPref = outPref; if (netPref) book[id].netPref = netPref; } else delete book[id];
   await saveRem(env, book);
   if (!items.length) {
     const again = await loadSubs(env);
@@ -441,6 +446,15 @@ export async function applyOutages(env, rec, now = Date.now()) {
   for (const id of Object.keys(book)) { const e = book[id]; const po = e && e.outPref && e.outPref !== 'off', pn = e && e.netPref === 'on'; if (!po && !pn) continue;
     const items = Array.isArray(e.items) ? e.items : (e.items = []), have = new Set(items.map(x => x && x.id));
     for (const r of (po ? outageReminders(rec, e.outPref, now) : []).concat(pn ? netReminders(rec, now) : [])) { if (items.length >= MAX_REMS) break; const c = cleanReminder(r, now); if (c && !have.has(c.id)) { have.add(c.id); items.push(c); added++; } } }
+  if (added) await saveRem(env, book); return added;
+}
+// 2.27.67: after each NZTA read, one push per new crash or incident for phones with crash alerts on (never again for updates or clearing)
+export async function applyCrashes(env, rec, now = Date.now()) {
+  if (!env.EVENTS_KV || !rec) return 0; const book = await loadRem(env); let added = 0;
+  for (const id of Object.keys(book)) { const e = book[id]; if (!e || !e.accPref || e.accPref === 'off') continue;
+    const items = Array.isArray(e.items) ? e.items : (e.items = []), have = new Set(items.map(x => x && x.id)), sent = new Set(e.accSent || []);
+    for (const r of crashReminders(rec, e.accPref, now, e.polPref !== 'off')) { if (items.length >= MAX_REMS || sent.has(r.id)) continue; const c = cleanReminder(r, now); if (c && !have.has(c.id)) { have.add(c.id); sent.add(r.id); items.push(c); added++; } }
+    e.accSent = [...sent].slice(-80); }
   if (added) await saveRem(env, book); return added;
 }
 // 2.27.44: a kept appointment or delivery text becomes a push (sms- id, due now) on phones with text alerts on.

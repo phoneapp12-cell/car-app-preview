@@ -25,7 +25,7 @@ export function parseTraffic(features, now = Date.now()) {
     const id = String(a.eventId || ''); if (!id || seen.has(id)) continue; seen.add(id);
     const type = String(a.eventType || '').trim(), desc = String(a.eventDescription || '').replace(/\s+/g, ' ').trim();
     const closed = /clos/i.test(type + ' ' + desc + ' ' + (a.impact || ''));
-    out.push({ id, type, desc: desc.slice(0, 160), where: String(a.locationArea || '').replace(/\s+/g, ' ').trim().slice(0, 120), comments: String(a.eventComments || '').replace(/\s+/g, ' ').trim().slice(0, 200), impact: String(a.impact || '').slice(0, 60), start: a.startDate || null, end: a.endDate || null, until: String(a.expectedResolution || '').slice(0, 60), active: /^active$/i.test(st), closed, commute: near <= 1.5, km: Math.round(dist * 10) / 10 });
+    out.push({ id, type, desc: desc.slice(0, 160), where: String(a.locationArea || '').replace(/\s+/g, ' ').trim().slice(0, 120), comments: String(a.eventComments || '').replace(/\s+/g, ' ').trim().slice(0, 200), impact: String(a.impact || '').slice(0, 60), start: a.startDate || null, end: a.endDate || null, until: String(a.expectedResolution || '').slice(0, 60), active: /^active$/i.test(st), closed, commute: near <= 1.5, km: Math.round(dist * 10) / 10, lat: Math.round(P[0][0] * 1e5) / 1e5, lon: Math.round(P[0][1] * 1e5) / 1e5 });
   }
   return out.sort((x, y) => (y.commute - x.commute) || (y.closed - x.closed) || (y.active - x.active) || x.km - y.km).slice(0, 25);
 }

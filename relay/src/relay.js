@@ -216,6 +216,7 @@ import { heatRoute } from './heat.js';
 import { alarmRoute } from './alarm.js';
 import { fuelRoute } from './fuel.js';
 import { getOutages, runOutages } from './outages.js';
+import { getCrashes, runCrashes } from './crashes.js';
 // 2.27.45: routes that take a key in the body or header get a per-IP limit on wrong keys (30 an hour).
 const KEYED_RE = /^\/(cars\/alexa|shared-todo|shared-photo|shared-car|reno|sync|sunshine\/|shared-push\/|brands|prices|pair\/redeem)/;
 export async function handle(request, env = {}, fetchImpl = fetch) {
@@ -282,6 +283,12 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
   if (path.startsWith('/hue/')) { // 2.23.79: Philips Hue
     try { return await hueRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }
     catch (e) { return json(502, 'hue_unavailable', origin, env); }
+  }
+  if (path === '/crashes') { // 2.27.67: NZTA crashes and incidents near Whangārei (active, and cleared in the last 3 hours)
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try { let d = await getCrashes(env); if (!d) d = await runCrashes(env, fetchImpl, Date.now(), true); return new Response(JSON.stringify(d || { active: [], cleared: [] }), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
+    catch (e) { return json(502, 'crashes_unavailable', origin, env); }
   }
   if (path === '/outages') { // 2.27.40: Northpower outages (current, planned, recently restored)
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
