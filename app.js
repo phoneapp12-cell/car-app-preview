@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.50';
+const APP_VERSION = '2.27.51';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10603,7 +10603,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   notes: ['note', 'note', 'Notes', 'Notes'],
   lights: ['bulb', 'garden', 'Lights', 'Lights'],
   heat: ['sun', 'garden', 'Heat pumps', 'Heat'],
-  alarm: ['shield', 'garden', 'Alarm', 'Alarm']
+  alarm: ['shield', 'garden', 'Alarm', 'Alarm'],
+  media: ['play', 'vid', 'Media', 'Media'] // 2.27.51
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
@@ -10614,8 +10615,8 @@ const NAV_GROUPS = [
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'watch', 'claims', 'about'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] }, // 2.26.94: its own heading like the other groups
   { id: 'life', title: 'Home life', keys: ['meals', 'recipes', 'shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
-  { id: 'near', title: 'Nearby', keys: ['events', 'news', 'bridge', 'roadworks'] },
-  { id: 'media', title: 'Media', keys: ['tv', 'videos', 'top40', 'blogging', 'podcasts', 'radio', 'travel'] }
+  { id: 'near', title: 'Nearby', keys: ['bridge', 'roadworks', 'travel'] },
+  { id: 'media', title: '', keys: ['media'] } // 2.27.51: Media stands on its own; TV, videos, Top 40, blogs, podcasts, radio, news and events open from its page
 ];
 function navOrder() {
   return NAV_DEFAULT.slice();
@@ -12430,7 +12431,7 @@ async function refreshNews(force = false) {
 function updNews() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if (h === 'news' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
+  if (h === 'news' || h === 'media' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
     const v = $('#view'), top = v ? v.scrollTop : 0;
     render(); if (v) v.scrollTop = top;
   }
@@ -12499,7 +12500,7 @@ async function refreshEvents(force = false) {
 function updEvents() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if (h === 'events' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
+  if (h === 'events' || h === 'media' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
     const v = $('#view'), top = v.scrollTop, q = document.activeElement && document.activeElement.id === 'evq';
     render(); v.scrollTop = top;
     if (q) { const i = document.getElementById('evq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -18703,7 +18704,7 @@ function bottomTabsSetting() {
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'recipes' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather', media: 'tv' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -18761,7 +18762,7 @@ function render() {
   if (/^#(unimed|health\/claims|money\/claims)(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#claims'); renderedHash = '#claims'; } // 2.26.91: one UniMed claims page
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19790,7 +19791,7 @@ function glOrderFor(m) {
   return ['fun', 'read', 'food', 'listen', 'out', 'watch'];
 }
 function glEntInner() {
-  const m = glMode(), all = glTiles(); if (!all.length) return '';
+  const m = glMode(), all = glTiles().filter(t => !MEDIA_TILES.has(t.k)); if (!all.length) return ''; // 2.27.51: media tiles live on the Media page
   const pri = glOrderFor(m), seed = glDay() * 31 + glOpenN, hk = k => { let x = seed * 2654435761 >>> 0; for (const c of k) x = Math.imul(x ^ c.charCodeAt(0), 16777619) >>> 0; return x; }, sh = all.slice().sort((a, b) => hk(a.k) - hk(b.k)); // 2.26.14: stable per tile, so tiles that load later don't reshuffle the rest under a finger
   const sorted = m.night ? sh : sh.sort((a, b) => pri.indexOf(a.cat) - pri.indexOf(b.cat));
   const big = m.night;
@@ -19799,11 +19800,53 @@ function glEntInner() {
   const have = new Set(all.map(t => t.cat));
   const filt = big ? `<div class="glfilt" role="toolbar">${GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).map(c => `<button type="button" class="${glFilt === c[0] ? 'on' : ''}" onclick="glFilt='${c[0]}';glEntRedraw()">${c[1]}${c[0] === 'all' ? ' ' + all.length : ''}</button>`).join('')}</div>` : '';
   const more = big ? (glFilt === 'all' && all.length > cap && !m.night ? `<button type="button" class="glmore" onclick="glAll=!glAll;glEntRedraw()">${glAll ? 'Show fewer ▴' : 'Show all ' + all.length + ' ▾'}</button>` : '') : `<button type="button" class="glmore" onclick="glNightPeek()">All entertainment (${all.length}) ›</button>`;
-  return filt + (big && glFilt === 'all' ? glHero() : '') + `<div class="glgrid${!big && !m.off ? ' glg3' : ''}">${list.map(t => glTileHtml(t, !big && !m.off)).join('')}</div>` + more;
+  return filt + `<div class="glgrid${!big && !m.off ? ' glg3' : ''}">${list.map(t => glTileHtml(t, !big && !m.off)).join('')}</div>` + more;
 }
 function glNightPeek() { glFilt = 'all'; glAll = true; const el = document.getElementById('glent'); if (el) { el.classList.add('glbig'); el.innerHTML = glEntBig(); } }
 function glEntBig() { const save = glMode; try { glMode = () => Object.assign(save(), { night: true }); return glEntInner(); } finally { glMode = save; } }
 function glEntRedraw() { try { const el = document.getElementById('glent'); if (el) el.innerHTML = el.classList.contains('glbig') && !glMode().night ? glEntBig() : glEntInner(); } catch (e) { } }
+
+/* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
+   Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
+   the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
+const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'sarah', 'top40', 'radio', 'podcasts', 'blogs', 'posts', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide']);
+let mdFilt = 'all';
+function mdEvCat(e) {
+  const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
+  if (isMovieEv(e)) return 'movies';
+  if ((e.cats || []).includes('Markets') || /\bmarkets?\b|\bbazaar\b/i.test(e.title || '')) return 'markets';
+  if ((e.cats || []).includes('Live music') || /\b(concert|gig|orchestra|symphony|choir|recital|live music)\b/i.test(hay)) return 'concerts';
+  if (isNightlife(e)) return 'nightlife';
+  return 'other';
+}
+const MD_EV = [['concerts', '🎸 Concerts'], ['nightlife', '🌙 Whangārei nightlife'], ['movies', '🎬 Movies at Event Cinemas'], ['markets', '🧺 Markets'], ['other', '📌 Other']];
+function mdEvRow(e) {
+  const when = (e.date ? fmtW(e.date) : '') + (e.time ? ' · ' + fmtTime(e.time) : ''), ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',') : '';
+  const u = /^https:\/\//.test(e.url || '') ? e.url : '';
+  return tabRow('events', esc(e.title), esc([when, ven].filter(Boolean).join(' · ')), u ? `window.open('${esc(u)}','_blank','noopener')` : "go('#events')");
+}
+function mdEvents() {
+  const G = { concerts: [], nightlife: [], movies: [], markets: [], other: [] };
+  try { upcomingEvents().forEach(e => { if (isSport([e.title, (e.cats || []).join(' '), e.desc].join(' '))) return; const c = mdEvCat(e); if ((c === 'concerts' || c === 'nightlife') && evDuringWork(e)) return; G[c].push(e); }); } catch (e) { }
+  return MD_EV.map(([k, t]) => {
+    let body = '';
+    if (k === 'movies') body = homeTry('md cinema', () => cineCard(), '') || (G.movies.length ? `<div class="list">${G.movies.slice(0, 6).map(mdEvRow).join('')}</div>` : '');
+    else if (G[k].length) body = `<div class="list">${G[k].slice(0, 6).map(mdEvRow).join('')}</div>` + (G[k].length > 6 ? `<button type="button" class="glmore" onclick="go('#events')">+${G[k].length - 6} more on Events ›</button>` : '');
+    return `<div class="glzone"><span>${t}</span></div>` + (body || '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
+  }).join('');
+}
+function MediaPage() {
+  setTimeout(() => { try { refreshEvents(); refreshNews(); } catch (e) { } }, 0);
+  const all = homeTry('md tiles', () => glTiles().filter(t => MEDIA_TILES.has(t.k)), []), have = new Set(all.map(t => t.cat));
+  const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0]));
+  if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
+  const list = mdFilt === 'all' ? all : all.filter(t => t.cat === mdFilt);
+  const filt = `<div class="glfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';render()">${c[1]}</button>`).join('')}</div>`;
+  const ev = mdFilt === 'all' || mdFilt === 'out' ? `<div class="glzone"><span>🎟️ Events</span><a href="#events">All events ›</a></div>` + mdEvents() : '';
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Media', 'Watch, listen, read, news and what’s on') + filt +
+    (mdFilt === 'all' || mdFilt === 'watch' ? homeTry('md hero', () => glHero(), '') : '') + (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
+    `<div class="foot">Events: Whangārei District Council, Eventfinda and Event Cinemas. No sport.</div>`;
+}
 /* ---- Organise ---- */
 function glGardenSafe() { try { const w = wxNext5(); return !!(w && num(w.now) && num(w.maxT) && w.now <= 10 && w.maxT <= 10); } catch (e) { return false; } }
 const glGardenOkText = t => glGardenSafe() || !/\b(water|watering|feed|feeding|fertili[sz]e|liquid feed)\b/i.test(String(t || ''));
@@ -19820,7 +19863,6 @@ function glGardenRows() {
   const rows = [];
   try { glCU().filter(x => x.kind === 'garden').slice(0, 2).forEach(x => rows.push(cuRowHtml(x))); } catch (e) { }
   if (!rows.length) rows.push(tabRow('garden', 'Garden', glGardenSafe() ? 'Cool enough to water or feed if needed' : 'Too warm to water or feed right now', "go('#garden')"));
-  try { upcomingEvents().filter(e => !evDuringWork(e)).slice(0, 2).forEach(e => rows.push(tabRow('events', esc(e.title), esc((e.date ? fmtW(e.date) : '') + (e.venue ? ' · ' + e.venue : '')), "go('#events')"))); } catch (e) { }
   try { const p = false && travelToday(); if (p) rows.push(tabRow('travel', 'Place of the day: ' + esc(p.name), esc(p.country), "go('#travel')")); } catch (e) { }
   return rows.join('');
 }
@@ -19863,7 +19905,7 @@ function glanceHome() {
   const ent = homeTry('gl ent', () => glEntInner(), ''), org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const wk = homeTry('week overview', () => weekOverview(), ''); // 2.27.28: the week overview replaces the Organise tabs; the shortcut tiles stay
-  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><a href="#calendar">Calendar ›</a></div>${wk}${quick}<div class="wklinks"><a href="#todo">To-do</a><a href="#bills">Bills</a><a href="#cars">Cars</a><a href="#garden">Garden</a><a href="#events">Events</a><a href="#cashflow">Cash flow</a></div>`
+  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><a href="#calendar">Calendar ›</a></div>${wk}${quick}<div class="wklinks"><a href="#todo">To-do</a><a href="#bills">Bills</a><a href="#cars">Cars</a><a href="#garden">Garden</a><a href="#media">Media</a><a href="#cashflow">Cash flow</a></div>`
     : org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
