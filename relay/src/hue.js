@@ -7,7 +7,9 @@ import { cacheGet, cachePut } from './kvguard.js';
    link button + whitelist -> bridge app key) -> back to the app. Tokens refresh themselves before they expire. */
 const HUE = 'https://api.meethue.com';
 const KV_KEY = 'hue-v1';
-const APP_URL = 'https://phoneapp12-cell.github.io/car-app-preview/#lights';
+const APP_URL_OLD = 'https://phoneapp12-cell.github.io/car-app-preview/#lights', APP_URL_NEW = 'https://shane-my-app.pages.dev/#lights';
+import { movedAt } from './move.js';
+const appUrl = async env => (await movedAt(env)) ? APP_URL_NEW : APP_URL_OLD; // 2.27.47: back to whichever address he uses
 
 const ready = env => !!(env && env.HUE_CLIENT_ID && env.HUE_CLIENT_SECRET && env.EVENTS_KV);
 async function sha(s) { const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('hue-v1:' + s)); return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join(''); }
@@ -49,7 +51,7 @@ export async function hueRoute(path, request, env, f, okOrigin, reply) {
     if (!ready(env)) return new Response('Philips Hue is not set up yet.', { status: 503 });
     const st = url.searchParams.get('state') || '', code = url.searchParams.get('code') || '';
     const owner = /^[a-f0-9]{48}$/.test(st) ? await env.EVENTS_KV.get('hue-state:' + st) : null;
-    if (!owner || !code) return Response.redirect(APP_URL, 302);
+    if (!owner || !code) return Response.redirect(await appUrl(env), 302);
     await env.EVENTS_KV.delete('hue-state:' + st);
     try {
       const t = await tokenCall(env, { grant_type: 'authorization_code', code }, f);
@@ -59,8 +61,8 @@ export async function hueRoute(path, request, env, f, okOrigin, reply) {
       const j = await r.json(); const appkey = j && j[0] && j[0].success && j[0].success.username;
       if (!appkey) throw new Error('no_app_key');
       await env.EVENTS_KV.put(KV_KEY, JSON.stringify({ ...t, appkey, owner, linkedAt: new Date().toISOString() }));
-      return Response.redirect(APP_URL, 302);
-    } catch (e) { return Response.redirect(APP_URL, 302); }
+      return Response.redirect(await appUrl(env), 302);
+    } catch (e) { return Response.redirect(await appUrl(env), 302); }
   }
   // Everything else is called by the app: POST, allowed Origin, JSON body with the phone's key.
   if (request.method !== 'POST') return reply(405, { error: 'post_only' });
