@@ -8,7 +8,7 @@ git ls-files -z | grep -zv -E '^(relay/|tests/|tools/|\.github/|README\.md$|\.gi
 cat > "$out/_headers" <<'H'
 /*
   X-Content-Type-Options: nosniff
-  Referrer-Policy: no-referrer
+  Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
 /sw.js
   Cache-Control: no-cache
