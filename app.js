@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.55';
+const APP_VERSION = '2.27.56';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19815,9 +19815,26 @@ function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
   if (isMovieEv(e)) return 'movies';
   if ((e.cats || []).includes('Markets') || /\bmarkets?\b|\bbazaar\b/i.test(e.title || '')) return 'markets';
-  if ((e.cats || []).includes('Live music') || /\b(concert|gig|orchestra|symphony|choir|recital|live music)\b/i.test(hay)) return 'concerts';
+  if (mdIsConcert(e)) return 'concerts';
   if (isNightlife(e)) return 'nightlife';
   return 'other';
+}
+/* 2.27.55: concerts only. A named concert word in the title, or an Eventfinda live-music show at a proper concert venue.
+   Pub and bar gigs, open mics, DJ, club, party, hoedown and dance nights are not concerts (they stay in Nightlife). */
+const MD_CONCERT_W = /\b(concert|orchestra|symphony|philharmonic|choir|chorus|recital|quartet|opera|tour|tribute|in concert|one night only)\b/i;
+const MD_NOT_CONCERT = /\b(open mic|dj|karaoke|quiz|trivia|hoe-?down|how-?down|sokkie|club night|party|burlesque|\w*lesque|fireworks|disco|jam night|happy hour)\b/i;
+const MD_CONCERT_VENUE = /\b(forum north|turner centre|oneonesix|little theatre|theatre|auditorium|town hall|community hall|memorial hall|russell hall|cathedral|church|glow-?worm cave)\b/i;
+const MD_PUB = /\b(tap ?room|tavern|bar|pub|hotel|brewery|boating club|bunker|1905)\b/i;
+function mdIsConcert(e) {
+  const t = String(e.title || ''), v = String(e.venue || ''), live = (e.cats || []).includes('Live music');
+  if (MD_NOT_CONCERT.test(t) || (e.cats || []).some(c => /comedy|theatre|quiz/i.test(c))) return false;
+  if (MD_CONCERT_W.test(t)) return !MD_PUB.test(v) || /\bconcert\b/i.test(t);
+  return live && MD_CONCERT_VENUE.test(v) && !MD_PUB.test(v);
+}
+function mdConcertRow(e) {
+  const tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC', ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',') : 'Venue TBC';
+  const u = /^https:\/\//.test(e.url || '') ? e.url : '';
+  return tabRow('events', esc(e.title), esc(ven) + '<br>' + esc((e.date ? fmtW(e.date) : 'Date TBC') + ' · ' + tm), u ? `window.open('${esc(u)}','_blank','noopener')` : "go('#events')");
 }
 const MD_EV = [['concerts', '🎸 Concerts'], ['nightlife', '🌙 Whangārei nightlife'], ['movies', '🎬 Movies at Event Cinemas'], ['markets', '🧺 Markets'], ['other', '📌 Other']];
 function mdEvRow(e) {
@@ -19831,7 +19848,7 @@ function mdEvents() {
   return MD_EV.map(([k, t]) => {
     let body = '';
     if (k === 'movies') body = homeTry('md cinema', () => cineCard(), '') || (G.movies.length ? `<div class="list">${G.movies.slice(0, 6).map(mdEvRow).join('')}</div>` : '');
-    else if (G[k].length) body = `<div class="list">${G[k].slice(0, 6).map(mdEvRow).join('')}</div>` + (G[k].length > 6 ? `<button type="button" class="glmore" onclick="go('#events')">+${G[k].length - 6} more on Events ›</button>` : '');
+    else if (G[k].length) body = `<div class="list">${G[k].slice(0, 6).map(k === 'concerts' ? mdConcertRow : mdEvRow).join('')}</div>` + (G[k].length > 6 ? `<button type="button" class="glmore" onclick="go('#events')">+${G[k].length - 6} more on Events ›</button>` : '');
     return `<div class="glzone"><span>${t}</span></div>` + (body || '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
   }).join('');
 }
