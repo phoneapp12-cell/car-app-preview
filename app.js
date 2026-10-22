@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.75';
+const APP_VERSION = '2.27.76';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10538,6 +10538,7 @@ function More() {
     tv: () => 'TVNZ 1, TVNZ 2, Three and Sky Starter',
     meals: () => mealsMoreSub(),
     food: () => 'Meal planner, recipes and shopping',
+    projects: () => 'Renovations and your days off plan',
     recipes: () => plural(visibleIdeas().length, 'recipe') + (M().ideas.some(i => i.fav && !i.hidden) ? ` · ${M().ideas.filter(i => i.fav && !i.hidden).length} favourites` : ''),
     shopping: () => shopMoreSub(),
     pets: () => petsMoreSub(),
@@ -10607,6 +10608,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   heat: ['sun', 'garden', 'Heat pumps', 'Heat'],
   alarm: ['shield', 'garden', 'Alarm', 'Alarm'],
   media: ['play', 'vid', 'Entertainment', 'Entertain'], // 2.27.51
+  projects: ['wrench', 'rw', 'Projects', 'Projects'], // 2.27.76: Projects page (renovations and days off plan)
   food: ['meal', 'meal', 'Meals', 'Meals'] // 2.27.74: Meals page (planner, recipes, shopping). #meals stays the planner so old links keep working
 };
 const NAV_DEFAULT = Object.keys(NAV);
@@ -18770,6 +18772,12 @@ function btCustomise() {
   }, 'Save');
   btWireDrag();
 }
+async function btAddProjects() { // 2.27.76
+  const s = snap(), b = btState();
+  if (b.keys.includes('projects')) { if (!b.on) { b.on = true; await save(); render(); } toast('Projects is on your bottom tabs.'); return; }
+  if (b.keys.length >= BT_MAX) { toast('Six tabs is the most. Remove one, then add Projects.'); btCustomise(); return; }
+  const i = b.keys.indexOf('more'); b.keys.splice(i < 0 ? b.keys.length : i, 0, 'projects'); b.on = true; await save(); render(); toast('Projects added to your bottom tabs.', 'Undo', undoTo(s));
+}
 async function btAddFood() { // 2.27.74: same as Entertainment's button
   const s = snap(), b = btState();
   if (b.keys.includes('food')) { if (!b.on) { b.on = true; await save(); render(); } toast('Meals is on your bottom tabs.'); return; }
@@ -18790,9 +18798,9 @@ function bottomTabsSetting() {
 }
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
-const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'food', meals: 'food', recipes: 'food' }; // detail pages belong to their section
+const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'food', meals: 'food', recipes: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather', media: 'tv' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather', media: 'tv' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -18813,9 +18821,7 @@ function tabbar(active) {
   const pwrBtn = (() => { const l = (() => { try { const t = PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })(); return `<button class="${active === 'power' ? 'on' : ''}" ${active === 'power' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#power')"><span class="w"><span style="font-size:1.3rem;line-height:1">⚡</span></span><span class="lbl">${l}</span></button>`; })();
   const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'commission' ? `<button class="${active === 'wage' ? 'on' : ''}" ${active === 'wage' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#wage')"><span class="w"><span style="font-size:1.3rem;line-height:1">💵</span></span><span class="lbl">Wage estimate</span></button>` : '') + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
   // 2.26.78: the project pages sit under a 'Projects' heading; Power moved into Money (as a link to Money › Power)
-  const reno = (() => { const b = (k, e, l) => `<button class="${active === k ? 'on' : ''}" onclick="setTabsOpen(false);go('#${k}')"><span class="w"><span style="font-size:1.3rem;line-height:1">${e}</span></span><span class="lbl">${l}</span></button>`;
-    let mill = ''; try { mill = renoOn() ? b('reno', '🛠️', 'Renovation ' + (window.Reno ? Reno.progress() + '%' : '')) : ''; } catch (e) { mill = ''; }
-    return `<div class="tabgrp g-reno g-projects"><div class="tabgh">Projects</div>${mill}${b('mumreno', '👵', 'Mum’s Renovation')}${b('myreno', '🔨', 'My Renovations')}${b('weekend', '🌤️', 'Days off plan')}</div>`; })();
+  const reno = `<div class="tabgrp g-projects">${btn('projects')}</div>`; // 2.27.76: the project pages open from the Projects page
   $('#tabbar').innerHTML = groups + reno + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
@@ -18851,7 +18857,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19636,7 +19642,7 @@ function renoSetting() { const on = renoOn(); return `<div class="list" id="reno
 async function renoShare() { try { if (navigator.share) { await navigator.share({ title: 'Millesha’s Renovation', text: 'Our renovation checklist – tick jobs off as you go:', url: RENO_LINK }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(RENO_LINK); toast('Link copied. Send it to Millesha.'); } catch (e) { prompt('Copy this link for Millesha', RENO_LINK); } }
 function RenoPage() {
   let body = ''; try { body = window.Reno ? Reno.html() : '<div class="card empty"><div class="t">Loading…</div></div>'; } catch (e) { body = ''; }
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Millesha’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, flooring') +
+  return `<button class="back" onclick="go('#projects')">${I('left')} Projects</button>` + header('Millesha’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, flooring') +
     `<button type="button" class="row card" style="margin-bottom:12px" onclick="renoShare()"><div class="tx"><div class="t">Share with Millesha</div><div class="s">Her own page with just this checklist. Nothing else from My App.</div></div>${I('right')}</button>` + body;
 }
 try { if (window.Reno) Reno.init({ key: RENO_KEY, me: 'Shane', onChange: () => { if ((location.hash || '').slice(1) === 'reno') render(); } }); } catch (e) { }
@@ -19695,7 +19701,7 @@ function wkHomeCard() { // top of Home on a day off: just today
 }
 function WeekendPage() {
   const L = wkOffDays(3);
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Days off plan', 'A few things for each day off – swap or skip anything') +
+  return `<button class="back" onclick="go('#projects')">${I('left')} Projects</button>` + header('Days off plan', 'A few things for each day off – swap or skip anything') +
     (L.length ? L.map((o, n) => `<div class="card wkcard">${wkDayHtml(o, n)}</div>`).join('') : '<div class="card empty"><div class="t">No days off in the next two weeks</div></div>') +
     `<p class="muted" style="margin:6px 4px">Anything not done just moves on to your next day off. No overdue, no catching up.</p>`;
 }
@@ -19708,7 +19714,7 @@ function mumRenoReady() { if (!MumReno && window.makeReno) { MumReno = makeReno(
 function mumAddArea() { openSheet('Add an area', field('Area name', '<input name="n" maxlength="30" placeholder="e.g. Kitchen" required>'), async v => { if (!v.n) return 'Type a name.'; S.settings.mumAreas = mumAreaList().map(a => a.n).concat(v.n.slice(0, 30)); await save(); mumRenoReady(); render(); }, 'Add'); }
 function MumRenoPage() {
   const R = mumRenoReady();
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Mum’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, flooring') +
+  return `<button class="back" onclick="go('#projects')">${I('left')} Projects</button>` + header('Mum’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, flooring') +
     (R ? R.html() : '') + `<div class="btns" style="margin-top:12px"><button class="btn" onclick="mumAddArea()">${I('plus')} Add an area</button></div>`;
 }
 
@@ -19723,7 +19729,7 @@ async function myRenoDel(id) { S.myReno = myReno().filter(j => j.id !== id); awa
 function MyRenoPage() {
   const L = myReno(), open = L.filter(x => !x.done).sort((a, b) => (a.status === 'doing' ? 0 : 1) - (b.status === 'doing' ? 0 : 1)), done = L.filter(x => x.done), have = new Set(L.filter(x => !x.done).map(x => x.title.toLowerCase()));
   const row = x => `<div class="row mrrow${x.done ? ' done' : ''}"><button type="button" class="tick" aria-label="${x.done ? 'Not done' : 'Complete'}: ${esc(x.title)}" onclick="myRenoDone('${x.id}')"><span>${I('check')}</span></button><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${x.done ? 'Done ' + fmtW(x.doneAt) : x.status === 'doing' ? 'Started ' + fmtW(x.startedAt) : (x.side || 'To do')}</div></div>${x.done ? `<button type="button" class="iconbtn" aria-label="Remove" onclick="myRenoDel('${x.id}')">${I('trash')}</button>` : `<button type="button" class="tstat ${x.status === 'doing' ? 'doing' : ''}" onclick="myRenoStart('${x.id}')">${x.status === 'doing' ? '● In progress' : '▶ Start'}</button>`}</div>`;
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('My Renovations', 'Your own house jobs, one at a time') + progLine(done.length, L.length, 'Jobs') +
+  return `<button class="back" onclick="go('#projects')">${I('left')} Projects</button>` + header('My Renovations', 'Your own house jobs, one at a time') + progLine(done.length, L.length, 'Jobs') +
     `<form class="addbar" onsubmit="event.preventDefault();myRenoAdd(this.n.value);this.n.value=''"><input name="n" placeholder="Add a job…" maxlength="80" autocomplete="off" aria-label="New job"><button aria-label="Add">${I('plus')}</button></form>` +
     (open.length ? `<div class="list">${open.map(row).join('')}</div>` : '<div class="card empty"><div class="t">No jobs yet</div><div class="s">Add one above, or pick from the ideas below on a motivated day.</div></div>') +
     `<div class="sec">Ideas for motivated days</div><p class="muted" style="margin:0 4px 8px">Optional. Tap a group to see it, and add only what you want.</p>` +
@@ -19980,6 +19986,19 @@ function FoodPage() {
   const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('food'); } catch (e) { return true; } })();
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header(`<span style="display:inline-flex;align-items:center;gap:10px"><img src="art/i3-plate.webp" alt="" width="40" height="40" style="width:40px;height:40px;object-fit:contain" onerror="this.remove()">Meals</span>`, 'Plan, cook and shop · all gluten free') +
     (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddFood()">${I('plus')} Add to bottom bar</button>`) + `<div class="glgrid">${T.map(t => glTileHtml(t, false)).join('')}</div>`;
+}
+/* ---- 2.27.76: Projects page (#projects): one tile per project page, each with a live line from its own data.
+   Millesha's renovation only shows while it's switched on; nothing is shared from here. Mum's stays private to My App. */
+function ProjectsPage() {
+  const T = [], add = (k, title, fn, art, grad, go) => { let x = ''; try { x = String(fn() || ''); } catch (e) { } T.push({ k, cat: 'fun', title, s: x.slice(0, 70), art, grad, go }); };
+  const rn = R => { const n = R.next(), p = R.progress(); return p + '% done' + (n ? ' · Next: ' + n.title + (n.area ? ' (' + n.area + ')' : '') : ''); };
+  try { if (renoOn() && window.Reno) add('reno', 'Millesha’s Renovation', () => rn(Reno), 'i3-house', ['#0d9488', '#155e75'], "go('#reno')"); } catch (e) { }
+  add('mumreno', 'Mum’s Renovation', () => { const R = mumRenoReady(); return R ? rn(R) : ''; }, 'i3-house', ['#db2777', '#7c3aed'], "go('#mumreno')");
+  add('myreno', 'My Renovations', () => { const L = myReno(), open = L.filter(x => !x.done), doing = open.find(x => x.status === 'doing'); return L.length ? plural(open.length, 'open job') + (doing ? ' · Doing: ' + doing.title : '') : 'No jobs yet'; }, 'i3-todo', ['#ca8a04', '#9a3412'], "go('#myreno')");
+  add('weekend', 'Days off plan', () => { const o = wkOffDays(1)[0]; return o ? 'Next day off: ' + (o.i === 0 ? 'today' : o.i === 1 ? 'tomorrow' : fmtW(o.iso)) : 'No days off in the next two weeks'; }, 'i3-weather', ['#2563eb', '#1e3a8a'], "go('#weekend')");
+  const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('projects'); } catch (e) { return true; } })();
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header(`<span style="display:inline-flex;align-items:center;gap:10px"><img src="art/i3-todo.webp" alt="" width="40" height="40" style="width:40px;height:40px;object-fit:contain" onerror="this.remove()">Projects</span>`, 'Renovations and your days off plan') +
+    (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddProjects()">${I('plus')} Add to bottom bar</button>`) + `<div class="glgrid">${T.map(t => glTileHtml(t, false).replace(/<span class="gltag">[^<]*<\/span>/, '<span class="gltag">PROJECT</span>')).join('')}</div>`;
 }
 (() => { const bk = `<button class="back" onclick="go('#food')">${I('left')} Meals</button>`; const o1 = Meals, o2 = Recipes;
   Meals = function (a) { return a === 'ideas' ? Recipes() : bk + o1.apply(this, arguments); }; Recipes = function () { return bk + o2.apply(this, arguments); }; })();
