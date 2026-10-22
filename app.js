@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.53';
+const APP_VERSION = '2.27.54';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19844,7 +19844,7 @@ function MediaPage() {
   const filt = `<div class="glfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';render()">${c[1]}</button>`).join('')}</div>`;
   const ev = mdFilt === 'all' || mdFilt === 'out' ? `<div class="glzone"><span>🎟️ Events</span><a href="#events">All events ›</a></div>` + mdEvents() : '';
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + filt +
-    (mdFilt === 'all' || mdFilt === 'watch' ? homeTry('md hero', () => glHero(), '') : '') + (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
+    /* 2.27.54: TV tonight hero removed at Shane's request */ (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
     `<div class="foot">Events: Whangārei District Council, Eventfinda and Event Cinemas. No sport.</div>`;
 }
 /* ---- Organise ---- */
