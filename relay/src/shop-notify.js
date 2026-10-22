@@ -83,7 +83,7 @@ export async function queueTicks(env, key, before, after, now = Date.now()) {
 export async function shanePush(env, msg, now = Date.now(), fetchImpl = fetch) {
   if (!env || !env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return 0;
   const doc = await load(env), seen = new Set(); let sent = 0;
-  for (const h of Object.keys(doc)) for (const s of ((doc[h] && doc[h].subs && doc[h].subs.shane) || [])) { if (seen.has(s.id)) continue; seen.add(s.id); if (await sendPush(s, msg, env, fetchImpl, now) === 'ok') sent++; }
+  for (const h of Object.keys(doc)) for (const s of ((doc[h] && doc[h].subs && doc[h].subs.shane) || [])) { if (!s.v || seen.has(s.id)) continue; seen.add(s.id); if (await sendPush(s, msg, env, fetchImpl, now) === 'ok') sent++; }
   return sent;
 }
 async function sarahSubs(env, sunK) {
@@ -99,15 +99,17 @@ export async function sarahPush(env, key, msg, now = Date.now(), fetchImpl = fet
 // Every minute (with reminders): send batches that have waited a minute.
 export async function runShop(env, fetchImpl = fetch, now = Date.now()) {
   if (!env || !env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return { sent: 0 };
-  const doc = await load(env); let sent = 0, changed = false;
+  const doc = await load(env); let sent = 0, changed = false, purged = 0;
   for (const h of Object.keys(doc)) {
     const e = entry(doc, h);
+    // 2.27.45: Shane's push addresses must have been registered with My App's device key; drop any others
+    if ((e.subs.shane || []).some(s => !s.v)) { const n0 = e.subs.shane.length; e.subs.shane = e.subs.shane.filter(s => s.v); purged += n0 - e.subs.shane.length; changed = true; }
     for (const to of WHO) {
       const q = e.q[to]; if (!q || now - q.at < BATCH_MS) continue;
       if (to === 'shane' && e.pref && e.pref.shop === false) { delete e.q[to]; changed = true; continue; }
       const from = to === 'shane' ? 'sarah' : 'shane';
       const labels = q.items.concat(q.more ? [`${q.more} more`] : []);
-      const subs = to === 'sarah' ? await sarahSubs(env, e.sun) : (e.subs.shane || []);
+      const subs = to === 'sarah' ? await sarahSubs(env, e.sun) : (e.subs.shane || []).filter(s => s.v);
       const msg = { title: `\u{1F6D2} ${NAME[from]} added to shopping`, body: shopBody(labels), url: to === 'shane' ? '#shopping' : './', tag: 'shop-' + from + '-' + q.at, ttl: 24 * 3600 };
       const gone = new Set();
       for (const s of subs) { const r = await sendPush(s, msg, env, fetchImpl, now); if (r === 'ok') sent++; else if (r === 'gone') gone.add(s.id); }
@@ -118,19 +120,19 @@ export async function runShop(env, fetchImpl = fetch, now = Date.now()) {
     if (t && now - t.at >= BATCH_MS) {
       const labels = t.items.concat(t.more ? [`${t.more} more`] : []), gone = new Set();
       const msg = { title: '\u2705 Sarah ticked off' + (labels.length > 1 ? ` ${labels.length} to-dos` : ''), body: shopBody(labels), url: '#alerts', tag: 'tick-' + t.at, ttl: 24 * 3600 };
-      if (!(e.pref && e.pref.ticks === false)) for (const s of (e.subs.shane || [])) { const r = await sendPush(s, msg, env, fetchImpl, now); if (r === 'ok') sent++; else if (r === 'gone') gone.add(s.id); }
+      if (!(e.pref && e.pref.ticks === false)) for (const s of (e.subs.shane || []).filter(s => s.v)) { const r = await sendPush(s, msg, env, fetchImpl, now); if (r === 'ok') sent++; else if (r === 'gone') gone.add(s.id); }
       if (gone.size) e.subs.shane = (e.subs.shane || []).filter(s => !gone.has(s.id));
       delete e.q.ticks; changed = true;
     }
   }
   if (changed) await store(env, doc);
-  return { sent };
+  return { sent, purged };
 }
 
 // /shared-push/subscribe, /shared-push/unsubscribe, /shared-push/status (app origin only, POST JSON with the shared key)
 const hits = [];
 function limited(now) { while (hits.length && now - hits[0] > 3600e3) hits.shift(); if (hits.length >= 30) return true; hits.push(now); return false; }
-export async function sharedPushRoute(path, body, env, now = Date.now()) {
+export async function sharedPushRoute(path, body, env, now = Date.now(), devOk = false) {
   if (!env || !env.EVENTS_KV || !env.VAPID_PRIVATE_JWK) return [503, { error: 'push_unavailable' }];
   const key = normSharedKey(body && body.key); if (!key) return [403, { error: 'bad_key' }];
   const who = body && body.who === 'shane' ? 'shane' : '';
@@ -142,14 +144,15 @@ export async function sharedPushRoute(path, body, env, now = Date.now()) {
   if (path === '/shared-push/status') return [200, { subscribed: list.some(s => s.id === id), pending: !!e.q[who] }];
   if (path === '/shared-push/unsubscribe') { e.subs[who] = list.filter(s => s.id !== id); await store(env, doc); return [200, { removed: list.length !== e.subs[who].length }]; }
   if (path === '/shared-push/subscribe') {
+    if (!devOk) return [401, { error: 'no_key' }]; // 2.27.45: only My App (device key) can sign up as Shane
     if (limited(now)) return [429, { error: 'too_many' }];
     const sub = cleanSub(body && body.subscription); if (!sub) return [400, { error: 'bad_subscription' }];
     const prevId = typeof body.previous === 'string' ? await hash16(body.previous) : '';
     const pref = { shop: body.shop !== false, ticks: body.ticks !== false }, prefCh = JSON.stringify(e.pref || { shop: true, ticks: true }) !== JSON.stringify(pref);
     e.pref = pref; if (prefCh) await store(env, doc);
     const old = list.find(s => s.id === id);
-    if (old && old.keys.p256dh === sub.keys.p256dh && old.keys.auth === sub.keys.auth && !prevId) return [200, { subscribed: true, same: true }];
-    e.subs[who] = list.filter(s => s.id !== id && s.id !== prevId).concat([{ id, endpoint: sub.endpoint, keys: sub.keys, at: now }]).slice(-SUBS_MAX);
+    if (old && old.v && old.keys.p256dh === sub.keys.p256dh && old.keys.auth === sub.keys.auth && !prevId) return [200, { subscribed: true, same: true }];
+    e.subs[who] = list.filter(s => s.id !== id && s.id !== prevId).concat([{ id, endpoint: sub.endpoint, keys: sub.keys, at: now, v: 1 }]).slice(-SUBS_MAX);
     e.sun = e.sun || await sunHash(key);
     await store(env, doc);
     return [200, { subscribed: true }];

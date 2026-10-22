@@ -206,12 +206,26 @@ import { hueRoute } from './hue.js';
 import { akahuRoute } from './akahu.js';
 import { healthRoute } from './health.js';
 import { smsRoute } from './sms.js';
+import { appOk } from './health.js';
+import { allow, blocked, fail } from './ratelimit.js';
+import { sha as sha256b64, eq as ctEq } from './akahu.js';
 import { smsPushNow } from './push.js';
 import { heatRoute } from './heat.js';
 import { alarmRoute } from './alarm.js';
 import { fuelRoute } from './fuel.js';
 import { getOutages, runOutages } from './outages.js';
+// 2.27.45: routes that take a key in the body or header get a per-IP limit on wrong keys (30 an hour).
+const KEYED_RE = /^\/(cars\/alexa|shared-todo|shared-photo|shared-car|reno|sync|sunshine\/|shared-push\/|brands)/;
 export async function handle(request, env = {}, fetchImpl = fetch) {
+  const p0 = new URL(request.url).pathname.replace(/\/+$/, '') || '/', keyed = KEYED_RE.test(p0) && request.method !== 'OPTIONS';
+  if (keyed && await blocked('key', request, 30, 3600)) return json(429, 'rate_limited', request.headers.get('Origin') || '', env);
+  const res = await handleInner(request, env, fetchImpl);
+  if (keyed && (res.status === 401 || res.status === 403 || res.status === 404)) { try { // 404 = no record for that key (a guess)
+    await fail('key', request, 3600); } catch (e) { } }
+  return res;
+}
+const devKeyOk = async (env, request) => { try { return await appOk(env, request); } catch (e) { return false; } };
+async function handleInner(request, env = {}, fetchImpl = fetch) {
   const origin = request.headers.get('Origin') || '';
   const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
   const okOrigin = allowedOrigins(env).includes(origin);
@@ -264,6 +278,8 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   if (path === '/ai/ask' || path === '/ai/reply') {
     if (request.method !== 'POST') return json(405, 'post_only', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    if (!(await devKeyOk(env, request))) return json(401, 'no_key', origin, env); // 2.27.45: My App's device key
+    if (!(await allow('ai', request, 60, 3600))) return json(429, 'rate_limited', origin, env);
     try {
       const len = +(request.headers.get('content-length') || 0);
       if (len > 20000) return json(413, 'too_large', origin, env);
@@ -275,6 +291,8 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   if (path === '/ai') {
     if (request.method !== 'POST') return json(405, 'post_only', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    if (!(await devKeyOk(env, request))) return json(401, 'no_key', origin, env);
+    if (!(await allow('ai', request, 60, 3600))) return json(429, 'rate_limited', origin, env);
     try {
       const len = +(request.headers.get('content-length') || 0);
       if (len > 16000) return json(413, 'too_large', origin, env);
@@ -351,6 +369,7 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   if (path === '/sarah/seen') {
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    if (!(await devKeyOk(env, request))) return json(401, 'no_key', origin, env);
     let body = {};
     try {
       const raw = await request.text();
@@ -477,13 +496,15 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     const H = { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
     if (request.method === 'GET') {
       if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+      if (!(await devKeyOk(env, request))) return json(401, 'no_key', origin, env); // 2.27.45: home power figures need the device key
       const d = env.EVENTS_KV ? await env.EVENTS_KV.get('power-v1') : null;
       return new Response(d || '{}', { status: 200, headers: H });
     }
     if (request.method !== 'PUT' && request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
     const tok = env.POWER_WRITE_TOKEN || '';
     const got = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-    if (!tok || got.length !== tok.length || got !== tok) return json(401, 'unauthorised', origin, env);
+    if (!(await allow('power-put', request, 120, 3600))) return json(429, 'rate_limited', origin, env);
+    if (!tok || !got || got.length > 400 || !ctEq(await sha256b64(got), await sha256b64(tok))) return json(401, 'unauthorised', origin, env); // 2.27.45: hashed, constant-time
     let body; try { const raw = await request.text(); if (raw.length > 20000) return json(413, 'too_large', origin, env); body = JSON.parse(raw); } catch (e) { return json(400, 'bad_request', origin, env); }
     if (!body || typeof body !== 'object' || !body.updatedAt) return json(400, 'bad_request', origin, env);
     await env.EVENTS_KV.put('power-v1', JSON.stringify(body));
@@ -492,7 +513,8 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   if (path === '/cars/alexa') { // E1: car dates for the Alexa skill. Writes need the app's Origin; the skill reads with the key alone.
     const H = { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
     const m = request.method; let key = request.headers.get('X-Cars-Key') || '', body = null;
-    if (m === 'GET') { if (!key) key = new URL(request.url).searchParams.get('k') || ''; }
+    // 2.27.45: the key goes in the X-Cars-Key header. ?k= is still accepted until 30 Nov 2026 so the Echo doesn't break.
+    if (m === 'GET') { if (!key && Date.now() < Date.parse('2026-11-30T00:00:00+13:00')) key = new URL(request.url).searchParams.get('k') || ''; }
     else if (m === 'PUT' || m === 'POST' || m === 'DELETE') {
       if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
       try { const raw = await request.text(); if (raw.length > 20000) return json(413, 'too_large', origin, env); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
@@ -547,7 +569,7 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     let body = {};
     try { const raw = await request.text(); if (raw.length > 4096) throw new Error('big'); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
-    const [status, data] = await sharedPushRoute(path, body, env);
+    const [status, data] = await sharedPushRoute(path, body, env, Date.now(), path === '/shared-push/subscribe' ? await devKeyOk(env, request) : false);
     return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
   }
   if (path.startsWith('/sunshine/')) {
@@ -563,6 +585,7 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     let body = {};
     try { const raw = await request.text(); const cap = path === '/push/reminders' ? 32768 : 4096; if (raw.length > cap) throw new Error('big'); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
+    if (path === '/push/reminders' && body && body.sms === 'on' && !(await devKeyOk(env, request))) body.sms = 'off'; // 2.27.45: SMS pushes need the device key
     const [status, data] = await pushRoute(path, body, env, fetchImpl);
     return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
   }
@@ -586,6 +609,7 @@ export async function handle(request, env = {}, fetchImpl = fetch) {
   if (path !== '/fetch') return json(404, 'not_found_route', origin, env);
   if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
   if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+  if (!(await allow('fetch', request, 240, 3600))) return json(429, 'rate_limited', origin, env); // 2.27.45
 
   let body;
   try {

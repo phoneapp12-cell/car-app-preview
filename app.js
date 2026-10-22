@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.44';
+const APP_VERSION = '2.27.45';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5944,6 +5944,21 @@ const RELAY_URL = (() => {
   try { if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.getItem('relayOverride')) return localStorage.getItem('relayOverride'); } catch (e) { }
   return RELAY_DEFAULT;
 })().replace(/\/+$/, '');
+// 2.27.45: these relay routes now need My App's device key (X-Cash-Key), so add it to every call to them
+const RELAY_KEYED_RE = /^\/(ai(\/|$)|power$|sarah\/seen$|shared-push\/|push\/)/;
+(() => {
+  if (typeof window === 'undefined' || !window.fetch || window.__relayKeyed) return; window.__relayKeyed = true;
+  const f0 = window.fetch.bind(window);
+  window.fetch = (u, o) => {
+    try {
+      if (typeof u === 'string' && u.startsWith(RELAY_URL + '/') && RELAY_KEYED_RE.test(u.slice(RELAY_URL.length).split('?')[0])) {
+        const k = localStorage.getItem('cfKey') || '';
+        if (k) { o = Object.assign({}, o || {}); const h = new Headers(o.headers || {}); if (!h.has('X-Cash-Key')) h.set('X-Cash-Key', k); o.headers = h; }
+      }
+    } catch (e) { }
+    return f0(u, o);
+  };
+})();
 const CAL_HOSTS = ['outlook.live.com', 'outlook.office365.com', 'outlook.office.com', 'calendar.google.com'];
 const SYNC_EVERY = 15 * 60 * 1000;
 const FEED_COLOURS = [['#0A64C8', 'Blue'], ['#E8710A', 'Orange'], ['#188038', 'Green'], ['#D01884', 'Pink'], ['#7C3AED', 'Purple'], ['#0E7C86', 'Teal']];
@@ -10414,7 +10429,7 @@ async function shopPushReg(sub) {
   if (!sub || !RELAY_URL || typeof SHARED_KEY === 'undefined') return;
   const shopOn = (S.settings || {}).shopPush !== false, tickOn = (S.settings || {}).sarahTicks !== false, off = !shopOn && !tickOn, ep = sub.endpoint, k = 'shopPushReg', was = localStorage.getItem(k) || '';
   if (off) { if (was) { try { await pushPost('/shared-push/unsubscribe', { key: SHARED_KEY, who: 'shane', endpoint: ep }); localStorage.removeItem(k); } catch (e) { } } return; }
-  const tag = ep.slice(-24) + '|' + todayISO() + '|' + (shopOn ? 1 : 0) + (tickOn ? 1 : 0); if (was === tag) return;
+  const tag = ep.slice(-24) + '|k2|' + todayISO() + '|' + (shopOn ? 1 : 0) + (tickOn ? 1 : 0); if (was === tag) return;
   const prev = was && !ep.endsWith(was.split('|')[0]) ? localStorage.getItem('shopPushEp') || undefined : undefined;
   await pushPost('/shared-push/subscribe', { key: SHARED_KEY, who: 'shane', subscription: sub.toJSON(), shop: shopOn, ticks: tickOn, ...(prev ? { previous: prev } : {}) });
   localStorage.setItem(k, tag); localStorage.setItem('shopPushEp', ep);

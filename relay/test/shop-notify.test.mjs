@@ -15,7 +15,8 @@ const shane = await mkSub('https://fcm.googleapis.com/fcm/send/TEST-shane'), sar
 // Sarah's existing Sarah's To-do notification address (sunshine list), plus someone else's on another key
 await env.EVENTS_KV.put(SUN_KEY, JSON.stringify({ subs: [{ id: 'sar1', k: await sunHash(KEY), endpoint: sarah.endpoint, keys: sarah.keys }, { id: 'oth', k: 'other', endpoint: 'https://fcm.googleapis.com/fcm/send/TEST-other', keys: sarah.keys }] }));
 let pushes = []; const f = async (u, o) => { pushes.push(u); return new Response('', { status: 201 }); };
-ok((await sharedPushRoute('/shared-push/subscribe', { key: KEY, who: 'shane', subscription: shane }, env))[1].subscribed, 'My App registers Shane');
+ok((await sharedPushRoute('/shared-push/subscribe', { key: KEY, who: 'shane', subscription: shane }, env))[0] === 401, '2.27.45: sign-up without the device key refused');
+ok((await sharedPushRoute('/shared-push/subscribe', { key: KEY, who: 'shane', subscription: shane }, env, Date.now(), true))[1].subscribed, 'My App registers Shane');
 ok((await sharedPushRoute('/shared-push/subscribe', { key: 'bad', who: 'shane', subscription: shane }, env))[0] === 403, 'bad key refused');
 ok((await sharedPushRoute('/shared-push/subscribe', { key: KEY, who: 'sarah', subscription: shane }, env))[0] === 400, 'only Shane registers here');
 const T0 = Date.UTC(2026, 9, 17, 5, 0);

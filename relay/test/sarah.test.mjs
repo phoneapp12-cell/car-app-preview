@@ -1,4 +1,6 @@
 import { handle } from '../src/relay.js';
+import { sha } from '../src/akahu.js';
+const APPKEY = 'test-device-key-0123456789abcdef';
 import { parseSarahFeed, SARAH_RSS, SARAH_CHANNEL_ID, refreshSarah } from '../src/sarah.js';
 let fails = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) fails++; };
 const O = 'https://phoneapp12-cell.github.io';
@@ -56,12 +58,15 @@ r = await handle(new Request('https://relay.example/sarah?channel_id=UCEvil', { 
 ok(r.status === 200 && (await r.json()).channelId === SARAH_CHANNEL_ID, 'a query string cannot switch channel');
 
 r = await handle(new Request('https://relay.example/sarah/seen', { method: 'POST', headers: { Origin: O, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'hyuecefG9Aw' }) }), env, fetchImpl);
+ok(r.status === 401, '2.27.45: marking seen needs My App\'s device key');
+store['health-cred-v1'] = JSON.stringify(JSON.stringify({ tokHash: 'none', appKeyHash: await sha(APPKEY), created: '' }));
+r = await handle(new Request('https://relay.example/sarah/seen', { method: 'POST', headers: { Origin: O, 'Content-Type': 'application/json', 'X-Cash-Key': APPKEY }, body: JSON.stringify({ id: 'hyuecefG9Aw' }) }), env, fetchImpl);
 j = await r.json();
 ok(r.status === 200 && j.announced === 'hyuecefG9Aw', 'the phone can mark the newest id so it is not announced again');
 const again = await refreshSarah(env, fetchImpl, Date.now() + 20 * 60 * 1000);
 ok(again.announced === 'hyuecefG9Aw' && again.videos[0].id === 'hyuecefG9Aw', 'a later check keeps the same id marked');
 
-r = await handle(new Request('https://relay.example/sarah/seen', { method: 'POST', headers: { Origin: O, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'not-an-id' }) }), env, fetchImpl);
+r = await handle(new Request('https://relay.example/sarah/seen', { method: 'POST', headers: { Origin: O, 'Content-Type': 'application/json', 'X-Cash-Key': APPKEY }, body: JSON.stringify({ id: 'not-an-id' }) }), env, fetchImpl);
 ok(r.status === 400, 'a bad id is refused');
 
 console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
