@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.62';
+const APP_VERSION = '2.27.63';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12500,7 +12500,7 @@ async function refreshEvents(force = false) {
 function updEvents() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if (h === 'events' || h === 'media' || h === 'movies' || h === 'concerts' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
+  if (h === 'events' || h === 'media' || h === 'movies' || h === 'concerts' || h === 'nightlife' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
     const v = $('#view'), top = v.scrollTop, q = document.activeElement && document.activeElement.id === 'evq';
     render(); v.scrollTop = top;
     if (q) { const i = document.getElementById('evq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
@@ -18782,7 +18782,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, movies: MoviesPage, concerts: ConcertsPage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -19771,7 +19771,7 @@ function glTiles() {
   add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
   add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(x => !(x.cats || []).includes('Movies') && !isNightlife(x)); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
   add('concerts', 'out', 'Concerts', () => { const G = mdEvGroups(), e = G.akl[0] || G.concerts[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), e.date ? fmtW(e.date) : ''].filter(Boolean).join(' · ') : ''; }, 'i3-radio', ['#7c3aed', '#1e1b4b'], "go('#concerts')"); // 2.27.62
-  add('nightlife', 'out', 'Nightlife', () => { const e = nightlifeSoon(7, 2); return e.length ? e.map(x => x.title).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#events')");
+  add('nightlife', 'out', 'Nightlife', () => { const e = mdEvGroups().nightlife[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), (e.date ? fmtW(e.date) : '') + (e.time ? ' ' + fmtTime(e.time) : '')].filter(Boolean).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#nightlife')"); // 2.27.63: own page
   add('place', 'fun', 'Travel', () => { const p = travelToday(); return p ? 'Place of the day: ' + p.name + ', ' + p.country : 'Places to go'; }, B('travel'), '', "go('#travel')");
   add('recipe', 'fun', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
   // 2.26.20: joke, quote and fact back as their own blue tiles, each with its own setting; tap opens a sheet
@@ -19878,10 +19878,10 @@ function mdEvTile(e, k) {
   return `<button type="button" class="gltile glic" style="--a:${g[0]};--b:${g[1]}" onclick="hab('tap:${k}',${esc(JSON.stringify(ven))});hab('tapt:${k}',${esc(JSON.stringify(String(e.title).slice(0, 60)))});${u ? esc(`window.open('${u.replace(/'/g, '%27')}','_blank','noopener')`) : "go('#events')"}" aria-label="${esc(e.title + ': ' + s)}"><img src="art/i3-${k === 'nightlife' ? 'moon' : 'radio'}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltag">${esc(tag)}</span><span class="gltt">${esc(e.title)}<small>${esc(s)}</small></span></button>`;
 }
 const mdTiles = (L, k) => L.length ? `<div class="glgrid">${L.map(e => mdEvTile(e, k)).join('')}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>';
-const mdGo = f => f === 'concerts' ? "go('#concerts')" : `mdFilt='${f}';render()`;
-function mdEvents() {
+const mdGo = f => f === 'concerts' || f === 'wconc' ? "go('#concerts')" : "go('#nightlife')";
+function mdEvents(only) {
   const G = mdEvGroups();
-  return MD_EV.map(([k, t, f, n]) => {
+  return MD_EV.filter(x => !only || only.includes(x[0])).map(([k, t, f, n]) => {
     let body = '';
     if (k === 'movies') body = homeTry('md cinema', () => cineCard(), '') || (G.movies.length ? `<div class="list">${G.movies.slice(0, 6).map(mdEvRow).join('')}</div>` : '');
     else if (G[k].length) body = `<div class="list">${G[k].slice(0, 6).map(f ? mdConcertRow : mdEvRow).join('')}</div>` + (G[k].length > 6 ? (f ? `<button type="button" class="glmore" onclick="${mdGo(f)}">See all ${G[k].length} ›</button>` : `<button type="button" class="glmore" onclick="go('#events')">+${G[k].length - 6} more on Events ›</button>`) : '');
@@ -19891,31 +19891,35 @@ function mdEvents() {
 function MediaPage() {
   setTimeout(() => { try { refreshEvents(); refreshNews(); } catch (e) { } }, 0);
   const all = homeTry('md tiles', () => glTiles().filter(t => MEDIA_TILES.has(t.k)), []), have = new Set(all.map(t => t.cat));
-  const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).flatMap(c => c[0] === 'out' ? [c, ['nightlife', 'Nightlife'], ['wconc', 'Whangārei concerts']] : [c]); // 2.27.62: Concerts is a tile and its own page // 2.27.57: own tabs
-  if (!cats.some(c => c[0] === 'nightlife')) { const i = cats.findIndex(c => c[0] === 'fun'); cats.splice(i < 0 ? cats.length : i, 0, ['nightlife', 'Nightlife'], ['wconc', 'Whangārei concerts']); }
-  if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
+  const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).flatMap(c => c[0] === 'out' ? [c] : [c]); // 2.27.63: Concerts and Nightlife are tiles with their own pages // 2.27.57: own tabs
+    if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
   const list = mdFilt === 'all' ? all : all.filter(t => t.cat === mdFilt);
   const filt = `<div class="glfilt mdfilt" role="toolbar">${cats.map(c => `<button type="button" class="${mdFilt === c[0] ? 'on' : ''}" onclick="mdFilt='${c[0]}';hab('tab:${c[0]}');render()">${c[1]}</button>`).join('')}</div>`;
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
-  if (mdFilt === 'concerts') return back + header('Entertainment', 'Auckland concerts') + filt + mdTiles(mdEvGroups().akl, 'akl') +
-    `<div class="foot">Auckland concerts from Eventfinda (eventfinda.co.nz), Auckland gig guide: major venues and concerts only. Tap a tile for tickets. Check details before you go. No sport.</div>`;
-  if (mdFilt === 'nightlife' || mdFilt === 'wconc') { const G = mdEvGroups(), wc = mdFilt === 'wconc'; // 2.27.59: Whangārei concerts is its own top-level tab
-    return back + header('Entertainment', wc ? 'Whangārei and Northland concerts, outside your shifts' : 'Whangārei nightlife, outside your shifts') + filt +
-      (wc ? mdTiles(G.concerts, 'concerts') : mdTiles(G.nightlife, 'nightlife')) + `<div class="foot">From Eventfinda and Whangārei District Council. No sport.</div>`; }
-  const ev = mdFilt === 'all' || mdFilt === 'out' ? `<div class="glzone"><span>🎟️ Events</span><a href="#events">All events ›</a></div>` + mdEvents() : '';
+  const ev = mdFilt === 'out' ? mdEvents(['markets', 'other']) : ''; // 2.27.63: the rest have their own tiles and pages
   return back + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + filt +
     /* 2.27.54: TV tonight hero removed at Shane's request */ (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
-    `<div class="foot">Events: Whangārei District Council, Eventfinda (including Auckland concerts) and Event Cinemas. No sport.</div>`;
+    `<div class="foot">Events from Whangārei District Council, Eventfinda and Event Cinemas.</div>`;
 }
 
 /* ---- 2.27.62: Concerts page (#concerts), opened from the Concerts tile. Whangārei first, then Auckland, each grouped by month.
    Rows: name, venue, date and start time (or time TBC). Tap opens the Eventfinda / ticket page. No sport; Whangārei ones skip his shifts. */
+function evListSecs() {
+  const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const row = (e, k) => { const ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',').trim() : 'Venue TBC', tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC', u = /^https:\/\//.test(e.url || '') ? e.url : '';
+    return `<button class="row" onclick="${esc(`hab('tap:${k}',${JSON.stringify(ven.split(',')[0])});hab('tapt:${k}',${JSON.stringify(String(e.title).slice(0, 60))});` + (u ? `window.open('${u.replace(/'/g, '%27')}','_blank','noopener')` : "go('#events')"))}"><div class="tx"><div class="t">${esc(e.title)}${k === 'nightlife' ? (t => t ? ` <span class="cinerate">${esc(t)}</span>` : '')((e.cats || []).find(c => c !== 'Nightlife') || '') : ''}</div><div class="s">${esc(ven)}</div><div class="s">${esc((e.date ? fmtW(e.date) : 'Date TBC') + ' · ' + tm)}</div></div>${I('ext')}</button>`; };
+  const sec = (title, L, k) => `<div class="glzone"><span>${title}</span><span>${L.length}</span></div>` + (L.length ? (() => { let out = '', cur = ''; L.forEach(e => { const m = String(e.date || '').slice(0, 7); if (m !== cur) { if (cur) out += '</div>'; cur = m; out += `<div class="muted" style="margin:10px 4px 4px;font-weight:700">${m ? MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4) : 'Date TBC'}</div><div class="list">`; } out += row(e, k); }); return out + '</div>'; })() : '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
+  return sec;
+}
+function NightlifePage() { // 2.27.63: same list style as Concerts
+  setTimeout(() => { try { refreshEvents(); } catch (e) { } }, 0);
+  const sec = evListSecs();
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('Nightlife', 'Whangārei and Northland, outside your shifts') + sec('🌙 Nightlife', mdEvGroups().nightlife, 'nightlife') +
+    `<div class="foot">From Eventfinda (eventfinda.co.nz). Events during your shifts are left out. Times can change, so check before you go. No sport.</div>`;
+}
 function ConcertsPage() {
   setTimeout(() => { try { refreshEvents(); } catch (e) { } }, 0);
-  const G = mdEvGroups(), MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const row = (e, k) => { const ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',').trim() : 'Venue TBC', tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC', u = /^https:\/\//.test(e.url || '') ? e.url : '';
-    return `<button class="row" onclick="${esc(`hab('tap:${k}',${JSON.stringify(ven.split(',')[0])});hab('tapt:${k}',${JSON.stringify(String(e.title).slice(0, 60))});` + (u ? `window.open('${u.replace(/'/g, '%27')}','_blank','noopener')` : "go('#events')"))}"><div class="tx"><div class="t">${esc(e.title)}</div><div class="s">${esc(ven)}</div><div class="s">${esc((e.date ? fmtW(e.date) : 'Date TBC') + ' · ' + tm)}</div></div>${I('ext')}</button>`; };
-  const sec = (title, L, k) => `<div class="glzone"><span>${title}</span><span>${L.length}</span></div>` + (L.length ? (() => { let out = '', cur = ''; L.forEach(e => { const m = String(e.date || '').slice(0, 7); if (m !== cur) { if (cur) out += '</div>'; cur = m; out += `<div class="muted" style="margin:10px 4px 4px;font-weight:700">${m ? MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4) : 'Date TBC'}</div><div class="list">`; } out += row(e, k); }); return out + '</div>'; })() : '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
+  const sec = evListSecs(), G = mdEvGroups();
   return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('Concerts', 'Whangārei and Auckland') +
     sec('🎸 Whangārei', G.concerts, 'concerts') + sec('🎤 Auckland', G.akl, 'akl') +
     `<div class="foot">From Eventfinda (eventfinda.co.nz) and Whangārei District Council. Whangārei concerts during your shifts are left out. Times can change, so check before you go. No sport.</div>`;
