@@ -501,7 +501,8 @@ export async function runReminders(env, fetchImpl = fetch, now = Date.now()) {
       keep.push(item);
     }
     if (gone.has(id)) { delete book[id]; changed = true; }
-    else if (keep.length !== items.length || keep.some((x, i) => x !== items[i])) { if (keep.length) book[id] = { items: keep }; else delete book[id]; changed = true; }
+    else if (keep.length !== items.length || keep.some((x, i) => x !== items[i])) { const e = book[id] || {}; // 2.27.82: keep this phone's alert choices (crashes, outages, texts, TV links) when sent reminders come off
+      if (keep.length || e.accPref || e.outPref || e.netPref || e.smsPref || (e.tvLinks && e.tvLinks.length)) book[id] = { ...e, items: keep }; else delete book[id]; changed = true; }
   }
   if (gone.size) await saveSubs(env, subs.filter(s => !gone.has(s.id)));
   if (changed) await saveRem(env, book);
