@@ -2041,6 +2041,10 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 .btabs .btgrab{position:absolute;top:0;left:50%;transform:translateX(-50%);width:72px;height:14px;min-height:0!important;padding:0!important;border-radius:0 0 8px 8px!important;background:transparent!important;display:flex;align-items:center;justify-content:center}
 .btabs .btgrab span{display:block;width:38px;height:4px;border-radius:4px;background:var(--ink3);opacity:.55}
 .btabs.bxup .btgrab span{opacity:.9}
+/* 2.27.69: every bottom tab gets the same icon box and label line, so icons and labels each sit on one line */
+.btabs button:not(.btgrab){display:grid;grid-template-rows:28px 15px;justify-items:center;align-content:center;row-gap:2px}
+.btabs button:not(.btgrab) span.w{width:28px;height:28px;align-items:center;justify-content:center}
+.btabs button:not(.btgrab) .lbl{display:block;height:15px;line-height:15px}
 #btabs2{display:none}#btabs2.show{display:block}
 #btabs2 .bxscrim{position:fixed;inset:0;z-index:24;background:rgba(0,0,0,.18)}
 #btabs2 .btabs.bx2{position:absolute;z-index:26;padding-top:6px;padding-bottom:4px;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -6px 18px rgba(0,0,0,.12);animation:bxup .18s ease-out}
@@ -2153,6 +2157,6 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.27.68"></script>
+<script src="app.js?v=2.27.69"></script>
 </body>
 </html>

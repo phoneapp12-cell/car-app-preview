@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.68';
+const APP_VERSION = '2.27.69';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10409,6 +10409,7 @@ async function scheduleReminders() {
       if (w && (S.settings || {}).waterPlants !== false) reminders.push({ id: 'sug-water', title: "💧 Water the plants. It's 10° or under for the next 5 hours.", date: w.date, time: w.time, repeat: 'none' });
     } catch (e) {}
     try { tvPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.27.36: flagged TV shows, 10 min before
+    try { wchPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.27.69: charge your watch, then put it back on
     try { bedPushes().forEach(r => reminders.push(r)); } catch (e) {} // 2.27.17: bedtime nudges on work nights (he asked; not held back by quiet hours)
     if (!sub) {
       if (!reminders.length && !S.settings.remOnRelay && !(S.settings.tvLinks || []).length) return '';
@@ -20174,7 +20175,7 @@ function weekOverview() {
   return `<div class="wkscroll" id="wkscroll">${cols}</div>`;
 }
 function wkAdd(d) { openSheet('Add on ' + fmtW(d), `<div class="btns" style="flex-direction:column;gap:8px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>todoForm(null,{due:'${d}'}))">☑️ To-do for this day</button><button type="button" class="btn" onclick="closeSheet().then(()=>mineForm(null,'${d}'))">📅 Event on this day</button></div>`, null, ''); }
-(() => { try { const st = document.createElement('style'); st.textContent = '.wkscroll{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;margin:0 -2px;touch-action:pan-x pan-y}.wkcol{flex:0 0 40%;min-width:140px;scroll-snap-align:start;background:var(--card,#fff);border-radius:14px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}.wktoday{outline:2.5px solid #F59E0B;background:rgba(245,158,11,.08)}.wkday{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px}.wkdn{display:block;font-size:.78rem;font-weight:700;opacity:.75;text-transform:uppercase}.wkdd{font-size:1.4rem;font-weight:800}.wktoday .wkdd{color:#DC2626}.wkadd{width:30px;height:30px;border-radius:50%;border:0;background:#F59E0B;color:#111;font-size:1.25rem;font-weight:800;line-height:1}.wkcard{display:block;width:100%;text-align:left;border:0;padding:0;margin:0 0 8px;border-radius:10px;overflow:hidden;background:var(--card,#fff);box-shadow:0 1px 3px rgba(0,0,0,.12);font:inherit;color:inherit}.wkh{display:flex;gap:4px;justify-content:space-between;background:var(--wc);color:#fff;padding:6px 7px 2px;font-weight:700;font-size:.86rem;line-height:1.2}.wktm{background:var(--wc);color:#fff;padding:0 7px 6px;font-size:.78rem;opacity:.95}.wkb{padding:5px 7px;font-size:.78rem;line-height:1.3}.wkwarn{color:#DC2626;font-weight:700;margin-top:2px}.wkfree{font-size:.8rem;opacity:.6;padding:6px 2px}.wklinks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}.wklinks a{font-size:.82rem;padding:4px 10px;border-radius:999px;background:rgba(127,127,127,.12);color:inherit;text-decoration:none}'; document.head.appendChild(st); } catch (e) { } })();
+(() => { try { const st = document.createElement('style'); st.textContent = '.wkscroll{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;margin:0 -2px;touch-action:pan-x pan-y}.wkcol{box-sizing:border-box;margin:0;flex:0 0 40%;min-width:140px;scroll-snap-align:start;background:var(--card,#fff);border-radius:14px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}.wktoday{outline:0;box-shadow:inset 0 0 0 2.5px #F59E0B,0 1px 3px rgba(0,0,0,.08);background:rgba(245,158,11,.08)}.wkday{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px}.wkdn{display:block;font-size:.78rem;font-weight:700;opacity:.75;text-transform:uppercase}.wkdd{font-size:1.4rem;font-weight:800}.wktoday .wkdd{color:#DC2626}.wkadd{width:30px;height:30px;border-radius:50%;border:0;background:#F59E0B;color:#111;font-size:1.25rem;font-weight:800;line-height:1}.wkcard{display:block;width:100%;text-align:left;border:0;padding:0;margin:0 0 8px;border-radius:10px;overflow:hidden;background:var(--card,#fff);box-shadow:0 1px 3px rgba(0,0,0,.12);font:inherit;color:inherit}.wkh{display:flex;gap:4px;justify-content:space-between;background:var(--wc);color:#fff;padding:6px 7px 2px;font-weight:700;font-size:.86rem;line-height:1.2}.wktm{background:var(--wc);color:#fff;padding:0 7px 6px;font-size:.78rem;opacity:.95}.wkb{padding:5px 7px;font-size:.78rem;line-height:1.3}.wkwarn{color:#DC2626;font-weight:700;margin-top:2px}.wkfree{font-size:.8rem;opacity:.6;padding:6px 2px}.wklinks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}.wklinks a{font-size:.82rem;padding:4px 10px;border-radius:999px;background:rgba(127,127,127,.12);color:inherit;text-decoration:none}'; document.head.appendChild(st); } catch (e) { } })();
 
 /* ================= 2.27.29: My week (regular weekly items) =================
    Gym, Mum's and the cleaning job as weekly cards on This week and the Calendar. Settings › My week: days, times, on/off,
@@ -25289,6 +25290,53 @@ async function accSetScope(v) { S.settings.accScope = v; await save(); await set
   return h + `<div class="srow"><div class="tx"><div class="t">Local crash alerts</div><div class="s">Crashes and road incidents on state highways in and around Whangārei, from NZTA Waka Kotahi, on the bell page. One buzz per new crash.</div>${on ? `<div style="margin-top:8px;display:flex;gap:8px"><button type="button" class="btn small ${sc === 'all' ? 'primary' : ''}" onclick="accSetScope('all')">All Whangārei</button><button type="button" class="btn small ${sc === 'route' ? 'primary' : ''}" onclick="accSetScope('route')">My route only</button></div>` : ''}</div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Local crash alerts" onclick="toggleSetting('accAlerts')"></button></div>`
     + `<div class="srow"><div class="tx"><div class="t">Police updates (Northland)</div><div class="s">NZ Police Northland news on the bell page: crashes and road closures, scams, missing people and safety or weather advice. No court, crime or injury stories. Only crashes and road closures near Whangārei buzz.</div></div><button class="switch ${po ? 'on' : ''}" role="switch" aria-checked="${po}" aria-label="Police updates (Northland)" onclick="toggleSetting('polAlerts')"></button></div>`; } catch (e) { return h; } }; })();
 
+// ---- 2.27.69: charge-your-watch reminder every N days at 9:30pm, then a put-it-back-on reminder (relay pushes + bell cards) ----
+const WCH_ANCHOR = '2026-10-22';
+const wchSet = () => { const o = S.settings || {}; return { on: o.wchOn !== false, time: /^\d\d:\d\d$/.test(o.wchTime || '') ? o.wchTime : '21:30', every: Math.max(1, Math.min(30, parseInt(o.wchEvery, 10) || 4)), back: o.wchBack !== false, mins: Math.max(5, Math.min(600, parseInt(o.wchBackMin, 10) || 60)) }; };
+const wchSt = () => { try { return JSON.parse(localStorage.getItem('wch') || '{}') || {}; } catch (e) { return {}; } };
+const wchSave = o => { try { localStorage.setItem('wch', JSON.stringify(o)); } catch (e) { } };
+const wchYmd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const wchHm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+const wchAt = (day, time) => new Date(day + 'T' + time + ':00').getTime();
+function wchDays(n) { // charge days from 2 back, n of them
+  const c = wchSet(), a = new Date(WCH_ANCHOR + 'T12:00:00'), t = new Date(todayISO() + 'T12:00:00');
+  let k = Math.floor(Math.round((t - a) / 864e5) / c.every) - 1; if (k < 0) k = 0; const out = [];
+  for (; out.length < n; k++) { const d = new Date(a); d.setDate(a.getDate() + k * c.every); out.push(wchYmd(d)); } return out;
+}
+function wchBackAt(day) { const c = wchSet(), st = wchSt(), d = !(st.backStay || {})[day] && (st.done || {})[day]; return d ? d + c.mins * 60e3 : wchAt(day, c.time) + c.mins * 60e3; }
+function wchPushes() {
+  const c = wchSet(); if (!c.on) return []; const now = Date.now() + 60e3, st = wchSt(), out = [];
+  const add = (id, title, body, ms) => { if (ms > now) { const d = new Date(ms); out.push({ id, title, body, date: wchYmd(d), time: wchHm(d), repeat: 'none' }); } };
+  wchDays(5).forEach(day => { const k = day.replace(/-/g, '');
+    if (!(st.done || {})[day]) add('sug-wch-' + k, '⌚ Charge your watch', 'Pop your Huawei watch on the charger.', (st.snooze || {})[day] || wchAt(day, c.time));
+    if (c.back && !(st.backDone || {})[day]) add('sug-wchb-' + k, '⌚ Put your watch back on', 'It should be charged by now.', (st.backSnooze || {})[day] || wchBackAt(day)); });
+  return out;
+}
+function wchCards() {
+  const c = wchSet(); if (!c.on) return ''; const now = Date.now(), st = wchSt(), H = [];
+  const card = (t, s, f) => `<div class="card habcard" style="padding:12px 14px;margin-bottom:10px"><div class="t" style="font-weight:700">${t}</div><div class="s muted" style="margin:3px 0 8px">${s}</div><div class="btns"><button type="button" class="btn primary small" onclick="wchAct('${f}','done')">Done</button><button type="button" class="btn small" onclick="wchAct('${f}','snooze')">Snooze 30 min</button></div></div>`;
+  wchDays(4).forEach(day => {
+    const due = (st.snooze || {})[day] || wchAt(day, c.time);
+    if (!(st.done || {})[day] && now >= due && now - wchAt(day, c.time) < 12 * 3600e3) H.push(card('⌚ Charge your watch', 'Pop your Huawei watch on the charger.', 'c' + day));
+    const bd = (st.backSnooze || {})[day] || wchBackAt(day);
+    if (c.back && !(st.backDone || {})[day] && now >= bd && now - wchBackAt(day) < 12 * 3600e3) H.push(card('⌚ Put your watch back on', 'It should be charged by now.', 'b' + day));
+  });
+  return H.join('');
+}
+async function wchAct(f, what) {
+  const st = wchSt(), back = f[0] === 'b', day = f.slice(1), c = wchSet(), now = Date.now(), put = (k, v) => { st[k] = st[k] || {}; st[k][day] = v; };
+  if (what === 'snooze') put(back ? 'backSnooze' : 'snooze', now + 30 * 60e3);
+  else if (back) put('backDone', 1);
+  else { if (now > wchAt(day, c.time) + c.mins * 60e3) put('backStay', 1); put('done', now); } // the default back-on already went: keep that one, no second buzz
+  const old = addDays(todayISO(), -10); Object.keys(st).forEach(x => { if (st[x] && typeof st[x] === 'object') Object.keys(st[x]).forEach(d => { if (d < old) delete st[x][d]; }); });
+  wchSave(st); toast(what === 'snooze' ? 'Okay, in 30 minutes.' : back ? 'Nice one.' : c.back ? 'Done. I’ll remind you to put it back on.' : 'Done.');
+  try { habRedraw(); } catch (e) { } try { await setupBackground(); } catch (e) { }
+}
+(() => { const o = habCards; habCards = function () { let w = ''; try { w = wchCards(); } catch (e) { } return w + o.apply(this, arguments); }; })();
+async function wchSetVal(k, v) { S.settings[k] = v; await save(); await setupBackground(); render(); }
+(() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { const c = wchSet(), sw = (k, on) => `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" onclick="toggleSetting('${k}')"><span></span></button>`;
+  return h + `<div class="list"><div class="srow"><div class="tx"><div class="t">Charge reminder</div><div class="s">A buzz to charge your watch every few days, since Huawei doesn’t share the battery level.</div>${c.on ? `<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="time" value="${c.time}" onchange="wchSetVal('wchTime',this.value)"> every <input type="number" min="1" max="30" value="${c.every}" style="width:4em" onchange="wchSetVal('wchEvery',this.value)"> days</div>` : ''}</div>${sw('wchOn', c.on)}</div>
+  <div class="srow"><div class="tx"><div class="t">Put-back-on reminder</div><div class="s">A buzz to put your watch back on after charging. Counts from when you tap Done, if you do.</div>${c.back ? `<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><input type="number" min="5" max="600" value="${c.mins}" style="width:5em" onchange="wchSetVal('wchBackMin',this.value)"> minutes later</div>` : ''}</div>${sw('wchBack', c.back)}</div></div>`; } catch (e) { return h; } }; })();
 // ---- 2.27.41: internet and mobile outages ----
 /* From the same relay check (about every 20 minutes): Northpower Fibre unplanned outages (Whangārei's fibre network) and
    2degrees' published mobile and broadband outages, Northland only. One NZ, Spark and Chorus aren't used (terms, captcha,

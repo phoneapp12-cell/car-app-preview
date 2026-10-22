@@ -352,7 +352,8 @@ export function cleanReminder(r, now = Date.now()) {
   if (repeat === 'none') {
     const due = aucklandDue(date, time);
     if (due == null || due < now - REM_GRACE) return null;
-    return { id, title, date, time, repeat: 'none', due, body: reminderBody(date, time) };
+    const own = String(r.body || '').replace(/\s+/g, ' ').trim().slice(0, 120); // 2.27.69: a reminder can carry its own body text
+    return { id, title, date, time, repeat: 'none', due, body: own || reminderBody(date, time) };
   }
   const dom = Number(date.slice(8, 10));
   const next = nextOccurrence(date, time, repeat, dom, now);
