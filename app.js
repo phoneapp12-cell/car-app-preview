@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.98';
+const APP_VERSION = '2.27.99';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14550,7 +14550,7 @@ function Videos() {
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
   return `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#b91c1c,#0f172a)"></div><div class="tbtop"><h1>Videos</h1><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div><div class="tblists" id="vblists">${vbBoardHtml()}</div></div>` + `<div style="margin-top:12px"></div>` + tabs + search +
-    `<div class="foot">Tap a card for Play and Move to…. Category chips above: the × on the selected one hides that category; add more from search.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 22 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
+    `<div class="foot">Tap a card to play it, send it to the TV or move it. Hold down a subject list to remove that subject. You can add it again from search.<br>These refresh every day.</div>`;
 }
 
 
@@ -26365,3 +26365,15 @@ function flaggedMoreSub() { const L = flgGet().items.filter(x => x.status !== 'd
 
 // 2.27.88: show or hide bills on Home
 function homeBillsToggle() { try { S.settings = S.settings || {}; S.settings.homeBillsOff = !S.settings.homeBillsOff; save(); const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; } catch (e) { } }
+
+// 2.27.99: hold down a subject list on the Videos board to remove that subject (confirm and Undo come from askRemoveVideoCat)
+(() => { let t = null, x0 = 0, y0 = 0, fired = false;
+  const clear = () => { if (t) { clearTimeout(t); t = null; } };
+  document.addEventListener('pointerdown', e => { const sec = e.target.closest && e.target.closest('#vblists section.tblist[data-k^="c_"]'); fired = false; clear(); if (!sec) return;
+    x0 = e.clientX; y0 = e.clientY; const id = sec.dataset.k.slice(2);
+    t = setTimeout(() => { t = null; fired = true; try { navigator.vibrate && navigator.vibrate(30); } catch (er) { } askRemoveVideoCat(id); }, 650); }, { passive: true });
+  document.addEventListener('pointermove', e => { if (t && (Math.abs(e.clientX - x0) > 10 || Math.abs(e.clientY - y0) > 10)) clear(); }, { passive: true });
+  ['pointerup', 'pointercancel', 'scroll'].forEach(n => document.addEventListener(n, clear, { passive: true, capture: true }));
+  document.addEventListener('click', e => { if (fired && e.target.closest && e.target.closest('#vblists')) { e.preventDefault(); e.stopPropagation(); fired = false; } }, true);
+  document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('#vblists section.tblist[data-k^="c_"]')) e.preventDefault(); });
+})();
