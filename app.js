@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.88';
+const APP_VERSION = '2.27.89';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -611,7 +611,9 @@ const HOME_CARD = {
     });
     const list = [...billRows, ...loanRows].sort((a, b) => a.sort.localeCompare(b.sort)).slice(0, 4);
     if (!list.length) return '';
-    return homeSec('Bills', '<a href="#bills">See all</a>') + `<div class="list" id="homebills">${list.map(x => {
+    // 2.27.88: show or hide bills on Home
+    if (S.settings && S.settings.homeBillsOff) return homeSec('Bills', `<a href="#" onclick="event.preventDefault();homeBillsToggle()">Show bills</a>`) + `<div class="s" style="opacity:.65;padding:2px 4px 8px">Bills are hidden on Home. They're still on the Bills page.</div>`;
+    return homeSec('Bills', `<a href="#" onclick="event.preventDefault();homeBillsToggle()">Hide</a> · <a href="#bills">See all</a>`) + `<div class="list" id="homebills">${list.map(x => {
       if (x.kind === 'loan') {
         const name = 'Loan · ' + x.l.from;
         return `<div class="row bill"><button class="tapzone" onclick="go('#loan/${x.l.id}')"><div class="ic bill">${I('coins')}</div>
@@ -26192,3 +26194,6 @@ function flgCuHtml() {
   const T = todayISO(); return flgGet().items.filter(x => x.status !== 'done' && x.due && x.due <= T).map(x => `<button class="row" onclick="flgOpen(${jsArg(x.id)})"><div class="ic">${flgFlag(x.pri)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s"${x.due < T ? ' style="color:var(--red);font-weight:650"' : ''}>Flagged · ${esc(x.due < T ? 'Overdue since ' + fmtW(x.due) : 'Due today')}${flgProg(x).n ? ' · ' + flgProg(x).d + '/' + flgProg(x).n + ' sub-tasks' : ''}</div></div></button>`).join('');
 }
 function flaggedMoreSub() { const L = flgGet().items.filter(x => x.status !== 'done'); return L.length ? plural(L.length, 'open item') : 'Flag things to build on them'; }
+
+// 2.27.88: show or hide bills on Home
+function homeBillsToggle() { try { S.settings = S.settings || {}; S.settings.homeBillsOff = !S.settings.homeBillsOff; save(); const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; } catch (e) { } }
