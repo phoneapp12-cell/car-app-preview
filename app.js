@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.95';
+const APP_VERSION = '2.27.96';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14482,6 +14482,41 @@ function homeVideosCard() {
   return `<div class="sec"><a class="sechead" href="#videos">Videos</a><a href="#videos">All videos</a></div>
     <div class="list" id="homevideos">${list.map(homeVideoRow).join('')}</div>`;
 }
+// 2.27.96: Videos board, same .tb* board as Travel. Today's picks, one list per category, plus Watch later / Watched in localStorage 'videoBoard' (in backups and Move my data).
+const VB_KEY = 'videoBoard', VB_LISTS = [['later', 'Watch later'], ['watched', 'Watched']], VB_COL = ['#dc2626', '#2563eb', '#16a34a', '#7c3aed', '#ea580c', '#0891b2', '#ca8a04', '#db2777', '#0d9488', '#475569', '#9333ea', '#65a30d'];
+function vbGet() { let o = null; try { o = JSON.parse(localStorage.getItem(VB_KEY) || 'null'); } catch (e) { } if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {}; VB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; }); return o; }
+function vbSave(o) { try { localStorage.setItem(VB_KEY, JSON.stringify(o)); } catch (e) { } }
+function vbRestore(o) { if (o && o.lists && typeof o.lists === 'object') vbSave(o); }
+const vbCat = id => VIDEO_CATS.find(c => c.id === id), vbCol = id => { const i = VIDEO_CATS.findIndex(c => c.id === id); return i < 0 ? '#475569' : VB_COL[i % VB_COL.length]; };
+const vbYt = u => (String(u || '').match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/)([\w-]{11})/) || [])[1] || '';
+let VB_ALL = {};
+function vbCard(v) {
+  const id = v.id || vbYt(v.url); if (!id) return ''; VB_ALL[id] = { id, title: v.title, channel: v.channel || '', category: v.category || '', url: v.url || 'https://www.youtube.com/watch?v=' + id }; const c = vbCat(v.category);
+  return `<button type="button" class="tbcard" onclick="vbOpen(${jsArg(id)})"><div class="tbcover" style="background:#111;aspect-ratio:16/9;overflow:hidden"><img src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div><div class="tbbody">${tbLbl([[c ? c.name : 'Mine', vbCol(v.category)]])}<div class="tbt">${esc(v.title)}</div>${v.channel ? `<div class="tbs">${esc(v.channel)}</div>` : ''}</div></button>`;
+}
+function vbBoardHtml() {
+  VB_ALL = {}; const o = vbGet(), cats = enabledVideoCats(), ok = v => v && !isSport(v.title || '');
+  const L = (k, t, a, add, none) => tbList(k, t, a.length, a.map(vbCard).join(''), add, 'vb', none);
+  let picks = []; try { picks = homeVideoPicks().filter(v => ok(v) && v.category !== 'sarah'); } catch (e) { }
+  return L('picks', 'Today’s picks', picks, false, 'No picks today') + cats.map(c => L('c_' + c.id, c.name, (videosForCat(c.id) || []).filter(ok), false, 'No videos left today')).join('') +
+    VB_LISTS.map(([k, t]) => L(k, t, o.lists[k].filter(ok), true, k === 'later' ? 'Tap a video, then Move to… Watch later' : 'Videos you play show here')).join('');
+}
+function vbRedraw() { const el = document.getElementById('vblists'); if (!el) return; const x = el.scrollLeft; el.innerHTML = vbBoardHtml(); el.scrollLeft = x; }
+function vbMenu(k) { document.getElementById('vidcatq')?.focus(); }
+function vbPlay(id) { const o = vbGet(), v = VB_ALL[id]; if (v && !o.lists.watched.some(x => x.id === id)) { o.lists.watched.unshift(v); o.lists.watched = o.lists.watched.slice(0, 100); vbSave(o); } setTimeout(vbRedraw, 300); }
+function vbOpen(id) {
+  const v = VB_ALL[id]; if (!v) return; const o = vbGet(), cur = o.lists.later.some(x => x.id === id) ? 'later' : o.lists.watched.some(x => x.id === id) ? 'watched' : '';
+  openSheet(esc(v.title), `<p class="muted">${esc(v.channel)}</p><p><a class="btn primary" href="${esc(v.url)}" target="_blank" rel="noopener" onclick="vbPlay(${jsArg(id)})">▶ Play</a></p>
+    <label class="field"><span>Move to…</span><select name="list"><option value="">Not in my lists</option>${VB_LISTS.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
+    f => { const g = vbGet(); VB_LISTS.forEach(([j]) => { g.lists[j] = g.lists[j].filter(x => x.id !== id); }); if (f.list && g.lists[f.list]) g.lists[f.list].unshift(v); vbSave(g); return () => vbRedraw(); }, 'Save');
+}
+function vbAdd(k) {
+  openSheet('Add a video', `<label class="field"><span>YouTube link</span><input name="url" type="url" maxlength="300" placeholder="https://www.youtube.com/watch?v=…"></label><label class="field"><span>Title (optional)</span><input name="title" maxlength="140"></label>`,
+    f => { const id = vbYt(f.url); if (!id) return 'That doesn’t look like a YouTube link.'; const v = { id, title: (f.title || '').slice(0, 140) || 'YouTube video', channel: '', category: '', url: 'https://www.youtube.com/watch?v=' + id, mine: 1 };
+      const g = vbGet(); g.lists[k] = g.lists[k].filter(x => x.id !== id); g.lists[k].unshift(v); vbSave(g);
+      if (!f.title) fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(v.url)).then(r => r.ok ? r.json() : null).then(d => { if (!d || !d.title) return; const h = vbGet(), c = h.lists[k].find(x => x.id === id); if (c) { c.title = String(d.title).slice(0, 140); c.channel = String(d.author_name || '').slice(0, 80); vbSave(h); vbRedraw(); } }).catch(() => { });
+      return () => vbRedraw(); }, 'Add');
+}
 function Videos() {
   const cats = enabledVideoCats();
   if (!cats.some(c => c.id === videoTab)) videoTab = cats.length ? cats[0].id : '';
@@ -14501,8 +14536,8 @@ function Videos() {
         ? `<div class="card empty" id="videonone"><div class="t">No videos left today</div><div class="s">Skipped videos come back tomorrow.</div></div>`
         : `<div class="card empty" id="videonone"><div class="t">No videos for this yet</div></div>`;
   const search = `<div class="field" id="vidadd" style="margin-bottom:6px"><span>Add a category</span></div><label class="search">${I('search')}<input id="vidcatq" type="search" placeholder="Search for a category" value="${esc(videoCatQuery)}" aria-label="Add a category" autocomplete="off" enterkeyhint="search" maxlength="40" oninput="videoCatQuery=this.value;document.getElementById('vidcatres').innerHTML=videoCatSearchHtml()"></label><div id="vidcatres">${videoCatSearchHtml()}</div>`;
-  return header('Videos', 'One category at a time') + tabs + body + search +
-    `<div class="foot">Tap a picture to play it at the top. “Skip for today” under the main video swaps it for another from this category.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 22 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
+  return `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#b91c1c,#0f172a)"></div><div class="tbtop"><h1>Videos</h1><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div><div class="tblists" id="vblists">${vbBoardHtml()}</div></div>` + `<div style="margin-top:12px"></div>` + tabs + search +
+    `<div class="foot">Tap a card for Play and Move to…. Category chips above: the × on the selected one hides that category; add more from search.<br>Skipped ones stay hidden until tomorrow.<br>The × on the selected tab hides that category. You can add it again from search.<br>Updated 22 Oct 2026. These refresh every day.<br>Tap a video to play it in the picture beside the description. Open on YouTube opens the YouTube site.</div>`;
 }
 
 
@@ -17613,8 +17648,8 @@ async function requestPersist() { try { if (navigator.storage && navigator.stora
 function backupBlob() {
   const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
   let planning = null; try { planning = plnKeepGet(); } catch (e) { } // 2.27.84: kept planning & development updates
-  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } let recipeBoard = null; try { recipeBoard = rbGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, flagged, newsBoard, recipeBoard }, null, 2)], { type: 'application/json' });
+  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } let recipeBoard = null; try { recipeBoard = rbGet(); } catch (e) { } let videoBoard = null; try { videoBoard = vbGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, flagged, newsBoard, recipeBoard, videoBoard }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -17639,7 +17674,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } try { if (obj && obj.videoBoard) vbRestore(obj.videoBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
