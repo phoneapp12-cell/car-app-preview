@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.81';
+const APP_VERSION = '2.27.82';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4011,12 +4011,12 @@ const jaTime = x => { const c = Number(x && x.created) || 0; return c > 1.5e12 ?
 function justAddedList(now = Date.now()) {
   const seenAt = Number(S.settings && S.settings.justSeenAt) || 0, from = Math.max(now - JA_MS, seenAt), out = [];
   const add = (at, o) => { if (at > from && at <= now + 6e4) out.push(Object.assign({ at }, o)); };
-  (S.todos || []).forEach(t => { if (t.done) return; add(jaTime(t), { who: isSarahTodo(t) ? 'sarah' : '', ic: 'todo', icon: 'todo', title: (isSarahTodo(t) ? sarahBadge(t) : '') + esc(t.title), sub: `${isSarahTodo(t) ? 'Sarah added · ' : ''}To-do · ${esc(t.list || '')}${t.due ? ' · ' + fmtW(t.due) : ''}`, go: `todoForm('${t.id}')`, tid: isSarahTodo(t) ? t.id : '' }); });
-  ((S.shop && S.shop.items) || []).forEach(x => { if (x.done) return; const sar = isSarahShop(x); add(jaTime(x), { who: sar ? 'sarah' : '', ic: 'meal', icon: 'cart', title: (sar ? sarahBadge({ from: 'sarah' }) : '') + esc(x.name), sub: [sar ? 'Sarah added' : '', 'Shopping', x.brand ? esc(brandLine(x.brand)) : ''].filter(Boolean).join(' · '), go: `go('#shopping');setTimeout(()=>shopEdit('${x.id}'),60)` }); });
+  (S.todos || []).forEach(t => { if (t.done) return; add(jaTime(t), { who: isSarahTodo(t) ? 'sarah' : '', ic: 'todo', icon: 'todo', title: (isSarahTodo(t) ? sarahBadge(t) : '') + esc(t.title), sub: `${isSarahTodo(t) ? 'Sarah added · ' : ''}To-do · ${esc(t.list || '')}${t.due ? ' · ' + fmtW(t.due) : ''}`, go: `todoForm('${t.id}')`, tid: isSarahTodo(t) ? t.id : '', sk: isSarahTodo(t) ? 'todo' : '', sid: t.id }); });
+  ((S.shop && S.shop.items) || []).forEach(x => { if (x.done) return; const sar = isSarahShop(x); add(jaTime(x), { who: sar ? 'sarah' : '', ic: 'meal', icon: 'cart', title: (sar ? sarahBadge({ from: 'sarah' }) : '') + esc(x.name), sub: [sar ? 'Sarah added' : '', 'Shopping', x.brand ? esc(brandLine(x.brand)) : ''].filter(Boolean).join(' · '), go: `go('#shopping');setTimeout(()=>shopEdit('${x.id}'),60)`, sk: sar ? 'shop' : '', sid: x.id }); });
   (S.bills || []).forEach(b => { if (b.paid) return; const inv = b.invoice; const at = inv && inv.at ? (Number(inv.at) || Date.parse(inv.at) || 0) : 0;
     if (at) add(at, { who: 'auto', ic: 'bill', icon: billIcon(b.name), title: esc(b.name), sub: `Added from ${esc(inv.from || 'an')} email · ${money(b.amount)} due ${fmtW(b.due)}`, go: `go('#bills')` });
     else add(uidTime(b.id), { ic: 'bill', icon: billIcon(b.name), title: esc(b.name), sub: `Bill · ${money(b.amount)} due ${fmtW(b.due)}`, go: `go('#bills')` }); });
-  (S.appts || []).filter(a => a.from === 'sarah').forEach(a => add(Number(a.created) || 0, { who: 'sarah', ic: 'appt', icon: 'cal', title: sarahBadge({ from: 'sarah' }) + esc(a.title), sub: `Sarah’s ${esc((SARAH_APPT_TYPE[a.kind] || 'appointment').toLowerCase())} · ${fmtW(a.date)}${a.time ? ' ' + fmtTime(a.time) : ''}`, go: `apptForm('${a.id}')` }));
+  (S.appts || []).filter(a => a.from === 'sarah').forEach(a => add(Number(a.created) || 0, { who: 'sarah', ic: 'appt', icon: 'cal', title: sarahBadge({ from: 'sarah' }) + esc(a.title), sub: `Sarah’s ${esc((SARAH_APPT_TYPE[a.kind] || 'appointment').toLowerCase())} · ${fmtW(a.date)}${a.time ? ' ' + fmtTime(a.time) : ''}`, go: `apptForm('${a.id}')`, sk: a.done ? '' : 'appt', sid: a.id }));
   (S.appts || []).filter(a => a.from !== 'sarah').forEach(a => add(uidTime(a.id), { ic: a.evId ? 'ev' : 'appt', icon: a.evId ? 'ticket' : 'cal', title: esc(a.title), sub: `${a.evId ? 'Event you added' : 'Appointment'} · ${fmtW(a.date)}${a.time ? ' ' + fmtTime(a.time) : ''}`, go: `calOpenDay(${parseD(a.date)})` }));
   (S.myEvents || []).forEach(e => add(uidTime(e.id), { ic: 'mine', icon: 'repeat', title: esc(e.title), sub: `My event · from ${fmtW(e.start)}`, go: `mineForm('${e.id}')` }));
   (S.birthdays || []).forEach(b => add(uidTime(b.id), { ic: 'bday', icon: 'cake', title: esc(b.name) + '’s birthday', sub: 'Birthday', go: `go('#birthdays')` }));
@@ -4087,7 +4087,7 @@ function justAddedCard0() {
   const list = justAddedList();
   const head = homeSec('Just added', list.length ? '<button class="linkbtn jaclear" id="jaclear" onclick="justAddedClear()">Clear…</button>' : '');
   if (!list.length) return head + `<div class="card empty" id="justadded"><div class="t">Nothing new in the last two days</div><div class="s">New things from Sarah, and bills from emails, show here.</div></div>`;
-  return head + `<div class="list" id="justadded">${list.slice(0, 12).map(x => (h => x.tid ? sTodoCalInject(h, (S.todos || []).find(t => t.id === x.tid)) : h)(`<button class="row ja${x.who === 'sarah' ? ' jasarah' : ''}" onclick="${x.go}"><div class="ic ${x.ic}">${I(x.icon)}</div><div class="tx"><div class="t">${x.title}</div><div class="s">${x.sub}</div></div><span class="jaago">${esc(jaAgo(x.at))}</span></button>`)).join('')}</div>` +
+  return head + `<div class="list" id="justadded">${list.slice(0, 12).map(x => (h => jaSarahInject(x.tid ? sTodoCalInject(h, (S.todos || []).find(t => t.id === x.tid)) : h, x.sk, x.sid))(`<button class="row ja${x.who === 'sarah' ? ' jasarah' : ''}" onclick="${x.go}"><div class="ic ${x.ic}">${I(x.icon)}</div><div class="tx"><div class="t">${x.title}</div><div class="s">${x.sub}</div></div><span class="jaago">${esc(jaAgo(x.at))}</span></button>`)).join('')}</div>` +
     (list.length > 12 ? `<p class="muted" style="margin:6px 4px 0">and ${list.length - 12} more</p>` : '');
 }
 /* 2.23.25: Clear used to empty the card with one tap. Now it asks first, and Undo stays up for 8 seconds.
@@ -4949,7 +4949,46 @@ function sarahApptSheet(a) {
     ${a.notes ? `<div class="muted notes" style="margin-top:6px">${esc(a.notes)}</div>` : ''}</div>
     <div class="btns">${maps ? `<a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a>` : ''}<button type="button" class="btn" onclick="claimSheet('a:${a.id}')">${I('medkit')} UniMed claim${a.claim && a.claim.status !== 'none' ? ' · ' + CLAIM_ST[a.claim.status] : ''}</button></div>
     <div class="btns"><button type="button" class="btn" id="sagcal" onclick="gcalToggleSarahAppt('${a.id}')">${I('cal')} ${a.gcalWant ? 'Remove from Family calendar' : 'Add to Family calendar'}</button></div>
-    <p class="muted" style="margin:8px 2px 0">Sarah added this in her app. She keeps it up to date there.${a.gcalWant ? ' Her changes update your Family calendar too.' : ''}</p>`, null);
+    <div class="btns" id="saactions"><button type="button" class="btn" id="satick" onclick="sarahTick('appt','${a.id}')">${I('check')} ${a.done ? 'Mark not done' : 'Mark done'}</button><button type="button" class="btn danger" id="sadel" aria-label="Delete appointment" onclick="sarahDelete('appt','${a.id}')">${I('trash')} Delete</button></div>
+    <p class="muted" style="margin:8px 2px 0">Sarah added this in her app. Ticks and deletes here go back to her.${a.gcalWant ? ' Her changes update your Family calendar too.' : ''}</p>`, null);
+}
+/* 2.27.82: tick off or delete anything Sarah added (to-dos, shopping, appointments), from her appointment sheet and
+   the Just added card. Uses the normal shared sync: a tick is sent as done, a delete as a tombstone, so it comes off
+   her app too and doesn't come back. Undo puts it back (and that goes to her as well). */
+function sarahFind(kind, id) {
+  if (kind === 'todo') return (S.todos || []).find(t => t.id === id && isSarahTodo(t)) || null;
+  if (kind === 'shop') return ((S.shop && S.shop.items) || []).find(x => x.id === id && isSarahShop(x)) || null;
+  if (kind === 'appt') return (S.appts || []).find(a => a.id === id && a.from === 'sarah') || null;
+  return null;
+}
+async function sarahTick(kind, id) {
+  const o = sarahFind(kind, id); if (!o) return;
+  if (kind === 'todo') return tick(id);
+  const s = snap(), nm = kind === 'shop' ? o.name : o.title;
+  o.done = !o.done; if (o.done) o.doneAt = Date.now(); else delete o.doneAt;
+  await save(); if (sheetOpen) await closeSheet(); render(); sharedSoon(300);
+  toast(o.done ? `Marked done: ${nm}` : `${nm} marked not done.`, 'Undo', undoTo(s));
+}
+function sarahDelete(kind, id) {
+  const o = sarahFind(kind, id); if (!o) return;
+  const nm = kind === 'shop' ? o.name : o.title;
+  confirmSheet(`Delete ${esc(nm)}?`, 'Sarah added this. Deleting it here takes it off her app too.', 'Delete', async () => {
+    const s = snap();
+    if (kind === 'todo') S.todos = S.todos.filter(t => t.id !== id);
+    else if (kind === 'shop') S.shop.items = S.shop.items.filter(x => x.id !== id);
+    else S.appts = S.appts.filter(a => a.id !== id);
+    await save(); render(); sharedSoon(300); toast('Deleted.', 'Undo', undoTo(s));
+  });
+}
+// Adds ✓ and delete buttons to a Just added row (a <button> row is turned into a <div> with a tap zone, like sTodoCalInject)
+function jaSarahInject(h, kind, id) {
+  if (!kind || !sarahFind(kind, id)) return h;
+  const st = 'margin:0 4px 0 0;align-self:center;flex:none;padding:4px 8px;min-width:0;font-size:12px;white-space:nowrap';
+  const b = `<button type="button" class="paybtn jatick" style="${st}" onclick="event.stopPropagation();sarahTick('${kind}','${id}')" aria-label="Mark done">✓ Done</button><button type="button" class="paybtn jadel" style="${st};color:var(--red)" onclick="event.stopPropagation();sarahDelete('${kind}','${id}')" aria-label="Delete">${I('trash')}</button>`;
+  if (/^<div /.test(h)) return h.replace(/<\/div>\s*$/, b + '</div>');
+  const m = h.match(/^<button ([^>]*?)onclick="([^"]*)"([^>]*)>([\s\S]*)<\/button>\s*$/);
+  if (!m) return h;
+  return `<div ${m[1]}${m[3]} style="display:flex;align-items:center;padding:0"><button type="button" class="tapzone" style="flex:1;min-width:0;display:flex;align-items:center;gap:inherit;background:none;border:0;color:inherit;text-align:left;font:inherit;padding:inherit" onclick="${m[2]}">${m[4]}</button>${b}</div>`;
 }
 /* Sarah's car due dates for her app. Only the Haval (PNU312): WOF, rego, service date, service km and odometer.
    Sent to the relay's /shared-car when they change (checked on open and with each shared sync). Nothing else. */
@@ -25381,6 +25420,40 @@ function accItems() {
   let gone = []; try { gone = gkDis(); } catch (e) { }
   const add = A.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk));
   return keep.concat(add).sort((a, b) => b.pri - a.pri); } catch (e) { return L; } }; })();
+// ---- 2.27.82: Whangārei District Council roadworks and road closures on the bell page ----
+/* From the relay's /road-closures (WDC "Roadworks and closures" notices, council terms allow personal, non-commercial use;
+   robots.txt is followed). Only notices with a date in the next 7 days that hasn't finished; finished ones drop off on
+   their own. Onerahi first, then his commute (HU_ROUTE), then the rest. Council wording, each links to its notice.
+   The lifting bridge notices already show (headsUpList), so they're skipped here. Bell only: no push. */
+let RDC = null, rdcBusy = false, rdcTry = 0; try { RDC = JSON.parse(localStorage.getItem('roadClosures') || 'null'); } catch (e) { }
+async function rdcLoad(force) {
+  if (!RELAY_URL || rdcBusy || navigator.onLine === false || (!force && Date.now() - rdcTry < 30 * 60e3)) return;
+  rdcBusy = true; rdcTry = Date.now();
+  try { const d = await getJSON(RELAY_URL + '/road-closures', 20000); if (d && Array.isArray(d.closures)) { RDC = { at: Date.now(), d }; try { localStorage.setItem('roadClosures', JSON.stringify(RDC)); } catch (e) { } glWarnRedraw(); } } catch (e) { }
+  finally { rdcBusy = false; }
+}
+setTimeout(() => rdcLoad(), 7000); setInterval(() => rdcLoad(), 30 * 60e3);
+function rdcItems() {
+  const L = [], list = (RDC && RDC.d && RDC.d.closures) || [], T = todayISO(), lim = addDays(T, 7);
+  const hm = t => t ? fmtTime(t).replace(':00', '').replace(/\s/g, '') : '';
+  const dl = d => (d.end && d.end !== d.start ? fmtW(d.start) + '–' + fmtW(d.end) : fmtW(d.start)) + (d.time ? ' ' + hm(d.time) + (d.endTime ? '–' + hm(d.endTime) : '') : '');
+  list.forEach(c => {
+    if (!c || c.bridge || !c.title) return;
+    const ds = (c.dates || []).filter(d => d && d.start && (d.end || d.start) >= T && d.start <= lim);
+    if (!ds.length) return;
+    const blob = [c.title, c.where, c.desc].join(' '), onr = /onerahi/i.test(blob), route = HU_ROUTE.test(blob), today = ds.some(d => d.start <= T && (d.end || d.start) >= T);
+    const closed = /\bclos(ed|ure|ures|ing)\b/i.test(c.title + ' ' + c.desc), where = String(c.where || '').replace(/,?\s*\d{4}$/, '').slice(0, 90);
+    const when = (today ? 'Today · ' : '') + dl(ds[0]) + (ds.length > 1 ? ` (+${ds.length - 1} more)` : '');
+    L.push({ pri: route && today ? 94 : onr ? 80 : route ? 72 : closed ? 45 : 30, red: route && today, route: route && today, info: !closed && !route && !onr,
+      tag: (onr ? '🏠 Onerahi' : route ? '🚗 On your commute' : closed ? '⛔ Road closure' : '🚧 Roadworks') + ' · WDC',
+      what: c.title, s: [when, where, c.desc, c.detour ? 'Detour: ' + c.detour.replace(/^detour:?\s*/i, '') : ''].filter(Boolean).join(' · ').slice(0, 320), url: /^https:\/\/www\.wdc\.govt\.nz\//.test(c.url || '') ? c.url : 'https://www.wdc.govt.nz/Services/Roads-and-Transportation/Roads/Roadworks-and-closures', rdcId: c.id });
+  });
+  return L;
+}
+(() => { const o = glWarnList; glWarnList = function () { const L = o.apply(this, arguments); try { const A = rdcItems(); if (!A.length) return L;
+  let gone = []; try { gone = gkDis(); } catch (e) { }
+  const add = A.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk));
+  return L.concat(add).sort((a, b) => b.pri - a.pri); } catch (e) { return L; } }; })();
 async function accSetScope(v) { S.settings.accScope = v; await save(); await setupBackground(); render(); }
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = accOn(), sc = accScope(), po = polOn();
   return h + `<div class="srow"><div class="tx"><div class="t">Local crash alerts</div><div class="s">Crashes and road incidents on state highways in and around Whangārei, from NZTA Waka Kotahi, on the bell page. One buzz per new crash.</div>${on ? `<div style="margin-top:8px;display:flex;gap:8px"><button type="button" class="btn small ${sc === 'all' ? 'primary' : ''}" onclick="accSetScope('all')">All Whangārei</button><button type="button" class="btn small ${sc === 'route' ? 'primary' : ''}" onclick="accSetScope('route')">My route only</button></div>` : ''}</div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Local crash alerts" onclick="toggleSetting('accAlerts')"></button></div>`

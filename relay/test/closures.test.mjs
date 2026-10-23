@@ -26,12 +26,14 @@ const single = (title, body, centre, dates) => `<html><h1 class='oc-page-title '
 // parsing
 let r = parseClosureList(page(1, 2, [li('Rally-20260923', 'Rally closures', 'Various roads', 'Multiple locations'), li('https://evil.example/x', 'Evil', 'x', 'y'), li('Bank-Street', 'Bank Street closure', 'Night works', 'Bank Street, Whangārei')]));
 ok(r.items.length === 2 && r.page === 1 && r.pages === 2 && r.items[0].url === B + 'Rally-20260923', 'list parsed; links elsewhere dropped');
-let e = parseClosurePage(multi, { title: 'Rally closures' });
+const bo = a => a.filter(x => x.bridge); // 2.27.82: every part is kept, marked bridge or not
+let eAll = parseClosurePage(multi, { title: 'Rally closures' }), e = bo(eAll);
+ok(eAll.length >= 2 && eAll.some(x => !x.bridge && /Pohe Island/i.test(x.where + x.desc)), 'multi-location: other parts kept for /road-closures, not marked bridge');
 ok(e.length === 1 && e[0].where === 'Dave Culham Drive, Whangārei 0110' && /Te Matau a Pohe bridge/.test(e[0].desc), 'multi-location notice: only the Dave Culham Drive part kept (not Pohe Island Road, not the footer notice)');
 ok(e[0].dates.length === 1 && e[0].dates[0].start === '2026-09-26' && e[0].dates[0].time === '14:00' && e[0].dates[0].endTime === '22:00', 'its date and times');
-ok(parseClosurePage(single('Bank Street closure', 'Night works on Bank Street.', '-35.7252, 174.3194', [['2026-09-27', '2026-09-28', '18', '00', '05', '30']]), { title: 'Bank Street closure' }).length === 0, 'unrelated single notice (1.9 km away, no mention) ignored, even with a bridge notice in the page footer');
+ok(parseClosurePage(single('Bank Street closure', 'Night works on Bank Street.', '-35.7252, 174.3194', [['2026-09-27', '2026-09-28', '18', '00', '05', '30']]), { title: 'Bank Street closure' }).filter(x => x.bridge).length === 0, 'unrelated single notice (1.9 km away, no mention) ignored, even with a bridge notice in the page footer');
 e = parseClosurePage(single('Port Road resurfacing', 'Lane closures near the harbour.', '-35.7352, 174.3360', [['2026-10-03', '2026-10-03', '19', '00', '23', '00']]), { title: 'Port Road resurfacing' });
-ok(e.length === 1 && e[0].dates[0].time === '19:00', 'single notice mapped within 400 m of the bridge kept');
+ok(e.length === 1 && e[0].bridge && e[0].dates[0].time === '19:00', 'single notice mapped within 400 m of the bridge kept');
 ok(parseClosurePage(single('Hātea works', 'Te Matau ā Pohe will be closed to all traffic for maintenance.', '-35.70, 174.30', [['2026-10-10', '2026-10-10', '20', '00', '23', '30']]), {}).length === 1, 'notice that names Te Matau ā Pohe kept');
 // robots
 const rules = robotsRules('User-agent: *\nDisallow: /After5\nDisallow: /Services/Roads-and-Transportation/Roads/Roadworks-and-closures/Anzac-Day-closures-20260425/Cameron-Street-Anzac\nDisallow: /Services/Roads-and-Transportation/Roads/Roadworks-and-closures/*/Hidden\nDisallow: /Services/Building/X\n');

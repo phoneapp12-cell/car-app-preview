@@ -77,7 +77,10 @@ export function parseClosureList(html) {
   return { items, page: pm ? +pm[1] : 1, pages: pm ? +pm[2] : 1 };
 }
 
-// A notice page → the parts that concern the bridge: [{ where, desc, dates }]
+// 2.27.82: the detour line, only when the council wrote one
+const detourOf = t => { const m = String(t || '').match(/[^.]*\b(detours?|diversions?|alternative route)\b[^.]*\.?/i); return m ? clip(m[0].trim(), 240) : ''; };
+// A notice page → every part, each marked bridge or not: [{ where, desc, dates, detour, bridge }]
+// (2.27.82: all parts are kept for the district-wide /road-closures; /closures and the bridge alerts use the bridge ones)
 export function parseClosurePage(html, item = {}) {
   const out = [];
   if (html.includes('<div class="multi-location-item">')) {
@@ -85,8 +88,9 @@ export function parseClosurePage(html, item = {}) {
       const end = blk.indexOf('</ul></div></div>');
       blk = end > 0 ? blk.slice(0, end + 17) : blk.slice(0, 4000);
       const where = text((blk.match(/<h3>([\s\S]*?)<\/h3>/) || [])[1]).slice(0, 200);
-      const desc = clip(text((blk.match(/<p>([\s\S]*?)<\/p>/) || [])[1]), 400);
-      if (MATCH.test(where + ' ' + desc)) out.push({ where, desc, dates: parseDetail(blk).dates });
+      const paras = [...blk.matchAll(/<p>([\s\S]*?)<\/p>/g)].map(m => text(m[1])).filter(Boolean);
+      const desc = clip(paras[0] || '', 400);
+      out.push({ where, desc, dates: parseDetail(blk).dates, detour: detourOf(paras.join(' ')), bridge: MATCH.test(where + ' ' + desc) });
     }
     return out;
   }
@@ -99,8 +103,7 @@ export function parseClosurePage(html, item = {}) {
   const det = parseDetail(html);
   const c = html.match(/"centerPoint"\s*:\s*"(-?[\d.]+),\s*(-?[\d.]+)"/);
   const near = c ? metres(BRIDGE, { lat: +c[1], lon: +c[2] }) < 400 : false;
-  if (near || MATCH.test([item.title, item.desc, item.where, desc, det.venue].join(' ')))
-    out.push({ where: det.venue || item.where || '', desc, dates: det.dates });
+  out.push({ where: det.venue || item.where || '', desc, dates: det.dates, detour: detourOf(paras.join(' ')), bridge: !!(near || MATCH.test([item.title, item.desc, item.where, desc, det.venue].join(' '))) });
   return out;
 }
 
@@ -130,6 +133,8 @@ export async function step(state, fetchImpl = fetch, now = Date.now(), opts = {}
   state = state && typeof state === 'object' ? state : {};
   state.pages = state.pages || {};
   let changed = false;
+  // 2.27.82: notice pages saved before v2 only kept the bridge parts; read them again (a few per run)
+  if (state.v !== 2) { for (const u of Object.keys(state.pages)) if (state.pages[u]) state.pages[u].at = 0; state.v = 2; changed = true; }
   if (!state.robots || now - state.robots.at > ROBOTS_MAX_AGE) {
     try { state.robots = { at: now, rules: robotsRules(await get(WDC_BASE + '/robots.txt', fetchImpl)) }; }
     catch (e) { if (!state.robots) state.robots = { at: now - ROBOTS_MAX_AGE + 3600 * 1000, rules: null }; } // unknown: skip notice pages for now
@@ -160,7 +165,7 @@ export function toClosures(state, now = Date.now()) {
   const nowS = nzStamp(now), out = [];
   for (const item of (state && state.list) || []) {
     const pg = state.pages && state.pages[item.url];
-    let entries = pg && Array.isArray(pg.entries) ? pg.entries : null;
+    let entries = pg && Array.isArray(pg.entries) ? pg.entries.filter(e => e.bridge !== false) : null; // old entries (no flag) were bridge-only
     if (!entries) entries = MATCH.test([item.title, item.desc, item.where].join(' ')) ? [{ where: item.where, desc: item.desc, dates: [] }] : [];
     entries.forEach((e, i) => {
       const dates = (e.dates || []).filter(d => stamp(d.end || d.start, d.endTime, '23:59') > nowS);
@@ -176,6 +181,34 @@ export function toClosures(state, now = Date.now()) {
     updated: state && state.listAt ? new Date(state.listAt).toISOString() : null,
     count: out.length, closures: out.slice(0, 20)
   };
+}
+
+/* 2.27.82: every current or upcoming notice in the district (next 7 days), for the bell page. Council wording only,
+   each links to its notice. Finished dates drop off; a notice with every date finished is left out. A notice whose page
+   hasn't been read yet shows the list's own summary (no dates). */
+export function toRoadClosures(state, now = Date.now(), days = 7) {
+  const nowS = nzStamp(now), today = nowS.slice(0, 10), lim = new Date(Date.parse(today + 'T12:00:00Z') + days * 864e5).toISOString().slice(0, 10), out = [];
+  for (const item of (state && state.list) || []) {
+    const pg = state.pages && state.pages[item.url];
+    const read = pg && Array.isArray(pg.entries) && state.v === 2 && !(pg.at === 0);
+    const entries = read ? pg.entries : [{ where: item.where, desc: item.desc, dates: [], detour: '', bridge: MATCH.test([item.title, item.desc, item.where].join(' ')), unread: true }];
+    const slug = item.url.split('/').pop().replace(/[^A-Za-z0-9-]+/g, '-').slice(0, 80);
+    entries.forEach((e, i) => {
+      const all = e.dates || [];
+      const dates = all.filter(d => stamp(d.end || d.start, d.endTime, '23:59') > nowS && d.start <= lim);
+      if (all.length && !dates.length) return; // finished, or not in the next week
+      if (e.unread) return; // page not read yet (or couldn't be): no dates to place it in the week, so wait
+      out.push({ id: 'wdc-road-' + slug + '-' + i, title: item.title, where: e.where || item.where || '', desc: e.desc || item.desc || '', detour: e.detour || '', url: item.url, bridge: !!e.bridge, unread: !!e.unread, dates: dates.slice(0, 10) });
+    });
+  }
+  const first = c => c.dates.length ? stamp(c.dates[0].start, c.dates[0].time, '00:00') : '9999';
+  out.sort((a, b) => first(a).localeCompare(first(b)));
+  return { source: { name: 'Whangārei District Council – Roadworks and closures', url: CLOSURES_URL }, updated: state && state.listAt ? new Date(state.listAt).toISOString() : null, count: out.length, closures: out.slice(0, 30) };
+}
+export async function getRoadClosures(env, fetchImpl = fetch, now = Date.now()) {
+  let state = await load(env);
+  if (!state || !state.listAt || now - state.listAt > STALE_REBUILD) { await getClosures(env, fetchImpl, now); state = await load(env); }
+  return toRoadClosures(state, now);
 }
 
 async function load(env) { if (!env || !env.EVENTS_KV) return null; try { return await env.EVENTS_KV.get(KV_KEY, { type: 'json', cacheTtl: 300 }); } catch (e) { return null; } }
