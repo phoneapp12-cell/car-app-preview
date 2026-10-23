@@ -28,7 +28,7 @@ export const NEWS_FEEDS = [
   // 2.27.4: NZ Herald's Northern Advocate (Whangārei / Northland) news. Only stories that name a Northland place.
   { id: 'heraldnorth', name: 'NZ Herald', url: 'https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/news/?outputType=xml&_website=northern-advocate', host: 'www.nzherald.co.nz', local: true, sportOut: true }
 ];
-const KV_KEY = 'rnz-news-v5';
+const KV_KEY = 'rnz-news-v7';
 const TTL = 10 * 60 * 1000;
 const MAX_ITEMS = 12;
 const MAX_ALL = 24;
@@ -172,6 +172,38 @@ export function mergeFeeds(parts, now = Date.now(), prev = null) {
   // items: both together, for older copies of the app.
   return { source: 'RNZ', sourceName: 'RNZ', page: NEWS_PAGE, feed: NEWS_URL, feeds: NEWS_FEEDS.map(f => ({ name: f.name, feed: f.url, local: !!f.local })), local: L, nz: N, items: [...L.items, ...N.items].sort(byDate).slice(0, MAX_ALL) };
 }
+// 2.27.93: link-preview picture (og:image / twitter:image) for local stories. One fetch per article, cached in KV 7 days (misses too). Robots.txt respected.
+const IMG_TTL = 7 * 86400, UA = 'Mozilla/5.0 (compatible; ShaneMyAppRelay/1.0; +https://shane-my-app.pages.dev)';
+const robotsMem = {};
+async function robotsOk(u, fetchImpl) {
+  const h = u.hostname;
+  if (!robotsMem[h]) robotsMem[h] = (async () => { try { const r = await fetchImpl('https://' + h + '/robots.txt', { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(4000) }); if (!r.ok) return []; const dis = []; let star = false;
+    for (const ln of (await r.text()).split(/\r?\n/)) { const m = ln.replace(/#.*/, '').trim().match(/^([a-z-]+)\s*:\s*(.*)$/i); if (!m) continue; const k = m[1].toLowerCase(); if (k === 'user-agent') star = m[2].trim() === '*'; else if (k === 'disallow' && star && m[2].trim()) dis.push(m[2].trim()); } return dis; } catch (e) { return []; } })();
+  const dis = await robotsMem[h], path = u.pathname + u.search;
+  return !dis.some(d => { const re = new RegExp('^' + d.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\\\$$/, '$')); return re.test(path); });
+}
+const unent = s => s.replace(/&amp;/g, '&').replace(/&#x2F;/g, '/').replace(/&quot;/g, '"');
+async function ogImage(url, env, fetchImpl) {
+  const key = 'ogimg2:' + url;
+  if (env.EVENTS_KV) { try { const c = await env.EVENTS_KV.get(key); if (c !== null) return c; } catch (e) { } }
+  let img = '';
+  try {
+    const u = new URL(url);
+    if (await robotsOk(u, fetchImpl)) {
+      const r = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'text/html' }, signal: AbortSignal.timeout(5000) });
+      if (r.ok) { const html = (await r.text()).slice(0, 300000);
+        for (const t of ['og:image', 'twitter:image']) { const m = html.match(new RegExp('<meta[^>]+(?:property|name)=["\']' + t + '["\'][^>]*>', 'i')); const c = m && m[0].match(/content=["']([^"']+)["']/i); if (c) { const x = new URL(unent(c[1]), url); if (x.protocol === 'https:') { img = x.toString(); break; } } } }
+    }
+  } catch (e) { return ''; }
+  if (env.EVENTS_KV) { try { await env.EVENTS_KV.put(key, img, { expirationTtl: IMG_TTL }); } catch (e) { } }
+  return img;
+}
+async function addImages(data, env, fetchImpl) {
+  const list = (data.local && data.local.items) || [], todo = list.filter(x => x.img === undefined);
+  for (let i = 0; i < todo.length; i += 3) await Promise.all(todo.slice(i, i + 3).map(async x => { x.img = await ogImage(x.url, env, fetchImpl); }));
+  const m = new Map(list.map(x => [x.url, x.img])); (data.items || []).forEach(x => { if (m.has(x.url)) x.img = m.get(x.url); });
+  return data;
+}
 export async function getLocalNews(env = {}, fetchImpl = fetch, now = Date.now()) {
   if (mem && mem.data && Array.isArray(mem.data.items) && now - mem.at < TTL) return mem.data;
   if (env.EVENTS_KV) {
@@ -185,7 +217,7 @@ export async function getLocalNews(env = {}, fetchImpl = fetch, now = Date.now()
     const res = await Promise.allSettled(NEWS_FEEDS.map(async f => parseRss(await get(f.url, fetchImpl, { headers: { Accept: 'application/rss+xml, application/xml, text/xml, */*;q=0.1' } }), f)));
     const parts = res.map((r, i) => r.status === 'fulfilled' ? { ...r.value, local: !!NEWS_FEEDS[i].local } : null).filter(Boolean);
     if (!parts.length) throw (res[0] && res[0].reason) || new Error('news_unavailable');
-    const data = mergeFeeds(parts, now, mem && mem.data);
+    const data = await addImages(mergeFeeds(parts, now, mem && mem.data), env, fetchImpl);
     mem = { at: now, data };
     if (env.EVENTS_KV) { try { await env.EVENTS_KV.put(KV_KEY, JSON.stringify(mem)); } catch (e) { } }
     return data;

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.92';
+const APP_VERSION = '2.27.93';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12543,7 +12543,7 @@ let NB_ALL = {};
 function nbCard(x) {
   const s = nbSrc(x), id = newsUrl(x.url) || x.url; NB_ALL[id] = { id, title: x.title, src: s, published: x.published, url: x.url, img: x.img || x.image || '' };
   const img = x.img || x.image;
-  return `<button type="button" class="tbcard" onclick="nbOpen(${jsArg(id)})"><div class="tbcover${img ? '' : ' noimg'}" style="${img ? '' : 'background:linear-gradient(135deg,' + nbCol(s) + ',#1e293b);min-height:64px'}">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div><div class="tbbody">${tbLbl([[s, nbCol(s)]])}<div class="tbt">${esc(x.title)}</div><div class="tbicons">${I('news')}<span>${esc(nbAgo(x.published))}</span></div></div></button>`;
+  return `<button type="button" class="tbcard" onclick="nbOpen(${jsArg(id)})"><div class="tbcover" style="background:linear-gradient(135deg,${nbCol(s)},#1e293b);aspect-ratio:16/9;overflow:hidden">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()">` : ''}</div><div class="tbbody">${tbLbl([[s, nbCol(s)]])}<div class="tbt">${esc(x.title)}</div><div class="tbicons">${I('news')}<span>${esc(nbAgo(x.published))}</span></div></div></button>`;
 }
 function nbBoardHtml() {
   NB_ALL = {}; const o = nbGet(), items = newsSec('local') || [], moved = new Set(o.lists.saved.map(c => c.id)), t = nzTodayISO();
