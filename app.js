@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.91';
+const APP_VERSION = '2.27.92';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12487,6 +12487,7 @@ async function refreshNews(force = false) {
 function updNews() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
+  if (h === 'localnews') { nbRedraw(); return; }
   if (h === 'news' || h === 'media' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
     const v = $('#view'), top = v ? v.scrollTop : 0;
     render(); if (v) v.scrollTop = top;
@@ -12529,6 +12530,43 @@ function LocalNews() {
     `<div class="newstabs"><a href="#news-local" onclick="event.preventDefault();document.getElementById('news-local')?.scrollIntoView({behavior:'smooth',block:'center'})">Local — Northland</a><a href="#news-nz" onclick="event.preventDefault();document.getElementById('news-nz')?.scrollIntoView({behavior:'smooth',block:'center'})">New Zealand</a></div>` +
     part('local', true) + part('nz', false) +
     `<div class="foot">Local — Northland: RNZ Northland, plus any NZ-wide story that names a Northland place; stories drop off after 7 days. New Zealand: RNZ New Zealand, RNZ Politics, RNZ In Depth, RNZ Country and the NZ Herald’s New Zealand section; stories drop off after 3 days. Stories about courts, crime, violence, crashes, deaths or sexual matters are left out. Tap a story to open it on the source’s website. Both lists refresh when you open the app if they’re more than 15 minutes old, and about every 15 minutes while it stays open.</div>`;
+}
+// 2.27.92: Local news board. Today / This week / Earlier from the local feed (same filters), plus Saved and Read kept in localStorage 'newsBoard' (in backups and Move my data).
+const NB_KEY = 'newsBoard', NB_LISTS = [['saved', 'Saved'], ['read', 'Read']], NB_SRC = { 'Northern Advocate': '#0369a1', RNZ: '#b91c1c', WDC: '#15803d', 'NZ Herald': '#1e3a8a' };
+function nbGet() { let o = null; try { o = JSON.parse(localStorage.getItem(NB_KEY) || 'null'); } catch (e) { } if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {}; NB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; }); return o; }
+function nbSave(o) { try { localStorage.setItem(NB_KEY, JSON.stringify(o)); } catch (e) { } }
+function nbRestore(o) { if (o && o.lists && typeof o.lists === 'object') nbSave(o); }
+const nbSrc = x => { const s = String(x.src || x.sourceName || x.source || 'RNZ'); return /herald|advocate/i.test(s) ? (/advocate/i.test(s) ? 'Northern Advocate' : 'NZ Herald') : /wdc|council/i.test(s) ? 'WDC' : /rnz/i.test(s) ? 'RNZ' : s; };
+const nbCol = s => NB_SRC[s] || ['#7c3aed', '#0d9488', '#c2410c', '#475569'][[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % 4];
+function nbAgo(iso) { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 6e4)); return !Number.isFinite(m) ? '' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; }
+let NB_ALL = {};
+function nbCard(x) {
+  const s = nbSrc(x), id = newsUrl(x.url) || x.url; NB_ALL[id] = { id, title: x.title, src: s, published: x.published, url: x.url, img: x.img || x.image || '' };
+  const img = x.img || x.image;
+  return `<button type="button" class="tbcard" onclick="nbOpen(${jsArg(id)})"><div class="tbcover${img ? '' : ' noimg'}" style="${img ? '' : 'background:linear-gradient(135deg,' + nbCol(s) + ',#1e293b);min-height:64px'}">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div><div class="tbbody">${tbLbl([[s, nbCol(s)]])}<div class="tbt">${esc(x.title)}</div><div class="tbicons">${I('news')}<span>${esc(nbAgo(x.published))}</span></div></div></button>`;
+}
+function nbBoardHtml() {
+  NB_ALL = {}; const o = nbGet(), items = newsSec('local') || [], moved = new Set(o.lists.saved.map(c => c.id)), t = nzTodayISO();
+  const day = x => new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date(Date.parse(x.published)));
+  const live = items.filter(x => !moved.has(newsUrl(x.url))), T = live.filter(x => day(x) === t), W = live.filter(x => day(x) !== t && day(x) >= addDays(t, -6)), E = live.filter(x => day(x) < addDays(t, -6));
+  const L = (k, n, a, none) => tbList(k, n, a.length, a.map(nbCard).join(''), false, 'nb', none);
+  return L('today', 'Today', T, newsBusy ? 'Updating…' : 'No local stories yet today') + L('week', 'This week', W) + L('earlier', 'Earlier', E) +
+    NB_LISTS.map(([k, n]) => L(k, n, o.lists[k].filter(c => k !== 'read' || !moved.has(c.id)).sort((a, b) => String(b.published).localeCompare(String(a.published))), k === 'saved' ? 'Tap a story, then Move to… Saved' : 'Stories you open show here')).join('');
+}
+function nbRedraw() { const el = document.getElementById('nblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = nbBoardHtml(); el.scrollLeft = x; }
+function nbMenu(k) { refreshNews(true); }
+function nbMark(id) { const o = nbGet(), c = NB_ALL[id]; if (!c) return; if (!o.lists.read.some(x => x.id === id)) { o.lists.read.unshift(c); o.lists.read = o.lists.read.slice(0, 100); nbSave(o); } setTimeout(nbRedraw, 300); }
+function nbOpen(id) {
+  const c = NB_ALL[id]; if (!c) return; const o = nbGet(), cur = o.lists.saved.some(x => x.id === id) ? 'saved' : o.lists.read.some(x => x.id === id) ? 'read' : '';
+  openSheet(esc(c.title), `<p class="muted">${esc(c.src)} · ${esc(newsWhen(c.published))}</p><p><a class="btn" href="${esc(newsUrl(c.url))}" target="_blank" rel="noopener" onclick="nbMark(${jsArg(id)})">Open story ›</a></p>
+    <label class="field"><span>Move to…</span><select name="list"><option value="">Its date list</option>${NB_LISTS.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
+    v => { const f = nbGet(); NB_LISTS.forEach(([j]) => { f.lists[j] = f.lists[j].filter(x => x.id !== id); }); if (v.list && f.lists[v.list]) f.lists[v.list].unshift(c); nbSave(f); return () => nbRedraw(); }, 'Save');
+}
+function LocalNewsBoard() {
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0369a1,#0f172a)"></div>
+    <div class="tbtop"><h1>Local news</h1><button class="iconbtn" aria-label="Refresh" onclick="refreshNews(true)">${I('news')}</button></div>
+    <div class="tblists" id="nblists">${nbBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists. Northland stories from RNZ and other local sources; court, crime, violence, sexual and sport stories are left out. ${esc(newsUpdated('local'))}</div>`;
 }
 function newsMoreSub() {
   const items = newsItems();
@@ -17517,8 +17555,8 @@ async function requestPersist() { try { if (navigator.storage && navigator.stora
 function backupBlob() {
   const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
   let planning = null; try { planning = plnKeepGet(); } catch (e) { } // 2.27.84: kept planning & development updates
-  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, flagged }, null, 2)], { type: 'application/json' });
+  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, flagged, newsBoard }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -17543,7 +17581,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
@@ -19231,7 +19269,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -20214,7 +20252,7 @@ function glTiles() {
   add('learn', 'read', 'Learn', () => { const p = spToday(), t = travelToday(); return [langToday('mi')[0], p && p.name, t && t.name].filter(Boolean).join(' · '); }, 'i3-idea', ['#0d9488', '#1e3a8a'], "go('#learn')"); // 2.27.91: one Learn board for Word of the day, Space and Travel
   add('blogs', 'read', 'Blogs', () => (glFirst(HOME_CARD.blogging()) || {}).t, 'i3-note', ['#0d9488', '#155e75'], "go('#blogging')");
   add('posts', 'read', 'Your posts', () => { const p = postsSorted(); return p.length ? p[0].title : ''; }, 'i3-idea', ['#ca8a04', '#9a3412'], "go('#blogging/mine')");
-  add('localnews', 'read', 'Local news', () => { const n = (newsSec('local') || []).filter(newsOk); return n.length ? n[0].title : ''; }, B('news'), '', "go('#news')");
+  add('localnews', 'read', 'Local news', () => { const n = (newsSec('local') || []).filter(newsOk); return n.length ? n[0].title : ''; }, B('news'), '', "go('#localnews')");
   add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
   add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(evPlain); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
   add('concerts', 'out', 'Concerts', () => { const G = mdEvGroups(), e = G.akl[0] || G.concerts[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), e.date ? fmtW(e.date) : ''].filter(Boolean).join(' · ') : ''; }, 'i3-radio', ['#7c3aed', '#1e1b4b'], "go('#concerts')"); // 2.27.62
