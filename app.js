@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.90';
+const APP_VERSION = '2.27.91';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10603,6 +10603,7 @@ function More() {
     roadworks: () => rwmMoreSub(),
     travel: () => travelMoreSub(),
     space: () => spaceMoreSub(),
+    learn: () => 'Word of the day, Space and Travel',
     flagged: () => flaggedMoreSub(),
     sleep: () => 'Your sleep and morning check-in',
     gym: () => 'Gym visits and workouts',
@@ -10641,6 +10642,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   roster: ['clock', 'roster', 'Work hours', 'Work'],
   roadworks: ['wrench', 'rw', 'Roadworks', 'Roadworks'],
   travel: ['globe', 'ev', 'Travel', 'Travel'],
+  learn: ['star', 'ev', 'Learn', 'Learn'], // 2.27.91
   space: ['star', 'ev', 'Space', 'Space'], // 2.27.86: Space learning board
   sleep: ['moon', 'roster', 'Sleep', 'Sleep'],
   gym: ['heart', 'health', 'Gym', 'Gym'],
@@ -10670,7 +10672,7 @@ const NAV_GROUPS = [
   { id: 'near', title: 'Nearby', keys: ['bridge', 'roadworks', 'planning'] }, // 2.27.52: Travel is on the Media page
   { id: 'food', title: '', keys: ['food'] }, // 2.27.74: Meal planner and Recipes open from the Meals page
   { id: 'media', title: '', keys: ['media'] },
-  { id: 'space', title: '', keys: ['space'] } // 2.27.86: Space board, next to Entertainment (where Travel opens from) // 2.27.51: Media stands on its own; TV, videos, Top 40, blogs, podcasts, radio, news and events open from its page
+  { id: 'space', title: '', keys: ['learn', 'space'] } // 2.27.86: Space board, next to Entertainment (where Travel opens from) // 2.27.51: Media stands on its own; TV, videos, Top 40, blogs, podcasts, radio, news and events open from its page
 ];
 function navOrder() {
   return NAV_DEFAULT.slice();
@@ -16884,7 +16886,7 @@ function tbMenu(k) {
 function Travel() {
   const p = travelToday();
   setTimeout(() => { clearInterval(travelTick); travelTick = setInterval(travelPaintClock, 1000); }, 0);
-  return `<div class="tbboard"><div class="tbbg" aria-hidden="true"><img src="${esc(p.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"></div>
+  return `<button class="back" onclick="go('#learn')">${I('left')} Learn</button><div class="tbboard"><div class="tbbg" aria-hidden="true"><img src="${esc(p.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"></div>
     <div class="tbtop"><h1>Travel</h1><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
     <div class="tblists" id="tblists">${tbBoardHtml()}</div></div>
     <div class="foot">Swipe sideways between lists. Distances are straight-line from ${esc(ME().homeLabel)}. Photos from Wikimedia Commons.</div>`;
@@ -17110,11 +17112,35 @@ async function btAddSpace() {
 }
 function SpacePage() {
   const p = spToday(), btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('space'); } catch (e) { return true; } })();
-  return `<div class="tbboard"><div class="tbbg" aria-hidden="true">${p.img ? `<img src="${esc(p.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+  return `<button class="back" onclick="go('#learn')">${I('left')} Learn</button><div class="tbboard"><div class="tbbg" aria-hidden="true">${p.img ? `<img src="${esc(p.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
     <div class="tbtop"><h1>Space</h1><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
     <div class="tblists" id="splists">${spBoardHtml()}</div></div>
     ${btIn ? '' : `<button type="button" class="btn small" style="margin:10px 0 0" onclick="btAddSpace()">${I('plus')} Add to bottom bar</button>`}
     <div class="foot">Swipe sideways between lists. Summaries from Wikipedia, pictures from Wikimedia Commons (mostly NASA).</div>`;
+}
+// 2.27.91: Learn board. Word of the day, Space and Travel side by side, same .tb* board as Travel. Cards open the existing pages and sheets.
+function lnWordCard(k, back) {
+  const L = LANGS[k].list, w = L[(((langDay() - back) % L.length) + L.length) % L.length];
+  return `<button type="button" class="tbcard" onclick="go('#lang')"><div class="tbbody">${tbLbl([[LANGS[k].name, k === 'mi' ? '#16a34a' : '#2563eb']])}<div class="tbt">${esc(w[0])}</div><div class="tbs">${esc(w[1])}</div><div class="tbicons"><span>${back ? esc(fmtW(addDays(nzTodayISO(), -back))) : 'Today'}</span></div></div></button>`;
+}
+function lnMenu(k) { const T = { words: ['Word of the day', '#lang', 'Open Languages'], space: ['Space', '#space', 'Open Space board'], travel: ['Travel', '#travel', 'Open Travel board'] }[k]; if (T) go(T[1]); }
+function LearnPage() {
+  const t = travelToday(), btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('learn'); } catch (e) { return true; } })();
+  const lnk = (h, x) => `<a class="tbadd" href="${h}" style="text-decoration:none">${x} ›</a>`;
+  const words = [0, 1, 2, 3, 4, 5, 6].map(b => lnWordCard('mi', b) + lnWordCard('fr', b)).join('') + lnk('#lang', 'Open Languages');
+  const SD = spDays().slice(0, 5), space = SD.map((iso, i) => spTopicCard(spToday(iso), i ? fmtW(iso) : 'Today', iso, !i)).join('') + lnk('#space', 'Open Space board');
+  const TD = travelDays().slice(0, 5), trav = TD.map((iso, i) => { const p = travelToday(iso); return tbPlaceCard(p, (i ? fmtW(iso) : 'Today') + ' · ' + p.country, iso, !i); }).join('') + lnk('#travel', 'Open Travel board');
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true"><img src="${esc(t.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"></div>
+    <div class="tbtop"><h1>Learn</h1><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists" id="lnlists">${tbList('words', 'Word of the day', 14, words, false, 'ln')}${tbList('space', 'Space', SD.length, space, false, 'ln')}${tbList('travel', 'Travel', TD.length, trav, false, 'ln')}</div></div>
+    ${btIn ? '' : `<button type="button" class="btn small" style="margin:10px 0 0" onclick="btAddLearn()">${I('plus')} Add to bottom bar</button>`}
+    <div class="foot">Swipe sideways between lists. Tap a card to open it.</div>`;
+}
+async function btAddLearn() {
+  const s = snap(), b = btState();
+  if (b.keys.includes('learn')) { if (!b.on) { b.on = true; await save(); render(); } toast('Learn is on your bottom tabs.'); return; }
+  if (b.keys.length >= BT_MAX) { toast('Six tabs is the most. Remove one, then add Learn.'); btCustomise(); return; }
+  const i = b.keys.indexOf('more'); b.keys.splice(i < 0 ? b.keys.length : i, 0, 'learn'); b.on = true; await save(); render(); toast('Learn added to your bottom tabs.', 'Undo', undoTo(s));
 }
 function spaceMoreSub() { try { return 'Topic of the day: ' + esc(spToday().name); } catch (e) { return 'Learn about space'; } }
 // 2.22.98: one app-written line in the Home summary (no AI), same daily pick as the Travel tab. The place opens Travel.
@@ -19205,7 +19231,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -20137,7 +20163,7 @@ function debtForm() {
 }
 function Languages() {
   const st = langSt(), s = langStreak(st);
-  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Languages', 'A new te reo Māori and French word each day') +
+  return `<button class="back" onclick="go('#learn')">${I('left')} Learn</button>` + header('Languages', 'A new te reo Māori and French word each day') +
     `<div class="muted" style="margin:0 4px 10px;font-size:.85rem">${s ? `🔥 ${s}-day streak` : 'Learn a word or try the quiz to start a streak'}</div>` + langCard('mi') + langCard('fr') +
     `<div class="foot">Kept on this phone. “Hear it” uses your phone’s own voices; Māori audio shows only if your phone has a te reo Māori voice.</div>`;
 }
@@ -20170,7 +20196,7 @@ function glWxCard(m) {
   return `<button type="button" class="glwxc glwxc2${sky[3] ? ' gldark' : ''}" style="--s1:${sky[0]};--s2:${sky[1]};--s3:${sky[2]}" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}">${fx}<span class="glwxtop"><span class="glwxi">${wxIcon(nowW, 'big')}</span>${temp ? `<b class="glwxt">${temp}</b>` : ''}<b class="glwxn">${esc(nowW.words)}</b></span>${uv || sun ? `<span class="glwxchips">${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}${sun ? sunPill(sun, 'glsunp') : ''}</span>` : ''}${out ? `<span class="glwxout">${esc(out)}</span>` : ''}</button>`; // 2.26.97: compact, three rows
 }
 /* ---- Entertainment ---- */
-const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['learn', 'Learn'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
+const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
 const GL_SUNO = ['A Suno track about Onerahi and the harbour', 'A Suno song about a sunny day off', 'A calm Suno playlist for tonight', 'A Suno track about the Te Matau ā Pohe bridge', 'A Suno song about the Northland coast'];
 const glDay = () => { try { return aklDayNumber(); } catch (e) { return Math.floor(Date.now() / 864e5); } };
 function glPickRecipe() { try { const L = visibleIdeas().filter(i => i && i.title && !/\b(wheat|regular pasta|flour tortilla)\b/i.test(i.title)); if (!L.length) return null; return L[(glDay() * 3 + glOpenN) % L.length]; } catch (e) { return null; } }
@@ -20182,19 +20208,17 @@ function glTiles() {
   add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
   add('videos', 'watch', 'Videos', () => { let t = ''; try { const sv = currentSarahVideo(); const l = preferFilmVideoTitles(videoSuggestions() || []); const v = (sv ? [sv] : []).concat(l || []).find(x => x && x.title && glOk(x.title) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(x.title)); t = v ? v.title : ''; } catch (e) { } return t || 'Your video categories'; }, B('tv'), '', "go('#videos')");
   add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "glSarahOpen()");
-  add('lang', 'learn', 'Word of the day', () => { const m = langToday('mi'), f = langToday('fr'); return `${m[0]} · ${f[0]}`; }, 'i3-idea', ['#0d9488', '#1d4ed8'], "go('#lang')"); // 2.26.13
   add('top40', 'listen', 'Top 40 NZ', () => { const t = (typeof TOP40 !== 'undefined' && TOP40[0]) || null; return t ? '#1 ' + t.title + ' · ' + t.artist : 'This week’s NZ chart'; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
   add('radio', 'listen', 'Radio', () => (glFirst(HOME_CARD.radio()) || {}).t || 'NZ stations, live', 'i3-radio', ['#16a34a', '#065f46'], "go('#radio')");
   add('podcasts', 'listen', 'Podcasts', () => (glFirst(HOME_CARD.podcasts()) || {}).t, 'i3-phone', ['#9333ea', '#4c1d95'], "go('#podcasts')");
+  add('learn', 'read', 'Learn', () => { const p = spToday(), t = travelToday(); return [langToday('mi')[0], p && p.name, t && t.name].filter(Boolean).join(' · '); }, 'i3-idea', ['#0d9488', '#1e3a8a'], "go('#learn')"); // 2.27.91: one Learn board for Word of the day, Space and Travel
   add('blogs', 'read', 'Blogs', () => (glFirst(HOME_CARD.blogging()) || {}).t, 'i3-note', ['#0d9488', '#155e75'], "go('#blogging')");
   add('posts', 'read', 'Your posts', () => { const p = postsSorted(); return p.length ? p[0].title : ''; }, 'i3-idea', ['#ca8a04', '#9a3412'], "go('#blogging/mine')");
   add('localnews', 'read', 'Local news', () => { const n = (newsSec('local') || []).filter(newsOk); return n.length ? n[0].title : ''; }, B('news'), '', "go('#news')");
-  add('space', 'learn', 'Space', () => { const p = spToday(); return p ? 'Topic of the day: ' + p.name : 'Learn about space'; }, 'i3-weather', ['#1e3a8a', '#0f172a'], "go('#space')"); // 2.27.86
   add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
   add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(evPlain); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
   add('concerts', 'out', 'Concerts', () => { const G = mdEvGroups(), e = G.akl[0] || G.concerts[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), e.date ? fmtW(e.date) : ''].filter(Boolean).join(' · ') : ''; }, 'i3-radio', ['#7c3aed', '#1e1b4b'], "go('#concerts')"); // 2.27.62
   add('nightlife', 'out', 'Nightlife', () => { const e = mdEvGroups().nightlife[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), (e.date ? fmtW(e.date) : '') + (e.time ? ' ' + fmtTime(e.time) : '')].filter(Boolean).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#nightlife')"); // 2.27.63: own page
-  add('place', 'learn', 'Travel', () => { const p = travelToday(); return p ? 'Place of the day: ' + p.name + ', ' + p.country : 'Places to go'; }, B('travel'), '', "go('#travel')");
   add('recipe', 'fun', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
   // 2.26.20: joke, quote and fact back as their own blue tiles, each with its own setting; tap opens a sheet
   if (dailyJokeOn()) add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
@@ -20252,7 +20276,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'sarah', 'top40', 'radio', 'podcasts', 'blogs', 'posts', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'place', 'space', 'lang', 'recipe', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
+const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'sarah', 'top40', 'radio', 'podcasts', 'blogs', 'posts', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'recipe', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
@@ -20330,7 +20354,7 @@ function mdEvents(only) {
 function MediaPage() {
   setTimeout(() => { try { refreshEvents(); refreshNews(); } catch (e) { } }, 0);
   const all = homeTry('md tiles', () => glTiles().filter(t => MEDIA_TILES.has(t.k)), []), have = new Set(all.map(t => t.cat));
-  const mdOrd = (() => { let w = false; try { w = !!glMode().atWork; } catch (e) { } return w ? ['fun', 'read', 'learn', 'listen', 'watch', 'out'] : ['watch', 'listen', 'read', 'learn', 'fun', 'out']; })(), mdRank = c => { const i = mdOrd.indexOf(c); return i < 0 ? 99 : i; }; // 2.27.79: noisy first off work, quiet first on shift
+  const mdOrd = (() => { let w = false; try { w = !!glMode().atWork; } catch (e) { } return w ? ['fun', 'read', 'listen', 'watch', 'out'] : ['watch', 'listen', 'read', 'fun', 'out']; })(), mdRank = c => { const i = mdOrd.indexOf(c); return i < 0 ? 99 : i; }; // 2.27.79: noisy first off work, quiet first on shift
   const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).flatMap(c => c[0] === 'out' ? [c] : [c]).sort((x, y) => x[0] === 'all' ? -1 : y[0] === 'all' ? 1 : mdRank(x[0]) - mdRank(y[0])); // 2.27.63: Concerts and Nightlife are tiles with their own pages // 2.27.57: own tabs
     if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
   const list = mdFilt === 'all' ? all.map((t, i) => [t, i]).sort((x, y) => mdRank(x[0].cat) - mdRank(y[0].cat) || x[1] - y[1]).map(x => x[0]) : all.filter(t => t.cat === mdFilt);
