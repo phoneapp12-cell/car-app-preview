@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.82';
+const APP_VERSION = '2.27.83';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23289,7 +23289,7 @@ function flBtns(id) {
   const st = 'event.stopPropagation();event.preventDefault();if(window.glSwipe&&glSwipe.moved)return;';
   const tick = /ticket|eventfinda|ticketek|iticket|humanitix|eventbrite|ticketmaster|flicket|book/i.test(x.url || '');
   const cl = (() => { try { return flEv(x).days.some(d => evClash(d, x.time, '')); } catch (e) { return false; } })();
-  return `<div class="mbbtns flbtns">${ad ? `<button type="button" class="btn small" onclick="${st}calOpenDay(${parseD(ad.start)})">${I('check')} In your calendar ✓</button><button type="button" class="btn small" onclick="${st}flUndo(${esc(jsArg(id))})">Undo</button>` : ap ? `<button type="button" class="btn small" onclick="${st}apptForm('${ap.id}')">${I('check')} In your calendar ✓</button>` : `<button type="button" class="btn small primary" onclick="${st}flAdd(${esc(jsArg(id))})">${I('cal')} Add to calendar</button>`}${x.url ? `<button type="button" class="btn small" onclick="${st}window.open(${esc(jsArg(x.url))},'_blank','noopener')">${I('ticket')} ${tick ? 'Get tickets' : 'Event page'}</button>` : ''}</div>${cl && !ad && !ap ? `<div class="evclash flclash">⚠️ ${esc((() => { const d = flEv(x).days.find(dd => evClash(dd, x.time, '')); return evClashTxt(evClash(d, x.time, '')) + ' on ' + fmtW(d); })())}</div>` : ''}`;
+  return `<div class="mbbtns flbtns">${ad ? `<button type="button" class="btn small" onclick="${st}calOpenDay(${parseD(ad.start)})">${I('check')} In your calendar ✓</button><button type="button" class="btn small" onclick="${st}flUndo(${esc(jsArg(id))})">Undo</button>` : ap ? `<button type="button" class="btn small" onclick="${st}apptForm('${ap.id}')">${I('check')} In your calendar ✓</button>` : `<button type="button" class="btn small primary" onclick="${st}flAdd(${esc(jsArg(id))})">${I('cal')} Add to calendar</button>`}${x.url ? `<button type="button" class="btn small" onclick="${st}window.open(${jsArg(x.url)},'_blank','noopener')">${I('ticket')} ${tick ? 'Get tickets' : 'Event page'}</button>` : ''}</div>${cl && !ad && !ap ? `<div class="evclash flclash">⚠️ ${esc((() => { const d = flEv(x).days.find(dd => evClash(dd, x.time, '')); return evClashTxt(evClash(d, x.time, '')) + ' on ' + fmtW(d); })())}</div>` : ''}`;
 }
 (() => { const o = glWarnCard; glWarnCard = function (x) { const h = o(x); if (!x || !x.flag) return h; try { const b = flBtns(x.flag); if (!b) return h; const i = h.indexOf('<button type="button" class="glunflag"'); return i >= 0 ? h.slice(0, i) + b + h.slice(i) : h; } catch (e) { return h; } }; })();
 /* ================= 2.26.97: pin notifications =================
@@ -25527,6 +25527,35 @@ function netSheet() { const L = netList(), ok = (OUTG && OUTG.netOk) || {};
   return h + `<div class="srow"><div class="tx"><div class="t">Internet & mobile outage alerts</div><div class="s">Northpower Fibre and 2degrees outages around Whangārei on the bell page. Buzzes straight away for an unplanned outage; planned work at 6pm the day before (6pm the same day if it starts in the evening) and 7am on the day.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Internet and mobile outage alerts" onclick="toggleSetting('netAlerts').then(() => outRefresh(true))"></button></div>`; } catch (e) { return h; } }; })();
 // 2.27.42: the bell page re-checks outages when it opens (a copy saved before 2.27.41 had no internet/mobile list).
 window.addEventListener('hashchange', () => { if (/^#alerts/.test(location.hash)) outRefresh(false); });
+// ---- 2.27.83: Planning & development updates on the bell page ----
+/* From the relay's /planning (refreshed about every 6 hours, kept 30 days): Whangārei District Council news (projects,
+   plans, consultations, improvement works), NZ Government (Beehive) Northland releases, and RNZ / NZ Herald / Northern
+   Advocate headlines about development, planning and the new highways between Whangārei and Auckland. Source headline,
+   date, source name and link only; sport, court and crime are left out at the relay. Bell only: no push. Swipe to archive
+   (stays gone). New ones float into Just in like any other card. */
+const plnOn = () => (S.settings || {}).plnAlerts !== false;
+let PLN = null, plnBusy = false, plnTry = 0; try { PLN = JSON.parse(localStorage.getItem('planningFeed') || 'null'); } catch (e) { }
+async function plnLoad(force) {
+  if (!RELAY_URL || !plnOn() || plnBusy || navigator.onLine === false || (!force && Date.now() - plnTry < 60 * 60e3)) return;
+  plnBusy = true; plnTry = Date.now();
+  try { const d = await getJSON(RELAY_URL + '/planning', 20000); if (d && Array.isArray(d.items)) { PLN = { at: Date.now(), d }; try { localStorage.setItem('planningFeed', JSON.stringify(PLN)); } catch (e) { } glWarnRedraw(); } } catch (e) { }
+  finally { plnBusy = false; }
+}
+setTimeout(() => plnLoad(), 9000); setInterval(() => plnLoad(), 60 * 60e3);
+window.addEventListener('hashchange', () => { if (/^#alerts/.test(location.hash)) plnLoad(false); });
+const PLN_IC = { road: '🛣️', plan: '📋', dev: '🏗️' };
+function plnList() { const L = (PLN && PLN.d && PLN.d.items) || [], now = Date.now();
+  return L.filter(x => x && x.title && /^https:\/\//.test(x.url || '') && now - Date.parse(x.published) <= 30 * 864e5).sort((a, b) => String(b.published).localeCompare(String(a.published))); }
+function plnDay(iso) { const d = new Date(iso); if (isNaN(d)) return ''; const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); return k === todayISO() ? 'Today' : k === addDays(todayISO(), -1) ? 'Yesterday' : fmtW(k); }
+function plnRow(x, nk) { return `<div class="row glnew" data-nk="${esc(nk)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))window.open(${jsArg(x.url)},'_blank','noopener')"><div class="ic">${PLN_IC[x.kind] || '🏗️'}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc(['Planning & development', plnDay(x.published), x.src].filter(Boolean).join(' · '))}</div></div></div>`; }
+function plnBellRows() { try { if (!plnOn()) return []; const D = nfDis(), L = plnList().map(x => [x, 'bf-pln-' + bfH(x.url)]).filter(([, k]) => !D.includes(k));
+  const R = L.slice(0, 6).map(([x, k]) => plnRow(x, k)); if (L.length > 6) R.push(`<div class="row glnew" data-nk="pln-more" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))plnSheet()"><div class="ic">🏗️</div><div class="tx"><div class="t">${L.length - 6} more planning & development updates</div><div class="s">Last 30 days · tap to see them all</div></div></div>`); return R; } catch (e) { return []; } }
+function plnSheet() { const L = plnList();
+  openSheet('Planning & development', (L.length ? `<div class="list">${L.map(x => plnRow(x, 'x').replace(/ data-nk="x"/, '').replace('class="row glnew"', 'class="row"')).join('')}</div>` : '<div class="s">No planning or development updates in the last 30 days.</div>')
+    + `<div class="s muted" style="margin-top:10px">From Whangārei District Council news, NZ Government (Beehive) releases, RNZ, NZ Herald and the Northern Advocate. Headlines only, checked about every 6 hours, kept 30 days. NZTA and Northland Regional Council block automated reads, so highway news comes through government and news reports.</div>`, null); }
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = plnBellRows(); return B.length ? L.concat(B) : L; } catch (e) { return L; } }; })();
+(() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = plnOn();
+  return h + `<div class="srow"><div class="tx"><div class="t">Planning & development updates</div><div class="s">Council plans, consultations and projects, new developments around Whangārei and progress on the new highways to Auckland, on the bell page. Headlines from WDC, the Government, RNZ and the Herald. No buzz.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Planning and development updates" onclick="toggleSetting('plnAlerts').then(() => plnLoad(true))"></button></div>`; } catch (e) { return h; } }; })();
 
 // ---- 2.27.44: appointment and delivery texts ----
 /* SMS to URL Forwarder (open source, F-Droid) on Shane's phone posts each incoming text to the relay's /sms/in with a

@@ -48,6 +48,7 @@ import { getBridgeTraffic } from './bridge-traffic.js';
 import { getDrive } from './drive.js';
 import { getStoreBusy } from './busy.js';
 import { getLocalNews } from './news.js';
+import { getPlanning } from './planning.js';
 import { getBlogs } from './blogs.js';
 import { getRecs } from './recs.js';
 import { getPodcasts } from './podcasts.js';
@@ -111,6 +112,7 @@ const MESSAGES = {
   busy_unavailable: 'Store busyness could not be checked right now.',
   alerts_unavailable: 'Weather warnings could not be checked right now.',
   news_unavailable: 'Local news could not be loaded right now.',
+  planning_unavailable: 'Planning updates could not be loaded right now.',
   blogs_unavailable: 'Blogs could not be loaded right now.',
   podcasts_unavailable: 'Podcasts could not be loaded right now.',
   bad_query: 'Use a short English topic name.',
@@ -370,6 +372,14 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
       const body = data && data.level ? { basis: data.basis, level: data.level } : {};
       return new Response(JSON.stringify(body), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
     } catch (e) { return json(502, 'busy_unavailable', origin, env); }
+  }
+  if (path === '/planning') { // 2.27.83: planning & development updates (planning.js). Fixed sources, no input.
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try {
+      const data = await getPlanning(env, fetchImpl);
+      return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
+    } catch (e) { return json(502, 'planning_unavailable', origin, env); }
   }
   if (path === '/news') {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
