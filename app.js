@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.99';
+const APP_VERSION = '2.28.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14484,7 +14484,9 @@ function homeVideosCard() {
 }
 // 2.27.96: Videos board, same .tb* board as Travel. Today's picks, one list per category, plus Watch later / Watched in localStorage 'videoBoard' (in backups and Move my data).
 const VB_KEY = 'videoBoard', VB_LISTS = [['later', 'Watch later'], ['watched', 'Watched']], VB_COL = ['#dc2626', '#2563eb', '#16a34a', '#7c3aed', '#ea580c', '#0891b2', '#ca8a04', '#db2777', '#0d9488', '#475569', '#9333ea', '#65a30d'];
-function vbGet() { let o = null; try { o = JSON.parse(localStorage.getItem(VB_KEY) || 'null'); } catch (e) { } if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {}; VB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; }); return o; }
+function vbGet() { let o = null; try { o = JSON.parse(localStorage.getItem(VB_KEY) || 'null'); } catch (e) { } if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {}; if (!Array.isArray(o.custom)) o.custom = []; vbAllLists(o).forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; }); return o; }
+// 2.28.0: his own named lists sit after Watch later and Watched, then Deleted. Videos in these lists are his own copies, so removing a subject never touches them.
+function vbAllLists(o) { return [...VB_LISTS, ...((o && o.custom) || []), ['bin', 'Deleted']]; }
 function vbSave(o) { try { localStorage.setItem(VB_KEY, JSON.stringify(o)); } catch (e) { } }
 function vbRestore(o) { if (o && o.lists && typeof o.lists === 'object') vbSave(o); }
 const vbCat = id => VIDEO_CATS.find(c => c.id === id), vbCol = id => { const i = VIDEO_CATS.findIndex(c => c.id === id); return i < 0 ? '#475569' : VB_COL[i % VB_COL.length]; };
@@ -14495,22 +14497,40 @@ function vbCard(v) {
   return `<button type="button" class="tbcard" onclick="vbOpen(${jsArg(id)})"><div class="tbcover" style="background:#111;aspect-ratio:16/9;overflow:hidden"><img src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div><div class="tbbody">${tbLbl([[c ? c.name : 'Mine', vbCol(v.category)]])}<div class="tbt">${esc(v.title)}</div>${v.channel ? `<div class="tbs">${esc(v.channel)}</div>` : ''}</div></button>`;
 }
 function vbBoardHtml() {
-  VB_ALL = {}; const o = vbGet(), cats = enabledVideoCats(), ok = v => v && !isSport(v.title || '');
+  VB_ALL = {}; const o = vbGet(), cats = enabledVideoCats(), binned = new Set(o.lists.bin.map(x => x.id)), mineOk = v => v && !isSport(v.title || ''), ok = v => mineOk(v) && !binned.has(v.id || vbYt(v.url));
   const L = (k, t, a, add, none) => tbList(k, t, a.length, a.map(vbCard).join(''), add, 'vb', none);
   let picks = []; try { picks = homeVideoPicks().filter(v => ok(v) && v.category !== 'sarah'); } catch (e) { }
   return L('picks', 'Today’s picks', picks, false, 'No picks today') + cats.map(c => L('c_' + c.id, c.name, (videosForCat(c.id) || []).filter(ok), false, 'No videos left today')).join('') +
-    VB_LISTS.map(([k, t]) => L(k, t, o.lists[k].filter(ok), true, k === 'later' ? 'Tap a video, then Move to… Watch later' : 'Videos you play show here')).join('');
+    vbAllLists(o).map(([k, t]) => k === 'bin' ? L(k, t, o.lists[k].filter(mineOk), false, 'Move a video here to delete it') : L(k, t, o.lists[k].filter(ok), true, k === 'later' ? 'Tap a video, then Move to… Watch later' : k === 'watched' ? 'Videos you play show here' : 'Tap a video, then Move to… this list')).join('') +
+    `<section class="tblist" style="align-self:flex-start"><button type="button" class="tbadd" style="margin:0" onclick="vbNewList()">${I('plus')} Add a list</button></section>`;
 }
 function vbRedraw() { const el = document.getElementById('vblists'); if (!el) return; const x = el.scrollLeft; el.innerHTML = vbBoardHtml(); el.scrollLeft = x; }
-function vbMenu(k) { document.getElementById('vidcatq')?.focus(); }
+function vbMenu(k) {
+  const o = vbGet(), cu = o.custom.find(c => c[0] === k);
+  if (cu) return openSheet('List options', `<label class="field"><span>List name</span><input name="name" maxlength="40" value="${esc(cu[1])}"></label><button type="button" class="btn danger" style="margin-top:8px" onclick="closeSheet();vbDelList('${k}')">Delete this list</button>`,
+    f => { const n = String(f.name || '').trim(); if (!n) return 'Give the list a name.'; const g = vbGet(), c = g.custom.find(x => x[0] === k); if (c) c[1] = n.slice(0, 40); vbSave(g); return () => vbRedraw(); }, 'Save');
+  if (k === 'bin') { if (!o.lists.bin.length) return toast('Deleted is already empty.'); return confirmSheet('Empty Deleted?', 'These videos will be gone for good.', 'Empty', () => { const g = vbGet(), shot = JSON.stringify(g); g.lists.bin = []; vbSave(g); vbRedraw(); toast('Deleted emptied.', 'Undo', () => { vbSave(JSON.parse(shot)); vbRedraw(); }); }); }
+  if (k.startsWith('c_')) return askRemoveVideoCat(k.slice(2));
+  document.getElementById('vidcatq')?.focus();
+}
+function vbNewList() {
+  openSheet('New list', `<label class="field"><span>List name</span><input name="name" maxlength="40" placeholder="e.g. Woodwork ideas"></label>`,
+    f => { const n = String(f.name || '').trim(); if (!n) return 'Give the list a name.'; const g = vbGet(), k = 'u_' + Date.now().toString(36); g.custom.push([k, n.slice(0, 40)]); g.lists[k] = []; vbSave(g); return () => { vbRedraw(); setTimeout(() => { const el = document.getElementById('vblists'); if (el) el.scrollLeft = el.scrollWidth; }, 50); }; }, 'Add');
+}
+function vbDelList(k) {
+  const g0 = vbGet(), c = g0.custom.find(x => x[0] === k); if (!c) return;
+  confirmSheet('Delete ' + esc(c[1]) + '?', g0.lists[k].length ? 'Its videos will move to Deleted.' : 'The list is empty.', 'Delete', () => {
+    const g = vbGet(), shot = JSON.stringify(g); const ids = new Set(g.lists.bin.map(x => x.id)); (g.lists[k] || []).forEach(v => { if (!ids.has(v.id)) g.lists.bin.unshift(v); });
+    delete g.lists[k]; g.custom = g.custom.filter(x => x[0] !== k); vbSave(g); vbRedraw(); toast(c[1] + ' deleted.', 'Undo', () => { vbSave(JSON.parse(shot)); vbRedraw(); }); });
+}
 function vbPlay(id) { const o = vbGet(), v = VB_ALL[id]; if (v && !o.lists.watched.some(x => x.id === id)) { o.lists.watched.unshift(v); o.lists.watched = o.lists.watched.slice(0, 100); vbSave(o); } setTimeout(() => { if (!sheetOpen) vbRedraw(); }, 300); }
 function vbOpen(id) {
-  const v = VB_ALL[id]; if (!v) return; const o = vbGet(), cur = o.lists.later.some(x => x.id === id) ? 'later' : o.lists.watched.some(x => x.id === id) ? 'watched' : '';
+  const v = VB_ALL[id]; if (!v) return; const o = vbGet(), AL = vbAllLists(o), cur = (AL.find(([j]) => j !== 'watched' && o.lists[j].some(x => x.id === id)) || (o.lists.watched.some(x => x.id === id) ? ['watched'] : ['']))[0];
   openSheet(esc(v.title), `<div style="aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;margin-bottom:8px"><iframe id="vbframe" src="https://www.youtube-nocookie.com/embed/${esc(id)}?autoplay=1&playsinline=1&rel=0" title="${esc(v.title)}" style="width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
     <p class="muted" style="margin:0 0 8px">${esc(v.channel)}</p>
     <div class="btns"><a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener">▶ YouTube</a><button type="button" class="btn" onclick="vbTv(${jsArg(id)})">📺 TV</button></div>
-    <label class="field"><span>Move to…</span><select name="list"><option value="">Not in my lists</option>${VB_LISTS.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
-    f => { const g = vbGet(); VB_LISTS.forEach(([j]) => { g.lists[j] = g.lists[j].filter(x => x.id !== id); }); if (f.list && g.lists[f.list]) g.lists[f.list].unshift(v); vbSave(g); return () => vbRedraw(); }, 'Save');
+    <label class="field"><span>Move to…</span><select name="list"><option value="">Not in my lists</option>${AL.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
+    f => { if ((f.list || '') === cur) return () => vbRedraw(); const g = vbGet(); vbAllLists(g).forEach(([j]) => { if (j === 'watched' && f.list !== 'bin' && cur !== 'watched') return; g.lists[j] = g.lists[j].filter(x => x.id !== id); }); if (f.list && g.lists[f.list]) g.lists[f.list].unshift(v); vbSave(g); if (f.list === 'bin') toast('Moved to Deleted.'); return () => vbRedraw(); }, 'Save');
   vbPlay(id);
 }
 // 2.27.98: the browser can't cast a plain YouTube link, so the TV button opens the video in the YouTube app on Android,
