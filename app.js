@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.84';
+const APP_VERSION = '2.27.85';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16778,40 +16778,109 @@ async function travelImgFail(img) {
   } catch (e) {}
   box.classList.add('noimg');
 }
-// 2.27.70: Place of the day is a swipeable history: today first, then every earlier day back to the start of the cycle.
-// The pick is fixed by date (TRAVEL_ORDER, unchanged since TRAVEL_START), so earlier days are rebuilt, not stored.
-let travelAt = 0;
+// 2.27.85: Travel is a Trello-style board. Fixed lists: Place of the day (today) and Previous places (every earlier day of
+// the cycle, newest first; the pick is fixed by date so these are rebuilt, not stored). User lists Want to go, Planning and
+// Been there are kept in localStorage 'travelBoard' (in backups and Move my data). Tap a card for details and Move to….
+const TB_KEY = 'travelBoard', TB_LISTS = [['want', 'Want to go'], ['plan', 'Planning'], ['been', 'Been there']];
+const TB_START = ['Book flights', 'Book accommodation', 'Travel insurance', 'Passport check'];
 const travelDays = () => { const t = nzTodayISO(), n = Math.max(0, Math.round((parseD(t) - parseD(TRAVEL_START)) / DAY)); return Array.from({ length: n + 1 }, (_, i) => addDays(t, -i)); };
-function travelCardHtml(i) {
-  const D = travelDays(); travelAt = Math.max(0, Math.min(D.length - 1, i)); const iso = D[travelAt];
-  const p = travelToday(iso), now = new Date(), c = travelClock(p.tz, now), km = travelKm(p.lat, p.lon);
-  const maps = 'https://www.google.com/maps/search/?api=1&query=' + p.lat + ',' + p.lon;
-  const lbl = (travelAt ? fmtW(iso) : 'Today') + ' · ' + (travelAt + 1) + ' of ' + D.length;
-  return `<div class="trnav" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px"><button type="button" class="btn small" aria-label="Newer place" ${travelAt ? '' : 'disabled'} onclick="travelGo(-1)">‹ Newer</button><span class="muted" style="font-size:.85rem;font-weight:650">${esc(lbl)}</span><button type="button" class="btn small" aria-label="Older place" ${travelAt < D.length - 1 ? '' : 'disabled'} onclick="travelGo(1)">Older ›</button></div>
-      <div class="trphoto" data-wiki="${esc(p.wiki)}"><img src="${esc(p.img)}" alt="${esc(p.name)}, ${esc(p.country)}" loading="eager" referrerpolicy="no-referrer" onerror="travelImgFail(this)"><div class="trnoimg">${I('globe')}<span>${esc(p.name)}</span></div></div>
+function tbGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(TB_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  TB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  if (!o.seeded) { o.seeded = true; o.lists.plan = TB_START.map(t => ({ id: uid('tb'), title: t, note: '' })).concat(o.lists.plan); tbSave(o); }
+  return o;
+}
+function tbSave(o) { try { localStorage.setItem(TB_KEY, JSON.stringify(o)); } catch (e) { } }
+function tbRestore(o) { if (o && o.lists && typeof o.lists === 'object') { o.seeded = true; tbSave(o); } }
+const tbPlace = name => { const i = TRAVEL.findIndex(t => t[0] === name); return i < 0 ? null : travelToday.fromRow(TRAVEL[i]); };
+travelToday.fromRow = t => ({ name: t[0], country: t[1], lat: t[2], lon: t[3], tz: t[4], img: t[5], credit: t[6], file: t[7], wiki: t[8], paras: t[9] });
+// Labels come from the place's own data: its country and the region part of its time zone.
+const TB_REG = { Pacific: ['Pacific', '#0891b2'], Europe: ['Europe', '#2563eb'], Asia: ['Asia', '#dc2626'], Africa: ['Africa', '#d97706'], America: ['Americas', '#7c3aed'], Australia: ['Australia', '#ea580c'], Atlantic: ['Atlantic', '#0284c7'], Indian: ['Indian Ocean', '#0d9488'], Antarctica: ['Antarctica', '#64748b'] };
+function tbLabels(p) {
+  if (!p) return []; if (p.country === 'New Zealand') return [['Aotearoa', '#16a34a']];
+  const r = TB_REG[String(p.tz).split('/')[0]]; return r ? [r] : [];
+}
+const tbLbl = L => L.length ? `<div class="tblbls">${L.map(([t, c]) => `<span class="tblbl" style="background:${c}" title="${esc(t)}">${esc(t)}</span>`).join('')}</div>` : '';
+function tbCover(p, big) {
+  return `<div class="tbcover trphoto${big ? ' big' : ''}" data-wiki="${esc(p.wiki)}"><img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="travelImgFail(this)"><div class="trnoimg">${I('globe')}<span>${esc(p.name)}</span></div></div>`;
+}
+function tbPlaceCard(p, sub, iso, big) {
+  return `<button type="button" class="tbcard" onclick="tbOpenPlace(${jsArg(p.name)},${jsArg(iso || '')})">${tbCover(p, big)}<div class="tbbody">${tbLbl(tbLabels(p))}<div class="tbt">${esc(p.name)}</div><div class="tbs">${esc(sub)}</div><div class="tbicons">${I('globe')}<span>${esc(travelKmText(travelKm(p.lat, p.lon)))}</span><span class="tbdesc" aria-label="Has details">≡</span></div></div></button>`;
+}
+function tbUserCard(k, c) {
+  const p = c.place ? tbPlace(c.place) : null;
+  return `<button type="button" class="tbcard" onclick="tbOpenCard('${k}',${jsArg(c.id)})">${p ? tbCover(p) : ''}<div class="tbbody">${tbLbl(tbLabels(p))}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.length > 90 ? c.note.slice(0, 88) + '…' : c.note)}</div>` : p ? `<div class="tbs">${esc(p.country)}</div>` : ''}${c.note || p ? `<div class="tbicons">${p ? `${I('globe')}<span>${esc(travelKmText(travelKm(p.lat, p.lon)))}</span>` : ''}${c.note ? '<span class="tbdesc" aria-label="Has a note">≡</span>' : ''}</div>` : ''}</div></button>`;
+}
+function tbList(k, title, n, inner, add) {
+  return `<section class="tblist" data-k="${k}"><div class="tbhead"><h3>${esc(title)}</h3><span class="tbn">${n}</span><button type="button" class="tbmenu" aria-label="${esc(title)} options" onclick="tbMenu('${k}')">…</button></div><div class="tbcards">${inner || '<div class="tbempty">No cards yet</div>'}</div>${add ? `<button type="button" class="tbadd" onclick="tbAdd('${k}')">${I('plus')} Add a card</button>` : ''}</section>`;
+}
+function tbBoardHtml() {
+  const D = travelDays(), today = travelToday(D[0]), o = tbGet();
+  const prev = D.slice(1).map(iso => tbPlaceCard(travelToday(iso), fmtW(iso) + ' · ' + travelToday(iso).country, iso)).join('');
+  return tbList('today', 'Place of the day', 1, tbPlaceCard(today, 'Today · ' + today.country + ' · ' + sumTravelTime(today.tz) + ' there', D[0], true), false) +
+    tbList('prev', 'Previous places', D.length - 1, prev, false) +
+    TB_LISTS.map(([k, t]) => tbList(k, t, o.lists[k].length, o.lists[k].map(c => tbUserCard(k, c)).join(''), true)).join('');
+}
+function tbRedraw() { const el = document.getElementById('tblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = tbBoardHtml(); el.scrollLeft = x; }
+function tbPlaceDetail(p, iso) {
+  const now = new Date(), c = travelClock(p.tz, now), km = travelKm(p.lat, p.lon), maps = 'https://www.google.com/maps/search/?api=1&query=' + p.lat + ',' + p.lon;
+  return `<div class="trcard tbsheet" id="travelcard">${iso ? `<div class="muted" style="font-size:.85rem;font-weight:650;margin:0 0 8px">${iso === nzTodayISO() ? 'Place of the day · today' : 'Place of the day · ' + esc(fmtW(iso))}</div>` : ''}
+      <div class="trphoto" data-wiki="${esc(p.wiki)}"><img src="${esc(p.img)}" alt="${esc(p.name)}, ${esc(p.country)}" referrerpolicy="no-referrer" onerror="travelImgFail(this)"><div class="trnoimg">${I('globe')}<span>${esc(p.name)}</span></div></div>
       <div class="trcredit muted">Photo: ${esc(p.credit)} · <a href="https://commons.wikimedia.org/wiki/${esc(p.file)}" target="_blank" rel="noopener">source</a></div>
-      <h2 class="trname" id="trname">${esc(p.name)}</h2><div class="muted trcountry">${esc(p.country)}</div>
+      ${tbLbl(tbLabels(p))}<h2 class="trname">${esc(p.name)}</h2><div class="muted trcountry">${esc(p.country)}</div>
       <div class="trfacts">
-        <div class="trfact"><span class="muted">From home</span><b id="trkm">${travelKmText(km)}</b><span class="muted">as the crow flies</span></div>
+        <div class="trfact"><span class="muted">From home</span><b>${travelKmText(km)}</b><span class="muted">as the crow flies</span></div>
         <div class="trfact" id="trclock" data-tz="${esc(p.tz)}"><span class="muted">Time there now</span><b class="trtime">${esc(c.time)}</b><span class="muted trdate">${esc(c.date)}</span></div>
       </div>
       <p class="muted trdiff" style="margin-top:8px;margin-bottom:0">${esc(travelDiffText(p.tz, now))}</p>
       <div class="trtext">${p.paras.map(x => `<p>${esc(x)}</p>`).join('')}</div>
-      <div class="btns"><a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a><a class="btn" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wiki)}" target="_blank" rel="noopener">${I('ext')} Read more</a></div>`;
+      <div class="btns"><a class="btn" href="${esc(maps)}" target="_blank" rel="noopener">${I('pin')} Open in Maps</a><a class="btn" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wiki)}" target="_blank" rel="noopener">${I('ext')} Read more</a></div></div>`;
 }
-function travelGo(d) { const el = document.getElementById('travelcard'); if (!el) return; const n = travelAt + d; if (n < 0 || n >= travelDays().length) return; el.innerHTML = travelCardHtml(n); try { travelPaintClock(); } catch (e) { } }
-function travelSwipeInit() {
-  const el = document.getElementById('travelcard'); if (!el || el.dataset.sw) return; el.dataset.sw = 1; let x0 = null, y0 = 0;
-  el.addEventListener('touchstart', e => { const t = e.touches[0]; x0 = e.touches.length === 1 ? t.clientX : null; y0 = t.clientY; }, { passive: true });
-  el.addEventListener('touchend', e => { if (x0 == null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > 1.8 * Math.abs(dy)) travelGo(dx < 0 ? 1 : -1); }, { passive: true }); // swipe left = older, right = newer
+function tbOpenPlace(name, iso) {
+  const p = tbPlace(name); if (!p) return; const o = tbGet();
+  const where = TB_LISTS.filter(([k]) => o.lists[k].some(c => c.place === name)).map(([, t]) => t);
+  openSheet(esc(p.name), tbPlaceDetail(p, iso) + `<div class="tbmove"><div class="lbl">Move to…</div>${where.length ? `<div class="muted" style="font-size:.8125rem;margin-bottom:6px">Already in ${esc(where.join(', '))}</div>` : ''}<div class="chips">${TB_LISTS.map(([k, t]) => `<button type="button" class="chip" onclick="tbCopyPlace(${jsArg(name)},'${k}')">${esc(t)}</button>`).join('')}</div></div>`, null);
+  try { travelPaintClock(); } catch (e) { }
+}
+async function tbCopyPlace(name, k) {
+  const o = tbGet(), t = (TB_LISTS.find(x => x[0] === k) || [])[1];
+  if (o.lists[k].some(c => c.place === name)) { toast('Already in ' + t + '.'); return; }
+  TB_LISTS.forEach(([j]) => { o.lists[j] = o.lists[j].filter(c => c.place !== name); }); // one place lives in one of your lists
+  o.lists[k].unshift({ id: uid('tb'), title: name, note: '', place: name }); tbSave(o); await closeSheet(); tbRedraw(); toast(name + ' moved to ' + t + '.');
+}
+function tbFind(k, id) { const o = tbGet(), L = o.lists[k] || []; return { o, L, c: L.find(x => x.id === id) }; }
+function tbAdd(k) {
+  const t = (TB_LISTS.find(x => x[0] === k) || [])[1]; if (!t) return;
+  openSheet('Add a card to ' + esc(t), `<label class="field"><span>Title</span><input id="tbt" name="title" maxlength="120" required placeholder="e.g. Rarotonga"></label><label class="field"><span>Note (optional)</span><textarea id="tbn" name="note" rows="3" maxlength="1000"></textarea></label>`,
+    v => { if (!v.title) return 'Give the card a title.'; const o = tbGet(); o.lists[k].push({ id: uid('tb'), title: v.title.slice(0, 120), note: (v.note || '').slice(0, 1000) }); tbSave(o); return () => tbRedraw(); }, 'Add card');
+  setTimeout(() => { const i = document.getElementById('tbt'); if (i) i.focus(); }, 50);
+}
+function tbOpenCard(k, id) {
+  const { c } = tbFind(k, id); if (!c) return; const p = c.place ? tbPlace(c.place) : null;
+  openSheet(esc(c.title), (p ? tbPlaceDetail(p, '') : '') + `<label class="field"><span>Title</span><input id="tbt" name="title" maxlength="120" value="${esc(c.title)}"></label><label class="field"><span>Note</span><textarea id="tbn" name="note" rows="3" maxlength="1000">${esc(c.note || '')}</textarea></label>
+    <label class="field"><span>Move to…</span><select id="tbl" name="list"></label>${TB_LISTS.map(([j, t]) => `<option value="${j}"${j === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
+    v => { if (!v.title) return 'Give the card a title.'; const f = tbFind(k, id); if (!f.c) return; f.c.title = v.title.slice(0, 120); f.c.note = (v.note || '').slice(0, 1000);
+      const to = TB_LISTS.some(x => x[0] === v.list) ? v.list : k; if (to !== k) { f.o.lists[k] = f.L.filter(x => x.id !== id); f.o.lists[to].unshift(f.c); } tbSave(f.o); return () => tbRedraw(); }, 'Save',
+    `<button type="button" class="btn danger" onclick="tbDel('${k}',${jsArg(id)})">Delete</button>`);
+  if (p) try { travelPaintClock(); } catch (e) { }
+}
+async function tbDel(k, id) {
+  const f = tbFind(k, id); if (!f.c) return; const before = JSON.stringify(f.o); f.o.lists[k] = f.L.filter(x => x.id !== id); tbSave(f.o); await closeSheet(); tbRedraw();
+  toast('Card deleted.', 'Undo', () => { try { tbSave(JSON.parse(before)); } catch (e) { } tbRedraw(); });
+}
+function tbMenu(k) {
+  const user = TB_LISTS.find(x => x[0] === k);
+  const txt = k === 'today' ? 'A new place each day at midnight NZ time, ' + TRAVEL.length + ' places before any repeat. Tomorrow: somewhere in ' + travelToday(addDays(nzTodayISO(), 1)).country + '.' : k === 'prev' ? 'Every earlier place of the day since ' + fmtW(TRAVEL_START) + ', newest first. Tap one to read about it or move it to one of your lists.' : 'Your own list, saved on this phone and in your backups. Tap a card to edit it, move it or delete it.';
+  openSheet(esc(user ? user[1] : k === 'today' ? 'Place of the day' : 'Previous places'), `<p class="muted" style="margin:0 0 6px">${esc(txt)}</p>`, null, 'Save', user ? `<button type="button" class="btn primary" onclick="closeSheet().then(()=>tbAdd('${k}'))">${I('plus')} Add a card</button>` : '');
 }
 function Travel() {
-  const tmr = travelToday(addDays(nzTodayISO(), 1));
-  setTimeout(() => { clearInterval(travelTick); travelTick = setInterval(travelPaintClock, 1000); travelSwipeInit(); }, 0);
-  return header('Travel', 'Somewhere new in the world every day') +
-    `<div class="card trcard" id="travelcard" style="touch-action:pan-y">${travelCardHtml(0)}</div>
-    <div class="foot">A new place each day at midnight NZ time, ${TRAVEL.length} places before any repeat. Swipe or use the arrows for earlier days. Tomorrow: somewhere in ${esc(tmr.country)}. Distances are straight-line from ${esc(ME().homeLabel)}.</div>`;
+  const p = travelToday();
+  setTimeout(() => { clearInterval(travelTick); travelTick = setInterval(travelPaintClock, 1000); }, 0);
+  return `<div class="tbboard"><div class="tbbg" aria-hidden="true"><img src="${esc(p.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"></div>
+    <div class="tbtop"><h1>Travel</h1><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists" id="tblists">${tbBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists. Distances are straight-line from ${esc(ME().homeLabel)}. Photos from Wikimedia Commons.</div>`;
 }
 // 2.22.98: one app-written line in the Home summary (no AI), same daily pick as the Travel tab. The place opens Travel.
 function sumTravelTime(tz, now = new Date()) {
@@ -17187,7 +17256,8 @@ async function requestPersist() { try { if (navigator.storage && navigator.stora
 function backupBlob() {
   const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
   let planning = null; try { planning = plnKeepGet(); } catch (e) { } // 2.27.84: kept planning & development updates
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning }, null, 2)], { type: 'application/json' });
+  let travelBoard = null; try { travelBoard = tbGet(); } catch (e) { } // 2.27.85: Travel board lists
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -17212,7 +17282,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
