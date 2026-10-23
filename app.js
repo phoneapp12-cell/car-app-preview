@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.86';
+const APP_VERSION = '2.27.87';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10601,6 +10601,7 @@ function More() {
     roadworks: () => rwmMoreSub(),
     travel: () => travelMoreSub(),
     space: () => spaceMoreSub(),
+    flagged: () => flaggedMoreSub(),
     sleep: () => 'Your sleep and morning check-in',
     gym: () => 'Gym visits and workouts',
     meds: () => 'Your medications',
@@ -10650,7 +10651,8 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   heat: ['sun', 'garden', 'Heat pumps', 'Heat'],
   alarm: ['shield', 'garden', 'Alarm', 'Alarm'],
   media: ['play', 'vid', 'Entertainment', 'Entertain'], // 2.27.51
-  projects: ['wrench', 'rw', 'Projects', 'Projects'], // 2.27.76: Projects page (renovations and days off plan)
+  projects: ['wrench', 'rw', 'Projects', 'Projects'],
+  flagged: ['flag', 'todo', 'Flagged', 'Flagged'], // 2.27.87: ClickUp-style flagged items // 2.27.76: Projects page (renovations and days off plan)
   planning: ['flag', 'rw', 'Planning', 'Planning'], // 2.27.84: Planning & development page (kept copy of the /planning feed)
   food: ['meal', 'meal', 'Meals', 'Meals'] // 2.27.74: Meals page (planner, recipes, shopping). #meals stays the planner so old links keep working
 };
@@ -17487,8 +17489,8 @@ async function requestPersist() { try { if (navigator.storage && navigator.stora
 function backupBlob() {
   const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
   let planning = null; try { planning = plnKeepGet(); } catch (e) { } // 2.27.84: kept planning & development updates
-  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard }, null, 2)], { type: 'application/json' });
+  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, flagged }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -17513,7 +17515,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
@@ -19144,7 +19146,7 @@ function bottomTabsSetting() {
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'food', meals: 'food', recipes: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', weather: 'weather', media: 'tv' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -19165,7 +19167,7 @@ function tabbar(active) {
   const pwrBtn = (() => { const l = (() => { try { const t = PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })(); return `<button class="${active === 'power' ? 'on' : ''}" ${active === 'power' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#power')"><span class="w"><span style="font-size:1.3rem;line-height:1">⚡</span></span><span class="lbl">${l}</span></button>`; })();
   const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'commission' ? `<button class="${active === 'wage' ? 'on' : ''}" ${active === 'wage' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#wage')"><span class="w"><span style="font-size:1.3rem;line-height:1">💵</span></span><span class="lbl">Wage estimate</span></button>` : '') + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
   // 2.26.78: the project pages sit under a 'Projects' heading; Power moved into Money (as a link to Money › Power)
-  const reno = `<div class="tabgrp g-projects">${btn('projects')}</div>`; // 2.27.76: the project pages open from the Projects page
+  const reno = `<div class="tabgrp g-projects">${btn('projects')}${btn('flagged')}</div>`; // 2.27.76: the project pages open from the Projects page
   $('#tabbar').innerHTML = groups + reno + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
@@ -19201,7 +19203,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -22333,7 +22335,8 @@ glAlertsBody = function () {
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
   const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent), mbC = p.mb.filter(x => !x.urgent && x.coming), rmU = p.rm.filter(x => x.urgent), rmC = p.rm.filter(x => !x.urgent && x.coming), rmTop = new Set(p.rm.filter(x => x.urgent || x.coming).map(x => x.key.split('|')[1])), rmL = p.rm.filter(x => !x.urgent && !x.coming && !rmTop.has(x.key.split('|')[1])); /* 2.26.54: not again at the bottom */
   const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length || abU.length || mbU.length || rmU.length ? `<div class="list">${rmU.map(x => x.html).join('')}${mbU.map(x => x.html).join('')}${pwU.map(x => x.html).join('')}${abU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
-  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', p.coming.length || gC || abN.length || mbC.length || rmC.length ? `<div class="list">${rmC.map(x => x.html).join('')}${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}${mbC.map(x => x.html).join('')}</div>` : '') +
+  const flC = (() => { try { return flgCuHtml(); } catch (e) { return ''; } })(); // 2.27.87: flagged items due today or overdue
+  const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', flC || p.coming.length || gC || abN.length || mbC.length || rmC.length ? `<div class="list">${flC}${rmC.map(x => x.html).join('')}${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}${mbC.map(x => x.html).join('')}</div>` : '') +
     sec('New on your lists <span class="glswipehint">swipe left to archive</span>', nlN.length ? `<div class="list">${nlN.map(x => x.html).join('')}</div>` : '') +
     sec('From Sarah', p.sarah.length ? `<div class="list">${p.sarah.join('')}</div>` : '') +
     sec('Power <span class="glswipehint">swipe left to archive</span>', pwN.length ? `<div class="list">${pwN.map(x => x.html).join('')}</div>` : '') +
@@ -25892,7 +25895,7 @@ function plnListHtml() {
   if (q) L = L.filter(x => (x.title + ' ' + x.src + ' ' + (x.desc || '')).toLowerCase().includes(q));
   plnStar.L = L.map(x => x.url);
   if (!L.length) return `<div class="card empty"><div class="t">${q ? 'Nothing matches that search' : plnF === 'star' ? 'Nothing starred yet' : 'No updates kept yet'}</div><div class="s">${plnF === 'star' && !q ? 'Tap the star on any update to keep it at hand.' : 'New planning and development updates are saved here as they come in.'}</div></div>`;
-  return `<div class="list">` + L.map((x, i) => `<div class="row"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;color:inherit;text-decoration:none"><div class="ic">${PLN_IC[x.kind] || '🏗️'}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc([PLN_CAT[x.kind] || 'Developments', plnDay(x.published), x.src].filter(Boolean).join(' · '))}</div></div></a><button type="button" class="icon-btn" aria-label="${x.star ? 'Remove star' : 'Star to keep'}" aria-pressed="${!!x.star}" onclick="plnStar(${i})" style="background:none;border:0;font-size:1.35rem;line-height:1;padding:6px;color:${x.star ? '#eab308' : 'var(--ink3)'}">${x.star ? '★' : '☆'}</button></div>`).join('') + `</div>`;
+  return `<div class="list">` + L.map((x, i) => `<div class="row"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;color:inherit;text-decoration:none"><div class="ic">${PLN_IC[x.kind] || '🏗️'}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc([PLN_CAT[x.kind] || 'Developments', plnDay(x.published), x.src].filter(Boolean).join(' · '))}</div></div></a><button type="button" class="icon-btn" aria-label="${x.star ? 'Remove star' : 'Star to keep'}" aria-pressed="${!!x.star}" onclick="plnStar(${i})" style="background:none;border:0;font-size:1.35rem;line-height:1;padding:6px;color:${x.star ? '#eab308' : 'var(--ink3)'}">${x.star ? '★' : '☆'}</button>${flgPlanBtn(x.url, x.title)}</div>`).join('') + `</div>`;
 }
 async function btAddPlanning() {
   const s = snap(), b = btState();
@@ -26066,3 +26069,126 @@ function pairSettings() {
   return `<div class="sec" id="pairset">Sarah’s To-do</div><div class="list"><div style="padding:12px">${body}</div></div>`;
 }
 (() => { const o = hwSettings; hwSettings = function () { const h = o.apply(this, arguments); try { return h + pairSettings(); } catch (e) { return h; } }; })();
+
+/* ================= 2.27.87: Flagged (ClickUp-style, all on the phone) =================
+   Flag a bill, to-do, appointment, event, Travel/Space card or planning update to build on it. Each flagged item keeps a
+   copy of its source (type, id, title, date) so it links back, and stays if the source goes. Status, priority, due date,
+   sub-tasks with a progress bar, notes and links. #flagged: List (by status) or Board (status columns, Travel board CSS).
+   Saved in localStorage 'flaggedItems' (in backups and Move my data). Due today or overdue shows in Coming up. */
+const FLG_KEY = 'flaggedItems', FLG_ST = [['todo', 'To do'], ['prog', 'In progress'], ['done', 'Done']];
+const FLG_PRI = [['urgent', 'Urgent', '#e11d2a'], ['high', 'High', '#e8a400'], ['normal', 'Normal', '#3b9ee0'], ['low', 'Low', '#9aa3ab']];
+const FLG_SRC = { event: ['Event', 'events'], appt: ['Appointment', 'events'], bill: ['Bill', 'bills'], todo: ['To-do', 'todos'], travel: ['Travel', 'other'], space: ['Space', 'other'], planning: ['Planning', 'other'] };
+let flgView = 'list', flgF = 'all';
+function flgGet() { try { const o = JSON.parse(localStorage.getItem(FLG_KEY) || 'null'); if (o && Array.isArray(o.items)) return o; } catch (e) { } return { items: [] }; }
+function flgSave(o) { try { localStorage.setItem(FLG_KEY, JSON.stringify(o)); } catch (e) { } }
+function flgRestore(o) { if (o && Array.isArray(o.items)) flgSave(o); }
+const flgPri = k => FLG_PRI.find(p => p[0] === k) || FLG_PRI[2];
+const flgFlag = (k, big) => `<svg viewBox="0 0 24 24" class="flgf${big ? ' big' : ''}" aria-hidden="true"><path d="M5 21V4m0 0h11l-2 4 2 4H5" fill="${flgPri(k)[2]}" stroke="${flgPri(k)[2]}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+const flgProg = x => { const n = (x.subs || []).length, d = (x.subs || []).filter(s => s.done).length; return { n, d, pc: n ? Math.round(d / n * 100) : (x.status === 'done' ? 100 : 0) }; };
+const flgBar = x => { const p = flgProg(x); return p.n ? `<div class="flgbar" title="${p.d} of ${p.n} done"><i style="width:${p.pc}%"></i></div><span class="flgpc">${p.d}/${p.n}</span>` : ''; };
+const flgDue = x => x.due ? (daysLeft(x.due) < 0 ? 'Overdue · ' : daysLeft(x.due) === 0 ? 'Today · ' : '') + fmtW(x.due) : '';
+function flgSrcLive(s) {
+  try {
+    if (s.type === 'bill') return S.bills.some(b => b.id === s.id); if (s.type === 'todo') return S.todos.some(t => t.id === s.id); if (s.type === 'appt') return S.appts.some(a => a.id === s.id);
+    if (s.type === 'event') return !!evById(s.id); if (s.type === 'travel') return !!tbPlace(s.id) || TB_LISTS.some(([k]) => tbGet().lists[k].some(c => c.id === s.id));
+    if (s.type === 'space') return !!spByName(s.id) || SP_LISTS.some(([k]) => spGet().lists[k].some(c => c.id === s.id)); if (s.type === 'planning') return true;
+  } catch (e) { } return false;
+}
+async function flgOpenSrc(id) {
+  const x = flgGet().items.find(i => i.id === id); if (!x) return; const s = x.src || {}; await closeSheet();
+  if (!flgSrcLive(s)) { toast('The original has gone. Your flagged copy is kept.'); return; }
+  if (s.type === 'bill') billForm(s.id); else if (s.type === 'todo') todoForm(s.id); else if (s.type === 'appt') apptForm(s.id);
+  else if (s.type === 'event') go('#events'); else if (s.type === 'travel') go('#travel'); else if (s.type === 'space') go('#space');
+  else if (s.type === 'planning' && /^https:\/\//.test(s.id)) window.open(s.id, '_blank', 'noopener');
+}
+async function flgAdd(src) {
+  if (!src || !src.type || !src.id) return; const o = flgGet(), had = o.items.find(i => i.src && i.src.type === src.type && i.src.id === src.id);
+  if (had) { await closeSheet(); flgOpen(had.id); return; }
+  const x = { id: uid('fl'), src: { type: src.type, id: String(src.id).slice(0, 300), title: String(src.title || '').slice(0, 160), date: src.date || '' }, title: String(src.title || 'Flagged item').slice(0, 160), status: 'todo', pri: 'normal', due: /^\d{4}-\d\d-\d\d$/.test(src.date || '') ? src.date : '', subs: [], notes: '', links: src.url && /^https:\/\//.test(src.url) ? [src.url] : [], at: Date.now() };
+  o.items.unshift(x); flgSave(o); await closeSheet(); toast('Flagged. Build on it here.'); flgOpen(x.id); try { glBellRedraw(); } catch (e) { }
+}
+// Flag button on a source's sheet: put in the sheet's title row
+function flgInject(src) {
+  const h = document.querySelector('#sheet .panel h3'); if (!h || !src || !src.id || h.querySelector('.flgbtn')) return;
+  const on = flgGet().items.some(i => i.src && i.src.type === src.type && i.src.id === String(src.id));
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'flgbtn' + (on ? ' on' : ''); b.innerHTML = flgFlag(on ? 'urgent' : 'low') + (on ? 'Flagged' : 'Flag'); b.setAttribute('aria-label', on ? 'Open flagged item' : 'Flag this to build on it');
+  b.onclick = () => flgAdd(src); h.classList.add('flgh'); h.appendChild(b);
+}
+function flgHook(name, ctx) { const o = window[name]; if (typeof o !== 'function') return; window[name] = function () { const r = o.apply(this, arguments); try { const c = ctx.apply(null, arguments); if (c) flgInject(c); } catch (e) { } return r; }; }
+flgHook('billForm', id => { const b = id && S.bills.find(x => x.id === id); return b && { type: 'bill', id: b.id, title: b.name, date: b.due }; });
+flgHook('todoForm', id => { const t = id && S.todos.find(x => x.id === id); return t && { type: 'todo', id: t.id, title: t.title, date: t.due }; });
+flgHook('apptForm', id => { const a = id && S.appts.find(x => x.id === id); return a && { type: 'appt', id: a.id, title: a.title, date: a.date, url: a.evUrl }; });
+flgHook('tbOpenPlace', (n, iso) => ({ type: 'travel', id: n, title: n, date: '' }));
+flgHook('tbOpenCard', (k, id) => { const c = tbFind(k, id).c; return c && { type: 'travel', id: c.id, title: c.title }; });
+flgHook('spOpenTopic', n => ({ type: 'space', id: n, title: n }));
+flgHook('spOpenCard', (k, id) => { const c = spFind(k, id).c; return c && { type: 'space', id: c.id, title: c.title }; });
+// Events: flagging an event (existing Notifications flag) also makes a flagged item to build on
+(() => { const o = evFlagToggle; evFlagToggle = async function (id, ev) { const was = evFlagged(id); await o.apply(this, arguments); try { if (!was && evFlagged(id)) { const e = evById(id); if (e && !flgGet().items.some(i => i.src && i.src.type === 'event' && i.src.id === e.id)) { const f = flgGet(); f.items.unshift({ id: uid('fl'), src: { type: 'event', id: e.id, title: String(e.title || '').slice(0, 160), date: e.date || '' }, title: String(e.title || 'Event').slice(0, 160), status: 'todo', pri: 'normal', due: e.date || '', subs: [], notes: '', links: /^https:\/\//.test(e.url || '') ? [e.url] : [], at: Date.now() }); flgSave(f); toast('Flagged. It’s in Flagged to build on, and shows in Notifications.', 'Open', () => go('#flagged')); } } } catch (e) { } }; })();
+function flgPlanBtn(url, title, pub) { return `<button type="button" aria-label="Flag this update" onclick="flgAdd({type:'planning',id:${esc(JSON.stringify(url))},title:${esc(JSON.stringify(title))},date:'',url:${esc(JSON.stringify(url))}})" style="background:none;border:0;padding:6px;line-height:0">${flgFlag(flgGet().items.some(i => i.src && i.src.id === url) ? 'urgent' : 'low')}</button>`; }
+function flgSubsHtml(x) {
+  return `<div class="flgsubs">${(x.subs || []).map(s => `<label class="flgsub"><input type="checkbox" ${s.done ? 'checked' : ''} onchange="flgSubTick(${jsArg(x.id)},${jsArg(s.id)},this.checked)"><span${s.done ? ' class="done"' : ''}>${esc(s.t)}</span><button type="button" aria-label="Remove sub-task" onclick="flgSubDel(${jsArg(x.id)},${jsArg(s.id)})">×</button></label>`).join('')}</div>
+    <div class="flgprog">${flgBar(x)}</div>
+    <div class="flgaddsub"><input id="flgsubin" placeholder="Add a sub-task" maxlength="140" onkeydown="if(event.key==='Enter'){event.preventDefault();flgSubAdd(${jsArg(x.id)})}"><button type="button" class="btn small" onclick="flgSubAdd(${jsArg(x.id)})">${I('plus')} Add</button></div>`;
+}
+function flgSubRedraw(id) { const x = flgGet().items.find(i => i.id === id), el = document.getElementById('flgsubbox'); if (x && el) el.innerHTML = flgSubsHtml(x); flgRedraw(); }
+function flgEdit(id, fn) { const o = flgGet(), x = o.items.find(i => i.id === id); if (!x) return; fn(x); flgSave(o); }
+function flgSubAdd(id) { const i = document.getElementById('flgsubin'), t = i && i.value.trim(); if (!t) return; flgEdit(id, x => { x.subs = (x.subs || []).concat({ id: uid('st'), t: t.slice(0, 140), done: false }); }); flgSubRedraw(id); setTimeout(() => { const n = document.getElementById('flgsubin'); if (n) n.focus(); }, 0); }
+function flgSubTick(id, sid, on) { flgEdit(id, x => { const s = (x.subs || []).find(y => y.id === sid); if (s) s.done = !!on; }); flgSubRedraw(id); }
+function flgSubDel(id, sid) { flgEdit(id, x => { x.subs = (x.subs || []).filter(y => y.id !== sid); }); flgSubRedraw(id); }
+function flgOpen(id) {
+  const x = flgGet().items.find(i => i.id === id); if (!x) return; const s = x.src || {}, live = flgSrcLive(s), src = FLG_SRC[s.type] || ['Item'];
+  const sel = (n, L, v) => `<select name="${n}">${L.map(([k, t]) => `<option value="${k}"${k === v ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  openSheet(flgFlag(x.pri, true) + ' ' + esc(x.title),
+    `<div class="flgsrc">${esc(src[0])}${s.title && s.title !== x.title ? ': ' + esc(s.title) : ''}${s.date ? ' · ' + esc(fmtW(s.date)) : ''} · ${live ? `<a href="javascript:void 0" onclick="flgOpenSrc(${jsArg(x.id)})">Open original</a>` : '<span class="muted">original gone, copy kept</span>'}</div>
+    <label class="field"><span>Title</span><input name="title" maxlength="160" value="${esc(x.title)}"></label>
+    <div style="display:flex;gap:10px"><label class="field" style="flex:1"><span>Status</span>${sel('status', FLG_ST, x.status)}</label><label class="field" style="flex:1"><span>Priority</span>${sel('pri', FLG_PRI, x.pri)}</label></div>
+    <label class="field"><span>Due date</span><input type="date" name="due" value="${esc(x.due || '')}"></label>
+    <div class="field"><span>Sub-tasks</span><div id="flgsubbox">${flgSubsHtml(x)}</div></div>
+    <label class="field"><span>Notes</span><textarea name="notes" rows="3" maxlength="2000">${esc(x.notes || '')}</textarea></label>
+    <label class="field"><span>Links (one per line)</span><textarea name="links" rows="2" maxlength="2000" placeholder="https://">${esc((x.links || []).join('\n'))}</textarea></label>
+    ${(x.links || []).length ? `<div class="flglinks">${x.links.map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">${I('ext')} ${esc(u.replace(/^https:\/\/(www\.)?/, '').slice(0, 50))}</a>`).join('')}</div>` : ''}`,
+    v => { if (!v.title) return 'Give it a title.'; flgEdit(id, y => { y.title = v.title.slice(0, 160); y.status = FLG_ST.some(a => a[0] === v.status) ? v.status : 'todo'; y.pri = FLG_PRI.some(a => a[0] === v.pri) ? v.pri : 'normal'; y.due = /^\d{4}-\d\d-\d\d$/.test(v.due || '') ? v.due : ''; y.notes = (v.notes || '').slice(0, 2000); y.links = String(v.links || '').split(/\s+/).filter(u => /^https:\/\/\S+$/.test(u)).slice(0, 10); });
+      return () => { flgRedraw(); try { glBellRedraw(); } catch (e) { } }; }, 'Save',
+    `<button type="button" class="btn danger" onclick="flgDel(${jsArg(id)})">Delete</button>`);
+}
+async function flgDel(id) { const o = flgGet(), before = JSON.stringify(o); o.items = o.items.filter(i => i.id !== id); flgSave(o); await closeSheet(); flgRedraw(); toast('Flagged item deleted.', 'Undo', () => { try { flgSave(JSON.parse(before)); } catch (e) { } flgRedraw(); }); }
+function flgStatusMenu(id) {
+  const x = flgGet().items.find(i => i.id === id); if (!x) return;
+  openSheet('Move ' + esc(x.title), `<div class="chips">${FLG_ST.map(([k, t]) => `<button type="button" class="chip${x.status === k ? ' on' : ''}" onclick="flgSetStatus(${jsArg(id)},'${k}')">${esc(t)}</button>`).join('')}</div>`, null);
+}
+async function flgSetStatus(id, st) { flgEdit(id, x => { x.status = st; }); await closeSheet(); flgRedraw(); try { glBellRedraw(); } catch (e) { } }
+const flgFiltered = () => flgGet().items.filter(x => flgF === 'all' || ((FLG_SRC[(x.src || {}).type] || [0, 'other'])[1]) === flgF)
+  .sort((a, b) => FLG_PRI.findIndex(p => p[0] === a.pri) - FLG_PRI.findIndex(p => p[0] === b.pri) || String(a.due || '9').localeCompare(String(b.due || '9')));
+function flgRow(x) {
+  const s = [(FLG_SRC[(x.src || {}).type] || ['Item'])[0], flgDue(x)].filter(Boolean).join(' · '), od = x.due && x.status !== 'done' && daysLeft(x.due) < 0;
+  return `<div class="row flgrow"><button type="button" class="flgmain" onclick="flgOpen(${jsArg(x.id)})"><div class="ic">${flgFlag(x.pri)}</div><div class="tx"><div class="t${x.status === 'done' ? ' flgdone' : ''}">${esc(x.title)}</div><div class="s"${od ? ' style="color:var(--red);font-weight:650"' : ''}>${esc(s)}</div>${flgProg(x).n ? `<div class="flgprog">${flgBar(x)}</div>` : ''}</div></button><button type="button" class="tbmenu" aria-label="Change status" onclick="flgStatusMenu(${jsArg(x.id)})">…</button></div>`;
+}
+function flgCard(x) {
+  return `<button type="button" class="tbcard" onclick="flgOpen(${jsArg(x.id)})"><div class="tbbody"><div class="tblbls"><span class="tblbl" style="background:${flgPri(x.pri)[2]}">${esc(flgPri(x.pri)[1])}</span><span class="tblbl" style="background:#475569">${esc((FLG_SRC[(x.src || {}).type] || ['Item'])[0])}</span></div><div class="tbt">${esc(x.title)}</div>${x.due ? `<div class="tbs">${esc(flgDue(x))}</div>` : ''}${flgProg(x).n ? `<div class="flgprog">${flgBar(x)}</div>` : ''}</div></button>`;
+}
+function flgMenu(k) { const t = (FLG_ST.find(s => s[0] === k) || [])[1]; openSheet(esc(t || ''), `<p class="muted" style="margin:0 0 6px">Tap a card to open it. To move it, open it and change Status, or use … in the List view.</p>`, null); }
+function flgBodyHtml() {
+  const L = flgFiltered();
+  if (!flgGet().items.length) return `<div class="card empty"><div class="t">Nothing flagged yet</div><div class="s">Open a bill, to-do, appointment, Travel or Space card and tap Flag. Flagging an event in Events or a planning update works too.</div></div>`;
+  if (flgView === 'board') return `<div class="tbboard flgboard"><div class="tblists">${FLG_ST.map(([k, t]) => { const C = L.filter(x => x.status === k); return tbList(k, t, C.length, C.map(flgCard).join(''), false, 'flg', 'Nothing here'); }).join('')}</div></div>`;
+  return FLG_ST.map(([k, t]) => { const C = L.filter(x => x.status === k); return `<div class="sec">${esc(t)} <span class="muted">${C.length}</span></div>` + (C.length ? `<div class="list">${C.map(flgRow).join('')}</div>` : '<p class="muted glhint">Nothing here.</p>'); }).join('');
+}
+function flgChips() { const n = f => f === 'all' ? flgGet().items.length : flgGet().items.filter(x => ((FLG_SRC[(x.src || {}).type] || [0, 'other'])[1]) === f).length;
+  return [['list', 'List'], ['board', 'Board']].map(([k, t]) => `<button type="button" class="chip ${flgView === k ? 'on' : ''}" onclick="flgView='${k}';flgRedraw()">${t}</button>`).join('') + '<span style="width:10px"></span>' +
+    [['all', 'All'], ['events', 'Events'], ['bills', 'Bills'], ['todos', 'To-dos'], ['other', 'Other']].map(([k, t]) => `<button type="button" class="chip ${flgF === k ? 'on' : ''}" onclick="flgF='${k}';flgRedraw()">${t} ${n(k) ? `<span class="muted">${n(k)}</span>` : ''}</button>`).join(''); }
+function flgRedraw() { const el = document.getElementById('flgbody'); if (!el) { if (/^#flagged/.test(location.hash)) render(); return; } el.innerHTML = flgBodyHtml(); const c = document.getElementById('flgchips'); if (c) c.innerHTML = flgChips(); }
+async function btAddFlagged() {
+  const s = snap(), b = btState();
+  if (b.keys.includes('flagged')) { if (!b.on) { b.on = true; await save(); render(); } toast('Flagged is on your bottom tabs.'); return; }
+  if (b.keys.length >= BT_MAX) { toast('Six tabs is the most. Remove one, then add Flagged.'); btCustomise(); return; }
+  const i = b.keys.indexOf('more'); b.keys.splice(i < 0 ? b.keys.length : i, 0, 'flagged'); b.on = true; await save(); render(); toast('Flagged added to your bottom tabs.', 'Undo', undoTo(s));
+}
+function FlaggedPage() {
+  const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('flagged'); } catch (e) { return true; } })();
+  return header('Flagged', 'Things you’ve flagged to build on') + (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddFlagged()">${I('plus')} Add to bottom bar</button>`) +
+    `<div class="chips" id="flgchips">${flgChips()}</div><div id="flgbody">${flgBodyHtml()}</div><div class="foot">Saved on this phone and in your backups. If the original goes, your flagged copy stays.</div>`;
+}
+function flgCuHtml() {
+  const T = todayISO(); return flgGet().items.filter(x => x.status !== 'done' && x.due && x.due <= T).map(x => `<button class="row" onclick="flgOpen(${jsArg(x.id)})"><div class="ic">${flgFlag(x.pri)}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s"${x.due < T ? ' style="color:var(--red);font-weight:650"' : ''}>Flagged · ${esc(x.due < T ? 'Overdue since ' + fmtW(x.due) : 'Due today')}${flgProg(x).n ? ' · ' + flgProg(x).d + '/' + flgProg(x).n + ' sub-tasks' : ''}</div></div></button>`).join('');
+}
+function flaggedMoreSub() { const L = flgGet().items.filter(x => x.status !== 'done'); return L.length ? plural(L.length, 'open item') : 'Flag things to build on them'; }
