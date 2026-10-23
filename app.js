@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.83';
+const APP_VERSION = '2.27.84';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10578,6 +10578,7 @@ function More() {
     meals: () => mealsMoreSub(),
     food: () => 'Meal planner, recipes and shopping',
     projects: () => 'Renovations and your days off plan',
+    planning: () => 'Whangārei growth, plans and highways',
     recipes: () => plural(visibleIdeas().length, 'recipe') + (M().ideas.some(i => i.fav && !i.hidden) ? ` · ${M().ideas.filter(i => i.fav && !i.hidden).length} favourites` : ''),
     shopping: () => shopMoreSub(),
     pets: () => petsMoreSub(),
@@ -10648,6 +10649,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   alarm: ['shield', 'garden', 'Alarm', 'Alarm'],
   media: ['play', 'vid', 'Entertainment', 'Entertain'], // 2.27.51
   projects: ['wrench', 'rw', 'Projects', 'Projects'], // 2.27.76: Projects page (renovations and days off plan)
+  planning: ['flag', 'rw', 'Planning', 'Planning'], // 2.27.84: Planning & development page (kept copy of the /planning feed)
   food: ['meal', 'meal', 'Meals', 'Meals'] // 2.27.74: Meals page (planner, recipes, shopping). #meals stays the planner so old links keep working
 };
 const NAV_DEFAULT = Object.keys(NAV);
@@ -10659,7 +10661,7 @@ const NAV_GROUPS = [
   { id: 'people', title: 'People', keys: ['birthdays', 'pets', 'health', 'watch', 'claims', 'about'] },
   { id: 'cars', title: 'Cars', keys: ['cars'] }, // 2.26.94: its own heading like the other groups
   { id: 'life', title: 'Home life', keys: ['shopping', 'garden', 'ideas', 'lights', 'heat', 'alarm'] },
-  { id: 'near', title: 'Nearby', keys: ['bridge', 'roadworks'] }, // 2.27.52: Travel is on the Media page
+  { id: 'near', title: 'Nearby', keys: ['bridge', 'roadworks', 'planning'] }, // 2.27.52: Travel is on the Media page
   { id: 'food', title: '', keys: ['food'] }, // 2.27.74: Meal planner and Recipes open from the Meals page
   { id: 'media', title: '', keys: ['media'] } // 2.27.51: Media stands on its own; TV, videos, Top 40, blogs, podcasts, radio, news and events open from its page
 ];
@@ -17184,7 +17186,8 @@ async function requestPersist() { try { if (navigator.storage && navigator.stora
 /* ---------- backup ---------- */
 function backupBlob() {
   const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data }, null, 2)], { type: 'application/json' });
+  let planning = null; try { planning = plnKeepGet(); } catch (e) { } // 2.27.84: kept planning & development updates
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -17209,7 +17212,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
@@ -18840,7 +18843,7 @@ function bottomTabsSetting() {
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
 const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'food', meals: 'food', recipes: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather', media: 'tv' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', weather: 'weather', media: 'tv' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -18897,7 +18900,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -25538,7 +25541,7 @@ let PLN = null, plnBusy = false, plnTry = 0; try { PLN = JSON.parse(localStorage
 async function plnLoad(force) {
   if (!RELAY_URL || !plnOn() || plnBusy || navigator.onLine === false || (!force && Date.now() - plnTry < 60 * 60e3)) return;
   plnBusy = true; plnTry = Date.now();
-  try { const d = await getJSON(RELAY_URL + '/planning', 20000); if (d && Array.isArray(d.items)) { PLN = { at: Date.now(), d }; try { localStorage.setItem('planningFeed', JSON.stringify(PLN)); } catch (e) { } glWarnRedraw(); } } catch (e) { }
+  try { const d = await getJSON(RELAY_URL + '/planning', 20000); if (d && Array.isArray(d.items)) { PLN = { at: Date.now(), d }; try { localStorage.setItem('planningFeed', JSON.stringify(PLN)); } catch (e) { } try { plnKeepMerge(d.items); } catch (e) { } glWarnRedraw(); if (/^#planning/.test(location.hash)) render(); } } catch (e) { }
   finally { plnBusy = false; }
 }
 setTimeout(() => plnLoad(), 9000); setInterval(() => plnLoad(), 60 * 60e3);
@@ -25549,13 +25552,62 @@ function plnList() { const L = (PLN && PLN.d && PLN.d.items) || [], now = Date.n
 function plnDay(iso) { const d = new Date(iso); if (isNaN(d)) return ''; const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); return k === todayISO() ? 'Today' : k === addDays(todayISO(), -1) ? 'Yesterday' : fmtW(k); }
 function plnRow(x, nk) { return `<div class="row glnew" data-nk="${esc(nk)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))window.open(${jsArg(x.url)},'_blank','noopener')"><div class="ic">${PLN_IC[x.kind] || '🏗️'}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc(['Planning & development', plnDay(x.published), x.src].filter(Boolean).join(' · '))}</div></div></div>`; }
 function plnBellRows() { try { if (!plnOn()) return []; const D = nfDis(), L = plnList().map(x => [x, 'bf-pln-' + bfH(x.url)]).filter(([, k]) => !D.includes(k));
-  const R = L.slice(0, 6).map(([x, k]) => plnRow(x, k)); if (L.length > 6) R.push(`<div class="row glnew" data-nk="pln-more" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))plnSheet()"><div class="ic">🏗️</div><div class="tx"><div class="t">${L.length - 6} more planning & development updates</div><div class="s">Last 30 days · tap to see them all</div></div></div>`); return R; } catch (e) { return []; } }
+  const R = L.slice(0, 6).map(([x, k]) => plnRow(x, k)); if (L.length > 6) R.push(`<div class="row glnew" data-nk="pln-more" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))go('#planning')"><div class="ic">🏗️</div><div class="tx"><div class="t">${L.length - 6} more planning & development updates</div><div class="s">Tap to open Planning & development, where every update is kept</div></div></div>`); return R; } catch (e) { return []; } }
 function plnSheet() { const L = plnList();
   openSheet('Planning & development', (L.length ? `<div class="list">${L.map(x => plnRow(x, 'x').replace(/ data-nk="x"/, '').replace('class="row glnew"', 'class="row"')).join('')}</div>` : '<div class="s">No planning or development updates in the last 30 days.</div>')
     + `<div class="s muted" style="margin-top:10px">From Whangārei District Council news, NZ Government (Beehive) releases, RNZ, NZ Herald and the Northern Advocate. Headlines only, checked about every 6 hours, kept 30 days. NZTA and Northland Regional Council block automated reads, so highway news comes through government and news reports.</div>`, null); }
 (() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = plnBellRows(); return B.length ? L.concat(B) : L; } catch (e) { return L; } }; })();
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = plnOn();
   return h + `<div class="srow"><div class="tx"><div class="t">Planning & development updates</div><div class="s">Council plans, consultations and projects, new developments around Whangārei and progress on the new highways to Auckland, on the bell page. Headlines from WDC, the Government, RNZ and the Herald. No buzz.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Planning and development updates" onclick="toggleSetting('plnAlerts').then(() => plnLoad(true))"></button></div>`; } catch (e) { return h; } }; })();
+
+// ---- 2.27.84: Planning & development page (#planning) ----
+/* A permanent copy on the phone: every item ever received from /planning is kept in localStorage 'planningKeep'
+   (no 30-day expiry; newest 500 kept, starred ones never dropped), so items stay after the relay lets them go.
+   Chips: All / Highways / Plans & consultations / Developments / Starred, plus a search box. Included in backups and Move my data. */
+const PLK_MAX = 500, PLN_CAT = { road: 'Highways', plan: 'Plans & consultations', dev: 'Developments' };
+let plnF = 'all', plnQ = '';
+function plnKeepGet() { try { const o = JSON.parse(localStorage.getItem('planningKeep') || 'null'); if (o && Array.isArray(o.items)) return o; } catch (e) { } return { items: [] }; }
+function plnKeepSave(o) { try { localStorage.setItem('planningKeep', JSON.stringify(o)); } catch (e) { } }
+function plnKeepMerge(list, keepStar) {
+  const o = plnKeepGet(), by = new Map(o.items.map(x => [x.url, x])); let ch = false;
+  (list || []).forEach(x => { if (!x || !x.title || !/^https:\/\//.test(x.url || '')) return; const old = by.get(x.url);
+    const n = { title: String(x.title).slice(0, 300), url: x.url, published: x.published || '', src: x.src || '', kind: x.kind || 'dev', desc: x.desc ? String(x.desc).slice(0, 400) : '', got: (old && old.got) || x.got || Date.now(), star: !!((old && old.star) || (keepStar && x.star)) };
+    if (!old || old.title !== n.title || old.kind !== n.kind || old.published !== n.published || old.star !== n.star) { by.set(x.url, n); ch = true; } });
+  if (!ch) return;
+  let L = [...by.values()].sort((a, b) => String(b.published).localeCompare(String(a.published)));
+  if (L.length > PLK_MAX) { const st = L.filter(x => x.star), rest = L.filter(x => !x.star).slice(0, Math.max(0, PLK_MAX - st.length)); L = st.concat(rest).sort((a, b) => String(b.published).localeCompare(String(a.published))); }
+  o.items = L; plnKeepSave(o);
+}
+try { if (PLN && PLN.d && Array.isArray(PLN.d.items)) plnKeepMerge(PLN.d.items); } catch (e) { }
+function plnStar(i) { const o = plnKeepGet(), x = o.items.find(y => y.url === plnStar.L[i]); if (!x) return; x.star = !x.star; plnKeepSave(o); toast(x.star ? 'Starred. It’ll stay even if the list gets long.' : 'Star removed.'); plnRedraw(); }
+function plnSet(f) { plnF = f; plnRedraw(true); }
+function plnRedraw(chips) { const el = document.getElementById('plnlist'); if (!el) return render(); el.innerHTML = plnListHtml(); if (chips) { const c = document.getElementById('plnchips'); if (c) c.innerHTML = plnChipsHtml(); } }
+function plnChipsHtml() { const L = plnKeepGet().items, n = k => k === 'all' ? L.length : k === 'star' ? L.filter(x => x.star).length : L.filter(x => (x.kind || 'dev') === k).length;
+  return [['all', 'All'], ['road', 'Highways'], ['plan', 'Plans & consultations'], ['dev', 'Developments'], ['star', '★ Starred']].map(([k, t]) => `<button type="button" class="chip ${plnF === k ? 'on' : ''}" onclick="plnSet('${k}')">${esc(t)} ${n(k) ? `<span class="muted">${n(k)}</span>` : ''}</button>`).join(''); }
+function plnListHtml() {
+  const q = plnQ.trim().toLowerCase(); let L = plnKeepGet().items;
+  if (plnF === 'star') L = L.filter(x => x.star); else if (plnF !== 'all') L = L.filter(x => (x.kind || 'dev') === plnF);
+  if (q) L = L.filter(x => (x.title + ' ' + x.src + ' ' + (x.desc || '')).toLowerCase().includes(q));
+  plnStar.L = L.map(x => x.url);
+  if (!L.length) return `<div class="card empty"><div class="t">${q ? 'Nothing matches that search' : plnF === 'star' ? 'Nothing starred yet' : 'No updates kept yet'}</div><div class="s">${plnF === 'star' && !q ? 'Tap the star on any update to keep it at hand.' : 'New planning and development updates are saved here as they come in.'}</div></div>`;
+  return `<div class="list">` + L.map((x, i) => `<div class="row"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="display:flex;gap:12px;align-items:flex-start;flex:1;min-width:0;color:inherit;text-decoration:none"><div class="ic">${PLN_IC[x.kind] || '🏗️'}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc([PLN_CAT[x.kind] || 'Developments', plnDay(x.published), x.src].filter(Boolean).join(' · '))}</div></div></a><button type="button" class="icon-btn" aria-label="${x.star ? 'Remove star' : 'Star to keep'}" aria-pressed="${!!x.star}" onclick="plnStar(${i})" style="background:none;border:0;font-size:1.35rem;line-height:1;padding:6px;color:${x.star ? '#eab308' : 'var(--ink3)'}">${x.star ? '★' : '☆'}</button></div>`).join('') + `</div>`;
+}
+async function btAddPlanning() {
+  const s = snap(), b = btState();
+  if (b.keys.includes('planning')) { if (!b.on) { b.on = true; await save(); render(); } toast('Planning is on your bottom tabs.'); return; }
+  if (b.keys.length >= BT_MAX) { toast('Six tabs is the most. Remove one, then add Planning.'); btCustomise(); return; }
+  const i = b.keys.indexOf('more'); b.keys.splice(i < 0 ? b.keys.length : i, 0, 'planning'); b.on = true; await save(); render(); toast('Planning added to your bottom tabs.', 'Undo', undoTo(s));
+}
+function PlanningPage() {
+  setTimeout(() => { try { plnLoad(false); } catch (e) { } }, 0);
+  const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('planning'); } catch (e) { return true; } })(), n = plnKeepGet().items.length;
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Planning & development', 'Whangārei growth, plans and highways') +
+    (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddPlanning()">${I('plus')} Add to bottom bar</button>`) +
+    `<div class="chips" id="plnchips">${plnChipsHtml()}</div>` +
+    (n ? `<label class="search">${I('search')}<input id="plnq" type="search" placeholder="Search updates" value="${esc(plnQ)}" aria-label="Search planning updates" oninput="plnQ=this.value;document.getElementById('plnlist').innerHTML=plnListHtml()"></label>` : '') +
+    `<div id="plnlist">${plnListHtml()}</div>` +
+    `<div class="foot">From Whangārei District Council, NZ Government (Beehive) releases, RNZ, NZ Herald and the Northern Advocate, checked about every 6 hours. Every update is kept on this phone (the newest ${PLK_MAX}, and starred ones always), and goes into your backup. NZTA blocks automated reads, so highway news comes through government and news reports.</div>`;
+}
 
 // ---- 2.27.44: appointment and delivery texts ----
 /* SMS to URL Forwarder (open source, F-Droid) on Shane's phone posts each incoming text to the relay's /sms/in with a
