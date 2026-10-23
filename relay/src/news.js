@@ -183,7 +183,7 @@ async function robotsOk(u, fetchImpl) {
   return !dis.some(d => { const re = new RegExp('^' + d.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\\\$$/, '$')); return re.test(path); });
 }
 const unent = s => s.replace(/&amp;/g, '&').replace(/&#x2F;/g, '/').replace(/&quot;/g, '"');
-async function ogImage(url, env, fetchImpl) {
+export async function ogImage(url, env, fetchImpl) {
   const key = 'ogimg2:' + url;
   if (env.EVENTS_KV) { try { const c = await env.EVENTS_KV.get(key); if (c !== null) return c; } catch (e) { } }
   let img = '';

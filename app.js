@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.93';
+const APP_VERSION = '2.27.94';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7807,7 +7807,7 @@ function mealIdeaList() {
     <button class="tapzone mealpair" onclick="go('#recipe/${i.id}')">${mealPic(i)}<div class="s">${desc}</div></button></div>`;
   }).join('')}</div>`;
 }
-function Recipes() {
+function RecipesOld() {
   const hidden = M().ideas.filter(i => i.hidden).length, mine = M().ideas.some(i => !i.builtin && !i.hidden);
   if ((mealFilter === 'Hidden' && !hidden) || (mealFilter === 'Mine' && !mine)) mealFilter = 'All';
   return header('Recipes', plural(visibleIdeas().length, 'recipe') + (hidden ? ` · ${hidden} hidden` : ''), addBtn('Add a recipe', 'mealIdeaForm()')) + mealTabs('recipes') +
@@ -7816,6 +7816,64 @@ function Recipes() {
     <div class="chips scroll">${['All', '★', ...(mine ? ['Mine'] : []), ...MEAL_TAGS, ...(hidden ? ['Hidden'] : [])].map(c => `<button class="chip ${c === mealFilter ? 'on' : ''}" onclick="mealFilter=${jsArg(c)};render()">${c === '★' ? '★ Favourites' : c === 'Mine' ? 'Added by me' : c === 'Hidden' ? `Hidden (${hidden})` : esc(c)}</button>`).join('')}</div>
     <div id="meallist">${mealIdeaList()}</div>
     <div class="foot">${gfTag(true)} marks recipes written gluten free – still check labels, especially stock, sauces, sausages and seasonings. Only recipes ticked “Gluten free” are suggested in the meal planner. Starter recipes can be edited or hidden.</div>`;
+}
+// 2.27.94: Recipes board, same .tb* board as Travel. Recipe of the day, All recipes, plus Want to cook / This week / Cooked kept in localStorage 'recipeBoard' (in backups and Move my data).
+const RB_KEY = 'recipeBoard', RB_LISTS = [['want', 'Want to cook'], ['week', 'This week'], ['cooked', 'Cooked']], RB_COL = ['#16a34a', '#ea580c', '#0891b2', '#7c3aed', '#db2777', '#ca8a04', '#2563eb'];
+function rbGet() { let o = null; try { o = JSON.parse(localStorage.getItem(RB_KEY) || 'null'); } catch (e) { } if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {}; RB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; }); return o; }
+function rbSave(o) { try { localStorage.setItem(RB_KEY, JSON.stringify(o)); } catch (e) { } }
+function rbRestore(o) { if (o && o.lists && typeof o.lists === 'object') rbSave(o); }
+const rbCol = t => t ? RB_COL[[...t].reduce((a, c) => a + c.charCodeAt(0), 0) % RB_COL.length] : '#16a34a';
+let RB_OG = null, rbOgBusy = {};
+function rbOg(link) {
+  if (!RB_OG) { try { RB_OG = JSON.parse(localStorage.getItem('recOg') || '{}'); } catch (e) { RB_OG = {}; } }
+  if (RB_OG[link] !== undefined) return RB_OG[link];
+  if (RELAY_URL && !rbOgBusy[link] && /^https:/.test(link)) { rbOgBusy[link] = 1; getJSON(RELAY_URL + '/ogimg?u=' + encodeURIComponent(link), 12000).then(d => { RB_OG[link] = (d && d.img) || ''; try { localStorage.setItem('recOg', JSON.stringify(RB_OG)); } catch (e) { } if (RB_OG[link]) rbRedraw(); }).catch(() => { }); }
+  return '';
+}
+function rbCover(img, t, big) { return `<div class="tbcover" style="background:linear-gradient(135deg,${rbCol(t)},#14532d);aspect-ratio:16/9;overflow:hidden">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()">` : ''}</div>`; }
+function rbIdeaCard(i, k, cid, sub) {
+  const img = recipePhotoSrc(i) || (i.link ? rbOg(i.link) : ''), line = sub || i.notes || i.ingr.slice(0, 4).join(', ');
+  return `<button type="button" class="tbcard" onclick="rbOpen(${jsArg(i.id)},'${k || ''}',${jsArg(cid || '')})">${rbCover(img, i.tag)}<div class="tbbody">${tbLbl([[i.tag || 'GF', rbCol(i.tag)]])}<div class="tbt">${esc(i.title)}</div>${line ? `<div class="tbs">${esc(line.length > 90 ? line.slice(0, 88) + '…' : line)}</div>` : ''}</div></button>`;
+}
+function rbUserCard(k, c) {
+  const i = c.ideaId && M().ideas.find(x => x.id === c.ideaId); if (i) return rbIdeaCard(i, k, c.id, c.note);
+  const img = c.link ? rbOg(c.link) : '';
+  return `<button type="button" class="tbcard" onclick="rbOpenCard('${k}',${jsArg(c.id)})">${rbCover(img, '')}<div class="tbbody">${tbLbl([['Mine', '#475569']])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.slice(0, 90))}</div>` : ''}</div></button>`;
+}
+function rbAllList() {
+  const q = mealQuery.trim().toLowerCase();
+  return M().ideas.filter(i => !i.hidden && (!q || (i.title + ' ' + i.ingr.join(' ') + ' ' + (i.tag || '')).toLowerCase().includes(q))).sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || (a.builtin ? 1 : 0) - (b.builtin ? 1 : 0) || a.title.localeCompare(b.title));
+}
+function rbBoardHtml() {
+  const o = rbGet(), p = glPickRecipe(), all = rbAllList();
+  return tbList('today', 'Recipe of the day', p ? 1 : 0, p ? rbIdeaCard(p) : '', false, 'rb', 'No recipe today') +
+    tbList('all', 'All recipes', all.length, all.map(i => rbIdeaCard(i)).join(''), false, 'rb', 'No recipes match') +
+    RB_LISTS.map(([k, t]) => tbList(k, t, o.lists[k].length, o.lists[k].map(c => rbUserCard(k, c)).join(''), true, 'rb')).join('');
+}
+function rbRedraw() { const el = document.getElementById('rblists'); if (!el) return; const x = el.scrollLeft; el.innerHTML = rbBoardHtml(); el.scrollLeft = x; }
+function rbMenu(k) { if (k === 'all') document.getElementById('mealq')?.focus(); else mealIdeaForm(); }
+const rbSel = cur => `<label class="field"><span>Move to…</span><select name="list"><option value="">${cur ? 'Remove from my lists' : 'Not in my lists'}</option>${RB_LISTS.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
+function rbMove(f, from, cid, to, card) { if (from) f.lists[from] = f.lists[from].filter(x => x.id !== cid); if (to && f.lists[to]) f.lists[to].unshift(card); rbSave(f); }
+function rbOpen(ideaId, k, cid) {
+  const i = M().ideas.find(x => x.id === ideaId); if (!i) return;
+  openSheet(esc(i.title), `<div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>go('#recipe/${i.id}'))">Open recipe</button><button type="button" class="btn" onclick="closeSheet().then(()=>planRecipeForm('${i.id}'))">${I('cal')} Plan it</button><button type="button" class="btn" onclick="closeSheet().then(()=>recipeToShop('${i.id}'))">${I('cart')} Shopping list</button></div>` + rbSel(k),
+    v => { const f = rbGet(), c = (k && f.lists[k].find(x => x.id === cid)) || { id: 'rb' + Date.now(), ideaId, title: i.title }; if ((v.list || '') !== (k || '')) rbMove(f, k, cid, v.list, c); return () => rbRedraw(); }, 'Save');
+}
+function rbAdd(k) { rbOpenCard(k, ''); }
+function rbOpenCard(k, id) {
+  const f = rbGet(), c = (id && f.lists[k].find(x => x.id === id)) || { title: '', link: '', note: '' };
+  openSheet(id ? esc(c.title) : 'Add a recipe card', `<label class="field"><span>Title</span><input name="title" maxlength="120" value="${esc(c.title)}"></label><label class="field"><span>Link</span><input name="link" type="url" maxlength="500" value="${esc(c.link || '')}"></label><label class="field"><span>Note</span><textarea name="note" rows="3" maxlength="1000">${esc(c.note || '')}</textarea></label>${c.link ? `<p><a href="${esc(c.link)}" target="_blank" rel="noopener">Open the link ›</a></p>` : ''}` + rbSel(k),
+    v => { if (!v.title) return 'Give the card a title.'; const g = rbGet(), n = { ...c, id: c.id || 'rb' + Date.now(), title: v.title.slice(0, 120), link: /^https?:\/\//.test(v.link || '') ? v.link.slice(0, 500) : '', note: (v.note || '').slice(0, 1000) };
+      if (id) g.lists[k] = g.lists[k].filter(x => x.id !== id); if (v.list && g.lists[v.list]) g.lists[v.list].unshift(n); rbSave(g); return () => rbRedraw(); }, 'Save');
+}
+function Recipes() {
+  const p = glPickRecipe(), bg = p && recipePhotoSrc(p);
+  return `<button class="back" onclick="go('#meals')">${I('left')} Meals</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#15803d,#0f172a)">${bg ? `<img src="${esc(bg)}" alt="" onerror="this.remove()">` : ''}</div>
+    <div class="tbtop"><h1>Recipes</h1><button class="iconbtn" aria-label="Add a recipe" onclick="mealIdeaForm()">${I('plus')}</button></div>
+    <label class="search" style="margin:0 12px 8px">${I('search')}<input id="mealq" type="search" placeholder="Search recipes or ingredients" value="${esc(mealQuery)}" aria-label="Search recipes" oninput="mealQuery=this.value;rbRedraw()"></label>
+    <div class="tblists" id="rblists">${rbBoardHtml()}</div></div>
+    <div class="btns recbtns" style="margin-top:10px"><button class="btn" onclick="scanForm()">${I('camera')} Scan a recipe</button><button class="btn" onclick="mealIdeaForm()">${I('plus')} Type one in</button></div>
+    <div class="foot">Swipe sideways between lists. All starter recipes are written gluten free – still check labels, especially stock, sauces, sausages and seasonings.</div>`;
 }
 // One recipe: ingredients (with "check label" and gluten hints), method, and buttons for the planner and shopping list
 function RecipeDetail(id) {
@@ -17555,8 +17613,8 @@ async function requestPersist() { try { if (navigator.storage && navigator.stora
 function backupBlob() {
   const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
   let planning = null; try { planning = plnKeepGet(); } catch (e) { } // 2.27.84: kept planning & development updates
-  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, flagged, newsBoard }, null, 2)], { type: 'application/json' });
+  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } let recipeBoard = null; try { recipeBoard = rbGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, flagged, newsBoard, recipeBoard }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -17581,7 +17639,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
