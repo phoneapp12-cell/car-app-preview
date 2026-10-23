@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.97';
+const APP_VERSION = '2.27.98';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14513,11 +14513,15 @@ function vbOpen(id) {
     f => { const g = vbGet(); VB_LISTS.forEach(([j]) => { g.lists[j] = g.lists[j].filter(x => x.id !== id); }); if (f.list && g.lists[f.list]) g.lists[f.list].unshift(v); vbSave(g); return () => vbRedraw(); }, 'Save');
   vbPlay(id);
 }
-// 2.27.97: no cast feature exists in the app. Try the browser's Presentation API (Chrome on Android can show it on a Chromecast/Google TV); otherwise open YouTube, where the cast icon sends it to the TV.
-async function vbTv(id) {
-  const v = VB_ALL[id], u = v ? v.url : 'https://www.youtube.com/watch?v=' + id;
-  if ('PresentationRequest' in window) { try { await new PresentationRequest([u]).start(); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
-  window.open(u, '_blank', 'noopener'); toast('Opening YouTube. Tap the cast icon there to play it on the TV.');
+// 2.27.98: the browser can't cast a plain YouTube link, so the TV button opens the video in the YouTube app on Android,
+// where the cast button sends it to a Chromecast, Google TV or a smart TV with YouTube. Other phones get the youtube.com link.
+function vbTv(id) {
+  const v = VB_ALL[id], vid = String(id).replace(/[^\w-]/g, ''), u = v && v.url ? v.url : 'https://www.youtube.com/watch?v=' + vid;
+  try { const f = document.getElementById('vbframe'); if (f) f.src = 'about:blank'; } catch (e) { }
+  if (/Android/i.test(navigator.userAgent)) {
+    location.href = 'intent://www.youtube.com/watch?v=' + vid + '#Intent;package=com.google.android.youtube;scheme=https;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
+  } else window.open(u, '_blank', 'noopener');
+  toast('Opening YouTube. Tap the cast icon at the top of the video to put it on the TV.');
 }
 function vbAdd(k) {
   openSheet('Add a video', `<label class="field"><span>YouTube link</span><input name="url" type="url" maxlength="300" placeholder="https://www.youtube.com/watch?v=…"></label><label class="field"><span>Title (optional)</span><input name="title" maxlength="140"></label>`,
