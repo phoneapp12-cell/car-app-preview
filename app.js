@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.94';
+const APP_VERSION = '2.27.95';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7868,7 +7868,7 @@ function rbOpenCard(k, id) {
 }
 function Recipes() {
   const p = glPickRecipe(), bg = p && recipePhotoSrc(p);
-  return `<button class="back" onclick="go('#meals')">${I('left')} Meals</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#15803d,#0f172a)">${bg ? `<img src="${esc(bg)}" alt="" onerror="this.remove()">` : ''}</div>
+  return `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#15803d,#0f172a)">${bg ? `<img src="${esc(bg)}" alt="" onerror="this.remove()">` : ''}</div>
     <div class="tbtop"><h1>Recipes</h1><button class="iconbtn" aria-label="Add a recipe" onclick="mealIdeaForm()">${I('plus')}</button></div>
     <label class="search" style="margin:0 12px 8px">${I('search')}<input id="mealq" type="search" placeholder="Search recipes or ingredients" value="${esc(mealQuery)}" aria-label="Search recipes" oninput="mealQuery=this.value;rbRedraw()"></label>
     <div class="tblists" id="rblists">${rbBoardHtml()}</div></div>
