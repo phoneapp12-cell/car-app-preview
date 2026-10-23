@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.87';
+const APP_VERSION = '2.27.88';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6939,11 +6939,11 @@ const RADIO = [
   { name: 'Beagle Radio', freq: '88.1 FM', where: 'Whangārei', home: 'https://www.beagleradio.co.nz/', stream: 'https://stream.beagleradio.co.nz/stream' },
   { name: 'The Hits', freq: '89.2 FM', where: 'Whangārei', home: 'https://www.thehits.co.nz/info/frequencies/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_74AAC.aac' },
   { name: 'The Rock', freq: '90.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-rock', stream: 'https://digitalstreams.mediaworks.nz/rock_net_icy' },
-  { name: 'The Breeze', freq: '90.8 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-breeze', stream: 'https://mediaworks.streamguys1.com/breeze_net/playlist.m3u8' },
-  { name: 'More FM', freq: '91.6 FM', where: 'Northland', home: 'https://www.rova.nz/find-your-more-fm-frequency', stream: 'https://mediaworks.streamguys1.com/more-whg-high/playlist.m3u8' },
-  { name: 'Breeze Classic', freq: '92.4 FM', where: 'Northland', home: 'https://www.rova.nz/breeze-breeze-classic-frequencies', stream: 'https://mediaworks.streamguys1.com/breeze_classic_net/playlist.m3u8' },
+  { name: 'The Breeze', freq: '90.8 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-breeze', stream: 'https://mediaworks.streamguys1.com/breeze_net_icy' },
+  { name: 'More FM', freq: '91.6 FM', where: 'Northland', home: 'https://www.rova.nz/find-your-more-fm-frequency', stream: 'https://mediaworks.streamguys1.com/more-whg-high_icy' },
+  { name: 'Breeze Classic', freq: '92.4 FM', where: 'Northland', home: 'https://www.rova.nz/breeze-breeze-classic-frequencies', stream: 'https://mediaworks.streamguys1.com/breeze_classic_net_icy' },
   { name: 'Radio Hauraki', freq: '93.2 FM', where: 'Northland', home: 'https://www.hauraki.co.nz/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_04AAC.aac' },
-  { name: 'The Edge', freq: '94.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-edge', stream: 'https://mediaworks.streamguys1.com/edge_net/playlist.m3u8' },
+  { name: 'The Edge', freq: '94.0 FM', where: 'Northland', home: 'https://www.rova.nz/radio/the-edge', stream: 'https://mediaworks.streamguys1.com/edge_net_icy' },
   { name: 'ZM', freq: '94.8 FM', where: 'Whangārei', home: 'https://www.zmonline.com/listen/frequencies/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_03AAC.aac' },
   { name: 'iHeartCountry', freq: '95.6 FM', where: 'Northland', home: 'https://iheartcountrynz.iheart.com/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_09AAC.aac' },
   { name: 'Coast', freq: '96.4 FM', where: 'Northland', home: 'https://www.thecoast.net.nz/info/frequencies/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_07AAC.aac' },
