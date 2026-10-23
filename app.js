@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.27.96';
+const APP_VERSION = '2.27.97';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14503,12 +14503,21 @@ function vbBoardHtml() {
 }
 function vbRedraw() { const el = document.getElementById('vblists'); if (!el) return; const x = el.scrollLeft; el.innerHTML = vbBoardHtml(); el.scrollLeft = x; }
 function vbMenu(k) { document.getElementById('vidcatq')?.focus(); }
-function vbPlay(id) { const o = vbGet(), v = VB_ALL[id]; if (v && !o.lists.watched.some(x => x.id === id)) { o.lists.watched.unshift(v); o.lists.watched = o.lists.watched.slice(0, 100); vbSave(o); } setTimeout(vbRedraw, 300); }
+function vbPlay(id) { const o = vbGet(), v = VB_ALL[id]; if (v && !o.lists.watched.some(x => x.id === id)) { o.lists.watched.unshift(v); o.lists.watched = o.lists.watched.slice(0, 100); vbSave(o); } setTimeout(() => { if (!sheetOpen) vbRedraw(); }, 300); }
 function vbOpen(id) {
   const v = VB_ALL[id]; if (!v) return; const o = vbGet(), cur = o.lists.later.some(x => x.id === id) ? 'later' : o.lists.watched.some(x => x.id === id) ? 'watched' : '';
-  openSheet(esc(v.title), `<p class="muted">${esc(v.channel)}</p><p><a class="btn primary" href="${esc(v.url)}" target="_blank" rel="noopener" onclick="vbPlay(${jsArg(id)})">▶ Play</a></p>
+  openSheet(esc(v.title), `<div style="aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;margin-bottom:8px"><iframe id="vbframe" src="https://www.youtube-nocookie.com/embed/${esc(id)}?autoplay=1&playsinline=1&rel=0" title="${esc(v.title)}" style="width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+    <p class="muted" style="margin:0 0 8px">${esc(v.channel)}</p>
+    <div class="btns"><a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener">▶ YouTube</a><button type="button" class="btn" onclick="vbTv(${jsArg(id)})">📺 TV</button></div>
     <label class="field"><span>Move to…</span><select name="list"><option value="">Not in my lists</option>${VB_LISTS.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
     f => { const g = vbGet(); VB_LISTS.forEach(([j]) => { g.lists[j] = g.lists[j].filter(x => x.id !== id); }); if (f.list && g.lists[f.list]) g.lists[f.list].unshift(v); vbSave(g); return () => vbRedraw(); }, 'Save');
+  vbPlay(id);
+}
+// 2.27.97: no cast feature exists in the app. Try the browser's Presentation API (Chrome on Android can show it on a Chromecast/Google TV); otherwise open YouTube, where the cast icon sends it to the TV.
+async function vbTv(id) {
+  const v = VB_ALL[id], u = v ? v.url : 'https://www.youtube.com/watch?v=' + id;
+  if ('PresentationRequest' in window) { try { await new PresentationRequest([u]).start(); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+  window.open(u, '_blank', 'noopener'); toast('Opening YouTube. Tap the cast icon there to play it on the TV.');
 }
 function vbAdd(k) {
   openSheet('Add a video', `<label class="field"><span>YouTube link</span><input name="url" type="url" maxlength="300" placeholder="https://www.youtube.com/watch?v=…"></label><label class="field"><span>Title (optional)</span><input name="title" maxlength="140"></label>`,
