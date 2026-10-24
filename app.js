@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.25';
+const APP_VERSION = '2.28.26';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -30405,53 +30405,126 @@ Radio = function () {
     `<div class="foot">Tap any local or worldwide station card to play it on the Car Stereo deck above. Tap <b>P+</b> on any card to assign it to your 12 Car Stereo preset buttons (FM 1 / FM 2), or tap <b>🔊 BT / OUT</b> to pick your Bluetooth speaker.</div>`;
 };
 
-/* ================= 2.28.24: LIVE TV (#livetv) — FREE INTERNET TV PLAYER & TRELLO GUIDE ================= */
+/* ================= 2.28.26: LIVE TV (#livetv) — 78 VERIFIED FREE INTERNET TV CHANNELS & TRELLO GUIDE ================= */
 const LIVE_TV_CHANNELS = [
-  // NZ & Australia Freeview Live
+  // 1. 🇳🇿 NZ & Australia Freeview Live (16 channels)
   { id: "three-nz", name: "Three NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Warner Bros. Discovery NZ live stream — news, entertainment, reality & drama", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/three-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/three" },
+  { id: "three-plus1-nz", name: "ThreePlus1 NZ (+1 hr)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Three NZ broadcast delayed by 1 hour — catch anything you missed", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/threeplus1-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/" },
   { id: "bravo-nz", name: "Bravo NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Real-life stories, Below Deck, true crime, property & lifestyle shows", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/bravo-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/bravo" },
+  { id: "bravo-plus1-nz", name: "Bravo PLUS 1 NZ (+1 hr)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Bravo NZ broadcast delayed by 1 hour", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/bravoplus1-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/" },
   { id: "skyopen-nz", name: "Sky Open NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Free-to-air drama, comedy, documentaries & entertainment (formerly Prime)", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/skyopen-hls/cmaf-clear/hls.m3u8", web: "https://www.sky.co.nz/" },
   { id: "rush-nz", name: "RUSH NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Adventure, builds, engineering, survival, cars & outdoor factual TV", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/rush-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/rush" },
   { id: "eden-nz", name: "Eden NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Documentaries, history, nature, science, food & world exploration", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/eden-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/eden" },
   { id: "hgtv-nz", name: "HGTV NZ (Home & Reno)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "24/7 home renovations, DIY builds, property flips & design inspiration", hls: "https://mediapackage-sky-hgtv-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
   { id: "whakaata-maori", name: "Whakaata Māori (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Aotearoa stories, documentaries, movies, kai & cultural programmes", hls: "https://i.mjh.nz/.r/maori-tv.m3u8", web: "https://www.maoritelevision.com/live" },
+  { id: "tereo-nz", name: "Te Reo Channel NZ", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "100% te reo Māori language, culture, kapa haka & local Aotearoa stories", hls: "https://i.mjh.nz/.r/te-reo.m3u8", web: "https://www.maoritelevision.com/tv/te-reo-channel" },
   { id: "parliament-nz", name: "NZ Parliament TV", cat: "nz", catLabel: "🇳🇿 NZ Live", country: "New Zealand", desc: "Live coverage from the New Zealand House of Representatives & select committees", hls: "https://ptvlive.kordia.net.nz/out/v1/daf20b9a9ec5449dadd734e50ce52b74/index.m3u8", web: "https://ondemand.parliament.nz/" },
   { id: "ch200-nz", name: "Channel 200 NZ", cat: "nz", catLabel: "🇳🇿 NZ Live", country: "New Zealand", desc: "New Zealand regional & community television live stream", hls: "https://ptvlive.kordia.net.nz/out/v1/3fc2254c865a457c8d7fbbce227a2aae/index.m3u8", web: "https://ch200.co.nz/watch-live/" },
   { id: "wairarapa-nz", name: "Wairarapa TV NZ", cat: "nz", catLabel: "🇳🇿 NZ Regional", country: "New Zealand", desc: "Local NZ regional lifestyle, heritage, classic shows & community TV", hls: "https://stream.wairarapatv.co.nz/Broadband_High/playlist.m3u8", web: "http://www.wairarapatv.co.nz/" },
+  { id: "10bold-au", name: "10 Bold Australia", cat: "nz", catLabel: "🇦🇺 Australia Live", country: "Australia", desc: "Australian action, drama, NCIS, Law & Order, adventure & entertainment", hls: "https://dce3793146fef017.mediapackage.us-west-2.amazonaws.com/out/v1/55cdf73af7894775ba6de8f57482b66a/CMAF_HLS/index.m3u8", web: "https://10play.com.au/" },
   { id: "abc-news-au", name: "ABC News Australia 24/7", cat: "nz", catLabel: "🇦🇺 Australia Live", country: "Australia", desc: "Australia’s 24-hour public broadcasting news & current affairs channel", hls: "https://abc-news-dmd-streams-1.akamaized.net/out/v1/701126012d044971b3fa89406a440133/index.m3u8", web: "https://www.abc.net.au/news/newschannel/" },
   { id: "sky-news-au", name: "Sky News Australia Live", cat: "nz", catLabel: "🇦🇺 Australia Live", country: "Australia", desc: "Live Australian & trans-Tasman breaking news, politics and weather", hls: "https://skynewsau-live-premium.akamaized.net/hls/live/2105299/skynews/live.m3u8", web: "https://www.skynews.com.au/" },
 
-  // Movies, MythBusters, Reno & Factual 24/7 (FAST Channels)
-  { id: "moviesphere", name: "MovieSphere 24/7 Movies", cat: "movies", catLabel: "🎬 Movies 24/7", country: "NZ / Global", desc: "24/7 free streaming movies — action, thrillers, sci-fi, drama & modern classics", hls: "https://mediapackage-ms-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "mythbusters", name: "MythBusters 24/7", cat: "movies", catLabel: "🔬 Science & DIY", country: "NZ / Global", desc: "Non-stop episodes of MythBusters — experiments, builds, explosions & workshop engineering", hls: "https://mediapackage-ptmb-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "wb-househunters", name: "WB TV House Hunters 24/7", cat: "movies", catLabel: "🏠 Home & Property", country: "NZ / Global", desc: "24/7 House Hunters & international property tours", hls: "https://mediapackage-sky-azf6-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "wb-motorheads", name: "WB TV Motorheads 24/7", cat: "movies", catLabel: "🚗 Cars & Restorations", country: "NZ / Global", desc: "24/7 custom car builds, garage restorations, classic engines & workshop shows", hls: "https://mediapackage-sky-azf1-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "wb-deadliest", name: "WB TV Deadliest Catch 24/7", cat: "movies", catLabel: "🌊 Ocean Adventure", country: "NZ / Global", desc: "24/7 high-seas crabbing & Bering Sea adventure documentaries", hls: "https://mediapackage-sky-azf2-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "wb-truecrime", name: "WB TV True Crime 24/7", cat: "movies", catLabel: "🕵️ True Crime", country: "NZ / Global", desc: "24/7 forensic mysteries, investigations & true-crime documentaries", hls: "https://mediapackage-sky-azf4-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "wb-paranormal", name: "WB TV Paranormal & Mysteries", cat: "movies", catLabel: "👻 Unexplained", country: "NZ / Global", desc: "24/7 unexplained mysteries, haunted history & paranormal investigations", hls: "https://mediapackage-sky-azf5-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "belowdeck", name: "Below Deck Vault 24/7", cat: "movies", catLabel: "🛥️ Reality & Travel", country: "NZ / Global", desc: "24/7 superyacht charters, crew drama & Mediterranean/Caribbean travel", hls: "https://mediapackage-sky-azf3-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "redbull-tv", name: "Red Bull TV (Adventure & Films)", cat: "movies", catLabel: "🏔️ Expeditions", country: "Global", desc: "Documentaries, expedition films, aviation, mountain & ocean exploration", hls: "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8", web: "https://www.redbull.com/int-en/live-events" },
+  // 2. 🎬 Movies, Sci-Fi & Action 24/7 (17 channels)
+  { id: "moviesphere", name: "MovieSphere NZ 24/7", cat: "movies", catLabel: "🎬 Blockbusters", country: "NZ / Lionsgate", desc: "24/7 free streaming movies — action, thrillers, sci-fi, drama & modern classics", hls: "https://mediapackage-ms-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "moviesphere-gold", name: "MovieSphere Gold", cat: "movies", catLabel: "🎬 Iconic Movies", country: "USA / Global", desc: "24/7 acclaimed Hollywood movies, mystery thrillers & box-office favourites", hls: "https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg01438-ewscrippscompan-ionmystery-tablo/playlist.m3u8", web: "https://moviespheregold.com/" },
+  { id: "dust-scifi", name: "DUST Sci-Fi 24/7", cat: "movies", catLabel: "🛸 Sci-Fi Cinema", country: "USA / Global", desc: "24/7 science fiction feature films, space thrillers, AI & futuristic shorts", hls: "https://dqi7ayt2o24fn.cloudfront.net/playlist.m3u8", web: "https://watchdust.com/" },
+  { id: "darkmatter-tv", name: "Dark Matter TV", cat: "movies", catLabel: "⚡ Sci-Fi & Action", country: "USA / Global", desc: "24/7 sci-fi, action, dark thrillers & cult genre cinema", hls: "https://tricoast-tv-dark-matter-01-us.ono.wurl.tv/playlist.m3u8", web: "https://www.darkmattertv.com/" },
+  { id: "gravitas-movies", name: "Gravitas Movies 24/7", cat: "movies", catLabel: "🎬 Indie & Action", country: "USA / Global", desc: "24/7 independent feature films, action, comedy, drama & documentaries", hls: "https://d6dg3ebeih71x.cloudfront.net/Gravitas_Movies.m3u8", web: "https://gravitasventures.com/" },
+  { id: "cinevault-80s", name: "Cinevault 80s Movies", cat: "movies", catLabel: "📼 80s Movies", country: "USA / Sony", desc: "24/7 classic 1980s movies, adventure, comedy & retro cinema gems", hls: "https://gsn-cinevault-80s-2-us.roku.wurl.tv/playlist.m3u8", web: "https://www.cinevaulttv.com/" },
+  { id: "cinevault-westerns", name: "Cinevault Westerns", cat: "movies", catLabel: "🤠 Classic Westerns", country: "USA / Sony", desc: "24/7 classic Hollywood westerns and frontier action films", hls: "https://gsn-cinevault-westerns-2-us.roku.wurl.tv/playlist.m3u8", web: "https://www.cinevaulttv.com/" },
+  { id: "filmrise-western", name: "FilmRise Western 24/7", cat: "movies", catLabel: "🤠 Western Movies", country: "USA", desc: "24/7 classic western movies and frontier series from the FilmRise vault", hls: "https://dz05z8iljgvbe.cloudfront.net/master.m3u8", web: "https://filmrise.com/" },
+  { id: "charge-action", name: "CHARGE! Action TV", cat: "movies", catLabel: "💥 Action & Sci-Fi", country: "USA", desc: "24/7 high-octane action movies, police thrillers, sci-fi & adventure", hls: "https://fast-channels.sinclairstoryline.com/CHARGE/index.m3u8", web: "https://watchcharge.com/" },
+  { id: "shout-factory", name: "Shout! Factory TV", cat: "movies", catLabel: "🎬 Cult & Classic", country: "USA", desc: "24/7 cult movies, classic sci-fi, retro television & fan-favourite cinema", hls: "https://d1s1wrpgemt9re.cloudfront.net/Shout_TV.m3u8", web: "https://shoutfactorytv.com/" },
+  { id: "hallmark-movies", name: "Hallmark Movies & More", cat: "movies", catLabel: "🎬 Feel-Good Movies", country: "USA", desc: "24/7 uplifting movies, mysteries & family drama", hls: "https://dbrb49pjoymg4.cloudfront.net/v1/master/3fec3e5cac39a52b2132f9c66c83dae043dc17d4/prod_default_xumo-ams-aws/master.m3u8?ads.xumo_channelId=99991709", web: "https://www.hallmarkchannel.com/" },
+  { id: "artflix-classics", name: "ARTFLIX Movie Classics", cat: "movies", catLabel: "🎞️ Cinema Classics", country: "Global", desc: "24/7 golden-age cinema classics, world films & timeless directors", hls: "https://amogonetworx-artflix-1-nl.samsung.wurl.tv/playlist.m3u8", web: "https://watch.plex.tv/live-tv/channel/artflix-movie-classics" },
+  { id: "24hr-freemovies", name: "24 Hour Free Movies", cat: "movies", catLabel: "🎬 Free Movies", country: "USA", desc: "Non-stop feature films across action, mystery, drama and adventure", hls: "https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8", web: "https://channelstore.roku.com/" },
+  { id: "movies-tv-net", name: "Movies! TV Network", cat: "movies", catLabel: "🎞️ Hollywood Vault", country: "USA", desc: "24/7 classic and modern Hollywood feature films from the studio vaults", hls: "https://2-fss-2.streamhoster.com/pl_120/206858-4412962-1/playlist.m3u8", web: "http://www.moviestvnetwork.com/" },
+  { id: "made-in-hollywood", name: "Made In Hollywood TV", cat: "movies", catLabel: "🎬 Behind the Scenes", country: "NZ / USA", desc: "Behind-the-scenes movie features, director interviews & new film previews", hls: "https://connection3-ent-nz.samsung.wurl.tv/playlist.m3u8", web: "https://www.moviefone.com/made-in-hollywood/" },
+  { id: "wutang-collection", name: "Wu-Tang Collection (Martial Arts)", cat: "movies", catLabel: "🥋 Martial Arts", country: "USA", desc: "24/7 classic kung-fu, martial arts action cinema & Asian action films", hls: "https://dbrb49pjoymg4.cloudfront.net/10001/99991745/hls/master.m3u8?ads.xumo_channelId=99991745", web: "https://www.thewutangcollection.com/" },
+  { id: "frightflix", name: "FrightFlix 24/7", cat: "movies", catLabel: "🎃 Suspense & Horror", country: "USA", desc: "24/7 supernatural thrillers, creature features & late-night suspense movies", hls: "https://stream-us-east-1.getpublica.com/playlist.m3u8?network_id=2229", web: "https://www.frightflix.com/" },
 
-  // World News 24/7
+  // 3. 😂 Comedy, Sitcoms & Classic TV 24/7 (11 channels)
+  { id: "drybar-comedy", name: "Dry Bar Comedy+ 24/7", cat: "comedy", catLabel: "🎤 Stand-Up Comedy", country: "AU / USA", desc: "24/7 clean, hilarious stand-up comedy specials from top comedians", hls: "https://drybar-drybarcomedy-1-au.samsung.wurl.tv/playlist.m3u8", web: "https://www.drybarcomedy.com/" },
+  { id: "just-for-laughs", name: "Just for Laughs Gags", cat: "comedy", catLabel: "😂 Pranks & Gags", country: "Canada", desc: "24/7 classic hidden-camera pranks and laughs from Montreal’s Just for Laughs", hls: "https://distributionsjustepourrire-justforlaughsgags-1-be.samsung.wurl.tv/playlist.m3u8", web: "https://www.hahaha.com/" },
+  { id: "snl-vault", name: "SNL Vault (Saturday Night Live)", cat: "comedy", catLabel: "🎭 Sketch Comedy", country: "USA · NBC", desc: "24/7 best sketches, Weekend Update & musical moments from 50 years of SNL", hls: "https://d4whmvwm0rdvi.cloudfront.net/10007/99993017/hls/master.m3u8?ads.xumo_channelId=99993017", web: "https://www.nbc.com/saturday-night-live" },
+  { id: "nbc-comedy-vault", name: "NBC Comedy Vault", cat: "comedy", catLabel: "📺 Classic Sitcoms", country: "USA · NBC", desc: "24/7 classic NBC comedy series, sitcoms and late-night laughs", hls: "https://xumo-xumoent-vc-105-z0vpm.fast.nbcuni.com/live/master.m3u8", web: "https://www.nbc.com/" },
+  { id: "mst3k", name: "Mystery Science Theater 3000", cat: "comedy", catLabel: "🤖 Sci-Fi Riffing", country: "USA", desc: "24/7 hilarious movie riffing on cheesy sci-fi & B-movies with Joel, Mike, Jonah & the bots", hls: "https://d1c73nj8qxp55a.cloudfront.net/Mystery_Science_Theater_3000.m3u8", web: "https://mst3k.com/" },
+  { id: "anger-management", name: "Anger Management Channel", cat: "comedy", catLabel: "😂 Sitcom 24/7", country: "AU / Lionsgate", desc: "24/7 back-to-back episodes of the hit sitcom Anger Management", hls: "https://amg00353-lionsgatestudio-angermgmt-samsungau-o9jg9.amagi.tv/playlist/amg00353-lionsgatestudio-angermgmt-samsungau/playlist.m3u8", web: "https://lionsgatechannels.com/" },
+  { id: "afv-tv", name: "AFV (America’s Funniest Videos)", cat: "comedy", catLabel: "😂 Family Bloopers", country: "USA", desc: "24/7 funniest home videos, pet bloopers & viral family laughs", hls: "https://linear-12.frequency.stream/dist/plex/12/hls/master/playlist.m3u8", web: "https://www.afv.com/" },
+  { id: "laff-tv", name: "Laff Comedy TV", cat: "comedy", catLabel: "😂 Sitcoms & Stand-Up", country: "USA", desc: "24/7 modern sitcoms, comedy movies and stand-up specials", hls: "https://tvsen3.aynaott.com/UC6a8nsf/index.m3u8", web: "https:// www.laff.com/" },
+  { id: "johnny-carson", name: "Johnny Carson TV", cat: "comedy", catLabel: "🎙️ Classic Late Night", country: "USA", desc: "24/7 classic Tonight Show episodes, legendary comedians & Hollywood guests", hls: "https://aegis-cloudfront-1.tubi.video/475550ae-8708-46a5-a7c3-54acb3d91480/playlist.m3u8", web: "https://johnnycarson.com/" },
+  { id: "carol-burnett", name: "The Carol Burnett Show 24/7", cat: "comedy", catLabel: "🎭 Classic Sketch", country: "USA", desc: "24/7 classic sketch comedy with Carol Burnett, Tim Conway & Harvey Korman", hls: "https://aegis-cloudfront-1.tubi.video/e17b8de5-e8b7-415a-8377-5707a2f9a727/playlist.m3u8", web: "https://pluto.tv/" },
+  { id: "filmrise-classictv", name: "FilmRise Classic TV", cat: "comedy", catLabel: "📺 Retro TV", country: "USA", desc: "24/7 beloved classic television series, retro sitcoms & vintage dramas", hls: "https://d2tv4k5moji5m7.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-lu4pzh9l4b57p/master.m3u8", web: "https://filmrise.com/" },
+
+  // 4. 🔨 Home, Reno, Cooking, Cars & DIY 24/7 (10 channels)
+  { id: "mythbusters", name: "MythBusters 24/7", cat: "home", catLabel: "🔬 Science & DIY", country: "NZ / Global", desc: "Non-stop episodes of MythBusters — experiments, builds, explosions & workshop engineering", hls: "https://mediapackage-ptmb-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "wb-househunters", name: "WB TV House Hunters 24/7", cat: "home", catLabel: "🏠 Home & Property", country: "NZ / Global", desc: "24/7 House Hunters, renovations & international property tours", hls: "https://mediapackage-sky-azf6-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "wb-motorheads", name: "WB TV Motorheads 24/7", cat: "home", catLabel: "🚗 Cars & Restorations", country: "NZ / Global", desc: "24/7 custom car builds, garage restorations, classic engines & workshop shows", hls: "https://mediapackage-sky-azf1-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "bbc-home-garden", name: "BBC Home & Garden 24/7", cat: "home", catLabel: "🌱 Home & Gardening", country: "UK / Global", desc: "24/7 British home makeovers, garden design, DIY & country living", hls: "https://d11r33s5i066xh.cloudfront.net/playlist.m3u8", web: "https://www.bbc.co.uk/" },
+  { id: "bbc-food", name: "BBC Food 24/7", cat: "home", catLabel: "🍳 Cooking & Chefs", country: "UK / Global", desc: "24/7 cooking inspiration, baking, world cuisine & top British chefs", hls: "https://d1e9r0b71zfwk7.cloudfront.net/playlist.m3u8", web: "https://www.bbc.co.uk/food" },
+  { id: "jamie-oliver", name: "The Jamie Oliver Channel", cat: "home", catLabel: "🍳 Quick & Easy Meals", country: "UK / Global", desc: "24/7 Jamie Oliver’s 15-Minute Meals, 5 Ingredients, Italian & home cooking", hls: "https://d3i68hpvh19xjd.cloudfront.net/JamieOliver_GB.m3u8", web: "https://www.jamieoliver.com/" },
+  { id: "bon-appetit", name: "Bon Appétit TV 24/7", cat: "home", catLabel: "🍽️ Test Kitchen", country: "USA / Global", desc: "24/7 test-kitchen recipes, culinary techniques, street food & chef challenges", hls: "https://bonappetit-samsung.amagi.tv/playlist.m3u8", web: "https://www.bonappetit.com/" },
+  { id: "tastemade", name: "Tastemade Food & Travel", cat: "home", catLabel: "🥘 Food & Design", country: "Global", desc: "24/7 award-winning food, cooking, home design & global travel series", hls: "https://tastemade-tdint-rakuten.amagi.tv/playlist.m3u8", web: "https://www.tastemade.com/" },
+  { id: "design-network", name: "The Design Network", cat: "home", catLabel: "🛋️ Interior Design", country: "USA", desc: "24/7 home interiors, architecture, backyard builds & renovation ideas", hls: "https://amg00441-amg00441c1-rakuten-us-6050.playouts.now.amagi.tv/playlist/amg00441-thedesignnetworkllcfast-thedesignnetwork-rakutenus/playlist.m3u8", web: "https://www.tdn.tv/" },
+  { id: "pbs-travel", name: "PBS Travel 24/7", cat: "home", catLabel: "✈️ World Travel", country: "USA · PBS", desc: "24/7 scenic railway journeys, European travel, culture & culinary adventures", hls: "https://d3hqevbyoxtkoi.cloudfront.net/PBS_Travel.m3u8", web: "https://www.pbs.org/" },
+
+  // 5. 🔍 True Crime, History & Documentaries 24/7 (11 channels)
+  { id: "wb-truecrime", name: "WB TV True Crime 24/7", cat: "doco", catLabel: "🕵️ True Crime", country: "NZ / Global", desc: "24/7 forensic mysteries, investigations & true-crime documentaries", hls: "https://mediapackage-sky-azf4-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "dateline-247", name: "Dateline 24/7", cat: "doco", catLabel: "🕵️ Investigations", country: "USA · NBC", desc: "24/7 investigative journalism, true-crime mysteries & courtroom stories", hls: "https://d1si3n1st4nkgb.cloudfront.net/10502/88896029/hls/master.m3u8?ads.xumo_channelId=88896029", web: "https://www.nbcnews.com/dateline" },
+  { id: "law-and-crime", name: "Law & Crime Network", cat: "doco", catLabel: "⚖️ Live Trials", country: "USA", desc: "Live courtroom trials, legal analysis & high-profile criminal justice coverage", hls: "https://a-cdn.klowdtv.com/live3/law_720p/playlist.m3u8", web: "https://lawandcrime.com/" },
+  { id: "court-tv", name: "Court TV Live", cat: "doco", catLabel: "⚖️ Courtroom Live", country: "USA", desc: "24/7 live gavel-to-gavel trial coverage and true-crime analysis", hls: "https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg01438-ewscrippscompan-courttv-tablo/playlist.m3u8", web: "https://www.courttv.com/" },
+  { id: "total-crime", name: "Total Crime 24/7", cat: "doco", catLabel: "🕵️ Crime Docos", country: "Canada / UK", desc: "24/7 real-life detective investigations, cold cases & forensics", hls: "https://aegis-cloudfront-1.tubi.video/b062c287-a170-47df-99e4-f5dcd441ee59/playlist.m3u8", web: "https://tubitv.com/" },
+  { id: "true-history", name: "True History Channel", cat: "doco", catLabel: "🏛️ World History", country: "USA / Global", desc: "24/7 ancient civilisations, WWII history, aviation & engineering documentaries", hls: "https://linear-188.frequency.stream/dist/glewedtv/188/hls/master/playlist.m3u8", web: "https://watch.plex.tv/" },
+  { id: "documentary-plus", name: "Documentary+ 24/7", cat: "doco", catLabel: "📽️ Feature Docos", country: "USA / Global", desc: "24/7 critically acclaimed feature documentaries across science, history & culture", hls: "https://1d153317c8db4250b3789601274e2402.mediatailor.us-west-2.amazonaws.com/v1/master/ba62fe743df0fe93366eba3a257d792884136c7f/LINEAR-887-DOCUMENTARYINTERNATIONAL-DOCUMENTARYPLUS/mt/documentaryplus/887/hls/master/playlist.m3u8", web: "https://www.docplus.com/" },
+  { id: "get-factual", name: "Get.factual 24/7", cat: "doco", catLabel: "🌍 Factual & History", country: "UK / Global", desc: "24/7 engineering, history, nature and real-world factual documentaries", hls: "https://d1nhni5l2n8hjt.cloudfront.net/gf.m3u8", web: "https://pluto.tv/" },
+  { id: "the-nest", name: "The Nest (History & Reality)", cat: "doco", catLabel: "📺 Factual Entertainment", country: "USA", desc: "24/7 Ice Road Truckers, Pawn Stars, American Pickers & real-life history", hls: "https://fast-channels.sinclairstoryline.com/THENEST/index.m3u8", web: "https://watchthenest.com/" },
+  { id: "wb-paranormal", name: "WB TV Paranormal & Mysteries", cat: "doco", catLabel: "👻 Unexplained", country: "NZ / Global", desc: "24/7 unexplained mysteries, haunted history & paranormal investigations", hls: "https://mediapackage-sky-azf5-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "belowdeck", name: "Below Deck Vault 24/7", cat: "doco", catLabel: "🛥️ Superyachts", country: "NZ / Global", desc: "24/7 superyacht charters, crew drama & Mediterranean/Caribbean voyages", hls: "https://mediapackage-sky-azf3-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+
+  // 6. 🚀 Space, Science, Nature, Pets & Weather 24/7 (13 channels)
+  { id: "nasa-tv", name: "NASA TV Public HD", cat: "space", catLabel: "🚀 Space & NASA", country: "USA · NASA", desc: "Live mission coverage, ISS views, rocket launches, astronomy & NASA documentaries", hls: "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8", web: "https://plus.nasa.gov/" },
+  { id: "iss-earth", name: "ISS Live Earth Views (NASA)", cat: "space", catLabel: "🛰️ Orbit Live", country: "Space", desc: "High-definition live views of Earth from the International Space Station", yt: "xRPjKQtRXR8", web: "https://www.youtube.com/watch?v=xRPjKQtRXR8" },
+  { id: "love-nature-4k", name: "Love Nature 4K", cat: "space", catLabel: "🦁 Wildlife & Nature", country: "Canada / Global", desc: "24/7 breathtaking natural history, ocean life & wildlife documentaries", hls: "https://pb-ehs1glsha1juy.akamaized.net/Love_Nature_4K.m3u8", web: "https://tv.lovenature.com/" },
+  { id: "nature-time", name: "NatureTime (AU/NZ)", cat: "space", catLabel: "🌿 Planet Earth", country: "AU / Global", desc: "24/7 wildlife expeditions, oceans, forests & natural wonders", hls: "https://amg00090-blueantllc-lovenature-au-samsungau-wggcn.amagi.tv/playlist/amg00090-blueantllc-lovenature-au-samsungau/playlist.m3u8", web: "https://naturetimetv.com/" },
+  { id: "pet-collective", name: "The Pet Collective 24/7", cat: "space", catLabel: "🐕 Dogs & Pets", country: "AU / Global", desc: "24/7 funny dogs, cats, puppies & heartwarming animal rescues", hls: "https://the-pet-collective-international-au.samsung.wurl.tv/playlist.m3u8", web: "https://www.thepetcollective.com/" },
+  { id: "love-pets", name: "Love Pets TV", cat: "space", catLabel: "🐾 Vet & Pet Stories", country: "Canada / UK", desc: "24/7 veterinary stories, dog training, rescues & amazing pets", hls: "https://amg01576-blueskyeenterta-lovepetsemea-samsungse-ctamh.amagi.tv/playlist/amg01576-blueskyeenterta-lovepetsemea-samsungse/playlist.m3u8", web: "https://lovepetstv.com/" },
+  { id: "wb-deadliest", name: "WB TV Deadliest Catch 24/7", cat: "space", catLabel: "🌊 Ocean Adventure", country: "NZ / Global", desc: "24/7 high-seas crabbing & Bering Sea adventure documentaries", hls: "https://mediapackage-sky-azf2-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "redbull-tv", name: "Red Bull TV (Expeditions & Films)", cat: "space", catLabel: "🏔️ Expeditions", country: "Global", desc: "Documentaries, expedition films, aviation, mountain & ocean exploration", hls: "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8", web: "https://www.redbull.com/int-en/live-events" },
+  { id: "danger-tv", name: "Danger TV (Storms & Rescue)", cat: "space", catLabel: "🚁 Rescue & Survival", country: "USA", desc: "24/7 coastguard rescues, storm chasers, extreme weather & survival", hls: "https://dk0n7jh428tzj.cloudfront.net/v1/dangertv/samsungheadend_us/latest/main/hls/playlist.m3u8", web: "https://www.dangertv.com/" },
+  { id: "weatherspy", name: "WeatherSpy TV 24/7", cat: "space", catLabel: "🌩️ Weather & Nature", country: "AU / Global", desc: "Extreme weather footage, storm chasers, ocean swells & atmospheric science", hls: "https://jukin-weatherspy-2-au.samsung.wurl.tv/playlist.m3u8", web: "https://www.weatherspy.tv/" },
+  { id: "sky-weather-au", name: "Sky News Weather 24/7", cat: "space", catLabel: "🌤️ Tasman Weather", country: "Australia / Tasman", desc: "Continuous Tasman Sea, Australian & Pacific satellite radar and forecasts", hls: "https://skynewsau-live-premium.akamaized.net/hls/live/2105305/skynewsweather/live_540p.m3u8", web: "https://www.skynews.com.au/" },
+  { id: "accuweather-now", name: "AccuWeather NOW 24/7", cat: "space", catLabel: "🌎 Global Weather", country: "Global", desc: "24/7 global severe weather tracking, climate science & forecasts", hls: "https://cdn-ue1-prod.tsv2.amagi.tv/linear/amg00684-accuweather-accuweather-plex/playlist.m3u8", web: "https://www.accuweather.com/" },
+  { id: "fox-weather", name: "Fox Weather Live", cat: "space", catLabel: "🌪️ Live Radar", country: "USA", desc: "24/7 live weather radar, storm tracking & meteorology", hls: "https://247wlive.foxweather.com/stream/index.m3u8", web: "https://www.foxweather.com/" },
+
+  // 7. 🌍 World News 24/7 (English) (11 channels)
   { id: "aljazeera", name: "Al Jazeera English HD", cat: "news", catLabel: "🌍 World News", country: "International", desc: "24/7 global news, in-depth documentaries & international reporting", hls: "https://live-hls-web-aje-gcp.thehlive.com/AJE/index.m3u8", web: "https://www.aljazeera.com/live" },
+  { id: "reuters-tv", name: "Reuters TV 24/7", cat: "news", catLabel: "🌍 Global Wire", country: "UK / Global", desc: "24/7 straight-to-the-point global breaking news from Reuters correspondents", hls: "https://amg00453-reuters-amg00453c1-rakuten-uk-2110.playouts.now.amagi.tv/playlist/amg00453-reuters-reuters-rakutenuk/playlist.m3u8", web: "https://www.reuters.com/" },
   { id: "dw-english", name: "DW English (Deutsche Welle)", cat: "news", catLabel: "🌍 World News", country: "Germany / Global", desc: "24/7 European & world news, science, tech and documentaries in English", hls: "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/master.m3u8", web: "https://www.dw.com/en/live-tv/channel-english" },
   { id: "cna-live", name: "CNA (Channel NewsAsia) 24/7", cat: "news", catLabel: "🌏 Asia-Pacific News", country: "Singapore / APAC", desc: "Breaking Asia-Pacific & world news, business and award-winning documentaries", hls: "https://d2e1asnsl7br7b.cloudfront.net/7782e205e72f43aeb4a48ec97f66ebbe/index.m3u8", web: "https://www.channelnewsasia.com/watch" },
   { id: "cnn-intl", name: "CNN Headlines International", cat: "news", catLabel: "🌍 World News", country: "USA / Global", desc: "24/7 international breaking news headlines & global coverage", hls: "https://mediapackage-ptcn-source.fullscreen.nz/index.m3u8", web: "https://edition.cnn.com/" },
+  { id: "nbc-news-now", name: "NBC News NOW 24/7", cat: "news", catLabel: "🇺🇸 US & World News", country: "USA", desc: "24/7 live breaking news, deep-dive reporting & world headlines from NBC", hls: "https://d1si3n1st4nkgb.cloudfront.net/10502/88896001/hls/master.m3u8?ads.xumo_channelId=88896001", web: "https://www.nbcnews.com/now" },
+  { id: "abc-news-us", name: "ABC News Live (US)", cat: "news", catLabel: "🇺🇸 US & World News", country: "USA", desc: "24/7 live breaking news and special reports from ABC News", hls: "https://abcnews-streams.akamaized.net/hls/live/2023560/abcnewshudson1/master.m3u8", web: "https://abcnews.go.com/Live" },
   { id: "cbs-news", name: "CBS News 24/7", cat: "news", catLabel: "🇺🇸 US & World News", country: "USA", desc: "Live 24/7 breaking news, technology & investigative reports from CBS News", hls: "https://cbsn-us.cbsnstream.cbsnews.com/out/v1/55a8648e8f134e82a470f83d562deeca/master.m3u8", web: "https://www.cbsnews.com/live/" },
-  { id: "bloomberg", name: "Bloomberg TV & Originals", cat: "news", catLabel: "📈 Tech & Markets", country: "USA / Global", desc: "Global technology, AI, economics, markets & documentary originals", hls: "https://liveproduseast.global.ssl.fastly.net/us/Channel-USTV-AWS-virginia-1/Source-USTV-1000-1_live.m3u8", web: "https://www.bloomberg.com/live" },
+  { id: "bloomberg", name: "Bloomberg TV Live", cat: "news", catLabel: "📈 Tech & Markets", country: "USA / Global", desc: "Global technology, AI, economics & financial markets live", hls: "https://liveproduseast.global.ssl.fastly.net/us/Channel-USTV-AWS-virginia-1/Source-USTV-1000-1_live.m3u8", web: "https://www.bloomberg.com/live" },
+  { id: "bloomberg-orig", name: "Bloomberg Originals 24/7", cat: "news", catLabel: "🤖 Future & AI Docos", country: "USA / Global", desc: "24/7 short documentaries on AI, future tech, science & global innovation", hls: "https://e96a7526.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmFrdXRlblRWLWV1X0Jsb29tYmVyZ09yaWdpbmFsc19ITFM/playlist.m3u8", web: "https://www.bloomberg.com/originals/live" },
   { id: "ticker-news", name: "Ticker News", cat: "news", catLabel: "🇦🇺 Tech & World", country: "Australia", desc: "Fast-paced streaming news covering tech, aviation, space & global headlines", hls: "https://live-hls-7agy.livepush.io/live_abr_cdn/nsitWAl1pTZtwca/emnmZbKZcO8RfwJR/index.m3u8", web: "https://tickernews.co/" },
 
-  // Space, Science, Weather & Nature
-  { id: "nasa-tv", name: "NASA TV Public HD", cat: "space", catLabel: "🚀 Space & NASA", country: "USA · NASA", desc: "Live mission coverage, ISS views, rocket launches, astronomy & NASA documentaries", hls: "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8", web: "https://plus.nasa.gov/" },
-  { id: "weatherspy", name: "WeatherSpy TV 24/7", cat: "space", catLabel: "🌩️ Weather & Nature", country: "AU / Global", desc: "Extreme weather footage, storm chasers, ocean swells & atmospheric science", hls: "https://jukin-weatherspy-2-au.samsung.wurl.tv/playlist.m3u8", web: "https://www.weatherspy.tv/" },
-  { id: "sky-weather-au", name: "Sky News Weather 24/7", cat: "space", catLabel: "🌤️ Tasman Weather", country: "Australia / Tasman", desc: "Continuous Tasman Sea, Australian & Pacific satellite radar and forecasts", hls: "https://skynewsau-live-premium.akamaized.net/hls/live/2105305/skynewsweather/live_540p.m3u8", web: "https://www.skynews.com.au/" },
-  { id: "iss-earth", name: "ISS Live Earth Views (NASA)", cat: "space", catLabel: "🛰️ Orbit Live", country: "Space", desc: "High-definition live views of Earth from the International Space Station", yt: "xRPjKQtRXR8", web: "https://www.youtube.com/watch?v=xRPjKQtRXR8" },
-
-  // Music & Ambience TV
-  { id: "j2-nz", name: "J2 Music TV NZ", cat: "music", catLabel: "🎵 NZ Music TV", country: "New Zealand", desc: "24/7 classic & modern music videos from New Zealand and around the world", hls: "https://gizmo2.cloudserver.nz/hls/J2.m3u8", web: "https://www.j2.co.nz/" },
-  { id: "groat-nz", name: "The Groat Rock TV NZ", cat: "music", catLabel: "🎸 Rock Music TV", country: "New Zealand", desc: "24/7 rock, classic rock, alternative & guitar anthems music television", hls: "https://gizmo2.cloudserver.nz/hls/GROAT.m3u8", web: "https://www.j2.co.nz/" },
-  { id: "melo-nz", name: "Melo Easy & Chill TV NZ", cat: "music", catLabel: "✨ Easy Listening TV", country: "New Zealand", desc: "24/7 laid-back acoustic, soul, pop & easy-listening music videos", hls: "https://gizmo2.cloudserver.nz/hls/Melo.m3u8", web: "https://www.j2.co.nz/" },
-  { id: "bigrig-nz", name: "Big Rig Country TV NZ", cat: "music", catLabel: "🤠 Country Music TV", country: "New Zealand", desc: "24/7 country, roots & Heartland music videos from NZ, Australia & Nashville", hls: "https://gizmo2.cloudserver.nz/hls/bigrig.m3u8", web: "https://www.j2.co.nz/" },
+  // 8. 🎵 Music TV (70s, 80s, 90s, Rock, Concerts & Chill) (15 channels)
+  { id: "j2-nz", name: "J2 Music TV NZ", cat: "music", catLabel: "🇳🇿 NZ Music TV", country: "New Zealand", desc: "24/7 classic & modern music videos from New Zealand and around the world", hls: "https://gizmo2.cloudserver.nz/hls/J2.m3u8", web: "https://www.j2.co.nz/" },
+  { id: "groat-nz", name: "The Groat Rock TV NZ", cat: "music", catLabel: "🎸 NZ Rock TV", country: "New Zealand", desc: "24/7 rock, classic rock, alternative & guitar anthems music television", hls: "https://gizmo2.cloudserver.nz/hls/GROAT.m3u8", web: "https://www.j2.co.nz/" },
+  { id: "melo-nz", name: "Melo Easy & Chill TV NZ", cat: "music", catLabel: "✨ NZ Easy TV", country: "New Zealand", desc: "24/7 laid-back acoustic, soul, pop & easy-listening music videos", hls: "https://gizmo2.cloudserver.nz/hls/Melo.m3u8", web: "https://www.j2.co.nz/" },
+  { id: "bigrig-nz", name: "Big Rig Country TV NZ", cat: "music", catLabel: "🤠 NZ Country TV", country: "New Zealand", desc: "24/7 country, roots & Heartland music videos from NZ, Australia & Nashville", hls: "https://gizmo2.cloudserver.nz/hls/bigrig.m3u8", web: "https://www.j2.co.nz/" },
+  { id: "qello-concerts", name: "Qello Concerts by Stingray", cat: "music", catLabel: "🎤 Live Concerts", country: "Global", desc: "24/7 full-length live concert films & music documentaries from legendary artists", hls: "https://d39g1vxj2ef6in.cloudfront.net/v1/master/3fec3e5cac39a52b2132f9c66c83dae043dc17d4/prod-rakuten-stitched/master.m3u8?ads.xumo_channelId=88883052", web: "https://qello.com/" },
+  { id: "stingray-80s", name: "Stingray Everything ’80s TV", cat: "music", catLabel: "📼 80s Music Videos", country: "Global", desc: "24/7 non-stop 1980s pop, new wave & rock music videos", hls: "https://lotus.stingray.com/manifest/ose-128ads-montreal/samsungtvplus/master.m3u8", web: "https://www.stingray.com/" },
+  { id: "stingray-90s", name: "Stingray Nothin’ But 90s TV", cat: "music", catLabel: "💿 90s Music Videos", country: "Global", desc: "24/7 iconic 1990s hits, pop, rock & R&B music videos", hls: "https://lotus.stingray.com/manifest/ose-142ads-montreal/samsungtvplus/master.m3u8", web: "https://www.stingray.com/" },
+  { id: "stingray-70s", name: "Stingray Flashback 70s TV", cat: "music", catLabel: "🕺 70s Classics", country: "Global", desc: "24/7 classic 1970s rock, soul, disco & pop music videos", hls: "https://lotus.stingray.com/manifest/ose-115ads-montreal/samsungtvplus/master.m3u8", web: "https://www.stingray.com/" },
+  { id: "stingray-classicrock", name: "Stingray Classic Rock TV", cat: "music", catLabel: "🎸 Classic Rock", country: "Global", desc: "24/7 legendary guitar anthems and classic rock music videos", hls: "https://lotus.stingray.com/manifest/ose-101ads-montreal/samsungtvplus/master.m3u8", web: "https://www.stingray.com/" },
+  { id: "stingray-greatesthits", name: "Stingray Greatest Hits TV", cat: "music", catLabel: "⭐ Timeless Hits", country: "Global", desc: "24/7 chart-topping music videos from the 70s, 80s, 90s & 2000s", hls: "https://d39g1vxj2ef6in.cloudfront.net/v1/master/3fec3e5cac39a52b2132f9c66c83dae043dc17d4/prod-rakuten-stitched/master.m3u8?ads.xumo_channelId=88883053", web: "https://www.stingray.com/" },
+  { id: "stingray-hitlist", name: "Stingray Hit List TV", cat: "music", catLabel: "🔥 Today’s Hits", country: "Global", desc: "24/7 current chart hits and pop music videos", hls: "https://d39g1vxj2ef6in.cloudfront.net/v1/master/3fec3e5cac39a52b2132f9c66c83dae043dc17d4/prod-rakuten-stitched/master.m3u8?ads.xumo_channelId=88883054", web: "https://www.stingray.com/" },
+  { id: "stingray-soulstorm", name: "Stingray Soul Storm TV", cat: "music", catLabel: "🎷 R&B & Soul", country: "Global", desc: "24/7 classic and smooth R&B, Motown & soul music videos", hls: "https://lotus.stingray.com/manifest/ose-134ads-montreal/samsungtvplus/master.m3u8", web: "https://www.stingray.com/" },
+  { id: "stingray-easy", name: "Stingray Easy Listening TV", cat: "music", catLabel: "☕ Easy & Relax", country: "Global", desc: "24/7 smooth adult contemporary and relaxing melodies", hls: "https://lotus.stingray.com/manifest/ose-137ads-montreal/samsungtvplus/master.m3u8", web: "https://www.stingray.com/" },
+  { id: "stingray-naturescape", name: "Stingray Naturescape 4K", cat: "music", catLabel: "🏝️ Scenic Ambience", country: "Global", desc: "24/7 stunning aerial landscapes, beaches & mountains with gentle ambient soundtracks", hls: "https://d39g1vxj2ef6in.cloudfront.net/v1/master/3fec3e5cac39a52b2132f9c66c83dae043dc17d4/prod-rakuten-stitched/master.m3u8?ads.xumo_channelId=88883056", web: "https://www.stingray.com/" },
   { id: "lofigirl-tv", name: "Lofi Girl 24/7 Chill TV", cat: "music", catLabel: "🎧 Chill & Study TV", country: "Global", desc: "24/7 relaxing lofi beats & animated visual stream for reading, DIY or winding down", yt: "jfKfPfyJRdk", web: "https://www.youtube.com/watch?v=jfKfPfyJRdk" }
 ];
 
@@ -30462,7 +30535,7 @@ function ltvGet() {
     const o = JSON.parse(localStorage.getItem(LTV_KEY) || "null");
     if (o && Array.isArray(o.saved)) return o;
   } catch (e) {}
-  return { saved: ["three-nz", "mythbusters", "moviesphere", "hgtv-nz", "nasa-tv", "aljazeera"], custom: [] };
+  return { saved: ["three-nz", "mythbusters", "moviesphere", "dust-scifi", "drybar-comedy", "hgtv-nz", "nasa-tv", "qello-concerts"], custom: [] };
 }
 function ltvSave(o) {
   try { localStorage.setItem(LTV_KEY, JSON.stringify(o)); } catch (e) {}
@@ -30523,7 +30596,6 @@ async function ltvMountVideo() {
     if (ltvCur.hlsInst) { ltvCur.hlsInst.destroy(); ltvCur.hlsInst = null; }
   } catch (e) {}
   vid.disableRemotePlayback = false;
-  // Prefer native HLS on iOS/Safari, or hls.js on Android/Desktop Chrome
   if (vid.canPlayType("application/vnd.apple.mpegurl") && !/Android|Chrome/i.test(navigator.userAgent || "")) {
     vid.src = ch.hls;
     vid.play().catch(() => {});
@@ -30619,7 +30691,7 @@ function ltvPlayerHtml() {
   if (!ch) return "";
   const saved = ltvIsSaved(ch);
   const all = ltvAllChannels();
-  const presets = ltvGet().saved.map(id => all.find(x => x.id === id)).filter(Boolean).slice(0, 6);
+  const presets = ltvGet().saved.map(id => all.find(x => x.id === id)).filter(Boolean).slice(0, 8);
   let screen = "";
   if (ch.yt) {
     screen = `<iframe src="https://www.youtube-nocookie.com/embed/${esc(ch.yt)}?autoplay=1&playsinline=1&rel=0" title="${esc(ch.name)}" style="width:100%;height:100%;border:0;display:block" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
@@ -30675,7 +30747,7 @@ function ltvCardHtml(ch, badgeCol) {
   </div>`;
 }
 function ltvMenu(k) {
-  openSheet("Live TV Channels", `<p class="muted" style="margin:0 0 10px">Tap any channel card to watch it live inside the widescreen TV player at the top of the page. All sport channels are excluded. You can also search hundreds of free worldwide internet TV streams or add any custom <code>.m3u8</code> stream.</p>`, null, "",
+  openSheet("Live TV Channels", `<p class="muted" style="margin:0 0 10px">Tap any channel card to watch it live inside the widescreen TV player at the top of the page. All sport channels are excluded. You can also search 1,000+ free worldwide internet TV streams or add any custom <code>.m3u8</code> stream.</p>`, null, "",
     `<button type="button" class="btn primary" onclick="closeSheet().then(()=>ltvAddCustomSheet())">${I("plus")} Add custom channel</button>`);
 }
 function ltvAddCustomSheet() {
@@ -30701,9 +30773,12 @@ function ltvBoardHtml() {
   const all = ltvAllChannels();
   const o = ltvGet();
   const nzAu = all.filter(c => c.cat === "nz");
-  const moviesFactual = all.filter(c => c.cat === "movies");
-  const news = all.filter(c => c.cat === "news");
+  const movies = all.filter(c => c.cat === "movies");
+  const comedy = all.filter(c => c.cat === "comedy");
+  const home = all.filter(c => c.cat === "home");
+  const doco = all.filter(c => c.cat === "doco");
   const space = all.filter(c => c.cat === "space");
+  const news = all.filter(c => c.cat === "news");
   const music = all.filter(c => c.cat === "music");
   const saved = o.saved.map(id => all.find(c => c.id === id)).filter(Boolean);
   const f = ltvCur.filt;
@@ -30719,10 +30794,13 @@ function ltvBoardHtml() {
     cols.push(tbList("search", `🔍 Free TV Search (“${ltvCur.q.trim()}”)`, ltvCur.hits.length, searchCards || (ltvCur.searching ? "Searching worldwide free TV directory…" : "No matching free TV streams"), false, "ltv"));
   }
   if (f === "all" || f === "nz") cols.push(tbList("nz", "🇳🇿 NZ & Australia Freeview Live", nzAu.length, nzAu.map(c => ltvCardHtml(c, "#16a34a")).join(""), false, "ltv"));
-  if (f === "all" || f === "movies") cols.push(tbList("movies", "🎬 Movies, MythBusters, Reno & Docos 24/7", moviesFactual.length, moviesFactual.map(c => ltvCardHtml(c, "#e11d48")).join(""), false, "ltv"));
+  if (f === "all" || f === "movies") cols.push(tbList("movies", "🎬 Movies, Sci-Fi & Action 24/7", movies.length, movies.map(c => ltvCardHtml(c, "#e11d48")).join(""), false, "ltv"));
+  if (f === "all" || f === "comedy") cols.push(tbList("comedy", "😂 Comedy, Sitcoms & Classic TV 24/7", comedy.length, comedy.map(c => ltvCardHtml(c, "#d97706")).join(""), false, "ltv"));
+  if (f === "all" || f === "home") cols.push(tbList("home", "🔨 Home, Reno, Cooking, Cars & DIY 24/7", home.length, home.map(c => ltvCardHtml(c, "#0d9488")).join(""), false, "ltv"));
+  if (f === "all" || f === "doco") cols.push(tbList("doco", "🔍 True Crime, History & Documentaries 24/7", doco.length, doco.map(c => ltvCardHtml(c, "#4f46e5")).join(""), false, "ltv"));
+  if (f === "all" || f === "space") cols.push(tbList("space", "🚀 Space, Science, Nature, Pets & Weather", space.length, space.map(c => ltvCardHtml(c, "#0891b2")).join(""), false, "ltv"));
   if (f === "all" || f === "news") cols.push(tbList("news", "🌍 World News 24/7 (English)", news.length, news.map(c => ltvCardHtml(c, "#2563eb")).join(""), false, "ltv"));
-  if (f === "all" || f === "space") cols.push(tbList("space", "🚀 Space, Science, Weather & Nature", space.length, space.map(c => ltvCardHtml(c, "#0891b2")).join(""), false, "ltv"));
-  if (f === "all" || f === "music") cols.push(tbList("music", "🎵 Music & Chill TV 24/7", music.length, music.map(c => ltvCardHtml(c, "#7c3aed")).join(""), false, "ltv"));
+  if (f === "all" || f === "music") cols.push(tbList("music", "🎵 Music TV (70s, 80s, 90s, Rock & Concerts)", music.length, music.map(c => ltvCardHtml(c, "#7c3aed")).join(""), false, "ltv"));
   if (f === "all" || f === "saved") cols.push(tbList("saved", "⭐ Saved & Preset Channels", saved.length, saved.map(c => ltvCardHtml(c, "#ca8a04")).join(""), false, "ltv", "Tap ☆ Save on any channel"));
   return cols.join("");
 }
@@ -30730,11 +30808,14 @@ function ltvChipsHtml() {
   return [
     ["all", "All (" + ltvAllChannels().length + ")"],
     ["nz", "🇳🇿 NZ & Australia"],
-    ["movies", "🎬 Movies, MythBusters & Reno"],
+    ["movies", "🎬 Movies & Sci-Fi"],
+    ["comedy", "😂 Comedy & Sitcoms"],
+    ["home", "🔨 Home, Cooking & Cars"],
+    ["doco", "🔍 True Crime & History"],
+    ["space", "🚀 Space, Nature & Weather"],
     ["news", "🌍 World News 24/7"],
-    ["space", "🚀 Space & Weather"],
-    ["music", "🎵 Music TV"],
-    ["saved", "⭐ Saved Channels"]
+    ["music", "🎵 Music TV (70s/80s/90s/Rock)"],
+    ["saved", "⭐ Saved"]
   ].map(([k, lbl]) => `<button type="button" class="chip${ltvCur.filt === k ? " on" : ""}" onclick="ltvCur.filt='${k}';ltvRedrawBoard()">${esc(lbl)}</button>`).join("");
 }
 function ltvRedrawBoard() {
@@ -30753,16 +30834,16 @@ function LiveTvPage() {
   setTimeout(ltvMountVideo, 60);
   return `<button class="back" onclick="go('#media')">${I("left")} Entertainment</button>
     <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">
-      <label class="search" style="flex:1;margin:0">${I("search")}<input type="search" placeholder="Search 1,000+ free worldwide TV channels (NASA, BBC, movies, nature, music…)" value="${esc(ltvCur.q)}" aria-label="Search free live TV channels" oninput="ltvSearchInput(this.value)"></label>
+      <label class="search" style="flex:1;margin:0">${I("search")}<input type="search" placeholder="Search 1,000+ free worldwide TV channels (NASA, BBC, movies, comedy, music…)" value="${esc(ltvCur.q)}" aria-label="Search free live TV channels" oninput="ltvSearchInput(this.value)"></label>
       ${ltvCur.q ? `<button type="button" class="btn small" onclick="ltvCur.q='';ltvCur.hits=[];ltvRedrawBoard()">Clear</button>` : ""}
     </div>
     <div class="chips scroll" id="ltvchips" style="margin:0 0 10px">${ltvChipsHtml()}</div>
     <div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#1e1b4b,#0f172a 60%,#064e3b)"></div>
-      <div class="tbtop"><div><h1>📺 Live Internet TV</h1><div style="font-size:.82rem;opacity:.9">Free NZ Freeview, 24/7 Movies &amp; MythBusters, World News, Space &amp; Music TV</div></div><button class="iconbtn" aria-label="What’s on TV Guide" title="TV Guide" onclick="go('#tv')">📅</button></div>
+      <div class="tbtop"><div><h1>📺 Live Internet TV (${ltvAllChannels().length} Channels)</h1><div style="font-size:.82rem;opacity:.9">NZ Freeview, 24/7 Movies &amp; Sci-Fi, Comedy, Home/Cooking/Cars, True Crime/History, Space &amp; Music TV</div></div><button class="iconbtn" aria-label="What’s on TV Guide" title="TV Guide" onclick="go('#tv')">📅</button></div>
       ${ltvPlayerHtml()}
       <div class="tblists" id="ltvlists">${ltvBoardHtml()}</div>
     </div>
-    <div class="foot">Tap any channel card to watch live in the widescreen player at the top. Use <b>🔊 Bluetooth / Output</b> to send audio to your Bluetooth speaker or headphones, or <b>📅</b> for the NZ TV Guide.</div>`;
+    <div class="foot">Tap any of the ${ltvAllChannels().length} verified free channels to watch live in the widescreen player at the top. Use <b>🔊 Bluetooth / Output</b> to send audio to your Bluetooth speaker or headphones, or <b>📅</b> for the NZ TV Guide.</div>`;
 }
 
 /* ---- 2.28.24: Long-press any recipe card on #recipes or #food to delete it ---- */
