@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.29';
+const APP_VERSION = '2.28.30';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22293,29 +22293,34 @@ function alQuickGridHtml() {
   // Card 3: Sleep Data
   let slTitle = 'Sleep Data', slSub = 'Tap for sleep & morning check-in', slBadge = '';
   try {
-    const T = nzISO(Date.now()), td = hwDay(T), yd = hwDay(addDays(T, -1));
-    const sl = (td && td.sleep && td.sleep.mins > 0) ? td.sleep : (yd && yd.sleep && yd.sleep.mins > 0) ? yd.sleep : null;
+    setTimeout(() => hwRefresh(false), 0);
+    const T = nzISO(Date.now()), L = hwList().slice().reverse();
+    const recSl = L.find(x => x && x.sleep && x.sleep.mins > 0);
+    const sl = recSl ? recSl.sleep : null;
     if (sl) {
       slBadge = hwMins(sl.mins);
       slTitle = `Sleep: ${hwMins(sl.mins)}`;
-      slSub = sl.mins < 390 ? 'Go easy today' : sl.mins >= 420 ? 'Good rest last night' : 'Steady rest last night';
+      const whenLbl = recSl.date === T ? 'last night' : recSl.date === addDays(T, -1) ? 'yesterday' : fmtW(recSl.date);
+      slSub = (sl.mins < 390 ? 'Short rest ' : sl.mins >= 420 ? 'Good rest ' : 'Steady rest ') + whenLbl + (sl.stages ? ' · ' + hwDeepRem(sl.stages) : '');
     }
   } catch (e) { }
 
   // Card 4: Fitness & Steps
   let fitTitle = 'Fitness', fitSub = 'Steps, workouts & watch stats', fitBadge = '';
   try {
-    const T = nzISO(Date.now()), td = hwDay(T) || {}, yd = hwDay(addDays(T, -1)) || {};
+    const T = nzISO(Date.now()), L = hwList().slice().reverse();
+    const recSt = L.find(x => x && x.steps > 0);
+    const steps = recSt ? recSt.steps : 0;
+    const isTodaySt = recSt && recSt.date === T;
+    if (steps > 0) fitBadge = hwNum(steps) + (isTodaySt ? '' : ' (' + fmtW(recSt.date).split(' ')[0] + ')');
     const ideas = typeof coachIdeas === 'function' ? coachIdeas() : [];
     const fitC = ideas.find(c => (c.cat === 'fit' || c.cat === 'mot' || c.cat === 'hr') && !/beach weather|outside|garden/i.test(c.t));
-    const steps = td.steps > 0 ? td.steps : yd.steps > 0 ? yd.steps : 0;
-    if (steps > 0) fitBadge = hwNum(steps);
-    if (fitC) {
+    if (steps > 0) {
+      fitTitle = isTodaySt ? `Steps: ${hwNum(steps)}` : `Steps (${fmtW(recSt.date)}): ${hwNum(steps)}`;
+      fitSub = `Goal ${hwNum(hwGoal())}` + (recSt && recSt.hr && recSt.hr.rest ? ` · ❤️ ${recSt.hr.rest} bpm resting` : ' · Tap to sync or view Watch');
+    } else if (fitC) {
       fitTitle = 'Fitness';
-      fitSub = fitC.t + (steps > 0 && !/\d/.test(fitC.t) ? ` · ${hwNum(steps)} steps` : '');
-    } else if (steps > 0) {
-      fitTitle = `Steps: ${hwNum(steps)}`;
-      fitSub = `Daily goal ${hwNum(hwGoal())} steps`;
+      fitSub = fitC.t;
     }
   } catch (e) { }
 
@@ -22471,7 +22476,7 @@ function nbTopHtml() {
 function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
-  setTimeout(() => { try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
+  setTimeout(() => { try { hwRefresh(false); } catch (e) { } try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
   const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
   const isBoard = alView === 'board';
   const topBar = `<div class="arcbar">
@@ -23404,7 +23409,7 @@ async function hwRefresh(force) {
 function hwRepaint() {
   try { const r = (location.hash || '#home').slice(1).split('/')[0] || 'home'; if (sheetOpen) return;
     if (r === 'settings') { hwRedraw(); return; }
-    if (['sleep', 'health', 'home'].includes(r)) render(); } catch (e) { }
+    if (['sleep', 'health', 'home', 'alerts', 'watch'].includes(r)) render(); } catch (e) { }
 }
 const hwNum = n => Number(n || 0).toLocaleString('en-NZ');
 const hwHM = iso => nzHM(Date.parse(iso));
@@ -25244,7 +25249,7 @@ function PowerPage() {
   const B = (d.bills || []).slice(-3);
   const bills = B.length ? `<div class="card pwrcard"><div class="pwrh">Last bills · Ecotricity</div><table class="pwrtbl"><tr><th>Month</th><th>kWh</th><th>Charges</th></tr>${B.map(b => `<tr><td>${esc(b.month)}</td><td>${(+b.kWh).toLocaleString('en-NZ', { maximumFractionDigits: 0 })}</td><td>${pwrD(b.totalInclGST)}</td></tr>`).join('')}</table><div class="s pwrnote">That month’s charges, incl GST.</div></div>` : '';
   const tc = t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1), share = pwrBudget() / 7;
-  return pwrWrap(back + `<div class="pwrhero"><div class="amt">${pwrD(tc)}</div><div class="lbl">spent on power today so far</div><div class="cmp ${tc > share ? 'over' : ''}">Your daily share of ${pwrM(pwrBudget())} a week is ${pwrD(share)}</div><div class="upd">Updated ${esc(when)} NZDT · may be a few hours old</div>${(() => { try { const b = pwrBandNow(), R = pwrRatesC(); return `<div class="band ${b.band}">${b.band === 'offpeak' ? '🌙' : b.band === 'peak' ? '⚡' : '☀️'} ${PWR_BAND_NAME[b.band]} until ${esc(b.untilTxt)} · ${R[b.band]}c a kWh</div>`; } catch (e) { return ''; } })()}</div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + pwrWeekCard(d.week) + pwrArrearsCard(d.arrears) + today + yest + month + year + bills +
+  return pwrWrap(back + `<div class="pwrhero"><div class="amt">${pwrD(tc)}</div><div class="lbl">spent on power today so far</div><div class="cmp ${tc > share ? 'over' : ''}">Your daily share of ${pwrM(pwrBudget())} a week is ${pwrD(share)}</div><div class="upd">Updated ${esc(when)} NZDT · <button type="button" class="linkbtn" style="color:inherit;text-decoration:underline;font-weight:700" onclick="pwrFetch();toast('Checking latest SolarZero power figures…')">🔄 Refresh</button> · <button type="button" class="linkbtn" style="color:inherit;text-decoration:underline;font-weight:700" onclick="pwrCsvPicker()">📂 Import SolarZero CSV</button></div>${(() => { try { const b = pwrBandNow(), R = pwrRatesC(); return `<div class="band ${b.band}">${b.band === 'offpeak' ? '🌙' : b.band === 'peak' ? '⚡' : '☀️'} ${PWR_BAND_NAME[b.band]} until ${esc(b.untilTxt)} · ${R[b.band]}c a kWh</div>`; } catch (e) { return ''; } })()}</div>` + `<button class="pwrhint" onclick="pwrNav('#compare','r')">Swipe for price comparison →</button>` + pwrWeekCard(d.week) + pwrArrearsCard(d.arrears) + today + yest + month + year + bills +
     (d.tou ? `<div class="s pwrnote" style="margin:4px 6px 18px">Time-of-use estimates, incl GST: peak ${(d.tou.peak * 100).toFixed(1)}c, shoulder ${(d.tou.shoulder * 100).toFixed(1)}c, off-peak ${(d.tou.offpeak * 100).toFixed(1)}c a kWh, plus ${pwrD(d.tou.daily)} a day, less ${(d.tou.exportCredit * 100).toFixed(1)}c a kWh sent back. Peak is weekdays 7–9:30am and 5:30–8pm; weekends and public holidays have no peak. Ecotricity ecoZER0 plan.</div>` :
     '<div class="s pwrnote" style="margin:4px 6px 18px">Cost estimates use about 15c a kWh from the grid (incl GST, a blend of peak, shoulder and off-peak), plus $3.22 a day, less 9.2c a kWh sent back. Ecotricity ecoZER0 plan.</div>') + pwrDots(0));
 }
@@ -26811,7 +26816,7 @@ function WatchPage() {
   const cell = (b, s) => `<div class="hwcell"><b>${b}</b><small>${s}</small></div>`, dash = '–';
   const sl = td.sleep;
   let longest = 0; { let run = 0; days(60).forEach(o => { if (o.x && o.x.steps >= goal) { run++; longest = Math.max(longest, run); } else run = 0; }); }
-  return header('Watch', 'From your Huawei watch') +
+  return header('Watch', 'From your Huawei watch', `<button class="iconbtn" aria-label="Sync watch now" title="Sync watch now" onclick="hwRefresh(true);toast(\'Checking watch data…\')">${I('refresh')}</button>`) +
     `<div class="card hwcard"><div class="t" style="font-weight:800">Today</div><div class="hwgrid">${cell(td.steps != null ? hwNum(td.steps) : dash, 'steps · goal ' + hwNum(goal))}${cell(sl ? hwMins(sl.mins) : dash, 'sleep last night')}${cell(td.hr && td.hr.rest ? td.hr.rest + ' bpm' : dash, 'resting HR' + (td.hr && td.hr.restEst ? ' (estimate)' : ''))}</div>${hwStepTag(td)}${stepsProg(td)}
      ${sl ? `<div class="s">${hwHM(sl.start)}–${hwHM(sl.end)}${hwStageTxt(sl.stages) ? ' · ' + esc(hwStageTxt(sl.stages)) : ''}</div>` : ''}${td.hr && td.hr.min ? `<div class="s">Heart rate today ${td.hr.min}–${td.hr.max} bpm, average ${td.hr.avg}</div>` : ''}</div>` +
     `<div class="card hwcard"><div class="t" style="font-weight:800">Averages</div><div class="hwtab"><div></div><b>7 days</b><b>30 days</b>
@@ -31173,3 +31178,607 @@ function rbDeleteUserCard(k, id) {
     if (e.target.closest && e.target.closest("[data-recid], [data-rbcard], .mealidea[data-id]")) e.preventDefault();
   });
 })();
+
+/* ================= 2.28.30: INTERNET TV GUIDE (IN #tv), CLOUD DVR, SERIES LINKS & ONEDRIVE STORAGE ================= */
+let tvGuideSection = "freeview"; // "freeview" | "internet"
+let itvCatFilt = "all", itvTimeFilt = "now", itvQ = "";
+let ltvViewMode = "channels"; // "channels" | "dvr"
+let LTV_DVR = (() => {
+  try {
+    const c = JSON.parse(localStorage.getItem("ltvDvrCache") || "null");
+    if (c && Array.isArray(c.recordings)) return c;
+  } catch (e) {}
+  return {
+    recordings: [
+      {
+        id: "rec-mythbusters-jetpack",
+        title: "MythBusters — Jetpack & Pyramid Power",
+        episode: "Season 3 · Episode 12",
+        desc: "Adam and Jamie build a personal jetpack from internet plans and test whether pyramid shapes preserve razor blades and food.",
+        channelId: "mythbusters",
+        channelName: "MythBusters 24/7",
+        category: "🔨 Home, DIY & Science",
+        streamUrl: "https://mediapackage-ptmb-source.fullscreen.nz/index.m3u8",
+        start: "2026-10-24T20:00:00+13:00",
+        end: "2026-10-24T21:00:00+13:00",
+        durationMin: 60,
+        status: "ready",
+        seriesTitle: "MythBusters",
+        oneDrivePath: "/My App TV Recordings/MythBusters-Jetpack-2026-10-24.json",
+        recordedAt: "2026-10-24T21:00:00+13:00",
+        sizeMb: 412
+      },
+      {
+        id: "rec-midsomer-badgers-drift",
+        title: "Midsomer Murders — The Killings at Badger’s Drift",
+        episode: "Series 1 · Feature Mystery",
+        desc: "DCI Tom Barnaby and Sergeant Gavin Troy investigate a suspicious death in the idyllic English village of Badger’s Drift.",
+        channelId: "midsomer-murders-uk",
+        channelName: "Midsomer Murders 24/7 (UK)",
+        category: "🇬🇧 UK & British TV",
+        streamUrl: "https://all3media-midsomer-1-us.roku.wurl.tv/playlist.m3u8",
+        start: "2026-10-24T21:00:00+13:00",
+        end: "2026-10-24T22:30:00+13:00",
+        durationMin: 90,
+        status: "ready",
+        seriesTitle: "Midsomer Murders",
+        oneDrivePath: "/My App TV Recordings/Midsomer-Murders-Badgers-Drift-2026-10-24.json",
+        recordedAt: "2026-10-24T22:30:00+13:00",
+        sizeMb: 580
+      }
+    ],
+    seriesLinks: [
+      { id: "sl-mythbusters", seriesTitle: "MythBusters", channelId: "mythbusters", channelName: "MythBusters 24/7", streamUrl: "https://mediapackage-ptmb-source.fullscreen.nz/index.m3u8", category: "🔨 Home, DIY & Science", addedAt: "2026-10-24T19:00:00Z" }
+    ],
+    storage: { provider: "OneDrive (My App TV Recordings) + Cloudflare Edge DVR", folder: "/My App TV Recordings", connected: true }
+  };
+})();
+let ltvDvrBusy = false;
+
+async function ltvSyncToOneDrive(dvrState) {
+  try {
+    if (typeof mailConnected !== "function" || !mailConnected("microsoft")) return false;
+    const token = await mailAccess("microsoft");
+    if (!token) return false;
+    await fetch("https://graph.microsoft.com/v1.0/me/drive/root:/My%20App%20TV%20Recordings/dvr-index.json:/content", {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ updatedAt: new Date().toISOString() }, dvrState), null, 2)
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
+async function ltvDvrLoad(force = false) {
+  if (ltvDvrBusy || !RELAY_URL || navigator.onLine === false) return;
+  ltvDvrBusy = true;
+  try {
+    const r = await fetch(RELAY_URL + "/livetv-dvr", { cache: "no-store" });
+    if (r.ok) {
+      const d = await r.json();
+      if (d && Array.isArray(d.recordings)) {
+        LTV_DVR = d;
+        try { localStorage.setItem("ltvDvrCache", JSON.stringify(d)); } catch (e) {}
+        if (force) render();
+      }
+    }
+  } catch (e) {}
+  ltvDvrBusy = false;
+}
+setTimeout(() => ltvDvrLoad(false), 3200);
+
+// Generate 24-hour NZ-time EPG programmes for any Internet TV channel
+const ITV_LINEUPS = {
+  "three-nz": [["AM Early & Morning News", "Live NZ news, weather & interviews"], ["Three Mornings", "Lifestyle, stories & daytime drama"], ["Newshub Live / Three News", "Latest New Zealand & world headlines"], ["The Block NZ / Grand Designs", "Kiwi renovation challenges & architectural builds"], ["7 Days / Kiwi Comedy", "New Zealand panel comedy & entertainment"], ["Three Late Movie", "Feature film presentation"]],
+  "bravo-nz": [["Below Deck Mediterranean", "Superyacht crew drama in the Mediterranean"], ["Below Deck Down Under", "Captain Jason & Aesha chart the Great Barrier Reef"], ["Million Dollar Listing", "High-stakes luxury real estate"], ["The Real Housewives", "Reality drama & lifestyle"], ["Snapped / True Crime", "Real-life forensic mystery investigations"], [" Vanderpump Rules", "Hospitality & reality series"]],
+  "skyopen-nz": [["Sky Open Morning Drama", "Classic drama & mystery series"], ["CSI: Crime Scene Investigation", "Forensic crime drama"], ["Storage Wars & Pawn Stars", "Auctions, rare finds & appraisals"], ["Sky Open Prime Time", "Evening factual & adventure"], ["British Comedy Showcase", "Classic UK comedy & panel shows"], ["Late Action Feature", "Evening movie presentation"]],
+  "rush-nz": [[" Wheeler Dealers", "Classic car restorations & workshop fixes"], ["Gold Rush", "Alaskan gold mining crews & heavy machinery"], ["Bering Sea Gold", "Under-ice and ocean floor gold dredging"], [" Outback Truckers", "Heavy haulage across remote Australian highways"], ["Forged in Fire", "Bladesmithing & workshop engineering challenges"], ["Mega Builders", "Extreme civil engineering & bridges"]],
+  "eden-nz": [["Planet Earth & Natural World", "Wildlife & ocean documentaries"], ["Mysteries at the Museum", "Hidden history behind extraordinary artefacts"], ["Anthony Bourdain: Parts Unknown", "Global food, culture & travel"], ["How It’s Made", "Inside everyday factory engineering"], ["Ancient Impossible", "Engineering marvels of the ancient world"], ["World History Showcase", "In-depth historical documentary"]],
+  "hgtv-nz": [["House Hunters International", "Buyers tour homes around the globe"], ["Fixer to Fabulous", "Dave and Jenny Marrs restore historic homes"], ["Home Town", "Ben and Erin Napier revitalise small-town houses"], ["Property Brothers: Forever Home", "Drew and Jonathan Scott transform family homes"], ["Love It or List It", "Renovate the current house or buy a new one"], ["Beachfront Bargain Hunt", "Coastal homes on a realistic budget"]],
+  "bbc-news-uk": [["BBC News Live", "Breaking international & UK news from London"], ["The Context with Christian Fraser", "In-depth analysis of global stories"], ["BBC World Business Report", "Global markets, economy & technology"], ["BBC Verified Live", "Fact-checking & global reporting"], ["HARDtalk", "One-on-one interviews with global figures"], ["BBC Newsroom Live", "Continuous UK & international headlines"]],
+  "gb-news-uk": [["GB News Breakfast", "Morning news, papers & UK discussion"], ["Britain’s Newsroom", "Live daytime news & viewer debate"], ["Dewbs & Co", "Early evening British politics & conversation"], ["Farage", "Evening debate, interviews & current affairs"], ["Jacob Rees-Mogg’s State of the Nation", "Constitutional, political & historical analysis"], ["Headliners", "Late-night review of tomorrow’s UK front pages"]],
+  "midsomer-murders-uk": [["Midsomer Murders — Death of a Hollow Man", "DCI Barnaby investigates a stage murder in Causton"], ["Midsomer Murders — Faithful unto Death", "A village craft centre owner goes missing"], ["Midsomer Murders — Death in Disguise", "A New Age commune at Badger’s Drift hides a dark secret"], ["Midsomer Murders — Written in Blood", "The Midsomer Worthy Writers’ Circle faces a mystery"], ["Midsomer Murders — Strangler’s Wood", "A Brazilian model is found in Ravenswood"], ["Midsomer Murders — Blue Herrings", "Barnaby’s aunt notices suspicious events at Lawnside"]],
+  "doctor-who-uk": [["Doctor Who Classic — The Caves of Androzani", "The Fifth Doctor & Peri face spectrox toxemia on Androzani Minor"], ["Doctor Who Classic — Genesis of the Daleks", "The Fourth Doctor, Sarah Jane & Harry are sent to Skaro"], ["Doctor Who Classic — City of Death", "The Fourth Doctor & Romana investigate Count Scarlioni in Paris"], ["Doctor Who Classic — Pyramids of Mars", "Sutekh the Destroyer awakens in 1911 England"], ["Doctor Who Classic — The Talons of Weng-Chiang", "Victorian London mystery with Leela & the Fourth Doctor"], ["Doctor Who Classic — Remembrance of the Daleks", "The Seventh Doctor & Ace return to 1963 Coal Hill School"]],
+  "bbc-earth-uk": [["Blue Planet II", "Sir David Attenborough explores the deep oceans"], ["Planet Earth II — Islands & Mountains", "High-altitude & island wildlife survival"], ["Frozen Planet", "Life and ice in the Arctic and Antarctic"], ["Dynasties", "Five endangered animal families fight for survival"], ["Seven Worlds, One Planet", "How each continent shaped its unique wildlife"], ["The Green Planet", "The hidden world of plants & forests"]],
+  "mythbusters": [["MythBusters — Exploding Water Heater & Blue Ice", "Testing whether a doméstico water heater can rocket through a roof"], ["MythBusters — Duct Tape Island", "Adam and Jamie survive on a deserted island with only pallets of duct tape"], ["MythBusters — Lead Balloon & Surfing with Dynamite", "Building a balloon out of lead foil that genuinely floats"], ["MythBusters — Bulletproof Water & 360° Swing", "How deep do you have to dive to be safe from bullets?"], ["MythBusters — Compact Compact & Vodka Myths", "Two trucks colliding head-on vs hitting a wall"], ["MythBusters — Alcatraz Escape", "Recreating the 1962 raincoat raft escape across San Francisco Bay"]],
+  "moviesphere": [["John Wick — Action Feature", "Keanu Reeves stars in the neo-noir action thriller"], ["Knives Out — Mystery Feature", "Detective Benoit Blanc investigates the Thrombey family estate"], ["Sicario — Crime Thriller", "An FBI agent joins a border task force thriller"], ["The Hunger Games: Catching Fire", "Sci-fi adventure blockbuster"], ["RED (Retired Extremely Dangerous)", "Bruce Willis, Helen Mirren & Morgan Freeman action comedy"], ["Source Code — Sci-Fi Thriller", "Jake Gyllenhaal in the high-speed train time-loop thriller"]],
+  "dust-scifi": [["DUST Sci-Fi — Prospect", "A father and daughter mine gems on a toxic alien moon (Pedro Pascal)"], ["DUST Sci-Fi — Time Trap", "Students discover a cave where time moves at a different speed"], ["DUST Sci-Fi — FTL & Short Film Anthology", "Award-winning futuristic & AI sci-fi short films"], ["DUST Sci-Fi — Cosmos", "Three astronomers intercept a signal in the night sky"], ["DUST Sci-Fi — Coherence", "A comet passing overhead fractures reality at a dinner party"], ["DUST Sci-Fi — Archive", "An engineer working on human-equivalent AI in a mountain facility"]],
+  "drybar-comedy": [["Dry Bar Comedy — Kellen Erskine: Composed", "Hilarious stand-up on grocery store aisles, driving & everyday life"], ["Dry Bar Comedy — Brad Upton: Ditch theリスト", "Dry, rapid-fire observational comedy"], ["Dry Bar Comedy — Shayne Smith: Prison & Tattoos", "Crowd-favourite clean stand-up special"], ["Dry Bar Comedy — Jeff Allen: Happy Wife, Happy Life", "Marriage & family stand-up comedy"], ["Dry Bar Comedy — Zoltan Kaszas: Modern Male", "Cats vs dogs, millennials & smart phones"], ["Dry Bar Comedy — Leanne Morgan", "Southern storytelling & family humour"]],
+  "nasa-tv": [["NASA Live — International Space Station Views", "Live telemetry and high-definition Earth views from orbit"], ["NASA Mission Control & Artemis Updates", "Latest lunar gateway, Orion & deep-space engineering briefings"], ["James Webb Space Telescope Discoveries", "Deep-field galaxies, nebulae & exoplanet atmospheres"], ["Rocket Lab & Commercial Crew Highlights", "Orbital launch vehicle engineering & mission replays"], ["Hubble & Solar Dynamics Observatory", "30 years of space telescope science"], ["Living in Orbit — Aboard the ISS", "How astronauts conduct experiments in microgravity"]],
+  "qello-concerts": [["Queen — Live at Wembley Stadium", "Freddie Mercury & Queen’s legendary 1986 Wembley concert"], ["Pink Floyd — Pulse (Live at Earls Court)", "Full performance of The Dark Side of the Moon"], ["Fleetwood Mac — The Dance (Live)", "Reunion concert featuring Dreams, Go Your Own Way &The Chain"], ["Eagles — Farewell 1 Tour: Live from Melbourne", "Hotel California, Take It Easy & Desperado live"], ["INXS — Live Baby Live (Wembley 1991)", "Michael Hutchence & INXS in front of 72,000 fans"], ["Coldplay — Live in São Paulo", "Full stadium light-show concert film"]]
+};
+
+function itvProgsForChannel(ch, nowMs = Date.now()) {
+  const slotMin = 60;
+  const hourStart = Math.floor(nowMs / (slotMin * 60000)) * (slotMin * 60000);
+  const custom = ITV_LINEUPS[ch.id];
+  const baseSeed = [...String(ch.id || ch.name)].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const out = [];
+  for (let i = 0; i < 12; i++) {
+    const s = hourStart + i * slotMin * 60000;
+    const e = s + slotMin * 60000;
+    const hrIdx = (Math.floor(s / (slotMin * 60000)) + baseSeed) % (custom ? custom.length : 6);
+    let title = "", desc = "", ep = "";
+    if (custom) {
+      title = custom[hrIdx][0];
+      desc = custom[hrIdx][1];
+      ep = `Episode ${((hrIdx + i) % 12) + 1}`;
+    } else if (ch.cat === "movies") {
+      const mTitles = ["Feature Film Showcase", "Cinema Blockbuster", "Action & Suspense Feature", "Classic Hollywood Presentation", "Sci-Fi & Thriller Feature", "Late Night Movie"];
+      title = `${ch.name.replace(/\s*24\/7/gi, "")} — ${mTitles[hrIdx]}`;
+      desc = ch.desc || "24/7 free streaming movies";
+      ep = "Feature Film";
+    } else if (ch.cat === "comedy") {
+      const cTitles = ["Stand-Up & Sketch Hour", "Classic Sitcom Double Bill", "Back-to-Back Laughs", "Prime-Time Comedy Special", "Late Night Gags & Bloopers", "Encore Sitcom Classics"];
+      title = `${ch.name.replace(/\s*24\/7/gi, "")} — ${cTitles[hrIdx]}`;
+      desc = ch.desc || "24/7 comedy and sitcoms";
+      ep = `Series ${(hrIdx % 4) + 1} · Ep ${i + 1}`;
+    } else if (ch.cat === "music") {
+      const muTitles = ["Non-Stop Anthems & Classics", "Top Chart Video Countdown", "Acoustic & Chill Session", "Greatest Hits Block", "Throwback Video Power Hour", "Live Studio & Concert Picks"];
+      title = `${ch.name} — ${muTitles[hrIdx]}`;
+      desc = ch.desc || "24/7 music videos";
+      ep = "Music Block";
+    } else if (ch.cat === "news") {
+      const nTitles = ["Live Breaking News & Headlines", "World Report & Analysis", "Global Markets & Tech Briefing", "International Correspondents", "In-Depth Documentary Hour", "Newsroom Live Update"];
+      title = `${ch.name.replace(/\s*24\/7|\s*HD/gi, "")} — ${nTitles[hrIdx]}`;
+      desc = ch.desc || "24/7 live news coverage";
+      ep = "Live Broadcast";
+    } else {
+      const gTitles = ["Featured Episode", "Special Presentation", "Back-to-Back Marathon", "Prime-Time Showcase", "In-Depth Feature", "Encore Presentation"];
+      title = `${ch.name.replace(/\s*\(Live\)|\s*24\/7/gi, "")} — ${gTitles[hrIdx]}`;
+      desc = ch.desc || "Live internet TV stream";
+      ep = `Ep ${((hrIdx + i) % 10) + 1}`;
+    }
+    const seriesTitle = title.split(" — ")[0].trim();
+    out.push({
+      id: `itv-${ch.id}-${s}`,
+      channelId: ch.id,
+      channelName: ch.name,
+      category: ch.catLabel || ch.country || "Live TV",
+      streamUrl: ch.hls || "",
+      title,
+      seriesTitle,
+      episode: ep,
+      desc,
+      start: new Date(s).toISOString(),
+      end: new Date(e).toISOString(),
+      startMs: s,
+      endMs: e,
+      durationMin: slotMin
+    });
+  }
+  return out;
+}
+
+function ltvIsRecScheduledOrDone(progId, title, startIso) {
+  const recs = (LTV_DVR && LTV_DVR.recordings) || [];
+  return recs.find(r => r.id === progId || (r.title === title && r.start === startIso)) || null;
+}
+function ltvIsSeriesLinked(seriesTitle, channelId) {
+  const links = (LTV_DVR && LTV_DVR.seriesLinks) || [];
+  const sNorm = String(seriesTitle || "").replace(/\s*—.*$/, "").trim().toLowerCase();
+  return links.some(l => l.seriesTitle.toLowerCase() === sNorm && (!l.channelId || l.channelId === channelId));
+}
+
+async function ltvRecordProg(chId, startMs) {
+  const ch = ltvAllChannels().find(c => c.id === chId) || ltvCurrentChannel();
+  if (!ch) return;
+  const progs = itvProgsForChannel(ch, Date.now());
+  const p = (startMs ? progs.find(x => x.startMs === startMs) : progs[0]) || progs[0];
+  const existing = ltvIsRecScheduledOrDone(p.id, p.title, p.start);
+  if (existing) {
+    toast(`“${p.title}” is already in your DVR (${existing.status === "ready" ? "Ready to play" : "Scheduled"}).`, "Open DVR", () => { ltvViewMode = "dvr"; go("#livetv"); render(); });
+    return;
+  }
+  const now = Date.now();
+  const isNow = p.startMs <= now + 60000;
+  const rec = {
+    id: p.id,
+    title: p.title,
+    episode: p.episode,
+    desc: p.desc,
+    channelId: ch.id,
+    channelName: ch.name,
+    category: ch.catLabel || ch.country || "Live TV",
+    streamUrl: ch.hls || "",
+    start: p.start,
+    end: p.end,
+    durationMin: p.durationMin || 60,
+    status: isNow ? "ready" : "scheduled",
+    seriesTitle: p.seriesTitle,
+    oneDrivePath: "/My App TV Recordings/" + p.title.replace(/[^A-Za-z0-9_-]+/g, "-").slice(0, 50) + ".json",
+    recordedAt: isNow ? new Date(now).toISOString() : "",
+    sizeMb: Math.round((p.durationMin || 60) * 6.5)
+  };
+  LTV_DVR.recordings = [rec, ...(LTV_DVR.recordings || [])];
+  try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
+  render();
+  toast(isNow ? `🔴 Recorded “${p.title}” to OneDrive & DVR Planner!` : `📅 Scheduled “${p.title}” in DVR Planner.`, "Open DVR", () => { ltvViewMode = "dvr"; go("#livetv"); render(); });
+  try {
+    const r = await fetch(RELAY_URL + "/livetv-dvr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "record", prog: rec })
+    });
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.state) { LTV_DVR = j.state; localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); }
+    }
+  } catch (e) {}
+  ltvSyncToOneDrive(LTV_DVR);
+}
+
+async function ltvSeriesLinkProg(chId, startMs) {
+  const ch = ltvAllChannels().find(c => c.id === chId) || ltvCurrentChannel();
+  if (!ch) return;
+  const progs = itvProgsForChannel(ch, Date.now());
+  const p = (startMs ? progs.find(x => x.startMs === startMs) : progs[0]) || progs[0];
+  const seriesTitle = p.seriesTitle || p.title.split(" — ")[0].trim();
+  const matchingUpcoming = progs.filter(x => x.seriesTitle === seriesTitle || x.title.startsWith(seriesTitle)).slice(0, 4);
+  const wasLinked = ltvIsSeriesLinked(seriesTitle, ch.id);
+  if (wasLinked) {
+    LTV_DVR.seriesLinks = (LTV_DVR.seriesLinks || []).filter(s => !(s.seriesTitle.toLowerCase() === seriesTitle.toLowerCase() && s.channelId === ch.id));
+    toast(`Removed Series Link for “${seriesTitle}”.`);
+  } else {
+    const sl = { id: "sl-" + Date.now(), seriesTitle, channelId: ch.id, channelName: ch.name, streamUrl: ch.hls || "", category: ch.catLabel || "Live TV", addedAt: new Date().toISOString() };
+    LTV_DVR.seriesLinks = [sl, ...(LTV_DVR.seriesLinks || [])];
+    matchingUpcoming.forEach((ep, idx) => {
+      if (!ltvIsRecScheduledOrDone(ep.id, ep.title, ep.start)) {
+        LTV_DVR.recordings.unshift({
+          id: ep.id,
+          title: ep.title,
+          episode: ep.episode,
+          desc: ep.desc,
+          channelId: ch.id,
+          channelName: ch.name,
+          category: ch.catLabel || "Live TV",
+          streamUrl: ch.hls || "",
+          start: ep.start,
+          end: ep.end,
+          durationMin: ep.durationMin || 60,
+          status: idx === 0 ? "ready" : "scheduled",
+          seriesTitle,
+          fromSeriesLink: true,
+          oneDrivePath: "/My App TV Recordings/" + seriesTitle.replace(/[^A-Za-z0-9_-]+/g, "-") + ".json",
+          recordedAt: idx === 0 ? new Date().toISOString() : "",
+          sizeMb: 390
+        });
+      }
+    });
+    toast(`🔁 Series Linked “${seriesTitle}” on ${ch.name}! Upcoming episodes added to DVR Planner.`, "Open Planner", () => { ltvViewMode = "dvr"; go("#livetv"); render(); });
+  }
+  try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
+  render();
+  try {
+    const r = await fetch(RELAY_URL + "/livetv-dvr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "series-link", prog: { seriesTitle, channelId: ch.id, channelName: ch.name, streamUrl: ch.hls || "", category: ch.catLabel || "Live TV" }, upcoming: matchingUpcoming })
+    });
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.state) { LTV_DVR = j.state; localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); }
+    }
+  } catch (e) {}
+  ltvSyncToOneDrive(LTV_DVR);
+}
+
+async function ltvDeleteRecording(recId) {
+  const rec = ((LTV_DVR && LTV_DVR.recordings) || []).find(r => r.id === recId);
+  if (!rec) return;
+  const before = JSON.stringify(LTV_DVR);
+  LTV_DVR.recordings = (LTV_DVR.recordings || []).filter(r => r.id !== recId);
+  try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
+  render();
+  toast(`Removed “${rec.title}” from DVR.`, "Undo", () => {
+    try { LTV_DVR = JSON.parse(before); localStorage.setItem("ltvDvrCache", before); render(); } catch (e) {}
+  });
+  try {
+    await fetch(RELAY_URL + "/livetv-dvr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete-recording", id: recId })
+    });
+  } catch (e) {}
+  ltvSyncToOneDrive(LTV_DVR);
+}
+
+async function ltvDeleteSeriesLink(slId) {
+  LTV_DVR.seriesLinks = ((LTV_DVR && LTV_DVR.seriesLinks) || []).filter(s => s.id !== slId);
+  try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
+  render();
+  toast("Series Link removed.");
+  try {
+    await fetch(RELAY_URL + "/livetv-dvr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete-series-link", id: slId })
+    });
+  } catch (e) {}
+  ltvSyncToOneDrive(LTV_DVR);
+}
+
+function ltvPlayRecording(recId) {
+  const rec = ((LTV_DVR && LTV_DVR.recordings) || []).find(r => r.id === recId);
+  if (!rec) return;
+  const dvrHls = RELAY_URL ? (RELAY_URL + "/livetv-recording/" + encodeURIComponent(rec.id) + ".m3u8") : rec.streamUrl;
+  ltvCur.custom = {
+    id: rec.id,
+    name: "📼 " + rec.title,
+    cat: "dvr",
+    catLabel: "📼 DVR Recording · " + (rec.channelName || "Recorded"),
+    country: "OneDrive / Cloud DVR",
+    desc: [rec.episode, rec.desc].filter(Boolean).join(" · "),
+    hls: rec.streamUrl || dvrHls,
+    web: ""
+  };
+  if (location.hash !== "#livetv") go("#livetv");
+  else ltvRedraw();
+  try { document.getElementById("ltvplayer")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (e) {}
+  toast(`▶ Playing recording: ${rec.title}`);
+}
+
+function ltvDvrBoardHtml() {
+  const recs = (LTV_DVR && LTV_DVR.recordings) || [];
+  const ready = recs.filter(r => r.status === "ready" || r.status === "recording");
+  const sched = recs.filter(r => r.status === "scheduled");
+  const sLinks = (LTV_DVR && LTV_DVR.seriesLinks) || [];
+
+  const readyCards = ready.map(r => {
+    const when = r.recordedAt ? newsWhen(r.recordedAt) : fmtW((r.start || "").slice(0, 10));
+    return `<div class="tbcard" data-dvrrec="${esc(r.id)}" style="cursor:pointer" onclick="ltvPlayRecording(${jsArg(r.id)})">
+      <div class="tbbody">
+        ${tbLbl([["📼 Recorded · Ready", "#16a34a"], [r.channelName || "TV", "#2563eb"], ...(r.fromSeriesLink ? [["🔁 Series", "#ca8a04"]] : [])])}
+        <div class="tbt">▶ ${esc(r.title)}</div>
+        ${r.episode ? `<div class="tbs" style="font-weight:650">${esc(r.episode)}</div>` : ""}
+        ${r.desc ? `<div class="tbs">${esc(r.desc)}</div>` : ""}
+        <div class="tbicons"><span>☁️ OneDrive (${r.sizeMb || 380} MB) · ${esc(when)}</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px" onclick="event.stopPropagation()">
+          <button type="button" class="btn small primary" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayRecording(${jsArg(r.id)})">▶ Play in TV Player</button>
+          <button type="button" class="btn small danger" style="padding:4px 9px;font-size:.75rem" onclick="ltvDeleteRecording(${jsArg(r.id)})">🗑️ Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const schedCards = sched.map(r => {
+    const tm = r.start ? epgClock(Date.parse(r.start)) + " – " + epgClock(Date.parse(r.end)) : "";
+    return `<div class="tbcard" data-dvrrec="${esc(r.id)}">
+      <div class="tbbody">
+        ${tbLbl([["📅 Scheduled", "#d97706"], [r.channelName || "TV", "#2563eb"], ...(r.fromSeriesLink ? [["🔁 Series Link", "#7c3aed"]] : [])])}
+        <div class="tbt">${esc(r.title)}</div>
+        <div class="tbs">${esc([r.episode, tm].filter(Boolean).join(" · "))}</div>
+        ${r.desc ? `<div class="tbs">${esc(r.desc)}</div>` : ""}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn small primary" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayId(${jsArg(r.channelId)})">▶ Watch Channel</button>
+          <button type="button" class="btn small danger" style="padding:4px 9px;font-size:.75rem" onclick="ltvDeleteRecording(${jsArg(r.id)})">✕ Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const slCards = sLinks.map(s => `<div class="tbcard">
+    <div class="tbbody">
+      ${tbLbl([["🔁 Active Series Link", "#7c3aed"], [s.channelName || "Any channel", "#0284c7"]])}
+      <div class="tbt">${esc(s.seriesTitle)}</div>
+      <div class="tbs">Automatically records every episode on ${esc(s.channelName)} to OneDrive (/My App TV Recordings)</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button type="button" class="btn small" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayId(${jsArg(s.channelId)})">▶ Open Channel</button>
+        <button type="button" class="btn small danger" style="padding:4px 9px;font-size:.75rem" onclick="ltvDeleteSeriesLink(${jsArg(s.id)})">✕ Remove Series Link</button>
+      </div>
+    </div>
+  </div>`).join("");
+
+  return tbList("dvr_ready", "📼 Recorded Programmes (Ready to Play)", ready.length, readyCards, false, "ltv", "Tap 🔴 Record on any show in the Internet TV Guide or player") +
+    tbList("dvr_sched", "📅 Scheduled Recordings (Planner)", sched.length, schedCards, false, "ltv", "Upcoming recordings from the Internet TV Guide show here") +
+    tbList("dvr_series", "🔁 Active Series Links", sLinks.length, slCards, false, "ltv", "Tap 🔁 Series Link on any show in the Internet TV Guide");
+}
+
+function renderInternetTvGuide() {
+  const all = ltvAllChannels();
+  const presets = ltvPresets();
+  const q = itvQ.trim().toLowerCase();
+  const filteredChans = all.filter(ch => {
+    if (itvCatFilt === "presets" && !presets.includes(ch.id)) return false;
+    else if (itvCatFilt !== "all" && itvCatFilt !== "presets" && ch.cat !== itvCatFilt) return false;
+    if (!q) return true;
+    const progs = itvProgsForChannel(ch);
+    return (ch.name + " " + ch.desc + " " + progs.map(p => p.title + " " + p.desc).join(" ")).toLowerCase().includes(q);
+  });
+
+  const catChips = [
+    ["all", "All (" + all.length + ")"],
+    ["presets", "⭐ Presets (P1–P12)"],
+    ["nz", "🇳🇿 NZ & AU"],
+    ["uk", "🇬🇧 UK & British TV"],
+    ["movies", "🎬 Movies & Sci-Fi"],
+    ["comedy", "😂 Comedy & Sitcoms"],
+    ["home", "🔨 Home, DIY & Cars"],
+    ["doco", "🔍 Crime & History"],
+    ["space", "🚀 Space & Nature"],
+    ["news", "🌍 World News"],
+    ["music", "🎵 Music TV"]
+  ].map(([k, lbl]) => `<button type="button" class="chip${itvCatFilt === k ? " on" : ""}" onclick="itvCatFilt='${k}';render()">${esc(lbl)}</button>`).join("");
+
+  const slotCount = itvTimeFilt === "now" ? 3 : itvTimeFilt === "tonight" ? 6 : 8;
+  const cols = filteredChans.slice(0, 36).map(ch => {
+    const progs = itvProgsForChannel(ch, Date.now()).slice(0, slotCount);
+    const pSlot = presets.indexOf(ch.id) + 1;
+    const cards = progs.map((p, idx) => {
+      const rec = ltvIsRecScheduledOrDone(p.id, p.title, p.start);
+      const sl = ltvIsSeriesLinked(p.seriesTitle, ch.id);
+      const timeStr = `${epgClock(p.startMs)} – ${epgClock(p.endMs)}`;
+      const lbls = [
+        [idx === 0 ? "● ON NOW" : idx === 1 ? "⏭ UP NEXT" : timeStr, idx === 0 ? "#dc2626" : idx === 1 ? "#0284c7" : "#475569"]
+      ];
+      if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : "📅 Scheduled", "#16a34a"]);
+      if (sl) lbls.push(["🔁 Series Linked", "#7c3aed"]);
+      return `<div class="tbcard" style="${idx === 0 ? "border-left:4px solid #dc2626" : ""}">
+        <div class="tbbody">
+          ${tbLbl(lbls)}
+          <div class="tbt">${esc(p.title)}</div>
+          <div class="tbs" style="font-weight:650">${esc(timeStr)} · ${esc(p.episode)}</div>
+          <div class="tbs">${esc(p.desc)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+            <button type="button" class="btn small primary" style="padding:4px 9px;font-size:.74rem" onclick="go('#livetv');setTimeout(()=>ltvPlayId(${jsArg(ch.id)}),60)">▶ Watch</button>
+            <button type="button" class="btn small" style="padding:4px 9px;font-size:.74rem;${rec ? "background:#dcfce7;color:#166534;border-color:#86efac" : ""}" onclick="ltvRecordProg(${jsArg(ch.id)},${p.startMs})">${rec ? (rec.status === "ready" ? "📼 Recorded ✓" : "📅 Scheduled ✓") : "🔴 Record"}</button>
+            <button type="button" class="btn small" style="padding:4px 9px;font-size:.74rem;${sl ? "background:#f3e8ff;color:#6b21a8;border-color:#d8b4fe" : ""}" onclick="ltvSeriesLinkProg(${jsArg(ch.id)},${p.startMs})">${sl ? "🔁 Linked ✓" : "🔁 Series Link"}</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+    return tbList("itv_" + ch.id, (pSlot ? `[P${pSlot}] ` : "") + ch.name, progs.length, cards, false, "ltv");
+  }).join("");
+
+  const readyN = ((LTV_DVR && LTV_DVR.recordings) || []).length;
+  return `<div style="margin-top:6px">
+    <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">
+      <label class="search" style="flex:1;margin:0">${I("search")}<input type="search" placeholder="Search Internet TV shows or channels (MythBusters, BBC, Midsomer, movies…)" value="${esc(itvQ)}" oninput="itvQ=this.value;render()"></label>
+      <button type="button" class="btn small primary" onclick="ltvViewMode='dvr';go('#livetv')">📼 DVR Planner (${readyN})</button>
+    </div>
+    <div class="chips scroll" style="margin:0 0 8px">${catChips}</div>
+    <div class="chips" style="margin:0 0 10px">
+      <button type="button" class="chip${itvTimeFilt === "now" ? " on" : ""}" onclick="itvTimeFilt='now';render()">Now &amp; Next (3h)</button>
+      <button type="button" class="chip${itvTimeFilt === "tonight" ? " on" : ""}" onclick="itvTimeFilt='tonight';render()">6-Hour Lineup</button>
+      <button type="button" class="chip${itvTimeFilt === "full" ? " on" : ""}" onclick="itvTimeFilt='full';render()">8-Hour Guide</button>
+    </div>
+    <div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0f172a,#1e3a8a 55%,#065f46)"></div>
+      <div class="tbtop"><div><h1>🌐 Internet TV Guide (${filteredChans.length} Channels)</h1><div style="font-size:.82rem;opacity:.9">Tap <b>🔴 Record</b> or <b>🔁 Series Link</b> on any programme · Playback &amp; Planner in Live TV · Synced with OneDrive</div></div><button class="iconbtn" onclick="ltvViewMode='dvr';go('#livetv')" title="Open DVR Planner">📼</button></div>
+      <div class="tblists">${cols || `<div class="tbempty">No channels match that filter.</div>`}</div>
+    </div>
+  </div>`;
+}
+
+// Wrap TvGuide() so it has top tabs for "📺 Freeview & Sky Guide" | "🌐 Internet TV Guide (Record & Series Link)" | "📼 DVR Playback & Planner"
+// AND also shows the Internet TV Guide section right underneath the Freeview grid!
+(() => {
+  const origTvGuide = TvGuide;
+  TvGuide = function () {
+    const recCount = ((LTV_DVR && LTV_DVR.recordings) || []).length;
+    const topPills = `<div class="chips scroll" style="margin:0 0 10px">
+      <button type="button" class="chip${tvGuideSection === "freeview" ? " on" : ""}" onclick="tvGuideSection='freeview';render()">📺 Freeview &amp; Sky TV Guide</button>
+      <button type="button" class="chip${tvGuideSection === "internet" ? " on" : ""}" onclick="tvGuideSection='internet';render()">🌐 Internet TV Guide (Record &amp; Series Link)</button>
+      <button type="button" class="chip" onclick="ltvViewMode='dvr';go('#livetv')">📼 DVR Playback &amp; Planner (${recCount})</button>
+      <button type="button" class="chip" onclick="ltvViewMode='channels';go('#livetv')">▶ Watch Live Internet TV</button>
+    </div>`;
+    if (tvGuideSection === "internet") {
+      return `<button class="back" onclick="go('#media')">${I("left")} Entertainment</button>` +
+        header("Internet TV Guide", "Live schedules, 🔴 Record & 🔁 Series Link · saved to OneDrive") +
+        topPills +
+        renderInternetTvGuide();
+    }
+    const base = origTvGuide.apply(this, arguments);
+    return base.replace(header("TV guide", "Two weeks ahead, where the guides go that far"), header("TV guide", "Freeview, Sky & Internet TV Guide with Record & Series Link") + topPills) +
+      `<div class="sec" style="margin-top:18px">🌐 Internet TV Guide (Record &amp; Series Link)</div>` +
+      renderInternetTvGuide();
+  };
+})();
+
+// Upgrade LiveTvPage() to include the 📼 Recordings & Planner (DVR) view switcher, 🔴 Record button on the player, and DVR columns
+(() => {
+  const origLtvPlayer = ltvPlayerHtml;
+  ltvPlayerHtml = function () {
+    const h = origLtvPlayer.apply(this, arguments);
+    const ch = ltvCurrentChannel();
+    if (!ch) return h;
+    return h.replace(
+      `<button type="button" class="cs-hbtn" onclick="ltvAssignSheet(${jsArg(ch.id)})"><span>📌</span><small>PRESET</small></button>`,
+      `<button type="button" class="cs-hbtn" style="border-color:#ef4444;color:#fecaca" onclick="ltvRecordProg(${jsArg(ch.id)},0)"><span>🔴</span><small>RECORD</small></button><button type="button" class="cs-hbtn" onclick="ltvAssignSheet(${jsArg(ch.id)})"><span>📌</span><small>PRESET</small></button>`
+    );
+  };
+  const origLtvBoard = ltvBoardHtml;
+  ltvBoardHtml = function () {
+    if (ltvViewMode === "dvr") return ltvDvrBoardHtml();
+    return ltvDvrBoardHtml() + origLtvBoard.apply(this, arguments);
+  };
+  const origLiveTvPage = LiveTvPage;
+  LiveTvPage = function () {
+    const recCount = ((LTV_DVR && LTV_DVR.recordings) || []).length;
+    const slCount = ((LTV_DVR && LTV_DVR.seriesLinks) || []).length;
+    const modeBar = `<div class="chips scroll" style="margin:0 0 10px">
+      <button type="button" class="chip${ltvViewMode === "channels" ? " on" : ""}" onclick="ltvViewMode='channels';render()">📺 All Live Channels &amp; DVR (${ltvAllChannels().length})</button>
+      <button type="button" class="chip${ltvViewMode === "dvr" ? " on" : ""}" onclick="ltvViewMode='dvr';render()">📼 DVR Playback &amp; Planner (${recCount} rec · ${slCount} series)</button>
+      <button type="button" class="chip" onclick="tvGuideSection='internet';go('#tv')">🗓️ Open Internet TV Guide (Record &amp; Series Link)</button>
+    </div>`;
+    const base = origLiveTvPage.apply(this, arguments);
+    return base.replace(`<div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">`, modeBar + `<div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">`);
+  };
+})();
+
+/* ---- 2.28.30: Direct SolarZero CSV Importer on Phone & OneDrive Sync (Zero Grok Bot Usage) ---- */
+function pwrCsvPicker() {
+  let inp = document.getElementById("pwr-csv-input");
+  if (!inp) {
+    inp = document.createElement("input");
+    inp.type = "file";
+    inp.id = "pwr-csv-input";
+    inp.accept = ".csv,text/csv";
+    inp.style.display = "none";
+    inp.onchange = e => {
+      const f = e.target.files && e.target.files[0];
+      if (f) pwrImportCsvFile(f);
+      inp.value = "";
+    };
+    document.body.appendChild(inp);
+  }
+  inp.click();
+}
+async function pwrImportCsvFile(file) {
+  try {
+    const text = await file.text();
+    const lines = text.trim().split(/\r?\n/).map(l => l.split(",").map(s => s.replace(/^"|"$/g, "")));
+    const H = lines[0] || [];
+    const ix = n => H.indexOf(n);
+    if (ix("Month Name") < 0 || ix("Day In Month") < 0) {
+      toast("That file doesn’t look like a SolarZero UsageReport CSV.");
+      return;
+    }
+    const monMap = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
+    const yr = (file.name.match(/(20\d\d)/) || [, new Date().getFullYear()])[1];
+    const rows = lines.slice(1).map(r => ({
+      date: `${yr}-${String(monMap[r[ix("Month Name")]] || 10).padStart(2, "0")}-${String(r[ix("Day In Month")]).padStart(2, "0")}`,
+      solarKWh: +r[ix("Accumulated Solar")] || 0,
+      chargeKWh: +r[ix("Accumulated Charge")] || 0,
+      dischargeKWh: +r[ix("Accumulated Discharge")] || 0,
+      exportKWh: +r[ix("Accumulated Export")] || 0,
+      importKWh: +r[ix("Accumulated Import")] || 0,
+      usedKWh: +r[ix("Accumulated Load")] || 0
+    })).filter(d => d.importKWh || d.exportKWh || d.usedKWh);
+    if (!rows.length) { toast("No non-zero usage rows found in CSV."); return; }
+    const latest = rows[rows.length - 1];
+    const d = Object.assign({}, PWR || {});
+    d.updatedAt = new Date().toISOString();
+    const totUsed = Math.round(rows.reduce((s, r) => s + r.usedKWh, 0) * 10) / 10;
+    const totSol = Math.round(rows.reduce((s, r) => s + r.solarKWh, 0) * 10) / 10;
+    const totImp = Math.round(rows.reduce((s, r) => s + r.importKWh, 0) * 10) / 10;
+    const totExp = Math.round(rows.reduce((s, r) => s + r.exportKWh, 0) * 10) / 10;
+    const fromGridPct = latest.usedKWh > 0 ? Math.min(100, Math.round((latest.importKWh / latest.usedKWh) * 100)) : 50;
+    const fromBatPct = latest.usedKWh > 0 ? Math.min(100 - fromGridPct, Math.round((latest.dischargeKWh / latest.usedKWh) * 100)) : 20;
+    const fromSolPct = Math.max(0, 100 - fromGridPct - fromBatPct);
+    d.today = Object.assign({}, d.today || {}, {
+      date: latest.date,
+      usedKWh: latest.usedKWh,
+      solarKWh: latest.solarKWh,
+      gridImportKWh: latest.importKWh,
+      gridExportKWh: latest.exportKWh,
+      fromSolarPct: fromSolPct,
+      fromBatteryPct: fromBatPct,
+      fromGridPct: fromGridPct
+    });
+    d.month = Object.assign({}, d.month || {}, {
+      usedKWh: totUsed,
+      avgPerDayKWh: Math.round((totUsed / rows.length) * 10) / 10,
+      days: rows.length,
+      solarKWh: totSol,
+      gridImportKWh: totImp,
+      gridExportKWh: totExp,
+      daily: rows.map(r => ({ date: r.date, importKWh: r.importKWh, exportKWh: r.exportKWh }))
+    });
+    PWR = d;
+    try { localStorage.setItem("powerCache", JSON.stringify(d)); } catch (e) {}
+    render();
+    toast(`Updated Power from ${file.name} (${rows.length} days, latest ${fmtW(latest.date)}).`);
+  } catch (e) {
+    toast("Couldn’t read that CSV file.");
+  }
+}
