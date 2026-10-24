@@ -20888,7 +20888,7 @@ function glanceHome() {
   const ent = '', org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const wk = homeTry('week overview', () => weekOverview(), ''); // 2.27.28: the week overview replaces the Organise tabs; the shortcut tiles stay
-  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><a href="#calendar">Calendar ›</a></div>${wk}${quick}<div class="wklinks"><a href="#todo">To-do</a><a href="#bills">Bills</a><a href="#cars">Cars</a><a href="#garden">Garden</a><a href="#media">Entertainment</a><a href="#cashflow">Cash flow</a></div>`
+  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><a href="#calendar">Calendar ›</a></div>${wk}${quick}<div class="wklinks"><a href="#todo">To-do</a><a href="#cars">Cars</a><a href="#garden">Garden</a><a href="#media">Entertainment</a><a href="#cashflow">Cash flow</a></div>`
     : org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
@@ -20933,7 +20933,7 @@ function weekItems() {
   return out;
 }
 function weekOverview() {
-  const D = weekItems(), T = todayISO();
+  const D = weekItems(), T = todayISO(); Object.keys(D).forEach(d => { D[d] = D[d].filter(it => it.type !== 'bill' && it.type !== 'loan'); }); // 2.28.5: no bills on Home
   const card = it => { const [ic0, col0] = WK_TYPE[it.type] || WK_TYPE.due, ic = it.ic || ic0, col = it.color2 || col0, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
     return `<button type="button" class="wkcard" style="--wc:${esc(it.color || col)}" onclick="if(window.glSwipe&&glSwipe.moved)return;${oc}"><div class="wkh"><span class="wkt">${it.sarah ? sarahBadge({ from: 'sarah' }) + ' ' : ''}${esc(it.title)}</span><span class="wki">${ic}</span></div>${it.time ? `<div class="wktm">${esc(it.time)}</div>` : ''}${it.line || it.warn ? `<div class="wkb">${it.line ? `<div>${esc(it.line)}</div>` : ''}${it.warn ? `<div class="wkwarn">⚠️ ${esc(it.warn)}</div>` : ''}</div>` : ''}</button>`; };
   const cols = Object.keys(D).sort().map(d => { const dt = new Date(parseD(d));
