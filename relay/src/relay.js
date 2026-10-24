@@ -1,3 +1,102 @@
+
+const RADIO_STREAMS = [
+  ['Beagle Radio', 'https://stream.beagleradio.co.nz/stream'],
+  ['The Hits', 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_74AAC.aac'],
+  ['The Rock', 'https://digitalstreams.mediaworks.nz/rock_net_icy'],
+  ['The Breeze', 'https://mediaworks.streamguys1.com/breeze_net_icy'],
+  ['More FM', 'https://mediaworks.streamguys1.com/more-whg-high_icy'],
+  ['Breeze Classic', 'https://mediaworks.streamguys1.com/breeze_classic_net_icy'],
+  ['Radio Hauraki', 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_04AAC.aac'],
+  ['The Edge', 'https://mediaworks.streamguys1.com/edge_net_icy'],
+  ['ZM', 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_03AAC.aac'],
+  ['iHeartCountry', 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_09AAC.aac'],
+  ['Coast', 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_07AAC.aac'],
+  ['The Sound', 'https://digitalstreams.mediaworks.nz/sound_net_icy'],
+  ['Life FM', 'https://rhema-radio.streamguys1.com/rhema-lifefm.aac'],
+  ['Ngāti Hine FM', 'https://icast1.streamcom.net/NgatiHine'],
+  ['RNZ Concert', 'https://stream-ice.radionz.co.nz/concert.mp3'],
+  ['RNZ National', 'https://stream-ice.radionz.co.nz/national.mp3'],
+  ['PMN 531pi', 'https://18243.live.streamtheworld.com/531PI_SC'],
+  ['Flava', 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_08AAC.aac'],
+  ['Mai FM', 'https://mediaworks.streamguys1.com/mai_net_icy'],
+  ['The Generator', 'https://s1.myradiostream.com/14268/stream/1/'],
+  ['Rhema', 'https://rhema-radio.streamguys1.com/rhema.aac'],
+  ['Newstalk ZB', 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_01AAC.aac']
+];
+function cleanIcyText(raw) {
+  return String(raw || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;|&apos;/gi, "'")
+    .replace(/`+/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function parseRadioStreamMeta(metaStr, stationName) {
+  const m = String(metaStr || '').match(/StreamTitle='([^']*)'/i);
+  const u = String(metaStr || '').match(/StreamUrl='([^']*)'/i);
+  let raw = cleanIcyText(m ? m[1] : '');
+  let cover = '';
+  if (u && u[1]) {
+    const pic = u[1].match(/[?&]picture=([^&]+)/i);
+    if (pic && /^https:\/\//i.test(pic[1])) cover = pic[1];
+  }
+  if (!raw || /^\d+:\d+/.test(raw) || /^(ad|commercial|spot|promo|station|welcome|live|stream)$/i.test(raw)) {
+    return { ok: true, station: stationName, title: '', artist: '', raw: '', cover: '' };
+  }
+  const parts = raw.split(' - ').map(x => x.trim()).filter(Boolean);
+  let artist = '', title = '';
+  if (parts.length >= 4 && parts[0].toLowerCase() === parts[2].toLowerCase() && parts[1].toLowerCase() === parts[3].toLowerCase()) {
+    artist = parts[0];
+    title = parts[1];
+  } else if (parts.length >= 2) {
+    artist = parts[0];
+    title = parts.slice(1).join(' - ');
+    if (title.toLowerCase().endsWith((' - ' + artist + ' - ' + title.split(' - ')[0]).toLowerCase())) {
+      title = title.split(' - ')[0];
+    }
+  } else {
+    title = raw;
+  }
+  if (/^(more fm|the breeze|the sound|the rock|the edge|mai fm|coast|zm|the hits|radio hauraki|newstalk zb|flava)$/i.test(artist) && (!title || title.toLowerCase() === artist.toLowerCase())) {
+    return { ok: true, station: stationName, title: '', artist: '', raw: '', cover: '' };
+  }
+  return { ok: true, station: stationName, title: title.slice(0, 120), artist: artist.slice(0, 120), raw: (artist && title ? artist + ' – ' + title : raw).slice(0, 200), cover };
+}
+async function getRadioNow(idx, fetchImpl = fetch) {
+  const entry = RADIO_STREAMS[idx];
+  if (!entry) return { ok: false, error: 'bad_station' };
+  const [stationName, streamUrl] = entry;
+  const ctl = new AbortController();
+  const tm = setTimeout(() => ctl.abort(), 4000);
+  try {
+    const r = await fetchImpl(streamUrl, { headers: { 'Icy-MetaData': '1', 'User-Agent': 'Mozilla/5.0 (compatible; ShaneCarStereo/1.0)' }, signal: ctl.signal });
+    const metaint = +(r.headers.get('icy-metaint') || 0);
+    if (!metaint || metaint > 65536 || !r.body) {
+      if (r.body) try { r.body.cancel(); } catch (e) { }
+      return { ok: true, station: stationName, title: '', artist: '', raw: '', cover: '' };
+    }
+    const reader = r.body.getReader();
+    let buf = new Uint8Array(0);
+    while (buf.length < metaint + 512) {
+      const { value, done } = await reader.read();
+      if (done || !value) break;
+      const next = new Uint8Array(buf.length + value.length);
+      next.set(buf); next.set(value, buf.length);
+      buf = next;
+    }
+    try { reader.cancel(); } catch (e) { }
+    if (buf.length <= metaint) return { ok: true, station: stationName, title: '', artist: '', raw: '', cover: '' };
+    const len = buf[metaint] * 16;
+    const metaStr = len > 0 ? new TextDecoder().decode(buf.slice(metaint + 1, metaint + 1 + len)).replace(/\0+$/, '') : '';
+    return parseRadioStreamMeta(metaStr, stationName);
+  } catch (e) {
+    return { ok: true, station: stationName, title: '', artist: '', raw: '', cover: '' };
+  } finally {
+    clearTimeout(tm);
+  }
+}
+
 import { renoRoute } from './reno.js';
 import { carsAlexaRoute } from './cars-alexa.js';
 import { sharedTodoRoute, sharedCarRoute, sharedPhotoRoute } from './shared-todo.js';
@@ -287,10 +386,10 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     try { return await hueRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }
     catch (e) { return json(502, 'hue_unavailable', origin, env); }
   }
-  if (path === '/crashes') { // 2.27.67: NZTA crashes and incidents near Whangārei (active, and cleared in the last 3 hours)
+  if (path === '/crashes') { // 2.27.67 / 2.28.18: NZTA crashes, Whangārei Police/emergency updates, and GeoNet/USGS large earthquakes
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
-    try { let d = await getCrashes(env); if (!d) d = await runCrashes(env, fetchImpl, Date.now(), true); return new Response(JSON.stringify(d || { active: [], cleared: [] }), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
+    try { let d = await getCrashes(env); if (!d || !Array.isArray(d.quakes)) d = await runCrashes(env, fetchImpl, Date.now(), true); return new Response(JSON.stringify(d || { active: [], cleared: [], police: [], quakes: [] }), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
     catch (e) { return json(502, 'crashes_unavailable', origin, env); }
   }
   if (path === '/outages') { // 2.27.40: Northpower outages (current, planned, recently restored)
@@ -416,6 +515,13 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     } catch (e) {
       return json(502, 'blogs_unavailable', origin, env);
     }
+  }
+  if (path === '/radio-now') {
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    const idx = parseInt(new URL(request.url).searchParams.get('i') || '0', 10);
+    const data = await getRadioNow(idx, fetchImpl);
+    return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
   }
   if (path === '/podcasts') {
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
