@@ -18,6 +18,7 @@ import { runHealthDiag } from './health.js';
 import { runFuel } from './fuel.js';
 import { refreshPlanning } from './planning.js';
 import { tickDvr } from './livetv.js';
+import { getPowerDoc, refreshSolarZero } from './solarzero.js';
 const CLOSURES_CRON = '5-59/10 * * * *';
 const REMIND_CRON = '* * * * *'; // reminders: the minute the phone asked for (not the bridge 7 am hold)
 export default {
@@ -33,6 +34,7 @@ export default {
     try { await runAkahu(env, fetch, Date.now()); } catch (e) { /* bank data waits for the next check */ }
     try { await runTvSeries(env, fetch, Date.now()); } catch (e) { /* 2.27.37: TV series links, about hourly */ }
     try { await tickDvr(env, fetch, Date.now()); } catch (e) { /* 2.28.30: Internet TV DVR */ }
+    try { const pd = await getPowerDoc(env); if (!pd || !pd.updatedAt || Date.now() - Date.parse(pd.updatedAt) > 25 * 60e3) await refreshSolarZero(env, fetch, Date.now()); } catch (e) { /* 2.28.31: SolarZero auto-refresh */ }
     try { await runFuel(env, fetch, Date.now()); } catch (e) { /* 2.27.36: terminal fuel prices, once a day from 6am */ }
     try { await refreshPlanning(env, fetch, Date.now()); } catch (e) { /* 2.27.83: planning updates, every 6 hours */ }
     try { await sealMePlain(env0); } catch (e) { /* 2.27.47: seal a freshly seeded profile */ }

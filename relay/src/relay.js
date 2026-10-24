@@ -148,6 +148,7 @@ import { getDrive } from './drive.js';
 import { getStoreBusy } from './busy.js';
 import { getLocalNews, ogImage, articleFromUrl, recipeFromUrl } from './news.js';
 import { dvrRoute } from './livetv.js';
+import { getPowerDoc, refreshSolarZero } from './solarzero.js';
 import { getPlanning } from './planning.js';
 import { getBlogs } from './blogs.js';
 import { getRecs } from './recs.js';
@@ -694,8 +695,13 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     if (request.method === 'GET') {
       if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
       if (!(await devKeyOk(env, request))) return json(401, 'no_key', origin, env); // 2.27.45: home power figures need the device key
-      const d = env.EVENTS_KV ? await env.EVENTS_KV.get('power-v1') : null;
-      return new Response(d || '{}', { status: 200, headers: H });
+      const wantRefresh = new URL(request.url).searchParams.get('refresh') === '1';
+      let doc = await getPowerDoc(env);
+      const ageMs = doc && doc.updatedAt ? (Date.now() - Date.parse(doc.updatedAt)) : Infinity;
+      if (wantRefresh || ageMs > 25 * 60e3) {
+        try { doc = await refreshSolarZero(env, fetchImpl, Date.now()); } catch (e) {}
+      }
+      return new Response(JSON.stringify(doc || {}), { status: 200, headers: H });
     }
     if (request.method !== 'PUT' && request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
     const tok = env.POWER_WRITE_TOKEN || '';
