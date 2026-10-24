@@ -21484,9 +21484,11 @@ function glWarnList() {
   return L.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url || x.go || ''}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk)).sort((a, b) => b.pri - a.pri);
 }
 function glWarnCard(x) {
-  const cls = `glwarn ${x.red ? 'glw-red' : x.info ? 'glw-info' : 'glw-amb'}${x.route ? ' glw-route' : ''}${x.isNew ? ' glisnew' : ''}`, inner = `${x.isNew ? '<span class="newpill">New</span>' : ''}<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${x.s ? `<span>${esc(x.s)}</span>` : ''}`;
-  if (x.flag) return `<div class="glflagwrap"${x.gk ? ` data-gk="${esc(x.gk)}"` : ''}>${x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="go('#events')">${inner}</button>`}<button type="button" class="glunflag" onclick="evFlagToggle(${jsArg(x.flag)}, event)" aria-label="Unflag ${esc(x.what)}">Unflag</button></div>`;
-  const g = x.gk ? ` data-gk="${esc(x.gk)}"` : '';
+  const shortS = alShortBody(x.s || '');
+  const fullAttr = x.full || (x.s && x.s.length > shortS.length + 8) ? ` data-full="${esc(x.full || x.s)}"` : '';
+  const cls = `glwarn ${x.red ? 'glw-red' : x.info ? 'glw-info' : 'glw-amb'}${x.route ? ' glw-route' : ''}${x.isNew ? ' glisnew' : ''}`, inner = `${x.isNew ? '<span class="newpill">New</span>' : ''}<span class="glwtag">${esc(x.tag)}</span><b>${esc(x.what)}</b>${shortS ? `<span class="s">${esc(shortS)}</span>` : ''}`;
+  if (x.flag) return `<div class="glflagwrap"${x.gk ? ` data-gk="${esc(x.gk)}"` : ''}${fullAttr}>${x.url ? `<a class="${cls}" href="${esc(x.url)}" target="_blank" rel="noopener">${inner}</a>` : `<button type="button" class="${cls}" onclick="go('#events')">${inner}</button>`}<button type="button" class="glunflag" onclick="evFlagToggle(${jsArg(x.flag)}, event)" aria-label="Unflag ${esc(x.what)}">Unflag</button></div>`;
+  const g = (x.gk ? ` data-gk="${esc(x.gk)}"` : '') + fullAttr;
   return x.url ? `<a class="${cls}"${g} href="${esc(x.url)}" target="_blank" rel="noopener" onclick="if(glSwipe.moved)event.preventDefault()">${inner}</a>` : `<button type="button" class="${cls}"${g} onclick="if(!glSwipe.moved){${esc(x.go || '')}}">${inner}</button>`;
 }
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
@@ -22198,6 +22200,14 @@ function alBriefingHtml(list) {
   const decorateCard = el => {
     if (!el || !el.setAttribute) return;
     if (!el.dataset.pid) el.setAttribute('data-pid', bpIdOf(el));
+    const sEl = el.querySelector('.s') || el.querySelector('b + span');
+    if (sEl && !sEl.querySelector('button, a, input')) {
+      const fullTxt = (sEl.textContent || '').replace(/\s+/g, ' ').trim();
+      if (fullTxt.length > 130) {
+        if (!el.dataset.full) el.setAttribute('data-full', fullTxt);
+        sEl.textContent = alShortBody(fullTxt, 125);
+      }
+    }
     const on = pinnedSet.has(el.dataset.pid);
     el.querySelectorAll('.bpin').forEach(x => x.remove());
     const host = el.matches('.glflagwrap, .glwarnwrap') ? (el.querySelector('.glwarn') || el) : el;
@@ -25996,7 +26006,10 @@ function bellCardMenu(ev, btn) {
   if (!el.dataset.pid) el.setAttribute('data-pid', bpIdOf(el));
   const id = el.dataset.pid, isPin = bellPins().some(p => p.id === id);
   const t = ((el.querySelector('.t') || el.querySelector('b') || {}).textContent || 'Notification').replace(/\s+/g, ' ').trim().slice(0, 80);
-  openSheet(t, `<p class="muted" style="margin:-2px 0 10px">Tip: you can also press and hold any card to pin or unpin it.</p><div class="btns" style="flex-direction:column;align-items:stretch">
+  const fullTxt = el.dataset.full || ((el.querySelector('.s') || el.querySelector('b + span') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+  const href = el.getAttribute('href') || (el.querySelector('a[href]') ? el.querySelector('a[href]').getAttribute('href') : '');
+  openSheet(t, `${fullTxt ? `<div class="card" style="padding:10px 12px;margin:0 0 10px;font-size:.88rem;line-height:1.45">${esc(fullTxt)}</div>` : ''}<p class="muted" style="margin:-2px 0 10px">Tip: you can also press and hold any card to pin or unpin it.</p><div class="btns" style="flex-direction:column;align-items:stretch">
+    ${href && /^https?:\/\//.test(href) ? `<a class="btn" href="${esc(href)}" target="_blank" rel="noopener">🔗 Open full notice ›</a>` : ''}
     <button type="button" class="btn primary" onclick="bellMenuPin(${jsArg(id)})">${isPin ? '📌 Unpin from top' : '📌 Pin to top of Notifications'}</button>
     <button type="button" class="btn" onclick="bellMenuArc(${jsArg(id)})">🗂 Archive notification</button>
   </div>`, null);
@@ -28182,13 +28195,72 @@ async function rdcLoad(force) {
   finally { rdcBusy = false; }
 }
 setTimeout(() => rdcLoad(), 1500); setInterval(() => rdcLoad(), 15 * 60e3);
+function alShortBody(txt, max = 128) {
+  let s = String(txt || '').replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  s = s.replace(/Pursuant to Schedule[^·.]*[·.]?\s*/gi, '')
+       .replace(/Whang[aā]rei District Council(?: and [A-Za-z0-9 &]+)? will be carrying out\s+/gi, '')
+       .replace(/Period of closure(?:\s*\([^)]*\))?\s*:\s*[^·.]*[·.]?\s*/gi, '')
+       .replace(/All works are weather dependent[^·.]*[·.]?\s*/gi, '')
+       .replace(/\s*·\s*·\s*/g, ' · ')
+       .replace(/^\s*·\s*|\s*·\s*$/g, '')
+       .trim();
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max).replace(/\s+\S*$/, '').replace(/[·,;:–-]+$/, '').trim();
+  return cut + '…';
+}
+function rdcCleanWhere(where, desc, title) {
+  let w = String(where || '').replace(/,?\s*\d{4}$/, '').replace(/,?\s*Whang[aā]rei$/i, '').trim();
+  const d = String(desc || '');
+  // Extract "from the roundabout at X to the roundabout at Y" or "between X and Y"
+  const rbt = d.match(/from the roundabout at ([^,.]+?) to the roundabout at ([^,.]+)/i);
+  if (rbt) {
+    const a = rbt[1].replace(/\b(?:Okara Drive and|and Okara Drive)\b/gi, '').trim();
+    const b = rbt[2].replace(/\b(?:Okara Drive and|and Okara Drive)\b/gi, '').trim();
+    if (a && b) return (w ? w.split(',')[0] : 'Okara Drive') + ` (${a} to ${b})`;
+  }
+  // Clean "Whau Valley Road / Kamo Road to Adams Place / Kamo Road, Te Kamo" -> "Whau Valley Rd to Adams Pl, Te Kamo"
+  w = w.replace(/\s*\/\s*[A-Za-z ]+Road\b/gi, '')
+       .replace(/\bRoad\b/g, 'Rd').replace(/\bStreet\b/g, 'St').replace(/\bAvenue\b/g, 'Ave').replace(/\bDrive\b/g, 'Dr').replace(/\bPlace\b/g, 'Pl');
+  const mainRd = (String(title || '').match(/^([A-Za-zāēīōū ]+?(?:Road|Street|Drive|Avenue|Bridge))/i) || [])[1] || '';
+  if (mainRd) {
+    const shortRd = mainRd.replace(/\bRoad\b/i, 'Rd').replace(/\bStreet\b/i, 'St').replace(/\bDrive\b/i, 'Dr').replace(/\bAvenue\b/i, 'Ave');
+    if (w.toLowerCase() === shortRd.toLowerCase() || w.toLowerCase() === mainRd.toLowerCase()) w = '';
+  }
+  return w.slice(0, 65);
+}
+function rdcCleanReason(desc, title, detour) {
+  const blob = (title + ' ' + desc).toLowerCase();
+  const reasons = [];
+  if (/resurfac|asphalt|pavement/i.test(blob) && !/resurfac/i.test(title)) reasons.push('Resurfacing');
+  else if (/deck replacement|bridge strengthening|bridge maintenance/i.test(blob) && !/deck|strengthen|maintenance/i.test(title)) reasons.push('Bridge works');
+  else if (/wastewater|water main|rising main|stormwater|culvert/i.test(blob) && !/wastewater|culvert/i.test(title)) reasons.push('Water/drainage works');
+  else if (/slip|dropout|washout/i.test(blob) && !/slip/i.test(title)) reasons.push('Slip repairs');
+  if (detour) {
+    const dt = String(detour).replace(/^.*?\b(?:via|along|follow the detour via)\s+/i, 'Detour via ').replace(/\.$/, '').trim();
+    if (dt.length <= 48) reasons.push(dt);
+    else reasons.push('Detour in place');
+  } else if (/detour|diversion/i.test(desc)) {
+    reasons.push('Detour in place');
+  }
+  return reasons.join(' · ').slice(0, 60);
+}
+function rdcCleanTitle(title, desc, ds) {
+  let t = String(title || 'Road closure').trim();
+  const isNight = ds && ds.length > 1 && ds[0].time >= '18:00';
+  const hasResurf = /resurfac/i.test(desc || '') && !/resurfac/i.test(t);
+  t = t.replace(/\s+proposed road closures?$/i, ' road closure')
+       .replace(/\s+temporary road closures?$/i, isNight ? ' night closures' : ' road closure');
+  if (hasResurf && t.length < 42) t += ' (resurfacing)';
+  return t;
+}
 function rdcItems() {
   const L = [], raw = ((RDC && RDC.d && RDC.d.closures) || []).slice(), T = todayISO(), lim = addDays(T, 14);
   stadiumClosureItems(14).forEach(sc => {
     if (!raw.some(c => /okara|semenoff/i.test([c.title, c.where, c.desc].join(' ')) && (c.dates || []).some(d => d.start === sc.dates[0].start))) raw.push(sc);
   });
-  const hm = t => t ? fmtTime(t).replace(':00', '').replace(/\s/g, '') : '';
-  const dl = d => (d.end && d.end !== d.start ? fmtW(d.start) + '–' + fmtW(d.end) : fmtW(d.start)) + (d.time ? ' ' + hm(d.time) + (d.endTime ? '–' + hm(d.endTime) : '') : '');
+  const hm = t => t === '23:59' ? 'midnight' : t ? fmtTime(t).replace(':00', '').replace(/\s/g, '') : '';
+  const dl = d => (d.end && d.end !== d.start ? fmtW(d.start) + '–' + fmtW(d.end) : fmtW(d.start)) + (d.time ? ', ' + hm(d.time) + (d.endTime ? '–' + hm(d.endTime) : '') : '');
   const seen = new Set();
   raw.forEach(c => {
     if (!c || c.bridge || !c.title) return;
@@ -28197,14 +28269,19 @@ function rdcItems() {
     const blob = [c.title, c.where, c.desc].join(' '), onr = /onerahi/i.test(blob), stad = !!(c.stadium || /okara|semenoff/i.test(blob)), route = !!(stad || c.commute || HU_ROUTE.test(blob));
     const today = ds.some(d => d.start <= T && (d.end || d.start) >= T);
     const closed = !!(stad || /\bclos(ed|ure|ures|ing)\b/i.test(c.title + ' ' + c.desc));
-    const where = String(c.where || '').replace(/,?\s*\d{4}$/, '').slice(0, 90);
-    const dedupe = ds[0].start + '|' + c.title.toLowerCase() + '|' + where.toLowerCase();
+    const dedupe = ds[0].start + '|' + c.title.toLowerCase() + '|' + String(c.where || '').toLowerCase();
     if (seen.has(dedupe)) return; seen.add(dedupe);
-    const when = (today ? 'Today · ' : '') + dl(ds[0]) + (ds.length > 1 ? ` (+${ds.length - 1} more)` : '');
+    const isNight = ds.length > 1 && ds[0].time >= '18:00';
+    let when = (today ? 'Today · ' : '') + dl(ds[0]);
+    if (ds.length > 1) when += isNight ? ` (${ds.length} nights)` : ` (+${ds.length - 1} more)`;
+    const whereShort = rdcCleanWhere(c.where, c.desc, c.title);
+    const reasonShort = rdcCleanReason(c.desc, c.title, c.detour);
+    const shortLine = [when, whereShort, reasonShort].filter(Boolean).join(' · ');
+    const fullLine = [when, c.where, c.desc, c.detour ? 'Detour: ' + c.detour.replace(/^detour:?\s*/i, '') : ''].filter(Boolean).join(' · ');
     const pri = (stad && today) ? 98 : (route && today) ? 96 : today ? 91 : stad ? 85 : onr ? 82 : route ? 76 : closed ? 55 : 35;
     L.push({ pri, red: today || stad || (route && closed), route: route || stad, info: false,
       tag: (stad ? '🏟️ Okara / Stadium road closure' : onr ? '🏠 Onerahi road alert' : route ? '🚗 On your commute' : closed ? '⛔ Road closure' : '🚧 Roadworks') + ' · WDC',
-      what: c.title, s: [when, where, c.desc, c.detour ? 'Detour: ' + c.detour.replace(/^detour:?\s*/i, '') : ''].filter(Boolean).join(' · ').slice(0, 320), url: /^https:\/\/www\.wdc\.govt\.nz\//.test(c.url || '') ? c.url : 'https://www.wdc.govt.nz/Services/Roads-and-Transportation/Roads/Roadworks-and-closures', rdcId: c.id });
+      what: rdcCleanTitle(c.title, c.desc, ds), s: shortLine, full: fullLine, url: /^https:\/\/www\.wdc\.govt\.nz\//.test(c.url || '') ? c.url : 'https://www.wdc.govt.nz/Services/Roads-and-Transportation/Roads/Roadworks-and-closures', rdcId: c.id });
   });
   return L;
 }

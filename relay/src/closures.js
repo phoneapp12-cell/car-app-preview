@@ -80,7 +80,18 @@ export function parseClosureList(html) {
 }
 
 // 2.27.82: the detour line, only when the council wrote one
-const detourOf = t => { const m = String(t || '').match(/[^.]*\b(detours?|diversions?|alternative route)\b[^.]*\.?/i); return m ? clip(m[0].trim(), 240) : ''; };
+const detourOf = t => { const m = String(t || '').match(/[^.]*\b(detours?|diversions?|alternative route)\b[^.]*\.?/i); return m ? clip(m[0].trim(), 200) : ''; };
+export function cleanClosureDesc(raw) {
+  let s = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  s = s.replace(/^Pursuant to Schedule[^:]+:\s*/i, '');
+  s = s.replace(/^Whang[aā]rei District Council(?: and [A-Za-z0-9 &]+)? will be carrying out\s+/i, 'Carrying out ');
+  s = s.replace(/\bPeriod of closure(?:\s*\([^)]*\))?\s*:\s*[^.]*\.\s*/gi, '');
+  s = s.replace(/\bAll works are weather dependent[^.]*\.\s*/gi, '');
+  s = s.replace(/\bDuring the (?:proposed )?period of closure[^.]*\.\s*/gi, '');
+  s = s.replace(/\bAny enquiries should be addressed[^.]*\.\s*/gi, '');
+  return clip(s.trim(), 240);
+}
 // A notice page → every part, each marked bridge or not: [{ where, desc, dates, detour, bridge }]
 // (2.27.82: all parts are kept for the district-wide /road-closures; /closures and the bridge alerts use the bridge ones)
 export function parseClosurePage(html, item = {}) {
@@ -91,7 +102,7 @@ export function parseClosurePage(html, item = {}) {
       blk = end > 0 ? blk.slice(0, end + 17) : blk.slice(0, 4000);
       const where = text((blk.match(/<h3>([\s\S]*?)<\/h3>/) || [])[1]).slice(0, 200);
       const paras = [...blk.matchAll(/<p>([\s\S]*?)<\/p>/g)].map(m => text(m[1])).filter(Boolean);
-      const desc = clip(paras[0] || '', 400);
+      const desc = cleanClosureDesc(paras[0] || '');
       out.push({ where, desc, dates: parseDetail(blk).dates, detour: detourOf(paras.join(' ')), bridge: MATCH.test(where + ' ' + desc) });
     }
     return out;
@@ -101,7 +112,7 @@ export function parseClosurePage(html, item = {}) {
   for (const k of ['<h2 class="sub-title">When', '<h2 class="sub-title">Location', 'class="gmap']) { const i = html.indexOf(k, a); if (i > 0 && i < end) end = i; }
   const content = html.slice(a, Math.min(end, a + 40000));
   const paras = [...content.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/g)].map(m => text(m[1])).filter(t => t && !/^(Event date|Next date)\s*:/i.test(t));
-  const desc = clip(paras.join(' '), 400);
+  const desc = cleanClosureDesc(paras.join(' '));
   const det = parseDetail(html);
   const c = html.match(/"centerPoint"\s*:\s*"(-?[\d.]+),\s*(-?[\d.]+)"/);
   const near = c ? metres(BRIDGE, { lat: +c[1], lon: +c[2] }) < 400 : false;
