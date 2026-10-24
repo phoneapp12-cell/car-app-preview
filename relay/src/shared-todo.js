@@ -4,6 +4,7 @@
    never overwrite each other. Deletes are kept as short tombstones so they don't come back. No AI, nothing logged. */
 export const SHARED_MAX_ITEMS = 500;
 import { queueShop, queueTicks, sarahPush } from './shop-notify.js';
+import { queueShaneAdds } from './sarah-notify.js';
 const TOMBSTONE_MS = 60 * 24 * 3600 * 1000;
 const PRI = ['high', 'normal', 'low'];
 
@@ -94,6 +95,7 @@ export async function sharedTodoRoute(body, env, now = Date.now()) {
   // 2.26.49 / 1.10.0: new Shopping items -> one push to the other person (batched about a minute). Never blocks the sync.
   if (m.changed && cur && items.length) { try { await queueShop(env, k, items, m.items, now); } catch (e) { } }
   // 2.27.4 / 1.12.0: Sarah ticked off a shared to-do -> one push to Shane (batched about a minute)
+  if (m.changed && cur && items.length) { try { await queueShaneAdds(env, k, items, m.items, now); } catch (e) { } }
   if (m.changed && cur && items.length) { try { await queueTicks(env, k, items, m.items, now); } catch (e) { } }
   return [200, { ok: true, rev, items: m.items, now }];
 }

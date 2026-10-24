@@ -54,6 +54,7 @@ import { getRecs } from './recs.js';
 import { getPodcasts } from './podcasts.js';
 import { pushRoute } from './push.js';
 import { sunshineRoute } from './sunshine.js';
+import { remindersRoute } from './sarah-notify.js';
 import { searchVideos } from './videos.js';
 import { syncRoute } from './sync.js';
 import { getSarah, markSarahSeen } from './sarah.js';
@@ -646,8 +647,8 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     if (request.method !== 'POST') return json(405, 'method_not_allowed', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
     let body = {};
-    try { const raw = await request.text(); if (raw.length > 4096) throw new Error('big'); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
-    const [status, data] = await sunshineRoute(path, body, env, fetchImpl);
+    try { const raw = await request.text(); if (raw.length > (path === '/sunshine/reminders' ? 32768 : 4096)) throw new Error('big'); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
+    const [status, data] = path === '/sunshine/reminders' ? await remindersRoute(body, env) : await sunshineRoute(path, body, env, fetchImpl);
     return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
   }
   if (path.startsWith('/push/')) {

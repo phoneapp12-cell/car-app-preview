@@ -24,7 +24,9 @@ const isShopList = l => String(l || '').trim().toLowerCase() === 'shopping';
 export function shopLabel(x) {
   const t = String(x.title || '').trim(); const b = x.brand;
   const br = b && !b.any && !b.other ? String(b.brand || '').trim() : '';
-  return br && !t.toLowerCase().includes(br.toLowerCase()) ? `${t} (${br})` : t;
+  const base = br && !t.toLowerCase().includes(br.toLowerCase()) ? `${t} (${br})` : t;
+  const ex = [b && !b.any && !b.other ? String(b.size || '').trim() : '', b && b.store ? String(b.store).trim() : '', String(x.notes || '').replace(/\s+/g, ' ').trim().slice(0, 80)].filter(Boolean);
+  return ex.length ? `${base} – ${ex.join(', ')}` : base;
 }
 // New shopping items in this sync: on the merged list, not on the list before, open, on Shopping.
 export function newShopItems(before, after) {
