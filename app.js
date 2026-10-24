@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.33';
+const APP_VERSION = '2.28.34';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -31087,18 +31087,21 @@ Radio = function () {
 
 /* ================= 2.28.26: LIVE TV (#livetv) — 78 VERIFIED FREE INTERNET TV CHANNELS & TRELLO GUIDE ================= */
 const LIVE_TV_CHANNELS = [
-  // 1. 🇳🇿 NZ & Australia Freeview Live (16 channels)
-  { id: "three-nz", name: "Three NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Warner Bros. Discovery NZ live stream — news, entertainment, reality & drama", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/three-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/three" },
+  // 1. 🇳🇿 NZ & Australia Freeview Live (19 channels — incl. TVNZ 1, TVNZ 2 & TVNZ DUKE via TVNZ+ app/web + open HLS for Three/Bravo/Sky Open/Māori TV)
+  { id: "tvnz-1", epgId: "mjh-tvnz-1", tvnzWatch: "mjh-tvnz-1", name: "TVNZ 1 (TVNZ+)", cat: "nz", catLabel: "🇳🇿 TVNZ+ Free", country: "New Zealand", desc: "1News at Six, Seven Sharp, Breakfast, Sunday, Fair Go, British drama & Kiwi factual (opens in free TVNZ+ app/player — DRM protected)", hls: "", web: "https://www.tvnz.co.nz/livetv/tvnz-1" },
+  { id: "tvnz-2", epgId: "mjh-tvnz-2", tvnzWatch: "mjh-tvnz-2", name: "TVNZ 2 (TVNZ+)", cat: "nz", catLabel: "🇳🇿 TVNZ+ Free", country: "New Zealand", desc: "Shortland Street, Taskmaster NZ, comedy, sitcoms, blockbuster movies & entertainment (opens in free TVNZ+ app/player — DRM protected)", hls: "", web: "https://www.tvnz.co.nz/livetv/tvnz-2" },
+  { id: "tvnz-duke", epgId: "sky.23", tvnzWatch: "sky.23", name: "TVNZ DUKE (TVNZ+)", cat: "nz", catLabel: "🇳🇿 TVNZ+ Free", country: "New Zealand", desc: "Late-night comedy, sci-fi, action movies, cult classics, motoring & factual entertainment (opens in free TVNZ+ app/player — DRM protected)", hls: "", web: "https://www.tvnz.co.nz/livetv/tvnz-duke" },
+  { id: "three-nz", epgId: "mjh-three", name: "Three NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Warner Bros. Discovery NZ live stream — news, entertainment, reality & drama", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/three-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/three" },
   { id: "three-plus1-nz", name: "ThreePlus1 NZ (+1 hr)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Three NZ broadcast delayed by 1 hour — catch anything you missed", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/threeplus1-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "bravo-nz", name: "Bravo NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Real-life stories, Below Deck, true crime, property & lifestyle shows", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/bravo-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/bravo" },
+  { id: "bravo-nz", epgId: "sky.12", name: "Bravo NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Real-life stories, Below Deck, true crime, property & lifestyle shows", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/bravo-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/bravo" },
   { id: "bravo-plus1-nz", name: "Bravo PLUS 1 NZ (+1 hr)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Bravo NZ broadcast delayed by 1 hour", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/bravoplus1-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "skyopen-nz", name: "Sky Open NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Free-to-air drama, comedy, documentaries & entertainment (formerly Prime)", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/skyopen-hls/cmaf-clear/hls.m3u8", web: "https://www.sky.co.nz/" },
-  { id: "rush-nz", name: "RUSH NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Adventure, builds, engineering, survival, cars & outdoor factual TV", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/rush-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/rush" },
-  { id: "eden-nz", name: "Eden NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Documentaries, history, nature, science, food & world exploration", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/eden-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/eden" },
-  { id: "hgtv-nz", name: "HGTV NZ (Home & Reno)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "24/7 home renovations, DIY builds, property flips & design inspiration", hls: "https://mediapackage-sky-hgtv-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
-  { id: "whakaata-maori", name: "Whakaata Māori (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Aotearoa stories, documentaries, movies, kai & cultural programmes", hls: "https://i.mjh.nz/.r/maori-tv.m3u8", web: "https://www.maoritelevision.com/live" },
+  { id: "skyopen-nz", epgId: "sky.4", name: "Sky Open NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Free-to-air drama, comedy, documentaries & entertainment (formerly Prime)", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/skyopen-hls/cmaf-clear/hls.m3u8", web: "https://www.sky.co.nz/" },
+  { id: "rush-nz", epgId: "sky.24", name: "RUSH NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Adventure, builds, engineering, survival, cars & outdoor factual TV", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/rush-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/rush" },
+  { id: "eden-nz", epgId: "sky.13", name: "Eden NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Documentaries, history, nature, science, food & world exploration", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/eden-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/eden" },
+  { id: "hgtv-nz", epgId: "sky.21", name: "HGTV NZ (Home & Reno)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "24/7 home renovations, DIY builds, property flips & design inspiration", hls: "https://mediapackage-sky-hgtv-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "whakaata-maori", epgId: "sky.19", name: "Whakaata Māori (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Aotearoa stories, documentaries, movies, kai & cultural programmes", hls: "https://i.mjh.nz/.r/maori-tv.m3u8", web: "https://www.maoritelevision.com/live" },
   { id: "tereo-nz", name: "Te Reo Channel NZ", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "100% te reo Māori language, culture, kapa haka & local Aotearoa stories", hls: "https://i.mjh.nz/.r/te-reo.m3u8", web: "https://www.maoritelevision.com/tv/te-reo-channel" },
-  { id: "parliament-nz", name: "NZ Parliament TV", cat: "nz", catLabel: "🇳🇿 NZ Live", country: "New Zealand", desc: "Live coverage from the New Zealand House of Representatives & select committees", hls: "https://ptvlive.kordia.net.nz/out/v1/daf20b9a9ec5449dadd734e50ce52b74/index.m3u8", web: "https://ondemand.parliament.nz/" },
+  { id: "parliament-nz", epgId: "sky.86", name: "NZ Parliament TV", cat: "nz", catLabel: "🇳🇿 NZ Live", country: "New Zealand", desc: "Live coverage from the New Zealand House of Representatives & select committees", hls: "https://ptvlive.kordia.net.nz/out/v1/daf20b9a9ec5449dadd734e50ce52b74/index.m3u8", web: "https://ondemand.parliament.nz/" },
   { id: "ch200-nz", name: "Channel 200 NZ", cat: "nz", catLabel: "🇳🇿 NZ Live", country: "New Zealand", desc: "New Zealand regional & community television live stream", hls: "https://ptvlive.kordia.net.nz/out/v1/3fc2254c865a457c8d7fbbce227a2aae/index.m3u8", web: "https://ch200.co.nz/watch-live/" },
   { id: "wairarapa-nz", name: "Wairarapa TV NZ", cat: "nz", catLabel: "🇳🇿 NZ Regional", country: "New Zealand", desc: "Local NZ regional lifestyle, heritage, classic shows & community TV", hls: "https://stream.wairarapatv.co.nz/Broadband_High/playlist.m3u8", web: "http://www.wairarapatv.co.nz/" },
   { id: "10bold-au", name: "10 Bold Australia", cat: "nz", catLabel: "🇦🇺 Australia Live", country: "Australia", desc: "Australian action, drama, NCIS, Law & Order, adventure & entertainment", hls: "https://dce3793146fef017.mediapackage.us-west-2.amazonaws.com/out/v1/55cdf73af7894775ba6de8f57482b66a/CMAF_HLS/index.m3u8", web: "https://10play.com.au/" },
@@ -31486,7 +31489,24 @@ function ltvPlayerHtml() {
   }).join("");
 
   let screen = "";
-  if (ch.yt) {
+  if (ch.tvnzWatch) {
+    const progs = itvProgsForChannel(ch, Date.now());
+    const nowP = progs[0], nextP = progs[1];
+    screen = `<div style="width:100%;height:100%;background:linear-gradient(145deg,#090d16,#1e1b4b 55%,#0f172a);color:#f8fafc;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:18px;text-align:center;box-sizing:border-box">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+        <span class="tblbl" style="background:#0284c7;font-size:.72rem;padding:3px 9px">🇳🇿 TVNZ+ LIVE STREAM</span>
+        <span class="tblbl" style="background:#475569;font-size:.72rem;padding:3px 9px">WIDEVINE DRM</span>
+      </div>
+      <div style="font-size:1.2rem;font-weight:800;margin-bottom:4px">${esc(ch.name)}</div>
+      ${nowP ? `<div style="font-size:.92rem;font-weight:700;color:#38bdf8;margin-bottom:2px">● On Now: ${esc(nowP.title)} (${esc(epgClock(nowP.startMs))}–${esc(epgClock(nowP.endMs))})</div>` : ""}
+      ${nextP ? `<div style="font-size:.78rem;color:#cbd5e1;margin-bottom:10px">⏭ Up Next: ${esc(nextP.title)} at ${esc(epgClock(nextP.startMs))}</div>` : ""}
+      <div style="font-size:.76rem;color:#94a3b8;max-width:440px;line-height:1.35;margin-bottom:12px">TVNZ encrypts its live streams with Widevine DRM (unlike Three, Bravo, Sky Open &amp; Whakaata Māori which stream openly here). Tap below to open the live stream directly in the free <b>TVNZ+</b> app or web player:</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+        <button type="button" class="btn primary" style="padding:8px 16px;font-weight:800" onclick="tvWatch(${jsArg(ch.tvnzWatch)})">▶ Watch Live in TVNZ+ (Free)</button>
+        <button type="button" class="btn" style="padding:8px 12px" onclick="ltvRecordProg(${jsArg(ch.id)},0)">🔴 Record / Bookmark</button>
+      </div>
+    </div>`;
+  } else if (ch.yt) {
     screen = `<iframe src="https://www.youtube-nocookie.com/embed/${esc(ch.yt)}?autoplay=1&playsinline=1&rel=0" title="${esc(ch.name)}" style="width:100%;height:100%;border:0;display:block" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
   } else {
     screen = `<video id="ltv-video" controls autoplay playsinline style="width:100%;height:100%;background:#000;display:block;object-fit:contain"></video>`;
@@ -31542,7 +31562,7 @@ function ltvCardHtml(ch, badgeCol) {
       <div class="tbt">${isPlaying ? "📺 " : "▶ "}${esc(ch.name)}</div>
       <div class="tbs">${esc(ch.desc || ch.country || "")}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px" onclick="event.stopPropagation()">
-        <button type="button" class="btn small${isPlaying ? " primary" : ""}" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayId(${jsArg(ch.id)})">${isPlaying ? "● Watching" : "▶ Watch"}</button>
+        ${ch.tvnzWatch ? `<button type="button" class="btn small primary" style="padding:4px 10px;font-size:.75rem" onclick="tvWatch(${jsArg(ch.tvnzWatch)})">▶ TVNZ+ App</button><button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem" onclick="ltvPlayId(${jsArg(ch.id)})">Info</button>` : `<button type="button" class="btn small${isPlaying ? " primary" : ""}" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayId(${jsArg(ch.id)})">${isPlaying ? "● Watching" : "▶ Watch"}</button>`}
         <button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem" onclick="ltvAssignSheet(${jsArg(ch.id)})">P${pSlot || "+"}</button>
         <button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem" onclick="ltvToggleSave(${jsArg(ch.id)})">${saved ? "★ Saved" : "☆ Save"}</button>
       </div>
@@ -31844,6 +31864,9 @@ setTimeout(() => ltvDvrLoad(false), 3200);
 
 // Generate 24-hour NZ-time EPG programmes for any Internet TV channel
 const ITV_LINEUPS = {
+  "tvnz-1": [["Breakfast & Morning News", "Live New Zealand news, weather, politics & regional stories"], ["The Chase UK & Tipping Point", "Bradley Walsh & Ben Shephard host the hit British quiz shows"], ["1News at Six — Live", "New Zealand’s flagship evening news bulletin & weather"], ["Seven Sharp", "Hilary Barry & Jeremy Wells with Kiwi stories & current affairs"], ["Country Calendar & Kiwi Factual", "Heartland New Zealand farming, coastal living & documentaries"], ["Sunday / British Crime Drama", "Acclaimed British detective mysteries & investigative journalism"]],
+  "tvnz-2": [["TVNZ 2 Morning Cartoons & Sitcoms", "Classic sitcoms, animation & daytime entertainment"], ["Home and Away & Neighbours", "Iconic Australian coastal & suburban drama"], ["The Big Bang Theory & Friends", "Back-to-back classic comedy sitcoms"], ["Shortland Street", "New Zealand’s longest-running medical drama at Ferndale"], ["Taskmaster NZ & Panel Comedy", "Jeremy Wells & Paul Williams set bizarre tasks for Kiwi comedians"], ["TVNZ 2 Saturday/Sunday Blockbuster Movie", "Feature film presentation on TVNZ 2"]],
+  "tvnz-duke": [["DUKE Daytime Motoring & Engineering", "Top Gear, Mighty Car Mods & engineering builds"], ["The Simpsons & Family Guy", "Animated comedy classics back-to-back"], ["8 Out of 10 Cats Does Countdown", "Jimmy Carr hosts the British comedy panel mashup"], ["DUKE Sci-Fi & Action Hour", "Futuristic action, cult series & adventure"], ["DUKE 8:30pm Feature Movie", "Prime-time action, sci-fi or comedy blockbuster movie"], ["Late Night Cult & Stand-Up Comedy", "Alternative comedy specials & late-night cinema"]],
   "three-nz": [["AM Early & Morning News", "Live NZ news, weather & interviews"], ["Three Mornings", "Lifestyle, stories & daytime drama"], ["Newshub Live / Three News", "Latest New Zealand & world headlines"], ["The Block NZ / Grand Designs", "Kiwi renovation challenges & architectural builds"], ["7 Days / Kiwi Comedy", "New Zealand panel comedy & entertainment"], ["Three Late Movie", "Feature film presentation"]],
   "bravo-nz": [["Below Deck Mediterranean", "Superyacht crew drama in the Mediterranean"], ["Below Deck Down Under", "Captain Jason & Aesha chart the Great Barrier Reef"], ["Million Dollar Listing", "High-stakes luxury real estate"], ["The Real Housewives", "Reality drama & lifestyle"], ["Snapped / True Crime", "Real-life forensic mystery investigations"], [" Vanderpump Rules", "Hospitality & reality series"]],
   "skyopen-nz": [["Sky Open Morning Drama", "Classic drama & mystery series"], ["CSI: Crime Scene Investigation", "Forensic crime drama"], ["Storage Wars & Pawn Stars", "Auctions, rare finds & appraisals"], ["Sky Open Prime Time", "Evening factual & adventure"], ["British Comedy Showcase", "Classic UK comedy & panel shows"], ["Late Action Feature", "Evening movie presentation"]],
@@ -31879,6 +31902,42 @@ const ITV_LINEUPS = {
 };
 
 function itvProgsForChannel(ch, nowMs = Date.now()) {
+  if (ch && ch.epgId) {
+    try {
+      const T = todayISO();
+      let real = (typeof epgProgs === "function" ? epgProgs(T, ch.epgId) : []) || [];
+      if (!real.length && TV && TV.data && TV.data.slots && TV.data.slots[ch.epgId]) {
+        real = TV.data.slots[ch.epgId];
+      }
+      const upcoming = real.filter(p => p && p.until > nowMs - 5 * 60000 && p.title);
+      if (upcoming.length >= 2) {
+        return upcoming.slice(0, 12).map((p, i) => {
+          const s = p.start, e = p.until;
+          const dur = Math.max(15, Math.round((e - s) / 60000));
+          const g = typeof tvGenre === "function" ? tvGenre(p) : "";
+          const ep = g === "movie" ? "🎬 Feature Movie" : (p.cats && p.cats.length ? p.cats.slice(0, 2).join(" · ") : `${dur} min`);
+          const seriesTitle = String(p.title || "").replace(/\s*\([^)]*\)\s*$/, "").split(" — ")[0].trim();
+          return {
+            id: `itv-${ch.id}-${s}`,
+            channelId: ch.id,
+            channelName: ch.name,
+            category: ch.catLabel || ch.country || "Live TV",
+            streamUrl: ch.hls || ch.web || "",
+            title: p.title,
+            seriesTitle,
+            episode: ep,
+            desc: p.desc || (ch.tvnzWatch ? "Live on Freeview & TVNZ+ (tap Watch to open in TVNZ+)" : ch.desc || ""),
+            start: new Date(s).toISOString(),
+            end: new Date(e).toISOString(),
+            startMs: s,
+            endMs: e,
+            durationMin: dur,
+            isMovie: g === "movie"
+          };
+        });
+      }
+    } catch (e) {}
+  }
   const slotMin = 60;
   const hourStart = Math.floor(nowMs / (slotMin * 60000)) * (slotMin * 60000);
   const custom = ITV_LINEUPS[ch.id];
@@ -32178,7 +32237,7 @@ function itvMoviesSpotlightCol(allChans, nowMs, q) {
   allChans.filter(c => c.cat !== "movies").forEach(ch => {
     const progs = itvProgsForChannel(ch, nowMs).slice(0, 3);
     progs.forEach((p, idx) => {
-      if (!/movie|feature|film/i.test(p.title + " " + p.desc)) return;
+      if (!p.isMovie && !/movie|feature|film/i.test(p.title + " " + p.desc + " " + (p.episode || ""))) return;
       if (q && !(ch.name + " " + p.title + " " + p.desc).toLowerCase().includes(q)) return;
       picks.push({ ch, p, idx });
     });
