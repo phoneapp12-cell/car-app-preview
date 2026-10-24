@@ -9,7 +9,7 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F4F6F5",
+  "background_color": "#0B3D91",
   "theme_color": "#0F766E",
   "categories": ["productivity", "lifestyle"],
   "icons": [

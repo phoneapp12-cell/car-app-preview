@@ -2196,6 +2196,8 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true" style="position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at 50% 40%,#1e6fd9 0%,#0b3d91 55%,#06224f 100%);display:flex;align-items:center;justify-content:center;transition:opacity .5s ease"><img src="images/splash.jpg" alt="" style="width:min(82vw,82vh,520px);aspect-ratio:1;object-fit:cover;border-radius:22px;box-shadow:0 12px 40px rgba(0,0,0,.45)"></div>
+<script>/* 2.28.1: loading picture on blue, fades once the app has drawn (at least 0.9s, at most 6s) */(function(){var t0=Date.now(),done=0;function hide(){if(done)return;done=1;var s=document.getElementById('splash');if(!s)return;s.style.opacity='0';setTimeout(function(){s.remove();},550);}function ready(){setTimeout(hide,Math.max(0,900-(Date.now()-t0)));}window.addEventListener('load',ready);setTimeout(hide,6000);})();</script>
 <div id="app">
   <main id="view"><noscript>This app needs JavaScript turned on.</noscript></main>
   <div class="tabscrim" id="tabscrim" hidden></div>
