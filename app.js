@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.31';
+const APP_VERSION = '2.28.32';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11461,7 +11461,7 @@ function More() {
    A saved settings.navOrder is left in backups and is not used. */
 const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
-  cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
+  cars: ['car', 'car', 'Cars', 'Cars'], fuel: ['car', 'car', 'Fuel History (30d)', 'Fuel'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
   tv: ['tv', 'tv', 'TV guide', 'TV'], livetv: ['tv', 'tv', 'Live TV', 'Live TV'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], watch: ['heart', 'health', 'Watch', 'Watch'], about: ['info', 'about', 'About you', 'About'],
@@ -20948,9 +20948,9 @@ function bottomTabsSetting() {
 }
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
-const ROUTE_ITEM = { todo: 'lists', reminders: 'lists', flagged: 'lists', ideas: 'lists', notes: 'lists', birthdays: 'lists', countdown: 'lists', diary: 'lists', photos: 'lists', recipe: 'food', meals: 'food', recipes: 'food', shopping: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', tidy: 'projects', bills: 'money', budget: 'money', cashflow: 'money', notbills: 'money', power: 'money', compare: 'money', powertime: 'money', work: 'money', roster: 'money', commission: 'money', wage: 'money', loans: 'money', loan: 'money', watch: 'wellbeing', sleep: 'wellbeing', gym: 'wellbeing', meds: 'wellbeing', health: 'wellbeing', claims: 'wellbeing', about: 'wellbeing', weather: 'local', walks: 'local', bridge: 'local', roadworks: 'local', garden: 'local', events: 'local', news: 'local', localnews: 'local', planning: 'local', cars: 'homelife', car: 'homelife', driver: 'homelife', drivers: 'homelife', pets: 'homelife', pet: 'homelife', lights: 'homelife', heat: 'homelife', alarm: 'homelife', aitech: 'learn', diy: 'learn', science: 'learn', coding: 'learn', astronomy: 'learn', gardening: 'learn', space: 'learn', travel: 'learn', lang: 'learn', tv: 'media', livetv: 'media', videos: 'media', top40: 'media', radio: 'media', podcasts: 'media', blogging: 'media', movies: 'media', concerts: 'media', nightlife: 'media', netflix: 'media', prime: 'media' }; // detail pages belong to their section
+const ROUTE_ITEM = { todo: 'lists', reminders: 'lists', flagged: 'lists', ideas: 'lists', notes: 'lists', birthdays: 'lists', countdown: 'lists', diary: 'lists', photos: 'lists', recipe: 'food', meals: 'food', recipes: 'food', shopping: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', tidy: 'projects', bills: 'money', budget: 'money', cashflow: 'money', notbills: 'money', power: 'money', compare: 'money', powertime: 'money', work: 'money', roster: 'money', commission: 'money', wage: 'money', loans: 'money', loan: 'money', watch: 'wellbeing', sleep: 'wellbeing', gym: 'wellbeing', meds: 'wellbeing', health: 'wellbeing', claims: 'wellbeing', about: 'wellbeing', weather: 'local', walks: 'local', bridge: 'local', roadworks: 'local', garden: 'local', events: 'local', news: 'local', localnews: 'local', planning: 'local', cars: 'homelife', fuel: 'homelife', car: 'homelife', driver: 'homelife', drivers: 'homelife', pets: 'homelife', pet: 'homelife', lights: 'homelife', heat: 'homelife', alarm: 'homelife', aitech: 'learn', diy: 'learn', science: 'learn', coding: 'learn', astronomy: 'learn', gardening: 'learn', space: 'learn', travel: 'learn', lang: 'learn', tv: 'media', livetv: 'media', videos: 'media', top40: 'media', radio: 'media', podcasts: 'media', blogging: 'media', movies: 'media', concerts: 'media', nightlife: 'media', netflix: 'media', prime: 'media' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', livetv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden', gflist: 'plate', lists: 'todo', money: 'money', wellbeing: 'health', local: 'travel', homelife: 'car' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', fuel: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', livetv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden', gflist: 'plate', lists: 'todo', money: 'money', wellbeing: 'health', local: 'travel', homelife: 'car' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -21013,7 +21013,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -22276,16 +22276,31 @@ function alQuickGridHtml() {
     }
   } catch (e) { }
 
-  // Card 2: Gas / Fuel Alert (Marsden Point 91)
-  let gasTitle = 'Gas Alert', gasSub = 'Marsden Point 91 · Check prices', gasBadge = '';
+  // Card 2: Gas / Fuel Alert (Marsden Point 91 — opens 30-day history #fuel on tap)
+  let gasTitle = 'Gas Alert', gasSub = 'Marsden Point 91 · Tap for 30-day history', gasBadge = '';
   try {
-    const st = typeof fuelStats === 'function' ? fuelStats() : null;
+    const st = typeof fuelStats === 'function' ? fuelStats('91') : null;
     if (st && st.now) {
-      gasBadge = fuelC(st.now);
-      const d = st.day != null && Math.abs(st.day) >= 0.1 ? st.day : st.wk;
-      if (d != null && d <= -0.3) gasSub = `Down ${fuelC(Math.abs(d))} at Marsden Pt · Fill up today`;
-      else if (d != null && d >= 0.3) gasSub = `Up ${fuelC(d)} at Marsden Pt · ${fuelC(st.now)}/L`;
-      else gasSub = `${fuelC(st.now)}/L at Marsden Point · Steady today`;
+      const mv = st.day != null && Math.abs(st.day) >= 0.2 ? st.day : (st.lastMove ? st.lastMove.diff : st.wk);
+      const wkD = st.wk != null ? st.wk : 0;
+      const dirArrow = (wkD <= -0.2 || (mv != null && mv <= -0.2)) ? '▼ ' : (wkD >= 0.2 || (mv != null && mv >= 0.2)) ? '▲ ' : '';
+      gasBadge = dirArrow + fuelC(st.now);
+      if (wkD <= -0.3) {
+        gasTitle = `Gas: ▼ Down ${fuelC(Math.abs(wkD))}`;
+        gasSub = `${fuelC(st.now)}/L (7d ▼${fuelC(Math.abs(wkD))}) · Tap for 30d history`;
+      } else if (wkD >= 0.3) {
+        gasTitle = `Gas: ▲ Up ${fuelC(wkD)}`;
+        gasSub = `${fuelC(st.now)}/L (7d ▲${fuelC(wkD)}) · Tap for 30d history`;
+      } else if (mv != null && mv <= -0.2) {
+        gasTitle = `Gas: ▼ Down ${fuelC(Math.abs(mv))}`;
+        gasSub = `${fuelC(st.now)}/L · Tap for 30-day history`;
+      } else if (mv != null && mv >= 0.2) {
+        gasTitle = `Gas: ▲ Up ${fuelC(mv)}`;
+        gasSub = `${fuelC(st.now)}/L · Tap for 30-day history`;
+      } else {
+        gasTitle = `Gas: ${fuelC(st.now)}/L`;
+        gasSub = `Marsden Pt 91 · Tap for 30-day history`;
+      }
     } else {
       setTimeout(() => { try { fuelRefresh(false); } catch (e) { } }, 0);
     }
@@ -22334,7 +22349,7 @@ function alQuickGridHtml() {
 
   return `<div class="al-grid2" role="region" aria-label="Quick daily stats">
     ${card(wxIc, 'qc-wx', wxTitle, wxBadge, wxSub, "go('#weather')")}
-    ${card('⛽', 'qc-gas', gasTitle, gasBadge, gasSub, "go('#cars')")}
+    ${card('⛽', 'qc-gas', gasTitle, gasBadge, gasSub, "fuelBackHash=location.hash||'#alerts';go('#fuel')")}
     ${card('😴', 'qc-sleep', slTitle, slBadge, slSub, "go('#sleep')")}
     ${card('🏋️', 'qc-fit', fitTitle, fitBadge, fitSub, "go('#watch')")}
   </div>`;
@@ -28022,46 +28037,309 @@ async function caNewKey() { if (!confirm('Make a new key? The Alexa skill stops 
    TV: tap 🔔 on a programme coming up; the relay pushes 'Starting in 10 min…' 10 minutes before (works with the app
    closed when notifications are on), and it shows on the bell page. Passed shows drop off. Sport is already filtered out. */
 const FUEL_URL = RELAY_URL + '/fuel';
-let FUEL = null, fuelBusy = false;
-try { FUEL = JSON.parse(localStorage.getItem('fuel') || 'null'); } catch (e) { FUEL = null; }
+const FUEL_SEED_DAYS = [
+  { d: "2026-09-26", z91: 329.50, z95: 351.46, zDiesel: 307.62, zEff: "2026-09-23" },
+  { d: "2026-09-27", z91: 329.50, z95: 351.46, zDiesel: 307.62, zEff: "2026-09-23" },
+  { d: "2026-09-28", z91: 329.50, z95: 351.46, zDiesel: 307.62, zEff: "2026-09-23" },
+  { d: "2026-09-29", z91: 329.50, z95: 351.46, zDiesel: 307.62, zEff: "2026-09-23" },
+  { d: "2026-09-30", z91: 328.96, z95: 351.51, zDiesel: 290.84, zEff: "2026-09-30" },
+  { d: "2026-10-01", z91: 328.96, z95: 351.51, zDiesel: 290.84, zEff: "2026-09-30" },
+  { d: "2026-10-02", z91: 328.96, z95: 351.51, zDiesel: 290.84, zEff: "2026-09-30" },
+  { d: "2026-10-03", z91: 328.96, z95: 351.51, zDiesel: 290.84, zEff: "2026-09-30" },
+  { d: "2026-10-04", z91: 328.96, z95: 351.51, zDiesel: 290.84, zEff: "2026-09-30" },
+  { d: "2026-10-05", z91: 328.96, z95: 351.51, zDiesel: 290.84, zEff: "2026-09-30" },
+  { d: "2026-10-06", z91: 328.96, z95: 351.51, zDiesel: 290.84, zEff: "2026-09-30" },
+  { d: "2026-10-07", z91: 335.46, z95: 358.18, zDiesel: 291.75, zEff: "2026-10-07" },
+  { d: "2026-10-08", z91: 335.46, z95: 358.18, zDiesel: 291.75, zEff: "2026-10-07" },
+  { d: "2026-10-09", z91: 335.46, z95: 358.18, zDiesel: 291.75, zEff: "2026-10-07" },
+  { d: "2026-10-10", z91: 335.46, z95: 358.18, zDiesel: 291.75, zEff: "2026-10-07" },
+  { d: "2026-10-11", z91: 335.46, z95: 358.18, zDiesel: 291.75, zEff: "2026-10-07" },
+  { d: "2026-10-12", z91: 335.46, z95: 358.18, zDiesel: 291.75, zEff: "2026-10-07" },
+  { d: "2026-10-13", z91: 335.46, z95: 358.18, zDiesel: 291.75, zEff: "2026-10-07" },
+  { d: "2026-10-14", z91: 339.92, z95: 361.75, zDiesel: 288.52, zEff: "2026-10-14" },
+  { d: "2026-10-15", z91: 339.92, z95: 361.75, zDiesel: 288.52, zEff: "2026-10-14" },
+  { d: "2026-10-16", z91: 339.92, z95: 361.75, zDiesel: 288.52, zEff: "2026-10-14" },
+  { d: "2026-10-17", z91: 339.92, z95: 361.75, zDiesel: 288.52, zEff: "2026-10-14" },
+  { d: "2026-10-18", z91: 339.92, z95: 361.75, zDiesel: 288.52, zEff: "2026-10-14" },
+  { d: "2026-10-19", z91: 339.92, z95: 361.75, zDiesel: 288.52, zEff: "2026-10-14" },
+  { d: "2026-10-20", bp91: 335.05, bp95: 347.02, bpDiesel: 304.65, bpEff: "2026-10-20", z91: 339.92, z95: 361.75, zDiesel: 288.52, zEff: "2026-10-14" },
+  { d: "2026-10-21", bp91: 335.05, bp95: 347.02, bpDiesel: 304.65, bpEff: "2026-10-20", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
+  { d: "2026-10-22", bp91: 335.05, bp95: 347.02, bpDiesel: 304.65, bpEff: "2026-10-20", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
+  { d: "2026-10-23", bp91: 328.86, bp95: 340.02, bpDiesel: 305.36, bpEff: "2026-10-23", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
+  { d: "2026-10-24", bp91: 328.86, bp95: 340.02, bpDiesel: 305.36, bpEff: "2026-10-23", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
+  { d: "2026-10-25", bp91: 328.86, bp95: 340.02, bpDiesel: 305.36, bpEff: "2026-10-23", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" }
+];
+function mergeFuelDays(rawDays) {
+  const byD = new Map(FUEL_SEED_DAYS.map(x => [x.d, Object.assign({}, x)]));
+  (Array.isArray(rawDays) ? rawDays : []).forEach(x => {
+    if (x && x.d) byD.set(x.d, Object.assign({}, byD.get(x.d) || {}, x));
+  });
+  return [...byD.values()].sort((a, b) => a.d.localeCompare(b.d)).slice(-30);
+}
+let FUEL = null, fuelBusy = false, fuelGrade = "91", fuelBackHash = "#alerts";
+try {
+  const saved = JSON.parse(localStorage.getItem('fuel') || 'null');
+  FUEL = { days: mergeFuelDays(saved && saved.days), day: (saved && saved.day) || "2026-10-25", got: (saved && saved.got) || 0 };
+} catch (e) {
+  FUEL = { days: mergeFuelDays([]), day: "2026-10-25", got: 0 };
+}
 async function fuelRefresh(force) {
-  if (fuelBusy || (!force && FUEL && Date.now() - (FUEL.got || 0) < 3 * 3600e3 && FUEL.day === todayISO())) return;
+  if (fuelBusy || (!force && FUEL && Date.now() - (FUEL.got || 0) < 3 * 3600e3 && FUEL.day === todayISO() && FUEL.days && FUEL.days.length >= 25)) return;
   fuelBusy = true;
-  try { const r = await fetch(FUEL_URL, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); if (d && Array.isArray(d.days)) { FUEL = Object.assign(d, { got: Date.now() }); localStorage.setItem('fuel', JSON.stringify(FUEL)); const h = (location.hash || '#home').slice(1); if (!sheetOpen && (h === 'cars' || h === 'home' || h === '')) render(); } } } catch (e) { }
+  try {
+    const r = await fetch(FUEL_URL, { cache: 'no-store' });
+    if (r.ok) {
+      const d = await r.json();
+      if (d && Array.isArray(d.days)) {
+        d.days = mergeFuelDays(d.days);
+        FUEL = Object.assign(d, { got: Date.now() });
+        localStorage.setItem('fuel', JSON.stringify(FUEL));
+        const h = (location.hash || '#home').slice(1);
+        if (!sheetOpen && ['cars', 'fuel', 'alerts', 'home', ''].includes(h)) render();
+      }
+    }
+  } catch (e) { }
   fuelBusy = false;
 }
 setTimeout(() => fuelRefresh(false), 5000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fuelRefresh(false); });
-const fuelSrc = ['bp91', 'z91'];
-const fuelMean = e => { const v = fuelSrc.map(k => e[k]).filter(x => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
-const fuelDiff = (a, b) => { const v = fuelSrc.filter(k => a[k] > 0 && b[k] > 0).map(k => a[k] - b[k]); return v.length ? v.reduce((x, y) => x + y, 0) / v.length : null; };
-function fuelStats() {
-  const D = (FUEL && Array.isArray(FUEL.days) ? FUEL.days : []).filter(e => fuelMean(e)); if (!D.length) return null;
-  const last = D[D.length - 1], prev = D.length > 1 ? D[D.length - 2] : null, wk = D.slice().reverse().find(e => e.d <= addDays(last.d, -7)) || (D.length > 1 && D[0] !== last ? D[0] : null);
-  return { last, now: fuelMean(last), day: prev ? fuelDiff(last, prev) : null, dayFrom: prev && prev.d, wk: wk ? fuelDiff(last, wk) : null, wkFrom: wk && wk.d, series: D.map(fuelMean), fresh: FUEL.day === todayISO() };
+function fuelKeysForGrade(g = "91") {
+  if (g === "95") return ["bp95", "z95"];
+  if (g === "diesel") return ["bpDiesel", "zDiesel"];
+  return ["bp91", "z91"];
+}
+const fuelMean = (e, g = "91") => {
+  const keys = fuelKeysForGrade(g);
+  const v = keys.map(k => e && e[k]).filter(x => x > 0);
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+};
+const fuelDiff = (a, b, g = "91") => {
+  const va = fuelMean(a, g), vb = fuelMean(b, g);
+  return (va != null && vb != null) ? (va - vb) : null;
+};
+function fuelStats(g = "91") {
+  const rawDays = mergeFuelDays(FUEL && FUEL.days);
+  const D = rawDays.filter(e => fuelMean(e, g) != null);
+  if (!D.length) return null;
+  const last = D[D.length - 1];
+  const prev = D.length > 1 ? D[D.length - 2] : null;
+  const wk = D.slice().reverse().find(e => e.d <= addDays(last.d, -7)) || D[0];
+  const mo = D[0];
+  const series = D.map(e => fuelMean(e, g));
+  const hi30 = Math.max(...series), lo30 = Math.min(...series);
+  const hiEntry = D.find(e => Math.abs(fuelMean(e, g) - hi30) < 0.01) || last;
+  const loEntry = D.slice().reverse().find(e => Math.abs(fuelMean(e, g) - lo30) < 0.01) || last;
+  // Find every date where the price moved compared to the day before
+  const changes = [];
+  for (let i = 1; i < D.length; i++) {
+    const curV = fuelMean(D[i], g), prevV = fuelMean(D[i - 1], g);
+    const df = curV - prevV;
+    if (Math.abs(df) >= 0.05) {
+      changes.push({
+        d: D[i].d,
+        from: prevV,
+        to: curV,
+        diff: df,
+        dir: df < 0 ? "down" : "up",
+        bp: D[i][fuelKeysForGrade(g)[0]] || null,
+        z: D[i][fuelKeysForGrade(g)[1]] || null
+      });
+    }
+  }
+  changes.reverse();
+  const lastMove = changes[0] || null;
+  return {
+    grade: g,
+    days: D,
+    last,
+    now: fuelMean(last, g),
+    day: prev ? fuelDiff(last, prev, g) : null,
+    dayFrom: prev && prev.d,
+    wk: wk ? fuelDiff(last, wk, g) : null,
+    wkFrom: wk && wk.d,
+    mo: mo ? fuelDiff(last, mo, g) : null,
+    moFrom: mo && mo.d,
+    hi30, lo30,
+    hiDate: hiEntry.d,
+    loDate: loEntry.d,
+    changes,
+    lastMove,
+    series,
+    fresh: (FUEL && FUEL.day) === todayISO()
+  };
 }
 const fuelC = v => (Math.round(v * 10) / 10).toFixed(1) + 'c';
-function fuelArrow(d) { if (d == null) return '<span class="muted">–</span>'; const r = Math.round(d * 10) / 10; if (Math.abs(r) < 0.5) return '<b style="color:#64748B">→ steady</b>'; return r < 0 ? `<b style="color:#15803D">↓ ${fuelC(-r)}</b>` : `<b style="color:#B91C1C">↑ ${fuelC(r)}</b>`; }
-function fuelSpark(s) { if (s.length < 2) return ''; const W = 120, H = 30, lo = Math.min(...s), hi = Math.max(...s), sp = hi - lo || 1;
+function fuelArrow(d) {
+  if (d == null) return '<span class="muted">–</span>';
+  const r = Math.round(d * 10) / 10;
+  if (Math.abs(r) < 0.2) return '<b style="color:#64748B">▬ steady</b>';
+  return r < 0 ? `<b style="color:#15803D">▼ Down ${fuelC(-r)}</b>` : `<b style="color:#B91C1C">▲ Up ${fuelC(r)}</b>`;
+}
+function fuelBadgeHtml(d, label = "") {
+  if (d == null) return `<span class="pill">–</span>`;
+  const r = Math.round(d * 10) / 10;
+  if (Math.abs(r) < 0.2) return `<span class="pill" style="background:rgba(100,116,139,.14);color:#475569;font-weight:700">▬ Steady${label ? " " + esc(label) : ""}</span>`;
+  if (r < 0) return `<span class="pill" style="background:#dcfce7;color:#166534;font-weight:800">▼ DOWN ${fuelC(-r)}${label ? " " + esc(label) : ""}</span>`;
+  return `<span class="pill" style="background:#fee2e2;color:#991b1b;font-weight:800">▲ UP ${fuelC(r)}${label ? " " + esc(label) : ""}</span>`;
+}
+function fuelSpark(s) {
+  if (s.length < 2) return '';
+  const W = 120, H = 30, lo = Math.min(...s), hi = Math.max(...s), sp = hi - lo || 1;
   const pts = s.map((v, i) => `${(i / (s.length - 1) * W).toFixed(1)},${(H - 3 - (v - lo) / sp * (H - 6)).toFixed(1)}`).join(' ');
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-label="30-day trend" style="display:block"><polyline points="${pts}" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`; }
-function openGaspy() { const web = 'https://www.gaspy.nz/';
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-label="30-day trend" style="display:block"><polyline points="${pts}" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function openGaspy() {
+  const web = 'https://www.gaspy.nz/';
   if (/Android/i.test(navigator.userAgent)) location.href = 'intent://#Intent;package=nz.hwem.gaspy;S.browser_fallback_url=' + encodeURIComponent(web) + ';end';
-  else window.open(web, '_blank', 'noopener'); }
+  else window.open(web, '_blank', 'noopener');
+}
 function fuelCard() {
-  const st = fuelStats(), L = st && st.last;
+  const st = fuelStats('91'), L = st && st.last;
   const src = L ? [L.bp91 ? `BP ${fuelC(L.bp91)}${L.bpEff ? ' (from ' + fmt(L.bpEff) + ')' : ''}` : '', L.z91 ? `Z ${fuelC(L.z91)}${L.zEff ? ' (from ' + fmt(L.zEff) + ')' : ''}` : ''].filter(Boolean).join(' · ') : '';
-  const body = st ? `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div><div style="font-size:26px;font-weight:800">${fuelC(st.now)}<small style="font-size:13px;font-weight:600"> /L · 91</small></div>
-      <div class="s">Since yesterday ${fuelArrow(st.day)} · 7 days ${fuelArrow(st.wk)}</div></div>${fuelSpark(st.series)}</div>
+  const body = st ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-size:26px;font-weight:800">${fuelC(st.now)}<small style="font-size:13px;font-weight:600"> /L · 91</small></div>
+      <div class="s" style="margin-top:2px">7 days: ${fuelArrow(st.wk)} · 30 days: ${fuelArrow(st.mo)}</div></div>${fuelSpark(st.series)}</div>
       <div class="s" style="margin-top:6px">${esc(src)}${L.bp95 || L.z95 ? ' · 95: ' + [L.bp95 ? 'BP ' + fuelC(L.bp95) : '', L.z95 ? 'Z ' + fuelC(L.z95) : ''].filter(Boolean).join(', ') : ''}</div>`
     : `<div class="s">${fuelBusy ? 'Checking today’s price…' : 'No price yet. The relay reads the BP and Z lists each morning from 6am.'}</div>`;
   return `<div class="sec">⛽ Fuel · Marsden Point</div><div class="carcard" style="padding:14px">${body}
     <div class="s" style="margin-top:8px">Terminal (wholesale) price, not the pump price. Kora saves 10c+/L at Mobil and Waitomo.</div>
-    <div style="margin-top:10px;display:flex;gap:8px"><button type="button" class="btn small primary" onclick="openGaspy()">Open Gaspy</button><button type="button" class="btn small" onclick="fuelRefresh(true).then(render)">Refresh</button></div></div>`;
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn small primary" onclick="fuelBackHash='#cars';go('#fuel')">📈 30-Day Price History</button><button type="button" class="btn small" onclick="openGaspy()">Open Gaspy</button><button type="button" class="btn small" onclick="fuelRefresh(true).then(render)">Refresh</button></div></div>`;
+}
+function fuelChartSvg(st) {
+  if (!st || !st.days || st.days.length < 2) return '';
+  const D = st.days, S = st.series;
+  const W = 340, H = 135, padL = 42, padR = 14, padT = 18, padB = 26;
+  const cw = W - padL - padR, ch = H - padT - padB;
+  const lo = Math.floor(Math.min(...S) - 1.5), hi = Math.ceil(Math.max(...S) + 1.5), sp = Math.max(2, hi - lo);
+  const xOf = i => padL + (i / (S.length - 1)) * cw;
+  const yOf = v => padT + ch - ((v - lo) / sp) * ch;
+  const pts = S.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ');
+  const areaPts = `${xOf(0).toFixed(1)},${(padT + ch).toFixed(1)} ${pts} ${xOf(S.length - 1).toFixed(1)},${(padT + ch).toFixed(1)}`;
+  const isDownOverall = (st.wk != null && st.wk < 0) || (st.mo != null && st.mo <= 0);
+  const strokeCol = isDownOverall ? "#16a34a" : "#dc2626";
+  const fillCol = isDownOverall ? "rgba(22,163,74,0.14)" : "rgba(220,38,38,0.14)";
+  const dots = S.map((v, i) => {
+    if (i === 0) return `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="3" fill="#64748b"/>`;
+    const df = v - S[i - 1];
+    if (Math.abs(df) < 0.05 && i < S.length - 1) return '';
+    const col = df < -0.05 ? "#16a34a" : df > 0.05 ? "#dc2626" : strokeCol;
+    return `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="${i === S.length - 1 ? 4.5 : 3.8}" fill="${col}" stroke="#fff" stroke-width="1.5"/>`;
+  }).join('');
+  const yTicks = [lo, Math.round((lo + hi) / 2), hi].map(v => `<line x1="${padL}" y1="${yOf(v).toFixed(1)}" x2="${W - padR}" y2="${yOf(v).toFixed(1)}" stroke="rgba(148,163,184,0.25)" stroke-dasharray="3,3"/><text x="${padL - 5}" y="${(yOf(v) + 4).toFixed(1)}" font-size="10" fill="currentColor" opacity="0.65" text-anchor="end">${v}c</text>`).join('');
+  const xIdxs = [0, Math.floor(D.length / 3), Math.floor((D.length * 2) / 3), D.length - 1];
+  const xLabels = xIdxs.map((idx, k) => `<text x="${xOf(idx).toFixed(1)}" y="${H - 6}" font-size="10" fill="currentColor" opacity="0.7" text-anchor="${k === 0 ? 'start' : k === xIdxs.length - 1 ? 'end' : 'middle'}">${esc(fmt(D[idx].d).replace(/ 20\d\d$/, ''))}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin-top:6px" role="img" aria-label="30-day fuel price chart">
+    ${yTicks}
+    <polygon points="${areaPts}" fill="${fillCol}"/>
+    <polyline points="${pts}" fill="none" stroke="${strokeCol}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    ${xLabels}
+  </svg>`;
+}
+function FuelHistoryPage() {
+  setTimeout(() => fuelRefresh(false), 0);
+  const st = fuelStats(fuelGrade) || fuelStats("91");
+  const gName = { "91": "Regular 91 Unleaded", "95": "Premium 95 Unleaded", "diesel": "Diesel (ADF)" }[fuelGrade] || "Regular 91";
+  const keys = fuelKeysForGrade(fuelGrade);
+  const L = st ? st.last : null;
+  const bpNow = L && L[keys[0]] ? fuelC(L[keys[0]]) : null;
+  const zNow = L && L[keys[1]] ? fuelC(L[keys[1]]) : null;
+
+  // Overall trend verdict banner
+  const primaryDiff = st ? (st.wk != null && Math.abs(st.wk) >= 0.2 ? st.wk : (st.lastMove ? st.lastMove.diff : st.mo)) : 0;
+  const isDown = primaryDiff < -0.15;
+  const isUp = primaryDiff > 0.15;
+  const bannerBg = isDown ? "linear-gradient(135deg,#065f46,#15803d)" : isUp ? "linear-gradient(135deg,#991b1b,#b91c1c)" : "linear-gradient(135deg,#1e293b,#334155)";
+  const bannerTitle = isDown
+    ? `▼ PRICES HAVE GONE DOWN (${fuelC(Math.abs(primaryDiff))}/L)`
+    : isUp
+    ? `▲ PRICES HAVE GONE UP (+${fuelC(primaryDiff)}/L)`
+    : `▬ PRICES ARE STEADY TODAY`;
+  const bannerSub = st
+    ? (isDown
+      ? `${gName} at Marsden Point is down ${fuelC(Math.abs(st.wk || primaryDiff))} over the last 7 days (from ${fuelC(st.hi30)} peak down to ${fuelC(st.now)}/L). Great time to fill up!`
+      : isUp
+      ? `${gName} at Marsden Point rose ${fuelC(primaryDiff)} recently to ${fuelC(st.now)}/L (30-day low was ${fuelC(st.lo30)}).`
+      : `${gName} is holding steady at ${fuelC(st.now)}/L at Marsden Point.`)
+    : "Loading Marsden Point 30-day fuel history…";
+
+  const gradeTabs = [
+    ["91", "⛽ Regular 91"],
+    ["95", "⚡ Premium 95"],
+    ["diesel", "🚛 Diesel"]
+  ].map(([k, lbl]) => `<button type="button" class="chip${fuelGrade === k ? " on" : ""}" onclick="fuelGrade='${k}';render()">${lbl}</button>`).join("");
+
+  // Price changes log (every Up / Down change in the last 30 days)
+  const changeRows = st && st.changes.length ? st.changes.map(c => {
+    const down = c.diff < 0;
+    return `<div class="row" style="align-items:center">
+      <div class="ic" style="background:${down ? "#dcfce7" : "#fee2e2"};color:${down ? "#166534" : "#991b1b"};font-weight:900;font-size:1.05rem">${down ? "▼" : "▲"}</div>
+      <div class="tx">
+        <div class="t" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span>${esc(fmtW(c.d))}</span>
+          ${fuelBadgeHtml(c.diff)}
+        </div>
+        <div class="s">Moved from <b>${fuelC(c.from)}/L</b> → <b>${fuelC(c.to)}/L</b>${c.bp || c.z ? " · " + [c.bp ? "BP " + fuelC(c.bp) : "", c.z ? "Z " + fuelC(c.z) : ""].filter(Boolean).join(", ") : ""}</div>
+      </div>
+    </div>`;
+  }).join("") : `<div class="row"><div class="tx"><div class="s">No price shifts recorded in this window.</div></div></div>`;
+
+  // Full 30-day day-by-day history list (newest first)
+  const dailyRows = st ? st.days.slice().reverse().map((e, idx, arr) => {
+    const val = fuelMean(e, fuelGrade);
+    const prevE = arr[idx + 1] || null;
+    const df = prevE ? (val - fuelMean(prevE, fuelGrade)) : 0;
+    const vs30 = val - fuelMean(st.days[0], fuelGrade);
+    const bpV = e[keys[0]] ? `BP ${fuelC(e[keys[0]])}` : "";
+    const zV = e[keys[1]] ? `Z ${fuelC(e[keys[1]])}` : "";
+    return `<div class="row" style="padding:10px 12px">
+      <div class="tx">
+        <div class="t" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span>${e.d === todayISO() ? "Today · " + esc(fmtW(e.d)) : esc(fmtW(e.d))}</span>
+          <span style="font-weight:800;font-size:1.02rem">${fuelC(val)}/L</span>
+        </div>
+        <div class="s" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;flex-wrap:wrap">
+          <span>${esc([bpV, zV].filter(Boolean).join(" · ") || "Marsden Point TGP")}</span>
+          <span>${Math.abs(df) >= 0.05 ? fuelBadgeHtml(df, " that day") : `<span style="font-size:.78rem;opacity:.8">vs 30d ago: ${fuelArrow(vs30)}</span>`}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join("") : "";
+
+  return `<button class="back" onclick="go(${jsArg(fuelBackHash || "#alerts")})">${I("left")} Back</button>` +
+    header("⛽ Gas Alerts · Last 30 Days", "Marsden Point Terminal prices & Up / Down history") +
+    `<div class="chips" style="margin:0 0 10px">${gradeTabs}</div>` +
+    `<div class="card" style="background:${bannerBg};color:#fff;padding:16px;border-radius:18px;margin-bottom:12px;box-shadow:0 8px 22px rgba(0,0,0,.18)">
+      <div style="font-size:.78rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.9">Marsden Point · ${esc(gName)}</div>
+      <div style="font-size:1.32rem;font-weight:900;margin:4px 0 6px">${esc(bannerTitle)}</div>
+      <div style="font-size:.88rem;line-height:1.45;opacity:.95">${esc(bannerSub)}</div>
+      ${st ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;background:rgba(0,0,0,.22);padding:10px;border-radius:12px;text-align:center">
+        <div><div style="font-size:.72rem;opacity:.8">NOW</div><div style="font-size:1.1rem;font-weight:800">${fuelC(st.now)}/L</div><div style="font-size:.7rem;opacity:.8">${esc([zNow ? "Z " + zNow : "", bpNow ? "BP " + bpNow : ""].filter(Boolean).join(" · "))}</div></div>
+        <div><div style="font-size:.72rem;opacity:.8">LAST 7 DAYS</div><div style="font-size:1.05rem;font-weight:800">${st.wk != null ? (st.wk < -0.1 ? "▼ " + fuelC(-st.wk) : st.wk > 0.1 ? "▲ +" + fuelC(st.wk) : "▬ 0.0c") : "–"}</div><div style="font-size:.7rem;opacity:.8">${st.wk < -0.1 ? "Gone DOWN" : st.wk > 0.1 ? "Gone UP" : "Steady"}</div></div>
+        <div><div style="font-size:.72rem;opacity:.8">LAST 30 DAYS</div><div style="font-size:1.05rem;font-weight:800">${st.mo != null ? (st.mo < -0.1 ? "▼ " + fuelC(-st.mo) : st.mo > 0.1 ? "▲ +" + fuelC(st.mo) : "▬ 0.0c") : "–"}</div><div style="font-size:.7rem;opacity:.8">High ${fuelC(st.hi30)} · Low ${fuelC(st.lo30)}</div></div>
+      </div>` : ""}
+    </div>` +
+    (st ? `<div class="card" style="padding:14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div class="t" style="font-weight:800">📈 30-Day Price Trend (${esc(fmt(st.days[0].d).replace(/ 20\d\d$/, ""))} – ${esc(fmt(st.last.d).replace(/ 20\d\d$/, ""))})</div>
+        ${fuelBadgeHtml(st.wk, "(7d)")}
+      </div>
+      <div class="s" style="margin-top:2px">Green dots = price dropped (▼) · Red dots = price rose (▲) · 30-day peak <b>${fuelC(st.hi30)}</b> (${esc(fmt(st.hiDate).replace(/ 20\d\d$/, ""))}) · 30-day low <b>${fuelC(st.lo30)}</b> (${esc(fmt(st.loDate).replace(/ 20\d\d$/, ""))})</div>
+      ${fuelChartSvg(st)}
+    </div>` : "") +
+    `<div class="sec">📊 Price Movements (Up / Down Log — Last 30 Days)</div>
+    <div class="list" style="margin-bottom:14px">${changeRows}</div>` +
+    `<div class="sec">🗓️ All 30 Days (Day-by-Day History)</div>
+    <div class="list" style="margin-bottom:14px">${dailyRows}</div>` +
+    `<div class="btns" style="margin-bottom:12px">
+      <button type="button" class="btn primary" onclick="openGaspy()">⛽ Open Gaspy (Pump Prices)</button>
+      <button type="button" class="btn" onclick="go('#cars')">🚗 Open Cars</button>
+      <button type="button" class="btn" onclick="fuelRefresh(true);toast('Refreshing Marsden Point fuel prices…')">${I("refresh")} Refresh</button>
+    </div>
+    <div class="foot">Marsden Point Terminal Gate Prices (wholesale incl. GST, ETS &amp; taxes) published daily under the Fuel Industry Act 2020 by Z Energy and BP NZ. Kora fuel card saves 10c+/L at Mobil and Waitomo in Whangārei.</div>`;
 }
 (() => { const o = Cars; Cars = function () { const h = o.apply(this, arguments); try { const f = fuelCard(), i = h.indexOf('<div class="callout blue">'); return i > 0 ? h.slice(0, i) + f + h.slice(i) : h + f; } catch (e) { return h; } }; })();
 (() => { const o = HOME_CARD.cars; if (!o) return; HOME_CARD.cars = function () { const h = o.apply(this, arguments); try { const st = fuelStats(); if (!h || !st) return h;
-  return h + `<div class="list"><button class="row" onclick="go('#cars')"><div class="ic">⛽</div><div class="tx"><div class="t">91 at Marsden Point ${fuelC(st.now)}/L</div><div class="s">Today ${fuelArrow(st.day)} · 7 days ${fuelArrow(st.wk)} · wholesale</div></div></button></div>`; } catch (e) { return h; } }; })();
+  return h + `<div class="list"><button class="row" onclick="fuelBackHash='#home';go('#fuel')"><div class="ic">⛽</div><div class="tx"><div class="t">91 at Marsden Point ${fuelC(st.now)}/L</div><div class="s">7 days ${fuelArrow(st.wk)} · 30 days ${fuelArrow(st.mo)} · Tap for 30-day history ›</div></div></button></div>`; } catch (e) { return h; } }; })();
 function fuelNoteText(st) { const n = v => fuelC(Math.abs(v)).replace('.0c', 'c'), r = v => v == null ? 0 : Math.round(v);
   if (r(st.wk) <= -3) return `91 is down ${n(st.wk)} this week at Marsden Point, a good time to fill up.`;
   if (r(st.day) >= 3) return `91 is up ${n(st.day)} since yesterday at Marsden Point, fill up sooner rather than later.`;
@@ -28071,7 +28349,7 @@ function fuelNoteText(st) { const n = v => fuelC(Math.abs(v)).replace('.0c', 'c'
   return `91 is steady at Marsden Point, ${fuelC(st.now)} a litre.`; }
 function fuelBellRows() { try { if ((S.settings || {}).fuelNote === false) return []; const st = fuelStats(); if (!st || !st.fresh || nzStampLocal().slice(11, 13) < '06') return [];
   const k = 'fuel-' + todayISO(); if (nfDis().includes(k)) return [];
-  return [`<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){go('#cars')}"><div class="ic">⛽</div><div class="tx"><div class="t">${esc(fuelNoteText(st))}</div><div class="s">Terminal (wholesale) price, not the pump price · Kora saves 10c+/L at Mobil and Waitomo</div></div></div>`]; } catch (e) { return []; } }
+  return [`<div class="row glnew" data-nk="${k}" role="button" tabindex="0" onclick="if(!glSwipe.moved){fuelBackHash='#alerts';go('#fuel')}"><div class="ic">⛽</div><div class="tx"><div class="t">${esc(fuelNoteText(st))}</div><div class="s">7 days ${st.wk != null && st.wk < 0 ? "▼ Down " + fuelC(-st.wk) : st.wk > 0 ? "▲ Up " + fuelC(st.wk) : "Steady"} · Tap for 30-day price history ›</div></div></div>`]; } catch (e) { return []; } }
 (() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = fuelBellRows().concat(tvBellRows()); return B.length ? B.concat(L) : L; } catch (e) { return L; } }; })();
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = (S.settings || {}).fuelNote !== false;
   return h + `<div class="srow"><div class="tx"><div class="t">Daily fuel price note</div><div class="s">Once a day after the morning check of the Marsden Point 91 price. Bell page only, no buzz.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Daily fuel price note" onclick="toggleSetting('fuelNote')"></button></div>`; } catch (e) { return h; } }; })();

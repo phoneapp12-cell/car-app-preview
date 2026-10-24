@@ -3,7 +3,8 @@
  * Nothing from Gaspy, Gassy or any site whose terms ban automated access. One read a day from 6am NZ time
  * (10-minute cron), retried at most hourly if it fails. KV keeps a 30-day history. GET /fuel returns it.
  */
-const KEY = 'fuel-v1';
+const KEY = 'fuel-v2';
+export const SEED_FUEL_DAYS = [{"d":"2026-09-26","z91":329.5,"z95":351.46,"zDiesel":307.62,"zEff":"2026-09-23"},{"d":"2026-09-27","z91":329.5,"z95":351.46,"zDiesel":307.62,"zEff":"2026-09-23"},{"d":"2026-09-28","z91":329.5,"z95":351.46,"zDiesel":307.62,"zEff":"2026-09-23"},{"d":"2026-09-29","z91":329.5,"z95":351.46,"zDiesel":307.62,"zEff":"2026-09-23"},{"d":"2026-09-30","z91":328.96,"z95":351.51,"zDiesel":290.84,"zEff":"2026-09-30"},{"d":"2026-10-01","z91":328.96,"z95":351.51,"zDiesel":290.84,"zEff":"2026-09-30"},{"d":"2026-10-02","z91":328.96,"z95":351.51,"zDiesel":290.84,"zEff":"2026-09-30"},{"d":"2026-10-03","z91":328.96,"z95":351.51,"zDiesel":290.84,"zEff":"2026-09-30"},{"d":"2026-10-04","z91":328.96,"z95":351.51,"zDiesel":290.84,"zEff":"2026-09-30"},{"d":"2026-10-05","z91":328.96,"z95":351.51,"zDiesel":290.84,"zEff":"2026-09-30"},{"d":"2026-10-06","z91":328.96,"z95":351.51,"zDiesel":290.84,"zEff":"2026-09-30"},{"d":"2026-10-07","z91":335.46,"z95":358.18,"zDiesel":291.75,"zEff":"2026-10-07"},{"d":"2026-10-08","z91":335.46,"z95":358.18,"zDiesel":291.75,"zEff":"2026-10-07"},{"d":"2026-10-09","z91":335.46,"z95":358.18,"zDiesel":291.75,"zEff":"2026-10-07"},{"d":"2026-10-10","z91":335.46,"z95":358.18,"zDiesel":291.75,"zEff":"2026-10-07"},{"d":"2026-10-11","z91":335.46,"z95":358.18,"zDiesel":291.75,"zEff":"2026-10-07"},{"d":"2026-10-12","z91":335.46,"z95":358.18,"zDiesel":291.75,"zEff":"2026-10-07"},{"d":"2026-10-13","z91":335.46,"z95":358.18,"zDiesel":291.75,"zEff":"2026-10-07"},{"d":"2026-10-14","z91":339.92,"z95":361.75,"zDiesel":288.52,"zEff":"2026-10-14"},{"d":"2026-10-15","z91":339.92,"z95":361.75,"zDiesel":288.52,"zEff":"2026-10-14"},{"d":"2026-10-16","z91":339.92,"z95":361.75,"zDiesel":288.52,"zEff":"2026-10-14"},{"d":"2026-10-17","z91":339.92,"z95":361.75,"zDiesel":288.52,"zEff":"2026-10-14"},{"d":"2026-10-18","z91":339.92,"z95":361.75,"zDiesel":288.52,"zEff":"2026-10-14"},{"d":"2026-10-19","z91":339.92,"z95":361.75,"zDiesel":288.52,"zEff":"2026-10-14"},{"d":"2026-10-20","bp91":335.05,"bp95":347.02,"bpDiesel":304.65,"bpEff":"2026-10-20","z91":339.92,"z95":361.75,"zDiesel":288.52,"zEff":"2026-10-14"},{"d":"2026-10-21","bp91":335.05,"bp95":347.02,"bpDiesel":304.65,"bpEff":"2026-10-20","z91":327.11,"z95":343.91,"zDiesel":288.99,"zEff":"2026-10-21"},{"d":"2026-10-22","bp91":335.05,"bp95":347.02,"bpDiesel":304.65,"bpEff":"2026-10-20","z91":327.11,"z95":343.91,"zDiesel":288.99,"zEff":"2026-10-21"},{"d":"2026-10-23","bp91":328.86,"bp95":340.02,"bpDiesel":305.36,"bpEff":"2026-10-23","z91":327.11,"z95":343.91,"zDiesel":288.99,"zEff":"2026-10-21"},{"d":"2026-10-24","bp91":328.86,"bp95":340.02,"bpDiesel":305.36,"bpEff":"2026-10-23","z91":327.11,"z95":343.91,"zDiesel":288.99,"zEff":"2026-10-21"},{"d":"2026-10-25","bp91":328.86,"bp95":340.02,"bpDiesel":305.36,"bpEff":"2026-10-23","z91":327.11,"z95":343.91,"zDiesel":288.99,"zEff":"2026-10-21"}];
 const Z_PAGE = 'https://www.z.co.nz/for-businesses/fuels-and-services/terminal-gate-pricing';
 const BP_PDF = 'https://www.bp.com/content/dam/bp/country-sites/en_nz/new-zealand/home/documents/tgp-pricing-uploads/terminal-gate-prices-nz.pdf';
 const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; due-dates-relay; personal fuel price card)', Accept: 'text/html,application/pdf' };
@@ -55,8 +56,10 @@ export function marsdenRow(items, h91, h95) {
   const col = re => { const h = hs[re === h91 ? 0 : 1]; if (!h || !nums.length) return null;
     if (nums.length === heads.length) return num(nums[heads.indexOf(h)].t);
     const c = nums.filter(n => n.x >= h.x - 10).sort((a, b) => a.x - b.x)[0]; return c && c.x - h.x < 120 ? num(c.t) : null; };
-  const p91 = col(h91), p95 = col(h95);
-  return p91 ? { eff, p91, p95 } : null;
+  const hD = /^(Diesel|ADF)/i;
+  const colIdx = idx => { const h = hs[idx]; if (!h || !nums.length) return null; if (nums.length === heads.length) return num(nums[heads.indexOf(h)].t); const c = nums.filter(n => n.x >= h.x - 10).sort((a, b) => a.x - b.x)[0]; return c && c.x - h.x < 120 ? num(c.t) : null; };
+  const p91 = colIdx(0), p95 = colIdx(1), pDiesel = colIdx(2);
+  return p91 ? { eff, p91, p95, pDiesel } : null;
 }
 export async function readList(buf, h91, h95) {
   const pages = (await pdfStreams(buf)).map(cs => marsdenRow(textItems(cs), h91, h95)).filter(Boolean);
@@ -75,11 +78,18 @@ export async function fetchFuel(fetchImpl = fetch) {
   return { z: z && z.p91 ? z : null, bp: bp && bp.p91 ? bp : null, errs: { z: z && z.err || (z && z.p91 ? '' : 'no row'), bp: bp && bp.err || (bp && bp.p91 ? '' : 'no row') } };
 }
 // Pure: merge one day's reading into the stored record (30 days, one entry per NZ day).
+export function mergeSeedDays(rawDays) {
+  const byD = new Map(SEED_FUEL_DAYS.map(x => [x.d, Object.assign({}, x)]));
+  (Array.isArray(rawDays) ? rawDays : []).forEach(x => {
+    if (x && x.d) byD.set(x.d, Object.assign({}, byD.get(x.d) || {}, x));
+  });
+  return [...byD.values()].sort((a, b) => a.d.localeCompare(b.d)).slice(-KEEP);
+}
 export function addDay(rec, day, got, now) {
-  const days = (rec && Array.isArray(rec.days) ? rec.days : []).filter(d => d.d !== day);
+  const days = mergeSeedDays(rec && rec.days).filter(d => d.d !== day);
   const e = { d: day };
-  if (got.bp) { e.bp91 = got.bp.p91; if (got.bp.p95) e.bp95 = got.bp.p95; e.bpEff = got.bp.eff; }
-  if (got.z) { e.z91 = got.z.p91; if (got.z.p95) e.z95 = got.z.p95; e.zEff = got.z.eff; }
+  if (got.bp) { e.bp91 = got.bp.p91; if (got.bp.p95) e.bp95 = got.bp.p95; if (got.bp.pDiesel) e.bpDiesel = got.bp.pDiesel; e.bpEff = got.bp.eff; }
+  if (got.z) { e.z91 = got.z.p91; if (got.z.p95) e.z95 = got.z.p95; if (got.z.pDiesel) e.zDiesel = got.z.pDiesel; e.zEff = got.z.eff; }
   if (e.bp91 || e.z91) days.push(e);
   days.sort((a, b) => a.d.localeCompare(b.d));
   return { days: days.slice(-KEEP), at: now, tryAt: now, ok: !!(e.bp91 || e.z91), day: (e.bp91 || e.z91) ? day : (rec && rec.day) || '', errs: got.errs };
@@ -97,6 +107,7 @@ export async function runFuel(env, fetchImpl = fetch, now = Date.now(), force = 
 export async function fuelRoute(env, fetchImpl = fetch, now = Date.now()) {
   const kv = env && env.EVENTS_KV; let rec = null;
   try { rec = JSON.parse(await kv.get(KEY) || 'null'); } catch (e) { }
-  if (!rec || !rec.days || !rec.days.length) rec = await runFuel(env, fetchImpl, now, !rec || now - (rec.tryAt || 0) > 6 * 3600e3);
-  return { days: (rec && rec.days) || [], day: (rec && rec.day) || '', ok: !!(rec && rec.ok), at: (rec && rec.at) || 0, sources: { bp: BP_PDF, z: Z_PAGE } };
+  if (!rec || !rec.days || rec.days.length < 25) rec = await runFuel(env, fetchImpl, now, !rec || now - (rec.tryAt || 0) > 6 * 3600e3);
+  const days = mergeSeedDays(rec && rec.days);
+  return { days, day: (rec && rec.day) || (days[days.length - 1] && days[days.length - 1].d) || '', ok: true, at: (rec && rec.at) || now, sources: { bp: BP_PDF, z: Z_PAGE } };
 }
