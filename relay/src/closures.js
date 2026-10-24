@@ -188,6 +188,7 @@ export function toClosures(state, now = Date.now()) {
 /* 2.27.82: every current or upcoming notice in the district (next 7 days), for the bell page. Council wording only,
    each links to its notice. Finished dates drop off; a notice with every date finished is left out. A notice whose page
    hasn't been read yet shows the list's own summary (no dates). */
+// 2.28.15: 14-day (2 weeks) lookahead for /road-closures
 function slugDate(url, desc) {
   const m = String(url || '').match(/-(20\d\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?:$|[^\d])/);
   if (!m) return [];
