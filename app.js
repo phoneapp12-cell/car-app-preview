@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.1';
+const APP_VERSION = '2.28.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5551,20 +5551,23 @@ function Todo() {
   const vis = S.todos.filter(t => todoFilter === 'All' || t.list === todoFilter);
   const open = vis.filter(t => !t.done).sort(cmpOpenTodo);
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
-  const row = t => todoMetaDedupe(`<div class="row ${t.done ? 'done' : ''}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-    <button class="tapzone" onclick="todoForm('${t.id}')"><div class="tx"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div class="s">${esc(t.list)}${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${sharedMark(t)}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></div>
-    ${t.due && !t.done ? todoDuePill(t) : ''}</button>${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}</div>`);
+  // 2.28.2: task cards (Tasks - Today look). Same actions as before, only the layout changed.
+  const TKC = ['#22c55e', '#3b82f6', '#ec4899', '#f59e0b', '#8b5cf6', '#06b6d4'], tkc = l => TKC[Math.max(0, S.lists.indexOf(l)) % TKC.length];
+  const row = t => todoMetaDedupe(`<div class="row tkcard ${t.done ? 'done' : ''}" style="--tk:${tkc(t.list)}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
+    <div class="tkmain"><button class="tapzone" onclick="todoForm('${t.id}')"><div class="tktop"><div class="t">${sarahBadge(t)}${esc(t.title)}</div>${t.due && !t.done ? `<span class="tkpill">${todoDuePill(t)}</span>` : ''}</div>
+    <div class="s"><span class="tktag">${esc(t.list)}</span>${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></button>
+    <div class="tkacts">${isMineShared(t) || isSarahTodo(t) ? `<span class="tkshare"><span class="tkav">S</span>Shared with Sarah</span>` : ''}${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}<button type="button" class="paybtn tkdone" onclick="tick('${t.id}')">${t.done ? 'Undo' : 'Done'}</button></div></div></div>`);
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
-  return banHeader('To-do', openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do', addBtn('Add a to-do', 'todoForm()'), 'todo') +
-    `<div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${esc(l)}</button>`).join('')}
+  return `<div class="tkpage"><div class="tkhead"><h1>Tasks - Today</h1><button class="iconbtn" aria-label="Add a to-do" onclick="todoForm()">${I('plus')}</button><button class="iconbtn" aria-label="Open calendar" onclick="go('#calendar')">${I('cal')}</button></div><div class="tksub">${openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do'}</div>
+    <div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${esc(l)}</button>`).join('')}
       <button class="chip plus" onclick="listForm()">+ New list</button></div>
     ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
     <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="Add a to-do${todoFilter !== 'All' ? ' to ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="todoshare"> Also add to Sarah’s list</label>
     ${todoTodayProg()}${todoListProg(todoFilter)}
     ${open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">All done. Good as gold!</div></div>' : empty('Nothing on your list', 'Type a to-do above and tap +, or add one with a due date.', 'Add a to-do', 'todoForm()'))}
-    ${done.length ? `<div class="sec">Done <button onclick="clearDone()">Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}`;
+    ${done.length ? `<div class="sec">Done <button onclick="clearDone()">Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}</div>`;
 }
 function setTodoFilter(l) { todoFilter = l; render(); }
 async function quickAdd(e) {
