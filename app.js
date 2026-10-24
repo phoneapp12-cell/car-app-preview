@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.13';
+const APP_VERSION = '2.28.14';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16672,22 +16672,61 @@ const STRIP_ART = { next: 'cal', plan: 'cal', garden: 'garden', out: 'travel', w
 /* 2.23.60: Heads up. Upcoming road closures from Whangārei District Council's Roadworks and closures page (the
    relay's /closures, the same source as the bridge page): next 14 days, not finished, his Onerahi to Port Road
    route first. Real notices only; no slide when there are none. */
-const HU_ROUTE = /onerahi|riverside|te matau|dave culham|port r(oa)?d|hatea|kioreroa|okara|tarewa/i;
+const HU_ROUTE = /onerahi|riverside|te matau|dave culham|port r(oa)?d|h[aā]tea|kioreroa|okara|semenoff|porowini|reyburn|tarewa|kamo r(oa)?d|bank st|maunu|whang[aā]rei heads/i;
+const STADIUM_EV_RE = /\b(semenoff\s+stadium|51\s+okara\s+dr(?:ive)?|okara\s+park)\b/i;
 let huTried = 0;
+function stadiumClosureItems(days = 21) {
+  const out = [];
+  try {
+    const evs = (typeof EVS !== 'undefined' && EVS && EVS.data && Array.isArray(EVS.data.events)) ? EVS.data.events : [];
+    const T = todayISO(), lim = addDays(T, days), seen = new Set();
+    evs.forEach(ev => {
+      if (!ev || !ev.title || !ev.date || (ev.end || ev.date) < T || ev.date > lim) return;
+      if (!STADIUM_EV_RE.test([ev.title, ev.venue, ev.desc].join(' '))) return;
+      const k = ev.date + '|' + ev.title.toLowerCase();
+      if (seen.has(k)) return; seen.add(k);
+      let sh = ev.time || '13:00', eh = ev.endTime || '18:30';
+      if (ev.time) {
+        const m = +ev.time.slice(0, 2) * 60 + +ev.time.slice(3, 5);
+        const sMin = Math.max(0, m - 120), eMin = ev.endTime ? Math.min(23 * 60 + 59, +ev.endTime.slice(0, 2) * 60 + +ev.endTime.slice(3, 5) + 90) : Math.min(23 * 60 + 59, m + 210);
+        sh = String(Math.floor(sMin / 60)).padStart(2, '0') + ':' + String(sMin % 60).padStart(2, '0');
+        eh = String(Math.floor(eMin / 60)).padStart(2, '0') + ':' + String(eMin % 60).padStart(2, '0');
+      }
+      out.push({
+        id: 'wdc-stadium-' + String(ev.id || ev.date).replace(/[^A-Za-z0-9-]+/g, '-'),
+        title: `Okara Drive / Semenoff Stadium road closure (${ev.title})`,
+        where: 'Okara Drive (Porowini Ave to Port Rd), Semenoff Stadium, Whangārei',
+        desc: `Event road closure & traffic management on Okara Drive outside Semenoff Stadium (51 Okara Drive) for ${ev.title}. Expect road closures, resident/pass-only access and delays around Okara Drive, Port Road and Porowini Avenue.`,
+        detour: 'Use Port Road, Reyburn Street or Porowini Avenue to avoid Okara Drive around Semenoff Stadium.',
+        url: /^https:\/\//.test(ev.url || '') ? ev.url : 'https://www.wdc.govt.nz/Events/Whats-On',
+        bridge: false,
+        commute: true,
+        stadium: true,
+        dates: [{ start: ev.date, end: ev.end || ev.date, time: sh, endTime: eh }]
+      });
+    });
+  } catch (e) { }
+  return out;
+}
 function headsUpList() {
-  try { if ((!CLS || Date.now() - CLS.at > 6 * 3600e3) && Date.now() - huTried > 15 * 60e3) { huTried = Date.now(); refreshClosures(true); } } catch (e) { }
-  const list = (CLS && CLS.data && CLS.data.closures) || [], T = todayISO(), lim = addDays(T, 14), out = [];
+  try { if ((!CLS || Date.now() - CLS.at > 6 * 3600e3) && Date.now() - huTried > 15 * 60e3) { huTried = Date.now(); refreshClosures(true); if (typeof rdcLoad === 'function') rdcLoad(true); } } catch (e) { }
+  const clsList = (CLS && CLS.data && CLS.data.closures) || [];
+  const rdcList = (typeof RDC !== 'undefined' && RDC && RDC.d && Array.isArray(RDC.d.closures)) ? RDC.d.closures : [];
+  const stadList = stadiumClosureItems(14);
+  const all = clsList.concat(rdcList, stadList), T = todayISO(), lim = addDays(T, 14), out = [], seen = new Set();
   const hm = t => t ? fmtTime(t).replace(':00', '').replace(/\s/g, '') : '';
-  list.forEach(c => (c.dates || []).forEach(d => {
+  all.forEach(c => (c && c.dates || []).forEach(d => {
     if (!d || !d.start || (d.end || d.start) < T || d.start > lim) return;
-    const blob = [c.title, c.where, c.desc].join(' '), route = HU_ROUTE.test(blob);
-    let what = String(c.title || 'Road closure').replace(/\s+temporary road closure$/i, ' closed').replace(/\s+road closure$/i, ' closed');
+    const blob = [c.title, c.where, c.desc].join(' '), route = !!(c.commute || c.stadium || HU_ROUTE.test(blob));
+    let what = String(c.title || 'Road closure').replace(/\s+proposed road closures?$/i, ' road closure').replace(/\s+temporary road closures?$/i, ' closed').replace(/\s+road closures?$/i, ' closed');
     if (/te matau a pohe/i.test(blob) && !/te matau/i.test(what)) what = what.replace(/ closed$/, '') + ' (incl. Te Matau a Pohe bridge) closed';
+    const dedupeKey = d.start + '|' + what.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    if (seen.has(dedupeKey)) return; seen.add(dedupeKey);
     const day = d.end && d.end !== d.start ? fmtW(d.start) + '–' + fmtW(d.end) : fmtW(d.start);
-    const when = day + (d.time ? ' ' + hm(d.time) + (d.endTime ? '–' + hm(d.endTime) : '') : '');
-    out.push({ what, when, where: String(c.where || '').replace(/,\s*\d{4}$/, '').slice(0, 60), url: /^https:\/\//.test(c.url || '') ? c.url : '', route, start: d.start });
+    const when = (d.start <= T && (d.end || d.start) >= T ? 'Today · ' : '') + day + (d.time ? ' ' + hm(d.time) + (d.endTime ? '–' + hm(d.endTime) : '') : '');
+    out.push({ what, when, where: String(c.where || '').replace(/,\s*\d{4}$/, '').slice(0, 70), url: /^https:\/\//.test(c.url || '') ? c.url : '', route, today: d.start <= T && (d.end || d.start) >= T, start: d.start });
   }));
-  return out.sort((a, b) => (b.route - a.route) || a.start.localeCompare(b.start)).slice(0, 4);
+  return out.sort((a, b) => ((b.today && b.route) - (a.today && a.route)) || (b.route - a.route) || a.start.localeCompare(b.start)).slice(0, 6);
 }
 /* 2.23.61: the joke slide goes 3 hours after it's read. Read = the joke slide was on screen (strip in view, app
    visible) for 3 seconds or more, or tapped. The first read time is kept per joke in localStorage. */
@@ -21126,7 +21165,7 @@ function alBoardHtml(list) {
     let n = 0;
     g.nodes.forEach(el => {
       if (el.matches && el.matches('.row, .glwarnwrap, .glflagwrap, .tbcard, .card:not(.empty)')) n++;
-      else if (el.querySelectorAll) n += el.querySelectorAll(':scope > .row, :scope > .glwarnwrap, :scope > .glflagwrap, :scope > .tbcard, :scope > .card:not(.empty), :scope > .jimore > *').length;
+      else if (el.querySelectorAll) n += el.querySelectorAll(':scope > .row, :scope > .glwarnwrap, :scope > .glflagwrap, :scope > .glwarn, :scope > .glwarns > .glwarn, :scope > .tbcard, :scope > .card:not(.empty), :scope > .jimore > *').length;
     });
     return n;
   };
@@ -21206,7 +21245,23 @@ function alTopMenu() {
 }
 function alPickHero(list) {
   const cleanList = (list || []).filter(x => !nbIsBill(x) && x.kind !== 'meal');
-  // 1. Today's timed appointment or event
+  // 1. Active today road closure on commute/Whangārei or crash on route
+  try {
+    const roadToday = glWarnList().find(x => x && x.red && !x.flag && x.pri >= 92 && /road|closure|bridge|okara|semenoff|commute|crash/i.test((x.tag || '') + ' ' + (x.what || '')));
+    if (roadToday) {
+      const wGo = roadToday.go || (roadToday.url ? `window.open(${jsArg(roadToday.url)},'_blank','noopener')` : "go('#bridge')");
+      return {
+        key: cuNorm(roadToday.what),
+        badge: '⛔ WHANGĀREI ROAD ALERT · TODAY',
+        icon: '⛔',
+        title: roadToday.what.replace(/^[⛔🚧⚠️]\s*/, ''),
+        sub: (roadToday.s || roadToday.tag || 'Active road closure in Whangārei today') + ' · Tap for notice & detour.',
+        go: wGo,
+        tone: 'hero-warn'
+      };
+    }
+  } catch (e) { }
+  // 2. Today's timed appointment or event
   try {
     const todayAppt = (S.appts || []).filter(a => a && a.date && daysLeft(a.date) === 0 && !(a.from === 'sarah' && a.done)).sort((a, b) => String(a.time || '99').localeCompare(String(b.time || '99')))[0];
     if (todayAppt) {
@@ -21222,35 +21277,51 @@ function alPickHero(list) {
       };
     }
   } catch (e) { }
-  // 2. Birthday today or coming up within 7 days (e.g. Aranea's Birthday)
+  // 3. Birthday today (d === 0)
   try {
-    const bdays = (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 7).sort((x, y) => x.d - y.d);
-    if (bdays.length) {
-      const topB = bdays[0];
-      const when = topB.d === 0 ? 'TODAY' : topB.d === 1 ? 'TOMORROW' : fmtW(topB.iso).toUpperCase();
+    const bdaysToday = (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d === 0);
+    if (bdaysToday.length) {
+      const topB = bdaysToday[0];
       return {
         key: cuNorm(topB.b.name + "’s birthday"),
-        badge: topB.d === 0 ? '🎂 CELEBRATING TODAY' : `🎂 UPCOMING BIRTHDAY · ${topB.d === 1 ? 'TOMORROW' : 'IN ' + topB.d + ' DAYS'}`,
-        icon: topB.d === 0 ? '🎂' : '⏰',
-        title: `${topB.d === 0 ? 'Today' : fmtW(topB.iso)}: ${topB.b.name}’s Birthday`,
-        sub: `${topB.d === 0 ? 'Celebrating today' : 'Turns ' + (topB.age || '') + ' on ' + fmtW(topB.iso)}. Tap to view details or sort a gift.`,
+        badge: '🎂 CELEBRATING TODAY',
+        icon: '🎂',
+        title: `Today: ${topB.b.name}’s Birthday`,
+        sub: 'Celebrating today. Tap to view details or sort a gift.',
         go: "go('#birthdays')",
         tone: 'hero-bday'
       };
     }
   } catch (e) { }
-  // 3. Urgent warning on commute or severe weather
+  // 4. Any other urgent warning on commute or severe weather
   try {
     const w = glWarnList().find(x => x && x.red && !x.flag);
     if (w) {
+      const wGo = w.go || (w.url ? `window.open(${jsArg(w.url)},'_blank','noopener')` : "go('#weather')");
       return {
         key: cuNorm(w.what),
         badge: '⚠️ HEADS UP TODAY',
         icon: '⚠️',
         title: w.what,
         sub: (w.s || w.tag || 'Check before you head out') + ' · Tap for details.',
-        go: w.go || "go('#weather')",
+        go: wGo,
         tone: 'hero-warn'
+      };
+    }
+  } catch (e) { }
+  // 5. Birthday coming up within 7 days (e.g. Aranea's Birthday)
+  try {
+    const bdays = (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d > 0 && x.d <= 7).sort((x, y) => x.d - y.d);
+    if (bdays.length) {
+      const topB = bdays[0];
+      return {
+        key: cuNorm(topB.b.name + "’s birthday"),
+        badge: `🎂 UPCOMING BIRTHDAY · ${topB.d === 1 ? 'TOMORROW' : 'IN ' + topB.d + ' DAYS'}`,
+        icon: '⏰',
+        title: `${fmtW(topB.iso)}: ${topB.b.name}’s Birthday`,
+        sub: `Turns ${topB.age || ''} on ${fmtW(topB.iso)}. Tap to view details or sort a gift.`,
+        go: "go('#birthdays')",
+        tone: 'hero-bday'
       };
     }
   } catch (e) { }
@@ -21401,8 +21472,8 @@ function alBriefingHtml(list) {
   d.querySelectorAll('.glnewtop').forEach(el => el.classList.add('all'));
   d.querySelectorAll('.jimore').forEach(el => { el.style.display = ''; });
   d.querySelectorAll('.glnewmore, .bfmore, .jimorebtn, .card.empty, .glswipehint, p.glhint, .bflbl, .bflist, .bfrest').forEach(el => el.remove());
-  // Remove Fun/Discover & Quick-Grid duplicate cards from vertical feed
-  const SKIP_NK = /^(joke|fact|place|mi|fr|cowork|fuel-|hw-sleep-|hw-steps-|hw-week-|hw-coach-)/;
+  // Remove Fun/Discover, Quick-Grid duplicate cards & non-Whangārei general news from vertical feed
+  const SKIP_NK = /^(joke|fact|place|mi|fr|cowork|fuel-|hw-sleep-|hw-steps-|hw-week-|hw-coach-|bf-nz-|bf-world-)/;
   d.querySelectorAll('[data-nk]').forEach(el => {
     const nk = el.getAttribute('data-nk') || '';
     if (SKIP_NK.test(nk) && !el.closest('.bellpinned')) el.remove();
@@ -21442,7 +21513,7 @@ function alBriefingHtml(list) {
       return;
     }
     if (curSec === 'skip') return;
-    const items = ch.matches('.row, .glwarnwrap, .glflagwrap, .glwarn') ? [ch] : [...ch.querySelectorAll(':scope > .row, :scope > .glwarnwrap, :scope > .glflagwrap, :scope > .glwarn, :scope > .jimore > *')];
+    const items = ch.matches('.row, .glwarnwrap, .glflagwrap, .glwarn') ? [ch] : [...ch.querySelectorAll(':scope > .row, :scope > .glwarnwrap, :scope > .glflagwrap, :scope > .glwarn, :scope > .glwarns > .glwarn, :scope > .glwarns > .glflagwrap, :scope > .jimore > .row, :scope > .jimore > .glwarnwrap, :scope > .jimore > .glflagwrap, :scope > .jimore > .glwarn, :scope > .jimore > .glwarns > .glwarn')];
     items.forEach(el => {
       decorateCard(el);
       if (curSec === 'pinned') { pinnedNodes.push(el.outerHTML); return; }
@@ -21502,7 +21573,7 @@ function nbTopHtml() {
 function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
-  setTimeout(() => { try { accLoad(); } catch (e) { } try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
+  setTimeout(() => { try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
   const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
   const isBoard = alView === 'board';
   const topBar = `<div class="arcbar">
@@ -25341,7 +25412,7 @@ window.addEventListener('resize', () => { try { bxPlace(); } catch (e) { } });
 const BF_TYPES = [
   ['quote', '💬', 'Quote of the day'], ['netflix', '🎬', 'New on Netflix'], ['prime', '📺', 'New on Prime Video'], ['sky', '📡', 'Sky Starter'],
   ['recipe', '🌾', 'GF recipe pick'], ['top40', '🎵', 'NZ Top 40'], ['blogs', '📰', 'Blogs for you'], ['videos', '▶️', 'Videos for you'],
-  ['sarah', '🌅', 'Sarah’s videos'], ['local', '📍', 'Local news'], ['nz', '🇳🇿', 'NZ news'], ['world', '🌍', 'World news'], ['games', '🎮', 'Games'], ['suno', '🎹', 'Suno tip']
+  ['sarah', '🌅', 'Sarah’s videos'], ['local', '📍', 'Whangārei alerts & local updates'], ['games', '🎮', 'Games'], ['suno', '🎹', 'Suno tip']
 ];
 const bfOn = k => !(S && S.settings && S.settings.bellFeeds && S.settings.bellFeeds[k] === false);
 async function bfToggle(k) { const o = Object.assign({}, S.settings.bellFeeds || {}); o[k] = !bfOn(k); S.settings.bellFeeds = o; await save(); render(); }
@@ -25432,8 +25503,8 @@ function bfItems(k) {
       L.sort((a, b) => (L.filter(y => y.s.split(' · ')[0] === a.s.split(' · ')[0]).indexOf(a)) - (L.filter(y => y.s.split(' · ')[0] === b.s.split(' · ')[0]).indexOf(b))); }
     else if (k === 'videos') { homeVideoPicks().filter(v => v && v.id && v.category !== 'sarah' && !isSport(v.title)).slice(0, 4).forEach(v => add(v.id, { t: v.title, s: v.channel || v.reason || '', thumb: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg', url: 'https://www.youtube.com/watch?v=' + v.id, btns: [['Watch', 'open']] })); }
     else if (k === 'sarah') { const v = currentSarahVideo(); if (v && v.id && bfRecent(v.published, 14)) add(v.id, { t: v.title, s: 'Sarah Jenkins · ' + fmtW(String(v.published).slice(0, 10)), thumb: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg', url: v.url, btns: [['Watch', 'open']] }); }
-    else if (k === 'local' || k === 'nz') { (newsSec(k) || []).filter(newsOk).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: (k === 'local' ? 'Northland' : 'New Zealand') + ' · ' + newsWhen(x.published), url: newsUrl(x.url), btns: [['Read', 'open']] })); }
-    else if (k === 'world') { const d = RECS.world && RECS.world.data; ((d && d.items) || []).filter(x => bfRecent(x.published, 2) && newsOk(x)).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: 'BBC News · ' + newsWhen(x.published), url: x.url, btns: [['Read', 'open']] })); }
+    else if (k === 'local') { (newsSec('local') || []).filter(notifLocalNewsOk).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: 'Whangārei · ' + newsWhen(x.published), url: newsUrl(x.url), btns: [['Read', 'open']] })); }
+    else if (k === 'nz' || k === 'world') { /* 2.28.14: general NZ/World news excluded from Notifications */ }
     else if (k === 'suno') { // 2.27.4: a new Suno release note (last 10 days, once each), else today's tip from the built-in list
       const ro = "event.stopPropagation();window.open('https://suno.com/create','_blank','noopener')", d = RECS.suno && RECS.suno.data;
       ((d && d.items) || []).filter(x => bfRecent(x.published, 10)).slice(0, 1).forEach(x => add(x.url, { t: 'New on Suno: ' + x.title, s: 'Suno release notes · ' + fmtW(String(x.published).slice(0, 10)), url: x.url, btns: [['Read', 'open'], ['Open Suno', ro]] }));
@@ -25480,7 +25551,7 @@ function bfGone() { try { return JSON.parse(localStorage.getItem('bfGone') || '[
    word of the day, co-worker question, quote) are new every day by design and already sit at the top, so they stay put.
    At most 8 at a time (newest first); first-seen times stay on this phone ('bellFirst', 30 days). */
 const JI_MS = Infinity, JI_MAX = 15, // 2.27.15: unread stays at the very top (no 24 h expiry), 15 shown then 'Show N more new'
-  JI_DAILY = /^(joke|fact|place|cowork|mi|fr|bf-quote-.*)$/;
+  JI_DAILY = /^(joke|fact|place|cowork|mi|fr|bf-(?:quote|nz|world|blogs|videos|games|suno|top40|sky|recipe)-.*)$/;
 function jiLoad() { try { const o = JSON.parse(localStorage.getItem('bellFirst') || 'null'); return o && typeof o === 'object' && o.m ? o : null; } catch (e) { return null; } }
 function jiKey(el) { const c = bpClean(el); c.querySelectorAll('.jiage').forEach(x => x.remove()); const n = s => String(s || '').replace(/\s+/g, ' ').replace(/\d+/g, '#').trim().toLowerCase(); const t = (n((c.querySelector('.t, b') || c).textContent) + (el.dataset.nk ? '' : ' ~ ' + n((c.querySelector('.s') || {}).textContent).slice(0, 60))).slice(0, 180);
   return (el.dataset.nk || (/^h\|/.test(el.dataset.pid || '') ? '' : el.dataset.pid) || 'x') + '|' + t; }
@@ -27054,7 +27125,7 @@ const mealGate = L => { try { return Array.isArray(L) && mealWeekDone() ? L.filt
 const OUT_URL = RELAY_URL + '/outages';
 let OUTG = null, outBusy = false; try { OUTG = JSON.parse(localStorage.getItem('outages') || 'null'); } catch (e) { }
 const outOn = () => (S.settings || {}).outAlerts !== false;
-const outScope = () => (S.settings || {}).outScope === 'all' ? 'all' : 'onerahi';
+const outScope = () => (S.settings || {}).outScope === 'onerahi' ? 'onerahi' : 'all';
 function outPref() { return outOn() ? outScope() : 'off'; }
 const outHome = o => { const st = String(ME().homeStreet || '').toLowerCase(); return (o.suburbs || []).some(x => /onerahi/i.test(x)) || (!!st && (o.roads || []).some(x => String(x).toLowerCase().includes(st))) || /onerahi/i.test(o.area || ''); };
 const OUT_KAIPARA = /\b(dargaville|maungaturoto|te kopuru|mareretu|taipuha|kaiwaka|mangawhai|ruawai|paparoa|matakohe|kaihu|tinopai|pouto|baylys|aratapu|tangowahine|kirikopuni|tangiteroria|batley|whakapirau|hakaru|oneriri|tanoa|otamatea)\b/i;
@@ -27120,10 +27191,12 @@ function accItems() {
     (d.cleared || []).forEach(x => L.push({ pri: 20, info: true, tag: '✅ Cleared · NZTA', what: 'Crash: ' + road(x) + (place(x) ? ', ' + place(x) : ''), s: 'Cleared ' + accT(x.clearedAt), url: accMap(x), accId: x.id }));
   }
   if (polOn()) (d.police || []).forEach(x => { if (x.kind === 'road') { if (Date.now() - Date.parse(x.cleared ? x.clearedAt : x.at) > (x.cleared ? 3 : 12) * 3600e3) return;
+      if (NON_WHG_NOTIF_RE.test(x.label || x.title || '') && !/\bwhang[aā]rei\b/i.test(x.label || x.title || '')) return;
       L.push(x.cleared ? { pri: 20, info: true, tag: '✅ Cleared · NZ Police', what: String(x.label || '').replace(/^Crash – [^:]+:/, 'Crash – road reopened:'), s: 'Reopened ' + accT(x.clearedAt) + ' · Police release › · NZ Police', url: x.clearUrl || x.url }
         : { pri: 90, red: true, tag: '🚓 Crash · NZ Police', what: x.label, s: accT(x.at) + ' · Police release › · NZ Police', url: x.url }); return; }
-    const crash = x.kind === 'crash', fresh = Date.now() - Date.parse(x.at) < (crash ? 12 : 72) * 3600e3; if (!fresh) return;
-    L.push({ pri: crash ? (x.near ? 86 : 50) : 35, red: crash && x.near, info: !crash, tag: crash ? '🚓 Police · roads' : '🚓 Police update', what: x.title, s: accT(x.at) + ' · NZ Police', url: x.url }); });
+    const crash = x.kind === 'crash', fresh = Date.now() - Date.parse(x.at) < 12 * 3600e3; if (!crash || !x.near || !fresh) return;
+    if (NON_WHG_NOTIF_RE.test(x.title || '') && !/\bwhang[aā]rei\b/i.test(x.title || '')) return;
+    L.push({ pri: 86, red: true, info: false, tag: '🚓 Police · Whangārei roads', what: x.title, s: accT(x.at) + ' · NZ Police', url: x.url }); });
   return L;
 }
 (() => { const o = glWarnList; glWarnList = function () { const L = o.apply(this, arguments); try { const A = accItems(); if (!A.length) return L; const ids = new Set(A.map(x => x.accId).filter(Boolean));
@@ -27131,32 +27204,37 @@ function accItems() {
   let gone = []; try { gone = gkDis(); } catch (e) { }
   const add = A.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk));
   return keep.concat(add).sort((a, b) => b.pri - a.pri); } catch (e) { return L; } }; })();
-// ---- 2.27.82: Whangārei District Council roadworks and road closures on the bell page ----
-/* From the relay's /road-closures (WDC "Roadworks and closures" notices, council terms allow personal, non-commercial use;
-   robots.txt is followed). Only notices with a date in the next 7 days that hasn't finished; finished ones drop off on
-   their own. Onerahi first, then his commute (HU_ROUTE), then the rest. Council wording, each links to its notice.
-   The lifting bridge notices already show (headsUpList), so they're skipped here. Bell only: no push. */
+// ---- 2.27.82 / 2.28.14: Whangārei District Council roadworks, stadium closures, and road closures on the bell page ----
 let RDC = null, rdcBusy = false, rdcTry = 0; try { RDC = JSON.parse(localStorage.getItem('roadClosures') || 'null'); } catch (e) { }
 async function rdcLoad(force) {
-  if (!RELAY_URL || rdcBusy || navigator.onLine === false || (!force && Date.now() - rdcTry < 30 * 60e3)) return;
+  if (!RELAY_URL || rdcBusy || navigator.onLine === false || (!force && Date.now() - rdcTry < 15 * 60e3)) return;
   rdcBusy = true; rdcTry = Date.now();
   try { const d = await getJSON(RELAY_URL + '/road-closures', 20000); if (d && Array.isArray(d.closures)) { RDC = { at: Date.now(), d }; try { localStorage.setItem('roadClosures', JSON.stringify(RDC)); } catch (e) { } glWarnRedraw(); } } catch (e) { }
   finally { rdcBusy = false; }
 }
-setTimeout(() => rdcLoad(), 7000); setInterval(() => rdcLoad(), 30 * 60e3);
+setTimeout(() => rdcLoad(), 1500); setInterval(() => rdcLoad(), 15 * 60e3);
 function rdcItems() {
-  const L = [], list = (RDC && RDC.d && RDC.d.closures) || [], T = todayISO(), lim = addDays(T, 7);
+  const L = [], raw = ((RDC && RDC.d && RDC.d.closures) || []).slice(), T = todayISO(), lim = addDays(T, 21);
+  stadiumClosureItems(21).forEach(sc => {
+    if (!raw.some(c => /okara|semenoff/i.test([c.title, c.where, c.desc].join(' ')) && (c.dates || []).some(d => d.start === sc.dates[0].start))) raw.push(sc);
+  });
   const hm = t => t ? fmtTime(t).replace(':00', '').replace(/\s/g, '') : '';
   const dl = d => (d.end && d.end !== d.start ? fmtW(d.start) + '–' + fmtW(d.end) : fmtW(d.start)) + (d.time ? ' ' + hm(d.time) + (d.endTime ? '–' + hm(d.endTime) : '') : '');
-  list.forEach(c => {
+  const seen = new Set();
+  raw.forEach(c => {
     if (!c || c.bridge || !c.title) return;
     const ds = (c.dates || []).filter(d => d && d.start && (d.end || d.start) >= T && d.start <= lim);
     if (!ds.length) return;
-    const blob = [c.title, c.where, c.desc].join(' '), onr = /onerahi/i.test(blob), route = HU_ROUTE.test(blob), today = ds.some(d => d.start <= T && (d.end || d.start) >= T);
-    const closed = /\bclos(ed|ure|ures|ing)\b/i.test(c.title + ' ' + c.desc), where = String(c.where || '').replace(/,?\s*\d{4}$/, '').slice(0, 90);
+    const blob = [c.title, c.where, c.desc].join(' '), onr = /onerahi/i.test(blob), stad = !!(c.stadium || /okara|semenoff/i.test(blob)), route = !!(stad || c.commute || HU_ROUTE.test(blob));
+    const today = ds.some(d => d.start <= T && (d.end || d.start) >= T);
+    const closed = !!(stad || /\bclos(ed|ure|ures|ing)\b/i.test(c.title + ' ' + c.desc));
+    const where = String(c.where || '').replace(/,?\s*\d{4}$/, '').slice(0, 90);
+    const dedupe = ds[0].start + '|' + c.title.toLowerCase() + '|' + where.toLowerCase();
+    if (seen.has(dedupe)) return; seen.add(dedupe);
     const when = (today ? 'Today · ' : '') + dl(ds[0]) + (ds.length > 1 ? ` (+${ds.length - 1} more)` : '');
-    L.push({ pri: route && today ? 94 : onr ? 80 : route ? 72 : closed ? 45 : 30, red: route && today, route: route && today, info: !closed && !route && !onr,
-      tag: (onr ? '🏠 Onerahi' : route ? '🚗 On your commute' : closed ? '⛔ Road closure' : '🚧 Roadworks') + ' · WDC',
+    const pri = (stad && today) ? 98 : (route && today) ? 96 : today ? 91 : stad ? 85 : onr ? 82 : route ? 76 : closed ? 55 : 35;
+    L.push({ pri, red: today || stad || (route && closed), route: route || stad, info: false,
+      tag: (stad ? '🏟️ Okara / Stadium road closure' : onr ? '🏠 Onerahi road alert' : route ? '🚗 On your commute' : closed ? '⛔ Road closure' : '🚧 Roadworks') + ' · WDC',
       what: c.title, s: [when, where, c.desc, c.detour ? 'Detour: ' + c.detour.replace(/^detour:?\s*/i, '') : ''].filter(Boolean).join(' · ').slice(0, 320), url: /^https:\/\/www\.wdc\.govt\.nz\//.test(c.url || '') ? c.url : 'https://www.wdc.govt.nz/Services/Roads-and-Transportation/Roads/Roadworks-and-closures', rdcId: c.id });
   });
   return L;
@@ -27164,7 +27242,9 @@ function rdcItems() {
 (() => { const o = glWarnList; glWarnList = function () { const L = o.apply(this, arguments); try { const A = rdcItems(); if (!A.length) return L;
   let gone = []; try { gone = gkDis(); } catch (e) { }
   const add = A.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk));
-  return L.concat(add).sort((a, b) => b.pri - a.pri); } catch (e) { return L; } }; })();
+  const rdcUrls = new Set(add.map(x => x.url).filter(Boolean));
+  const keep = L.filter(x => !(x.tag && /Council/.test(x.tag) && x.url && rdcUrls.has(x.url)));
+  return keep.concat(add).sort((a, b) => b.pri - a.pri); } catch (e) { return L; } }; })();
 async function accSetScope(v) { S.settings.accScope = v; await save(); await setupBackground(); render(); }
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = accOn(), sc = accScope(), po = polOn();
   return h + `<div class="srow"><div class="tx"><div class="t">Local crash alerts</div><div class="s">Crashes and road incidents on state highways in and around Whangārei, from NZTA Waka Kotahi, on the bell page. One buzz per new crash.</div>${on ? `<div style="margin-top:8px;display:flex;gap:8px"><button type="button" class="btn small ${sc === 'all' ? 'primary' : ''}" onclick="accSetScope('all')">All Whangārei</button><button type="button" class="btn small ${sc === 'route' ? 'primary' : ''}" onclick="accSetScope('route')">My route only</button></div>` : ''}</div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Local crash alerts" onclick="toggleSetting('accAlerts')"></button></div>`
@@ -27254,9 +27334,60 @@ async function plnLoad(force) {
 }
 setTimeout(() => plnLoad(), 9000); setInterval(() => plnLoad(), 60 * 60e3);
 window.addEventListener('hashchange', () => { if (/^#alerts/.test(location.hash)) plnLoad(false); });
+const WHG_NOTIF_PLACE_RE = /\b(whang[aā]rei|onerahi|te\s+kamo|kamo|tikipunga|maunu|raumanga|otangarei|port\s+nikau|town\s+basin|okara|semenoff|morningside|woodhill|regent|kensington|mairtown|parahaki|riverside|h[aā]tea|pohe\s+island|te\s+matau|springs\s+flat|ruak[aā]k[aā]|marsden\s+point|one\s+tree\s+point|waip[uū]|bream\s+bay|hikurangi|ngunguru|tutukaka|matapouri|whananaki|pataua|p[aā]rua\s+bay|whang[aā]rei\s+heads|tamaterau|reotahi|[oō]akura|helena\s+bay|whangaruru|maungatapere|maungakaramea|glenbervie|whareora|horahora|kioreroa|northport|port\s+road|porowini|dave\s+culham)\b/i;
+const NON_WHG_NOTIF_RE = /\b(kerikeri|kaitaia|kaikohe|dargaville|hokianga|paihia|waitangi|[oō]m[aā]pere|kohukohu|rawene|opononi|kawakawa|moerewa|mangonui|taipa|ahipara|kaeo|bay\s+of\s+islands|far\s+north|kaipara|mangawhai|kaiwaka|maungaturoto|ruawai|te\s+kopuru|houhora|haruru|okaihau|russell)\b/i;
+const WHG_CORRIDOR_RE = /\b(northland\s+corridor|northland\s+expressway|brynderwyn\w*|warkworth\s+to\s+te\s+hana|te\s+hana|port\s+marsden|ara\s+t[uū]hono|dome\s+valley)\b/i;
+const NOTIF_TOPIC_RE = /\b(road\s*clos\w*|closed\s+road|bridge\s*clos\w*|detours?|diversions?|traffic\s+management|traffic\s+delays?|roadworks?|slip\b|washout|okara\s+dr\w*|port\s+r(?:oa)?d|te\s+matau|dave\s+culham|onerahi\s+r(?:oa)?d|riverside\s+dr\w*|kamo\s+r(?:oa)?d|reyburn\s+st\w*|porowini|maunu\s+r(?:oa)?d|tarewa\s+r(?:oa)?d|power\s+(?:cut|cuts|outage|outages|off|fault|lines?\s+down|restor\w*)|northpower|blackout|electricity\s+outage|(?:internet|broadband|fibre|fiber|mobile|cell(?:ular)?|network|chorus|spark|one\s*nz|vodafone|2degrees)\s+(?:outage|outages|down|fault|disrupt\w*|cut|issue)|outage\s+affect\w*\s+(?:internet|broadband|fibre|mobile)|develop\w*|subdivision\w*|housing|apartments?|plan\s+changes?|district\s+plan|spatial\s+plan|long[- ]term\s+plan|annual\s+plan|resource\s+consents?|consented|fast[- ]track\w*|re-?zon\w*|zoning|infrastructure|expressway|motorway|northland\s+corridor|brynderwyn\w*|four[- ]lan\w*|roundabout|interchange|northport|marsden\s+point|airport|hospital|civic\s+cent(?:re|er)|town\s+basin|hihiaua|waterfront|redevelop\w*|wastewater|water\s+treatment|cycleway|shared\s+path|business\s+park|supermarket|contract\s+awarded|consultation)\b/i;
+function plnWhangareiOk(x) {
+  if (!x || !x.title) return false;
+  const t = String(x.title || ''), d = String(x.desc || '');
+  if (NON_WHG_NOTIF_RE.test(t) && !/\bwhang[aā]rei\b/i.test(t) && !WHG_CORRIDOR_RE.test(t)) return false;
+  if (x.src === 'Whangārei District Council' || /wdc\.govt\.nz/i.test(x.url || '')) return !NON_WHG_NOTIF_RE.test(t);
+  return WHG_CORRIDOR_RE.test(t + ' ' + d) || (WHG_NOTIF_PLACE_RE.test(t + ' ' + d) && !NON_WHG_NOTIF_RE.test(t));
+}
+function notifLocalNewsOk(x) {
+  if (!x || !x.title || !newsOk(x)) return false;
+  const t = String(x.title || ''), d = String(x.desc || x.summary || ''), blob = t + ' ' + d;
+  if (NON_WHG_NOTIF_RE.test(t) && !/\bwhang[aā]rei\b/i.test(t) && !WHG_CORRIDOR_RE.test(t)) return false;
+  if (!NOTIF_TOPIC_RE.test(blob)) return false;
+  const isNetOutage = /\b(?:internet|broadband|fibre|fiber|mobile|chorus|spark|one\s*nz|2degrees|northpower)\s+(?:outage|outages|down|fault|disrupt\w*|cut)\b/i.test(blob);
+  return isNetOutage || WHG_CORRIDOR_RE.test(blob) || WHG_NOTIF_PLACE_RE.test(blob);
+}
+function newsAlertBellRows() {
+  try {
+    const D = nfDis(), items = (newsSec('local') || []).filter(notifLocalNewsOk).slice(0, 4);
+    return items.map(x => {
+      const k = 'nwal-' + bfH(x.url);
+      if (D.includes(k)) return '';
+      const t = x.title || '';
+      const ic = /road|clos|bridge|detour|traffic|slip/i.test(t) ? '⛔' : /power|northpower|blackout/i.test(t) ? '⚡' : /internet|broadband|fibre|mobile|chorus|spark|2degrees/i.test(t) ? '📶' : '🏗️';
+      const cat = ic === '⛔' ? 'Whangārei road alert' : ic === '⚡' ? 'Whangārei power alert' : ic === '📶' ? 'Network outage alert' : 'Whangārei planning & development';
+      return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))window.open(${jsArg(newsUrl(x.url))},'_blank','noopener')"><div class="ic">${ic}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${esc([cat, newsWhen(x.published), nbSrc(x)].filter(Boolean).join(' · '))}</div></div></div>`;
+    }).filter(Boolean);
+  } catch (e) { return []; }
+}
+function aklConcertBellRows() {
+  try {
+    if (!AKLC && typeof loadAklConcerts === 'function') setTimeout(() => { try { loadAklConcerts(false); } catch (e) { } }, 0);
+    const D = nfDis(), T = todayISO(), out = [];
+    const dated = ((AKLC && AKLC.dated) || []).filter(x => x && x.title && x.date && x.date >= T && !isSport(x.title));
+    const bigEf = (typeof mdAkl === 'function' ? mdAkl() : []).filter(e => e && mdBig(e) && !dated.some(d => d.date === e.date && d.title.toLowerCase().slice(0, 10) === e.title.toLowerCase().slice(0, 10)));
+    const allDated = dated.concat(bigEf.map(e => ({ title: e.title, date: e.date, venue: String(e.venue || 'Auckland').replace(/,\s*Auckland$/i, ''), url: e.url }))).slice(0, 4);
+    allDated.forEach(x => {
+      const k = 'aklc-' + bfH(x.title + '|' + x.date);
+      if (D.includes(k)) return;
+      out.push(`<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))go('#concerts')"><div class="ic">🎤</div><div class="tx"><div class="t">Big Auckland concert: ${esc(x.title)}</div><div class="s">${esc([fmtW(x.date), x.venue, 'Auckland · Tap for tickets & details'].filter(Boolean).join(' · '))}</div></div></div>`);
+    });
+    const spark = ((AKLC && AKLC.spark) || []).filter(x => x && x.title && !/^(new|presale|on sale)$/i.test(x.title) && !isSport(x.title)).slice(0, 5);
+    if (spark.length && !D.includes('aklc-spark')) {
+      out.push(`<div class="row glnew" data-nk="aklc-spark" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))go('#concerts')"><div class="ic">🌟</div><div class="tx"><div class="t">Coming to Spark Arena Auckland: ${esc(spark.slice(0, 3).map(x => x.title).join(', '))}${spark.length > 3 ? ' +' + (spark.length - 3) + ' more' : ''}</div><div class="s">Big shows in Auckland · Tap to view all Auckland concerts</div></div></div>`);
+    }
+    return out;
+  } catch (e) { return []; }
+}
 const PLN_IC = { road: '🛣️', plan: '📋', dev: '🏗️' };
 function plnList() { const L = (PLN && PLN.d && PLN.d.items) || [], now = Date.now();
-  return L.filter(x => x && x.title && /^https:\/\//.test(x.url || '') && now - Date.parse(x.published) <= 30 * 864e5).sort((a, b) => String(b.published).localeCompare(String(a.published))); }
+  return L.filter(x => x && x.title && /^https:\/\//.test(x.url || '') && now - Date.parse(x.published) <= 30 * 864e5 && plnWhangareiOk(x)).sort((a, b) => String(b.published).localeCompare(String(a.published))); }
 function plnDay(iso) { const d = new Date(iso); if (isNaN(d)) return ''; const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); return k === todayISO() ? 'Today' : k === addDays(todayISO(), -1) ? 'Yesterday' : fmtW(k); }
 function plnRow(x, nk) { return `<div class="row glnew" data-nk="${esc(nk)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))window.open(${jsArg(x.url)},'_blank','noopener')"><div class="ic">${PLN_IC[x.kind] || '🏗️'}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc(['Planning & development', plnDay(x.published), x.src].filter(Boolean).join(' · '))}</div></div></div>`; }
 function plnBellRows() { try { if (!plnOn()) return []; const D = nfDis(), L = plnList().map(x => [x, 'bf-pln-' + bfH(x.url)]).filter(([, k]) => !D.includes(k));
@@ -27264,7 +27395,7 @@ function plnBellRows() { try { if (!plnOn()) return []; const D = nfDis(), L = p
 function plnSheet() { const L = plnList();
   openSheet('Planning & development', (L.length ? `<div class="list">${L.map(x => plnRow(x, 'x').replace(/ data-nk="x"/, '').replace('class="row glnew"', 'class="row"')).join('')}</div>` : '<div class="s">No planning or development updates in the last 30 days.</div>')
     + `<div class="s muted" style="margin-top:10px">From Whangārei District Council news, NZ Government (Beehive) releases, RNZ, NZ Herald and the Northern Advocate. Headlines only, checked about every 6 hours, kept 30 days. NZTA and Northland Regional Council block automated reads, so highway news comes through government and news reports.</div>`, null); }
-(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const B = plnBellRows(); return B.length ? L.concat(B) : L; } catch (e) { return L; } }; })();
+(() => { const o = glNewItems; glNewItems = function () { const L = o.apply(this, arguments); try { const N = newsAlertBellRows(), B = plnBellRows(), C = aklConcertBellRows(); return N.concat(L, B, C); } catch (e) { return L; } }; })();
 (() => { const o = bkSettingsRows; bkSettingsRows = function () { const h = o.apply(this, arguments); try { const on = plnOn();
   return h + `<div class="srow"><div class="tx"><div class="t">Planning & development updates</div><div class="s">Council plans, consultations and projects, new developments around Whangārei and progress on the new highways to Auckland, on the bell page. Headlines from WDC, the Government, RNZ and the Herald. No buzz.</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="Planning and development updates" onclick="toggleSetting('plnAlerts').then(() => plnLoad(true))"></button></div>`; } catch (e) { return h; } }; })();
 
@@ -27274,7 +27405,7 @@ function plnSheet() { const L = plnList();
    Chips: All / Highways / Plans & consultations / Developments / Starred, plus a search box. Included in backups and Move my data. */
 const PLK_MAX = 500, PLN_CAT = { road: 'Highways', plan: 'Plans & consultations', dev: 'Developments' };
 let plnF = 'all', plnQ = '';
-function plnKeepGet() { try { const o = JSON.parse(localStorage.getItem('planningKeep') || 'null'); if (o && Array.isArray(o.items)) return o; } catch (e) { } return { items: [] }; }
+function plnKeepGet() { try { const o = JSON.parse(localStorage.getItem('planningKeep') || 'null'); if (o && Array.isArray(o.items)) { o.items = o.items.filter(plnWhangareiOk); return o; } } catch (e) { } return { items: [] }; }
 function plnKeepSave(o) { try { localStorage.setItem('planningKeep', JSON.stringify(o)); } catch (e) { } }
 function plnKeepMerge(list, keepStar) {
   const o = plnKeepGet(), by = new Map(o.items.map(x => [x.url, x])); let ch = false;

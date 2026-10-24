@@ -16,7 +16,7 @@
 import { decode, get } from './events.js';
 import { isBlocked, SPORT_RE, sameStory, namesNorthland } from './news.js';
 
-const KV_KEY = 'planning-v1';
+const KV_KEY = 'planning-v2';
 export const PLN_TTL = 6 * 3600 * 1000;
 const KEEP_MS = 30 * 864e5;
 const MAX = 40;
@@ -37,6 +37,16 @@ const RSS = [
 ];
 // The new highways between Whangārei and Auckland: these count on their own (no Northland place name needed).
 export const CORRIDOR = /\b(northland corridor|northland expressway|brynderwyns?|brynderwyn hills|te hana|warkworth to te hana|port marsden|ara t[uū]hono|p[uū]hoi to warkworth|dome valley|roads? of national significance|rons)\b/i;
+export const WHG_PLACES = /\b(whang[aā]rei|onerahi|te\s+kamo|kamo|tikipunga|maunu|raumanga|otangarei|port\s+nikau|town\s+basin|okara|semenoff|morningside|woodhill|regent|kensington|mairtown|parahaki|riverside|h[aā]tea|pohe\s+island|te\s+matau|springs\s+flat|ruak[aā]k[aā]|marsden\s+point|one\s+tree\s+point|waip[uū]|bream\s+bay|hikurangi|ngunguru|tutukaka|matapouri|whananaki|pataua|p[aā]rua\s+bay|whang[aā]rei\s+heads|tamaterau|reotahi|[oō]akura|helena\s+bay|whangaruru|maungatapere|maungakaramea|glenbervie|whareora|horahora|kioreroa|northport|port\s+road|porowini|dave\s+culham)\b/i;
+export const NON_WHG_PLACES = /\b(kerikeri|kaitaia|kaikohe|dargaville|hokianga|paihia|waitangi|[oō]m[aā]pere|kohukohu|rawene|opononi|kawakawa|moerewa|mangonui|taipa|ahipara|kaeo|bay\s+of\s+islands|far\s+north|kaipara|mangawhai|kaiwaka|maungaturoto|ruawai|te\s+kopuru|houhora|haruru|okaihau|russell)\b/i;
+export const OUTAGE_ROAD = /\b(road\s*clos\w*|closed\s+road|bridge\s*clos\w*|detours?|traffic\s+management|power\s+(?:cut|cuts|outage|outages|off)|northpower|(?:internet|broadband|fibre|mobile|network|chorus|spark|one\s*nz|2degrees)\s+(?:outage|outages|down|fault|disrupt\w*))\b/i;
+export function isWhangareiStory(title, desc = '') {
+  const t = String(title || ''), d = String(desc || '');
+  if (NON_WHG_PLACES.test(t) && !/\bwhang[aā]rei\b/i.test(t)) return false;
+  if (WHG_PLACES.test(t)) return true;
+  if (!NON_WHG_PLACES.test(t + ' ' + d) && WHG_PLACES.test(d)) return true;
+  return false;
+}
 export const DEV = /\b(develop\w*|subdivision\w*|housing|new homes|homes? (built|planned)|apartments?|plan changes?|district plan|spatial plan|long[- ]term plan|annual plan|resource consents?|consents?|consented|fast[- ]track\w*|re-?zon\w*|zoning|designation|notice of requirement|infrastructure|expressway|motorway|highways?|sh1|sh15|state highway|four[- ]lan\w*|roundabout|interchange|bridges?|rail|railway|kiwirail|north auckland line|northport|marsden point|refinery|port|airport|hospital|civic cent(re|er)|te iwitahi|town basin|hihiaua|kea hub|knowledge,? education and arts|hub|construction|constructed|build\w*|upgrades?|upgrading|projects?|redevelop\w*|restoration of|wastewater|water treatment|reservoir|dam|cycleway|shared path|footpath|car ?park|business park|industrial|retail|supermarket|investment|funding|milestone|tender|contract awarded|sod[- ]turning|ground[- ]breaking|opens?|opened|reopen\w*|consultation|have (your|their) say|bylaws?|growth)\b/i;
 const PLAN = /\b(plan changes?|district plan|spatial plan|long[- ]term plan|annual plan|resource consents?|consents?|consented|fast[- ]track\w*|re-?zon\w*|zoning|designation|notice of requirement|consultation|have (your|their) say|bylaws?|subdivision\w*)\b/i;
 const OFF = /\b(alcohol|on licence|off licence|club licence|dog control|elections?|candidates?|obituar\w*|civic honours|jobs? (fair|vacanc\w*))\b/i;
@@ -76,8 +86,8 @@ export function parsePlanRss(xml, feed) {
     const url = okUrl(field(m[1], 'link'), feed.host), ms = Date.parse(clean(field(m[1], 'pubDate')));
     if (!title || !url || !Number.isFinite(ms) || bad(title) || isBlocked(title, desc) || /\/sport\//.test(url) || /\bquiz\b/i.test(title)) continue;
     const corridor = CORRIDOR.test(title + ' ' + desc);
-    const local = namesNorthland(title) || (feed.id === 'rnzn' || feed.id === 'na' || feed.id === 'bh') && namesNorthland(desc);
-    if (!corridor && !(local && DEV.test(title))) continue;
+    const whg = isWhangareiStory(title, (feed.id === 'rnzn' || feed.id === 'na' || feed.id === 'bh') ? desc : '');
+    if (!corridor && !(whg && (DEV.test(title) || OUTAGE_ROAD.test(title)))) continue;
     out.push({ title, url, published: new Date(ms).toISOString(), src: feed.name, kind: kindOf(title + (corridor ? ' ' + desc : '')) });
   }
   return out;
@@ -93,7 +103,7 @@ function robotsOk(txt) {
 }
 export function mergePlanning(prev, fresh, now = Date.now()) {
   const out = [], seenU = new Set();
-  const all = fresh.concat(prev || []).filter(x => x && now - Date.parse(x.published) <= KEEP_MS && Date.parse(x.published) <= now + 864e5);
+  const all = fresh.concat(prev || []).filter(x => x && now - Date.parse(x.published) <= KEEP_MS && Date.parse(x.published) <= now + 864e5 && (x.src === 'Whangārei District Council' || CORRIDOR.test(x.title + ' ' + (x.desc || '')) || isWhangareiStory(x.title, x.desc || '')));
   all.sort((a, b) => (a.src === 'Whangārei District Council' ? 0 : a.src.startsWith('NZ Gov') ? 1 : 2) - (b.src === 'Whangārei District Council' ? 0 : b.src.startsWith('NZ Gov') ? 1 : 2));
   for (const x of all) {
     if (seenU.has(x.url) || out.some(y => sameStory(y.title, x.title))) continue;

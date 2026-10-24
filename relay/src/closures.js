@@ -23,6 +23,8 @@ const PAGES_PER_RUN = 4;
 const MAX_LIST_PAGES = 4;
 const MAX_ITEMS = 30;
 export const MATCH = /te\s+matau(?:\s+[aā])?\s+pohe|dave\s+culham/i;
+export const ROUTE_MATCH = /onerahi|riverside|te\s+matau|dave\s+culham|port\s+r(?:oa)?d|okara|semenoff|porowini|reyburn|h[aā]tea|kioreroa|tarewa|maunu|bank\s+st|kamo\s+r(?:oa)?d|whang[aā]rei\s+heads/i;
+export const STADIUM_MATCH = /\b(semenoff\s+stadium|51\s+okara\s+dr(?:ive)?|okara\s+park)\b/i;
 const BRIDGE = { lat: -35.73498, lon: 174.33534 };
 
 export function nzStamp(now = Date.now()) {
@@ -186,29 +188,133 @@ export function toClosures(state, now = Date.now()) {
 /* 2.27.82: every current or upcoming notice in the district (next 7 days), for the bell page. Council wording only,
    each links to its notice. Finished dates drop off; a notice with every date finished is left out. A notice whose page
    hasn't been read yet shows the list's own summary (no dates). */
-export function toRoadClosures(state, now = Date.now(), days = 7) {
+function slugDate(url, desc) {
+  const m = String(url || '').match(/-(20\d\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?:$|[^\d])/);
+  if (!m) return [];
+  const iso = `${m[1]}-${m[2]}-${m[3]}`;
+  const tm = String(desc || '').match(/(\d{1,2}):(\d{2})\s*(am|pm)\s+to\s+(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  const to24 = (h, mn, ap) => String((+h % 12) + (/pm/i.test(ap) ? 12 : 0)).padStart(2, '0') + ':' + mn;
+  return [{ start: iso, end: iso, time: tm ? to24(tm[1], tm[2], tm[3]) : '', endTime: tm ? to24(tm[4], tm[5], tm[6]) : '' }];
+}
+export function stadiumEventClosures(eventsState, existing = [], now = Date.now(), days = 35) {
+  const nowS = nzStamp(now), today = nowS.slice(0, 10), lim = new Date(Date.parse(today + 'T12:00:00Z') + days * 864e5).toISOString().slice(0, 10);
+  const out = [], list = (eventsState && eventsState.list) || [], details = (eventsState && eventsState.details) || {};
+  for (const ev of list) {
+    if (!ev || !ev.title || !ev.url) continue;
+    const det = details[ev.url] || {};
+    const venue = det.venue || ev.venue || '';
+    const blob = [ev.title, venue, ev.desc].join(' ');
+    if (!STADIUM_MATCH.test(blob)) continue;
+    const occ = (det.dates && det.dates.length) ? det.dates : (ev.date ? [{ start: ev.date, end: ev.date, time: '', endTime: '' }] : []);
+    const dates = occ.filter(d => d && d.start && (d.end || d.start) >= today && d.start <= lim).map(d => {
+      let sh = d.time || '13:00', eh = d.endTime || '18:30';
+      if (d.time) {
+        const m = +d.time.slice(0, 2) * 60 + +d.time.slice(3, 5);
+        const sMin = Math.max(0, m - 120), eMin = d.endTime ? Math.min(23 * 60 + 59, +d.endTime.slice(0, 2) * 60 + +d.endTime.slice(3, 5) + 90) : Math.min(23 * 60 + 59, m + 210);
+        sh = String(Math.floor(sMin / 60)).padStart(2, '0') + ':' + String(sMin % 60).padStart(2, '0');
+        eh = String(Math.floor(eMin / 60)).padStart(2, '0') + ':' + String(eMin % 60).padStart(2, '0');
+      }
+      return { start: d.start, end: d.end || d.start, time: sh, endTime: eh };
+    });
+    if (!dates.length) continue;
+    const already = existing.some(c => /okara|semenoff/i.test([c.title, c.where, c.desc].join(' ')) && (c.dates || []).some(cd => dates.some(dd => cd.start === dd.start)));
+    if (already) continue;
+    const slug = ev.url.split('/').pop().replace(/[^A-Za-z0-9-]+/g, '-').slice(0, 70);
+    const tLabel = dates[0].time ? ` (${dates[0].time}–${dates[0].endTime})` : '';
+    out.push({
+      id: 'wdc-stadium-' + slug,
+      title: `Okara Drive / Semenoff Stadium road closure (${ev.title})`,
+      where: 'Okara Drive (Porowini Ave to Port Rd), Semenoff Stadium, Whangārei',
+      desc: `Event road closure and traffic management on Okara Drive outside Semenoff Stadium (51 Okara Drive) for ${ev.title}${tLabel}. Expect road closures, resident/pass-only access and delays around Okara Drive, Port Road and Porowini Avenue.`,
+      detour: 'Use Port Road, Reyburn Street or Porowini Avenue to avoid Okara Drive around Semenoff Stadium.',
+      url: ev.url,
+      bridge: false,
+      commute: true,
+      stadium: true,
+      unread: false,
+      dates: dates.slice(0, 6)
+    });
+  }
+  return out;
+}
+export function toRoadClosures(state, now = Date.now(), days = 35, eventsState = null) {
   const nowS = nzStamp(now), today = nowS.slice(0, 10), lim = new Date(Date.parse(today + 'T12:00:00Z') + days * 864e5).toISOString().slice(0, 10), out = [];
   for (const item of (state && state.list) || []) {
     const pg = state.pages && state.pages[item.url];
     const read = pg && Array.isArray(pg.entries) && state.v === 2 && !(pg.at === 0);
-    const entries = read ? pg.entries : [{ where: item.where, desc: item.desc, dates: [], detour: '', bridge: MATCH.test([item.title, item.desc, item.where].join(' ')), unread: true }];
+    const fallbackDates = !read ? slugDate(item.url, item.desc) : [];
+    const entries = read ? pg.entries : [{ where: item.where, desc: item.desc, dates: fallbackDates, detour: '', bridge: MATCH.test([item.title, item.desc, item.where].join(' ')), unread: !fallbackDates.length }];
     const slug = item.url.split('/').pop().replace(/[^A-Za-z0-9-]+/g, '-').slice(0, 80);
     entries.forEach((e, i) => {
-      const all = e.dates || [];
-      const dates = all.filter(d => stamp(d.end || d.start, d.endTime, '23:59') > nowS && d.start <= lim);
-      if (all.length && !dates.length) return; // finished, or not in the next week
-      if (e.unread) return; // page not read yet (or couldn't be): no dates to place it in the week, so wait
-      out.push({ id: 'wdc-road-' + slug + '-' + i, title: item.title, where: e.where || item.where || '', desc: e.desc || item.desc || '', detour: e.detour || '', url: item.url, bridge: !!e.bridge, unread: !!e.unread, dates: dates.slice(0, 10) });
+      const all = (e.dates && e.dates.length) ? e.dates : slugDate(item.url, e.desc || item.desc);
+      const dates = all.filter(d => (d.end || d.start) >= today && (d.start === today || stamp(d.end || d.start, d.endTime, '23:59') > nowS) && d.start <= lim);
+      if (all.length && !dates.length) return;
+      if (e.unread && !dates.length) return;
+      const blob = [item.title, e.where || item.where, e.desc || item.desc].join(' ');
+      out.push({ id: 'wdc-road-' + slug + '-' + i, title: item.title, where: e.where || item.where || '', desc: e.desc || item.desc || '', detour: e.detour || '', url: item.url, bridge: !!e.bridge, commute: !!(e.bridge || ROUTE_MATCH.test(blob)), unread: false, dates: dates.slice(0, 10) });
     });
+  }
+  if (eventsState) {
+    for (const sc of stadiumEventClosures(eventsState, out, now, days)) out.push(sc);
   }
   const first = c => c.dates.length ? stamp(c.dates[0].start, c.dates[0].time, '00:00') : '9999';
   out.sort((a, b) => first(a).localeCompare(first(b)));
   return { source: { name: 'Whangārei District Council – Roadworks and closures', url: CLOSURES_URL }, updated: state && state.listAt ? new Date(state.listAt).toISOString() : null, count: out.length, closures: out.slice(0, 30) };
 }
+const RAMM_URL = 'https://services1.arcgis.com/RfTgcgHraFPg7Fq4/arcgis/rest/services/RAMM_Road_Closures_and_Restrictions_-_All/FeatureServer/0/query?where=1%3D1&outFields=OBJECTID,road_id,c_description,cause,road_status,planned_action,detour_details,estimated_outage,info_updated&returnGeometry=false&f=json';
+let rammMem = null;
+async function fetchRammClosures(fetchImpl = fetch, now = Date.now()) {
+  if (rammMem && now - rammMem.at < 15 * 60 * 1000) return rammMem.items;
+  try {
+    const r = await fetchImpl(RAMM_URL, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return (rammMem && rammMem.items) || [];
+    const j = await r.json();
+    const today = nzStamp(now).slice(0, 10), items = [];
+    for (const f of (j && j.features) || []) {
+      const a = (f && f.attributes) || {};
+      const road = String(a.road_id || '').replace(/\s+CTRL$/i, '').trim();
+      const status = String(a.road_status || '').trim();
+      if (!road || !/closed/i.test(status + ' ' + (a.c_description || ''))) continue;
+      const endIso = String(a.estimated_outage || '').slice(0, 10);
+      if (endIso && endIso < today) continue;
+      const startIso = String(a.info_updated || '').slice(0, 10) || today;
+      const slug = road.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50);
+      const blob = [road, a.c_description, a.cause, a.detour_details].join(' ');
+      items.push({
+        id: 'wdc-ramm-' + slug + '-' + (a.OBJECTID || 0),
+        title: `${road} – ${status || 'Road Closed'}`,
+        where: road + ', Whangārei District',
+        desc: [a.c_description, a.cause, a.planned_action].filter(Boolean).join(' · ').slice(0, 320),
+        detour: String(a.detour_details || '').slice(0, 200),
+        url: CLOSURES_URL,
+        bridge: MATCH.test(blob),
+        commute: ROUTE_MATCH.test(blob),
+        unread: false,
+        dates: [{ start: startIso > today ? startIso : today, end: endIso || today, time: '', endTime: '' }]
+      });
+    }
+    rammMem = { at: now, items };
+    return items;
+  } catch (e) { return (rammMem && rammMem.items) || []; }
+}
 export async function getRoadClosures(env, fetchImpl = fetch, now = Date.now()) {
   let state = await load(env);
-  if (!state || !state.listAt || now - state.listAt > STALE_REBUILD) { await getClosures(env, fetchImpl, now); state = await load(env); }
-  return toRoadClosures(state, now);
+  if (!state || !state.listAt || now - state.listAt > STALE_REBUILD || (state.list && state.list.length <= 5 && state.list.some(i => !state.pages || !state.pages[i.url]))) {
+    const s = (await step(state, fetchImpl, now, { all: true })).state;
+    await save(env, s).catch(() => { });
+    state = s;
+  }
+  let eventsState = null;
+  if (env && env.EVENTS_KV) { try { eventsState = await env.EVENTS_KV.get('wdc-events-v1', { type: 'json', cacheTtl: 300 }); } catch (e) { eventsState = null; } }
+  const res = toRoadClosures(state, now, 35, eventsState);
+  if (fetchImpl === fetch) {
+    const ramm = await fetchRammClosures(fetchImpl, now);
+    for (const rc of ramm) {
+      if (!res.closures.some(c => c.where && c.where.toLowerCase().includes(rc.where.split(',')[0].toLowerCase()))) res.closures.push(rc);
+    }
+    res.count = res.closures.length;
+  }
+  return res;
 }
 
 async function load(env) { if (!env || !env.EVENTS_KV) return null; try { return await env.EVENTS_KV.get(KV_KEY, { type: 'json', cacheTtl: 300 }); } catch (e) { return null; } }

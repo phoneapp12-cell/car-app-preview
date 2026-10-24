@@ -105,8 +105,13 @@ export function parseDetail(html) {
 
 export function hiddenFields(html) {
   const f = new URLSearchParams();
-  const form = html.slice(html.indexOf('<form'), html.indexOf('events-list-container') > 0 ? html.indexOf('events-list-container') : undefined);
-  for (const m of form.matchAll(/<input type="hidden" name="([^"]+)"[^>]*?value="([^"]*)"/g)) f.set(m[1], decode(m[2]));
+  const endForm = html.indexOf('</form>');
+  const form = html.slice(html.indexOf('<form'), endForm > 0 ? endForm : undefined);
+  for (const m of form.matchAll(/<input\b[^>]*\btype="hidden"[^>]*>/gi)) {
+    const nm = (m[0].match(/\bname="([^"]+)"/i) || [])[1];
+    const vl = (m[0].match(/\bvalue="([^"]*)"/i) || [])[1] || '';
+    if (nm) f.set(nm, decode(vl));
+  }
   const pager = html.slice(html.indexOf('seamless-pagination-controls'));
   const sel = (pager.match(/Page <select name="([^"]+)"/) || [])[1];
   const go = (pager.match(/<input type="submit" name="([^"]+)" value="Go"/) || [])[1];

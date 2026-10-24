@@ -13,7 +13,8 @@ import { cacheGet, cachePut } from './kvguard.js';
  * already been announced. The VAPID private key is a Worker secret (VAPID_PRIVATE_JWK), never in the repo.
  * No logging.
  */
-import { toClosures, nzStamp } from './closures.js';
+import { toClosures, toRoadClosures, nzStamp } from './closures.js';
+const ROAD_ALERTS_KEY = 'push-road-alerts-v1';
 
 const SUBS_KEY = 'push-subs-v1';
 const ALERTS_KEY = 'push-alerts-v1';
@@ -218,6 +219,62 @@ export async function runAlerts(env, closuresState, fetchImpl = fetch, now = Dat
     const r = await sendPush(s, m, env, fetchImpl, now);
     if (r === 'gone') gone.add(s.id); else if (r === 'ok') sent++;
   }
+  // 2.28.14: also push-notify local Whangārei commute & Semenoff Stadium / Okara Drive road closures
+  try {
+    let evState = null;
+    try { evState = await env.EVENTS_KV.get('wdc-events-v1', { type: 'json' }); } catch (e) { }
+    const rFeed = toRoadClosures(closuresState, now, 21, evState);
+    const localClosures = (rFeed.closures || []).filter(c => !c.bridge && (c.commute || c.stadium) && (c.stadium || pages[c.url]));
+    if (localClosures.length) {
+      let rAlerts = null; try { rAlerts = await env.EVENTS_KV.get(ROAD_ALERTS_KEY, { type: 'json' }); } catch (e) { }
+      rAlerts = rAlerts && typeof rAlerts === 'object' ? rAlerts : { seeded: false, announced: {}, reminded: {} };
+      rAlerts.announced = { ...(rAlerts.announced || {}) };
+      rAlerts.reminded = { ...(rAlerts.reminded || {}) };
+      const { date, hour } = nzParts(now), tomorrow = nextDay(date), quiet = hour >= QUIET_FROM || hour < QUIET_TO;
+      const rMsgs = []; let rCh = false;
+      for (const c of localClosures) {
+        const isToday = (c.dates || []).some(d => d.start <= date && (d.end || d.start) >= date);
+        if (!rAlerts.seeded && !isToday) { rAlerts.announced[c.id] = now; rCh = true; continue; }
+        if (!quiet && !rAlerts.announced[c.id]) {
+          rAlerts.announced[c.id] = now; rCh = true;
+          const when = c.dates.length ? c.dates.slice(0, 2).map(whenTxt).join(' and ') : 'See council notice';
+          const w = whereTxt(c);
+          rMsgs.push({
+            title: isToday ? '⛔ Whangārei road closure today' : '⛔ Whangārei road closure notice',
+            body: `${c.title}. ${when}.${w ? ' ' + w + '.' : ''}`,
+            url: '#alerts',
+            tag: 'road-new-' + c.id
+          });
+          if (isToday) rAlerts.reminded[c.id + '|today|' + date] = now;
+          (c.dates || []).forEach(d => { if (d.start === tomorrow) rAlerts.reminded[c.id + '|' + d.start] = now; });
+        }
+        if (hour >= REMIND_HOUR && hour < 22) {
+          for (const d of c.dates || []) {
+            const k = c.id + '|' + d.start;
+            if (d.start !== tomorrow || rAlerts.reminded[k]) continue;
+            rAlerts.reminded[k] = now; rCh = true;
+            const t = d.time ? (d.endTime ? ` from ${timeTxt(d.time)} to ${timeTxt(d.endTime)}` : ` from ${timeTxt(d.time)}`) : '';
+            const w = whereTxt(c);
+            rMsgs.push({ title: `Tomorrow: road closure${t}`, body: `${c.title}.${w ? ' ' + w + '.' : ''} ${dayTxt(d.start)}.`, url: '#alerts', tag: 'road-remind-' + c.id + '-' + d.start });
+          }
+        }
+        if (!quiet && isToday && !rAlerts.reminded[c.id + '|today|' + date]) {
+          const d = (c.dates || []).find(x => x.start <= date && (x.end || x.start) >= date) || c.dates[0] || {};
+          rAlerts.reminded[c.id + '|today|' + date] = now; rCh = true;
+          const t = d.time ? (d.endTime ? ` (${timeTxt(d.time)}–${timeTxt(d.endTime)})` : ` (from ${timeTxt(d.time)})`) : '';
+          const w = whereTxt(c);
+          rMsgs.push({ title: `⛔ Road closure today${t}`, body: `${c.title}.${w ? ' ' + w + '.' : ''}`, url: '#alerts', tag: 'road-today-' + c.id + '-' + date });
+        }
+      }
+      if (!rAlerts.seeded) { rAlerts.seeded = true; rCh = true; }
+      for (const m of rMsgs) for (const s of subs) {
+        if (s.bridge === false || gone.has(s.id)) continue;
+        const r = await sendPush(s, m, env, fetchImpl, now);
+        if (r === 'gone') gone.add(s.id); else if (r === 'ok') sent++;
+      }
+      if (rCh) await env.EVENTS_KV.put(ROAD_ALERTS_KEY, JSON.stringify(rAlerts));
+    }
+  } catch (e) { }
   if (gone.size) await saveSubs(env, subs.filter(s => !gone.has(s.id)));
   if (plan.changed) await env.EVENTS_KV.put(ALERTS_KEY, JSON.stringify(plan.alerts));
   return { sent, msgs: plan.msgs.length, removed: gone.size };

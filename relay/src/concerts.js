@@ -34,11 +34,17 @@ export function parseStadiums(html) {
   return out.filter(x => x.date);
 }
 export function parseSpark(html) {
-  const seen = new Set(), out = [], re = /href="(?:https:\/\/www\.sparkarena\.co\.nz)?(\/all-events\/[a-z0-9-]+-tickets-ae\d+)">(?:<[^>]*>)*\s*([^<]{2,80})</g;
+  const seen = new Set(), out = [], re = /<a\b[^>]*href="(?:https:\/\/www\.sparkarena\.co\.nz)?(\/all-events\/[a-z0-9-]+-tickets-ae\d+)"[^>]*>([\s\S]*?)<\/a>/gi;
   let m;
   while ((m = re.exec(html))) {
-    const title = unesc(m[2]);
-    if (!title || /^(get|buy) tickets|more info/i.test(title) || seen.has(m[1]) || SPORT.test(title) || /wiggles/i.test(title)) continue;
+    if (seen.has(m[1])) continue;
+    const texts = [...m[2].matchAll(/>([^<]{2,90})</g)].map(x => unesc(x[1])).filter(t => t && !/^(new|presale|on sale|sold out|just announced|find out more|(?:get|buy) tickets|more info|read more|view event)$/i.test(t));
+    let title = texts[0] || '';
+    if (!title) {
+      const slug = (m[1].match(/\/all-events\/([a-z0-9-]+)-tickets-ae\d+/i) || [])[1] || '';
+      title = slug.split('-').map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join(' ');
+    }
+    if (!title || SPORT.test(title) || /wiggles|bluey/i.test(title)) continue;
     seen.add(m[1]); out.push({ title, venue: 'Spark Arena', url: 'https://www.sparkarena.co.nz' + m[1] });
   }
   return out.slice(0, 30);
