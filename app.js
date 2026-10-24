@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.6';
+const APP_VERSION = '2.28.7';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20933,7 +20933,7 @@ function weekItems() {
   return out;
 }
 function weekOverview() {
-  const D = weekItems(), T = todayISO(); if (!(S.settings && S.settings.homeWeekBills)) Object.keys(D).forEach(d => { D[d] = D[d].filter(it => it.type !== 'bill' && it.type !== 'loan'); }); // 2.28.5: bills hidden on Home This week unless shown
+  const D = weekItems(), T = todayISO(); if (!(S.settings && S.settings.homeWeekBills)) Object.keys(D).forEach(d => { D[d] = D[d].filter(it => it.type !== 'bill' && it.type !== 'loan' && it.type !== 'xfer'); }); // 2.28.5: bills hidden on Home This week unless shown
   const card = it => { const [ic0, col0] = WK_TYPE[it.type] || WK_TYPE.due, ic = it.ic || ic0, col = it.color2 || col0, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
     return `<button type="button" class="wkcard" style="--wc:${esc(it.color || col)}" onclick="if(window.glSwipe&&glSwipe.moved)return;${oc}"><div class="wkh"><span class="wkt">${it.sarah ? sarahBadge({ from: 'sarah' }) + ' ' : ''}${esc(it.title)}</span><span class="wki">${ic}</span></div>${it.time ? `<div class="wktm">${esc(it.time)}</div>` : ''}${it.line || it.warn ? `<div class="wkb">${it.line ? `<div>${esc(it.line)}</div>` : ''}${it.warn ? `<div class="wkwarn">⚠️ ${esc(it.warn)}</div>` : ''}</div>` : ''}</button>`; };
   const cols = Object.keys(D).sort().map(d => { const dt = new Date(parseD(d));
