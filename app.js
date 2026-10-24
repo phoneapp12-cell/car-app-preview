@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.32';
+const APP_VERSION = '2.28.33';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11786,7 +11786,7 @@ function placesSettingsRows() {
   return customPlaces().map(pl => `<div class="srow" data-place="${esc(pl.id)}"><div class="tx"><div class="t">${esc(pl.name)}</div><div class="s">${pl.at ? 'Saved ' + fmtW(isoT(todayT(new Date(pl.at)))) + '. ' : ''}Within about 150 m counts as there.</div></div>
     <span style="display:flex;gap:6px;flex:none"><button class="btn small" onclick="renamePlaceForm('${esc(pl.id)}')">Rename</button><button class="btn small" onclick="deletePlace('${esc(pl.id)}')">Delete</button></span></div>`).join('');
 }
-let hereFix = null, hereBusy = false; // { lat, lon, acc, at } while the app is open. Not saved.
+let hereFix = (() => { try { const f = JSON.parse(localStorage.getItem('lastFix') || 'null'); return f && f.at && Date.now() - f.at < 12 * 3600e3 ? f : null; } catch (e) { return null; } })(), hereBusy = false;
 function metresBetween(aLat, aLon, bLat, bLon) {
   const R = 6371000, r = x => x * Math.PI / 180, dLat = r(bLat - aLat), dLon = r(bLon - aLon);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(dLon / 2) ** 2;
@@ -11800,6 +11800,7 @@ function rememberFix(pos) {
     const acc = Number.isFinite(+pos.coords.accuracy) ? +pos.coords.accuracy : null;
     const speed = pos.coords.speed != null && Number.isFinite(+pos.coords.speed) ? +pos.coords.speed : null; // m/s, when the phone gives it
     hereFix = { lat, lon, acc, speed, at: Date.now() };
+    try { localStorage.setItem('lastFix', JSON.stringify(hereFix)); } catch (e) {}
     noteHomeArrival();
     noteNewSpot(hereFix, speed); // 2.22.31
     nwCheck(hereFix); // 2.22.88
@@ -11948,7 +11949,9 @@ async function checkHere(force = false) {
     if (hereBusy || brLocBusy) return;
     hereBusy = true;
     navigator.geolocation.getCurrentPosition(pos => {
+      const wasSick = (() => { try { return glMode().sick; } catch (e) { return false; } })();
       hereBusy = false; rememberFix(pos); paintHomeSum();
+      try { const nowSick = glMode().sick; if (nowSick !== wasSick && !sheetOpen) render(); } catch (e) {}
     }, () => { hereBusy = false; }, { enableHighAccuracy: false, maximumAge: force ? 0 : 2 * 60 * 1000, timeout: 15000 });
   } catch (e) { hereBusy = false; }
 }
@@ -13199,9 +13202,20 @@ async function refreshTv(force = false) {
 function updTv() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
+  if (h === 'tv') {
+    // Update the Freeview/Sky EPG grid in-place without wiping out the page or resetting Internet TV Guide scroll!
+    const sc = document.getElementById('epgsc');
+    if (sc && typeof epgPaint === 'function') {
+      try { epgWin = null; epgPaint(true); epgLabel(); } catch (e) {}
+      return;
+    }
+    if (typeof tvGuideSection !== 'undefined' && (tvGuideSection === 'internet' || tvGuideSection === 'movies')) return;
+  }
   if (((h === 'home' || h === '') && !homeEdit) || h === 'tv') {
-    const v = $('#view'), top = v ? v.scrollTop : 0;
-    render(); if (v) v.scrollTop = top;
+    const v = $('#view'), top = v ? v.scrollTop : 0, wy = window.scrollY || 0;
+    render();
+    if (v) v.scrollTop = top;
+    try { window.scrollTo(0, wy); } catch (e) {}
   }
 }
 function toggleTvMore() {
@@ -21036,7 +21050,34 @@ function render() {
   const view = document.getElementById('view');
   if (!view) return;
   if (typeof page !== 'string' || !page) { if (view.children.length) return; page = renderFallback(r, null); }
+  const sameRoute = render._lastRoute === h;
+  render._lastRoute = h;
+  let savedWinY = 0, savedViewTop = 0, savedTbScrolls = [], savedColScrolls = {}, savedChipScrolls = [];
+  if (sameRoute) {
+    try {
+      savedWinY = window.scrollY || document.documentElement.scrollTop || 0;
+      savedViewTop = view.scrollTop || 0;
+      view.querySelectorAll('.tblists').forEach((el, idx) => { savedTbScrolls[idx] = el.scrollLeft; });
+      view.querySelectorAll('.tblist[data-col] .tbcards').forEach(el => {
+        const col = el.closest('.tblist').getAttribute('data-col');
+        if (col) savedColScrolls[col] = el.scrollTop;
+      });
+      view.querySelectorAll('.chips.scroll').forEach((el, idx) => { savedChipScrolls[idx] = el.scrollLeft; });
+    } catch (e) {}
+  }
   view.innerHTML = page;
+  if (sameRoute) {
+    try {
+      view.querySelectorAll('.tblists').forEach((el, idx) => { if (savedTbScrolls[idx] != null) el.scrollLeft = savedTbScrolls[idx]; });
+      view.querySelectorAll('.tblist[data-col] .tbcards').forEach(el => {
+        const col = el.closest('.tblist').getAttribute('data-col');
+        if (col && savedColScrolls[col] != null) el.scrollTop = savedColScrolls[col];
+      });
+      view.querySelectorAll('.chips.scroll').forEach((el, idx) => { if (savedChipScrolls[idx] != null) el.scrollLeft = savedChipScrolls[idx]; });
+      if (savedViewTop) view.scrollTop = savedViewTop;
+      if (savedWinY) window.scrollTo(0, savedWinY);
+    } catch (e) {}
+  }
   if (pendingNight && r === 'meals' && !arg) showPendingNight(); else pendingNight = null;
   if (r === 'commission') { const sc = $('#commsetup'); if (sc) wireAnchor(sc); else if (arg === 'add') { history.replaceState(history.state, '', '#commission'); setTimeout(() => commForm(null, yesterdayISO()), 0); } }
   tabbar(activeTab(map[r] || NAV[ROUTE_ITEM[r] || r] || MORE_PAGES.includes(r) ? r : 'home'));
@@ -21537,15 +21578,21 @@ function workSickMap() {
 }
 function isLocAwayFromWork() {
   try {
-    if (!hereFix || Date.now() - hereFix.at > 20 * 60 * 1000) return false;
-    if (hereFix.acc != null && hereFix.acc > 1000) return false;
-    const p = placeHere();
-    if (p === "work") return false;
-    if (p === "home" || p) return true;
-    const wk = SAVED_PLACES.find(x => x && x.id === "work");
-    if (wk && Number.isFinite(wk.lat) && Number.isFinite(wk.lon)) {
-      return metresBetween(hereFix.lat, hereFix.lon, wk.lat, wk.lon) > 450;
+    if (hereFix && Date.now() - hereFix.at <= 12 * 3600e3 && (hereFix.acc == null || hereFix.acc <= 1200)) {
+      const p = placeHere();
+      if (p === "work") return false;
+      if (p === "home" || p) return true;
+      const wk = SAVED_PLACES.find(x => x && x.id === "work");
+      if (wk && Number.isFinite(wk.lat) && Number.isFinite(wk.lon)) {
+        return metresBetween(hereFix.lat, hereFix.lon, wk.lat, wk.lon) > 400;
+      }
+      const hm = SAVED_PLACES.find(x => x && x.id === "home");
+      if (hm && Number.isFinite(hm.lat) && Number.isFinite(hm.lon) && metresBetween(hereFix.lat, hereFix.lon, hm.lat, hm.lon) <= 500) {
+        return true;
+      }
     }
+    const ha = readHomeArrive();
+    if (ha && ha.state === "home") return true;
   } catch (e) {}
   return false;
 }
@@ -21557,8 +21604,8 @@ function isSickOnDate(iso) {
   try {
     const a = homeAklParts(new Date()) || {}, min = a.min || 0;
     const r = rosterState(), k = String(a.dow), start = r.days[k] || "", end = (r.ends || {})[k] || "";
-    const sm = start ? hmMin(start) : null, em = end ? hmMin(end) : null;
-    const inShift = sm != null && min >= sm + 15 && (em == null || min < em);
+    const sm = start ? hmMin(start) : null, em = end ? hmMin(end) : (a.dow === 4 ? 19 * 60 + 15 : 18 * 60);
+    const inShift = sm != null && min >= sm + 5 && (em == null || min < em);
     if (inShift && isLocAwayFromWork()) {
       m[iso] = "sick";
       try { save(); } catch (e) {}
@@ -22270,6 +22317,7 @@ function homeShownKeys() {
     const wi = typeof weekItems === 'function' ? weekItems() : {};
     Object.values(wi).forEach(arr => (arr || []).forEach(it => {
       if (it && it.title) {
+        if (it.type === 'bday') return; // let 3-day birthday filter control birthday deduplication
         S0.add(cuNorm(it.title));
         S0.add(cuNorm(String(it.title).replace(/^Celebrating\s+/i, '')));
       }
@@ -22277,7 +22325,14 @@ function homeShownKeys() {
   } catch (e) { }
   try {
     (S.appts || []).forEach(a => { if (a && a.title) S0.add(cuNorm(a.title)); });
-    (S.birthdays || []).forEach(b => { if (b && b.name) { S0.add(cuNorm(b.name + "’s birthday")); S0.add(cuNorm("Celebrating " + b.name + "’s birthday")); } });
+    (S.birthdays || []).forEach(b => {
+      if (b && b.name) {
+        const inf = typeof bdayInfo === "function" ? bdayInfo(b) : null;
+        if (inf && inf.d >= 0 && inf.d <= 3) return; // 2.28.33: Birthdays in the next 3 days stay on Notifications!
+        S0.add(cuNorm(b.name + "’s birthday"));
+        S0.add(cuNorm("Celebrating " + b.name + "’s birthday"));
+      }
+    });
     (S.todos || []).forEach(t => { if (t && t.title) S0.add(cuNorm(t.title)); });
     (S.myEvents || []).forEach(e => { if (e && e.title) S0.add(cuNorm(e.title)); });
   } catch (e) { }
@@ -24889,10 +24944,87 @@ function pnItems() {
     return { id: n.id, urgent, html: `<div class="row glnew pnrow${urgent ? ' pnurg' : ''}" data-pn="${esc(n.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${/^#[a-z]+$/.test(n.go || '') ? n.go : '#power'}')"><div class="ic">${IC[n.kind] || '⚡'}</div><div class="tx"><div class="t">${esc(n.title)}</div>${n.body ? `<div class="s pnbody">${esc(n.body)}</div>` : ''}<div class="s">${esc(n.src || 'Power')}${when ? ' · ' + esc(when) : ''}</div></div></div>` };
   }));
 }
+
+/* ---- 2.28.33: Birthdays in the next 3 days & 1-at-a-time To-Do sitting > 1 week on Notifications ---- */
+let sittingTodoSkip = (() => { try { return JSON.parse(localStorage.getItem("sittingTodoSkip") || "[]") || []; } catch (e) { return []; } })();
+function sittingTodoCandidates() {
+  if (!S || !Array.isArray(S.todos)) return [];
+  const now = Date.now(), weekMs = 7 * 86400e3;
+  return S.todos.filter(t => {
+    if (!t || t.done || !t.title || !glOk(t.title)) return false;
+    // Backfill missing created timestamp on legacy items so old items sitting on the list are eligible
+    if (!t.created) t.created = now - 10 * 86400e3;
+    return (now - (+t.created)) >= weekMs;
+  }).sort((a, b) => (+a.created || 0) - (+b.created || 0));
+}
+function pickOneSittingTodo() {
+  const all = sittingTodoCandidates();
+  if (!all.length) return null;
+  let avail = all.filter(t => !sittingTodoSkip.includes(t.id));
+  if (!avail.length) {
+    sittingTodoSkip = [];
+    try { localStorage.setItem("sittingTodoSkip", "[]"); } catch (e) {}
+    avail = all;
+  }
+  const picked = avail[0];
+  const idx = all.indexOf(picked) + 1;
+  const daysOld = Math.max(7, Math.floor((Date.now() - (+picked.created)) / 86400e3));
+  return { todo: picked, idx, total: all.length, daysOld };
+}
+function nextSittingTodo(id, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  if (id && !sittingTodoSkip.includes(id)) sittingTodoSkip.push(id);
+  try { localStorage.setItem("sittingTodoSkip", JSON.stringify(sittingTodoSkip.slice(-100))); } catch (e) {}
+  render();
+}
+async function doneSittingTodo(id, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  await tick(id);
+  render();
+}
+function notifThreeDayBdaysAndSittingTodo() {
+  const urgentOut = [], comingOut = [];
+  // 1. Birthdays in the next 3 days (0, 1, 2, or 3 days away)
+  try {
+    (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b)))
+      .filter(x => x.d >= 0 && x.d <= 3 && glOk(x.b.name))
+      .sort((a, b) => a.d - b.d)
+      .forEach(x => {
+        const when = x.d === 0 ? "Today! 🎂" : x.d === 1 ? "Tomorrow 🎂" : `In ${x.d} days (${fmtW(x.iso)})`;
+        const h = `<button class="row" onclick="go('#birthdays')"><div class="ic bday">🎂</div><div class="tx"><div class="t">🎂 ${esc(x.b.name)}’s${x.age > 0 ? " " + ordinal(x.age) : ""} birthday</div><div class="s">${esc(when)}${x.age > 0 ? " · turns " + x.age : ""}</div></div><span class="pill">${esc(x.d === 0 ? "Today" : x.d === 1 ? "Tomorrow" : x.d + "d")}</span></button>`;
+        if (x.d <= 1) urgentOut.push({ days: x.d, html: h, noCount: false });
+        else comingOut.push({ days: x.d, html: h, noCount: false });
+      });
+  } catch (e) {}
+
+  // 2. ONE To-do item sitting longer than a week (> 7 days) at a time
+  try {
+    const st = pickOneSittingTodo();
+    if (st && st.todo) {
+      const t = st.todo;
+      const h = `<div class="row" onclick="go('#todo')" style="cursor:pointer">
+        <div class="ic todo">📋</div>
+        <div class="tx">
+          <div class="t">To-do sitting ${st.daysOld} days: ${esc(t.title)}</div>
+          <div class="s">${esc(t.list || "To-do")} · Sitting &gt; 1 week (${st.idx} of ${st.total}) · Tap Done to see the next one</div>
+          <div style="display:flex;gap:6px;margin-top:6px" onclick="event.stopPropagation()">
+            <button type="button" class="btn small primary" style="padding:4px 10px;font-size:.75rem" onclick="doneSittingTodo(${jsArg(t.id)}, event)">✓ Done</button>
+            ${st.total > 1 ? `<button type="button" class="btn small" style="padding:4px 10px;font-size:.75rem" onclick="nextSittingTodo(${jsArg(t.id)}, event)">⏭ Next (${st.idx}/${st.total})</button>` : ""}
+            <button type="button" class="btn small" style="padding:4px 10px;font-size:.75rem" onclick="todoForm(${jsArg(t.id)})">Edit</button>
+          </div>
+        </div>
+      </div>`;
+      urgentOut.push({ days: 0, html: h, noCount: false, sittingTodo: true });
+    }
+  } catch (e) {}
+  return { urgentOut, comingOut };
+}
+
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDeviceItems();
-  // 2.28.22: Anything already shown on the Home page (This week calendar board, to-dos, cars, garden, birthdays, appointments) is excluded from Notifications
-  const P = { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: [], sarah: glSarahItems(), flags, warn, garden: null, fresh: glNewItems(), nl: [], prog: [], pw: pnItems(), ab: [], rm: [], packBadge: 0, packKeys: [], mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems().filter(x => x.sec !== 'bill' && x.sec !== 'ap'); } catch (e) { return []; } })() };
+  const extra = notifThreeDayBdaysAndSittingTodo();
+  const duePlus = due.filter(x => x.days <= 0).concat(extra.urgentOut).concat(extra.comingOut);
+  const P = { urgent: warn.map(glWarnCard).concat(duePlus.map(x => x.html)), dueUrgent: duePlus, coming: extra.comingOut, sarah: glSarahItems(), flags, warn, garden: null, fresh: glNewItems(), nl: [], prog: [], pw: pnItems(), ab: [], rm: [], packBadge: 0, packKeys: [], mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems().filter(x => x.sec !== 'bill' && x.sec !== 'ap'); } catch (e) { return []; } })() };
   try { gkApply(P); } catch (e) { }
   return P;
 }
@@ -26157,10 +26289,10 @@ const evGcalAppts = () => (S.myEvents || []).filter(e => e && e.gcalWant && e.re
 function glWorkCard(m) {
   if (!m || m.night) return '';
   if (m.sick) {
-    return `<div class="list glworkcard"><div class="row"><div class="ic health">🤒</div><div class="tx" onclick="go('#work')" style="cursor:pointer"><div class="t">Off sick today (rostered ${esc(glShift(m))})</div><div class="s">Detected from your location (not at work) · take it easy today</div></div><button type="button" class="btn small" onclick="setWorkSickToday('working')">I’m at work</button></div></div>`;
+    return `<div class="list glworkcard"><div class="row"><div class="ic health">🤒</div><div class="tx" onclick="go('#work')" style="cursor:pointer"><div class="t">Off sick today (rostered ${esc(glShift(m))})</div><div class="s">Not at work · rest up and take it easy today</div></div><button type="button" class="btn small" onclick="setWorkSickToday('working')">I’m at work</button></div></div>`;
   }
   if (m.off || m.workDone || !m.atWork) return ''; const f = glFree(m); if (!f) return '';
-  return `<div class="list glworkcard">${tabRow('calendar', 'Work ' + esc(glShift(m)), `<span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span>`, "go('#work')")}</div>`;
+  return `<div class="list glworkcard"><div class="row"><div class="ic appt">${I('calendar')}</div><div class="tx" onclick="go('#work')" style="cursor:pointer"><div class="t">Work ${esc(glShift(m))}</div><div class="s"><span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span></div></div><button type="button" class="btn small" onclick="setWorkSickToday('sick')">🤒 Off sick</button></div></div>`;
 }
 const bellTxt = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 function bellTodayRows(have) {
@@ -31099,7 +31231,12 @@ const LTV_DEFAULT_PRESETS = [
   "three-nz", "bravo-nz", "skyopen-nz", "bbc-news-uk", "gb-news-uk", "mythbusters",
   "moviesphere", "midsomer-murders-uk", "bbc-earth-uk", "drybar-comedy", "nasa-tv", "now-80s-uk"
 ];
-let ltvCur = { idx: 0, bank: 0, setMode: false, custom: null, filt: "all", q: "", hits: [], searching: false, hlsInst: null };
+let ltvCur = {
+  idx: (() => { try { return Math.max(0, +localStorage.getItem("ltvLastIdx") || 0); } catch (e) { return 0; } })(),
+  bank: 0, setMode: false, custom: null,
+  filt: (() => { try { return localStorage.getItem("ltvLastFilt") || "all"; } catch (e) { return "all"; } })(),
+  q: "", hits: [], searching: false, hlsInst: null
+};
 function ltvGet() {
   try {
     const o = JSON.parse(localStorage.getItem(LTV_KEY) || "null");
@@ -31218,10 +31355,14 @@ function ltvEnsureHlsJs() {
     document.head.appendChild(s);
   });
 }
-async function ltvMountVideo() {
+async function ltvMountVideo(forceReload = false) {
   const ch = ltvCurrentChannel();
   const vid = document.getElementById("ltv-video");
   if (!vid || !ch || !ch.hls) return;
+  if (!forceReload && vid.dataset.playingUrl === ch.hls && (ltvCur.hlsInst || vid.currentSrc)) {
+    return;
+  }
+  vid.dataset.playingUrl = ch.hls;
   try {
     if (ltvCur.hlsInst) { ltvCur.hlsInst.destroy(); ltvCur.hlsInst = null; }
   } catch (e) {}
@@ -31233,12 +31374,18 @@ async function ltvMountVideo() {
   }
   const HlsClass = await ltvEnsureHlsJs();
   if (HlsClass && HlsClass.isSupported()) {
-    const hls = new HlsClass({ enableWorker: true, lowLatencyMode: true });
+    const hls = new HlsClass({ enableWorker: true, lowLatencyMode: false, backBufferLength: 60, maxBufferLength: 30 });
     ltvCur.hlsInst = hls;
     hls.loadSource(ch.hls);
     hls.attachMedia(vid);
     hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
       vid.play().catch(() => {});
+    });
+    hls.on(HlsClass.Events.ERROR, (ev, data) => {
+      if (data && data.fatal) {
+        if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR) { try { hls.recoverMediaError(); } catch (e) {} }
+        else if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) { try { hls.startLoad(); } catch (e) {} }
+      }
     });
   } else {
     vid.src = ch.hls;
@@ -31251,6 +31398,7 @@ function ltvPlayId(id) {
   if (idx < 0) return;
   ltvCur.custom = null;
   ltvCur.idx = idx;
+  try { localStorage.setItem("ltvLastIdx", String(idx)); } catch (e) {}
   ltvRedraw();
   try { document.getElementById("ltvplayer")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (e) {}
 }
@@ -31266,6 +31414,7 @@ function ltvStep(dir) {
   const all = ltvAllChannels();
   ltvCur.custom = null;
   ltvCur.idx = (ltvCur.idx + dir + all.length) % all.length;
+  try { localStorage.setItem("ltvLastIdx", String(ltvCur.idx)); } catch (e) {}
   ltvRedraw();
 }
 function ltvFullscreen() {
@@ -31474,7 +31623,7 @@ function ltvChipsHtml() {
     ["news", "🌍 World News 24/7"],
     ["music", "🎵 Music TV"],
     ["saved", "⭐ Presets & Saved"]
-  ].map(([k, lbl]) => `<button type="button" class="chip${ltvCur.filt === k ? " on" : ""}" onclick="ltvCur.filt='${k}';ltvRedrawBoard()">${esc(lbl)}</button>`).join("");
+  ].map(([k, lbl]) => `<button type="button" class="chip${ltvCur.filt === k ? " on" : ""}" onclick="ltvCur.filt='${k}';try{localStorage.setItem('ltvLastFilt','${k}')}catch(e){};ltvRedrawBoard()">${esc(lbl)}</button>`).join("");
 }
 function ltvRedrawBoard() {
   const el = document.getElementById("ltvlists");
@@ -31550,8 +31699,64 @@ function rbDeleteUserCard(k, id) {
 })();
 
 /* ================= 2.28.30: INTERNET TV GUIDE (IN #tv), CLOUD DVR, SERIES LINKS & ONEDRIVE STORAGE ================= */
-let tvGuideSection = "freeview"; // "freeview" | "internet"
-let itvCatFilt = "all", itvTimeFilt = "now", itvQ = "";
+let tvGuideSection = (() => { try { return localStorage.getItem("tvGuideSection") || "internet"; } catch (e) { return "internet"; } })(); // "freeview" | "internet" | "movies"
+let itvCatFilt = (() => { try { return localStorage.getItem("itvCatFilt") || "all"; } catch (e) { return "all"; } })();
+let itvTimeFilt = (() => { try { return localStorage.getItem("itvTimeFilt") || "now"; } catch (e) { return "now"; } })();
+let itvQ = "";
+function setTvGuideSection(sec) {
+  tvGuideSection = sec;
+  if (sec === "movies") {
+    itvCatFilt = "movies";
+    try { localStorage.setItem("itvCatFilt", "movies"); } catch (e) {}
+  }
+  try { localStorage.setItem("tvGuideSection", sec); } catch (e) {}
+  render();
+}
+function setItvCatFilt(cat) {
+  itvCatFilt = cat;
+  try { localStorage.setItem("itvCatFilt", cat); } catch (e) {}
+  itvRedrawInPlace(true);
+}
+function setItvTimeFilt(tf) {
+  itvTimeFilt = tf;
+  try { localStorage.setItem("itvTimeFilt", tf); } catch (e) {}
+  itvRedrawInPlace(false);
+}
+function setItvSearch(q) {
+  itvQ = String(q || "");
+  itvRedrawInPlace(false);
+}
+function itvRedrawInPlace(resetHoriz) {
+  const mount = document.getElementById("itv-guide-mount");
+  if (!mount) { render(); return; }
+  const prevLists = mount.querySelector(".tblists");
+  const prevLeft = prevLists && !resetHoriz ? prevLists.scrollLeft : 0;
+  const prevChipBar = mount.querySelector("#itv-cat-chips");
+  const prevChipLeft = prevChipBar ? prevChipBar.scrollLeft : 0;
+  const colTops = {};
+  mount.querySelectorAll(".tblist[data-col] .tbcards").forEach(el => {
+    const c = el.closest(".tblist")?.getAttribute("data-col");
+    if (c) colTops[c] = el.scrollTop;
+  });
+  const activeEl = document.activeElement;
+  const wasSearch = activeEl && activeEl.id === "itv-search-inp";
+  const selStart = wasSearch ? activeEl.selectionStart : null;
+  mount.outerHTML = renderInternetTvGuide();
+  const nextMount = document.getElementById("itv-guide-mount");
+  if (!nextMount) return;
+  const nextLists = nextMount.querySelector(".tblists");
+  if (nextLists && !resetHoriz) nextLists.scrollLeft = prevLeft;
+  const nextChipBar = nextMount.querySelector("#itv-cat-chips");
+  if (nextChipBar) nextChipBar.scrollLeft = prevChipLeft;
+  nextMount.querySelectorAll(".tblist[data-col] .tbcards").forEach(el => {
+    const c = el.closest(".tblist")?.getAttribute("data-col");
+    if (c && colTops[c] != null) el.scrollTop = colTops[c];
+  });
+  if (wasSearch) {
+    const inp = document.getElementById("itv-search-inp");
+    if (inp) { inp.focus(); try { if (selStart != null) inp.setSelectionRange(selStart, selStart); } catch (e) {} }
+  }
+}
 let ltvViewMode = "channels"; // "channels" | "dvr"
 let LTV_DVR = (() => {
   try {
@@ -31655,7 +31860,22 @@ const ITV_LINEUPS = {
   "dust-scifi": [["DUST Sci-Fi — Prospect", "A father and daughter mine gems on a toxic alien moon (Pedro Pascal)"], ["DUST Sci-Fi — Time Trap", "Students discover a cave where time moves at a different speed"], ["DUST Sci-Fi — FTL & Short Film Anthology", "Award-winning futuristic & AI sci-fi short films"], ["DUST Sci-Fi — Cosmos", "Three astronomers intercept a signal in the night sky"], ["DUST Sci-Fi — Coherence", "A comet passing overhead fractures reality at a dinner party"], ["DUST Sci-Fi — Archive", "An engineer working on human-equivalent AI in a mountain facility"]],
   "drybar-comedy": [["Dry Bar Comedy — Kellen Erskine: Composed", "Hilarious stand-up on grocery store aisles, driving & everyday life"], ["Dry Bar Comedy — Brad Upton: Ditch theリスト", "Dry, rapid-fire observational comedy"], ["Dry Bar Comedy — Shayne Smith: Prison & Tattoos", "Crowd-favourite clean stand-up special"], ["Dry Bar Comedy — Jeff Allen: Happy Wife, Happy Life", "Marriage & family stand-up comedy"], ["Dry Bar Comedy — Zoltan Kaszas: Modern Male", "Cats vs dogs, millennials & smart phones"], ["Dry Bar Comedy — Leanne Morgan", "Southern storytelling & family humour"]],
   "nasa-tv": [["NASA Live — International Space Station Views", "Live telemetry and high-definition Earth views from orbit"], ["NASA Mission Control & Artemis Updates", "Latest lunar gateway, Orion & deep-space engineering briefings"], ["James Webb Space Telescope Discoveries", "Deep-field galaxies, nebulae & exoplanet atmospheres"], ["Rocket Lab & Commercial Crew Highlights", "Orbital launch vehicle engineering & mission replays"], ["Hubble & Solar Dynamics Observatory", "30 years of space telescope science"], ["Living in Orbit — Aboard the ISS", "How astronauts conduct experiments in microgravity"]],
-  "qello-concerts": [["Queen — Live at Wembley Stadium", "Freddie Mercury & Queen’s legendary 1986 Wembley concert"], ["Pink Floyd — Pulse (Live at Earls Court)", "Full performance of The Dark Side of the Moon"], ["Fleetwood Mac — The Dance (Live)", "Reunion concert featuring Dreams, Go Your Own Way &The Chain"], ["Eagles — Farewell 1 Tour: Live from Melbourne", "Hotel California, Take It Easy & Desperado live"], ["INXS — Live Baby Live (Wembley 1991)", "Michael Hutchence & INXS in front of 72,000 fans"], ["Coldplay — Live in São Paulo", "Full stadium light-show concert film"]]
+  "qello-concerts": [["Queen — Live at Wembley Stadium", "Freddie Mercury & Queen’s legendary 1986 Wembley concert"], ["Pink Floyd — Pulse (Live at Earls Court)", "Full performance of The Dark Side of the Moon"], ["Fleetwood Mac — The Dance (Live)", "Reunion concert featuring Dreams, Go Your Own Way & The Chain"], ["Eagles — Farewell 1 Tour: Live from Melbourne", "Hotel California, Take It Easy & Desperado live"], ["INXS — Live Baby Live (Wembley 1991)", "Michael Hutchence & INXS in front of 72,000 fans"], ["Coldplay — Live in São Paulo", "Full stadium light-show concert film"]],
+  "moviesphere-gold": [["The Italian Job — Heist Movie", "Charlize Theron, Mark Wahlberg & Jason Statham pull off a gold bullion heist in Venice and LA"], ["Sherlock Holmes — Mystery Feature", "Robert Downey Jr. & Jude Law investigate Lord Blackwood in Victorian London"], ["The Bourne Identity — Spy Thriller", "Matt Damon stars as an amnesiac operative piecing together his past across Europe"], ["Ocean’s Eleven — Heist Classic", "Danny Ocean recruits a team of specialists to rob three Las Vegas casinos"], ["Catch Me If You Can — Crime Drama", "Leonardo DiCaprio & Tom Hanks in Steven Spielberg’s cat-and-mouse caper"], ["Edge of Tomorrow — Sci-Fi Action", "Tom Cruise & Emily Blunt battle alien invaders in a time loop"]],
+  "darkmatter-tv": [["Predestination — Sci-Fi Thriller", "Ethan Hawke stars as a temporal agent on one final time-travel assignment"], ["Pandorum — Deep Space Sci-Fi", "Two astronauts awaken in a hyper-sleep chamber aboard a seemingly abandoned spacecraft"], ["Equilibrium — Futuristic Action", "Christian Bale in a dystopian future where all human emotion is outlawed"], ["Event Horizon — Space Suspense", "A rescue crew investigates a spaceship that disappeared into a black hole"], ["Moon — Sci-Fi Mystery", "Sam Rockwell nears the end of a solitary three-year mining contract on the far side of the Moon"], ["Upgrade — Cyberpunk Action", "A technophobe receives an experimental AI implant after a violent mugging"]],
+  "gravitas-movies": [["The Secret Art of Human Flight — Indie Feature", "Grant Gustin stars in an uplifting indie comedy-drama about grief and eccentric invention"], ["Above the Shadows — Romantic Fantasy", "Olivia Thirlby & Alan Ritchson in a supernatural New York story"], ["Fast Color — Sci-Fi Drama", "Gugu Mbatha-Raw stars as a woman with extraordinary abilities returning home"], ["The Last Movie Star — Comedy Drama", "Burt Reynolds stars as an aging screen legend invited to a small film festival"], ["anguard — Action Adventure", "Global security specialists race from London to Dubai on a high-stakes rescue"], ["QueenBees — Feel-Good Comedy", "Ellen Burstyn, Jane Curtin & Christopher Lloyd in a lively retirement community comedy"]],
+  "cinevault-80s": [["Back to the Future (1985) — 80s Classic", "Marty McFly is accidentally sent back to 1955 in Doc Brown’s plutonium-powered DeLorean"], ["Ghostbusters (1984) — 80s Sci-Fi Comedy", "Bill Murray, Dan Aykroyd & Harold Ramis start a paranormal removal service in New York"], ["The Goonies (1985) — 80s Adventure", "A group of kids in Astoria follow One-Eyed Willy’s pirate treasure map"], ["Ferris Bueller’s Day Off (1986) — 80s Comedy", "A high-school wise guy takes a legendary day off in Chicago with his best friend and girlfriend"], ["Beverly Hills Cop (1984) — 80s Action Comedy", "Eddie Murphy stars as Detroit detective Axel Foley investigating a case in Beverly Hills"], ["Stand by Me (1986) — 80s Classic Drama", "Four Oregon boys set out on a hike along the railway tracks in 1959"]],
+  "cinevault-westerns": [["Tombstone (1993) — Classic Western", "Kurt Russell & Val Kilmer star as Wyatt Earp and Doc Holliday in Tombstone, Arizona"], ["The Good, the Bad and the Ugly (1966)", "Clint Eastwood in Sergio Leone’s epic Civil War gold-hunt Western"], ["Silverado (1985) — Western Adventure", "Kevin Kline, Scott Glenn, Kevin Costner & Danny Glover ride into the town of Silverado"], ["3:10 to Yuma — Frontier Western", "A drought-stricken rancher agrees to escort a captured outlaw to the train for Yuma"], ["High Noon — Golden Age Western", "Marshal Will Kane stands alone when Frank Miller’s gang arrives on the noon train"], ["The Magnificent Seven — Western Classic", "Seven gunfighters are hired to protect a small village from marauding bandits"]],
+  "filmrise-western": [["Once Upon a Time in the West — Epic Western", "Henry Fonda & Charles Bronson in Sergio Leone’s railroad frontier masterpiece"], ["True Grit — Western Adventure", "A tough US Marshal helps a stubborn teenager track down her father’s outlaw killer"], ["Butch Cassidy and the Sundance Kid", "Paul Newman & Robert Redford lead the Hole-in-the-Wall Gang across the Old West"], ["A Fistful of Dollars — Spaghetti Western", "A wandering stranger plays two rival smuggling families against each other"], ["Rio Bravo — Classic Western", "John Wayne & Dean Martin hold a town jail against a powerful rancher’s gang"], ["The Outlaw Josey Wales — Western Drama", "A Missouri farmer joins the frontier trail after the Civil War"]],
+  "charge-action": [["Die Hard — Action Blockbuster", "NYPD officer John McClane takes on Hans Gruber’s terrorists inside Nakatomi Plaza"], ["Speed — High-Octane Thriller", "Keanu Reeves & Sandra Bullock race to keep a city bus above 50 mph"], ["The Rock — Alcatraz Action Feature", "Sean Connery & Nicolas Cage infiltrate Alcatraz Island to stop a rogue general"], ["Con Air — Action Thriller", "Nicolas Cage, John Cusack & John Malkovich aboard a hijacked prisoner transport plane"], ["Ronin — European Car Chase Thriller", "Robert De Niro & Jean Reno pursue a mysterious briefcase across Paris and Nice"], ["Total Recall — Sci-Fi Action Classic", "Arnold Schwarzenegger uncovers a Martian conspiracy after a virtual vacation"]],
+  "shout-factory": [["The Princess Bride — Cult Adventure", "Rob Reiner’s beloved fairy-tale adventure with Westley, Buttercup & Inigo Montoya"], ["Clue (1985) — Cult Mystery Comedy", "Tim Curry leads six dinner guests through a hilarious mansion murder mystery"], ["Galaxy Quest — Sci-Fi Comedy Classic", "The cast of a cancelled space TV series is beamed aboard a real alien starship"], ["Big Trouble in Little China — Cult Action", "Kurt Russell battles ancient sorcery beneath San Francisco’s Chinatown"], ["Labyrinth (1986) — Fantasy Classic", "David Bowie & Jennifer Connelly in Jim Henson’s magical maze adventure"], [" Highlander (1986) — Cult Sci-Fi Fantasy", "Connor MacLeod of the Clan MacLeod battles immortals through the centuries"]],
+  "hallmark-movies": [["A Royal Winter — Feel-Good Movie", "A surprise holiday in Europe turns into an unexpected romance with a crown prince"], ["Signed, Sealed, Delivered — Mystery Movie", "The Dead Letter Office team solves the mystery behind a lost decades-old letter"], ["Aurora Teagarden Mysteries — Cozy Mystery", "A small-town librarian and the Real Murders Club investigate a puzzling local case"], ["Garage Sale Mystery — Whodunit Feature", "An antique shop owner spots a clue connecting burglaries in her town"], ["Summer Villa — Romantic Comedy", "A novelist with writer’s block and a famous chef share a French villa"], ["Chronicle Mysteries — Investigative Drama", "A true-crime podcaster returns to her hometown to solve an old disappearance"]],
+  "artflix-classics": [["North by Northwest (1959) — Hitchcock Classic", "Cary Grant is mistaken for a government agent and pursued across America to Mount Rushmore"], ["Rear Window (1954) — Suspense Masterpiece", "James Stewart & Grace Kelly suspect a neighbour of murder from a Greenwich Village courtyard"], ["Charade (1963) — Mystery Romance", "Cary Grant & Audrey Hepburn search Paris for a hidden fortune"], ["His Girl Friday (1940) — Screwball Comedy", "Cary Grant & Rosalind Russell in Howard Hawks’ rapid-fire newspaper comedy"], ["To Catch a Thief (1955) — French Riviera Mystery", "A retired jewel thief must prove his innocence along the Côte d’Azur"], ["The Lady Vanishes — Mystery Thriller", "A young traveller discovers an elderly passenger has vanished from a European train"]],
+  "24hr-freemovies": [["The Illusionist — Period Mystery", "Edward Norton stars as a master magician in turn-of-the-century Vienna"], ["National Treasure — Adventure Feature", "Nicolas Cage follows clues hidden on the Declaration of Independence"], ["The Italian Job — Heist Adventure", "A team of thieves plans a daring gold heist through subterranean tunnels"], ["Deja Vu — Sci-Fi Detective Thriller", "Denzel Washington uses an experimental time-window device to prevent a disaster"], ["Unstoppable — Runaway Train Thriller", "Denzel Washington & Chris Pine race to stop a half-mile-long unmanned freight train"], ["Limitless — Sci-Fi Thriller", "Bradley Cooper & Robert De Niro in the high-stakes nootropic thriller"]],
+  "movies-tv-net": [["The Fugitive (1993) — Suspense Blockbuster", "Harrison Ford & Tommy Lee Jones in the relentless manhunt thriller"], ["Air Force One — Action Thriller", "Harrison Ford defends the presidential aircraft from hijackers"], ["Sneakers (1992) — Tech Heist Capers", "Robert Redford, Sidney Poitier & Dan Aykroyd test security systems and find a black box"], ["Apollo 13 — Space Drama", "Tom Hanks, Kevin Bacon & Bill Paxton fight to bring the crippled lunar spacecraft home"], ["A Few Good Men — Courtroom Drama", "Tom Cruise, Jack Nicholson & Demi Moore in Rob Reiner’s military courtroom classic"], ["Rain Man — Academy Award Drama", "Dustin Hoffman & Tom Cruise on a cross-country road trip"]],
+  "made-in-hollywood": [["Behind the Scenes: Sci-Fi Blockbusters", "Inside the visual effects, stunt engineering & sound design of modern sci-fi cinema"], ["Directors’ Roundtable & Film Vault", "Interviews with acclaimed directors on cinematography and storytelling"], ["Classic Movie Locations Tour", "Visiting the real-world filming locations of iconic Hollywood movies"], ["How Practical Stunts Are Built", "Stunt coordinators break down classic car chases and practical rigs"], ["Cinema Score & Soundtrack Masters", "How Hans Zimmer, John Williams & Ennio Morricone shaped movie history"], ["New Movie Releases & Trailer Showcase", "Previews and behind-the-camera features on upcoming films"]],
+  "wutang-collection": [["Drunken Master (Jackie Chan) — Martial Arts", "Young Wong Fei-hung learns the eight drunken immortals kung-fu style"], ["The 36th Chamber of Shaolin — Kung Fu Classic", "Gordon Liu stars in the legendary Shaw Brothers martial arts masterpiece"], ["Five Deadly Venoms — Cult Martial Arts", "The final pupil of the Poison Clan must track down five former disciples"], ["Iron Monkey (Donnie Yen) — Action Classic", "A masked martial arts healer defends villagers from corrupt officials"], ["Snake in the Eagle’s Shadow — Jackie Chan", "A martial arts orphan learns the Snake Fist technique from an old master"], ["Master of the Flying Guillotine — Cult Action", "A one-armed boxer enters a martial arts tournament"]],
+  "frightflix": [["The Others — Supernatural Mystery", "Nicole Kidman stars in the atmospheric Jersey manor ghost story"], ["A Quiet Place — Suspense Thriller", "A family must live in silence to avoid blind creatures that hunt by sound"], ["Tremors (1990) — Creature Feature Classic", "Kevin Bacon battles giant subterranean sandworms in Perfection, Nevada"], ["Sleepy Hollow — Gothic Mystery", "Constable Ichabod Crane investigates the Headless Horseman in 1799 New York"], ["Signs — Sci-Fi Suspense", "A Pennsylvania family discovers intricate crop circles in their cornfields"], ["The Sixth Sense — Supernatural Thriller", "Bruce Willis & Haley Joel Osment in M. Night Shyamalan’s classic thriller"]]
 };
 
 function itvProgsForChannel(ch, nowMs = Date.now()) {
@@ -31762,7 +31982,7 @@ async function ltvRecordProg(chId, startMs) {
   };
   LTV_DVR.recordings = [rec, ...(LTV_DVR.recordings || [])];
   try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
-  render();
+  if (document.getElementById("itv-guide-mount")) itvRedrawInPlace(false); else render();
   toast(isNow ? `🔴 Recorded “${p.title}” to OneDrive & DVR Planner!` : `📅 Scheduled “${p.title}” in DVR Planner.`, "Open DVR", () => { ltvViewMode = "dvr"; go("#livetv"); render(); });
   try {
     const r = await fetch(RELAY_URL + "/livetv-dvr", {
@@ -31818,7 +32038,7 @@ async function ltvSeriesLinkProg(chId, startMs) {
     toast(`🔁 Series Linked “${seriesTitle}” on ${ch.name}! Upcoming episodes added to DVR Planner.`, "Open Planner", () => { ltvViewMode = "dvr"; go("#livetv"); render(); });
   }
   try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
-  render();
+  if (document.getElementById("itv-guide-mount")) itvRedrawInPlace(false); else render();
   try {
     const r = await fetch(RELAY_URL + "/livetv-dvr", {
       method: "POST",
@@ -31944,10 +32164,57 @@ function ltvDvrBoardHtml() {
     tbList("dvr_series", "🔁 Active Series Links", sLinks.length, slCards, false, "ltv", "Tap 🔁 Series Link on any show in the Internet TV Guide");
 }
 
+function itvMoviesSpotlightCol(allChans, nowMs, q) {
+  const movieChans = allChans.filter(c => c.cat === "movies" || /movie|film|cinema|western|sci-fi/i.test(c.name + " " + (c.catLabel || "")));
+  const picks = [];
+  movieChans.forEach(ch => {
+    const progs = itvProgsForChannel(ch, nowMs).slice(0, 2);
+    progs.forEach((p, idx) => {
+      if (q && !(ch.name + " " + p.title + " " + p.desc).toLowerCase().includes(q)) return;
+      picks.push({ ch, p, idx });
+    });
+  });
+  // Also include any movie currently on or coming up on NZ/UK channels
+  allChans.filter(c => c.cat !== "movies").forEach(ch => {
+    const progs = itvProgsForChannel(ch, nowMs).slice(0, 3);
+    progs.forEach((p, idx) => {
+      if (!/movie|feature|film/i.test(p.title + " " + p.desc)) return;
+      if (q && !(ch.name + " " + p.title + " " + p.desc).toLowerCase().includes(q)) return;
+      picks.push({ ch, p, idx });
+    });
+  });
+  picks.sort((a, b) => a.idx - b.idx || a.p.startMs - b.p.startMs);
+  const cards = picks.slice(0, 24).map(({ ch, p, idx }) => {
+    const rec = ltvIsRecScheduledOrDone(p.id, p.title, p.start);
+    const sl = ltvIsSeriesLinked(p.seriesTitle, ch.id);
+    const timeStr = `${epgClock(p.startMs)} – ${epgClock(p.endMs)}`;
+    const lbls = [
+      [idx === 0 ? "🎬 MOVIE ON NOW" : "⏭ UP NEXT · " + epgClock(p.startMs), idx === 0 ? "#e11d48" : "#0284c7"],
+      [ch.name, "#334155"]
+    ];
+    if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : "📅 Scheduled", "#16a34a"]);
+    return `<div class="tbcard" style="border-left:4px solid ${idx === 0 ? "#e11d48" : "#0284c7"}">
+      <div class="tbbody">
+        ${tbLbl(lbls)}
+        <div class="tbt">🎬 ${esc(p.title)}</div>
+        <div class="tbs" style="font-weight:650">${esc(ch.name)} · ${esc(timeStr)}</div>
+        <div class="tbs">${esc(p.desc)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn small primary" style="padding:4px 9px;font-size:.74rem" onclick="go('#livetv');setTimeout(()=>ltvPlayId(${jsArg(ch.id)}),60)">▶ Watch Movie</button>
+          <button type="button" class="btn small" style="padding:4px 9px;font-size:.74rem;${rec ? "background:#dcfce7;color:#166534;border-color:#86efac" : ""}" onclick="ltvRecordProg(${jsArg(ch.id)},${p.startMs})">${rec ? (rec.status === "ready" ? "📼 Recorded ✓" : "📅 Scheduled ✓") : "🔴 Record Movie"}</button>
+          <button type="button" class="btn small" style="padding:4px 9px;font-size:.74rem;${sl ? "background:#f3e8ff;color:#6b21a8;border-color:#d8b4fe" : ""}" onclick="ltvSeriesLinkProg(${jsArg(ch.id)},${p.startMs})">${sl ? "🔁 Linked ✓" : "🔁 Series Link"}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  return tbList("itv_movies_now", "🎬 Movies On Now & Next (All Channels)", picks.length, cards, false, "ltv");
+}
+
 function renderInternetTvGuide() {
   const all = ltvAllChannels();
   const presets = ltvPresets();
   const q = itvQ.trim().toLowerCase();
+  const movieCount = all.filter(c => c.cat === "movies").length;
   const filteredChans = all.filter(ch => {
     if (itvCatFilt === "presets" && !presets.includes(ch.id)) return false;
     else if (itvCatFilt !== "all" && itvCatFilt !== "presets" && ch.cat !== itvCatFilt) return false;
@@ -31958,22 +32225,24 @@ function renderInternetTvGuide() {
 
   const catChips = [
     ["all", "All (" + all.length + ")"],
+    ["movies", "🎬 Movies (" + movieCount + ")"],
     ["presets", "⭐ Presets (P1–P12)"],
     ["nz", "🇳🇿 NZ & AU"],
     ["uk", "🇬🇧 UK & British TV"],
-    ["movies", "🎬 Movies & Sci-Fi"],
     ["comedy", "😂 Comedy & Sitcoms"],
     ["home", "🔨 Home, DIY & Cars"],
     ["doco", "🔍 Crime & History"],
     ["space", "🚀 Space & Nature"],
     ["news", "🌍 World News"],
     ["music", "🎵 Music TV"]
-  ].map(([k, lbl]) => `<button type="button" class="chip${itvCatFilt === k ? " on" : ""}" onclick="itvCatFilt='${k}';render()">${esc(lbl)}</button>`).join("");
+  ].map(([k, lbl]) => `<button type="button" class="chip${itvCatFilt === k ? " on" : ""}" onclick="setItvCatFilt('${k}')">${esc(lbl)}</button>`).join("");
 
+  const nowMs = Date.now();
   const slotCount = itvTimeFilt === "now" ? 3 : itvTimeFilt === "tonight" ? 6 : 8;
-  const cols = filteredChans.slice(0, 36).map(ch => {
-    const progs = itvProgsForChannel(ch, Date.now()).slice(0, slotCount);
+  const chanCols = filteredChans.slice(0, 36).map(ch => {
+    const progs = itvProgsForChannel(ch, nowMs).slice(0, slotCount);
     const pSlot = presets.indexOf(ch.id) + 1;
+    const isMovieCh = ch.cat === "movies";
     const cards = progs.map((p, idx) => {
       const rec = ltvIsRecScheduledOrDone(p.id, p.title, p.start);
       const sl = ltvIsSeriesLinked(p.seriesTitle, ch.id);
@@ -31981,12 +32250,13 @@ function renderInternetTvGuide() {
       const lbls = [
         [idx === 0 ? "● ON NOW" : idx === 1 ? "⏭ UP NEXT" : timeStr, idx === 0 ? "#dc2626" : idx === 1 ? "#0284c7" : "#475569"]
       ];
+      if (isMovieCh) lbls.push(["🎬 Movie", "#e11d48"]);
       if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : "📅 Scheduled", "#16a34a"]);
       if (sl) lbls.push(["🔁 Series Linked", "#7c3aed"]);
       return `<div class="tbcard" style="${idx === 0 ? "border-left:4px solid #dc2626" : ""}">
         <div class="tbbody">
           ${tbLbl(lbls)}
-          <div class="tbt">${esc(p.title)}</div>
+          <div class="tbt">${isMovieCh ? "🎬 " : ""}${esc(p.title)}</div>
           <div class="tbs" style="font-weight:650">${esc(timeStr)} · ${esc(p.episode)}</div>
           <div class="tbs">${esc(p.desc)}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
@@ -32000,40 +32270,45 @@ function renderInternetTvGuide() {
     return tbList("itv_" + ch.id, (pSlot ? `[P${pSlot}] ` : "") + ch.name, progs.length, cards, false, "ltv");
   }).join("");
 
+  const movieSpotlight = (itvCatFilt === "movies" || itvCatFilt === "all") ? itvMoviesSpotlightCol(all, nowMs, q) : "";
+  const cols = movieSpotlight + chanCols;
+
   const readyN = ((LTV_DVR && LTV_DVR.recordings) || []).length;
-  return `<div style="margin-top:6px">
+  return `<div id="itv-guide-mount" style="margin-top:6px">
     <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">
-      <label class="search" style="flex:1;margin:0">${I("search")}<input type="search" placeholder="Search Internet TV shows or channels (MythBusters, BBC, Midsomer, movies…)" value="${esc(itvQ)}" oninput="itvQ=this.value;render()"></label>
+      <label class="search" style="flex:1;margin:0">${I("search")}<input id="itv-search-inp" type="search" placeholder="Search Internet TV movies, shows or channels (Back to the Future, MythBusters, BBC…)" value="${esc(itvQ)}" oninput="setItvSearch(this.value)"></label>
+      ${itvQ ? `<button type="button" class="btn small" onclick="setItvSearch('')">Clear</button>` : ""}
       <button type="button" class="btn small primary" onclick="ltvViewMode='dvr';go('#livetv')">📼 DVR Planner (${readyN})</button>
     </div>
-    <div class="chips scroll" style="margin:0 0 8px">${catChips}</div>
+    <div class="chips scroll" id="itv-cat-chips" style="margin:0 0 8px">${catChips}</div>
     <div class="chips" style="margin:0 0 10px">
-      <button type="button" class="chip${itvTimeFilt === "now" ? " on" : ""}" onclick="itvTimeFilt='now';render()">Now &amp; Next (3h)</button>
-      <button type="button" class="chip${itvTimeFilt === "tonight" ? " on" : ""}" onclick="itvTimeFilt='tonight';render()">6-Hour Lineup</button>
-      <button type="button" class="chip${itvTimeFilt === "full" ? " on" : ""}" onclick="itvTimeFilt='full';render()">8-Hour Guide</button>
+      <button type="button" class="chip${itvTimeFilt === "now" ? " on" : ""}" onclick="setItvTimeFilt('now')">Now &amp; Next (3h)</button>
+      <button type="button" class="chip${itvTimeFilt === "tonight" ? " on" : ""}" onclick="setItvTimeFilt('tonight')">6-Hour Lineup</button>
+      <button type="button" class="chip${itvTimeFilt === "full" ? " on" : ""}" onclick="setItvTimeFilt('full')">8-Hour Guide</button>
+      <button type="button" class="chip${itvCatFilt === "movies" ? " on" : ""}" style="${itvCatFilt === "movies" ? "" : "border-color:#e11d48;color:#e11d48"}" onclick="setItvCatFilt(itvCatFilt==='movies'?'all':'movies')">🎬 Movies Only (${movieCount})</button>
     </div>
     <div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0f172a,#1e3a8a 55%,#065f46)"></div>
-      <div class="tbtop"><div><h1>🌐 Internet TV Guide (${filteredChans.length} Channels)</h1><div style="font-size:.82rem;opacity:.9">Tap <b>🔴 Record</b> or <b>🔁 Series Link</b> on any programme · Playback &amp; Planner in Live TV · Synced with OneDrive</div></div><button class="iconbtn" onclick="ltvViewMode='dvr';go('#livetv')" title="Open DVR Planner">📼</button></div>
-      <div class="tblists">${cols || `<div class="tbempty">No channels match that filter.</div>`}</div>
+      <div class="tbtop"><div><h1>${itvCatFilt === "movies" ? "🎬 Internet TV Movies Guide (" + movieCount + " Movie Channels)" : "🌐 Internet TV Guide (" + filteredChans.length + " Channels)"}</h1><div style="font-size:.82rem;opacity:.9">Tap <b>🔴 Record</b> or <b>🔁 Series Link</b> on any movie or programme · Playback &amp; Planner in Live TV · Synced with OneDrive</div></div><button class="iconbtn" onclick="ltvViewMode='dvr';go('#livetv')" title="Open DVR Planner">📼</button></div>
+      <div class="tblists" id="itv-lists">${cols || `<div class="tbempty">No channels match that filter.</div>`}</div>
     </div>
   </div>`;
 }
 
-// Wrap TvGuide() so it has top tabs for "📺 Freeview & Sky Guide" | "🌐 Internet TV Guide (Record & Series Link)" | "📼 DVR Playback & Planner"
-// AND also shows the Internet TV Guide section right underneath the Freeview grid!
+// Wrap TvGuide() so it has top tabs for "🌐 Internet TV Guide" | "🎬 Movies Guide" | "📺 Freeview & Sky Guide" | "📼 DVR Playback & Planner"
 (() => {
   const origTvGuide = TvGuide;
   TvGuide = function () {
     const recCount = ((LTV_DVR && LTV_DVR.recordings) || []).length;
     const topPills = `<div class="chips scroll" style="margin:0 0 10px">
-      <button type="button" class="chip${tvGuideSection === "freeview" ? " on" : ""}" onclick="tvGuideSection='freeview';render()">📺 Freeview &amp; Sky TV Guide</button>
-      <button type="button" class="chip${tvGuideSection === "internet" ? " on" : ""}" onclick="tvGuideSection='internet';render()">🌐 Internet TV Guide (Record &amp; Series Link)</button>
+      <button type="button" class="chip${tvGuideSection === "internet" && itvCatFilt !== "movies" ? " on" : ""}" onclick="itvCatFilt='all';setTvGuideSection('internet')">🌐 Internet TV Guide (All Channels)</button>
+      <button type="button" class="chip${(tvGuideSection === "movies" || (tvGuideSection === "internet" && itvCatFilt === "movies")) ? " on" : ""}" onclick="setTvGuideSection('movies')">🎬 Movies Guide (On Now &amp; Next)</button>
+      <button type="button" class="chip${tvGuideSection === "freeview" ? " on" : ""}" onclick="setTvGuideSection('freeview')">📺 Freeview &amp; Sky TV Guide</button>
       <button type="button" class="chip" onclick="ltvViewMode='dvr';go('#livetv')">📼 DVR Playback &amp; Planner (${recCount})</button>
       <button type="button" class="chip" onclick="ltvViewMode='channels';go('#livetv')">▶ Watch Live Internet TV</button>
     </div>`;
-    if (tvGuideSection === "internet") {
+    if (tvGuideSection === "internet" || tvGuideSection === "movies") {
       return `<button class="back" onclick="go('#media')">${I("left")} Entertainment</button>` +
-        header("Internet TV Guide", "Live schedules, 🔴 Record & 🔁 Series Link · saved to OneDrive") +
+        header(itvCatFilt === "movies" ? "🎬 Internet TV Movies Guide" : "Internet TV Guide", "Live movie & channel schedules, 🔴 Record & 🔁 Series Link · saved to OneDrive") +
         topPills +
         renderInternetTvGuide();
     }
@@ -32065,10 +32340,11 @@ function renderInternetTvGuide() {
   LiveTvPage = function () {
     const recCount = ((LTV_DVR && LTV_DVR.recordings) || []).length;
     const slCount = ((LTV_DVR && LTV_DVR.seriesLinks) || []).length;
-    const modeBar = `<div class="chips scroll" style="margin:0 0 10px">
-      <button type="button" class="chip${ltvViewMode === "channels" ? " on" : ""}" onclick="ltvViewMode='channels';render()">📺 All Live Channels &amp; DVR (${ltvAllChannels().length})</button>
-      <button type="button" class="chip${ltvViewMode === "dvr" ? " on" : ""}" onclick="ltvViewMode='dvr';render()">📼 DVR Playback &amp; Planner (${recCount} rec · ${slCount} series)</button>
-      <button type="button" class="chip" onclick="tvGuideSection='internet';go('#tv')">🗓️ Open Internet TV Guide (Record &amp; Series Link)</button>
+    const modeBar = `<div class="chips scroll" id="ltv-mode-bar" style="margin:0 0 10px">
+      <button type="button" class="chip${ltvViewMode === "channels" ? " on" : ""}" onclick="ltvViewMode='channels';ltvRedrawBoard();document.querySelectorAll('#ltv-mode-bar .chip').forEach((b,i)=>b.classList.toggle('on',i===0))">📺 All Live Channels &amp; DVR (${ltvAllChannels().length})</button>
+      <button type="button" class="chip${ltvViewMode === "dvr" ? " on" : ""}" onclick="ltvViewMode='dvr';ltvRedrawBoard();document.querySelectorAll('#ltv-mode-bar .chip').forEach((b,i)=>b.classList.toggle('on',i===1))">📼 DVR Playback &amp; Planner (${recCount} rec · ${slCount} series)</button>
+      <button type="button" class="chip" onclick="setTvGuideSection('movies');go('#tv')">🎬 Internet TV Movies Guide</button>
+      <button type="button" class="chip" onclick="setTvGuideSection('internet');go('#tv')">🗓️ Open Internet TV Guide (Record &amp; Series Link)</button>
     </div>`;
     const base = origLiveTvPage.apply(this, arguments);
     return base.replace(`<div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">`, modeBar + `<div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">`);
