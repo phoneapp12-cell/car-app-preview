@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.7';
+const APP_VERSION = '2.28.8';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20468,10 +20468,12 @@ function nbFunCards() {
     return `<button type="button" class="tbcard" ${go ? `onclick="${esc(go)}"` : ''}>${s.img ? `<div class="tbcover" style="aspect-ratio:16/9;overflow:hidden;background:${col[s.id] || '#475569'}"><img src="${esc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl([[s.emoji + ' ' + s.label, col[s.id] || '#475569']])}<div class="tbt">${esc(s.title.length > 120 ? s.title.slice(0, 118) + '…' : s.title)}</div>${sn ? `<div class="tbs">${esc(sn.length > 110 ? sn.slice(0, 108) + '…' : sn)}</div>` : ''}</div></button>`; }).join('');
 }
 const nbStrip = h => String(h || '').replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ');
+const nbIsBill = x => !!(x && (['bill', 'loan', 'pay', 'budget', 'xfer', 'move'].includes(x.kind) || x.ic === 'bill' || /go\('#(bills|cashflow|loans)'\)/.test(String(x.html || x.go || ''))));
 function nbBoardHtml(list) {
+  list = (list || []).filter(x => !nbIsBill(x));
   const now = [], today = [], week = [], later = [];
   const urgent = x => x.days < 0 || (x.days === 0 && x.pri === 0) || ((x.kind === 'car' || x.kind === 'driver') && x.days <= 0);
-  let ja = []; try { ja = justAddedList(); } catch (e) { }
+  let ja = []; try { ja = justAddedList().filter(x => !nbIsBill(x)); } catch (e) { }
   // 2.28.5: a Just added item that is already in a column gets a New badge there instead of a second card
   const jaLeft = ja.filter(j => { const hit = list.find(x => { const t = x.ref && x.ref.todo; return (t && String(j.go || '').includes("'" + t.id + "'")) || (x.name && cuNorm(x.name) === cuNorm(nbStrip(j.title))); }); if (hit) { hit.isNew = true; return false; } return true; });
   list.forEach(x => (urgent(x) ? now : x.days <= 0 ? today : x.days <= 7 ? week : later).push(x));
@@ -20488,7 +20490,7 @@ function nbBoardHtml(list) {
     tbList('fun', 'Fun & Daily', nbStoryList().length, nbFunCards(), false, 'nb', 'Nothing today');
 }
 function nbMenu(k) {
-  const n = (() => { try { return justAddedList().length; } catch (e) { return 0; } })();
+  const n = (() => { try { return justAddedList().filter(x => !nbIsBill(x)).length; } catch (e) { return 0; } })();
   openSheet({ now: 'Urgent / Now', today: 'Today', week: 'This week', later: 'Later', fun: 'Fun & Daily' }[k] || 'Notifications', `<p class="muted">Most urgent on the left, most important at the top of each list. Cards move along by themselves as dates get closer.</p><div class="btns" style="flex-direction:column;align-items:stretch">${n ? `<button type="button" class="btn" onclick="closeSheet().then(justAddedClear)">Clear new… (${n})</button>` : ''}<button type="button" class="btn" onclick="closeSheet().then(()=>go('#calendar'))">${I('cal')} Calendar</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button></div>`, null);
 }
 function nbTopHtml() {
@@ -21038,7 +21040,7 @@ function glDueItems() {
         if (cp && cp.rd != null && cp.rd <= 7) out.push({ days: cp.rd, html: cp.html, noCount: cp.rd > 1 });
         return;
       }
-      const ok = k === 'bill' || k === 'pay' || k === 'loan' ? d <= 1 : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? false : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
+      const ok = k === 'bill' || k === 'pay' || k === 'loan' ? false : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? false : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
       if (!ok) return;
       let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
       out.push({ days: d, html: h });
@@ -21055,8 +21057,7 @@ function glDueItems() {
       out.push({ days: d, html: glTodoCard(t, d), noCount: d > 1, todoId: t.id });
     });
   } catch (e) { }
-  // 2.26.60: ASB card due in 3 days or less, until it's paid in full (one gentle row, no push)
-  try { const g = !cardDays().dueGuess && cardGoal(); if (g && !g.full) { const d = daysLeft(g.due); if (d >= 0 && d <= 3) out.push({ days: Math.max(1, d), noCount: true, html: `<button class="row" onclick="go('#cashflow')"><div class="ic bill">💳</div><div class="tx"><div class="t">ASB credit card due ${d === 0 ? 'today' : d === 1 ? 'tomorrow' : fmtW(g.due)}</div><div class="s">${g.paid ? 'Part paid ' + money(g.paid) + ' · ' : ''}${money(g.left)} to pay it off in full</div></div><span class="pill">${d === 0 ? 'Today' : d + (d === 1 ? ' day' : ' days')}</span></button>` }); } } catch (e) { }
+  // 2.28.8: bills hidden from Notifications
   // 2.26.31: birthdays from the Birthdays list, 28 days ahead. Today → Urgent; 1–28 days → Coming up; only 0–7 days count toward the bell badge.
   try {
     (S.birthdays || []).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 28 && glOk(x.b.name)).forEach(x => {
@@ -22609,7 +22610,7 @@ function pnItems() {
 }
 function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  const P = { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: (() => { try { return abItems(); } catch (e) { return []; } })(), mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems(); } catch (e) { return []; } })() };
+  const P = { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: [], mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems().filter(x => x.sec !== 'bill'); } catch (e) { return []; } })() };
   try { // 2.26.53: reminders; a to-do already here gets the time attached instead of its own row
     const R = rmItems(), seen = P.dueUrgent.concat(P.coming).map(x => x.html).join('') + P.fresh.join('');
     const packOn = x => x.packKey && seen.includes(`packTick('${esc(x.packKey)}')`); // 2.26.55: on the event's row already
@@ -23860,7 +23861,7 @@ function glWorkCard(m) {
 const bellTxt = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 function bellTodayRows(have) {
   const rows = [], seen = new Set();
-  try { glCU().filter(x => typeof x.days === 'number' && x.days <= 0).forEach(x => { let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
+  try { glCU().filter(x => typeof x.days === 'number' && x.days <= 0 && !nbIsBill(x)).forEach(x => { let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
     const d = document.createElement('div'); d.innerHTML = h; const t = bellTxt((d.querySelector('.t') || d).innerHTML).slice(0, 60);
     if (!t || seen.has(t) || have.includes(t)) return; seen.add(t); rows.push(h); }); } catch (e) { }
   return rows;
