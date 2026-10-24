@@ -137,6 +137,45 @@ async function carKey(k) {
   let hex = ''; for (const b of new Uint8Array(dig)) hex += b.toString(16).padStart(2, '0');
   return 'shared-car-v1:' + hex;
 }
+async function petsKey(k) {
+  const dig = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('shared-pets-v1:' + k));
+  let hex = ''; for (const b of new Uint8Array(dig)) hex += b.toString(16).padStart(2, '0');
+  return 'shared-pets-v1:' + hex;
+}
+export function cleanPet(p, now = Date.now()) {
+  if (!p || typeof p !== 'object') return null;
+  const id = str(p.id, 48).trim();
+  if (!/^[A-Za-z0-9_-]{2,48}$/.test(id)) return null;
+  const updated = Math.min(Number(p.updated) || now, now + 300000);
+  if (p.deleted) return { id, deleted: true, updated };
+  const name = str(p.name, 40).trim();
+  if (!name) return null;
+  const type = ['dog', 'cat', 'other'].includes(p.type) ? p.type : 'other';
+  const care = (Array.isArray(p.care) ? p.care : []).slice(0, 30).map(c => {
+    if (!c || typeof c !== 'object') return null;
+    const cid = str(c.id, 40).trim(); if (!cid) return null;
+    const unit = ['weeks', 'months', 'years', 'none'].includes(c.unit) ? c.unit : 'months';
+    const every = unit === 'none' ? 0 : Math.max(1, Math.min(99, Math.round(Number(c.every) || 1)));
+    return { id: cid, kind: str(c.kind || 'custom', 20), name: str(c.name || 'Care', 40).trim() || 'Care', every, unit, last: isoOk(c.last), due: isoOk(c.due) };
+  }).filter(Boolean);
+  const history = (Array.isArray(p.history) ? p.history : []).slice(0, 60).map(h => {
+    if (!h || typeof h !== 'object' || !isoOk(h.date)) return null;
+    return { id: str(h.id || 'ph', 40), careId: str(h.careId, 40), kind: str(h.kind, 20), name: str(h.name, 40), date: isoOk(h.date), notes: str(h.notes, 240), cost: h.cost === '' || h.cost == null ? '' : num(h.cost), at: Number(h.at) || 0 };
+  }).filter(Boolean);
+  return { id, name, type, breed: str(p.breed, 50).trim(), birthday: isoOk(p.birthday), chip: str(p.chip, 24).trim(), vet: str(p.vet, 60).trim(), vetPhone: str(p.vetPhone, 24).trim(), notes: str(p.notes, 500).trim(), care, history, updated };
+}
+export function mergePets(cur, incoming, now = Date.now()) {
+  const map = new Map();
+  (Array.isArray(cur) ? cur : []).forEach(x => { const c = cleanPet(x, now); if (c) map.set(c.id, c); });
+  let changed = false;
+  (Array.isArray(incoming) ? incoming : []).slice(0, 20).forEach(x => {
+    const c = cleanPet(x, now); if (!c) return;
+    const have = map.get(c.id);
+    if (!have || c.updated > (have.updated || 0)) { map.set(c.id, c); changed = true; }
+  });
+  const pets = [...map.values()].filter(x => !x.deleted || now - x.updated < TOMBSTONE_MS);
+  return { pets, changed };
+}
 export async function sharedCarRoute(body, env, now = Date.now(), notifySarah = sarahPush) {
   const k = normSharedKey(body && body.key);
   if (!k) return [403, { error: 'bad_key' }];
@@ -155,7 +194,16 @@ export async function sharedCarRoute(body, env, now = Date.now(), notifySarah = 
     if (!same) { await env.EVENTS_KV.put(key, JSON.stringify(c)); cur = c; }
     if (note && notifySarah) { try { await notifySarah(env, k, note.msg, now); } catch (e) { } }
   }
-  return [200, { ok: true, car: cur || null, now }];
+  const pKey = await petsKey(k);
+  let curPets = null;
+  try { curPets = await env.EVENTS_KV.get(pKey, { type: 'json' }); } catch (e) { curPets = null; }
+  let petList = curPets && Array.isArray(curPets.pets) ? curPets.pets : [];
+  if (body && Array.isArray(body.pets)) {
+    const pm = mergePets(petList, body.pets, now);
+    petList = pm.pets;
+    if (pm.changed) { await env.EVENTS_KV.put(pKey, JSON.stringify({ updatedAt: new Date(now).toISOString(), pets: petList })); }
+  }
+  return [200, { ok: true, car: cur || null, pets: petList, now }];
 }
 
 /* 1.5.0 / 2.23.18: invoice photos for shared UniMed claims. One compressed JPEG per id (≤ ~320 KB), same shared key,

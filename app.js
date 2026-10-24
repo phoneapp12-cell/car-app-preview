@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.11';
+const APP_VERSION = '2.28.12';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -157,7 +157,7 @@ function normalise(d) {
   delete d.summaryFeedback; // 2.22.23: summary votes removed
   d.about = normAbout(d.about); // 2.13.0: About you (older data and backups have none)
   d.roster = normRoster(d.roster); // 2.13.0: work roster (older data and backups have none)
-  d.pets = normPets(d.pets); // 1.5.0: Pets & Vet (older data and backups have none)
+  d.pets = normPets(d.pets, d.settings); // 1.5.0: Pets & Vet (older data and backups have none)
   d.health = normHealth(d.health); // 1.8.0: Health (older data and backups have none)
   d.garden = normGarden(d.garden); // 1.20.0: Gardening (older data and backups have none)
   d.settings = Object.assign({ name: 'Shane', reminders: true, apptReminders: true, bdayReminders: true }, d.settings || {});
@@ -4895,7 +4895,8 @@ const SH = {
    For: Sarah or that mention Sarah) go to her app's Appointments with the blue S. Two-way: her edits and deletes come
    back here. Shane's own health items and medications never go. "Share with Sarah" (default on) can stop one. */
 const SARAH_RE = /\bsarah\b/i;
-const apptForSarah = a => !!(a && a.from !== 'sarah' && !a.evId && a.shareSarah !== false && (a.for === 'sarah' || (!a.for && SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')))));
+const PET_NAME_RE = /\b(zeus|mindy|silken)\b/i;
+const apptForSarah = a => !!(a && a.from !== 'sarah' && !a.evId && a.shareSarah !== false && (a.for === 'sarah' || PET_NAME_RE.test(String(a.title || '')) || (!a.for && SARAH_RE.test(String(a.title || '') + ' ' + String(a.notes || '')))));
 const isSarahPerson = p => !!(p && /^\s*sarah\b/i.test(String(p.name || '')));
 function healthSarahItemsAll() { const out = []; (S.health || []).forEach(p => (p.items || []).forEach(it => { if (it && (isSarahPerson(p) || SARAH_RE.test([it.name, it.clinic].join(' ')))) out.push({ p, it }); })); return out; }
 function healthSarahItems() {
@@ -4974,17 +4975,60 @@ function jaSarahInject(h, kind, id) {
 const SARAH_CAR_PLATE = 'PNU312';
 const sarahCar = () => (S.cars || []).find(c => c && String(c.plate || '').replace(/\s+/g, '').toUpperCase() === SARAH_CAR_PLATE) || null;
 let sarahCarBusy = false;
-async function publishSarahCar() {
-  const c = sarahCar(); if (!c || sarahCarBusy || navigator.onLine === false) return;
-  const car = { name: String(c.name || "Sarah's car"), plate: SARAH_CAR_PLATE, model: [c.model].filter(Boolean).join(' '), year: String(c.year || ''), wof: c.wof || '', rego: c.rego || '', svc: c.svcDate || '', svcKm: c.svcKm || '', odo: c.odo || '' };
-  try { car.wofSt = wofStatus(c); } catch (e) { } // 2.26.50
-  const sig = JSON.stringify(car);
-  let last = ''; try { last = localStorage.getItem('sarahCarSent') || ''; } catch (e) { }
-  if (sig === last) return;
+function mergeSharedPets(remote) {
+  if (!Array.isArray(remote) || !S) return false;
+  let changed = false;
+  const delMap = (S.settings && S.settings.deletedPets && typeof S.settings.deletedPets === 'object') ? S.settings.deletedPets : {};
+  remote.forEach(rp => {
+    if (!rp || !rp.id) return;
+    const rUpd = Number(rp.updated) || 0;
+    if (rp.deleted) {
+      const idx = (S.pets || []).findIndex(p => p.id === rp.id);
+      if (idx >= 0 && rUpd > (Number(S.pets[idx].updated) || 0)) {
+        S.pets.splice(idx, 1);
+        delMap[rp.id] = rUpd;
+        changed = true;
+      }
+      return;
+    }
+    if (delMap[rp.id] && delMap[rp.id] >= rUpd) return;
+    const byId = (S.pets || []).find(p => p.id === rp.id);
+    const byName = !byId && (S.pets || []).find(p => String(p.name || '').trim().toLowerCase() === String(rp.name || '').trim().toLowerCase());
+    const loc = byId || byName;
+    if (!loc) {
+      S.pets.push(normPets([rp])[0]);
+      changed = true;
+    } else if (rUpd > (Number(loc.updated) || 0)) {
+      const cl = normPets([Object.assign({}, rp, { id: loc.id })])[0];
+      if (cl) { Object.assign(loc, cl); changed = true; }
+    }
+  });
+  if (changed && S.settings) S.settings.deletedPets = delMap;
+  return changed;
+}
+async function publishSarahCar(force = false) {
+  if (!S || sarahCarBusy || navigator.onLine === false) return;
+  const c = sarahCar();
+  const car = c ? { name: String(c.name || "Sarah's car"), plate: SARAH_CAR_PLATE, model: [c.model].filter(Boolean).join(' '), year: String(c.year || ''), wof: c.wof || '', rego: c.rego || '', svc: c.svcDate || '', svcKm: c.svcKm || '', odo: c.odo || '' } : null;
+  if (car && c) { try { car.wofSt = wofStatus(c); } catch (e) { } }
+  const delMap = (S.settings && S.settings.deletedPets && typeof S.settings.deletedPets === 'object') ? S.settings.deletedPets : {};
+  const petsPayload = [
+    ...(S.pets || []).map(p => Object.assign({}, p, { updated: Number(p.updated) || 1.7e12 })),
+    ...Object.entries(delMap).map(([id, updated]) => ({ id, deleted: true, updated: Number(updated) || Date.now() }))
+  ];
   sarahCarBusy = true;
   try {
-    const r = await fetch(SHARED_URL.replace(/\/shared-todo$/, '/shared-car'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: sharedKey(), car: Object.assign({ updated: Date.now() }, car) }) });
-    if (r.ok) try { localStorage.setItem('sarahCarSent', sig); } catch (e) { }
+    const body = { key: sharedKey(), pets: petsPayload };
+    if (car) body.car = Object.assign({ updated: Date.now() }, car);
+    const r = await fetch(SHARED_URL.replace(/\/shared-todo$/, '/shared-car'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.ok) {
+      const d = await r.json().catch(() => null);
+      if (d && Array.isArray(d.pets) && mergeSharedPets(d.pets)) {
+        sharedApplying = true;
+        try { await kvSet('data', S); } catch (e) { } finally { sharedApplying = false; }
+        if (!sheetOpen) render();
+      }
+    }
   } catch (e) { } finally { sarahCarBusy = false; }
 }
 /* ================= UNIMED SMART CLAIM HELPER (2.23.18) =================
@@ -6941,7 +6985,7 @@ const RADIO = [
   { name: 'Rhema', freq: '621 AM', where: 'Whangārei', home: 'https://rhema.co.nz/frequencies', stream: 'https://rhema-radio.streamguys1.com/rhema.aac' },
   { name: 'Newstalk ZB', freq: '729 AM, 1026 AM, 105.1 FM and 1215 AM', where: 'Northland', home: 'https://www.newstalkzb.co.nz/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_01AAC.aac' },
 ];
-// 2.28.11: Car stereo head-unit with FM1/FM2 presets (1-6 & 7-12), LCD frequency dial, seek & volume
+// 2.28.12: Car stereo head-unit with FM1/FM2 presets (1-6 & 7-12), LCD frequency dial, seek & volume
 const RADIO_DEFAULT_PRESETS = [4, 3, 11, 10, 1, 21, 2, 5, 6, 8, 15, 18]; // More FM, The Breeze, The Sound, Coast, The Hits, Newstalk ZB | The Rock, Breeze Classic, Hauraki, ZM, RNZ National, Mai FM
 const radioSt = (() => {
   let idx = 4, vol = 85, muted = false, bank = 0;
@@ -8996,14 +9040,72 @@ const CARE_SUGGEST = ['Medication', 'Heartworm', 'Tick treatment', 'Dental clean
 const UNITS = [['weeks', 'weeks'], ['months', 'months'], ['years', 'years'], ['none', 'Doesn’t repeat']];
 const careItem = kind => Object.assign({ id: 'care-' + kind, kind, last: '', due: '' }, PET_CARE[kind]);
 const defaultCare = type => ['flea', 'worm', 'vacc', 'groom', 'check'].concat(type === 'dog' ? ['reg'] : []).map(careItem);
-function normPets(list) {
-  return (Array.isArray(list) ? list : []).filter(p => p && typeof p === 'object' && p.id).map(p => {
+const DEFAULT_PETS = [
+  { id: 'pet-zeus', name: 'Zeus', type: 'dog' },
+  { id: 'pet-mindy', name: 'Mindy', type: 'cat' },
+  { id: 'pet-silken', name: 'Silken', type: 'cat' }
+];
+function normPets(list, settings) {
+  const out = (Array.isArray(list) ? list : []).filter(p => p && typeof p === 'object' && p.id).map(p => {
     p.name = String(p.name || 'Pet'); if (!['dog', 'cat', 'other'].includes(p.type)) p.type = 'other';
     ['breed', 'birthday', 'chip', 'vet', 'vetPhone', 'notes'].forEach(k => { if (typeof p[k] !== 'string') p[k] = ''; });
     p.care = (Array.isArray(p.care) ? p.care : []).filter(c => c && c.id).map(c => Object.assign({ kind: 'custom', name: 'Care', every: 1, unit: 'months', last: '', due: '' }, c));
     p.history = (Array.isArray(p.history) ? p.history : []).filter(h => h && h.id && parseD(h.date) != null);
+    p.updated = Number(p.updated) || 1.7e12;
     return p;
   });
+  const del = (settings && settings.deletedPets && typeof settings.deletedPets === 'object') ? settings.deletedPets : {};
+  DEFAULT_PETS.forEach(dp => {
+    if (del[dp.id]) return;
+    const re = new RegExp('\\b' + dp.name + '\\b', 'i');
+    if (!out.some(p => p.id === dp.id || re.test(String(p.name || '')))) {
+      out.push({ id: dp.id, name: dp.name, type: dp.type, breed: '', birthday: '', chip: '', vet: '', vetPhone: '', notes: '', care: defaultCare(dp.type), history: [], updated: 1.7e12 });
+    }
+  });
+  return out;
+}
+/* 2.28.12: Any appointments (or calendar events / dated to-dos) with Zeus, Mindy, or Silken in the name are shown in Pets as a duplicate. */
+function petDupAppts(petName) {
+  if (!S) return [];
+  const re = petName ? new RegExp('\\b' + homeSugEsc(petName) + '\\b', 'i') : PET_NAME_RE;
+  const out = [], seen = new Set();
+  const T = todayT();
+  const push = x => {
+    if (!x || !x.date || parseD(x.date) == null) return;
+    const k = x.date + '|' + String(x.title || '').trim().toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(Object.assign({ days: daysLeft(x.date) }, x));
+  };
+  (S.appts || []).forEach(a => {
+    if (!a || !a.date || (a.from === 'sarah' && a.done)) return;
+    if (!re.test(String(a.title || ''))) return;
+    if (daysLeft(a.date) < -30) return;
+    push({ id: 'appt:' + a.id, title: a.title, date: a.date, time: a.time ? fmtTime(a.time) : 'All day', sort: a.time || '00:00', notes: [a.place, a.notes].filter(Boolean).join(' · '), sarah: a.from === 'sarah', go: `apptForm('${a.id}')`, src: a.from === 'sarah' ? 'Sarah’s appointment' : 'Appointment' });
+  });
+  try {
+    mineItems(T - 7 * DAY, T + 365 * DAY, true).forEach(e => {
+      if (!e || e.done || !re.test(String(e.title || ''))) return;
+      push({ id: 'mine:' + e.id + ':' + e.date, title: e.title, date: e.date, time: e.time || 'All day', sort: e.sort || '00:00', notes: e.notes || '', go: e.go, src: 'My event' });
+    });
+  } catch (e) { }
+  try {
+    extEvents(T - 7 * DAY, T + 365 * DAY).forEach(e => {
+      if (!e || !re.test(String(e.title || ''))) return;
+      push({ id: 'ext:' + e.date + ':' + e.title, title: e.title, date: e.date, time: e.time || 'All day', sort: e.sort || '00:00', notes: e.tag || 'Calendar', go: `calOpenDay(${parseD(e.date)})`, src: e.tag || 'Calendar' });
+    });
+  } catch (e) { }
+  (S.todos || []).forEach(t => {
+    if (!t || t.done || !t.due || t.apptId || !re.test(String(t.title || ''))) return;
+    if (daysLeft(t.due) < -30) return;
+    push({ id: 'todo:' + t.id, title: t.title, date: t.due, time: 'To-do', sort: '23:59', notes: t.notes || '', sarah: isSarahTodo(t), go: `todoForm('${t.id}')`, src: 'To-do' });
+  });
+  return out.sort((a, b) => parseD(a.date) - parseD(b.date) || (a.sort || '').localeCompare(b.sort || ''));
+}
+function petDupRow(a) {
+  return `<button class="row petapptdup" data-petappt="${esc(a.id)}" onclick="${a.go}"><div class="ic appt">${I('cal')}</div>
+    <div class="tx"><div class="t">${a.sarah ? sarahBadge({ from: 'sarah' }) : ''}${esc(a.title)}</div>
+    <div class="s"><b class="duewhen">${fmtW(a.date)}${a.time && a.time !== 'All day' && a.time !== 'To-do' ? ' · ' + esc(a.time) : ''}</b> · ${esc(a.src)}${a.notes ? ' · ' + esc(a.notes) : ''}</div></div>${pill(a.days)}</button>`;
 }
 const getPet = id => S.pets.find(p => p.id === id);
 const getCare = (p, cid) => p && p.care.find(c => c.id === cid);
@@ -9019,15 +9121,19 @@ const petSub = p => [PET_TYPES.find(t => t[0] === p.type)[1], p.breed ? esc(p.br
 const petPic = (p, big) => `<div class="carpic petpic" style="background:${PET_HEX[p.type]}">${I('paw')}</div>`;
 const telHref = n => 'tel:' + String(n || '').replace(/[^\d+]/g, '');
 function Pets() {
-  return header('Pets & Vet', S.pets.length ? plural(S.pets.length, 'pet') : 'Flea treatment, worming, vaccinations and more', addBtn('Add a pet', 'petForm()')) +
+  const allAppts = petDupAppts();
+  return header('Pets & Vet', S.pets.length ? plural(S.pets.length, 'pet') + ' · shared with Sarah' : 'Flea treatment, worming, vaccinations and more', addBtn('Add a pet', 'petForm()')) +
+    (allAppts.length ? `<div class="sec">Pet appointments (Zeus, Mindy &amp; Silken) <button onclick="apptForm(null,null,{title:'Zeus '})">Add appointment</button></div><div class="list" id="petappts" style="margin-bottom:14px">${allAppts.map(petDupRow).join('')}</div>` : '') +
     (S.pets.length ? S.pets.map(p => {
       const next = petItems(p).slice(0, 3);
+      const pappts = petDupAppts(p.name);
       return `<div class="carcard petcard" role="button" tabindex="0" data-pet="${p.id}" onclick="go('#pet/${p.id}')"><div class="carhead">${petPic(p)}
         <div style="flex:1;min-width:0"><div class="carname">${esc(p.name)}</div><div class="carmodel">${petSub(p)}</div></div>${I('right')}</div>
-        ${next.length ? `<div class="petnext">${next.map(x => `<div><span class="pn">${esc(x.care.name)}</span><b>${fmtW(x.date)}</b>${pill(x.days)}</div>`).join('')}</div>` : '<div class="muted" style="margin-top:10px;font-size:0.875rem">No dates yet. Tap to add when things were last done.</div>'}</div>`;
-    }).join('') + `<div class="btns"><button class="btn" onclick="petForm()">${I('plus')} Add another pet</button></div>`
+        ${pappts.length ? `<div class="petnext">${pappts.map(a => `<div><span class="pn">📅 ${esc(a.title)}</span><b>${fmtW(a.date)}${a.time && a.time !== 'All day' && a.time !== 'To-do' ? ' ' + esc(a.time) : ''}</b>${pill(a.days)}</div>`).join('')}</div>` : ''}
+        ${next.length ? `<div class="petnext">${next.map(x => `<div><span class="pn">${esc(x.care.name)}</span><b>${fmtW(x.date)}</b>${pill(x.days)}</div>`).join('')}</div>` : (!pappts.length ? '<div class="muted" style="margin-top:10px;font-size:0.875rem">No dates yet. Tap to add when things were last done.</div>' : '')}</div>`;
+    }).join('') + `<div class="btns"><button class="btn" onclick="petForm()">${I('plus')} Add another pet</button><button class="btn" onclick="apptForm(null,null,{title:'Zeus '})">${I('cal')} Add pet appointment</button></div>`
       : empty('No pets yet', 'Keep track of flea treatment, worming, vaccinations, grooming, vet check-ups and dog registration.', 'Add your first pet', 'petForm()')) +
-    `<div class="foot">Due pet care shows on Home and the Calendar.<br>${savedWhere()}</div>`;
+    `<div class="foot">Any appointment with Zeus, Mindy, or Silken in the name also shows here automatically.<br>${savedWhere()}</div>`;
 }
 let petHistAll = false;
 function careRow(p, it) {
@@ -9045,11 +9151,14 @@ function PetDetail(id) {
   const hist = [...p.history].sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0));
   const shown = petHistAll ? hist : hist.slice(0, 8);
   const info = [p.birthday ? `Born ${fmtY(p.birthday)}` : '', p.chip ? `Microchip ${esc(p.chip)}` : ''].filter(Boolean);
+  const pappts = petDupAppts(p.name);
   return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#pets')">${I('left')} Pets &amp; Vet</button>
     <button class="btn small" onclick="petForm('${p.id}')">${I('edit')} Edit</button></div>
   <div class="hero">${petPic(p, true)}<div style="min-width:0"><h2>${esc(p.name)}</h2><div class="muted">${petSub(p)}${info.length ? '<br>' + info.join(' · ') : ''}</div></div></div>
   ${p.vet || p.vetPhone ? `<div class="dcard vetcard"><div class="h">${I('heart')} Vet</div><div class="big" style="font-size:1.125rem">${esc(p.vet || 'Vet clinic')}</div>
     ${p.vetPhone ? `<div class="btns"><a class="btn primary" href="${telHref(p.vetPhone)}">${I('call')} Call ${esc(p.vetPhone)}</a></div>` : ''}</div>` : ''}
+  <div class="sec">Appointments <button onclick="apptForm(null,null,{title:${jsArg(p.name + ' ')}})">Add appointment</button></div>
+  ${pappts.length ? `<div class="list" id="petdetailappts" style="margin-bottom:12px">${pappts.map(petDupRow).join('')}</div>` : `<div class="card muted" style="font-size:0.875rem;margin-bottom:12px">No upcoming appointments with ${esc(p.name)} in the name.</div>`}
   <div class="sec">Care <button onclick="careForm('${p.id}')">Add care item</button></div>
   ${care.length ? `<div class="list" id="carelist">${care.map(it => careRow(p, it)).join('')}</div>` : empty('No care items', 'Add flea treatment, a medication or anything else you want reminding about.', 'Add care item', `careForm('${p.id}')`)}
   <div class="sec">History ${hist.length > 8 ? `<button onclick="petHistAll=!petHistAll;render()">${petHistAll ? 'Show less' : `Show all (${hist.length})`}</button>` : ''}</div>
@@ -9079,13 +9188,13 @@ function petForm(id) {
       const upd = { name: v.name, type: v.type, breed: v.breed, birthday: v.birthday, chip: v.chip, vet: v.vet, vetPhone: v.vetPhone, notes: v.notes };
       if (id) {
         const s = snap(); let note = '';
-        Object.assign(p, upd);
+        Object.assign(p, upd, { updated: Date.now() });
         const reg = p.care.find(c => c.kind === 'reg');
         if (p.type === 'dog' && !reg) { p.care.push(careItem('reg')); note = ' Dog registration added.'; }
         if (p.type !== 'dog' && reg) { p.care = p.care.filter(c => c !== reg); note = ' Dog registration removed.'; }
         await save(); render(); toast('Pet updated.' + note, note ? 'Undo' : '', note ? undoTo(s) : null);
       } else {
-        upd.id = uid('pet'); upd.care = defaultCare(v.type); upd.history = []; S.pets.push(upd);
+        upd.id = uid('pet'); upd.care = defaultCare(v.type); upd.history = []; upd.updated = Date.now(); S.pets.push(upd);
         await save(); toast(`${v.name} added. Tap a care item to add when it was last done.`);
         return () => go('#pet/' + upd.id);
       }
@@ -9097,7 +9206,7 @@ function petForm(id) {
 function deletePet(id) {
   const p = getPet(id); if (!p) return;
   confirmSheet(`Delete ${esc(p.name)}?`, `${esc(p.name)}’s care items and history will be removed from this phone.`, 'Delete pet', async () => {
-    const s = snap(); S.pets = S.pets.filter(x => x.id !== id); await save();
+    const s = snap(); S.settings.deletedPets = Object.assign({}, S.settings.deletedPets || {}, { [id]: Date.now() }); S.pets = S.pets.filter(x => x.id !== id); await save();
     return () => { go('#pets'); toast(`${p.name} deleted.`, 'Undo', undoTo(s)); };
   });
 }
@@ -9118,7 +9227,7 @@ function careForm(petId, cid) {
       if (!reg && unit !== 'none' && !(every >= 1 && every <= 99)) return 'Please choose how often, e.g. every 1 month.';
       if (v.last && (!parseD(v.last) || v.last > todayISO())) return 'The last done date can’t be in the future.';
       const s = snap(), upd = { name: v.name, every: unit === 'none' ? 0 : every, unit, last: v.last, due: v.due };
-      if (cid) Object.assign(it, upd); else p.care.push(Object.assign({ id: uid('care'), kind: 'custom' }, upd));
+      if (cid) Object.assign(it, upd); else p.care.push(Object.assign({ id: uid('care'), kind: 'custom' }, upd)); p.updated = Date.now();
       await save(); render(); toast(cid ? 'Saved.' : `${v.name} added.`, 'Undo', undoTo(s));
     }, cid ? 'Save' : 'Add',
     cid ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete care item" onclick="deleteCare('${petId}','${cid}')">${I('trash')}</button>` : '');
@@ -9131,7 +9240,7 @@ function careForm(petId, cid) {
 }
 async function deleteCare(petId, cid) {
   const p = getPet(petId), it = getCare(p, cid), s = snap();
-  p.care = p.care.filter(c => c.id !== cid); await save(); await closeSheet(); render(); toast(`${it.name} removed.`, 'Undo', undoTo(s));
+  p.care = p.care.filter(c => c.id !== cid); p.updated = Date.now(); await save(); await closeSheet(); render(); toast(`${it.name} removed.`, 'Undo', undoTo(s));
 }
 function doneForm(petId, cid) {
   const p = getPet(petId), it = getCare(p, cid); if (!it) return;
@@ -9144,7 +9253,7 @@ function doneForm(petId, cid) {
       if (v.date > todayISO()) return 'The date can’t be in the future.';
       const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 45.90.';
       const s = snap();
-      p.history.push({ id: uid('ph'), careId: it.id, kind: it.kind, name: it.name, date: v.date, notes: v.notes, cost, at: Date.now() });
+      p.history.push({ id: uid('ph'), careId: it.id, kind: it.kind, name: it.name, date: v.date, notes: v.notes, cost, at: Date.now() }); p.updated = Date.now();
       if (!it.last || v.date >= it.last) { it.last = v.date; it.due = ''; }
       await save(); render();
       const nd = careDue(it);
@@ -9167,14 +9276,14 @@ function histForm(petId, hid) {
       if (!parseD(v.date)) return 'Please choose the date it was done.';
       if (v.date > todayISO()) return 'The date can’t be in the future.';
       const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 45.90.';
-      const s = snap(); Object.assign(h, { date: v.date, notes: v.notes, cost }); syncCareLast(p, h.careId);
+      const s = snap(); Object.assign(h, { date: v.date, notes: v.notes, cost }); syncCareLast(p, h.careId); p.updated = Date.now();
       await save(); render(); toast('History updated.', 'Undo', undoTo(s));
     }, 'Save',
     `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete history entry" onclick="deleteHist('${petId}','${hid}')">${I('trash')}</button>`);
 }
 async function deleteHist(petId, hid) {
   const p = getPet(petId), s = snap(), h = p.history.find(x => x.id === hid);
-  p.history = p.history.filter(x => x.id !== hid); syncCareLast(p, h.careId);
+  p.history = p.history.filter(x => x.id !== hid); syncCareLast(p, h.careId); p.updated = Date.now();
   await save(); await closeSheet(); render(); toast('Entry deleted.', 'Undo', undoTo(s));
 }
 function petCalItems(inR) {
