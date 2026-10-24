@@ -28,7 +28,7 @@ export const NEWS_FEEDS = [
   // 2.27.4: NZ Herald's Northern Advocate (Whangārei / Northland) news. Only stories that name a Northland place.
   { id: 'heraldnorth', name: 'NZ Herald', url: 'https://www.nzherald.co.nz/arc/outboundfeeds/rss/section/news/?outputType=xml&_website=northern-advocate', host: 'www.nzherald.co.nz', local: true, sportOut: true }
 ];
-const KV_KEY = 'rnz-news-v7';
+const KV_KEY = 'rnz-news-v8';
 const TTL = 10 * 60 * 1000;
 const MAX_ITEMS = 12;
 const MAX_ALL = 24;
@@ -116,7 +116,10 @@ export function parseRss(xml, feed) {
     if (feed.host === 'www.nzherald.co.nz' && (/\bquiz\b/i.test(title) || SPORT_RE.test(title) || /\/sport\//.test(url))) continue;
     if (seen.has(url)) continue;
     seen.add(url);
-    items.push({ title, url, published: new Date(publishedMs).toISOString(), src: feed.name, local: !!feed.local });
+    let img = "";
+    const mc = block[1].match(/<(?:media:content|media:thumbnail|enclosure)\b[^>]+url=["'](https:\/\/[^"']+)["']/i);
+    if (mc) img = unent(mc[1]);
+    items.push({ title, url, published: new Date(publishedMs).toISOString(), src: feed.name, local: !!feed.local, summary: description.slice(0, 280), ...(img ? { img } : {}) });
   }
   items.sort((a, b) => b.published.localeCompare(a.published));
   return {
@@ -182,26 +185,92 @@ async function robotsOk(u, fetchImpl) {
   const dis = await robotsMem[h], path = u.pathname + u.search;
   return !dis.some(d => { const re = new RegExp('^' + d.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\\\$$/, '$')); return re.test(path); });
 }
-const unent = s => s.replace(/&amp;/g, '&').replace(/&#x2F;/g, '/').replace(/&quot;/g, '"');
-export async function ogImage(url, env, fetchImpl) {
-  const key = 'ogimg2:' + url;
-  if (env.EVENTS_KV) { try { const c = await env.EVENTS_KV.get(key); if (c !== null) return c; } catch (e) { } }
-  let img = '';
+const unent = s => decode(String(s || '').replace(/&amp;/g, '&').replace(/&#x2F;/g, '/').replace(/&quot;/g, '"').replace(/&#x27;|&#39;|&apos;|&rsquo;/g, "'").replace(/&ldquo;|&rdquo;/g, '"').replace(/&nbsp;/g, ' '));
+function extractArticleParagraphs(html) {
+  const bodyChunk = (() => {
+    const rnz = html.match(/<div[^>]+class=["'][^"']*article__body[^"']*["'][^>]*>([\s\S]*?)<\/(?:div|article)>/i);
+    if (rnz) return rnz[1];
+    const art = html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
+    if (art) return art[1];
+    const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
+    return main ? main[1] : html;
+  })();
+  const cleaned = bodyChunk.replace(/<(script|style|nav|footer|aside|figure|figcaption|form|button)\b[^>]*>[\s\S]*?<\/\1>/gi, " ");
+  const out = [];
+  const seen = new Set();
+  for (const m of cleaned.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const txt = unent(m[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+    if (txt.length < 28) continue;
+    if (/^(Link:\s*https?:|Audio player for |Visit page to play audio:|Photo:|Sign up for |RNZ is a public|Copyright ©|All rights reserved|The BBC is not responsible|Read more:|Related stories|Share this article)/i.test(txt)) continue;
+    const k = txt.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(txt);
+    if (out.length >= 28) break;
+  }
+  return out;
+}
+export async function articleFromUrl(url, env = {}, fetchImpl = fetch) {
+  const key = 'artmeta2:' + url;
+  if (env && env.EVENTS_KV) {
+    try {
+      const c = await env.EVENTS_KV.get(key, { type: 'json' });
+      if (c && typeof c === 'object') return c;
+    } catch (e) {}
+  }
+  const res = { url, title: '', img: '', site: '', paragraphs: [] };
   try {
     const u = new URL(url);
+    res.site = u.hostname.replace(/^www\./, '');
     if (await robotsOk(u, fetchImpl)) {
-      const r = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'text/html' }, signal: AbortSignal.timeout(5000) });
-      if (r.ok) { const html = (await r.text()).slice(0, 300000);
-        for (const t of ['og:image', 'twitter:image']) { const m = html.match(new RegExp('<meta[^>]+(?:property|name)=["\']' + t + '["\'][^>]*>', 'i')); const c = m && m[0].match(/content=["']([^"']+)["']/i); if (c) { const x = new URL(unent(c[1]), url); if (x.protocol === 'https:') { img = x.toString(); break; } } } }
+      const r = await fetchImpl(url, { headers: { 'User-Agent': UA, Accept: 'text/html' }, redirect: 'follow', signal: AbortSignal.timeout(5500) });
+      if (r.ok) {
+        const html = (await r.text()).slice(0, 450000);
+        for (const t of ['og:image', 'twitter:image']) {
+          const m = html.match(new RegExp('<meta[^>]+(?:property|name)=["\']' + t + '["\'][^>]*>', 'i'));
+          const c = m && m[0].match(/content=["']([^"']+)["']/i);
+          if (c) {
+            const x = new URL(unent(c[1]), url);
+            if (x.protocol === 'https:' && !/rnz-sky-sq|default_share|logo/i.test(x.pathname)) { res.img = x.toString(); break; }
+          }
+        }
+        const tm = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        if (tm) res.title = unent(tm[1]).replace(/\s*\|\s*(RNZ|NZ Herald).*$/i, '').trim();
+        res.paragraphs = extractArticleParagraphs(html);
+      }
     }
-  } catch (e) { return ''; }
-  if (env.EVENTS_KV) { try { await env.EVENTS_KV.put(key, img, { expirationTtl: IMG_TTL }); } catch (e) { } }
-  return img;
+  } catch (e) {}
+  if (env && env.EVENTS_KV && (res.img || res.paragraphs.length)) {
+    try { await env.EVENTS_KV.put(key, JSON.stringify(res), { expirationTtl: IMG_TTL }); } catch (e) {}
+  }
+  return res;
+}
+export async function ogImage(url, env, fetchImpl) {
+  const m = await articleFromUrl(url, env, fetchImpl);
+  return m.img || '';
 }
 async function addImages(data, env, fetchImpl) {
-  const list = (data.local && data.local.items) || [], todo = list.filter(x => x.img === undefined);
-  for (let i = 0; i < todo.length; i += 3) await Promise.all(todo.slice(i, i + 3).map(async x => { x.img = await ogImage(x.url, env, fetchImpl); }));
-  const m = new Map(list.map(x => [x.url, x.img])); (data.items || []).forEach(x => { if (m.has(x.url)) x.img = m.get(x.url); });
+  const locList = (data.local && data.local.items) || [];
+  const nzList = (data.nz && data.nz.items) || [];
+  const combined = [...locList, ...nzList];
+  const todo = combined.filter(x => !x.img || !Array.isArray(x.paragraphs) || !x.paragraphs.length);
+  for (let i = 0; i < todo.length; i += 6) {
+    await Promise.all(todo.slice(i, i + 6).map(async x => {
+      const m = await articleFromUrl(x.url, env, fetchImpl);
+      if (m.img && !x.img) x.img = m.img;
+      if (m.paragraphs && m.paragraphs.length) x.paragraphs = m.paragraphs;
+      else if (!x.paragraphs && x.summary) x.paragraphs = [x.summary];
+    }));
+  }
+  const byUrl = new Map(combined.map(x => [x.url, x]));
+  (data.items || []).forEach(x => {
+    const hit = byUrl.get(x.url);
+    if (hit) {
+      if (hit.img) x.img = hit.img;
+      if (hit.paragraphs) x.paragraphs = hit.paragraphs;
+      if (hit.summary && !x.summary) x.summary = hit.summary;
+    }
+  });
   return data;
 }
 export async function getLocalNews(env = {}, fetchImpl = fetch, now = Date.now()) {

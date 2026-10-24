@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.26';
+const APP_VERSION = '2.28.27';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -13252,7 +13252,8 @@ let NEWS = null, newsBusy = false, newsFailed = false, newsTimer = null;
 function loadNews() {
   try {
     const r = JSON.parse(localStorage.getItem('localnews') || 'null');
-    NEWS = r && r.at && r.data && Array.isArray(r.data.items) ? r : null;
+    const hasRich = r && r.data && r.data.nz && Array.isArray(r.data.nz.items) && r.data.nz.items.some(x => x && x.img && Array.isArray(x.paragraphs) && x.paragraphs.length);
+    NEWS = r && r.at && hasRich ? r : null;
   } catch (e) { NEWS = null; }
 }
 function newsUrl(u) {
@@ -13338,8 +13339,10 @@ function updNews() {
 function newsRows(list) {
   return list.map(x => {
     const when = newsWhen(x.published);
-    const sub = [x.src || 'RNZ', when].filter(Boolean).join(' · ');
-    return `<a class="row" href="${esc(newsUrl(x.url))}" target="_blank" rel="noopener"><div class="ic ln">${I('news')}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc(sub)}</div></div></a>`;
+    const sub = [x.src || 'RNZ', when, 'Read in app'].filter(Boolean).join(' · ');
+    const u = newsUrl(x.url) || x.url || '';
+    const img = x.img || x.image || '';
+    return `<button type="button" class="row" onclick="openNewsUrl(${jsArg(u)})">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:48px;height:48px;border-radius:10px;object-fit:cover;flex:none" onerror="this.remove()">` : `<div class="ic ln">${I('news')}</div>`}<div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc(sub)}</div></div></button>`;
   }).join('');
 }
 function newsEmpty(id) {
@@ -13370,14 +13373,26 @@ const nbSrc = x => { const s = String(x.src || x.sourceName || x.source || 'RNZ'
 const nbCol = s => NB_SRC[s] || ['#7c3aed', '#0d9488', '#c2410c', '#475569'][[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % 4];
 function nbAgo(iso) { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 6e4)); return !Number.isFinite(m) ? '' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; }
 let NB_ALL = {};
+const NB_ART_CACHE = (() => { try { return JSON.parse(localStorage.getItem('nbArtCache') || '{}') || {}; } catch (e) { return {}; } })();
+function nbFallbackImg(x) {
+  const t = String((x && x.title) || '') + ' ' + String((x && x.src) || '');
+  if ((x && x.local) || /whang[aā]rei|northland|onerahi|kamo|kerikeri|far north|kaipara/i.test(t)) return 'https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b3/Whangarei_Harbour.JPG/960px-Whangarei_Harbour.JPG';
+  if (/politics|government|parliament|minister|coalition|labour|national|budget|policy/i.test(t)) return 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8b/Space_Place_at_Carter_Observatory.jpg/960px-Space_Place_at_Carter_Observatory.jpg';
+  return 'https://thumb.wikimedia.org/wikipedia/commons/thumb/8/88/Southern_Cross_-New_Zealand-.jpg/960px-Southern_Cross_-New_Zealand-.jpg';
+}
 function nbCard(x, extraLbl) {
   const s = nbSrc(x), id = newsUrl(x.url) || x.url; if (!id) return '';
-  NB_ALL[id] = { id, title: x.title, src: s, published: x.published, url: x.url, img: x.img || x.image || '' };
-  const img = x.img || x.image;
+  const cached = NB_ART_CACHE[id] || {};
+  const fb = nbFallbackImg(x);
+  const img = x.img || x.image || cached.img || fb;
+  const paragraphs = (Array.isArray(x.paragraphs) && x.paragraphs.length ? x.paragraphs : (Array.isArray(cached.paragraphs) && cached.paragraphs.length ? cached.paragraphs : []));
+  const summary = x.summary || x.desc || (paragraphs[0] || '');
+  NB_ALL[id] = { id, title: x.title, src: s, published: x.published, url: x.url, img, summary, paragraphs };
   const lbls = [];
   if (extraLbl) lbls.push(extraLbl);
   lbls.push([s, nbCol(s)]);
-  return `<button type="button" class="tbcard" onclick="nbOpen(${jsArg(id)})">${img ? `<div class="tbcover" style="background:linear-gradient(135deg,${nbCol(s)},#1e293b);aspect-ratio:16/9;overflow:hidden"><img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div><div class="tbicons">${I('news')}<span>${esc(nbAgo(x.published) || s)}</span></div></div></button>`;
+  const snip = summary ? (summary.length > 95 ? summary.slice(0, 93).replace(/\s+\S*$/, '') + '…' : summary) : '';
+  return `<button type="button" class="tbcard" onclick="nbOpen(${jsArg(id)})"><div class="tbcover" style="background:linear-gradient(135deg,${nbCol(s)},#1e293b);height:96px;max-height:96px;overflow:hidden"><img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:96px;object-fit:cover;display:block" onerror="if(this.src!=='${esc(fb)}'){this.src='${esc(fb)}'}else{this.closest('.tbcover').remove()}"></div><div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div>${snip ? `<div class="tbs">${esc(snip)}</div>` : ''}<div class="tbicons">${I('news')}<span>${esc(nbAgo(x.published) || s)} · 📖 Read in app</span></div></div></button>`;
 }
 function nbBoardHtml() {
   NB_ALL = {}; const o = nbGet(), items = newsSec('local') || [], moved = new Set(o.lists.saved.map(c => c.id)), t = nzTodayISO();
@@ -13396,7 +13411,7 @@ function nzbBoardHtml() {
   const nzEarlier = liveNz.filter(x => day(x) !== t);
   const liveLoc = locItems.filter(x => !moved.has(newsUrl(x.url)));
   const worldRaw = (typeof RECS !== 'undefined' && RECS.world && RECS.world.data && Array.isArray(RECS.world.data.items)) ? RECS.world.data.items.filter(x => x && x.title && x.url && newsOk(x)) : [];
-  const worldItems = worldRaw.slice(0, 15).map(x => ({ title: x.title, url: x.url, published: x.published, src: 'BBC News', img: x.img || '' }));
+  const worldItems = worldRaw.slice(0, 15).map(x => ({ title: x.title, url: x.url, published: x.published, src: x.source || 'BBC News', img: x.img || '', summary: x.summary || '' }));
   const L = (k, n, a, add, none, tag) => tbList(k, n, a.length, a.map(x => nbCard(x, tag)).join(''), add, 'nb', none);
   return L('nztoday', '🇳🇿 NZ Today', nzToday, false, newsBusy ? 'Updating…' : 'No NZ stories yet today', ['🇳🇿 New Zealand', '#2563eb']) +
     L('nzweek', '🇳🇿 Earlier in NZ', nzEarlier, false, 'No earlier NZ stories', ['🇳🇿 New Zealand', '#475569']) +
@@ -13428,16 +13443,109 @@ async function nbMove(id, target) {
   nbSave(o); await closeSheet(); nbRedraw();
   toast(target === 'saved' ? 'Saved to read.' : target === 'read' ? 'Marked as Read.' : 'Removed from your lists.');
 }
+let nbSpeakingId = "";
+function nbStopSpeak() {
+  nbSpeakingId = "";
+  try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+  const btn = document.getElementById("nb-tts-btn");
+  if (btn) btn.textContent = "🔊 Listen";
+}
+function nbToggleSpeak(id) {
+  try {
+    if (!window.speechSynthesis) { toast("Speech playback isn’t supported on this browser."); return; }
+    if (nbSpeakingId === id && window.speechSynthesis.speaking) {
+      nbStopSpeak();
+      return;
+    }
+    const c = NB_ALL[id];
+    if (!c) return;
+    window.speechSynthesis.cancel();
+    const paras = (Array.isArray(c.paragraphs) && c.paragraphs.length) ? c.paragraphs : (c.summary ? [c.summary] : []);
+    const text = [c.title, ...paras].join(". ");
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-NZ";
+    u.onend = () => { nbSpeakingId = ""; const b = document.getElementById("nb-tts-btn"); if (b) b.textContent = "🔊 Listen"; };
+    nbSpeakingId = id;
+    const btn = document.getElementById("nb-tts-btn");
+    if (btn) btn.textContent = "⏹ Stop reading";
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function openNewsUrl(url) {
+  if (!url) return;
+  if (!NB_ALL[url]) {
+    const all = [...(newsSec("local") || []), ...(newsSec("nz") || []), ...((typeof RECS !== "undefined" && RECS.world && RECS.world.data && RECS.world.data.items) || [])];
+    const hit = all.find(x => x && (newsUrl(x.url) === url || x.url === url));
+    if (hit) nbCard(hit);
+    else NB_ALL[url] = { id: url, url, title: "News story", src: "News", published: "", img: "", summary: "", paragraphs: [] };
+  }
+  nbOpen(url);
+}
+async function nbFetchArticleBody(id) {
+  const c = NB_ALL[id];
+  if (!c || !RELAY_URL) return;
+  const href = newsUrl(c.url) || (/^https:\/\//.test(c.url || "") ? c.url : "");
+  if (!href) return;
+  try {
+    const d = await getJSON(RELAY_URL + "/article?u=" + encodeURIComponent(href), 9000);
+    if (d && Array.isArray(d.paragraphs) && d.paragraphs.length) {
+      c.paragraphs = d.paragraphs;
+      if (d.img && !c.img) c.img = d.img;
+      if (d.title && c.title === "News story") c.title = d.title;
+      NB_ART_CACHE[id] = { img: c.img, paragraphs: c.paragraphs, at: Date.now() };
+      try { localStorage.setItem("nbArtCache", JSON.stringify(NB_ART_CACHE)); } catch (e) {}
+      const bodyEl = document.getElementById("nb-art-body");
+      if (bodyEl) {
+        bodyEl.innerHTML = c.paragraphs.map(p => `<p style="margin:0 0 12px;font-size:.98rem;line-height:1.65">${esc(p)}</p>`).join("");
+      }
+      const imgWrap = document.getElementById("nb-art-img");
+      if (imgWrap && c.img && !imgWrap.querySelector("img")) {
+        imgWrap.innerHTML = `<img src="${esc(c.img)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:210px;object-fit:cover;border-radius:14px;margin-bottom:12px;display:block" onerror="this.remove()">`;
+      }
+      return;
+    }
+  } catch (e) {}
+  const bodyEl = document.getElementById("nb-art-body");
+  if (bodyEl && (!c.paragraphs || !c.paragraphs.length)) {
+    bodyEl.innerHTML = c.summary ? `<p style="margin:0 0 12px;font-size:.98rem;line-height:1.65">${esc(c.summary)}</p>` : `<p class="muted">Tap “↗ Original webpage” below to view this page directly.</p>`;
+  }
+}
 function nbOpen(id) {
-  const c = NB_ALL[id]; if (!c) return; const o = nbGet(), cur = o.lists.saved.some(x => x.id === id) ? 'saved' : o.lists.read.some(x => x.id === id) ? 'read' : '';
+  const c = NB_ALL[id]; if (!c) return;
+  nbStopSpeak();
+  const cached = NB_ART_CACHE[id];
+  if (cached) {
+    if (cached.img && !c.img) c.img = cached.img;
+    if (Array.isArray(cached.paragraphs) && cached.paragraphs.length && (!c.paragraphs || !c.paragraphs.length)) c.paragraphs = cached.paragraphs;
+  }
+  nbMark(id);
+  const o = nbGet(), cur = o.lists.saved.some(x => x.id === id) ? 'saved' : 'read';
   const href = newsUrl(c.url) || (/^https:\/\//.test(c.url || '') ? c.url : '');
-  openSheet(esc(c.title), `${c.img ? `<img src="${esc(c.img)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin-bottom:10px" onerror="this.remove()">` : ''}<p class="muted" style="margin:0 0 10px">${esc(c.src)}${c.published ? ' · ' + esc(newsWhen(c.published)) : ''}</p>
-    <div class="btns" style="margin-bottom:12px"><a class="btn primary" href="${esc(href)}" target="_blank" rel="noopener" onclick="nbMark(${jsArg(id)})">${I('ext')} Open story ›</a></div>
-    <div class="tbmove"><div class="lbl">Move to…</div><div class="chips">
+  const paras = Array.isArray(c.paragraphs) && c.paragraphs.length ? c.paragraphs : [];
+  const bodyHtml = paras.length
+    ? paras.map(p => `<p style="margin:0 0 12px;font-size:.98rem;line-height:1.65">${esc(p)}</p>`).join('')
+    : (c.summary ? `<p style="margin:0 0 12px;font-size:.98rem;line-height:1.65">${esc(c.summary)}</p><p class="muted" style="font-size:.85rem">Loading full article…</p>` : `<p class="muted" style="font-size:.9rem">Loading full article…</p>`);
+
+  openSheet(esc(c.title),
+    `<div id="nb-art-img">${c.img ? `<img src="${esc(c.img)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:210px;object-fit:cover;border-radius:14px;margin-bottom:12px;display:block" onerror="this.remove()">` : ''}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:0 0 12px">
+      <div class="muted" style="font-size:.86rem;font-weight:650">${esc(c.src)}${c.published ? ' · ' + esc(newsWhen(c.published)) : ''}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" class="chip" id="nb-tts-btn" style="padding:4px 10px;font-size:.78rem" onclick="nbToggleSpeak(${jsArg(id)})">🔊 Listen</button>
+        <button type="button" class="chip${cur === 'saved' ? ' on' : ''}" style="padding:4px 10px;font-size:.78rem" onclick="nbMove(${jsArg(id)},'saved')">📌 ${cur === 'saved' ? 'Saved' : 'Save'}</button>
+        ${href ? `<a class="chip" style="padding:4px 10px;font-size:.78rem;text-decoration:none" href="${esc(href)}" target="_blank" rel="noopener">↗ Web</a>` : ''}
+      </div>
+    </div>
+    <div id="nb-art-body" style="padding-top:4px;border-top:1px solid var(--line)">${bodyHtml}</div>
+    <div class="tbmove" style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line)"><div class="lbl">Move story to…</div><div class="chips">
       <button type="button" class="chip${cur === 'saved' ? ' on' : ''}" onclick="nbMove(${jsArg(id)},'saved')">📌 Saved</button>
       <button type="button" class="chip${cur === 'read' ? ' on' : ''}" onclick="nbMove(${jsArg(id)},'read')">✓ Read</button>
       ${cur ? `<button type="button" class="chip" onclick="nbMove(${jsArg(id)},'')">Its date list</button>` : ''}
     </div></div>`, null);
+
+  if (paras.length < 2) {
+    nbFetchArticleBody(id);
+  }
 }
 function LocalNews() {
   try { if (!NEWS && !newsBusy) refreshNews(false); } catch (e) { }
@@ -26356,7 +26464,7 @@ function bfSettingsRows() {
     BF_TYPES.map(([k, ic, l]) => `<div class="srow"><div class="tx"><div class="t">${ic} ${esc(l)}</div></div><button class="switch ${bfOn(k) ? 'on' : ''}" role="switch" aria-checked="${bfOn(k)}" aria-label="${esc(l)}" onclick="bfToggle('${k}')"></button></div>`).join('');
 }
 // relay recs, cached on the phone for 12 h
-const RECS = {}; ['top40', 'games', 'topics', 'world', 'suno'].forEach(k => { try { RECS[k] = JSON.parse(localStorage.getItem('recs-' + k) || 'null'); } catch (e) { RECS[k] = null; } });
+const RECS = {}; ['top40', 'games', 'topics', 'world', 'suno'].forEach(k => { try { RECS[k] = JSON.parse(localStorage.getItem('recs-' + k) || 'null'); } catch (e) { RECS[k] = null; } }); try { if (RECS.world && RECS.world.data && Array.isArray(RECS.world.data.items) && !RECS.world.data.items.some(x => x && x.img)) { RECS.world = null; localStorage.removeItem('recs-world'); } } catch (e) {}
 async function loadRecs(force) {
   if (!RELAY_URL || navigator.onLine === false) return; let got = false;
   for (const k of ['top40', 'games', 'topics', 'world', 'suno']) {
@@ -26436,7 +26544,7 @@ function bfItems(k) {
       L.sort((a, b) => (L.filter(y => y.s.split(' · ')[0] === a.s.split(' · ')[0]).indexOf(a)) - (L.filter(y => y.s.split(' · ')[0] === b.s.split(' · ')[0]).indexOf(b))); }
     else if (k === 'videos') { homeVideoPicks().filter(v => v && v.id && v.category !== 'sarah' && !isSport(v.title)).slice(0, 4).forEach(v => add(v.id, { t: v.title, s: v.channel || v.reason || '', thumb: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg', url: 'https://www.youtube.com/watch?v=' + v.id, btns: [['Watch', 'open']] })); }
     else if (k === 'sarah') { const v = currentSarahVideo(); if (v && v.id && bfRecent(v.published, 14)) add(v.id, { t: v.title, s: 'Sarah Jenkins · ' + fmtW(String(v.published).slice(0, 10)), thumb: 'https://i.ytimg.com/vi/' + v.id + '/mqdefault.jpg', url: v.url, btns: [['Watch', 'open']] }); }
-    else if (k === 'local') { (newsSec('local') || []).filter(notifLocalNewsOk).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: 'Whangārei · ' + newsWhen(x.published), url: newsUrl(x.url), btns: [['Read', 'open']] })); }
+    else if (k === 'local') { (newsSec('local') || []).filter(notifLocalNewsOk).slice(0, 4).forEach(x => add(x.url, { t: x.title, s: 'Whangārei · ' + newsWhen(x.published), thumb: x.img || '', tap: `openNewsUrl(${jsArg(newsUrl(x.url))})`, btns: [['Read in app', `openNewsUrl(${jsArg(newsUrl(x.url))})`]] })); }
     else if (k === 'nz' || k === 'world') { /* 2.28.14: general NZ/World news excluded from Notifications */ }
     else if (k === 'suno') { // 2.27.4: a new Suno release note (last 10 days, once each), else today's tip from the built-in list
       const ro = "event.stopPropagation();window.open('https://suno.com/create','_blank','noopener')", d = RECS.suno && RECS.suno.data;
@@ -28439,7 +28547,7 @@ function newsAlertBellRows() {
       const isWx = /weather|rain|downpour|flood|storm|thunder|lightning|cyclone|gale|wind|metservice|civil defence/i.test(t);
       const ic = isQuake ? '🌍' : /road|clos|bridge|detour|traffic|washout/i.test(t) ? '⛔' : isAmb ? '🚑' : isFire ? '🚒' : isPol ? '🚓' : isWx ? '⛈️' : /power|northpower|blackout/i.test(t) ? '⚡' : /internet|broadband|fibre|mobile|chorus|spark|2degrees/i.test(t) ? '📶' : '🏗️';
       const cat = isQuake ? 'Earthquake alert' : ic === '⛔' ? 'Whangārei road alert' : isAmb ? 'Whangārei ambulance alert' : isFire ? 'Whangārei fire & emergency' : isPol ? 'Whangārei police & emergency' : ic === '⛈️' ? 'Whangārei weather alert' : ic === '⚡' ? 'Whangārei power alert' : ic === '📶' ? 'Network outage alert' : 'Whangārei planning & development';
-      return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))window.open(${jsArg(newsUrl(x.url))},'_blank','noopener')"><div class="ic">${ic}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${esc([cat, newsWhen(x.published), nbSrc(x)].filter(Boolean).join(' · '))}</div></div></div>`;
+      return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))openNewsUrl(${jsArg(newsUrl(x.url))})"><div class="ic">${ic}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${esc([cat, newsWhen(x.published), nbSrc(x)].filter(Boolean).join(' · '))}</div></div></div>`;
     }).filter(Boolean);
   } catch (e) { return []; }
 }
@@ -29755,7 +29863,7 @@ function LocalHubPage() {
   const lnews = (typeof newsSec === 'function' ? (newsSec('local') || []).filter(newsOk) : []).slice(0, 3);
   const evNewsCards = [
     ...evs.map(e => grpCard([['🎟️ Whangārei Event', '#7c3aed']], e.title, [e.date ? fmtW(e.date) : '', e.venue ? e.venue.split(',')[0] : ''].filter(Boolean).join(' · '), "go('#events')")),
-    ...lnews.map(n => grpCard([['📰 Northland News', '#0d9488']], n.title, newsWhen(n.published), "go('#localnews')"))
+    ...lnews.map(n => grpCard([['📰 Northland News', '#0d9488']], n.title, newsWhen(n.published) + ' · Tap to read in app', `openNewsUrl(${jsArg(newsUrl(n.url))})`))
   ].join('') + grpLinkBtn('#events', 'Open Events board') + grpLinkBtn('#localnews', 'Open Local news board');
 
   const plns = (typeof plnKeepGet === 'function' ? plnKeepGet().items : []).slice(0, 4);
