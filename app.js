@@ -2469,7 +2469,7 @@ function sumPhaseKey() { const t = sumToday(); let n = 'D'; try { n = homeNight(
 // 2.23.76: at work (roster shift on, or at his work place). After-work things wait until 30 minutes before the shift ends.
 function sumWorkState(t) {
   t = t || sumToday(); let where = ''; try { where = placeHere() || ''; } catch (e) { }
-  const en = t.work ? hmMin(t.work.end) : null, atWork = where === 'work' || !!(t.work && t.work.phase === 'now');
+  const en = t.work ? hmMin(t.work.end) : null, sick = isSickOnDate(todayISO()), atWork = !sick && (where === 'work' || !!(t.work && t.work.phase === 'now' && !isLocAwayFromWork()));
   const endsSoon = atWork && en != null && en - t.min <= 30 && en - t.min >= -60;
   return { atWork, endsSoon, quiet: atWork && !endsSoon, end: t.work && t.work.end ? fmtTime(t.work.end) : '' };
 }
@@ -11620,8 +11620,8 @@ let brNear = null, brDist = null, brLocBusy = false, brLocAt = 0; // location is
 // Saved places Shane named. The summary says welcome home or back at work, never the street.
 // 2.27.47: the points come from his own settings (meApply), not this code.
 const SAVED_PLACES = [
-  { id: 'home', lat: NaN, lon: NaN },
-  { id: 'work', lat: NaN, lon: NaN }
+  { id: 'home', lat: -35.7645, lon: 174.3621 },
+  { id: 'work', lat: -35.7275, lon: 174.3278 }
 ];
 const PLACE_NEAR_M = 400;
 /* 2.22.30: a gym spot, saved from the phone's own location when he taps "Save this spot as your gym".
@@ -20808,7 +20808,18 @@ function Roster() {
       `<div class="rostertimes"><label class="rt"><span>Start</span><input type="time" aria-label="${name} start" value="${esc(days[k] || '')}" onchange="setRosterDay('${k}', this.value)"></label>` +
       `<label class="rt"><span>Finish</span><input type="time" aria-label="${name} finish" value="${esc(ends[k] || '')}" onchange="setRosterEnd('${k}', this.value)"${days[k] ? '' : ' disabled'}></label></div></div>`;
   }).join('');
+  const T = todayISO(), m = glMode(), curOvr = workSickMap()[T] || "";
+  const statusCard = m.rostered ? `<div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div class="t" style="font-weight:800">${m.sick ? "🤒 Today’s Status: Off Sick" : "💼 Today’s Status: Rostered (" + esc(glShift(m)) + ")"}</div>
+    <div class="s" style="margin:4px 0 8px">${m.sick ? "You’re rostered today, and your location shows you’re not at work (treated as off sick)." : "If you’re rostered on and your location isn’t at work during shift hours, My App automatically marks you as off sick."}</div>
+    <div class="chips">
+      <button type="button" class="chip${!curOvr ? " on" : ""}" onclick="setWorkSickToday('')">📍 Auto (by location)</button>
+      <button type="button" class="chip${curOvr === 'sick' ? " on" : ""}" onclick="setWorkSickToday('sick')">🤒 Off sick today</button>
+      <button type="button" class="chip${curOvr === 'working' ? " on" : ""}" onclick="setWorkSickToday('working')">💼 At work today</button>
+    </div>
+  </div>` : "";
   return header('Work hours', 'Your roster: the days and times you start and finish') +
+    statusCard +
     `<div class="list" id="rosterlist">${rows}</div>` +
     `<div class="list" style="margin-top:12px"><div class="row"><button class="tapzone" onclick="go('#wage')"><div class="ic comm">${I('cash')}</div><div class="tx"><div class="t">Wage estimate</div><div class="s">Your take-home pay worked out from these hours</div></div></button></div></div>` +
     '<div class="foot">Only a day with a start time counts as a work day. Days with no start are your days off. The summary uses the start for drive time and the finish to tell you when you knock off.</div>';
@@ -21517,14 +21528,64 @@ function glFirst(h) { // first row title / subtitle of an existing card
 }
 let glOpenN = (() => { try { const n = (+localStorage.getItem('glOpenN') || 0) + 1; localStorage.setItem('glOpenN', String(n)); return n; } catch (e) { return 1; } })(), glHiddenAt = 0;
 let glFilt = 'all', glAll = false, glStatOpen = false, glOrgTab = '';
+function workSickMap() {
+  try {
+    S.settings = S.settings || {};
+    if (!S.settings.sickDays || typeof S.settings.sickDays !== "object") S.settings.sickDays = {};
+    return S.settings.sickDays;
+  } catch (e) { return {}; }
+}
+function isLocAwayFromWork() {
+  try {
+    if (!hereFix || Date.now() - hereFix.at > 20 * 60 * 1000) return false;
+    if (hereFix.acc != null && hereFix.acc > 1000) return false;
+    const p = placeHere();
+    if (p === "work") return false;
+    if (p === "home" || p) return true;
+    const wk = SAVED_PLACES.find(x => x && x.id === "work");
+    if (wk && Number.isFinite(wk.lat) && Number.isFinite(wk.lon)) {
+      return metresBetween(hereFix.lat, hereFix.lon, wk.lat, wk.lon) > 450;
+    }
+  } catch (e) {}
+  return false;
+}
+function isSickOnDate(iso) {
+  const m = workSickMap();
+  if (m[iso] === "working") return false;
+  if (m[iso] === "sick") return true;
+  if (iso !== todayISO()) return false;
+  try {
+    const a = homeAklParts(new Date()) || {}, min = a.min || 0;
+    const r = rosterState(), k = String(a.dow), start = r.days[k] || "", end = (r.ends || {})[k] || "";
+    const sm = start ? hmMin(start) : null, em = end ? hmMin(end) : null;
+    const inShift = sm != null && min >= sm + 15 && (em == null || min < em);
+    if (inShift && isLocAwayFromWork()) {
+      m[iso] = "sick";
+      try { save(); } catch (e) {}
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+async function setWorkSickToday(mode) {
+  const T = todayISO(), m = workSickMap();
+  if (!mode) delete m[T];
+  else m[T] = mode;
+  await save();
+  render();
+  toast(mode === "sick" ? "Marked as off sick today. Rest up!" : mode === "working" ? "Marked as working today." : "Using automatic location detection.");
+}
 function glMode(now = new Date()) {
   const a = homeAklParts(now) || {}, min = a.min || 0, h = min / 60;
   let start = '', end = ''; try { const r = rosterState(), k = String(a.dow); start = r.days[k] || ''; end = (r.ends || {})[k] || ''; } catch (e) { }
-  const off = !start;
+  const rostered = !!start;
+  const sick = rostered && isSickOnDate(todayISO(now));
+  const off = !rostered || sick;
   let night = h >= 18 || h < 5; try { night = night || homeNight(now); } catch (e) { }
   const sm = start ? hmMin(start) : null, em = end ? hmMin(end) : null;
   const workDone = !off && em != null && min >= em;
-  return { night, off, start, end, h, min, dow: a.dow, morning: h < 12, workDone, beforeWork: !off && sm != null && min < sm, atWork: !off && sm != null && min >= sm && (em == null || min < em) };
+  const inShift = !off && sm != null && min >= sm && (em == null || min < em);
+  return { night, off, rostered, sick, start, end, h, min, dow: a.dow, morning: h < 12, workDone, beforeWork: !off && sm != null && min < sm, atWork: inShift && !sick };
 }
 // 2.26.81: while he's on a rostered shift, a countdown to finishing ('Free in 6:26', under an hour '45 min'). Roster finish time, else 6pm (Thu 7:15pm).
 function glFree(m) { m = m || glMode(); if (!m || m.off || !m.start || m.workDone) return null; const sm = hmMin(m.start); if (sm == null || m.min < sm) return null;
@@ -21546,8 +21607,8 @@ function glSetBook(v) { try { localStorage.setItem('readingBook', String(v || ''
 /* 2.26.11: where Shane is, for the greeting line only. Uses the fix the app already reads (checkHere: only when the browser
    already allows location, never prompts). Stays on the phone: nothing is sent to the relay or saved anywhere. */
 const GL_SPOTS = [
-  { k: 'home', lat: NaN, lon: NaN, r: 200 }, // from his settings (meApply)
-  { k: 'work', lat: NaN, lon: NaN, r: 200 },
+  { k: 'home', lat: -35.7645, lon: 174.3621, r: 250 }, // from his settings (meApply)
+  { k: 'work', lat: -35.7275, lon: 174.3278, r: 250 },
   { k: 'beach', lat: -35.7563, lon: 174.3585, r: 600 }, // Onerahi foreshore and beach
   { k: 'beach', lat: -35.8391, lon: 174.4597, r: 1200 }, // Ocean Beach
   { k: 'beach', lat: -35.6127, lon: 174.5160, r: 1200 }, // Tutukaka harbour
@@ -21579,7 +21640,7 @@ function glLinePool(m, now = new Date()) {
   else if (h >= 17) add('Suno time? 🎵', 'Anything good to watch tonight? 🎬');
   if (h >= 5 && h < 10) add('Breakfast on TVNZ with your coffee? ☕', 'Morning! Kettle on?');
   if (h >= 4 && h < 12 && !m.off) add('Have a good one at work today 👋');
-  if (m.off && h >= 8 && h < 18) add('Day off: anything fun planned?', fine ? 'Good day for a bushwalk or a wander along Onerahi beach?' : 'Lazy day? Good excuse for a film.');
+  if (m.sick) { add('Rest up and take it easy today 💛', 'Off sick today — hope you feel better soon 🍵'); } else if (m.off && h >= 8 && h < 18) add('Day off: anything fun planned?', fine ? 'Good day for a bushwalk or a wander along Onerahi beach?' : 'Lazy day? Good excuse for a film.');
   if ((d === 5 || d === 6) && h >= 15 && h < 20) add('Cooking something gluten-free tonight? 🍳', 'GF pizza night? 🍕');
   if ((d === 2 || d === 3) && !m.off && h >= 14 && h < 19) add('Gym after work today? 💪');
   if (d === 1 && h >= 12 && h < 20) add('Monday at mum’s. Say hi from the app 💛');
@@ -21602,7 +21663,7 @@ function glLine(m) {
 document.addEventListener('visibilitychange', () => { if (document.hidden) { window.__glLine = ''; window.__glLineLoc = 0; } });
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
-  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
+  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.sick ? '🤒 Off sick today' : m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
   return `<div class="top glhead"><div style="min-width:0;flex:1"><div class="glrow"><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1><div class="iconrow"><button class="iconbtn" aria-label="Summary" onclick="go('#summary')">${I('news')}</button>${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
 }
 /* ---- Home status ---- */
@@ -21678,6 +21739,7 @@ function homeStatusRefresh() {
   try { alarmLoad(); } catch (e) { }
   try { hroomFetch(); } catch (e) { }
   try { pwrFetch(false); } catch (e) { }
+  try { checkHere(false); } catch (e) { }
   try { loadTides(); glTidesEnsure(); } catch (e) { }
   try { glTrafficLoad(); } catch (e) { }
   try { refreshAlerts(); loadWx16(); } catch (e) { }
@@ -23134,7 +23196,7 @@ function weekItems() {
   try { const r = rosterState(), n = DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds) ? Math.round(DRIVE.seconds / 60) : 0;
     Object.keys(out).forEach(d => { const k = String(new Date(parseD(d)).getUTCDay()), st = (r.days || {})[k], en = (r.ends || {})[k]; if (!st) return;
       const sm = hmMin(st), leave = n >= 1 && n <= 180 && sm != null ? fmtTime(hmFromMin(sm - n)) : '';
-      add(d, { type: 'work', title: 'Work', time: fmtTime(st) + (en ? ' – ' + fmtTime(en) : ''), sort: st, line: '📍 Work', warn: leave ? 'Leave by ' + leave + (d === T ? '' : ' (today’s traffic)') : '', go: "go('#work')" }); }); } catch (e) { }
+      const sickD = isSickOnDate(d); add(d, { type: 'work', ic: sickD ? '🤒' : '💼', title: sickD ? 'Off sick' : 'Work', time: fmtTime(st) + (en ? ' – ' + fmtTime(en) : ''), sort: st, line: sickD ? '🏠 Resting (sick leave)' : '📍 Work', warn: (!sickD && leave) ? 'Leave by ' + leave + (d === T ? '' : ' (today’s traffic)') : '', go: "go('#work')" }); }); } catch (e) { }
   // everything the Calendar shows
   try { calItems(T0, T0 + 6 * DAY).forEach(e => { if (!out[e.date] || !glOk(e.title)) return;
       const type = e.src !== 'due' ? e.src : e.time === 'To-do' ? 'todo' : e.time === 'Bill' ? 'bill' : e.time === 'Loan' ? 'loan' : /^(WOF|Rego|Service|AA|Licence)$/.test(e.time) ? 'car' : 'due';
@@ -26093,7 +26155,11 @@ const evGcalAppts = () => (S.myEvents || []).filter(e => e && e.gcalWant && e.re
    The Today items (Coming up, today and overdue) are on the Notifications page under Today, without repeats. Night Home is unchanged. */
 (() => { const o = glTabs; glTabs = function (m) { const t = o(m); return m && m.night ? t : t.filter(x => x[0] !== 'today'); }; })();
 function glWorkCard(m) {
-  if (!m || m.night || m.off || m.workDone || !m.atWork) return ''; const f = glFree(m); if (!f) return '';
+  if (!m || m.night) return '';
+  if (m.sick) {
+    return `<div class="list glworkcard"><div class="row"><div class="ic health">🤒</div><div class="tx" onclick="go('#work')" style="cursor:pointer"><div class="t">Off sick today (rostered ${esc(glShift(m))})</div><div class="s">Detected from your location (not at work) · take it easy today</div></div><button type="button" class="btn small" onclick="setWorkSickToday('working')">I’m at work</button></div></div>`;
+  }
+  if (m.off || m.workDone || !m.atWork) return ''; const f = glFree(m); if (!f) return '';
   return `<div class="list glworkcard">${tabRow('calendar', 'Work ' + esc(glShift(m)), `<span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span>`, "go('#work')")}</div>`;
 }
 const bellTxt = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
