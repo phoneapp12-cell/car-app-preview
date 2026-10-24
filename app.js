@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.3';
+const APP_VERSION = '2.28.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20448,11 +20448,82 @@ function SummaryPage() { // 2.26.18: the Home summary feed, now its own page. 2.
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header('Summary', 'Your day at a glance') +
     `<div class="sumbar"><span id="sumupd" class="muted">${esc(upd)}</span><button type="button" class="btn small" onclick="sumRefresh(true)">${I('refresh')} Refresh</button></div>` + (body || '<div class="card empty"><div class="t">Nothing to sum up yet</div><div class="s">Check back in a moment.</div></div>');
 }
+// 2.28.4: Notifications layout. Story bubbles, one hero card, a Today / This week / Later board (Coming up + Just added), mascot strip. Same data as before.
+function nbStoryList() {
+  const out = [], add = (id, label, emoji, img, title, body, go) => { if (title) out.push({ id, label, emoji, img: img || '', title: String(title), body: String(body || ''), go: go || '' }); };
+  try { if (dailyJokeOn()) { const j = dailyJokeFor(); if (Array.isArray(j)) add('joke', 'Joke', '😄', '', j[0], j[1] || ''); } } catch (e) { }
+  try { if (showDailyQuote()) { const q = dailyQuoteFor(); if (q) add('quote', 'Quote', '💬', '', '“' + q.t + '”', q.w || ''); } } catch (e) { }
+  try { const w = langToday('mi'); if (w) add('word', 'Kupu', '🗣️', '', w[0], w[1] + (w[2] ? ' · say it: ' + w[2] : ''), "go('#lang')"); } catch (e) { }
+  try { const p = spToday(); if (p) add('space', 'Space', '🚀', p.img, p.name, spShort(p), "go('#space')"); } catch (e) { }
+  try { const t = travelToday(); if (t && t.name) add('travel', 'Travel', '✈️', t.img, t.name + ', ' + t.country, '', "go('#travel')"); } catch (e) { }
+  try { Object.keys(LB).forEach(s => { const p = lbToday(s); if (p) add('lb-' + s, LB[s].name, { cd: '💻', as: '🔭', gd: '🌱' }[s], p.img, p.name, spShort(p), `go('${LB[s].hash}')`); }); } catch (e) { }
+  try { const r = glPickRecipe(); if (r) add('recipe', 'Recipe', '🍽️', recipePhotoSrc(r), r.title, 'Gluten-free recipe of the day', "go('#recipes')"); } catch (e) { }
+  try { glTiles().forEach(t => { if (t.k === 'videos') add('video', 'Video', '🎬', '', t.s, 'Video pick', t.go); else if (t.k === 'events') add('events', 'Events', '🎟️', '', t.s, 'Local events', t.go); else if (t.k === 'netflix') add('netflix', 'Netflix', '🍿', '', t.s, 'New on Netflix', t.go); }); } catch (e) { }
+  return out;
+}
+function nbSeen() { try { const o = JSON.parse(localStorage.getItem('storySeen') || 'null'); if (o && o.d === nzTodayISO()) return o; } catch (e) { } return { d: nzTodayISO(), ids: [] }; }
+function nbMarkSeen(id) { const o = nbSeen(); if (!o.ids.includes(id)) { o.ids.push(id); try { localStorage.setItem('storySeen', JSON.stringify(o)); } catch (e) { } } }
+function nbStoriesHtml() {
+  const L = nbStoryList(), seen = nbSeen().ids; if (!L.length) return '';
+  return `<div class="nbstories" role="list" aria-label="Today’s stories">${L.map((s, i) => `<button type="button" role="listitem" class="nbst${seen.includes(s.id) ? ' seen' : ''}" data-sid="${esc(s.id)}" onclick="nbOpenStory(${i})"><span class="nbring"><span class="nbpic">${s.img ? `<img src="${esc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<span class="nbemo">${s.emoji}</span></span></span><span class="nblab">${esc(s.label)}</span></button>`).join('')}</div>`;
+}
+let NB_ST = null;
+function nbOpenStory(i) {
+  NB_ST = { L: nbStoryList(), i };
+  let el = document.getElementById('nbviewer'); if (!el) { el = document.createElement('div'); el.id = 'nbviewer'; document.body.appendChild(el); }
+  let y0 = null, x0 = null;
+  el.ontouchstart = e => { y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; };
+  el.ontouchend = e => { if (y0 == null) return; const dy = e.changedTouches[0].clientY - y0, dx = Math.abs(e.changedTouches[0].clientX - x0); y0 = null; if (dy > 80 && dy > dx) { e.preventDefault(); nbCloseStory(); } };
+  nbDrawStory();
+}
+function nbDrawStory() {
+  const el = document.getElementById('nbviewer'); if (!el || !NB_ST) return; const { L, i } = NB_ST, s = L[i]; if (!s) return nbCloseStory();
+  nbMarkSeen(s.id); document.querySelectorAll(`.nbst[data-sid="${s.id}"]`).forEach(b => b.classList.add('seen'));
+  el.className = 'show';
+  el.innerHTML = `<div class="nbvbars">${L.map((_, j) => `<span class="${j < i ? 'done' : j === i ? 'on' : ''}"></span>`).join('')}</div>
+    <div class="nbvtop"><span class="nbvlab">${s.emoji} ${esc(s.label)}</span><button type="button" class="nbvx" aria-label="Close" onclick="nbCloseStory()">✕</button></div>
+    <div class="nbvbody">${s.img ? `<img class="nbvimg" src="${esc(s.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : `<div class="nbvemo">${s.emoji}</div>`}<h2>${esc(s.title)}</h2>${s.body ? `<p>${esc(s.body)}</p>` : ''}${s.go ? `<button type="button" class="btn primary nbvgo" onclick="nbCloseStory();${esc(s.go)}">Open</button>` : ''}</div>
+    <button type="button" class="nbvprev" aria-label="Back" onclick="nbStep(-1)"></button><button type="button" class="nbvnext" aria-label="Next" onclick="nbStep(1)"></button>`;
+}
+function nbStep(d) { if (!NB_ST) return; NB_ST.i += d; if (NB_ST.i < 0) NB_ST.i = 0; if (NB_ST.i >= NB_ST.L.length) return nbCloseStory(); nbDrawStory(); }
+function nbCloseStory() { const el = document.getElementById('nbviewer'); if (el) { el.className = ''; el.innerHTML = ''; } NB_ST = null; }
+document.addEventListener('keydown', e => { if (NB_ST && e.key === 'Escape') nbCloseStory(); });
+function nbHero(list) {
+  const T = list || [], pick = T.find(x => x.days < 0) || T.find(x => x.days === 0 && x.pri === 0) || T.find(x => (x.kind === 'bill' || x.kind === 'loan') && x.days <= 1) || T.filter(x => x.kind === 'car' || x.kind === 'driver').sort((a, b) => a.days - b.days)[0] || T.find(x => x.days === 0 && (x.kind === 'appt' || x.kind === 'ext' || x.kind === 'mine'));
+  if (!pick) return `<div class="nbhero nbclear"><div class="nbhk">All clear</div><div class="nbht">Nothing urgent right now</div><div class="nbhs">Sweet as. Enjoy your day.</div></div>`;
+  const tone = pick.days < 0 ? 'red' : pick.days === 0 ? 'amber' : 'blue', k = pick.days < 0 ? 'Overdue' : pick.days === 0 ? 'Today' : pick.days === 1 ? 'Tomorrow' : 'Coming up';
+  return `<div class="nbhero nb-${tone}"><div class="nbhk">${k} · most important now</div><div class="list cucolours">${cuRowHtml(pick)}</div></div>`;
+}
+function nbJaRow(x) { return `<button class="row ja${x.who === 'sarah' ? ' jasarah' : ''}" onclick="${x.go}"><div class="ic ${x.ic}">${I(x.icon)}</div><div class="tx"><div class="t"><span class="nbnew">New</span> ${x.title}</div><div class="s">${x.sub}</div></div></button>`; }
+function nbBoardHtml(list) {
+  const today = [], week = [], later = [];
+  list.forEach(x => (x.days <= 0 ? today : x.days <= 7 ? week : later).push(x));
+  const byPri = (a, b) => a.days - b.days || a.pri - b.pri;
+  let ja = []; try { ja = justAddedList().slice(0, 12); } catch (e) { }
+  const rows = L => `<div class="list${cuColoursOn() ? ' cucolours' : ''} nbrows">${L.sort(byPri).map(cuRowHtml).join('')}</div>`;
+  const jaHtml = ja.length ? `<div class="list nbrows">${ja.map(nbJaRow).join('')}</div>` + `<button class="linkbtn jaclear" onclick="justAddedClear()">Clear new…</button>` : '';
+  return tbList('today', 'Today', today.length + ja.length, (jaHtml + (today.length ? rows(today) : '')) || '', false, 'nb', 'Nothing due today') +
+    tbList('week', 'This week', week.length, week.length ? rows(week) : '', false, 'nb', 'Nothing this week') +
+    tbList('later', 'Later', later.length, later.length ? rows(later) : '', false, 'nb', 'Nothing later');
+}
+function nbMenu(k) { openSheet(k === 'today' ? 'Today' : k === 'week' ? 'This week' : 'Later', `<p class="muted">Everything from Coming up and Just added, soonest and most important first. Colours, Busy entries and the rest follow your Settings.</p><div class="btns"><button type="button" class="btn" onclick="closeSheet().then(()=>go('#calendar'))">${I('cal')} Calendar</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button></div>`, null); }
+function nbMascot(n) {
+  const k = mascotKey(), mood = n >= 8 ? 'energetic' : n >= 4 ? 'alert' : n >= 1 ? 'tired' : 'sleep', says = MASCOTS[k].says[mood];
+  const line = n >= 8 ? 'Big day! ' + n + ' things on.' : n >= 4 ? n + ' things on today. You’ve got this.' : n >= 1 ? 'A calm day, just ' + plural(n, 'thing') + '.' : 'Nothing on. Time to relax.';
+  return `<div class="nbfun"><button type="button" class="nbpet" aria-label="Pat the ${k}" onclick="nbPat(this)">${mascotMini(k).replace('cat-alert', 'cat-' + (mood === 'sleep' ? 'sleep' : mood))}</button><div><div class="nbsay">${esc(says[0])}</div><div class="nbline">${esc(line)}</div></div></div>`;
+}
+function nbPat(b) { try { const h = b.querySelector('.hcat'); if (h) { h.classList.add('cat-tap'); setTimeout(() => h.classList.remove('cat-tap'), 700); } if (mascotSoundOn()) mascotSynth(mascotKey(), .6); } catch (e) { } }
+function nbTopHtml() {
+  let list = []; try { list = comingUpList(); } catch (e) { }
+  const todayN = list.filter(x => x.days <= 0).length;
+  return { top: nbStoriesHtml() + nbHero(list) + `<div class="tbboard nbboard"><div class="tblists" id="nblists">${nbBoardHtml(list)}</div></div>`, fun: nbMascot(todayN) };
+}
 function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   setTimeout(() => { try { accLoad(); } catch (e) { } try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
-  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + `<div id="habsug">${habCards()}</div><div id="glalerts">${glAlertsBody()}</div>
+  const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
+  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + (NB.top) + `<div id="habsug">${habCards()}</div><div class="sec">Alerts</div><div id="glalerts">${glAlertsBody()}</div>${NB.fun}
   <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
 }
