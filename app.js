@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.18';
+const APP_VERSION = '2.28.19';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8201,7 +8201,7 @@ function mealRow(iso, hist = false) {
     <div class="mealcap"><button class="tapzone" onclick="mealNight('${iso}')"><div class="t">${esc(e.title)}</div></button>${recipeLink}</div>
     <div class="mealpair">${mealPic(idea)}${tick}<button class="tapzone" onclick="mealNight('${iso}')"><div class="s">${sub}</div></button></div></div>`;
 }
-const mealTabs = on => `<div class="chips mealtabs"><button class="chip ${on === 'plan' ? 'on' : ''}" id="tabplan" onclick="go('#meals')">Meal plan</button><button class="chip ${on === 'recipes' ? 'on' : ''}" id="tabrecipes" onclick="go('#recipes')">Recipes (${visibleIdeas().length})</button><button class="chip ${on === 'shop' ? 'on' : ''}" id="tabshop" onclick="go('#shopping')">Shopping${S.shop.items.some(x => !x.done) ? ` (${S.shop.items.filter(x => !x.done).length})` : ''}</button></div>`;
+const mealTabs = on => `<div class="chips mealtabs"><button class="chip ${on === 'plan' ? 'on' : ''}" id="tabplan" onclick="go('#meals')">Meal plan</button><button class="chip ${on === 'recipes' ? 'on' : ''}" id="tabrecipes" onclick="go('#recipes')">Recipes (${visibleIdeas().length})</button><button class="chip ${on === 'shop' ? 'on' : ''}" id="tabshop" onclick="go('#shopping')">Shopping${S.shop.items.some(x => !x.done) ? ` (${S.shop.items.filter(x => !x.done).length})` : ''}</button><button class="chip ${on === 'gflist' ? 'on' : ''}" id="tabgflist" onclick="go('#gflist')">GF Safe List</button></div>`;
 function nightsText() {
   const n = M().nights; if (!n.length) return 'No cooking nights picked';
   const names = n.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(x => WDL[x]);
@@ -11265,6 +11265,7 @@ function More() {
     gardening: () => lbMoreSub('gd'),
     walks: () => walksMoreSub(),
     tidy: () => tidyMoreSub(),
+    gflist: () => gfListMoreSub(),
     flagged: () => flaggedMoreSub(),
     sleep: () => 'Your sleep and morning check-in',
     gym: () => 'Gym visits and workouts',
@@ -11289,7 +11290,7 @@ function More() {
     ['health', '🩺 Health & Wellbeing', ['watch', 'sleep', 'gym', 'health', 'meds', 'claims']],
     ['local', '📍 Local & Outdoors', ['walks', 'weather', 'bridge', 'roadworks', 'events', 'news', 'planning', 'garden']],
     ['explore', '✨ Explore & Learn', ['media', 'learn', 'aitech', 'diy', 'science', 'coding', 'astronomy', 'gardening', 'space', 'travel', 'ideas', 'tv', 'videos', 'top40', 'radio', 'podcasts', 'blogging', 'about']],
-    ['home', '🏠 Home & Daily', ['calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'projects', 'flagged', 'birthdays', 'countdown', 'diary', 'notes', 'photos', 'lights', 'heat', 'alarm']],
+    ['home', '🏠 Home & Daily', ['calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'projects', 'flagged', 'birthdays', 'countdown', 'diary', 'notes', 'photos', 'lights', 'heat', 'alarm']],
     ['money', '💰 Money & Bills', ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans']],
     ['cars', '🚗 Cars & Pets', ['cars', 'pets']]
   ];
@@ -11347,13 +11348,14 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   science: ['bulb', 'appt', 'Science', 'Science'],
   coding: ['star', 'ev', 'Coding', 'Coding'],
   astronomy: ['moon', 'ev', 'Astronomy', 'Astronomy'],
-  gardening: ['leaf', 'garden', 'Gardening board', 'Gardening']
+  gardening: ['leaf', 'garden', 'Gardening board', 'Gardening'],
+  gflist: ['shield', 'meal', 'GF Safe List', 'GF Safe']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'shopping', 'countdown', 'diary', 'notes', 'photos'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'shopping', 'gflist', 'countdown', 'diary', 'notes', 'photos'] },
   { id: 'people', title: 'Health', keys: ['watch', 'sleep', 'gym', 'health', 'meds', 'claims', 'birthdays', 'about'] },
   { id: 'near', title: 'Local', keys: ['walks', 'bridge', 'roadworks', 'planning', 'garden'] },
   { id: 'media', title: 'Explore', keys: ['media', 'learn', 'aitech', 'diy', 'science', 'space', 'ideas'] },
@@ -18910,8 +18912,8 @@ function backupBlob() {
   let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } let recipeBoard = null; try { recipeBoard = rbGet(); } catch (e) { } let videoBoard = null; try { videoBoard = vbGet(); } catch (e) { }
   let primeBoard = null, moviesBoard = null, blogBoard = null, podcastBoard = null, concertsBoard = null, nightlifeBoard = null, eventsBoard = null, top40Board = null; try { top40Board = t40Get(); } catch (e) { }
   try { primeBoard = prbGet(); } catch (e) { } try { moviesBoard = mvbGet(); } catch (e) { } try { blogBoard = blgGet(); } catch (e) { } try { podcastBoard = pdbGet(); } catch (e) { } try { concertsBoard = cnbGet(); } catch (e) { } try { nightlifeBoard = nlbGet(); } catch (e) { } try { eventsBoard = evbGet(); } catch (e) { }
-  let walksBoard = null, tidyBoard = null; try { walksBoard = wkGet(); } catch (e) { } try { tidyBoard = tdGet(); } catch (e) { }
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, ...lbBackup(), walksBoard, tidyBoard, flagged, newsBoard, recipeBoard, videoBoard, primeBoard, moviesBoard, blogBoard, podcastBoard, concertsBoard, nightlifeBoard, eventsBoard, top40Board }, null, 2)], { type: 'application/json' });
+  let walksBoard = null, tidyBoard = null, gflistBoard = null; try { walksBoard = wkGet(); } catch (e) { } try { tidyBoard = tdGet(); } catch (e) { } try { gflistBoard = gfGet(); } catch (e) { }
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, ...lbBackup(), walksBoard, tidyBoard, gflistBoard, flagged, newsBoard, recipeBoard, videoBoard, primeBoard, moviesBoard, blogBoard, podcastBoard, concertsBoard, nightlifeBoard, eventsBoard, top40Board }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -18936,7 +18938,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { lbRestoreAll(obj); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } try { if (obj && obj.videoBoard) vbRestore(obj.videoBoard); } catch (e) { } try { if (obj && obj.primeBoard) prbRestore(obj.primeBoard); } catch (e) { } try { if (obj && obj.moviesBoard) mvbRestore(obj.moviesBoard); } catch (e) { } try { if (obj && obj.blogBoard) blgRestore(obj.blogBoard); } catch (e) { } try { if (obj && obj.podcastBoard) pdbRestore(obj.podcastBoard); } catch (e) { } try { if (obj && obj.concertsBoard) cnbRestore(obj.concertsBoard); } catch (e) { } try { if (obj && obj.nightlifeBoard) nlbRestore(obj.nightlifeBoard); } catch (e) { } try { if (obj && obj.eventsBoard) evbRestore(obj.eventsBoard); } catch (e) { } try { if (obj && obj.top40Board) t40Restore(obj.top40Board); } catch (e) { } try { if (obj && obj.walksBoard) wkRestore(obj.walksBoard); } catch (e) { } try { if (obj && obj.tidyBoard) tdRestore(obj.tidyBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { lbRestoreAll(obj); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } try { if (obj && obj.videoBoard) vbRestore(obj.videoBoard); } catch (e) { } try { if (obj && obj.primeBoard) prbRestore(obj.primeBoard); } catch (e) { } try { if (obj && obj.moviesBoard) mvbRestore(obj.moviesBoard); } catch (e) { } try { if (obj && obj.blogBoard) blgRestore(obj.blogBoard); } catch (e) { } try { if (obj && obj.podcastBoard) pdbRestore(obj.podcastBoard); } catch (e) { } try { if (obj && obj.concertsBoard) cnbRestore(obj.concertsBoard); } catch (e) { } try { if (obj && obj.nightlifeBoard) nlbRestore(obj.nightlifeBoard); } catch (e) { } try { if (obj && obj.eventsBoard) evbRestore(obj.eventsBoard); } catch (e) { } try { if (obj && obj.top40Board) t40Restore(obj.top40Board); } catch (e) { } try { if (obj && obj.walksBoard) wkRestore(obj.walksBoard); } catch (e) { } try { if (obj && obj.tidyBoard) tdRestore(obj.tidyBoard); } catch (e) { } try { if (obj && obj.gflistBoard) gfRestore(obj.gflistBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
@@ -20565,9 +20567,9 @@ function bottomTabsSetting() {
 }
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
-const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'food', meals: 'food', recipes: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', coding: 'learn', astronomy: 'learn', gardening: 'learn' }; // detail pages belong to their section
+const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'food', meals: 'food', recipes: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', coding: 'learn', astronomy: 'learn', gardening: 'learn' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden', gflist: 'plate' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -20635,7 +20637,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), walks: WalksPage, tidy: TidyPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -22369,6 +22371,7 @@ function FoodPage() {
   add('planner', 'Meal planner', () => mealsMoreSub(), 'art/meals-banner.webp', "go('#meals')");
   add('recipes', 'Recipes', () => { const r = glPickRecipe(); return r ? 'GF idea: ' + r.title : plural(visibleIdeas().length, 'recipe'); }, 'i3-plate', "go('#recipes')");
   add('shopping', 'Shopping list', () => { const n = S.shop.items.filter(x => !x.done).length; return n ? plural(n, 'item') : 'Nothing on the list'; }, 'art/shopping-banner.webp', "go('#shopping')");
+  add('gflist', 'GF Safe List & Dining', () => gfListMoreSub(), 'i3-plate', "go('#gflist')");
   const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('food'); } catch (e) { return true; } })();
   return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` + header(`<span style="display:inline-flex;align-items:center;gap:10px"><img src="art/i3-plate.webp" alt="" width="40" height="40" style="width:40px;height:40px;object-fit:contain" onerror="this.remove()">Meals</span>`, 'Plan, cook and shop · all gluten free') +
     (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddFood()">${I('plus')} Add to bottom bar</button>`) + `<div class="glgrid">${T.map(t => glTileHtml(t, false)).join('')}</div>`;
@@ -28956,4 +28959,217 @@ function TidyPage() {
     <div class="tblists" id="tdlists">${tdBoardHtml()}</div></div>
     ${btIn ? '' : `<button type="button" class="btn small" style="margin:10px 0 0" onclick="btAddTidy()">${I('plus')} Add to bottom bar</button>`}
     <div class="foot">Swipe sideways between lists. Pick one small shelf, drawer or tray for 10 minutes—no big blitzes required.</div>`;
+}
+
+
+/* ================= 2.28.19: GLUTEN-FREE SAFE LIST & DINING OUT (#gflist) =================
+   Tailored coeliac reference & Trello board for Shane in Whangārei / Onerahi / NZ.
+   Columns: Safe Supermarket Favourites ✅, Local GF Dining & Takeaways 🍽️, Want to Try,
+   Avoid / Caught Out By ⚠️, and Hidden Gluten Label Guide 🔍.
+   Includes filter chips, custom product/place adder, and 1-tap "+ Add to Shopping List". */
+const GF_SAFE_DATA = [{"id":"gf-venerdi-bread","title":"Venerdi Gluten Free Sourdough & Paleo Loaves","cat":"bread","catLabel":"🍞 Bread & Bakery","store":"New World Onerahi · Woolworths","shopName":"Venerdi gluten free bread","status":"safe","note":"NZ-made gluten-free loaves (Six Seeds, Activated Sourdough, Paleo). Toasts really well and holds together for sandwiches without crumbling."},{"id":"gf-venerdi-pizza","title":"Venerdi Gluten Free Pizza Bases (2-Pack)","cat":"bread","catLabel":"🍞 Bread & Bakery","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Gluten free pizza bases","status":"safe","note":"Crispy, thin-crust GF pizza bases—ideal for Friday or Saturday pizza night with pepperoni, ham & pineapple, or BBQ chicken."},{"id":"gf-vogels","title":"Vogel’s Gluten Free Bread (White / Soy & Linseed / 6 Seed)","cat":"bread","catLabel":"🍞 Bread & Bakery","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Vogels gluten free bread","status":"safe","note":"Coeliac NZ Crossed Grain certified. Great toasted for bacon & eggs on a weekend morning."},{"id":"gf-brioche-buns","title":"Woolworths Free From / Purebred GF Brioche Burger Buns","cat":"bread","catLabel":"🍞 Bread & Bakery","store":"Woolworths · New World Onerahi","shopName":"Gluten free burger buns","status":"safe","note":"Soft gluten-free burger buns that don’t fall apart. Warm for 15 seconds in the microwave or lightly toast the cut side on the pan."},{"id":"gf-farrahs-wraps","title":"Farrah’s Gluten Free Wraps (White / Spinach / Garden Veggie)","cat":"bread","catLabel":"🍞 Bread & Bakery","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Farrahs gluten free wraps","status":"safe","note":"NZ-made in Upper Hutt. Warm each wrap in a dry frypan for 15 seconds per side so it rolls flexibly without cracking."},{"id":"gf-diamond-pasta","title":"Diamond Gluten Free Pasta (Spirals, Penne, Spaghetti & Lasagne)","cat":"pasta","catLabel":"🍝 Pasta & Noodles","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Gluten free pasta","status":"safe","note":"Corn and rice pasta blend that cooks al dente and doesn’t go mushy in bolognese, carbonara, or pasta bakes."},{"id":"gf-rice-noodles","title":"Trident / Wai Wai 100% Rice Vermicelli & Pad Thai Noodles","cat":"pasta","catLabel":"🍝 Pasta & Noodles","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Rice noodles (gluten free)","status":"safe","note":"Made from rice and water only—naturally gluten-free and quick to soak for beef & broccoli stir-fries or Pad Thai."},{"id":"gf-lkk-soy","title":"Lee Kum Kee Gluten-Free Soy Sauce & San-J Tamari","cat":"sauces","catLabel":"🥫 Sauces & Stock","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Gluten free soy sauce (tamari)","status":"safe","note":"Brewed with soybeans and corn/rice instead of wheat. Essential coeliac swap for stir-fries, marinades, and fried rice."},{"id":"gf-massel-stock","title":"Massel Ultracubes & Liquid Stock (Chicken, Beef, Vegetable)","cat":"sauces","catLabel":"🥫 Sauces & Stock","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Massel gluten free stock","status":"safe","note":"Clearly labelled Gluten Free and Coeliac-safe (also low FODMAP). No hidden wheat starch or barley."},{"id":"gf-barkers","title":"Barker’s of Geraldine Simmer Sauces, Chutneys & Relishes","cat":"sauces","catLabel":"🥫 Sauces & Stock","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Barkers gluten free sauce","status":"safe","note":"NZ-made in South Canterbury; almost the entire Barker’s range is thickened with cornflour/fruit and clearly states \"Gluten Free\" on the back label."},{"id":"gf-hellers-sausages","title":"Hellers Gluten Free Sausages & Precooked Sausages","cat":"meat","catLabel":"🥩 Meat & Sausages","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Hellers gluten free sausages","status":"safe","note":"Made with rice flour instead of wheat rusk. Look for the explicit \"Gluten Free\" flashes on the front of the pack for BBQ nights."},{"id":"gf-proper-crisps","title":"Proper Crisps (Marlborough Sea Salt / Rosemary & Thyme / Onion)","cat":"snacks","catLabel":"🍫 Snacks & Treats","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Proper Crisps","status":"safe","note":"Nelson-made in dedicated gluten-free runs, clearly labelled Gluten Free on the back."},{"id":"gf-arnotts-timtam","title":"Arnott’s Gluten Free Tim Tam, Mint Slice & Scotch Finger","cat":"snacks","catLabel":"🍫 Snacks & Treats","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Gluten free Tim Tams","status":"safe","note":"Endorsed by Coeliac NZ/Australia with the Crossed Grain logo—tastes just like the original with a cuppa."},{"id":"gf-edmonds-flour","title":"Edmonds Gluten Free Standard & Self-Raising Flour + Cornflour","cat":"baking","catLabel":"🥣 Baking & Pantry","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Gluten free flour","status":"safe","note":"Reliable cup-for-cup GF flour blend for pancakes, batters, muffins, and thickening gravies."},{"id":"gf-pics-pb","title":"Pic’s Peanut Butter (Crunchy / Smooth)","cat":"baking","catLabel":"🥣 Baking & Pantry","store":"New World Onerahi · Woolworths · Pak’nSave","shopName":"Pics peanut butter","status":"safe","note":"99.5% hi-oleic peanuts and salt—naturally gluten-free and great for satay chicken sauce or toast."}];
+const GF_DINING_DATA = [{"id":"gfd-townbasin","title":"Town Basin Cafés & Waterfront Dining (Whangārei)","cat":"dining","catLabel":"🍽️ Local Dining","where":"Town Basin, Whangārei (8 min from work / 12 min from Onerahi)","ask":"Say \"coeliac gluten-free\" so staff use clean tongs, separate butter/toaster, and check kitchen sauces.","note":"Several Town Basin cafés stock GF cabinet slices, friands, and brunch options on GF toast. Bacon & eggs with hash browns (only if cooked on a clean flat-top or dedicated fryer) is a reliable go-to."},{"id":"gfd-indian","title":"Indian Curries (Butter Chicken, Tikka Masala, Korma, Vindaloo)","cat":"dining","catLabel":"🍽️ Takeaway & Dining","where":"Whangārei & Onerahi Indian Takeaways / Restaurants","ask":"Confirm curries are thickened with cashew/cream/onion only (no flour or wheat-cut asafoetida/hing) and skip naan/samosas.","note":"One of the safest, easiest gluten-free takeaway nights: traditional Indian curries, basmati rice, and plain pappadums (made from lentil/chickpea flour) are naturally gluten-free."},{"id":"gfd-thai","title":"Thai Green/Red Curries & Pad Thai (Rice Noodles)","cat":"dining","catLabel":"🍽️ Takeaway & Dining","where":"Whangārei Thai Restaurants","ask":"Ask for GF fish sauce / tamari only—no regular dark soy sauce or wheat-containing oyster sauce.","note":"Thai coconut curries with jasmine rice and rice-noodle Pad Thai are naturally wheat-free when made with fish sauce, tamarind, and palm sugar."},{"id":"gfd-fishchips","title":"Fish & Chips / Hot Chips Checklist","cat":"dining","catLabel":"🍽️ Takeaway Check","where":"Onerahi & Whangārei Fish & Chip Shops","ask":"Always ask: \"Do you have a separate fryer dedicated ONLY to gluten-free chips/fish, with no battered fish, nuggets, or spring rolls?\"","note":"If a fryer is shared with wheat-battered fish or crumbed sausages, the oil is cross-contaminated for coeliacs. If they don’t have a dedicated fryer, go for grilled fish or a home oven-bake."},{"id":"gfd-pizza","title":"Takeaway Pizza (Hell Pizza / Domino’s / Local Pizzerias)","cat":"dining","catLabel":"🍽️ Takeaway Check","where":"Whangārei Pizza Takeaways","ask":"Order a GF base, ask for a clean baking tray/foil and a clean pizza wheel cutter, and check meat/BBQ swirls are GF.","note":"Hell Pizza clearly marks GF options and lets you flag coeliac prep instructions in the order notes."},{"id":"gfd-steak","title":"Steak, Grill & Roast Dinners Out","cat":"dining","catLabel":"🍽️ Local Dining","where":"Whangārei & Tutukaka Coast Restaurants","ask":"Ask for steak cooked on a clean grill section with garlic butter instead of regular gravy (unless confirmed GF gravy) and salad/roast veg.","note":"Pairs great with a glass of merlot! Always double-check whether any fries share a fryer with battered bar snacks."}];
+const GF_TRY_DATA = [{"id":"gft-turkish","title":"Gluten-Free Checked Turkish Delight","cat":"snacks","catLabel":"🍫 Snacks & Treats","store":"New World Onerahi / Confectionery aisle","shopName":"Turkish Delight (check GF label)","note":"Authentic rose/lemon Turkish Delight thickened with cornstarch and dusted in icing sugar/cornflour (always check the allergen box to ensure no wheat starch dusting!)."},{"id":"gft-culleys","title":"Culley’s Gluten Free Gravy & Simmer Sauces","cat":"sauces","catLabel":"🥫 Sauces & Stock","store":"New World Onerahi · Woolworths","shopName":"Culleys gluten free gravy","note":"NZ-made quick pouches for roast meat and steak nights."},{"id":"gft-loopy-naan","title":"Homemade 20-Min Gluten-Free Naan (No Yeast)","cat":"baking","catLabel":"🥣 Baking & Pantry","store":"Home recipe (GF self-raising flour + Greek yoghurt)","shopName":"Greek yoghurt","note":"From your Videos board (The Loopy Whisk): equal parts GF self-raising flour and Greek yoghurt cooked in a hot dry cast-iron pan for Friday curry night."}];
+const GF_AVOID_DATA = [{"id":"gfa-soy","title":"🚫 Regular Soy Sauce & Teriyaki Marinades","cat":"avoid","catLabel":"⚠️ Hidden Wheat","note":"Standard Chinese and Japanese soy sauces (Kikkoman red-top, Maggi, standard dark soy) are brewed with 40–50% wheat. Always use San-J Tamari, Kikkoman Green-Top GF, or Lee Kum Kee GF Soy."},{"id":"gfa-malt","title":"🚫 Barley Malt Extract (Cornflakes, Rice Bubbles, Malt Chocolates)","cat":"avoid","catLabel":"⚠️ Hidden Barley","note":"Standard Kellogg’s Corn Flakes, Rice Bubbles, Milo, and malted chocolates contain barley malt extract or flavouring. Only buy cereals with \"Gluten Free\" printed on the front."},{"id":"gfa-fryer","title":"🚫 Shared-Fryer Hot Chips, Wedges & Hash Browns","cat":"avoid","catLabel":"⚠️ Cross-Contact","note":"Even when plain potato chips have no wheat coating, cooking them in oil shared with battered fish, onion rings, or chicken nuggets transfers gluten into the chips."},{"id":"gfa-sausages","title":"🚫 Unlabelled Butcher / Supermarket Sausages & Patties","cat":"avoid","catLabel":"⚠️ Hidden Binder","note":"Standard NZ sausages and pre-made burger patties usually use wheat flour or breadcrumbs as a binder. Always look for the \"Gluten Free\" label (like Hellers GF)."},{"id":"gfa-oats","title":"🚫 Oats & Oat Milk (NZ & Australia FSANZ Law)","cat":"avoid","catLabel":"⚠️ Coeliac Rule","note":"In New Zealand and Australia, oats cannot be labelled \"Gluten Free\" because ~1 in 5 coeliacs react to oat avenin, and commercial oats have high wheat/barley cross-contamination."},{"id":"gfa-licorice","title":"🚫 Regular Licorice, Wheaten Lollies & Unchecked Confectionery","cat":"avoid","catLabel":"⚠️ Hidden Wheat","note":"Traditional black and red licorice uses wheat flour as its main base, and some chocolates/Turkish Delight use wheat glucose or wheat flour dusting. Always check the bold \"Contains:\" box."},{"id":"gfa-surimi","title":"🚫 Imitation Crab / Surimi in Sushi & Seafood Salad","cat":"avoid","catLabel":"⚠️ Hidden Wheat","note":"Seafood sticks / crab sticks in sushi rolls almost always use wheat starch as a binder. Stick to real salmon, tuna, chicken, or prawn sushi."}];
+const GF_GUIDE_DATA = [{"id":"gfg-peal","title":"🔍 NZ/Aus Plain English Allergen Labelling (PEAL Law)","cat":"guide","catLabel":"🔍 Label Rule","note":"Under strict NZ & Australian food law, if a food contains any gluten grain, the exact words \"Wheat\", \"Barley\", \"Rye\", \"Oats\", or \"Gluten\" MUST be printed in BOLD inside the ingredients list AND listed in the bold \"Contains:\" summary box."},{"id":"gfg-safe-exceptions","title":"✅ SAFE Ingredients Even If Derived From Wheat","cat":"guide","catLabel":"✅ Safe Exceptions","note":"Coeliac NZ confirms these highly processed ingredients have no detectable gluten and are SAFE for coeliacs even when the label says \"(from wheat)\": Glucose syrup, Dextrose, Caramel colour (150a–d), and Maltodextrin."},{"id":"gfg-safe-grains","title":"✅ Naturally Gluten-Free Grains, Starches & Thickener Swaps","cat":"guide","catLabel":"✅ Safe Grains","note":"Always safe: Rice, Corn (Maize / Polenta), Potato starch, Tapioca, Arrowroot, Buckwheat (a seed, not wheat!), Quinoa, Millet, Sorghum, Chickpea (Besan) flour, Xanthan gum, and Guar gum."},{"id":"gfg-unsafe-words","title":"🚫 UNSAFE Ingredient Words That Always Mean Gluten","cat":"guide","catLabel":"🚫 Never Safe","note":"Avoid anything listing: Wheat, Barley, Rye, Oats, Triticale, Spelt, Khorasan (Kamut), Farro, Einkorn, Semolina, Durum, Couscous, Bulgur, Orzo, Panko, Rusk, Malt / Malt extract / Malt vinegar, Brewer’s yeast, or Seitan."},{"id":"gfg-crossedgrain","title":"🌾 Crossed Grain Logo & \"Gluten Free\" Claim in NZ","cat":"guide","catLabel":"🔍 Certification","note":"In NZ/Australia, a product can only legally say \"Gluten Free\" if laboratory testing shows NO detectable gluten (<3 ppm—much stricter than Europe/USA’s 20 ppm). The Coeliac NZ Crossed Grain logo means independent auditing too."}];
+const GF_KEY = 'gflistBoard';
+const GF_LISTS = [
+  ['safe', 'Safe Supermarket Favourites ✅'],
+  ['dining', 'Local GF Dining & Takeaways 🍽️'],
+  ['try', 'Want to Try'],
+  ['avoid', 'Avoid / Caught Out By ⚠️'],
+  ['guide', 'Hidden Gluten Label Guide 🔍']
+];
+const GF_FILTS = [
+  ['all', 'All'],
+  ['safe', '🛒 Supermarket Safe'],
+  ['bread', '🍞 Bread, Pasta & Baking'],
+  ['snacks', '🍫 Snacks & Sauces'],
+  ['dining', '🍽️ Whangārei & Local Dining'],
+  ['avoid', '⚠️ Avoid / Watch Out'],
+  ['guide', '🔍 Label Guide']
+];
+const GF_CAT_COL = {
+  bread: '#d97706',
+  pasta: '#0284c7',
+  sauces: '#0d9488',
+  meat: '#dc2626',
+  snacks: '#7c3aed',
+  baking: '#16a34a',
+  dining: '#2563eb',
+  avoid: '#b91c1c',
+  guide: '#475569'
+};
+let gfFilt = 'all', gfQ = '';
+function gfGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(GF_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {};
+  if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  GF_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  if (!o.seeded) {
+    o.seeded = true;
+    o.lists.safe = GF_SAFE_DATA.map(x => Object.assign({}, x));
+    o.lists.dining = GF_DINING_DATA.map(x => Object.assign({}, x));
+    o.lists.try = GF_TRY_DATA.map(x => Object.assign({}, x));
+    o.lists.avoid = GF_AVOID_DATA.map(x => Object.assign({}, x));
+    o.lists.guide = GF_GUIDE_DATA.map(x => Object.assign({}, x));
+    gfSave(o);
+  }
+  return o;
+}
+function gfSave(o) { try { localStorage.setItem(GF_KEY, JSON.stringify(o)); } catch (e) { } }
+function gfRestore(o) { if (o && o.lists && typeof o.lists === 'object') { o.seeded = true; gfSave(o); } }
+function gfMatchFilt(item, colKey) {
+  if (gfQ.trim()) {
+    const q = gfQ.trim().toLowerCase();
+    const hay = [item.title, item.catLabel, item.store, item.where, item.ask, item.note, item.shopName].join(' ').toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  if (gfFilt === 'all') return true;
+  if (gfFilt === 'safe') return colKey === 'safe' || colKey === 'try';
+  if (gfFilt === 'bread') return ['bread', 'pasta', 'baking'].includes(item.cat);
+  if (gfFilt === 'snacks') return ['snacks', 'sauces', 'meat'].includes(item.cat);
+  if (gfFilt === 'dining') return colKey === 'dining' || item.cat === 'dining';
+  if (gfFilt === 'avoid') return colKey === 'avoid' || item.cat === 'avoid';
+  if (gfFilt === 'guide') return colKey === 'guide' || item.cat === 'guide';
+  return true;
+}
+async function gfToShop(name, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const clean = String(name || '').trim();
+  if (!clean) return;
+  const s = snap();
+  const added = addToShop([clean]);
+  await save();
+  if (added) toast(`Added "${clean}" to Shopping list.`, 'Undo', undoTo(s));
+  else toast(`"${clean}" is already on your Shopping list.`, 'Open Shopping', () => go('#shopping'));
+}
+function gfCardHtml(colKey, item) {
+  const col = GF_CAT_COL[item.cat] || (colKey === 'avoid' ? '#b91c1c' : colKey === 'dining' ? '#2563eb' : '#16a34a');
+  const statusLbl = colKey === 'safe' ? ['✓ Coeliac Safe', '#15803d'] : colKey === 'avoid' ? ['⚠️ Avoid', '#b91c1c'] : colKey === 'dining' ? ['🍽️ Dining Out', '#1d4ed8'] : colKey === 'try' ? ['✨ Want to Try', '#d97706'] : ['🔍 Label Guide', '#334155'];
+  const lbls = [statusLbl];
+  if (item.catLabel && item.catLabel !== statusLbl[0]) lbls.push([item.catLabel, col]);
+  const shopTarget = item.shopName || (colKey === 'safe' || colKey === 'try' ? item.title : '');
+  const canShop = (colKey === 'safe' || colKey === 'try') && shopTarget;
+  return `<div class="tbcard" style="cursor:pointer" onclick="gfOpenCard('${colKey}',${jsArg(item.id)})"><div class="tbbody">
+    ${tbLbl(lbls)}
+    <div class="tbt">${esc(item.title)}</div>
+    ${item.store ? `<div class="tbs" style="font-weight:650;color:var(--brand,#0f766e);opacity:1">🛒 ${esc(item.store)}</div>` : ''}
+    ${item.where ? `<div class="tbs" style="font-weight:650;color:#1d4ed8;opacity:1">📍 ${esc(item.where)}</div>` : ''}
+    ${item.ask ? `<div class="tbs" style="background:rgba(245,158,11,.14);border-radius:8px;padding:5px 7px;margin-top:5px;opacity:1"><b>🗣️ Coeliac check:</b> ${esc(item.ask)}</div>` : ''}
+    ${item.note ? `<div class="tbs" style="margin-top:4px">${esc(item.note)}</div>` : ''}
+    ${canShop ? `<div style="margin-top:8px;display:flex;justify-content:flex-end"><button type="button" class="btn small primary" style="padding:5px 10px;font-size:.76rem" onclick="gfToShop(${jsArg(shopTarget)},event)">${I('cart')} + Shopping list</button></div>` : ''}
+  </div></div>`;
+}
+function gfBoardHtml() {
+  const o = gfGet();
+  return GF_LISTS.map(([k, title]) => {
+    const items = (o.lists[k] || []).filter(it => gfMatchFilt(it, k));
+    return tbList(k, title, items.length, items.map(it => gfCardHtml(k, it)).join(''), k !== 'guide', 'gf', 'No items match this filter');
+  }).join('');
+}
+function gfRedraw() {
+  const el = document.getElementById('gflists'); if (!el) return render();
+  const x = el.scrollLeft; el.innerHTML = gfBoardHtml(); el.scrollLeft = x;
+  const ch = document.getElementById('gfchips'); if (ch) ch.innerHTML = gfChipsHtml();
+}
+function gfChipsHtml() {
+  return GF_FILTS.map(([k, lbl]) => `<button type="button" class="chip${gfFilt === k ? ' on' : ''}" onclick="gfFilt='${k}';gfRedraw()">${esc(lbl)}</button>`).join('');
+}
+function gfFind(k, id) { const o = gfGet(), L = o.lists[k] || []; return { o, L, c: L.find(x => x.id === id) }; }
+function gfOpenCard(k, id) {
+  const { c } = gfFind(k, id); if (!c) return;
+  const shopTarget = c.shopName || (k === 'safe' || k === 'try' ? c.title : '');
+  const shopBtn = (k === 'safe' || k === 'try') && shopTarget ? `<div class="btns" style="margin-bottom:12px"><button type="button" class="btn primary" onclick="gfToShop(${jsArg(shopTarget)},event);closeSheet()">${I('cart')} Add "${esc(shopTarget)}" to Shopping list</button></div>` : '';
+  openSheet(esc(c.title),
+    shopBtn +
+    `<label class="field"><span>Product, place or rule title</span><input name="title" maxlength="140" value="${esc(c.title)}"></label>
+    <div style="display:flex;gap:10px">
+      <label class="field" style="flex:1"><span>Board column</span><select name="list">${GF_LISTS.map(([j, t]) => `<option value="${j}"${j === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+      <label class="field" style="flex:1"><span>Category tag</span><input name="catLabel" maxlength="40" value="${esc(c.catLabel || '')}" placeholder="e.g. 🍞 Bread & Bakery"></label>
+    </div>
+    <label class="field"><span>Store or location (optional)</span><input name="store" maxlength="100" value="${esc(c.store || c.where || '')}" placeholder="e.g. New World Onerahi or Town Basin"></label>
+    ${k === 'dining' || c.ask ? `<label class="field"><span>Coeliac check / what to ask staff</span><input name="ask" maxlength="200" value="${esc(c.ask || '')}" placeholder="e.g. Dedicated GF fryer?"></label>` : `<label class="field"><span>Shopping list item name (optional)</span><input name="shopName" maxlength="80" value="${esc(c.shopName || '')}" placeholder="e.g. Venerdi GF bread"></label>`}
+    <label class="field"><span>Notes</span><textarea name="note" rows="3" maxlength="1000">${esc(c.note || '')}</textarea></label>`,
+    v => {
+      if (!v.title) return 'Please enter a title.';
+      const f = gfFind(k, id); if (!f.c) return;
+      f.c.title = v.title.slice(0, 140);
+      if (v.catLabel) f.c.catLabel = v.catLabel.slice(0, 40);
+      if (k === 'dining') f.c.where = (v.store || '').slice(0, 100); else f.c.store = (v.store || '').slice(0, 100);
+      if (v.ask !== undefined) f.c.ask = v.ask.slice(0, 200);
+      if (v.shopName !== undefined) f.c.shopName = v.shopName.slice(0, 80);
+      f.c.note = (v.note || '').slice(0, 1000);
+      const to = GF_LISTS.some(x => x[0] === v.list) ? v.list : k;
+      if (to !== k) { f.o.lists[k] = f.L.filter(x => x.id !== id); f.o.lists[to].unshift(f.c); }
+      gfSave(f.o); return () => gfRedraw();
+    }, 'Save',
+    `<button type="button" class="btn danger" onclick="gfDel('${k}',${jsArg(id)})">Delete</button>`);
+}
+async function gfDel(k, id) {
+  const f = gfFind(k, id); if (!f.c) return;
+  const before = JSON.stringify(f.o); f.o.lists[k] = f.L.filter(x => x.id !== id); gfSave(f.o);
+  await closeSheet(); gfRedraw();
+  toast('Removed from GF Safe List.', 'Undo', () => { try { gfSave(JSON.parse(before)); } catch (e) { } gfRedraw(); });
+}
+function gfAdd(k) {
+  const target = GF_LISTS.some(x => x[0] === k) ? k : 'safe';
+  const t = (GF_LISTS.find(x => x[0] === target) || [])[1] || 'Safe Supermarket Favourites ✅';
+  openSheet('Add to ' + esc(t),
+    `<label class="field"><span>Product, café or takeaway name</span><input id="gft" name="title" maxlength="140" required placeholder="e.g. Countdown Free From GF Wraps"></label>
+    <div style="display:flex;gap:10px">
+      <label class="field" style="flex:1"><span>Column</span><select name="list">${GF_LISTS.map(([j, lbl]) => `<option value="${j}"${j === target ? ' selected' : ''}>${esc(lbl)}</option>`).join('')}</select></label>
+      <label class="field" style="flex:1"><span>Category</span><select name="cat">
+        <option value="bread">🍞 Bread &amp; Bakery</option>
+        <option value="pasta">🍝 Pasta &amp; Noodles</option>
+        <option value="sauces">🥫 Sauces &amp; Stock</option>
+        <option value="snacks">🍫 Snacks &amp; Treats</option>
+        <option value="meat">🥩 Meat &amp; Sausages</option>
+        <option value="baking">🥣 Baking &amp; Pantry</option>
+        <option value="dining"${target === 'dining' ? ' selected' : ''}>🍽️ Local Dining</option>
+        <option value="avoid"${target === 'avoid' ? ' selected' : ''}>⚠️ Avoid / Watch Out</option>
+      </select></label>
+    </div>
+    <label class="field"><span>Store or suburb (optional)</span><input name="store" maxlength="100" placeholder="e.g. New World Onerahi or Whangārei"></label>
+    <label class="field"><span>Coeliac note / what to check</span><textarea name="note" rows="3" maxlength="800" placeholder="e.g. Certified GF, or ask for separate fryer"></textarea></label>`,
+    v => {
+      if (!v.title) return 'Please enter a name.';
+      const o = gfGet(), to = GF_LISTS.some(x => x[0] === v.list) ? v.list : target;
+      const catNames = { bread: '🍞 Bread & Bakery', pasta: '🍝 Pasta & Noodles', sauces: '🥫 Sauces & Stock', snacks: '🍫 Snacks & Treats', meat: '🥩 Meat & Sausages', baking: '🥣 Baking & Pantry', dining: '🍽️ Local Dining', avoid: '⚠️ Avoid' };
+      const item = { id: uid('gf'), title: v.title.slice(0, 140), cat: v.cat || 'snacks', catLabel: catNames[v.cat] || 'GF Item', store: to === 'dining' ? '' : (v.store || '').slice(0, 100), where: to === 'dining' ? (v.store || 'Whangārei').slice(0, 100) : '', shopName: (to === 'safe' || to === 'try') ? v.title.slice(0, 80) : '', note: (v.note || '').slice(0, 800) };
+      o.lists[to].unshift(item); gfSave(o); return () => gfRedraw();
+    }, 'Add item');
+  setTimeout(() => { const i = document.getElementById('gft'); if (i) i.focus(); }, 50);
+}
+function gfMenu(k) {
+  const col = GF_LISTS.find(x => x[0] === k);
+  openSheet(esc(col ? col[1] : 'GF Safe List'), `<p class="muted" style="margin:0 0 10px">Your personal coeliac safe list for New World Onerahi, Woolworths, Pak’nSave and local Whangārei dining. Tap + Shopping list on any safe product to add it straight to your groceries.</p>`, null, 'Save',
+    `<button type="button" class="btn primary" onclick="closeSheet().then(()=>gfAdd('${col ? col[0] : 'safe'}'))">${I('plus')} Add item</button>`);
+}
+async function btAddGfList() {
+  const s = snap(), b = btState();
+  if (b.keys.includes('gflist')) { if (!b.on) { b.on = true; await save(); render(); } toast('GF Safe List is on your bottom tabs.'); return; }
+  if (b.keys.length >= BT_MAX) { toast('Six tabs is the most. Remove one, then add GF Safe List.'); btCustomise(); return; }
+  const i = b.keys.indexOf('more'); b.keys.splice(i < 0 ? b.keys.length : i, 0, 'gflist'); b.on = true; await save(); render(); toast('GF Safe List added to your bottom tabs.', 'Undo', undoTo(s));
+}
+function gfListMoreSub() {
+  try {
+    const o = gfGet();
+    return `${(o.lists.safe || []).length} safe supermarket picks · ${(o.lists.dining || []).length} dining guides · Label checker`;
+  } catch (e) { return 'Coeliac safe supermarket picks, Whangārei dining & label guide'; }
+}
+function GfListPage() {
+  const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('gflist'); } catch (e) { return true; } })();
+  return `<button class="back" onclick="go('#food')">${I('left')} Meals</button>` +
+    mealTabs('gflist') +
+    `<div style="display:flex;gap:8px;align-items:center;margin:6px 0 8px">
+      <label class="search" style="flex:1;margin:0">${I('search')}<input type="search" placeholder="Search products, brands, cafés or ingredients…" value="${esc(gfQ)}" aria-label="Search GF Safe List" oninput="gfQ=this.value;gfRedraw()"></label>
+      <button type="button" class="btn primary small" onclick="gfAdd('safe')">${I('plus')} Add</button>
+    </div>
+    <div class="chips scroll" id="gfchips" style="margin:0 0 10px">${gfChipsHtml()}</div>
+    <div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#065f46,#0f766e 50%,#1e293b)"></div>
+    <div class="tbtop"><div><h1>GF Safe List &amp; Dining</h1><div style="font-size:.82rem;opacity:.92">Coeliac-safe supermarket staples, Whangārei dining &amp; NZ label guide</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists" id="gflists">${gfBoardHtml()}</div></div>
+    ${btIn ? '' : `<button type="button" class="btn small" style="margin:10px 0 0" onclick="btAddGfList()">${I('plus')} Add to bottom bar</button>`}
+    <div class="foot">Swipe sideways between lists. Formulations can change—always check the bold NZ/Aus allergen statement on the pack.</div>`;
 }
