@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.4';
+const APP_VERSION = '2.28.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20461,69 +20461,46 @@ function nbStoryList() {
   try { glTiles().forEach(t => { if (t.k === 'videos') add('video', 'Video', '🎬', '', t.s, 'Video pick', t.go); else if (t.k === 'events') add('events', 'Events', '🎟️', '', t.s, 'Local events', t.go); else if (t.k === 'netflix') add('netflix', 'Netflix', '🍿', '', t.s, 'New on Netflix', t.go); }); } catch (e) { }
   return out;
 }
-function nbSeen() { try { const o = JSON.parse(localStorage.getItem('storySeen') || 'null'); if (o && o.d === nzTodayISO()) return o; } catch (e) { } return { d: nzTodayISO(), ids: [] }; }
-function nbMarkSeen(id) { const o = nbSeen(); if (!o.ids.includes(id)) { o.ids.push(id); try { localStorage.setItem('storySeen', JSON.stringify(o)); } catch (e) { } } }
-function nbStoriesHtml() {
-  const L = nbStoryList(), seen = nbSeen().ids; if (!L.length) return '';
-  return `<div class="nbstories" role="list" aria-label="Today’s stories">${L.map((s, i) => `<button type="button" role="listitem" class="nbst${seen.includes(s.id) ? ' seen' : ''}" data-sid="${esc(s.id)}" onclick="nbOpenStory(${i})"><span class="nbring"><span class="nbpic">${s.img ? `<img src="${esc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<span class="nbemo">${s.emoji}</span></span></span><span class="nblab">${esc(s.label)}</span></button>`).join('')}</div>`;
-}
-let NB_ST = null;
-function nbOpenStory(i) {
-  NB_ST = { L: nbStoryList(), i };
-  let el = document.getElementById('nbviewer'); if (!el) { el = document.createElement('div'); el.id = 'nbviewer'; document.body.appendChild(el); }
-  let y0 = null, x0 = null;
-  el.ontouchstart = e => { y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; };
-  el.ontouchend = e => { if (y0 == null) return; const dy = e.changedTouches[0].clientY - y0, dx = Math.abs(e.changedTouches[0].clientX - x0); y0 = null; if (dy > 80 && dy > dx) { e.preventDefault(); nbCloseStory(); } };
-  nbDrawStory();
-}
-function nbDrawStory() {
-  const el = document.getElementById('nbviewer'); if (!el || !NB_ST) return; const { L, i } = NB_ST, s = L[i]; if (!s) return nbCloseStory();
-  nbMarkSeen(s.id); document.querySelectorAll(`.nbst[data-sid="${s.id}"]`).forEach(b => b.classList.add('seen'));
-  el.className = 'show';
-  el.innerHTML = `<div class="nbvbars">${L.map((_, j) => `<span class="${j < i ? 'done' : j === i ? 'on' : ''}"></span>`).join('')}</div>
-    <div class="nbvtop"><span class="nbvlab">${s.emoji} ${esc(s.label)}</span><button type="button" class="nbvx" aria-label="Close" onclick="nbCloseStory()">✕</button></div>
-    <div class="nbvbody">${s.img ? `<img class="nbvimg" src="${esc(s.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : `<div class="nbvemo">${s.emoji}</div>`}<h2>${esc(s.title)}</h2>${s.body ? `<p>${esc(s.body)}</p>` : ''}${s.go ? `<button type="button" class="btn primary nbvgo" onclick="nbCloseStory();${esc(s.go)}">Open</button>` : ''}</div>
-    <button type="button" class="nbvprev" aria-label="Back" onclick="nbStep(-1)"></button><button type="button" class="nbvnext" aria-label="Next" onclick="nbStep(1)"></button>`;
-}
-function nbStep(d) { if (!NB_ST) return; NB_ST.i += d; if (NB_ST.i < 0) NB_ST.i = 0; if (NB_ST.i >= NB_ST.L.length) return nbCloseStory(); nbDrawStory(); }
-function nbCloseStory() { const el = document.getElementById('nbviewer'); if (el) { el.className = ''; el.innerHTML = ''; } NB_ST = null; }
-document.addEventListener('keydown', e => { if (NB_ST && e.key === 'Escape') nbCloseStory(); });
-function nbHero(list) {
-  const T = list || [], pick = T.find(x => x.days < 0) || T.find(x => x.days === 0 && x.pri === 0) || T.find(x => (x.kind === 'bill' || x.kind === 'loan') && x.days <= 1) || T.filter(x => x.kind === 'car' || x.kind === 'driver').sort((a, b) => a.days - b.days)[0] || T.find(x => x.days === 0 && (x.kind === 'appt' || x.kind === 'ext' || x.kind === 'mine'));
-  if (!pick) return `<div class="nbhero nbclear"><div class="nbhk">All clear</div><div class="nbht">Nothing urgent right now</div><div class="nbhs">Sweet as. Enjoy your day.</div></div>`;
-  const tone = pick.days < 0 ? 'red' : pick.days === 0 ? 'amber' : 'blue', k = pick.days < 0 ? 'Overdue' : pick.days === 0 ? 'Today' : pick.days === 1 ? 'Tomorrow' : 'Coming up';
-  return `<div class="nbhero nb-${tone}"><div class="nbhk">${k} · most important now</div><div class="list cucolours">${cuRowHtml(pick)}</div></div>`;
-}
 function nbJaRow(x) { return `<button class="row ja${x.who === 'sarah' ? ' jasarah' : ''}" onclick="${x.go}"><div class="ic ${x.ic}">${I(x.icon)}</div><div class="tx"><div class="t"><span class="nbnew">New</span> ${x.title}</div><div class="s">${x.sub}</div></div></button>`; }
+function nbFunCards() {
+  const col = { joke: '#2563eb', quote: '#7c3aed', word: '#16a34a', space: '#1e3a8a', travel: '#0891b2', 'lb-cd': '#2563eb', 'lb-as': '#312e81', 'lb-gd': '#15803d', recipe: '#ea580c', video: '#dc2626', events: '#db2777', netflix: '#b91c1c' };
+  return nbStoryList().map(s => { const go = s.go || (s.id === 'joke' || s.id === 'quote' ? `glInfo('${s.id}')` : ''); const sn = s.body || '';
+    return `<button type="button" class="tbcard" ${go ? `onclick="${esc(go)}"` : ''}>${s.img ? `<div class="tbcover" style="aspect-ratio:16/9;overflow:hidden;background:${col[s.id] || '#475569'}"><img src="${esc(s.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl([[s.emoji + ' ' + s.label, col[s.id] || '#475569']])}<div class="tbt">${esc(s.title.length > 120 ? s.title.slice(0, 118) + '…' : s.title)}</div>${sn ? `<div class="tbs">${esc(sn.length > 110 ? sn.slice(0, 108) + '…' : sn)}</div>` : ''}</div></button>`; }).join('');
+}
+const nbStrip = h => String(h || '').replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ');
 function nbBoardHtml(list) {
-  const today = [], week = [], later = [];
-  list.forEach(x => (x.days <= 0 ? today : x.days <= 7 ? week : later).push(x));
+  const now = [], today = [], week = [], later = [];
+  const urgent = x => x.days < 0 || (x.days === 0 && x.pri === 0) || ((x.kind === 'car' || x.kind === 'driver') && x.days <= 0);
+  let ja = []; try { ja = justAddedList(); } catch (e) { }
+  // 2.28.5: a Just added item that is already in a column gets a New badge there instead of a second card
+  const jaLeft = ja.filter(j => { const hit = list.find(x => { const t = x.ref && x.ref.todo; return (t && String(j.go || '').includes("'" + t.id + "'")) || (x.name && cuNorm(x.name) === cuNorm(nbStrip(j.title))); }); if (hit) { hit.isNew = true; return false; } return true; });
+  list.forEach(x => (urgent(x) ? now : x.days <= 0 ? today : x.days <= 7 ? week : later).push(x));
   const byPri = (a, b) => a.days - b.days || a.pri - b.pri;
-  let ja = []; try { ja = justAddedList().slice(0, 12); } catch (e) { }
-  const rows = L => `<div class="list${cuColoursOn() ? ' cucolours' : ''} nbrows">${L.sort(byPri).map(cuRowHtml).join('')}</div>`;
-  const jaHtml = ja.length ? `<div class="list nbrows">${ja.map(nbJaRow).join('')}</div>` + `<button class="linkbtn jaclear" onclick="justAddedClear()">Clear new…</button>` : '';
-  return tbList('today', 'Today', today.length + ja.length, (jaHtml + (today.length ? rows(today) : '')) || '', false, 'nb', 'Nothing due today') +
-    tbList('week', 'This week', week.length, week.length ? rows(week) : '', false, 'nb', 'Nothing this week') +
-    tbList('later', 'Later', later.length, later.length ? rows(later) : '', false, 'nb', 'Nothing later');
+  const row = x => { const h = cuRowHtml(x); return x.isNew ? h.replace('<div class="t">', '<div class="t"><span class="nbnew">New</span> ') : h; };
+  const rows = L => L.length ? `<div class="list${cuColoursOn() ? ' cucolours' : ''} nbrows">${L.sort(byPri).map(row).join('')}</div>` : '';
+  const nowL = now.sort((a, b) => a.pri - b.pri || a.days - b.days);
+  const al = `<div id="glalerts">${glAlertsBody()}</div>`;
+  const jaH = jaLeft.length ? `<div class="list nbrows">${jaLeft.slice(0, 12).map(nbJaRow).join('')}</div>` : '';
+  return tbList('now', 'Urgent / Now', now.length, rows(nowL) + al, false, 'nb') +
+    tbList('today', 'Today', today.length + jaLeft.length, rows(today) + jaH + `<div id="habsug">${habCards()}</div>`, false, 'nb', 'Nothing else today') +
+    tbList('week', 'This week', week.length, rows(week), false, 'nb', 'Nothing this week') +
+    tbList('later', 'Later', later.length, rows(later), false, 'nb', 'Nothing later') +
+    tbList('fun', 'Fun & Daily', nbStoryList().length, nbFunCards(), false, 'nb', 'Nothing today');
 }
-function nbMenu(k) { openSheet(k === 'today' ? 'Today' : k === 'week' ? 'This week' : 'Later', `<p class="muted">Everything from Coming up and Just added, soonest and most important first. Colours, Busy entries and the rest follow your Settings.</p><div class="btns"><button type="button" class="btn" onclick="closeSheet().then(()=>go('#calendar'))">${I('cal')} Calendar</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button></div>`, null); }
-function nbMascot(n) {
-  const k = mascotKey(), mood = n >= 8 ? 'energetic' : n >= 4 ? 'alert' : n >= 1 ? 'tired' : 'sleep', says = MASCOTS[k].says[mood];
-  const line = n >= 8 ? 'Big day! ' + n + ' things on.' : n >= 4 ? n + ' things on today. You’ve got this.' : n >= 1 ? 'A calm day, just ' + plural(n, 'thing') + '.' : 'Nothing on. Time to relax.';
-  return `<div class="nbfun"><button type="button" class="nbpet" aria-label="Pat the ${k}" onclick="nbPat(this)">${mascotMini(k).replace('cat-alert', 'cat-' + (mood === 'sleep' ? 'sleep' : mood))}</button><div><div class="nbsay">${esc(says[0])}</div><div class="nbline">${esc(line)}</div></div></div>`;
+function nbMenu(k) {
+  const n = (() => { try { return justAddedList().length; } catch (e) { return 0; } })();
+  openSheet({ now: 'Urgent / Now', today: 'Today', week: 'This week', later: 'Later', fun: 'Fun & Daily' }[k] || 'Notifications', `<p class="muted">Most urgent on the left, most important at the top of each list. Cards move along by themselves as dates get closer.</p><div class="btns" style="flex-direction:column;align-items:stretch">${n ? `<button type="button" class="btn" onclick="closeSheet().then(justAddedClear)">Clear new… (${n})</button>` : ''}<button type="button" class="btn" onclick="closeSheet().then(()=>go('#calendar'))">${I('cal')} Calendar</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button></div>`, null);
 }
-function nbPat(b) { try { const h = b.querySelector('.hcat'); if (h) { h.classList.add('cat-tap'); setTimeout(() => h.classList.remove('cat-tap'), 700); } if (mascotSoundOn()) mascotSynth(mascotKey(), .6); } catch (e) { } }
 function nbTopHtml() {
   let list = []; try { list = comingUpList(); } catch (e) { }
-  const todayN = list.filter(x => x.days <= 0).length;
-  return { top: nbStoriesHtml() + nbHero(list) + `<div class="tbboard nbboard"><div class="tblists" id="nblists">${nbBoardHtml(list)}</div></div>`, fun: nbMascot(todayN) };
+  return { top: `<div class="tbboard nbboard"><div class="tblists" id="nblists">${nbBoardHtml(list)}</div></div>`, fun: '' };
 }
 function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   setTimeout(() => { try { accLoad(); } catch (e) { } try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
-  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + (NB.top) + `<div id="habsug">${habCards()}</div><div class="sec">Alerts</div><div id="glalerts">${glAlertsBody()}</div>${NB.fun}
+  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + (NB.top) + `
   <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
 }
