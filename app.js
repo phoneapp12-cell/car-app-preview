@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.24';
+const APP_VERSION = '2.28.25';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -8459,7 +8459,7 @@ function rbOg(link) {
   if (RELAY_URL && !rbOgBusy[link] && /^https:/.test(link)) { rbOgBusy[link] = 1; getJSON(RELAY_URL + '/ogimg?u=' + encodeURIComponent(link), 12000).then(d => { RB_OG[link] = (d && d.img) || ''; try { localStorage.setItem('recOg', JSON.stringify(RB_OG)); } catch (e) { } if (RB_OG[link]) rbRedraw(); }).catch(() => { }); }
   return '';
 }
-function rbCover(img, t, big) { return `<div class="tbcover" style="background:linear-gradient(135deg,${rbCol(t)},#14532d);aspect-ratio:16/9;overflow:hidden">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()">` : ''}</div>`; }
+function rbCover(img, t, big) { if (!img) return ''; return `<div class="tbcover" style="background:linear-gradient(135deg,${rbCol(t)},#14532d);height:92px;max-height:92px;overflow:hidden"><img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:92px;object-fit:cover;display:block" onerror="this.closest('.tbcover').remove()"></div>`; }
 function rbIdeaCard(i, k, cid, sub) {
   const img = recipePhotoSrc(i) || (i.link ? rbOg(i.link) : ''), line = sub || i.notes || i.ingr.slice(0, 4).join(', ');
   return `<button type="button" class="tbcard" data-recid="${esc(i.id)}" onclick="rbOpen(${jsArg(i.id)},'${k || ''}',${jsArg(cid || '')})">${rbCover(img, i.tag)}<div class="tbbody">${tbLbl([...(i.builtin ? [] : [['Mine', '#475569']]), [i.tag || 'GF', rbCol(i.tag)]])}<div class="tbt">${esc(i.title)}</div>${line ? `<div class="tbs">${esc(line.length > 90 ? line.slice(0, 88) + '…' : line)}</div>` : ''}</div></button>`;
@@ -29968,7 +29968,7 @@ FoodPage = function () {
   add("gflist", "GF Safe List & Dining", () => gfListMoreSub(), "i3-plate", "go('#gflist')");
   const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes("food"); } catch (e) { return true; } })();
 
-  // Live Trello columns for Meals Board
+  // Live Trello columns for Meals Board (compact 52x52 thumbnails so photos are neat & never oversized)
   const nights = typeof mealNights === "function" ? mealNights() : [];
   const planCards = (nights.slice(0, 8).map(d => {
     const e = M().plan[d] || {};
@@ -29976,7 +29976,7 @@ FoodPage = function () {
     const pic = idea ? recipePhotoSrc(idea) : "";
     const lbls = [[nightLabel(d), e.title ? "#16a34a" : "#d97706"]];
     if (e.cooked) lbls.push(["✓ Cooked", "#0d9488"]);
-    return `<button type="button" class="tbcard" onclick="go('#meals');setTimeout(()=>mealNight('${d}'),120)">${pic ? `<div class="tbcover"><img src="${esc(pic)}" alt="" loading="lazy" onerror="this.closest('.tbcover').remove()"></div>` : ""}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(e.title || "Tap to plan this night")}</div><div class="tbs">${esc(e.notes || (idea && idea.tag ? idea.tag + " · Gluten free" : "Choose a GF recipe or type a meal"))}</div></div></button>`;
+    return `<button type="button" class="tbcard" onclick="go('#meals');setTimeout(()=>mealNight('${d}'),120)"><div class="tbbody" style="display:flex;gap:10px;align-items:center">${pic ? `<img src="${esc(pic)}" alt="" loading="lazy" style="width:52px;height:52px;min-width:52px;border-radius:10px;object-fit:cover;display:block;flex:none" onerror="this.remove()">` : ""}<div style="min-width:0;flex:1">${tbLbl(lbls)}<div class="tbt">${esc(e.title || "Tap to plan this night")}</div><div class="tbs">${esc(e.notes || (idea && idea.tag ? idea.tag + " · Gluten free" : "Choose a GF recipe or type a meal"))}</div></div></div></button>`;
   }).join("") || grpCard([["📅 Meal Plan", "#ea580c"]], "No cooking nights picked", "Tap to choose your cooking nights (e.g. Fri & Sat)", "go('#meals')")) + grpLinkBtn("#meals", "Open full Meal planner");
 
   const ideas = typeof visibleIdeas === "function" ? visibleIdeas() : [];
@@ -29985,7 +29985,7 @@ FoodPage = function () {
     const pic = recipePhotoSrc(i);
     const lbls = [[i.tag || "GF Recipe", "#15803d"]];
     if (i.fav) lbls.push(["★ Favourite", "#ca8a04"]);
-    return `<button type="button" class="tbcard" data-recid="${esc(i.id)}" onclick="go('#recipe/${esc(i.id)}')">${pic ? `<div class="tbcover"><img src="${esc(pic)}" alt="" loading="lazy" onerror="this.closest('.tbcover').remove()"></div>` : ""}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(i.title)}</div><div class="tbs">${esc([i.time, i.serves ? "Serves " + i.serves : ""].filter(Boolean).join(" · ") || (i.ingr || []).slice(0, 4).join(", "))}</div></div></button>`;
+    return `<button type="button" class="tbcard" data-recid="${esc(i.id)}" onclick="go('#recipe/${esc(i.id)}')"><div class="tbbody" style="display:flex;gap:10px;align-items:center">${pic ? `<img src="${esc(pic)}" alt="" loading="lazy" style="width:52px;height:52px;min-width:52px;border-radius:10px;object-fit:cover;display:block;flex:none" onerror="this.remove()">` : ""}<div style="min-width:0;flex:1">${tbLbl(lbls)}<div class="tbt">${esc(i.title)}</div><div class="tbs">${esc([i.time, i.serves ? "Serves " + i.serves : ""].filter(Boolean).join(" · ") || (i.ingr || []).slice(0, 4).join(", "))}</div></div></div></button>`;
   }).join("") + grpLinkBtn("#recipes", `Open all GF Recipes (${ideas.length})`);
 
   const openShop = (S.shop && S.shop.items || []).filter(x => !x.done);
