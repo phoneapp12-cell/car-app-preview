@@ -18,6 +18,8 @@ import { decode, clip, get } from './events.js';
 import { httpsUrl } from './blogs.js';
 
 export const PODCASTS = [
+  { id: 'rlsunplugged', name: 'RLS Unplugged (RLS Foundation)', cat: 'Restless Legs Syndrome', home: 'https://www.rls.org/', feed: 'https://anchor.fm/s/109751548/podcast/rss', max: 11 },
+  { id: 'mayosleep', name: 'Mayo Clinic Sleep Medicine', cat: 'Restless Legs Syndrome', home: 'https://podcasts.apple.com/us/podcast/mayo-clinic-center-for-sleep-medicine/id1738968691', feed: 'https://feed.podbean.com/buskirktodd/feed.xml' },
   { id: 'aglutenfree', name: 'A Gluten Free Podcast', cat: 'Gluten-Free Living', home: 'https://www.aglutenfreepodcast.com/', feed: 'https://rss.buzzsprout.com/1867152.rss' },
   { id: 'celiacproject', name: 'The Celiac Project Podcast', cat: 'Gluten-Free Living', home: 'https://celiacprojectpodcast.libsyn.com/', feed: 'https://rss.libsyn.com/shows/76156/destinations/339238.xml' },
   { id: 'hiddenbrain', name: 'Hidden Brain', cat: 'Human Psychology', home: 'https://hiddenbrain.org/', feed: 'https://feeds.simplecast.com/kwWc0lhf' },
@@ -32,7 +34,7 @@ export const PODCASTS = [
   { id: 'shortwave', name: 'Short Wave', cat: 'Space & Science', home: 'https://www.npr.org/podcasts/510351/short-wave', feed: 'https://feeds.npr.org/510351/podcast.xml' }
 ];
 
-const KV_KEY = 'public-podcasts-v3';
+const KV_KEY = 'public-podcasts-v4';
 const TTL = 15 * 60 * 1000;
 const MAX_ITEMS = 5;
 let mem = null;
@@ -74,7 +76,7 @@ function enclosureAudio(block) {
   return '';
 }
 
-export function parsePodcastFeed(xml) {
+export function parsePodcastFeed(xml, maxItems = MAX_ITEMS) {
   const raw = String(xml || '');
   if (!/<rss\b/i.test(raw) || !/<item\b/i.test(raw)) throw new Error('podcasts_changed');
   const blocks = [...raw.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(m => m[1]);
@@ -98,7 +100,7 @@ export function parsePodcastFeed(xml) {
     items.push(item);
   }
   items.sort((a, b) => b.published.localeCompare(a.published));
-  const out = items.slice(0, MAX_ITEMS);
+  const out = items.slice(0, maxItems);
   if (!out.length) throw new Error('podcasts_changed');
   return out;
 }
@@ -116,7 +118,7 @@ function fresh(saved, now) {
 async function readOne(show, fetchImpl) {
   try {
     const xml = await get(show.feed, fetchImpl, { headers: { Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.1' } });
-    const items = parsePodcastFeed(xml);
+    const items = parsePodcastFeed(xml, show.max || MAX_ITEMS);
     return { id: show.id, name: show.name, cat: show.cat || '', home: show.home, feed: show.feed, ok: true, items };
   } catch (e) {
     return failed(show);

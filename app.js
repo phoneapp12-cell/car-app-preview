@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.23';
+const APP_VERSION = '2.28.24';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4679,7 +4679,7 @@ function kmForm(id) {
 // Payday comes from S.settings.payday (any payday, picked in Bills) or else a fortnightly "Payday" event in Calendar › My events.
 const BILL_PER_YEAR = { weekly: 52, fortnightly: 26, monthly: 12, quarterly: 4, yearly: 1 };
 let payOff = 0;
-const payEvent = () => (S.myEvents || []).find(e => /\bpay ?day\b/i.test(e.title) && e.repeat === 'fortnightly');
+const payEvent = () => (S.myEvents || []).find(e => /\bpay ?day\b/i.test(e.title) && !/sarah/i.test(e.title) && e.repeat === 'fortnightly');
 function paydays() {
   const T = todayT(), from = T - 420 * DAY, to = T + 420 * DAY;
   let ev = null;
@@ -6924,7 +6924,7 @@ let PODFEED = null, podBusy = false, podFailed = false, podTimer = null;
 function loadPodcasts() {
   try {
     const r = JSON.parse(localStorage.getItem('podfeeds') || 'null');
-    const hasNew = r && r.data && Array.isArray(r.data.podcasts) && r.data.podcasts.some(p => p && p.id === 'aglutenfree');
+    const hasNew = r && r.data && Array.isArray(r.data.podcasts) && r.data.podcasts.some(p => p && p.id === 'rlsunplugged');
     PODFEED = r && r.at && hasNew ? r : null;
   } catch (e) { PODFEED = null; }
 }
@@ -6944,9 +6944,14 @@ function podAudio(u) {
   return url;
 }
 function podEpisodes() {
-  const shows = PODFEED && PODFEED.data && Array.isArray(PODFEED.data.podcasts) ? PODFEED.data.podcasts : null;
-  if (!shows) return null;
+  const shows = PODFEED && PODFEED.data && Array.isArray(PODFEED.data.podcasts) ? PODFEED.data.podcasts : [];
   const episodes = [];
+  const seen = new Set();
+  for (const c of POD_RLS_CURATED) {
+    const k = (c.audio || c.url || c.title).toLowerCase();
+    seen.add(k);
+    episodes.push(Object.assign({}, c));
+  }
   for (const b of shows) {
     if (!b || !b.ok || !Array.isArray(b.items)) continue;
     const name = String(b.name || '').trim();
@@ -6957,8 +6962,11 @@ function podEpisodes() {
       const title = it && String(it.title || '').trim();
       const ms = Date.parse(it && it.published);
       if (!title || !Number.isFinite(ms) || (!url && !audio)) continue;
+      const k = (audio || url || title).toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
       const summary = it.summary ? String(it.summary).replace(/\s+/g, ' ').trim() : '';
-      const cat = b.cat || (/gluten|celiac|coeliac/i.test(name) ? 'Gluten-Free Living' : /brain|psych|mind/i.test(name) ? 'Human Psychology' : /fork|tech/i.test(name) ? 'Tech & AI' : /star|wave|science/i.test(name) ? 'Space & Science' : /slob|clean/i.test(name) ? 'Home & Organising' : /spork/i.test(name) ? 'Food & Cooking' : 'Design & Curiosity');
+      const cat = b.cat || (/rls|restless|sleep/i.test(name) ? 'Restless Legs Syndrome' : /gluten|celiac|coeliac/i.test(name) ? 'Gluten-Free Living' : /brain|psych|mind/i.test(name) ? 'Human Psychology' : /fork|tech/i.test(name) ? 'Tech & AI' : /star|wave|science/i.test(name) ? 'Space & Science' : /slob|clean/i.test(name) ? 'Home & Organising' : /spork/i.test(name) ? 'Food & Cooking' : 'Design & Curiosity');
       episodes.push({ title, url, audio, published: new Date(ms).toISOString(), show: name, cat, summary });
     }
   }
@@ -7034,6 +7042,21 @@ function podEmpty(id) {
 function podNone(id) {
   return `<div class="list" id="${id}"><div class="row"><div class="ic pod">${I('podcast')}</div><div class="tx"><div class="t">No episodes</div><div class="s">None of the podcasts had an episode to show.</div></div></div></div>`;
 }
+const POD_RLS_CURATED = [
+  { title: "Restless Legs Syndrome — Clinical Diagnosis, Iron & Treatment", show: "JAMA Clinical Reviews", cat: "Restless Legs Syndrome", published: "2026-01-21T16:00:00.000Z", audio: "https://traffic.libsyn.com/secure/jamaclinicalreviews/Restless_Legs_Syndrome.mp3", url: "https://podcasts.apple.com/us/podcast/restless-legs-syndrome/id1027430378?i=1000746072502", summary: "Comprehensive clinical review of restless legs syndrome (RLS), iron/ferritin thresholds, alpha-2-delta ligands, dopamine agonist augmentation, and sleep relief." },
+  { title: "Tips To Tame Restless Legs Syndrome with Dr. Aparna Bhat, MD", show: "Cleveland Clinic Health Essentials", cat: "Restless Legs Syndrome", published: "2026-08-19T12:00:00.000Z", audio: "https://traffic.megaphone.fm/IAIIL2388787451.mp3", url: "https://podcasts.apple.com/us/podcast/tips-to-tame-restless-legs-syndrome-with-dr-aparna-bhat-md/id1322659480?i=1000784340068", summary: "Sleep medicine specialist Dr. Aparna Bhat explains why restless legs flare up at night, iron deficiency links, triggers to avoid, and practical relief strategies." },
+  { title: "Restless Legs: What Has Happened to Dopamine Agonists?", show: "Mayo Clinic Sleep Medicine", cat: "Restless Legs Syndrome", published: "2025-11-15T13:35:52.000Z", audio: "https://mcdn.podbean.com/mf/web/b5dw9c/WF3333270_Restless_Legs_and_Dopamine_Agonists8ogyi.mp3", url: "https://podcasts.apple.com/us/podcast/restless-legs-what-has-happened-to-dopamine-agonists/id1738968691?i=1000651112286", summary: "Mayo Clinic Center for Sleep Medicine specialists discuss why guidelines shifted away from dopamine agonists due to augmentation and what works better long-term." },
+  { title: "Restless Legs: What Therapies Does the Future Hold?", show: "Mayo Clinic Sleep Medicine", cat: "Restless Legs Syndrome", published: "2025-12-06T19:08:15.000Z", audio: "https://mcdn.podbean.com/mf/web/xhj99adhbscntzpv/WF3333286_RLS_Future_Therapies98h33.mp3", url: "https://podcasts.apple.com/us/podcast/restless-legs-what-therapies-does-the-future-hold/id1738968691?i=1000658087529", summary: "Exploring emerging non-pharmacological devices, iron infusions, and neurological treatments for stubborn Restless Legs Syndrome." },
+  { title: "#50 – Restless Leg Syndrome (Causes, Iron & Relief)", show: "The Matt Walker Podcast", cat: "Restless Legs Syndrome", published: "2025-09-19T08:00:00.000Z", audio: "https://pscrb.fm/rss/p/www.buzzsprout.com/1821163/episodes/13063998-50-restless-leg-syndrome.mp3", url: "https://podcasts.apple.com/us/podcast/50-restless-leg-syndrome/id1578319619?i=1000617525820", summary: "Sleep scientist Prof. Matt Walker breaks down the neuroscience of Restless Legs Syndrome (RLS), periodic limb movements, brain iron transport, and evidence-based relief." },
+  { title: "Show 1419: Restless Legs, Muscle Cramps & Sleepless Nights (with Dr. Andrew Spector)", show: "The People’s Pharmacy", cat: "Restless Legs Syndrome", published: "2025-10-20T00:19:53.000Z", audio: "https://pscrb.fm/rss/p/mgln.ai/e/35/dts.podtrac.com/redirect.mp3/traffic.libsyn.com/peoplespharmacy/PP-1419RLSandCramps.mp3", url: "https://podcasts.apple.com/us/podcast/show-1419-restless-legs-muscle-cramps-and-sleepless-nights/id268003768?i=1000695137848", summary: "Duke neurologist Dr. Andrew Spector explains how to distinguish restless legs from nocturnal leg cramps, ferritin testing, and modern treatment options." },
+  { title: "Q&A: Restless Legs Syndrome — Nutrients, Iron & Relief", show: "Intelligent Medicine (Dr. Ronald Hoffman)", cat: "Restless Legs Syndrome", published: "2026-10-08T08:00:00.000Z", audio: "https://media.transistor.fm/7a8ed132/f81c70fb.mp3", url: "https://podcasts.apple.com/us/podcast/q-a-with-leyla-part-2-restless-legs-syndrome/id663864861?i=1000793825614", summary: "Nutritional and medical strategies for calming Restless Legs Syndrome, checking iron/ferritin, magnesium, folate, and avoiding medication triggers." },
+  { title: "Surgery and Hospitalization with RLS with Dr. J. Andrew Berkowski", show: "RLS Unplugged (RLS Foundation)", cat: "Restless Legs Syndrome", published: "2026-08-13T21:38:19.000Z", audio: "https://anchor.fm/s/109751548/podcast/play/124192756/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2026-7-13%2F765dbfa3-61b3-5fc3-6324-730f0dadd7e2.mp3", url: "https://podcasters.spotify.com/pod/show/restless-legs-syndrome-fo/episodes/Surgery-and-Hospitalization-with-RLS-with-Dr--J--Andrew-Berkowski-e3ncihk", summary: "Sleep neurologist Dr. J. Andrew Berkowski discusses managing RLS symptoms and medications safely before and after surgery or hospital stays." },
+  { title: "15 RLS Myths with Dr. Andrew Berkowski", show: "RLS Unplugged (RLS Foundation)", cat: "Restless Legs Syndrome", published: "2025-10-16T09:00:00.000Z", audio: "https://anchor.fm/s/109751548/podcast/play/109731540/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-9-15%2Fc5357ce8-fa0a-6c58-7629-d6bf7550ddb5.mp3", url: "https://podcasters.spotify.com/pod/show/restless-legs-syndrome-fo/episodes/15-RLS-Myths-with-Dr--Andrew-Berkowski-e39j88k", summary: "Debunking the 15 most common myths about Restless Legs Syndrome, from iron blood tests to evening habits and treatments." },
+  { title: "Understanding Augmentation with Dr. Mark Buchfuhrer", show: "RLS Unplugged (RLS Foundation)", cat: "Restless Legs Syndrome", published: "2025-10-09T09:00:00.000Z", audio: "https://anchor.fm/s/109751548/podcast/play/109030334/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-8-30%2Ff627ee60-8528-6b07-5583-c6c412a12df3.mp3", url: "https://podcasters.spotify.com/pod/show/restless-legs-syndrome-fo/episodes/Understanding-Augmentation-with-Dr--Mark-Buchfuhrer-e38trfu", summary: "Dr. Mark Buchfuhrer explains RLS augmentation (when certain medications make symptoms start earlier or spread) and how to safely resolve it." },
+  { title: "RLS Lifestyle and Behavioral Strategies with Dr. Shalini Paruthi", show: "RLS Unplugged (RLS Foundation)", cat: "Restless Legs Syndrome", published: "2025-10-02T09:00:00.000Z", audio: "https://anchor.fm/s/109751548/podcast/play/108654364/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-8-22%2Fede14814-dfeb-380c-cba6-60d388c956d3.mp3", url: "https://podcasters.spotify.com/pod/show/restless-legs-syndrome-fo/episodes/RLS-Lifestyle-and-Behavioral-Strategies-with-Dr--Shalini-Paruthi-e38icas", summary: "Practical daytime and evening habits, stretching, temperature, and behavioural strategies that calm restless legs at night." },
+  { title: "RLS Treatment Options with Dr. William Ondo", show: "RLS Unplugged (RLS Foundation)", cat: "Restless Legs Syndrome", published: "2025-09-23T09:00:00.000Z", audio: "https://anchor.fm/s/109751548/podcast/play/108653574/https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F2025-8-22%2F63f741dd-a13f-d8b2-e6cd-cb718b226bbc.mp3", url: "https://podcasters.spotify.com/pod/show/restless-legs-syndrome-fo/episodes/RLS-Treatment-Options-with-Dr--William-Ondo-e38ibi6", summary: "Dr. William Ondo, RLS Quality Care Center Director, walks through current first-line treatments, iron therapy, and clinical guidelines for RLS." }
+];
+let pdbFilt = "all";
 const PDB_KEY = 'podcastBoard', PDB_LISTS = [['queue', 'Queue / Saved'], ['listened', 'Listened']];
 const PDB_COLS = ['#9333ea', '#2563eb', '#0d9488', '#db2777', '#ea580c', '#16a34a'];
 let PDB_ALL = {};
@@ -7060,22 +7083,28 @@ function pdbCard(p, tagOverride) {
 function pdbBoardHtml() {
   PDB_ALL = {};
   const o = pdbGet(), episodes = podEpisodes() || [];
+  const rls = episodes.filter(e => e.cat === 'Restless Legs Syndrome' || /restless\s+legs|\brls\b/i.test((e.title || '') + ' ' + (e.show || '')));
   const gf = episodes.filter(e => e.cat === 'Gluten-Free Living');
   const psych = episodes.filter(e => e.cat === 'Human Psychology');
   const techSpace = episodes.filter(e => e.cat === 'Tech & AI' || e.cat === 'Space & Science');
-  const lifeCurio = episodes.filter(e => !gf.includes(e) && !psych.includes(e) && !techSpace.includes(e));
+  const lifeCurio = episodes.filter(e => !rls.includes(e) && !gf.includes(e) && !psych.includes(e) && !techSpace.includes(e));
   const byShow = new Map();
   episodes.forEach(e => { const s = e.show || 'Podcast'; if (!byShow.has(s)) byShow.set(s, []); byShow.get(s).push(e); });
   const recentCards = episodes.slice(0, 20).map(e => pdbCard(e)).join('');
   const showCols = [...byShow.entries()].map(([name, arr], i) => tbList('s_' + i, name, arr.length, arr.map(e => pdbCard(e)).join(''), false, 'pdb', 'No episodes')).join('');
-  return tbList('new', '🆕 New episodes', episodes.length, recentCards, false, 'pdb', podBusy ? 'Checking the podcasts…' : 'No episodes right now') +
-    tbList('gf', '🌾 Gluten-Free Living', gf.length, gf.map(e => pdbCard(e, ['🌾 GF Living', '#16a34a'])).join(''), false, 'pdb', podBusy ? 'Loading GF podcasts…' : 'No episodes right now') +
-    tbList('psych', '🧠 Human Psychology', psych.length, psych.map(e => pdbCard(e, ['🧠 Psychology', '#7c3aed'])).join(''), false, 'pdb', podBusy ? 'Loading psychology podcasts…' : 'No episodes right now') +
-    tbList('tech', '🤖 Tech, AI & Space', techSpace.length, techSpace.map(e => pdbCard(e, [e.cat || 'Tech & Space', '#0284c7'])).join(''), false, 'pdb', 'No episodes right now') +
-    tbList('curio', '✨ Curiosity, Home & Food', lifeCurio.length, lifeCurio.map(e => pdbCard(e, [e.cat || 'Curiosity', '#d97706'])).join(''), false, 'pdb', 'No episodes right now') +
-    showCols +
-    tbList('queue', '📌 Queue / Saved', (o.lists.queue || []).length, (o.lists.queue || []).map(e => pdbCard(e, ['📌 Queue', '#2563eb'])).join(''), false, 'pdb', 'Tap an episode, then Move to… Queue') +
-    tbList('listened', '✓ Listened', (o.lists.listened || []).length, (o.lists.listened || []).map(e => pdbCard(e, ['✓ Listened', '#16a34a'])).join(''), false, 'pdb', 'Episodes you play show here');
+  const cols = [];
+  if (pdbFilt === 'all' || pdbFilt === 'rls') cols.push(tbList('rls', '🦵 Restless Legs Syndrome (RLS)', rls.length, rls.map(e => pdbCard(e, ['🦵 Restless Legs', '#e11d48'])).join(''), false, 'pdb', 'Loading RLS podcasts…'));
+  if (pdbFilt === 'all') cols.push(tbList('new', '🆕 New episodes', episodes.length, recentCards, false, 'pdb', podBusy ? 'Checking the podcasts…' : 'No episodes right now'));
+  if (pdbFilt === 'all' || pdbFilt === 'gf') cols.push(tbList('gf', '🌾 Gluten-Free Living', gf.length, gf.map(e => pdbCard(e, ['🌾 GF Living', '#16a34a'])).join(''), false, 'pdb', podBusy ? 'Loading GF podcasts…' : 'No episodes right now'));
+  if (pdbFilt === 'all' || pdbFilt === 'psych') cols.push(tbList('psych', '🧠 Human Psychology', psych.length, psych.map(e => pdbCard(e, ['🧠 Psychology', '#7c3aed'])).join(''), false, 'pdb', podBusy ? 'Loading psychology podcasts…' : 'No episodes right now'));
+  if (pdbFilt === 'all' || pdbFilt === 'tech') cols.push(tbList('tech', '🤖 Tech, AI & Space', techSpace.length, techSpace.map(e => pdbCard(e, [e.cat || 'Tech & Space', '#0284c7'])).join(''), false, 'pdb', 'No episodes right now'));
+  if (pdbFilt === 'all' || pdbFilt === 'curio') cols.push(tbList('curio', '✨ Curiosity, Home & Food', lifeCurio.length, lifeCurio.map(e => pdbCard(e, [e.cat || 'Curiosity', '#d97706'])).join(''), false, 'pdb', 'No episodes right now'));
+  if (pdbFilt === 'all') cols.push(showCols);
+  if (pdbFilt === 'all' || pdbFilt === 'queue') {
+    cols.push(tbList('queue', '📌 Queue / Saved', (o.lists.queue || []).length, (o.lists.queue || []).map(e => pdbCard(e, ['📌 Queue', '#2563eb'])).join(''), false, 'pdb', 'Tap an episode, then Move to… Queue'));
+    cols.push(tbList('listened', '✓ Listened', (o.lists.listened || []).length, (o.lists.listened || []).map(e => pdbCard(e, ['✓ Listened', '#16a34a'])).join(''), false, 'pdb', 'Episodes you play show here'));
+  }
+  return cols.join('');
 }
 function pdbRedraw() { const el = document.getElementById('pdblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = pdbBoardHtml(); el.scrollLeft = x; }
 function pdbMarkListened(k) {
@@ -7108,12 +7137,25 @@ function pdbMenu(k) {
   openSheet('Podcasts', `<p class="muted" style="margin:0 0 10px">Swipe sideways between podcast shows and lists, and scroll up and down inside each list. Tap any episode to listen inline, open its page, or add it to your Queue.</p>
     <div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>{refreshPodcasts(true);toast('Refreshing podcasts…')})">${I('refresh')} Refresh episodes</button></div>`, null);
 }
+function pdbChipsHtml() {
+  return [
+    ['all', 'All'],
+    ['rls', '🦵 Restless Legs (RLS)'],
+    ['gf', '🌾 Gluten-Free'],
+    ['psych', '🧠 Psychology'],
+    ['tech', '🤖 Tech & Space'],
+    ['curio', '✨ Curiosity & Home'],
+    ['queue', '📌 Queue & Listened']
+  ].map(([k, lbl]) => `<button type="button" class="chip${pdbFilt === k ? ' on' : ''}" onclick="pdbFilt='${k}';render()">${esc(lbl)}</button>`).join('');
+}
 function Podcasts() {
   try { if (!PODFEED && !podBusy) refreshPodcasts(false); } catch (e) { }
   const src = (PODFEED && PODFEED.data && PODFEED.data.podcasts || []).filter(b => b && b.name && podHttps(b.home));
   const links = src.map(b => `<a href="${esc(podHttps(b.home))}" target="_blank" rel="noopener">${esc(b.name)}</a>`).join(' · ');
-  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#7c3aed,#0f172a)"></div>
-    <div class="tbtop"><h1>Podcasts</h1><button class="iconbtn" aria-label="Refresh podcasts" title="Refresh" onclick="refreshPodcasts(true)">${I('refresh')}</button></div>
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>
+    <div class="chips scroll" style="margin:0 0 10px">${pdbChipsHtml()}</div>
+    <div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#7c3aed,#0f172a)"></div>
+    <div class="tbtop"><div><h1>Podcasts</h1><div style="font-size:.82rem;opacity:.9">Restless Legs Syndrome (RLS), Gluten-Free Living, Psychology, Tech, Space &amp; Curiosity</div></div><button class="iconbtn" aria-label="Refresh podcasts" title="Refresh" onclick="refreshPodcasts(true)">${I('refresh')}</button></div>
     <div class="tblists" id="pdblists">${pdbBoardHtml()}</div></div>
     <div class="foot">${links ? 'From ' + links + '. ' : ''}Swipe sideways between shows. Tap an episode to play it inline or add it to your Queue.</div>`;
 }
@@ -8420,12 +8462,12 @@ function rbOg(link) {
 function rbCover(img, t, big) { return `<div class="tbcover" style="background:linear-gradient(135deg,${rbCol(t)},#14532d);aspect-ratio:16/9;overflow:hidden">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()">` : ''}</div>`; }
 function rbIdeaCard(i, k, cid, sub) {
   const img = recipePhotoSrc(i) || (i.link ? rbOg(i.link) : ''), line = sub || i.notes || i.ingr.slice(0, 4).join(', ');
-  return `<button type="button" class="tbcard" onclick="rbOpen(${jsArg(i.id)},'${k || ''}',${jsArg(cid || '')})">${rbCover(img, i.tag)}<div class="tbbody">${tbLbl([...(i.builtin ? [] : [['Mine', '#475569']]), [i.tag || 'GF', rbCol(i.tag)]])}<div class="tbt">${esc(i.title)}</div>${line ? `<div class="tbs">${esc(line.length > 90 ? line.slice(0, 88) + '…' : line)}</div>` : ''}</div></button>`;
+  return `<button type="button" class="tbcard" data-recid="${esc(i.id)}" onclick="rbOpen(${jsArg(i.id)},'${k || ''}',${jsArg(cid || '')})">${rbCover(img, i.tag)}<div class="tbbody">${tbLbl([...(i.builtin ? [] : [['Mine', '#475569']]), [i.tag || 'GF', rbCol(i.tag)]])}<div class="tbt">${esc(i.title)}</div>${line ? `<div class="tbs">${esc(line.length > 90 ? line.slice(0, 88) + '…' : line)}</div>` : ''}</div></button>`;
 }
 function rbUserCard(k, c) {
   const i = c.ideaId && M().ideas.find(x => x.id === c.ideaId); if (i) return rbIdeaCard(i, k, c.id, c.note);
   const img = c.link ? rbOg(c.link) : '';
-  return `<button type="button" class="tbcard" onclick="rbOpenCard('${k}',${jsArg(c.id)})">${rbCover(img, '')}<div class="tbbody">${tbLbl([['Mine', '#475569']])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.slice(0, 90))}</div>` : ''}</div></button>`;
+  return `<button type="button" class="tbcard" data-rbcard="${esc(k + '|' + c.id)}" onclick="rbOpenCard('${k}',${jsArg(c.id)})">${rbCover(img, '')}<div class="tbbody">${tbLbl([['Mine', '#475569']])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.slice(0, 90))}</div>` : ''}</div></button>`;
 }
 function rbAllList() {
   const q = mealQuery.trim().toLowerCase();
@@ -8457,7 +8499,7 @@ function rbDelete(id) {
     if (i.builtin) { i.hidden = true; i.fav = false; } else M().ideas = M().ideas.filter(x => x.id !== id);
     const f = rbGet(); RB_LISTS.forEach(([k]) => { f.lists[k] = f.lists[k].filter(c => c.ideaId !== id); }); rbSave(f);
     await save();
-    return () => { rbRedraw(); if (location.hash.startsWith('#recipe/')) go('#recipes'); toast('Deleted: ' + i.title, 'Undo', async () => { M().ideas = JSON.parse(before); try { if (lists !== null) localStorage.setItem(RB_KEY, lists); } catch (e) { } await save(); render(); }); };
+    return () => { rbRedraw(); if (location.hash === '#food') render(); if (location.hash.startsWith('#recipe/')) go('#recipes'); toast('Deleted: ' + i.title, 'Undo', async () => { M().ideas = JSON.parse(before); try { if (lists !== null) localStorage.setItem(RB_KEY, lists); } catch (e) { } await save(); render(); }); };
   });
 }
 // 2.28.1: add his own recipe from a website link (read through the relay; he checks it and ticks gluten free before saving)
@@ -8527,7 +8569,7 @@ function RecipeDetail(id) {
   const blurb = i.notes ? esc(i.notes) : (i.ingr.length ? esc(i.ingr.slice(0, 8).join(', ') + (i.ingr.length > 8 ? '…' : '')) : '');
   const pic = picSrc ? `<img class="recphoto" alt="" src="${esc(picSrc)}">` : mealPic(i);
   return `<div style="display:flex;justify-content:space-between;align-items:center"><button class="back" onclick="go('#recipes')">${I('left')} Recipes</button>
-    <button class="btn small" id="recedit" aria-label="Edit recipe" onclick="mealIdeaForm('${i.id}')">${I('edit')} Edit</button></div>
+    <div style="display:flex;gap:6px"><button class="btn small" id="recedit" aria-label="Edit recipe" onclick="mealIdeaForm('${i.id}')">${I('edit')} Edit</button><button class="btn small danger" aria-label="Delete recipe" onclick="rbDelete('${i.id}')">${I('trash')} Delete</button></div></div>
     <div class="recblock">
       <h1 class="rectitle">${esc(i.title)}</h1>
       <div class="recpic">${pic}</div>
@@ -11421,7 +11463,7 @@ const NAV_TABS = 3;
 const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   cars: ['car', 'car', 'Cars', 'Cars'], calendar: ['cal', 'appt', 'Calendar', 'Calendar'], todo: ['todo', 'todo', 'To-do', 'To-do'],
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
-  tv: ['tv', 'tv', 'TV guide', 'TV'],
+  tv: ['tv', 'tv', 'TV guide', 'TV'], livetv: ['tv', 'tv', 'Live TV', 'Live TV'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], watch: ['heart', 'health', 'Watch', 'Watch'], about: ['info', 'about', 'About you', 'About'],
   bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], cashflow: ['coins', 'loan', 'Cash flow', 'Cash flow'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
@@ -20733,9 +20775,9 @@ function bottomTabsSetting() {
 }
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
-const ROUTE_ITEM = { todo: 'lists', reminders: 'lists', flagged: 'lists', ideas: 'lists', notes: 'lists', birthdays: 'lists', countdown: 'lists', diary: 'lists', photos: 'lists', recipe: 'food', meals: 'food', recipes: 'food', shopping: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', tidy: 'projects', bills: 'money', budget: 'money', cashflow: 'money', notbills: 'money', power: 'money', compare: 'money', powertime: 'money', work: 'money', roster: 'money', commission: 'money', wage: 'money', loans: 'money', loan: 'money', watch: 'wellbeing', sleep: 'wellbeing', gym: 'wellbeing', meds: 'wellbeing', health: 'wellbeing', claims: 'wellbeing', about: 'wellbeing', weather: 'local', walks: 'local', bridge: 'local', roadworks: 'local', garden: 'local', events: 'local', news: 'local', localnews: 'local', planning: 'local', cars: 'homelife', car: 'homelife', driver: 'homelife', drivers: 'homelife', pets: 'homelife', pet: 'homelife', lights: 'homelife', heat: 'homelife', alarm: 'homelife', aitech: 'learn', diy: 'learn', science: 'learn', coding: 'learn', astronomy: 'learn', gardening: 'learn', space: 'learn', travel: 'learn', lang: 'learn', tv: 'media', videos: 'media', top40: 'media', radio: 'media', podcasts: 'media', blogging: 'media', movies: 'media', concerts: 'media', nightlife: 'media', netflix: 'media', prime: 'media' }; // detail pages belong to their section
+const ROUTE_ITEM = { todo: 'lists', reminders: 'lists', flagged: 'lists', ideas: 'lists', notes: 'lists', birthdays: 'lists', countdown: 'lists', diary: 'lists', photos: 'lists', recipe: 'food', meals: 'food', recipes: 'food', shopping: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', tidy: 'projects', bills: 'money', budget: 'money', cashflow: 'money', notbills: 'money', power: 'money', compare: 'money', powertime: 'money', work: 'money', roster: 'money', commission: 'money', wage: 'money', loans: 'money', loan: 'money', watch: 'wellbeing', sleep: 'wellbeing', gym: 'wellbeing', meds: 'wellbeing', health: 'wellbeing', claims: 'wellbeing', about: 'wellbeing', weather: 'local', walks: 'local', bridge: 'local', roadworks: 'local', garden: 'local', events: 'local', news: 'local', localnews: 'local', planning: 'local', cars: 'homelife', car: 'homelife', driver: 'homelife', drivers: 'homelife', pets: 'homelife', pet: 'homelife', lights: 'homelife', heat: 'homelife', alarm: 'homelife', aitech: 'learn', diy: 'learn', science: 'learn', coding: 'learn', astronomy: 'learn', gardening: 'learn', space: 'learn', travel: 'learn', lang: 'learn', tv: 'media', livetv: 'media', videos: 'media', top40: 'media', radio: 'media', podcasts: 'media', blogging: 'media', movies: 'media', concerts: 'media', nightlife: 'media', netflix: 'media', prime: 'media' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden', gflist: 'plate', lists: 'todo', money: 'money', wellbeing: 'health', local: 'travel', homelife: 'car' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', livetv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden', gflist: 'plate', lists: 'todo', money: 'money', wellbeing: 'health', local: 'travel', homelife: 'car' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -20798,7 +20840,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -22286,7 +22328,7 @@ function glWxCard(m) {
   return `<button type="button" class="glwxc glwxc2${sky[3] ? ' gldark' : ''}" style="--s1:${sky[0]};--s2:${sky[1]};--s3:${sky[2]}" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}">${fx}<span class="glwxtop"><span class="glwxi">${wxIcon(nowW, 'big')}</span>${temp ? `<b class="glwxt">${temp}</b>` : ''}<b class="glwxn">${esc(nowW.words)}</b></span>${uv || sun ? `<span class="glwxchips">${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}${sun ? sunPill(sun, 'glsunp') : ''}</span>` : ''}${out ? `<span class="glwxout">${esc(out)}</span>` : ''}</button>`; // 2.26.97: compact, three rows
 }
 /* ---- Entertainment ---- */
-const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun']];
+const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
 const GL_SUNO = ['A Suno track about Onerahi and the harbour', 'A Suno song about a sunny day off', 'A calm Suno playlist for tonight', 'A Suno track about the Te Matau ā Pohe bridge', 'A Suno song about the Northland coast'];
 const glDay = () => { try { return aklDayNumber(); } catch (e) { return Math.floor(Date.now() / 864e5); } };
 function glPickRecipe() { try { const L = visibleIdeas().filter(i => i && i.title && !/\b(wheat|regular pasta|flour tortilla)\b/i.test(i.title)); if (!L.length) return null; return L[(glDay() * 3 + glOpenN) % L.length]; } catch (e) { return null; } }
@@ -22311,6 +22353,7 @@ function glTiles() {
   if (dailyJokeOn()) add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
   if (showDailyQuote()) add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('quote')");
   if (false) add('fact', 'fun', 'Fun fact', () => HOME_FACTS[(glDay() * 5 + glOpenN) % HOME_FACTS.length], 'i3-idea', ['#2563eb', '#1e3a8a'], "glInfo('fact')");
+  add('livetv', 'watch', 'Live TV (Free Stream)', () => 'Three · Bravo · Sky Open · HGTV · MythBusters · NASA · World News', 'i3-tv', ['#dc2626', '#1e1b4b'], "go('#livetv')");
   add('tvguide', 'watch', 'TV guide', () => 'TVNZ 1 · TVNZ 2 · Three', 'i3-tv', ['#b45309', '#7c2d12'], "go('#tv')");
   return T;
 }
@@ -22333,7 +22376,7 @@ function glPanels() { // 2.26.19: joke, quote and fact each as its own panel, ea
 function glTileHtml(t, small) {
   const img = /^art\//.test(t.art);
   const st = img ? `background-image:url('${t.art}')` : `--a:${t.grad[0]};--b:${t.grad[1]}`;
-  return `<button type="button" class="gltile${img ? '' : ' glic'}${small ? ' glsm' : ''}" style="${st}" onclick="${esc(t.go)}" aria-label="${esc(t.title + ': ' + t.s)}">${img ? '' : `<img src="art/${t.art}.webp" alt="" loading="lazy" onerror="this.remove()">`}<span class="gltag">${esc(GL_CATS.find(c => c[0] === t.cat)[1].toUpperCase())}</span><span class="gltt">${esc(t.title)}<small>${esc(t.s)}</small></span></button>`;
+  return `<button type="button" class="gltile${img ? '' : ' glic'}${small ? ' glsm' : ''}" style="${st}" onclick="${esc(t.go)}" aria-label="${esc(t.title + ': ' + t.s)}">${img ? '' : `<img src="art/${t.art}.webp" alt="" loading="lazy" onerror="this.remove()">`}<span class="gltag">${esc(((GL_CATS.find(c => c[0] === t.cat) || [0, t.cat || ''])[1] || '').toUpperCase())}</span><span class="gltt">${esc(t.title)}<small>${esc(t.s)}</small></span></button>`;
 }
 function glHero() {
   try { const f = glFirst(HOME_CARD.tv()); if (!f || !glOk(f.t)) return '';
@@ -22363,7 +22406,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
+const MEDIA_TILES = new Set(['livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
@@ -22905,8 +22948,10 @@ function weekItems() {
       add(e.date, { type, ic: e.icon || '', color2: e.src === 'reg' ? e.color : '', title: e.title, time: timed ? e.time : (type === 'todo' || type === 'bill' || type === 'loan' ? '' : e.time), sort: e.sort || '', line: e.notes ? String(e.notes).slice(0, 60) : e.tag && e.src === 'ext' ? e.tag : '', sarah: !!e.sarah, color: e.src === 'ext' && e.color ? e.color : '', go: e.go }); }); } catch (e) { }
   // pays and money in, on their usual day (estimate until it lands)
   try { [['shane', 'Your pay', () => mywSt().seen], ['sarah', 'Sarah’s pay', () => swSt().seen], ...IR_KEYS.map(k => [k, IR_DEF[k].name, () => irSt(k).seen])].forEach(([k, nm, sf]) => { const seen = sf() || [], a = fnAvg3(seen);
-      const landed = seen.filter(x => out[x.d]).map(x => x.d);
-      [...new Set(landed.concat(incDates(k, addDays(T, -1), addDays(T, 6))))].forEach(d => { if (!out[d]) return; const got = seen.filter(x => x.d === d).reduce((n, x) => n + x.a, 0);
+      const expected = incDates(k, addDays(T, -1), addDays(T, 6));
+      const landed = seen.filter(x => out[x.d] && (k !== 'shane' || expected.includes(x.d))).map(x => x.d);
+      [...new Set(landed.concat(expected))].forEach(d => { if (!out[d]) return; const got = seen.filter(x => x.d === d).reduce((n, x) => n + x.a, 0);
+        if (k === 'sarah' || k === 'shane') out[d] = out[d].filter(it => !(it.type === 'mine' && /\bpay ?day\b/i.test(it.title || '') && (k === 'sarah' ? /sarah/i.test(it.title || '') : !/sarah/i.test(it.title || ''))));
         add(d, { type: 'pay', title: nm, time: got ? 'Landed ✓' : k === 'board' ? 'about 11pm' : k === 'shane' ? 'afternoon' : '', sort: '23:00', line: got ? money(got) : a ? 'about ' + money(a) + ' (estimate)' : '', go: "go('#cashflow')" }); }); }); } catch (e) { }
   // transfers to make (Cash flow)
   try { const D = CF && CF.data; if (D) { const X = xferPlan(D), nmA = id => fnAcctNameD(D, id), done = S.settings.xferDone || {};
@@ -22937,7 +22982,7 @@ function rwList() { S.settings = S.settings || {}; if (!Array.isArray(S.settings
 const rwTime = x => x.start && x.end ? fmtTime(x.start) + ' – ' + fmtTime(x.end) : x.start ? 'from ' + fmtTime(x.start) : x.end ? 'until ' + fmtTime(x.end) : '';
 (() => { const o = calItems; calItems = function (fromT, toT) { const L = o.apply(this, arguments);
   try { const R = rwList().filter(x => x && x.on !== false && x.days && x.days.length); if (R.length && toT - fromT <= 62 * DAY) { for (let t = fromT; t <= toT; t += DAY) { const dw = new Date(t).getUTCDay();
-      R.filter(x => x.days.includes(dw)).forEach(x => L.push({ src: 'reg', title: x.name, date: isoT(t), time: rwTime(x) || 'Weekly', sort: x.start || x.end || '', color: x.color, icon: x.icon, tag: 'My week', go: "go('#settings');setTimeout(()=>{const e=document.getElementById('rwset');e&&e.scrollIntoView({block:'start'})},300)" })); }
+      const dIso = isoT(t); R.filter(x => x.days.includes(dw) && !L.some(y => y && y.date === dIso && String(y.title || '').trim().toLowerCase() === String(x.name || '').trim().toLowerCase())).forEach(x => L.push({ src: 'reg', title: x.name, date: dIso, time: rwTime(x) || 'Weekly', sort: x.start || x.end || '', color: x.color, icon: x.icon, tag: 'My week', go: "go('#settings');setTimeout(()=>{const e=document.getElementById('rwset');e&&e.scrollIntoView({block:'start'})},300)" })); }
     L.sort((a, b) => parseD(a.date) - parseD(b.date) || String(a.sort || '').localeCompare(String(b.sort || ''))); } } catch (e) { }
   return L; }; })();
 function rwSettings() {
@@ -27235,14 +27280,43 @@ function myLandFor(pp) { return pp && pp.start ? incSnap('shane', pp.start) : ''
 // a pay is still to come until the bank shows it (it lands in the evening, so payday itself still counts)
 function myPending(pp, T) { const land = myLandFor(pp); if (!land) return false; if (land > T) return true; if (land < addDays(T, -3)) return false;
   try { return !(mywSt().seen || []).some(x => x.d >= addDays(land, -3) && x.d <= addDays(land, 3)); } catch (e) { return land >= T; } }
-function myPayGuess() { try { const s = mywSt().seen || []; if (s.length) return snapDow(s[s.length - 1].d, incDow('shane')); } catch (e) { }
-  try { const a = CM() && CM().anchor; if (a) return addDays(a, 16); } catch (e) { } return ''; }
-(() => { const o = paydays; paydays = function () { const r = o.apply(this, arguments); if (r) return r;
+// 2.28.24: Shane is paid fortnightly on Wednesday (21 Oct 2026, 4 Nov 2026, 18 Nov 2026… — NOT 28 Oct 2026).
+const SHANE_PAY_ANCHOR = '2026-11-04';
+function shanePaySnapFortnight(d) {
+  if (!d || parseD(d) == null) return SHANE_PAY_ANCHOR;
+  const w = incSnap('shane', d);
+  const diffWeeks = Math.round((parseD(w) - parseD(SHANE_PAY_ANCHOR)) / (7 * DAY));
+  return Math.abs(diffWeeks) % 2 === 1 ? addDays(w, 7) : w;
+}
+function ensureShanePayCycle() {
+  try {
+    if (!S || !S.settings) return;
+    if (S.settings.payday && parseD(S.settings.payday) != null) {
+      const fixed = shanePaySnapFortnight(S.settings.payday);
+      if (fixed !== S.settings.payday) S.settings.payday = fixed;
+    }
+    if (Array.isArray(S.myEvents)) {
+      S.myEvents.forEach(e => {
+        if (e && /\bpay ?day\b/i.test(e.title || '') && !/sarah/i.test(e.title || '') && e.repeat === 'fortnightly' && e.start) {
+          const fixed = shanePaySnapFortnight(e.start);
+          if (fixed !== e.start) e.start = fixed;
+        }
+      });
+    }
+  } catch (e) {}
+}
+function myPayGuess() {
+  ensureShanePayCycle();
+  return SHANE_PAY_ANCHOR;
+}
+(() => { const o = paydays; paydays = function () {
+  ensureShanePayCycle();
+  const r = o.apply(this, arguments); if (r) return r;
   try { const g = myPayGuess(); if (!g) return null; const T = todayT(), from = T - 420 * DAY, to = T + 420 * DAY, a = parseD(g), k = Math.ceil((a - from) / (14 * DAY));
     const ds = repeatDates({ start: isoT(a - k * 14 * DAY), repeat: 'fortnightly' }, from, to).map(x => x.date); if (!ds.length) return null; if (ds[0] > todayISO()) ds.unshift(addDays(ds[0], -14)); return ds; } catch (e) { return null; } }; })();
 // the landing dates after 'after' up to 'to'
 function incDates(k, after, to, hint) { const per = INC_PER[k]; let base = '';
-  if (k === 'shane') { const ds = paydays(); if (ds) return [...new Set(ds.map(d => incSnap('shane', d)))].filter(d => d > after && d <= to).sort(); base = hint || ((mywSt().seen || []).slice(-1)[0] || {}).d; }
+  if (k === 'shane') { const ds = paydays(); if (ds) return [...new Set(ds.map(d => shanePaySnapFortnight(d)))].filter(d => d > after && d <= to).sort(); base = SHANE_PAY_ANCHOR; }
   else if (k === 'sarah') base = ((swSt().seen || []).slice(-1)[0] || {}).d || hint;
   else base = ((irSt(k).seen || []).slice(-1)[0] || {}).d || hint;
   if (!base || !per) return []; let d = incSnap(k, base); while (d > after) d = addDays(d, -per); while (d <= after) d = addDays(d, per); const out = []; for (; d <= to; d = addDays(d, per)) out.push(d); return out; }
@@ -29911,7 +29985,7 @@ FoodPage = function () {
     const pic = recipePhotoSrc(i);
     const lbls = [[i.tag || "GF Recipe", "#15803d"]];
     if (i.fav) lbls.push(["★ Favourite", "#ca8a04"]);
-    return `<button type="button" class="tbcard" onclick="go('#recipe/${esc(i.id)}')">${pic ? `<div class="tbcover"><img src="${esc(pic)}" alt="" loading="lazy" onerror="this.closest('.tbcover').remove()"></div>` : ""}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(i.title)}</div><div class="tbs">${esc([i.time, i.serves ? "Serves " + i.serves : ""].filter(Boolean).join(" · ") || (i.ingr || []).slice(0, 4).join(", "))}</div></div></button>`;
+    return `<button type="button" class="tbcard" data-recid="${esc(i.id)}" onclick="go('#recipe/${esc(i.id)}')">${pic ? `<div class="tbcover"><img src="${esc(pic)}" alt="" loading="lazy" onerror="this.closest('.tbcover').remove()"></div>` : ""}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(i.title)}</div><div class="tbs">${esc([i.time, i.serves ? "Serves " + i.serves : ""].filter(Boolean).join(" · ") || (i.ingr || []).slice(0, 4).join(", "))}</div></div></button>`;
   }).join("") + grpLinkBtn("#recipes", `Open all GF Recipes (${ideas.length})`);
 
   const openShop = (S.shop && S.shop.items || []).filter(x => !x.done);
@@ -30100,3 +30174,638 @@ async function openAudioOutputPicker(sourceLabel = "Audio") {
     </div>`,
     null, "");
 }
+
+/* ================= 2.28.24: WORLDWIDE + LOCAL TRELLO RADIO BOARD & LIVE TV PLAYER ================= */
+const RADIO_WORLD_ADD = [
+  // Extra NZ Stations
+  { name: "Channel X", freq: "NZ Rock & Alt", where: "New Zealand", region: "nz", home: "https://www.rova.nz/", stream: "https://mediaworks.streamguys1.com/chx_net_icy" },
+  { name: "Anthemz NZ", freq: "Throwback Hits", where: "New Zealand", region: "nz", home: "https://anthemz.nz/", stream: "https://mediaworks.streamguys1.com/anthemz-chc-high_icy" },
+  { name: "Brian FM", freq: "91.2 FM · No Ads", where: "New Zealand", region: "nz", home: "https://brianfm.com/", stream: "https://ais-sa1.streamon.fm/7100_128k.aac" },
+  { name: "95bFM", freq: "95.0 FM", where: "Auckland · NZ", region: "nz", home: "https://95bfm.com/", stream: "https://streams.95bfm.com/stream95" },
+  { name: "BayRock", freq: "93.4 FM · Classic Rock", where: "Bay of Plenty · NZ", region: "nz", home: "https://www.bayrock.co.nz/", stream: "https://stream-15.aiir.com/okom9fklptitv" },
+  // Australia
+  { name: "Gold 104.3 Melbourne", freq: "104.3 FM · Classic Hits", where: "Australia · Melbourne", region: "au", home: "https://www.gold1043.com.au/", stream: "https://ais-arn.streamguys1.com/au_004_icy" },
+  { name: "KIIS 106.5 Sydney", freq: "106.5 FM · Hit Music", where: "Australia · Sydney", region: "au", home: "https://www.kiis1065.com.au/", stream: "https://ais-arn.streamguys1.com/au_007_icy" },
+  { name: "80s 90s Super Pop Hits", freq: "80s & 90s Hits", where: "Australia · NSW", region: "au", home: "https://www.radio-australia.org/", stream: "https://s4.myradiostream.com:7344/listen.mp3?" },
+  { name: "Fresh 92.7 Adelaide", freq: "92.7 FM · Dance & Electronic", where: "Australia · Adelaide", region: "au", home: "https://fresh927.com.au/", stream: "https://live.fresh927.com.au/freshaac" },
+  { name: "Free FM Rock Australia", freq: "Classic & Aussie Rock", where: "Australia · Victoria", region: "au", home: "http://freefmradio.net/", stream: "https://freefmrock.radioca.st/" },
+  { name: "Sky News Australia Radio", freq: "Live News & Talk", where: "Australia · Sydney", region: "au", home: "https://www.skynews.com.au/sky-news-radio", stream: "https://playerservices.streamtheworld.com/api/livestream-redirect/NOVA_SKYNEWSAAC.aac" },
+  // UK & Europe
+  { name: "BBC World Service", freq: "Global News & Docos", where: "UK · London", region: "uk", home: "https://www.bbc.co.uk/sounds/play/live:bbc_world_service", stream: "https://stream.live.vc.bbcmedia.co.uk/bbc_world_service" },
+  { name: "Heart 80s UK", freq: "Non-Stop 80s Feel Good", where: "UK · London", region: "uk", home: "https://www.heart.co.uk/80s", stream: "https://media-ssl.musicradio.com/Heart80sMP3" },
+  { name: "Heart 90s UK", freq: "90s Throwbacks", where: "UK · London", region: "uk", home: "https://www.heart.co.uk/90s", stream: "https://media-ssl.musicradio.com/Heart90sMP3" },
+  { name: "Heart 70s UK", freq: "70s Classics", where: "UK · London", region: "uk", home: "https://www.heart.co.uk/70s", stream: "https://media-ssl.musicradio.com/Heart70sMP3" },
+  { name: "Gold UK", freq: "Greatest Hits of All Time", where: "UK · London", region: "uk", home: "https://www.mygoldmusic.co.uk/", stream: "https://media-ssl.musicradio.com/GoldMP3" },
+  { name: "Capital UK", freq: "95.8 FM · UK Hit Music", where: "UK · London", region: "uk", home: "https://www.capitalfm.com/", stream: "https://media-ssl.musicradio.com/CapitalUK" },
+  { name: "Smooth Chill UK", freq: "Ambient & Chillout", where: "UK · London", region: "uk", home: "https://www.smoothradio.com/chill/", stream: "https://media-ssl.musicradio.com/ChillMP3" },
+  { name: "Today FM Ireland", freq: "100–102 FM · Music & Chat", where: "Ireland · Dublin", region: "uk", home: "https://www.todayfm.com/", stream: "https://stream.audioxi.com/TD" },
+  // USA & Canada
+  { name: "SomaFM Groove Salad", freq: "Ambient · Downtempo Chill", where: "USA · San Francisco", region: "us", home: "https://somafm.com/groovesalad/", stream: "https://ice6.somafm.com/groovesalad-128-mp3" },
+  { name: "Classic Vinyl HD", freq: "Vintage & Classic Hits", where: "USA · New York", region: "us", home: "https://walmradio.com/classic", stream: "https://icecast.walmradio.com:8443/classic" },
+  { name: "Adroit Jazz Underground", freq: "Jazz · Bebop · Cool", where: "USA · Wisconsin", region: "us", home: "https://walmradio.com/jazz", stream: "https://icecast.walmradio.com:8443/jazz" },
+  { name: "CNN Live Audio", freq: "24/7 Breaking News", where: "USA · Atlanta", region: "us", home: "https://www.cnn.com/", stream: "https://tunein.cdnstream1.com/2868_96.mp3" },
+  { name: "Reggae Chill Cafe", freq: "Reggae & Island Vibes", where: "Canada · Toronto", region: "us", home: "https://radiosuitenetwork.torontocast.stream/", stream: "https://maggie.torontocast.com:2020/stream/reggaechillcafe" },
+  // 80s, 90s, Rock & Retro
+  { name: "100 Greatest of the 80s", freq: "80s Pop & Rock Anthems", where: "Worldwide · 80s", region: "rock", home: "https://100-greatest-network.torontocast.stream/", stream: "https://maggie.torontocast.com:2020/stream/100greatestofthe80s" },
+  { name: "RdMix Classic Rock 70s 80s 90s", freq: "70s · 80s · 90s Rock", where: "Worldwide · Rock", region: "rock", home: "https://radiodimensionemix.torontocast.stream/", stream: "https://cast1.torontocast.com:4610/stream" },
+  { name: "0R – 80s Rock Classics", freq: "Arena Rock & Guitar Anthems", where: "Worldwide · Rock", region: "rock", home: "https://0nlineradio.com/", stream: "https://0nlineradio.radioho.st/0r-80s-rock" },
+  { name: "Classic Hits 70s 80s Disco & Soul", freq: "70s & 80s Funk · Soul", where: "Worldwide · Retro", region: "rock", home: "http://classichits.radio/", stream: "https://radiopanther.radiolebowski.com/play" },
+  { name: "Labgate Progressive Rock", freq: "Prog & Classic Rock", where: "Worldwide · Rock", region: "rock", home: "https://labgateradio.com/", stream: "https://s2.ssl-stream.com/radio/8180/radio.mp3" }
+];
+RADIO_WORLD_ADD.forEach(st => {
+  if (!RADIO.some(x => x.name === st.name)) RADIO.push(st);
+});
+
+const RDB_KEY = "radioBoardSaved";
+let rdbFilt = "all", rdbQ = "", rdbHits = [], rdbSearching = false, rdbSearchT = null;
+function rdbSavedGet() {
+  try {
+    const o = JSON.parse(localStorage.getItem(RDB_KEY) || "null");
+    if (o && Array.isArray(o.saved)) return o;
+  } catch (e) {}
+  return { saved: [] };
+}
+function rdbSavedSave(o) {
+  try { localStorage.setItem(RDB_KEY, JSON.stringify(o)); } catch (e) {}
+}
+// Ensure any custom saved stations are in RADIO so presets & Car Stereo deck work seamlessly
+(() => {
+  try {
+    const o = rdbSavedGet();
+    (o.saved || []).forEach(st => {
+      if (st && st.name && st.stream && !RADIO.some(x => x.stream === st.stream)) {
+        RADIO.push(Object.assign({ region: "saved" }, st));
+      }
+    });
+  } catch (e) {}
+})();
+function rdbIsSaved(st) {
+  if (!st) return false;
+  return rdbSavedGet().saved.some(x => x.stream === st.stream || x.name === st.name);
+}
+function rdbToggleSave(idx, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const st = RADIO[idx];
+  if (!st) return;
+  const o = rdbSavedGet();
+  const had = o.saved.some(x => x.stream === st.stream || x.name === st.name);
+  if (had) o.saved = o.saved.filter(x => x.stream !== st.stream && x.name !== st.name);
+  else o.saved.unshift({ name: st.name, freq: st.freq || "LIVE", where: st.where || "Worldwide", home: st.home || "", stream: st.stream });
+  rdbSavedSave(o);
+  toast(had ? `Removed ${st.name} from Saved Stations.` : `Saved ${st.name} to ★ Saved Stations.`);
+  radioSyncUI();
+}
+function radioTuneCustom(name, freq, where, home, stream, saveToo) {
+  let idx = RADIO.findIndex(x => x.stream === stream || x.name === name);
+  if (idx < 0) {
+    idx = RADIO.length;
+    RADIO.push({ name, freq: freq || "LIVE", where: where || "Worldwide", home: home || "", stream, region: "world" });
+  }
+  if (saveToo) {
+    const o = rdbSavedGet();
+    if (!o.saved.some(x => x.stream === stream)) {
+      o.saved.unshift({ name, freq: freq || "LIVE", where: where || "Worldwide", home: home || "", stream });
+      rdbSavedSave(o);
+    }
+  }
+  radioTune(idx, true);
+  try { document.getElementById("carstereo")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (e) {}
+}
+async function rdbRunSearch(q) {
+  q = String(q || "").trim();
+  rdbQ = q;
+  const box = document.getElementById("rdb-search-col");
+  if (q.length < 2) { rdbHits = []; rdbSearching = false; radioSyncUI(); return; }
+  rdbSearching = true;
+  if (box) box.innerHTML = `<div class="tbempty">Searching 30,000+ worldwide stations for “${esc(q)}”…</div>`;
+  try {
+    const u = "https://de1.api.radio-browser.info/json/stations/search?name=" + encodeURIComponent(q) + "&order=clickcount&reverse=true&limit=24&hidebroken=true";
+    const r = await fetch(u);
+    const j = await r.json();
+    rdbHits = (Array.isArray(j) ? j : []).filter(s => s && s.name && /^https:\/\//i.test(s.url_resolved || "") && !isSport(s.name + " " + (s.tags || ""))).slice(0, 18).map(s => ({
+      name: String(s.name || "").trim().slice(0, 80),
+      freq: (s.tags || "").split(",").filter(Boolean).slice(0, 2).join(" · ") || (s.bitrate ? s.bitrate + " kbps" : "LIVE"),
+      where: [s.country, s.state].filter(Boolean).join(" · ") || "Worldwide",
+      home: /^https?:\/\//i.test(s.homepage || "") ? s.homepage : s.url_resolved,
+      stream: s.url_resolved
+    }));
+  } catch (e) { rdbHits = []; }
+  rdbSearching = false;
+  radioSyncUI();
+}
+function rdbSearchInput(v) {
+  clearTimeout(rdbSearchT);
+  rdbQ = v;
+  rdbSearchT = setTimeout(() => rdbRunSearch(v), 350);
+}
+function rdbCardHtml(st, idx, badgeText, badgeCol) {
+  const isTuned = idx === radioSt.idx;
+  const isPlaying = isTuned && (radioSt.playing || radioSt.loading);
+  const presets = radioPresets();
+  const pSlot = presets.indexOf(idx) + 1;
+  const saved = rdbIsSaved(st);
+  const lbls = [[badgeText || st.where || "Radio", badgeCol || "#0284c7"]];
+  if (pSlot) lbls.push([`Preset P${pSlot}`, "#ca8a04"]);
+  if (isPlaying) lbls.push(["● Playing Live", "#16a34a"]);
+  return `<div class="tbcard" style="cursor:pointer;${isTuned ? "outline:2px solid #38bdf8" : ""}" onclick="radioTune(${idx}, ${isPlaying ? "false" : "true"})">
+    <div class="tbbody">
+      ${tbLbl(lbls)}
+      <div class="tbt">${isPlaying ? "⏸ " : "▶ "}${esc(st.name)}</div>
+      <div class="tbs">${esc([st.freq, st.where].filter(Boolean).join(" · "))}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px" onclick="event.stopPropagation()">
+        <button type="button" class="btn small${isPlaying ? " primary" : ""}" style="padding:4px 10px;font-size:.75rem" onclick="radioTune(${idx}, ${isPlaying ? "false" : "true"})">${isPlaying ? "⏸ Pause" : "▶ Play on Stereo"}</button>
+        <button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem" onclick="radioAssignSheet(${idx})">P${pSlot || "+"}</button>
+        <button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem" onclick="rdbToggleSave(${idx}, event)">${saved ? "★ Saved" : "☆ Save"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+function rdbMenu(k) {
+  openSheet("Radio Stations Board", `<p class="muted" style="margin:0 0 10px">Tap any local or worldwide station card to tune and play it on the Car Stereo deck at the top of the page. Use <b>P+</b> on any card to assign it to your 12 Car Stereo preset buttons (FM 1 / FM 2), or use the search bar to search 30,000+ live stations worldwide.</p>`, null);
+}
+function radioBoardHtml() {
+  const presets = radioPresets();
+  const savedList = rdbSavedGet().saved;
+  const localWhg = RADIO.map((st, i) => [st, i]).filter(([st, i]) => i < 22 || st.region === "nz");
+  const auList = RADIO.map((st, i) => [st, i]).filter(([st]) => st.region === "au");
+  const ukList = RADIO.map((st, i) => [st, i]).filter(([st]) => st.region === "uk");
+  const usList = RADIO.map((st, i) => [st, i]).filter(([st]) => st.region === "us");
+  const rockList = RADIO.map((st, i) => [st, i]).filter(([st]) => st.region === "rock");
+  const savedIdxList = RADIO.map((st, i) => [st, i]).filter(([st, i]) => presets.includes(i) || savedList.some(s => s.stream === st.stream || s.name === st.name));
+
+  const cols = [];
+  if (rdbQ.trim().length >= 2 || rdbHits.length > 0) {
+    const searchCards = rdbHits.map(s => `<div class="tbcard" style="cursor:pointer" onclick="radioTuneCustom(${jsArg(s.name)},${jsArg(s.freq)},${jsArg(s.where)},${jsArg(s.home)},${jsArg(s.stream)},false)">
+      <div class="tbbody">
+        ${tbLbl([["🌍 Worldwide Match", "#2563eb"], [s.where.split("·")[0].trim(), "#0d9488"]])}
+        <div class="tbt">▶ ${esc(s.name)}</div>
+        <div class="tbs">${esc(s.freq + " · " + s.where)}</div>
+        <div style="display:flex;gap:6px;margin-top:8px" onclick="event.stopPropagation()">
+          <button type="button" class="btn small primary" style="padding:4px 10px;font-size:.75rem" onclick="radioTuneCustom(${jsArg(s.name)},${jsArg(s.freq)},${jsArg(s.where)},${jsArg(s.home)},${jsArg(s.stream)},false)">▶ Play</button>
+          <button type="button" class="btn small" style="padding:4px 10px;font-size:.75rem" onclick="radioTuneCustom(${jsArg(s.name)},${jsArg(s.freq)},${jsArg(s.where)},${jsArg(s.home)},${jsArg(s.stream)},true)">★ Play &amp; Save</button>
+        </div>
+      </div>
+    </div>`).join("");
+    cols.push(tbList("search", `🔍 Search Results (“${rdbQ.trim()}”)`, rdbHits.length, `<div id="rdb-search-col">${searchCards || (rdbSearching ? "Searching…" : "No stations matched — try another city, genre or station name")}</div>`, false, "rdb"));
+  }
+  if (rdbFilt === "all" || rdbFilt === "nz") {
+    cols.push(tbList("nz", "🇳🇿 Whangārei, Northland & NZ", localWhg.length, localWhg.map(([st, i]) => rdbCardHtml(st, i, i < 22 ? "🇳🇿 " + (st.where || "Whangārei") : "🇳🇿 New Zealand", "#16a34a")).join(""), false, "rdb"));
+  }
+  if (rdbFilt === "all" || rdbFilt === "au") {
+    cols.push(tbList("au", "🇦🇺 Australia Live", auList.length, auList.map(([st, i]) => rdbCardHtml(st, i, "🇦🇺 Australia", "#d97706")).join(""), false, "rdb"));
+  }
+  if (rdbFilt === "all" || rdbFilt === "uk") {
+    cols.push(tbList("uk", "🇬🇧 UK & Ireland Live", ukList.length, ukList.map(([st, i]) => rdbCardHtml(st, i, "🇬🇧 UK & IE", "#2563eb")).join(""), false, "rdb"));
+  }
+  if (rdbFilt === "all" || rdbFilt === "us") {
+    cols.push(tbList("us", "🇺🇸 USA & Canada Live", usList.length, usList.map(([st, i]) => rdbCardHtml(st, i, "🌎 North America", "#7c3aed")).join(""), false, "rdb"));
+  }
+  if (rdbFilt === "all" || rdbFilt === "rock") {
+    cols.push(tbList("rock", "🎸 80s, 90s, Classic Rock & Retro", rockList.length, rockList.map(([st, i]) => rdbCardHtml(st, i, "🎸 80s / Rock", "#e11d48")).join(""), false, "rdb"));
+  }
+  if (rdbFilt === "all" || rdbFilt === "saved") {
+    cols.push(tbList("saved", "⭐ Saved & Preset Stations", savedIdxList.length, savedIdxList.map(([st, i]) => rdbCardHtml(st, i, "★ Preset / Saved", "#ca8a04")).join(""), false, "rdb", "Tap ☆ Save or P+ on any station"));
+  }
+  return cols.join("");
+}
+function rdbChipsHtml() {
+  return [
+    ["all", "All (" + RADIO.length + "+)"],
+    ["nz", "🇳🇿 Whangārei & NZ"],
+    ["au", "🇦🇺 Australia"],
+    ["uk", "🇬🇧 UK & Ireland"],
+    ["us", "🇺🇸 USA & Canada"],
+    ["rock", "🎸 80s · 90s · Rock"],
+    ["saved", "⭐ Saved & Presets"]
+  ].map(([k, lbl]) => `<button type="button" class="chip${rdbFilt === k ? " on" : ""}" onclick="rdbFilt='${k}';radioSyncUI()">${esc(lbl)}</button>`).join("");
+}
+(() => {
+  const origSync = radioSyncUI;
+  radioSyncUI = function () {
+    origSync.apply(this, arguments);
+    const bd = document.getElementById("radioboard");
+    if (bd) { const x = bd.scrollLeft; bd.innerHTML = radioBoardHtml(); bd.scrollLeft = x; }
+    const ch = document.getElementById("rdbchips");
+    if (ch) ch.innerHTML = rdbChipsHtml();
+  };
+})();
+Radio = function () {
+  return `<button class="back" onclick="go('#media')">${I("left")} Entertainment</button>` +
+    header("Radio · Local & Worldwide", "Whangārei car stereo + Trello board of NZ & worldwide stations") +
+    `<div id="carstereo-wrap">${carStereoHtml()}</div>` +
+    `<div style="display:flex;gap:8px;align-items:center;margin:12px 0 8px">
+      <label class="search" style="flex:1;margin:0">${I("search")}<input type="search" placeholder="Search 30,000+ worldwide radio stations (city, country, 80s, rock, BBC…)" value="${esc(rdbQ)}" aria-label="Search worldwide radio stations" oninput="rdbSearchInput(this.value)"></label>
+      ${rdbQ ? `<button type="button" class="btn small" onclick="rdbQ='';rdbHits=[];render()">Clear</button>` : ""}
+    </div>` +
+    `<div class="chips scroll" id="rdbchips" style="margin:0 0 10px">${rdbChipsHtml()}</div>` +
+    `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0f172a,#1e3a8a 55%,#065f46)"></div>
+      <div class="tbtop"><div><h1>Radio Stations Board</h1><div style="font-size:.82rem;opacity:.9">Swipe sideways between Whangārei/NZ, Australia, UK, USA, 80s/Rock &amp; Saved</div></div><button class="iconbtn" aria-label="Bluetooth & Audio Output" title="Bluetooth / Audio Output" onclick="openAudioOutputPicker('Car Stereo')">🔊</button></div>
+      <div class="tblists" id="radioboard">${radioBoardHtml()}</div>
+    </div>` +
+    `<div class="foot">Tap any local or worldwide station card to play it on the Car Stereo deck above. Tap <b>P+</b> on any card to assign it to your 12 Car Stereo preset buttons (FM 1 / FM 2), or tap <b>🔊 BT / OUT</b> to pick your Bluetooth speaker.</div>`;
+};
+
+/* ================= 2.28.24: LIVE TV (#livetv) — FREE INTERNET TV PLAYER & TRELLO GUIDE ================= */
+const LIVE_TV_CHANNELS = [
+  // NZ & Australia Freeview Live
+  { id: "three-nz", name: "Three NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Warner Bros. Discovery NZ live stream — news, entertainment, reality & drama", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/three-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/three" },
+  { id: "bravo-nz", name: "Bravo NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Real-life stories, Below Deck, true crime, property & lifestyle shows", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/bravo-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/bravo" },
+  { id: "skyopen-nz", name: "Sky Open NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Free-to-air drama, comedy, documentaries & entertainment (formerly Prime)", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/skyopen-hls/cmaf-clear/hls.m3u8", web: "https://www.sky.co.nz/" },
+  { id: "rush-nz", name: "RUSH NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Adventure, builds, engineering, survival, cars & outdoor factual TV", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/rush-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/rush" },
+  { id: "eden-nz", name: "Eden NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Documentaries, history, nature, science, food & world exploration", hls: "https://linear.stream.skyone.co.nz/out/v1/g-tier2-v1-h/eden-v2-hls/cmaf-clear/hls.m3u8", web: "https://www.threenow.co.nz/live-tv-guide/eden" },
+  { id: "hgtv-nz", name: "HGTV NZ (Home & Reno)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "24/7 home renovations, DIY builds, property flips & design inspiration", hls: "https://mediapackage-sky-hgtv-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "whakaata-maori", name: "Whakaata Māori (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview", country: "New Zealand", desc: "Aotearoa stories, documentaries, movies, kai & cultural programmes", hls: "https://i.mjh.nz/.r/maori-tv.m3u8", web: "https://www.maoritelevision.com/live" },
+  { id: "parliament-nz", name: "NZ Parliament TV", cat: "nz", catLabel: "🇳🇿 NZ Live", country: "New Zealand", desc: "Live coverage from the New Zealand House of Representatives & select committees", hls: "https://ptvlive.kordia.net.nz/out/v1/daf20b9a9ec5449dadd734e50ce52b74/index.m3u8", web: "https://ondemand.parliament.nz/" },
+  { id: "ch200-nz", name: "Channel 200 NZ", cat: "nz", catLabel: "🇳🇿 NZ Live", country: "New Zealand", desc: "New Zealand regional & community television live stream", hls: "https://ptvlive.kordia.net.nz/out/v1/3fc2254c865a457c8d7fbbce227a2aae/index.m3u8", web: "https://ch200.co.nz/watch-live/" },
+  { id: "wairarapa-nz", name: "Wairarapa TV NZ", cat: "nz", catLabel: "🇳🇿 NZ Regional", country: "New Zealand", desc: "Local NZ regional lifestyle, heritage, classic shows & community TV", hls: "https://stream.wairarapatv.co.nz/Broadband_High/playlist.m3u8", web: "http://www.wairarapatv.co.nz/" },
+  { id: "abc-news-au", name: "ABC News Australia 24/7", cat: "nz", catLabel: "🇦🇺 Australia Live", country: "Australia", desc: "Australia’s 24-hour public broadcasting news & current affairs channel", hls: "https://abc-news-dmd-streams-1.akamaized.net/out/v1/701126012d044971b3fa89406a440133/index.m3u8", web: "https://www.abc.net.au/news/newschannel/" },
+  { id: "sky-news-au", name: "Sky News Australia Live", cat: "nz", catLabel: "🇦🇺 Australia Live", country: "Australia", desc: "Live Australian & trans-Tasman breaking news, politics and weather", hls: "https://skynewsau-live-premium.akamaized.net/hls/live/2105299/skynews/live.m3u8", web: "https://www.skynews.com.au/" },
+
+  // Movies, MythBusters, Reno & Factual 24/7 (FAST Channels)
+  { id: "moviesphere", name: "MovieSphere 24/7 Movies", cat: "movies", catLabel: "🎬 Movies 24/7", country: "NZ / Global", desc: "24/7 free streaming movies — action, thrillers, sci-fi, drama & modern classics", hls: "https://mediapackage-ms-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "mythbusters", name: "MythBusters 24/7", cat: "movies", catLabel: "🔬 Science & DIY", country: "NZ / Global", desc: "Non-stop episodes of MythBusters — experiments, builds, explosions & workshop engineering", hls: "https://mediapackage-ptmb-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "wb-househunters", name: "WB TV House Hunters 24/7", cat: "movies", catLabel: "🏠 Home & Property", country: "NZ / Global", desc: "24/7 House Hunters & international property tours", hls: "https://mediapackage-sky-azf6-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "wb-motorheads", name: "WB TV Motorheads 24/7", cat: "movies", catLabel: "🚗 Cars & Restorations", country: "NZ / Global", desc: "24/7 custom car builds, garage restorations, classic engines & workshop shows", hls: "https://mediapackage-sky-azf1-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "wb-deadliest", name: "WB TV Deadliest Catch 24/7", cat: "movies", catLabel: "🌊 Ocean Adventure", country: "NZ / Global", desc: "24/7 high-seas crabbing & Bering Sea adventure documentaries", hls: "https://mediapackage-sky-azf2-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "wb-truecrime", name: "WB TV True Crime 24/7", cat: "movies", catLabel: "🕵️ True Crime", country: "NZ / Global", desc: "24/7 forensic mysteries, investigations & true-crime documentaries", hls: "https://mediapackage-sky-azf4-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "wb-paranormal", name: "WB TV Paranormal & Mysteries", cat: "movies", catLabel: "👻 Unexplained", country: "NZ / Global", desc: "24/7 unexplained mysteries, haunted history & paranormal investigations", hls: "https://mediapackage-sky-azf5-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "belowdeck", name: "Below Deck Vault 24/7", cat: "movies", catLabel: "🛥️ Reality & Travel", country: "NZ / Global", desc: "24/7 superyacht charters, crew drama & Mediterranean/Caribbean travel", hls: "https://mediapackage-sky-azf3-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
+  { id: "redbull-tv", name: "Red Bull TV (Adventure & Films)", cat: "movies", catLabel: "🏔️ Expeditions", country: "Global", desc: "Documentaries, expedition films, aviation, mountain & ocean exploration", hls: "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8", web: "https://www.redbull.com/int-en/live-events" },
+
+  // World News 24/7
+  { id: "aljazeera", name: "Al Jazeera English HD", cat: "news", catLabel: "🌍 World News", country: "International", desc: "24/7 global news, in-depth documentaries & international reporting", hls: "https://live-hls-web-aje-gcp.thehlive.com/AJE/index.m3u8", web: "https://www.aljazeera.com/live" },
+  { id: "dw-english", name: "DW English (Deutsche Welle)", cat: "news", catLabel: "🌍 World News", country: "Germany / Global", desc: "24/7 European & world news, science, tech and documentaries in English", hls: "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/master.m3u8", web: "https://www.dw.com/en/live-tv/channel-english" },
+  { id: "cna-live", name: "CNA (Channel NewsAsia) 24/7", cat: "news", catLabel: "🌏 Asia-Pacific News", country: "Singapore / APAC", desc: "Breaking Asia-Pacific & world news, business and award-winning documentaries", hls: "https://d2e1asnsl7br7b.cloudfront.net/7782e205e72f43aeb4a48ec97f66ebbe/index.m3u8", web: "https://www.channelnewsasia.com/watch" },
+  { id: "cnn-intl", name: "CNN Headlines International", cat: "news", catLabel: "🌍 World News", country: "USA / Global", desc: "24/7 international breaking news headlines & global coverage", hls: "https://mediapackage-ptcn-source.fullscreen.nz/index.m3u8", web: "https://edition.cnn.com/" },
+  { id: "cbs-news", name: "CBS News 24/7", cat: "news", catLabel: "🇺🇸 US & World News", country: "USA", desc: "Live 24/7 breaking news, technology & investigative reports from CBS News", hls: "https://cbsn-us.cbsnstream.cbsnews.com/out/v1/55a8648e8f134e82a470f83d562deeca/master.m3u8", web: "https://www.cbsnews.com/live/" },
+  { id: "bloomberg", name: "Bloomberg TV & Originals", cat: "news", catLabel: "📈 Tech & Markets", country: "USA / Global", desc: "Global technology, AI, economics, markets & documentary originals", hls: "https://liveproduseast.global.ssl.fastly.net/us/Channel-USTV-AWS-virginia-1/Source-USTV-1000-1_live.m3u8", web: "https://www.bloomberg.com/live" },
+  { id: "ticker-news", name: "Ticker News", cat: "news", catLabel: "🇦🇺 Tech & World", country: "Australia", desc: "Fast-paced streaming news covering tech, aviation, space & global headlines", hls: "https://live-hls-7agy.livepush.io/live_abr_cdn/nsitWAl1pTZtwca/emnmZbKZcO8RfwJR/index.m3u8", web: "https://tickernews.co/" },
+
+  // Space, Science, Weather & Nature
+  { id: "nasa-tv", name: "NASA TV Public HD", cat: "space", catLabel: "🚀 Space & NASA", country: "USA · NASA", desc: "Live mission coverage, ISS views, rocket launches, astronomy & NASA documentaries", hls: "https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8", web: "https://plus.nasa.gov/" },
+  { id: "weatherspy", name: "WeatherSpy TV 24/7", cat: "space", catLabel: "🌩️ Weather & Nature", country: "AU / Global", desc: "Extreme weather footage, storm chasers, ocean swells & atmospheric science", hls: "https://jukin-weatherspy-2-au.samsung.wurl.tv/playlist.m3u8", web: "https://www.weatherspy.tv/" },
+  { id: "sky-weather-au", name: "Sky News Weather 24/7", cat: "space", catLabel: "🌤️ Tasman Weather", country: "Australia / Tasman", desc: "Continuous Tasman Sea, Australian & Pacific satellite radar and forecasts", hls: "https://skynewsau-live-premium.akamaized.net/hls/live/2105305/skynewsweather/live_540p.m3u8", web: "https://www.skynews.com.au/" },
+  { id: "iss-earth", name: "ISS Live Earth Views (NASA)", cat: "space", catLabel: "🛰️ Orbit Live", country: "Space", desc: "High-definition live views of Earth from the International Space Station", yt: "xRPjKQtRXR8", web: "https://www.youtube.com/watch?v=xRPjKQtRXR8" },
+
+  // Music & Ambience TV
+  { id: "j2-nz", name: "J2 Music TV NZ", cat: "music", catLabel: "🎵 NZ Music TV", country: "New Zealand", desc: "24/7 classic & modern music videos from New Zealand and around the world", hls: "https://gizmo2.cloudserver.nz/hls/J2.m3u8", web: "https://www.j2.co.nz/" },
+  { id: "groat-nz", name: "The Groat Rock TV NZ", cat: "music", catLabel: "🎸 Rock Music TV", country: "New Zealand", desc: "24/7 rock, classic rock, alternative & guitar anthems music television", hls: "https://gizmo2.cloudserver.nz/hls/GROAT.m3u8", web: "https://www.j2.co.nz/" },
+  { id: "melo-nz", name: "Melo Easy & Chill TV NZ", cat: "music", catLabel: "✨ Easy Listening TV", country: "New Zealand", desc: "24/7 laid-back acoustic, soul, pop & easy-listening music videos", hls: "https://gizmo2.cloudserver.nz/hls/Melo.m3u8", web: "https://www.j2.co.nz/" },
+  { id: "bigrig-nz", name: "Big Rig Country TV NZ", cat: "music", catLabel: "🤠 Country Music TV", country: "New Zealand", desc: "24/7 country, roots & Heartland music videos from NZ, Australia & Nashville", hls: "https://gizmo2.cloudserver.nz/hls/bigrig.m3u8", web: "https://www.j2.co.nz/" },
+  { id: "lofigirl-tv", name: "Lofi Girl 24/7 Chill TV", cat: "music", catLabel: "🎧 Chill & Study TV", country: "Global", desc: "24/7 relaxing lofi beats & animated visual stream for reading, DIY or winding down", yt: "jfKfPfyJRdk", web: "https://www.youtube.com/watch?v=jfKfPfyJRdk" }
+];
+
+const LTV_KEY = "liveTvBoard";
+let ltvCur = { idx: 0, custom: null, filt: "all", q: "", hits: [], searching: false, hlsInst: null };
+function ltvGet() {
+  try {
+    const o = JSON.parse(localStorage.getItem(LTV_KEY) || "null");
+    if (o && Array.isArray(o.saved)) return o;
+  } catch (e) {}
+  return { saved: ["three-nz", "mythbusters", "moviesphere", "hgtv-nz", "nasa-tv", "aljazeera"], custom: [] };
+}
+function ltvSave(o) {
+  try { localStorage.setItem(LTV_KEY, JSON.stringify(o)); } catch (e) {}
+}
+function ltvAllChannels() {
+  const o = ltvGet();
+  const custom = Array.isArray(o.custom) ? o.custom : [];
+  return LIVE_TV_CHANNELS.concat(custom);
+}
+function ltvCurrentChannel() {
+  if (ltvCur.custom) return ltvCur.custom;
+  const all = ltvAllChannels();
+  return all[ltvCur.idx] || all[0];
+}
+function ltvIsSaved(ch) {
+  if (!ch) return false;
+  return ltvGet().saved.includes(ch.id);
+}
+function ltvToggleSave(id) {
+  const o = ltvGet();
+  const ch = id ? ltvAllChannels().find(x => x.id === id) : ltvCurrentChannel();
+  if (!ch) return;
+  if (o.saved.includes(ch.id)) {
+    o.saved = o.saved.filter(x => x !== ch.id);
+    toast(`Removed ${ch.name} from Saved Channels.`);
+  } else {
+    if (!ltvAllChannels().some(x => x.id === ch.id)) {
+      o.custom = (o.custom || []).concat(ch);
+    }
+    o.saved.unshift(ch.id);
+    toast(`Saved ${ch.name} to ⭐ Saved Channels.`);
+  }
+  ltvSave(o);
+  ltvRedraw();
+}
+function ltvEnsureHlsJs() {
+  if (window.Hls) return Promise.resolve(window.Hls);
+  return new Promise(resolve => {
+    const existing = document.getElementById("hlsjs-script");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.Hls));
+      setTimeout(() => resolve(window.Hls), 1500);
+      return;
+    }
+    const s = document.createElement("script");
+    s.id = "hlsjs-script";
+    s.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
+    s.onload = () => resolve(window.Hls);
+    s.onerror = () => resolve(null);
+    document.head.appendChild(s);
+  });
+}
+async function ltvMountVideo() {
+  const ch = ltvCurrentChannel();
+  const vid = document.getElementById("ltv-video");
+  if (!vid || !ch || !ch.hls) return;
+  try {
+    if (ltvCur.hlsInst) { ltvCur.hlsInst.destroy(); ltvCur.hlsInst = null; }
+  } catch (e) {}
+  vid.disableRemotePlayback = false;
+  // Prefer native HLS on iOS/Safari, or hls.js on Android/Desktop Chrome
+  if (vid.canPlayType("application/vnd.apple.mpegurl") && !/Android|Chrome/i.test(navigator.userAgent || "")) {
+    vid.src = ch.hls;
+    vid.play().catch(() => {});
+    return;
+  }
+  const HlsClass = await ltvEnsureHlsJs();
+  if (HlsClass && HlsClass.isSupported()) {
+    const hls = new HlsClass({ enableWorker: true, lowLatencyMode: true });
+    ltvCur.hlsInst = hls;
+    hls.loadSource(ch.hls);
+    hls.attachMedia(vid);
+    hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
+      vid.play().catch(() => {});
+    });
+  } else {
+    vid.src = ch.hls;
+    vid.play().catch(() => {});
+  }
+}
+function ltvPlayId(id) {
+  const all = ltvAllChannels();
+  const idx = all.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  ltvCur.custom = null;
+  ltvCur.idx = idx;
+  ltvRedraw();
+  try { document.getElementById("ltvplayer")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (e) {}
+}
+function ltvPlayCustom(name, country, hlsUrl, webUrl) {
+  const all = ltvAllChannels();
+  const hit = all.findIndex(x => x.hls === hlsUrl);
+  if (hit >= 0) { ltvPlayId(all[hit].id); return; }
+  ltvCur.custom = { id: "custom-" + Date.now(), name, cat: "world", catLabel: "🌍 Free Live TV", country: country || "Worldwide", desc: "Free internet TV stream", hls: hlsUrl, web: webUrl || hlsUrl };
+  ltvRedraw();
+  try { document.getElementById("ltvplayer")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (e) {}
+}
+function ltvStep(dir) {
+  const all = ltvAllChannels();
+  ltvCur.custom = null;
+  ltvCur.idx = (ltvCur.idx + dir + all.length) % all.length;
+  ltvRedraw();
+}
+function ltvFullscreen() {
+  const el = document.getElementById("ltv-video") || document.getElementById("ltv-screen");
+  if (!el) return;
+  try {
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitEnterFullscreen) el.webkitEnterFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } catch (e) {}
+}
+let ltvIptvCache = null, ltvSearchT = null;
+async function ltvSearchChannels(q) {
+  q = String(q || "").trim();
+  ltvCur.q = q;
+  if (q.length < 2) { ltvCur.hits = []; ltvCur.searching = false; ltvRedrawBoard(); return; }
+  ltvCur.searching = true;
+  ltvRedrawBoard();
+  try {
+    if (!ltvIptvCache) {
+      const [streams, channels] = await Promise.all([
+        fetch("https://iptv-org.github.io/api/streams.json").then(r => r.json()),
+        fetch("https://iptv-org.github.io/api/channels.json").then(r => r.json())
+      ]);
+      const chMap = new Map(channels.map(c => [c.id, c]));
+      const list = [];
+      const seen = new Set();
+      for (const s of streams) {
+        if (!s.channel || !s.url || !s.url.startsWith("https://") || !s.url.includes(".m3u8") || s.referrer || s.user_agent) continue;
+        if (seen.has(s.channel)) continue;
+        const c = chMap.get(s.channel);
+        if (!c || c.is_nsfw) continue;
+        const cats = (c.categories || []).join(", ");
+        if (isSport(cats + " " + c.name)) continue;
+        seen.add(s.channel);
+        list.push({ id: c.id, name: c.name, country: c.country || "Global", cats: cats || "Live TV", hls: s.url, web: c.website || s.url });
+      }
+      ltvIptvCache = list;
+    }
+    const ql = q.toLowerCase();
+    ltvCur.hits = (ltvIptvCache || []).filter(c => (c.name + " " + c.country + " " + c.cats).toLowerCase().includes(ql)).slice(0, 20);
+  } catch (e) { ltvCur.hits = []; }
+  ltvCur.searching = false;
+  ltvRedrawBoard();
+}
+function ltvSearchInput(v) {
+  clearTimeout(ltvSearchT);
+  ltvCur.q = v;
+  ltvSearchT = setTimeout(() => ltvSearchChannels(v), 350);
+}
+function ltvPlayerHtml() {
+  const ch = ltvCurrentChannel();
+  if (!ch) return "";
+  const saved = ltvIsSaved(ch);
+  const all = ltvAllChannels();
+  const presets = ltvGet().saved.map(id => all.find(x => x.id === id)).filter(Boolean).slice(0, 6);
+  let screen = "";
+  if (ch.yt) {
+    screen = `<iframe src="https://www.youtube-nocookie.com/embed/${esc(ch.yt)}?autoplay=1&playsinline=1&rel=0" title="${esc(ch.name)}" style="width:100%;height:100%;border:0;display:block" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+  } else {
+    screen = `<video id="ltv-video" controls autoplay playsinline style="width:100%;height:100%;background:#000;display:block;object-fit:contain"></video>`;
+  }
+  return `<div class="card" id="ltvplayer" style="margin:0 4px 12px;padding:12px;background:linear-gradient(165deg,#0f172a,#1e1b4b);color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:18px;box-shadow:0 12px 30px rgba(0,0,0,.35)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="tblbl" style="background:#dc2626;font-size:.72rem;padding:3px 9px">● LIVE TV</span>
+        <span class="tblbl" style="background:#2563eb;font-size:.72rem;padding:3px 9px">${esc(ch.catLabel || ch.country || "Free Stream")}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="chip${saved ? " on" : ""}" style="padding:4px 10px;font-size:.75rem" onclick="ltvToggleSave(${jsArg(ch.id)})">${saved ? "★ Saved" : "☆ Save"}</button>
+        <button type="button" class="chip" style="padding:4px 10px;font-size:.75rem" onclick="ltvFullscreen()">⛶ Fullscreen</button>
+      </div>
+    </div>
+    <div id="ltv-screen" style="aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(255,255,255,.1)">${screen}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+      <div style="min-width:0;flex:1">
+        <div style="font-weight:800;font-size:1.06rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)}</div>
+        <div style="font-size:.82rem;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.desc || ch.country || "")}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex:none">
+        <button type="button" class="iconbtn" style="width:38px;height:38px;background:rgba(255,255,255,.14);color:#fff" aria-label="Previous channel" title="Previous channel" onclick="ltvStep(-1)">⏮</button>
+        <button type="button" class="iconbtn" style="width:38px;height:38px;background:rgba(255,255,255,.14);color:#fff" aria-label="Next channel" title="Next channel" onclick="ltvStep(1)">⏭</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <button type="button" class="btn small" style="background:rgba(37,99,235,.88);color:#fff;border:0;font-weight:700" onclick="openAudioOutputPicker('Live TV')">🔊 Bluetooth / Output</button>
+      <button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="ltvAddCustomSheet()">+ Add Stream URL</button>
+      ${ch.web ? `<a class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0;text-decoration:none" href="${esc(ch.web)}" target="_blank" rel="noopener">↗ Channel Site</a>` : ""}
+    </div>
+    ${presets.length ? `<div style="display:flex;gap:6px;overflow-x:auto;padding-top:4px">${presets.map((p, idx) => `<button type="button" class="chip${p.id === ch.id ? " on" : ""}" style="font-size:.74rem;padding:4px 9px;white-space:nowrap" onclick="ltvPlayId(${jsArg(p.id)})"><b>CH ${idx + 1}</b> · ${esc(p.name.replace(/\s*\(Live\)|\s*24\/7/gi, ""))}</button>`).join("")}</div>` : ""}
+  </div>`;
+}
+function ltvCardHtml(ch, badgeCol) {
+  const cur = ltvCurrentChannel();
+  const isPlaying = cur && (cur.id === ch.id || (cur.hls && cur.hls === ch.hls));
+  const saved = ltvIsSaved(ch);
+  const lbls = [[ch.catLabel || ch.country || "Live TV", badgeCol || "#2563eb"]];
+  if (isPlaying) lbls.push(["● Watching Now", "#dc2626"]);
+  return `<div class="tbcard" style="cursor:pointer;${isPlaying ? "outline:2px solid #ef4444" : ""}" onclick="ltvPlayId(${jsArg(ch.id)})">
+    <div class="tbbody">
+      ${tbLbl(lbls)}
+      <div class="tbt">${isPlaying ? "📺 " : "▶ "}${esc(ch.name)}</div>
+      <div class="tbs">${esc(ch.desc || ch.country || "")}</div>
+      <div style="display:flex;gap:6px;margin-top:8px" onclick="event.stopPropagation()">
+        <button type="button" class="btn small${isPlaying ? " primary" : ""}" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayId(${jsArg(ch.id)})">${isPlaying ? "● Watching" : "▶ Watch in Player"}</button>
+        <button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem" onclick="ltvToggleSave(${jsArg(ch.id)})">${saved ? "★ Saved" : "☆ Save"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+function ltvMenu(k) {
+  openSheet("Live TV Channels", `<p class="muted" style="margin:0 0 10px">Tap any channel card to watch it live inside the widescreen TV player at the top of the page. All sport channels are excluded. You can also search hundreds of free worldwide internet TV streams or add any custom <code>.m3u8</code> stream.</p>`, null, "",
+    `<button type="button" class="btn primary" onclick="closeSheet().then(()=>ltvAddCustomSheet())">${I("plus")} Add custom channel</button>`);
+}
+function ltvAddCustomSheet() {
+  openSheet("Add a Free Live TV Channel",
+    `<label class="field"><span>Channel name</span><input name="name" maxlength="80" required placeholder="e.g. Classic Movies TV"></label>
+    <label class="field"><span>HLS Stream (.m3u8) or YouTube video ID</span><input name="stream" maxlength="500" required placeholder="https://example.com/live/index.m3u8"></label>
+    <label class="field"><span>Description / Country</span><input name="desc" maxlength="120" placeholder="Optional description"></label>`,
+    v => {
+      if (!v.name || !v.stream) return "Please enter a name and stream URL.";
+      const s = v.stream.trim();
+      const o = ltvGet();
+      const id = "custom-" + Date.now();
+      const ch = { id, name: v.name.trim().slice(0, 80), cat: "saved", catLabel: "⭐ Custom TV", country: "Custom", desc: (v.desc || "Custom live stream").slice(0, 120) };
+      if (/^[A-Za-z0-9_-]{11}$/.test(s)) ch.yt = s;
+      else ch.hls = s;
+      o.custom = (o.custom || []).concat(ch);
+      o.saved.unshift(id);
+      ltvSave(o);
+      return () => ltvPlayId(id);
+    }, "Add & Watch");
+}
+function ltvBoardHtml() {
+  const all = ltvAllChannels();
+  const o = ltvGet();
+  const nzAu = all.filter(c => c.cat === "nz");
+  const moviesFactual = all.filter(c => c.cat === "movies");
+  const news = all.filter(c => c.cat === "news");
+  const space = all.filter(c => c.cat === "space");
+  const music = all.filter(c => c.cat === "music");
+  const saved = o.saved.map(id => all.find(c => c.id === id)).filter(Boolean);
+  const f = ltvCur.filt;
+  const cols = [];
+  if (ltvCur.q.trim().length >= 2 || ltvCur.hits.length > 0) {
+    const searchCards = ltvCur.hits.map(h => `<div class="tbcard" style="cursor:pointer" onclick="ltvPlayCustom(${jsArg(h.name)},${jsArg(h.country)},${jsArg(h.hls)},${jsArg(h.web)})">
+      <div class="tbbody">
+        ${tbLbl([["🌍 " + h.country, "#2563eb"], [h.cats.split(",")[0] || "Live TV", "#0d9488"]])}
+        <div class="tbt">▶ ${esc(h.name)}</div>
+        <div class="tbs">Free Internet TV (.m3u8) · ${esc(h.cats)}</div>
+      </div>
+    </div>`).join("");
+    cols.push(tbList("search", `🔍 Free TV Search (“${ltvCur.q.trim()}”)`, ltvCur.hits.length, searchCards || (ltvCur.searching ? "Searching worldwide free TV directory…" : "No matching free TV streams"), false, "ltv"));
+  }
+  if (f === "all" || f === "nz") cols.push(tbList("nz", "🇳🇿 NZ & Australia Freeview Live", nzAu.length, nzAu.map(c => ltvCardHtml(c, "#16a34a")).join(""), false, "ltv"));
+  if (f === "all" || f === "movies") cols.push(tbList("movies", "🎬 Movies, MythBusters, Reno & Docos 24/7", moviesFactual.length, moviesFactual.map(c => ltvCardHtml(c, "#e11d48")).join(""), false, "ltv"));
+  if (f === "all" || f === "news") cols.push(tbList("news", "🌍 World News 24/7 (English)", news.length, news.map(c => ltvCardHtml(c, "#2563eb")).join(""), false, "ltv"));
+  if (f === "all" || f === "space") cols.push(tbList("space", "🚀 Space, Science, Weather & Nature", space.length, space.map(c => ltvCardHtml(c, "#0891b2")).join(""), false, "ltv"));
+  if (f === "all" || f === "music") cols.push(tbList("music", "🎵 Music & Chill TV 24/7", music.length, music.map(c => ltvCardHtml(c, "#7c3aed")).join(""), false, "ltv"));
+  if (f === "all" || f === "saved") cols.push(tbList("saved", "⭐ Saved & Preset Channels", saved.length, saved.map(c => ltvCardHtml(c, "#ca8a04")).join(""), false, "ltv", "Tap ☆ Save on any channel"));
+  return cols.join("");
+}
+function ltvChipsHtml() {
+  return [
+    ["all", "All (" + ltvAllChannels().length + ")"],
+    ["nz", "🇳🇿 NZ & Australia"],
+    ["movies", "🎬 Movies, MythBusters & Reno"],
+    ["news", "🌍 World News 24/7"],
+    ["space", "🚀 Space & Weather"],
+    ["music", "🎵 Music TV"],
+    ["saved", "⭐ Saved Channels"]
+  ].map(([k, lbl]) => `<button type="button" class="chip${ltvCur.filt === k ? " on" : ""}" onclick="ltvCur.filt='${k}';ltvRedrawBoard()">${esc(lbl)}</button>`).join("");
+}
+function ltvRedrawBoard() {
+  const el = document.getElementById("ltvlists");
+  if (el) { const x = el.scrollLeft; el.innerHTML = ltvBoardHtml(); el.scrollLeft = x; }
+  const ch = document.getElementById("ltvchips");
+  if (ch) ch.innerHTML = ltvChipsHtml();
+}
+function ltvRedraw() {
+  const p = document.getElementById("ltvplayer");
+  if (p) p.outerHTML = ltvPlayerHtml();
+  ltvRedrawBoard();
+  setTimeout(ltvMountVideo, 40);
+}
+function LiveTvPage() {
+  setTimeout(ltvMountVideo, 60);
+  return `<button class="back" onclick="go('#media')">${I("left")} Entertainment</button>
+    <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">
+      <label class="search" style="flex:1;margin:0">${I("search")}<input type="search" placeholder="Search 1,000+ free worldwide TV channels (NASA, BBC, movies, nature, music…)" value="${esc(ltvCur.q)}" aria-label="Search free live TV channels" oninput="ltvSearchInput(this.value)"></label>
+      ${ltvCur.q ? `<button type="button" class="btn small" onclick="ltvCur.q='';ltvCur.hits=[];ltvRedrawBoard()">Clear</button>` : ""}
+    </div>
+    <div class="chips scroll" id="ltvchips" style="margin:0 0 10px">${ltvChipsHtml()}</div>
+    <div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#1e1b4b,#0f172a 60%,#064e3b)"></div>
+      <div class="tbtop"><div><h1>📺 Live Internet TV</h1><div style="font-size:.82rem;opacity:.9">Free NZ Freeview, 24/7 Movies &amp; MythBusters, World News, Space &amp; Music TV</div></div><button class="iconbtn" aria-label="What’s on TV Guide" title="TV Guide" onclick="go('#tv')">📅</button></div>
+      ${ltvPlayerHtml()}
+      <div class="tblists" id="ltvlists">${ltvBoardHtml()}</div>
+    </div>
+    <div class="foot">Tap any channel card to watch live in the widescreen player at the top. Use <b>🔊 Bluetooth / Output</b> to send audio to your Bluetooth speaker or headphones, or <b>📅</b> for the NZ TV Guide.</div>`;
+}
+
+/* ---- 2.28.24: Long-press any recipe card on #recipes or #food to delete it ---- */
+function rbDeleteUserCard(k, id) {
+  const f = rbGet(), L = f.lists[k] || [], c = L.find(x => x.id === id);
+  if (!c) return;
+  confirmSheet("Delete this recipe card?", esc(c.title) + " will be removed from your list.", "Delete", async () => {
+    const before = localStorage.getItem(RB_KEY);
+    f.lists[k] = L.filter(x => x.id !== id);
+    rbSave(f);
+    return () => {
+      rbRedraw();
+      toast("Deleted: " + c.title, "Undo", () => { try { if (before !== null) localStorage.setItem(RB_KEY, before); } catch (e) {} rbRedraw(); });
+    };
+  });
+}
+(() => {
+  let t = null, x0 = 0, y0 = 0, fired = false;
+  const clear = () => { if (t) { clearTimeout(t); t = null; } };
+  document.addEventListener("pointerdown", e => {
+    const card = e.target.closest && e.target.closest("[data-recid], [data-rbcard], .mealidea[data-id]");
+    fired = false; clear();
+    if (!card) return;
+    x0 = e.clientX; y0 = e.clientY;
+    const recId = card.dataset.recid || card.dataset.id || "";
+    const rbKey = card.dataset.rbcard || "";
+    t = setTimeout(() => {
+      t = null; fired = true;
+      try { navigator.vibrate && navigator.vibrate(25); } catch (er) {}
+      if (recId) rbDelete(recId);
+      else if (rbKey) { const [k, cid] = rbKey.split("|"); rbDeleteUserCard(k, cid); }
+    }, 520);
+  }, { passive: true });
+  document.addEventListener("pointermove", e => {
+    if (t && (Math.abs(e.clientX - x0) > 10 || Math.abs(e.clientY - y0) > 10)) clear();
+  }, { passive: true });
+  ["pointerup", "pointercancel", "scroll"].forEach(n => document.addEventListener(n, clear, { passive: true, capture: true }));
+  document.addEventListener("click", e => {
+    if (fired && e.target.closest && e.target.closest("[data-recid], [data-rbcard], .mealidea[data-id]")) {
+      e.preventDefault(); e.stopPropagation(); fired = false;
+    }
+  }, true);
+  document.addEventListener("contextmenu", e => {
+    if (e.target.closest && e.target.closest("[data-recid], [data-rbcard], .mealidea[data-id]")) e.preventDefault();
+  });
+})();
