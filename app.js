@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.0';
+const APP_VERSION = '2.28.1';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -602,30 +602,7 @@ const HOME_CARD = {
     const list = dueItems(S).filter(x => x.kind === 'pet').slice(0, 4); if (!list.length) return '';
     return homeSec('Pets', '<a href="#pets">See all</a>') + `<div class="list" id="homepets">${list.map(rowFor).join('')}</div>`;
   },
-  bills: () => {
-    const billRows = S.bills.filter(b => !b.paid && b.due).map(b => ({ kind: 'bill', b, d: b.due, sort: b.due }));
-    const loanRows = [];
-    (S.loans || []).forEach(l => {
-      const p = loanPlan(l); if (!p) return;
-      loanRows.push({ kind: 'loan', l, d: p.next, cents: Math.min(l.planCents, loanCalc(l).owed), sort: p.next });
-    });
-    const list = [...billRows, ...loanRows].sort((a, b) => a.sort.localeCompare(b.sort)).slice(0, 4);
-    if (!list.length) return '';
-    // 2.27.88: show or hide bills on Home
-    if (S.settings && S.settings.homeBillsOff) return homeSec('Bills', `<a href="#" onclick="event.preventDefault();homeBillsToggle()">Show bills</a>`) + `<div class="s" style="opacity:.65;padding:2px 4px 8px">Bills are hidden on Home. They're still on the Bills page.</div>`;
-    return homeSec('Bills', `<a href="#" onclick="event.preventDefault();homeBillsToggle()">Hide</a> · <a href="#bills">See all</a>`) + `<div class="list" id="homebills">${list.map(x => {
-      if (x.kind === 'loan') {
-        const name = 'Loan · ' + x.l.from;
-        return `<div class="row bill"><button class="tapzone" onclick="go('#loan/${x.l.id}')"><div class="ic bill">${I('coins')}</div>
-      <div class="tx"><div class="t">${esc(name)}</div><div class="s">Plan · due ${fmtW(x.d)}</div></div><div class="badgestack">${duePill(daysLeft(x.d))}${moneyBadge(x.cents / 100)}</div></button>
-      <button class="paybtn" aria-label="Record a payment: ${esc(name)}" onclick="payForm('${x.l.id}')">Rec</button></div>`;
-      }
-      const b = x.b;
-      return `<div class="row bill"><button class="tapzone" onclick="go('#bills')">${billIc(b.name)}
-      <div class="tx"><div class="t">${esc(b.name)}</div><div class="s">Due ${fmtW(b.due)}</div></div><div class="badgestack">${duePill(daysLeft(b.due))}${moneyBadge(b.amount)}</div></button>
-      <button class="paybtn" aria-label="Mark paid: ${esc(b.name)}" onclick="markPaid('${b.id}')">Pd</button></div>`;
-    }).join('')}</div>`;
-  },
+  bills: () => '', // 2.28.1: Bills are off Home (still on the Bills page)
   cars: () => {
     if (!S.cars.length) return '';
     const cell = (l, d, c, pt) => { if (!d) return ''; let cp = ''; try { cp = carProgShort(c, pt); } catch (e) { } return `<span class="cg"><small>${l}</small> ${fmt(d)} ${cp ? progPill(cp) : duePill(daysLeft(d))}</span>`; };
@@ -7699,6 +7676,7 @@ function recipePhotoSrc(idea) {
   const own = idea && storedPhoto(idea.photo);
   if (own) return own;
   const p = idea && idea.image;
+  if (typeof p === 'string' && idea && !idea.builtin && /^https:\/\//.test(p)) return p; // 2.28.1: picture from his recipe link
   return typeof p === 'string' && /^images\/recipe-[a-z0-9-]+\.jpg$/.test(p) ? p : '';
 }
 function mealPic(idea) {
@@ -7833,7 +7811,7 @@ function rbOg(link) {
 function rbCover(img, t, big) { return `<div class="tbcover" style="background:linear-gradient(135deg,${rbCol(t)},#14532d);aspect-ratio:16/9;overflow:hidden">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()">` : ''}</div>`; }
 function rbIdeaCard(i, k, cid, sub) {
   const img = recipePhotoSrc(i) || (i.link ? rbOg(i.link) : ''), line = sub || i.notes || i.ingr.slice(0, 4).join(', ');
-  return `<button type="button" class="tbcard" onclick="rbOpen(${jsArg(i.id)},'${k || ''}',${jsArg(cid || '')})">${rbCover(img, i.tag)}<div class="tbbody">${tbLbl([[i.tag || 'GF', rbCol(i.tag)]])}<div class="tbt">${esc(i.title)}</div>${line ? `<div class="tbs">${esc(line.length > 90 ? line.slice(0, 88) + '…' : line)}</div>` : ''}</div></button>`;
+  return `<button type="button" class="tbcard" onclick="rbOpen(${jsArg(i.id)},'${k || ''}',${jsArg(cid || '')})">${rbCover(img, i.tag)}<div class="tbbody">${tbLbl([...(i.builtin ? [] : [['Mine', '#475569']]), [i.tag || 'GF', rbCol(i.tag)]])}<div class="tbt">${esc(i.title)}</div>${line ? `<div class="tbs">${esc(line.length > 90 ? line.slice(0, 88) + '…' : line)}</div>` : ''}</div></button>`;
 }
 function rbUserCard(k, c) {
   const i = c.ideaId && M().ideas.find(x => x.id === c.ideaId); if (i) return rbIdeaCard(i, k, c.id, c.note);
@@ -7847,17 +7825,69 @@ function rbAllList() {
 function rbBoardHtml() {
   const o = rbGet(), p = glPickRecipe(), all = rbAllList();
   return tbList('today', 'Recipe of the day', p ? 1 : 0, p ? rbIdeaCard(p) : '', false, 'rb', 'No recipe today') +
-    tbList('all', 'All recipes', all.length, all.map(i => rbIdeaCard(i)).join(''), false, 'rb', 'No recipes match') +
+    tbList('all', 'All recipes', all.length, all.map(i => rbIdeaCard(i)).join(''), false, 'rb', 'No recipes match').replace(/<\/section>$/, `<button type="button" class="tbadd" onclick="rbLinkForm()">${I('plus')} Add a recipe from a link</button></section>`) +
     RB_LISTS.map(([k, t]) => tbList(k, t, o.lists[k].length, o.lists[k].map(c => rbUserCard(k, c)).join(''), true, 'rb')).join('');
 }
 function rbRedraw() { const el = document.getElementById('rblists'); if (!el) return; const x = el.scrollLeft; el.innerHTML = rbBoardHtml(); el.scrollLeft = x; }
-function rbMenu(k) { if (k === 'all') document.getElementById('mealq')?.focus(); else mealIdeaForm(); }
+function rbMenu(k) {
+  if (k !== 'all') return mealIdeaForm();
+  const n = M().ideas.filter(i => i.hidden).length;
+  openSheet('All recipes', `<div class="btns" style="flex-direction:column;align-items:stretch"><button type="button" class="btn" onclick="closeSheet().then(rbLinkForm)">${I('plus')} Add a recipe from a link</button><button type="button" class="btn" onclick="closeSheet().then(()=>document.getElementById('mealq')?.focus())">${I('search')} Search recipes</button><button type="button" class="btn" onclick="closeSheet().then(rbHiddenSheet)">Show hidden recipes (${n})</button></div>`, null);
+}
+// 2.28.1: bring hidden starter recipes back
+function rbHiddenSheet() {
+  const h = M().ideas.filter(i => i.hidden);
+  openSheet('Hidden recipes', h.length ? h.map(i => `<div class="row" style="display:flex;align-items:center;gap:8px;padding:6px 0"><div style="flex:1">${esc(i.title)}</div><button type="button" class="btn small" onclick="rbUnhide(${jsArg(i.id)})">Bring back</button></div>`).join('') : '<p class="muted">No hidden recipes.</p>', null);
+}
+async function rbUnhide(id) { const i = M().ideas.find(x => x.id === id); if (!i) return; i.hidden = false; await save(); await closeSheet(); rbRedraw(); toast(i.title + ' is back in All recipes.'); }
+// 2.28.1: delete a recipe. His own are removed; starters are hidden. Both come off his lists. Undo brings it all back.
+function rbDelete(id) {
+  const i = M().ideas.find(x => x.id === id); if (!i) return;
+  confirmSheet('Delete this recipe?', esc(i.title) + (i.builtin ? ' will be hidden. You can bring it back from All recipes … Show hidden recipes.' : ' will be removed.'), 'Delete', async () => {
+    const before = JSON.stringify(M().ideas), lists = localStorage.getItem(RB_KEY);
+    if (i.builtin) { i.hidden = true; i.fav = false; } else M().ideas = M().ideas.filter(x => x.id !== id);
+    const f = rbGet(); RB_LISTS.forEach(([k]) => { f.lists[k] = f.lists[k].filter(c => c.ideaId !== id); }); rbSave(f);
+    await save();
+    return () => { rbRedraw(); if (location.hash.startsWith('#recipe/')) go('#recipes'); toast('Deleted: ' + i.title, 'Undo', async () => { M().ideas = JSON.parse(before); try { if (lists !== null) localStorage.setItem(RB_KEY, lists); } catch (e) { } await save(); render(); }); };
+  });
+}
+// 2.28.1: add his own recipe from a website link (read through the relay; he checks it and ticks gluten free before saving)
+function rbLinkForm() {
+  openSheet('Add a recipe from a link', `<label class="field"><span>Recipe web link</span><input name="u" type="url" inputmode="url" placeholder="https://…" maxlength="500"></label><p class="muted" style="font-size:.85rem">I'll read the recipe from the page, then you can check and edit it before saving.</p>`, async v => {
+    if (!/^https?:\/\/\S+\.\S+/.test(v.u || '')) return 'Paste a full web link starting with https://';
+    if (!RELAY_URL) return 'The relay is not set up, so I can’t read links.';
+    const b = $('#sf button[type=submit]'); if (b) { b.disabled = true; b.textContent = 'Reading…'; }
+    let d = null; try { d = await getJSON(RELAY_URL + '/recipe?u=' + encodeURIComponent(v.u), 15000); } catch (e) { }
+    if (b) { b.disabled = false; b.textContent = 'Read it'; }
+    if (!d || d.error) return d && d.error === 'robots' ? 'That site doesn’t allow apps to read its pages. You can type the recipe in instead.' : 'Couldn’t read that page. Check the link, or type the recipe in instead.';
+    return () => rbPreview({ ...d, url: d.url || v.u });
+  }, 'Read it');
+}
+function rbPreview(d) {
+  const gfWord = /gluten[- ]?free|\bgf\b/i.test((d.title || '') + ' ' + (d.ingredients || []).join(' '));
+  openSheet('Check your recipe', `${d.found ? '' : '<p class="muted" style="font-size:.85rem">I couldn’t find the recipe details on that page, only its title and picture. Add the ingredients and steps yourself, or save it as a link.</p>'}
+    ${d.image ? `<img src="${esc(d.image)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:180px;object-fit:cover;border-radius:12px;margin-bottom:8px" onerror="this.remove()">` : ''}
+    <label class="field"><span>Title</span><input name="title" maxlength="120" value="${esc(d.title || '')}"></label>
+    <label class="field"><span>Picture link</span><input name="image" type="url" maxlength="800" value="${esc(d.image || '')}"></label>
+    <div style="display:flex;gap:8px"><label class="field" style="flex:1"><span>Serves</span><input name="serves" maxlength="40" value="${esc(d.serves || '')}"></label><label class="field" style="flex:1"><span>Time</span><input name="time" maxlength="40" value="${esc(d.time || '')}"></label></div>
+    <label class="field"><span>Ingredients (one per line)</span><textarea name="ingr" rows="7">${esc((d.ingredients || []).join('\n'))}</textarea></label>
+    <label class="field"><span>Method (one step per line)</span><textarea name="method" rows="7">${esc((d.steps || []).join('\n'))}</textarea></label>
+    <p class="muted" style="font-size:.85rem">From ${esc(d.site || '')} · <a href="${esc(d.url)}" target="_blank" rel="noopener">open the page ›</a>${gfWord ? '' : ' · This page doesn’t say gluten free – check every ingredient and swap anything with gluten.'}</p>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-weight:600;margin:6px 0"><input type="checkbox" name="gf" value="1" style="width:22px;height:22px;flex:none"> I’ve checked this recipe is gluten free (or edited it to be)</label>`, async v => {
+    if (!v.title) return 'Give the recipe a title.';
+    if (!v.gf) return 'Please tick the gluten-free box once you’ve checked it (or edited it to be).';
+    const host = (() => { try { return new URL(d.url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } })();
+    const r = { id: 'meal-link-' + Date.now(), title: v.title.slice(0, 120), tag: 'Mine', ingr: (v.ingr || '').split(/\n/).map(x => x.trim()).filter(Boolean).slice(0, 80), link: /^https?:\/\//.test(d.url) ? d.url.slice(0, 500) : '', notes: '', method: (v.method || '').split(/\n/).map(x => x.trim()).filter(Boolean).join('\n'), serves: v.serves || '', time: v.time || '', image: /^https:\/\//.test(v.image || '') ? v.image.slice(0, 800) : '', source: d.site || host, fav: false, hidden: false, gf: true, builtin: false };
+    M().ideas.unshift(r); await save();
+    return () => { rbRedraw(); toast('Saved to All recipes: ' + r.title); };
+  }, 'Save recipe');
+}
 const rbSel = cur => `<label class="field"><span>Move to…</span><select name="list"><option value="">${cur ? 'Remove from my lists' : 'Not in my lists'}</option>${RB_LISTS.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
 function rbMove(f, from, cid, to, card) { if (from) f.lists[from] = f.lists[from].filter(x => x.id !== cid); if (to && f.lists[to]) f.lists[to].unshift(card); rbSave(f); }
 function rbOpen(ideaId, k, cid) {
   const i = M().ideas.find(x => x.id === ideaId); if (!i) return;
-  openSheet(esc(i.title), `<div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>go('#recipe/${i.id}'))">Open recipe</button><button type="button" class="btn" onclick="closeSheet().then(()=>planRecipeForm('${i.id}'))">${I('cal')} Plan it</button><button type="button" class="btn" onclick="closeSheet().then(()=>recipeToShop('${i.id}'))">${I('cart')} Shopping list</button></div>` + rbSel(k),
-    v => { const f = rbGet(), c = (k && f.lists[k].find(x => x.id === cid)) || { id: 'rb' + Date.now(), ideaId, title: i.title }; if ((v.list || '') !== (k || '')) rbMove(f, k, cid, v.list, c); return () => rbRedraw(); }, 'Save');
+  openSheet(esc(i.title), `<div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>go('#recipe/${i.id}'))">Open recipe</button><button type="button" class="btn" onclick="closeSheet().then(()=>planRecipeForm('${i.id}'))">${I('cal')} Plan it</button><button type="button" class="btn" onclick="closeSheet().then(()=>recipeToShop('${i.id}'))">${I('cart')} Shopping list</button></div>` + (i.link ? `<p style="margin:4px 0"><a href="${esc(i.link)}" target="_blank" rel="noopener">Recipe source ›</a></p>` : '') + rbSel(k),
+    v => { const f = rbGet(), c = (k && f.lists[k].find(x => x.id === cid)) || { id: 'rb' + Date.now(), ideaId, title: i.title }; if ((v.list || '') !== (k || '')) rbMove(f, k, cid, v.list, c); return () => rbRedraw(); }, 'Save', `<button type="button" class="btn danger" onclick="closeSheet().then(()=>rbDelete(${jsArg(i.id)}))">Delete</button>`);
 }
 function rbAdd(k) { rbOpenCard(k, ''); }
 function rbOpenCard(k, id) {

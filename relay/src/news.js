@@ -228,3 +228,36 @@ export async function getLocalNews(env = {}, fetchImpl = fetch, now = Date.now()
 }
 
 export function resetNews() { mem = null; }
+// 2.28.1: recipe from a link. Reads schema.org Recipe JSON-LD (falls back to og:title / og:image). Robots.txt respected, 6 s, 1.5 MB max. Nothing is made up: missing fields stay empty.
+const strip = s => unent(String(s || '').replace(/<[^>]*>/g, ' ').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/&nbsp;/g, ' ').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')).replace(/\s+/g, ' ').trim();
+const isoDur = s => { const m = String(s || '').match(/^P(?:T)?(?:(\d+)H)?(?:(\d+)M)?/i); if (!m || (!m[1] && !m[2])) return ''; const h = +(m[1] || 0), mi = +(m[2] || 0), t = h * 60 + mi; return t >= 60 ? Math.floor(t / 60) + ' h' + (t % 60 ? ' ' + (t % 60) + ' min' : '') : t + ' min'; };
+function findRecipe(o, depth = 0) {
+  if (!o || typeof o !== 'object' || depth > 6) return null;
+  if (Array.isArray(o)) { for (const x of o) { const r = findRecipe(x, depth + 1); if (r) return r; } return null; }
+  const t = o['@type']; if (t === 'Recipe' || (Array.isArray(t) && t.includes('Recipe'))) return o;
+  return findRecipe(o['@graph'], depth + 1) || findRecipe(o.mainEntity, depth + 1);
+}
+const pickImg = (im, base) => { if (Array.isArray(im)) im = im[0]; if (im && typeof im === 'object') im = im.url || im.contentUrl; try { const x = new URL(String(im || ''), base); return x.protocol === 'https:' ? x.toString() : ''; } catch (e) { return ''; } };
+function steps(ins, out = [], d = 0) {
+  if (!ins || d > 4) return out;
+  if (typeof ins === 'string') { strip(ins).split(/\s*(?:\n|\r)\s*/).forEach(s => s && out.push(s)); return out; }
+  if (Array.isArray(ins)) { ins.forEach(x => steps(x, out, d + 1)); return out; }
+  if (ins.itemListElement) return steps(ins.itemListElement, out, d + 1);
+  if (ins.text || ins.name) out.push(strip(ins.text || ins.name));
+  return out;
+}
+export async function recipeFromUrl(url, fetchImpl = fetch) {
+  const u = new URL(url);
+  if (!(await robotsOk(u, fetchImpl))) return { error: 'robots' };
+  const r = await fetchImpl(u.toString(), { headers: { 'User-Agent': UA, Accept: 'text/html' }, redirect: 'follow', signal: AbortSignal.timeout(6000) });
+  if (!r.ok) return { error: 'http_' + r.status };
+  if (+(r.headers.get('content-length') || 0) > 1500000) return { error: 'too_big' };
+  const html = (await r.text()).slice(0, 1500000);
+  const meta = t => { const m = html.match(new RegExp('<meta[^>]+(?:property|name)=["\']' + t + '["\'][^>]*>', 'i')); const c = m && m[0].match(/content=["']([^"']*)["']/i); return c ? strip(c[1]) : ''; };
+  let rec = null;
+  for (const m of html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) { try { rec = findRecipe(JSON.parse(m[1].trim())); } catch (e) { } if (rec) break; }
+  const site = meta('og:site_name') || u.hostname.replace(/^www\./, '');
+  if (!rec) return { found: false, title: meta('og:title') || strip((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]), image: pickImg(meta('og:image'), u), ingredients: [], steps: [], site, url: u.toString() };
+  const y = rec.recipeYield; const serves = strip(Array.isArray(y) ? y[0] : y);
+  return { found: true, title: strip(rec.name) || meta('og:title'), image: pickImg(rec.image, u) || pickImg(meta('og:image'), u), ingredients: (Array.isArray(rec.recipeIngredient) ? rec.recipeIngredient : []).map(strip).filter(Boolean).slice(0, 80), steps: steps(rec.recipeInstructions).slice(0, 60), time: isoDur(rec.totalTime) || isoDur(rec.cookTime), serves: serves.slice(0, 40), site, url: u.toString() };
+}

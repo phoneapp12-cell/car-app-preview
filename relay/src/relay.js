@@ -47,7 +47,7 @@ import { getCouncilRoadworks } from './roadworks.js';
 import { getBridgeTraffic } from './bridge-traffic.js';
 import { getDrive } from './drive.js';
 import { getStoreBusy } from './busy.js';
-import { getLocalNews, ogImage } from './news.js';
+import { getLocalNews, ogImage, recipeFromUrl } from './news.js';
 import { getPlanning } from './planning.js';
 import { getBlogs } from './blogs.js';
 import { getRecs } from './recs.js';
@@ -380,6 +380,14 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
       const data = await getPlanning(env, fetchImpl);
       return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) { return json(502, 'planning_unavailable', origin, env); }
+  }
+  if (path === '/recipe') { // 2.28.1: recipe from a website link
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    let u = ''; try { const x = new URL(new URL(request.url).searchParams.get('u') || ''); if (/^https?:$/.test(x.protocol) && !/^(localhost|[\d.]+|\[)/.test(x.hostname) && !/\.(local|internal)$/.test(x.hostname)) u = x.toString(); } catch (e) { }
+    if (!u) return json(400, 'bad_url', origin, env);
+    let d; try { d = await recipeFromUrl(u, fetchImpl); } catch (e) { d = { error: 'fetch_failed' }; }
+    return new Response(JSON.stringify(d), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=3600' } });
   }
   if (path === '/ogimg') { // 2.27.94: link-preview picture for a recipe link (robots.txt respected, KV cached 7 days)
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
