@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.15';
+const APP_VERSION = '2.28.16';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6745,20 +6745,111 @@ function blogEmpty(id) {
 function blogNone(id) {
   return `<div class="list" id="${id}"><div class="row"><div class="ic blog">${I('pen')}</div><div class="tx"><div class="t">No posts</div><div class="s">None of the blogs had a post to show.</div></div></div></div>`;
 }
+const BLG_KEY = 'blogBoard', BLG_LISTS = [['saved', 'Saved to read'], ['read', 'Read']];
+const BLG_COLS = ['#0d9488', '#2563eb', '#7c3aed', '#d97706', '#db2777', '#16a34a', '#ea580c'];
+let BLG_ALL = {};
+function blgGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(BLG_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  BLG_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  return o;
+}
+function blgSave(o) { try { localStorage.setItem(BLG_KEY, JSON.stringify(o)); } catch (e) { } }
+function blgRestore(o) { if (o && o.lists && typeof o.lists === 'object') blgSave(o); }
+const blgCol = s => BLG_COLS[[...String(s || 'Blog')].reduce((a, c) => a + c.charCodeAt(0), 0) % BLG_COLS.length];
+function blgCard(p, tagOverride) {
+  const url = p.url || p.u || ''; if (!url) return '';
+  const title = p.title || p.t || url, src = p.blog || p.source || p.s || 'Blog', topic = p.topic || '';
+  const pub = p.published || p.at || '', summary = p.summary || '';
+  BLG_ALL[url] = { url, title, blog: src, topic, published: pub, summary };
+  const fl = typeof blogFlagged === 'function' && blogFlagged(url);
+  const lbls = [];
+  if (tagOverride) lbls.push(tagOverride);
+  else if (topic) lbls.push([topic, blgCol(topic)]);
+  lbls.push([src, blgCol(src)]);
+  if (fl) lbls.push(['🚩 Flagged', '#dc2626']);
+  const when = pub ? blogWhen(pub) : '';
+  return `<button type="button" class="tbcard" data-blogu="${esc(url)}" data-blogt="${esc(title)}" data-blogs="${esc(src)}" onclick="blgOpen(${jsArg(url)})"><div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(title)}</div>${summary ? `<div class="tbs">${esc(summary.length > 100 ? summary.slice(0, 98) + '…' : summary)}</div>` : ''}<div class="tbicons">${I('pen')}<span>${esc(when || src)}</span></div></div></button>`;
+}
+function blgMineCard(p) {
+  const sn = postSnippet(p);
+  return `<button type="button" class="tbcard" onclick="go('#blogging/${esc(p.id)}')"><div class="tbbody">${tbLbl([['✍️ Your post', '#ca8a04']])}<div class="tbt">${esc(p.title)}</div>${sn ? `<div class="tbs">${esc(sn)}</div>` : ''}<div class="tbicons">${I('pen')}<span>${esc(postStamp(p))}</span></div></div></button>`;
+}
+function blgBoardHtml() {
+  BLG_ALL = {};
+  const o = blgGet(), posts = blogPosts() || [], topics = (typeof RECS !== 'undefined' && RECS.topics && RECS.topics.data && Array.isArray(RECS.topics.data.items)) ? RECS.topics.data.items.filter(x => x && x.title && x.url && !isSport(x.title + ' ' + (x.summary || ''))) : [];
+  const flags = typeof blogFlags === 'function' ? blogFlags() : [];
+  const savedMap = new Map();
+  flags.forEach(f => { if (f && f.u) savedMap.set(f.u, { url: f.u, title: f.t || f.u, blog: f.s || 'Flagged', published: f.at || '' }); });
+  (o.lists.saved || []).forEach(c => { if (c && c.url && !savedMap.has(c.url)) savedMap.set(c.url, c); });
+  const savedList = [...savedMap.values()];
+  const byBlog = new Map();
+  posts.forEach(p => { const b = p.blog || 'Blogs'; if (!byBlog.has(b)) byBlog.set(b, []); byBlog.get(b).push(p); });
+  const recentCards = posts.slice(0, 20).map(p => blgCard(p)).join('');
+  const topicCards = topics.slice(0, 20).map(x => blgCard({ url: x.url, title: x.title, blog: x.source || 'Blog', topic: x.topic || 'For you', published: x.published, summary: x.summary })).join('');
+  const blogCols = [...byBlog.entries()].map(([name, arr], i) => tbList('b_' + i, name, arr.length, arr.map(p => blgCard(p)).join(''), false, 'blg', 'No posts')).join('');
+  const mine = postsSorted();
+  return tbList('recent', 'Recent posts', posts.length, recentCards, false, 'blg', blogBusy ? 'Checking the blogs…' : 'No posts right now') +
+    (topics.length ? tbList('topics', 'Topics for you', Math.min(20, topics.length), topicCards, false, 'blg', 'No topic picks yet') : '') +
+    blogCols +
+    tbList('saved', 'Flagged & Saved', savedList.length, savedList.map(c => blgCard(c, ['📌 Saved', '#2563eb'])).join(''), true, 'blg', 'Tap a post to flag or save it here') +
+    tbList('read', 'Read', (o.lists.read || []).length, (o.lists.read || []).map(c => blgCard(c, ['✓ Read', '#16a34a'])).join(''), false, 'blg', 'Posts you open show here') +
+    tbList('mine', 'Your posts', mine.length, mine.map(blgMineCard).join(''), true, 'blg', 'Write a post of your own (stays on this phone)');
+}
+function blgRedraw() { const el = document.getElementById('blglists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = blgBoardHtml(); el.scrollLeft = x; }
+function blgMarkRead(url) {
+  const c = BLG_ALL[url]; if (!c) return;
+  const o = blgGet();
+  if (!o.lists.read.some(x => x.url === url)) { o.lists.read.unshift(c); o.lists.read = o.lists.read.slice(0, 100); blgSave(o); }
+  setTimeout(() => { if (!sheetOpen) blgRedraw(); }, 300);
+}
+function blgOpen(url) {
+  const c = BLG_ALL[url]; if (!c) return;
+  const o = blgGet(), fl = typeof blogFlagged === 'function' && blogFlagged(url);
+  const inSaved = fl || o.lists.saved.some(x => x.url === url), inRead = o.lists.read.some(x => x.url === url);
+  openSheet(esc(c.title), `<p class="muted" style="margin:0 0 8px">${esc([c.topic, c.blog, c.published ? blogWhen(c.published) : ''].filter(Boolean).join(' · '))}</p>
+    ${c.summary ? `<p style="margin:0 0 12px">${esc(c.summary)}</p>` : ''}
+    <div class="btns" style="margin-bottom:12px">
+      <a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener" onclick="blgMarkRead(${jsArg(url)})">${I('ext')} Read article ›</a>
+      <button type="button" class="btn" onclick="blogFlagToggle(${jsArg(url)},${jsArg(c.title)},${jsArg(c.blog)}).then(()=>closeSheet()).then(()=>blgRedraw())">${fl ? '🚩 Unflag' : '🚩 Flag to Notifications'}</button>
+    </div>
+    <div class="tbmove"><div class="lbl">Move to…</div><div class="chips">
+      <button type="button" class="chip${inSaved ? ' on' : ''}" onclick="blgMove(${jsArg(url)},'saved')">📌 Flagged & Saved</button>
+      <button type="button" class="chip${inRead ? ' on' : ''}" onclick="blgMove(${jsArg(url)},'read')">✓ Read</button>
+      ${inSaved || inRead ? `<button type="button" class="chip" onclick="blgMove(${jsArg(url)},'')">Remove from my lists</button>` : ''}
+    </div></div>`, null);
+}
+async function blgMove(url, target) {
+  const c = BLG_ALL[url]; if (!c) return;
+  const o = blgGet();
+  BLG_LISTS.forEach(([k]) => { o.lists[k] = (o.lists[k] || []).filter(x => x.url !== url); });
+  if (target && o.lists[target]) o.lists[target].unshift(c);
+  if (!target && typeof blogFlagged === 'function' && blogFlagged(url)) { S.settings.blogFlags = blogFlags().filter(f => f.u !== url); await save(); }
+  blgSave(o); await closeSheet(); blgRedraw();
+  toast(target === 'saved' ? 'Saved to read.' : target === 'read' ? 'Moved to Read.' : 'Removed from your lists.');
+}
+function blgAdd(k) {
+  if (k === 'mine') { postForm(); return; }
+  openSheet('Save a blog link', `<label class="field"><span>Article link (https://)</span><input name="url" type="url" required placeholder="https://…"></label><label class="field"><span>Title</span><input name="title" maxlength="160" required placeholder="Article title"></label><label class="field"><span>Blog / source (optional)</span><input name="blog" maxlength="80" placeholder="e.g. Wait But Why"></label>`,
+    v => { const u = blogHttps(v.url); if (!u) return 'Please enter a valid https:// link.'; if (!v.title) return 'Please give it a title.';
+      const o = blgGet(); o.lists.saved = o.lists.saved.filter(x => x.url !== u); o.lists.saved.unshift({ url: u, title: v.title.slice(0, 160), blog: (v.blog || 'Saved link').slice(0, 80), published: new Date().toISOString() }); blgSave(o); return () => blgRedraw(); }, 'Save');
+}
+function blgMenu(k) {
+  openSheet('Blogging', `<p class="muted" style="margin:0 0 10px">Swipe sideways between blog columns, and scroll up and down inside each column. Tap any article to read it, flag it or move it to Saved / Read.</p>
+    <div class="btns" style="flex-direction:column;align-items:stretch">
+      <button type="button" class="btn primary" onclick="closeSheet().then(()=>postForm())">${I('pen')} Write a post of your own</button>
+      <button type="button" class="btn" onclick="closeSheet().then(()=>{refreshBlogs(true);loadRecs(true);toast('Refreshing blogs…')})">${I('refresh')} Refresh blogs</button>
+      <button type="button" class="btn" onclick="closeSheet().then(()=>go('#blogging/mine'))">Open Your posts (${(S.posts || []).length})</button>
+    </div>`, null);
+}
 function Blogging() {
-  const posts = blogPosts();
-  const failed = blogFailures();
-  let body;
-  if (!posts) body = blogEmpty('bloglist');
-  else if (!posts.length && !(failed && failed.length)) body = blogNone('bloglist');
-  else body = `<div class="list" id="bloglist">${posts.map(blogRow).join('')}${(failed || []).map(blogFailRow).join('')}</div>`;
+  try { if (!BLOGFEED && !blogBusy) refreshBlogs(false); } catch (e) { }
   const src = (BLOGFEED && BLOGFEED.data && BLOGFEED.data.blogs || []).filter(b => b && b.name && blogHttps(b.home));
   const links = src.map(b => `<a href="${esc(blogHttps(b.home))}" target="_blank" rel="noopener">${esc(b.name)}</a>`).join(' · ');
-  const n = (S.posts || []).length;
-  return header('Blogging', 'Posts from other blogs') +
-    `<div class="sec">Recent posts <button onclick="refreshBlogs(true)">${blogBusy ? 'Updating…' : 'Refresh'}</button></div>` +
-    body +
-    `<div class="foot">${links ? 'From ' + links + '. ' : ''}Tap a post to open it. This page refreshes when you open it, when you come back to the app, and about every 30 minutes while it stays open. <a href="#blogging/mine">Your posts</a>${n ? ' (' + n + ')' : ''} stay on this phone.</div>`;
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0d9488,#0f172a)"></div>
+    <div class="tbtop"><h1>Blogging</h1><div style="display:flex;gap:6px"><button class="iconbtn" aria-label="Write a post" title="Write a post" onclick="postForm()">${I('plus')}</button><button class="iconbtn" aria-label="Refresh blogs" title="Refresh" onclick="refreshBlogs(true)">${I('refresh')}</button></div></div>
+    <div class="tblists" id="blglists">${blgBoardHtml()}</div></div>
+    <div class="foot">${links ? 'From ' + links + '. ' : ''}Swipe sideways between lists. Tap a card to read, flag or move it. <a href="#blogging/mine">Your posts</a> stay on this phone.</div>`;
 }
 function postsSorted() {
   return (S.posts || []).slice().sort((a, b) => (b.created || 0) - (a.created || 0) || (b.updated || 0) - (a.updated || 0));
@@ -6940,19 +7031,80 @@ function podEmpty(id) {
 function podNone(id) {
   return `<div class="list" id="${id}"><div class="row"><div class="ic pod">${I('podcast')}</div><div class="tx"><div class="t">No episodes</div><div class="s">None of the podcasts had an episode to show.</div></div></div></div>`;
 }
+const PDB_KEY = 'podcastBoard', PDB_LISTS = [['queue', 'Queue / Saved'], ['listened', 'Listened']];
+const PDB_COLS = ['#9333ea', '#2563eb', '#0d9488', '#db2777', '#ea580c', '#16a34a'];
+let PDB_ALL = {};
+function pdbGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(PDB_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  PDB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  return o;
+}
+function pdbSave(o) { try { localStorage.setItem(PDB_KEY, JSON.stringify(o)); } catch (e) { } }
+function pdbRestore(o) { if (o && o.lists && typeof o.lists === 'object') pdbSave(o); }
+const pdbCol = s => PDB_COLS[[...String(s || 'Podcast')].reduce((a, c) => a + c.charCodeAt(0), 0) % PDB_COLS.length];
+function pdbKeyOf(p) { return String(p.audio || p.url || p.title || '').slice(0, 220); }
+function pdbCard(p, tagOverride) {
+  const k = pdbKeyOf(p); if (!k) return '';
+  PDB_ALL[k] = p;
+  const lbls = [];
+  if (tagOverride) lbls.push(tagOverride);
+  if (p.show) lbls.push([p.show, pdbCol(p.show)]);
+  if (p.audio) lbls.push(['▶ Audio', '#0284c7']);
+  const when = p.published ? podWhen(p.published) : '';
+  return `<button type="button" class="tbcard" onclick="pdbOpen(${jsArg(k)})"><div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(p.title)}</div>${p.summary ? `<div class="tbs">${esc(p.summary.length > 95 ? p.summary.slice(0, 93) + '…' : p.summary)}</div>` : ''}<div class="tbicons">${I('podcast')}<span>${esc(when || p.show || 'Episode')}</span></div></div></button>`;
+}
+function pdbBoardHtml() {
+  PDB_ALL = {};
+  const o = pdbGet(), episodes = podEpisodes() || [];
+  const byShow = new Map();
+  episodes.forEach(e => { const s = e.show || 'Podcast'; if (!byShow.has(s)) byShow.set(s, []); byShow.get(s).push(e); });
+  const recentCards = episodes.slice(0, 20).map(e => pdbCard(e)).join('');
+  const showCols = [...byShow.entries()].map(([name, arr], i) => tbList('s_' + i, name, arr.length, arr.map(e => pdbCard(e)).join(''), false, 'pdb', 'No episodes')).join('');
+  return tbList('new', 'New episodes', episodes.length, recentCards, false, 'pdb', podBusy ? 'Checking the podcasts…' : 'No episodes right now') +
+    showCols +
+    tbList('queue', 'Queue / Saved', (o.lists.queue || []).length, (o.lists.queue || []).map(e => pdbCard(e, ['📌 Queue', '#2563eb'])).join(''), false, 'pdb', 'Tap an episode, then Move to… Queue') +
+    tbList('listened', 'Listened', (o.lists.listened || []).length, (o.lists.listened || []).map(e => pdbCard(e, ['✓ Listened', '#16a34a'])).join(''), false, 'pdb', 'Episodes you play show here');
+}
+function pdbRedraw() { const el = document.getElementById('pdblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = pdbBoardHtml(); el.scrollLeft = x; }
+function pdbMarkListened(k) {
+  const p = PDB_ALL[k]; if (!p) return;
+  const o = pdbGet();
+  if (!o.lists.listened.some(x => pdbKeyOf(x) === k)) { o.lists.listened.unshift(p); o.lists.listened = o.lists.listened.slice(0, 100); pdbSave(o); }
+}
+function pdbOpen(k) {
+  const p = PDB_ALL[k]; if (!p) return;
+  const o = pdbGet(), inQ = o.lists.queue.some(x => pdbKeyOf(x) === k), inL = o.lists.listened.some(x => pdbKeyOf(x) === k);
+  openSheet(esc(p.title), `<p class="muted" style="margin:0 0 8px">${esc([p.show, p.published ? podWhen(p.published) : ''].filter(Boolean).join(' · '))}</p>
+    ${p.summary ? `<p style="margin:0 0 12px">${esc(p.summary)}</p>` : ''}
+    ${p.audio ? `<div style="margin:0 0 12px"><audio controls preload="metadata" src="${esc(p.audio)}" style="width:100%" onplay="pdbMarkListened(${jsArg(k)})"></audio></div>` : ''}
+    ${p.url ? `<div class="btns" style="margin-bottom:12px"><a class="btn primary" href="${esc(p.url)}" target="_blank" rel="noopener" onclick="pdbMarkListened(${jsArg(k)})">${I('ext')} Open episode page ›</a></div>` : ''}
+    <div class="tbmove"><div class="lbl">Move to…</div><div class="chips">
+      <button type="button" class="chip${inQ ? ' on' : ''}" onclick="pdbMove(${jsArg(k)},'queue')">📌 Queue / Saved</button>
+      <button type="button" class="chip${inL ? ' on' : ''}" onclick="pdbMove(${jsArg(k)},'listened')">✓ Listened</button>
+      ${inQ || inL ? `<button type="button" class="chip" onclick="pdbMove(${jsArg(k)},'')">Remove from my lists</button>` : ''}
+    </div></div>`, null);
+}
+async function pdbMove(k, target) {
+  const p = PDB_ALL[k]; if (!p) return;
+  const o = pdbGet();
+  PDB_LISTS.forEach(([j]) => { o.lists[j] = (o.lists[j] || []).filter(x => pdbKeyOf(x) !== k); });
+  if (target && o.lists[target]) o.lists[target].unshift(p);
+  pdbSave(o); await closeSheet(); pdbRedraw();
+  toast(target === 'queue' ? 'Added to Queue.' : target === 'listened' ? 'Marked as Listened.' : 'Removed from your lists.');
+}
+function pdbMenu(k) {
+  openSheet('Podcasts', `<p class="muted" style="margin:0 0 10px">Swipe sideways between podcast shows and lists, and scroll up and down inside each list. Tap any episode to listen inline, open its page, or add it to your Queue.</p>
+    <div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>{refreshPodcasts(true);toast('Refreshing podcasts…')})">${I('refresh')} Refresh episodes</button></div>`, null);
+}
 function Podcasts() {
-  const episodes = podEpisodes();
-  const failed = podFailures();
-  let body;
-  if (!episodes) body = podEmpty('podlist');
-  else if (!episodes.length && !(failed && failed.length)) body = podNone('podlist');
-  else body = `<div class="list" id="podlist">${episodes.map(podRow).join('')}${(failed || []).map(podFailRow).join('')}</div>`;
+  try { if (!PODFEED && !podBusy) refreshPodcasts(false); } catch (e) { }
   const src = (PODFEED && PODFEED.data && PODFEED.data.podcasts || []).filter(b => b && b.name && podHttps(b.home));
   const links = src.map(b => `<a href="${esc(podHttps(b.home))}" target="_blank" rel="noopener">${esc(b.name)}</a>`).join(' · ');
-  return header('Podcasts', 'Episodes from other people’s podcasts') +
-    `<div class="sec">Recent episodes <button onclick="refreshPodcasts(true)">${podBusy ? 'Updating…' : 'Refresh'}</button></div>` +
-    body +
-    `<div class="foot">${links ? 'From ' + links + '. ' : ''}Tap play to listen here when the episode is an ordinary https recording. Otherwise tap the title to open the episode. This page refreshes when you open it, when you come back to the app, and about every 30 minutes while it stays open.</div>`;
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#7c3aed,#0f172a)"></div>
+    <div class="tbtop"><h1>Podcasts</h1><button class="iconbtn" aria-label="Refresh podcasts" title="Refresh" onclick="refreshPodcasts(true)">${I('refresh')}</button></div>
+    <div class="tblists" id="pdblists">${pdbBoardHtml()}</div></div>
+    <div class="foot">${links ? 'From ' + links + '. ' : ''}Swipe sideways between shows. Tap an episode to play it inline or add it to your Queue.</div>`;
 }
 
 
@@ -14077,27 +14229,101 @@ function Meds() {
     `<div id="medlist">${medList()}</div><div class="btns"><button class="btn primary" onclick="medForm()">${I('plus')} Add a pill</button></div>
     <div class="foot">Ticks and pills stay with your My App data. The dots show the last 7 days.</div>`;
 }
+const EVB_KEY = 'eventsBoard', EVB_LISTS = [['going', 'Interested / Going'], ['been', 'Been']];
+let EVB_ALL = {};
+function evbGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(EVB_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  EVB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  return o;
+}
+function evbSave(o) { try { localStorage.setItem(EVB_KEY, JSON.stringify(o)); } catch (e) { } }
+function evbRestore(o) { if (o && o.lists && typeof o.lists === 'object') evbSave(o); }
+function evbCard(e, tagOverride) {
+  if (!e || !e.id) return '';
+  EVB_ALL[e.id] = e;
+  const T = todayISO(), d = e.date ? daysLeft(e.date) : null;
+  const when = (d === 0 ? 'Today · ' : d === 1 ? 'Tomorrow · ' : e.date ? fmtW(e.date) + ' · ' : '') + evWhen(e);
+  const fl = typeof evFlagged === 'function' && evFlagged(e.id), ap = evAppt(e.id);
+  const isMkt = (e.cats || []).includes('Markets') || /\bmarkets?\b|\bbazaar\b/i.test(e.title || '');
+  const lbls = [];
+  if (tagOverride) lbls.push(tagOverride);
+  else if (d != null && d <= 0) lbls.push(['📅 Today', '#dc2626']);
+  else if (isMkt) lbls.push(['🧺 Market', '#16a34a']);
+  else if ((e.cats || [])[0]) lbls.push([(e.cats || [])[0], '#0284c7']);
+  else lbls.push(['Whangārei', '#0d9488']);
+  if (fl) lbls.push(['🚩 Flagged', '#d97706']);
+  if (ap) lbls.push(['✓ In calendar', '#16a34a']);
+  const cover = isWhangareiGrowersMarket(e) ? `<div class="tbcover" style="aspect-ratio:16/9;overflow:hidden;background:#0f172a"><img src="${GROWERS_MARKET_PIC}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : '';
+  const ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',') : '';
+  return `<button type="button" class="tbcard" onclick="evbOpen(${jsArg(e.id)})">${cover}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(e.title)}</div><div class="tbs">${esc([when, ven].filter(Boolean).join(' · '))}</div>${e.cost ? `<div class="tbicons">${I('ticket')}<span>${esc(e.cost)}</span></div>` : ''}</div></button>`;
+}
+function evbBoardHtml() {
+  EVB_ALL = {};
+  const o = evbGet(), T = todayISO(), wk = addDays(T, 7);
+  const list = upcomingEvents().filter(evMatches);
+  const thisWeek = list.filter(e => e.date <= wk);
+  const markets = list.filter(e => (e.cats || []).includes('Markets') || /\bmarkets?\b|\bbazaar\b/i.test(e.title || ''));
+  const shows = list.filter(e => !markets.includes(e) && (e.cats || []).some(c => /show|music|art|exhibition|theatre|festival|kids|family/i.test(c)));
+  const coming = list.filter(e => e.date > wk && !markets.includes(e));
+  const flags = typeof evFlags === 'function' ? Object.values(evFlags()) : [];
+  const goingMap = new Map();
+  flags.forEach(f => { if (f && f.id) goingMap.set(f.id, evById(f.id) || f); });
+  (o.lists.going || []).forEach(c => { if (c && c.id && !goingMap.has(c.id)) goingMap.set(c.id, c); });
+  list.filter(e => evAppt(e.id)).forEach(e => { if (!goingMap.has(e.id)) goingMap.set(e.id, e); });
+  const goingList = [...goingMap.values()];
+  return tbList('week', 'Today & this week', thisWeek.length, thisWeek.map(e => evbCard(e)).join(''), false, 'evb', 'Nothing listed this week') +
+    tbList('markets', 'Markets & community', markets.length, markets.map(e => evbCard(e)).join(''), false, 'evb', 'No markets listed') +
+    (shows.length ? tbList('shows', 'Shows, arts & family', shows.length, shows.map(e => evbCard(e)).join(''), false, 'evb', 'No shows listed') : '') +
+    tbList('coming', 'Coming up', coming.length, coming.map(e => evbCard(e)).join(''), false, 'evb', 'Nothing further ahead') +
+    tbList('going', 'Flagged / Going', goingList.length, goingList.map(e => evbCard(e, ['🚩 Going', '#2563eb'])).join(''), true, 'evb', 'Flag an event or tap + Add a card') +
+    tbList('been', 'Been', (o.lists.been || []).length, (o.lists.been || []).map(e => evbCard(e, ['✓ Been', '#16a34a'])).join(''), false, 'evb', 'Events you mark as been show here');
+}
+function evbRedraw() { const el = document.getElementById('evblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = evbBoardHtml(); el.scrollLeft = x; }
+function evbOpen(id) {
+  const e = EVB_ALL[id] || evById(id); if (!e) return;
+  const o = evbGet(), fl = typeof evFlagged === 'function' && evFlagged(e.id), ap = evAppt(e.id);
+  const inGoing = fl || !!ap || o.lists.going.some(x => x.id === e.id), inBeen = o.lists.been.some(x => x.id === e.id);
+  const when = (e.date ? fmtW(e.date) + (e.end && e.end !== e.date ? ' – ' + fmtW(e.end) : '') : '') + (e.time ? ' · ' + evWhen(e) : '');
+  openSheet(esc(e.title), `<p class="muted" style="margin:0 0 8px">${esc([when, e.venue, e.cost].filter(Boolean).join(' · '))}${evDuringWork(e) ? ' · ⚠️ during your shift' : ''}</p>
+    ${e.desc ? `<p style="margin:0 0 12px">${esc(e.desc)}</p>` : ''}
+    <div class="btns" style="margin-bottom:12px">
+      ${ap ? `<button type="button" class="btn" onclick="closeSheet().then(()=>apptForm('${ap.id}'))">${I('check')} In calendar</button>` : `<button type="button" class="btn primary" onclick="addEvent(${jsArg(e.id)}).then(()=>closeSheet()).then(()=>evbRedraw())">${I('plus')} Add to calendar</button>`}
+      ${e.url ? `<a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener">Details ${I('ext')}</a>` : ''}
+      <button type="button" class="btn" onclick="evFlagToggle(${jsArg(e.id)}).then(()=>closeSheet()).then(()=>evbRedraw())">${fl ? '🚩 Unflag' : '🚩 Flag'}</button>
+    </div>
+    <div class="tbmove"><div class="lbl">Move to…</div><div class="chips">
+      <button type="button" class="chip${inGoing ? ' on' : ''}" onclick="evbMove(${jsArg(e.id)},'going')">🚩 Flagged / Going</button>
+      <button type="button" class="chip${inBeen ? ' on' : ''}" onclick="evbMove(${jsArg(e.id)},'been')">✓ Been</button>
+      ${inGoing || inBeen ? `<button type="button" class="chip" onclick="evbMove(${jsArg(e.id)},'')">Remove from my lists</button>` : ''}
+    </div></div>`, null);
+}
+async function evbMove(id, target) {
+  const e = EVB_ALL[id] || evById(id); if (!e) return;
+  const o = evbGet();
+  EVB_LISTS.forEach(([k]) => { o.lists[k] = (o.lists[k] || []).filter(x => x.id !== id); });
+  if (target && o.lists[target]) o.lists[target].unshift(e);
+  evbSave(o); await closeSheet(); evbRedraw();
+  toast(target === 'going' ? 'Added to Flagged / Going.' : target === 'been' ? 'Moved to Been.' : 'Removed from your lists.');
+}
+function evbAdd(k) {
+  openSheet('Add an event card', `<label class="field"><span>Event title</span><input name="title" maxlength="120" required placeholder="e.g. Whangārei Night Market"></label><label class="field"><span>Date</span><input name="date" type="date" value="${todayISO()}"></label><label class="field"><span>Venue (optional)</span><input name="venue" maxlength="100" placeholder="e.g. Town Basin"></label>`,
+    v => { if (!v.title) return 'Please give the event a title.'; const o = evbGet(); o.lists[k || 'going'].unshift({ id: uid('evb'), title: v.title.slice(0, 120), date: v.date || todayISO(), venue: (v.venue || '').slice(0, 100), cats: ['Custom'] }); evbSave(o); return () => evbRedraw(); }, 'Add card');
+}
+function evbMenu(k) {
+  openSheet('Events', `<p class="muted" style="margin:0 0 10px">Swipe sideways between event columns, and scroll up and down inside each column. Tap any event to add it to your calendar, flag it, or open its page.</p>
+    <div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>{refreshEvents(true);toast('Refreshing events…')})">${I('refresh')} Refresh events</button><button type="button" class="btn" onclick="closeSheet().then(()=>evbAdd('going'))">${I('plus')} Add event card</button></div>`, null);
+}
 function Events() {
-  const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
-  const head = back + header('Events', 'What’s on in Whangārei · next 60 days');
-  const src = `<a href="${WDC_WHATSON}" target="_blank" rel="noopener">Whangārei District Council’s What’s On</a>, <a href="https://www.eventfinda.co.nz/whatson/events/whangarei" target="_blank" rel="noopener">Eventfinda</a> (gigs, comedy, shows and nightlife), <a href="https://www.eventcinemas.co.nz/Cinema/Whangarei" target="_blank" rel="noopener">Event Cinemas</a> and local markets`;
-  const town = `<div class="card" id="towncard"><div class="t" style="font-weight:800;margin-bottom:6px">Around town</div>
-    <div class="s">Movies are at Event Cinemas, 18 James Street. CineNexus has been mentioned for Bank Street, but there’s no opening date, so the sessions here are Event’s.</div>
-    <div class="s" style="margin-top:6px">Worth a look when something’s on: the Butter Factory at 8 Butter Factory Lane and 1905 for live music, Octagon Theatre and Forum North for shows, Quarry Arts Centre and Reyburn House for art, and McKay Stadium for expos. The Canopy Night Market is Friday evenings at the Town Basin in season.</div></div>` + homeTry('akl concerts', () => aklConcertsCard(), '');
-  try { setTimeout(() => { loadAklConcerts(); }, 0); } catch (e) {}
-  if (!EVS) {
-    if (evBusy || (!evFailed && navigator.onLine !== false)) return head + town + `<div class="card empty"><div class="t">Loading events…</div><div class="s">Getting what’s on from the council’s events page, plus movies and markets.</div></div>`;
-    return head + town + `<div class="card empty" id="everr"><div class="t">Couldn’t load events</div><div class="s">Check your internet connection and try again. You can also look at ${src}.</div>
-      <button class="btn primary" style="flex:none;padding:12px 22px" onclick="refreshEvents(true)">${I('refresh')} Try again</button></div>`;
-  }
-  const up = upcomingEvents(), cats = evCats();
-  return head + town +
-    (evFailed ? `<div class="callout">${I('wifi')}<div>Couldn’t refresh events just now. Showing the list saved on this phone (${ago(EVS.at)}). <button style="color:inherit;font-weight:700;text-decoration:underline" onclick="refreshEvents(true)">Try again</button></div></div>` : '') +
-    (up.length ? `<label class="search">${I('search')}<input id="evq" type="search" placeholder="Search events" value="${esc(evQuery)}" aria-label="Search events" oninput="evQuery=this.value;document.getElementById('evlist').innerHTML=evList()"></label>
-      ${cats.length ? `<div class="chips scroll">${['All', ...cats].map(c => `<button class="chip ${c === evCat ? 'on' : ''}" onclick="setEvCat(${jsArg(c)})">${esc(c)}</button>`).join('')}</div>` : ''}
-      <div id="evlist">${evList()}</div>`
-      : `<div class="card empty"><div class="t">Nothing listed right now</div><div class="s">Have a look at ${src} for anything new.</div></div>`) +
-    `<div class="foot">Events from ${src}. Movies and markets are added alongside the council’s list. Check times and details with the organiser before you go.<br>Updated ${ago(EVS.data.updated ? Date.parse(EVS.data.updated) : EVS.at)}</div>`;
+  try { setTimeout(() => { loadAklConcerts(); if (!EVS && !evBusy) refreshEvents(false); }, 0); } catch (e) {}
+  const src = `<a href="${WDC_WHATSON}" target="_blank" rel="noopener">Whangārei District Council’s What’s On</a>, <a href="https://www.eventfinda.co.nz/whatson/events/whangarei" target="_blank" rel="noopener">Eventfinda</a> and local markets`;
+  const cats = evCats();
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0284c7,#0f172a)"></div>
+    <div class="tbtop"><h1>Events</h1><button class="iconbtn" aria-label="Refresh events" onclick="refreshEvents(true)">${I('refresh')}</button></div>
+    <div style="padding:0 4px 10px"><label class="search" style="margin:0 0 8px">${I('search')}<input id="evq" type="search" placeholder="Search Whangārei events…" value="${esc(evQuery)}" aria-label="Search events" oninput="evQuery=this.value;evbRedraw()"></label>
+    ${cats.length ? `<div class="chips scroll">${['All', ...cats].map(c => `<button class="chip ${c === evCat ? 'on' : ''}" onclick="evCat=${jsArg(c)};evbRedraw()">${esc(c)}</button>`).join('')}</div>` : ''}</div>
+    <div class="tblists" id="evblists">${evbBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists. Events from ${src}. Tap any card to add to your calendar, flag or move.</div>`;
 }
 async function addEvent(id) {
   const e = evById(id);
@@ -17125,7 +17351,7 @@ function primeList() {
 async function loadPrime(force) {
   if (!RELAY_URL || navigator.onLine === false) return;
   if (!force && PRIME && Date.now() - Date.parse(PRIME.checked || 0) < 12 * 3600e3) return;
-  try { const r = await fetch(RELAY_URL + '/prime', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items) && d.items.length) { PRIME = { checked: new Date().toISOString(), source: d.source, items: d.items }; try { localStorage.setItem('primeNew', JSON.stringify(PRIME)); } catch (e) { } if (location.hash === '#home' || !location.hash) render(); } } catch (e) { }
+  try { const r = await fetch(RELAY_URL + '/prime', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items) && d.items.length) { PRIME = { checked: new Date().toISOString(), source: d.source, items: d.items }; try { localStorage.setItem('primeNew', JSON.stringify(PRIME)); } catch (e) { } if (location.hash === '#prime') prRedraw(); else if (location.hash === '#home' || !location.hash) render(); } } catch (e) { }
 }
 setTimeout(() => loadPrime(), 4000); setInterval(() => loadPrime(), 6 * 3600e3);
 
@@ -17242,14 +17468,97 @@ function NetflixPage() {
     <div class="tblists" id="nflists">${nfBoardHtml()}</div></div>
     <div class="foot">Swipe sideways between lists, and scroll up and down inside each list. Titles and links come from Netflix’s “New on Netflix” emails in your Outlook.</div>`;
 }
+const PR_KEY = 'primeBoard', PR_LISTS = [['want', 'Want to watch'], ['watching', 'Watching'], ['watched', 'Watched']];
+let PR_ALL = {};
+function prbGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(PR_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  PR_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  return o;
+}
+function prbSave(o) { try { localStorage.setItem(PR_KEY, JSON.stringify(o)); } catch (e) { } }
+function prbRestore(o) { if (o && o.lists && typeof o.lists === 'object') prbSave(o); }
+function prUrlOf(x) {
+  return 'https://www.primevideo.com/search/ref=atv_nb_sr?phrase=' + encodeURIComponent((x && x.title) || '');
+}
+function prCard(x, kind, sub) {
+  const key = String(x.title || '').toLowerCase();
+  PR_ALL[key] = Object.assign({}, x, { key, sub, kind });
+  const series = /\b(season\s+\d+|series|s\d+e\d+|episode)\b/i.test(x.title || '');
+  const lbls = [[kind === 'coming' ? '🍿 Coming soon' : '📺 New on Prime', kind === 'coming' ? '#d97706' : '#0284c7']];
+  lbls.push([series ? 'Series' : 'Movie / Show', series ? '#7c3aed' : '#0d9488']);
+  return `<button type="button" class="tbcard" onclick="prOpen(${jsArg(key)})"><div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div>${sub ? `<div class="tbs">${esc(sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Search in Prime Video</span></div></div></button>`;
+}
+function prUserCard(k, c) {
+  const col = k === 'want' ? '#2563eb' : k === 'watching' ? '#d97706' : '#16a34a';
+  const lbl = (PR_LISTS.find(x => x[0] === k) || [])[1] || '';
+  return `<button type="button" class="tbcard" onclick="prOpenCard('${k}',${jsArg(c.id)})"><div class="tbbody">${tbLbl([[lbl, col]])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.length > 90 ? c.note.slice(0, 88) + '…' : c.note)}</div>` : c.sub ? `<div class="tbs">${esc(c.sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Prime Video</span>${c.note ? '<span class="tbdesc" aria-label="Has a note">≡</span>' : ''}</div></div></button>`;
+}
+function prBoardHtml() {
+  PR_ALL = {};
+  const o = prbGet(), t = todayISO(), ok = x => x && x.title && /^\d{4}-\d\d-\d\d$/.test(x.date || '');
+  const L = PRIME && Array.isArray(PRIME.items) ? PRIME.items.filter(ok) : [];
+  const F = L.filter(x => x.date <= t && daysLeft(x.date) >= -31).sort((a, b) => b.date.localeCompare(a.date));
+  const C = L.filter(x => x.date > t).sort((a, b) => a.date.localeCompare(b.date));
+  const fr = F.map(x => prCard(x, 'new', 'Added ' + fmtW(x.date))).join('');
+  const co = C.map(x => prCard(x, 'coming', 'From ' + fmtW(x.date))).join('');
+  return tbList('new', 'New on Prime', F.length, fr, false, 'pr', PRIME ? 'Nothing listed right now' : 'Checking Prime Video NZ releases…') +
+    tbList('coming', 'Coming soon', C.length, co, false, 'pr', 'Nothing listed as coming soon') +
+    PR_LISTS.map(([k, t2]) => tbList(k, t2, o.lists[k].length, o.lists[k].map(c => prUserCard(k, c)).join(''), true, 'pr', 'Tap a title or + Add a card')).join('');
+}
+function prRedraw() { const el = document.getElementById('prlists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = prBoardHtml(); el.scrollLeft = x; }
+function prOpen(key) {
+  const x = PR_ALL[key]; if (!x) return;
+  const o = prbGet(), url = prUrlOf(x);
+  const where = PR_LISTS.filter(([k]) => o.lists[k].some(c => (c.title || '').toLowerCase() === (x.title || '').toLowerCase())).map(([, t]) => t);
+  openSheet(esc(x.title), `${x.sub ? `<p class="muted" style="margin:0 0 10px">${esc(x.sub)} · opens Prime Video search</p>` : ''}
+    <div class="btns" style="margin-bottom:12px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>openStreamUrl('prime',${jsArg(url)}))">${I('tv')} Open in Prime Video</button></div>
+    <div class="tbmove"><div class="lbl">Move to…</div>${where.length ? `<div class="muted" style="font-size:.8125rem;margin-bottom:6px">Already in ${esc(where.join(', '))}</div>` : ''}<div class="chips">${PR_LISTS.map(([k, t]) => `<button type="button" class="chip" onclick="prCopyTitle(${jsArg(key)},'${k}')">${esc(t)}</button>`).join('')}</div></div>`, null);
+}
+async function prCopyTitle(key, k) {
+  const x = PR_ALL[key]; if (!x) return;
+  const o = prbGet(), t = (PR_LISTS.find(y => y[0] === k) || [])[1] || '';
+  const tl = (x.title || '').toLowerCase();
+  if (o.lists[k].some(c => (c.title || '').toLowerCase() === tl)) { toast('Already in ' + t + '.'); return; }
+  PR_LISTS.forEach(([j]) => { o.lists[j] = o.lists[j].filter(c => (c.title || '').toLowerCase() !== tl); });
+  o.lists[k].unshift({ id: uid('pr'), title: x.title, sub: x.sub || '', note: '' });
+  prbSave(o); await closeSheet(); prRedraw(); toast(x.title + ' moved to ' + t + '.');
+}
+function prAdd(k) {
+  const t = (PR_LISTS.find(x => x[0] === k) || [])[1]; if (!t) return;
+  openSheet('Add a card to ' + esc(t), `<label class="field"><span>Title</span><input id="prt" name="title" maxlength="120" required placeholder="e.g. Fallout"></label><label class="field"><span>Note (optional)</span><textarea id="prn" name="note" rows="3" maxlength="1000"></textarea></label>`,
+    v => { if (!v.title) return 'Give the card a title.'; const o = prbGet(); o.lists[k].unshift({ id: uid('pr'), title: v.title.slice(0, 120), note: (v.note || '').slice(0, 1000) }); prbSave(o); return () => prRedraw(); }, 'Add card');
+  setTimeout(() => { const i = document.getElementById('prt'); if (i) i.focus(); }, 50);
+}
+function prOpenCard(k, id) {
+  const o = prbGet(), L = o.lists[k] || [], c = L.find(x => x.id === id); if (!c) return;
+  const url = prUrlOf(c);
+  openSheet(esc(c.title), `<div class="btns" style="margin-bottom:10px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>openStreamUrl('prime',${jsArg(url)}))">${I('tv')} Open in Prime Video</button></div>
+    <label class="field"><span>Title</span><input name="title" maxlength="120" value="${esc(c.title)}"></label>
+    <label class="field"><span>Note</span><textarea name="note" rows="3" maxlength="1000">${esc(c.note || '')}</textarea></label>
+    <label class="field"><span>Move to…</span><select name="list">${PR_LISTS.map(([j, t]) => `<option value="${j}"${j === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
+    v => { if (!v.title) return 'Give the card a title.'; const g = prbGet(), cur = (g.lists[k] || []).find(x => x.id === id); if (!cur) return;
+      cur.title = v.title.slice(0, 120); cur.note = (v.note || '').slice(0, 1000);
+      const to = PR_LISTS.some(x => x[0] === v.list) ? v.list : k;
+      if (to !== k) { g.lists[k] = g.lists[k].filter(x => x.id !== id); g.lists[to].unshift(cur); }
+      prbSave(g); return () => prRedraw(); }, 'Save',
+    `<button type="button" class="btn danger" onclick="prDel('${k}',${jsArg(id)})">Delete</button>`);
+}
+async function prDel(k, id) {
+  const o = prbGet(), before = JSON.stringify(o); o.lists[k] = (o.lists[k] || []).filter(x => x.id !== id); prbSave(o); await closeSheet(); prRedraw();
+  toast('Card deleted.', 'Undo', () => { try { prbSave(JSON.parse(before)); } catch (e) { } prRedraw(); });
+}
+function prMenu(k) {
+  const user = PR_LISTS.find(x => x[0] === k);
+  const txt = k === 'new' ? 'Recent Prime Video NZ additions. Tap any card to open it in Prime Video or move it to your lists.' : k === 'coming' ? 'Upcoming dated titles coming to Prime Video NZ.' : 'Your own Prime Video list, saved on this phone. Tap a card to open it in Prime Video, edit it, move it or delete it.';
+  openSheet(esc(user ? user[1] : k === 'new' ? 'New on Prime' : 'Coming soon'), `<p class="muted" style="margin:0 0 10px">${esc(txt)}</p><div class="btns"><button type="button" class="btn" onclick="closeSheet().then(()=>{loadPrime(true);toast('Checking Prime Video…')})">Refresh</button><button type="button" class="btn" onclick="closeSheet().then(()=>openStreamApp('prime'))">${I('tv')} Open Prime Video app</button></div>`, null, 'Save', user ? `<button type="button" class="btn primary" onclick="closeSheet().then(()=>prAdd('${k}'))">${I('plus')} Add a card</button>` : '');
+}
 function PrimePage() {
   try { loadPrime(); } catch (e) { }
-  const head = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('New on Prime Video', 'Prime Video NZ');
-  const t = todayISO(), ok = x => x && x.title && /^\d{4}-\d\d-\d\d$/.test(x.date || ''), L = PRIME && Array.isArray(PRIME.items) ? PRIME.items.filter(ok) : [];
-  const fr = L.filter(x => x.date <= t && daysLeft(x.date) >= -31).sort((a, b) => b.date.localeCompare(a.date)), co = L.filter(x => x.date > t).sort((a, b) => a.date.localeCompare(b.date));
-  return head + `<div class="glzone"><span>📺 New</span><span>${fr.length}</span></div>` + (fr.length ? `<div class="list">${fr.map(x => streamRow('prime', x, 'Added ' + fmtW(x.date))).join('')}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>') +
-    (co.length ? `<div class="glzone"><span>🍿 Coming soon</span><span>${co.length}</span></div><div class="list">${co.map(x => streamRow('prime', x, 'From ' + fmtW(x.date))).join('')}</div>` : '') +
-    `<div class="foot">Titles and NZ dates from ${esc(PRIME && PRIME.source || 'flicks.co.nz')}. Tap to search for it in the Prime Video app.</div>`;
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0284c7,#0f172a)"></div>
+    <div class="tbtop"><h1>New on Prime Video</h1><button class="iconbtn" aria-label="Open Prime Video" onclick="openStreamApp('prime')">${I('tv')}</button></div>
+    <div class="tblists" id="prlists">${prBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists, and scroll up and down inside each list. Titles and NZ dates from ${esc(PRIME && PRIME.source || 'flicks.co.nz')}. Tap a card to open it in Prime Video or move it to your lists.</div>`;
 }
 /* Tap hands off to the installed app: Android intent with the web page as fallback; elsewhere the https universal link. */
 const STREAM_APPS = { netflix: { web: 'https://www.netflix.com/', pkg: 'com.netflix.mediaclient' }, prime: { web: 'https://www.primevideo.com/', pkg: 'com.amazon.avod.thirdpartyclient' } };
@@ -18384,8 +18693,10 @@ async function requestPersist() { try { if (navigator.storage && navigator.stora
 function backupBlob() {
   const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
   let planning = null; try { planning = plnKeepGet(); } catch (e) { } // 2.27.84: kept planning & development updates
-  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } let recipeBoard = null; try { recipeBoard = rbGet(); } catch (e) { } let videoBoard = null; try { videoBoard = vbGet(); } catch (e) { } // 2.27.85/86: Travel and Space board lists
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, ...lbBackup(), flagged, newsBoard, recipeBoard, videoBoard }, null, 2)], { type: 'application/json' });
+  let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } let recipeBoard = null; try { recipeBoard = rbGet(); } catch (e) { } let videoBoard = null; try { videoBoard = vbGet(); } catch (e) { }
+  let primeBoard = null, moviesBoard = null, blogBoard = null, podcastBoard = null, concertsBoard = null, nightlifeBoard = null, eventsBoard = null;
+  try { primeBoard = prbGet(); } catch (e) { } try { moviesBoard = mvbGet(); } catch (e) { } try { blogBoard = blgGet(); } catch (e) { } try { podcastBoard = pdbGet(); } catch (e) { } try { concertsBoard = cnbGet(); } catch (e) { } try { nightlifeBoard = nlbGet(); } catch (e) { } try { eventsBoard = evbGet(); } catch (e) { }
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, ...lbBackup(), flagged, newsBoard, recipeBoard, videoBoard, primeBoard, moviesBoard, blogBoard, podcastBoard, concertsBoard, nightlifeBoard, eventsBoard }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -18410,7 +18721,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { lbRestoreAll(obj); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } try { if (obj && obj.videoBoard) vbRestore(obj.videoBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { lbRestoreAll(obj); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } try { if (obj && obj.videoBoard) vbRestore(obj.videoBoard); } catch (e) { } try { if (obj && obj.primeBoard) prbRestore(obj.primeBoard); } catch (e) { } try { if (obj && obj.moviesBoard) mvbRestore(obj.moviesBoard); } catch (e) { } try { if (obj && obj.blogBoard) blgRestore(obj.blogBoard); } catch (e) { } try { if (obj && obj.podcastBoard) pdbRestore(obj.podcastBoard); } catch (e) { } try { if (obj && obj.concertsBoard) cnbRestore(obj.concertsBoard); } catch (e) { } try { if (obj && obj.nightlifeBoard) nlbRestore(obj.nightlifeBoard); } catch (e) { } try { if (obj && obj.eventsBoard) evbRestore(obj.eventsBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);
@@ -20517,16 +20828,19 @@ async function start() {
   }
   try { tabbar(activeTab((location.hash || '#home').slice(1).split('/')[0] || 'home')); } catch (e) { }
   // 2.22.21: a failure here must not leave a blank screen or skip service worker registration (updates).
-  try { if (S && S.settings && !S.settings.lifeMig29) { if (S.settings.mascotArt === 'krea') S.settings.mascotArt = 'life'; S.settings.lifeMig29 = true; await save(); } } catch (e) { } // 2.23.29: Krea art → Lifelike, once
-  try { if (S && S.settings && !S.settings.jaRestore25) { delete S.settings.justSeenAt; S.settings.jaRestore25 = true; await save(); } } catch (e) { } // 2.23.25: bring back a Just added list cleared by accident
-  try { await loadCal(); } catch (e) { console.error('loadCal', e); }
-  try { await loadMail(); } catch (e) { console.error('loadMail', e); }
-  try { await loadRwm(); } catch (e) { console.error('loadRwm', e); }
-  try { await loadNf(); } catch (e) { console.error('loadNf', e); }
-  try { await loadEr(); } catch (e) { console.error('loadEr', e); }
-  try { await finishMailSignIn(); } catch (e) { console.error('finishMailSignIn', e); }
   for (const f of [loadWx, loadAlerts, loadEvs, loadCls, loadRoadworks, loadTv, loadNews, loadBlogs, loadPodcasts]) { try { f(); } catch (e) { console.error('load', e); } }
   try { render(); } catch (e) { console.error('First render', e); }
+  try { if (S && S.settings && !S.settings.lifeMig29) { if (S.settings.mascotArt === 'krea') S.settings.mascotArt = 'life'; S.settings.lifeMig29 = true; await save(); } } catch (e) { } // 2.23.29: Krea art → Lifelike, once
+  try { if (S && S.settings && !S.settings.jaRestore25) { delete S.settings.justSeenAt; S.settings.jaRestore25 = true; await save(); } } catch (e) { } // 2.23.25: bring back a Just added list cleared by accident
+  await Promise.allSettled([
+    loadCal().catch(e => console.error('loadCal', e)),
+    loadMail().catch(e => console.error('loadMail', e)),
+    loadRwm().catch(e => console.error('loadRwm', e)),
+    loadNf().catch(e => console.error('loadNf', e)),
+    loadEr().catch(e => console.error('loadEr', e)),
+    finishMailSignIn().catch(e => console.error('finishMailSignIn', e))
+  ]);
+  try { if (!sheetOpen) render(); } catch (e) { }
   const shopNote = takeShopNote(); if (shopNote) { save().catch(() => { }); setTimeout(() => toast(shopNote, 'View', () => go('#shopping')), 900); }
   const mealNote = takeMealNote(); if (mealNote) { save().catch(() => { }); setTimeout(() => toast(mealNote), 700); }
   try { const pn = await pnu312Mig(); if (pn) { render(); setTimeout(() => toast(pn), 2600); } } catch (e) { console.error('pnu312', e); }
@@ -21859,22 +22173,167 @@ function evListSecs() {
   const sec = (title, L, k) => `<div class="glzone"><span>${title}</span><span>${L.length}</span></div>` + (L.length ? (() => { let out = '', cur = ''; L.forEach(e => { const m = String(e.date || '').slice(0, 7); if (m !== cur) { if (cur) out += '</div>'; cur = m; out += `<div class="muted" style="margin:10px 4px 4px;font-weight:700">${m ? MON[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4) : 'Date TBC'}</div><div class="list">`; } out += row(e, k); }); return out + '</div>'; })() : '<div class="muted" style="margin:0 4px 10px">Nothing listed right now</div>');
   sec.row = row; return sec;
 }
-function NightlifePage() { // 2.27.63: same list style as Concerts
-  setTimeout(() => { try { refreshEvents(); } catch (e) { } }, 0);
-  const sec = evListSecs();
-  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('Nightlife', 'Whangārei and Northland, outside your shifts') + sec('🌙 Nightlife', mdEvGroups().nightlife, 'nightlife') +
-    `<div class="foot">From Eventfinda (eventfinda.co.nz). Events during your shifts are left out. Times can change, so check before you go. No sport.</div>`;
+// ---- 2.28.16: Nightlife, Concerts & Movies as Trello-style boards ----
+const NLB_KEY = 'nightlifeBoard', NLB_LISTS = [['going', 'Interested / Going'], ['been', 'Been']];
+let NLB_ALL = {};
+function nlbGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(NLB_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  NLB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  return o;
 }
-function ConcertsPage() {
+function nlbSave(o) { try { localStorage.setItem(NLB_KEY, JSON.stringify(o)); } catch (e) { } }
+function nlbRestore(o) { if (o && o.lists && typeof o.lists === 'object') nlbSave(o); }
+function nlbCard(e, tagOverride) {
+  const id = e.id || String(e.title + '|' + e.date);
+  NLB_ALL[id] = Object.assign({}, e, { id });
+  const ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',').trim() : 'Whangārei / Northland';
+  const tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC';
+  const subCat = (e.cats || []).find(c => c !== 'Nightlife') || 'Nightlife';
+  const lbls = [];
+  if (tagOverride) lbls.push(tagOverride);
+  else lbls.push([subCat, /comedy|quiz|trivia/i.test(subCat + ' ' + e.title) ? '#d97706' : '#7c3aed']);
+  if (evAppt(id) || evAdded('nl|' + id)) lbls.push(['✓ In calendar', '#16a34a']);
+  return `<button type="button" class="tbcard" onclick="nlbOpen(${jsArg(id)})"><div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(e.title)}</div><div class="tbs">${esc([e.date ? fmtW(e.date) : 'Date TBC', tm, ven].filter(Boolean).join(' · '))}</div>${e.cost ? `<div class="tbicons">${I('ticket')}<span>${esc(e.cost)}</span></div>` : ''}</div></button>`;
+}
+function nlbBoardHtml() {
+  NLB_ALL = {};
+  const o = nlbGet(), L = mdEvGroups().nightlife || [], T = todayISO(), wk = addDays(T, 7);
+  const thisWeek = L.filter(e => e.date && e.date <= wk);
+  const comedyQuiz = L.filter(e => /comedy|quiz|trivia|theatre|cabaret/i.test([e.title, (e.cats || []).join(' '), e.desc].join(' ')));
+  const liveGigs = L.filter(e => !comedyQuiz.includes(e));
+  const coming = L.filter(e => !e.date || e.date > wk);
+  return tbList('week', 'This week (off shift)', thisWeek.length, thisWeek.map(e => nlbCard(e)).join(''), false, 'nlb', 'No nightlife listed this week') +
+    tbList('gigs', 'Live music, gigs & DJs', liveGigs.length, liveGigs.map(e => nlbCard(e)).join(''), false, 'nlb', 'No gigs listed right now') +
+    (comedyQuiz.length ? tbList('comedy', 'Comedy, quiz & shows', comedyQuiz.length, comedyQuiz.map(e => nlbCard(e)).join(''), false, 'nlb', 'Nothing listed') : '') +
+    tbList('coming', 'Coming up', coming.length, coming.map(e => nlbCard(e)).join(''), false, 'nlb', 'Nothing further ahead') +
+    tbList('going', 'Interested / Going', (o.lists.going || []).length, (o.lists.going || []).map(e => nlbCard(e, ['🌙 Going', '#2563eb'])).join(''), true, 'nlb', 'Tap a gig or + Add a card') +
+    tbList('been', 'Been', (o.lists.been || []).length, (o.lists.been || []).map(e => nlbCard(e, ['✓ Been', '#16a34a'])).join(''), false, 'nlb', 'Shows you mark as been show here');
+}
+function nlbRedraw() { const el = document.getElementById('nlblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = nlbBoardHtml(); el.scrollLeft = x; }
+function nlbOpen(id) {
+  const e = NLB_ALL[id]; if (!e) return;
+  const o = nlbGet(), inGoing = o.lists.going.some(x => x.id === id), inBeen = o.lists.been.some(x => x.id === id);
+  const ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',').trim() : 'Venue TBC';
+  const tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : 'time TBC';
+  hab('tap:nightlife', ven.split(',')[0]); hab('tapt:nightlife', String(e.title).slice(0, 60));
+  openSheet(esc(e.title), `<p class="muted" style="margin:0 0 8px">${esc([e.date ? fmtW(e.date) : 'Date TBC', tm, ven, e.cost].filter(Boolean).join(' · '))}</p>
+    ${e.desc ? `<p style="margin:0 0 12px">${esc(e.desc)}</p>` : ''}
+    <div class="btns" style="margin-bottom:12px">
+      ${e.url ? `<a class="btn primary" href="${esc(e.url)}" target="_blank" rel="noopener">${I('ticket')} Tickets & details ›</a>` : ''}
+      <button type="button" class="btn" onclick="closeSheet().then(()=>evAddSheet('nl|'+${jsArg(id)},{ev:{name:${jsArg(e.title)},days:[${jsArg(e.date || todayISO())}],time:${jsArg(e.time || '')},end:${jsArg(e.endTime || '')},times:[],place:${jsArg(ven)},tix:${jsArg(e.url || '')}},m:null}))">${I('cal')} Add to calendar</button>
+    </div>
+    <div class="tbmove"><div class="lbl">Move to…</div><div class="chips">
+      <button type="button" class="chip${inGoing ? ' on' : ''}" onclick="nlbMove(${jsArg(id)},'going')">🌙 Interested / Going</button>
+      <button type="button" class="chip${inBeen ? ' on' : ''}" onclick="nlbMove(${jsArg(id)},'been')">✓ Been</button>
+      ${inGoing || inBeen ? `<button type="button" class="chip" onclick="nlbMove(${jsArg(id)},'')">Remove from my lists</button>` : ''}
+    </div></div>`, null);
+}
+async function nlbMove(id, target) {
+  const e = NLB_ALL[id]; if (!e) return;
+  const o = nlbGet();
+  NLB_LISTS.forEach(([k]) => { o.lists[k] = (o.lists[k] || []).filter(x => x.id !== id); });
+  if (target && o.lists[target]) o.lists[target].unshift(e);
+  nlbSave(o); await closeSheet(); nlbRedraw();
+  toast(target === 'going' ? 'Added to Interested / Going.' : target === 'been' ? 'Moved to Been.' : 'Removed from your lists.');
+}
+function nlbAdd(k) {
+  openSheet('Add a nightlife card', `<label class="field"><span>Title</span><input name="title" maxlength="120" required placeholder="e.g. Live music at The Butter Factory"></label><label class="field"><span>Date</span><input name="date" type="date" value="${todayISO()}"></label><label class="field"><span>Venue (optional)</span><input name="venue" maxlength="100" placeholder="e.g. Butter Factory"></label>`,
+    v => { if (!v.title) return 'Please give it a title.'; const o = nlbGet(); o.lists[k || 'going'].unshift({ id: uid('nlb'), title: v.title.slice(0, 120), date: v.date || todayISO(), venue: (v.venue || '').slice(0, 100), cats: ['Nightlife'] }); nlbSave(o); return () => nlbRedraw(); }, 'Add card');
+}
+function nlbMenu(k) {
+  openSheet('Nightlife', `<p class="muted" style="margin:0 0 10px">Swipe sideways between lists, and scroll up and down inside each list. Events during your roster shifts are automatically left out.</p>
+    <div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>{refreshEvents(true);toast('Refreshing nightlife…')})">${I('refresh')} Refresh</button><button type="button" class="btn" onclick="closeSheet().then(()=>nlbAdd('going'))">${I('plus')} Add card</button></div>`, null);
+}
+function NightlifePage() {
   setTimeout(() => { try { refreshEvents(); } catch (e) { } }, 0);
-  const sec = evListSecs(), row = sec.row, G = mdEvGroups();
-  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('Concerts', 'Whangārei and Auckland') +
-    sec('🎸 Whangārei', G.concerts, 'concerts') + (B => (B.length ? `<div class="glzone"><span>🌟 Big shows in Auckland</span><span>${B.length}</span></div><div class="list bigl">` + B.map(e => row(e, 'akl')).join('').replace(/<div class="t">/g, '<div class="t">' + MD_BIG_B + ' ') + '</div>' : '') + sec('🎤 Auckland', G.akl.filter(e => !mdBig(e)), 'akl'))(G.akl.filter(mdBig)) +
-    `<div class="foot">From Eventfinda (eventfinda.co.nz), Whangārei District Council and the Eden Park and Auckland Stadiums websites. Whangārei concerts during your shifts are left out. Times can change, so check before you go. No sport.</div>`;
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#6d28d9,#0f172a)"></div>
+    <div class="tbtop"><h1>Nightlife</h1><button class="iconbtn" aria-label="Refresh nightlife" onclick="refreshEvents(true)">${I('refresh')}</button></div>
+    <div class="tblists" id="nlblists">${nlbBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists. From Eventfinda (eventfinda.co.nz), outside your shifts. No sport.</div>`;
 }
 
-/* ---- 2.27.55: Movies page. Only Event Cinemas Whangārei (relay /events → cinema, from Event Cinemas' own sessions and coming-soon data).
-   Now showing: each film with its sessions by day for the next 5 days. Coming soon: films with their release dates. */
+const CNB_KEY = 'concertsBoard', CNB_LISTS = [['going', 'Interested / Going'], ['been', 'Been']];
+let CNB_ALL = {};
+function cnbGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(CNB_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  CNB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  return o;
+}
+function cnbSave(o) { try { localStorage.setItem(CNB_KEY, JSON.stringify(o)); } catch (e) { } }
+function cnbRestore(o) { if (o && o.lists && typeof o.lists === 'object') cnbSave(o); }
+function cnbCard(e, kind, tagOverride) {
+  const id = e.id || ('cnb-' + String(e.title + '|' + (e.date || '') + '|' + (e.venue || '')).toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+  CNB_ALL[id] = Object.assign({}, e, { id, kind });
+  const ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',').trim() : 'Venue TBC';
+  const tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : '';
+  const big = mdBig(e) || kind === 'big' || kind === 'spark';
+  const lbls = [];
+  if (tagOverride) lbls.push(tagOverride);
+  if (big) lbls.push(['🌟 BIG SHOW', '#ca8a04']);
+  lbls.push([/auckland|eden park|spark arena|western springs|go media/i.test(ven + ' ' + (e.cats || []).join(' ')) ? '🎤 Auckland' : '🎸 Whangārei', big ? '#7c3aed' : '#db2777']);
+  if (evAppt(id) || evAdded('cn|' + id) || (S.appts || []).some(a => a.title === e.title && (!e.date || a.date === e.date))) lbls.push(['✓ In calendar', '#16a34a']);
+  const when = e.date ? fmtW(e.date) + (tm ? ' · ' + tm : '') : 'See venue page for dates';
+  return `<button type="button" class="tbcard" onclick="cnbOpen(${jsArg(id)})"><div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(e.title)}</div><div class="tbs">${esc([when, ven].filter(Boolean).join(' · '))}</div><div class="tbicons">${I('ticket')}<span>${esc(ven.split(',')[0])}</span></div></div></button>`;
+}
+function cnbBoardHtml() {
+  CNB_ALL = {};
+  const o = cnbGet(), G = mdEvGroups();
+  const bigShows = G.akl.filter(mdBig);
+  const spark = ((AKLC && AKLC.spark) || []).filter(x => x && x.title && !/^(new|presale|on sale)$/i.test(x.title) && !isSport(x.title) && !G.akl.some(a => a.title.toLowerCase().includes(x.title.toLowerCase().slice(0, 10))))
+    .map(x => ({ id: 'spark-' + x.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'), title: x.title, date: '', venue: 'Spark Arena, Auckland', url: x.url, cats: ['Concert', 'Auckland'] }));
+  const otherAkl = G.akl.filter(e => !mdBig(e));
+  return tbList('whg', '🎸 Whangārei & Northland', G.concerts.length, G.concerts.map(e => cnbCard(e, 'whg')).join(''), false, 'cnb', 'No Whangārei concerts listed right now') +
+    tbList('big', '🌟 Big Auckland stadium & arena shows', bigShows.length + spark.length, bigShows.map(e => cnbCard(e, 'big')).concat(spark.map(e => cnbCard(e, 'spark'))).join(''), false, 'cnb', 'Loading big Auckland shows…') +
+    tbList('akl', '🎤 More Auckland concerts', otherAkl.length, otherAkl.map(e => cnbCard(e, 'akl')).join(''), false, 'cnb', 'No other Auckland gigs listed') +
+    tbList('going', 'Interested / Going', (o.lists.going || []).length, (o.lists.going || []).map(e => cnbCard(e, 'going', ['🎟️ Going', '#2563eb'])).join(''), true, 'cnb', 'Tap a concert or + Add a card') +
+    tbList('been', 'Been', (o.lists.been || []).length, (o.lists.been || []).map(e => cnbCard(e, 'been', ['✓ Been', '#16a34a'])).join(''), false, 'cnb', 'Concerts you’ve been to show here');
+}
+function cnbRedraw() { const el = document.getElementById('cnblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = cnbBoardHtml(); el.scrollLeft = x; }
+function cnbOpen(id) {
+  const e = CNB_ALL[id]; if (!e) return;
+  const o = cnbGet(), inGoing = o.lists.going.some(x => x.id === id), inBeen = o.lists.been.some(x => x.id === id);
+  const ven = e.venue ? String(e.venue).split(',').slice(0, 2).join(',').trim() : 'Venue TBC';
+  const tm = e.time && e.timeKnown !== false ? fmtTime(e.time) : '';
+  hab('tap:akl', ven.split(',')[0]); hab('tapt:akl', String(e.title).slice(0, 60));
+  openSheet(esc(e.title), `<p class="muted" style="margin:0 0 8px">${esc([e.date ? fmtW(e.date) : 'Dates on venue website', tm, ven].filter(Boolean).join(' · '))}</p>
+    ${e.desc ? `<p style="margin:0 0 12px">${esc(e.desc)}</p>` : ''}
+    <div class="btns" style="margin-bottom:12px">
+      ${e.url ? `<a class="btn primary" href="${esc(e.url)}" target="_blank" rel="noopener">${I('ticket')} Tickets & details ›</a>` : ''}
+      <button type="button" class="btn" onclick="closeSheet().then(()=>evAddSheet('cn|'+${jsArg(id)},{ev:{name:${jsArg(e.title)},days:[${jsArg(e.date || todayISO())}],time:${jsArg(e.time || '')},end:${jsArg(e.endTime || '')},times:[],place:${jsArg(ven)},tix:${jsArg(e.url || '')}},m:null}))">${I('cal')} Add to calendar</button>
+    </div>
+    <div class="tbmove"><div class="lbl">Move to…</div><div class="chips">
+      <button type="button" class="chip${inGoing ? ' on' : ''}" onclick="cnbMove(${jsArg(id)},'going')">🎟️ Interested / Going</button>
+      <button type="button" class="chip${inBeen ? ' on' : ''}" onclick="cnbMove(${jsArg(id)},'been')">✓ Been</button>
+      ${inGoing || inBeen ? `<button type="button" class="chip" onclick="cnbMove(${jsArg(id)},'')">Remove from my lists</button>` : ''}
+    </div></div>`, null);
+}
+async function cnbMove(id, target) {
+  const e = CNB_ALL[id]; if (!e) return;
+  const o = cnbGet();
+  CNB_LISTS.forEach(([k]) => { o.lists[k] = (o.lists[k] || []).filter(x => x.id !== id); });
+  if (target && o.lists[target]) o.lists[target].unshift(e);
+  cnbSave(o); await closeSheet(); cnbRedraw();
+  toast(target === 'going' ? 'Added to Interested / Going.' : target === 'been' ? 'Moved to Been.' : 'Removed from your lists.');
+}
+function cnbAdd(k) {
+  openSheet('Add a concert card', `<label class="field"><span>Artist / Tour</span><input name="title" maxlength="120" required placeholder="e.g. Foo Fighters"></label><label class="field"><span>Date</span><input name="date" type="date" value="${todayISO()}"></label><label class="field"><span>Venue</span><input name="venue" maxlength="100" placeholder="e.g. Western Springs, Auckland"></label>`,
+    v => { if (!v.title) return 'Please give it a title.'; const o = cnbGet(); o.lists[k || 'going'].unshift({ id: uid('cnb'), title: v.title.slice(0, 120), date: v.date || todayISO(), venue: (v.venue || 'Auckland').slice(0, 100), cats: ['Concert'] }); cnbSave(o); return () => cnbRedraw(); }, 'Add card');
+}
+function cnbMenu(k) {
+  openSheet('Concerts', `<p class="muted" style="margin:0 0 10px">Swipe sideways between Whangārei concerts, Big Auckland stadium/arena shows, and your own lists.</p>
+    <div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>{refreshEvents(true);loadAklConcerts(true);toast('Refreshing concerts…')})">${I('refresh')} Refresh concerts</button><button type="button" class="btn" onclick="closeSheet().then(()=>cnbAdd('going'))">${I('plus')} Add concert card</button></div>`, null);
+}
+function ConcertsPage() {
+  setTimeout(() => { try { refreshEvents(); loadAklConcerts(); } catch (e) { } }, 0);
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#7c3aed,#0f172a)"></div>
+    <div class="tbtop"><h1>Concerts</h1><button class="iconbtn" aria-label="Refresh concerts" onclick="refreshEvents(true);loadAklConcerts(true)">${I('refresh')}</button></div>
+    <div class="tblists" id="cnblists">${cnbBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists. From Eventfinda, Whangārei District Council, Eden Park, Spark Arena and Auckland Stadiums. No sport.</div>`;
+}
+
+/* ---- 2.27.55 / 2.28.16: Movies page as a Trello-style board (Event Cinemas Whangārei + user watchlists) ---- */
 const mvNow = () => { const d = new Date(); return todayISO() + 'T' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 function mvShowing() {
   const c = cineData(); if (!c) return [];
@@ -21887,22 +22346,90 @@ function mvTileSub() {
   const L = mvShowing(); if (!L.length) return '';
   const f = L[0], t = f.ses[0].t; return f.m.title + ' · ' + mvDayLbl(t.slice(0, 10)).replace('Today', 'today').replace('Tomorrow', 'tomorrow') + ' ' + cineT(t);
 }
+const MVB_KEY = 'moviesBoard', MVB_LISTS = [['want', 'Want to watch'], ['watched', 'Watched']];
+let MVB_ALL = {};
+function mvbGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(MVB_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  MVB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  return o;
+}
+function mvbSave(o) { try { localStorage.setItem(MVB_KEY, JSON.stringify(o)); } catch (e) { } }
+function mvbRestore(o) { if (o && o.lists && typeof o.lists === 'object') mvbSave(o); }
+function mvbCard(m, ses, kind, tagOverride) {
+  const id = String(m.id || m.title || '').toLowerCase(); if (!id) return '';
+  MVB_ALL[id] = { m, ses: ses || m.sessions || [] };
+  const lbls = [];
+  if (tagOverride) lbls.push(tagOverride);
+  else if (kind === 'soon') lbls.push(['🍿 Coming soon', '#d97706']);
+  else lbls.push(['🎬 Now showing', '#dc2626']);
+  if (m.rating && m.rating !== 'TBC') lbls.push([m.rating, '#475569']);
+  if (evAdded('cin|' + m.id)) lbls.push(['✓ In calendar', '#16a34a']);
+  const meta = m.mins ? Math.floor(m.mins / 60) + 'h ' + (m.mins % 60) + 'm' : '';
+  let sub = '';
+  if (ses && ses.length) {
+    const firstDay = ses[0].t.slice(0, 10), daySes = ses.filter(x => x.t.slice(0, 10) === firstDay).slice(0, 4).map(x => cineT(x.t)).join(', ');
+    sub = mvDayLbl(firstDay) + ': ' + daySes + (ses.length > 4 ? ' +' + (ses.length - 4) + ' more' : '');
+  } else if (m.released) sub = 'Opens ' + fmtW(m.released);
+  else if (m.note) sub = m.note;
+  return `<button type="button" class="tbcard" onclick="mvbOpen(${jsArg(id)})">${m.poster ? `<div class="tbcover" style="background:#0f172a;aspect-ratio:16/10;overflow:hidden"><img src="${esc(m.poster)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(m.title)}</div>${sub ? `<div class="tbs">${esc(sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>${esc([meta, 'Event Cinemas Whangārei'].filter(Boolean).join(' · '))}</span></div></div></button>`;
+}
+function mvbBoardHtml() {
+  MVB_ALL = {};
+  const o = mvbGet(), c = cineData(), showing = mvShowing(), T = todayISO();
+  const todayFilms = showing.filter(x => x.ses.some(s => s.t.slice(0, 10) === T));
+  const soon = c ? c.movies.filter(m => m.soon).sort((a, b) => String(a.released || '9').localeCompare(String(b.released || '9'))) : [];
+  return tbList('now', '🎬 Now showing (next 5 days)', showing.length, showing.map(({ m, ses }) => mvbCard(m, ses, 'now')).join(''), false, 'mvb', c ? 'No sessions listed right now' : 'Loading Event Cinemas Whangārei sessions…') +
+    (todayFilms.length ? tbList('today', '🎟️ On today', todayFilms.length, todayFilms.map(({ m, ses }) => mvbCard(m, ses.filter(s => s.t.slice(0, 10) === T), 'today', ['🎟️ Today', '#0284c7'])).join(''), false, 'mvb', 'No sessions left today') : '') +
+    tbList('soon', '🍿 Coming soon', soon.length, soon.map(m => mvbCard(m, [], 'soon')).join(''), false, 'mvb', 'Nothing listed as coming soon') +
+    tbList('want', 'Want to watch', (o.lists.want || []).length, (o.lists.want || []).map(m => mvbCard(m, [], 'want', ['📌 Want to watch', '#2563eb'])).join(''), true, 'mvb', 'Tap a film or + Add a card') +
+    tbList('watched', 'Watched', (o.lists.watched || []).length, (o.lists.watched || []).map(m => mvbCard(m, [], 'watched', ['✓ Watched', '#16a34a'])).join(''), false, 'mvb', 'Films you’ve watched show here');
+}
+function mvbRedraw() { const el = document.getElementById('mvblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = mvbBoardHtml(); el.scrollLeft = x; }
+function mvbOpen(id) {
+  const entry = MVB_ALL[id]; if (!entry) return;
+  const { m, ses } = entry, o = mvbGet();
+  const inWant = o.lists.want.some(x => String(x.id || x.title).toLowerCase() === id), inWatched = o.lists.watched.some(x => String(x.id || x.title).toLowerCase() === id);
+  const meta = [m.rating && m.rating !== 'TBC' ? m.rating : '', m.mins ? Math.floor(m.mins / 60) + 'h ' + (m.mins % 60) + 'm' : '', m.released && m.soon ? 'Opens ' + fmtW(m.released) : ''].filter(Boolean).join(' · ');
+  const by = {}; (ses || []).forEach(x => { (by[x.t.slice(0, 10)] = by[x.t.slice(0, 10)] || []).push(x); });
+  const daysHtml = Object.keys(by).sort().map(d => `<div style="margin-top:6px"><b>${esc(mvDayLbl(d))}:</b> ${by[d].map(x => /^https:\/\/www\.eventcinemas\.co\.nz\//.test(x.url || '') && !x.full ? `<a href="${esc(x.url)}" target="_blank" rel="noopener" style="font-weight:700">${esc(cineT(x.t))}</a>` : `<span class="muted">${esc(cineT(x.t))}${x.full ? ' (full)' : ''}</span>`).join(' · ')}</div>`).join('');
+  const u = /^https:\/\/www\.eventcinemas\.co\.nz\//.test(m.url || '') ? m.url : 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions';
+  openSheet(esc(m.title), `${m.poster ? `<img src="${esc(m.poster)}" alt="" style="width:120px;border-radius:10px;margin-bottom:8px;display:block" onerror="this.remove()">` : ''}
+    ${meta ? `<p class="muted" style="margin:0 0 8px">${esc(meta)} · Event Cinemas Whangārei</p>` : ''}
+    ${daysHtml ? `<div class="card" style="padding:10px 12px;margin-bottom:12px"><div class="t" style="font-weight:700;margin-bottom:4px">Sessions (tap a time to book)</div>${daysHtml}</div>` : ''}
+    <div class="btns" style="margin-bottom:12px">
+      ${m.id ? `<button type="button" class="btn primary" onclick="cineAdd(${jsArg(m.id)})">${I('cal')} Add to calendar</button>` : ''}
+      <a class="btn" href="${esc(u)}" target="_blank" rel="noopener">${I('ticket')} Event Cinemas ›</a>
+    </div>
+    <div class="tbmove"><div class="lbl">Move to…</div><div class="chips">
+      <button type="button" class="chip${inWant ? ' on' : ''}" onclick="mvbMove(${jsArg(id)},'want')">📌 Want to watch</button>
+      <button type="button" class="chip${inWatched ? ' on' : ''}" onclick="mvbMove(${jsArg(id)},'watched')">✓ Watched</button>
+      ${inWant || inWatched ? `<button type="button" class="chip" onclick="mvbMove(${jsArg(id)},'')">Remove from my lists</button>` : ''}
+    </div></div>`, null);
+}
+async function mvbMove(id, target) {
+  const entry = MVB_ALL[id]; if (!entry) return;
+  const m = entry.m, o = mvbGet();
+  MVB_LISTS.forEach(([k]) => { o.lists[k] = (o.lists[k] || []).filter(x => String(x.id || x.title).toLowerCase() !== id); });
+  if (target && o.lists[target]) o.lists[target].unshift({ id: m.id || id, title: m.title, rating: m.rating || '', mins: m.mins || 0, poster: m.poster || '', url: m.url || '', released: m.released || '', note: m.note || '' });
+  mvbSave(o); await closeSheet(); mvbRedraw();
+  toast(target === 'want' ? 'Added to Want to watch.' : target === 'watched' ? 'Moved to Watched.' : 'Removed from your lists.');
+}
+function mvbAdd(k) {
+  openSheet('Add a movie card', `<label class="field"><span>Movie title</span><input name="title" maxlength="120" required placeholder="e.g. Gladiator II"></label><label class="field"><span>Note (optional)</span><input name="note" maxlength="140" placeholder="e.g. Watch on Friday night"></label>`,
+    v => { if (!v.title) return 'Please give the movie a title.'; const o = mvbGet(); o.lists[k || 'want'].unshift({ id: uid('mv'), title: v.title.slice(0, 120), note: (v.note || '').slice(0, 140) }); mvbSave(o); return () => mvbRedraw(); }, 'Add card');
+}
+function mvbMenu(k) {
+  openSheet('Movies', `<p class="muted" style="margin:0 0 10px">Event Cinemas Whangārei (18 James Street) sessions and coming-soon films, plus your own Want to watch and Watched lists.</p>
+    <div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>{refreshEvents(true);toast('Refreshing movie sessions…')})">${I('refresh')} Refresh sessions</button><button type="button" class="btn" onclick="closeSheet().then(()=>mvbAdd('want'))">${I('plus')} Add movie card</button></div>`, null);
+}
 function MoviesPage() {
   setTimeout(() => { try { refreshEvents(); } catch (e) { } }, 0);
-  const c = cineData(), head = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('Movies', 'Event Cinemas Whangārei · 18 James Street');
-  if (!c) return head + `<div class="card empty"><div class="t">Movie times aren’t loaded yet</div><div class="s">Check back in a moment, or see <a href="https://www.eventcinemas.co.nz/cinema/whangarei/sessions" target="_blank" rel="noopener">eventcinemas.co.nz</a>.</div></div>`;
-  const link = (m, inner) => `<a href="${esc(/^https:\/\/www\.eventcinemas\.co\.nz\//.test(m.url || '') ? m.url : 'https://www.eventcinemas.co.nz/cinema/whangarei')}" target="_blank" rel="noopener">${inner}</a>`;
-  const meta = m => [m.rating && m.rating !== 'TBC' ? m.rating : '', m.mins ? Math.floor(m.mins / 60) + 'h ' + (m.mins % 60) + 'm' : ''].filter(Boolean).join(' · ');
-  const now = mvShowing().map(({ m, ses }) => {
-    const by = {}; ses.forEach(x => { (by[x.t.slice(0, 10)] = by[x.t.slice(0, 10)] || []).push(x); });
-    const days = Object.keys(by).sort().map(d => `<div class="s" style="margin-top:4px"><b>${esc(mvDayLbl(d))}</b> ${by[d].map(x => /^https:\/\/www\.eventcinemas\.co\.nz\//.test(x.url || '') && !x.full ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(cineT(x.t))}</a>` : `<span${x.full ? ' class="muted"' : ''}>${esc(cineT(x.t))}${x.full ? ' (full)' : ''}</span>`).join(' · ')}</div>`).join('');
-    return `<div class="card cinerow">${cinePoster(m)}<div class="tx"><div class="t">${link(m, esc(m.title))}</div>${meta(m) ? `<div class="s muted">${esc(meta(m))}</div>` : ''}${days}</div></div>`;
-  }).join('');
-  const soon = c.movies.filter(m => m.soon).sort((a, b) => String(a.released || '9').localeCompare(String(b.released || '9'))).map(m =>
-    `<div class="card cinerow">${cinePoster(m, 40)}<div class="tx"><div class="t">${link(m, esc(m.title))}</div><div class="s">${m.released ? 'From ' + esc(fmtW(m.released)) : 'Date to be confirmed'}${meta(m) ? ' · ' + esc(meta(m)) : ''}</div></div></div>`).join('');
-  return head + `<div class="glzone"><span>🎬 Now showing</span><span>next 5 days</span></div>` + (now || '<div class="muted" style="margin:0 4px 10px">No sessions listed for the next few days</div>') +
-    `<div class="glzone"><span>🍿 Coming soon</span></div>` + (soon || '<div class="muted" style="margin:0 4px 10px">Nothing listed as coming soon right now</div>') +
-    `<div class="foot">From Event Cinemas (eventcinemas.co.nz), updated ${esc(ago(Date.parse(c.at)))}. Tap a time to book. Times can change, so check before you go.</div>`;
+  const c = cineData(), bg = (c && (c.movies.find(m => m.poster) || {}).poster) || '';
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#b91c1c,#0f172a)">${bg ? `<img src="${esc(bg)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+    <div class="tbtop"><h1>Movies</h1><button class="iconbtn" aria-label="Refresh movies" onclick="refreshEvents(true)">${I('refresh')}</button></div>
+    <div class="tblists" id="mvblists">${mvbBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists. From Event Cinemas Whangārei (18 James Street)${c && c.at ? ', updated ' + esc(ago(Date.parse(c.at))) : ''}. Tap any film for session times, tickets, or to add to your calendar.</div>`;
 }
 /* ================= 2.27.60: habit suggestions (on this phone only) =================
    Lightweight counts in localStorage 'habits' (never synced, never sent): pages opened, Entertainment tabs, concert taps,
@@ -24917,10 +25444,11 @@ MB_SECS.unshift(['ev', 'Events from email']);
 // Coming up (Home): events from email not yet added (added ones show as My events)
 CU_EXTRA.mailEv = T => { const gone = new Set(mbDis()); return evMailList().filter(x => !gone.has(x.key) && !evAdded(x.key)).map(x => { const d = daysLeft(x.ev.days[0]); return { days: d, rank: 1, sort: x.ev.time || '', kind: 'mailev', name: x.ev.name,
   html: attRow({ kind: 'mailev', date: x.ev.days[0], go: `evAddSheet('${esc(x.key)}')`, ic: 'ev', icon: 'ticket', title: esc(x.ev.name) + (x.ev.time ? ' ' + fmtTime(x.ev.time) : ''), sub: 'Event from email' + (x.ev.days.length > 1 ? ' · ' + x.ev.days.length + ' days' : '') + (x.ev.place ? ' · ' + esc(x.ev.place) : '') + (x.ev.days.some(dd => evClash(dd, x.ev.time, x.ev.end)) ? ' · ⚠️ work' : '') }) }; }).filter(x => x.days >= 0); };
-// Events page: From your email, at the top
-(() => { const o = Events; Events = function () { const h = o(); let L = []; try { const gone = new Set(mbDis()); L = evMailList().filter(x => !gone.has(x.key)); } catch (e) { }
-  if (!L.length) return h; const blk = `<div class="sec">From your email</div><div class="list evmail">${L.map(x => evCardHtml(x, 'events')).join('')}</div>`;
-  const i = h.indexOf('<div class="card" id="towncard"'); return i >= 0 ? h.slice(0, i) + blk + h.slice(i) : blk + h; }; })();
+// Events page: From your email, as the first Trello board column when present
+(() => { const o = evbBoardHtml; evbBoardHtml = function () { const h = o.apply(this, arguments); let L = []; try { const gone = new Set(mbDis()); L = evMailList().filter(x => !gone.has(x.key)); } catch (e) { }
+  if (!L.length) return h;
+  const cards = L.map(x => { const e = x.ev; return `<button type="button" class="tbcard" onclick="evAddSheet('${esc(x.key)}')"><div class="tbbody">${tbLbl([['✉️ From your email', '#7c3aed']])}<div class="tbt">${esc(e.name)}</div><div class="tbs">${esc([evmWhen(e), e.place].filter(Boolean).join(' · '))}</div></div></button>`; }).join('');
+  return tbList('mail', '✉️ From your email', L.length, cards, false, 'evb', 'No events from email') + h; }; })();
 // ---- Add to calendar (My event with place, reminder, Family calendar) ----
 function evAddSheet(k, pre) {
   const x = pre ? { key: k, ev: pre.ev, m: pre.m } : (EV_REG[k] || evMailList().find(y => y.key === k)); if (!x) return;

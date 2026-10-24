@@ -2301,7 +2301,7 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 .cs-mpbtn span{font-size:.82rem;font-weight:800;font-family:ui-monospace,monospace}
 .cs-mpbtn small{font-size:.68rem;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* 2.28.15: 5-part Notifications Briefing & Navigation Redesign */
+/* 2.28.16: 5-part Notifications Briefing & Navigation Redesign */
 #glalerts .glswipehint,#glalerts .bflbl{display:none!important}
 #glalerts .bpin.bpin-more{background:transparent!important;border:0!important;filter:none!important;color:#94a3b8!important;font-size:1.15rem;font-weight:900;opacity:.75;width:28px;height:28px;right:6px;top:50%;bottom:auto;transform:translateY(-50%)}
 #glalerts .bpin.bpin-more:hover,#glalerts .bpin.bpin-more:active{background:#f1f5f9!important;color:#0f172a!important;opacity:1}
@@ -2361,8 +2361,6 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 </style>
 </head>
 <body>
-<div id="splash" aria-hidden="true" style="position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at 50% 40%,#1e6fd9 0%,#0b3d91 55%,#06224f 100%);display:flex;align-items:center;justify-content:center;transition:opacity .5s ease"><img src="images/splash.jpg" alt="" style="width:min(82vw,82vh,520px);aspect-ratio:1;object-fit:cover;border-radius:22px;box-shadow:0 12px 40px rgba(0,0,0,.45)"></div>
-<script>/* 2.28.1: loading picture on blue, fades once the app has drawn (at least 0.9s, at most 6s) */(function(){var t0=Date.now(),done=0;function hide(){if(done)return;done=1;var s=document.getElementById('splash');if(!s)return;s.style.opacity='0';setTimeout(function(){s.remove();},550);}function ready(){setTimeout(hide,Math.max(0,900-(Date.now()-t0)));}window.addEventListener('load',ready);setTimeout(hide,6000);})();</script>
 <div id="app">
   <main id="view"><noscript>This app needs JavaScript turned on.</noscript></main>
   <div class="tabscrim" id="tabscrim" hidden></div>
@@ -2376,6 +2374,6 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.28.15"></script>
+<script src="app.js?v=2.28.16"></script>
 </body>
 </html>
