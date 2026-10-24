@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.9';
+const APP_VERSION = '2.28.10';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16640,14 +16640,103 @@ function streamRow(k, x, sub) {
   const type = /\(Season \d+\)$/.test(x.title) ? 'Series' : '';
   return `<button class="row" onclick="${esc(`openStreamUrl('${k}',${JSON.stringify(url)})`)}">${pic}<div class="tx"><div class="t">${esc(x.title)}${id ? '' : ' <span class="cinerate">search</span>'}</div><div class="s">${esc([type, sub].filter(Boolean).join(' · '))}</div></div>${I('ext')}</button>`;
 }
+const NF_KEY = 'netflixBoard', NF_LISTS = [['want', 'Want to watch'], ['watching', 'Watching'], ['watched', 'Watched']];
+let NF_ALL = {};
+function nfbGet() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(NF_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {};
+  NF_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; });
+  return o;
+}
+function nfbSave(o) { try { localStorage.setItem(NF_KEY, JSON.stringify(o)); } catch (e) { } }
+function nfUrlOf(x) {
+  const id = /^\d{5,10}$/.test(x && x.nfid || '') ? x.nfid : '';
+  return id ? 'https://www.netflix.com/title/' + id : 'https://www.netflix.com/search?q=' + encodeURIComponent((x && x.title) || '');
+}
+function nfCard(x, kind, sub) {
+  const id = /^\d{5,10}$/.test(x.nfid || '') ? x.nfid : '';
+  const key = (id || x.title || '').toLowerCase();
+  NF_ALL[key] = Object.assign({}, x, { key, sub, kind });
+  const pic = x.img && /^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(x.img) ? x.img : '';
+  const series = /\(Season \d+\)$/i.test(x.title || '');
+  const lbls = [[kind === 'coming' ? '🍿 Coming soon' : '🎬 New', kind === 'coming' ? '#d97706' : '#dc2626']];
+  if (series) lbls.push(['Series', '#7c3aed']);
+  if (!id) lbls.push(['Search', '#475569']);
+  return `<button type="button" class="tbcard" onclick="nfOpen(${jsArg(key)})">${pic ? `<div class="tbcover" style="background:linear-gradient(135deg,#991b1b,#0f172a);aspect-ratio:16/9;overflow:hidden"><img src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div>${sub ? `<div class="tbs">${esc(sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>${id ? 'Open in Netflix' : 'Search in Netflix'}</span></div></div></button>`;
+}
+function nfUserCard(k, c) {
+  const pic = c.img && /^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(c.img) ? c.img : '';
+  const col = k === 'want' ? '#2563eb' : k === 'watching' ? '#d97706' : '#16a34a';
+  const lbl = (NF_LISTS.find(x => x[0] === k) || [])[1] || '';
+  return `<button type="button" class="tbcard" onclick="nfOpenCard('${k}',${jsArg(c.id)})">${pic ? `<div class="tbcover" style="background:linear-gradient(135deg,#991b1b,#0f172a);aspect-ratio:16/9;overflow:hidden"><img src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl([[lbl, col]])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.length > 90 ? c.note.slice(0, 88) + '…' : c.note)}</div>` : c.sub ? `<div class="tbs">${esc(c.sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Netflix</span>${c.note ? '<span class="tbdesc" aria-label="Has a note">≡</span>' : ''}</div></div></button>`;
+}
+function nfBoardHtml() {
+  NF_ALL = {};
+  const o = nfbGet(), conn = mailConnected('microsoft');
+  const F = NF && conn ? (NF.fresh || []) : [], C = NF && conn ? (NF.coming || []) : [];
+  const fr = F.map(x => nfCard(x, 'new', x.at ? 'Added ' + fmtW(todayISO(new Date(x.at))) : '')).join('');
+  const co = C.map(x => nfCard(x, 'coming', x.date ? 'Coming ' + fmtW(x.date) : '')).join('');
+  const emptyNew = !conn ? 'Connect Outlook in Settings to read your New on Netflix emails' : nfBusy ? 'Checking your Netflix emails…' : 'Nothing listed right now';
+  return tbList('new', 'New on Netflix', F.length, fr, false, 'nf', emptyNew) +
+    tbList('coming', 'Coming soon', C.length, co, false, 'nf', 'Nothing listed as coming soon') +
+    NF_LISTS.map(([k, t]) => tbList(k, t, o.lists[k].length, o.lists[k].map(c => nfUserCard(k, c)).join(''), true, 'nf', 'Tap a title or + Add a card')).join('');
+}
+function nfRedraw() { const el = document.getElementById('nflists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = nfBoardHtml(); el.scrollLeft = x; }
+function nfOpen(key) {
+  const x = NF_ALL[key]; if (!x) return;
+  const o = nfbGet(), url = nfUrlOf(x);
+  const where = NF_LISTS.filter(([k]) => o.lists[k].some(c => (c.title || '').toLowerCase() === (x.title || '').toLowerCase())).map(([, t]) => t);
+  const pic = x.img && /^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(x.img) ? `<img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin-bottom:10px" onerror="this.remove()">` : '';
+  openSheet(esc(x.title), `${pic}${x.sub ? `<p class="muted" style="margin:0 0 10px">${esc(x.sub)}${x.nfid ? '' : ' · opens Netflix search'}</p>` : ''}
+    <div class="btns" style="margin-bottom:12px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>openStreamUrl('netflix',${jsArg(url)}))">${I('tv')} Open in Netflix</button>${x.link ? `<a class="btn" href="${esc(x.link)}" target="_blank" rel="noopener">Open email ›</a>` : ''}</div>
+    <div class="tbmove"><div class="lbl">Move to…</div>${where.length ? `<div class="muted" style="font-size:.8125rem;margin-bottom:6px">Already in ${esc(where.join(', '))}</div>` : ''}<div class="chips">${NF_LISTS.map(([k, t]) => `<button type="button" class="chip" onclick="nfCopyTitle(${jsArg(key)},'${k}')">${esc(t)}</button>`).join('')}</div></div>`, null);
+}
+async function nfCopyTitle(key, k) {
+  const x = NF_ALL[key]; if (!x) return;
+  const o = nfbGet(), t = (NF_LISTS.find(y => y[0] === k) || [])[1] || '';
+  const tl = (x.title || '').toLowerCase();
+  if (o.lists[k].some(c => (c.title || '').toLowerCase() === tl)) { toast('Already in ' + t + '.'); return; }
+  NF_LISTS.forEach(([j]) => { o.lists[j] = o.lists[j].filter(c => (c.title || '').toLowerCase() !== tl); });
+  o.lists[k].unshift({ id: uid('nf'), title: x.title, nfid: x.nfid || '', img: x.img || '', sub: x.sub || '', note: '' });
+  nfbSave(o); await closeSheet(); nfRedraw(); toast(x.title + ' moved to ' + t + '.');
+}
+function nfAdd(k) {
+  const t = (NF_LISTS.find(x => x[0] === k) || [])[1]; if (!t) return;
+  openSheet('Add a card to ' + esc(t), `<label class="field"><span>Title</span><input id="nft" name="title" maxlength="120" required placeholder="e.g. Stranger Things"></label><label class="field"><span>Note (optional)</span><textarea id="nfn" name="note" rows="3" maxlength="1000"></textarea></label>`,
+    v => { if (!v.title) return 'Give the card a title.'; const o = nfbGet(); o.lists[k].unshift({ id: uid('nf'), title: v.title.slice(0, 120), note: (v.note || '').slice(0, 1000) }); nfbSave(o); return () => nfRedraw(); }, 'Add card');
+  setTimeout(() => { const i = document.getElementById('nft'); if (i) i.focus(); }, 50);
+}
+function nfOpenCard(k, id) {
+  const o = nfbGet(), L = o.lists[k] || [], c = L.find(x => x.id === id); if (!c) return;
+  const url = nfUrlOf(c);
+  openSheet(esc(c.title), `<div class="btns" style="margin-bottom:10px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>openStreamUrl('netflix',${jsArg(url)}))">${I('tv')} Open in Netflix</button></div>
+    <label class="field"><span>Title</span><input name="title" maxlength="120" value="${esc(c.title)}"></label>
+    <label class="field"><span>Note</span><textarea name="note" rows="3" maxlength="1000">${esc(c.note || '')}</textarea></label>
+    <label class="field"><span>Move to…</span><select name="list">${NF_LISTS.map(([j, t]) => `<option value="${j}"${j === k ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
+    v => { if (!v.title) return 'Give the card a title.'; const g = nfbGet(), cur = (g.lists[k] || []).find(x => x.id === id); if (!cur) return;
+      cur.title = v.title.slice(0, 120); cur.note = (v.note || '').slice(0, 1000);
+      const to = NF_LISTS.some(x => x[0] === v.list) ? v.list : k;
+      if (to !== k) { g.lists[k] = g.lists[k].filter(x => x.id !== id); g.lists[to].unshift(cur); }
+      nfbSave(g); return () => nfRedraw(); }, 'Save',
+    `<button type="button" class="btn danger" onclick="nfDel('${k}',${jsArg(id)})">Delete</button>`);
+}
+async function nfDel(k, id) {
+  const o = nfbGet(), before = JSON.stringify(o); o.lists[k] = (o.lists[k] || []).filter(x => x.id !== id); nfbSave(o); await closeSheet(); nfRedraw();
+  toast('Card deleted.', 'Undo', () => { try { nfbSave(JSON.parse(before)); } catch (e) { } nfRedraw(); });
+}
+function nfMenu(k) {
+  const user = NF_LISTS.find(x => x[0] === k);
+  const txt = k === 'new' ? 'Titles from Netflix’s “New on Netflix” emails in your Outlook. Tap any card to open it in Netflix or move it to your lists.' : k === 'coming' ? 'Upcoming dated titles from Netflix’s emails in your Outlook.' : 'Your own Netflix list, saved on this phone. Tap a card to open it in Netflix, edit it, move it or delete it.';
+  openSheet(esc(user ? user[1] : k === 'new' ? 'New on Netflix' : 'Coming soon'), `<p class="muted" style="margin:0 0 10px">${esc(txt)}</p><div class="btns"><button type="button" class="btn" onclick="closeSheet().then(()=>{refreshNf(true);toast('Checking Netflix emails…')})">Refresh from Outlook</button><button type="button" class="btn" onclick="closeSheet().then(()=>openStreamApp('netflix'))">${I('tv')} Open Netflix app</button></div>`, null, 'Save', user ? `<button type="button" class="btn primary" onclick="closeSheet().then(()=>nfAdd('${k}'))">${I('plus')} Add a card</button>` : '');
+}
 function NetflixPage() {
   try { refreshNf(); } catch (e) { }
-  const head = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>` + header('New on Netflix', 'From Netflix’s emails to you · NZ');
-  const F = NF && mailConnected('microsoft') ? (NF.fresh || []) : [], C = NF && mailConnected('microsoft') ? (NF.coming || []) : [];
-  const fr = F.map(x => streamRow('netflix', x, x.at ? 'Added ' + fmtW(todayISO(new Date(x.at))) : '')).join(''), co = C.map(x => streamRow('netflix', x, x.date ? 'Coming ' + fmtW(x.date) : '')).join('');
-  return head + `<div class="glzone"><span>🎬 New</span></div>` + (fr ? `<div class="list">${fr}</div>` : '<div class="card empty"><div class="t">Nothing listed right now</div></div>') +
-    (co ? `<div class="glzone"><span>🍿 Coming soon</span></div><div class="list">${co}</div>` : '') +
-    `<div class="foot">Titles and links from Netflix’s “New on Netflix” emails in your Outlook. Tap to open it in the Netflix app. “search” means the email didn’t link that title, so it opens a Netflix search.</div>`;
+  const F = NF && mailConnected('microsoft') ? (NF.fresh || []) : [];
+  const bg = (F.find(x => x.img && /^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(x.img)) || {}).img || '';
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#991b1b,#0f172a)">${bg ? `<img src="${esc(bg)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}</div>
+    <div class="tbtop"><h1>New on Netflix</h1><button class="iconbtn" aria-label="Open Netflix" onclick="openStreamApp('netflix')">${I('tv')}</button></div>
+    <div class="tblists" id="nflists">${nfBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists, and scroll up and down inside each list. Titles and links come from Netflix’s “New on Netflix” emails in your Outlook.</div>`;
 }
 function PrimePage() {
   try { loadPrime(); } catch (e) { }
@@ -16780,6 +16869,7 @@ function nfHtml() {
 function nfPaint() {
   try {
     const h = (location.hash || '#home').slice(1);
+    if (h === 'netflix') { nfRedraw(); return; }
     if ((h !== 'home' && h !== '') || homeEdit) return;
     if (stripOn()) return;
     const html = nfHtml(), cur = document.getElementById('nfnew');
