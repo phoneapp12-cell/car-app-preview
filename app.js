@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.27';
+const APP_VERSION = '2.28.28';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -17823,7 +17823,7 @@ function primeList() {
 }
 async function loadPrime(force) {
   if (!RELAY_URL || navigator.onLine === false) return;
-  if (!force && PRIME && Date.now() - Date.parse(PRIME.checked || 0) < 12 * 3600e3) return;
+  if (!force && PRIME && Array.isArray(PRIME.items) && PRIME.items.some(x => x && x.img) && Date.now() - Date.parse(PRIME.checked || 0) < 12 * 3600e3) return;
   try { const r = await fetch(RELAY_URL + '/prime', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items) && d.items.length) { PRIME = { checked: new Date().toISOString(), source: d.source, items: d.items }; try { localStorage.setItem('primeNew', JSON.stringify(PRIME)); } catch (e) { } if (location.hash === '#prime') prRedraw(); else if (location.hash === '#home' || !location.hash) render(); } } catch (e) { }
 }
 setTimeout(() => loadPrime(), 4000); setInterval(() => loadPrime(), 6 * 3600e3);
@@ -17836,6 +17836,73 @@ function openStreamUrl(k, url) {
   if (/Android/i.test(navigator.userAgent)) { const u = new URL(url); location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;package=${a.pkg};S.browser_fallback_url=${encodeURIComponent(url)};end`; return; }
   window.open(url, '_blank', 'noopener');
 }
+
+const SHOW_IMG_CACHE = (() => { try { return JSON.parse(localStorage.getItem("showImgCache") || "{}") || {}; } catch (e) { return {}; } })();
+const SHOW_FALLBACK_IMG = "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Movie_theater_interior.jpg/960px-Movie_theater_interior.jpg";
+const NF_DEFAULT_PICKS = {
+  fresh: [
+    { title: "The Lincoln Lawyer (Season 3)", sub: "Drama & Mystery Series · Netflix", img: "https://static.tvmaze.com/uploads/images/medium_portrait/613/1532917.jpg" },
+    { title: "The Diplomat (Season 2)", sub: "Political Thriller Series · Netflix", img: "https://static.tvmaze.com/uploads/images/medium_portrait/646/1615567.jpg" },
+    { title: "Territory", sub: "Australian Outback Drama · Netflix", img: "https://static.tvmaze.com/uploads/images/medium_portrait/539/1348216.jpg" },
+    { title: "Outer Banks (Season 4)", sub: "Action Adventure Series · Netflix", img: "https://static.tvmaze.com/uploads/images/medium_portrait/635/1589150.jpg" },
+    { title: "The Gentlemen", sub: "Action Comedy Series · Netflix", img: "https://static.tvmaze.com/uploads/images/medium_portrait/641/1603070.jpg" },
+    { title: "3 Body Problem", sub: "Sci-Fi Mystery Series · Netflix", img: "https://static.tvmaze.com/uploads/images/medium_portrait/507/1268925.jpg" }
+  ],
+  coming: [
+    { title: "The Night Agent (Season 2)", sub: "Action Thriller · Coming soon", img: "https://static.tvmaze.com/uploads/images/medium_portrait/614/1536331.jpg" },
+    { title: "Black Mirror (Season 7)", sub: "Sci-Fi Anthology · Coming soon", img: "https://static.tvmaze.com/uploads/images/medium_portrait/564/1411764.jpg" },
+    { title: "Squid Game (Season 2)", sub: "Thriller Series · Coming soon", img: "https://static.tvmaze.com/uploads/images/medium_portrait/576/1440521.jpg" },
+    { title: "Stranger Things (Season 5)", sub: "Sci-Fi Adventure · Coming soon", img: "https://static.tvmaze.com/uploads/images/medium_portrait/595/1489169.jpg" }
+  ]
+};
+function showPosterFor(x) {
+  if (!x) return SHOW_FALLBACK_IMG;
+  if (x.img && /^https:\/\//i.test(x.img)) return x.img;
+  const k = String(x.title || "").trim().toLowerCase();
+  if (SHOW_IMG_CACHE[k]) return SHOW_IMG_CACHE[k];
+  return "";
+}
+async function fetchShowPoster(imgEl, rawTitle) {
+  if (!imgEl) return;
+  const key = String(rawTitle || "").trim().toLowerCase();
+  if (!key || imgEl.dataset.tried) { imgEl.src = SHOW_FALLBACK_IMG; return; }
+  imgEl.dataset.tried = "1";
+  if (SHOW_IMG_CACHE[key]) { imgEl.src = SHOW_IMG_CACHE[key]; return; }
+  const isSeries = /:\s*s(?:eason)?\s*\d+|\(season\s*\d+\)|\bseries\b/i.test(rawTitle || "");
+  const clean = String(rawTitle || "")
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/:\s*s(?:eason)?\s*\d+.*$/i, "")
+    .replace(/\s+s(?:eason)?\s*\d+.*$/i, "")
+    .replace(/[’‘]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  let found = "";
+  const tryTv = async () => {
+    try {
+      const r = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(clean));
+      if (r.ok) { const j = await r.json(); const u = j && j.image && (j.image.medium || j.image.original); if (u && u.startsWith("https://")) return u; }
+    } catch (e) {}
+    return "";
+  };
+  const tryItunes = async (ent) => {
+    try {
+      const r = await fetch("https://itunes.apple.com/search?country=us&entity=" + ent + "&limit=1&term=" + encodeURIComponent(clean));
+      if (r.ok) { const j = await r.json(); const h = j && j.results && j.results[0]; if (h && h.artworkUrl100) return String(h.artworkUrl100).replace("100x100bb", "600x600bb"); }
+    } catch (e) {}
+    return "";
+  };
+  found = isSeries ? ((await tryTv()) || (await tryItunes("tvSeason"))) : ((await tryItunes("movie")) || (await tryTv()));
+  if (!found) found = SHOW_FALLBACK_IMG;
+  SHOW_IMG_CACHE[key] = found;
+  try { localStorage.setItem("showImgCache", JSON.stringify(SHOW_IMG_CACHE)); } catch (e) {}
+  imgEl.src = found;
+}
+function showCoverHtml(x, grad) {
+  const pic = showPosterFor(x);
+  const blank = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  return `<div class="tbcover" style="background:${grad || "linear-gradient(135deg,#1e293b,#0f172a)"};height:108px;max-height:108px;overflow:hidden"><img src="${esc(pic || blank)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:108px;object-fit:cover;display:block" ${pic ? `onerror="fetchShowPoster(this,${jsArg(x.title || "")})"` : `onload="fetchShowPoster(this,${jsArg(x.title || "")})" onerror="fetchShowPoster(this,${jsArg(x.title || "")})"`}></div>`;
+}
+
 function streamRow(k, x, sub) {
   const id = k === 'netflix' ? (/^\d{5,10}$/.test(x.nfid || '') ? x.nfid : '') : '';
   const url = id ? 'https://www.netflix.com/title/' + id : k === 'netflix' ? 'https://www.netflix.com/search?q=' + encodeURIComponent(x.title) : 'https://www.primevideo.com/search/ref=atv_nb_sr?phrase=' + encodeURIComponent(x.title);
@@ -17860,28 +17927,25 @@ function nfCard(x, kind, sub) {
   const id = /^\d{5,10}$/.test(x.nfid || '') ? x.nfid : '';
   const key = (id || x.title || '').toLowerCase();
   NF_ALL[key] = Object.assign({}, x, { key, sub, kind });
-  const pic = x.img && /^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(x.img) ? x.img : '';
-  const series = /\(Season \d+\)$/i.test(x.title || '');
-  const lbls = [[kind === 'coming' ? '🍿 Coming soon' : '🎬 New', kind === 'coming' ? '#d97706' : '#dc2626']];
+  const series = /\(Season \d+\)|series/i.test((x.title || '') + ' ' + (sub || ''));
+  const lbls = [[kind === 'coming' ? '🍿 Coming soon' : '🎬 New on Netflix', kind === 'coming' ? '#d97706' : '#dc2626']];
   if (series) lbls.push(['Series', '#7c3aed']);
-  if (!id) lbls.push(['Search', '#475569']);
-  return `<button type="button" class="tbcard" onclick="nfOpen(${jsArg(key)})">${pic ? `<div class="tbcover" style="background:linear-gradient(135deg,#991b1b,#0f172a);aspect-ratio:16/9;overflow:hidden"><img src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div>${sub ? `<div class="tbs">${esc(sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>${id ? 'Open in Netflix' : 'Search in Netflix'}</span></div></div></button>`;
+  return `<button type="button" class="tbcard" onclick="nfOpen(${jsArg(key)})">${showCoverHtml(x, "linear-gradient(135deg,#991b1b,#0f172a)")}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div>${sub ? `<div class="tbs">${esc(sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>${id ? 'Open in Netflix' : 'Open in Netflix'}</span></div></div></button>`;
 }
 function nfUserCard(k, c) {
-  const pic = c.img && /^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(c.img) ? c.img : '';
   const col = k === 'want' ? '#2563eb' : k === 'watching' ? '#d97706' : '#16a34a';
   const lbl = (NF_LISTS.find(x => x[0] === k) || [])[1] || '';
-  return `<button type="button" class="tbcard" onclick="nfOpenCard('${k}',${jsArg(c.id)})">${pic ? `<div class="tbcover" style="background:linear-gradient(135deg,#991b1b,#0f172a);aspect-ratio:16/9;overflow:hidden"><img src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl([[lbl, col]])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.length > 90 ? c.note.slice(0, 88) + '…' : c.note)}</div>` : c.sub ? `<div class="tbs">${esc(c.sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Netflix</span>${c.note ? '<span class="tbdesc" aria-label="Has a note">≡</span>' : ''}</div></div></button>`;
+  return `<button type="button" class="tbcard" onclick="nfOpenCard('${k}',${jsArg(c.id)})">${showCoverHtml(c, "linear-gradient(135deg,#991b1b,#0f172a)")}<div class="tbbody">${tbLbl([[lbl, col]])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.length > 90 ? c.note.slice(0, 88) + '…' : c.note)}</div>` : c.sub ? `<div class="tbs">${esc(c.sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Netflix</span>${c.note ? '<span class="tbdesc" aria-label="Has a note">≡</span>' : ''}</div></div></button>`;
 }
 function nfBoardHtml() {
   NF_ALL = {};
   const o = nfbGet(), conn = mailConnected('microsoft');
-  const F = NF && conn ? (NF.fresh || []) : [], C = NF && conn ? (NF.coming || []) : [];
-  const fr = F.map(x => nfCard(x, 'new', x.at ? 'Added ' + fmtW(todayISO(new Date(x.at))) : '')).join('');
-  const co = C.map(x => nfCard(x, 'coming', x.date ? 'Coming ' + fmtW(x.date) : '')).join('');
-  const emptyNew = !conn ? 'Connect Outlook in Settings to read your New on Netflix emails' : nfBusy ? 'Checking your Netflix emails…' : 'Nothing listed right now';
-  return tbList('new', 'New on Netflix', F.length, fr, false, 'nf', emptyNew) +
-    tbList('coming', 'Coming soon', C.length, co, false, 'nf', 'Nothing listed as coming soon') +
+  const rawF = NF && conn && Array.isArray(NF.fresh) && NF.fresh.length ? NF.fresh : NF_DEFAULT_PICKS.fresh;
+  const rawC = NF && conn && Array.isArray(NF.coming) && NF.coming.length ? NF.coming : NF_DEFAULT_PICKS.coming;
+  const fr = rawF.map(x => nfCard(x, 'new', x.sub || (x.at ? 'Added ' + fmtW(todayISO(new Date(x.at))) : 'Netflix NZ'))).join('');
+  const co = rawC.map(x => nfCard(x, 'coming', x.sub || (x.date ? 'Coming ' + fmtW(x.date) : 'Coming soon'))).join('');
+  return tbList('new', 'New on Netflix', rawF.length, fr, false, 'nf', 'Nothing listed right now') +
+    tbList('coming', 'Coming soon', rawC.length, co, false, 'nf', 'Nothing listed as coming soon') +
     NF_LISTS.map(([k, t]) => tbList(k, t, o.lists[k].length, o.lists[k].map(c => nfUserCard(k, c)).join(''), true, 'nf', 'Tap a title or + Add a card')).join('');
 }
 function nfRedraw() { const el = document.getElementById('nflists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = nfBoardHtml(); el.scrollLeft = x; }
@@ -17889,7 +17953,8 @@ function nfOpen(key) {
   const x = NF_ALL[key]; if (!x) return;
   const o = nfbGet(), url = nfUrlOf(x);
   const where = NF_LISTS.filter(([k]) => o.lists[k].some(c => (c.title || '').toLowerCase() === (x.title || '').toLowerCase())).map(([, t]) => t);
-  const pic = x.img && /^https:\/\/[a-z0-9.-]*nflximg\.net\//.test(x.img) ? `<img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin-bottom:10px" onerror="this.remove()">` : '';
+  const picUrl = showPosterFor(x);
+  const pic = `<img src="${esc(picUrl || SHOW_FALLBACK_IMG)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:210px;object-fit:cover;border-radius:12px;margin-bottom:10px" ${picUrl ? "" : `onload="fetchShowPoster(this,${jsArg(x.title || "")})"`} onerror="this.remove()">`;
   openSheet(esc(x.title), `${pic}${x.sub ? `<p class="muted" style="margin:0 0 10px">${esc(x.sub)}${x.nfid ? '' : ' · opens Netflix search'}</p>` : ''}
     <div class="btns" style="margin-bottom:12px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>openStreamUrl('netflix',${jsArg(url)}))">${I('tv')} Open in Netflix</button>${x.link ? `<a class="btn" href="${esc(x.link)}" target="_blank" rel="noopener">Open email ›</a>` : ''}</div>
     <div class="tbmove"><div class="lbl">Move to…</div>${where.length ? `<div class="muted" style="font-size:.8125rem;margin-bottom:6px">Already in ${esc(where.join(', '))}</div>` : ''}<div class="chips">${NF_LISTS.map(([k, t]) => `<button type="button" class="chip" onclick="nfCopyTitle(${jsArg(key)},'${k}')">${esc(t)}</button>`).join('')}</div></div>`, null);
@@ -17957,15 +18022,15 @@ function prUrlOf(x) {
 function prCard(x, kind, sub) {
   const key = String(x.title || '').toLowerCase();
   PR_ALL[key] = Object.assign({}, x, { key, sub, kind });
-  const series = /\b(season\s+\d+|series|s\d+e\d+|episode)\b/i.test(x.title || '');
+  const series = /\b(season\s+\d+|series|s\d+e\d+|: ?s\d+|episode)\b/i.test(x.title || '');
   const lbls = [[kind === 'coming' ? '🍿 Coming soon' : '📺 New on Prime', kind === 'coming' ? '#d97706' : '#0284c7']];
   lbls.push([series ? 'Series' : 'Movie / Show', series ? '#7c3aed' : '#0d9488']);
-  return `<button type="button" class="tbcard" onclick="prOpen(${jsArg(key)})"><div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div>${sub ? `<div class="tbs">${esc(sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Search in Prime Video</span></div></div></button>`;
+  return `<button type="button" class="tbcard" onclick="prOpen(${jsArg(key)})">${showCoverHtml(x, "linear-gradient(135deg,#0284c7,#0f172a)")}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div>${sub ? `<div class="tbs">${esc(sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Open in Prime Video</span></div></div></button>`;
 }
 function prUserCard(k, c) {
   const col = k === 'want' ? '#2563eb' : k === 'watching' ? '#d97706' : '#16a34a';
   const lbl = (PR_LISTS.find(x => x[0] === k) || [])[1] || '';
-  return `<button type="button" class="tbcard" onclick="prOpenCard('${k}',${jsArg(c.id)})"><div class="tbbody">${tbLbl([[lbl, col]])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.length > 90 ? c.note.slice(0, 88) + '…' : c.note)}</div>` : c.sub ? `<div class="tbs">${esc(c.sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Prime Video</span>${c.note ? '<span class="tbdesc" aria-label="Has a note">≡</span>' : ''}</div></div></button>`;
+  return `<button type="button" class="tbcard" onclick="prOpenCard('${k}',${jsArg(c.id)})">${showCoverHtml(c, "linear-gradient(135deg,#0284c7,#0f172a)")}<div class="tbbody">${tbLbl([[lbl, col]])}<div class="tbt">${esc(c.title)}</div>${c.note ? `<div class="tbs">${esc(c.note.length > 90 ? c.note.slice(0, 88) + '…' : c.note)}</div>` : c.sub ? `<div class="tbs">${esc(c.sub)}</div>` : ''}<div class="tbicons">${I('tv')}<span>Prime Video</span>${c.note ? '<span class="tbdesc" aria-label="Has a note">≡</span>' : ''}</div></div></button>`;
 }
 function prBoardHtml() {
   PR_ALL = {};
@@ -17984,7 +18049,7 @@ function prOpen(key) {
   const x = PR_ALL[key]; if (!x) return;
   const o = prbGet(), url = prUrlOf(x);
   const where = PR_LISTS.filter(([k]) => o.lists[k].some(c => (c.title || '').toLowerCase() === (x.title || '').toLowerCase())).map(([, t]) => t);
-  openSheet(esc(x.title), `${x.sub ? `<p class="muted" style="margin:0 0 10px">${esc(x.sub)} · opens Prime Video search</p>` : ''}
+  const picUrl = showPosterFor(x); const pic = `<img src="${esc(picUrl || SHOW_FALLBACK_IMG)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:210px;object-fit:cover;border-radius:12px;margin-bottom:10px" ${picUrl ? "" : `onload="fetchShowPoster(this,${jsArg(x.title || "")})"`} onerror="this.remove()">`; openSheet(esc(x.title), `${pic}${x.sub ? `<p class="muted" style="margin:0 0 10px">${esc(x.sub)} · opens Prime Video search</p>` : ''}
     <div class="btns" style="margin-bottom:12px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>openStreamUrl('prime',${jsArg(url)}))">${I('tv')} Open in Prime Video</button></div>
     <div class="tbmove"><div class="lbl">Move to…</div>${where.length ? `<div class="muted" style="font-size:.8125rem;margin-bottom:6px">Already in ${esc(where.join(', '))}</div>` : ''}<div class="chips">${PR_LISTS.map(([k, t]) => `<button type="button" class="chip" onclick="prCopyTitle(${jsArg(key)},'${k}')">${esc(t)}</button>`).join('')}</div></div>`, null);
 }
@@ -17994,7 +18059,7 @@ async function prCopyTitle(key, k) {
   const tl = (x.title || '').toLowerCase();
   if (o.lists[k].some(c => (c.title || '').toLowerCase() === tl)) { toast('Already in ' + t + '.'); return; }
   PR_LISTS.forEach(([j]) => { o.lists[j] = o.lists[j].filter(c => (c.title || '').toLowerCase() !== tl); });
-  o.lists[k].unshift({ id: uid('pr'), title: x.title, sub: x.sub || '', note: '' });
+  o.lists[k].unshift({ id: uid('pr'), title: x.title, img: x.img || showPosterFor(x) || '', sub: x.sub || '', note: '' });
   prbSave(o); await closeSheet(); prRedraw(); toast(x.title + ' moved to ' + t + '.');
 }
 function prAdd(k) {
@@ -30533,6 +30598,24 @@ const LIVE_TV_CHANNELS = [
   { id: "abc-news-au", name: "ABC News Australia 24/7", cat: "nz", catLabel: "🇦🇺 Australia Live", country: "Australia", desc: "Australia’s 24-hour public broadcasting news & current affairs channel", hls: "https://abc-news-dmd-streams-1.akamaized.net/out/v1/701126012d044971b3fa89406a440133/index.m3u8", web: "https://www.abc.net.au/news/newschannel/" },
   { id: "sky-news-au", name: "Sky News Australia Live", cat: "nz", catLabel: "🇦🇺 Australia Live", country: "Australia", desc: "Live Australian & trans-Tasman breaking news, politics and weather", hls: "https://skynewsau-live-premium.akamaized.net/hls/live/2105299/skynews/live.m3u8", web: "https://www.skynews.com.au/" },
 
+  // 1b. 🇬🇧 UK & British TV Live (16 channels)
+  { id: "bbc-news-uk", name: "BBC News HD (UK)", cat: "uk", catLabel: "🇬🇧 BBC News", country: "UK · London", desc: "24/7 live breaking news, UK & international journalism from the BBC", hls: "https://vs-hls-push-ww-live.akamaized.net/x=4/i=urn:bbc:pips:service:bbc_news_channel_hd/mobile_wifi_main_hd_abr_v2.m3u8", web: "https://www.bbc.com/news" },
+  { id: "gb-news-uk", name: "GB News Live (UK)", cat: "uk", catLabel: "🇬🇧 UK News & Talk", country: "UK · London", desc: "24/7 live British news, debate, politics & opinion from across the UK", hls: "https://cdn-apse1-prod.tsv2.amagi.tv/linear/amg01076-lightningintern-gbnewsnz-samsungnz/playlist.m3u8", web: "https://www.gbnews.com/watchlive" },
+  { id: "talktv-uk", name: "TalkTV Live (UK)", cat: "uk", catLabel: "🇬🇧 UK News & Talk", country: "UK · London", desc: "24/7 live British news, current affairs, talk shows & commentary", hls: "https://488f4ce4.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/TEctZ2JfVGFsa19ITFM/playlist.m3u8", web: "https://talk.tv/" },
+  { id: "cnbc-uk", name: "CNBC UK & Europe Live", cat: "uk", catLabel: "🇬🇧 London Markets", country: "UK · London", desc: "Live financial news, FTSE/European markets, tech & business from London", hls: "https://amg01079-nbcuuk-amg01079c2-samsung-gb-1258.playouts.now.amagi.tv/playlist.m3u8", web: "https://www.cnbc.com/world/" },
+  { id: "sky-weather-uk", name: "Sky News Weather (UK)", cat: "uk", catLabel: "🇬🇧 UK Weather", country: "UK · London", desc: "Continuous UK & European weather forecasts from Sky News", hls: "https://distro001-gb-hls1-prd.delivery.skycdp.com/easel_cdn/ngrp:weather_loop.stream_all/playlist.m3u8", web: "https://news.sky.com/weather" },
+  { id: "bbc-earth-uk", name: "BBC Earth 24/7", cat: "uk", catLabel: "🇬🇧 BBC Nature", country: "UK · BBC Studios", desc: "24/7 iconic BBC natural history, science & wildlife documentaries", hls: "https://aegis-cloudfront-1.tubi.video/bb1fc6ad-9948-42ea-aaf3-20acfcdeecac/playlist.m3u8", web: "https://www.bbcearth.com/" },
+  { id: "bbc-drama-uk", name: "BBC Drama 24/7", cat: "uk", catLabel: "🇬🇧 British Drama", country: "UK · BBC Studios", desc: "24/7 acclaimed British drama series, mysteries & period classics", hls: "https://amg00793-amg00793c40-rakuten-es-5444.playouts.now.amagi.tv/playlist.m3u8", web: "https://www.bbc.co.uk/drama" },
+  { id: "midsomer-murders-uk", name: "Midsomer Murders 24/7 (UK)", cat: "uk", catLabel: "🇬🇧 British Mystery", country: "UK", desc: "24/7 back-to-back episodes of the classic British detective mystery series", hls: "https://all3media-midsomer-1-us.roku.wurl.tv/playlist.m3u8", web: "https://www.itv.com/" },
+  { id: "doctor-who-uk", name: "Doctor Who Classic 24/7 (BBC)", cat: "uk", catLabel: "🇬🇧 BBC Sci-Fi", country: "UK · BBC", desc: "24/7 classic Doctor Who adventures across time and space with the TARDIS", hls: "https://bbc-classicdrwho-1-us.roku.wurl.tv/playlist.m3u8", web: "https://www.doctorwho.tv/" },
+  { id: "antiques-roadshow-uk", name: "Antiques Roadshow UK 24/7 (BBC)", cat: "uk", catLabel: "🇬🇧 BBC Lifestyle", country: "UK · BBC", desc: "24/7 British Antiques Roadshow valuations, history & hidden treasures", hls: "https://bbc-antiquesroadshowuk-1-us.roku.wurl.tv/playlist.m3u8", web: "https://www.bbc.co.uk/" },
+  { id: "history-hit-uk", name: "History Hit / Timeline (UK)", cat: "uk", catLabel: "🇬🇧 British History", country: "UK · Dan Snow", desc: "24/7 British & world history documentaries from Dan Snow’s History Hit & Timeline", hls: "https://timeline-samsung-uk.amagi.tv/playlist.m3u8", web: "https://www.historyhit.com/" },
+  { id: "wonder-uk", name: "Wonder Science & Engineering (UK)", cat: "uk", catLabel: "🇬🇧 UK Engineering", country: "UK", desc: "24/7 mega-engineering, aviation, infrastructure & science documentaries", hls: "https://wonder-samsung-uk.amagi.tv/playlist.m3u8", web: "https://www.littledotstudios.com/" },
+  { id: "now-70s-uk", name: "NOW 70s Music TV (UK)", cat: "uk", catLabel: "🇬🇧 UK 70s Hits", country: "UK · NOW Music", desc: "24/7 classic 1970s British & international pop, rock, glam & disco hits", hls: "https://lightning-now70s-rakuten.amagi.tv/playlist.m3u8", web: "https://www.nowmusic.com/" },
+  { id: "now-80s-uk", name: "NOW 80s Music TV (UK)", cat: "uk", catLabel: "🇬🇧 UK 80s Hits", country: "UK · NOW Music", desc: "24/7 non-stop 1980s British synth-pop, new wave & chart classics", hls: "https://lightning-now80s-rakuten.amagi.tv/playlist.m3u8", web: "https://www.nowmusic.com/" },
+  { id: "now-rock-uk", name: "NOW Rock / 90s Music TV (UK)", cat: "uk", catLabel: "🇬🇧 UK Rock & 90s", country: "UK · NOW Music", desc: "24/7 Britpop, 90s anthems, classic rock & alternative music videos", hls: "https://lightning-now90s-rakuten.amagi.tv/playlist.m3u8", web: "https://www.nowmusic.com/" },
+  { id: "trace-uk", name: "Trace UK Music TV", cat: "uk", catLabel: "🇬🇧 UK Urban & Hits", country: "UK · London", desc: "24/7 UK chart hits, R&B, dance & British urban music videos", hls: "https://d2l4tng0wskzvn.cloudfront.net/Trace_GB.m3u8", web: "https://trace.tv/" },
+
   // 2. 🎬 Movies, Sci-Fi & Action 24/7 (17 channels)
   { id: "moviesphere", name: "MovieSphere NZ 24/7", cat: "movies", catLabel: "🎬 Blockbusters", country: "NZ / Lionsgate", desc: "24/7 free streaming movies — action, thrillers, sci-fi, drama & modern classics", hls: "https://mediapackage-ms-source.fullscreen.nz/index.m3u8", web: "https://www.threenow.co.nz/" },
   { id: "moviesphere-gold", name: "MovieSphere Gold", cat: "movies", catLabel: "🎬 Iconic Movies", country: "USA / Global", desc: "24/7 acclaimed Hollywood movies, mystery thrillers & box-office favourites", hls: "https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg01438-ewscrippscompan-ionmystery-tablo/playlist.m3u8", web: "https://moviespheregold.com/" },
@@ -30637,16 +30720,27 @@ const LIVE_TV_CHANNELS = [
 ];
 
 const LTV_KEY = "liveTvBoard";
-let ltvCur = { idx: 0, custom: null, filt: "all", q: "", hits: [], searching: false, hlsInst: null };
+const LTV_DEFAULT_PRESETS = [
+  "three-nz", "bravo-nz", "skyopen-nz", "bbc-news-uk", "gb-news-uk", "mythbusters",
+  "moviesphere", "midsomer-murders-uk", "bbc-earth-uk", "drybar-comedy", "nasa-tv", "now-80s-uk"
+];
+let ltvCur = { idx: 0, bank: 0, setMode: false, custom: null, filt: "all", q: "", hits: [], searching: false, hlsInst: null };
 function ltvGet() {
   try {
     const o = JSON.parse(localStorage.getItem(LTV_KEY) || "null");
-    if (o && Array.isArray(o.saved)) return o;
+    if (o && Array.isArray(o.saved)) {
+      if (!Array.isArray(o.presets) || o.presets.length !== 12) o.presets = LTV_DEFAULT_PRESETS.slice();
+      return o;
+    }
   } catch (e) {}
-  return { saved: ["three-nz", "mythbusters", "moviesphere", "dust-scifi", "drybar-comedy", "hgtv-nz", "nasa-tv", "qello-concerts"], custom: [] };
+  return { saved: LTV_DEFAULT_PRESETS.slice(0, 8), presets: LTV_DEFAULT_PRESETS.slice(), custom: [] };
 }
 function ltvSave(o) {
   try { localStorage.setItem(LTV_KEY, JSON.stringify(o)); } catch (e) {}
+}
+function ltvPresets() {
+  const o = ltvGet();
+  return Array.isArray(o.presets) && o.presets.length === 12 ? o.presets : LTV_DEFAULT_PRESETS.slice();
 }
 function ltvAllChannels() {
   const o = ltvGet();
@@ -30678,6 +30772,59 @@ function ltvToggleSave(id) {
   }
   ltvSave(o);
   ltvRedraw();
+}
+function ltvBank(b) {
+  ltvCur.bank = b === 1 ? 1 : 0;
+  const p = document.getElementById("ltvplayer");
+  if (p) p.outerHTML = ltvPlayerHtml();
+  setTimeout(ltvMountVideo, 30);
+}
+function ltvToggleSet() {
+  ltvCur.setMode = !ltvCur.setMode;
+  const p = document.getElementById("ltvplayer");
+  if (p) p.outerHTML = ltvPlayerHtml();
+  setTimeout(ltvMountVideo, 30);
+}
+function ltvTapPreset(slot) {
+  const o = ltvGet(), presets = ltvPresets(), realSlot = ltvCur.bank * 6 + slot;
+  const cur = ltvCurrentChannel();
+  if (ltvCur.setMode && cur) {
+    if (!ltvAllChannels().some(x => x.id === cur.id)) o.custom = (o.custom || []).concat(cur);
+    presets[realSlot] = cur.id;
+    o.presets = presets;
+    ltvSave(o);
+    ltvCur.setMode = false;
+    toast(`Saved ${cur.name} to TV Preset P${realSlot + 1}`);
+    ltvRedraw();
+    return;
+  }
+  const targetId = presets[realSlot];
+  if (targetId) ltvPlayId(targetId);
+}
+function ltvAssignSheet(chId) {
+  const all = ltvAllChannels();
+  const ch = chId ? all.find(x => x.id === chId) : ltvCurrentChannel();
+  if (!ch) return;
+  const presets = ltvPresets();
+  const rows = presets.map((pid, slot) => {
+    const cur = all.find(x => x.id === pid);
+    return `<button type="button" class="row" onclick="ltvAssignSlot(${jsArg(ch.id)},${slot})"><div class="ic tv"><b>P${slot + 1}</b></div><div class="tx"><div class="t">Preset ${slot + 1} ${slot < 6 ? "(CH 1 · 1–6)" : "(CH 2 · 7–12)"}</div><div class="s">Currently: ${esc(cur ? cur.name + " · " + (cur.catLabel || cur.country || "") : "Empty")}</div></div></button>`;
+  }).join("");
+  openSheet(`Save ${esc(ch.name)} to TV Preset`, `<p class="muted" style="margin:0 0 10px">Choose which Live TV preset button (<b>P1–P12</b>) should tune straight to <b>${esc(ch.name)}</b>:</p><div class="list">${rows}</div>`, null);
+}
+function ltvAssignSlot(chId, slot) {
+  const o = ltvGet(), presets = ltvPresets(), all = ltvAllChannels();
+  const ch = all.find(x => x.id === chId) || ltvCurrentChannel();
+  if (!ch) return;
+  if (!all.some(x => x.id === ch.id)) o.custom = (o.custom || []).concat(ch);
+  presets[slot] = ch.id;
+  o.presets = presets;
+  ltvSave(o);
+  ltvCur.bank = slot >= 6 ? 1 : 0;
+  ltvCur.setMode = false;
+  closeSheet();
+  toast(`Saved ${ch.name} to TV Preset P${slot + 1}`);
+  ltvPlayId(ch.id);
 }
 function ltvEnsureHlsJs() {
   if (window.Hls) return Promise.resolve(window.Hls);
@@ -30799,63 +30946,87 @@ function ltvPlayerHtml() {
   if (!ch) return "";
   const saved = ltvIsSaved(ch);
   const all = ltvAllChannels();
-  const presets = ltvGet().saved.map(id => all.find(x => x.id === id)).filter(Boolean).slice(0, 8);
+  const presets = ltvPresets();
+  const activePresetNum = presets.indexOf(ch.id) + 1;
+  const bankOffset = ltvCur.bank * 6;
+  const presetBtns = [0, 1, 2, 3, 4, 5].map(slot => {
+    const pid = presets[bankOffset + slot];
+    const pch = all.find(x => x.id === pid) || all[0];
+    const isTuned = pch && pch.id === ch.id;
+    const shortCat = String(pch.catLabel || pch.country || "TV").replace(/^[^A-Za-z0-9]+/, "").slice(0, 12);
+    return `<button type="button" class="cs-pbtn${isTuned ? " on playing" : ""}${ltvCur.setMode ? " setmode" : ""}" onclick="ltvTapPreset(${slot})">
+      <div class="cs-ptop"><span class="cs-pnum">P${bankOffset + slot + 1}</span><span class="cs-pled"></span></div>
+      <div class="cs-pfreq" style="font-size:.76rem">${esc(shortCat)}</div>
+      <div class="cs-pname">${esc(pch.name.replace(/\s*\(Live\)|\s*24\/7/gi, ""))}</div>
+    </button>`;
+  }).join("");
+
   let screen = "";
   if (ch.yt) {
     screen = `<iframe src="https://www.youtube-nocookie.com/embed/${esc(ch.yt)}?autoplay=1&playsinline=1&rel=0" title="${esc(ch.name)}" style="width:100%;height:100%;border:0;display:block" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
   } else {
     screen = `<video id="ltv-video" controls autoplay playsinline style="width:100%;height:100%;background:#000;display:block;object-fit:contain"></video>`;
   }
-  return `<div class="card" id="ltvplayer" style="margin:0 4px 12px;padding:12px;background:linear-gradient(165deg,#0f172a,#1e1b4b);color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:18px;box-shadow:0 12px 30px rgba(0,0,0,.35)">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span class="tblbl" style="background:#dc2626;font-size:.72rem;padding:3px 9px">● LIVE TV</span>
-        <span class="tblbl" style="background:#2563eb;font-size:.72rem;padding:3px 9px">${esc(ch.catLabel || ch.country || "Free Stream")}</span>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button type="button" class="chip${saved ? " on" : ""}" style="padding:4px 10px;font-size:.75rem" onclick="ltvToggleSave(${jsArg(ch.id)})">${saved ? "★ Saved" : "☆ Save"}</button>
-        <button type="button" class="chip" style="padding:4px 10px;font-size:.75rem" onclick="ltvFullscreen()">⛶ Fullscreen</button>
+  return `<div class="carstereo is-playing" id="ltvplayer" style="margin:0 4px 12px">
+    <div class="cs-bezel-top">
+      <div class="cs-brand"><span class="cs-dot"></span>LIVE TV TUNER ${activePresetNum ? `· P${activePresetNum}` : ""}</div>
+      <div class="cs-banks">
+        <button type="button" class="cs-bchip${ltvCur.bank === 0 ? " on" : ""}" onclick="ltvBank(0)">CH 1 <small>1–6</small></button>
+        <button type="button" class="cs-bchip${ltvCur.bank === 1 ? " on" : ""}" onclick="ltvBank(1)">CH 2 <small>7–12</small></button>
+        <button type="button" class="cs-bchip cs-setbtn${ltvCur.setMode ? " on" : ""}" onclick="ltvToggleSet()">${ltvCur.setMode ? "★ TAP 1–6" : "★ SET"}</button>
       </div>
     </div>
-    <div id="ltv-screen" style="aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(255,255,255,.1)">${screen}</div>
+    <div id="ltv-screen" style="aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(56,189,248,.25)">${screen}</div>
+    ${ltvCur.setMode ? `<div class="cs-set-banner" style="margin-bottom:10px">Tap any preset button below (<b>P${bankOffset + 1}–P${bankOffset + 6}</b>) to save <b>${esc(ch.name)}</b></div>` : ""}
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
       <div style="min-width:0;flex:1">
-        <div style="font-weight:800;font-size:1.06rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)}</div>
-        <div style="font-size:.82rem;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.desc || ch.country || "")}</div>
-      </div>
-      <div style="display:flex;gap:6px;flex:none">
-        <button type="button" class="iconbtn" style="width:38px;height:38px;background:rgba(255,255,255,.14);color:#fff" aria-label="Previous channel" title="Previous channel" onclick="ltvStep(-1)">⏮</button>
-        <button type="button" class="iconbtn" style="width:38px;height:38px;background:rgba(255,255,255,.14);color:#fff" aria-label="Next channel" title="Next channel" onclick="ltvStep(1)">⏭</button>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <span class="tblbl" style="background:#dc2626;font-size:.68rem;padding:2px 7px">● LIVE</span>
+          <span class="tblbl" style="background:#2563eb;font-size:.68rem;padding:2px 7px">${esc(ch.catLabel || ch.country || "Free TV")}</span>
+          ${activePresetNum ? `<span class="tblbl" style="background:#ca8a04;font-size:.68rem;padding:2px 7px">PRESET P${activePresetNum}</span>` : ""}
+        </div>
+        <div style="font-weight:800;font-size:1.05rem;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)}</div>
+        <div style="font-size:.8rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.desc || ch.country || "")}</div>
       </div>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-      <button type="button" class="btn small" style="background:rgba(37,99,235,.88);color:#fff;border:0;font-weight:700" onclick="openAudioOutputPicker('Live TV')">🔊 Bluetooth / Output</button>
-      <button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="ltvAddCustomSheet()">+ Add Stream URL</button>
-      ${ch.web ? `<a class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0;text-decoration:none" href="${esc(ch.web)}" target="_blank" rel="noopener">↗ Channel Site</a>` : ""}
+    <div class="cs-controls" style="margin:8px 0 12px">
+      <button type="button" class="cs-hbtn" onclick="ltvStep(-1)" aria-label="Previous channel"><span>|◀◀</span><small>CH −</small></button>
+      <button type="button" class="cs-hbtn" onclick="ltvStep(1)" aria-label="Next channel"><span>▶▶|</span><small>CH +</small></button>
+      <button type="button" class="cs-hbtn${saved ? " on" : ""}" style="${saved ? "border-color:#eab308;color:#fde047;background:rgba(234,179,8,.18)" : ""}" onclick="ltvToggleSave(${jsArg(ch.id)})"><span>${saved ? "★" : "☆"}</span><small>${saved ? "SAVED" : "SAVE"}</small></button>
+      <button type="button" class="cs-hbtn" onclick="ltvAssignSheet(${jsArg(ch.id)})"><span>📌</span><small>PRESET</small></button>
+      <button type="button" class="cs-hbtn" onclick="openAudioOutputPicker('Live TV')"><span>🔊</span><small>BT / OUT</small></button>
+      <button type="button" class="cs-hbtn" onclick="ltvFullscreen()"><span>⛶</span><small>FULL</small></button>
     </div>
-    ${presets.length ? `<div style="display:flex;gap:6px;overflow-x:auto;padding-top:4px">${presets.map((p, idx) => `<button type="button" class="chip${p.id === ch.id ? " on" : ""}" style="font-size:.74rem;padding:4px 9px;white-space:nowrap" onclick="ltvPlayId(${jsArg(p.id)})"><b>CH ${idx + 1}</b> · ${esc(p.name.replace(/\s*\(Live\)|\s*24\/7/gi, ""))}</button>`).join("")}</div>` : ""}
+    <div class="cs-presets-head">
+      <span>TV PRESET BUTTONS (${ltvCur.bank === 0 ? "CH 1 · P1–P6" : "CH 2 · P7–P12"})</span>
+      <button type="button" class="cs-assign-link" onclick="ltvAssignSheet(${jsArg(ch.id)})">Assign ${esc(ch.name)} to P1–P12…</button>
+    </div>
+    <div class="cs-presets">${presetBtns}</div>
   </div>`;
 }
 function ltvCardHtml(ch, badgeCol) {
   const cur = ltvCurrentChannel();
   const isPlaying = cur && (cur.id === ch.id || (cur.hls && cur.hls === ch.hls));
   const saved = ltvIsSaved(ch);
+  const pSlot = ltvPresets().indexOf(ch.id) + 1;
   const lbls = [[ch.catLabel || ch.country || "Live TV", badgeCol || "#2563eb"]];
+  if (pSlot) lbls.push([`Preset P${pSlot}`, "#ca8a04"]);
   if (isPlaying) lbls.push(["● Watching Now", "#dc2626"]);
   return `<div class="tbcard" style="cursor:pointer;${isPlaying ? "outline:2px solid #ef4444" : ""}" onclick="ltvPlayId(${jsArg(ch.id)})">
     <div class="tbbody">
       ${tbLbl(lbls)}
       <div class="tbt">${isPlaying ? "📺 " : "▶ "}${esc(ch.name)}</div>
       <div class="tbs">${esc(ch.desc || ch.country || "")}</div>
-      <div style="display:flex;gap:6px;margin-top:8px" onclick="event.stopPropagation()">
-        <button type="button" class="btn small${isPlaying ? " primary" : ""}" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayId(${jsArg(ch.id)})">${isPlaying ? "● Watching" : "▶ Watch in Player"}</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px" onclick="event.stopPropagation()">
+        <button type="button" class="btn small${isPlaying ? " primary" : ""}" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayId(${jsArg(ch.id)})">${isPlaying ? "● Watching" : "▶ Watch"}</button>
+        <button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem" onclick="ltvAssignSheet(${jsArg(ch.id)})">P${pSlot || "+"}</button>
         <button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem" onclick="ltvToggleSave(${jsArg(ch.id)})">${saved ? "★ Saved" : "☆ Save"}</button>
       </div>
     </div>
   </div>`;
 }
 function ltvMenu(k) {
-  openSheet("Live TV Channels", `<p class="muted" style="margin:0 0 10px">Tap any channel card to watch it live inside the widescreen TV player at the top of the page. All sport channels are excluded. You can also search 1,000+ free worldwide internet TV streams or add any custom <code>.m3u8</code> stream.</p>`, null, "",
+  openSheet("Live TV Channels", `<p class="muted" style="margin:0 0 10px">Tap any channel card to watch it live inside the widescreen TV player at the top of the page. Use <b>P+</b> or <b>★ SET</b> to save your favourite channels to the 12 Car-Stereo-style preset buttons (<b>P1–P12</b> across CH 1 and CH 2).</p>`, null, "",
     `<button type="button" class="btn primary" onclick="closeSheet().then(()=>ltvAddCustomSheet())">${I("plus")} Add custom channel</button>`);
 }
 function ltvAddCustomSheet() {
@@ -30881,6 +31052,7 @@ function ltvBoardHtml() {
   const all = ltvAllChannels();
   const o = ltvGet();
   const nzAu = all.filter(c => c.cat === "nz");
+  const uk = all.filter(c => c.cat === "uk");
   const movies = all.filter(c => c.cat === "movies");
   const comedy = all.filter(c => c.cat === "comedy");
   const home = all.filter(c => c.cat === "home");
@@ -30888,7 +31060,8 @@ function ltvBoardHtml() {
   const space = all.filter(c => c.cat === "space");
   const news = all.filter(c => c.cat === "news");
   const music = all.filter(c => c.cat === "music");
-  const saved = o.saved.map(id => all.find(c => c.id === id)).filter(Boolean);
+  const presetIds = ltvPresets();
+  const saved = [...new Set([...presetIds, ...(o.saved || [])])].map(id => all.find(c => c.id === id)).filter(Boolean);
   const f = ltvCur.filt;
   const cols = [];
   if (ltvCur.q.trim().length >= 2 || ltvCur.hits.length > 0) {
@@ -30902,6 +31075,7 @@ function ltvBoardHtml() {
     cols.push(tbList("search", `🔍 Free TV Search (“${ltvCur.q.trim()}”)`, ltvCur.hits.length, searchCards || (ltvCur.searching ? "Searching worldwide free TV directory…" : "No matching free TV streams"), false, "ltv"));
   }
   if (f === "all" || f === "nz") cols.push(tbList("nz", "🇳🇿 NZ & Australia Freeview Live", nzAu.length, nzAu.map(c => ltvCardHtml(c, "#16a34a")).join(""), false, "ltv"));
+  if (f === "all" || f === "uk") cols.push(tbList("uk", "🇬🇧 UK & British TV Live", uk.length, uk.map(c => ltvCardHtml(c, "#1d4ed8")).join(""), false, "ltv"));
   if (f === "all" || f === "movies") cols.push(tbList("movies", "🎬 Movies, Sci-Fi & Action 24/7", movies.length, movies.map(c => ltvCardHtml(c, "#e11d48")).join(""), false, "ltv"));
   if (f === "all" || f === "comedy") cols.push(tbList("comedy", "😂 Comedy, Sitcoms & Classic TV 24/7", comedy.length, comedy.map(c => ltvCardHtml(c, "#d97706")).join(""), false, "ltv"));
   if (f === "all" || f === "home") cols.push(tbList("home", "🔨 Home, Reno, Cooking, Cars & DIY 24/7", home.length, home.map(c => ltvCardHtml(c, "#0d9488")).join(""), false, "ltv"));
@@ -30909,21 +31083,22 @@ function ltvBoardHtml() {
   if (f === "all" || f === "space") cols.push(tbList("space", "🚀 Space, Science, Nature, Pets & Weather", space.length, space.map(c => ltvCardHtml(c, "#0891b2")).join(""), false, "ltv"));
   if (f === "all" || f === "news") cols.push(tbList("news", "🌍 World News 24/7 (English)", news.length, news.map(c => ltvCardHtml(c, "#2563eb")).join(""), false, "ltv"));
   if (f === "all" || f === "music") cols.push(tbList("music", "🎵 Music TV (70s, 80s, 90s, Rock & Concerts)", music.length, music.map(c => ltvCardHtml(c, "#7c3aed")).join(""), false, "ltv"));
-  if (f === "all" || f === "saved") cols.push(tbList("saved", "⭐ Saved & Preset Channels", saved.length, saved.map(c => ltvCardHtml(c, "#ca8a04")).join(""), false, "ltv", "Tap ☆ Save on any channel"));
+  if (f === "all" || f === "saved") cols.push(tbList("saved", "⭐ Saved & Preset Channels", saved.length, saved.map(c => ltvCardHtml(c, "#ca8a04")).join(""), false, "ltv", "Tap ☆ Save or P+ on any channel"));
   return cols.join("");
 }
 function ltvChipsHtml() {
   return [
     ["all", "All (" + ltvAllChannels().length + ")"],
     ["nz", "🇳🇿 NZ & Australia"],
+    ["uk", "🇬🇧 UK & British TV"],
     ["movies", "🎬 Movies & Sci-Fi"],
     ["comedy", "😂 Comedy & Sitcoms"],
     ["home", "🔨 Home, Cooking & Cars"],
     ["doco", "🔍 True Crime & History"],
     ["space", "🚀 Space, Nature & Weather"],
     ["news", "🌍 World News 24/7"],
-    ["music", "🎵 Music TV (70s/80s/90s/Rock)"],
-    ["saved", "⭐ Saved"]
+    ["music", "🎵 Music TV"],
+    ["saved", "⭐ Presets & Saved"]
   ].map(([k, lbl]) => `<button type="button" class="chip${ltvCur.filt === k ? " on" : ""}" onclick="ltvCur.filt='${k}';ltvRedrawBoard()">${esc(lbl)}</button>`).join("");
 }
 function ltvRedrawBoard() {
@@ -30942,16 +31117,16 @@ function LiveTvPage() {
   setTimeout(ltvMountVideo, 60);
   return `<button class="back" onclick="go('#media')">${I("left")} Entertainment</button>
     <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">
-      <label class="search" style="flex:1;margin:0">${I("search")}<input type="search" placeholder="Search 1,000+ free worldwide TV channels (NASA, BBC, movies, comedy, music…)" value="${esc(ltvCur.q)}" aria-label="Search free live TV channels" oninput="ltvSearchInput(this.value)"></label>
+      <label class="search" style="flex:1;margin:0">${I("search")}<input type="search" placeholder="Search 1,000+ free worldwide TV channels (BBC, UK, movies, comedy, music…)" value="${esc(ltvCur.q)}" aria-label="Search free live TV channels" oninput="ltvSearchInput(this.value)"></label>
       ${ltvCur.q ? `<button type="button" class="btn small" onclick="ltvCur.q='';ltvCur.hits=[];ltvRedrawBoard()">Clear</button>` : ""}
     </div>
     <div class="chips scroll" id="ltvchips" style="margin:0 0 10px">${ltvChipsHtml()}</div>
     <div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#1e1b4b,#0f172a 60%,#064e3b)"></div>
-      <div class="tbtop"><div><h1>📺 Live Internet TV (${ltvAllChannels().length} Channels)</h1><div style="font-size:.82rem;opacity:.9">NZ Freeview, 24/7 Movies &amp; Sci-Fi, Comedy, Home/Cooking/Cars, True Crime/History, Space &amp; Music TV</div></div><button class="iconbtn" aria-label="What’s on TV Guide" title="TV Guide" onclick="go('#tv')">📅</button></div>
+      <div class="tbtop"><div><h1>📺 Live Internet TV (${ltvAllChannels().length} Channels)</h1><div style="font-size:.82rem;opacity:.9">NZ Freeview, 🇬🇧 UK &amp; British TV, 24/7 Movies, Comedy, Home/Cars, Crime/History &amp; Music</div></div><button class="iconbtn" aria-label="What’s on TV Guide" title="TV Guide" onclick="go('#tv')">📅</button></div>
       ${ltvPlayerHtml()}
       <div class="tblists" id="ltvlists">${ltvBoardHtml()}</div>
     </div>
-    <div class="foot">Tap any of the ${ltvAllChannels().length} verified free channels to watch live in the widescreen player at the top. Use <b>🔊 Bluetooth / Output</b> to send audio to your Bluetooth speaker or headphones, or <b>📅</b> for the NZ TV Guide.</div>`;
+    <div class="foot">Tap any preset button (<b>P1–P12</b> across CH 1 and CH 2) or any channel card below to watch live. To save a channel to a preset, tap <b>★ SET</b> (or <b>📌 PRESET</b> / <b>P+</b> on any card).</div>`;
 }
 
 /* ---- 2.28.24: Long-press any recipe card on #recipes or #food to delete it ---- */

@@ -3,7 +3,7 @@
  * ottpath.com's "New on Prime Video in New Zealand this month" (dates the platform reports). Cached 24 h. No AI. */
 const FLICKS = 'https://www.flicks.co.nz/features/best-coming-to-prime-video-nz/';
 const OTT = 'https://ottpath.com/nz/prime/this-month';
-const TTL = 24 * 3600, CK = 'prime-v1';
+const TTL = 24 * 3600, CK = 'prime-v3';
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 const UA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36';
 let mem = null;
@@ -27,6 +27,62 @@ export function parseOtt(html) {
   return out;
 }
 async function get(u, f) { const r = await f(u, { headers: { 'user-agent': UA, accept: 'text/html', 'accept-language': 'en-NZ,en;q=0.9' } }); if (!r.ok) throw new Error('http ' + r.status); return r.text(); }
+
+const POSTER_FALLBACK = "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Movie_theater_interior.jpg/960px-Movie_theater_interior.jpg";
+async function lookupPoster(rawTitle, fetchImpl = fetch) {
+  const raw = String(rawTitle || "");
+  const isSeries = /:\s*s(?:eason)?\s*\d+|\(season\s*\d+\)|\bseries\b/i.test(raw);
+  const clean = raw
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/:\s*s(?:eason)?\s*\d+.*$/i, "")
+    .replace(/\s+s(?:eason)?\s*\d+.*$/i, "")
+    .replace(/[’‘]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return POSTER_FALLBACK;
+  const tryTvmaze = async () => {
+    try {
+      const r = await fetchImpl("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(clean), { signal: AbortSignal.timeout(3500) });
+      if (r.ok) {
+        const j = await r.json();
+        const img = j && j.image && (j.image.medium || j.image.original);
+        if (img && img.startsWith("https://")) return img;
+      }
+    } catch (e) {}
+    return "";
+  };
+  const tryItunes = async (entity) => {
+    for (const q of [clean, clean.replace(/favour/gi, "favor")]) {
+      try {
+        const r = await fetchImpl("https://itunes.apple.com/search?country=us&entity=" + entity + "&limit=1&term=" + encodeURIComponent(q), { signal: AbortSignal.timeout(3500) });
+        if (r.ok) {
+          const j = await r.json();
+          const hit = j && j.results && j.results[0];
+          if (hit && hit.artworkUrl100) return String(hit.artworkUrl100).replace("100x100bb", "600x600bb");
+        }
+      } catch (e) {}
+    }
+    return "";
+  };
+  const tryWiki = async () => {
+    for (const suffix of [" (film)", " (TV series)", ""]) {
+      try {
+        const r = await fetchImpl("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(clean + suffix), { signal: AbortSignal.timeout(3000) });
+        if (r.ok) {
+          const j = await r.json();
+          const src = j && ((j.thumbnail && j.thumbnail.source) || (j.originalimage && j.originalimage.source));
+          if (src && src.startsWith("https://")) return src;
+        }
+      } catch (e) {}
+    }
+    return "";
+  };
+  if (isSeries) {
+    return (await tryTvmaze()) || (await tryItunes("tvSeason")) || (await tryWiki()) || POSTER_FALLBACK;
+  }
+  return (await tryItunes("movie")) || (await tryWiki()) || (await tryTvmaze()) || POSTER_FALLBACK;
+}
+
 export async function primeRoute(env, fetchImpl = fetch, now = Date.now()) {
   if (mem && now - mem.at < TTL * 1000) return mem.data;
   const kv = env && env.EVENTS_KV && typeof env.EVENTS_KV.get === 'function' ? env.EVENTS_KV : null;
@@ -34,7 +90,13 @@ export async function primeRoute(env, fetchImpl = fetch, now = Date.now()) {
   let items = [], source = '', link = '';
   try { items = parseFlicks(await get(FLICKS, fetchImpl)); source = 'flicks.co.nz'; link = FLICKS; } catch (e) { }
   if (!items.length) { try { items = parseOtt(await get(OTT, fetchImpl)); source = 'ottpath.com'; link = OTT; } catch (e) { } }
-  const data = { ok: true, source, link, checked: new Date(now).toISOString(), items: items.slice(0, 80) };
+  const top = items.slice(0, 45);
+  for (let i = 0; i < top.length; i += 6) {
+    await Promise.all(top.slice(i, i + 6).map(async x => {
+      if (!x.img) x.img = await lookupPoster(x.title, fetchImpl);
+    }));
+  }
+  const data = { ok: true, source, link, checked: new Date(now).toISOString(), items: top };
   if (items.length) { mem = { at: now, data }; if (kv) { try { await kv.put(CK, JSON.stringify(data), { expirationTtl: TTL }); } catch (e) { } } }
   return data;
 }
