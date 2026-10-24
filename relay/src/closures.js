@@ -14,7 +14,7 @@ import { WDC_BASE, decode, text, clip, get, hiddenFields, parseDetail, nzToday }
 
 export const CLOSURES_PATH = '/Services/Roads-and-Transportation/Roads/Roadworks-and-closures';
 export const CLOSURES_URL = WDC_BASE + CLOSURES_PATH;
-const KV_KEY = 'wdc-closures-v1';
+const KV_KEY = 'wdc-closures-v2';
 const LIST_MAX_AGE = 3 * 3600 * 1000;
 const PAGE_MAX_AGE = 3 * 3600 * 1000;
 const ROBOTS_MAX_AGE = 24 * 3600 * 1000;
@@ -263,7 +263,7 @@ export function toRoadClosures(state, now = Date.now(), days = 14, eventsState =
       if (all.length && !dates.length) return;
       if (e.unread && !dates.length) return;
       const blob = [item.title, e.where || item.where, e.desc || item.desc].join(' ');
-      out.push({ id: 'wdc-road-' + slug + '-' + i, title: item.title, where: e.where || item.where || '', desc: e.desc || item.desc || '', detour: e.detour || '', url: item.url, bridge: !!e.bridge, commute: !!(e.bridge || ROUTE_MATCH.test(blob)), unread: false, dates: dates.slice(0, 10) });
+      out.push({ id: 'wdc-road-' + slug + '-' + i, title: item.title, where: e.where || item.where || '', desc: cleanClosureDesc(e.desc || item.desc || ''), detour: e.detour || '', url: item.url, bridge: !!e.bridge, commute: !!(e.bridge || ROUTE_MATCH.test(blob)), unread: false, dates: dates.slice(0, 10) });
     });
   }
   if (eventsState) {

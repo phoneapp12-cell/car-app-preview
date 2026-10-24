@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.21';
+const APP_VERSION = '2.28.22';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18466,7 +18466,7 @@ function spGet() {
 function spSave(o) { try { localStorage.setItem(SP_KEY, JSON.stringify(o)); } catch (e) { } }
 function spRestore(o) { if (o && o.lists && typeof o.lists === 'object') spSave(o); }
 function spCover(p, big) {
-  return `<div class="tbcover trphoto${big ? ' big' : ''}${p.img ? '' : ' noimg'}" data-wiki="${esc(p.wiki)}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="travelImgFail(this)">` : ''}<div class="trnoimg">${I('star')}<span>${esc(p.name)}</span></div></div>`;
+  return '';
 }
 function spTopicCard(p, sub, iso, big) {
   return `<button type="button" class="tbcard" onclick="spOpenTopic(${jsArg(p.name)},${jsArg(iso || '')})">${spCover(p, big)}<div class="tbbody">${tbLbl(spLbl(p))}<div class="tbt">${esc(p.name)}</div><div class="tbs">${esc(sub)}</div><div class="tbicons"><span class="tbdesc" style="margin:0" aria-label="Has details">≡</span><span>${esc(spShort(p))}</span></div></div></button>`;
@@ -18484,8 +18484,8 @@ function spBoardHtml() {
 function spRedraw() { const el = document.getElementById('splists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = spBoardHtml(); el.scrollLeft = x; }
 function spDetail(p, iso) {
   return `<div class="trcard tbsheet">${iso ? `<div class="muted" style="font-size:.85rem;font-weight:650;margin:0 0 8px">${iso === nzTodayISO() ? 'Topic of the day · today' : 'Topic of the day · ' + esc(fmtW(iso))}</div>` : ''}
-    ${p.img ? `<div class="trphoto" data-wiki="${esc(p.wiki)}"><img src="${esc(p.img)}" alt="${esc(p.name)}" referrerpolicy="no-referrer" onerror="travelImgFail(this)"><div class="trnoimg">${I('star')}<span>${esc(p.name)}</span></div></div>
-    <div class="trcredit muted">Image: ${esc(p.credit)} · <a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(p.file)}" target="_blank" rel="noopener">source</a></div>` : ''}
+    ${p.img ? `<div class="trphoto" data-wiki="${esc(p.wiki)}"><img src="${esc(p.img)}" alt="${esc(p.name)}" referrerpolicy="no-referrer" onerror="this.closest('.trphoto').remove()"></div>
+    ${p.credit && p.file ? `<div class="trcredit muted">Image: ${esc(p.credit)} · <a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(p.file)}" target="_blank" rel="noopener">source</a></div>` : ''}` : ''}
     ${tbLbl(spLbl(p))}<h2 class="trname">${esc(p.name)}</h2>
     <div class="trtext"><p>${esc(p.text)}</p></div><p class="muted" style="font-size:.75rem;margin:8px 0 0">Summary from Wikipedia (CC BY-SA).</p>
     <div class="btns"><a class="btn" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wiki)}" target="_blank" rel="noopener">${I('ext')} Read more</a></div></div>`;
@@ -21784,7 +21784,7 @@ function alJump(k) {
   if (box && sec) box.scrollTo({ left: Math.max(0, sec.offsetLeft - 14), behavior: 'smooth' });
 }
 function alBoardHtml(list) {
-  list = (list || []).filter(x => !nbIsBill(x) && (x.days == null || x.days <= 14));
+  list = [];
   const now = [], today = [], week = [], later = [];
   const urgent = x => x.days < 0 || (x.days === 0 && x.pri === 0) || ((x.kind === 'car' || x.kind === 'driver') && x.days <= 0);
   let ja = []; try { ja = justAddedList().filter(x => !nbIsBill(x)); } catch (e) { }
@@ -21952,114 +21952,55 @@ function alTopMenu() {
       <button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Notification Settings</button>
     </div>`, null);
 }
+function homeShownKeys() {
+  const S0 = new Set();
+  try {
+    const wi = typeof weekItems === 'function' ? weekItems() : {};
+    Object.values(wi).forEach(arr => (arr || []).forEach(it => {
+      if (it && it.title) {
+        S0.add(cuNorm(it.title));
+        S0.add(cuNorm(String(it.title).replace(/^Celebrating\s+/i, '')));
+      }
+    }));
+  } catch (e) { }
+  try {
+    (S.appts || []).forEach(a => { if (a && a.title) S0.add(cuNorm(a.title)); });
+    (S.birthdays || []).forEach(b => { if (b && b.name) { S0.add(cuNorm(b.name + "’s birthday")); S0.add(cuNorm("Celebrating " + b.name + "’s birthday")); } });
+    (S.todos || []).forEach(t => { if (t && t.title) S0.add(cuNorm(t.title)); });
+    (S.myEvents || []).forEach(e => { if (e && e.title) S0.add(cuNorm(e.title)); });
+  } catch (e) { }
+  return S0;
+}
 function alPickHero(list) {
-  const cleanList = (list || []).filter(x => !nbIsBill(x) && x.kind !== 'meal' && (x.days == null || x.days <= 14));
   // 1. Active today road closure on commute/Whangārei, crash/emergency in Whangārei, major earthquake, or severe MetService weather warning today
   try {
-    const urgentToday = glWarnList().find(x => x && x.red && !x.flag && x.pri >= 90 && /road|closure|bridge|okara|semenoff|commute|crash|earthquake|police|emergency|ambulance|fire|metservice|weather today|thunderstorm/i.test((x.tag || '') + ' ' + (x.what || '')));
+    const warnings = glWarnList().filter(x => x && !x.flag);
+    const urgentToday = warnings.find(x => x.red && x.pri >= 82 && /road|closure|bridge|okara|semenoff|commute|crash|earthquake|police|emergency|ambulance|fire|metservice|weather today|thunderstorm/i.test((x.tag || '') + ' ' + (x.what || ''))) || warnings.find(x => x.red) || warnings[0];
     if (urgentToday) {
       const blob = (urgentToday.tag || '') + ' ' + (urgentToday.what || '');
       const isQuake = /earthquake|geonet|usgs/i.test(blob);
       const isEmg = /police|ambulance|fire|emergency|rescue/i.test(blob) && !/road closure/i.test(blob);
       const isWx = /metservice|weather|rain|wind|storm|gale/i.test(blob);
       const wGo = urgentToday.url ? `window.open(${jsArg(urgentToday.url)},'_blank','noopener')` : (urgentToday.go || (isWx ? "go('#weather')" : "go('#bridge')"));
+      const shortSub = alShortBody(urgentToday.s || urgentToday.tag || 'Check details', 120);
       return {
         key: cuNorm(urgentToday.what),
-        badge: isQuake ? '🌍 EARTHQUAKE ALERT' : isEmg ? '🚨 WHANGĀREI EMERGENCY ALERT' : isWx ? '⛈️ WHANGĀREI WEATHER ALERT · TODAY' : '⛔ WHANGĀREI ROAD ALERT · TODAY',
+        badge: isQuake ? '🌍 EARTHQUAKE ALERT' : isEmg ? '🚨 WHANGĀREI EMERGENCY ALERT' : isWx ? '⛈️ WHANGĀREI WEATHER ALERT' : '⛔ WHANGĀREI ROAD ALERT',
         icon: isQuake ? '🌍' : isEmg ? '🚨' : isWx ? '⛈️' : '⛔',
         title: urgentToday.what.replace(/^[⛔🚧⚠️⛈️🌧️🌍🚨🚓🚑🚒]\s*/, ''),
-        sub: (urgentToday.s || urgentToday.tag || 'Check details') + ' · Tap for details.',
+        sub: shortSub + ' · Tap for details.',
         go: wGo,
         tone: 'hero-warn'
       };
     }
   } catch (e) { }
-  // 2. Today's timed appointment or event
-  try {
-    const todayAppt = (S.appts || []).filter(a => a && a.date && daysLeft(a.date) === 0 && !(a.from === 'sarah' && a.done)).sort((a, b) => String(a.time || '99').localeCompare(String(b.time || '99')))[0];
-    if (todayAppt) {
-      const tm = todayAppt.time ? fmtTime(todayAppt.time).toUpperCase() : 'TODAY';
-      return {
-        key: cuNorm(todayAppt.title),
-        badge: '⏰ YOUR DAY · UP NEXT',
-        icon: '⏰',
-        title: `${tm}: ${todayAppt.title}`,
-        sub: `${todayAppt.place ? todayAppt.place + ' · ' : ''}Happening today. Tap to view details in Calendar.`,
-        go: `calOpenDay(${parseD(todayAppt.date)})`,
-        tone: 'hero-today'
-      };
-    }
-  } catch (e) { }
-  // 3. Birthday today (d === 0)
-  try {
-    const bdaysToday = (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d === 0);
-    if (bdaysToday.length) {
-      const topB = bdaysToday[0];
-      return {
-        key: cuNorm(topB.b.name + "’s birthday"),
-        badge: '🎂 CELEBRATING TODAY',
-        icon: '🎂',
-        title: `Today: ${topB.b.name}’s Birthday`,
-        sub: 'Celebrating today. Tap to view details or sort a gift.',
-        go: "go('#birthdays')",
-        tone: 'hero-bday'
-      };
-    }
-  } catch (e) { }
-  // 4. Any other urgent warning on commute or severe weather
-  try {
-    const w = glWarnList().find(x => x && x.red && !x.flag);
-    if (w) {
-      const wGo = w.go || (w.url ? `window.open(${jsArg(w.url)},'_blank','noopener')` : "go('#weather')");
-      return {
-        key: cuNorm(w.what),
-        badge: '⚠️ HEADS UP TODAY',
-        icon: '⚠️',
-        title: w.what,
-        sub: (w.s || w.tag || 'Check before you head out') + ' · Tap for details.',
-        go: wGo,
-        tone: 'hero-warn'
-      };
-    }
-  } catch (e) { }
-  // 5. Birthday coming up within 7 days (e.g. Aranea's Birthday)
-  try {
-    const bdays = (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d > 0 && x.d <= 7).sort((x, y) => x.d - y.d);
-    if (bdays.length) {
-      const topB = bdays[0];
-      return {
-        key: cuNorm(topB.b.name + "’s birthday"),
-        badge: `🎂 UPCOMING BIRTHDAY · ${topB.d === 1 ? 'TOMORROW' : 'IN ' + topB.d + ' DAYS'}`,
-        icon: '⏰',
-        title: `${fmtW(topB.iso)}: ${topB.b.name}’s Birthday`,
-        sub: `Turns ${topB.age || ''} on ${fmtW(topB.iso)}. Tap to view details or sort a gift.`,
-        go: "go('#birthdays')",
-        tone: 'hero-bday'
-      };
-    }
-  } catch (e) { }
-  // 4. Overdue or due-today item from Coming Up (cars, appointments, high-priority tasks)
-  if (cleanList.length) {
-    const top = cleanList[0];
-    const when = top.days < 0 ? `${Math.abs(top.days)}d overdue` : top.days === 0 ? 'Today' : top.days === 1 ? 'Tomorrow' : fmtW(top.iso);
-    const goMatch = (String(top.html || '').match(/onclick="([^"]+)"/) || [])[1] || "go('#calendar')";
-    return {
-      key: cuNorm(top.name || nbStrip(top.html || '')),
-      badge: top.days <= 0 ? '⏰ PRIORITY TODAY' : `📅 UP NEXT · ${when.toUpperCase()}`,
-      icon: top.kind === 'car' ? '🚗' : top.kind === 'bday' ? '🎂' : '⏰',
-      title: `${top.days === 0 && top.sort ? fmtTime(top.sort).toUpperCase() + ': ' : ''}${top.name}`,
-      sub: `${when} · Tap to view details or take action.`,
-      go: goMatch,
-      tone: top.days < 0 ? 'hero-warn' : 'hero-today'
-    };
-  }
   return {
     key: '',
-    badge: '☀️ MORNING BRIEFING',
+    badge: '🔔 WHANGĀREI ALERTS',
     icon: '✨',
-    title: `Your schedule is clear (${fmtW(todayISO())})`,
-    sub: 'Nothing overdue or urgent right now. Tap to open your Calendar.',
-    go: "go('#calendar')",
+    title: `No urgent alerts right now (${fmtW(todayISO())})`,
+    sub: 'Road closures, weather warnings, outages, earthquakes and emergency updates appear here.',
+    go: "go('#weather')",
     tone: 'hero-today'
   };
 }
@@ -22216,7 +22157,7 @@ function alBriefingHtml(list) {
   };
 
   const pinnedNodes = [], yourDayNodes = [], sarahNodes = [], carOrderNodes = [];
-  const seenTitles = new Set();
+  const seenTitles = homeShownKeys();
   if (hero.key) seenTitles.add(hero.key);
 
   const cardTitleKey = el => {
@@ -22231,9 +22172,9 @@ function alBriefingHtml(list) {
     if (ch.classList.contains('sec')) {
       const s = ch.textContent.trim().toLowerCase();
       if (s.startsWith('pinned')) curSec = 'pinned';
-      else if (s.startsWith('from sarah') || s.startsWith('new on your lists')) curSec = 'sarah';
+      else if (s.startsWith('from sarah')) curSec = 'sarah';
       else if (s.startsWith('deliveries') || s.startsWith('click & collect') || s.startsWith('in progress')) curSec = 'cars';
-      else if (s.startsWith('for you today')) curSec = 'skip';
+      else if (s.startsWith('for you today') || s.startsWith('today') || s.startsWith('coming up') || s.startsWith('reminders') || s.startsWith('new on your lists')) curSec = 'skip';
       else curSec = 'today';
       return;
     }
@@ -22251,38 +22192,20 @@ function alBriefingHtml(list) {
     });
   });
 
-  // Also include today/overdue and upcoming 14-day (2 weeks) actionable items from comingUpList() not yet shown
-  const weekNodes = [];
-  list.forEach(x => {
-    if (x.days != null && x.days > 14) return;
-    const tk = cuNorm(x.name || nbStrip(x.html || ''));
-    if (!tk || seenTitles.has(tk)) return;
-    seenTitles.add(tk);
-    const tmp = document.createElement('div');
-    tmp.innerHTML = cuRowHtml(x);
-    const el = tmp.firstElementChild;
-    if (!el) return;
-    decorateCard(el);
-    if (x.kind === 'car' || x.kind === 'driver') carOrderNodes.push(el.outerHTML);
-    else if (x.days <= 0) yourDayNodes.push(el.outerHTML);
-    else if (x.days <= 14) weekNodes.push(el.outerHTML);
-  });
-
   const block = (title, arr, cls = '') => arr.length ? `<div class="sec al-yd-sec">${title} <span class="al-cnt">${arr.length}</span></div><div class="list al-yd-list ${cls}">${arr.join('')}</div>` : '';
 
   let body = '';
   if (alBriefFilter === 'all') {
     body = block('📌 Pinned', pinnedNodes, 'bellpinned') +
-           block('⚡ Your Day', yourDayNodes) +
-           block('💌 From Sarah & Lists', sarahNodes) +
-           block('🚗 Cars & Orders', carOrderNodes) +
-           block('📅 Coming Up (Next 2 Weeks)', weekNodes);
+           block('⚡ Alerts & Updates', yourDayNodes) +
+           block('💌 From Sarah', sarahNodes) +
+           block('📦 Deliveries & Orders', carOrderNodes);
   } else if (alBriefFilter === 'today') {
-    body = block('📌 Pinned', pinnedNodes, 'bellpinned') + block('⚡ Your Day', yourDayNodes) + block('📅 Coming Up (Next 2 Weeks)', weekNodes);
+    body = block('📌 Pinned', pinnedNodes, 'bellpinned') + block('⚡ Alerts & Updates', yourDayNodes);
   } else if (alBriefFilter === 'sarah') {
-    body = block('💌 From Sarah & Lists', sarahNodes);
+    body = block('💌 From Sarah', sarahNodes);
   } else if (alBriefFilter === 'cars') {
-    body = block('🚗 Cars & Orders', carOrderNodes);
+    body = block('📦 Deliveries & Orders', carOrderNodes);
   }
 
   return (alBriefFilter === 'all' || alBriefFilter === 'today' ? heroHtml + gridHtml : '') +
@@ -24631,16 +24554,9 @@ function pnItems() {
   }));
 }
 function glAlertParts() {
-  const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDueItems().concat(glDeviceItems());
-  const P = { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: due.filter(x => x.days > 0).sort((a, b) => a.days - b.days), sarah: glSarahItems(), flags, warn, garden: glGardenAlert(), fresh: glNewItems(), nl: nlItems(), prog: glProgItems(), pw: pnItems(), ab: [], mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems().filter(x => x.sec !== 'bill'); } catch (e) { return []; } })() };
-  try { // 2.26.53: reminders; a to-do already here gets the time attached instead of its own row
-    const R = rmItems(), seen = P.dueUrgent.concat(P.coming).map(x => x.html).join('') + P.fresh.join('');
-    const packOn = x => x.packKey && seen.includes(`packTick('${esc(x.packKey)}')`); // 2.26.55: on the event's row already
-    P.packBadge = R.filter(x => packOn(x) && x.badge).length; P.packKeys = R.filter(x => packOn(x) && x.badge).map(x => x.key);
-    P.rm = R.filter(x => !(x.todoId && seen.includes(`'${x.todoId}'`)) && !packOn(x));
-    const A = R.filter(x => x.todoId && seen.includes(`'${x.todoId}'`));
-    if (A.length) { const fix = x => { x.html = rmAttach(x.html, A); }; P.dueUrgent.forEach(fix); P.coming.forEach(fix); P.fresh = P.fresh.map(h => rmAttach(h, A)); P.urgent = P.urgent.map(h => rmAttach(h, A)); }
-  } catch (e) { P.rm = []; }
+  const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDeviceItems();
+  // 2.28.22: Anything already shown on the Home page (This week calendar board, to-dos, cars, garden, birthdays, appointments) is excluded from Notifications
+  const P = { urgent: warn.map(glWarnCard).concat(due.filter(x => x.days <= 0).map(x => x.html)), dueUrgent: due.filter(x => x.days <= 0), coming: [], sarah: glSarahItems(), flags, warn, garden: null, fresh: glNewItems(), nl: [], prog: [], pw: pnItems(), ab: [], rm: [], packBadge: 0, packKeys: [], mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems().filter(x => x.sec !== 'bill' && x.sec !== 'ap'); } catch (e) { return []; } })() };
   try { gkApply(P); } catch (e) { }
   return P;
 }
@@ -25883,11 +25799,7 @@ function glWorkCard(m) {
 }
 const bellTxt = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 function bellTodayRows(have) {
-  const rows = [], seen = new Set();
-  try { glCU().filter(x => typeof x.days === 'number' && x.days <= 0 && !nbIsBill(x)).forEach(x => { let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
-    const d = document.createElement('div'); d.innerHTML = h; const t = bellTxt((d.querySelector('.t') || d).innerHTML).slice(0, 60);
-    if (!t || seen.has(t) || have.includes(t)) return; seen.add(t); rows.push(h); }); } catch (e) { }
-  return rows;
+  return []; // 2.28.22: Home page already shows today's items
 }
 (() => { const o = glAlertsBody; glAlertsBody = function () { const h = o();
   try { const d = document.createElement('div'); d.innerHTML = h; const have = bellTxt([...d.querySelectorAll('.t')].map(x => x.innerHTML).join(' | '));
@@ -26989,6 +26901,7 @@ MB_SECS.unshift(['ap', 'Appointments from email']);
 MB_SECS.unshift(['sc', 'UniMed claim emails']);
 // the day before (from noon) and the morning of: one "Upcoming appointments" card (email ones and ones in his calendar)
 function apUpRows() {
+  return []; // 2.28.22: Appointments already show on Home 'This week'
   const now = new Date(), T = todayISO(), tm = addDays(T, 1), h = now.getHours(), L = [];
   try { apList().filter(x => x.a.kind !== 'cancel').forEach(x => { if (x.a.date === T && h < 18 || x.a.date === tm && h >= 12) L.push({ d: x.a.date, t: x.a.time, n: (x.a.type === 'Appointment' ? x.a.prov : x.a.type + (x.a.with ? ' with ' + x.a.with : '')) + (x.a.type !== 'Appointment' ? ' · ' + x.a.prov : '') }); }); } catch (e) { }
   try { (S.appts || []).forEach(a => { if (a && (a.date === T && h < 18 || a.date === tm && h >= 12) && !L.some(y => y.d === a.date && y.t === (a.time || ''))) L.push({ d: a.date, t: a.time || '', n: a.title }); }); } catch (e) { }
