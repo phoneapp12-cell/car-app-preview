@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.22';
+const APP_VERSION = '2.28.23';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -7485,6 +7485,7 @@ function carStereoHtml() {
       </button>
       <button type="button" class="cs-hbtn" onclick="radioSeek(1)" aria-label="Next station"><span>▶▶|</span><small>SEEK +</small></button>
       <button type="button" class="cs-hbtn cs-fav${radioNowInTop40Favs() ? ' on' : ''}" style="${radioNowInTop40Favs() ? 'border-color:#eab308;color:#fde047;background:rgba(234,179,8,.18)' : ''}" onclick="radioSaveToTop40()" aria-label="Save playing song to Top 40 Favourites" title="Save playing song to Top 40 Favourites"><span>${radioNowInTop40Favs() ? '★' : '☆'}</span><small>${radioNowInTop40Favs() ? 'SAVED' : 'TOP 40'}</small></button>
+      <button type="button" class="cs-hbtn cs-bt" onclick="openAudioOutputPicker('Car Stereo')" aria-label="Choose Bluetooth or speaker output" title="Choose Bluetooth or speaker output"><span>🔊</span><small>BT / OUT</small></button>
       <a class="cs-hbtn cs-site" href="${esc(st.home)}" target="_blank" rel="noopener"><span>↗</span><small>SITE</small></a>
     </div>
     <div class="cs-vol">
@@ -8309,7 +8310,7 @@ function mealRow(iso, hist = false) {
     <div class="mealcap"><button class="tapzone" onclick="mealNight('${iso}')"><div class="t">${esc(e.title)}</div></button>${recipeLink}</div>
     <div class="mealpair">${mealPic(idea)}${tick}<button class="tapzone" onclick="mealNight('${iso}')"><div class="s">${sub}</div></button></div></div>`;
 }
-const mealTabs = on => `<div class="chips mealtabs"><button class="chip ${on === 'plan' ? 'on' : ''}" id="tabplan" onclick="go('#meals')">Meal plan</button><button class="chip ${on === 'recipes' ? 'on' : ''}" id="tabrecipes" onclick="go('#recipes')">Recipes (${visibleIdeas().length})</button><button class="chip ${on === 'shop' ? 'on' : ''}" id="tabshop" onclick="go('#shopping')">Shopping${S.shop.items.some(x => !x.done) ? ` (${S.shop.items.filter(x => !x.done).length})` : ''}</button><button class="chip ${on === 'gflist' ? 'on' : ''}" id="tabgflist" onclick="go('#gflist')">GF Safe List</button></div>`;
+const mealTabs = on => `<div class="chips mealtabs scroll"><button class="chip ${on === 'board' ? 'on' : ''}" id="tabfood" onclick="go('#food')">🍽️ Meals Board</button><button class="chip ${on === 'plan' ? 'on' : ''}" id="tabplan" onclick="go('#meals')">📅 Meal plan</button><button class="chip ${on === 'recipes' ? 'on' : ''}" id="tabrecipes" onclick="go('#recipes')">📖 Recipes (${visibleIdeas().length})</button><button class="chip ${on === 'shop' ? 'on' : ''}" id="tabshop" onclick="go('#shopping')">🛒 Shopping${S.shop.items.some(x => !x.done) ? ` (${S.shop.items.filter(x => !x.done).length})` : ''}</button><button class="chip ${on === 'gflist' ? 'on' : ''}" id="tabgflist" onclick="go('#gflist')">🛡️ GF Safe List</button></div>`;
 function nightsText() {
   const n = M().nights; if (!n.length) return 'No cooking nights picked';
   const names = n.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(x => WDL[x]);
@@ -8506,7 +8507,7 @@ function rbOpenCard(k, id) {
 }
 function Recipes() {
   const p = glPickRecipe(), bg = p && recipePhotoSrc(p);
-  return `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#15803d,#0f172a)">${bg ? `<img src="${esc(bg)}" alt="" onerror="this.remove()">` : ''}</div>
+  return mealTabs('recipes') + `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#15803d,#0f172a)">${bg ? `<img src="${esc(bg)}" alt="" onerror="this.remove()">` : ''}</div>
     <div class="tbtop"><h1>Recipes</h1><button class="iconbtn" aria-label="Add a recipe" onclick="mealIdeaForm()">${I('plus')}</button></div>
     <label class="search" style="margin:0 12px 8px">${I('search')}<input id="mealq" type="search" placeholder="Search recipes or ingredients" value="${esc(mealQuery)}" aria-label="Search recipes" oninput="mealQuery=this.value;rbRedraw()"></label>
     <div class="tblists" id="rblists">${rbBoardHtml()}</div></div>
@@ -15613,6 +15614,7 @@ function t40PlayerHtml() {
       </div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn small" style="background:rgba(37,99,235,.85);color:#fff;border:0;font-weight:700" onclick="openAudioOutputPicker('Top 40')">🔊 Bluetooth / Output</button>
       <button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="musOpen(${jsArg(t.title)},${jsArg(t.artist)})">🎵 YouTube Music</button>
       ${hasYt ? `<button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="vbTv(${jsArg(t.id)})">📺 Cast to TV</button>` : ''}
       ${mode === 'audio' ? `<button type="button" class="btn small ${t40Cur.autoNext ? 'primary' : ''}" style="${t40Cur.autoNext ? '' : 'background:rgba(255,255,255,.12);color:#fff;border:0'}" onclick="t40Cur.autoNext=!t40Cur.autoNext;t40RedrawPlayer()">🔁 Auto-next: ${t40Cur.autoNext ? 'On' : 'Off'}</button>` : ''}
@@ -18197,16 +18199,42 @@ function travelPaintClock() {
   el.querySelector('.trdate').textContent = c.date;
   const df = document.querySelector('#travelcard .trdiff'); if (df) df.textContent = travelDiffText(tz, now);
 }
-// Photo didn't load: try the Wikipedia article's own picture, else a plain panel.
+// Photo didn't load (or needs Wikipedia thumbnail): try the Wikipedia article's own picture, else remove cleanly on Learning cards.
+const WIKI_IMG_CACHE = (() => { try { return JSON.parse(localStorage.getItem('wikiImgCache') || '{}') || {}; } catch (e) { return {}; } })();
 async function travelImgFail(img) {
-  const box = img.closest('.trphoto'); if (!box || box.dataset.tried) { if (box) box.classList.add('noimg'); return; }
+  const box = img && img.closest ? img.closest('.trphoto') : null;
+  if (!box) return;
+  const wiki = box.dataset.wiki || '';
+  const noFallback = !box.querySelector('.trnoimg');
+  if (box.dataset.tried || !wiki) {
+    if (noFallback) box.remove(); else box.classList.add('noimg');
+    return;
+  }
   box.dataset.tried = '1';
+  if (WIKI_IMG_CACHE[wiki]) {
+    if (WIKI_IMG_CACHE[wiki] === 'none') {
+      if (noFallback) box.remove(); else box.classList.add('noimg');
+      return;
+    }
+    img.src = WIKI_IMG_CACHE[wiki];
+    return;
+  }
   try {
-    const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(box.dataset.wiki));
-    const d = r.ok ? await r.json() : null, src = d && ((d.thumbnail && d.thumbnail.source) || (d.originalimage && d.originalimage.source));
-    if (src) { img.src = src; const cr = box.parentNode.querySelector('.trcredit'); if (cr) cr.textContent = 'Photo: from the Wikipedia article “' + box.dataset.wiki + '”'; return; }
+    const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(wiki));
+    const d = r.ok ? await r.json() : null;
+    const src = d && ((d.thumbnail && d.thumbnail.source) || (d.originalimage && d.originalimage.source));
+    if (src) {
+      WIKI_IMG_CACHE[wiki] = src;
+      try { localStorage.setItem('wikiImgCache', JSON.stringify(WIKI_IMG_CACHE)); } catch (e) {}
+      img.src = src;
+      const cr = box.parentNode && box.parentNode.querySelector('.trcredit');
+      if (cr) cr.textContent = 'Photo: from the Wikipedia article “' + wiki + '”';
+      return;
+    }
   } catch (e) {}
-  box.classList.add('noimg');
+  WIKI_IMG_CACHE[wiki] = 'none';
+  try { localStorage.setItem('wikiImgCache', JSON.stringify(WIKI_IMG_CACHE)); } catch (e) {}
+  if (noFallback) box.remove(); else box.classList.add('noimg');
 }
 // 2.27.85: Travel is a Trello-style board. Fixed lists: Place of the day (today) and Previous places (every earlier day of
 // the cycle, newest first; the pick is fixed by date so these are rebuilt, not stored). User lists Want to go, Planning and
@@ -18466,7 +18494,13 @@ function spGet() {
 function spSave(o) { try { localStorage.setItem(SP_KEY, JSON.stringify(o)); } catch (e) { } }
 function spRestore(o) { if (o && o.lists && typeof o.lists === 'object') spSave(o); }
 function spCover(p, big) {
-  return '';
+  if (!p) return '';
+  const cached = p.wiki && WIKI_IMG_CACHE[p.wiki];
+  if (cached === 'none' && !p.img) return '';
+  const src = p.img || (cached && cached !== 'none' ? cached : '');
+  if (!src && !p.wiki) return '';
+  const blank = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  return `<div class="tbcover trphoto${big ? ' big' : ''}" data-wiki="${esc(p.wiki || '')}"><img src="${esc(src || blank)}" alt="" loading="lazy" referrerpolicy="no-referrer" ${src ? 'onerror="travelImgFail(this)"' : 'onload="travelImgFail(this)" onerror="travelImgFail(this)"'}></div>`;
 }
 function spTopicCard(p, sub, iso, big) {
   return `<button type="button" class="tbcard" onclick="spOpenTopic(${jsArg(p.name)},${jsArg(iso || '')})">${spCover(p, big)}<div class="tbbody">${tbLbl(spLbl(p))}<div class="tbt">${esc(p.name)}</div><div class="tbs">${esc(sub)}</div><div class="tbicons"><span class="tbdesc" style="margin:0" aria-label="Has details">≡</span><span>${esc(spShort(p))}</span></div></div></button>`;
@@ -18484,8 +18518,8 @@ function spBoardHtml() {
 function spRedraw() { const el = document.getElementById('splists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = spBoardHtml(); el.scrollLeft = x; }
 function spDetail(p, iso) {
   return `<div class="trcard tbsheet">${iso ? `<div class="muted" style="font-size:.85rem;font-weight:650;margin:0 0 8px">${iso === nzTodayISO() ? 'Topic of the day · today' : 'Topic of the day · ' + esc(fmtW(iso))}</div>` : ''}
-    ${p.img ? `<div class="trphoto" data-wiki="${esc(p.wiki)}"><img src="${esc(p.img)}" alt="${esc(p.name)}" referrerpolicy="no-referrer" onerror="this.closest('.trphoto').remove()"></div>
-    ${p.credit && p.file ? `<div class="trcredit muted">Image: ${esc(p.credit)} · <a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(p.file)}" target="_blank" rel="noopener">source</a></div>` : ''}` : ''}
+    ${(p.img || p.wiki) ? `<div class="trphoto" data-wiki="${esc(p.wiki || '')}"><img src="${esc(p.img || (p.wiki && WIKI_IMG_CACHE[p.wiki] && WIKI_IMG_CACHE[p.wiki] !== 'none' ? WIKI_IMG_CACHE[p.wiki] : 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'))}" alt="${esc(p.name)}" referrerpolicy="no-referrer" ${p.img || (p.wiki && WIKI_IMG_CACHE[p.wiki] && WIKI_IMG_CACHE[p.wiki] !== 'none') ? 'onerror="travelImgFail(this)"' : 'onload="travelImgFail(this)" onerror="travelImgFail(this)"'}></div>
+    ${p.credit && p.file ? `<div class="trcredit muted">Image: ${esc(p.credit)} · <a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(p.file)}" target="_blank" rel="noopener">source</a></div>` : `<div class="trcredit muted"></div>`}` : ''}
     ${tbLbl(spLbl(p))}<h2 class="trname">${esc(p.name)}</h2>
     <div class="trtext"><p>${esc(p.text)}</p></div><p class="muted" style="font-size:.75rem;margin:8px 0 0">Summary from Wikipedia (CC BY-SA).</p>
     <div class="btns"><a class="btn" href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wiki)}" target="_blank" rel="noopener">${I('ext')} Read more</a></div></div>`;
@@ -20601,7 +20635,7 @@ function btMeta(k) {
   if (k === 'more') return ['Explore & More (opens the side menu)', 'Explore', 'more'];
   const n = NAV[k]; return n ? [n[2].replace('&amp;', '&'), n[3], n[0]] : null;
 }
-const BT_ALL = () => ['home', 'media', 'food', ...NAV_DEFAULT.filter(k => k !== 'meals' && k !== 'recipes'), 'weather', 'settings', 'more'].filter((k, i, a) => btMeta(k) && a.indexOf(k) === i);
+const BT_ALL = () => ['home', 'media', 'food', ...NAV_DEFAULT, 'weather', 'settings', 'more'].filter((k, i, a) => btMeta(k) && a.indexOf(k) === i);
 function btState() {
   S.settings = S.settings || {};
   const b = S.settings.bottomTabs && typeof S.settings.bottomTabs === 'object' ? S.settings.bottomTabs : (S.settings.bottomTabs = { on: false, keys: BT_DEFAULT.slice() });
@@ -22816,6 +22850,7 @@ function glQuick(m) {
   try { const c = glCU().filter(x => x.kind === 'car' || x.kind === 'driver'), ipf = x => { try { return !!(x.ref && x.ref.kind === 'car' && carProg(x.ref.car, x.ref.part)); } catch (e) { return false; } }, ip = c.filter(ipf).length, od = c.filter(x => x.days < 0 && !ipf(x)).length; q('cars', 'car', '#0891b2', '#155e75', 'Cars', c.length ? (od ? od + ' overdue · ' : '') + (ip ? ip + ' in progress · ' : '') + (c.length - ip ? (c.length - ip) + ' due' : '').replace(/ · $/, '') : 'All good', "go('#cars')"); } catch (e) { }
   try { const g = glCU().find(x => x.kind === 'garden'); q('garden', 'garden', '#16a34a', '#14532d', 'Garden', g ? String(g.name || '').replace(/<[^>]+>/g, '') : glGardenSafe() ? 'Cool enough to water' : 'Nothing to do', "go('#garden')"); } catch (e) { }
   try { const n = (S.shop && S.shop.items || []).filter(x => x && !x.done).length; q('shop', 'shop', '#ea580c', '#9a3412', 'Shopping', n ? plural(n, 'item') : 'List is empty', "go('#shopping')"); } catch (e) { }
+  try { const nights = mealNights(), nxt = nights.find(d => M().plan[d] && M().plan[d].title), r = glPickRecipe(); q('food', 'plate', '#e11d48', '#9f1239', 'Meals', nxt ? fmtW(nxt) + ': ' + M().plan[nxt].title : r ? 'GF: ' + r.title : 'Meal plan & GF recipes', "go('#food')"); } catch (e) { }
   return `<div class="glgrid glg3">${Q.join('')}</div>`;
 }
 function glOrgInner() {
@@ -22835,7 +22870,7 @@ function glanceHome() {
   const ent = '', org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const wk = homeTry('week overview', () => weekOverview(), ''); // 2.27.28: the week overview replaces the Organise tabs; the shortcut tiles stay
-  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}<div class="wklinks"><a href="#todo">To-do</a><a href="#cars">Cars</a><a href="#garden">Garden</a><a href="#media">Entertainment</a><a href="#cashflow">Cash flow</a></div>`
+  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}<div class="wklinks"><a href="#food">Meals</a><a href="#meals">Meal plan</a><a href="#recipes">Recipes</a><a href="#shopping">Shopping</a><a href="#todo">To-do</a><a href="#cars">Cars</a><a href="#garden">Garden</a><a href="#media">Entertainment</a><a href="#cashflow">Cash flow</a></div>`
     : org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
@@ -29362,7 +29397,9 @@ const LISTS_PILLS = [
   ['#birthdays', '🎂 Birthdays'],
   ['#countdown', '⏳ Countdown'],
   ['#diary', '📖 Diary'],
-  ['#photos', '📷 Photos']
+  ['#photos', '📷 Photos'],
+  ['#shopping', '🛒 Shopping'],
+  ['#food', '🍽️ Meals']
 ];
 function listsHubMenu(k) {
   const m = { todo: '#todo', rem: '#reminders', flg: '#flagged', ideas: '#ideas', bday: '#birthdays', diary: '#diary' }[k] || '#todo';
@@ -29842,3 +29879,224 @@ More = function () {
     <div class="tblists">${cols}</div></div>
     <div class="foot">${savedWhere()}</div>`;
 };
+
+/* ================= 2.28.23: MEALS BOARD (#food) & BLUETOOTH / AUDIO OUTPUT PICKER ================= */
+function foodHubMenu(k) {
+  const m = { plan: "#meals", rec: "#recipes", shop: "#shopping", gf: "#gflist" }[k] || "#meals";
+  go(m);
+}
+FoodPage = function () {
+  const un = x => String(x || "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;/g, "’").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  const T = [], add = (k, title, fn, art, go) => { let x = ""; try { x = un(fn()); } catch (e) { } T.push({ k, cat: "food", title, s: x.slice(0, 70), art, grad: ["#f97316", "#be123c"], go }); };
+  add("planner", "Meal planner", () => mealsMoreSub(), "art/meals-banner.webp", "go('#meals')");
+  add("recipes", "Recipes", () => { const r = glPickRecipe(); return r ? "GF idea: " + r.title : plural(visibleIdeas().length, "recipe"); }, "i3-plate", "go('#recipes')");
+  add("shopping", "Shopping list", () => { const n = S.shop.items.filter(x => !x.done).length; return n ? plural(n, "item") : "Nothing on the list"; }, "art/shopping-banner.webp", "go('#shopping')");
+  add("gflist", "GF Safe List & Dining", () => gfListMoreSub(), "i3-plate", "go('#gflist')");
+  const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes("food"); } catch (e) { return true; } })();
+
+  // Live Trello columns for Meals Board
+  const nights = typeof mealNights === "function" ? mealNights() : [];
+  const planCards = (nights.slice(0, 8).map(d => {
+    const e = M().plan[d] || {};
+    const idea = e.title ? mealIdeaFor(e.title) : null;
+    const pic = idea ? recipePhotoSrc(idea) : "";
+    const lbls = [[nightLabel(d), e.title ? "#16a34a" : "#d97706"]];
+    if (e.cooked) lbls.push(["✓ Cooked", "#0d9488"]);
+    return `<button type="button" class="tbcard" onclick="go('#meals');setTimeout(()=>mealNight('${d}'),120)">${pic ? `<div class="tbcover"><img src="${esc(pic)}" alt="" loading="lazy" onerror="this.closest('.tbcover').remove()"></div>` : ""}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(e.title || "Tap to plan this night")}</div><div class="tbs">${esc(e.notes || (idea && idea.tag ? idea.tag + " · Gluten free" : "Choose a GF recipe or type a meal"))}</div></div></button>`;
+  }).join("") || grpCard([["📅 Meal Plan", "#ea580c"]], "No cooking nights picked", "Tap to choose your cooking nights (e.g. Fri & Sat)", "go('#meals')")) + grpLinkBtn("#meals", "Open full Meal planner");
+
+  const ideas = typeof visibleIdeas === "function" ? visibleIdeas() : [];
+  const favFirst = ideas.filter(i => i.fav).concat(ideas.filter(i => !i.fav)).slice(0, 8);
+  const recCards = favFirst.map(i => {
+    const pic = recipePhotoSrc(i);
+    const lbls = [[i.tag || "GF Recipe", "#15803d"]];
+    if (i.fav) lbls.push(["★ Favourite", "#ca8a04"]);
+    return `<button type="button" class="tbcard" onclick="go('#recipe/${esc(i.id)}')">${pic ? `<div class="tbcover"><img src="${esc(pic)}" alt="" loading="lazy" onerror="this.closest('.tbcover').remove()"></div>` : ""}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(i.title)}</div><div class="tbs">${esc([i.time, i.serves ? "Serves " + i.serves : ""].filter(Boolean).join(" · ") || (i.ingr || []).slice(0, 4).join(", "))}</div></div></button>`;
+  }).join("") + grpLinkBtn("#recipes", `Open all GF Recipes (${ideas.length})`);
+
+  const openShop = (S.shop && S.shop.items || []).filter(x => !x.done);
+  const shopCards = (openShop.length ? openShop.slice(0, 8).map(x => grpCard([["🛒 To get", "#ea580c"], ...(x.meals && x.meals.length ? [["For " + x.meals[0], "#2563eb"]] : [])], x.name, x.brand ? brandLine(x.brand) : (x.meals && x.meals.length ? "For " + x.meals.join(", ") : "Tap to open Shopping list"), "go('#shopping')")).join("") : grpCard([["🛒 Shopping list", "#16a34a"]], "Shopping list is clear", "Tap to add groceries or pull ingredients from your Meal plan", "go('#shopping')")) + grpLinkBtn("#shopping", `Open Shopping list (${openShop.length} to get)`);
+
+  const gf = typeof gfGet === "function" ? gfGet() : { lists: {} };
+  const gfSafe = (gf.lists && gf.lists.safe || []).slice(0, 4);
+  const gfDine = (gf.lists && gf.lists.dining || []).slice(0, 3);
+  const gfCards = [
+    ...gfSafe.map(x => grpCard([["✓ Coeliac Safe", "#15803d"], [x.catLabel || "GF", "#0d9488"]], x.title, x.store || x.note || "", "go('#gflist')")),
+    ...gfDine.map(x => grpCard([["🍽️ Dining Out", "#2563eb"]], x.title, x.where || x.ask || "", "go('#gflist')"))
+  ].join("") + grpLinkBtn("#gflist", "Open GF Safe List & Dining");
+
+  const cols = [
+    tbList("plan", "Meal Planner (Next 4 Weeks)", nights.length, planCards, false, "foodHub"),
+    tbList("rec", "Gluten-Free Recipes", ideas.length, recCards, false, "foodHub"),
+    tbList("shop", "Shopping List", openShop.length, shopCards, false, "foodHub"),
+    tbList("gf", "GF Safe List & Dining", gfSafe.length + gfDine.length, gfCards, false, "foodHub")
+  ].join("");
+
+  return `<button class="back" onclick="go('#home')">${I("left")} Home</button>` +
+    header(`<span style="display:inline-flex;align-items:center;gap:10px"><img src="art/i3-plate.webp" alt="" width="40" height="40" style="width:40px;height:40px;object-fit:contain" onerror="this.remove()">Meals</span>`, "Plan, cook and shop · all gluten free") +
+    mealTabs("board") +
+    (btIn ? "" : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddFood()">${I("plus")} Add to bottom bar</button>`) +
+    `<div class="tbboard" style="margin-bottom:14px"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#be123c,#ea580c 55%,#0f172a)"></div>
+    <div class="tbtop"><div><h1>Meals &amp; Gluten-Free Hub</h1><div style="font-size:.82rem;opacity:.92">Cooking nights, GF recipes with photos, shopping list &amp; coeliac safe list</div></div><button class="iconbtn" aria-label="Surprise me for all nights" title="Surprise me" onclick="go('#meals');setTimeout(()=>surpriseAll(),120)">${I("shuffle")}</button></div>
+    <div class="tblists">${cols}</div></div>` +
+    `<div class="glgrid">${T.map(t => glTileHtml(t, false)).join("")}</div>`;
+};
+
+/* ---- Bluetooth & Audio Output Selector (Car Stereo & Top 40) ---- */
+function activeAudioEls() {
+  const els = [];
+  if (typeof radioSt !== "undefined" && radioSt && radioSt.audio) els.push(radioSt.audio);
+  const t40a = document.getElementById("t40audio");
+  if (t40a) els.push(t40a);
+  document.querySelectorAll("audio, video").forEach(el => { if (!els.includes(el)) els.push(el); });
+  els.forEach(el => { try { el.disableRemotePlayback = false; } catch (e) {} });
+  return els;
+}
+function syncMediaSession(source) {
+  try {
+    if (!("mediaSession" in navigator) || typeof MediaMetadata === "undefined") return;
+    if (source === "Top 40" || (location.hash || "").startsWith("#top40")) {
+      const t = typeof t40NowTrack === "function" ? t40NowTrack() : null;
+      if (t) {
+        const art = /^[A-Za-z0-9_-]{11}$/.test(t.id || "") ? `https://i.ytimg.com/vi/${t.id}/hqdefault.jpg` : "icons/icon-192.png";
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: t.title || "Top 40 NZ",
+          artist: t.artist || "Top 40",
+          album: "My App · Top 40 NZ",
+          artwork: [{ src: art, sizes: "480x360", type: "image/jpeg" }]
+        });
+        navigator.mediaSession.setActionHandler("previoustrack", () => { try { t40Step(-1); } catch (e) {} });
+        navigator.mediaSession.setActionHandler("nexttrack", () => { try { t40Step(1); } catch (e) {} });
+      }
+    } else {
+      const st = (typeof RADIO !== "undefined" && typeof radioSt !== "undefined" && RADIO[radioSt.idx]) || null;
+      const now = typeof radioNowTrack === "function" ? radioNowTrack() : null;
+      if (st) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: now && now.title ? now.title : st.name,
+          artist: now && now.artist ? now.artist + " · " + st.name : (st.freq || "Whangārei Radio"),
+          album: "My App · Car Stereo",
+          artwork: [{ src: (now && now.cover) || "icons/icon-192.png", sizes: "192x192", type: "image/png" }]
+        });
+        navigator.mediaSession.setActionHandler("play", () => { try { if (!radioSt.playing) radioToggle(); } catch (e) {} });
+        navigator.mediaSession.setActionHandler("pause", () => { try { if (radioSt.playing) radioToggle(); } catch (e) {} });
+        navigator.mediaSession.setActionHandler("previoustrack", () => { try { radioSeek(-1); } catch (e) {} });
+        navigator.mediaSession.setActionHandler("nexttrack", () => { try { radioSeek(1); } catch (e) {} });
+      }
+    }
+  } catch (e) {}
+}
+(() => {
+  if (typeof radioSyncUI === "function") {
+    const origSync = radioSyncUI;
+    radioSyncUI = function () {
+      const r = origSync.apply(this, arguments);
+      try { if (radioSt && radioSt.playing) syncMediaSession("Car Stereo"); } catch (e) {}
+      return r;
+    };
+  }
+  if (typeof t40RedrawPlayer === "function") {
+    const origT40 = t40RedrawPlayer;
+    t40RedrawPlayer = function () {
+      const r = origT40.apply(this, arguments);
+      try { syncMediaSession("Top 40"); } catch (e) {}
+      return r;
+    };
+  }
+})();
+async function applyAudioSink(deviceId, label) {
+  try {
+    const els = activeAudioEls();
+    let applied = false;
+    for (const el of els) {
+      if (typeof el.setSinkId === "function") {
+        await el.setSinkId(deviceId);
+        applied = true;
+      }
+    }
+    try { localStorage.setItem("audioSinkId", deviceId || ""); localStorage.setItem("audioSinkLabel", label || ""); } catch (e) {}
+    if (applied) {
+      toast("Playing audio through: " + (label || "Selected speaker / Bluetooth"));
+      await closeSheet();
+    } else {
+      openAndroidMediaOutput();
+    }
+  } catch (e) {
+    toast("Couldn’t switch directly in browser — opening phone output switcher…");
+    openAndroidMediaOutput();
+  }
+}
+async function pickBrowserAudioOutput(sourceLabel) {
+  syncMediaSession(sourceLabel);
+  const els = activeAudioEls();
+  // 1. Try standard Web Audio Output Devices API (selectAudioOutput)
+  try {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.selectAudioOutput === "function") {
+      const dev = await navigator.mediaDevices.selectAudioOutput();
+      if (dev && dev.deviceId) {
+        await applyAudioSink(dev.deviceId, dev.label || "Bluetooth / Speaker");
+        return;
+      }
+    }
+  } catch (e) {}
+  // 2. Try Remote Playback API prompt (Bluetooth / Cast / Remote speaker picker on mobile Chrome)
+  try {
+    const a = els[0] || (typeof radioEnsureAudio === "function" ? radioEnsureAudio() : new Audio());
+    a.disableRemotePlayback = false;
+    if (a.remote && typeof a.remote.prompt === "function") {
+      await a.remote.prompt();
+      return;
+    }
+  } catch (e) {}
+  // 3. On Android / Samsung One UI, open Android’s native floating Media Output Bluetooth panel
+  if (/Android/i.test(navigator.userAgent || "")) {
+    openAndroidMediaOutput();
+    return;
+  }
+  toast("Use your device’s Bluetooth or sound output menu to choose a speaker.");
+}
+function openAndroidMediaOutput() {
+  try {
+    location.href = "intent://#Intent;action=com.android.settings.panel.action.MEDIA_OUTPUT;end";
+  } catch (e) {
+    openAndroidBluetoothSettings();
+  }
+}
+function openAndroidBluetoothSettings() {
+  try {
+    location.href = "intent://#Intent;action=android.settings.BLUETOOTH_SETTINGS;end";
+  } catch (e) {
+    toast("Open your phone’s Settings › Connections › Bluetooth to pick a device.");
+  }
+}
+async function openAudioOutputPicker(sourceLabel = "Audio") {
+  syncMediaSession(sourceLabel);
+  const isAndroid = /Android/i.test(navigator.userAgent || "");
+  const savedLabel = (() => { try { return localStorage.getItem("audioSinkLabel") || ""; } catch (e) { return ""; } })();
+  const savedId = (() => { try { return localStorage.getItem("audioSinkId") || ""; } catch (e) { return ""; } })();
+  let outs = [];
+  try {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === "function") {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      outs = (all || []).filter(d => d && d.kind === "audiooutput" && d.deviceId);
+    }
+  } catch (e) {}
+  const devRows = outs.length > 0 ? `<div class="sec" style="margin-top:12px">Available audio outputs</div><div class="list">${outs.map((d, idx) => {
+    const lbl = d.label || (d.deviceId === "default" ? "Phone / Default Bluetooth Output" : "Audio Output " + (idx + 1));
+    const on = savedId === d.deviceId || (!savedId && d.deviceId === "default");
+    return `<button type="button" class="row" onclick="applyAudioSink(${jsArg(d.deviceId)},${jsArg(lbl)})"><div class="ic t40">🔊</div><div class="tx"><div class="t">${esc(lbl)}</div><div class="s">${on ? "● Active output" : "Tap to route audio here"}</div></div>${on ? `<span class="pill ok">Active</span>` : ""}</button>`;
+  }).join("")}</div>` : "";
+
+  openSheet(`🔊 Bluetooth &amp; Audio Output (${esc(sourceLabel)})`,
+    `<p class="muted" style="margin:0 0 10px">Choose which Bluetooth speaker, headphones, Echo or car stereo plays your <b>${esc(sourceLabel)}</b> audio${savedLabel ? ` (currently: <b>${esc(savedLabel)}</b>)` : ""}.</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button type="button" class="btn primary" style="justify-content:center;padding:12px 14px;font-size:.98rem" onclick="pickBrowserAudioOutput(${jsArg(sourceLabel)})">🔵 Choose Bluetooth / Speaker Output</button>
+      ${isAndroid ? `<button type="button" class="btn" style="justify-content:center;padding:11px 14px" onclick="openAndroidMediaOutput()">📱 Samsung / Android Media Output Panel</button>
+      <button type="button" class="btn" style="justify-content:center;padding:11px 14px" onclick="openAndroidBluetoothSettings()">⚙️ Phone Bluetooth Settings (Pair / Connect)</button>` : `<button type="button" class="btn" style="justify-content:center;padding:11px 14px" onclick="openAndroidBluetoothSettings()">⚙️ Open Bluetooth Settings</button>`}
+    </div>
+    ${devRows}
+    <div class="card muted" style="margin-top:12px;font-size:.82rem;line-height:1.45">
+      <b>Tip for Samsung Galaxy / Android:</b> Tapping <b>Choose Bluetooth / Speaker Output</b> or <b>Media Output Panel</b> opens your phone’s Bluetooth audio switcher right over the app so you can switch between your phone speaker, Bluetooth speaker, headphones or car stereo in one tap.
+    </div>`,
+    null, "");
+}
