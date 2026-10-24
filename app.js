@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.8';
+const APP_VERSION = '2.28.9';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -20217,7 +20217,7 @@ function glWarnCard(x) {
   return x.url ? `<a class="${cls}"${g} href="${esc(x.url)}" target="_blank" rel="noopener" onclick="if(glSwipe.moved)event.preventDefault()">${inner}</a>` : `<button type="button" class="${cls}"${g} onclick="if(!glSwipe.moved){${esc(x.go || '')}}">${inner}</button>`;
 }
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
-function glWarnRedraw() { try { const el = document.getElementById('glalerts'); if (el) { el.innerHTML = glAlertsBody(); el.style.setProperty('--newage', bellNewAge() + 's'); glBellMarkSeen(); } } catch (e) { } glBellRedraw(); }
+function glWarnRedraw() { try { const el = document.getElementById('allists'); if (el) { const sx = el.scrollLeft, sy = {}; el.querySelectorAll('section.tblist[data-k]').forEach(s => { const c = s.querySelector('.tbcards'); if (c) sy[s.dataset.k] = c.scrollTop; }); let list = []; try { list = comingUpList(); } catch (e) { } el.innerHTML = alBoardHtml(list); el.scrollLeft = sx; el.querySelectorAll('section.tblist[data-k]').forEach(s => { const c = s.querySelector('.tbcards'); if (c && sy[s.dataset.k]) c.scrollTop = sy[s.dataset.k]; }); const b = document.getElementById('glalerts'); if (b) b.style.setProperty('--newage', bellNewAge() + 's'); glBellMarkSeen(); } } catch (e) { } glBellRedraw(); }
 function glAlertsBody() { const L = glWarnList(), hint = L.some(x => x.flag) ? '' : '<p class="muted glhint">Flag events in Events to see them here.</p>'; return (L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook, road or bridge closures and events you flag show up here.</div></div>') + hint; }
 
 /* 2.26.13: Languages. A new te reo Māori and French word or phrase each day from a fixed, hand-checked list.
@@ -20469,41 +20469,170 @@ function nbFunCards() {
 }
 const nbStrip = h => String(h || '').replace(/<[^>]*>/g, '').replace(/&[a-z#0-9]+;/gi, ' ');
 const nbIsBill = x => !!(x && (['bill', 'loan', 'pay', 'budget', 'xfer', 'move'].includes(x.kind) || x.ic === 'bill' || /go\('#(bills|cashflow|loans)'\)/.test(String(x.html || x.go || ''))));
-function nbBoardHtml(list) {
+function nbArcCard(btn) {
+  const el = btn && btn.closest && btn.closest('.glnew, [data-gk]'); if (!el) return;
+  const pinEl = el.closest('[data-pid]'), isPin = pinEl && pinEl.closest('.bellpinned');
+  if (isPin && !confirm('Archive this pinned notification? It will be unpinned too.')) return;
+  if (isPin) { try { const P = bellPins(), i = P.findIndex(p => p.id === pinEl.dataset.pid); if (i >= 0) { P.splice(i, 1); save(); } } catch (x) { } }
+  arcAdd(arcEntryOf(el));
+  const tl = el.closest('section.tblist'); el.remove();
+  if (tl) { const nEl = tl.querySelector('.tbn'), cEl = tl.querySelector('.tbcards'); if (nEl && cEl) nEl.textContent = String(cEl.querySelectorAll('.row, .glwarnwrap, .glflagwrap, .tbcard, .card:not(.empty)').length); }
+  glBellRedraw();
+}
+function alJump(k) {
+  const box = document.getElementById('allists'), sec = box && box.querySelector(`section.tblist[data-k="${k}"]`);
+  if (box && sec) box.scrollTo({ left: Math.max(0, sec.offsetLeft - 14), behavior: 'smooth' });
+}
+function alBoardHtml(list) {
   list = (list || []).filter(x => !nbIsBill(x));
   const now = [], today = [], week = [], later = [];
   const urgent = x => x.days < 0 || (x.days === 0 && x.pri === 0) || ((x.kind === 'car' || x.kind === 'driver') && x.days <= 0);
   let ja = []; try { ja = justAddedList().filter(x => !nbIsBill(x)); } catch (e) { }
-  // 2.28.5: a Just added item that is already in a column gets a New badge there instead of a second card
   const jaLeft = ja.filter(j => { const hit = list.find(x => { const t = x.ref && x.ref.todo; return (t && String(j.go || '').includes("'" + t.id + "'")) || (x.name && cuNorm(x.name) === cuNorm(nbStrip(j.title))); }); if (hit) { hit.isNew = true; return false; } return true; });
   list.forEach(x => (urgent(x) ? now : x.days <= 0 ? today : x.days <= 7 ? week : later).push(x));
   const byPri = (a, b) => a.days - b.days || a.pri - b.pri;
   const row = x => { const h = cuRowHtml(x); return x.isNew ? h.replace('<div class="t">', '<div class="t"><span class="nbnew">New</span> ') : h; };
-  const rows = L => L.length ? `<div class="list${cuColoursOn() ? ' cucolours' : ''} nbrows">${L.sort(byPri).map(row).join('')}</div>` : '';
-  const nowL = now.sort((a, b) => a.pri - b.pri || a.days - b.days);
-  const al = `<div id="glalerts">${glAlertsBody()}</div>`;
-  const jaH = jaLeft.length ? `<div class="list nbrows">${jaLeft.slice(0, 12).map(nbJaRow).join('')}</div>` : '';
-  return tbList('now', 'Urgent / Now', now.length, rows(nowL) + al, false, 'nb') +
-    tbList('today', 'Today', today.length + jaLeft.length, rows(today) + jaH + `<div id="habsug">${habCards()}</div>`, false, 'nb', 'Nothing else today') +
-    tbList('week', 'This week', week.length, rows(week), false, 'nb', 'Nothing this week') +
-    tbList('later', 'Later', later.length, rows(later), false, 'nb', 'Nothing later') +
-    tbList('fun', 'Fun & Daily', nbStoryList().length, nbFunCards(), false, 'nb', 'Nothing today');
+  const d = document.createElement('div');
+  try { d.innerHTML = glAlertsBody(); } catch (e) { }
+  d.querySelectorAll('.glnewtop').forEach(el => el.classList.add('all'));
+  d.querySelectorAll('.bfrest').forEach(el => { el.hidden = false; el.removeAttribute('hidden'); });
+  d.querySelectorAll('.jimore').forEach(el => { el.style.display = ''; });
+  d.querySelectorAll('.glnewmore, .bfmore, .jimorebtn, .card.empty').forEach(el => el.remove());
+  const bf = d.querySelector('.bflist');
+  if (bf) { const pv = bf.previousElementSibling; if (!pv || !pv.classList.contains('sec') || !/for you today/i.test(pv.textContent)) { const s0 = document.createElement('div'); s0.className = 'sec'; s0.textContent = 'For you today'; bf.parentNode.insertBefore(s0, bf); } }
+  d.querySelectorAll('.glnew, [data-gk]').forEach(el => {
+    if (el.querySelector('.bparc')) return;
+    const host = el.matches('.glflagwrap, .glwarnwrap') ? (el.querySelector('.glwarn') || el) : el;
+    host.classList.add('bphost');
+    host.insertAdjacentHTML('beforeend', `<button type="button" class="bparc" aria-label="Archive notification" title="Archive" onclick="event.stopPropagation();nbArcCard(this)">✕</button>`);
+  });
+  const secs = new Map();
+  let cur = 'Urgent';
+  const normKey = t => {
+    const s = String(t || '').toLowerCase();
+    if (s.startsWith('just in')) return ['justin', 'Just in'];
+    if (s.startsWith('pinned')) return ['pinned', 'Pinned'];
+    if (s.startsWith('urgent')) return ['now', 'Urgent / Now'];
+    if (s.startsWith('new today')) return ['newtoday', 'New today'];
+    if (s.startsWith('for you today')) return ['foryou', 'For you today'];
+    if (s.startsWith('today')) return ['today', 'Today'];
+    if (s.startsWith('in progress')) return ['prog', 'In progress'];
+    if (s.startsWith('coming up')) return ['week', 'Coming up'];
+    if (s.startsWith('new on your lists')) return ['newlists', 'New on your lists'];
+    if (s.startsWith('from sarah')) return ['sarah', 'From Sarah'];
+    if (s.startsWith('power')) return ['power', 'Power'];
+    if (s.startsWith('put back')) return ['putback', 'Put back'];
+    if (s.startsWith('reminders')) return ['reminders', 'Reminders'];
+    if (s.startsWith('deliveries')) return ['deliveries', 'Deliveries'];
+    if (s.startsWith('click & collect')) return ['cc', 'Click & collect'];
+    if (s.startsWith('everyday rewards')) return ['er', 'Everyday Rewards'];
+    if (s.startsWith('gluten free')) return ['gf', 'Gluten free'];
+    if (s.startsWith('flagged events')) return ['flagged', 'Flagged events'];
+    const k = s.replace(/[^a-z0-9]+/g, '').slice(0, 16) || 'other';
+    return [k, t];
+  };
+  const ensure = (k, title) => { if (!secs.has(k)) secs.set(k, { k, title, nodes: [] }); return secs.get(k); };
+  [...d.children].forEach(ch => {
+    if (ch.classList.contains('sec')) {
+      const c = ch.cloneNode(true); c.querySelectorAll('.glswipehint, button').forEach(x => x.remove());
+      const [k, title] = normKey(c.textContent.trim()); cur = k; ensure(k, title);
+    } else {
+      if (ch.matches && ch.matches('p.glhint')) return;
+      const [k, title] = normKey(cur); ensure(k, title).nodes.push(ch);
+    }
+  });
+  const titlesIn = k => {
+    const g = secs.get(k); if (!g) return new Set();
+    const S0 = new Set();
+    g.nodes.forEach(n => n.querySelectorAll('.t, b').forEach(t => { const tx = cuNorm(t.textContent || ''); if (tx) S0.add(tx); }));
+    return S0;
+  };
+  const addCuRows = (k, title, arr, extraHtml) => {
+    const g = ensure(k, title), seen = titlesIn(k);
+    const keep = arr.filter(x => { const nm = cuNorm(x.name || nbStrip(x.html || '')); return !nm || !seen.has(nm); });
+    if (keep.length) {
+      const wrap = document.createElement('div'); wrap.className = `list${cuColoursOn() ? ' cucolours' : ''} nbrows`;
+      wrap.innerHTML = keep.map(row).join('');
+      g.nodes.unshift(wrap);
+    }
+    if (extraHtml) { const w = document.createElement('div'); w.innerHTML = extraHtml; [...w.children].forEach(c => g.nodes.push(c)); }
+  };
+  addCuRows('now', 'Urgent / Now', now.sort((a, b) => a.pri - b.pri || a.days - b.days), '');
+  if (jaLeft.length) {
+    const g = ensure('newtoday', 'New today'), w = document.createElement('div');
+    w.className = 'list nbrows'; w.innerHTML = jaLeft.slice(0, 20).map(nbJaRow).join('');
+    g.nodes.unshift(w);
+  } else ensure('newtoday', 'New today');
+  ensure('foryou', 'For you today');
+  const habH = (() => { try { return habCards(); } catch (e) { return ''; } })();
+  addCuRows('today', 'Today', today.sort(byPri), habH ? `<div id="habsug">${habH}</div>` : '');
+  addCuRows('week', 'Coming up', week.sort(byPri), '');
+  addCuRows('later', 'Later', later.sort(byPri), '');
+  ensure('flagged', 'Flagged events');
+  const countCards = g => {
+    if (!g) return 0;
+    let n = 0;
+    g.nodes.forEach(el => {
+      if (el.matches && el.matches('.row, .glwarnwrap, .glflagwrap, .tbcard, .card:not(.empty)')) n++;
+      else if (el.querySelectorAll) n += el.querySelectorAll(':scope > .row, :scope > .glwarnwrap, :scope > .glflagwrap, :scope > .tbcard, :scope > .card:not(.empty), :scope > .jimore > *').length;
+    });
+    return n;
+  };
+  const htmlOf = g => g ? g.nodes.map(n => n.outerHTML).join('') : '';
+  const ORDER = [
+    ['justin', 'Just in', false, 'Nothing new just in'],
+    ['pinned', 'Pinned', false, 'Nothing pinned'],
+    ['now', 'Urgent / Now', true, 'Nothing urgent right now'],
+    ['newtoday', 'New today', true, 'Nothing new today'],
+    ['foryou', 'For you today', true, 'Nothing for you right now'],
+    ['today', 'Today', true, 'Nothing else today'],
+    ['week', 'Coming up', true, 'Nothing coming up'],
+    ['prog', 'In progress', false, 'Nothing in progress'],
+    ['sarah', 'From Sarah', false, 'Nothing new from Sarah'],
+    ['newlists', 'New on your lists', false, 'Nothing new on your lists'],
+    ['deliveries', 'Deliveries', false, 'No active deliveries'],
+    ['cc', 'Click & collect', false, 'No click & collect orders'],
+    ['reminders', 'Reminders', false, 'No reminders'],
+    ['power', 'Power', false, 'No power notices'],
+    ['er', 'Everyday Rewards', false, 'No active boosters'],
+    ['gf', 'Gluten free', false, 'No gluten-free updates'],
+    ['putback', 'Put back', false, 'Nothing put back'],
+    ['flagged', 'Flagged events', true, 'Flag events in Events to see them here'],
+    ['later', 'Later', true, 'Nothing later']
+  ];
+  const cols = [];
+  const used = new Set();
+  ORDER.forEach(([k, title, always, emptyTxt]) => {
+    used.add(k);
+    const g = secs.get(k), n = countCards(g);
+    if (!always && !n) return;
+    cols.push({ k, title, n, html: tbList(k, title, n, n ? htmlOf(g) : '', false, 'al', emptyTxt) });
+  });
+  secs.forEach((g, k) => {
+    if (used.has(k)) return;
+    const n = countCards(g); if (!n) return;
+    cols.push({ k, title: g.title, n, html: tbList(k, g.title, n, htmlOf(g), false, 'al', 'Nothing here') });
+  });
+  const funN = nbStoryList().length;
+  cols.push({ k: 'fun', title: 'Fun & Daily', n: funN, html: tbList('fun', 'Fun & Daily', funN, nbFunCards(), false, 'al', 'Nothing today') });
+  return cols.map(c => c.html).join('');
 }
-function nbMenu(k) {
+function alMenu(k) {
   const n = (() => { try { return justAddedList().filter(x => !nbIsBill(x)).length; } catch (e) { return 0; } })();
-  openSheet({ now: 'Urgent / Now', today: 'Today', week: 'This week', later: 'Later', fun: 'Fun & Daily' }[k] || 'Notifications', `<p class="muted">Most urgent on the left, most important at the top of each list. Cards move along by themselves as dates get closer.</p><div class="btns" style="flex-direction:column;align-items:stretch">${n ? `<button type="button" class="btn" onclick="closeSheet().then(justAddedClear)">Clear new… (${n})</button>` : ''}<button type="button" class="btn" onclick="closeSheet().then(()=>go('#calendar'))">${I('cal')} Calendar</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button></div>`, null);
+  const titles = { justin: 'Just in', pinned: 'Pinned', now: 'Urgent / Now', newtoday: 'New today', foryou: 'For you today', today: 'Today', week: 'Coming up', prog: 'In progress', sarah: 'From Sarah', newlists: 'New on your lists', deliveries: 'Deliveries', cc: 'Click & collect', reminders: 'Reminders', power: 'Power', er: 'Everyday Rewards', gf: 'Gluten free', putback: 'Put back', flagged: 'Flagged events', later: 'Later', fun: 'Fun & Daily' };
+  openSheet(titles[k] || 'Notifications', `<p class="muted">Swipe sideways between boards, and scroll up and down inside each board. Tap ✕ on a card to archive it.</p><div class="btns" style="flex-direction:column;align-items:stretch">${k === 'justin' ? `<button type="button" class="btn" onclick="closeSheet().then(jiAllRead)">Mark all Just in as read</button>` : ''}${n ? `<button type="button" class="btn" onclick="closeSheet().then(justAddedClear)">Clear new… (${n})</button>` : ''}<button type="button" class="btn" onclick="closeSheet().then(()=>pwrNav('#archive','l'))">🗂 Open Archive</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#calendar'))">${I('cal')} Calendar</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button></div>`, null);
 }
 function nbTopHtml() {
   let list = []; try { list = comingUpList(); } catch (e) { }
-  return { top: `<div class="tbboard nbboard"><div class="tblists" id="nblists">${nbBoardHtml(list)}</div></div>`, fun: '' };
+  return { top: `<div class="tbboard nbboard" id="glalerts"><div class="tblists" id="allists">${alBoardHtml(list)}</div></div>`, fun: '' };
 }
 function GlAlerts() {
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   setTimeout(() => { try { accLoad(); } catch (e) { } try { glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); } catch (e) { } }, 0);
   const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
-  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Urgent, coming up, from Sarah and flagged events') + bellReadProg() + (NB.top) + `
-  <div class="pwrhint muted" style="text-align:center">Swipe left on an item to archive it · swipe the page right for the Archive →</div>
+  return pwrWrap(`<div class="arcbar"><button class="back" onclick="go('#home')">${I('left')} Home</button>${arcTab()}</div>` + header('Notifications', 'Swipe sideways between boards · scroll up and down inside each board') + bellReadProg() + (NB.top) + `
+  <div class="pwrhint muted" style="text-align:center">Swipe sideways between boards · scroll up and down inside each board · tap ✕ to archive</div>
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
 }
 function glWxSky(kind, day) {
@@ -22389,6 +22518,7 @@ function arcEntryOf(el) {
   let sec = '', box = el.closest('.list, .glwarns, .glnewlist') || el.parentElement, h = box && box.previousElementSibling;
   while (h && !h.classList.contains('sec')) h = h.previousElementSibling;
   if (h) { const c = h.cloneNode(true); c.querySelectorAll('.glswipehint').forEach(x => x.remove()); sec = c.textContent.trim(); }
+  if (!sec && el.closest) { const tl = el.closest('section.tblist'); const h3 = tl && tl.querySelector('.tbhead h3'); if (h3) sec = h3.textContent.trim(); }
   const tx = (sel) => { const n = el.querySelector(sel); return n ? n.textContent.replace(/\s+/g, ' ').trim().slice(0, 240) : ''; };
   const oc = el.getAttribute('onclick') || '', m = oc.match(/go\('(#[\w\/-]+)'\)/);
   return { id: type + '|' + key, type, key, section: sec || 'Notifications', title: tx('.t') || tx('b') || el.textContent.replace(/\s+/g, ' ').trim().slice(0, 120), body: tx('.s') || [tx('.glwtag'), tx('b + span')].filter(Boolean).join(' · '), link: m ? m[1] : '', archivedAt: new Date().toISOString() };
@@ -22428,7 +22558,7 @@ function BellArchive() {
 (function () {
   let x0 = 0, y0 = 0, t0 = 0, on = '', row = null, dx = 0;
   const route = () => (location.hash || '').slice(1).split('/')[0];
-  const skip = t => { if (!t.closest || t.closest('input,textarea,select,.glnew,[data-gk],button.arctab')) return true; for (let n = t; n && n !== document.body; n = n.parentElement) { const ox = getComputedStyle(n).overflowX; if ((ox === 'auto' || ox === 'scroll') && n.scrollWidth > n.clientWidth + 4) return true; } return false; };
+  const skip = t => { if (!t.closest || t.closest('input,textarea,select,.glnew,[data-gk],button.arctab,.nbboard,.tbboard')) return true; for (let n = t; n && n !== document.body; n = n.parentElement) { const ox = getComputedStyle(n).overflowX; if ((ox === 'auto' || ox === 'scroll') && n.scrollWidth > n.clientWidth + 4) return true; } return false; };
   document.addEventListener('touchstart', e => {
     on = ''; row = null; dx = 0; if (e.touches.length !== 1 || sheetOpen) return; const r = route(), t = e.target;
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
@@ -22538,7 +22668,7 @@ function glNewItems() {
   return out;
 }
 function glSwipe(e) {
-  const el = e.target.closest && e.target.closest('.glnew, #glalerts [data-gk]'); if (!el) return; // 2.26.32: also the 'new on your lists' cards (data-nl)
+  const el = e.target.closest && e.target.closest('.glnew, #glalerts [data-gk]'); if (!el || (el.closest && el.closest('.nbboard'))) return; // 2.26.32: also the 'new on your lists' cards (data-nl)
   const t0 = e.touches[0], x0 = t0.clientX, y0 = t0.clientY; let dx = 0, dir = '';
   glSwipe.moved = false;
   const mv = ev => { const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0; if (!dir && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) dir = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y'; if (dir !== 'x') return; ev.preventDefault(); glSwipe.moved = true; dx = Math.min(0, ddx); el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(1 + dx / 400); };
