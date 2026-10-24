@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.10';
+const APP_VERSION = '2.28.11';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -636,8 +636,8 @@ const HOME_CARD = {
   },
   // Off until switched on in Customise Home. Stations that broadcast in Whangārei. No made-up stream.
   radio: () => {
-    const head = homeSec('Radio', '<a href="#radio">See all</a>');
-    return head + `<div class="list" id="homeradio">${RADIO.slice(0, 3).map(radioRow).join('')}</div>`;
+    const head = homeSec('Radio', '<a href="#radio">Open stereo</a>');
+    return head + `<div id="homeradio-stereo">${homeRadioHtml()}</div>`;
   },
   // 2.9.6: off until Customise Home turns it on. One or two lines from today, nothing fetched.
   diary: () => {
@@ -6941,6 +6941,260 @@ const RADIO = [
   { name: 'Rhema', freq: '621 AM', where: 'Whangārei', home: 'https://rhema.co.nz/frequencies', stream: 'https://rhema-radio.streamguys1.com/rhema.aac' },
   { name: 'Newstalk ZB', freq: '729 AM, 1026 AM, 105.1 FM and 1215 AM', where: 'Northland', home: 'https://www.newstalkzb.co.nz/', stream: 'https://playerservices.streamtheworld.com/api/livestream-redirect/NZME_01AAC.aac' },
 ];
+// 2.28.11: Car stereo head-unit with FM1/FM2 presets (1-6 & 7-12), LCD frequency dial, seek & volume
+const RADIO_DEFAULT_PRESETS = [4, 3, 11, 10, 1, 21, 2, 5, 6, 8, 15, 18]; // More FM, The Breeze, The Sound, Coast, The Hits, Newstalk ZB | The Rock, Breeze Classic, Hauraki, ZM, RNZ National, Mai FM
+const radioSt = (() => {
+  let idx = 4, vol = 85, muted = false, bank = 0;
+  try {
+    const saved = JSON.parse(localStorage.getItem('carStereoLast') || '{}');
+    if (typeof saved.idx === 'number' && RADIO[saved.idx]) idx = saved.idx;
+    if (typeof saved.vol === 'number') vol = Math.max(0, Math.min(100, saved.vol));
+    if (saved.bank === 1) bank = 1;
+  } catch (e) { }
+  return { idx, vol, muted, bank, setMode: false, playing: false, loading: false, err: false, audio: null };
+})();
+function radioPresets() {
+  try {
+    const raw = (S && Array.isArray(S.radioPresets) && S.radioPresets.length === 12) ? S.radioPresets : JSON.parse(localStorage.getItem('carStereoPresets') || 'null');
+    if (Array.isArray(raw) && raw.length === 12) return raw.map((v, i) => (typeof v === 'number' && RADIO[v]) ? v : RADIO_DEFAULT_PRESETS[i]);
+  } catch (e) { }
+  return RADIO_DEFAULT_PRESETS.slice();
+}
+function saveRadioPresets(arr) {
+  try { localStorage.setItem('carStereoPresets', JSON.stringify(arr)); } catch (e) { }
+  try { if (S) { S.radioPresets = arr.slice(); save(); } } catch (e) { }
+}
+function saveRadioLast() {
+  try { localStorage.setItem('carStereoLast', JSON.stringify({ idx: radioSt.idx, vol: radioSt.vol, bank: radioSt.bank })); } catch (e) { }
+}
+function radioFreqParts(freqStr) {
+  const s = String(freqStr || '');
+  const fm = s.match(/(\d+(?:\.\d+)?)\s*FM/i);
+  if (fm) return { num: fm[1], band: 'FM', unit: 'MHz', isAm: false, val: parseFloat(fm[1]) };
+  const am = s.match(/(\d+)\s*AM/i);
+  if (am) return { num: am[1], band: 'AM', unit: 'kHz', isAm: true, val: parseFloat(am[1]) };
+  return { num: s.split(' ')[0] || '--', band: 'FM', unit: 'MHz', isAm: false, val: 95 };
+}
+function radioDialPct(fp) {
+  if (fp.isAm) return Math.max(4, Math.min(96, ((fp.val - 530) / (1600 - 530)) * 92 + 4));
+  return Math.max(4, Math.min(96, ((fp.val - 88) / (108 - 88)) * 92 + 4));
+}
+function radioEnsureAudio() {
+  if (radioSt.audio) return radioSt.audio;
+  const a = new Audio();
+  a.preload = 'none';
+  a.volume = (radioSt.muted ? 0 : radioSt.vol) / 100;
+  a.addEventListener('playing', () => { radioSt.playing = true; radioSt.loading = false; radioSt.err = false; radioSyncUI(); });
+  a.addEventListener('waiting', () => { if (!a.paused) { radioSt.loading = true; radioSyncUI(); } });
+  a.addEventListener('pause', () => { if (!radioSt.loading) { radioSt.playing = false; radioSyncUI(); } });
+  a.addEventListener('error', () => { if (a.src) { radioSt.playing = false; radioSt.loading = false; radioSt.err = true; radioSyncUI(); } });
+  radioSt.audio = a;
+  return a;
+}
+function radioTune(idx, autoPlay) {
+  if (idx < 0 || idx >= RADIO.length) return;
+  radioSt.idx = idx;
+  radioSt.err = false;
+  saveRadioLast();
+  const st = RADIO[idx];
+  const a = radioEnsureAudio();
+  document.querySelectorAll('audio.radioplay').forEach(o => { try { o.pause(); } catch (e) { } });
+  if (autoPlay && st && st.stream) {
+    try {
+      radioSt.loading = true;
+      radioSt.playing = false;
+      if (a.src !== st.stream) a.src = st.stream;
+      a.volume = (radioSt.muted ? 0 : radioSt.vol) / 100;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => { radioSt.playing = false; radioSt.loading = false; radioSt.err = true; radioSyncUI(); });
+    } catch (e) { radioSt.playing = false; radioSt.loading = false; radioSt.err = true; }
+  } else if (!autoPlay && radioSt.playing) {
+    try { a.pause(); } catch (e) { }
+    radioSt.playing = false;
+    radioSt.loading = false;
+  }
+  radioSyncUI();
+}
+function radioToggle() {
+  const st = RADIO[radioSt.idx] || RADIO[0];
+  const a = radioEnsureAudio();
+  if (radioSt.playing || radioSt.loading) {
+    radioSt.loading = false;
+    radioSt.playing = false;
+    try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) { }
+    radioSyncUI();
+  } else {
+    radioTune(radioSt.idx, true);
+  }
+}
+function radioSeek(dir) {
+  const next = (radioSt.idx + dir + RADIO.length) % RADIO.length;
+  radioTune(next, radioSt.playing || radioSt.loading || true);
+}
+function radioTapPreset(slot) {
+  const presets = radioPresets();
+  const realSlot = radioSt.bank * 6 + slot;
+  if (radioSt.setMode) {
+    presets[realSlot] = radioSt.idx;
+    saveRadioPresets(presets);
+    radioSt.setMode = false;
+    const st = RADIO[radioSt.idx];
+    if (typeof toast === 'function' && st) toast(`Saved ${st.name} to Preset ${realSlot + 1}`);
+    radioSyncUI();
+    return;
+  }
+  const targetIdx = presets[realSlot];
+  if (typeof targetIdx === 'number' && RADIO[targetIdx]) {
+    if (radioSt.idx === targetIdx && (radioSt.playing || radioSt.loading)) {
+      radioToggle();
+    } else {
+      radioTune(targetIdx, true);
+    }
+  }
+}
+function radioBank(b) {
+  radioSt.bank = b ? 1 : 0;
+  saveRadioLast();
+  radioSyncUI();
+}
+function radioToggleSet() {
+  radioSt.setMode = !radioSt.setMode;
+  radioSyncUI();
+}
+function radioSetVol(v) {
+  radioSt.vol = Math.max(0, Math.min(100, Number(v) || 0));
+  if (radioSt.vol > 0) radioSt.muted = false;
+  if (radioSt.audio) radioSt.audio.volume = (radioSt.muted ? 0 : radioSt.vol) / 100;
+  saveRadioLast();
+  const lbl = document.getElementById('cs-vol-lbl');
+  if (lbl) lbl.textContent = radioSt.muted ? 'MUTE' : 'VOL ' + radioSt.vol;
+  const mb = document.getElementById('cs-mute-btn');
+  if (mb) mb.textContent = (radioSt.muted || radioSt.vol === 0) ? '🔇' : '🔊';
+}
+function radioToggleMute() {
+  radioSt.muted = !radioSt.muted;
+  if (radioSt.audio) radioSt.audio.volume = (radioSt.muted ? 0 : radioSt.vol) / 100;
+  radioSyncUI();
+}
+function radioAssignSheet(stIdx) {
+  const st = RADIO[stIdx];
+  if (!st) return;
+  const presets = radioPresets();
+  const btns = presets.map((pIdx, slot) => {
+    const cur = RADIO[pIdx];
+    const fp = radioFreqParts(cur ? cur.freq : '');
+    return `<button class="row" onclick="radioAssignSlot(${stIdx},${slot})"><div class="ic rad"><b>P${slot + 1}</b></div><div class="tx"><div class="t">Preset ${slot + 1} ${slot < 6 ? '(FM 1)' : '(FM 2)'}</div><div class="s">Currently: ${esc(cur ? cur.name + ' · ' + fp.num + ' ' + fp.band : 'Empty')}</div></div></button>`;
+  }).join('');
+  openSheet(`<div class="shhead"><div class="t">Save ${esc(st.name)} to preset</div><button class="iconbtn" onclick="closeSheet()">✕</button></div><div class="s" style="margin:0 0 10px">Choose which car stereo preset button (1–12) should tune to <b>${esc(st.name)}</b> (${esc(st.freq)}):</div><div class="list">${btns}</div>`);
+}
+function radioAssignSlot(stIdx, slot) {
+  const presets = radioPresets();
+  presets[slot] = stIdx;
+  saveRadioPresets(presets);
+  radioSt.bank = slot >= 6 ? 1 : 0;
+  radioSt.idx = stIdx;
+  saveRadioLast();
+  closeSheet();
+  const st = RADIO[stIdx];
+  if (typeof toast === 'function' && st) toast(`Saved ${st.name} to Preset ${slot + 1}`);
+  radioSyncUI();
+}
+function carStereoHtml() {
+  const st = RADIO[radioSt.idx] || RADIO[0];
+  const fp = radioFreqParts(st.freq);
+  const pct = radioDialPct(fp);
+  const presets = radioPresets();
+  const activePresetNum = presets.indexOf(radioSt.idx) + 1;
+  const statusTxt = radioSt.err
+    ? 'STREAM UNAVAILABLE HERE · TAP SITE ↗'
+    : radioSt.loading
+    ? 'TUNING LIVE STREAM…'
+    : radioSt.playing
+    ? '● LIVE STEREO'
+    : 'STANDBY · TAP PLAY OR A PRESET';
+  const eqHtml = `<span class="cs-eq${radioSt.playing ? ' on' : ''}"><i></i><i></i><i></i><i></i></span>`;
+  const bankOffset = radioSt.bank * 6;
+  const presetBtns = [0, 1, 2, 3, 4, 5].map(slot => {
+    const pIdx = presets[bankOffset + slot];
+    const pst = RADIO[pIdx] || RADIO[0];
+    const pfp = radioFreqParts(pst.freq);
+    const isTuned = pIdx === radioSt.idx;
+    const isPlayingThis = isTuned && (radioSt.playing || radioSt.loading);
+    return `<button type="button" class="cs-pbtn${isTuned ? ' on' : ''}${isPlayingThis ? ' playing' : ''}${radioSt.setMode ? ' setmode' : ''}" onclick="radioTapPreset(${slot})">
+      <div class="cs-ptop"><span class="cs-pnum">${bankOffset + slot + 1}</span><span class="cs-pled"></span></div>
+      <div class="cs-pfreq">${esc(pfp.num)} <small>${esc(pfp.band)}</small></div>
+      <div class="cs-pname">${esc(pst.name)}</div>
+    </button>`;
+  }).join('');
+  const scaleMarks = fp.isAm
+    ? '<span>530</span><span>700</span><span>900</span><span>1100</span><span>1300</span><span>1600 kHz</span>'
+    : '<span>88</span><span>92</span><span>96</span><span>100</span><span>104</span><span>108 MHz</span>';
+  return `<div class="carstereo${radioSt.playing ? ' is-playing' : ''}" id="carstereo">
+    <div class="cs-bezel-top">
+      <div class="cs-brand"><span class="cs-dot"></span>WHANGĀREI CAR STEREO</div>
+      <div class="cs-banks">
+        <button type="button" class="cs-bchip${radioSt.bank === 0 ? ' on' : ''}" onclick="radioBank(0)">FM 1 <small>1–6</small></button>
+        <button type="button" class="cs-bchip${radioSt.bank === 1 ? ' on' : ''}" onclick="radioBank(1)">FM 2 <small>7–12</small></button>
+        <button type="button" class="cs-bchip cs-setbtn${radioSt.setMode ? ' on' : ''}" onclick="radioToggleSet()">${radioSt.setMode ? '★ TAP 1–6' : '★ SET'}</button>
+      </div>
+    </div>
+    <div class="cs-lcd">
+      <div class="cs-lcd-meta">
+        <span class="cs-badge">${esc(fp.band)} STEREO</span>
+        ${activePresetNum ? `<span class="cs-badge cs-ch">CH ${activePresetNum}</span>` : ''}
+        <span class="cs-badge cs-loc">${esc(st.where || 'Whangārei')}</span>
+        <span class="cs-status${radioSt.playing ? ' live' : radioSt.err ? ' err' : ''}">${eqHtml} ${esc(statusTxt)}</span>
+      </div>
+      <div class="cs-lcd-main">
+        <div class="cs-freq-wrap">
+          <span class="cs-freq-num">${esc(fp.num)}</span>
+          <span class="cs-freq-unit">${esc(fp.band)}<small>${esc(fp.unit)}</small></span>
+        </div>
+        <div class="cs-st-info">
+          <div class="cs-st-name">${esc(st.name)}</div>
+          <div class="cs-st-sub">${esc(st.freq)} · ${esc(st.where || 'Whangārei')}</div>
+        </div>
+      </div>
+      <div class="cs-dial">
+        <div class="cs-dial-track">
+          <div class="cs-dial-ticks"></div>
+          <div class="cs-dial-needle" style="left:${pct.toFixed(1)}%"></div>
+        </div>
+        <div class="cs-dial-labels">${scaleMarks}</div>
+      </div>
+      ${radioSt.setMode ? `<div class="cs-set-banner">Tap any preset button below (<b>${bankOffset + 1}–${bankOffset + 6}</b>) to save <b>${esc(st.name)}</b></div>` : ''}
+      ${radioSt.err ? `<div class="cs-err-banner">Couldn’t play this stream directly in the browser — <a href="${esc(st.home)}" target="_blank" rel="noopener">open ${esc(st.name)}’s website ↗</a></div>` : ''}
+    </div>
+    <div class="cs-controls">
+      <button type="button" class="cs-hbtn" onclick="radioSeek(-1)" aria-label="Previous station"><span>|◀◀</span><small>SEEK −</small></button>
+      <button type="button" class="cs-pwr${radioSt.playing ? ' on' : ''}${radioSt.loading ? ' busy' : ''}" onclick="radioToggle()" aria-label="${radioSt.playing ? 'Pause' : 'Play'}">
+        <span class="cs-pwr-ring"></span>
+        <span class="cs-pwr-ic">${radioSt.playing ? '⏸' : radioSt.loading ? '⏳' : '▶'}</span>
+        <small>${radioSt.playing ? 'PLAYING' : radioSt.loading ? 'TUNING' : 'PLAY'}</small>
+      </button>
+      <button type="button" class="cs-hbtn" onclick="radioSeek(1)" aria-label="Next station"><span>▶▶|</span><small>SEEK +</small></button>
+      <a class="cs-hbtn cs-site" href="${esc(st.home)}" target="_blank" rel="noopener"><span>↗</span><small>SITE</small></a>
+    </div>
+    <div class="cs-vol">
+      <button type="button" class="cs-mute" id="cs-mute-btn" onclick="radioToggleMute()" aria-label="Mute">${(radioSt.muted || radioSt.vol === 0) ? '🔇' : '🔊'}</button>
+      <input type="range" class="cs-slider" min="0" max="100" value="${radioSt.muted ? 0 : radioSt.vol}" oninput="radioSetVol(this.value)">
+      <span class="cs-vol-lbl" id="cs-vol-lbl">${radioSt.muted ? 'MUTE' : 'VOL ' + radioSt.vol}</span>
+    </div>
+    <div class="cs-presets-head">
+      <span>PRESET BUTTONS (${radioSt.bank === 0 ? 'FM 1 · 1–6' : 'FM 2 · 7–12'})</span>
+      <button type="button" class="cs-assign-link" onclick="radioAssignSheet(${radioSt.idx})">Assign ${esc(st.name)} to preset…</button>
+    </div>
+    <div class="cs-presets">${presetBtns}</div>
+  </div>`;
+}
+function radioSyncUI() {
+  const wrap = document.getElementById('carstereo-wrap');
+  if (wrap) wrap.innerHTML = carStereoHtml();
+  const list = document.getElementById('radiolist');
+  if (list) list.innerHTML = RADIO.map((st, i) => radioRow(st, i)).join('');
+  const homeBox = document.getElementById('homeradio-stereo');
+  if (homeBox) homeBox.innerHTML = homeRadioHtml();
+}
 function radioFail(el) {
   if (!el || el.dataset.failed) return;
   el.dataset.failed = '1';
@@ -6956,21 +7210,57 @@ function wireRadio() {
     a.dataset.wired = '1';
     a.addEventListener('error', () => radioFail(a));
     a.addEventListener('play', () => {
+      if (radioSt.audio) { try { radioSt.audio.pause(); } catch (e) { } radioSt.playing = false; }
       document.querySelectorAll('audio.radioplay').forEach(o => { if (o !== a) o.pause(); });
     });
   });
 }
-function radioRow(st) {
+function radioRow(st, idx) {
+  const i = typeof idx === 'number' ? idx : RADIO.indexOf(st);
   const freq = [st.freq, st.where].filter(Boolean).join(' · ');
-  const audio = st.stream
-    ? `<audio class="radioplay" controls preload="none" src="${esc(st.stream)}"></audio><div class="s radioerr" hidden>Couldn’t play this station.</div>`
-    : '';
-  return `<div class="row rad"><div class="ic rad">${I('radio')}</div><div class="tx"><a class="t" href="${esc(st.home)}" target="_blank" rel="noopener">${esc(st.name)}</a><div class="s">${esc(freq)}</div>${audio}</div></div>`;
+  const isTuned = i === radioSt.idx;
+  const isPlaying = isTuned && (radioSt.playing || radioSt.loading);
+  const presets = radioPresets();
+  const pSlot = presets.indexOf(i) + 1;
+  return `<div class="row rad${isTuned ? ' rad-tuned' : ''}">
+    <button type="button" class="ic rad cs-row-play${isPlaying ? ' on' : ''}" onclick="radioTune(${i}, ${isPlaying ? 'false' : 'true'})" aria-label="Play ${esc(st.name)}">${isPlaying ? '⏸' : '▶'}</button>
+    <div class="tx" onclick="radioTune(${i}, true)" style="cursor:pointer">
+      <div class="t">${esc(st.name)} ${pSlot ? `<span class="pill" style="font-size:.68rem;padding:1px 6px;margin-left:4px">P${pSlot}</span>` : ''} ${isPlaying ? `<span class="pill ok" style="font-size:.68rem;padding:1px 6px;margin-left:4px">Playing</span>` : ''}</div>
+      <div class="s">${esc(freq)}</div>
+    </div>
+    <div class="btns" style="margin:0;gap:6px;flex:none">
+      <button type="button" class="btn sm" onclick="radioAssignSheet(${i})" title="Save to preset">★ P${pSlot || '+'}</button>
+      <a class="btn sm" href="${esc(st.home)}" target="_blank" rel="noopener">Site ↗</a>
+    </div>
+  </div>`;
+}
+function homeRadioHtml() {
+  const presets = radioPresets().slice(0, 6);
+  const st = RADIO[radioSt.idx] || RADIO[0];
+  const fp = radioFreqParts(st.freq);
+  return `<div class="cs-mini">
+    <div class="cs-mini-lcd" onclick="go('#radio')">
+      <div class="cs-mini-freq">${esc(fp.num)} <small>${esc(fp.band)}</small></div>
+      <div class="cs-mini-info">
+        <div class="cs-mini-name">${esc(st.name)}</div>
+        <div class="cs-mini-sub">${radioSt.playing ? '● Playing live' : 'Tap a preset to play'}</div>
+      </div>
+      <button type="button" class="cs-mini-pwr${radioSt.playing ? ' on' : ''}" onclick="event.stopPropagation();radioToggle()">${radioSt.playing ? '⏸' : '▶'}</button>
+    </div>
+    <div class="cs-mini-presets">${presets.map((pIdx, slot) => {
+      const pst = RADIO[pIdx] || RADIO[0];
+      const pfp = radioFreqParts(pst.freq);
+      const on = pIdx === radioSt.idx && (radioSt.playing || radioSt.loading);
+      return `<button type="button" class="cs-mpbtn${on ? ' on' : ''}" onclick="radioTune(${pIdx}, true)"><b>P${slot + 1}</b><span>${esc(pfp.num)}</span><small>${esc(pst.name)}</small></button>`;
+    }).join('')}</div>
+  </div>`;
 }
 function Radio() {
-  return header('Radio', 'Stations you can hear in Whangārei') +
-    `<div class="list" id="radiolist">${RADIO.map(radioRow).join('')}</div>` +
-    `<div class="foot">Frequencies are from each station’s own site. Tap play only where a real https stream is listed. If it cannot play, the row says so. A station without a player opens its website. Nothing is downloaded.</div>`;
+  return header('Radio', 'Whangārei car stereo & live streams') +
+    `<div id="carstereo-wrap">${carStereoHtml()}</div>` +
+    `<div class="sec"><span class="sh">All Whangārei stations (${RADIO.length})</span><span class="ss">Tap any station to tune</span></div>` +
+    `<div class="list" id="radiolist">${RADIO.map((st, i) => radioRow(st, i)).join('')}</div>` +
+    `<div class="foot">Tap any preset button (1–12 across FM 1 and FM 2) to tune and play right away. To change a preset, tune to a station and tap <b>★ SET</b> (or <b>★ P+</b> on any row), then pick a button. Frequencies are from each station’s own site.</div>`;
 }
 
 /* ================= MEAL PLANNER ================= */
