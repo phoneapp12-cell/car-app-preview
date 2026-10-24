@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.16';
+const APP_VERSION = '2.28.17';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -6924,7 +6924,8 @@ let PODFEED = null, podBusy = false, podFailed = false, podTimer = null;
 function loadPodcasts() {
   try {
     const r = JSON.parse(localStorage.getItem('podfeeds') || 'null');
-    PODFEED = r && r.at && r.data && Array.isArray(r.data.podcasts) ? r : null;
+    const hasNew = r && r.data && Array.isArray(r.data.podcasts) && r.data.podcasts.some(p => p && p.id === 'aglutenfree');
+    PODFEED = r && r.at && hasNew ? r : null;
   } catch (e) { PODFEED = null; }
 }
 function podHttps(u) {
@@ -6957,7 +6958,8 @@ function podEpisodes() {
       const ms = Date.parse(it && it.published);
       if (!title || !Number.isFinite(ms) || (!url && !audio)) continue;
       const summary = it.summary ? String(it.summary).replace(/\s+/g, ' ').trim() : '';
-      episodes.push({ title, url, audio, published: new Date(ms).toISOString(), show: name, summary });
+      const cat = b.cat || (/gluten|celiac|coeliac/i.test(name) ? 'Gluten-Free Living' : /brain|psych|mind/i.test(name) ? 'Human Psychology' : /fork|tech/i.test(name) ? 'Tech & AI' : /star|wave|science/i.test(name) ? 'Space & Science' : /slob|clean/i.test(name) ? 'Home & Organising' : /spork/i.test(name) ? 'Food & Cooking' : 'Design & Curiosity');
+      episodes.push({ title, url, audio, published: new Date(ms).toISOString(), show: name, cat, summary });
     }
   }
   episodes.sort((a, b) => b.published.localeCompare(a.published));
@@ -7003,7 +7005,8 @@ function updPodcasts() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
   const r = h.split('/')[0];
-  if (r === 'podcasts' || ((r === 'home' || r === '') && !homeEdit) || r === 'more') {
+  if (r === 'podcasts') { pdbRedraw(); return; }
+  if (((r === 'home' || r === '') && !homeEdit) || r === 'more') {
     const v = $('#view'), top = v ? v.scrollTop : 0;
     render(); if (v) v.scrollTop = top;
   }
@@ -7057,14 +7060,22 @@ function pdbCard(p, tagOverride) {
 function pdbBoardHtml() {
   PDB_ALL = {};
   const o = pdbGet(), episodes = podEpisodes() || [];
+  const gf = episodes.filter(e => e.cat === 'Gluten-Free Living');
+  const psych = episodes.filter(e => e.cat === 'Human Psychology');
+  const techSpace = episodes.filter(e => e.cat === 'Tech & AI' || e.cat === 'Space & Science');
+  const lifeCurio = episodes.filter(e => !gf.includes(e) && !psych.includes(e) && !techSpace.includes(e));
   const byShow = new Map();
   episodes.forEach(e => { const s = e.show || 'Podcast'; if (!byShow.has(s)) byShow.set(s, []); byShow.get(s).push(e); });
   const recentCards = episodes.slice(0, 20).map(e => pdbCard(e)).join('');
   const showCols = [...byShow.entries()].map(([name, arr], i) => tbList('s_' + i, name, arr.length, arr.map(e => pdbCard(e)).join(''), false, 'pdb', 'No episodes')).join('');
-  return tbList('new', 'New episodes', episodes.length, recentCards, false, 'pdb', podBusy ? 'Checking the podcasts…' : 'No episodes right now') +
+  return tbList('new', '🆕 New episodes', episodes.length, recentCards, false, 'pdb', podBusy ? 'Checking the podcasts…' : 'No episodes right now') +
+    tbList('gf', '🌾 Gluten-Free Living', gf.length, gf.map(e => pdbCard(e, ['🌾 GF Living', '#16a34a'])).join(''), false, 'pdb', podBusy ? 'Loading GF podcasts…' : 'No episodes right now') +
+    tbList('psych', '🧠 Human Psychology', psych.length, psych.map(e => pdbCard(e, ['🧠 Psychology', '#7c3aed'])).join(''), false, 'pdb', podBusy ? 'Loading psychology podcasts…' : 'No episodes right now') +
+    tbList('tech', '🤖 Tech, AI & Space', techSpace.length, techSpace.map(e => pdbCard(e, [e.cat || 'Tech & Space', '#0284c7'])).join(''), false, 'pdb', 'No episodes right now') +
+    tbList('curio', '✨ Curiosity, Home & Food', lifeCurio.length, lifeCurio.map(e => pdbCard(e, [e.cat || 'Curiosity', '#d97706'])).join(''), false, 'pdb', 'No episodes right now') +
     showCols +
-    tbList('queue', 'Queue / Saved', (o.lists.queue || []).length, (o.lists.queue || []).map(e => pdbCard(e, ['📌 Queue', '#2563eb'])).join(''), false, 'pdb', 'Tap an episode, then Move to… Queue') +
-    tbList('listened', 'Listened', (o.lists.listened || []).length, (o.lists.listened || []).map(e => pdbCard(e, ['✓ Listened', '#16a34a'])).join(''), false, 'pdb', 'Episodes you play show here');
+    tbList('queue', '📌 Queue / Saved', (o.lists.queue || []).length, (o.lists.queue || []).map(e => pdbCard(e, ['📌 Queue', '#2563eb'])).join(''), false, 'pdb', 'Tap an episode, then Move to… Queue') +
+    tbList('listened', '✓ Listened', (o.lists.listened || []).length, (o.lists.listened || []).map(e => pdbCard(e, ['✓ Listened', '#16a34a'])).join(''), false, 'pdb', 'Episodes you play show here');
 }
 function pdbRedraw() { const el = document.getElementById('pdblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = pdbBoardHtml(); el.scrollLeft = x; }
 function pdbMarkListened(k) {
@@ -13148,8 +13159,8 @@ async function refreshNews(force = false) {
 function updNews() {
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
-  if (h === 'localnews') { nbRedraw(); return; }
-  if (h === 'news' || h === 'media' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
+  if (h === 'localnews' || h === 'news') { nbRedraw(); return; }
+  if (h === 'media' || ((h === 'home' || h === '') && !homeEdit) || h === 'more') {
     const v = $('#view'), top = v ? v.scrollTop : 0;
     render(); if (v) v.scrollTop = top;
   }
@@ -13180,48 +13191,90 @@ function homeNews() {
   const grp = (key, list) => list.length ? `<div class="newsgrp">${esc(NEWS_SECS[key].title)}</div><div class="list">${newsRows(list)}</div>` : '';
   return head + `<div id="homenews">${grp('local', (l || []).slice(0, nl))}${grp('nz', (n || []).slice(0, nn))}</div>`;
 }
-function LocalNews() {
-  const part = (key, first) => {
-    const items = newsSec(key), id = 'news-' + key;
-    const body = !items ? newsEmpty(id) : !items.length ? newsNone(id, key) : `<div class="list" id="${id}">${newsRows(items)}</div>`;
-    const btn = first ? ` <button onclick="refreshNews(true)">${newsBusy ? 'Updating…' : 'Refresh'}</button>` : '';
-    return `<div class="sec">${esc(NEWS_SECS[key].title)}${btn}</div><div class="muted newsupd">${newsBusy ? 'Updating…' : esc(newsUpdated(key))}</div>` + body;
-  };
-  return header('News', 'Northland, and news from around NZ') +
-    `<div class="newstabs"><a href="#news-local" onclick="event.preventDefault();document.getElementById('news-local')?.scrollIntoView({behavior:'smooth',block:'center'})">Local — Northland</a><a href="#news-nz" onclick="event.preventDefault();document.getElementById('news-nz')?.scrollIntoView({behavior:'smooth',block:'center'})">New Zealand</a></div>` +
-    part('local', true) + part('nz', false) +
-    `<div class="foot">Local — Northland: RNZ Northland, plus any NZ-wide story that names a Northland place; stories drop off after 7 days. New Zealand: RNZ New Zealand, RNZ Politics, RNZ In Depth, RNZ Country and the NZ Herald’s New Zealand section; stories drop off after 3 days. Stories about courts, crime, violence, crashes, deaths or sexual matters are left out. Tap a story to open it on the source’s website. Both lists refresh when you open the app if they’re more than 15 minutes old, and about every 15 minutes while it stays open.</div>`;
-}
-// 2.27.92: Local news board. Today / This week / Earlier from the local feed (same filters), plus Saved and Read kept in localStorage 'newsBoard' (in backups and Move my data).
-const NB_KEY = 'newsBoard', NB_LISTS = [['saved', 'Saved'], ['read', 'Read']], NB_SRC = { 'Northern Advocate': '#0369a1', RNZ: '#b91c1c', WDC: '#15803d', 'NZ Herald': '#1e3a8a' };
+// 2.27.92 / 2.28.17: Local news (#localnews) and New Zealand news (#news) Trello-style boards.
+const NB_KEY = 'newsBoard', NB_LISTS = [['saved', 'Saved'], ['read', 'Read']], NB_SRC = { 'Northern Advocate': '#0369a1', RNZ: '#b91c1c', 'RNZ Politics': '#7c3aed', 'RNZ In Depth': '#0d9488', 'RNZ Country': '#15803d', 'RNZ New Zealand': '#b91c1c', WDC: '#15803d', 'NZ Herald': '#1e3a8a', 'BBC News': '#991b1b' };
 function nbGet() { let o = null; try { o = JSON.parse(localStorage.getItem(NB_KEY) || 'null'); } catch (e) { } if (!o || typeof o !== 'object') o = {}; if (!o.lists || typeof o.lists !== 'object') o.lists = {}; NB_LISTS.forEach(([k]) => { if (!Array.isArray(o.lists[k])) o.lists[k] = []; }); return o; }
 function nbSave(o) { try { localStorage.setItem(NB_KEY, JSON.stringify(o)); } catch (e) { } }
 function nbRestore(o) { if (o && o.lists && typeof o.lists === 'object') nbSave(o); }
-const nbSrc = x => { const s = String(x.src || x.sourceName || x.source || 'RNZ'); return /herald|advocate/i.test(s) ? (/advocate/i.test(s) ? 'Northern Advocate' : 'NZ Herald') : /wdc|council/i.test(s) ? 'WDC' : /rnz/i.test(s) ? 'RNZ' : s; };
+const nbSrc = x => { const s = String(x.src || x.sourceName || x.source || 'RNZ'); return /herald|advocate/i.test(s) ? (/advocate/i.test(s) ? 'Northern Advocate' : 'NZ Herald') : /wdc|council/i.test(s) ? 'WDC' : /bbc/i.test(s) ? 'BBC News' : /rnz/i.test(s) ? s : s; };
 const nbCol = s => NB_SRC[s] || ['#7c3aed', '#0d9488', '#c2410c', '#475569'][[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % 4];
 function nbAgo(iso) { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 6e4)); return !Number.isFinite(m) ? '' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; }
 let NB_ALL = {};
-function nbCard(x) {
-  const s = nbSrc(x), id = newsUrl(x.url) || x.url; NB_ALL[id] = { id, title: x.title, src: s, published: x.published, url: x.url, img: x.img || x.image || '' };
+function nbCard(x, extraLbl) {
+  const s = nbSrc(x), id = newsUrl(x.url) || x.url; if (!id) return '';
+  NB_ALL[id] = { id, title: x.title, src: s, published: x.published, url: x.url, img: x.img || x.image || '' };
   const img = x.img || x.image;
-  return `<button type="button" class="tbcard" onclick="nbOpen(${jsArg(id)})"><div class="tbcover" style="background:linear-gradient(135deg,${nbCol(s)},#1e293b);aspect-ratio:16/9;overflow:hidden">${img ? `<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()">` : ''}</div><div class="tbbody">${tbLbl([[s, nbCol(s)]])}<div class="tbt">${esc(x.title)}</div><div class="tbicons">${I('news')}<span>${esc(nbAgo(x.published))}</span></div></div></button>`;
+  const lbls = [];
+  if (extraLbl) lbls.push(extraLbl);
+  lbls.push([s, nbCol(s)]);
+  return `<button type="button" class="tbcard" onclick="nbOpen(${jsArg(id)})">${img ? `<div class="tbcover" style="background:linear-gradient(135deg,${nbCol(s)},#1e293b);aspect-ratio:16/9;overflow:hidden"><img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}<div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(x.title)}</div><div class="tbicons">${I('news')}<span>${esc(nbAgo(x.published) || s)}</span></div></div></button>`;
 }
 function nbBoardHtml() {
   NB_ALL = {}; const o = nbGet(), items = newsSec('local') || [], moved = new Set(o.lists.saved.map(c => c.id)), t = nzTodayISO();
   const day = x => new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date(Date.parse(x.published)));
   const live = items.filter(x => !moved.has(newsUrl(x.url))), T = live.filter(x => day(x) === t), W = live.filter(x => day(x) !== t && day(x) >= addDays(t, -6)), E = live.filter(x => day(x) < addDays(t, -6));
-  const L = (k, n, a, none) => tbList(k, n, a.length, a.map(nbCard).join(''), false, 'nb', none);
-  return L('today', 'Today', T, newsBusy ? 'Updating…' : 'No local stories yet today') + L('week', 'This week', W) + L('earlier', 'Earlier', E) +
-    NB_LISTS.map(([k, n]) => L(k, n, o.lists[k].filter(c => k !== 'read' || !moved.has(c.id)).sort((a, b) => String(b.published).localeCompare(String(a.published))), k === 'saved' ? 'Tap a story, then Move to… Saved' : 'Stories you open show here')).join('');
+  const L = (k, n, a, add, none) => tbList(k, n, a.length, a.map(x => nbCard(x)).join(''), add, 'nb', none);
+  return L('today', 'Today', T, false, newsBusy ? 'Updating…' : 'No local stories yet today') + L('week', 'This week', W, false, 'No other stories this week') + L('earlier', 'Earlier', E, false, 'No earlier stories') +
+    NB_LISTS.map(([k, n]) => L(k, n, o.lists[k].filter(c => k !== 'read' || !moved.has(c.id)).sort((a, b) => String(b.published).localeCompare(String(a.published))), k === 'saved', k === 'saved' ? 'Tap a story, then Move to… Saved' : 'Stories you open show here')).join('');
 }
-function nbRedraw() { const el = document.getElementById('nblists'); if (!el) return render(); const x = el.scrollLeft; el.innerHTML = nbBoardHtml(); el.scrollLeft = x; }
-function nbMenu(k) { refreshNews(true); }
+function nzbBoardHtml() {
+  NB_ALL = {};
+  const o = nbGet(), nzItems = newsSec('nz') || [], locItems = newsSec('local') || [], moved = new Set(o.lists.saved.map(c => c.id)), t = nzTodayISO();
+  const day = x => new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date(Date.parse(x.published)));
+  const liveNz = nzItems.filter(x => !moved.has(newsUrl(x.url)));
+  const nzToday = liveNz.filter(x => day(x) === t);
+  const nzEarlier = liveNz.filter(x => day(x) !== t);
+  const liveLoc = locItems.filter(x => !moved.has(newsUrl(x.url)));
+  const worldRaw = (typeof RECS !== 'undefined' && RECS.world && RECS.world.data && Array.isArray(RECS.world.data.items)) ? RECS.world.data.items.filter(x => x && x.title && x.url && newsOk(x)) : [];
+  const worldItems = worldRaw.slice(0, 15).map(x => ({ title: x.title, url: x.url, published: x.published, src: 'BBC News', img: x.img || '' }));
+  const L = (k, n, a, add, none, tag) => tbList(k, n, a.length, a.map(x => nbCard(x, tag)).join(''), add, 'nb', none);
+  return L('nztoday', '🇳🇿 NZ Today', nzToday, false, newsBusy ? 'Updating…' : 'No NZ stories yet today', ['🇳🇿 New Zealand', '#2563eb']) +
+    L('nzweek', '🇳🇿 Earlier in NZ', nzEarlier, false, 'No earlier NZ stories', ['🇳🇿 New Zealand', '#475569']) +
+    L('local', '📍 Northland & Whangārei', liveLoc, false, 'No Northland stories right now', ['📍 Northland', '#0369a1']) +
+    (worldItems.length ? L('world', '🌍 World news', worldItems, false, 'No world stories right now', ['🌍 World', '#0d9488']) : '') +
+    NB_LISTS.map(([k, n]) => L(k, n, o.lists[k].filter(c => k !== 'read' || !moved.has(c.id)).sort((a, b) => String(b.published).localeCompare(String(a.published))), k === 'saved', k === 'saved' ? 'Tap a story, then Move to… Saved' : 'Stories you open show here', k === 'saved' ? ['📌 Saved', '#2563eb'] : ['✓ Read', '#16a34a'])).join('');
+}
+function nbRedraw() {
+  const el = document.getElementById('nblists');
+  if (el) { const x = el.scrollLeft; el.innerHTML = nbBoardHtml(); el.scrollLeft = x; return; }
+  const nzEl = document.getElementById('nzblists');
+  if (nzEl) { const x = nzEl.scrollLeft; nzEl.innerHTML = nzbBoardHtml(); nzEl.scrollLeft = x; return; }
+  render();
+}
+function nbAdd(k) {
+  openSheet('Save a news link', `<label class="field"><span>Article link (https://)</span><input name="url" type="url" required placeholder="https://…"></label><label class="field"><span>Headline</span><input name="title" maxlength="160" required placeholder="Story headline"></label><label class="field"><span>Source (optional)</span><input name="src" maxlength="60" placeholder="e.g. RNZ"></label>`,
+    v => { if (!v.title || !/^https:\/\//.test(v.url || '')) return 'Please enter a headline and https:// link.'; const o = nbGet(); const id = v.url.trim(); o.lists.saved = o.lists.saved.filter(x => x.id !== id); o.lists.saved.unshift({ id, url: id, title: v.title.slice(0, 160), src: (v.src || 'Saved').slice(0, 60), published: new Date().toISOString(), img: '' }); nbSave(o); return () => nbRedraw(); }, 'Save');
+}
+function nbMenu(k) {
+  openSheet('News', `<p class="muted" style="margin:0 0 10px">Swipe sideways between lists, and scroll up and down inside each list. Stories about courts, crime, violence, crashes, deaths, sexual matters and sport are left out.</p>
+    <div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>{refreshNews(true);loadRecs(true);toast('Refreshing news…')})">${I('refresh')} Refresh news</button><button type="button" class="btn" onclick="closeSheet().then(()=>nbAdd('saved'))">${I('plus')} Save a link</button></div>`, null);
+}
 function nbMark(id) { const o = nbGet(), c = NB_ALL[id]; if (!c) return; if (!o.lists.read.some(x => x.id === id)) { o.lists.read.unshift(c); o.lists.read = o.lists.read.slice(0, 100); nbSave(o); } setTimeout(nbRedraw, 300); }
+async function nbMove(id, target) {
+  const c = NB_ALL[id]; if (!c) return;
+  const o = nbGet();
+  NB_LISTS.forEach(([j]) => { o.lists[j] = o.lists[j].filter(x => x.id !== id); });
+  if (target && o.lists[target]) o.lists[target].unshift(c);
+  nbSave(o); await closeSheet(); nbRedraw();
+  toast(target === 'saved' ? 'Saved to read.' : target === 'read' ? 'Marked as Read.' : 'Removed from your lists.');
+}
 function nbOpen(id) {
   const c = NB_ALL[id]; if (!c) return; const o = nbGet(), cur = o.lists.saved.some(x => x.id === id) ? 'saved' : o.lists.read.some(x => x.id === id) ? 'read' : '';
-  openSheet(esc(c.title), `<p class="muted">${esc(c.src)} · ${esc(newsWhen(c.published))}</p><p><a class="btn" href="${esc(newsUrl(c.url))}" target="_blank" rel="noopener" onclick="nbMark(${jsArg(id)})">Open story ›</a></p>
-    <label class="field"><span>Move to…</span><select name="list"><option value="">Its date list</option>${NB_LISTS.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
-    v => { const f = nbGet(); NB_LISTS.forEach(([j]) => { f.lists[j] = f.lists[j].filter(x => x.id !== id); }); if (v.list && f.lists[v.list]) f.lists[v.list].unshift(c); nbSave(f); return () => nbRedraw(); }, 'Save');
+  const href = newsUrl(c.url) || (/^https:\/\//.test(c.url || '') ? c.url : '');
+  openSheet(esc(c.title), `${c.img ? `<img src="${esc(c.img)}" alt="" referrerpolicy="no-referrer" style="width:100%;max-height:200px;object-fit:cover;border-radius:12px;margin-bottom:10px" onerror="this.remove()">` : ''}<p class="muted" style="margin:0 0 10px">${esc(c.src)}${c.published ? ' · ' + esc(newsWhen(c.published)) : ''}</p>
+    <div class="btns" style="margin-bottom:12px"><a class="btn primary" href="${esc(href)}" target="_blank" rel="noopener" onclick="nbMark(${jsArg(id)})">${I('ext')} Open story ›</a></div>
+    <div class="tbmove"><div class="lbl">Move to…</div><div class="chips">
+      <button type="button" class="chip${cur === 'saved' ? ' on' : ''}" onclick="nbMove(${jsArg(id)},'saved')">📌 Saved</button>
+      <button type="button" class="chip${cur === 'read' ? ' on' : ''}" onclick="nbMove(${jsArg(id)},'read')">✓ Read</button>
+      ${cur ? `<button type="button" class="chip" onclick="nbMove(${jsArg(id)},'')">Its date list</button>` : ''}
+    </div></div>`, null);
+}
+function LocalNews() {
+  try { if (!NEWS && !newsBusy) refreshNews(false); } catch (e) { }
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#1e3a8a,#0f172a)"></div>
+    <div class="tbtop"><h1>New Zealand news</h1><button class="iconbtn" aria-label="Refresh" onclick="refreshNews(true)">${I('refresh')}</button></div>
+    <div class="tblists" id="nzblists">${nzbBoardHtml()}</div></div>
+    <div class="foot">Swipe sideways between lists. New Zealand stories from RNZ New Zealand, RNZ Politics, RNZ In Depth, RNZ Country and the NZ Herald, plus Northland and World news. Court, crime, violence, sexual and sport stories are left out. ${esc(newsUpdated('nz'))}</div>`;
 }
 function LocalNewsBoard() {
   return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0369a1,#0f172a)"></div>
@@ -15346,57 +15399,198 @@ function musHtml() {
   return homeSec('From your likes', '<a href="https://music.youtube.com/playlist?list=LM" target="_blank" rel="noopener">Liked songs</a>') + `<div class="list" id="muslikes">${MUS_LIKES.map(musRow).join('')}</div>` +
     homeSec('Similar picks', '<span class="muted" style="font-size:12px">New set each week</span>') + `<div class="list" id="muspicks">${musPicks().map(musRow).join('')}</div>`;
 }
-function Top40() {
-  return header('Top 40', 'Current chart music videos') + musHtml() + homeSec('Top 40 this week', '') +
-    `<div class="top40bar" id="top40bar"><button type="button" class="btn primary" id="top40surprise" onclick="surpriseTop40()">${I('shuffle')} Surprise me</button></div>` +
-    `<div class="list" id="top40list">${TOP40.map(top40Row).join('')}</div>` +
-    `<div class="foot">Chart as of 17 Oct 2026. New Zealand Official Top 40 singles, 16 October to 22 October 2026. Songs with an official video.<br>Surprise me scrolls to a song, highlights it, then plays it in that row. Tap a song to play it in the picture beside the description.</div>`;
+const T40_KEY = 'top40Board';
+let t40Cur = { idx: 0, mode: 'video', autoPlay: false, custom: null, preview: {} };
+function t40Get() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(T40_KEY) || 'null'); } catch (e) { }
+  if (!o || typeof o !== 'object') o = {};
+  if (!Array.isArray(o.favs)) o.favs = [];
+  return o;
 }
-let top40SurpriseToken = 0;
+function t40Save(o) { try { localStorage.setItem(T40_KEY, JSON.stringify(o)); } catch (e) { } }
+function t40Restore(o) { if (o && Array.isArray(o.favs)) t40Save(o); }
+function t40NowTrack() {
+  if (t40Cur.custom) return t40Cur.custom;
+  return TOP40[t40Cur.idx] || TOP40[0];
+}
+function t40IsFav(t) {
+  if (!t) return false;
+  const k = (t.title + '|' + t.artist).toLowerCase();
+  return t40Get().favs.some(x => (x.title + '|' + x.artist).toLowerCase() === k);
+}
+function t40ToggleFav() {
+  const t = t40NowTrack(); if (!t) return;
+  const o = t40Get(), k = (t.title + '|' + t.artist).toLowerCase();
+  const had = o.favs.some(x => (x.title + '|' + x.artist).toLowerCase() === k);
+  if (had) o.favs = o.favs.filter(x => (x.title + '|' + x.artist).toLowerCase() !== k);
+  else o.favs.unshift({ id: t.id || '', rank: t.rank || null, title: t.title, artist: t.artist });
+  t40Save(o);
+  t40Redraw();
+  toast(had ? 'Removed from Favourites.' : 'Saved to Favourites.');
+}
+async function t40EnsurePreview(t) {
+  if (!t) return null;
+  const k = (t.title + '|' + t.artist).toLowerCase();
+  if (t40Cur.preview[k] !== undefined) return t40Cur.preview[k];
+  try {
+    const r = await fetch('https://itunes.apple.com/search?country=nz&entity=song&limit=1&term=' + encodeURIComponent(t.title + ' ' + t.artist));
+    const j = await r.json();
+    const hit = (j && j.results && j.results[0]) || null;
+    t40Cur.preview[k] = hit && hit.previewUrl ? { audio: hit.previewUrl, art: String(hit.artworkUrl100 || '').replace('100x100bb', '400x400bb'), appleUrl: hit.trackViewUrl || '' } : null;
+  } catch (e) { t40Cur.preview[k] = null; }
+  return t40Cur.preview[k];
+}
+function t40PlayerHtml() {
+  const t = t40NowTrack(); if (!t) return '';
+  const fav = t40IsFav(t), k = (t.title + '|' + t.artist).toLowerCase(), pv = t40Cur.preview[k];
+  const hasYt = /^[A-Za-z0-9_-]{11}$/.test(t.id || '');
+  const mode = !hasYt ? 'audio' : t40Cur.mode;
+  let screen = '';
+  if (mode === 'video' && hasYt) {
+    if (t40Cur.autoPlay) {
+      screen = `<iframe src="https://www.youtube-nocookie.com/embed/${esc(t.id)}?autoplay=1&playsinline=1&rel=0" title="${esc(t.title)}" style="width:100%;height:100%;border:0;display:block" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+    } else {
+      screen = `<button type="button" onclick="t40Cur.autoPlay=true;t40RedrawPlayer()" style="width:100%;height:100%;border:0;padding:0;background:#000;position:relative;cursor:pointer;display:block" aria-label="Play ${esc(t.title)}">
+        <img src="https://i.ytimg.com/vi/${esc(t.id)}/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;opacity:.88">
+        <span style="position:absolute;inset:0;display:grid;place-items:center"><span style="width:62px;height:62px;border-radius:50%;background:rgba(220,38,38,.92);color:#fff;display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.45)"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></span></span>
+      </button>`;
+    }
+  } else {
+    if (pv === undefined) setTimeout(() => { t40EnsurePreview(t).then(() => t40RedrawPlayer()); }, 0);
+    const art = (pv && pv.art) || (hasYt ? `https://i.ytimg.com/vi/${esc(t.id)}/hqdefault.jpg` : '');
+    screen = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;background:linear-gradient(145deg,#1e1b4b,#0f172a);color:#fff;text-align:center;box-sizing:border-box">
+      ${art ? `<img src="${esc(art)}" alt="" style="width:92px;height:92px;border-radius:14px;object-fit:cover;box-shadow:0 6px 20px rgba(0,0,0,.4);margin-bottom:10px">` : `<div style="font-size:2.2rem;margin-bottom:8px">🎵</div>`}
+      ${pv && pv.audio ? `<audio id="t40audio" controls ${t40Cur.autoPlay ? 'autoplay' : ''} src="${esc(pv.audio)}" style="width:min(100%,340px);height:38px" onended="if(t40Cur.autoNext)t40Step(1)"></audio>` : `<div class="s" style="color:#cbd5e1;margin-bottom:8px">${pv === undefined ? 'Loading audio preview…' : 'No preview clip — tap YouTube Music below to listen'}</div>`}
+    </div>`;
+  }
+  const badge = t.rank ? `#${t.rank} NZ TOP 40` : (t.tag || 'YOUR MUSIC');
+  return `<div class="card" id="t40player" style="margin:0 4px 12px;padding:12px;background:rgba(15,23,42,.92);color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:18px;box-shadow:0 10px 28px rgba(0,0,0,.28)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+      <span class="tblbl" style="background:#e11d48;font-size:.72rem;padding:3px 9px">${esc(badge)}</span>
+      <div style="display:flex;gap:6px">
+        ${hasYt ? `<button type="button" class="chip ${mode === 'video' ? 'on' : ''}" style="padding:4px 10px;font-size:.75rem" onclick="t40SetMode('video')">🎬 Video</button>` : ''}
+        <button type="button" class="chip ${mode === 'audio' ? 'on' : ''}" style="padding:4px 10px;font-size:.75rem" onclick="t40SetMode('audio')">🎧 Audio</button>
+        <button type="button" class="chip ${fav ? 'on' : ''}" style="padding:4px 10px;font-size:.75rem" onclick="t40ToggleFav()" aria-label="Save favourite">${fav ? '★ Saved' : '☆ Save'}</button>
+      </div>
+    </div>
+    <div style="aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;margin-bottom:10px">${screen}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+      <div style="min-width:0;flex:1">
+        <div style="font-weight:800;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.title)}</div>
+        <div style="font-size:.84rem;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.artist)}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex:none">
+        <button type="button" class="iconbtn" style="width:38px;height:38px;background:rgba(255,255,255,.14);color:#fff" aria-label="Previous song" onclick="t40Step(-1)">⏮</button>
+        <button type="button" class="iconbtn" style="width:38px;height:38px;background:#e11d48;color:#fff" aria-label="Surprise me" title="Surprise me" onclick="surpriseTop40()">${I('shuffle')}</button>
+        <button type="button" class="iconbtn" style="width:38px;height:38px;background:rgba(255,255,255,.14);color:#fff" aria-label="Next song" onclick="t40Step(1)">⏭</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="musOpen(${jsArg(t.title)},${jsArg(t.artist)})">🎵 YouTube Music</button>
+      ${hasYt ? `<button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="vbTv(${jsArg(t.id)})">📺 Cast to TV</button>` : ''}
+      ${mode === 'audio' ? `<button type="button" class="btn small ${t40Cur.autoNext ? 'primary' : ''}" style="${t40Cur.autoNext ? '' : 'background:rgba(255,255,255,.12);color:#fff;border:0'}" onclick="t40Cur.autoNext=!t40Cur.autoNext;t40RedrawPlayer()">🔁 Auto-next: ${t40Cur.autoNext ? 'On' : 'Off'}</button>` : ''}
+    </div>
+  </div>`;
+}
+function t40RedrawPlayer() {
+  const el = document.getElementById('t40player');
+  if (el) el.outerHTML = t40PlayerHtml();
+}
+function t40SetMode(m) {
+  t40Cur.mode = m;
+  t40Cur.autoPlay = true;
+  if (m === 'audio') t40EnsurePreview(t40NowTrack()).then(() => t40RedrawPlayer());
+  t40RedrawPlayer();
+}
+function t40PlayRank(rank) {
+  const idx = TOP40.findIndex(x => x.rank === rank);
+  if (idx < 0) return;
+  t40Cur.custom = null;
+  t40Cur.idx = idx;
+  t40Cur.autoPlay = true;
+  if (t40Cur.mode === 'audio') t40EnsurePreview(TOP40[idx]);
+  t40Redraw();
+  try { document.getElementById('t40player')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) { }
+}
+function t40PlayCustom(title, artist, tag, ytId) {
+  const match = TOP40.findIndex(x => x.title.toLowerCase() === String(title || '').toLowerCase());
+  if (match >= 0) { t40PlayRank(TOP40[match].rank); return; }
+  t40Cur.custom = { id: ytId || '', rank: null, title, artist, tag: tag || 'YOUR MUSIC' };
+  t40Cur.autoPlay = true;
+  t40EnsurePreview(t40Cur.custom).then(() => t40RedrawPlayer());
+  t40Redraw();
+  try { document.getElementById('t40player')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) { }
+}
+function t40Step(dir) {
+  t40Cur.custom = null;
+  t40Cur.idx = (t40Cur.idx + dir + TOP40.length) % TOP40.length;
+  t40Cur.autoPlay = true;
+  if (t40Cur.mode === 'audio') t40EnsurePreview(TOP40[t40Cur.idx]);
+  t40Redraw();
+}
 function surpriseTop40() {
-  const scroller = document.getElementById('view');
-  const rows = [...document.querySelectorAll('#top40list .row.vrow')];
-  if (!scroller || !rows.length) return;
-  const i = Math.floor(Math.random() * rows.length);
-  const row = rows[i];
-  const id = TOP40[i].id;
-  const token = ++top40SurpriseToken;
-  rows.forEach(r => r.classList.remove('surprise'));
-  const destFor = () => {
-    const s = scroller.getBoundingClientRect();
-    const r = row.getBoundingClientRect();
-    const bar = document.getElementById('top40bar');
-    const barH = bar ? bar.offsetHeight : 0;
-    const raw = scroller.scrollTop + (r.top - s.top) - barH - 8;
-    const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    return Math.max(0, Math.min(max, raw));
-  };
-  // A short jump back to the top, when the row is not already well below, makes the scroll down visible.
-  if (destFor() - scroller.scrollTop < 240) scroller.scrollTop = 0;
-  const from = scroller.scrollTop;
-  const dest = destFor();
-  const dist = dest - from;
-  const finish = () => {
-    if (token !== top40SurpriseToken) return;
-    row.classList.add('surprise');
-    setTimeout(() => { if (token === top40SurpriseToken) row.classList.remove('surprise'); }, 1700);
-    setTimeout(() => {
-      if (token !== top40SurpriseToken) return;
-      playInlineVideo(id, TOP40[i].title);
-    }, 450);
-  };
-  if (dist < 28) { finish(); return; }
-  const ms = Math.min(1600, Math.max(900, Math.abs(dist) * 0.55));
-  const t0 = performance.now();
-  const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-  const step = now => {
-    if (token !== top40SurpriseToken) return;
-    const p = Math.min(1, (now - t0) / ms);
-    scroller.scrollTop = from + dist * ease(p);
-    if (p < 1) requestAnimationFrame(step);
-    else finish();
-  };
-  requestAnimationFrame(step);
+  t40Cur.custom = null;
+  t40Cur.idx = Math.floor(Math.random() * TOP40.length);
+  t40Cur.autoPlay = true;
+  if (t40Cur.mode === 'audio') t40EnsurePreview(TOP40[t40Cur.idx]);
+  t40Redraw();
+  try { document.getElementById('t40player')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) { }
+}
+function t40Card(v) {
+  const cur = t40NowTrack(), isPlaying = cur && cur.title === v.title && cur.artist === v.artist;
+  const col = v.rank <= 10 ? '#e11d48' : v.rank <= 25 ? '#7c3aed' : '#0284c7';
+  const lbls = [[`#${v.rank}`, col]];
+  if (isPlaying) lbls.push(['▶ Now playing', '#16a34a']);
+  return `<button type="button" class="tbcard" style="${isPlaying ? 'outline:2px solid #e11d48' : ''}" onclick="t40PlayRank(${v.rank})">
+    <div class="tbcover" style="background:#111;aspect-ratio:16/9;overflow:hidden;position:relative">
+      <img src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()">
+    </div>
+    <div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(v.title)}</div><div class="tbs">${esc(v.artist)}</div></div>
+  </button>`;
+}
+function t40SongCard(title, artist, badge, col, ytId) {
+  const cur = t40NowTrack(), isPlaying = cur && cur.title === title && cur.artist === artist;
+  const lbls = [[badge, col]];
+  if (isPlaying) lbls.push(['▶ Now playing', '#16a34a']);
+  return `<button type="button" class="tbcard" style="${isPlaying ? 'outline:2px solid #e11d48' : ''}" onclick="t40PlayCustom(${jsArg(title)},${jsArg(artist)},${jsArg(badge)},${jsArg(ytId || '')})">
+    ${ytId ? `<div class="tbcover" style="background:#111;aspect-ratio:16/9;overflow:hidden"><img src="https://i.ytimg.com/vi/${esc(ytId)}/mqdefault.jpg" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>` : ''}
+    <div class="tbbody">${tbLbl(lbls)}<div class="tbt">${esc(title)}</div><div class="tbs">${esc(artist)}</div><div class="tbicons">${I('music')}<span>Tap to play in window</span></div></div>
+  </button>`;
+}
+function t40BoardHtml() {
+  const o = t40Get();
+  const top10 = TOP40.slice(0, 10).map(t40Card).join('');
+  const mid15 = TOP40.slice(10, 25).map(t40Card).join('');
+  const low15 = TOP40.slice(25, 40).map(t40Card).join('');
+  const likes = MUS_LIKES.map(([t, ar]) => t40SongCard(t, ar, '❤️ Liked song', '#db2777')).join('');
+  const picks = musPicks().map(([t, ar]) => t40SongCard(t, ar, '✨ Weekly pick', '#2563eb')).join('');
+  const favs = (o.favs || []).map(f => f.rank ? (TOP40.find(x => x.rank === f.rank) ? t40Card(TOP40.find(x => x.rank === f.rank)) : t40SongCard(f.title, f.artist, '★ Saved', '#ca8a04', f.id)) : t40SongCard(f.title, f.artist, '★ Saved', '#ca8a04', f.id)).join('');
+  return tbList('top10', '🔥 Top 10 (#1 – #10)', 10, top10, false, 't40', '') +
+    tbList('mid', '📈 #11 – #25', 15, mid15, false, 't40', '') +
+    tbList('low', '🎵 #26 – #40', 15, low15, false, 't40', '') +
+    tbList('likes', '❤️ From your likes', MUS_LIKES.length, likes, false, 't40', '') +
+    tbList('picks', '✨ Similar picks', 15, picks, false, 't40', '') +
+    tbList('favs', '⭐ Saved Favourites', (o.favs || []).length, favs, true, 't40', 'Tap ☆ Save on the player or + Add a card');
+}
+function t40Redraw() {
+  t40RedrawPlayer();
+  const el = document.getElementById('t40lists');
+  if (el) { const x = el.scrollLeft; el.innerHTML = t40BoardHtml(); el.scrollLeft = x; }
+}
+function t40Add(k) {
+  openSheet('Add a favourite song', `<label class="field"><span>Song title</span><input name="title" maxlength="100" required placeholder="e.g. Birds of a Feather"></label><label class="field"><span>Artist</span><input name="artist" maxlength="100" required placeholder="e.g. Billie Eilish"></label>`,
+    v => { if (!v.title || !v.artist) return 'Please enter the song title and artist.'; const o = t40Get(); o.favs.unshift({ id: '', rank: null, title: v.title.slice(0, 100), artist: v.artist.slice(0, 100) }); t40Save(o); return () => t40Redraw(); }, 'Add song');
+}
+function t40Menu(k) {
+  openSheet('Top 40 NZ', `<p class="muted" style="margin:0 0 10px">Tap any song card to play it in the window at the top of the page. Switch between 🎬 Video and 🎧 Audio preview anytime.</p>
+    <div class="btns"><button type="button" class="btn primary" onclick="closeSheet().then(()=>surpriseTop40())">${I('shuffle')} Surprise me</button><button type="button" class="btn" onclick="closeSheet().then(()=>t40Add('favs'))">${I('plus')} Add a favourite song</button></div>`, null);
+}
+function Top40() {
+  return `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button><div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#be123c,#0f172a)"></div>
+    <div class="tbtop"><h1>Top 40 NZ</h1><button class="iconbtn" aria-label="Surprise me" title="Surprise me" onclick="surpriseTop40()">${I('shuffle')}</button></div>
+    ${t40PlayerHtml()}
+    <div class="tblists" id="t40lists">${t40BoardHtml()}</div></div>
+    <div class="foot">Official Aotearoa NZ Top 40 Singles (${esc(TOP40_UPDATED)}), plus your liked songs and weekly picks. Tap any card to play it in the window above.</div>`;
 }
 
 /* ================= SYNC (this phone and another device) ================= */
@@ -18694,9 +18888,9 @@ function backupBlob() {
   const data = Object.assign({}, S, { settings: Object.assign({}, (S && S.settings) || {}) }); delete data.settings.syncCode; // 2.27.46: the sync code stays out of backup files
   let planning = null; try { planning = plnKeepGet(); } catch (e) { } // 2.27.84: kept planning & development updates
   let travelBoard = null, spaceBoard = null; try { travelBoard = tbGet(); } catch (e) { } try { spaceBoard = spGet(); } catch (e) { } let flagged = null; try { flagged = flgGet(); } catch (e) { } let newsBoard = null; try { newsBoard = nbGet(); } catch (e) { } let recipeBoard = null; try { recipeBoard = rbGet(); } catch (e) { } let videoBoard = null; try { videoBoard = vbGet(); } catch (e) { }
-  let primeBoard = null, moviesBoard = null, blogBoard = null, podcastBoard = null, concertsBoard = null, nightlifeBoard = null, eventsBoard = null;
+  let primeBoard = null, moviesBoard = null, blogBoard = null, podcastBoard = null, concertsBoard = null, nightlifeBoard = null, eventsBoard = null, top40Board = null; try { top40Board = t40Get(); } catch (e) { }
   try { primeBoard = prbGet(); } catch (e) { } try { moviesBoard = mvbGet(); } catch (e) { } try { blogBoard = blgGet(); } catch (e) { } try { podcastBoard = pdbGet(); } catch (e) { } try { concertsBoard = cnbGet(); } catch (e) { } try { nightlifeBoard = nlbGet(); } catch (e) { } try { eventsBoard = evbGet(); } catch (e) { }
-  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, ...lbBackup(), flagged, newsBoard, recipeBoard, videoBoard, primeBoard, moviesBoard, blogBoard, podcastBoard, concertsBoard, nightlifeBoard, eventsBoard }, null, 2)], { type: 'application/json' });
+  return new Blob([JSON.stringify({ app: 'car-life-due-dates', version: 1, exportedAt: new Date().toISOString(), data, planning, travelBoard, spaceBoard, ...lbBackup(), flagged, newsBoard, recipeBoard, videoBoard, primeBoard, moviesBoard, blogBoard, podcastBoard, concertsBoard, nightlifeBoard, eventsBoard, top40Board }, null, 2)], { type: 'application/json' });
 }
 async function markBackedUp() { S.settings.lastBackup = new Date().toISOString(); await save(); render(); }
 function exportData() {
@@ -18721,7 +18915,7 @@ function importFile(input) {
     if (!d || !Array.isArray(d.cars) || !Array.isArray(d.bills) || !Array.isArray(d.todos)) { toast('That file isn’t a My App backup.'); return; }
     const when = obj.exportedAt ? ` from ${fmtY(isoT(todayT(new Date(obj.exportedAt))))}` : '';
     confirmSheet('Restore this backup?', `This replaces everything on this phone with the backup${when}: ${plural(d.cars.length, 'car')}, ${plural(d.bills.length, 'bill')}, ${plural(d.todos.length, 'to-do')}, ${plural((d.appts || []).length, 'appointment')}, ${plural((d.birthdays || []).length, 'birthday')}, ${plural((d.ideas || []).length, 'idea')}, ${plural((d.drivers || []).length, 'driver')}, ${plural(Object.keys((d.meals && d.meals.plan) || {}).length, 'planned meal')}, ${plural(Array.isArray(d.pets) ? d.pets.length : 0, 'pet')}, ${plural(Array.isArray(d.health) ? d.health.length : 0, 'person', 'people')} in Health, ${plural(Array.isArray(d.myEvents) ? d.myEvents.length : 0, 'event')} of your own, ${plural(d.commission && Array.isArray(d.commission.entries) ? d.commission.entries.length : 0, 'commission entry', 'commission entries')} and ${plural(Array.isArray(d.loans) ? d.loans.length : 0, 'loan')}.`, 'Restore', async () => {
-      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { lbRestoreAll(obj); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } try { if (obj && obj.videoBoard) vbRestore(obj.videoBoard); } catch (e) { } try { if (obj && obj.primeBoard) prbRestore(obj.primeBoard); } catch (e) { } try { if (obj && obj.moviesBoard) mvbRestore(obj.moviesBoard); } catch (e) { } try { if (obj && obj.blogBoard) blgRestore(obj.blogBoard); } catch (e) { } try { if (obj && obj.podcastBoard) pdbRestore(obj.podcastBoard); } catch (e) { } try { if (obj && obj.concertsBoard) cnbRestore(obj.concertsBoard); } catch (e) { } try { if (obj && obj.nightlifeBoard) nlbRestore(obj.nightlifeBoard); } catch (e) { } try { if (obj && obj.eventsBoard) evbRestore(obj.eventsBoard); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
+      const s = snap(); S = normalise(d); try { if (obj && obj.planning && Array.isArray(obj.planning.items)) plnKeepMerge(obj.planning.items, true); } catch (e) { } try { if (obj && obj.travelBoard) tbRestore(obj.travelBoard); } catch (e) { } try { if (obj && obj.spaceBoard) spRestore(obj.spaceBoard); } catch (e) { } try { lbRestoreAll(obj); } catch (e) { } try { if (obj && obj.flagged) flgRestore(obj.flagged); } catch (e) { } try { if (obj && obj.newsBoard) nbRestore(obj.newsBoard); } catch (e) { } try { if (obj && obj.recipeBoard) rbRestore(obj.recipeBoard); } catch (e) { } try { if (obj && obj.videoBoard) vbRestore(obj.videoBoard); } catch (e) { } try { if (obj && obj.primeBoard) prbRestore(obj.primeBoard); } catch (e) { } try { if (obj && obj.moviesBoard) mvbRestore(obj.moviesBoard); } catch (e) { } try { if (obj && obj.blogBoard) blgRestore(obj.blogBoard); } catch (e) { } try { if (obj && obj.podcastBoard) pdbRestore(obj.podcastBoard); } catch (e) { } try { if (obj && obj.concertsBoard) cnbRestore(obj.concertsBoard); } catch (e) { } try { if (obj && obj.nightlifeBoard) nlbRestore(obj.nightlifeBoard); } catch (e) { } try { if (obj && obj.eventsBoard) evbRestore(obj.eventsBoard); } catch (e) { } try { if (obj && obj.top40Board) t40Restore(obj.top40Board); } catch (e) { } const mn = takeMealNote(); await save(); render(); toast('Backup restored.' + (mn && mn.includes('→') ? ' ' + mn : ''), 'Undo', undoTo(s)); syncFeeds(true);
     });
   };
   r.readAsText(file);

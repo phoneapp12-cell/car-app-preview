@@ -18,14 +18,21 @@ import { decode, clip, get } from './events.js';
 import { httpsUrl } from './blogs.js';
 
 export const PODCASTS = [
-  { id: 'atp', name: 'Accidental Tech Podcast', home: 'https://atp.fm/', feed: 'https://cdn.atp.fm/rss/public' },
-  { id: 'joegardener', name: 'The joe gardener Show', home: 'https://joegardener.com/', feed: 'https://thejoegardenershow.libsyn.com/rss' },
-  { id: 'focusonpolitics', name: 'Focus on Politics', home: 'https://www.rnz.co.nz/podcast/focusonpolitics', feed: 'https://www.rnz.co.nz/podcasts/rss/focusonpolitics.rss' },
-  { id: 'sporkful', name: 'The Sporkful', home: 'https://www.sporkful.com/', feed: 'https://feeds.simplecast.com/n91GPFY5' },
-  { id: 'shortwave', name: 'Short Wave', home: 'https://www.npr.org/podcasts/510351/short-wave', feed: 'https://feeds.npr.org/510351/podcast.xml' }
+  { id: 'aglutenfree', name: 'A Gluten Free Podcast', cat: 'Gluten-Free Living', home: 'https://www.aglutenfreepodcast.com/', feed: 'https://rss.buzzsprout.com/1867152.rss' },
+  { id: 'celiacproject', name: 'The Celiac Project Podcast', cat: 'Gluten-Free Living', home: 'https://celiacprojectpodcast.libsyn.com/', feed: 'https://rss.libsyn.com/shows/76156/destinations/339238.xml' },
+  { id: 'hiddenbrain', name: 'Hidden Brain', cat: 'Human Psychology', home: 'https://hiddenbrain.org/', feed: 'https://feeds.simplecast.com/kwWc0lhf' },
+  { id: 'speakingofpsych', name: 'Speaking of Psychology', cat: 'Human Psychology', home: 'https://www.apa.org/news/podcasts/speaking-of-psychology', feed: 'https://feeds.megaphone.fm/AMERICANPSYCHOLOGICALASSOCIATION9933181801' },
+  { id: 'allinthemind', name: 'All in the Mind', cat: 'Human Psychology', home: 'https://www.abc.net.au/listen/programs/allinthemind', feed: 'https://www.abc.net.au/feeds/2888650/podcast.xml' },
+  { id: 'hardfork', name: 'Hard Fork (Tech & AI)', cat: 'Tech & AI', home: 'https://www.nytimes.com/column/hard-fork', feed: 'https://feeds.simplecast.com/6HKOhNgS' },
+  { id: 'startalk', name: 'StarTalk Radio', cat: 'Space & Science', home: 'https://startalkmedia.com/', feed: 'https://feeds.simplecast.com/4T39_jAj' },
+  { id: '99pi', name: '99% Invisible', cat: 'Design & Curiosity', home: 'https://99percentinvisible.org/', feed: 'https://feeds.simplecast.com/BqbsxVfO' },
+  { id: 'nosuchthing', name: 'No Such Thing As A Fish', cat: 'Curious Facts', home: 'https://www.nosuchthingasafish.com/', feed: 'https://audioboom.com/channels/2399216.rss' },
+  { id: 'aslobcomesclean', name: 'A Slob Comes Clean', cat: 'Home & Organising', home: 'https://www.aslobcomesclean.com/', feed: 'https://feeds.acast.com/public/shows/63b839dc938ea900111ff3e7' },
+  { id: 'sporkful', name: 'The Sporkful', cat: 'Food & Cooking', home: 'https://www.sporkful.com/', feed: 'https://feeds.simplecast.com/n91GPFY5' },
+  { id: 'shortwave', name: 'Short Wave', cat: 'Space & Science', home: 'https://www.npr.org/podcasts/510351/short-wave', feed: 'https://feeds.npr.org/510351/podcast.xml' }
 ];
 
-const KV_KEY = 'public-podcasts-v2';
+const KV_KEY = 'public-podcasts-v3';
 const TTL = 15 * 60 * 1000;
 const MAX_ITEMS = 5;
 let mem = null;
@@ -97,7 +104,7 @@ export function parsePodcastFeed(xml) {
 }
 
 function failed(show) {
-  return { id: show.id, name: show.name, home: show.home, feed: show.feed, ok: false, items: [] };
+  return { id: show.id, name: show.name, cat: show.cat || '', home: show.home, feed: show.feed, ok: false, items: [] };
 }
 
 function fresh(saved, now) {
@@ -110,7 +117,7 @@ async function readOne(show, fetchImpl) {
   try {
     const xml = await get(show.feed, fetchImpl, { headers: { Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.1' } });
     const items = parsePodcastFeed(xml);
-    return { id: show.id, name: show.name, home: show.home, feed: show.feed, ok: true, items };
+    return { id: show.id, name: show.name, cat: show.cat || '', home: show.home, feed: show.feed, ok: true, items };
   } catch (e) {
     return failed(show);
   }
