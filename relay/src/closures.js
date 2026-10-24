@@ -196,7 +196,7 @@ function slugDate(url, desc) {
   const to24 = (h, mn, ap) => String((+h % 12) + (/pm/i.test(ap) ? 12 : 0)).padStart(2, '0') + ':' + mn;
   return [{ start: iso, end: iso, time: tm ? to24(tm[1], tm[2], tm[3]) : '', endTime: tm ? to24(tm[4], tm[5], tm[6]) : '' }];
 }
-export function stadiumEventClosures(eventsState, existing = [], now = Date.now(), days = 35) {
+export function stadiumEventClosures(eventsState, existing = [], now = Date.now(), days = 14) {
   const nowS = nzStamp(now), today = nowS.slice(0, 10), lim = new Date(Date.parse(today + 'T12:00:00Z') + days * 864e5).toISOString().slice(0, 10);
   const out = [], list = (eventsState && eventsState.list) || [], details = (eventsState && eventsState.details) || {};
   for (const ev of list) {
@@ -237,7 +237,7 @@ export function stadiumEventClosures(eventsState, existing = [], now = Date.now(
   }
   return out;
 }
-export function toRoadClosures(state, now = Date.now(), days = 35, eventsState = null) {
+export function toRoadClosures(state, now = Date.now(), days = 14, eventsState = null) {
   const nowS = nzStamp(now), today = nowS.slice(0, 10), lim = new Date(Date.parse(today + 'T12:00:00Z') + days * 864e5).toISOString().slice(0, 10), out = [];
   for (const item of (state && state.list) || []) {
     const pg = state.pages && state.pages[item.url];

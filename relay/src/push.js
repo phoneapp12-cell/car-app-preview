@@ -223,7 +223,7 @@ export async function runAlerts(env, closuresState, fetchImpl = fetch, now = Dat
   try {
     let evState = null;
     try { evState = await env.EVENTS_KV.get('wdc-events-v1', { type: 'json' }); } catch (e) { }
-    const rFeed = toRoadClosures(closuresState, now, 21, evState);
+    const rFeed = toRoadClosures(closuresState, now, 14, evState);
     const localClosures = (rFeed.closures || []).filter(c => !c.bridge && (c.commute || c.stadium) && (c.stadium || pages[c.url]));
     if (localClosures.length) {
       let rAlerts = null; try { rAlerts = await env.EVENTS_KV.get(ROAD_ALERTS_KEY, { type: 'json' }); } catch (e) { }

@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.14';
+const APP_VERSION = '2.28.15';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12393,6 +12393,7 @@ async function refreshAlerts(force = false) {
   if (d && Array.isArray(d.alerts)) { MA = { at: Date.now(), data: d }; maFailed = false; try { localStorage.setItem('metAlerts', JSON.stringify(MA)); } catch (e) { } }
   else maFailed = true;
   try { updWx(); } catch (e) { }
+  try { glWarnRedraw(); } catch (e) { }
 }
 function liveAlerts() {
   if (!MA || !MA.data || !Array.isArray(MA.data.alerts)) return [];
@@ -16843,25 +16844,72 @@ try { WX16 = JSON.parse(localStorage.getItem('wx16') || 'null'); } catch (e) { W
 async function loadWx16() {
   if (wx16Busy || navigator.onLine === false || (WX16 && Date.now() - WX16.at < 6 * 3600e3)) return;
   wx16Busy = true;
-  try { const d = await getJSON(WX16_URL, 15000); if (d && d.daily && Array.isArray(d.daily.time)) { WX16 = { at: Date.now(), daily: d.daily }; try { localStorage.setItem('wx16', JSON.stringify(WX16)); } catch (e) { } } } catch (e) { } finally { wx16Busy = false; }
+  try { const d = await getJSON(WX16_URL, 15000); if (d && d.daily && Array.isArray(d.daily.time)) { WX16 = { at: Date.now(), daily: d.daily }; try { localStorage.setItem('wx16', JSON.stringify(WX16)); } catch (e) { } try { glWarnRedraw(); } catch (e) { } } } catch (e) { } finally { wx16Busy = false; }
 }
 function wxOutlook() {
-  const out = [];
-  try { liveAlerts().slice(0, 2).forEach(a => out.push({ score: /^(orange|red)$/i.test(a.colour || '') ? 88 : 64, lbl: '⚠️ MetService', what: alertName(a), when: (a.onset ? 'From ' + aklWhen(a.onset) : '') + (a.expires ? (a.onset ? ' to ' : 'Until ') + aklWhen(a.expires) : ''), tip: /wind|gale/i.test(alertName(a)) ? 'Secure outdoor stuff and the trampoline' : /rain|thunder/i.test(alertName(a)) ? 'Clear gutters and drains' : '', go: 'url:' + (/^https:\/\//.test(a.web || '') ? a.web : METSERVICE_WARN_URL) })); } catch (e) { }
-  const d = WX16 && WX16.daily; if (!d) return out;
-  const T = todayISO(), rows = d.time.map((t, i) => ({ t, hi: d.temperature_2m_max[i], lo: d.temperature_2m_min[i], rain: d.precipitation_sum[i], gust: d.wind_gusts_10m_max[i], code: d.weather_code[i] })).filter(r => r.t >= T);
-  const span = (a, b) => a === b ? fmtW(a) : fmtW(a) + '–' + fmtW(b), lab = t => dayGap(t, T) > 7 ? '🔭 Outlook' : '🌦️ Weather ahead';
-  const runs = test => { const rs = []; let s = null; rows.forEach((r, i) => { if (test(r)) { if (!s) s = { a: r.t, b: r.t, n: 0, x: r }; s.b = r.t; s.n++; } else if (s) { rs.push(s); s = null; } }); if (s) rs.push(s); return rs; };
+  const out = [], T = todayISO(), lim = addDays(T, 14);
+  try {
+    liveAlerts().slice(0, 4).forEach(a => {
+      const onsetIso = a.onset ? rwIso(Date.parse(a.onset)) : T;
+      if (onsetIso && onsetIso > lim) return;
+      const isSev = /^(orange|red)$/i.test(a.colour || '');
+      const isToday = !onsetIso || onsetIso <= addDays(T, 1);
+      const u = /^https:\/\//.test(a.web || '') ? a.web : METSERVICE_WARN_URL;
+      out.push({
+        score: isSev ? (isToday ? 95 : 88) : (isToday ? 82 : 68),
+        lbl: '⚠️ MetService · Whangārei',
+        what: alertName(a) + (a.colour ? ` (${a.colour})` : ''),
+        when: (a.onset ? 'From ' + aklWhen(a.onset) : '') + (a.expires ? (a.onset ? ' to ' : 'Until ') + aklWhen(a.expires) : ''),
+        tip: /wind|gale/i.test(alertName(a)) ? 'Secure outdoor stuff and the trampoline' : /rain|thunder/i.test(alertName(a)) ? 'Clear gutters and drains' : '',
+        url: u,
+        go: "go('#weather')"
+      });
+    });
+  } catch (e) { }
+  let rows = [];
+  const d = WX16 && WX16.daily;
+  if (d && Array.isArray(d.time)) {
+    rows = d.time.map((t, i) => ({
+      t,
+      hi: d.temperature_2m_max ? d.temperature_2m_max[i] : null,
+      lo: d.temperature_2m_min ? d.temperature_2m_min[i] : null,
+      rain: d.precipitation_sum ? d.precipitation_sum[i] : null,
+      prob: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null,
+      gust: d.wind_gusts_10m_max ? d.wind_gusts_10m_max[i] : null,
+      code: d.weather_code ? d.weather_code[i] : null
+    })).filter(r => r.t >= T && r.t <= lim);
+  } else {
+    try {
+      rows = (typeof wxDays === 'function' ? wxDays() : []).filter(x => x.iso >= T && x.iso <= lim).map(x => ({
+        t: x.iso, hi: x.hi, lo: x.lo, rain: x.precip, prob: x.rain, gust: x.gust, code: x.code
+      }));
+    } catch (e) { }
+  }
+  if (!rows.length) return out;
+  const span = (a, b) => a === b ? (a === T ? 'Today (' + fmtW(a) + ')' : a === addDays(T, 1) ? 'Tomorrow (' + fmtW(a) + ')' : fmtW(a)) : fmtW(a) + '–' + fmtW(b);
+  const lab = t => t === T ? '⛈️ Whangārei weather today' : dayGap(t, T) <= 2 ? '🌧️ Whangārei weather alert' : dayGap(t, T) > 7 ? '🔭 Whangārei 2-week outlook' : '🌦️ Whangārei weather ahead';
+  const runs = test => { const rs = []; let s = null; rows.forEach(r => { if (test(r)) { if (!s) s = { a: r.t, b: r.t, n: 0, x: r }; s.b = r.t; s.n++; } else if (s) { rs.push(s); s = null; } }); if (s) rs.push(s); return rs; };
+  // 1. Thunderstorms in the next 14 days
+  rows.filter(r => num(r.code) && r.code >= 95).slice(0, 2).forEach(storm => {
+    const isSoon = dayGap(storm.t, T) <= 1;
+    out.push({ score: isSoon ? 86 : 68, lbl: lab(storm.t), what: `Thunderstorms forecast for Whangārei`, when: span(storm.t, storm.t), tip: 'Unplug sensitive gear if lightning is close', go: "go('#weather')" });
+  });
+  // 2. Heavy rain / high rain probability in the next 14 days
+  rows.filter(r => (num(r.rain) && r.rain >= 20) || (num(r.prob) && r.prob >= 65 && (!num(r.rain) || r.rain >= 8))).slice(0, 2).forEach(wet => {
+    const isSevere = (num(wet.rain) && wet.rain >= 35) || (dayGap(wet.t, T) === 0 && ((num(wet.rain) && wet.rain >= 20) || (num(wet.prob) && wet.prob >= 75)));
+    const amt = num(wet.rain) && wet.rain >= 1 ? `about ${Math.round(wet.rain)} mm` : `${Math.round(wet.prob)}% chance`;
+    out.push({ score: isSevere ? 84 : dayGap(wet.t, T) <= 2 ? 72 : 58, lbl: lab(wet.t), what: `Heavy rain for Whangārei (${amt}${num(wet.prob) && num(wet.rain) && wet.rain >= 1 ? ' · ' + Math.round(wet.prob) + '%' : ''})`, when: span(wet.t, wet.t), tip: 'Clear gutters and bring washing in', go: "go('#weather')" });
+  });
+  // 3. Strong wind / gales (>= 65 km/h gusts) in the next 14 days
+  rows.filter(r => num(r.gust) && r.gust >= 65).slice(0, 2).forEach(wind => {
+    const isSevere = wind.gust >= 80 || (dayGap(wind.t, T) === 0 && wind.gust >= 70);
+    out.push({ score: isSevere ? 83 : dayGap(wind.t, T) <= 2 ? 70 : 56, lbl: lab(wind.t), what: `Strong winds in Whangārei (gusts to ${Math.round(wind.gust)} km/h)`, when: span(wind.t, wind.t), tip: 'Secure outdoor furniture and loose items', go: "go('#weather')" });
+  });
+  // 4. Hot spell or cold night in the next 14 days
   const hot = runs(r => num(r.hi) && r.hi >= 26).find(s => s.n >= 2);
-  if (hot) out.push({ score: 50, lbl: lab(hot.a), what: `Hot spell, ${Math.round(Math.max(...rows.filter(r => r.t >= hot.a && r.t <= hot.b).map(r => r.hi)))}° or so`, when: span(hot.a, hot.b), tip: 'Water the garden early or late, not in the heat' });
+  if (hot) out.push({ score: 50, lbl: lab(hot.a), what: `Warm spell in Whangārei, ${Math.round(Math.max(...rows.filter(r => r.t >= hot.a && r.t <= hot.b).map(r => r.hi)))}° or so`, when: span(hot.a, hot.b), tip: 'Water the garden early or late', go: "go('#weather')" });
   const cold = rows.find(r => num(r.lo) && r.lo <= 3);
-  if (cold) out.push({ score: 56, lbl: lab(cold.t), what: `Cold night, low of ${Math.round(cold.lo)}°${cold.lo <= 1 ? ', frost likely' : ''}`, when: fmtW(cold.t), tip: 'Cover tender plants the evening before' });
-  const wet = rows.find(r => num(r.rain) && r.rain >= 25);
-  if (wet) out.push({ score: 54, lbl: lab(wet.t), what: `Heavy rain, about ${Math.round(wet.rain)} mm`, when: fmtW(wet.t), tip: 'Clear the gutters and bring the washing in' });
-  const wind = rows.find(r => num(r.gust) && r.gust >= 75);
-  if (wind) out.push({ score: 55, lbl: lab(wind.t), what: `Strong wind, gusts to ${Math.round(wind.gust)} km/h`, when: fmtW(wind.t), tip: 'Secure outdoor furniture and loose things' });
-  const storm = rows.find(r => [95, 96, 99].includes(r.code));
-  if (storm && !wet) out.push({ score: 52, lbl: lab(storm.t), what: 'Thunderstorms possible', when: fmtW(storm.t), tip: 'Unplug the spa pump if lightning is close' });
+  if (cold) out.push({ score: 56, lbl: lab(cold.t), what: `Cold night in Whangārei, low of ${Math.round(cold.lo)}°${cold.lo <= 1 ? ', frost likely' : ''}`, when: span(cold.t, cold.t), tip: 'Cover tender plants the evening before', go: "go('#weather')" });
   return out;
 }
 // 2.23.73: light, friendly questions to get to know coworkers. Nothing personal or sensitive.
@@ -20771,7 +20819,7 @@ async function glTrafficLoad() {
 }
 function glWarnList() {
   const L = [];
-  try { wxOutlook().forEach(o => L.push({ pri: o.score >= 80 ? 90 : o.score >= 60 ? 70 : 40, red: o.score >= 80, tag: o.lbl, what: o.what, s: (o.when || '') + (o.tip ? ' · ' + o.tip : ''), go: o.go || "go('#weather')" })); } catch (e) { }
+  try { wxOutlook().forEach(o => L.push({ pri: o.score >= 80 ? 90 : o.score >= 60 ? 70 : 45, red: o.score >= 80, tag: o.lbl, what: o.what, s: (o.when || '') + (o.tip ? ' · ' + o.tip : ''), url: o.url || '', go: o.go || "go('#weather')" })); } catch (e) { }
   try { glRoadItems().forEach(x => L.push({ pri: x.route ? 95 : x.closed ? 60 : 30, red: x.route || x.closed, route: x.route, tag: (x.route ? '🚗 On your commute' : '🚧 Roads near you') + ' · ' + (x.src === 'NZTA' ? 'NZTA' : 'Council'), what: x.what, s: [x.when, x.note].filter(Boolean).join(' · ').slice(0, 220), url: x.url })); } catch (e) { }
   // 2.26.54: each warning (roads, weather) can be swiped to the Archive; a new status or time gives it a new key so it can come back
   let gone = []; try { gone = gkDis(); } catch (e) { }
@@ -21075,7 +21123,7 @@ function alJump(k) {
   if (box && sec) box.scrollTo({ left: Math.max(0, sec.offsetLeft - 14), behavior: 'smooth' });
 }
 function alBoardHtml(list) {
-  list = (list || []).filter(x => !nbIsBill(x));
+  list = (list || []).filter(x => !nbIsBill(x) && (x.days == null || x.days <= 14));
   const now = [], today = [], week = [], later = [];
   const urgent = x => x.days < 0 || (x.days === 0 && x.pri === 0) || ((x.kind === 'car' || x.kind === 'driver') && x.days <= 0);
   let ja = []; try { ja = justAddedList().filter(x => !nbIsBill(x)); } catch (e) { }
@@ -21244,18 +21292,19 @@ function alTopMenu() {
     </div>`, null);
 }
 function alPickHero(list) {
-  const cleanList = (list || []).filter(x => !nbIsBill(x) && x.kind !== 'meal');
-  // 1. Active today road closure on commute/Whangārei or crash on route
+  const cleanList = (list || []).filter(x => !nbIsBill(x) && x.kind !== 'meal' && (x.days == null || x.days <= 14));
+  // 1. Active today road closure on commute/Whangārei, crash on route, or severe MetService weather warning today
   try {
-    const roadToday = glWarnList().find(x => x && x.red && !x.flag && x.pri >= 92 && /road|closure|bridge|okara|semenoff|commute|crash/i.test((x.tag || '') + ' ' + (x.what || '')));
-    if (roadToday) {
-      const wGo = roadToday.go || (roadToday.url ? `window.open(${jsArg(roadToday.url)},'_blank','noopener')` : "go('#bridge')");
+    const urgentToday = glWarnList().find(x => x && x.red && !x.flag && x.pri >= 90 && /road|closure|bridge|okara|semenoff|commute|crash|metservice|weather today|thunderstorm/i.test((x.tag || '') + ' ' + (x.what || '')));
+    if (urgentToday) {
+      const isWx = /metservice|weather|rain|wind|storm|gale/i.test((urgentToday.tag || '') + ' ' + (urgentToday.what || ''));
+      const wGo = urgentToday.url ? `window.open(${jsArg(urgentToday.url)},'_blank','noopener')` : (urgentToday.go || (isWx ? "go('#weather')" : "go('#bridge')"));
       return {
-        key: cuNorm(roadToday.what),
-        badge: '⛔ WHANGĀREI ROAD ALERT · TODAY',
-        icon: '⛔',
-        title: roadToday.what.replace(/^[⛔🚧⚠️]\s*/, ''),
-        sub: (roadToday.s || roadToday.tag || 'Active road closure in Whangārei today') + ' · Tap for notice & detour.',
+        key: cuNorm(urgentToday.what),
+        badge: isWx ? '⛈️ WHANGĀREI WEATHER ALERT · TODAY' : '⛔ WHANGĀREI ROAD ALERT · TODAY',
+        icon: isWx ? '⛈️' : '⛔',
+        title: urgentToday.what.replace(/^[⛔🚧⚠️⛈️🌧️]\s*/, ''),
+        sub: (urgentToday.s || urgentToday.tag || (isWx ? 'Severe weather alert for Whangārei' : 'Active road closure in Whangārei today')) + (isWx ? ' · Tap for forecast & radar.' : ' · Tap for notice & detour.'),
         go: wGo,
         tone: 'hero-warn'
       };
@@ -21453,7 +21502,7 @@ function alDiscoverHtml() {
     <div class="al-discover-strip" role="region" aria-label="Discover">${cards.join('')}</div>`;
 }
 function alBriefingHtml(list) {
-  list = (list || []).filter(x => !nbIsBill(x) && x.kind !== 'meal');
+  list = (list || []).filter(x => !nbIsBill(x) && x.kind !== 'meal' && (x.days == null || x.days <= 14));
   const hero = alPickHero(list);
   const heroHtml = `<div class="al-hero-wrap">
     <button type="button" class="al-hero ${hero.tone || ''}" onclick="${esc(hero.go)}">
@@ -21526,9 +21575,10 @@ function alBriefingHtml(list) {
     });
   });
 
-  // Also include today/overdue and upcoming 7-day actionable items from comingUpList() not yet shown
+  // Also include today/overdue and upcoming 14-day (2 weeks) actionable items from comingUpList() not yet shown
   const weekNodes = [];
   list.forEach(x => {
+    if (x.days != null && x.days > 14) return;
     const tk = cuNorm(x.name || nbStrip(x.html || ''));
     if (!tk || seenTitles.has(tk)) return;
     seenTitles.add(tk);
@@ -21539,7 +21589,7 @@ function alBriefingHtml(list) {
     decorateCard(el);
     if (x.kind === 'car' || x.kind === 'driver') carOrderNodes.push(el.outerHTML);
     else if (x.days <= 0) yourDayNodes.push(el.outerHTML);
-    else if (x.days <= 7) weekNodes.push(el.outerHTML);
+    else if (x.days <= 14) weekNodes.push(el.outerHTML);
   });
 
   const block = (title, arr, cls = '') => arr.length ? `<div class="sec al-yd-sec">${title} <span class="al-cnt">${arr.length}</span></div><div class="list al-yd-list ${cls}">${arr.join('')}</div>` : '';
@@ -21550,9 +21600,9 @@ function alBriefingHtml(list) {
            block('⚡ Your Day', yourDayNodes) +
            block('💌 From Sarah & Lists', sarahNodes) +
            block('🚗 Cars & Orders', carOrderNodes) +
-           block('📅 Coming Up This Week', weekNodes);
+           block('📅 Coming Up (Next 2 Weeks)', weekNodes);
   } else if (alBriefFilter === 'today') {
-    body = block('📌 Pinned', pinnedNodes, 'bellpinned') + block('⚡ Your Day', yourDayNodes) + block('📅 Coming Up This Week', weekNodes);
+    body = block('📌 Pinned', pinnedNodes, 'bellpinned') + block('⚡ Your Day', yourDayNodes) + block('📅 Coming Up (Next 2 Weeks)', weekNodes);
   } else if (alBriefFilter === 'sarah') {
     body = block('💌 From Sarah & Lists', sarahNodes);
   } else if (alBriefFilter === 'cars') {
@@ -22098,8 +22148,8 @@ function evFlagBtn(e) { const on = evFlagged(e.id); return `<button type="button
 function evFlagMini(e) { const on = evFlagged(e.id); return `<span role="button" tabindex="0" class="evflagmini${on ? ' on' : ''}" data-flag="${esc(e.id)}" aria-pressed="${on}" aria-label="Flag for Notifications: ${esc(e.title)}" onclick="evFlagToggle(${jsArg(e.id)}, event)">🚩</span>`; }
 function glEventHeads() {
   try {
-    const T = todayISO();
-    return Object.values(evFlags()).filter(x => x && (x.end || x.date) >= T && glOk(x.title)).sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    const T = todayISO(), lim = addDays(T, 14);
+    return Object.values(evFlags()).filter(x => x && (x.end || x.date) >= T && x.date <= lim && glOk(x.title)).sort((a, b) => String(a.date).localeCompare(String(b.date)))
       .map(x => { const d = Math.max(0, daysLeft(x.date)); return { pri: 10, info: true, flag: x.id, tag: '🚩 Flagged event' + (d === 0 ? ' · Today' : d === 1 ? ' · Tomorrow' : ' · In ' + d + ' days'), what: x.title, s: [fmtW(x.date < T ? T : x.date) + (x.time ? ' · ' + fmtTime(x.time) : ''), x.venue].filter(Boolean).join(' · '), url: x.url }; });
   } catch (e) { return []; }
 }
@@ -22124,27 +22174,26 @@ function glDueItems() {
         if (cp && cp.rd != null && cp.rd <= 7) out.push({ days: cp.rd, html: cp.html, noCount: cp.rd > 1 });
         return;
       }
-      const ok = k === 'bill' || k === 'pay' || k === 'loan' ? false : k === 'car' || k === 'driver' ? d <= 7 : k === 'bday' ? false : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 1 : k === 'todo' ? d < 0 || (hi && d <= 1) : k === 'comm' || k === 'claim' ? d <= 7 : false; // 2.26.6: commission and claim reminders (read from the app only)
+      const ok = k === 'bill' || k === 'pay' || k === 'loan' ? false : k === 'car' || k === 'driver' ? d <= 14 : k === 'bday' ? false : ['appt', 'ext', 'health', 'custom', 'mine'].includes(k) ? d >= 0 && d <= 14 : k === 'todo' ? d < 0 || (hi && d <= 14) : k === 'comm' || k === 'claim' ? d <= 14 : false;
       if (!ok) return;
       let h = ''; try { h = cuRowHtml(x); } catch (e) { return; }
-      out.push({ days: d, html: h });
+      out.push({ days: d, html: h, noCount: d > 1 });
     });
   } catch (e) { }
-  // 2.26.34: every open dated to-do: overdue/today → Urgent, 1–7 days → Coming up. Only overdue, today and tomorrow count.
-  // In-progress ones that aren't overdue/today go to the In progress section instead; new ones stay under 'New on your lists'.
+  // 2.26.34 / 2.28.15: every open dated to-do up to 14 days ahead: overdue/today → Urgent, 1–14 days → Coming up.
   try {
     (S.todos || []).forEach(t => {
       if (!t || t.done || !t.due || !t.title || !glOk(t.title) || (glDueItems.nl && glDueItems.nl.has(t.id))) return;
-      const d = daysLeft(t.due); if (d > 7) return;
-      const doing = todoStatus(t) === 'doing'; if (doing) return; // 2.26.48: in progress stays in the In progress section
-      if (waterBlock(t)) { out.push({ days: 0.5, html: glTodoCard(t, d), noCount: true, todoId: t.id }); return; } // blocked by the garden rule: Coming up, not counted
+      const d = daysLeft(t.due); if (d > 14) return;
+      const doing = todoStatus(t) === 'doing'; if (doing) return;
+      if (waterBlock(t)) { out.push({ days: 0.5, html: glTodoCard(t, d), noCount: true, todoId: t.id }); return; }
       out.push({ days: d, html: glTodoCard(t, d), noCount: d > 1, todoId: t.id });
     });
   } catch (e) { }
   // 2.28.8: bills hidden from Notifications
-  // 2.26.31: birthdays from the Birthdays list, 28 days ahead. Today → Urgent; 1–28 days → Coming up; only 0–7 days count toward the bell badge.
+  // 2.28.15: birthdays from the Birthdays list, 14 days ahead (2 weeks). Today → Urgent; 1–14 days → Coming up.
   try {
-    (S.birthdays || []).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 28 && glOk(x.b.name)).forEach(x => {
+    (S.birthdays || []).map(b => Object.assign({ b }, bdayInfo(b))).filter(x => x.d >= 0 && x.d <= 14 && glOk(x.b.name)).forEach(x => {
       const when = x.d === 0 ? 'Today 🎂' : x.d === 1 ? 'Tomorrow' : x.d + ' days to go';
       const h = `<button class="row" onclick="go('#birthdays')"><div class="ic bday">${I('cake')}</div><div class="tx"><div class="t">${esc(x.b.name)}’s birthday</div><div class="s">${fmtW(x.iso)}${x.age > 0 ? ` · turns ${x.age}` : ''}</div></div><span class="pill">${when}</span></button>`;
       out.push({ days: x.d, html: h, noCount: x.d > 7 });
@@ -22159,7 +22208,7 @@ function nlDis() { try { return JSON.parse(localStorage.getItem('nlDismiss') || 
 function nlDismiss(id) { const L = nlDis().filter(Boolean); if (!L.includes(id)) L.push(id); try { localStorage.setItem('nlDismiss', JSON.stringify(L.slice(-400))); } catch (e) { } }
 function nlItems() {
   const since = nlSince(), gone = new Set(nlDis()), out = [];
-  try { (S.todos || []).forEach(t => { if (t && !t.done && !isSarahTodo(t) && +t.created >= since && !gone.has(t.id) && t.title && glOk(t.title) && todoStatus(t) !== 'doing') out.push({ id: t.id, title: t.title, where: '#todo', list: t.list || 'To-do', due: t.due || '', days: t.due ? daysLeft(t.due) : null, doing: todoStatus(t) === 'doing' }); }); } catch (e) { }
+  try { (S.todos || []).forEach(t => { if (t && !t.done && !isSarahTodo(t) && +t.created >= since && !gone.has(t.id) && t.title && glOk(t.title) && todoStatus(t) !== 'doing' && (!t.due || daysLeft(t.due) <= 14)) out.push({ id: t.id, title: t.title, where: '#todo', list: t.list || 'To-do', due: t.due || '', days: t.due ? daysLeft(t.due) : null, doing: todoStatus(t) === 'doing' }); }); } catch (e) { }
   try { ((S.shop && S.shop.items) || []).forEach(x => { if (x && !x.done && !isSarahShop(x) && +x.created >= since && !gone.has(x.id) && x.name && !(x.meals && x.meals.length) && glOk(x.name)) out.push({ id: x.id, title: x.name, where: '#shopping', list: 'Shopping', due: '', days: null }); }); } catch (e) { }
   return out.map(x => ({ ...x, wb: x.where === '#todo' ? waterBlock((S.todos || []).find(t => t.id === x.id)) : null })).map(x => ({ ...x, urgent: x.days !== null && x.days <= 0 && !x.wb, html: `<div class="row glnew" data-nl="${esc(x.id)}" role="button" tabindex="0" onclick="if(!glSwipe.moved)go('${x.where}')"><div class="ic">⭐</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">New on ${esc(x.list)}${x.wb ? ' · 💧 ' + esc(x.wb) : x.due ? ' · ' + (x.days < 0 ? plural(-x.days, 'day') + ' overdue' : x.days === 0 ? 'due today' : 'due ' + fmtW(x.due)) : ''} · priority</div></div>${x.doing ? '<span class="pill glprog">In progress</span>' : ''}</div>` }));
 }
@@ -24857,7 +24906,7 @@ function evNo(k) { mbDismiss(k); try { glBellRedraw(); } catch (e) { } render();
 // bell: one card per event, in Coming up when it's within 14 days
 (() => { const o = mbItems; mbItems = function () {
   const out = o(), gone = new Set(mbDis()), evIds = new Set();
-  try { evMailList().forEach(x => { x.m && evIds.add(x.m.src + ':' + x.m.id); if (gone.has(x.key) || evAdded(x.key)) return; const d = daysLeft(x.ev.days[0]);
+  try { evMailList().forEach(x => { x.m && evIds.add(x.m.src + ':' + x.m.id); if (gone.has(x.key) || evAdded(x.key)) return; const d = daysLeft(x.ev.days[0]); if (d > 14) return;
     out.push({ sec: 'ev', key: x.key, urgent: false, coming: d <= 14, badge: mbToday(x.m.at), at: x.m.at, html: evCardHtml(x, 'bell') }); });
     emMsgs().forEach(m => { if (m.ev) evIds.add(m.src + ':' + m.id); });
   } catch (e) { }
@@ -26035,7 +26084,7 @@ function apCardHtml(x) {
   return `<div class="row glnew mbrow evrow aprow" data-mb="${esc(k + '|' + a.kind)}" data-date="${a.date}" role="button" tabindex="0" onclick="if(window.glSwipe&&glSwipe.moved)return;${cancel ? '' : inc ? `calOpenDay(${parseD(inc.start)})` : `apAdd('${esc(k)}')`}"><div class="ic">${a.icon}</div><div class="tx"><div class="t">${title}</div><div class="s">${sub}</div>${btns}</div></div>`;
 }
 (() => { const o = mbItems; mbItems = function () { const out = o(), gone = new Set(mbDis());
-  try { apList().forEach(x => { if (gone.has(x.key + '|' + x.a.kind)) return; const d = daysLeft(x.a.date); if (x.a.kind === 'cancel' && mbAge(x.at) > 3) return;
+  try { apList().forEach(x => { if (gone.has(x.key + '|' + x.a.kind)) return; const d = daysLeft(x.a.date); if (d > 14) return; if (x.a.kind === 'cancel' && mbAge(x.at) > 3) return;
     out.push({ sec: 'ap', key: x.key + '|' + x.a.kind, urgent: false, coming: d <= 14, badge: mbToday(x.at), at: x.at, html: apCardHtml(x) }); }); } catch (e) { }
   return out; }; })();
 MB_SECS.unshift(['ap', 'Appointments from email']);
@@ -26279,7 +26328,7 @@ function lnEvLine(it, mini) {
   return { s: s + (cl ? `<br><span class="evclash">⚠️ ${esc(evClashTxt(cl))}</span>` : ''), btns };
 }
 function lnRows() {
-  const p = lnPref(), gone = nfDis(), st = lnSt(), ok = it => it.k === 'cin' ? p.cinema : p[it.ty] && (it.end || it.date) >= todayISO();
+  const p = lnPref(), gone = nfDis(), st = lnSt(), T = todayISO(), lim = addDays(T, 14), ok = it => it.k === 'cin' ? (p.cinema && (!it.released || it.released <= lim)) : (p[it.ty] && (it.end || it.date) >= T && it.date <= lim);
   return st.notes.filter(n => Date.now() - n.at < LN_KEEP).slice().reverse().map(n => {
     const k = 'ln-' + n.id; if (gone.includes(k)) return ''; const L = n.items.filter(ok); if (!L.length) return '';
     if (L.length === 1) { const it = L[0];
@@ -27139,8 +27188,9 @@ setTimeout(() => outRefresh(false), 6000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') outRefresh(false); });
 function outList() {
   if (!OUTG) return []; const now = Date.now(), sc = outScope();
+  const limMs = now + 14 * 864e5;
   const L = [].concat((OUTG.unplanned || []).map(o => ({ ...o, st: 'Current' })), (OUTG.restored || []).map(o => ({ ...o, st: 'Restored' })),
-    (OUTG.planned || []).filter(o => !o.end || Date.parse(o.end) > now).map(o => ({ ...o, st: o.start && Date.parse(o.start) <= now ? 'Current' : 'Planned' })));
+    (OUTG.planned || []).filter(o => (!o.end || Date.parse(o.end) > now) && (!o.start || Date.parse(o.start) <= limMs)).map(o => ({ ...o, st: o.start && Date.parse(o.start) <= now ? 'Current' : 'Planned' })));
   return L.filter(o => sc === 'all' ? outWhg(o) || outHome(o) : outHome(o))
     .sort((a, b) => (outHome(b) - outHome(a)) || ((a.st === 'Current' ? 0 : a.st === 'Restored' ? 1 : 2) - (b.st === 'Current' ? 0 : b.st === 'Restored' ? 1 : 2)) || String(a.start || '').localeCompare(String(b.start || '')));
 }
@@ -27214,8 +27264,8 @@ async function rdcLoad(force) {
 }
 setTimeout(() => rdcLoad(), 1500); setInterval(() => rdcLoad(), 15 * 60e3);
 function rdcItems() {
-  const L = [], raw = ((RDC && RDC.d && RDC.d.closures) || []).slice(), T = todayISO(), lim = addDays(T, 21);
-  stadiumClosureItems(21).forEach(sc => {
+  const L = [], raw = ((RDC && RDC.d && RDC.d.closures) || []).slice(), T = todayISO(), lim = addDays(T, 14);
+  stadiumClosureItems(14).forEach(sc => {
     if (!raw.some(c => /okara|semenoff/i.test([c.title, c.where, c.desc].join(' ')) && (c.dates || []).some(d => d.start === sc.dates[0].start))) raw.push(sc);
   });
   const hm = t => t ? fmtTime(t).replace(':00', '').replace(/\s/g, '') : '';
@@ -27337,7 +27387,7 @@ window.addEventListener('hashchange', () => { if (/^#alerts/.test(location.hash)
 const WHG_NOTIF_PLACE_RE = /\b(whang[aā]rei|onerahi|te\s+kamo|kamo|tikipunga|maunu|raumanga|otangarei|port\s+nikau|town\s+basin|okara|semenoff|morningside|woodhill|regent|kensington|mairtown|parahaki|riverside|h[aā]tea|pohe\s+island|te\s+matau|springs\s+flat|ruak[aā]k[aā]|marsden\s+point|one\s+tree\s+point|waip[uū]|bream\s+bay|hikurangi|ngunguru|tutukaka|matapouri|whananaki|pataua|p[aā]rua\s+bay|whang[aā]rei\s+heads|tamaterau|reotahi|[oō]akura|helena\s+bay|whangaruru|maungatapere|maungakaramea|glenbervie|whareora|horahora|kioreroa|northport|port\s+road|porowini|dave\s+culham)\b/i;
 const NON_WHG_NOTIF_RE = /\b(kerikeri|kaitaia|kaikohe|dargaville|hokianga|paihia|waitangi|[oō]m[aā]pere|kohukohu|rawene|opononi|kawakawa|moerewa|mangonui|taipa|ahipara|kaeo|bay\s+of\s+islands|far\s+north|kaipara|mangawhai|kaiwaka|maungaturoto|ruawai|te\s+kopuru|houhora|haruru|okaihau|russell)\b/i;
 const WHG_CORRIDOR_RE = /\b(northland\s+corridor|northland\s+expressway|brynderwyn\w*|warkworth\s+to\s+te\s+hana|te\s+hana|port\s+marsden|ara\s+t[uū]hono|dome\s+valley)\b/i;
-const NOTIF_TOPIC_RE = /\b(road\s*clos\w*|closed\s+road|bridge\s*clos\w*|detours?|diversions?|traffic\s+management|traffic\s+delays?|roadworks?|slip\b|washout|okara\s+dr\w*|port\s+r(?:oa)?d|te\s+matau|dave\s+culham|onerahi\s+r(?:oa)?d|riverside\s+dr\w*|kamo\s+r(?:oa)?d|reyburn\s+st\w*|porowini|maunu\s+r(?:oa)?d|tarewa\s+r(?:oa)?d|power\s+(?:cut|cuts|outage|outages|off|fault|lines?\s+down|restor\w*)|northpower|blackout|electricity\s+outage|(?:internet|broadband|fibre|fiber|mobile|cell(?:ular)?|network|chorus|spark|one\s*nz|vodafone|2degrees)\s+(?:outage|outages|down|fault|disrupt\w*|cut|issue)|outage\s+affect\w*\s+(?:internet|broadband|fibre|mobile)|develop\w*|subdivision\w*|housing|apartments?|plan\s+changes?|district\s+plan|spatial\s+plan|long[- ]term\s+plan|annual\s+plan|resource\s+consents?|consented|fast[- ]track\w*|re-?zon\w*|zoning|infrastructure|expressway|motorway|northland\s+corridor|brynderwyn\w*|four[- ]lan\w*|roundabout|interchange|northport|marsden\s+point|airport|hospital|civic\s+cent(?:re|er)|town\s+basin|hihiaua|waterfront|redevelop\w*|wastewater|water\s+treatment|cycleway|shared\s+path|business\s+park|supermarket|contract\s+awarded|consultation)\b/i;
+const NOTIF_TOPIC_RE = /\b(road\s*clos\w*|closed\s+road|bridge\s*clos\w*|detours?|diversions?|traffic\s+management|traffic\s+delays?|roadworks?|slip\b|slips\b|washout|okara\s+dr\w*|port\s+r(?:oa)?d|te\s+matau|dave\s+culham|onerahi\s+r(?:oa)?d|riverside\s+dr\w*|kamo\s+r(?:oa)?d|reyburn\s+st\w*|porowini|maunu\s+r(?:oa)?d|tarewa\s+r(?:oa)?d|power\s+(?:cut|cuts|outage|outages|off|fault|lines?\s+down|restor\w*)|northpower|blackout|electricity\s+outage|(?:internet|broadband|fibre|fiber|mobile|cell(?:ular)?|network|chorus|spark|one\s*nz|vodafone|2degrees)\s+(?:outage|outages|down|fault|disrupt\w*|cut|issue)|outage\s+affect\w*\s+(?:internet|broadband|fibre|mobile)|weather\s+(?:warning|warnings|watch|watches|alert|alerts|event|events|bomb|front)|severe\s+weather|heavy\s+rain\w*|downpours?|flood\w*|surface\s+flooding|storm\w*|thunderstorm\w*|lightning|cyclone\w*|ex-tropical|gales?|high\s+winds?|strong\s+winds?|king\s+tides?|storm\s+surge|metservice|civil\s+defence|develop\w*|subdivision\w*|housing|apartments?|plan\s+changes?|district\s+plan|spatial\s+plan|long[- ]term\s+plan|annual\s+plan|resource\s+consents?|consented|fast[- ]track\w*|re-?zon\w*|zoning|infrastructure|expressway|motorway|northland\s+corridor|brynderwyn\w*|four[- ]lan\w*|roundabout|interchange|northport|marsden\s+point|airport|hospital|civic\s+cent(?:re|er)|town\s+basin|hihiaua|waterfront|redevelop\w*|wastewater|water\s+treatment|cycleway|shared\s+path|business\s+park|supermarket|contract\s+awarded|consultation)\b/i;
 function plnWhangareiOk(x) {
   if (!x || !x.title) return false;
   const t = String(x.title || ''), d = String(x.desc || '');
@@ -27360,8 +27410,9 @@ function newsAlertBellRows() {
       const k = 'nwal-' + bfH(x.url);
       if (D.includes(k)) return '';
       const t = x.title || '';
-      const ic = /road|clos|bridge|detour|traffic|slip/i.test(t) ? '⛔' : /power|northpower|blackout/i.test(t) ? '⚡' : /internet|broadband|fibre|mobile|chorus|spark|2degrees/i.test(t) ? '📶' : '🏗️';
-      const cat = ic === '⛔' ? 'Whangārei road alert' : ic === '⚡' ? 'Whangārei power alert' : ic === '📶' ? 'Network outage alert' : 'Whangārei planning & development';
+      const isWx = /weather|rain|downpour|flood|storm|thunder|lightning|cyclone|gale|wind|metservice|civil defence/i.test(t);
+      const ic = /road|clos|bridge|detour|traffic|washout/i.test(t) ? '⛔' : isWx ? '⛈️' : /power|northpower|blackout/i.test(t) ? '⚡' : /internet|broadband|fibre|mobile|chorus|spark|2degrees/i.test(t) ? '📶' : '🏗️';
+      const cat = ic === '⛔' ? 'Whangārei road alert' : ic === '⛈️' ? 'Whangārei weather alert' : ic === '⚡' ? 'Whangārei power alert' : ic === '📶' ? 'Network outage alert' : 'Whangārei planning & development';
       return `<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))window.open(${jsArg(newsUrl(x.url))},'_blank','noopener')"><div class="ic">${ic}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${esc([cat, newsWhen(x.published), nbSrc(x)].filter(Boolean).join(' · '))}</div></div></div>`;
     }).filter(Boolean);
   } catch (e) { return []; }
@@ -27369,25 +27420,21 @@ function newsAlertBellRows() {
 function aklConcertBellRows() {
   try {
     if (!AKLC && typeof loadAklConcerts === 'function') setTimeout(() => { try { loadAklConcerts(false); } catch (e) { } }, 0);
-    const D = nfDis(), T = todayISO(), out = [];
-    const dated = ((AKLC && AKLC.dated) || []).filter(x => x && x.title && x.date && x.date >= T && !isSport(x.title));
-    const bigEf = (typeof mdAkl === 'function' ? mdAkl() : []).filter(e => e && mdBig(e) && !dated.some(d => d.date === e.date && d.title.toLowerCase().slice(0, 10) === e.title.toLowerCase().slice(0, 10)));
+    const D = nfDis(), T = todayISO(), lim = addDays(T, 14), out = [];
+    const dated = ((AKLC && AKLC.dated) || []).filter(x => x && x.title && x.date && x.date >= T && x.date <= lim && !isSport(x.title));
+    const bigEf = (typeof mdAkl === 'function' ? mdAkl() : []).filter(e => e && mdBig(e) && e.date >= T && e.date <= lim && !dated.some(d => d.date === e.date && d.title.toLowerCase().slice(0, 10) === e.title.toLowerCase().slice(0, 10)));
     const allDated = dated.concat(bigEf.map(e => ({ title: e.title, date: e.date, venue: String(e.venue || 'Auckland').replace(/,\s*Auckland$/i, ''), url: e.url }))).slice(0, 4);
     allDated.forEach(x => {
       const k = 'aklc-' + bfH(x.title + '|' + x.date);
       if (D.includes(k)) return;
       out.push(`<div class="row glnew" data-nk="${esc(k)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))go('#concerts')"><div class="ic">🎤</div><div class="tx"><div class="t">Big Auckland concert: ${esc(x.title)}</div><div class="s">${esc([fmtW(x.date), x.venue, 'Auckland · Tap for tickets & details'].filter(Boolean).join(' · '))}</div></div></div>`);
     });
-    const spark = ((AKLC && AKLC.spark) || []).filter(x => x && x.title && !/^(new|presale|on sale)$/i.test(x.title) && !isSport(x.title)).slice(0, 5);
-    if (spark.length && !D.includes('aklc-spark')) {
-      out.push(`<div class="row glnew" data-nk="aklc-spark" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))go('#concerts')"><div class="ic">🌟</div><div class="tx"><div class="t">Coming to Spark Arena Auckland: ${esc(spark.slice(0, 3).map(x => x.title).join(', '))}${spark.length > 3 ? ' +' + (spark.length - 3) + ' more' : ''}</div><div class="s">Big shows in Auckland · Tap to view all Auckland concerts</div></div></div>`);
-    }
     return out;
   } catch (e) { return []; }
 }
 const PLN_IC = { road: '🛣️', plan: '📋', dev: '🏗️' };
 function plnList() { const L = (PLN && PLN.d && PLN.d.items) || [], now = Date.now();
-  return L.filter(x => x && x.title && /^https:\/\//.test(x.url || '') && now - Date.parse(x.published) <= 30 * 864e5 && plnWhangareiOk(x)).sort((a, b) => String(b.published).localeCompare(String(a.published))); }
+  return L.filter(x => x && x.title && /^https:\/\//.test(x.url || '') && now - Date.parse(x.published) <= 14 * 864e5 && plnWhangareiOk(x)).sort((a, b) => String(b.published).localeCompare(String(a.published))); }
 function plnDay(iso) { const d = new Date(iso); if (isNaN(d)) return ''; const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); return k === todayISO() ? 'Today' : k === addDays(todayISO(), -1) ? 'Yesterday' : fmtW(k); }
 function plnRow(x, nk) { return `<div class="row glnew" data-nk="${esc(nk)}" role="button" tabindex="0" onclick="if(!(window.glSwipe&&glSwipe.moved))window.open(${jsArg(x.url)},'_blank','noopener')"><div class="ic">${PLN_IC[x.kind] || '🏗️'}</div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${esc(['Planning & development', plnDay(x.published), x.src].filter(Boolean).join(' · '))}</div></div></div>`; }
 function plnBellRows() { try { if (!plnOn()) return []; const D = nfDis(), L = plnList().map(x => [x, 'bf-pln-' + bfH(x.url)]).filter(([, k]) => !D.includes(k));
