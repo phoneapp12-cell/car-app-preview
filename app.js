@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.20';
+const APP_VERSION = '2.28.21';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11457,19 +11457,20 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   coding: ['star', 'ev', 'Coding', 'Coding'],
   astronomy: ['moon', 'ev', 'Astronomy', 'Astronomy'],
   gardening: ['leaf', 'garden', 'Gardening board', 'Gardening'],
-  gflist: ['shield', 'meal', 'GF Safe List', 'GF Safe']
+  gflist: ['shield', 'meal', 'GF Safe List', 'GF Safe'],
+  lists: ['todo', 'todo', 'Tasks &amp; Lists', 'Lists'],
+  money: ['cash', 'loan', 'Money &amp; Work', 'Money'],
+  wellbeing: ['heart', 'health', 'Health &amp; Gym', 'Health'],
+  local: ['pin', 'garden', 'Local &amp; Outdoors', 'Local'],
+  homelife: ['car', 'car', 'Home, Cars &amp; Pets', 'Cars & Home']
 };
 const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'shopping', 'gflist', 'countdown', 'diary', 'notes', 'photos'] },
-  { id: 'people', title: 'Health', keys: ['watch', 'sleep', 'gym', 'health', 'meds', 'claims', 'birthdays', 'about'] },
-  { id: 'near', title: 'Local', keys: ['walks', 'bridge', 'roadworks', 'planning', 'garden'] },
-  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
-  { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
-  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans'] },
-  { id: 'cars', title: 'Cars & Pets', keys: ['cars', 'pets'] }
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'lists', 'food', 'projects'] },
+  { id: 'money', title: 'Life & Local', keys: ['money', 'wellbeing', 'local', 'homelife'] },
+  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'learn'] }
 ];
 function navOrder() {
   return NAV_DEFAULT.slice();
@@ -20698,9 +20699,9 @@ function bottomTabsSetting() {
 }
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
-const ROUTE_ITEM = { car: 'cars', driver: 'cars', pet: 'pets', loan: 'loans', recipe: 'food', meals: 'food', recipes: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', coding: 'learn', astronomy: 'learn', gardening: 'learn' }; // detail pages belong to their section
+const ROUTE_ITEM = { todo: 'lists', reminders: 'lists', flagged: 'lists', ideas: 'lists', notes: 'lists', birthdays: 'lists', countdown: 'lists', diary: 'lists', photos: 'lists', recipe: 'food', meals: 'food', recipes: 'food', shopping: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', tidy: 'projects', bills: 'money', budget: 'money', cashflow: 'money', notbills: 'money', power: 'money', compare: 'money', powertime: 'money', work: 'money', roster: 'money', commission: 'money', wage: 'money', loans: 'money', loan: 'money', watch: 'wellbeing', sleep: 'wellbeing', gym: 'wellbeing', meds: 'wellbeing', health: 'wellbeing', claims: 'wellbeing', about: 'wellbeing', weather: 'local', walks: 'local', bridge: 'local', roadworks: 'local', garden: 'local', events: 'local', news: 'local', localnews: 'local', planning: 'local', cars: 'homelife', car: 'homelife', driver: 'homelife', drivers: 'homelife', pets: 'homelife', pet: 'homelife', lights: 'homelife', heat: 'homelife', alarm: 'homelife', aitech: 'learn', diy: 'learn', science: 'learn', coding: 'learn', astronomy: 'learn', gardening: 'learn', space: 'learn', travel: 'learn', lang: 'learn', tv: 'media', videos: 'media', top40: 'media', radio: 'media', podcasts: 'media', blogging: 'media', movies: 'media', concerts: 'media', nightlife: 'media', netflix: 'media', prime: 'media' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
-const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden', gflist: 'plate' };
+const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden', gflist: 'plate', lists: 'todo', money: 'money', wellbeing: 'health', local: 'travel', homelife: 'car' };
 function sideIco(k, ic) {
   try {
     if (!cardArtOn() || !SIDE_ART[k]) return I(ic);
@@ -20730,20 +20731,15 @@ function tabbar(active) {
       return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k === 'roster' ? 'work' : k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
     } catch (e) { return ''; }
   };
-  const pwrBtn = (() => { const l = (() => { try { const t = typeof PWR !== 'undefined' && PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })(); return `<button class="${active === 'power' ? 'on' : ''}" ${active === 'power' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#power')"><span class="w"><span style="font-size:1.3rem;line-height:1">⚡</span></span><span class="lbl">${l}</span></button>`; })();
-  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'commission' ? `<button class="${active === 'wage' ? 'on' : ''}" ${active === 'wage' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#wage')"><span class="w"><span style="font-size:1.3rem;line-height:1">💵</span></span><span class="lbl">Wage estimate</span></button>` : '') + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
-  const reno = `<div class="tabgrp g-projects"><div class="tabgh">Projects</div>${btn('projects')}${btn('tidy')}${btn('flagged')}</div>`;
-  bar.innerHTML = groups + reno + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
+  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
+  bar.innerHTML = groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
-  const item = ROUTE_ITEM[r] || r, tabs = navOrder();
   if (r === 'settings') return 'settings';
-  if (r === 'power' || r === 'compare' || r === 'powertime') return 'power'; // 2.26.78: Money › Power
-  if (r === 'notbills') return 'notbills'; // 2.26.84: Money › Not bills
-  if (r === 'wage') return 'wage'; // 2.26.90: Money › Work › Wage estimate
-  if (r === 'work' || r === 'roster') return 'roster'; // 2.26.90: Money › Work
-  if (tabs.includes(item)) return item;
-  if (r === 'home' || r === 'weather' || r === 'drivers' || r === 'alerts' || !r) return 'home';
+  if (r === 'more') return 'more';
+  if (r === 'home' || r === 'alerts' || r === 'archive' || r === 'summary' || !r) return 'home';
+  const item = ROUTE_ITEM[r] || r;
+  if (NAV_GROUPS.some(g => g.keys.includes(item))) return item;
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
 }
 let renderedDay = todayISO();
@@ -20768,7 +20764,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -22323,7 +22319,7 @@ function glWxCard(m) {
   return `<button type="button" class="glwxc glwxc2${sky[3] ? ' gldark' : ''}" style="--s1:${sky[0]};--s2:${sky[1]};--s3:${sky[2]}" onclick="go('#weather')" aria-label="Weather: ${esc(temp + ' ' + nowW.words)}">${fx}<span class="glwxtop"><span class="glwxi">${wxIcon(nowW, 'big')}</span>${temp ? `<b class="glwxt">${temp}</b>` : ''}<b class="glwxn">${esc(nowW.words)}</b></span>${uv || sun ? `<span class="glwxchips">${uv ? `<span class="nwxuv ${uv.cls} glwxuv">UV ${uv.n} ${esc(uv.words)}</span>` : ''}${sun ? sunPill(sun, 'glsunp') : ''}</span>` : ''}${out ? `<span class="glwxout">${esc(out)}</span>` : ''}</button>`; // 2.26.97: compact, three rows
 }
 /* ---- Entertainment ---- */
-const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['learn', 'Learning'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun'], ['food', 'Food']];
+const GL_CATS = [['all', 'All'], ['watch', 'Watch'], ['listen', 'Listen'], ['read', 'Read'], ['out', 'Out'], ['fun', 'Fun']];
 const GL_SUNO = ['A Suno track about Onerahi and the harbour', 'A Suno song about a sunny day off', 'A calm Suno playlist for tonight', 'A Suno track about the Te Matau ā Pohe bridge', 'A Suno song about the Northland coast'];
 const glDay = () => { try { return aklDayNumber(); } catch (e) { return Math.floor(Date.now() / 864e5); } };
 function glPickRecipe() { try { const L = visibleIdeas().filter(i => i && i.title && !/\b(wheat|regular pasta|flour tortilla)\b/i.test(i.title)); if (!L.length) return null; return L[(glDay() * 3 + glOpenN) % L.length]; } catch (e) { return null; } }
@@ -22334,29 +22330,16 @@ function glTiles() {
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#prime')");
   add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
   add('videos', 'watch', 'Videos', () => { let t = ''; try { const sv = currentSarahVideo(); const l = preferFilmVideoTitles(videoSuggestions() || []); const v = (sv ? [sv] : []).concat(l || []).find(x => x && x.title && glOk(x.title) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(x.title)); t = v ? v.title : ''; } catch (e) { } return t || 'Your video categories'; }, B('tv'), '', "go('#videos')");
-  add('sarah', 'watch', 'Sarah’s new video', () => { const v = currentSarahVideo(); return v && Date.now() - Date.parse(v.published || 0) < 14 * 864e5 ? '“' + v.title + '”' : ''; }, 'i3-sarah', ['#db2777', '#7c3aed'], "glSarahOpen()");
   add('top40', 'listen', 'Top 40 NZ', () => { const t = (typeof TOP40 !== 'undefined' && TOP40[0]) || null; return t ? '#1 ' + t.title + ' · ' + t.artist : 'This week’s NZ chart'; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
   add('radio', 'listen', 'Radio', () => (glFirst(HOME_CARD.radio()) || {}).t || 'NZ stations, live', 'i3-radio', ['#16a34a', '#065f46'], "go('#radio')");
   add('podcasts', 'listen', 'Podcasts', () => (glFirst(HOME_CARD.podcasts()) || {}).t, 'i3-phone', ['#9333ea', '#4c1d95'], "go('#podcasts')");
-  add('learn', 'learn', 'Learn (All boards)', () => { const ai = lbToday('ai'), dy = lbToday('dy'), sc = lbToday('sc'); return [ai && ai.name, sc && sc.name, dy && dy.name].filter(Boolean).slice(0, 3).join(' · '); }, 'i3-idea', ['#0d9488', '#1e3a8a'], "go('#learn')");
-  add('aitech', 'learn', 'AI & Tech', () => { const p = lbToday('ai'); return p ? p.name + ' · ' + p.cat : 'AI, smart home & tech'; }, 'i3-idea', ['#7c3aed', '#1e1b4b'], "go('#aitech')");
-  add('science', 'learn', 'Science', () => { const p = lbToday('sc'); return p ? p.name + ' · ' + p.cat : 'How everyday things work'; }, 'i3-weather', ['#0f766e', '#042f2e'], "go('#science')");
-  add('diy', 'learn', 'DIY & Tools', () => { const p = lbToday('dy'); return p ? p.name + ' · ' + p.cat : 'NZ DIY & workshop skills'; }, 'i3-todo', ['#b45309', '#451a03'], "go('#diy')");
-  add('space', 'learn', 'Space', () => { const p = spToday(); return p ? p.name + ' · ' + p.cat : 'Planets, stars & missions'; }, 'i3-hol', ['#312e81', '#0f172a'], "go('#space')");
-  add('astronomy', 'learn', 'Astronomy', () => { const p = lbToday('as'); return p ? p.name + ' · ' + p.cat : 'Southern sky & stars'; }, 'i3-moon', ['#1e3a8a', '#0f172a'], "go('#astronomy')");
-  add('coding', 'learn', 'Coding', () => { const p = lbToday('cd'); return p ? p.name + ' · ' + p.cat : 'Languages, web & tools'; }, 'i3-idea', ['#2563eb', '#1e3a8a'], "go('#coding')");
-  add('gardening', 'learn', 'Gardening', () => { const p = lbToday('gd'); return p ? p.name + ' · ' + p.cat : 'Veges, fruit & NZ natives'; }, 'i3-garden', ['#15803d', '#052e16'], "go('#gardening')");
-  add('lang', 'learn', 'Languages', () => { const m = langToday('mi'), fr = langToday('fr'); return [m && m[0], fr && fr[0]].filter(Boolean).join(' · '); }, 'i3-quote', ['#0d9488', '#115e59'], "go('#lang')");
-  add('travel', 'learn', 'Travel', () => { const p = travelToday(); return p ? p.name + ', ' + p.country : 'Place of the day'; }, 'i3-travel', ['#0284c7', '#0c4a6e'], "go('#travel')");
-  add('walks', 'out', 'Walks & Beaches', () => walksMoreSub(), 'i3-travel', ['#16a34a', '#064e3b'], "go('#walks')");
+  add('learn', 'read', 'Learn', () => { const ai = lbToday('ai'), dy = lbToday('dy'), sc = lbToday('sc'); return [langToday('mi')[0], ai && ai.name, sc && sc.name, dy && dy.name].filter(Boolean).slice(0, 3).join(' · '); }, 'i3-idea', ['#0d9488', '#1e3a8a'], "go('#learn')");
   add('blogs', 'read', 'Blogs', () => (glFirst(HOME_CARD.blogging()) || {}).t, 'i3-note', ['#0d9488', '#155e75'], "go('#blogging')");
-  add('posts', 'read', 'Your posts', () => { const p = postsSorted(); return p.length ? p[0].title : ''; }, 'i3-idea', ['#ca8a04', '#9a3412'], "go('#blogging/mine')");
   add('localnews', 'read', 'Local news', () => { const n = (newsSec('local') || []).filter(newsOk); return n.length ? n[0].title : ''; }, B('news'), '', "go('#localnews')");
   add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
   add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(evPlain); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
-  add('concerts', 'out', 'Concerts', () => { const G = mdEvGroups(), e = G.akl[0] || G.concerts[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), e.date ? fmtW(e.date) : ''].filter(Boolean).join(' · ') : ''; }, 'i3-radio', ['#7c3aed', '#1e1b4b'], "go('#concerts')"); // 2.27.62
-  add('nightlife', 'out', 'Nightlife', () => { const e = mdEvGroups().nightlife[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), (e.date ? fmtW(e.date) : '') + (e.time ? ' ' + fmtTime(e.time) : '')].filter(Boolean).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#nightlife')"); // 2.27.63: own page
-  add('recipe', 'fun', 'GF recipe', () => { const r = glPickRecipe(); return r ? r.title : ''; }, B('meals'), '', "go('#recipes')");
+  add('concerts', 'out', 'Concerts', () => { const G = mdEvGroups(), e = G.akl[0] || G.concerts[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), e.date ? fmtW(e.date) : ''].filter(Boolean).join(' · ') : ''; }, 'i3-radio', ['#7c3aed', '#1e1b4b'], "go('#concerts')");
+  add('nightlife', 'out', 'Nightlife', () => { const e = mdEvGroups().nightlife[0]; return e ? [e.title, String(e.venue || '').split(',')[0].trim(), (e.date ? fmtW(e.date) : '') + (e.time ? ' ' + fmtTime(e.time) : '')].filter(Boolean).join(' · ') : ''; }, 'i3-moon', ['#6d28d9', '#1e1b4b'], "go('#nightlife')");
   // 2.26.20: joke, quote and fact back as their own blue tiles, each with its own setting; tap opens a sheet
   if (dailyJokeOn()) add('joke', 'fun', 'Joke of the day', () => { const j = dailyJokeFor(); return Array.isArray(j) ? j[0] : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('joke')");
   if (showDailyQuote()) add('quote', 'fun', 'Quote of the day', () => { const q = dailyQuoteFor(); return q ? '“' + q.t + '”' : ''; }, 'i3-quote', ['#2563eb', '#1e3a8a'], "glInfo('quote')");
@@ -22413,7 +22396,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'sarah', 'top40', 'radio', 'podcasts', 'blogs', 'posts', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'aitech', 'diy', 'science', 'space', 'astronomy', 'coding', 'gardening', 'lang', 'travel', 'walks', 'recipe', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
+const MEDIA_TILES = new Set(['netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
@@ -22491,7 +22474,7 @@ function mdEvents(only) {
 function MediaPage() {
   setTimeout(() => { try { refreshEvents(); refreshNews(); } catch (e) { } }, 0);
   const all = homeTry('md tiles', () => glTiles().filter(t => MEDIA_TILES.has(t.k)), []), have = new Set(all.map(t => t.cat));
-  const mdOrd = (() => { let w = false; try { w = !!glMode().atWork; } catch (e) { } return w ? ['learn', 'fun', 'read', 'listen', 'watch', 'out'] : ['watch', 'listen', 'learn', 'read', 'fun', 'out']; })(), mdRank = c => { const i = mdOrd.indexOf(c); return i < 0 ? 99 : i; }; // 2.27.79: noisy first off work, quiet first on shift
+  const mdOrd = (() => { let w = false; try { w = !!glMode().atWork; } catch (e) { } return w ? ['fun', 'read', 'listen', 'watch', 'out'] : ['watch', 'listen', 'read', 'fun', 'out']; })(), mdRank = c => { const i = mdOrd.indexOf(c); return i < 0 ? 99 : i; }; // 2.27.79: noisy first off work, quiet first on shift
   const cats = GL_CATS.filter(c => c[0] === 'all' || have.has(c[0])).flatMap(c => c[0] === 'out' ? [c] : [c]).sort((x, y) => x[0] === 'all' ? -1 : y[0] === 'all' ? 1 : mdRank(x[0]) - mdRank(y[0])); // 2.27.63: Concerts and Nightlife are tiles with their own pages // 2.27.57: own tabs
     if (!cats.some(c => c[0] === mdFilt)) mdFilt = 'all';
   const list = mdFilt === 'all' ? all.map((t, i) => [t, i]).sort((x, y) => mdRank(x[0].cat) - mdRank(y[0].cat) || x[1] - y[1]).map(x => x[0]) : all.filter(t => t.cat === mdFilt);
@@ -22499,7 +22482,7 @@ function MediaPage() {
   const back = `<button class="back" onclick="go('#home')">${I('left')} Home</button>`;
   const ev = mdFilt === 'out' ? mdEvents(['markets', 'other']) : ''; // 2.27.63: the rest have their own tiles and pages
   const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('media'); } catch (e) { return true; } })();
-  return back + header('Entertainment', 'Watch, listen, learning, read, news, fun and what’s on') + (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddMedia()">${I('plus')} Add to bottom bar</button>`) + filt +
+  return back + header('Entertainment', 'Watch, listen, read, news, fun and what’s on') + (btIn ? '' : `<button type="button" class="btn small" style="margin:0 0 10px" onclick="btAddMedia()">${I('plus')} Add to bottom bar</button>`) + filt +
     /* 2.27.54: TV tonight hero removed at Shane's request */ (list.length ? `<div class="glgrid">${list.map(t => glTileHtml(t, false)).join('')}</div>` : '') + ev +
     `<div class="foot">Events from Whangārei District Council, Eventfinda and Event Cinemas.</div>`;
 }
@@ -23503,7 +23486,7 @@ function cfItemised(D) {
 function nm2(D, id) { const a = D.accounts.find(x => x.id === id); return a ? cfAName(a) : ''; }
 async function cfSetMain(id) { S.settings.cfMain = id; await save(); render(); }
 async function cfRefresh() { toast('Asking the banks for the latest…'); await cfLoad(true); if (CFerr) toast(CFerr); }
-function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['notbills', 'Not bills'], ['work', 'Work'], ['power', 'Power']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
+function moneyTabs(cur) { return `<div class="seg moneytabs" role="tablist">${[['money', '📋 Board'], ['bills', 'Bills'], ['budget', 'Budget'], ['cashflow', 'Cash flow'], ['notbills', 'Not bills'], ['work', 'Work'], ['power', 'Power'], ['loans', 'Loans']].map(([k, t]) => `<button type="button" role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" onclick="go('#${k}')">${t}</button>`).join('')}</div>`; }
 function CashFlow() {
   const head = moneyTabs('cashflow') + header('Cash flow', 'Your bank balances, and what’s left before payday');
   if (!cfKey() && !CFmock) return head + `<div class="card empty cfempty"><div class="t">Connect your bank to see cash flow</div><div class="s">Balances from your ASB, ANZ and Kiwibank accounts and the ASB credit card, money in and out this pay fortnight, and whether any account runs short before payday. Read-only, through Akahu.</div><button class="btn primary" style="flex:none;padding:12px 22px" onclick="cfGoSettings()">Connect in Settings</button></div>`;
@@ -29361,3 +29344,511 @@ function GfListPage() {
     ${btIn ? '' : `<button type="button" class="btn small" style="margin:10px 0 0" onclick="btAddGfList()">${I('plus')} Add to bottom bar</button>`}
     <div class="foot">Swipe sideways between lists. Formulations can change—always check the bold NZ/Aus allergen statement on the pack.</div>`;
 }
+
+
+/* ================= 2.28.21: TRELLO-STYLE GROUP HUBS & STREAMLINED TABS =================
+   Groups similar sections together under fewer top-level tabs, each opening a Trello-style
+   horizontal board with live cards and 1-tap navigation pills across sibling pages.
+   Entertainment (#media) and Meals (#food) are left untouched (with duplicate tabs removed from Entertainment). */
+
+function grpPillsHtml(items, curHash) {
+  return `<div class="chips scroll" style="margin:0 0 10px">${items.map(([h, lbl]) => `<button type="button" class="chip${curHash === h ? ' on' : ''}" onclick="go('${h}')">${lbl}</button>`).join('')}</div>`;
+}
+function grpLinkBtn(hash, label) {
+  return `<a class="tbadd" href="${hash}" style="text-decoration:none;font-weight:700">${esc(label)} ›</a>`;
+}
+function grpCard(lbls, title, sub, goCode, footText) {
+  return `<button type="button" class="tbcard" onclick="${esc(goCode)}"><div class="tbbody">${lbls && lbls.length ? tbLbl(lbls) : ''}<div class="tbt">${esc(title)}</div>${sub ? `<div class="tbs">${esc(sub)}</div>` : ''}${footText ? `<div class="tbicons"><span>${esc(footText)}</span></div>` : ''}</div></button>`;
+}
+
+/* ---- 1. TASKS & LISTS HUB (#lists): To-do, Reminders, Flagged, Ideas, Notes, Birthdays, Countdown, Diary, Photos ---- */
+const LISTS_PILLS = [
+  ['#lists', '📋 Board'],
+  ['#todo', '✅ To-do'],
+  ['#reminders', '🔔 Reminders'],
+  ['#flagged', '🚩 Flagged'],
+  ['#ideas', '💡 Ideas'],
+  ['#notes', '📝 Notes'],
+  ['#birthdays', '🎂 Birthdays'],
+  ['#countdown', '⏳ Countdown'],
+  ['#diary', '📖 Diary'],
+  ['#photos', '📷 Photos']
+];
+function listsHubMenu(k) {
+  const m = { todo: '#todo', rem: '#reminders', flg: '#flagged', ideas: '#ideas', bday: '#birthdays', diary: '#diary' }[k] || '#todo';
+  go(m);
+}
+function ListsHubPage() {
+  const openTodos = (S.todos || []).filter(t => t && !t.done);
+  const todoCards = openTodos.slice(0, 6).map(t => {
+    const d = t.due ? daysLeft(t.due) : null;
+    const col = d != null && d < 0 ? '#dc2626' : d != null && d <= 2 ? '#d97706' : '#2563eb';
+    const lbls = [[t.list || 'To-do', col]];
+    if (t.priority === 'high' || t.priority === 'urgent') lbls.push([t.priority.toUpperCase(), '#dc2626']);
+    return grpCard(lbls, t.title, t.due ? 'Due ' + fmtW(t.due) : (t.notes || 'Tap to view in To-do'), "go('#todo')", isSarahTodo(t) ? '💌 Added by Sarah' : '');
+  }).join('') + grpLinkBtn('#todo', `Open To-do (${openTodos.length} open)`);
+
+  const rems = (S.reminders || []).filter(r => r && !r.done).slice(0, 5);
+  const remCards = (rems.length ? rems.map(r => grpCard([['🔔 Reminder', '#7c3aed']], r.title || r.text || 'Reminder', [r.date ? fmtW(r.date) : '', r.time ? fmtTime(r.time) : ''].filter(Boolean).join(' · '), "go('#reminders')")).join('') : grpCard([['🔔 Reminders', '#7c3aed']], 'No active reminders', 'Tap to add a one-off or repeating reminder', "go('#reminders')")) + grpLinkBtn('#reminders', 'Open Reminders');
+
+  const flgItems = (typeof flgGet === 'function' ? flgGet().items : []).filter(x => x && x.status !== 'done');
+  const flgCards = (flgItems.length ? flgItems.slice(0, 5).map(x => grpCard([[flgPri(x.pri)[1], flgPri(x.pri)[2]], [(FLG_SRC[(x.src || {}).type] || ['Flagged'])[0], '#475569']], x.title, flgDue(x) || 'Tap to open sub-tasks & notes', `flgOpen(${jsArg(x.id)})`, (x.subs || []).length ? `${(x.subs || []).filter(s => s.done).length}/${x.subs.length} sub-tasks` : '')).join('') : grpCard([['🚩 Flagged', '#e11d2a']], 'Nothing flagged right now', 'Flag any bill, to-do, event or travel/learn card to build sub-tasks on it', "go('#flagged')")) + grpLinkBtn('#flagged', 'Open Flagged board');
+
+  const ideas = (S.ideas || []).slice(0, 4);
+  const notes = (typeof noteRows === 'function' ? noteRows() : []).slice(0, 3);
+  const ideaNoteCards = [
+    ...ideas.map(i => grpCard([[i.cat || 'Idea', '#ca8a04'], ...(i.pinned ? [['★ Starred', '#d97706']] : [])], i.title, i.notes || '', "go('#ideas')")),
+    ...notes.map(n => grpCard([['📝 Note', '#0d9488']], (n.text || 'Spoken note').slice(0, 80), n.day ? fmtW(n.day) : '', "go('#notes')"))
+  ].join('') + grpLinkBtn('#ideas', `Open Ideas (${(S.ideas || []).length})`) + grpLinkBtn('#notes', `Open Notes (${notes.length})`);
+
+  const bdays = (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b))).sort((a, b) => a.d - b.d).slice(0, 4);
+  const cds = (typeof countdownRows === 'function' ? countdownRows() : []).slice(0, 3);
+  const bdayCards = [
+    ...bdays.map(x => grpCard([['🎂 Birthday', x.d <= 7 ? '#db2777' : '#2563eb']], x.b.name, `${x.d === 0 ? 'Today!' : x.d === 1 ? 'Tomorrow' : 'In ' + x.d + ' days'} · ${fmtW(x.iso)}${x.age ? ' (turns ' + x.age + ')' : ''}`, "go('#birthdays')")),
+    ...cds.map(c => grpCard([['⏳ Countdown', '#0891b2']], c.name, cdWords(cdDays(c.date)), "go('#countdown')"))
+  ].join('') + grpLinkBtn('#birthdays', 'Open Birthdays') + grpLinkBtn('#countdown', 'Open Countdowns');
+
+  const dLines = (typeof diaryFlat === 'function' ? diaryFlat(diaryToday()) : []).slice(0, 4);
+  const diaryPhotoCards = [
+    ...(dLines.length ? dLines.map(l => grpCard([['📖 Today’s Diary', '#475569']], l.text, '', "go('#diary')")) : [grpCard([['📖 Diary', '#475569']], 'Today’s Diary page', 'See everything logged for today or this week', "go('#diary')")]),
+    grpCard([['📷 Photos', '#0d9488']], 'Bookmarked Photos & Receipts', 'Saved screenshots, receipts & warranties on this phone', "go('#photos')")
+  ].join('') + grpLinkBtn('#diary', 'Open Diary') + grpLinkBtn('#photos', 'Open Photos');
+
+  const cols = [
+    tbList('todo', 'To-do', openTodos.length, todoCards, false, 'listsHub'),
+    tbList('rem', 'Reminders', rems.length, remCards, false, 'listsHub'),
+    tbList('flg', 'Flagged', flgItems.length, flgCards, false, 'listsHub'),
+    tbList('ideas', 'Ideas & Notes', (S.ideas || []).length + notes.length, ideaNoteCards, false, 'listsHub'),
+    tbList('bday', 'Birthdays & Countdowns', bdays.length + cds.length, bdayCards, false, 'listsHub'),
+    tbList('diary', 'Diary & Photos', dLines.length + 1, diaryPhotoCards, false, 'listsHub')
+  ].join('');
+
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+    grpPillsHtml(LISTS_PILLS, '#lists') +
+    `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#1e3a8a,#312e81 55%,#0f172a)"></div>
+    <div class="tbtop"><div><h1>Tasks &amp; Lists</h1><div style="font-size:.82rem;opacity:.9">To-do, Reminders, Flagged, Ideas, Notes, Birthdays, Countdowns, Diary &amp; Photos</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists">${cols}</div></div>
+    <div class="foot">Swipe sideways between columns, or tap any pill above to open that full page.</div>`;
+}
+
+/* ---- 2. PROJECTS & TIDY HUB (#projects): Millesha's Reno, Mum's Reno, My Reno, Tidy & Organise, Days Off Plan ---- */
+const PROJ_PILLS = [
+  ['#projects', '🛠️ Board'],
+  ['#reno', '🏠 Millesha’s Reno'],
+  ['#mumreno', '👵 Mum’s Reno'],
+  ['#myreno', '🔨 My Reno'],
+  ['#tidy', '🧹 Tidy & Organise'],
+  ['#weekend', '🌤️ Days Off Plan']
+];
+function projHubMenu(k) {
+  const m = { reno: '#reno', mum: '#mumreno', mine: '#myreno', tidy: '#tidy', wk: '#weekend' }[k] || '#projects';
+  go(m);
+}
+ProjectsPage = function () {
+  const cols = [];
+  try {
+    if (renoOn() && window.Reno) {
+      const p = Reno.progress(), nxt = Reno.next();
+      const jobs = (Reno.areas || []).filter(a => !a.final).flatMap(a => (a.jobs || []).map(j => ({ area: a.n, title: j[1], id: a.k + '-' + j[0] }))).slice(0, 4);
+      const html = grpCard([['🏠 Shared Checklist', '#0d9488'], [p + '% done', '#2563eb']], 'Millesha’s Renovation Progress', nxt ? `Next up: ${nxt.title} (${nxt.area})` : 'All main rooms complete', "go('#reno')", 'Deadline 22 Nov 2026') +
+        jobs.map(j => grpCard([[j.area, '#475569']], j.title, 'Tap to tick off or assign room', "go('#reno')")).join('') +
+        grpLinkBtn('#reno', 'Open Millesha’s Renovation');
+      cols.push(tbList('reno', 'Millesha’s Renovation', jobs.length + 1, html, false, 'projHub'));
+    }
+  } catch (e) { }
+
+  try {
+    const R = mumRenoReady();
+    if (R) {
+      const p = R.progress(), nxt = R.next();
+      const html = grpCard([['👵 Private Checklist', '#db2777'], [p + '% done', '#7c3aed']], 'Mum’s Renovation Progress', nxt ? `Next up: ${nxt.title} (${nxt.area})` : 'All current areas done', "go('#mumreno')", 'Mondays at Mum’s') +
+        (R.areas || []).slice(0, 4).map(a => grpCard([[a.n, '#9333ea']], 'Clean, ceiling, speckle, sand, paint & floor', 'Tap to open room checklist', "go('#mumreno')")).join('') +
+        grpLinkBtn('#mumreno', 'Open Mum’s Renovation');
+      cols.push(tbList('mum', 'Mum’s Renovation', (R.areas || []).length + 1, html, false, 'projHub'));
+    }
+  } catch (e) { }
+
+  const own = myReno(), openOwn = own.filter(x => !x.done);
+  const ownHtml = (openOwn.length ? openOwn.slice(0, 5).map(x => grpCard([[x.status === 'doing' ? '● In progress' : 'To do', x.status === 'doing' ? '#d97706' : '#ca8a04']], x.title, x.startedAt ? 'Started ' + fmtW(x.startedAt) : 'Your house job list', "go('#myreno')")).join('') : grpCard([['🔨 My Renovations', '#ca8a04']], 'No open house jobs yet', 'Tap to add a job or pick from Inside / Outside ideas', "go('#myreno')")) + grpLinkBtn('#myreno', 'Open My Renovations');
+  cols.push(tbList('mine', 'My Renovations', openOwn.length, ownHtml, false, 'projHub'));
+
+  const pickSpot = typeof tdPickedSpot === 'function' ? tdPickedSpot() : null;
+  const doingSpots = typeof tdAllSpots === 'function' ? tdAllSpots().filter(s => tdStatusOf(s.id) === 'doing') : [];
+  const tidyHtml = (pickSpot ? tdSpotCard(pickSpot, true) : '') +
+    doingSpots.slice(0, 3).map(s => tdSpotCard(s, false)).join('') +
+    grpLinkBtn('#tidy', 'Open Tidy & Organise board');
+  cols.push(tbList('tidy', 'Tidy & Organise (10-Min)', (pickSpot ? 1 : 0) + doingSpots.length, tidyHtml, false, 'projHub'));
+
+  const offDays = typeof wkOffDays === 'function' ? wkOffDays(3) : [];
+  const wkHtml = (offDays.length ? offDays.map((o, i) => {
+    const P = wkPlanFor(o, i);
+    return grpCard([['🌤️ Day off', '#2563eb']], (o.i === 0 ? 'Today · ' : o.i === 1 ? 'Tomorrow · ' : '') + fmtW(o.iso), P.slots.map(s => s.ic + ' ' + s.t).join(' · '), "go('#weekend')", P.notes.join(' · '));
+  }).join('') : grpCard([['🌤️ Days off plan', '#2563eb']], 'Days off plan', 'Calm 3-item plan for your next roster days off', "go('#weekend')")) + grpLinkBtn('#weekend', 'Open Days off plan');
+  cols.push(tbList('wk', 'Days Off Plan', offDays.length || 1, wkHtml, false, 'projHub'));
+
+  const btIn = (() => { try { const b = btState(); return b.on && b.keys.includes('projects'); } catch (e) { return true; } })();
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+    grpPillsHtml(PROJ_PILLS, '#projects') +
+    `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0f766e,#1e3a8a 55%,#0f172a)"></div>
+    <div class="tbtop"><div><h1>Projects &amp; Tidy</h1><div style="font-size:.82rem;opacity:.9">Millesha’s reno, Mum’s reno, your house jobs, 10-min tidy spots &amp; days off</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists">${cols.join('')}</div></div>` +
+    (btIn ? '' : `<button type="button" class="btn small" style="margin:10px 0 0" onclick="btAddProjects()">${I('plus')} Add to bottom bar</button>`) +
+    `<div class="foot">Swipe sideways between project boards, or tap a pill above to open that project page.</div>`;
+};
+
+/* ---- 3. MONEY & WORK HUB (#money): Bills, Budget, Cash flow, Not bills, Power, Work, Commission, Wage, Loans ---- */
+function moneyHubMenu(k) {
+  const m = { bills: '#bills', cf: '#cashflow', pwr: '#power', work: '#work', loans: '#loans' }[k] || '#bills';
+  go(m);
+}
+function MoneyHubPage() {
+  const unpaid = (S.bills || []).filter(b => b && !b.paid).sort((a, b) => String(a.due || '').localeCompare(String(b.due || '')));
+  const billCards = (unpaid.length ? unpaid.slice(0, 6).map(b => {
+    const d = daysLeft(b.due);
+    const col = d < 0 ? '#dc2626' : d <= 3 ? '#d97706' : '#059669';
+    const status = d < 0 ? Math.abs(d) + 'd overdue' : d === 0 ? 'Due today' : d === 1 ? 'Tomorrow' : 'In ' + d + ' days';
+    return grpCard([[status, col], [money(b.amount), '#334155']], b.name, 'Due ' + fmtW(b.due) + (b.fromBank ? ' · ' + b.fromBank : ''), "go('#bills')");
+  }).join('') : grpCard([['✓ All clear', '#16a34a']], 'No unpaid bills due', 'Tap to view or add bills', "go('#bills')")) + grpLinkBtn('#bills', `Open Bills (${unpaid.length} unpaid)`);
+
+  const st = typeof cfStat === 'function' ? cfStat() : null;
+  const cfCards = [
+    grpCard([['📊 Fortnightly Budget', '#059669']], 'Budget & Pay Cycle', typeof budgetMoreSub === 'function' ? budgetMoreSub() : 'Your fortnightly budget', "go('#budget')"),
+    grpCard([['🏦 Cash Flow & Transfers', '#2563eb']], 'Cash Flow & Payday Transfers', cfKey() && st ? `${st.name || 'Bank connected'} · ${plural(st.accounts || 0, 'account')}` : 'Week-by-week money in, bills & payday transfers', "go('#cashflow')"),
+    grpCard([['🧾 Not Bills / Spending', '#7c3aed']], 'Other Bank Spending', 'Card & account spending categorised outside regular bills', "go('#notbills')")
+  ].join('') + grpLinkBtn('#budget', 'Open Budget') + grpLinkBtn('#cashflow', 'Open Cash flow') + grpLinkBtn('#notbills', 'Open Not bills');
+
+  const tPwr = typeof PWR !== 'undefined' && PWR && PWR.today ? PWR.today : null;
+  const pwrCards = [
+    grpCard([['⚡ SolarZero & Ecotricity', '#ca8a04']], tPwr && tPwr.cost ? `Today so far: ${pwrD(tPwr.cost.total)}` : 'House Power & SolarZero', tPwr ? `Solar ${tPwr.fromSolarPct ?? '–'}% · Battery ${tPwr.batteryPct ?? '–'}% · Used ${pwrK(tPwr.usedKWh)}` : 'Tap to load today’s solar, battery & grid figures', "go('#power')"),
+    grpCard([['🕒 Time-of-Use Bands', '#0284c7']], 'Peak, Shoulder & Off-Peak', 'Weekdays off-peak after 8pm & all weekend · ecoZER0 plan', "go('#powertime')"),
+    grpCard([['⚖️ Plan Comparison', '#0d9488']], 'Compare Power Plans', 'See how ecoZER0 compares against other Whangārei plans', "go('#compare')")
+  ].join('') + grpLinkBtn('#power', 'Open Power');
+
+  let nxtShift = ''; try { nxtShift = rosterNext(); } catch (e) { }
+  const workCards = [
+    grpCard([['🕒 Work Roster', '#2563eb']], 'Work Hours & Roster', nxtShift ? 'Next start: ' + nxtShift : '4 Port Rd · days and start/finish times', "go('#work')"),
+    grpCard([['💵 Sales Commission', '#059669']], 'Commission Tracker', typeof commMoreSub === 'function' ? commMoreSub() : 'Daily commission by pay fortnight', "go('#commission')"),
+    grpCard([['🧮 Take-Home Pay', '#7c3aed']], 'Wage Estimate', 'Fortnightly take-home pay worked out from your roster & commission', "go('#wage')")
+  ].join('') + grpLinkBtn('#work', 'Open Work hours') + grpLinkBtn('#commission', 'Open Commission') + grpLinkBtn('#wage', 'Open Wage estimate');
+
+  const loans = S.loans || [];
+  const loanCards = (loans.length ? loans.map(l => grpCard([['💰 Loan', '#d97706']], l.name || 'Loan', typeof loansMoreSub === 'function' ? loansMoreSub() : 'Tap for balance & repayments', `go('#loan/${esc(l.id)}')`)).join('') : grpCard([['💰 Loans', '#64748b']], 'Loans & Repayments', typeof loansMoreSub === 'function' ? loansMoreSub() : 'Track money borrowed & repayments', "go('#loans')")) + grpLinkBtn('#loans', 'Open Loans');
+
+  const cols = [
+    tbList('bills', 'Bills', unpaid.length, billCards, false, 'moneyHub'),
+    tbList('cf', 'Budget & Cash Flow', 3, cfCards, false, 'moneyHub'),
+    tbList('pwr', 'Power & SolarZero', 3, pwrCards, false, 'moneyHub'),
+    tbList('work', 'Work & Commission', 3, workCards, false, 'moneyHub'),
+    tbList('loans', 'Loans', loans.length || 1, loanCards, false, 'moneyHub')
+  ].join('');
+
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+    moneyTabs('money') +
+    `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#064e3b,#047857 50%,#0f172a)"></div>
+    <div class="tbtop"><div><h1>Money &amp; Work</h1><div style="font-size:.82rem;opacity:.9">Bills, fortnightly budget, cash flow, SolarZero power, roster, commission &amp; loans</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists">${cols}</div></div>
+    <div class="foot">Swipe sideways between Money &amp; Work columns, or use the tabs above to open any section.</div>`;
+}
+
+/* ---- 4. HEALTH & GYM HUB (#wellbeing): Watch, Sleep, Gym, Meds, Health, Claims, About you ---- */
+const WELLBEING_PILLS = [
+  ['#wellbeing', '🩺 Board'],
+  ['#watch', '⌚ Watch & Steps'],
+  ['#sleep', '😴 Sleep'],
+  ['#gym', '🏋️ Gym'],
+  ['#meds', '💊 Medications'],
+  ['#health', '🏥 Check-ups'],
+  ['#claims', '🧾 UniMed Claims'],
+  ['#about', '🙂 About You']
+];
+function wbHubMenu(k) {
+  const m = { watch: '#watch', gym: '#gym', meds: '#meds', health: '#health', claims: '#claims' }[k] || '#watch';
+  go(m);
+}
+function WellbeingHubPage() {
+  let watchSub = 'Steps, sleep and heart rate'; try { watchSub = hwWatchSub(); } catch (e) { }
+  const watchSleepCards = [
+    grpCard([['⌚ Huawei Watch', '#dc2626']], 'Steps, Heart Rate & Watch', watchSub, "go('#watch')", 'Goal: ' + (typeof hwGoal === 'function' ? hwNum(hwGoal()) : '10,000') + ' steps'),
+    grpCard([['😴 Sleep Tracker', '#7c3aed']], 'Last Night’s Sleep & Check-in', 'Deep sleep, 7-night average & morning check-in', "go('#sleep')")
+  ].join('') + grpLinkBtn('#watch', 'Open Watch & Steps') + grpLinkBtn('#sleep', 'Open Sleep');
+
+  const g = typeof gymState === 'function' ? gymState() : { mine: [], log: [] };
+  const day = typeof gymDayNow === 'function' ? gymDayNow() : 'A';
+  const gymCards = [
+    grpCard([['🏋️ Tue & Wed After Work', '#16a34a'], ['Day ' + day, '#2563eb']], day === 'A' ? 'Day A · Push & Legs Program' : 'Day B · Pull & Core Program', `${(g.mine || []).length} machines ticked · ${(g.log || []).length} sets logged`, "go('#gym')"),
+    ...(GYM_MACHINES || []).filter(m => (g.mine || []).includes(m.id)).slice(0, 3).map(m => grpCard([[m.g.toUpperCase(), '#475569']], m.name, m.works, "go('#gym')"))
+  ].join('') + grpLinkBtn('#gym', 'Open Gym & Workouts');
+
+  const ms = typeof medsState === 'function' ? medsState() : { list: [] };
+  const medLeft = (ms.list || []).filter(x => !medTakenAt(x.id)).length;
+  const medCards = ((ms.list || []).length ? ms.list.map(m => {
+    const taken = medTakenAt(m.id);
+    return grpCard([[taken ? '✓ Taken today' : 'Still to take', taken ? '#16a34a' : '#d97706']], m.name, m.dose || m.notes || 'Daily medication', "go('#meds')");
+  }).join('') : grpCard([['💊 Medications', '#0d9488']], 'Your Medications', medLeft ? medLeft + ' still to take today' : 'Tick off your evening/daily pills', "go('#meds')")) + grpLinkBtn('#meds', 'Open Medications');
+
+  const hPeople = S.health || [];
+  const healthCards = (hPeople.length ? hPeople.map(p => {
+    const nxt = healthNext(p)[0];
+    return grpCard([['🏥 ' + p.name, '#0d9488']], nxt ? `Next: ${nxt.item.name} (${fmtW(nxt.date)})` : `${p.name}’s Check-ups`, nxt && nxt.item.clinic ? nxt.item.clinic : 'Dentist, doctor, chiro & optometrist', `go('#health/${esc(p.id)}')`);
+  }).join('') : grpCard([['🏥 Family Check-ups', '#0d9488']], 'Shane, Sarah & Cass Check-ups', typeof healthMoreSub === 'function' ? healthMoreSub() : 'Dentist, doctor, chiropractor & optometrist dates', "go('#health')")) + grpLinkBtn('#health', 'Open Health check-ups');
+
+  const openClaims = (typeof claimRows === 'function' ? claimRows().filter(x => claimOpen(x.claim)) : []);
+  const claimAboutCards = [
+    grpCard([['🧾 UniMed Smart Claim', openClaims.length ? '#d97706' : '#0284c7']], openClaims.length ? `${plural(openClaims.length, 'claim')} ready to make` : 'UniMed Claims Helper', 'Invoice photos, Sarah’s claim emails & refund status', "go('#claims')"),
+    grpCard([['🙂 About You & Mood', '#7c3aed']], 'Daily Question & Mood Check-in', 'Questions that personalise your My App summary', "go('#about')")
+  ].join('') + grpLinkBtn('#claims', 'Open UniMed claims') + grpLinkBtn('#about', 'Open About you');
+
+  const cols = [
+    tbList('watch', 'Watch & Sleep', 2, watchSleepCards, false, 'wbHub'),
+    tbList('gym', 'Gym & Workouts', 1 + Math.min(3, (g.mine || []).length), gymCards, false, 'wbHub'),
+    tbList('meds', 'Medications', (ms.list || []).length || 1, medCards, false, 'wbHub'),
+    tbList('health', 'Health Check-ups', hPeople.length || 1, healthCards, false, 'wbHub'),
+    tbList('claims', 'Claims & About You', 2, claimAboutCards, false, 'wbHub')
+  ].join('');
+
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+    grpPillsHtml(WELLBEING_PILLS, '#wellbeing') +
+    `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0f766e,#1e3a8a 55%,#1e1b4b)"></div>
+    <div class="tbtop"><div><h1>Health &amp; Gym</h1><div style="font-size:.82rem;opacity:.9">Huawei watch, sleep, gym program, medications, check-ups &amp; UniMed claims</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists">${cols}</div></div>
+    <div class="foot">Swipe sideways between Health &amp; Gym columns, or tap a pill above to open that page.</div>`;
+}
+
+/* ---- 5. LOCAL & OUTDOORS HUB (#local): Weather, Walks & Beaches, Bridge, Roadworks, Garden, Events, News, Planning ---- */
+const LOCAL_PILLS = [
+  ['#local', '📍 Board'],
+  ['#weather', '🌤️ Weather & Tides'],
+  ['#walks', '🥾 Walks & Beaches'],
+  ['#bridge', '🌉 Lifting Bridge'],
+  ['#roadworks', '🚧 Roadworks'],
+  ['#garden', '🌱 Gardening'],
+  ['#events', '🎟️ Events'],
+  ['#localnews', '📰 Local News'],
+  ['#planning', '🏗️ Planning']
+];
+function localHubMenu(k) {
+  const m = { wx: '#weather', walks: '#walks', garden: '#garden', ev: '#events', pln: '#planning' }[k] || '#weather';
+  go(m);
+}
+function LocalHubPage() {
+  const c = WX && validWx(WX.data) ? WX.data.current : null;
+  const temp = c && num(c.temperature_2m) ? Math.round(c.temperature_2m) + '°C' : 'Whangārei';
+  const br = brStatus();
+  const wxBridgeCards = [
+    grpCard([['🌤️ Whangārei Forecast', '#0284c7'], [temp, '#1d4ed8']], 'Weather, Rain Radar & Harbour Tides', 'Hourly strip, 7-day high/low bars, MetService warnings & Whangārei tides', "go('#weather')"),
+    grpCard([['🌉 Te Matau ā Pohe', br.state === 'open' ? '#16a34a' : '#d97706']], 'Dave Culham Drive Lifting Bridge', BR_TXT[br.state][3], "go('#bridge')"),
+    grpCard([['🚧 State Highways & WDC', '#ea580c']], 'Whangārei Roadworks & Closures', typeof rwmMoreSub === 'function' ? rwmMoreSub() : 'NZTA SH1/SH14 & council roadworks', "go('#roadworks')")
+  ].join('') + grpLinkBtn('#weather', 'Open Weather & Tides') + grpLinkBtn('#bridge', 'Open Lifting bridge') + grpLinkBtn('#roadworks', 'Open Roadworks');
+
+  const wToday = walkToday();
+  const zeusSpots = WALKS.filter(w => w.dog === 'lead' || w.dog === 'offlead').slice(0, 3);
+  const walkCards = [
+    wkSpotCard(wToday, `Spot of the day · 🚗 ${wToday.driveMin} min from Onerahi`, true),
+    ...zeusSpots.filter(w => w.id !== wToday.id).slice(0, 2).map(w => wkSpotCard(w, `🚗 ${w.driveMin} min · 🥾 ${w.walkTime}`, false))
+  ].join('') + grpLinkBtn('#walks', 'Open Walks & Beaches board (18 spots)');
+
+  const gOn = GARDEN_IDS.filter(id => gardenGrowing(id));
+  const gardenCards = gOn.map(id => grpCard([['🌱 Growing in Whangārei', '#16a34a']], GARDEN_META[id].name, gardenNextLine(id), `go('#garden/${id}')`)).join('') + grpLinkBtn('#garden', 'Open Gardening');
+
+  const evs = (typeof upcomingEvents === 'function' ? upcomingEvents() : []).slice(0, 3);
+  const lnews = (typeof newsSec === 'function' ? (newsSec('local') || []).filter(newsOk) : []).slice(0, 3);
+  const evNewsCards = [
+    ...evs.map(e => grpCard([['🎟️ Whangārei Event', '#7c3aed']], e.title, [e.date ? fmtW(e.date) : '', e.venue ? e.venue.split(',')[0] : ''].filter(Boolean).join(' · '), "go('#events')")),
+    ...lnews.map(n => grpCard([['📰 Northland News', '#0d9488']], n.title, newsWhen(n.published), "go('#localnews')"))
+  ].join('') + grpLinkBtn('#events', 'Open Events board') + grpLinkBtn('#localnews', 'Open Local news board');
+
+  const plns = (typeof plnKeepGet === 'function' ? plnKeepGet().items : []).slice(0, 4);
+  const plnCards = (plns.length ? plns.map(x => grpCard([[PLN_CAT[x.kind] || 'Development', '#2563eb']], x.title, [plnDay(x.published), x.src].filter(Boolean).join(' · '), "go('#planning')")).join('') : grpCard([['🏗️ Planning & Growth', '#2563eb']], 'Whangārei Growth, Plans & Highways', 'Council consultations, new developments & SH1 corridor updates', "go('#planning')")) + grpLinkBtn('#planning', 'Open Planning & development');
+
+  const cols = [
+    tbList('wx', 'Weather, Bridge & Roads', 3, wxBridgeCards, false, 'localHub'),
+    tbList('walks', 'Walks & Beaches', 3, walkCards, false, 'localHub'),
+    tbList('garden', 'My Garden', gOn.length, gardenCards, false, 'localHub'),
+    tbList('ev', 'Local Events & News', evs.length + lnews.length, evNewsCards, false, 'localHub'),
+    tbList('pln', 'Planning & Development', plns.length || 1, plnCards, false, 'localHub')
+  ].join('');
+
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+    grpPillsHtml(LOCAL_PILLS, '#local') +
+    `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#064e3b,#0369a1 55%,#0f172a)"></div>
+    <div class="tbtop"><div><h1>Local &amp; Outdoors</h1><div style="font-size:.82rem;opacity:.9">Whangārei weather, walks &amp; beaches, lifting bridge, roadworks, garden &amp; local updates</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists">${cols}</div></div>
+    <div class="foot">Swipe sideways between Local &amp; Outdoors columns, or tap a pill above to open that page.</div>`;
+}
+
+/* ---- 6. HOME, CARS & PETS HUB (#homelife): Cars, Drivers, Pets & Vet, Hue Lights, Heat Pumps, ADT Alarm ---- */
+const HOMELIFE_PILLS = [
+  ['#homelife', '🚗 Board'],
+  ['#cars', '🚗 Cars & Rego/WOF'],
+  ['#pets', '🐾 Pets & Vet'],
+  ['#lights', '💡 Hue Lights'],
+  ['#heat', '☀️ Heat Pumps'],
+  ['#alarm', '🛡️ ADT Alarm']
+];
+function hlHubMenu(k) {
+  const m = { cars: '#cars', pets: '#pets', smart: '#lights' }[k] || '#cars';
+  go(m);
+}
+function HomeLifeHubPage() {
+  const carCards = (S.cars || []).map(c => {
+    const wofD = c.wof ? daysLeft(c.wof) : null, regoD = c.rego ? daysLeft(c.rego) : null;
+    const minD = Math.min(wofD ?? 999, regoD ?? 999);
+    const col = minD < 0 ? '#dc2626' : minD <= 30 ? '#d97706' : '#16a34a';
+    const lbls = [[c.plate || 'Car', '#1e3a8a'], [minD < 0 ? 'Overdue' : minD <= 30 ? 'Due soon' : 'All good', col]];
+    const sub = [c.year + ' ' + c.model, c.wof ? 'WOF ' + fmtW(c.wof) : '', c.rego ? 'Rego ' + fmtW(c.rego) : ''].filter(Boolean).join(' · ');
+    return grpCard(lbls, c.name, sub, `go('#car/${esc(c.id)}')`);
+  }).join('') + grpLinkBtn('#cars', 'Open Cars & Drivers');
+
+  const pets = S.pets || [];
+  const petCards = pets.map(p => {
+    const nxt = petItems(p)[0];
+    const appts = petDupAppts(p.name);
+    const lbls = [[p.type === 'dog' ? '🐕 Dog' : '🐱 Cat', p.type === 'dog' ? '#d97706' : '#7c3aed']];
+    const sub = [appts[0] ? '📅 ' + appts[0].title + ' (' + fmtW(appts[0].date) + ')' : '', nxt ? nxt.care.name + ' due ' + fmtW(nxt.date) : 'Tap to view care dates & history'].filter(Boolean).join(' · ');
+    return grpCard(lbls, p.name, sub, `go('#pet/${esc(p.id)}')`);
+  }).join('') + grpLinkBtn('#pets', 'Open Pets & Vet (Zeus, Mindy & Silken)');
+
+  let alSub = 'ADT alarm status'; try { alSub = alarmSub(); } catch (e) { }
+  const smartCards = [
+    grpCard([['💡 Philips Hue', hueKey() ? '#16a34a' : '#64748b']], 'Smart Lights & Scenes', hueKey() ? 'Rooms, brightness & Hue scenes' : 'Tap to connect Philips Hue', "go('#lights')"),
+    grpCard([['☀️ Climate Control', '#ea580c']], 'Panasonic & Mitsubishi Heat Pumps', 'Lounge & bedroom heat pump controls', "go('#heat')"),
+    grpCard([['🛡️ Home Security', '#2563eb']], 'ADT Home Alarm', alSub, "go('#alarm')")
+  ].join('') + grpLinkBtn('#lights', 'Open Lights') + grpLinkBtn('#heat', 'Open Heat pumps') + grpLinkBtn('#alarm', 'Open Alarm');
+
+  const cols = [
+    tbList('cars', 'Cars (WOF, Rego & Fuel)', (S.cars || []).length, carCards, false, 'hlHub'),
+    tbList('pets', 'Pets & Vet', pets.length, petCards, false, 'hlHub'),
+    tbList('smart', 'Smart Home (Lights, Heat & Alarm)', 3, smartCards, false, 'hlHub')
+  ].join('');
+
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+    grpPillsHtml(HOMELIFE_PILLS, '#homelife') +
+    `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#1e3a8a,#0f766e 55%,#0f172a)"></div>
+    <div class="tbtop"><div><h1>Home, Cars &amp; Pets</h1><div style="font-size:.82rem;opacity:.9">Shane’s, Sarah’s &amp; Cass’s cars, Zeus, Mindy &amp; Silken, Hue lights, heat pumps &amp; alarm</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists">${cols}</div></div>
+    <div class="foot">Swipe sideways between Cars, Pets and Smart Home columns, or tap a pill above to open that page.</div>`;
+}
+
+/* ---- Inject group navigation pills onto child pages so jumping back to the group's Trello Board is always 1 tap ---- */
+(() => {
+  const wrapGroup = (fnName, hash, pills) => {
+    const orig = window[fnName];
+    if (typeof orig !== 'function') return;
+    window[fnName] = function () {
+      const h = orig.apply(this, arguments);
+      return grpPillsHtml(pills, hash) + h;
+    };
+  };
+  wrapGroup('Todo', '#todo', LISTS_PILLS);
+  wrapGroup('Reminders', '#reminders', LISTS_PILLS);
+  wrapGroup('FlaggedPage', '#flagged', LISTS_PILLS);
+  wrapGroup('Ideas', '#ideas', LISTS_PILLS);
+  wrapGroup('Notes', '#notes', LISTS_PILLS);
+  wrapGroup('Birthdays', '#birthdays', LISTS_PILLS);
+  wrapGroup('Countdown', '#countdown', LISTS_PILLS);
+  wrapGroup('Diary', '#diary', LISTS_PILLS);
+  wrapGroup('PhotosPage', '#photos', LISTS_PILLS);
+
+  wrapGroup('RenoPage', '#reno', PROJ_PILLS);
+  wrapGroup('MumRenoPage', '#mumreno', PROJ_PILLS);
+  wrapGroup('MyRenoPage', '#myreno', PROJ_PILLS);
+  wrapGroup('TidyPage', '#tidy', PROJ_PILLS);
+  wrapGroup('WeekendPage', '#weekend', PROJ_PILLS);
+
+  wrapGroup('WatchPage', '#watch', WELLBEING_PILLS);
+  wrapGroup('Sleep', '#sleep', WELLBEING_PILLS);
+  wrapGroup('Gym', '#gym', WELLBEING_PILLS);
+  wrapGroup('Meds', '#meds', WELLBEING_PILLS);
+  wrapGroup('Health', '#health', WELLBEING_PILLS);
+  wrapGroup('Claims', '#claims', WELLBEING_PILLS);
+  wrapGroup('About', '#about', WELLBEING_PILLS);
+
+  wrapGroup('Weather', '#weather', LOCAL_PILLS);
+  wrapGroup('WalksPage', '#walks', LOCAL_PILLS);
+  wrapGroup('Bridge', '#bridge', LOCAL_PILLS);
+  wrapGroup('RoadworksMail', '#roadworks', LOCAL_PILLS);
+  wrapGroup('Garden', '#garden', LOCAL_PILLS);
+  wrapGroup('Events', '#events', LOCAL_PILLS);
+  wrapGroup('LocalNewsBoard', '#localnews', LOCAL_PILLS);
+  wrapGroup('PlanningPage', '#planning', LOCAL_PILLS);
+
+  wrapGroup('Cars', '#cars', HOMELIFE_PILLS);
+  wrapGroup('Pets', '#pets', HOMELIFE_PILLS);
+  wrapGroup('Lights', '#lights', HOMELIFE_PILLS);
+  wrapGroup('Heat', '#heat', HOMELIFE_PILLS);
+  wrapGroup('Alarm', '#alarm', HOMELIFE_PILLS);
+
+  const origLoans = window.Loans;
+  if (typeof origLoans === 'function') {
+    window.Loans = function () { return moneyTabs('loans') + origLoans.apply(this, arguments); };
+  }
+})();
+
+/* ---- Upgrade Explore & More (#more) to a clean Trello-style Master Board of the grouped hubs ---- */
+function moreHubMenu(k) {
+  const m = { day: '#lists', money: '#money', wb: '#wellbeing', local: '#local', hl: '#homelife', media: '#media', learn: '#learn' }[k] || '#home';
+  go(m);
+}
+More = function () {
+  const hubs = [
+    ['#home', '🏠 Home'],
+    ['#calendar', '📅 Calendar'],
+    ['#lists', '✅ Tasks & Lists'],
+    ['#food', '🍽️ Meals'],
+    ['#projects', '🛠️ Projects & Tidy'],
+    ['#money', '💰 Money & Work'],
+    ['#wellbeing', '🩺 Health & Gym'],
+    ['#local', '📍 Local & Outdoors'],
+    ['#homelife', '🚗 Home, Cars & Pets'],
+    ['#media', '🎬 Entertainment'],
+    ['#learn', '🎓 Learning'],
+    ['#settings', '⚙️ Settings']
+  ];
+  const makeCol = (k, title, badgeCol, hubHash, hubLabel, rows) => {
+    const cards = rows.map(([lbl, sub, h]) => grpCard([[title, badgeCol]], lbl, sub, `go('${h}')`)).join('') + grpLinkBtn(hubHash, hubLabel);
+    return tbList(k, title, rows.length, cards, false, 'moreHub');
+  };
+  const cols = [
+    makeCol('day', 'Everyday & Projects', '#2563eb', '#lists', 'Open Tasks & Lists board', [
+      ['Tasks & Lists Board', 'To-do, Reminders, Flagged, Ideas, Notes, Birthdays, Countdowns, Diary & Photos', '#lists'],
+      ['Projects & Tidy Board', 'Millesha’s reno, Mum’s reno, My reno, 10-min Tidy & Days off plan', '#projects'],
+      ['Meals (Gluten Free)', 'Meal planner, GF Recipes, Shopping list & GF Safe List', '#food'],
+      ['Calendar', 'Appointments, repeating events & public holidays', '#calendar']
+    ]),
+    makeCol('money', 'Money & Work', '#059669', '#money', 'Open Money & Work board', [
+      ['Bills & Due Dates', 'Upcoming & auto-matched bank bills', '#bills'],
+      ['Budget & Cash Flow', 'Fortnightly budget, payday transfers & Not bills', '#cashflow'],
+      ['Power & SolarZero', 'Today’s solar, battery, grid cost & time-of-use bands', '#power'],
+      ['Work, Commission & Wage', 'Roster hours, daily sales commission & take-home estimate', '#work'],
+      ['Loans', 'Loan balances & repayment plans', '#loans']
+    ]),
+    makeCol('wb', 'Health & Gym', '#0d9488', '#wellbeing', 'Open Health & Gym board', [
+      ['Watch & Sleep', 'Huawei watch steps, heart rate & sleep stages', '#watch'],
+      ['Gym & Workouts', 'Tue/Wed Day A & Day B machines and weight log', '#gym'],
+      ['Medications & Check-ups', 'Daily pills and family dentist/doctor/chiro dates', '#health'],
+      ['UniMed Claims & About You', 'Smart Claim helper & daily check-in questions', '#claims']
+    ]),
+    makeCol('local', 'Local & Outdoors', '#16a34a', '#local', 'Open Local & Outdoors board', [
+      ['Walks & Beaches', '18 Whangārei & Northland walks with drive times & Zeus badges', '#walks'],
+      ['Weather, Bridge & Roadworks', 'Whangārei forecast, tides, Te Matau ā Pohe bridge & road closures', '#weather'],
+      ['My Garden', 'Whangārei citrus, stonefruit, strawberries & tomatoes', '#garden'],
+      ['Events, News & Planning', 'What’s On in Whangārei, local news & highway/council plans', '#planning']
+    ]),
+    makeCol('hl', 'Home, Cars & Pets', '#d97706', '#homelife', 'Open Home, Cars & Pets board', [
+      ['Cars (WOF, Rego & Service)', 'Shane’s Fit, Sarah’s Haval & Cass’s Fit + Marsden Pt fuel', '#cars'],
+      ['Pets & Vet', 'Zeus, Mindy & Silken care dates and vet appointments', '#pets'],
+      ['Smart Home', 'Philips Hue lights, Panasonic/Mitsubishi heat pumps & ADT alarm', '#lights']
+    ]),
+    makeCol('media', 'Entertainment & Learning', '#7c3aed', '#media', 'Open Entertainment', [
+      ['Entertainment', 'Netflix, Prime, Movies, Videos, TV guide, Top 40, Radio, Podcasts & Concerts', '#media'],
+      ['Learning Board', 'AI & Tech, Science, DIY & Tools, Space, Astronomy, Coding, Gardening, Languages & Travel', '#learn']
+    ])
+  ].join('');
+
+  return header('Explore & More', 'Streamlined into grouped Trello boards · tap a group pill or swipe sideways', '') +
+    grpPillsHtml(hubs, '#more') +
+    `<div class="tbboard"><div class="tbbg" aria-hidden="true" style="background:linear-gradient(160deg,#0f172a,#1e3a8a 55%,#0f766e)"></div>
+    <div class="tbtop"><div><h1>All App Sections</h1><div style="font-size:.82rem;opacity:.9">Grouped into 6 clean Trello boards · Meals &amp; Entertainment kept as-is</div></div><button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div>
+    <div class="tblists">${cols}</div></div>
+    <div class="foot">${savedWhere()}</div>`;
+};
