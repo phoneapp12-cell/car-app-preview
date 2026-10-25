@@ -3,7 +3,7 @@
  * ottpath.com's "New on Prime Video in New Zealand this month" (dates the platform reports). Cached 24 h. No AI. */
 const FLICKS = 'https://www.flicks.co.nz/features/best-coming-to-prime-video-nz/';
 const OTT = 'https://ottpath.com/nz/prime/this-month';
-const TTL = 24 * 3600, CK = 'prime-v3';
+const TTL = 24 * 3600, CK = 'prime-v5';
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 const UA = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36';
 let mem = null;
@@ -28,59 +28,78 @@ export function parseOtt(html) {
 }
 async function get(u, f) { const r = await f(u, { headers: { 'user-agent': UA, accept: 'text/html', 'accept-language': 'en-NZ,en;q=0.9' } }); if (!r.ok) throw new Error('http ' + r.status); return r.text(); }
 
-const POSTER_FALLBACK = "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Movie_theater_interior.jpg/960px-Movie_theater_interior.jpg";
+const POSTER_FALLBACK = "";
 async function lookupPoster(rawTitle, fetchImpl = fetch) {
   const raw = String(rawTitle || "");
   const isSeries = /:\s*s(?:eason)?\s*\d+|\(season\s*\d+\)|\bseries\b/i.test(raw);
+  const altMatch = raw.match(/\(([^)]+)\)/);
+  const altTitle = altMatch && !/season\s*\d+/i.test(altMatch[1]) ? altMatch[1].trim() : "";
   const clean = raw
     .replace(/\s*\([^)]*\)\s*/g, " ")
     .replace(/:\s*s(?:eason)?\s*\d+.*$/i, "")
     .replace(/\s+s(?:eason)?\s*\d+.*$/i, "")
+    .replace(/f\*\*k/gi, "fuck")
+    .replace(/\s+35\+$/i, "")
     .replace(/[’‘]/g, "'")
     .replace(/\s+/g, " ")
     .trim();
-  if (!clean) return POSTER_FALLBACK;
-  const tryTvmaze = async () => {
+  if (!clean) return "";
+  const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+  // 1. IMDb Suggestion API (covers both movies & TV shows accurately)
+  const queries = [clean, clean.replace(/favour/gi, "favor"), altTitle, clean.split(":")[0].trim()].filter(Boolean);
+  for (const q of queries) {
+    const slug = q.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    if (!slug) continue;
     try {
-      const r = await fetchImpl("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(clean), { signal: AbortSignal.timeout(3500) });
+      const r = await fetchImpl("https://v3.sg.media-imdb.com/suggestion/x/" + encodeURIComponent(slug) + ".json", { signal: AbortSignal.timeout(3500) });
       if (r.ok) {
         const j = await r.json();
-        const img = j && j.image && (j.image.medium || j.image.original);
-        if (img && img.startsWith("https://")) return img;
+        const d = (j && Array.isArray(j.d)) ? j.d.filter(x => x && x.i && x.i.imageUrl) : [];
+        if (d.length) {
+          const qn = norm(q);
+          const hit =
+            d.find(x => norm(x.l) === qn && (isSeries ? /tv/i.test(x.qid || "") : /movie|feature|short|tvMovie/i.test(x.qid || ""))) ||
+            d.find(x => norm(x.l) === qn) ||
+            d.find(x => isSeries ? /tv/i.test(x.qid || "") : /movie|feature/i.test(x.qid || "")) ||
+            d[0];
+          if (hit && hit.i && hit.i.imageUrl) {
+            return String(hit.i.imageUrl).replace(/\._V1_.*\.jpg$/i, "._V1_QL75_UX480_.jpg");
+          }
+        }
       }
     } catch (e) {}
-    return "";
-  };
-  const tryItunes = async (entity) => {
-    for (const q of [clean, clean.replace(/favour/gi, "favor")]) {
-      try {
-        const r = await fetchImpl("https://itunes.apple.com/search?country=us&entity=" + entity + "&limit=1&term=" + encodeURIComponent(q), { signal: AbortSignal.timeout(3500) });
-        if (r.ok) {
-          const j = await r.json();
-          const hit = j && j.results && j.results[0];
-          if (hit && hit.artworkUrl100) return String(hit.artworkUrl100).replace("100x100bb", "600x600bb");
-        }
-      } catch (e) {}
-    }
-    return "";
-  };
-  const tryWiki = async () => {
-    for (const suffix of [" (film)", " (TV series)", ""]) {
-      try {
-        const r = await fetchImpl("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(clean + suffix), { signal: AbortSignal.timeout(3000) });
-        if (r.ok) {
-          const j = await r.json();
-          const src = j && ((j.thumbnail && j.thumbnail.source) || (j.originalimage && j.originalimage.source));
-          if (src && src.startsWith("https://")) return src;
-        }
-      } catch (e) {}
-    }
-    return "";
-  };
-  if (isSeries) {
-    return (await tryTvmaze()) || (await tryItunes("tvSeason")) || (await tryWiki()) || POSTER_FALLBACK;
   }
-  return (await tryItunes("movie")) || (await tryWiki()) || (await tryTvmaze()) || POSTER_FALLBACK;
+
+  // 2. TVMaze (exact title check)
+  try {
+    const r = await fetchImpl("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(clean), { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const j = await r.json();
+      const img = j && j.image && (j.image.medium || j.image.original);
+      if (img && img.startsWith("https://") && norm(j.name) === norm(clean)) return img;
+    }
+  } catch (e) {}
+
+  // 3. Wikipedia summary thumbnail
+  for (const suffix of [" (film)", " (TV series)", ""]) {
+    try {
+      const r = await fetchImpl("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(clean + suffix), { signal: AbortSignal.timeout(3000) });
+      if (r.ok) {
+        const j = await r.json();
+        const src = j && ((j.thumbnail && j.thumbnail.source) || (j.originalimage && j.originalimage.source));
+        if (src && src.startsWith("https://")) return src;
+      }
+    } catch (e) {}
+  }
+
+  return "";
+}
+export async function posterRoute(urlObj, fetchImpl = fetch) {
+  const q = (urlObj.searchParams.get("q") || "").trim().slice(0, 140);
+  if (!q) return { img: "" };
+  const img = await lookupPoster(q, fetchImpl);
+  return { q, img };
 }
 
 export async function primeRoute(env, fetchImpl = fetch, now = Date.now()) {

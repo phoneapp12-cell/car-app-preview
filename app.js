@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.36';
+const APP_VERSION = '2.28.37';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -17837,7 +17837,8 @@ function primeList() {
 }
 async function loadPrime(force) {
   if (!RELAY_URL || navigator.onLine === false) return;
-  if (!force && PRIME && Array.isArray(PRIME.items) && PRIME.items.some(x => x && x.img) && Date.now() - Date.parse(PRIME.checked || 0) < 12 * 3600e3) return;
+  const hasGoodPosters = PRIME && Array.isArray(PRIME.items) && PRIME.items.filter(x => x && x.img && !/thumb\.wikimedia\.org/i.test(x.img)).length >= Math.min(10, PRIME.items.length);
+  if (!force && hasGoodPosters && Date.now() - Date.parse(PRIME.checked || 0) < 12 * 3600e3) return;
   try { const r = await fetch(RELAY_URL + '/prime', { cache: 'no-store' }); const d = await r.json(); if (r.ok && d && Array.isArray(d.items) && d.items.length) { PRIME = { checked: new Date().toISOString(), source: d.source, items: d.items }; try { localStorage.setItem('primeNew', JSON.stringify(PRIME)); } catch (e) { } if (location.hash === '#prime') prRedraw(); else if (location.hash === '#home' || !location.hash) render(); } } catch (e) { }
 }
 setTimeout(() => loadPrime(), 4000); setInterval(() => loadPrime(), 6 * 3600e3);
@@ -17851,8 +17852,14 @@ function openStreamUrl(k, url) {
   window.open(url, '_blank', 'noopener');
 }
 
-const SHOW_IMG_CACHE = (() => { try { return JSON.parse(localStorage.getItem("showImgCache") || "{}") || {}; } catch (e) { return {}; } })();
-const SHOW_FALLBACK_IMG = "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Movie_theater_interior.jpg/960px-Movie_theater_interior.jpg";
+const SHOW_IMG_CACHE_KEY = "showImgCacheV2";
+const SHOW_IMG_CACHE = (() => {
+  try {
+    try { localStorage.removeItem("showImgCache"); } catch (e) {}
+    return JSON.parse(localStorage.getItem(SHOW_IMG_CACHE_KEY) || "{}") || {};
+  } catch (e) { return {}; }
+})();
+const SHOW_FALLBACK_IMG = "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1e293b"/><stop offset="100%" stop-color="#0f172a"/></linearGradient></defs><rect width="400" height="220" fill="url(#g)"/><circle cx="200" cy="110" r="38" fill="rgba(255,255,255,0.08)"/><polygon points="190,92 190,128 220,110" fill="rgba(255,255,255,0.55)"/></svg>`);
 const NF_DEFAULT_PICKS = {
   fresh: [
     { title: "The Lincoln Lawyer (Season 3)", sub: "Drama & Mystery Series · Netflix", img: "https://static.tvmaze.com/uploads/images/medium_portrait/613/1532917.jpg" },
@@ -17870,10 +17877,10 @@ const NF_DEFAULT_PICKS = {
   ]
 };
 function showPosterFor(x) {
-  if (!x) return SHOW_FALLBACK_IMG;
-  if (x.img && /^https:\/\//i.test(x.img)) return x.img;
+  if (!x) return "";
+  if (x.img && /^https:\/\//i.test(x.img) && !/thumb\.wikimedia\.org/i.test(x.img)) return x.img;
   const k = String(x.title || "").trim().toLowerCase();
-  if (SHOW_IMG_CACHE[k]) return SHOW_IMG_CACHE[k];
+  if (SHOW_IMG_CACHE[k] && !/thumb\.wikimedia\.org/i.test(SHOW_IMG_CACHE[k])) return SHOW_IMG_CACHE[k];
   return "";
 }
 async function fetchShowPoster(imgEl, rawTitle) {
@@ -17881,40 +17888,42 @@ async function fetchShowPoster(imgEl, rawTitle) {
   const key = String(rawTitle || "").trim().toLowerCase();
   if (!key || imgEl.dataset.tried) { imgEl.src = SHOW_FALLBACK_IMG; return; }
   imgEl.dataset.tried = "1";
-  if (SHOW_IMG_CACHE[key]) { imgEl.src = SHOW_IMG_CACHE[key]; return; }
-  const isSeries = /:\s*s(?:eason)?\s*\d+|\(season\s*\d+\)|\bseries\b/i.test(rawTitle || "");
-  const clean = String(rawTitle || "")
-    .replace(/\s*\([^)]*\)\s*/g, " ")
-    .replace(/:\s*s(?:eason)?\s*\d+.*$/i, "")
-    .replace(/\s+s(?:eason)?\s*\d+.*$/i, "")
-    .replace(/[’‘]/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
+  if (SHOW_IMG_CACHE[key] && !/thumb\.wikimedia\.org/i.test(SHOW_IMG_CACHE[key])) { imgEl.src = SHOW_IMG_CACHE[key]; return; }
   let found = "";
-  const tryTv = async () => {
+  if (typeof RELAY_URL === "string" && RELAY_URL) {
+    try {
+      const r = await fetch(RELAY_URL + "/poster?q=" + encodeURIComponent(rawTitle));
+      if (r.ok) {
+        const j = await r.json();
+        if (j && j.img && /^https:\/\//i.test(j.img)) found = j.img;
+      }
+    } catch (e) {}
+  }
+  if (!found) {
+    const clean = String(rawTitle || "")
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/:\s*s(?:eason)?\s*\d+.*$/i, "")
+      .replace(/\s+s(?:eason)?\s*\d+.*$/i, "")
+      .replace(/[’‘]/g, "'")
+      .replace(/\s+/g, " ")
+      .trim();
     try {
       const r = await fetch("https://api.tvmaze.com/singlesearch/shows?q=" + encodeURIComponent(clean));
-      if (r.ok) { const j = await r.json(); const u = j && j.image && (j.image.medium || j.image.original); if (u && u.startsWith("https://")) return u; }
+      if (r.ok) { const j = await r.json(); const u = j && j.image && (j.image.medium || j.image.original); if (u && u.startsWith("https://")) found = u; }
     } catch (e) {}
-    return "";
-  };
-  const tryItunes = async (ent) => {
-    try {
-      const r = await fetch("https://itunes.apple.com/search?country=us&entity=" + ent + "&limit=1&term=" + encodeURIComponent(clean));
-      if (r.ok) { const j = await r.json(); const h = j && j.results && j.results[0]; if (h && h.artworkUrl100) return String(h.artworkUrl100).replace("100x100bb", "600x600bb"); }
-    } catch (e) {}
-    return "";
-  };
-  found = isSeries ? ((await tryTv()) || (await tryItunes("tvSeason"))) : ((await tryItunes("movie")) || (await tryTv()));
-  if (!found) found = SHOW_FALLBACK_IMG;
-  SHOW_IMG_CACHE[key] = found;
-  try { localStorage.setItem("showImgCache", JSON.stringify(SHOW_IMG_CACHE)); } catch (e) {}
-  imgEl.src = found;
+  }
+  if (found) {
+    SHOW_IMG_CACHE[key] = found;
+    try { localStorage.setItem(SHOW_IMG_CACHE_KEY, JSON.stringify(SHOW_IMG_CACHE)); } catch (e) {}
+    imgEl.src = found;
+  } else {
+    imgEl.src = SHOW_FALLBACK_IMG;
+  }
 }
 function showCoverHtml(x, grad) {
   const pic = showPosterFor(x);
   const blank = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-  return `<div class="tbcover" style="background:${grad || "linear-gradient(135deg,#1e293b,#0f172a)"};height:108px;max-height:108px;overflow:hidden"><img src="${esc(pic || blank)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:108px;object-fit:cover;display:block" ${pic ? `onerror="fetchShowPoster(this,${jsArg(x.title || "")})"` : `onload="fetchShowPoster(this,${jsArg(x.title || "")})" onerror="fetchShowPoster(this,${jsArg(x.title || "")})"`}></div>`;
+  return `<div class="tbcover" style="background:${grad || "linear-gradient(135deg,#1e293b,#0f172a)"};width:100%;height:112px;max-height:112px;overflow:hidden"><img src="${esc(pic || blank)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:100%;height:112px;object-fit:cover;object-position:center 22%;display:block" ${pic ? `onerror="fetchShowPoster(this,${jsArg(x.title || "")})"` : `onload="fetchShowPoster(this,${jsArg(x.title || "")})" onerror="fetchShowPoster(this,${jsArg(x.title || "")})"`}></div>`;
 }
 
 function streamRow(k, x, sub) {
