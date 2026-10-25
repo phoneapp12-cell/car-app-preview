@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.34';
+const APP_VERSION = '2.28.35';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22338,37 +22338,243 @@ function homeShownKeys() {
   } catch (e) { }
   return S0;
 }
-function alPickHero(list) {
-  // 1. Active today road closure on commute/Whangārei, crash/emergency in Whangārei, major earthquake, or severe MetService weather warning today
+const HERO_SEEN_KEY = "glHeroSeenV1";
+let _alCurrentHeroId = "";
+let _alHeroMarkTimer = null;
+function alHeroSeenMap() {
+  let m = null;
+  try {
+    const raw = JSON.parse(localStorage.getItem(HERO_SEEN_KEY) || "null");
+    if (raw && typeof raw === "object") m = raw;
+  } catch (e) {}
+  if (!m) m = {};
+  // Pre-mark the Millbrook Road Bridge alert Shane already saw
+  if (!m["warn:millbrook road bridge temporary closure"]) {
+    m["warn:millbrook road bridge temporary closure"] = Date.now() - 120000;
+    try { localStorage.setItem(HERO_SEEN_KEY, JSON.stringify(m)); } catch (e) {}
+  }
+  return m;
+}
+function alHeroMarkSeen(id, rerender) {
+  if (!id) return;
+  try {
+    const m = alHeroSeenMap();
+    m[id] = Date.now();
+    localStorage.setItem(HERO_SEEN_KEY, JSON.stringify(m));
+  } catch (e) {}
+  if (rerender) {
+    _alCurrentHeroId = "";
+    try { glWarnRedraw(); } catch (e) { try { render(); } catch (e2) {} }
+  }
+}
+function alHeroAdvance(ev, id) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  if (ev && ev.preventDefault) ev.preventDefault();
+  const curId = id || _alCurrentHeroId;
+  // If the current hero is a sitting to-do, also advance to the next sitting to-do if desired when rotating
+  alHeroMarkSeen(curId, true);
+}
+window.addEventListener("hashchange", () => {
+  if (!/^#alerts/.test(location.hash || "") && _alCurrentHeroId) {
+    alHeroMarkSeen(_alCurrentHeroId, false);
+    _alCurrentHeroId = "";
+  }
+});
+function alClosureExpiredToday(txt) {
+  // e.g. "Mon 31 Aug–Sun 25 Oct, 9am" -> if end date is today and end hour has passed, drop it from hero
+  try {
+    const s = String(txt || "");
+    const m = s.match(/–\s*(?:[A-Za-z]{3}\s+)?(\d{1,2})\s+([A-Za-z]{3})(?:\s*,?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm))?/i);
+    if (!m) return false;
+    const months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+    const mon = months[m[2].toLowerCase().slice(0,3)];
+    if (!mon) return false;
+    const now = new Date();
+    const y = now.getFullYear();
+    const iso = y + "-" + String(mon).padStart(2,"0") + "-" + String(+m[1]).padStart(2,"0");
+    const td = todayISO();
+    if (iso < td) return true;
+    if (iso === td && m[3] && m[5]) {
+      let hr = +m[3] % 12;
+      if (m[5].toLowerCase() === "pm") hr += 12;
+      const mn = +(m[4] || 0);
+      if (now.getHours() > hr || (now.getHours() === hr && now.getMinutes() >= mn)) return true;
+    }
+  } catch (e) {}
+  return false;
+}
+function alHeroCandidates(list) {
+  const cands = [];
+  const push = c => {
+    if (!c || !c.id || !c.title) return;
+    if (cands.some(x => x.id === c.id)) return;
+    cands.push(c);
+  };
+  // 1. Birthdays in the next 3 days
+  try {
+    (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b)))
+      .filter(x => x.d >= 0 && x.d <= 3 && glOk(x.b.name))
+      .sort((a, b) => a.d - b.d)
+      .forEach(x => {
+        const when = x.d === 0 ? "Today! 🎂" : x.d === 1 ? "Tomorrow (" + fmtW(x.iso) + ")" : "In " + x.d + " days (" + fmtW(x.iso) + ")";
+        const ageTxt = x.age > 0 ? x.b.name + "’s " + ordinal(x.age) + " birthday" : x.b.name + "’s birthday";
+        push({
+          id: "bday:" + cuNorm(x.b.name) + ":" + x.iso + ":d" + x.d,
+          key: cuNorm(ageTxt),
+          badge: x.d === 0 ? "🎂 BIRTHDAY TODAY" : x.d === 1 ? "🎂 BIRTHDAY TOMORROW" : "🎂 UPCOMING BIRTHDAY",
+          icon: "🎂",
+          title: ageTxt,
+          sub: when + (x.age > 0 ? " · Turns " + x.age : "") + " · Tap to view birthdays.",
+          go: "go('#birthdays')",
+          tone: "hero-bday"
+        });
+      });
+  } catch (e) {}
+
+  // 2. Active warnings (road closures not yet expired, weather warnings, earthquakes, emergencies)
   try {
     const warnings = glWarnList().filter(x => x && !x.flag);
-    const urgentToday = warnings.find(x => x.red && x.pri >= 82 && /road|closure|bridge|okara|semenoff|commute|crash|earthquake|police|emergency|ambulance|fire|metservice|weather today|thunderstorm/i.test((x.tag || '') + ' ' + (x.what || ''))) || warnings.find(x => x.red) || warnings[0];
-    if (urgentToday) {
-      const blob = (urgentToday.tag || '') + ' ' + (urgentToday.what || '');
+    warnings.forEach(w => {
+      const blob = (w.tag || "") + " " + (w.what || "") + " " + (w.s || "");
+      if (alClosureExpiredToday(blob)) return;
       const isQuake = /earthquake|geonet|usgs/i.test(blob);
       const isEmg = /police|ambulance|fire|emergency|rescue/i.test(blob) && !/road closure/i.test(blob);
       const isWx = /metservice|weather|rain|wind|storm|gale/i.test(blob);
-      const wGo = urgentToday.url ? `window.open(${jsArg(urgentToday.url)},'_blank','noopener')` : (urgentToday.go || (isWx ? "go('#weather')" : "go('#bridge')"));
-      const shortSub = alShortBody(urgentToday.s || urgentToday.tag || 'Check details', 120);
-      return {
-        key: cuNorm(urgentToday.what),
-        badge: isQuake ? '🌍 EARTHQUAKE ALERT' : isEmg ? '🚨 WHANGĀREI EMERGENCY ALERT' : isWx ? '⛈️ WHANGĀREI WEATHER ALERT' : '⛔ WHANGĀREI ROAD ALERT',
-        icon: isQuake ? '🌍' : isEmg ? '🚨' : isWx ? '⛈️' : '⛔',
-        title: urgentToday.what.replace(/^[⛔🚧⚠️⛈️🌧️🌍🚨🚓🚑🚒]\s*/, ''),
-        sub: shortSub + ' · Tap for details.',
+      const wGo = w.url ? "window.open(" + jsArg(w.url) + ",'_blank','noopener')" : (w.go || (isWx ? "go('#weather')" : "go('#bridge')"));
+      const shortSub = alShortBody(w.s || w.tag || "Check details", 120);
+      const cleanT = (w.what || "").replace(/^[⛔🚧⚠️⛈️🌧️🌍🚨🚓🚑🚒]\s*/, "");
+      push({
+        id: "warn:" + cuNorm(cleanT),
+        key: cuNorm(cleanT),
+        badge: isQuake ? "🌍 EARTHQUAKE ALERT" : isEmg ? "🚨 WHANGĀREI EMERGENCY ALERT" : isWx ? "⛈️ WHANGĀREI WEATHER ALERT" : "⛔ WHANGĀREI ROAD ALERT",
+        icon: isQuake ? "🌍" : isEmg ? "🚨" : isWx ? "⛈️" : "⛔",
+        title: cleanT,
+        sub: shortSub + " · Tap for details.",
         go: wGo,
-        tone: 'hero-warn'
-      };
+        tone: "hero-warn"
+      });
+    });
+  } catch (e) {}
+
+  // 3. Fuel price movement alert (Marsden Point 91)
+  try {
+    const st = typeof fuelStats === "function" ? fuelStats("91") : null;
+    if (st && st.now) {
+      const wkD = st.wk != null ? st.wk : 0;
+      const mv = st.day != null && Math.abs(st.day) >= 0.2 ? st.day : (st.lastMove ? st.lastMove.diff : wkD);
+      const dir = wkD <= -0.2 ? "▼ Down " + fuelC(Math.abs(wkD)) : wkD >= 0.2 ? "▲ Up " + fuelC(wkD) : (mv != null && mv <= -0.2) ? "▼ Down " + fuelC(Math.abs(mv)) : (mv != null && mv >= 0.2) ? "▲ Up " + fuelC(mv) : "Steady";
+      push({
+        id: "fuel:91:" + st.now.toFixed(1) + ":" + wkD.toFixed(1),
+        key: "gasprice91",
+        badge: "⛽ WHANGĀREI GAS ALERT",
+        icon: "⛽",
+        title: "Regular 91: " + dir + " (" + fuelC(st.now) + "/L)",
+        sub: "Marsden Point 30-day range " + fuelC(st.lo30) + "–" + fuelC(st.hi30) + "/L · Tap for 30-day price history.",
+        go: "fuelBackHash='#alerts';go('#fuel')",
+        tone: "hero-gas"
+      });
     }
-  } catch (e) { }
+  } catch (e) {}
+
+  // 4. Sitting >1 week To-Do item (1 at a time)
+  try {
+    const td = typeof pickOneSittingTodo === "function" ? pickOneSittingTodo() : null;
+    if (td && td.todo) {
+      push({
+        id: "sit-todo:" + td.todo.id + ":" + todayISO(),
+        key: cuNorm("To-do sitting " + td.daysOld + " days: " + td.todo.title),
+        badge: "📋 TO-DO SITTING > 1 WEEK (" + td.idx + " OF " + td.total + ")",
+        icon: "📋",
+        title: td.todo.title,
+        sub: "Sitting on " + (td.todo.list || "To-do") + " for " + td.daysOld + " days · Tap to open your To-do list.",
+        go: "go('#todo')",
+        tone: "hero-todo"
+      });
+    }
+  } catch (e) {}
+
+  // 5. House Power live update (SolarZero)
+  try {
+    const p = typeof PWR !== "undefined" && PWR && PWR.today ? PWR.today : null;
+    const costTot = p && p.cost && p.cost.total != null ? Number(p.cost.total) : null;
+    if (p && costTot != null) {
+      const bat = p.batteryPct != null ? " · " + Math.round(+p.batteryPct) + "% battery" : "";
+      const used = p.usedKWh != null ? (+p.usedKWh).toFixed(2) + " kWh used today" : "Live from SolarZero";
+      push({
+        id: "pwr:" + (p.date || todayISO()) + ":" + costTot.toFixed(2),
+        key: "powerherotoday",
+        badge: "⚡ SOLARZERO POWER TODAY",
+        icon: "⚡",
+        title: "$" + costTot.toFixed(2) + " spent on power today so far",
+        sub: used + bat + " · Tap for Power breakdown.",
+        go: "go('#power')",
+        tone: "hero-pwr"
+      });
+    }
+  } catch (e) {}
+
+  // 6. Fresh Northland Local News top headline
+  try {
+    const locList = typeof newsSec === "function" ? (newsSec("local") || []).filter(newsOk) : [];
+    const loc = locList[0] || null;
+    if (loc && loc.title) {
+      push({
+        id: "locnews:" + cuNorm(loc.title),
+        key: cuNorm(loc.title),
+        badge: "📰 WHANGĀREI LOCAL NEWS",
+        icon: "📰",
+        title: loc.title,
+        sub: (loc.src || "Local News") + (loc.when ? " · " + loc.when : "") + " · Tap to read in app.",
+        go: "go('#localnews')",
+        tone: "hero-news"
+      });
+    }
+  } catch (e) {}
+
+  return cands;
+}
+function alPickHero(list) {
+  const cands = alHeroCandidates(list);
+  const seen = alHeroSeenMap();
+  if (cands.length) {
+    let picked = _alCurrentHeroId ? cands.find(c => c.id === _alCurrentHeroId) : null;
+    // If new unseen info arrived while current hero was already seen, rotate to the new unseen item
+    const firstUnseen = cands.find(c => !seen[c.id]);
+    if (picked && seen[picked.id] && firstUnseen && firstUnseen.id !== picked.id) {
+      picked = firstUnseen;
+      _alCurrentHeroId = picked.id;
+    }
+    if (!picked) {
+      picked = firstUnseen || cands.slice().sort((a, b) => (seen[a.id] || 0) - (seen[b.id] || 0))[0];
+      _alCurrentHeroId = picked ? picked.id : "";
+    }
+    if (picked) {
+      clearTimeout(_alHeroMarkTimer);
+      const hid = picked.id;
+      _alHeroMarkTimer = setTimeout(() => {
+        try {
+          const m = alHeroSeenMap();
+          m[hid] = Date.now();
+          localStorage.setItem(HERO_SEEN_KEY, JSON.stringify(m));
+        } catch (e) {}
+      }, 2200);
+      const unseenCount = cands.filter(c => !seen[c.id]).length;
+      const idx = cands.indexOf(picked) + 1;
+      return Object.assign({}, picked, { total: cands.length, idx, unseenCount });
+    }
+  }
   return {
-    key: '',
-    badge: '🔔 WHANGĀREI ALERTS',
-    icon: '✨',
-    title: `No urgent alerts right now (${fmtW(todayISO())})`,
-    sub: 'Road closures, weather warnings, outages, earthquakes and emergency updates appear here.',
+    id: "default:none",
+    key: "",
+    badge: "🔔 WHANGĀREI ALERTS",
+    icon: "✨",
+    title: "No urgent alerts right now (" + fmtW(todayISO()) + ")",
+    sub: "Road closures, weather warnings, birthdays, fuel moves and updates appear here.",
     go: "go('#weather')",
-    tone: 'hero-today'
+    tone: "hero-today",
+    total: 1,
+    idx: 1,
+    unseenCount: 0
   };
 }
 function alQuickGridHtml() {
@@ -22501,11 +22707,11 @@ function alBriefingHtml(list) {
   list = (list || []).filter(x => !nbIsBill(x) && x.kind !== 'meal' && (x.days == null || x.days <= 14));
   const hero = alPickHero(list);
   const heroHtml = `<div class="al-hero-wrap">
-    <button type="button" class="al-hero ${hero.tone || ''}" onclick="${esc(hero.go)}">
-      <div class="al-hero-top"><span class="al-hero-badge">${esc(hero.badge)}</span><span class="al-hero-cta">View details ›</span></div>
+    <div role="button" tabindex="0" class="al-hero ${hero.tone || ''}" onclick="alHeroMarkSeen(${jsArg(hero.id)},false);${esc(hero.go)}">
+      <div class="al-hero-top"><span class="al-hero-badge">${esc(hero.badge)}</span><span class="al-hero-cta" onclick="alHeroAdvance(event, ${jsArg(hero.id)})" title="Mark seen and show next hero card" style="background:rgba(255,255,255,0.22);padding:3px 9px;border-radius:999px;font-weight:700">✓ Seen · Next ↻</span></div>
       <div class="al-hero-title">${esc(hero.title)}</div>
       <div class="al-hero-sub">${esc(hero.sub)}</div>
-    </button>
+    </div>
   </div>`;
   const gridHtml = alQuickGridHtml();
   const discHtml = alDiscoverHtml();
@@ -22607,6 +22813,7 @@ function nbTopHtml() {
   return { top: `<div class="al-briefing" id="glalerts"><div id="albrief">${alBriefingHtml(list)}</div></div>`, fun: '' };
 }
 function GlAlerts() {
+  _alCurrentHeroId = "";
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   setTimeout(() => { try { hwRefresh(false); } catch (e) { } try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
@@ -28966,7 +29173,17 @@ function rdcItems() {
   const seen = new Set();
   raw.forEach(c => {
     if (!c || c.bridge || !c.title) return;
-    const ds = (c.dates || []).filter(d => d && d.start && (d.end || d.start) >= T && d.start <= lim);
+    const nowD = new Date(), nowHm = String(nowD.getHours()).padStart(2, 0) + : + String(nowD.getMinutes()).padStart(2, 0);
+    const ds = (c.dates || []).filter(d => {
+      if (!d || !d.start) return false;
+      const endDay = d.end || d.start;
+      if (endDay < T || d.start > lim) return false;
+      if (endDay === T) {
+        if (d.endTime && d.endTime !== 23:59 && nowHm >= d.endTime) return false;
+        if (!d.endTime && d.end && d.end !== d.start && d.time && nowHm >= d.time) return false;
+      }
+      return true;
+    });
     if (!ds.length) return;
     const blob = [c.title, c.where, c.desc].join(' '), onr = /onerahi/i.test(blob), stad = !!(c.stadium || /okara|semenoff/i.test(blob)), route = !!(stad || c.commute || HU_ROUTE.test(blob));
     const today = ds.some(d => d.start <= T && (d.end || d.start) >= T);
