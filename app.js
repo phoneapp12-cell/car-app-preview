@@ -29173,13 +29173,13 @@ function rdcItems() {
   const seen = new Set();
   raw.forEach(c => {
     if (!c || c.bridge || !c.title) return;
-    const nowD = new Date(), nowHm = String(nowD.getHours()).padStart(2, 0) + : + String(nowD.getMinutes()).padStart(2, 0);
+    const nowD = new Date(), nowHm = String(nowD.getHours()).padStart(2, '0') + ':' + String(nowD.getMinutes()).padStart(2, '0');
     const ds = (c.dates || []).filter(d => {
       if (!d || !d.start) return false;
       const endDay = d.end || d.start;
       if (endDay < T || d.start > lim) return false;
       if (endDay === T) {
-        if (d.endTime && d.endTime !== 23:59 && nowHm >= d.endTime) return false;
+        if (d.endTime && d.endTime !== '23:59' && nowHm >= d.endTime) return false;
         if (!d.endTime && d.end && d.end !== d.start && d.time && nowHm >= d.time) return false;
       }
       return true;
