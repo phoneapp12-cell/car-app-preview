@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.37';
+const APP_VERSION = '2.28.38';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -15548,7 +15548,7 @@ function vbDelList(k) {
 function vbPlay(id) { const o = vbGet(), v = VB_ALL[id]; if (v && !o.lists.watched.some(x => x.id === id)) { o.lists.watched.unshift(v); o.lists.watched = o.lists.watched.slice(0, 100); vbSave(o); } setTimeout(() => { if (!sheetOpen) vbRedraw(); }, 300); }
 function vbOpen(id) {
   const v = VB_ALL[id]; if (!v) return; const o = vbGet(), AL = vbAllLists(o), cur = (AL.find(([j]) => j !== 'watched' && o.lists[j].some(x => x.id === id)) || (o.lists.watched.some(x => x.id === id) ? ['watched'] : ['']))[0];
-  openSheet(esc(v.title), `<div style="aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;margin-bottom:8px"><iframe id="vbframe" src="https://www.youtube-nocookie.com/embed/${esc(id)}?autoplay=1&playsinline=1&rel=0" title="${esc(v.title)}" style="width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+  openSheet(esc(v.title), `<div style="aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;margin-bottom:8px"><iframe id="vbframe" src="https://www.youtube-nocookie.com/embed/${esc(id)}?autoplay=1&playsinline=1&rel=0&cc_load_policy=0" title="${esc(v.title)}" style="width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
     <p class="muted" style="margin:0 0 8px">${esc(v.channel)}</p>
     <div class="btns"><a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener">▶ YouTube</a><button type="button" class="btn" onclick="vbTv(${jsArg(id)})">📺 TV</button></div>
     <label class="field"><span>Move to…</span><select name="list"><option value="">Not in my lists</option>${AL.map(([j, t]) => `<option value="${j}"${j === cur ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`,
@@ -31580,11 +31580,30 @@ function ltvEnsureHlsJs() {
     document.head.appendChild(s);
   });
 }
+function ltvKillSubtitles(vid, hls) {
+  try {
+    if (hls) {
+      hls.subtitleDisplay = false;
+      if (hls.subtitleTrack !== -1) hls.subtitleTrack = -1;
+    }
+  } catch (e) {}
+  try {
+    if (vid && vid.textTracks) {
+      for (let i = 0; i < vid.textTracks.length; i++) {
+        if (vid.textTracks[i].mode !== "disabled") vid.textTracks[i].mode = "disabled";
+      }
+    }
+    if (vid && vid.querySelectorAll) {
+      vid.querySelectorAll("track").forEach(t => t.remove());
+    }
+  } catch (e) {}
+}
 async function ltvMountVideo(forceReload = false) {
   const ch = ltvCurrentChannel();
   const vid = document.getElementById("ltv-video");
   if (!vid || !ch || !ch.hls) return;
   if (!forceReload && vid.dataset.playingUrl === ch.hls && (ltvCur.hlsInst || vid.currentSrc)) {
+    ltvKillSubtitles(vid, ltvCur.hlsInst);
     return;
   }
   vid.dataset.playingUrl = ch.hls;
@@ -31592,20 +31611,53 @@ async function ltvMountVideo(forceReload = false) {
     if (ltvCur.hlsInst) { ltvCur.hlsInst.destroy(); ltvCur.hlsInst = null; }
   } catch (e) {}
   vid.disableRemotePlayback = false;
+  if (!vid.dataset.noSubBound) {
+    vid.dataset.noSubBound = "1";
+    const cleanSubs = () => ltvKillSubtitles(vid, ltvCur.hlsInst);
+    vid.addEventListener("loadedmetadata", cleanSubs);
+    vid.addEventListener("play", cleanSubs);
+    vid.addEventListener("playing", cleanSubs);
+    vid.addEventListener("timeupdate", cleanSubs);
+    try {
+      if (vid.textTracks && vid.textTracks.addEventListener) {
+        vid.textTracks.addEventListener("addtrack", cleanSubs);
+        vid.textTracks.addEventListener("change", cleanSubs);
+      }
+    } catch (e) {}
+  }
   if (vid.canPlayType("application/vnd.apple.mpegurl") && !/Android|Chrome/i.test(navigator.userAgent || "")) {
     vid.src = ch.hls;
+    ltvKillSubtitles(vid, null);
     vid.play().catch(() => {});
     return;
   }
   const HlsClass = await ltvEnsureHlsJs();
   if (HlsClass && HlsClass.isSupported()) {
-    const hls = new HlsClass({ enableWorker: true, lowLatencyMode: false, backBufferLength: 60, maxBufferLength: 30 });
+    const hls = new HlsClass({
+      enableWorker: true,
+      lowLatencyMode: false,
+      backBufferLength: 60,
+      maxBufferLength: 30,
+      enableWebVTT: false,
+      enableIMSC1: false,
+      enableCEA708Captions: false,
+      renderTextTracksNatively: false
+    });
+    hls.subtitleDisplay = false;
+    hls.subtitleTrack = -1;
     ltvCur.hlsInst = hls;
     hls.loadSource(ch.hls);
     hls.attachMedia(vid);
     hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
+      ltvKillSubtitles(vid, hls);
       vid.play().catch(() => {});
     });
+    if (HlsClass.Events.SUBTITLE_TRACKS_UPDATED) {
+      hls.on(HlsClass.Events.SUBTITLE_TRACKS_UPDATED, () => ltvKillSubtitles(vid, hls));
+    }
+    if (HlsClass.Events.SUBTITLE_TRACK_SWITCH) {
+      hls.on(HlsClass.Events.SUBTITLE_TRACK_SWITCH, () => ltvKillSubtitles(vid, hls));
+    }
     hls.on(HlsClass.Events.ERROR, (ev, data) => {
       if (data && data.fatal) {
         if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR) { try { hls.recoverMediaError(); } catch (e) {} }
@@ -31614,6 +31666,7 @@ async function ltvMountVideo(forceReload = false) {
     });
   } else {
     vid.src = ch.hls;
+    ltvKillSubtitles(vid, null);
     vid.play().catch(() => {});
   }
 }
