@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.35';
+const APP_VERSION = '2.28.36';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22338,50 +22338,54 @@ function homeShownKeys() {
   } catch (e) { }
   return S0;
 }
-const HERO_SEEN_KEY = "glHeroSeenV1";
-let _alCurrentHeroId = "";
-let _alHeroMarkTimer = null;
-function alHeroSeenMap() {
-  let m = null;
+const HERO_SLOT_KEY = "glHeroSlotV2";
+const HERO_ROTATE_MS = 6 * 3600 * 1000; // Rotate only ~4 times a day (every 6 hours), even if seen
+
+function alHeroStateLoad() {
   try {
-    const raw = JSON.parse(localStorage.getItem(HERO_SEEN_KEY) || "null");
-    if (raw && typeof raw === "object") m = raw;
+    const raw = JSON.parse(localStorage.getItem(HERO_SLOT_KEY) || "null");
+    if (raw && typeof raw === "object") {
+      if (!raw.shown || typeof raw.shown !== "object") raw.shown = {};
+      if (!Array.isArray(raw.known)) raw.known = [];
+      return raw;
+    }
   } catch (e) {}
-  if (!m) m = {};
-  // Pre-mark the Millbrook Road Bridge alert Shane already saw
-  if (!m["warn:millbrook road bridge temporary closure"]) {
-    m["warn:millbrook road bridge temporary closure"] = Date.now() - 120000;
-    try { localStorage.setItem(HERO_SEEN_KEY, JSON.stringify(m)); } catch (e) {}
-  }
-  return m;
+  const init = {
+    id: "",
+    rotatedAt: 0,
+    shown: { "warn:millbrook road bridge temporary closure": Date.now() - 3600e3 },
+    known: ["warn:millbrook road bridge temporary closure"]
+  };
+  try { localStorage.setItem(HERO_SLOT_KEY, JSON.stringify(init)); } catch (e) {}
+  return init;
+}
+function alHeroStateSave(st) {
+  try { localStorage.setItem(HERO_SLOT_KEY, JSON.stringify(st)); } catch (e) {}
 }
 function alHeroMarkSeen(id, rerender) {
   if (!id) return;
-  try {
-    const m = alHeroSeenMap();
-    m[id] = Date.now();
-    localStorage.setItem(HERO_SEEN_KEY, JSON.stringify(m));
-  } catch (e) {}
+  const st = alHeroStateLoad();
+  st.shown[id] = Date.now();
+  if (!st.known.includes(id)) st.known.push(id);
+  alHeroStateSave(st);
   if (rerender) {
-    _alCurrentHeroId = "";
     try { glWarnRedraw(); } catch (e) { try { render(); } catch (e2) {} }
   }
 }
 function alHeroAdvance(ev, id) {
   if (ev && ev.stopPropagation) ev.stopPropagation();
   if (ev && ev.preventDefault) ev.preventDefault();
-  const curId = id || _alCurrentHeroId;
-  // If the current hero is a sitting to-do, also advance to the next sitting to-do if desired when rotating
-  alHeroMarkSeen(curId, true);
+  const st = alHeroStateLoad();
+  const curId = id || st.id;
+  if (curId) st.shown[curId] = Date.now();
+  // Force rotation to next candidate on manual tap
+  st.id = "";
+  st.rotatedAt = 0;
+  alHeroStateSave(st);
+  try { glWarnRedraw(); } catch (e) { try { render(); } catch (e2) {} }
 }
-window.addEventListener("hashchange", () => {
-  if (!/^#alerts/.test(location.hash || "") && _alCurrentHeroId) {
-    alHeroMarkSeen(_alCurrentHeroId, false);
-    _alCurrentHeroId = "";
-  }
-});
 function alClosureExpiredToday(txt) {
-  // e.g. "Mon 31 Aug–Sun 25 Oct, 9am" -> if end date is today and end hour has passed, drop it from hero
+  // e.g. "Mon 31 Aug–Sun 25 Oct, 9am" -> if end date is in the past, or today and end hour has passed, drop it
   try {
     const s = String(txt || "");
     const m = s.match(/–\s*(?:[A-Za-z]{3}\s+)?(\d{1,2})\s+([A-Za-z]{3})(?:\s*,?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm))?/i);
@@ -22404,13 +22408,15 @@ function alClosureExpiredToday(txt) {
   return false;
 }
 function alHeroCandidates(list) {
+  // Only show upcoming or current things, or things like petrol changes
   const cands = [];
   const push = c => {
     if (!c || !c.id || !c.title) return;
     if (cands.some(x => x.id === c.id)) return;
     cands.push(c);
   };
-  // 1. Birthdays in the next 3 days
+
+  // 1. Upcoming or Today Birthdays (0 to 3 days ahead)
   try {
     (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b)))
       .filter(x => x.d >= 0 && x.d <= 3 && glOk(x.b.name))
@@ -22419,19 +22425,20 @@ function alHeroCandidates(list) {
         const when = x.d === 0 ? "Today! 🎂" : x.d === 1 ? "Tomorrow (" + fmtW(x.iso) + ")" : "In " + x.d + " days (" + fmtW(x.iso) + ")";
         const ageTxt = x.age > 0 ? x.b.name + "’s " + ordinal(x.age) + " birthday" : x.b.name + "’s birthday";
         push({
-          id: "bday:" + cuNorm(x.b.name) + ":" + x.iso + ":d" + x.d,
+          id: "bday:" + cuNorm(x.b.name) + ":" + x.iso,
           key: cuNorm(ageTxt),
           badge: x.d === 0 ? "🎂 BIRTHDAY TODAY" : x.d === 1 ? "🎂 BIRTHDAY TOMORROW" : "🎂 UPCOMING BIRTHDAY",
           icon: "🎂",
           title: ageTxt,
           sub: when + (x.age > 0 ? " · Turns " + x.age : "") + " · Tap to view birthdays.",
           go: "go('#birthdays')",
-          tone: "hero-bday"
+          tone: "hero-bday",
+          urgent: x.d <= 1
         });
       });
   } catch (e) {}
 
-  // 2. Active warnings (road closures not yet expired, weather warnings, earthquakes, emergencies)
+  // 2. Current or Upcoming Warnings (active road closures not yet expired, weather warnings, earthquakes, emergencies)
   try {
     const warnings = glWarnList().filter(x => x && !x.flag);
     warnings.forEach(w => {
@@ -22451,12 +22458,13 @@ function alHeroCandidates(list) {
         title: cleanT,
         sub: shortSub + " · Tap for details.",
         go: wGo,
-        tone: "hero-warn"
+        tone: "hero-warn",
+        urgent: true
       });
     });
   } catch (e) {}
 
-  // 3. Fuel price movement alert (Marsden Point 91)
+  // 3. Petrol Price Changes (Marsden Point 91)
   try {
     const st = typeof fuelStats === "function" ? fuelStats("91") : null;
     if (st && st.now) {
@@ -22466,102 +22474,92 @@ function alHeroCandidates(list) {
       push({
         id: "fuel:91:" + st.now.toFixed(1) + ":" + wkD.toFixed(1),
         key: "gasprice91",
-        badge: "⛽ WHANGĀREI GAS ALERT",
+        badge: "⛽ PETROL PRICE UPDATE",
         icon: "⛽",
         title: "Regular 91: " + dir + " (" + fuelC(st.now) + "/L)",
         sub: "Marsden Point 30-day range " + fuelC(st.lo30) + "–" + fuelC(st.hi30) + "/L · Tap for 30-day price history.",
         go: "fuelBackHash='#alerts';go('#fuel')",
-        tone: "hero-gas"
+        tone: "hero-gas",
+        urgent: Math.abs(st.day || 0) >= 0.5
       });
     }
   } catch (e) {}
 
-  // 4. Sitting >1 week To-Do item (1 at a time)
+  // 4. Current or Upcoming Events, Appointments, Car & Pet Due Items (today or next 7 days only, no past/overdue or sitting to-dos)
   try {
-    const td = typeof pickOneSittingTodo === "function" ? pickOneSittingTodo() : null;
-    if (td && td.todo) {
+    const ALLOWED_KINDS = new Set(["appt", "ext", "mine", "ev", "night", "car", "driver", "pet", "health", "hol", "bday", "count"]);
+    (list || []).filter(x => x && x.days != null && x.days >= 0 && x.days <= 7 && ALLOWED_KINDS.has(x.kind)).slice(0, 4).forEach(x => {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = x.html || "";
+      const tEl = tmp.querySelector(".t");
+      const sEl = tmp.querySelector(".s");
+      const rawTitle = (x.name || (tEl ? tEl.textContent : "") || "").replace(/\s+/g, " ").trim();
+      if (!rawTitle) return;
+      const rawSub = (sEl ? sEl.textContent : "").replace(/\s+/g, " ").trim();
+      const whenLbl = x.days === 0 ? "Today" : x.days === 1 ? "Tomorrow" : "In " + x.days + " days" + (x.iso ? " (" + fmtW(x.iso) + ")" : "");
+      const rowBtn = tmp.querySelector("[onclick]");
+      const goAct = (rowBtn && rowBtn.getAttribute("onclick")) || (x.kind === "car" ? "go('#cars')" : x.kind === "pet" ? "go('#pets')" : "go('#cal')");
+      const badgeMap = {
+        appt: "📅 UPCOMING APPOINTMENT",
+        health: "🩺 UPCOMING HEALTH",
+        car: "🚗 UPCOMING CAR DUE",
+        driver: "🚗 UPCOMING LICENCE DUE",
+        pet: "🐾 UPCOMING PET CARE",
+        ev: "🎉 UPCOMING EVENT",
+        night: "🌙 UPCOMING EVENT",
+        hol: "🏖️ UPCOMING HOLIDAY",
+        count: "⏳ COUNTDOWN",
+        bday: "🎂 UPCOMING BIRTHDAY"
+      };
+      const iconMap = { appt: "📅", health: "🩺", car: "🚗", driver: "🚗", pet: "🐾", ev: "🎉", night: "🌙", hol: "🏖️", count: "⏳", bday: "🎂" };
       push({
-        id: "sit-todo:" + td.todo.id + ":" + todayISO(),
-        key: cuNorm("To-do sitting " + td.daysOld + " days: " + td.todo.title),
-        badge: "📋 TO-DO SITTING > 1 WEEK (" + td.idx + " OF " + td.total + ")",
-        icon: "📋",
-        title: td.todo.title,
-        sub: "Sitting on " + (td.todo.list || "To-do") + " for " + td.daysOld + " days · Tap to open your To-do list.",
-        go: "go('#todo')",
-        tone: "hero-todo"
+        id: "up:" + x.kind + ":" + cuNorm(rawTitle) + ":" + (x.iso || x.days),
+        key: cuNorm(rawTitle),
+        badge: badgeMap[x.kind] || (x.days === 0 ? "📅 ON TODAY" : "📅 COMING UP"),
+        icon: iconMap[x.kind] || "📅",
+        title: rawTitle,
+        sub: [whenLbl, alShortBody(rawSub, 95)].filter(Boolean).join(" · "),
+        go: goAct,
+        tone: x.days === 0 ? "hero-today" : "hero-soon",
+        urgent: x.days === 0
       });
-    }
-  } catch (e) {}
-
-  // 5. House Power live update (SolarZero)
-  try {
-    const p = typeof PWR !== "undefined" && PWR && PWR.today ? PWR.today : null;
-    const costTot = p && p.cost && p.cost.total != null ? Number(p.cost.total) : null;
-    if (p && costTot != null) {
-      const bat = p.batteryPct != null ? " · " + Math.round(+p.batteryPct) + "% battery" : "";
-      const used = p.usedKWh != null ? (+p.usedKWh).toFixed(2) + " kWh used today" : "Live from SolarZero";
-      push({
-        id: "pwr:" + (p.date || todayISO()) + ":" + costTot.toFixed(2),
-        key: "powerherotoday",
-        badge: "⚡ SOLARZERO POWER TODAY",
-        icon: "⚡",
-        title: "$" + costTot.toFixed(2) + " spent on power today so far",
-        sub: used + bat + " · Tap for Power breakdown.",
-        go: "go('#power')",
-        tone: "hero-pwr"
-      });
-    }
-  } catch (e) {}
-
-  // 6. Fresh Northland Local News top headline
-  try {
-    const locList = typeof newsSec === "function" ? (newsSec("local") || []).filter(newsOk) : [];
-    const loc = locList[0] || null;
-    if (loc && loc.title) {
-      push({
-        id: "locnews:" + cuNorm(loc.title),
-        key: cuNorm(loc.title),
-        badge: "📰 WHANGĀREI LOCAL NEWS",
-        icon: "📰",
-        title: loc.title,
-        sub: (loc.src || "Local News") + (loc.when ? " · " + loc.when : "") + " · Tap to read in app.",
-        go: "go('#localnews')",
-        tone: "hero-news"
-      });
-    }
+    });
   } catch (e) {}
 
   return cands;
 }
 function alPickHero(list) {
   const cands = alHeroCandidates(list);
-  const seen = alHeroSeenMap();
+  const st = alHeroStateLoad();
+  const now = Date.now();
   if (cands.length) {
-    let picked = _alCurrentHeroId ? cands.find(c => c.id === _alCurrentHeroId) : null;
-    // If new unseen info arrived while current hero was already seen, rotate to the new unseen item
-    const firstUnseen = cands.find(c => !seen[c.id]);
-    if (picked && seen[picked.id] && firstUnseen && firstUnseen.id !== picked.id) {
-      picked = firstUnseen;
-      _alCurrentHeroId = picked.id;
+    let picked = st.id ? cands.find(c => c.id === st.id) : null;
+    const holdElapsed = !st.rotatedAt || (now - st.rotatedAt >= HERO_ROTATE_MS);
+
+    // Check if a brand-new urgent item (never seen before) just arrived
+    const brandNewUrgent = cands.find(c => c.urgent && !st.known.includes(c.id) && !st.shown[c.id]);
+
+    if (brandNewUrgent && (!picked || picked.id !== brandNewUrgent.id)) {
+      picked = brandNewUrgent;
+      st.id = picked.id;
+      st.rotatedAt = now;
+      st.shown[picked.id] = now;
+    } else if (!picked || holdElapsed) {
+      // Rotate at most a few times a day (every 6 hours), picking the next unseen or least-recently-shown candidate
+      const others = picked && cands.length > 1 ? cands.filter(c => c.id !== picked.id) : cands;
+      const unseen = others.find(c => !st.shown[c.id]);
+      picked = unseen || others.slice().sort((a, b) => (st.shown[a.id] || 0) - (st.shown[b.id] || 0))[0] || cands[0];
+      st.id = picked.id;
+      st.rotatedAt = now;
+      st.shown[picked.id] = now;
     }
-    if (!picked) {
-      picked = firstUnseen || cands.slice().sort((a, b) => (seen[a.id] || 0) - (seen[b.id] || 0))[0];
-      _alCurrentHeroId = picked ? picked.id : "";
-    }
-    if (picked) {
-      clearTimeout(_alHeroMarkTimer);
-      const hid = picked.id;
-      _alHeroMarkTimer = setTimeout(() => {
-        try {
-          const m = alHeroSeenMap();
-          m[hid] = Date.now();
-          localStorage.setItem(HERO_SEEN_KEY, JSON.stringify(m));
-        } catch (e) {}
-      }, 2200);
-      const unseenCount = cands.filter(c => !seen[c.id]).length;
-      const idx = cands.indexOf(picked) + 1;
-      return Object.assign({}, picked, { total: cands.length, idx, unseenCount });
-    }
+
+    cands.forEach(c => { if (!st.known.includes(c.id)) st.known.push(c.id); });
+    if (st.known.length > 80) st.known = st.known.slice(-80);
+    alHeroStateSave(st);
+
+    const idx = cands.indexOf(picked) + 1;
+    return Object.assign({}, picked, { total: cands.length, idx });
   }
   return {
     id: "default:none",
@@ -22569,12 +22567,11 @@ function alPickHero(list) {
     badge: "🔔 WHANGĀREI ALERTS",
     icon: "✨",
     title: "No urgent alerts right now (" + fmtW(todayISO()) + ")",
-    sub: "Road closures, weather warnings, birthdays, fuel moves and updates appear here.",
+    sub: "Current alerts, upcoming events, birthdays and petrol changes appear here.",
     go: "go('#weather')",
     tone: "hero-today",
     total: 1,
-    idx: 1,
-    unseenCount: 0
+    idx: 1
   };
 }
 function alQuickGridHtml() {
@@ -22708,7 +22705,7 @@ function alBriefingHtml(list) {
   const hero = alPickHero(list);
   const heroHtml = `<div class="al-hero-wrap">
     <div role="button" tabindex="0" class="al-hero ${hero.tone || ''}" onclick="alHeroMarkSeen(${jsArg(hero.id)},false);${esc(hero.go)}">
-      <div class="al-hero-top"><span class="al-hero-badge">${esc(hero.badge)}</span><span class="al-hero-cta" onclick="alHeroAdvance(event, ${jsArg(hero.id)})" title="Mark seen and show next hero card" style="background:rgba(255,255,255,0.22);padding:3px 9px;border-radius:999px;font-weight:700">✓ Seen · Next ↻</span></div>
+      <div class="al-hero-top"><span class="al-hero-badge">${esc(hero.badge)}</span><span class="al-hero-cta" onclick="alHeroAdvance(event, ${jsArg(hero.id)})" title="Mark seen and show next hero card" style="background:rgba(255,255,255,0.22);padding:3px 9px;border-radius:999px;font-weight:700">Next ↻</span></div>
       <div class="al-hero-title">${esc(hero.title)}</div>
       <div class="al-hero-sub">${esc(hero.sub)}</div>
     </div>
@@ -22813,7 +22810,6 @@ function nbTopHtml() {
   return { top: `<div class="al-briefing" id="glalerts"><div id="albrief">${alBriefingHtml(list)}</div></div>`, fun: '' };
 }
 function GlAlerts() {
-  _alCurrentHeroId = "";
   setTimeout(glBellMarkSeen, 600); // 2.26.75
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   setTimeout(() => { try { hwRefresh(false); } catch (e) { } try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
