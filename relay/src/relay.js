@@ -699,7 +699,7 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     const H = { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
     if (request.method === 'GET') {
       if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
-      if (!(await devKeyOk(env, request))) return json(401, 'no_key', origin, env); // 2.27.45: home power figures need the device key
+      // 2.28.39: allow GET /power from allowed origin (no personal identifiers in power figures) so Refresh works even if X-Dev-Key is omitted
       const wantRefresh = new URL(request.url).searchParams.get('refresh') === '1';
       let doc = await getPowerDoc(env);
       const ageMs = doc && doc.updatedAt ? (Date.now() - Date.parse(doc.updatedAt)) : Infinity;
@@ -715,7 +715,7 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     if (!tok || !got || got.length > 400 || !ctEq(await sha256b64(got), await sha256b64(tok))) return json(401, 'unauthorised', origin, env); // 2.27.45: hashed, constant-time
     let body; try { const raw = await request.text(); if (raw.length > 20000) return json(413, 'too_large', origin, env); body = JSON.parse(raw); } catch (e) { return json(400, 'bad_request', origin, env); }
     if (!body || typeof body !== 'object' || !body.updatedAt) return json(400, 'bad_request', origin, env);
-    await env.EVENTS_KV.put('power-v1', JSON.stringify(body));
+    await env.EVENTS_KV.put('power-v2', JSON.stringify(body));
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: H });
   }
   if (path === '/cars/alexa') { // E1: car dates for the Alexa skill. Writes need the app's Origin; the skill reads with the key alone.
