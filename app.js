@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.43';
+const APP_VERSION = '2.28.44';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12610,7 +12610,7 @@ function notifWxStrip() {
   const warnHtml = warn ? `<span class="nwxwarn">${esc(warn)}</span>` : '';
   if (!fresh) {
     const loading = wxBusy || (!wxFailed && navigator.onLine !== false);
-    return `<button type="button" class="notifwx nwxwait" id="notifwx" onclick="${warn ? "go('#weather')" : 'refreshWx(true)'}">${I('cloudsun')}<span class="nwxtx">${warnHtml}<span class="nwxnext">${loading ? 'Weather loading…' : 'Weather isn’t available right now. Tap to try again.'}</span></span></button>`;
+    return `<button type="button" class="notifwx nwxwait" id="notifwx" style="background:linear-gradient(135deg,rgba(15,23,42,.55),rgba(30,64,175,.55)),url('art/travel-banner.webp') center/cover no-repeat;color:#fff;padding:14px 16px" onclick="${warn ? "go('#weather')" : 'refreshWx(true)'}"><img src="art/i3-weather.webp" alt="" style="width:42px;height:42px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))"><span class="nwxtx" style="color:#fff">${warnHtml}<b style="font-size:1rem;color:#fff">Whangārei Weather</b><span class="nwxnext" style="color:rgba(255,255,255,.88)">${loading ? 'Updating live forecast…' : 'Tap to refresh Whangārei forecast'}</span></span></button>`;
   }
   const c = WX.data.current, day = wxIsDay(), nowW = wmo(c.weather_code, day, c.wind_speed_10m);
   const next = homeTry('weather next', () => notifWxNext(), []);
@@ -14327,9 +14327,9 @@ function routineCands() {
 function routineAskCard() {
   const c = routineCands()[0]; if (!c) return '';
   const when = WD_NAMES[c.dow] + (c.time ? ' at ' + hmTxt(+c.time.slice(0, 2) * 60 + +c.time.slice(3)) : '');
-  return `<div class="card" id="routineask"><div class="t" style="font-weight:800;margin-bottom:4px">Add to your calendar?</div>
-    <div class="s">${esc(c.why)}. Add “${esc(c.title)}” every ${esc(when)}${c.notes ? ' (' + esc(c.notes.toLowerCase()) + ')' : ''}?</div>
-    <div class="row" style="gap:8px;margin-top:8px"><button type="button" class="btn primary small" onclick="routineAdd(${jsArg(c.key)})">${I('plus')} Add every week</button><button type="button" class="btn small" onclick="routineNo(${jsArg(c.key)})">No thanks</button></div></div>`;
+  const ico = /gym/i.test(c.title) ? 'i3-gym' : 'i3-cal';
+  return `<div class="card krea-ask" id="routineask"><div class="krea-ask-top"><span class="krea-ask-ico"><img src="art/${ico}.webp" alt="" onerror="this.remove()"></span><div style="min-width:0;flex:1"><div class="t" style="font-weight:800;margin-bottom:3px">Add to your calendar?</div><div class="s">${esc(c.why)}. Add “${esc(c.title)}” every ${esc(when)}${c.notes ? ' (' + esc(c.notes.toLowerCase()) + ')' : ''}?</div></div></div>
+    <div class="row" style="gap:8px;margin-top:10px"><button type="button" class="btn primary small" onclick="routineAdd(${jsArg(c.key)})">${I('plus')} Add every week</button><button type="button" class="btn small" onclick="routineNo(${jsArg(c.key)})">No thanks</button></div></div>`;
 }
 async function routineAdd(key) {
   const c = routineCands().find(x => x.key === key); if (!c) return;
@@ -14385,9 +14385,9 @@ function bookAskCard() {
   const c = bookCands()[0]; if (!c) return '';
   const when = c.days < 0 ? 'was due ' + fmtW(c.date) : c.days === 0 ? 'is due today' : 'is due ' + homeSugDay(c.date);
   const who = c.kind === 'pet' ? 'Book the vet or groomer for it?' : c.kind === 'car' ? 'Book it in?' : 'Book an appointment?';
-  return `<div class="card" id="bookask"><div class="t" style="font-weight:800;margin-bottom:4px">Time to book?</div>
-    <div class="s">${esc(c.title)} ${esc(when)}. ${esc(who)}</div>
-    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn primary small" onclick="bookIt(${jsArg(c.key)})">${I('cal')} Book it</button><button type="button" class="btn small" onclick="bookSet(${jsArg(c.key)},'booked')">Already booked</button><button type="button" class="btn small" onclick="bookSet(${jsArg(c.key)},'later')">Not now</button></div></div>`;
+  const ico = c.kind === 'car' ? 'i3-car' : c.kind === 'pet' ? 'i3-pet' : 'i3-health';
+  return `<div class="card krea-ask" id="bookask"><div class="krea-ask-top"><span class="krea-ask-ico"><img src="art/${ico}.webp" alt="" onerror="this.remove()"></span><div style="min-width:0;flex:1"><div class="t" style="font-weight:800;margin-bottom:3px">Time to book?</div><div class="s">${esc(c.title)} ${esc(when)}. ${esc(who)}</div></div></div>
+    <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap"><button type="button" class="btn primary small" onclick="bookIt(${jsArg(c.key)})">${I('cal')} Book it</button><button type="button" class="btn small" onclick="bookSet(${jsArg(c.key)},'booked')">Already booked</button><button type="button" class="btn small" onclick="bookSet(${jsArg(c.key)},'later')">Not now</button></div></div>`;
 }
 function bookIt(key) {
   const c = bookCands().find(x => x.key === key); if (!c) return;
@@ -21876,7 +21876,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { win
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.sick ? '🤒 Off sick today' : m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
-  return `<div class="top glhead"><div style="min-width:0;flex:1"><div class="glrow"><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1><div class="iconrow"><button class="iconbtn" aria-label="Summary" onclick="go('#summary')">${I('news')}</button>${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1><div class="iconrow"><button class="iconbtn" aria-label="Summary" onclick="go('#summary')">${I('news')}</button>${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -21914,19 +21914,20 @@ function glPowerTile(ic) {
   const ok = tc != null && Number.isFinite(+tc), share = (() => { try { return pwrBudget() / 7; } catch (e) { return 60 / 7; } })();
   let up = ''; try { const ms = Date.parse(d && d.updatedAt); if (ms) up = new Date(ms).toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase(); } catch (e) { }
   const cls = !ok ? '' : +tc > share ? ' glpwr over' : ' glpwr under';
-  return `<button type="button" class="glst${cls || ' glpwr'}" id="glpwrtile" aria-label="Power today ${ok ? '$' + (+tc).toFixed(2) : 'not known yet'}. Open Power." onclick="event.stopPropagation();go('#power')">${ic(bolt)}<b>${ok ? '$' + (+tc).toFixed(2) : '—'}</b><small>${up ? esc(up) : 'Power'}</small></button>`;
+  return `<button type="button" class="glst${cls || ' glpwr'}" id="glpwrtile" aria-label="Power today ${ok ? '$' + (+tc).toFixed(2) : 'not known yet'}. Open Power." onclick="event.stopPropagation();go('#power')"><img class="glst-krea" src="art/i3-zap.webp" alt="" onerror="this.remove()"><b>${ok ? '$' + (+tc).toFixed(2) : '—'}</b><small>${up ? esc(up) : 'Power'}</small></button>`;
 }
 function glStatInner() {
   const m = glMode(), ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`; // 2.26.9: five equal tiles, icon over value
   const tile = (i, v, l, cls = '') => `<span class="glst${cls}">${ic(i)}<b>${esc(v)}</b><small>${esc(l)}</small></span>`;
   const T = glTemps(), D = glDoors(), L = glLights(), td = glTideNext(2);
   const tv = T.map(x => parseFloat(x.t)).filter(Number.isFinite), lo = Math.min(...tv), hi = Math.max(...tv);
+  const ktile = (img, v, l, cls = '') => `<span class="glst${cls}"><img class="glst-krea" src="art/${img}.webp" alt="" onerror="this.remove()"><b>${esc(v)}</b><small>${esc(l)}</small></span>`;
   const ch = [
-    tile('M14 14V4a2 2 0 0 0-4 0v10a4 4 0 1 0 4 0z', !tv.length ? '–' : Math.round(lo) === Math.round(hi) ? Math.round(lo) + '°' : `${Math.round(lo)}–${Math.round(hi)}°`, tv.length ? (tv.length === 1 ? T[0].n : tv.length + ' rooms') : 'Temps'),
-    tile('M5 21V3h11v18M14 12h.01', !D ? '–' : D.length ? D.length + ' open' : 'Closed', 'Doors', D && D.length ? ' glalert' : ''),
-    tile('M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z', !L ? '–' : L.length ? L.length + ' on' : 'Off', 'Lights'),
-    glPowerTile(ic), // 2.26.51: today's power cost replaces UV here (UV stays on the weather card)
-    tile('M2 14c3-4 5-4 8 0s5 4 8 0 3-2 4-1', td.length ? (td[0].high ? '▲' : '▼') + aklTime(td[0].ms).replace(/\s?[ap]m$/i, '') : '–', 'Tide')];
+    ktile('i3-weather', !tv.length ? '–' : Math.round(lo) === Math.round(hi) ? Math.round(lo) + '°' : `${Math.round(lo)}–${Math.round(hi)}°`, tv.length ? (tv.length === 1 ? T[0].n : tv.length + ' rooms') : 'Temps'),
+    ktile('i3-shield', !D ? '–' : D.length ? D.length + ' open' : 'Closed', 'Doors', D && D.length ? ' glalert' : ''),
+    ktile('i3-idea', !L ? '–' : L.length ? L.length + ' on' : 'Off', 'Lights'),
+    glPowerTile(ic),
+    ktile('i3-drop', td.length ? (td[0].high ? '▲' : '▼') + aklTime(td[0].ms).replace(/\s?[ap]m$/i, '') : '–', 'Tide')];
   const up = glUpdated();
   let x = '';
   if (glStatOpen) {
@@ -23621,7 +23622,8 @@ function glOrgBody(k, m) {
 function glOrgSet(k) { glOrgTab = k; try { const el = document.getElementById('glorg'); if (el) el.innerHTML = glOrgInner(); } catch (e) { } }
 function glQuick(m) {
   const T = todayISO(), Q = [];
-  const q = (k, art, a, b, title, s, go) => Q.push(`<button type="button" class="gltile glic glsm" style="--a:${a};--b:${b}" onclick="${go}"><img src="art/i3-${art}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltt">${title}<small>${esc(s)}</small></span></button>`);
+  const BG = { todo: 'todo-banner', bills: 'bills-banner', calendar: 'cal-banner', cars: 'cars-banner', garden: 'events-banner', shop: 'shopping-banner', food: 'meals-banner', power: 'budget-banner', livetv: 'tv-banner' };
+  const q = (k, art, a, b, title, s, go) => { const bg = BG[k] ? `background-image:url('art/${BG[k]}.webp');` : ''; Q.push(`<button type="button" class="gltile glic glsm glkrea" style="${bg}--a:${a};--b:${b}" onclick="${go}"><img src="art/i3-${art}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltt">${title}<small>${esc(s)}</small></span></button>`); };
   try { const o = (S.todos || []).filter(t => t && !t.done && glOk(t.title)), td = o.filter(t => t.due && t.due <= T).length; q('todo', 'todo', '#2563eb', '#1e40af', 'To-do', td ? td + ' today · ' + o.length + ' open' : o.length ? o.length + ' open' : 'All done', "go('#todo')"); } catch (e) { }
   try { const b = (S.bills || []).filter(x => x && !x.paid && x.due).sort((x, y) => String(x.due).localeCompare(String(y.due)))[0]; q('bills', 'bill', '#dc2626', '#9a3412', 'Bills', b ? b.name + ' · ' + (daysLeft(b.due) < 0 ? 'overdue' : fmtW(b.due)) : 'Nothing due', "go('#bills')"); } catch (e) { }
   try { const a = (S.appts || []).filter(x => x && x.date === T && !x.done); q('calendar', 'cal', '#7c3aed', '#4c1d95', 'Calendar', !m.off ? 'Work ' + glShift(m) + (a.length ? ' · ' + a.length + ' more' : '') : a.length ? a[0].title : 'Free all day', "go('#calendar')"); } catch (e) { }
@@ -23629,6 +23631,8 @@ function glQuick(m) {
   try { const g = glCU().find(x => x.kind === 'garden'); q('garden', 'garden', '#16a34a', '#14532d', 'Garden', g ? String(g.name || '').replace(/<[^>]+>/g, '') : glGardenSafe() ? 'Cool enough to water' : 'Nothing to do', "go('#garden')"); } catch (e) { }
   try { const n = (S.shop && S.shop.items || []).filter(x => x && !x.done).length; q('shop', 'shop', '#ea580c', '#9a3412', 'Shopping', n ? plural(n, 'item') : 'List is empty', "go('#shopping')"); } catch (e) { }
   try { const nights = mealNights(), nxt = nights.find(d => M().plan[d] && M().plan[d].title), r = glPickRecipe(); q('food', 'plate', '#e11d48', '#9f1239', 'Meals', nxt ? fmtW(nxt) + ': ' + M().plan[nxt].title : r ? 'GF: ' + r.title : 'Meal plan & GF recipes', "go('#food')"); } catch (e) { }
+  try { const d = (typeof PWR !== 'undefined' && PWR) || null, t = d && d.today, tc = t ? (t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1)) : null, bat = d && d.now && Number.isFinite(d.now.batterySocPct) ? ` · ${d.now.batterySocPct}% bat` : ''; q('power', 'zap', '#0d9488', '#115e59', 'Solar & Power', tc != null && Number.isFinite(+tc) ? `$${(+tc).toFixed(2)} today${bat}` : 'Live SolarZero', "go('#power')"); } catch (e) { }
+  try { const recN = ((typeof LTV_DVR !== 'undefined' && LTV_DVR && LTV_DVR.recordings) || []).length; q('livetv', 'tv', '#4f46e5', '#312e81', 'Live TV & DVR', recN ? `${recN} recorded · Freeview` : 'Freeview · Bravo · DVR', "go('#livetv')"); } catch (e) { }
   return `<div class="glgrid glg3">${Q.join('')}</div>`;
 }
 function glOrgInner() {
@@ -23648,7 +23652,7 @@ function glanceHome() {
   const ent = '', org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const wk = homeTry('week overview', () => weekOverview(), ''); // 2.27.28: the week overview replaces the Organise tabs; the shortcut tiles stay
-  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}<div class="wklinks"><a href="#food">Meals</a><a href="#meals">Meal plan</a><a href="#recipes">Recipes</a><a href="#shopping">Shopping</a><a href="#todo">To-do</a><a href="#cars">Cars</a><a href="#garden">Garden</a><a href="#media">Entertainment</a><a href="#cashflow">Cash flow</a></div>`
+  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}<div class="wklinks"><a href="#food"><img src="art/i3-plate.webp" alt="">Meals</a><a href="#shopping"><img src="art/i3-shop.webp" alt="">Shopping</a><a href="#todo"><img src="art/i3-todo.webp" alt="">To-do</a><a href="#cars"><img src="art/i3-car.webp" alt="">Cars</a><a href="#fuel"><img src="art/i3-fuel.webp" alt="">Fuel 30d</a><a href="#power"><img src="art/i3-zap.webp" alt="">Solar</a><a href="#livetv"><img src="art/i3-tv.webp" alt="">Live TV</a><a href="#media"><img src="art/i3-radio.webp" alt="">Media</a><a href="#cashflow"><img src="art/i3-money.webp" alt="">Cash flow</a></div>`
     : org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +

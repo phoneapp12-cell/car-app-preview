@@ -2036,7 +2036,7 @@ html body #glalerts span.newpill,html body #glalerts .glisnew span.newpill{displ
 .glance.glnight .glhead .glline,.glnight .glhead .glline{color:#5eead4}
 
 /* 2.26.12: entertainment tiles back to the mock-up look: blue gradient, 3D art top right, tag badge top right */
-.gltile.glic{background:linear-gradient(135deg,#1e3a8a,#3b82f6 60%,#93c5fd)!important}
+.gltile.glic{background:linear-gradient(135deg,var(--a,#1e3a8a),var(--b,#3b82f6))}
 .gltile.glic .gltag{top:6px;bottom:auto;right:8px;background:rgba(15,23,42,.65)}
 .gltile.glic img{top:14px}
 
@@ -2362,7 +2362,33 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 .al-dtag{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;font-size:.66rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:999px}
 .al-dt{font-size:.96rem;font-weight:800;line-height:1.22;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .al-ds{font-size:.76rem;line-height:1.3;opacity:.9;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-video::cue,#ltv-video::cue{display:none!important;opacity:0!important;visibility:hidden!important;color:transparent!important;background:transparent!important;font-size:0!important}video::-webkit-media-text-track-container,video::-webkit-media-text-track-display,video::-webkit-media-text-track-Background,#ltv-video::-webkit-media-text-track-container,#ltv-video::-webkit-media-text-track-display{display:none!important;opacity:0!important;visibility:hidden!important}</style>
+video::cue,#ltv-video::cue{display:none!important;opacity:0!important;visibility:hidden!important;color:transparent!important;background:transparent!important;font-size:0!important}video::-webkit-media-text-track-container,video::-webkit-media-text-track-display,video::-webkit-media-text-track-Background,#ltv-video::-webkit-media-text-track-container,#ltv-video::-webkit-media-text-track-display{display:none!important;opacity:0!important;visibility:hidden!important}
+/* 2.28.44: Krea Homepage Polish */
+.glance .glhead.glhero-card{position:relative;overflow:hidden;border-radius:20px;padding:14px 16px;margin:2px 0 12px;background:linear-gradient(135deg,rgba(15,23,42,.58),rgba(30,58,138,.48)),url("art/cu-banner.webp") right center/cover no-repeat;color:#fff;box-shadow:0 6px 18px rgba(15,23,42,.22),inset 0 1px 0 rgba(255,255,255,.25)}
+.glance.glnight .glhead.glhero-card{background:linear-gradient(135deg,rgba(11,20,56,.76),rgba(49,46,129,.62)),url("art/travel-banner.webp") right center/cover no-repeat;box-shadow:0 6px 20px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.18)}
+.glance .glhead.glhero-card h1.glh1{color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.45)}
+.glance .glhead.glhero-card .glhome{background:rgba(255,255,255,.22);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 3px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.4)}
+.glance .glhead.glhero-card .sub{color:rgba(255,255,255,.94);font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.45);margin-top:4px}
+.glance .glhead.glhero-card .glfree{color:#fde047!important;text-shadow:0 1px 4px rgba(0,0,0,.55)}
+.glance .glhead.glhero-card .glline{display:inline-flex;align-items:center;gap:6px;background:rgba(15,23,42,.48);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#5eead4!important;padding:4px 11px;border-radius:999px;margin-top:7px;font-size:.82rem;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.glance .glhead.glhero-card .iconrow .iconbtn{background:rgba(15,23,42,.42);color:#fff;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.2);border-radius:12px}
+.glstiles{gap:7px}
+.glst{position:relative;overflow:hidden;border-radius:15px!important;padding:8px 4px 7px!important;box-shadow:0 2px 8px rgba(15,23,42,.1),inset 0 1px 0 rgba(255,255,255,.6)!important;transition:transform .12s ease}
+.glst:active{transform:scale(.97)}
+.glst .glst-krea{width:28px;height:28px;object-fit:contain;margin-bottom:2px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.22))}
+.gltile.glkrea{background-size:cover!important;background-position:center!important;box-shadow:0 4px 12px rgba(15,23,42,.24),inset 0 1px 0 rgba(255,255,255,.28)!important;border-radius:16px!important;height:84px!important;transition:transform .12s ease}
+.gltile.glkrea:active{transform:scale(.97)}
+.gltile.glkrea::before{content:"";position:absolute;inset:0;background:linear-gradient(155deg,var(--a,rgba(15,23,42,.45)) 0%,var(--b,rgba(15,23,42,.82)) 100%);opacity:.84;z-index:0}
+.gltile.glkrea img{z-index:1;width:40px!important;height:40px!important;top:6px!important;right:6px!important;filter:drop-shadow(0 3px 6px rgba(0,0,0,.4))}
+.gltile.glkrea .gltt{z-index:2;left:10px;right:8px;bottom:7px;text-shadow:0 1px 5px rgba(0,0,0,.85)}
+.krea-ask{position:relative;overflow:hidden;border-radius:18px!important;padding:13px 15px!important;border:1px solid rgba(148,163,184,.22)!important;box-shadow:0 4px 14px rgba(15,23,42,.12)!important}
+.krea-ask-top{display:flex;align-items:center;gap:12px}
+.krea-ask-ico{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,rgba(37,99,235,.18),rgba(124,58,237,.18));display:grid;place-items:center;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.krea-ask-ico img{width:38px;height:38px;object-fit:contain;filter:drop-shadow(0 2px 5px rgba(0,0,0,.25))}
+.wklinks a{display:inline-flex;align-items:center;gap:5px;font-weight:650;padding:5px 11px!important;border-radius:999px;box-shadow:0 1px 3px rgba(0,0,0,.1);background:var(--card,#fff)!important;border:1px solid rgba(148,163,184,.22)}
+.wklinks a img{width:16px;height:16px;object-fit:contain}
+
+</style>
 </head>
 <body>
 <div id="app">
@@ -2378,6 +2404,6 @@ video::cue,#ltv-video::cue{display:none!important;opacity:0!important;visibility
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.28.43"></script>
+<script src="app.js?v=2.28.44"></script>
 </body>
 </html>
