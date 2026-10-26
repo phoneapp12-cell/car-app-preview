@@ -403,7 +403,7 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
   if (path === '/fuel') { // 2.27.36: Marsden Point terminal gate prices (BP and Z public lists), 30 days
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);
     if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
-    try { const data = await fuelRoute(env, fetchImpl); return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
+    try { const force = new URL(request.url).searchParams.get('force') === '1'; const data = await fuelRoute(env, fetchImpl, Date.now(), force); return new Response(JSON.stringify(data), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
     catch (e) { return json(502, 'fuel_unavailable', origin, env); }
   }
   if (path === '/' || path === '/health') {

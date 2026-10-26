@@ -53,7 +53,7 @@ export function guardKV(env) {
       try {
         const raw = await kv.get(key, "text");
         if (raw !== null && raw !== undefined) {
-          await edgePut(key, raw, 604800);
+          await edgePut(key, raw, 120);
           if (wantJson) { try { return JSON.parse(raw); } catch (e) { return null; } }
           return raw;
         }

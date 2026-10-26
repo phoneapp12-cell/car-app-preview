@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.45';
+const APP_VERSION = '2.28.46';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22835,25 +22835,31 @@ function alQuickGridHtml() {
   try {
     const st = typeof fuelStats === 'function' ? fuelStats('91') : null;
     if (st && st.now) {
-      const mv = st.day != null && Math.abs(st.day) >= 0.2 ? st.day : (st.lastMove ? st.lastMove.diff : st.wk);
+      const L = st.last || {};
+      const dayD = st.day != null ? st.day : 0;
       const wkD = st.wk != null ? st.wk : 0;
-      const dirArrow = (wkD <= -0.2 || (mv != null && mv <= -0.2)) ? '▼ ' : (wkD >= 0.2 || (mv != null && mv >= 0.2)) ? '▲ ' : '';
+      const mv = Math.abs(dayD) >= 0.2 ? dayD : (st.lastMove ? st.lastMove.diff : wkD);
+      const dirArrow = (dayD <= -0.2 || wkD <= -0.2) ? '▼ ' : (dayD >= 0.2 || wkD >= 0.2) ? '▲ ' : '';
       gasBadge = dirArrow + fuelC(st.now);
-      if (wkD <= -0.3) {
+      const zbp = [L.z91 ? `Z ${fuelC(L.z91)}` : '', L.bp91 ? `BP ${fuelC(L.bp91)}` : ''].filter(Boolean).join(' · ');
+      if (dayD <= -0.2) {
+        gasTitle = `Gas: ▼ Down ${fuelC(Math.abs(dayD))} today`;
+        gasSub = `${fuelC(st.now)}/L (${zbp || 'Marsden Pt'}) · 7d ▼${fuelC(Math.abs(wkD))}`;
+      } else if (dayD >= 0.2) {
+        gasTitle = `Gas: ▲ Up ${fuelC(dayD)} today`;
+        gasSub = `${fuelC(st.now)}/L (${zbp || 'Marsden Pt'}) · Tap for 30d history`;
+      } else if (wkD <= -0.3) {
         gasTitle = `Gas: ▼ Down ${fuelC(Math.abs(wkD))}`;
-        gasSub = `${fuelC(st.now)}/L (7d ▼${fuelC(Math.abs(wkD))}) · Tap for 30d history`;
+        gasSub = `${fuelC(st.now)}/L (${zbp || '7d ▼' + fuelC(Math.abs(wkD))}) · 30d history`;
       } else if (wkD >= 0.3) {
         gasTitle = `Gas: ▲ Up ${fuelC(wkD)}`;
-        gasSub = `${fuelC(st.now)}/L (7d ▲${fuelC(wkD)}) · Tap for 30d history`;
+        gasSub = `${fuelC(st.now)}/L (${zbp || '7d ▲' + fuelC(wkD)}) · 30d history`;
       } else if (mv != null && mv <= -0.2) {
         gasTitle = `Gas: ▼ Down ${fuelC(Math.abs(mv))}`;
-        gasSub = `${fuelC(st.now)}/L · Tap for 30-day history`;
-      } else if (mv != null && mv >= 0.2) {
-        gasTitle = `Gas: ▲ Up ${fuelC(mv)}`;
-        gasSub = `${fuelC(st.now)}/L · Tap for 30-day history`;
+        gasSub = `${fuelC(st.now)}/L (${zbp}) · Tap for 30-day history`;
       } else {
         gasTitle = `Gas: ${fuelC(st.now)}/L`;
-        gasSub = `Marsden Pt 91 · Tap for 30-day history`;
+        gasSub = `${zbp || 'Marsden Pt 91'} · Tap for 30-day history`;
       }
     } else {
       setTimeout(() => { try { fuelRefresh(false); } catch (e) { } }, 0);
@@ -28797,7 +28803,9 @@ const FUEL_SEED_DAYS = [
   { d: "2026-10-22", bp91: 335.05, bp95: 347.02, bpDiesel: 304.65, bpEff: "2026-10-20", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
   { d: "2026-10-23", bp91: 328.86, bp95: 340.02, bpDiesel: 305.36, bpEff: "2026-10-23", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
   { d: "2026-10-24", bp91: 328.86, bp95: 340.02, bpDiesel: 305.36, bpEff: "2026-10-23", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
-  { d: "2026-10-25", bp91: 328.86, bp95: 340.02, bpDiesel: 305.36, bpEff: "2026-10-23", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" }
+  { d: "2026-10-25", bp91: 328.86, bp95: 340.02, bpDiesel: 305.36, bpEff: "2026-10-23", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
+  { d: "2026-10-26", bp91: 328.86, bp95: 340.02, bpDiesel: 305.36, bpEff: "2026-10-23", z91: 327.11, z95: 343.91, zDiesel: 288.99, zEff: "2026-10-21" },
+  { d: "2026-10-27", bp91: 330.08, bp95: 340.99, bpDiesel: 307.09, bpEff: "2026-10-27", z91: 322.37, z95: 338.12, zDiesel: 295.16, zEff: "2026-10-28" }
 ];
 function mergeFuelDays(rawDays) {
   const byD = new Map(FUEL_SEED_DAYS.map(x => [x.d, Object.assign({}, x)]));
@@ -28809,23 +28817,36 @@ function mergeFuelDays(rawDays) {
 let FUEL = null, fuelBusy = false, fuelGrade = "91", fuelBackHash = "#alerts";
 try {
   const saved = JSON.parse(localStorage.getItem('fuel') || 'null');
-  FUEL = { days: mergeFuelDays(saved && saved.days), day: (saved && saved.day) || "2026-10-25", got: (saved && saved.got) || 0 };
+  const merged = mergeFuelDays(saved && saved.days);
+  const lastD = (merged[merged.length - 1] && merged[merged.length - 1].d) || "2026-10-27";
+  FUEL = { days: merged, day: (saved && saved.day && saved.day >= lastD) ? saved.day : lastD, got: (saved && saved.got) || 0, at: (saved && saved.at) || 0 };
 } catch (e) {
-  FUEL = { days: mergeFuelDays([]), day: "2026-10-25", got: 0 };
+  FUEL = { days: mergeFuelDays([]), day: "2026-10-27", got: 0, at: 0 };
 }
 async function fuelRefresh(force) {
-  if (fuelBusy || (!force && FUEL && Date.now() - (FUEL.got || 0) < 3 * 3600e3 && FUEL.day === todayISO() && FUEL.days && FUEL.days.length >= 25)) return;
+  if (fuelBusy || (!force && FUEL && Date.now() - (FUEL.got || 0) < 30 * 60e3 && FUEL.day === todayISO() && FUEL.days && FUEL.days.length >= 25)) return;
   fuelBusy = true;
   try {
-    const r = await fetch(FUEL_URL, { cache: 'no-store' });
+    const u = FUEL_URL + (force ? '?force=1&t=' + Date.now() : '?t=' + Math.floor(Date.now() / 60000));
+    const r = await fetch(u, { cache: 'no-store' });
     if (r.ok) {
       const d = await r.json();
       if (d && Array.isArray(d.days)) {
         d.days = mergeFuelDays(d.days);
         FUEL = Object.assign(d, { got: Date.now() });
         localStorage.setItem('fuel', JSON.stringify(FUEL));
+        try { _cuCache = null; _bellSigsMemo = null; } catch (e) {}
         const h = (location.hash || '#home').slice(1);
-        if (!sheetOpen && ['cars', 'fuel', 'alerts', 'home', ''].includes(h)) render();
+        if (h === 'alerts') {
+          try { glWarnRedraw(true); } catch (e) { if (!sheetOpen) render(); }
+        } else if (!sheetOpen && ['cars', 'fuel', 'home', ''].includes(h)) {
+          render();
+        }
+        if (force && typeof toast === 'function') {
+          const st91 = fuelStats('91');
+          const L91 = st91 && st91.last;
+          toast(st91 ? "Updated: 91 is " + fuelC(st91.now) + "/L (Z " + (L91 && L91.z91 ? fuelC(L91.z91) : "–") + " · BP " + (L91 && L91.bp91 ? fuelC(L91.bp91) : "–") + ")" : "Marsden Point prices updated");
+        }
       }
     }
   } catch (e) { }
