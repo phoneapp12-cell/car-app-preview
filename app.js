@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.41';
+const APP_VERSION = '2.28.42';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -31904,7 +31904,18 @@ async function ltvMountVideo(forceReload = false) {
       }
     } catch (e) {}
   }
-  if (vid.canPlayType("application/vnd.apple.mpegurl") && !/Android|Chrome/i.test(navigator.userAgent || "")) {
+  if (ch.directVideoBlobUrl) {
+    vid.src = ch.directVideoBlobUrl;
+    ltvKillSubtitles(vid, null);
+    vid.addEventListener("loadedmetadata", function onMeta() {
+      vid.removeEventListener("loadedmetadata", onMeta);
+      try { vid.currentTime = 0; } catch (e) {}
+    });
+    vid.play().catch(() => {});
+    return;
+  }
+  const isVodRec = !!ch.isDvrRecording;
+  if (!isVodRec && vid.canPlayType("application/vnd.apple.mpegurl") && !/Android|Chrome/i.test(navigator.userAgent || "")) {
     vid.src = ch.hls;
     ltvKillSubtitles(vid, null);
     vid.play().catch(() => {});
@@ -31915,8 +31926,9 @@ async function ltvMountVideo(forceReload = false) {
     const hls = new HlsClass({
       enableWorker: true,
       lowLatencyMode: false,
-      backBufferLength: 60,
-      maxBufferLength: 30,
+      startPosition: isVodRec ? 0 : -1,
+      backBufferLength: isVodRec ? 300 : 60,
+      maxBufferLength: isVodRec ? 60 : 30,
       enableWebVTT: false,
       enableIMSC1: false,
       enableCEA708Captions: false,
@@ -31929,6 +31941,9 @@ async function ltvMountVideo(forceReload = false) {
     hls.attachMedia(vid);
     hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
       ltvKillSubtitles(vid, hls);
+      if (isVodRec) {
+        try { vid.currentTime = 0; } catch (e) {}
+      }
       vid.play().catch(() => {});
     });
     if (HlsClass.Events.SUBTITLE_TRACKS_UPDATED) {
@@ -32076,10 +32091,20 @@ function ltvPlayerHtml() {
     </div>
     <div id="ltv-screen" style="aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(56,189,248,.25)">${screen}</div>
     ${ltvCur.setMode ? `<div class="cs-set-banner" style="margin-bottom:10px">Tap any preset button below (<b>P${bankOffset + 1}–P${bankOffset + 6}</b>) to save <b>${esc(ch.name)}</b></div>` : ""}
+    ${ch.isDvrRecording ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;background:rgba(22,163,74,.18);border:1px solid rgba(74,222,128,.4);border-radius:10px;padding:7px 10px;margin-bottom:10px">
+      <div style="font-size:.76rem;font-weight:800;color:#bbf7d0">📼 DVR RECORDING PLAYBACK (VOD)</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button type="button" class="btn small" style="padding:3px 8px;font-size:.72rem;background:#0f172a;color:#f8fafc;border-color:#334155" onclick="ltvSeekRec(0,true)">⏮ Start (0:00)</button>
+        <button type="button" class="btn small" style="padding:3px 8px;font-size:.72rem;background:#0f172a;color:#f8fafc;border-color:#334155" onclick="ltvSeekRec(-30,false)">⏪ −30s</button>
+        <button type="button" class="btn small" style="padding:3px 8px;font-size:.72rem;background:#0f172a;color:#f8fafc;border-color:#334155" onclick="ltvSeekRec(30,false)">⏩ +30s</button>
+        <button type="button" class="btn small" style="padding:3px 8px;font-size:.72rem;background:#0f172a;color:#f8fafc;border-color:#334155" onclick="ltvSeekRec(120,false)">⏩ +2m</button>
+        <button type="button" class="btn small primary" style="padding:3px 9px;font-size:.72rem" onclick="ltvExitRecording()">📺 Return to Live TV</button>
+      </div>
+    </div>` : ""}
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
       <div style="min-width:0;flex:1">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-          <span class="tblbl" style="background:#dc2626;font-size:.68rem;padding:2px 7px">● LIVE</span>
+          <span class="tblbl" style="background:${ch.isDvrRecording ? "#16a34a" : "#dc2626"};font-size:.68rem;padding:2px 7px">${ch.isDvrRecording ? "📼 RECORDED VOD" : "● LIVE"}</span>
           <span class="tblbl" style="background:#2563eb;font-size:.68rem;padding:2px 7px">${esc(ch.catLabel || ch.country || "Free TV")}</span>
           ${activePresetNum ? `<span class="tblbl" style="background:#ca8a04;font-size:.68rem;padding:2px 7px">PRESET P${activePresetNum}</span>` : ""}
         </div>
@@ -32563,20 +32588,322 @@ function ltvIsSeriesLinked(seriesTitle, channelId) {
   return links.some(l => l.seriesTitle.toLowerCase() === sNorm && (!l.channelId || l.channelId === channelId));
 }
 
+// IndexedDB storage for recorded video Blobs and static VOD manifests on this phone
+function ltvIdbOpen() {
+  return new Promise((resolve, reject) => {
+    try {
+      const req = indexedDB.open("myAppDvrMedia", 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains("media")) db.createObjectStore("media");
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    } catch (e) { reject(e); }
+  });
+}
+async function ltvIdbPut(key, val) {
+  try {
+    const db = await ltvIdbOpen();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction("media", "readwrite");
+      tx.objectStore("media").put(val, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { return false; }
+}
+async function ltvIdbGet(key) {
+  try {
+    const db = await ltvIdbOpen();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction("media", "readonly");
+      const r = tx.objectStore("media").get(key);
+      r.onsuccess = () => resolve(r.result || null);
+      r.onerror = () => resolve(null);
+    });
+  } catch (e) { return null; }
+}
+async function ltvIdbDel(key) {
+  try {
+    const db = await ltvIdbOpen();
+    const tx = db.transaction("media", "readwrite");
+    tx.objectStore("media").delete(key);
+  } catch (e) {}
+}
+
+function ltvResolveAttrUris(line, base) {
+  return line.replace(/URI="([^"]+)"/g, (m, u) => {
+    try { return 'URI="' + new URL(u, base).toString() + '"'; } catch (e) { return m; }
+  });
+}
+
+async function ltvBuildVodChildFromUrl(childUrl, startMs, endMs, prevSegUrls) {
+  try {
+    const r = await fetch(childUrl, { cache: "no-store" });
+    if (!r.ok) return null;
+    const txt = await r.text();
+    if (!txt.includes("#EXTM3U")) return null;
+    const base = r.url || childUrl;
+    const rawLines = txt.split(/\r?\n/);
+    let targetDur = 6, mapLine = "", curPdt = 0, curKey = "", curDisc = false;
+    const items = [];
+    for (let i = 0; i < rawLines.length; i++) {
+      const l = rawLines[i].trim();
+      if (!l) continue;
+      if (l.startsWith("#EXT-X-TARGETDURATION:")) targetDur = Math.max(2, parseInt(l.split(":")[1], 10) || 6);
+      else if (l.startsWith("#EXT-X-MAP:")) mapLine = ltvResolveAttrUris(l, base);
+      else if (l.startsWith("#EXT-X-KEY:")) curKey = ltvResolveAttrUris(l, base);
+      else if (l.startsWith("#EXT-X-PROGRAM-DATE-TIME:")) {
+        const dt = Date.parse(l.slice("#EXT-X-PROGRAM-DATE-TIME:".length).trim());
+        if (dt) curPdt = dt;
+      } else if (l === "#EXT-X-DISCONTINUITY") curDisc = true;
+      else if (l.startsWith("#EXTINF:")) {
+        const dur = parseFloat(l.slice(8)) || targetDur;
+        for (let j = i + 1; j < rawLines.length; j++) {
+          const nxt = rawLines[j].trim();
+          if (!nxt) continue;
+          if (nxt.startsWith("#")) {
+            if (nxt.startsWith("#EXT-X-PROGRAM-DATE-TIME:")) {
+              const dt = Date.parse(nxt.slice("#EXT-X-PROGRAM-DATE-TIME:".length).trim());
+              if (dt) curPdt = dt;
+            } else if (nxt.startsWith("#EXT-X-KEY:")) curKey = ltvResolveAttrUris(nxt, base);
+            else if (nxt === "#EXT-X-DISCONTINUITY") curDisc = true;
+            continue;
+          }
+          let absUrl = nxt;
+          try { absUrl = new URL(nxt, base).toString(); } catch (e) {}
+          items.push({ dur, extinf: l, url: absUrl, pdt: curPdt, key: curKey, disc: curDisc });
+          if (curPdt) curPdt += Math.round(dur * 1000);
+          curDisc = false;
+          i = j;
+          break;
+        }
+      }
+    }
+    if (!items.length) return null;
+    let chosen = items;
+    const hasPdt = items.some(x => x.pdt > 0);
+    if (hasPdt && items.length > 60 && startMs && endMs) {
+      const win = items.filter(x => x.pdt >= startMs - 30000 && x.pdt <= endMs + 60000);
+      chosen = win.length >= 15 ? win : items.slice(Math.max(0, items.length - 450));
+    } else if (items.length > 80) {
+      chosen = items.slice(Math.max(0, items.length - 450));
+    } else if (items.length <= 30 && (!prevSegUrls || !prevSegUrls.length)) {
+      const first = items.find(x => !/:tag=ad:/i.test(x.extinf)) || items[0];
+      const fsMatch = first.url.match(/^(.*_)(\d+)(\.ts\?m=\d+.*)$/);
+      const wurlMatch = !fsMatch && first.url.match(/^(.*-)(\d{5})(\.ts.*)$/);
+      if (fsMatch) {
+        const prefix = fsMatch[1], firstSeq = parseInt(fsMatch[2], 10), suffix = fsMatch[3];
+        const backfilled = [];
+        for (let s = Math.max(1, firstSeq - 225); s < firstSeq; s++) {
+          backfilled.push({ dur: first.dur, extinf: "#EXTINF:" + first.dur.toFixed(3) + ",", url: prefix + s + suffix, pdt: 0, key: first.key, disc: false });
+        }
+        chosen = backfilled.concat(items);
+      } else if (wurlMatch) {
+        const prefix = wurlMatch[1], firstSeq = parseInt(wurlMatch[2], 10), suffix = wurlMatch[3];
+        let backSteps = 0;
+        for (const step of [35, 20, 10, 5]) {
+          if (firstSeq - step <= 0) continue;
+          try {
+            const pr = await fetch(prefix + String(firstSeq - step).padStart(5, "0") + suffix, { method: "HEAD" });
+            if (pr.ok) { backSteps = step; break; }
+          } catch (e) {}
+        }
+        if (backSteps > 0) {
+          const backfilled = [];
+          for (let s = firstSeq - backSteps; s < firstSeq; s++) {
+            backfilled.push({ dur: first.dur, extinf: "#EXTINF:" + first.dur.toFixed(3) + ",", url: prefix + String(s).padStart(5, "0") + suffix, pdt: 0, key: first.key, disc: false });
+          }
+          chosen = backfilled.concat(items);
+        }
+      }
+    }
+    const merged = Array.isArray(prevSegUrls) && prevSegUrls.length ? prevSegUrls.slice() : [];
+    const seen = new Set(merged.map(x => x.url));
+    for (const seg of chosen) {
+      if (!seen.has(seg.url)) {
+        seen.add(seg.url);
+        merged.push(seg);
+      }
+    }
+    const headers = [
+      "#EXTM3U",
+      "#EXT-X-VERSION:6",
+      "#EXT-X-PLAYLIST-TYPE:VOD",
+      "#EXT-X-INDEPENDENT-SEGMENTS",
+      "#EXT-X-TARGETDURATION:" + Math.ceil(targetDur),
+      "#EXT-X-MEDIA-SEQUENCE:0"
+    ];
+    if (mapLine) headers.push(mapLine);
+    let lastKey = "";
+    for (const seg of merged) {
+      if (seg.disc) headers.push("#EXT-X-DISCONTINUITY");
+      if (seg.key && seg.key !== lastKey) { headers.push(seg.key); lastKey = seg.key; }
+      headers.push(seg.extinf);
+      headers.push(seg.url);
+    }
+    headers.push("#EXT-X-ENDLIST");
+    const totalSec = Math.round(merged.reduce((s, x) => s + (x.dur || 4), 0));
+    return { m3u8: headers.join("\n") + "\n", segs: merged, totalSec, childUrl: base };
+  } catch (e) { return null; }
+}
+
+async function ltvCaptureClientVod(streamUrl, recId, startMs, endMs, prevState) {
+  if (!streamUrl || !streamUrl.startsWith("https://")) return null;
+  try {
+    if (prevState && prevState.videoChildUrl) {
+      const vRes = await ltvBuildVodChildFromUrl(prevState.videoChildUrl, startMs, endMs, prevState.videoSegs);
+      if (!vRes) return prevState;
+      prevState.videoSegs = vRes.segs;
+      prevState.videoM3u8 = vRes.m3u8;
+      prevState.totalSec = vRes.totalSec;
+      if (prevState.audioChildUrl) {
+        const aRes = await ltvBuildVodChildFromUrl(prevState.audioChildUrl, startMs, endMs, prevState.audioSegs);
+        if (aRes) { prevState.audioSegs = aRes.segs; prevState.audioM3u8 = aRes.m3u8; }
+      } else {
+        prevState.m3u8 = vRes.m3u8;
+      }
+      return prevState;
+    }
+    const r = await fetch(streamUrl, { cache: "no-store" });
+    if (!r.ok) return null;
+    const txt = await r.text();
+    if (!txt.includes("#EXTM3U")) return null;
+    const base = r.url || streamUrl;
+    if (txt.includes("#EXTINF:")) {
+      const vRes = await ltvBuildVodChildFromUrl(base, startMs, endMs, null);
+      if (!vRes) return null;
+      return { m3u8: vRes.m3u8, videoM3u8: "", audioM3u8: "", videoChildUrl: base, audioChildUrl: "", videoSegs: vRes.segs, audioSegs: [], totalSec: vRes.totalSec };
+    }
+    const lines = txt.split(/\r?\n/);
+    let audioUri = "";
+    for (const l of lines) {
+      if (l.startsWith("#EXT-X-MEDIA:") && /TYPE=AUDIO/i.test(l) && /URI="([^"]+)"/i.test(l)) {
+        const m = l.match(/URI="([^"]+)"/i);
+        if (m && (!audioUri || /DEFAULT=YES|LANGUAGE="en/i.test(l))) {
+          try { audioUri = new URL(m[1], base).toString(); } catch (e) {}
+        }
+      }
+    }
+    const variants = [];
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i].trim();
+      if (l.startsWith("#EXT-X-STREAM-INF:")) {
+        const bw = parseInt((l.match(/BANDWIDTH=(\d+)/) || [])[1] || "0", 10);
+        for (let j = i + 1; j < lines.length; j++) {
+          const u = lines[j].trim();
+          if (!u || u.startsWith("#")) continue;
+          try { variants.push({ inf: l, bw, url: new URL(u, base).toString() }); } catch (e) {}
+          i = j;
+          break;
+        }
+      }
+    }
+    if (!variants.length) return null;
+    variants.sort((a, b) => Math.abs(a.bw - 2400000) - Math.abs(b.bw - 2400000));
+    const picked = variants[0];
+    if (!audioUri) {
+      const vRes = await ltvBuildVodChildFromUrl(picked.url, startMs, endMs, null);
+      if (!vRes) return null;
+      return { m3u8: vRes.m3u8, videoM3u8: "", audioM3u8: "", videoChildUrl: picked.url, audioChildUrl: "", videoSegs: vRes.segs, audioSegs: [], totalSec: vRes.totalSec };
+    }
+    const [vRes, aRes] = await Promise.all([
+      ltvBuildVodChildFromUrl(picked.url, startMs, endMs, null),
+      ltvBuildVodChildFromUrl(audioUri, startMs, endMs, null)
+    ]);
+    if (!vRes) return null;
+    const cleanInf = picked.inf.replace(/,?\s*SUBTITLES="[^"]*"/gi, "");
+    const masterVod = [
+      "#EXTM3U",
+      "#EXT-X-VERSION:6",
+      "#EXT-X-INDEPENDENT-SEGMENTS",
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="English",LANGUAGE="en",DEFAULT=YES,AUTOSELECT=YES,URI="' + RELAY_URL + '/livetv-recording/' + encodeURIComponent(recId) + '-audio.m3u8"',
+      cleanInf.replace(/AUDIO="[^"]*"/, 'AUDIO="aud"'),
+      RELAY_URL + "/livetv-recording/" + encodeURIComponent(recId) + "-video.m3u8",
+      ""
+    ].join("\n");
+    return {
+      m3u8: aRes ? masterVod : vRes.m3u8,
+      videoM3u8: aRes ? vRes.m3u8 : "",
+      audioM3u8: aRes ? aRes.m3u8 : "",
+      videoChildUrl: picked.url,
+      audioChildUrl: audioUri,
+      videoSegs: vRes.segs,
+      audioSegs: aRes ? aRes.segs : [],
+      totalSec: vRes.totalSec
+    };
+  } catch (e) { return null; }
+}
+
+let ltvActiveRec = null; // { recId, chId, startedAt, mediaRec, chunks, pollTimer, tickTimer, vodState }
+
+function ltvFormatElapsed(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60);
+  const rem = String(s % 60).padStart(2, "0");
+  return m + ":" + rem;
+}
+
+async function ltvStopActiveRecording() {
+  if (!ltvActiveRec) return;
+  const active = ltvActiveRec;
+  ltvActiveRec = null;
+  if (active.pollTimer) clearInterval(active.pollTimer);
+  if (active.tickTimer) clearInterval(active.tickTimer);
+  const rec = ((LTV_DVR && LTV_DVR.recordings) || []).find(r => r.id === active.recId);
+  if (active.mediaRec && active.mediaRec.state !== "inactive") {
+    try { active.mediaRec.stop(); } catch (e) {}
+  }
+  if (active.vodState && active.vodState.m3u8) {
+    await ltvIdbPut("vod:" + active.recId, active.vodState);
+    try {
+      await fetch(RELAY_URL + "/livetv-dvr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-vod",
+          id: active.recId,
+          m3u8: active.vodState.m3u8,
+          videoM3u8: active.vodState.videoM3u8 || "",
+          audioM3u8: active.vodState.audioM3u8 || ""
+        })
+      });
+    } catch (e) {}
+  }
+  if (rec) {
+    rec.status = "ready";
+    rec.recordedAt = new Date().toISOString();
+    if (active.vodState && active.vodState.totalSec) {
+      rec.durationMin = Math.max(1, Math.round(active.vodState.totalSec / 60));
+      rec.recordedSec = active.vodState.totalSec;
+    }
+    try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
+  }
+  if (document.getElementById("itv-guide-mount")) itvRedrawInPlace(false); else ltvRedraw();
+  toast(`⏹ Stopped & saved recording${rec ? ": “" + rec.title + "”" : ""}! Ready to play from 0:00.`, "▶ Play Now", () => ltvPlayRecording(active.recId));
+}
+
 async function ltvRecordProg(chId, startMs) {
   const ch = ltvAllChannels().find(c => c.id === chId) || ltvCurrentChannel();
   if (!ch) return;
+  // If user taps RECORD on the channel currently being actively recorded, stop & finalize the recording
+  if (ltvActiveRec && (ltvActiveRec.chId === ch.id || !startMs)) {
+    await ltvStopActiveRecording();
+    return;
+  }
   const progs = itvProgsForChannel(ch, Date.now());
   const p = (startMs ? progs.find(x => x.startMs === startMs) : progs[0]) || progs[0];
   const existing = ltvIsRecScheduledOrDone(p.id, p.title, p.start);
-  if (existing) {
-    toast(`“${p.title}” is already in your DVR (${existing.status === "ready" ? "Ready to play" : "Scheduled"}).`, "Open DVR", () => { ltvViewMode = "dvr"; go("#livetv"); render(); });
+  if (existing && startMs) {
+    toast(`“${p.title}” is already in your DVR (${existing.status === "ready" ? "Ready to play" : "Scheduled"}).`, "▶ Play Recording", () => ltvPlayRecording(existing.id));
     return;
   }
   const now = Date.now();
-  const isNow = p.startMs <= now + 60000;
+  const isNow = !startMs || p.startMs <= now + 60000;
+  const recId = existing ? existing.id : (startMs ? p.id : "rec-" + ch.id + "-" + now);
   const rec = {
-    id: p.id,
+    id: recId,
     title: p.title,
     episode: p.episode,
     desc: p.desc,
@@ -32593,15 +32920,79 @@ async function ltvRecordProg(chId, startMs) {
     recordedAt: isNow ? new Date(now).toISOString() : "",
     sizeMb: Math.round((p.durationMin || 60) * 6.5)
   };
-  LTV_DVR.recordings = [rec, ...(LTV_DVR.recordings || [])];
+  LTV_DVR.recordings = [rec, ...(LTV_DVR.recordings || []).filter(x => x.id !== recId)];
   try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
-  if (document.getElementById("itv-guide-mount")) itvRedrawInPlace(false); else render();
-  toast(isNow ? `🔴 Recorded “${p.title}” to OneDrive & DVR Planner!` : `📅 Scheduled “${p.title}” in DVR Planner.`, "Open DVR", () => { ltvViewMode = "dvr"; go("#livetv"); render(); });
+
+  // If recording a live programme right now, capture the VOD segment playlist immediately + start live segment/video capture!
+  let vodSnap = null;
+  if (isNow && ch.hls) {
+    vodSnap = await ltvCaptureClientVod(ch.hls, recId, p.startMs || (now - 1800000), p.endMs || (now + 1800000), null);
+    if (vodSnap && vodSnap.m3u8) {
+      await ltvIdbPut("vod:" + recId, vodSnap);
+      if (vodSnap.totalSec) rec.recordedSec = vodSnap.totalSec;
+    }
+    // Start active background segment accumulator + MediaRecorder (if currently playing in #ltv-video)
+    if (ltvActiveRec) await ltvStopActiveRecording();
+    const active = { recId, chId: ch.id, startedAt: Date.now(), mediaRec: null, chunks: [], pollTimer: null, tickTimer: null, vodState: vodSnap };
+    const vid = document.getElementById("ltv-video");
+    const curCh = ltvCurrentChannel();
+    if (vid && curCh && curCh.id === ch.id && typeof MediaRecorder !== "undefined") {
+      try {
+        const stream = vid.captureStream ? vid.captureStream() : (vid.mozCaptureStream ? vid.mozCaptureStream() : null);
+        if (stream && stream.getTracks && stream.getTracks().length > 0) {
+          const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find(t => { try { return MediaRecorder.isTypeSupported(t); } catch (e) { return false; } }) || "";
+          const mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+          mr.ondataavailable = ev => { if (ev.data && ev.data.size > 0) active.chunks.push(ev.data); };
+          mr.onstop = async () => {
+            if (active.chunks.length > 0) {
+              const blob = new Blob(active.chunks, { type: mr.mimeType || "video/webm" });
+              if (blob.size > 30000) {
+                await ltvIdbPut("blob:" + recId, blob);
+                rec.hasLocalVideo = true;
+                rec.sizeMb = Math.max(1, Math.round((blob.size / (1024 * 1024)) * 10) / 10);
+                try { localStorage.setItem("ltvDvrCache", JSON.stringify(LTV_DVR)); } catch (e) {}
+              }
+            }
+          };
+          mr.start(3000);
+          active.mediaRec = mr;
+        }
+      } catch (e) {}
+    }
+    active.pollTimer = setInterval(async () => {
+      if (!ltvActiveRec || ltvActiveRec.recId !== recId) return;
+      const nextVod = await ltvCaptureClientVod(ch.hls, recId, p.startMs || (now - 1800000), Date.now() + 60000, active.vodState);
+      if (nextVod && nextVod.m3u8) {
+        active.vodState = nextVod;
+        await ltvIdbPut("vod:" + recId, nextVod);
+      }
+    }, 10000);
+    active.tickTimer = setInterval(() => {
+      const btn = document.getElementById("ltv-rec-btn-lbl");
+      if (btn && ltvActiveRec) btn.textContent = "STOP " + ltvFormatElapsed(Date.now() - ltvActiveRec.startedAt);
+    }, 1000);
+    ltvActiveRec = active;
+  }
+
+  if (document.getElementById("itv-guide-mount")) itvRedrawInPlace(false); else ltvRedraw();
+  toast(
+    isNow
+      ? `🔴 Recording “${p.title}” (VOD captured + live recording active)! Tap ▶ Play in DVR anytime to watch from the start.`
+      : `📅 Scheduled “${p.title}” in DVR Planner.`,
+    isNow ? "▶ Play Recording" : "Open DVR",
+    () => { if (isNow) ltvPlayRecording(recId); else { ltvViewMode = "dvr"; go("#livetv"); render(); } }
+  );
   try {
     const r = await fetch(RELAY_URL + "/livetv-dvr", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "record", prog: rec })
+      body: JSON.stringify({
+        action: "record",
+        prog: rec,
+        vodM3u8: vodSnap ? vodSnap.m3u8 : "",
+        videoM3u8: vodSnap ? vodSnap.videoM3u8 : "",
+        audioM3u8: vodSnap ? vodSnap.audioM3u8 : ""
+      })
     });
     if (r.ok) {
       const j = await r.json();
@@ -32701,10 +33092,64 @@ async function ltvDeleteSeriesLink(slId) {
   ltvSyncToOneDrive(LTV_DVR);
 }
 
-function ltvPlayRecording(recId) {
+function ltvSeekRec(deltaSec, toStart = false) {
+  const vid = document.getElementById("ltv-video");
+  if (!vid) return;
+  try {
+    if (toStart) vid.currentTime = 0;
+    else vid.currentTime = Math.max(0, (vid.currentTime || 0) + deltaSec);
+    vid.play().catch(() => {});
+  } catch (e) {}
+}
+
+function ltvExitRecording() {
+  ltvCur.custom = null;
+  ltvRedraw();
+  toast("Returned to live TV channel.");
+}
+
+async function ltvPlayRecording(recId) {
   const rec = ((LTV_DVR && LTV_DVR.recordings) || []).find(r => r.id === recId);
   if (!rec) return;
-  const dvrHls = RELAY_URL ? (RELAY_URL + "/livetv-recording/" + encodeURIComponent(rec.id) + ".m3u8") : rec.streamUrl;
+  // If this recording is currently actively recording, stop & finalize it first so the user watches the full captured recording
+  if (ltvActiveRec && ltvActiveRec.recId === recId) {
+    await ltvStopActiveRecording();
+  }
+  let directVideoBlobUrl = "";
+  const localBlob = await ltvIdbGet("blob:" + rec.id);
+  if (localBlob instanceof Blob && localBlob.size > 30000) {
+    directVideoBlobUrl = URL.createObjectURL(localBlob);
+  }
+  let vodHlsUrl = RELAY_URL
+    ? (RELAY_URL + "/livetv-recording/" + encodeURIComponent(rec.id) + ".m3u8?u=" + encodeURIComponent(rec.streamUrl || "") + "&_t=" + Date.now())
+    : "";
+  const localVod = await ltvIdbGet("vod:" + rec.id);
+  if (localVod && localVod.m3u8 && !localVod.audioM3u8) {
+    try {
+      const m3u8Blob = new Blob([localVod.m3u8], { type: "application/vnd.apple.mpegurl" });
+      vodHlsUrl = URL.createObjectURL(m3u8Blob);
+    } catch (e) {}
+  } else if (!localVod && rec.streamUrl) {
+    // Capture a client-side VOD playlist on the spot if none was stored yet (e.g. NZ geo-locked Freeview streams)
+    const freshVod = await ltvCaptureClientVod(rec.streamUrl, rec.id, Date.parse(rec.start || "") || 0, Date.parse(rec.end || "") || 0, null);
+    if (freshVod && freshVod.m3u8) {
+      await ltvIdbPut("vod:" + rec.id, freshVod);
+      if (!freshVod.audioM3u8) {
+        try {
+          const m3u8Blob = new Blob([freshVod.m3u8], { type: "application/vnd.apple.mpegurl" });
+          vodHlsUrl = URL.createObjectURL(m3u8Blob);
+        } catch (e) {}
+      } else if (RELAY_URL) {
+        try {
+          await fetch(RELAY_URL + "/livetv-dvr", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "save-vod", id: rec.id, m3u8: freshVod.m3u8, videoM3u8: freshVod.videoM3u8, audioM3u8: freshVod.audioM3u8 })
+          });
+        } catch (e) {}
+      }
+    }
+  }
   ltvCur.custom = {
     id: rec.id,
     name: "📼 " + rec.title,
@@ -32712,13 +33157,18 @@ function ltvPlayRecording(recId) {
     catLabel: "📼 DVR Recording · " + (rec.channelName || "Recorded"),
     country: "OneDrive / Cloud DVR",
     desc: [rec.episode, rec.desc].filter(Boolean).join(" · "),
-    hls: rec.streamUrl || dvrHls,
+    hls: vodHlsUrl,
+    directVideoBlobUrl,
+    isDvrRecording: true,
     web: ""
   };
   if (location.hash !== "#livetv") go("#livetv");
-  else ltvRedraw();
+  else {
+    ltvRedraw();
+    setTimeout(() => ltvMountVideo(true), 50);
+  }
   try { document.getElementById("ltvplayer")?.scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch (e) {}
-  toast(`▶ Playing recording: ${rec.title}`);
+  toast(`▶ Playing recorded VOD from 0:00: ${rec.title}`);
 }
 
 function ltvDvrBoardHtml() {
@@ -32729,15 +33179,22 @@ function ltvDvrBoardHtml() {
 
   const readyCards = ready.map(r => {
     const when = r.recordedAt ? newsWhen(r.recordedAt) : fmtW((r.start || "").slice(0, 10));
-    return `<div class="tbcard" data-dvrrec="${esc(r.id)}" style="cursor:pointer" onclick="ltvPlayRecording(${jsArg(r.id)})">
+    const isActRec = ltvActiveRec && ltvActiveRec.recId === r.id;
+    const isPlayingThis = ltvCur && ltvCur.custom && ltvCur.custom.isDvrRecording && ltvCur.custom.id === r.id;
+    return `<div class="tbcard" data-dvrrec="${esc(r.id)}" style="cursor:pointer;${isPlayingThis ? "border-left:4px solid #16a34a" : isActRec ? "border-left:4px solid #dc2626" : ""}" onclick="ltvPlayRecording(${jsArg(r.id)})">
       <div class="tbbody">
-        ${tbLbl([["📼 Recorded · Ready", "#16a34a"], [r.channelName || "TV", "#2563eb"], ...(r.fromSeriesLink ? [["🔁 Series", "#ca8a04"]] : [])])}
+        ${tbLbl([
+          isActRec ? ["🔴 Recording Live", "#dc2626"] : isPlayingThis ? ["▶ Playing VOD Now", "#15803d"] : ["📼 Recorded VOD · Ready", "#16a34a"],
+          [r.channelName || "TV", "#2563eb"],
+          ...(r.fromSeriesLink ? [["🔁 Series", "#ca8a04"]] : [])
+        ])}
         <div class="tbt">▶ ${esc(r.title)}</div>
         ${r.episode ? `<div class="tbs" style="font-weight:650">${esc(r.episode)}</div>` : ""}
         ${r.desc ? `<div class="tbs">${esc(r.desc)}</div>` : ""}
         <div class="tbicons"><span>☁️ OneDrive (${r.sizeMb || 380} MB) · ${esc(when)}</span></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px" onclick="event.stopPropagation()">
-          <button type="button" class="btn small primary" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayRecording(${jsArg(r.id)})">▶ Play in TV Player</button>
+          <button type="button" class="btn small primary" style="padding:4px 10px;font-size:.75rem" onclick="ltvPlayRecording(${jsArg(r.id)})">▶ Play from 0:00 (VOD)</button>
+          ${isActRec ? `<button type="button" class="btn small" style="padding:4px 9px;font-size:.75rem;background:#fef2f2;color:#b91c1c;border-color:#fca5a5" onclick="ltvStopActiveRecording()">⏹ Stop &amp; Save</button>` : ""}
           <button type="button" class="btn small danger" style="padding:4px 9px;font-size:.75rem" onclick="ltvDeleteRecording(${jsArg(r.id)})">🗑️ Delete</button>
         </div>
       </div>
@@ -32939,9 +33396,13 @@ function renderInternetTvGuide() {
     const h = origLtvPlayer.apply(this, arguments);
     const ch = ltvCurrentChannel();
     if (!ch) return h;
+    const isRecNow = ltvActiveRec && ltvActiveRec.chId === ch.id;
+    const recBtnHtml = ch.isDvrRecording
+      ? `<button type="button" class="cs-hbtn" style="border-color:#22c55e;color:#bbf7d0" onclick="ltvSeekRec(0,true)"><span>⏮</span><small>RESTART</small></button>`
+      : `<button type="button" class="cs-hbtn${isRecNow ? " on" : ""}" style="border-color:#ef4444;color:#fecaca;${isRecNow ? "background:rgba(239,68,68,.28)" : ""}" onclick="ltvRecordProg(${jsArg(ch.id)},0)"><span>${isRecNow ? "⏹" : "🔴"}</span><small id="ltv-rec-btn-lbl">${isRecNow ? "STOP " + ltvFormatElapsed(Date.now() - ltvActiveRec.startedAt) : "RECORD"}</small></button>`;
     return h.replace(
       `<button type="button" class="cs-hbtn" onclick="ltvAssignSheet(${jsArg(ch.id)})"><span>📌</span><small>PRESET</small></button>`,
-      `<button type="button" class="cs-hbtn" style="border-color:#ef4444;color:#fecaca" onclick="ltvRecordProg(${jsArg(ch.id)},0)"><span>🔴</span><small>RECORD</small></button><button type="button" class="cs-hbtn" onclick="ltvAssignSheet(${jsArg(ch.id)})"><span>📌</span><small>PRESET</small></button>`
+      recBtnHtml + `<button type="button" class="cs-hbtn" onclick="ltvAssignSheet(${jsArg(ch.id)})"><span>📌</span><small>PRESET</small></button>`
     );
   };
   const origLtvBoard = ltvBoardHtml;
