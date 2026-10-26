@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.39';
+const APP_VERSION = '2.28.40';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -15379,8 +15379,32 @@ function wireVideoSwipe() {
 }
 // Sarah Jenkins, @sarahjenkins1510. Confirmed 2 Oct 2026 (oembed). A newer one from the channel replaces it.
 const SARAH_CHANNEL_ID = 'UC2sjJeoD0gLkf66iLbm28hg';
-const SARAH_KNOWN = { id: 'ShTVHD_hSLY', title: '16 October 2026', channel: 'Sarah Jenkins', published: '2026-10-16T06:47:35+00:00' };
+const SARAH_CHANNEL_URL = 'https://www.youtube.com/@sarahjenkins1510/videos';
+const SARAH_KNOWN = { id: 'FZlgUR5bzEQ', title: '26 October 2026', channel: 'Sarah Jenkins', published: '2026-10-25T21:21:58+00:00' };
+const SARAH_RECENT_DEFAULT = [
+  { id: 'FZlgUR5bzEQ', title: '26 October 2026', channel: 'Sarah Jenkins', published: '2026-10-25T21:21:58+00:00' },
+  { id: 'WSl6YWyZiJU', title: '20 October 2026', channel: 'Sarah Jenkins', published: '2026-10-20T06:51:09+00:00' },
+  { id: 'WMc7B14xEdw', title: '20 October 2026', channel: 'Sarah Jenkins', published: '2026-10-20T05:01:04+00:00' },
+  { id: 'ShTVHD_hSLY', title: '16 October 2026', channel: 'Sarah Jenkins', published: '2026-10-16T06:47:35+00:00' },
+  { id: 'GBv5hPud67w', title: '14 October 2026', channel: 'Sarah Jenkins', published: '2026-10-14T08:18:29+00:00' }
+];
 let sarahMem = null;
+let sarahListMem = null;
+function currentSarahVideos() {
+  const seen = new Set(), out = [];
+  const push = v => {
+    if (!v || typeof v.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(v.id) || seen.has(v.id)) return;
+    seen.add(v.id);
+    out.push({ id: v.id, title: v.title || 'Sarah Jenkins video', channel: 'Sarah Jenkins', published: v.published || '', category: 'sarah', url: 'https://www.youtube.com/watch?v=' + v.id });
+  };
+  const top = currentSarahVideo();
+  if (top) push(top);
+  const savedList = S && S.settings && Array.isArray(S.settings.sarahVideos) ? S.settings.sarahVideos : [];
+  (sarahListMem || []).forEach(push);
+  savedList.forEach(push);
+  SARAH_RECENT_DEFAULT.forEach(push);
+  return out.sort((a, b) => String(b.published || '').localeCompare(String(a.published || '')));
+}
 function sarahPick(a, b) {
   if (!a || typeof a.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(a.id)) return b || null;
   if (!b || typeof b.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(b.id)) return a;
@@ -15407,6 +15431,10 @@ async function refreshSarah() {
       const data = await getJSON(RELAY_URL + '/sarah', 12000);
       if (data.channelId && data.channelId !== SARAH_CHANNEL_ID) return;
       announced = typeof data.announced === 'string' ? data.announced : '';
+      if (Array.isArray(data.videos) && data.videos.length) {
+        sarahListMem = data.videos.filter(x => x && typeof x.id === 'string' && /^[A-Za-z0-9_-]{11}$/.test(x.id)).slice(0, 10);
+        if (S && S.settings) S.settings.sarahVideos = sarahListMem;
+      }
       const top = Array.isArray(data.videos) ? data.videos.filter(x => x && typeof x.id === 'string').sort((a, b) => String(b.published || '').localeCompare(String(a.published || '')))[0] || null : null; // 2.26.13: newest by date
       if (top && typeof top.id === 'string' && /^[A-Za-z0-9_-]{11}$/.test(top.id)) {
         let title = String(top.title || '').replace(/\s+/g, ' ').trim();
@@ -15431,7 +15459,8 @@ async function refreshSarah() {
               S.settings.sarahLatest = next;
               save().catch(() => { });
               const h = (location.hash || '#home').slice(1).split('/')[0];
-              if (!sheetOpen && (h === 'home' || h === '')) render();
+              if (!sheetOpen && (h === 'home' || h === '' || h === 'alerts' || h === 'videos')) render();
+              try { glBellRedraw(); } catch (e) {}
             }
           }
         }
@@ -15521,8 +15550,15 @@ function vbCard(v) {
 function vbBoardHtml() {
   VB_ALL = {}; const o = vbGet(), cats = enabledVideoCats(), binned = new Set(o.lists.bin.map(x => x.id)), mineOk = v => v && !isSport(v.title || ''), ok = v => mineOk(v) && !binned.has(v.id || vbYt(v.url));
   const L = (k, t, a, add, none) => tbList(k, t, a.length, a.map(vbCard).join(''), add, 'vb', none);
+  let sarahVids = []; try { sarahVids = currentSarahVideos().filter(ok); } catch (e) { }
+  const sarahCards = sarahVids.map(v => {
+    const id = v.id; VB_ALL[id] = { id, title: v.title, channel: 'Sarah Jenkins', category: 'sarah', url: v.url };
+    const dt = sarahDateText(v);
+    return `<button type="button" class="tbcard" onclick="vbOpen(${jsArg(id)})"><div class="tbcover" style="background:#111;aspect-ratio:16/9;overflow:hidden"><img src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div><div class="tbbody">${tbLbl([['💌 Sarah’s video', '#db2777']])}<div class="tbt">${esc(v.title)}</div><div class="tbs">Sarah Jenkins${dt ? ' · ' + esc(dt) : ''}</div></div></button>`;
+  }).join('') + `<a class="btn small" href="${SARAH_CHANNEL_URL}" target="_blank" rel="noopener" style="margin:6px 4px 2px;display:inline-flex;align-items:center;gap:6px;text-decoration:none">▶ Open Sarah’s YouTube channel</a>`;
+  const sarahCol = tbList('sarah', '💌 Sarah’s videos', sarahVids.length, sarahCards, false, 'vb', 'No videos yet');
   let picks = []; try { picks = homeVideoPicks().filter(v => ok(v) && v.category !== 'sarah'); } catch (e) { }
-  return L('picks', 'Today’s picks', picks, false, 'No picks today') + cats.map(c => L('c_' + c.id, c.name, (videosForCat(c.id) || []).filter(ok), false, 'No videos left today')).join('') +
+  return sarahCol + L('picks', 'Today’s picks', picks, false, 'No picks today') + cats.map(c => L('c_' + c.id, c.name, (videosForCat(c.id) || []).filter(ok), false, 'No videos left today')).join('') +
     vbAllLists(o).map(([k, t]) => k === 'bin' ? L(k, t, o.lists[k].filter(mineOk), false, 'Move a video here to delete it') : L(k, t, o.lists[k].filter(ok), true, k === 'later' ? 'Tap a video, then Move to… Watch later' : k === 'watched' ? 'Videos you play show here' : 'Tap a video, then Move to… this list')).join('') +
     `<section class="tblist" style="align-self:flex-start"><button type="button" class="tbadd" style="margin:0" onclick="vbNewList()">${I('plus')} Add a list</button></section>`;
 }
@@ -22447,6 +22483,28 @@ function alHeroCandidates(list) {
       });
   } catch (e) {}
 
+  // 1b. New video from Sarah (published within the last 3 days)
+  try {
+    const sv = currentSarahVideo();
+    if (sv && sv.id) {
+      const pubMs = Date.parse(sv.published || "") || 0;
+      if (pubMs && (Date.now() - pubMs) <= 3 * 86400e3) {
+        const dt = sarahDateText(sv) || sv.title;
+        push({
+          id: "sarahvid:" + sv.id,
+          key: "",
+          badge: "🎬 NEW VIDEO FROM SARAH",
+          icon: "🎬",
+          title: "Sarah Jenkins posted: " + sv.title,
+          sub: "Published " + dt + " (" + ago(pubMs) + ") · Tap to watch on YouTube.",
+          go: "window.open(" + jsArg(sv.url) + ",'_blank','noopener')",
+          tone: "hero-bday",
+          urgent: (Date.now() - pubMs) <= 36 * 3600e3
+        });
+      }
+    }
+  } catch (e) {}
+
   // 2. Current or Upcoming Warnings (active road closures not yet expired, weather warnings, earthquakes, emergencies)
   try {
     const warnings = glWarnList().filter(x => x && !x.flag);
@@ -22819,9 +22877,10 @@ function nbTopHtml() {
   return { top: `<div class="al-briefing" id="glalerts"><div id="albrief">${alBriefingHtml(list)}</div></div>`, fun: '' };
 }
 function GlAlerts() {
-  setTimeout(glBellMarkSeen, 600); // 2.26.75
+  setTimeout(glBellMarkSeen, 50); // mark seen right away when Notifications is opened
+  setTimeout(glBellMarkSeen, 650);
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
-  setTimeout(() => { try { hwRefresh(false); } catch (e) { } try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
+  setTimeout(() => { try { refreshSarah(); } catch (e) { } try { hwRefresh(false); } catch (e) { } try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
   const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
   const isBoard = alView === 'board';
   const topBar = `<div class="arcbar">
@@ -25011,6 +25070,27 @@ function glProgItems() { // 2.26.34 / 2.26.48: In progress section: every in-pro
 }
 function glSarahItems() {
   const out = [], since = Date.now() - 864e5;
+  try {
+    const sv = currentSarahVideo();
+    if (sv && sv.id) {
+      const pubMs = Date.parse(sv.published || '') || 0;
+      const isRecent = pubMs && (Date.now() - pubMs < 7 * 864e5);
+      const dt = sarahDateText(sv) || sv.title;
+      const ageTxt = pubMs ? ago(pubMs) : '';
+      out.push(`<div class="row" data-nk="sarah-video-${esc(sv.id)}" onclick="window.open(${jsArg(sv.url)},'_blank','noopener')" style="cursor:pointer;align-items:flex-start">
+        <div class="ic todo" style="overflow:hidden;padding:0;width:64px;height:44px;border-radius:8px;flex-shrink:0;background:#111"><img src="https://i.ytimg.com/vi/${esc(sv.id)}/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.remove()"></div>
+        <div class="tx">
+          <div class="t">🎬 ${esc(isRecent ? 'New video from Sarah: ' + sv.title : 'Sarah’s latest video: ' + sv.title)}</div>
+          <div class="s">Sarah Jenkins · ${esc(dt)}${ageTxt ? ' (' + esc(ageTxt) + ')' : ''}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px" onclick="event.stopPropagation()">
+            <a class="btn small primary" href="${esc(sv.url)}" target="_blank" rel="noopener" style="padding:4px 10px;font-size:.75rem;text-decoration:none">▶ Watch video</a>
+            <a class="btn small" href="${SARAH_CHANNEL_URL}" target="_blank" rel="noopener" style="padding:4px 10px;font-size:.75rem;text-decoration:none">📺 Sarah’s channel</a>
+            <button type="button" class="btn small" style="padding:4px 10px;font-size:.75rem" onclick="go('#videos')">All videos</button>
+          </div>
+        </div>
+      </div>`);
+    }
+  } catch (e) { }
   const add = (x, where, what) => { if (x && !x.done && +x.created >= since && x.title && glOk(x.title)) out.push(`<button class="row" onclick="go('${where}')"><div class="ic todo"><span class="sbadge">S</span></div><div class="tx"><div class="t">${esc(x.title)}</div><div class="s">${what} · added ${esc(ago(+x.created))}</div></div>${I('right')}</button>`); };
   try { (S.todos || []).filter(isSarahTodo).filter(t => !(t.due && daysLeft(t.due) <= 7) && todoStatus(t) !== 'doing').forEach(t => add(t, '#todo', 'To-do from Sarah')); } catch (e) { }
   try { // 2.26.49: what Sarah added to shopping in the last day, in one row (shop items carry .name)
@@ -25251,18 +25331,23 @@ const bellNorm = h => String(h || '').replace(/<[^>]*>/g, ' ').replace(/&[a-z#0-
   .replace(/\b\d{1,2}(:\d{2})?\s*(am|pm)\b|\b\d{1,2}:\d{2}\b/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
 const bellHash = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 // each counted item: fn(signature, item kind, get html, set html). Warnings/flags are objects drawn by glWarnCard, so they get x.isNew instead.
+const BELL_SKIP_NK = /^(joke|fact|place|mi|fr|cowork|fuel-|hw-sleep-|hw-steps-|hw-week-|hw-coach-|bf-nz-|bf-world-)/;
 function glBellEach(p, fn) {
   const hash = (k, t) => k + bellHash(String(t || '')), amts = h => (bellNorm(h).match(/\$[\d,]+(\.\d+)?/g) || []).join(',');
   const objs = (L, k, key) => L.forEach(x => fn(hash(k, key(x)), x, v => { x.html = v; }));
   const strs = (L, k, key) => L.forEach((h, i) => fn(hash(k, key(h)), null, v => { L[i] = v; }));
   p.warn.forEach(x => fn(hash('w', x.tag + '|' + x.what), x, null)); p.flags.forEach(x => fn(hash('f', x.tag + '|' + x.what), x, null));
-  objs(p.dueUrgent, 'd', x => bellNorm(x.html)); objs(p.coming.filter(x => !x.noCount), 'd', x => bellNorm(x.html));
+  objs(p.dueUrgent, 'd', x => bellNorm(x.html));
   strs(p.sarah, 's', bellNorm); if (p.garden && p.garden.count) fn(hash('g', bellNorm(p.garden.html)), p.garden, v => { p.garden.html = v; });
-  strs(p.fresh, 'n', h => { const m = String(h).match(/data-nk="([^"]+)"/); return (m ? m[1] + '|' : '') + bellNorm(h); });
-  objs(p.nl, 'l', x => (x.id || '') + '|' + (x.title || '') + '|' + (x.due || ''));
+  (p.fresh || []).forEach((h, i) => {
+    const m = String(h).match(/data-nk="([^"]+)"/);
+    const nk = m ? m[1] : '';
+    if (nk && BELL_SKIP_NK.test(nk)) return; // hidden from briefing alerts, never count as unread badge
+    fn(hash('n', (nk ? nk + '|' : '') + bellNorm(h)), null, v => { p.fresh[i] = v; });
+  });
   objs(p.pw.filter(x => x.urgent), 'p', x => x.id || bellNorm(x.html));
   objs(p.mb.filter(x => x.badge), 'm', x => (x.key || '') + '|' + amts(x.html));
-  objs((p.rm || []).filter(x => x.badge), 'r', x => x.key); (p.packKeys || []).forEach(k => fn(hash('k', k), null, null));
+  (p.packKeys || []).forEach(k => fn(hash('k', k), null, null));
 }
 function glBellSigs(p) { p = p || glAlertParts(); const L = []; glBellEach(p, sg => L.push(sg)); return L; }
 /* 2.26.76: what was new when Notifications opened (or arrived while it's open) stays highlighted for that visit: a blue edge and a
