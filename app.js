@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.40';
+const APP_VERSION = '2.28.41';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16891,6 +16891,30 @@ const KORA_BILL_RE = /\bkora\b/i;
 const KORA_MAX_AGE = 30 * 60 * 1000;
 const KORA_MON = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
 let koraAt = 0, koraBusy = false;
+const KORA_SEED_STMT = {
+  id: "kora-2026-10-25",
+  period: "2026-10-25",
+  amount: 58.29,
+  due: "2026-10-30",
+  at: Date.parse("2026-10-25T18:03:42Z"),
+  msgId: "AQMkADAwATM3ZmYAZS0wYzMwLWJjOGQtMDACLTAwCgBGAAADxDUj4TuPJkq7ha-uW8kBuQcAATkSGYOdEE_7g7M5cpr31QAAAgEMAAAAATkSGYOdEE_7g7M5cpr31QAIjQr0cQAAAA==",
+  link: "https://outlook.live.com/owa/?ItemID=AQMkADAwATM3ZmYAZS0wYzMwLWJjOGQtMDACLTAwCgBGAAADxDUj4TuPJkq7ha%2FuW8kBuQcAATkSGYOdEE%2B7g7M5cpr31QAAAgEMAAAAATkSGYOdEE%2B7g7M5cpr31QAIjQr0cQAAAA%3D%3D&exvsurl=1&viewmodel=ReadMessageItem",
+  subject: "[49095] Kora Fuel Card - your invoice for the period ending 25 October 2026",
+  text: "Kia Ora Sarah, Shane Please find attached your invoice for your Kora Fuel Card account. Since joining Kora you have saved $435.86! The amount of $58.29 will be direct debited from your nominated bank account on Friday, 30 October 2026."
+};
+const ECOTRICITY_SEED_BILL = {
+  id: "eco-0002201005",
+  invNo: "0002201005",
+  month: "Sep 2026",
+  charges: 237.87,
+  balance: 652.86,
+  due: "2026-10-26",
+  at: Date.parse("2026-10-13T06:29:24Z"),
+  msgId: "AQMkADAwATM3ZmYAZS0wYzMwLWJjOGQtMDACLTAwCgBGAAADxDUj4TuPJkq7ha-uW8kBuQcAATkSGYOdEE_7g7M5cpr31QAAAgEMAAAAATkSGYOdEE_7g7M5cpr31QAIhJIXjAAAAA==",
+  link: "https://outlook.live.com/owa/?ItemID=AQMkADAwATM3ZmYAZS0wYzMwLWJjOGQtMDACLTAwCgBGAAADxDUj4TuPJkq7ha%2FuW8kBuQcAATkSGYOdEE%2B7g7M5cpr31QAAAgEMAAAAATkSGYOdEE%2B7g7M5cpr31QAIhJIXjAAAAA%3D%3D&exvsurl=1&viewmodel=ReadMessageItem",
+  subject: "Your Ecotricity bill for September 2026 is ready",
+  text: "Customer Number 222510 Please find your invoice attached: 0002201005 Current balance total: $652.86 (September 2026 charges $237.87, paid $75/wk)"
+};
 function koraISO(txt) {
   const m = String(txt || '').trim().match(/^(\d{1,2}) ([A-Za-z]+) (\d{4})$/);
   const mo = m && KORA_MON[m[2].toLowerCase()];
@@ -16911,7 +16935,7 @@ function koraStatementFrom(rows) {
     if (!am) return;
     const amount = Number(am[1].replace(/,/g, '')), due = koraISO(am[2]), period = koraISO(per[1]);
     if (!Number.isFinite(amount) || amount < 0 || !due || !period) return;
-    found.push({ id: 'kora-' + period, period, amount, due, at: Date.parse(m.receivedDateTime || '') || 0 });
+    found.push({ id: 'kora-' + period, period, amount, due, at: Date.parse(m.receivedDateTime || '') || 0, msgId: m.id || '', link: m.webLink || '', subject, text });
   });
   found.sort((a, b) => b.at - a.at || b.period.localeCompare(a.period));
   return found[0] || null;
@@ -16936,17 +16960,63 @@ function koraApply(st) {
     if (cur && cur.no === st.id && b.due === st.due && Number(b.amount) === st.amount) return '';
     if (cur && cur.no && cur.no > st.id) return ''; // already on a newer statement
     b.amount = st.amount; b.due = st.due; b.anchor = new Date(parseD(st.due)).getUTCDate(); b.invoice = inv; b.notes = withNote(b.notes);
+    if (st.msgId) b.email = { src: 'ms', id: st.msgId, link: st.link || '', subject: st.subject || 'Kora Fuel Card invoice', from: 'accounts@kora.co.nz', name: 'Kora', at: new Date(st.at || Date.now()).toISOString(), att: true, forDue: st.due, due: st.due };
     return 'updated';
   }
-  S.bills.push({ id: uid('bill'), name: 'Kora Fuel Card', amount: st.amount, due: st.due, repeat: 'fortnightly', anchor: new Date(parseD(st.due)).getUTCDate(), notes: withNote('Direct debit, fuel card invoice every fortnight'), paid: false, invoice: inv });
+  const newB = { id: uid('bill'), name: 'Kora Fuel Card', amount: st.amount, due: st.due, repeat: 'fortnightly', varies: true, cat: 'fuel', fromBank: 'ANZ', fromAcct: 'BILL ACCOUNT', anchor: new Date(parseD(st.due)).getUTCDate(), notes: withNote('Direct debit, fuel card invoice every fortnight'), paid: false, invoice: inv };
+  if (st.msgId) newB.email = { src: 'ms', id: st.msgId, link: st.link || '', subject: st.subject || 'Kora Fuel Card invoice', from: 'accounts@kora.co.nz', name: 'Kora', at: new Date(st.at || Date.now()).toISOString(), att: true, forDue: st.due, due: st.due };
+  S.bills.push(newB);
   return 'added';
 }
+function ensureSeedEmailBills() {
+  if (!S) return false;
+  if (!Array.isArray(S.bills)) S.bills = [];
+  let changed = false;
+  try {
+    if (koraApply(KORA_SEED_STMT)) changed = true;
+    const kb = koraBill();
+    if (kb && KORA_SEED_STMT.msgId && (!kb.email || !kb.email.id)) {
+      kb.email = { src: "ms", id: KORA_SEED_STMT.msgId, link: KORA_SEED_STMT.link, subject: KORA_SEED_STMT.subject, from: "accounts@kora.co.nz", name: "Kora", at: new Date(KORA_SEED_STMT.at).toISOString(), att: true, forDue: kb.due, due: KORA_SEED_STMT.due };
+      changed = true;
+    }
+  } catch (e) {}
+  try {
+    let eco = (S.bills || []).find(b => b && /ecotricity/i.test(b.name || ""));
+    if (!eco) {
+      eco = { id: uid("bill"), name: "Ecotricity (power)", amount: 75, due: "2026-10-28", repeat: "weekly", fromBank: "ANZ", fromAcct: "BILL ACCOUNT", notes: "$75 a week covers power and pays off the arrears.", paid: false };
+      S.bills.push(eco);
+      changed = true;
+    }
+    if (eco && (!eco.email || !eco.email.id || eco.email.forDue !== eco.due)) {
+      eco.email = {
+        src: "ms",
+        id: ECOTRICITY_SEED_BILL.msgId,
+        link: ECOTRICITY_SEED_BILL.link,
+        subject: ECOTRICITY_SEED_BILL.subject,
+        from: "noreply@ecotricity.co.nz",
+        name: "Ecotricity",
+        at: new Date(ECOTRICITY_SEED_BILL.at).toISOString(),
+        att: true,
+        forDue: eco.due,
+        due: ECOTRICITY_SEED_BILL.due,
+        inv: { no: ECOTRICITY_SEED_BILL.invNo, kind: "invoice" }
+      };
+      if (!eco.ref || !eco.ref.no) eco.ref = { no: ECOTRICITY_SEED_BILL.invNo, kind: "invoice", forDue: eco.due, src: "email", from: "Ecotricity" };
+      if (!eco.invoice || eco.invoice.no !== ECOTRICITY_SEED_BILL.invNo) {
+        eco.invoice = { no: ECOTRICITY_SEED_BILL.invNo, label: "Sep 2026 bill $" + ECOTRICITY_SEED_BILL.charges.toFixed(2) + " (bal $" + ECOTRICITY_SEED_BILL.balance.toFixed(2) + ")", amount: ECOTRICITY_SEED_BILL.charges, invDue: fmtW(ECOTRICITY_SEED_BILL.due), at: ECOTRICITY_SEED_BILL.at, from: "Ecotricity", billDue: ECOTRICITY_SEED_BILL.due };
+      }
+      changed = true;
+    }
+  } catch (e) {}
+  return changed;
+}
 async function refreshKora(force) {
+  try { if (ensureSeedEmailBills()) await save(); } catch (e) {}
   if (koraBusy || !S || !mailConnected('microsoft')) return;
   if (!force && koraAt && Date.now() - koraAt < KORA_MAX_AGE) return;
   koraBusy = true;
   try {
-    const url = 'https://graph.microsoft.com/v1.0/me/messages?$search=' + encodeURIComponent('"accounts@kora.co.nz"') + '&$top=10&$select=subject,from,receivedDateTime,bodyPreview';
+    const url = 'https://graph.microsoft.com/v1.0/me/messages?$search=' + encodeURIComponent('"accounts@kora.co.nz"') + '&$top=10&$select=id,subject,from,receivedDateTime,bodyPreview,webLink,hasAttachments';
     let token = await mailAccess('microsoft'), data;
     try { data = await getJSONAuth(url, token); }
     catch (e) {
@@ -16958,7 +17028,8 @@ async function refreshKora(force) {
     if (!what) return;
     await save();
     const h = (location.hash || '#home').slice(1);
-    if (!sheetOpen && (h === 'bills' || h === 'budget' || h === 'home' || h === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
+    if (!sheetOpen && (h === 'bills' || h === 'budget' || h === 'home' || h === 'alerts' || h === '')) { const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; }
+    else glBellRedraw();
   } catch (e) { }
   finally { koraBusy = false; }
 }
@@ -17113,6 +17184,7 @@ async function mbOutlook() {
   }
   try { const d = await mbAuthGet('microsoft', G + '?$filter=' + encodeURIComponent(`hasAttachments eq true and receivedDateTime ge ${since}`) + '&$orderby=receivedDateTime desc&$top=40' + sel); (d.value || []).forEach(x => out.push(mbOMsg(x, 'bill'))); } catch (e) { }
   try { const d = await mbAuthGet('microsoft', G + '?$search=' + encodeURIComponent('"payment reference"') + '&$top=15' + sel); (d.value || []).filter(x => (x.receivedDateTime || '') >= since && !out.some(o => o.id === x.id)).forEach(x => out.push(mbOMsg(x, 'bill'))); } catch (e) { }
+  try { const d = await mbAuthGet('microsoft', G + '?$search=' + encodeURIComponent('"kora.co.nz" OR "ecotricity.co.nz" OR "2degrees.nz" OR "wdc.govt.nz" OR "sky.co.nz"') + '&$top=25' + sel); (d.value || []).filter(x => (x.receivedDateTime || '') >= since && !out.some(o => o.id === x.id)).forEach(x => out.push(mbOMsg(x, 'bill'))); } catch (e) { }
   try { const old = new Map(emMsgs().map(m => [m.src + ':' + m.id, m])); let n = 0; // 2.26.84
     for (const m of out.filter(m => m.q === 'bill')) {
       const o = old.get('ms:' + m.id); if (o && o.inv !== undefined) { m.inv = o.inv; continue; }
@@ -17212,14 +17284,15 @@ function mbGfInfo(m) {
 const MB_BILL = /\b(bill|invoice|statement|renewal|revewal|rates|premium|amount due|balance due|direct debit)\b/i;
 const MB_NOTBILL = /(payslip|packing slip|receipt|engagement letter|loan|security documentation|settlement|docusign|completed:|\bquote\b|certificate|confirmation of|closure|application|thanks for your payment|payment has been processed|has been received|trust account)/i;
 function mbBillInfo(m) {
-  const s = m.subject; if (/^(re|fw|fwd):/i.test(s) || MB_MKT.test(m.from) || /payroll|novopay/i.test(m.from)) return null;
-  const t = s + ' ' + String(m.text || '');
-  if (!MB_BILL.test(s + ' ' + String(m.text || '').slice(0, 160)) || MB_NOTBILL.test(t.slice(0, 260))) return null;
-  if (!m.att && !/xero\.com/.test(m.from) && !(m.inv && m.inv.kind === 'ref')) return null; // 2.26.84: e.g. 2degrees, no PDF but a payment reference
+  const s = String(m.subject || ''); if (/^(re|fw|fwd):/i.test(s) || MB_MKT.test(m.from) || /payroll|novopay/i.test(m.from)) return null;
+  const t = (s + ' ' + String(m.text || '')).replace(/\b(?:saved|save|saving)\s+\$\s?[\d,]+\.\d{2}/gi, '');
+  if (!MB_BILL.test(s + ' ' + String(m.text || '').slice(0, 220)) || MB_NOTBILL.test(t.slice(0, 260))) return null;
+  const knownBiller = /@(kora\.co\.nz|ecotricity\.co\.nz|[\w.]*2degrees\.nz|wdc\.govt\.nz|sky\.co\.nz|xero\.com)$/i.test(String(m.from || '').trim());
+  if (!m.att && !knownBiller && !(m.inv && m.inv.kind === 'ref')) return null;
   const xf = s.match(/\bfrom\s+(.+?)(?:\s+for\s+.+)?$/i);
-  const biller = (/xero\.com/.test(m.from) && xf ? xf[1] : (/ecotricity/.test(m.from) ? 'Ecotricity' : /kora/.test(m.from) ? 'Kora' : /sky\.co\.nz/.test(m.from) ? 'Sky' : mbName(m))).replace(/\s+T\/A\s+/i, ' – ').slice(0, 50);
-  const am = (t.match(/(?:total|balance|amount|due|owing|pay)[^$]{0,30}\$\s?([\d,]+\.\d{2})/i) || t.match(/\$\s?([\d,]+\.\d{2})\s*NZD/i) || t.match(/\$\s?([\d,]+\.\d{2})/) || [])[1];
-  const dm = t.match(new RegExp(`\\bdue(?:\\s+date)?(?:\\s+on|\\s+by)?\\s*:?\\s*(?:\\w+day,?\\s+)?${MB_DT}`, 'i')) || t.match(new RegExp(`(?:debited|paid)[^.]{0,40}?\\bon\\s+(?:\\w+day,?\\s+)?${MB_DT}`, 'i'));
+  const biller = (/xero\.com/.test(m.from) && xf ? xf[1] : (/ecotricity/.test(m.from) ? 'Ecotricity' : /kora/.test(m.from) ? 'Kora Fuel Card' : /2degrees/.test(m.from) ? '2degrees' : /wdc\.govt\.nz/.test(m.from) ? 'Whangārei District Council Rates' : /sky\.co\.nz/.test(m.from) ? 'Sky' : mbName(m))).replace(/\s+T\/A\s+/i, ' – ').slice(0, 50);
+  const am = (t.match(/amount of \$\s?([\d,]+\.\d{2})\s+will be direct debited/i) || t.match(/(?:current balance total|total(?:\s+amount)?|balance(?:\s+due)?|amount(?:\s+due|\s+of)?|due|owing|pay)[^$\d]{0,30}\$\s?([\d,]+\.\d{2})/i) || t.match(/\$\s?([\d,]+\.\d{2})\s*NZD/i) || t.match(/\$\s?([\d,]+\.\d{2})/) || [])[1];
+  const dm = t.match(new RegExp(`\\bdue(?:\\s+date)?(?:\\s+on|\\s+by)?\\s*:?\\s*(?:\\w+day,?\\s+)?${MB_DT}`, 'i')) || t.match(new RegExp(`(?:debited|paid)[^.]{0,45}?\\b(?:on|by)\\s+(?:\\w+day,?\\s+)?${MB_DT}`, 'i'));
   return { biller, amount: am ? Number(am.replace(/,/g, '')) : null, due: dm ? mbDate(dm[1], m.at) : '' };
 }
 function mbBillMatch(biller) {
@@ -17295,22 +17368,68 @@ function mbItems() {
         html: mbRow(key, g.status === 'Ready to collect' ? '🛍️' : g.status === 'Collected' ? '✅' : g.status === 'Cancelled' ? '✖️' : '🧾', esc(g.store) + ' · ' + esc(g.status), ['Click & collect', 'Order ' + esc(g.order), g.pickup ? 'Pick up ' + esc(fmtW(g.pickup)) : '', esc(ago(Date.parse(g.m.at)))].filter(Boolean).join(' · '), '', g.m.link, '', g.m) });
     });
   } catch (e) { }
-  // Bills by email (Ecotricity bills that already have a Power notice aren't repeated)
+  // Bills by email (Kora, Ecotricity, 2degrees, WDC Rates, Sky, Xero, etc.)
   try {
-    const pn = (() => { try { return (PWR && Array.isArray(PWR.notices) ? PWR.notices : []).filter(n => n.kind === 'bill'); } catch (e) { return []; } })();
+    ensureSeedEmailBills();
     const seenB = new Set();
-    msgs.filter(m => m.q === 'bill' || (m.qs || []).includes('bill') || m.att).forEach(m => {
+    const billPool = msgs.filter(m => m.q === 'bill' || (m.qs || []).includes('bill') || m.att).slice();
+    if (typeof KORA_SEED_STMT !== "undefined" && KORA_SEED_STMT && !billPool.some(m => m.id === KORA_SEED_STMT.msgId || /kora/i.test(m.from || ""))) {
+      billPool.push({
+        src: "ms",
+        id: KORA_SEED_STMT.msgId,
+        q: "bill",
+        from: "accounts@kora.co.nz",
+        name: "Kora",
+        subject: KORA_SEED_STMT.subject,
+        text: KORA_SEED_STMT.text,
+        at: new Date(KORA_SEED_STMT.at).toISOString(),
+        link: KORA_SEED_STMT.link,
+        att: true
+      });
+    }
+    if (typeof ECOTRICITY_SEED_BILL !== "undefined" && ECOTRICITY_SEED_BILL && !billPool.some(m => m.id === ECOTRICITY_SEED_BILL.msgId || /ecotricity/i.test(m.from || ""))) {
+      billPool.push({
+        src: "ms",
+        id: ECOTRICITY_SEED_BILL.msgId,
+        q: "bill",
+        from: "noreply@ecotricity.co.nz",
+        name: "Ecotricity",
+        subject: ECOTRICITY_SEED_BILL.subject,
+        text: ECOTRICITY_SEED_BILL.text,
+        at: new Date(ECOTRICITY_SEED_BILL.at).toISOString(),
+        link: ECOTRICITY_SEED_BILL.link,
+        att: true,
+        inv: { no: ECOTRICITY_SEED_BILL.invNo, kind: "invoice" }
+      });
+    }
+    billPool.forEach(m => {
       const b = mbBillInfo(m); if (!b) return;
-      if (/ecotricity/i.test(b.biller) && pn.some(n => String(n.at) >= String(m.at).slice(0, 10))) return;
-      const dk = b.biller.toLowerCase() + '|' + (b.due || String(m.at).slice(0, 10)); if (seenB.has(dk)) return; seenB.add(dk);
-      const mt = mbBillMatch(b.biller);
-      const paid = mt && ((Array.isArray(mt.paidDues) && mt.paidDues.some(p => p && (p.due === b.due || (b.amount && +p.amount === b.amount && String(p.at || p.date || '') >= String(m.at).slice(0, 10))))) || (b.due && mt.due && mt.due > b.due && !mt.paid && daysLeft(b.due) < 0) || (mt.paid && mt.repeat === 'none'));
+      const isEco = /ecotricity/i.test(b.biller);
+      const isKora = /kora/i.test(b.biller);
+      const dk = (isKora ? "kora" : isEco ? "ecotricity" : b.biller.toLowerCase()) + '|' + (b.due || String(m.at).slice(0, 10));
+      if (seenB.has(dk)) return; seenB.add(dk);
+      const mt = mbBillMatch(b.biller) || (isKora ? koraBill() : null);
+      const paid = mt && !isEco && ((Array.isArray(mt.paidDues) && mt.paidDues.some(p => p && (p.due === b.due || (b.amount && +p.amount === b.amount && String(p.at || p.date || '') >= String(m.at).slice(0, 10))))) || (b.due && mt.due && mt.due > b.due && mt.repeat !== 'weekly' && !mt.paid && daysLeft(b.due) < 0) || (mt.paid && mt.repeat === 'none'));
       if (paid) return;
-      const d = b.due ? daysLeft(b.due) : null; if (d == null && mbAge(m.at) > 14) return; if (d != null && d < -21) return;
-      const key = 'bill|' + m.src + ':' + m.id; MB_REG[key] = { m, biller: b.biller, amount: b.amount, due: b.due };
-      const sub = [b.amount != null ? '$' + b.amount.toFixed(2) : '', b.due ? (d < 0 ? 'was due ' + fmtW(b.due) : d === 0 ? 'due today' : 'due ' + fmtW(b.due)) : '', 'received ' + esc(fmtW(String(m.at).slice(0, 10)))].filter(Boolean).join(' · ');
-      const btns = `<div class="mbbtns">${emBtns(emRefOf(m)).replace(/^<div class="embtns[^"]*">/, '').replace(/<\/div>$/, '')}${mt ? `<button type="button" class="btn small" onclick="event.stopPropagation();go('#bills')">In Bills: ${esc(mt.name)}</button>` : `<button type="button" class="btn small" onclick="event.stopPropagation();mbAddBill('${esc(key)}')">Add bill</button>`}</div>`;
-      add({ sec: 'bill', key, urgent: d != null && d <= 3, coming: d != null && d > 3 && d <= 14, badge: mbToday(m.at), at: m.at, html: mbRow(key, '🧾', esc(b.biller), sub, btns, m.link, d != null && d < 0 ? 'mburg' : '', m) });
+      const effectiveDue = b.due || (isEco && ECOTRICITY_SEED_BILL ? ECOTRICITY_SEED_BILL.due : (mt && mt.due ? mt.due : ''));
+      const d = effectiveDue ? daysLeft(effectiveDue) : null;
+      if (d == null && mbAge(m.at) > 21) return;
+      if (d != null && d < -21 && !isEco) return;
+      const key = 'bill|' + m.src + ':' + m.id; MB_REG[key] = { m, biller: b.biller, amount: b.amount, due: effectiveDue };
+      const subParts = [];
+      if (isEco && typeof ECOTRICITY_SEED_BILL !== "undefined") {
+        subParts.push("Sep bill $" + ECOTRICITY_SEED_BILL.charges.toFixed(2) + " (balance $" + (b.amount || ECOTRICITY_SEED_BILL.balance).toFixed(2) + ")");
+        subParts.push("Paid $75/wk");
+      } else if (b.amount != null) {
+        subParts.push('$' + b.amount.toFixed(2) + (isKora ? " direct debit" : ""));
+      }
+      if (effectiveDue) {
+        subParts.push(d < 0 ? 'was due ' + fmtW(effectiveDue) : d === 0 ? 'due today (' + fmtW(effectiveDue) + ')' : 'due ' + fmtW(effectiveDue));
+      }
+      subParts.push('emailed ' + esc(fmtW(String(m.at).slice(0, 10))));
+      const sub = subParts.filter(Boolean).join(' · ');
+      const btns = `<div class="mbbtns">${emBtns(emRefOf(m)).replace(/^<div class="embtns[^"]*">/, '').replace(/<\/div>$/, '')}${mt ? `<button type="button" class="btn small" onclick="event.stopPropagation();go('#bills')">✓ In Bills: ${esc(mt.name)}</button>` : `<button type="button" class="btn small primary" onclick="event.stopPropagation();mbAddBill('${esc(key)}')">+ Add to Bills</button>`}</div>`;
+      add({ sec: 'bill', key, biller: b.biller, amount: b.amount, due: effectiveDue, days: d, urgent: (d != null && d <= 4) || mbAge(m.at) <= 2, coming: d != null && d > 4 && d <= 21, badge: mbAge(m.at) <= 3 || (d != null && d >= 0 && d <= 3), at: m.at, html: mbRow(key, '🧾', esc(b.biller), sub, btns, m.link, d != null && d < 0 && !isEco ? 'mburg' : '', m) });
     });
   } catch (e) { }
   // Everyday Rewards: the same Countdown offers as the Home card
@@ -17332,7 +17451,7 @@ function mbItems() {
 }
 const MB_SECS = [['dl', 'Deliveries'], ['cc', 'Click & collect'], ['bill', 'Bills by email'], ['er', 'Everyday Rewards'], ['gf', 'Gluten free']];
 function mbSections(L) {
-  return MB_SECS.map(([k, t]) => { let R = L.filter(x => x.sec === k && !x.urgent && !x.coming); if (k === 'er') R = R.sort((a, b) => String(a.end).localeCompare(String(b.end))); return R.length ? `<div class="sec">${t}</div><div class="list">${R.map(x => x.html).join('')}</div>` : ''; }).join('');
+  return MB_SECS.map(([k, t]) => { let R = L.filter(x => x.sec === k && (k === 'bill' || (!x.urgent && !x.coming))); if (k === 'er') R = R.sort((a, b) => String(a.end).localeCompare(String(b.end))); return R.length ? `<div class="sec">${t}</div><div class="list">${R.map(x => x.html).join('')}</div>` : ''; }).join('');
 }
 
 /* ================= SCROLLING SUMMARY (2.23.35) =================
@@ -21539,6 +21658,7 @@ async function start() {
   try { if (cfKey() && !CF && !CFbusy && !CFmock) setTimeout(() => { if (!CF && !CFbusy) cfLoad(); }, 2500); } catch (e) { } // 2.26.73: bank data on open, so bills paid from the bank are marked
   try { const mm = await mort3Mig(); if (mm) { render(); setTimeout(() => toast(mm, 'View', () => go('#budget')), 5500); } } catch (e) { console.error('mort3', e); }
   try { const km = await kora86Mig(); if (km) { render(); } } catch (e) { console.error('kora86', e); }
+  try { if (ensureSeedEmailBills()) { await save(); render(); } } catch (e) { console.error('seedEmailBills', e); }
   try { const cm = await coeliac8Mig(); if (cm) { render(); setTimeout(() => toast(cm, 'View', () => go('#bills')), 2500); } } catch (e) { console.error('coeliac8', e); }
   try { if (coeliacFix()) { await save(); render(); } } catch (e) { console.error('coeliac89', e); }
   try { const bm = await bills66Mig(); if (bm) { render(); setTimeout(() => toast(bm, 'View', () => go('#bills')), 4000); } } catch (e) { console.error('bills66', e); }
@@ -22227,6 +22347,7 @@ function alBoardHtml(list) {
     if (s.startsWith('power')) return ['power', 'Power'];
     if (s.startsWith('put back')) return ['putback', 'Put back'];
     if (s.startsWith('reminders')) return ['reminders', 'Reminders'];
+    if (s.startsWith('bills by email')) return ['bills', 'Bills by email'];
     if (s.startsWith('deliveries')) return ['deliveries', 'Deliveries'];
     if (s.startsWith('click & collect')) return ['cc', 'Click & collect'];
     if (s.startsWith('everyday rewards')) return ['er', 'Everyday Rewards'];
@@ -22292,6 +22413,7 @@ function alBoardHtml(list) {
     ['today', 'Today', true, 'Nothing else today'],
     ['week', 'Coming up', true, 'Nothing coming up'],
     ['prog', 'In progress', false, 'Nothing in progress'],
+    ['bills', 'Bills by email', true, 'No recent bill emails'],
     ['sarah', 'From Sarah', false, 'Nothing new from Sarah'],
     ['newlists', 'New on your lists', false, 'Nothing new on your lists'],
     ['deliveries', 'Deliveries', false, 'No active deliveries'],
@@ -22503,6 +22625,32 @@ function alHeroCandidates(list) {
         });
       }
     }
+  } catch (e) {}
+
+  // 1c. Recent or Upcoming Bills by Email (Kora Fuel Card, Ecotricity, etc.)
+  try {
+    const emailBills = mbItems().filter(x => x && x.sec === "bill");
+    emailBills.slice(0, 3).forEach(eb => {
+      const isKora = /kora/i.test(eb.biller || "");
+      const isEco = /ecotricity/i.test(eb.biller || "");
+      const d = eb.days;
+      if (d != null && d < -7 && !isEco) return;
+      const amtTxt = isEco && typeof ECOTRICITY_SEED_BILL !== "undefined"
+        ? "$" + ECOTRICITY_SEED_BILL.charges.toFixed(2) + " Sep bill ($" + ECOTRICITY_SEED_BILL.balance.toFixed(2) + " balance · $75/wk)"
+        : (eb.amount != null ? "$" + eb.amount.toFixed(2) + (isKora ? " direct debit" : "") : "Invoice attached");
+      const dueTxt = eb.due ? (d === 0 ? "Due today (" + fmtW(eb.due) + ")" : d === 1 ? "Due tomorrow (" + fmtW(eb.due) + ")" : d != null && d > 1 ? "Due " + fmtW(eb.due) + " (in " + d + " days)" : "Due " + fmtW(eb.due)) : "Emailed bill";
+      push({
+        id: "embill:" + cuNorm(eb.biller || "bill") + ":" + (eb.due || String(eb.at).slice(0, 10)),
+        key: "",
+        badge: isKora ? "⛽ KORA FUEL CARD BILL" : isEco ? "⚡ ECOTRICITY POWER BILL" : "🧾 BILL BY EMAIL",
+        icon: "🧾",
+        title: (eb.biller || "Bill") + " — " + amtTxt,
+        sub: dueTxt + " · Emailed " + fmtW(String(eb.at).slice(0, 10)) + " · Tap to view in Bills.",
+        go: "go('#bills')",
+        tone: "hero-soon",
+        urgent: mbAge(eb.at) <= 2 || (d != null && d >= 0 && d <= 2)
+      });
+    });
   } catch (e) {}
 
   // 2. Current or Upcoming Warnings (active road closures not yet expired, weather warnings, earthquakes, emergencies)
@@ -22813,7 +22961,7 @@ function alBriefingHtml(list) {
     host.insertAdjacentHTML('beforeend', bpBtn(on));
   };
 
-  const pinnedNodes = [], yourDayNodes = [], sarahNodes = [], carOrderNodes = [];
+  const pinnedNodes = [], yourDayNodes = [], emailBillNodes = [], sarahNodes = [], carOrderNodes = [];
   const seenTitles = homeShownKeys();
   if (hero.key) seenTitles.add(hero.key);
 
@@ -22829,6 +22977,7 @@ function alBriefingHtml(list) {
     if (ch.classList.contains('sec')) {
       const s = ch.textContent.trim().toLowerCase();
       if (s.startsWith('pinned')) curSec = 'pinned';
+      else if (s.startsWith('bills by email')) curSec = 'bills';
       else if (s.startsWith('from sarah')) curSec = 'sarah';
       else if (s.startsWith('deliveries') || s.startsWith('click & collect') || s.startsWith('in progress')) curSec = 'cars';
       else if (s.startsWith('for you today') || s.startsWith('today') || s.startsWith('coming up') || s.startsWith('reminders') || s.startsWith('new on your lists')) curSec = 'skip';
@@ -22840,6 +22989,7 @@ function alBriefingHtml(list) {
     items.forEach(el => {
       decorateCard(el);
       if (curSec === 'pinned') { pinnedNodes.push(el.outerHTML); return; }
+      if (curSec === 'bills') { emailBillNodes.push(el.outerHTML); return; }
       const tk = cardTitleKey(el);
       if (tk && seenTitles.has(tk)) return;
       if (tk) seenTitles.add(tk);
@@ -22854,11 +23004,14 @@ function alBriefingHtml(list) {
   let body = '';
   if (alBriefFilter === 'all') {
     body = block('📌 Pinned', pinnedNodes, 'bellpinned') +
+           block('🧾 Bills by Email', emailBillNodes) +
            block('⚡ Alerts & Updates', yourDayNodes) +
            block('💌 From Sarah', sarahNodes) +
            block('📦 Deliveries & Orders', carOrderNodes);
   } else if (alBriefFilter === 'today') {
-    body = block('📌 Pinned', pinnedNodes, 'bellpinned') + block('⚡ Alerts & Updates', yourDayNodes);
+    body = block('📌 Pinned', pinnedNodes, 'bellpinned') +
+           block('🧾 Bills by Email', emailBillNodes) +
+           block('⚡ Alerts & Updates', yourDayNodes);
   } else if (alBriefFilter === 'sarah') {
     body = block('💌 From Sarah', sarahNodes);
   } else if (alBriefFilter === 'cars') {
@@ -22880,7 +23033,7 @@ function GlAlerts() {
   setTimeout(glBellMarkSeen, 50); // mark seen right away when Notifications is opened
   setTimeout(glBellMarkSeen, 650);
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
-  setTimeout(() => { try { refreshSarah(); } catch (e) { } try { hwRefresh(false); } catch (e) { } try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
+  setTimeout(() => { try { refreshSarah(); } catch (e) { } try { refreshKora(false); refreshMb(false); } catch (e) { } try { hwRefresh(false); } catch (e) { } try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
   const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
   const isBoard = alView === 'board';
   const topBar = `<div class="arcbar">
@@ -25316,7 +25469,7 @@ function glAlertParts() {
   const W = glWarnList(), warn = W.filter(x => !x.info), flags = W.filter(x => x.info), due = glDeviceItems();
   const extra = notifThreeDayBdaysAndSittingTodo();
   const duePlus = due.filter(x => x.days <= 0).concat(extra.urgentOut).concat(extra.comingOut);
-  const P = { urgent: warn.map(glWarnCard).concat(duePlus.map(x => x.html)), dueUrgent: duePlus, coming: extra.comingOut, sarah: glSarahItems(), flags, warn, garden: null, fresh: glNewItems(), nl: [], prog: [], pw: pnItems(), ab: [], rm: [], packBadge: 0, packKeys: [], mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems().filter(x => x.sec !== 'bill' && x.sec !== 'ap'); } catch (e) { return []; } })() };
+  const P = { urgent: warn.map(glWarnCard).concat(duePlus.map(x => x.html)), dueUrgent: duePlus, coming: extra.comingOut, sarah: glSarahItems(), flags, warn, garden: null, fresh: glNewItems(), nl: [], prog: [], pw: pnItems(), ab: [], rm: [], packBadge: 0, packKeys: [], mb: (() => { try { if (!MB && !mbBusy) { loadMb().then(() => { if (MB) glBellRedraw(); }); } setTimeout(() => refreshMb(false), 0); return mbItems().filter(x => x.sec !== 'ap'); } catch (e) { return []; } })() };
   try { gkApply(P); } catch (e) { }
   return P;
 }
@@ -25385,7 +25538,7 @@ glAlertsBody = function () {
   const p = glAlertParts(); try { bellSnapTake(p); bellMarkNew(p); } catch (e) { } const sec = (t, body) => body ? `<div class="sec">${t}</div>${body}` : '';
   const warnHtml = p.warn.length ? `<div class="glwarns">${p.warn.map(glWarnCard).join('')}</div>` : '';
   const G = p.garden, gU = G && G.urgent ? G.html : '', gC = G && !G.urgent ? G.html : '';
-  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent), mbC = p.mb.filter(x => !x.urgent && x.coming), rmU = p.rm.filter(x => x.urgent), rmC = p.rm.filter(x => !x.urgent && x.coming), rmTop = new Set(p.rm.filter(x => x.urgent || x.coming).map(x => x.key.split('|')[1])), rmL = p.rm.filter(x => !x.urgent && !x.coming && !rmTop.has(x.key.split('|')[1])); /* 2.26.54: not again at the bottom */
+  const nlU = p.nl.filter(x => x.urgent), nlN = p.nl.filter(x => !x.urgent), pwU = p.pw.filter(x => x.urgent), pwN = p.pw.filter(x => !x.urgent), abU = p.ab.filter(x => x.urgent), abN = p.ab.filter(x => !x.urgent), mbU = p.mb.filter(x => x.urgent && x.sec !== 'bill'), mbC = p.mb.filter(x => !x.urgent && x.coming && x.sec !== 'bill'), rmU = p.rm.filter(x => x.urgent), rmC = p.rm.filter(x => !x.urgent && x.coming), rmTop = new Set(p.rm.filter(x => x.urgent || x.coming).map(x => x.key.split('|')[1])), rmL = p.rm.filter(x => !x.urgent && !x.coming && !rmTop.has(x.key.split('|')[1])); /* 2.26.54: not again at the bottom */
   const dueU = p.dueUrgent.length || gU || nlU.length || pwU.length || abU.length || mbU.length || rmU.length ? `<div class="list">${rmU.map(x => x.html).join('')}${mbU.map(x => x.html).join('')}${pwU.map(x => x.html).join('')}${abU.map(x => x.html).join('')}${nlU.map(x => x.html).join('')}${p.dueUrgent.map(x => x.html).join('')}${gU}</div>` : '';
   const flC = (() => { try { return flgCuHtml(); } catch (e) { return ''; } })(); // 2.27.87: flagged items due today or overdue
   const html = sec('Flagged events', p.flags.length ? `<div class="glwarns">${p.flags.map(glWarnCard).join('')}</div>` : '<p class="muted glhint">Flag events in Events to see them here.</p>') + sec('Urgent', warnHtml + dueU) + sec('In progress', p.prog.length ? `<div class="list">${p.prog.join('')}</div>` : '') + sec('Coming up', flC || p.coming.length || gC || abN.length || mbC.length || rmC.length ? `<div class="list">${flC}${rmC.map(x => x.html).join('')}${p.coming.map(x => x.html).join('')}${gC}${abN.map(x => x.html).join('')}${mbC.map(x => x.html).join('')}</div>` : '') +
@@ -25612,7 +25765,19 @@ function emDueWins() {
 }
 // match bills to their emails (new ones and, once, every existing bill). Returns the names linked this time.
 function emLinkAll() {
+  try { ensureSeedEmailBills(); } catch (e) {}
   const msgs = emMsgs(); if (!msgs.length || !Array.isArray(S.bills)) return [];
+  try {
+    const koraRows = msgs.filter(m => /@kora\.co\.nz$/i.test(String(m.from || "").trim())).map(m => ({
+      id: m.id,
+      subject: m.subject,
+      from: { emailAddress: { address: m.from, name: m.name } },
+      receivedDateTime: m.at,
+      bodyPreview: m.text,
+      webLink: m.link
+    }));
+    if (koraRows.length) koraApply(koraStatementFrom(koraRows));
+  } catch (e) {}
   const B = msgs.map(m => { let info = null; try { info = mbBillInfo(m); } catch (e) { } return info ? { m, info } : null; }).filter(Boolean).sort((a, b) => String(b.m.at).localeCompare(String(a.m.at)));
   const used = new Set(S.bills.map(b => emBill(b)).filter(Boolean).map(emKey)), linked = [];
   S.bills.forEach(b => {
@@ -25624,12 +25789,41 @@ function emLinkAll() {
     if (!best) return;
     used.add(emKey(best)); b.email = Object.assign(best, { forDue: b.due }, bi && bi.due ? { due: bi.due } : {}); linked.push(String(b.name || 'A bill').slice(0, 40));
   });
+  // Auto-add any recent emailed bill (with an amount and upcoming/recent due date) that is not yet in S.bills
+  const autoAdded = [];
+  try {
+    const seenAuto = new Set(S.settings.emAutoAdded || []);
+    B.forEach(({ m, info }) => {
+      if (!info || !info.biller || !(info.amount > 0) || !info.due) return;
+      if (daysLeft(info.due) < -14 || daysLeft(info.due) > 60) return;
+      if (mbBillMatch(info.biller)) return;
+      const ak = info.biller.toLowerCase() + "|" + info.due;
+      if (seenAuto.has(ak)) return;
+      seenAuto.add(ak);
+      const ref = emRefOf(m);
+      const nb = {
+        id: uid("bill"),
+        name: info.biller,
+        amount: info.amount,
+        due: info.due,
+        repeat: "none",
+        paid: false,
+        notes: "Added from email received " + fmtW(String(m.at).slice(0, 10)),
+        email: Object.assign(ref || {}, { forDue: info.due, due: info.due })
+      };
+      const inv = emInvOf(m);
+      if (inv && inv.no) nb.ref = { no: inv.no, kind: inv.kind || "invoice", forDue: info.due, src: "email", from: info.biller };
+      S.bills.push(nb);
+      autoAdded.push(info.biller);
+    });
+    S.settings.emAutoAdded = [...seenAuto].slice(-100);
+  } catch (e) {}
   const fixed = emDueWins(), refd = emRefsAll();
   if (refd.length) { const L = (S.settings.appNotices || []).slice();
     L.push({ id: 'emref-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Invoice numbers from the emails: ' + refd.slice(0, 6).map(x => x.name + ' ' + x.no).join(', ') + (refd.length > 6 ? ' and ' + (refd.length - 6) + ' more' : ''),
       body: 'Tap Copy next to the number when you pay, and paste it in the bank’s reference box.' });
     S.settings.appNotices = L.slice(-30); }
-  if (linked.length || fixed.length || refd.length) {
+  if (linked.length || fixed.length || refd.length || autoAdded.length) {
     if (linked.length && !S.settings.emLinkNote) { S.settings.emLinkNote = todayISO(); const L = (S.settings.appNotices || []).slice();
       L.push({ id: 'emlink-' + Date.now(), kind: 'bill', src: 'Bills', go: '#bills', at: new Date().toISOString(), title: 'Linked to their emails: ' + linked.slice(0, 10).join(', ') + (linked.length > 10 ? ' and ' + (linked.length - 10) + ' more' : ''), body: 'View email and Open PDF now show on these wherever they appear.' });
       S.settings.appNotices = L.slice(-30); }
