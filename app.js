@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.44';
+const APP_VERSION = '2.28.45';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -164,7 +164,7 @@ function normalise(d) {
   d.version = 1;
   return d;
 }
-async function save() {
+async function save() { try { _cuCache = null; _bellSigsMemo = null; _mbCache = null; } catch (e) {}
   S.updatedAt = new Date().toISOString();
   try { sharedNote(); } catch (e) { }
   try { await kvSet('data', S); } catch (e) { toast('Sorry, that couldn’t be saved on this phone.'); throw e; }
@@ -3890,7 +3890,9 @@ function cuFar(T, from, to) {
   try { countdownRows().filter(x => x.kind === 'mine' && inR(daysLeft(x.date))).forEach(x => out.push({ days: daysLeft(x.date), rank: 2, sort: '', kind: 'count', name: x.name, html: cdRow(x, false) })); } catch (e) {}
   return out;
 }
+let _cuCache = null;
 function comingUpList() {
+  if (_cuCache && Date.now() - _cuCache.at < 800) return _cuCache.list.slice();
   const T = todayT(), all = [];
   try { homeAttention().forEach(x => all.push(x)); } catch (e) { }
   Object.values(CU_EXTRA).forEach(src => { try { src(T).forEach(x => all.push(x)); } catch (e) { } });
@@ -3906,7 +3908,9 @@ function comingUpList() {
     if (seen.has(k)) return; seen.add(k);
     x.iso = iso; out.push(x);
   });
-  return out.sort((a, b) => a.days - b.days || a.pri - b.pri || a.rank - b.rank || String(a.sort || '').localeCompare(String(b.sort || '')));
+  out.sort((a, b) => a.days - b.days || a.pri - b.pri || a.rank - b.rank || String(a.sort || '').localeCompare(String(b.sort || '')));
+  _cuCache = { at: Date.now(), list: out };
+  return out.slice();
 }
 function cuRowHtml(x) {
   let h = cuChip(x.html, x.days, x.iso);
@@ -17331,7 +17335,9 @@ function mbRow(k, ic, title, sub, extra, url, cls = '', m) {
   return `<div class="row glnew mbrow ${cls}" data-mb="${esc(k)}" role="button" tabindex="0" onclick="mbOpen(this.dataset.mb)"><div class="ic">${ic}</div><div class="tx"><div class="t">${title}</div><div class="s">${sub}</div>${extra || ''}</div></div>`;
 }
 function mbSteps(st) { const n = Math.min(4, st); return `<div class="mbsteps">${['Ordered', 'Shipped', 'Out for delivery', 'Delivered'].map((x, i) => `<span class="${i < n ? 'on' : ''}${i === n - 1 ? ' cur' : ''}">${x}</span>`).join('')}</div>`; }
+let _mbCache = null;
 function mbItems() {
+  if (_mbCache && Date.now() - _mbCache.at < 1200 && _mbCache.mbAt === mbAt) return _mbCache.list.slice();
   const out = [], gone = new Set(mbDis()); MB_REG = {};
   const msgs = (MB && MB.msgs || []).filter(m => mbAge(m.at) <= MB_DAYS);
   const add = (o) => { if (!gone.has(o.key)) out.push(o); };
@@ -17447,7 +17453,9 @@ function mbItems() {
       add({ sec: 'gf', key, urgent: false, coming: false, badge: mbToday(m.at), at: m.at,
         html: mbRow(key, '🌾', esc(g.who) + ': ' + esc(m.subject.slice(0, 90)), [g.line ? esc(g.line) : '', (g.ev ? '📅 ' + esc(fmtW(g.ev)) + ' · ' : '') + esc(fmtW(String(m.at).slice(0, 10)))].filter(Boolean).join('<br>'), '', m.link, '', m) }); });
   } catch (e) { }
-  return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  _mbCache = { at: Date.now(), mbAt, list: out };
+  return out.slice();
 }
 const MB_SECS = [['dl', 'Deliveries'], ['cc', 'Click & collect'], ['bill', 'Bills by email'], ['er', 'Everyday Rewards'], ['gf', 'Gluten free']];
 function mbSections(L) {
@@ -22017,28 +22025,53 @@ function glWarnCard(x) {
   return x.url ? `<a class="${cls}"${g} href="${esc(x.url)}" target="_blank" rel="noopener" onclick="if(glSwipe.moved)event.preventDefault()">${inner}</a>` : `<button type="button" class="${cls}"${g} onclick="if(!glSwipe.moved){${esc(x.go || '')}}">${inner}</button>`;
 }
 function glWarnInner() { return ''; } // 2.26.2: warnings live on the Notifications page (bell)
-function glWarnRedraw() {
+let _warnRedrawT = null;
+function glWarnRedrawNow(forceDom) {
+  _warnRedrawT = null;
   try {
-    let list = []; try { list = comingUpList(); } catch (e) { }
-    const br = document.getElementById('albrief');
-    if (br) {
-      const ds = br.querySelector('.al-discover-strip'), dx = ds ? ds.scrollLeft : 0;
-      br.innerHTML = alBriefingHtml(list);
-      const ds2 = br.querySelector('.al-discover-strip'); if (ds2 && dx) ds2.scrollLeft = dx;
-      const b = document.getElementById('glalerts'); if (b) b.style.setProperty('--newage', bellNewAge() + 's');
-      glBellMarkSeen();
+    if (!forceDom && typeof glTouchAt !== "undefined" && Date.now() - glTouchAt < 700) {
+      _warnRedrawT = setTimeout(() => glWarnRedrawNow(false), 750);
+      return;
     }
+    const br = document.getElementById('albrief');
     const el = document.getElementById('allists');
-    if (el) {
-      const sx = el.scrollLeft, sy = {};
-      el.querySelectorAll('section.tblist[data-k]').forEach(s => { const c = s.querySelector('.tbcards'); if (c) sy[s.dataset.k] = c.scrollTop; });
-      el.innerHTML = alBoardHtml(list); el.scrollLeft = sx;
-      el.querySelectorAll('section.tblist[data-k]').forEach(s => { const c = s.querySelector('.tbcards'); if (c && sy[s.dataset.k]) c.scrollTop = sy[s.dataset.k]; });
-      const b = document.getElementById('glalerts'); if (b) b.style.setProperty('--newage', bellNewAge() + 's');
-      glBellMarkSeen();
+    if (br || el) {
+      let list = []; try { list = comingUpList(); } catch (e) { }
+      if (br) {
+        const ds = br.querySelector('.al-discover-strip'), dx = ds ? ds.scrollLeft : 0;
+        const nextHtml = alBriefingHtml(list);
+        if (forceDom || br._lastHtml !== nextHtml) {
+          br._lastHtml = nextHtml;
+          br.innerHTML = nextHtml;
+          const ds2 = br.querySelector('.al-discover-strip'); if (ds2 && dx) ds2.scrollLeft = dx;
+        }
+        const b = document.getElementById('glalerts'); if (b) b.style.setProperty('--newage', bellNewAge() + 's');
+        glBellMarkSeen();
+      }
+      if (el) {
+        const nextBoard = alBoardHtml(list);
+        if (forceDom || el._lastHtml !== nextBoard) {
+          el._lastHtml = nextBoard;
+          const sx = el.scrollLeft, sy = {};
+          el.querySelectorAll('section.tblist[data-k]').forEach(s => { const c = s.querySelector('.tbcards'); if (c) sy[s.dataset.k] = c.scrollTop; });
+          el.innerHTML = nextBoard; el.scrollLeft = sx;
+          el.querySelectorAll('section.tblist[data-k]').forEach(s => { const c = s.querySelector('.tbcards'); if (c && sy[s.dataset.k]) c.scrollTop = sy[s.dataset.k]; });
+        }
+        const b = document.getElementById('glalerts'); if (b) b.style.setProperty('--newage', bellNewAge() + 's');
+        glBellMarkSeen();
+      }
     }
   } catch (e) { }
   glBellRedraw();
+}
+function glWarnRedraw(immediate) {
+  if (immediate === true) {
+    if (_warnRedrawT) { clearTimeout(_warnRedrawT); _warnRedrawT = null; }
+    glWarnRedrawNow(true);
+    return;
+  }
+  if (_warnRedrawT) return;
+  _warnRedrawT = setTimeout(() => glWarnRedrawNow(false), 180);
 }
 function glAlertsBody() { const L = glWarnList(), hint = L.some(x => x.flag) ? '' : '<p class="muted glhint">Flag events in Events to see them here.</p>'; return (L.length ? `<div class="glwarns">${L.map(glWarnCard).join('')}</div>` : '<div class="card empty"><div class="t">No warnings right now</div><div class="s">Weather warnings, the outlook, road or bridge closures and events you flag show up here.</div></div>') + hint; }
 
@@ -22506,7 +22539,7 @@ function homeShownKeys() {
   } catch (e) { }
   return S0;
 }
-const HERO_SLOT_KEY = "glHeroSlotV2";
+const HERO_SLOT_KEY = "glHeroSlotV3";
 const HERO_ROTATE_MS = 6 * 3600 * 1000; // Rotate only ~4 times a day (every 6 hours), even if seen
 
 function alHeroStateLoad() {
@@ -22537,7 +22570,7 @@ function alHeroMarkSeen(id, rerender) {
   if (!st.known.includes(id)) st.known.push(id);
   alHeroStateSave(st);
   if (rerender) {
-    try { glWarnRedraw(); } catch (e) { try { render(); } catch (e2) {} }
+    try { glWarnRedraw(true); } catch (e) { try { render(); } catch (e2) {} }
   }
 }
 function alHeroAdvance(ev, id) {
@@ -22550,7 +22583,7 @@ function alHeroAdvance(ev, id) {
   st.id = "";
   st.rotatedAt = 0;
   alHeroStateSave(st);
-  try { glWarnRedraw(); } catch (e) { try { render(); } catch (e2) {} }
+  try { glWarnRedraw(true); } catch (e) { try { render(); } catch (e2) {} }
 }
 function alClosureExpiredToday(txt) {
   // e.g. "Mon 31 Aug–Sun 25 Oct, 9am" -> if end date is in the past, or today and end hour has passed, drop it
@@ -22576,42 +22609,43 @@ function alClosureExpiredToday(txt) {
   return false;
 }
 function alHeroCandidates(list) {
-  // Only show upcoming or current things, or things like petrol changes
+  // 2.28.45: Hero card ONLY shows Today and Tomorrow items (0 to 1 days ahead)
   const cands = [];
+  const T = todayISO(), tmISO = addDays(T, 1);
   const push = c => {
     if (!c || !c.id || !c.title) return;
     if (cands.some(x => x.id === c.id)) return;
     cands.push(c);
   };
 
-  // 1. Upcoming or Today Birthdays (0 to 3 days ahead)
+  // 1. Today or Tomorrow Birthdays (0 to 1 days ahead only)
   try {
     (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b)))
-      .filter(x => x.d >= 0 && x.d <= 3 && glOk(x.b.name))
+      .filter(x => x.d >= 0 && x.d <= 1 && glOk(x.b.name))
       .sort((a, b) => a.d - b.d)
       .forEach(x => {
-        const when = x.d === 0 ? "Today! 🎂" : x.d === 1 ? "Tomorrow (" + fmtW(x.iso) + ")" : "In " + x.d + " days (" + fmtW(x.iso) + ")";
+        const when = x.d === 0 ? "Today! 🎂" : "Tomorrow (" + fmtW(x.iso) + ")";
         const ageTxt = x.age > 0 ? x.b.name + "’s " + ordinal(x.age) + " birthday" : x.b.name + "’s birthday";
         push({
           id: "bday:" + cuNorm(x.b.name) + ":" + x.iso,
           key: cuNorm(ageTxt),
-          badge: x.d === 0 ? "🎂 BIRTHDAY TODAY" : x.d === 1 ? "🎂 BIRTHDAY TOMORROW" : "🎂 UPCOMING BIRTHDAY",
+          badge: x.d === 0 ? "🎂 BIRTHDAY TODAY" : "🎂 BIRTHDAY TOMORROW",
           icon: "🎂",
           title: ageTxt,
           sub: when + (x.age > 0 ? " · Turns " + x.age : "") + " · Tap to view birthdays.",
           go: "go('#birthdays')",
           tone: "hero-bday",
-          urgent: x.d <= 1
+          urgent: true
         });
       });
   } catch (e) {}
 
-  // 1b. New video from Sarah (published within the last 3 days)
+  // 1b. New video from Sarah (published today or yesterday, i.e. within 36h)
   try {
     const sv = currentSarahVideo();
     if (sv && sv.id) {
       const pubMs = Date.parse(sv.published || "") || 0;
-      if (pubMs && (Date.now() - pubMs) <= 3 * 86400e3) {
+      if (pubMs && (Date.now() - pubMs) <= 36 * 3600e3) {
         const dt = sarahDateText(sv) || sv.title;
         push({
           id: "sarahvid:" + sv.id,
@@ -22622,44 +22656,48 @@ function alHeroCandidates(list) {
           sub: "Published " + dt + " (" + ago(pubMs) + ") · Tap to watch on YouTube.",
           go: "window.open(" + jsArg(sv.url) + ",'_blank','noopener')",
           tone: "hero-bday",
-          urgent: (Date.now() - pubMs) <= 36 * 3600e3
+          urgent: true
         });
       }
     }
   } catch (e) {}
 
-  // 1c. Recent or Upcoming Bills by Email (Kora Fuel Card, Ecotricity, etc.)
+  // 1c. Bills by Email due Today or Tomorrow (or emailed today)
   try {
     const emailBills = mbItems().filter(x => x && x.sec === "bill");
-    emailBills.slice(0, 3).forEach(eb => {
+    emailBills.forEach(eb => {
       const isKora = /kora/i.test(eb.biller || "");
       const isEco = /ecotricity/i.test(eb.biller || "");
       const d = eb.days;
-      if (d != null && d < -7 && !isEco) return;
+      const emailedToday = mbAge(eb.at) <= 1;
+      if (!((d != null && d >= 0 && d <= 1) || emailedToday)) return;
       const amtTxt = isEco && typeof ECOTRICITY_SEED_BILL !== "undefined"
         ? "$" + ECOTRICITY_SEED_BILL.charges.toFixed(2) + " Sep bill ($" + ECOTRICITY_SEED_BILL.balance.toFixed(2) + " balance · $75/wk)"
         : (eb.amount != null ? "$" + eb.amount.toFixed(2) + (isKora ? " direct debit" : "") : "Invoice attached");
-      const dueTxt = eb.due ? (d === 0 ? "Due today (" + fmtW(eb.due) + ")" : d === 1 ? "Due tomorrow (" + fmtW(eb.due) + ")" : d != null && d > 1 ? "Due " + fmtW(eb.due) + " (in " + d + " days)" : "Due " + fmtW(eb.due)) : "Emailed bill";
+      const dueTxt = d === 0 ? "Due today (" + fmtW(eb.due) + ")" : d === 1 ? "Due tomorrow (" + fmtW(eb.due) + ")" : eb.due ? "Due " + fmtW(eb.due) : "Emailed today";
       push({
         id: "embill:" + cuNorm(eb.biller || "bill") + ":" + (eb.due || String(eb.at).slice(0, 10)),
         key: "",
-        badge: isKora ? "⛽ KORA FUEL CARD BILL" : isEco ? "⚡ ECOTRICITY POWER BILL" : "🧾 BILL BY EMAIL",
+        badge: d === 0 ? "🧾 BILL DUE TODAY" : d === 1 ? "🧾 BILL DUE TOMORROW" : (isKora ? "⛽ KORA BILL TODAY" : "🧾 NEW BILL TODAY"),
         icon: "🧾",
         title: (eb.biller || "Bill") + " — " + amtTxt,
-        sub: dueTxt + " · Emailed " + fmtW(String(eb.at).slice(0, 10)) + " · Tap to view in Bills.",
+        sub: dueTxt + " · Tap to view in Bills.",
         go: "go('#bills')",
-        tone: "hero-soon",
-        urgent: mbAge(eb.at) <= 2 || (d != null && d >= 0 && d <= 2)
+        tone: d === 0 ? "hero-today" : "hero-soon",
+        urgent: true
       });
     });
   } catch (e) {}
 
-  // 2. Current or Upcoming Warnings (active road closures not yet expired, weather warnings, earthquakes, emergencies)
+  // 2. Active Today or Tomorrow Warnings (road closures active today/tomorrow, weather warnings today/tomorrow, emergencies)
   try {
     const warnings = glWarnList().filter(x => x && !x.flag);
     warnings.forEach(w => {
       const blob = (w.tag || "") + " " + (w.what || "") + " " + (w.s || "");
       if (alClosureExpiredToday(blob)) return;
+      // Only include if it is active today/tomorrow or an active crash/emergency/weather alert for today/tomorrow
+      const isTodayOrTm = /\b(today|tonight|tomorrow|now|current|reported)\b/i.test(blob) || w.red || (blob.includes(fmtW(T)) || blob.includes(fmtW(tmISO)));
+      if (!isTodayOrTm) return;
       const isQuake = /earthquake|geonet|usgs/i.test(blob);
       const isEmg = /police|ambulance|fire|emergency|rescue/i.test(blob) && !/road closure/i.test(blob);
       const isWx = /metservice|weather|rain|wind|storm|gale/i.test(blob);
@@ -22669,7 +22707,7 @@ function alHeroCandidates(list) {
       push({
         id: "warn:" + cuNorm(cleanT),
         key: cuNorm(cleanT),
-        badge: isQuake ? "🌍 EARTHQUAKE ALERT" : isEmg ? "🚨 WHANGĀREI EMERGENCY ALERT" : isWx ? "⛈️ WHANGĀREI WEATHER ALERT" : "⛔ WHANGĀREI ROAD ALERT",
+        badge: isQuake ? "🌍 EARTHQUAKE ALERT" : isEmg ? "🚨 WHANGĀREI EMERGENCY" : isWx ? "⛈️ WEATHER TODAY / TOMORROW" : "⛔ ROAD ALERT TODAY",
         icon: isQuake ? "🌍" : isEmg ? "🚨" : isWx ? "⛈️" : "⛔",
         title: cleanT,
         sub: shortSub + " · Tap for details.",
@@ -22680,31 +22718,10 @@ function alHeroCandidates(list) {
     });
   } catch (e) {}
 
-  // 3. Petrol Price Changes (Marsden Point 91)
-  try {
-    const st = typeof fuelStats === "function" ? fuelStats("91") : null;
-    if (st && st.now) {
-      const wkD = st.wk != null ? st.wk : 0;
-      const mv = st.day != null && Math.abs(st.day) >= 0.2 ? st.day : (st.lastMove ? st.lastMove.diff : wkD);
-      const dir = wkD <= -0.2 ? "▼ Down " + fuelC(Math.abs(wkD)) : wkD >= 0.2 ? "▲ Up " + fuelC(wkD) : (mv != null && mv <= -0.2) ? "▼ Down " + fuelC(Math.abs(mv)) : (mv != null && mv >= 0.2) ? "▲ Up " + fuelC(mv) : "Steady";
-      push({
-        id: "fuel:91:" + st.now.toFixed(1) + ":" + wkD.toFixed(1),
-        key: "gasprice91",
-        badge: "⛽ PETROL PRICE UPDATE",
-        icon: "⛽",
-        title: "Regular 91: " + dir + " (" + fuelC(st.now) + "/L)",
-        sub: "Marsden Point 30-day range " + fuelC(st.lo30) + "–" + fuelC(st.hi30) + "/L · Tap for 30-day price history.",
-        go: "fuelBackHash='#alerts';go('#fuel')",
-        tone: "hero-gas",
-        urgent: Math.abs(st.day || 0) >= 0.5
-      });
-    }
-  } catch (e) {}
-
-  // 4. Current or Upcoming Events, Appointments, Car & Pet Due Items (today or next 7 days only, no past/overdue or sitting to-dos)
+  // 3. Today and Tomorrow Events, Appointments, Car & Pet Due Items, Roster/Holidays (days === 0 or days === 1 ONLY)
   try {
     const ALLOWED_KINDS = new Set(["appt", "ext", "mine", "ev", "night", "car", "driver", "pet", "health", "hol", "bday", "count"]);
-    (list || []).filter(x => x && x.days != null && x.days >= 0 && x.days <= 7 && ALLOWED_KINDS.has(x.kind)).slice(0, 4).forEach(x => {
+    (list || []).filter(x => x && x.days != null && x.days >= 0 && x.days <= 1 && ALLOWED_KINDS.has(x.kind)).slice(0, 6).forEach(x => {
       const tmp = document.createElement("div");
       tmp.innerHTML = x.html || "";
       const tEl = tmp.querySelector(".t");
@@ -22712,32 +22729,33 @@ function alHeroCandidates(list) {
       const rawTitle = (x.name || (tEl ? tEl.textContent : "") || "").replace(/\s+/g, " ").trim();
       if (!rawTitle) return;
       const rawSub = (sEl ? sEl.textContent : "").replace(/\s+/g, " ").trim();
-      const whenLbl = x.days === 0 ? "Today" : x.days === 1 ? "Tomorrow" : "In " + x.days + " days" + (x.iso ? " (" + fmtW(x.iso) + ")" : "");
+      const whenLbl = x.days === 0 ? "Today" : "Tomorrow (" + fmtW(x.iso || tmISO) + ")";
       const rowBtn = tmp.querySelector("[onclick]");
       const goAct = (rowBtn && rowBtn.getAttribute("onclick")) || (x.kind === "car" ? "go('#cars')" : x.kind === "pet" ? "go('#pets')" : "go('#cal')");
+      const dayWord = x.days === 0 ? "TODAY" : "TOMORROW";
       const badgeMap = {
-        appt: "📅 UPCOMING APPOINTMENT",
-        health: "🩺 UPCOMING HEALTH",
-        car: "🚗 UPCOMING CAR DUE",
-        driver: "🚗 UPCOMING LICENCE DUE",
-        pet: "🐾 UPCOMING PET CARE",
-        ev: "🎉 UPCOMING EVENT",
-        night: "🌙 UPCOMING EVENT",
-        hol: "🏖️ UPCOMING HOLIDAY",
-        count: "⏳ COUNTDOWN",
-        bday: "🎂 UPCOMING BIRTHDAY"
+        appt: "📅 APPOINTMENT " + dayWord,
+        health: "🩺 HEALTH " + dayWord,
+        car: "🚗 CAR DUE " + dayWord,
+        driver: "🚗 LICENCE DUE " + dayWord,
+        pet: "🐾 PET CARE " + dayWord,
+        ev: "🎉 EVENT " + dayWord,
+        night: "🌙 TONIGHT / " + dayWord,
+        hol: "🏖️ HOLIDAY " + dayWord,
+        count: "⏳ " + dayWord,
+        bday: "🎂 BIRTHDAY " + dayWord
       };
       const iconMap = { appt: "📅", health: "🩺", car: "🚗", driver: "🚗", pet: "🐾", ev: "🎉", night: "🌙", hol: "🏖️", count: "⏳", bday: "🎂" };
       push({
         id: "up:" + x.kind + ":" + cuNorm(rawTitle) + ":" + (x.iso || x.days),
         key: cuNorm(rawTitle),
-        badge: badgeMap[x.kind] || (x.days === 0 ? "📅 ON TODAY" : "📅 COMING UP"),
+        badge: badgeMap[x.kind] || (x.days === 0 ? "📅 ON TODAY" : "📅 ON TOMORROW"),
         icon: iconMap[x.kind] || "📅",
         title: rawTitle,
         sub: [whenLbl, alShortBody(rawSub, 95)].filter(Boolean).join(" · "),
         go: goAct,
         tone: x.days === 0 ? "hero-today" : "hero-soon",
-        urgent: x.days === 0
+        urgent: true
       });
     });
   } catch (e) {}
@@ -22780,10 +22798,10 @@ function alPickHero(list) {
   return {
     id: "default:none",
     key: "",
-    badge: "🔔 WHANGĀREI ALERTS",
+    badge: "📅 TODAY & TOMORROW",
     icon: "✨",
-    title: "No urgent alerts right now (" + fmtW(todayISO()) + ")",
-    sub: "Current alerts, upcoming events, birthdays and petrol changes appear here.",
+    title: "All clear for today & tomorrow (" + fmtW(todayISO()) + ")",
+    sub: "Items happening today or tomorrow appear right here at the top.",
     go: "go('#weather')",
     tone: "hero-today",
     total: 1,
@@ -22845,7 +22863,6 @@ function alQuickGridHtml() {
   // Card 3: Sleep Data
   let slTitle = 'Sleep Data', slSub = 'Tap for sleep & morning check-in', slBadge = '';
   try {
-    setTimeout(() => hwRefresh(false), 0);
     const T = nzISO(Date.now()), L = hwList().slice().reverse();
     const recSl = L.find(x => x && x.sleep && x.sleep.mins > 0);
     const sl = recSl ? recSl.sleep : null;
@@ -23034,7 +23051,10 @@ function GlAlerts() {
   setTimeout(glBellMarkSeen, 50); // mark seen right away when Notifications is opened
   setTimeout(glBellMarkSeen, 650);
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
-  setTimeout(() => { try { refreshSarah(); } catch (e) { } try { refreshKora(false); refreshMb(false); } catch (e) { } try { hwRefresh(false); } catch (e) { } try { accLoad(); } catch (e) { } try { if (typeof rdcLoad === 'function') rdcLoad(true); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(); loadWx16(); refreshClosures(true); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 0);
+  if (!GlAlerts._lastBg || Date.now() - GlAlerts._lastBg > 90e3) {
+    GlAlerts._lastBg = Date.now();
+    setTimeout(() => { try { refreshSarah(); refreshKora(false); refreshMb(false); hwRefresh(false); accLoad(false); if (typeof rdcLoad === 'function') rdcLoad(false); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(false); loadWx16(); refreshClosures(false); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 150);
+  }
   const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
   const isBoard = alView === 'board';
   const topBar = `<div class="arcbar">
@@ -25506,7 +25526,15 @@ function glBellEach(p, fn) {
   objs(p.mb.filter(x => x.badge), 'm', x => (x.key || '') + '|' + amts(x.html));
   (p.packKeys || []).forEach(k => fn(hash('k', k), null, null));
 }
-function glBellSigs(p) { p = p || glAlertParts(); const L = []; glBellEach(p, sg => L.push(sg)); return L; }
+let _bellSigsMemo = null;
+function glBellSigs(p) {
+  if (!p && _bellSigsMemo && Date.now() - _bellSigsMemo.at < 1500) return _bellSigsMemo.list;
+  p = p || glAlertParts();
+  const L = [];
+  glBellEach(p, sg => L.push(sg));
+  _bellSigsMemo = { at: Date.now(), list: L };
+  return L;
+}
 /* 2.26.76: what was new when Notifications opened (or arrived while it's open) stays highlighted for that visit: a blue edge and a
    "New" pill, fading after about a minute. Leaving the page clears it; next time they're normal. */
 let bellNewSnap = null;
@@ -25862,7 +25890,10 @@ async function emView(k) {
 }
 // add the buttons to any row that names a bill (data-bill) or a car's rego (data-rego), wherever it shows
 function emDecorate(root) {
-  try { (root || document).querySelectorAll('[data-bill]:not([data-emd]),[data-rego]:not([data-emd])').forEach(el => {
+  try {
+    const nodes = (root || document).querySelectorAll('[data-bill]:not([data-emd]),[data-rego]:not([data-emd])');
+    if (!nodes.length) return;
+    nodes.forEach(el => {
     let r = null, ref = null; if (el.dataset.bill) { const b = (S.bills || []).find(x => x && x.id === el.dataset.bill); r = emBill(b); ref = billRef(b); } else if (el.dataset.rego) r = emRego(el.dataset.rego);
     if (!r && !ref) return; el.setAttribute('data-emd', '1');
     const box = document.createElement('div'); box.innerHTML = emBtns(r, '', ref); const btns = box.firstElementChild;
