@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.42';
+const APP_VERSION = '2.28.43';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -25879,11 +25879,14 @@ let PWR = (() => {
   return JSON.parse(JSON.stringify(PWR_SEED));
 })(), pwrBusy = false;
 const PWR_RATE = { importBlend: 0.15, daily: 3.22, exportCredit: 0.092 }; // incl GST; blended import is an estimate
-function pwrFetch(forceRefresh = false) {
+let pwrLastLivePullMs = 0;
+function pwrFetch(forceRefresh = false, silentAuto = false) {
   if (pwrBusy && !forceRefresh) return;
   pwrBusy = true;
-  if (forceRefresh) toast('Pulling live figures from SolarZero…');
-  (typeof devFetch === 'function' ? devFetch : fetch)(RELAY_URL + '/power' + (forceRefresh ? '?refresh=1' : ''), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+  if (forceRefresh || silentAuto) pwrLastLivePullMs = Date.now();
+  if (forceRefresh && !silentAuto) toast('Pulling live figures from SolarZero…');
+  const wantLive = forceRefresh || silentAuto;
+  (typeof devFetch === 'function' ? devFetch : fetch)(RELAY_URL + '/power' + (wantLive ? '?refresh=1&_t=' + Date.now() : ''), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
     pwrBusy = false;
     if (d && d.updatedAt) {
       const changed = !PWR || JSON.stringify(d) !== JSON.stringify(PWR);
@@ -25894,14 +25897,14 @@ function pwrFetch(forceRefresh = false) {
         if (/^#(power|compare|powertime|alerts|home|)$/.test(location.hash)) render();
         else glBellRedraw();
       }
-      if (forceRefresh && d.today) {
+      if (forceRefresh && !silentAuto && d.today) {
         const tc = d.today.cost ? d.today.cost.total : pwrCost(d.today.gridImportKWh, d.today.gridExportKWh, 1);
-        toast(`✓ Updated from SolarZero (${(+tc).toFixed(2)} today${d.today.batteryPct != null ? ' · ' + d.today.batteryPct + '% battery' : ''})`);
+        toast(`✓ Updated from SolarZero ($${(+tc).toFixed(2)} today${d.today.batteryPct != null ? ' · ' + d.today.batteryPct + '% battery' : ''})`);
       }
-    } else if (forceRefresh) {
+    } else if (forceRefresh && !silentAuto) {
       toast('Showing latest SolarZero figures.');
     }
-  }).catch(() => { pwrBusy = false; if (forceRefresh) toast('Couldn’t reach relay right now.'); });
+  }).catch(() => { pwrBusy = false; if (forceRefresh && !silentAuto) toast('Couldn’t reach relay right now.'); });
 }
 /* 2.26.71: end-of-day power line for the homepage summary, 8pm until 5am. Same figures as the Power page tiles
    (today.usedKWh / solarKWh / gridImportKWh / gridExportKWh, today.cost.total; after midnight the Yesterday card's).
@@ -25949,7 +25952,10 @@ function pwrBreak(c) {
   return `<table class="pwrtbl"><tr><th>Band</th><th>Grid</th><th>Cost</th></tr>${r('Peak', c.bands.peak)}${r('Shoulder', c.bands.shoulder)}${r('Off-peak', c.bands.offpeak)}<tr><td>Daily charge</td><td></td><td>${pwrD(c.daily)}</td></tr><tr><td>Export credit</td><td>${pwrK(c.exportKWh)}</td><td>−${pwrD(c.exportCredit)}</td></tr></table>`;
 }
 function PowerPage() {
-  setTimeout(pwrFetch, 0);
+  setTimeout(() => {
+    const needLive = (Date.now() - pwrLastLivePullMs) > 25000;
+    pwrFetch(false, needLive);
+  }, 0);
   const back = moneyTabs('power') /* 2.26.78: Power is the fourth Money tab */ + header('Power', 'Your house power, from SolarZero').replace(`aria-label="Settings" onclick="go('#settings')"`, `aria-label="Power settings" onclick="pwrSettings()"`);
   const d = PWR;
   if (!d || !d.updatedAt) return back + '<div class="card empty"><div class="t">Loading power figures…</div><div class="s">Needs the internet the first time.</div></div>';

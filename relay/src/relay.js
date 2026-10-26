@@ -703,7 +703,7 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
       const wantRefresh = new URL(request.url).searchParams.get('refresh') === '1';
       let doc = await getPowerDoc(env);
       const ageMs = doc && doc.updatedAt ? (Date.now() - Date.parse(doc.updatedAt)) : Infinity;
-      if (wantRefresh || ageMs > 25 * 60e3) {
+      if (wantRefresh || ageMs > 2 * 60e3) {
         try { doc = await refreshSolarZero(env, fetchImpl, Date.now()); } catch (e) {}
       }
       return new Response(JSON.stringify(doc || {}), { status: 200, headers: H });
