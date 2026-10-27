@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.46';
+const APP_VERSION = '2.28.47';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -26830,7 +26830,7 @@ function glWorkCard(m) {
     return `<div class="list glworkcard"><div class="row"><div class="ic health">🤒</div><div class="tx" onclick="go('#work')" style="cursor:pointer"><div class="t">Off sick today (rostered ${esc(glShift(m))})</div><div class="s">Not at work · rest up and take it easy today</div></div><button type="button" class="btn small" onclick="setWorkSickToday('working')">I’m at work</button></div></div>`;
   }
   if (m.off || m.workDone || !m.atWork) return ''; const f = glFree(m); if (!f) return '';
-  return `<div class="list glworkcard"><div class="row"><div class="ic appt">${I('calendar')}</div><div class="tx" onclick="go('#work')" style="cursor:pointer"><div class="t">Work ${esc(glShift(m))}</div><div class="s"><span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span></div></div><button type="button" class="btn small" onclick="setWorkSickToday('sick')">🤒 Off sick</button></div></div>`;
+  return `<div class="list glworkcard"><div class="row" style="gap:10px;align-items:center"><div class="ic appt"><img src="art/i3-cal.webp" alt="" width="28" height="28" style="width:28px;height:28px;object-fit:contain" onerror="this.outerHTML=I('cal')"></div><div class="tx" onclick="go('#work')" style="cursor:pointer;min-width:0"><div class="t" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Work ${esc(glShift(m))}</div><div class="s"><span data-glfree="card">Roster · free in ${esc(f.txt)} · ${esc(fmtTime(f.end))}</span></div></div><button type="button" class="btn small" style="flex:none;white-space:nowrap" onclick="setWorkSickToday('sick')">🤒 Off sick</button></div></div>`;
 }
 const bellTxt = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 function bellTodayRows(have) {
