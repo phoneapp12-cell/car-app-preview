@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.52';
+const APP_VERSION = '2.28.53';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22690,7 +22690,7 @@ function homeShownKeys() {
     (S.birthdays || []).forEach(b => {
       if (b && b.name) {
         const inf = typeof bdayInfo === "function" ? bdayInfo(b) : null;
-        if (inf && inf.d >= 0 && inf.d <= 3) return; // 2.28.33: Birthdays in the next 3 days stay on Notifications!
+        if (inf && inf.d >= 0 && inf.d <= 14) return; // 2.28.53: Upcoming birthdays (up to 14 days) stay on Notifications prioritised by days away!
         S0.add(cuNorm(b.name + "’s birthday"));
         S0.add(cuNorm("Celebrating " + b.name + "’s birthday"));
       }
@@ -23204,6 +23204,11 @@ function alBriefingHtml(list) {
     if (mAgoDays) ageDays = Math.max(ageDays, parseInt(mAgoDays[1], 10));
     else if (mAgoHrs) ageDays = Math.max(ageDays, Math.round(parseInt(mAgoHrs[1], 10) / 24));
 
+    const bdayAttr = el.getAttribute && el.getAttribute('data-bday-days');
+    const isBday = bdayAttr != null || /\bbirthday\b/i.test(txt);
+    if (bdayAttr != null && Number.isFinite(parseInt(bdayAttr, 10))) {
+      dueDays = parseInt(bdayAttr, 10);
+    }
     const isRedWarn = el.classList.contains('glwarn') || el.classList.contains('glwarnwrap') || /\b(road closure|warning|emergency|overdue)\b/i.test(txt);
     const isBill = secName === 'bills' || /\b(bill|invoice|direct debit|kora|ecotricity)\b/i.test(txt);
     const isSarah = secName === 'sarah';
@@ -23222,9 +23227,9 @@ function alBriefingHtml(list) {
       score = 6500 + ageDays * 8;
       priBadge = `<span class="pill" style="background:#fef3c7;color:#92400e;font-weight:700;font-size:.7rem;padding:2px 7px;border-radius:999px">🟡 Tomorrow</span>`;
     } else if (dueDays != null && dueDays > 1) {
-      // Upcoming dated items: sooner dates first, then longer sitting
-      score = Math.max(1000, 5500 - dueDays * 120) + ageDays * 6 + (isBill ? 80 : 0);
-      priBadge = `<span class="pill" style="background:#e0f2fe;color:#075985;font-weight:700;font-size:.7rem;padding:2px 7px;border-radius:999px">📅 In ${dueDays}d</span>`;
+      // Upcoming dated items (especially birthdays): strictly ordered by how close the date is (fewer days away = higher priority)
+      score = Math.max(1000, 6200 - dueDays * 180) + (isBday ? 250 : 0) + ageDays * 6 + (isBill ? 80 : 0);
+      priBadge = `<span class="pill" style="background:${dueDays <= 3 ? '#fef3c7;color:#92400e' : dueDays <= 7 ? '#ffedd5;color:#9a3412' : '#e0f2fe;color:#075985'};font-weight:700;font-size:.7rem;padding:2px 7px;border-radius:999px">${isBday ? '🎂 In ' : '📅 In '}${dueDays}d</span>`;
     } else {
       // Undated items: ordered by how long they have been sitting there (oldest/longest sitting first)
       score = 3500 + Math.min(1800, ageDays * 90) + (isBill ? 200 : isSarah ? 150 : 0);
@@ -23249,7 +23254,7 @@ function alBriefingHtml(list) {
       else if (s.startsWith('bills by email')) curSec = 'bills';
       else if (s.startsWith('from sarah')) curSec = 'sarah';
       else if (s.startsWith('deliveries') || s.startsWith('click & collect') || s.startsWith('in progress')) curSec = 'cars';
-      else if (s.startsWith('for you today') || s.startsWith('today') || s.startsWith('coming up') || s.startsWith('reminders') || s.startsWith('new on your lists')) curSec = 'skip';
+      else if (s.startsWith('for you today') || s.startsWith('today') || s.startsWith('reminders') || s.startsWith('new on your lists')) curSec = 'skip';
       else curSec = 'today';
       return;
     }
@@ -25706,16 +25711,24 @@ async function doneSittingTodo(id, ev) {
 }
 function notifThreeDayBdaysAndSittingTodo() {
   const urgentOut = [], comingOut = [];
-  // 1. Birthdays in the next 3 days (0, 1, 2, or 3 days away)
+  // 1. Upcoming birthdays (up to 14 days away), prioritised by how long until the date
   try {
     (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b)))
-      .filter(x => x.d >= 0 && x.d <= 3 && glOk(x.b.name))
+      .filter(x => x.d >= 0 && x.d <= 14 && glOk(x.b.name))
       .sort((a, b) => a.d - b.d)
       .forEach(x => {
         const when = x.d === 0 ? "Today! 🎂" : x.d === 1 ? "Tomorrow 🎂" : `In ${x.d} days (${fmtW(x.iso)})`;
-        const h = `<button class="row" onclick="go('#birthdays')"><div class="ic bday">🎂</div><div class="tx"><div class="t">🎂 ${esc(x.b.name)}’s${x.age > 0 ? " " + ordinal(x.age) : ""} birthday</div><div class="s">${esc(when)}${x.age > 0 ? " · turns " + x.age : ""}</div></div><span class="pill">${esc(x.d === 0 ? "Today" : x.d === 1 ? "Tomorrow" : x.d + "d")}</span></button>`;
-        if (x.d <= 1) urgentOut.push({ days: x.d, html: h, noCount: false });
-        else comingOut.push({ days: x.d, html: h, noCount: false });
+        const priStyle = x.d <= 1
+          ? "background:#fee2e2;color:#991b1b;font-weight:800"
+          : x.d <= 3
+          ? "background:#fef3c7;color:#92400e;font-weight:800"
+          : x.d <= 7
+          ? "background:#ffedd5;color:#9a3412;font-weight:700"
+          : "background:#e0f2fe;color:#075985;font-weight:700";
+        const pillTxt = x.d === 0 ? "🔴 Today 🎂" : x.d === 1 ? "🔴 Tomorrow" : x.d <= 3 ? `🟠 In ${x.d}d` : x.d <= 7 ? `🟡 In ${x.d}d` : `🔵 In ${x.d}d`;
+        const h = `<button class="row" data-bday-days="${x.d}" onclick="go('#birthdays')"><div class="ic bday">🎂</div><div class="tx"><div class="t">🎂 ${esc(x.b.name)}’s${x.age > 0 ? " " + ordinal(x.age) : ""} birthday</div><div class="s">${esc(when)}${x.age > 0 ? " · turns " + x.age : ""}</div></div><span class="pill" style="${priStyle}">${esc(pillTxt)}</span></button>`;
+        if (x.d <= 3) urgentOut.push({ days: x.d, html: h, noCount: false });
+        else comingOut.push({ days: x.d, html: h, noCount: x.d > 7 });
       });
   } catch (e) {}
 
