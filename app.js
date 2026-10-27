@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.55';
+const APP_VERSION = '2.28.56';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -14895,7 +14895,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-25'
+// VIDEO_LIST_UPDATED = '2026-10-28'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -14912,8 +14912,8 @@ const VIDEO_CATS = [
   { id: 'wood', name: 'Woodworking', sub: 'Beginner projects with basic tools', extra: true }
 ];
 const VIDEOS = [
-  { id: 'TD74a5g5rp0', title: 'Everything Apple announced in under 10 mins - Welcome Home 2026', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=TD74a5g5rp0', reason: 'Linus Tech Tips sums up everything Apple announced at Welcome Home 2026 in under ten minutes.' },
-  { id: 'b2tjnxX8IHU', title: 'Did Google just dethrone OpenAI and Anthropic?', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=b2tjnxX8IHU', reason: 'Fireship asks whether Google has just pulled ahead of OpenAI and Anthropic in AI.' },
+  { id: 'DN953UW8iJ8', title: 'dbrand Forced me to Review the iPhone 18 Pro', channel: 'Linus Tech Tips', category: 'tech', url: 'https://www.youtube.com/watch?v=DN953UW8iJ8', reason: 'Linus Tech Tips gives his take on the iPhone 18 Pro.' },
+  { id: 'G_em1hHPnXY', title: 'China just dropped a new frontier model... and nobody can explain how', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=G_em1hHPnXY', reason: 'Fireship on a new top-end AI model just released in China.' },
   { id: 'ULWD2IAfH1c', title: 'iPhone Duo Review: I See Why Apple Took Its Time', channel: 'CNET', category: 'tech', url: 'https://www.youtube.com/watch?v=ULWD2IAfH1c', reason: 'CNET reviews the iPhone Duo, Apple’s new foldable iPhone that’s out this week.' },
   { id: 'SMGg7iisHmc', title: 'The most vulnerable week in internet history...', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=SMGg7iisHmc', reason: 'Fireship’s quick take on what it calls the most vulnerable week in internet history.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
