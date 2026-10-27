@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.58';
+const APP_VERSION = '2.28.59';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4110,7 +4110,7 @@ function cleanHead(name, now) {
 /* 2.24.3: Classic layout gets the same dog as Clean, on the left of the header (same art, size and look). Falls back to the plain header. */
 function classicDogHead(name, now) {
   const h = header('Notifications', `<span class="subhi">Hi ${esc(name)}</span><span class="subdate">${WDL[now.getDay()]} ${now.getDate()} ${MONL[now.getMonth()]}</span>`, homeTry('cat', () => (mascotKey() === 'dog' ? '' : catHtml()), '')); // 2.24.4: the left dog replaces the wagging header dog (no two dogs); a chosen cat stays
-  return h.replace('<div class="top"><div style="min-width:0">', '<div class="top"><div class="cldogwrap"><img class="cldog" src="art/dog.webp" alt="" width="52" height="52" onerror="this.remove()"><div style="min-width:0">').replace(/<\/div>\s*<div class="iconrow">/, '</div></div>\n  <div class="iconrow">');
+  return h.replace('<div class="top"><div style="min-width:0">', '<div class="top"><div class="cldogwrap"><img class="cldog" src="art/dog.webp" alt="" width="52" height="52" onerror="this.remove()"><div style="min-width:0">').replace(/<\/div>\s*<div class="iconrow">/, '</div></div>\n  <div class="iconrow">').replace('<button class="iconbtn" aria-label="Settings" onclick="go(\'#settings\')">' + I('gear') + '</button>', '');
 }
 // 2.24.7: Settings › Check for update. Asks the service worker for a new version, then reloads.
 async function checkAppUpdate() { // 2.26.21: compare with the live version; if the phone is stuck on an old one, clear the old copy and reload
@@ -11601,7 +11601,7 @@ const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'lists', 'food', 'projects'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'lists', 'food', 'projects', 'settings'] },
   { id: 'money', title: 'Life & Local', keys: ['money', 'wellbeing', 'local', 'homelife'] },
   { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'learn'] }
 ];
@@ -21359,7 +21359,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -22051,7 +22051,7 @@ function glHead(name, m, now) {
   const shiftPill = m.sick ? '🤒 Off sick today' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
   let blurb = ''; try { blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || ''); } catch (e) { blurb = esc(glLine(m) || ''); }
   let qStrip = ''; try { qStrip = typeof glHeroQuoteStrip === 'function' ? glHeroQuoteStrip() : ''; } catch (e) { qStrip = ''; }
-  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open menu" title="All Sections &amp; Menu" onclick="openQuickMenuSheet()"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}${qStrip}</div></div>`;
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open sidebar" title="Open sidebar" onclick="setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}</div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}${qStrip}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -34093,7 +34093,7 @@ function openSavedQuotesSheet() {
   openSheet("Quotes & Quips (" + saved.length + " saved)", rows, null, "Close", `<button type="button" class="btn primary" onclick="glNextHeroQuote();closeSheet()">🎲 Shuffle Home Quote</button>`);
 }
 
-/* ---- NZX Top 40 Share Market & General Stats Engine (2.28.58: 1 NZX Top 40 card + General stuff: Petrol prices, etc.) ---- */
+/* ---- NZX Top 40 Share Market, Finance Page & General Stats Engine (2.28.59) ---- */
 const NZX_TOP40_STOCKS = [
   { code: "FPH", name: "Fisher & Paykel Healthcare", price: "$36.40", chg: "+1.4%", up: true, sec: "Healthcare" },
   { code: "IFT", name: "Infratil", price: "$12.15", chg: "+0.9%", up: true, sec: "Infrastructure" },
@@ -34111,10 +34111,27 @@ const NZX_TOP40_STOCKS = [
   { code: "AIR", name: "Air New Zealand", price: "$0.56", chg: "+0.9%", up: true, sec: "Aviation" }
 ];
 
+const NZ_MORTGAGE_RATES = [
+  { bank: "ASB (Your 3 Loans)", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Your current bank · 3 fortnightly mortgages" },
+  { bank: "BNZ", f6m: 6.09, f1y: 5.55, f18m: 5.39, f2y: 5.45, f3y: 5.55, note: "Lowest 18-month fixed rate (5.39%)" },
+  { bank: "ANZ", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Matches ASB across 1-yr & 2-yr terms" },
+  { bank: "Kiwibank", f6m: 6.09, f1y: 5.55, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Competitive 1-yr rate (5.55%)" },
+  { bank: "Westpac", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.55, note: "Lowest 3-yr rate (5.55%)" }
+];
+
+const KIWISAVER_FUNDS = [
+  { name: "Milford Active Growth", type: "Growth", r1y: 15.1, r5y: 9.8, fee: "1.05%", rank: "#1 5-Yr Growth" },
+  { name: "Simplicity Growth", type: "Growth (Low Fee)", r1y: 13.8, r5y: 8.9, fee: "0.25%", rank: "Lowest Fee (0.25%)" },
+  { name: "Generate Focused Growth", type: "Growth", r1y: 14.6, r5y: 9.1, fee: "1.29%", rank: "#2 1-Yr Return" },
+  { name: "ASB Growth Fund", type: "Growth", r1y: 12.6, r5y: 8.1, fee: "0.70%", rank: "Big-4 Bank Pick" },
+  { name: "Fisher Funds Growth", type: "Growth", r1y: 12.9, r5y: 8.3, fee: "0.97%", rank: "Solid 1-Yr" },
+  { name: "NZ Growth Category Average", type: "Benchmark", r1y: 12.4, r5y: 8.0, fee: "0.88%", rank: "Morningstar Avg" }
+];
+
 let MKT_DATA = (() => {
   try {
     const c = JSON.parse(localStorage.getItem("mktPulseCacheV1") || "null");
-    if (c && c.nzx) return c;
+    if (c && c.nzx) return Object.assign({ nzx40: { val: "11,920", chg: "+0.48%", up: true }, ocr: "3.75%" }, c);
   } catch (e) {}
   return {
     at: Date.now(),
@@ -34122,12 +34139,14 @@ let MKT_DATA = (() => {
     nzx40: { val: "11,920", chg: "+0.48%", up: true },
     dow: { val: "43,290", chg: "+0.68%", up: true },
     sp500: { val: "5,892", chg: "+0.54%", up: true },
-    nzd: "0.604"
+    nzd: "0.604",
+    ocr: "3.75%"
   };
 })();
 
 let __heroBlurbSeed = Math.floor(Math.random() * 1000);
 let __pulseMode = "all"; // Default stays on "all" (1 NZX Top 40 card + General stuff: Petrol, Solar/Weather, Today)
+let __financeTab = "all"; // "all" | "nzx40" | "rates" | "kiwi"
 
 function setPulseMode(m, ev) {
   if (ev && ev.stopPropagation) ev.stopPropagation();
@@ -34172,29 +34191,29 @@ function glLivePulseHtml(m) {
   const driveMin = (() => { try { return (typeof DRIVE !== "undefined" && DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds)) ? Math.round(DRIVE.seconds / 60) + " min" : "16 min"; } catch (e) { return "16 min"; } })();
   const nzx40 = MKT_DATA.nzx40 || { val: "11,920", chg: "+0.48%", up: true };
 
-  // Single finance card: NZX Top 40 Share Market
+  // Single finance card on Home: NZX Top 40 Share Market -> tapping opens the full Finance page (#finance)
   const nzxCardHtml = `
-    <button type="button" class="pulse-card market" onclick="openMarketsRatesSheet(nzx40)">
+    <button type="button" class="pulse-card market" onclick="go('#finance')">
       <div class="p-top"><span class="p-lbl">📈 NZX Top 40</span><span class="p-badge up">▲ ${esc(nzx40.chg)}</span></div>
       <div class="p-main"><span class="p-big" style="color:#4ade80">${esc(nzx40.val)}</span><span class="p-vs" style="color:#86efac">NZD $${esc(MKT_DATA.nzd)}</span></div>
-      <div class="p-sub"><span>FPH +1.4% · IFT +0.9% · AIA +0.6%</span><span>Top 40 ›</span></div>
+      <div class="p-sub"><span>Shares · ASB Rates · KiwiSaver</span><span>Finance ›</span></div>
     </button>`;
 
   let cardsHtml = "";
   if (__pulseMode === "fuel") {
     cardsHtml = `
       ${nzxCardHtml}
-      <button type="button" class="pulse-card rates" onclick="fuelBackHash=#home;go(#fuel)">
+      <button type="button" class="pulse-card rates" onclick="fuelBackHash='#home';go('#fuel')">
         <div class="p-top"><span class="p-lbl">⛽ 91 Unleaded</span><span class="p-badge ${fl.badgeCls}">${esc(fl.badge)}</span></div>
         <div class="p-main"><span class="p-big">$${esc(fl.now91)}<small>/L</small></span><span class="p-vs">Marsden Pt</span></div>
         <div class="p-sub"><span>Kora saves 10c+/L at Mobil/Waitomo</span><span>30d Chart ›</span></div>
       </button>
-      <button type="button" class="pulse-card kiwi" onclick="fuelBackHash=#home;go(#fuel)">
+      <button type="button" class="pulse-card kiwi" onclick="fuelBackHash='#home';go('#fuel')">
         <div class="p-top"><span class="p-lbl">⛽ 95 &amp; Diesel</span><span class="p-badge">Wholesale</span></div>
         <div class="p-main"><span class="p-big">95 $${esc(fl.now95)}</span><span class="p-vs">Dsl $${esc(fl.nowD)}</span></div>
         <div class="p-sub"><span>BP &amp; Z terminal list prices</span><span>Compare ›</span></div>
       </button>
-      <button type="button" class="pulse-card needed" onclick="go(#bridge)">
+      <button type="button" class="pulse-card needed" onclick="go('#bridge')">
         <div class="p-top"><span class="p-lbl">🚗 Port Rd &amp; Bridge</span><span class="p-badge up">${esc(driveMin)}</span></div>
         <div class="p-main"><span class="p-big">${esc(driveMin)}</span><span class="p-vs">Onerahi → Town</span></div>
         <div class="p-sub"><span>Te Matau a Pohe &amp; WDC roadworks</span><span>Roads ›</span></div>
@@ -34202,17 +34221,17 @@ function glLivePulseHtml(m) {
   } else if (__pulseMode === "home") {
     cardsHtml = `
       ${nzxCardHtml}
-      <button type="button" class="pulse-card kiwi" onclick="go(#power)">
+      <button type="button" class="pulse-card kiwi" onclick="go('#power')">
         <div class="p-top"><span class="p-lbl">☀️ SolarZero Today</span><span class="p-badge up">Under $8.50/d</span></div>
         <div class="p-main"><span class="p-big">${esc(pwrSolar)}</span><span class="p-vs">Battery + Grid</span></div>
         <div class="p-sub"><span>Onerahi solar generation today</span><span>Open Power ›</span></div>
       </button>
-      <button type="button" class="pulse-card rates" onclick="go(#weather)">
+      <button type="button" class="pulse-card rates" onclick="go('#weather')">
         <div class="p-top"><span class="p-lbl">⛅ Weather &amp; Tides</span><span class="p-badge">${esc(wxTemp)} Now</span></div>
         <div class="p-main"><span class="p-big">Onerahi ${esc(wxTemp)}</span><span class="p-vs">Tides &amp; UV</span></div>
         <div class="p-sub"><span>Whangārei forecast &amp; high/low tide</span><span>Weather ›</span></div>
       </button>
-      <button type="button" class="pulse-card needed" onclick="go(#tv)">
+      <button type="button" class="pulse-card needed" onclick="go('#tv')">
         <div class="p-top"><span class="p-lbl">📺 Live TV Guide</span><span class="p-badge up">${ltvAllChannels().length} Ch</span></div>
         <div class="p-main"><span class="p-big">${ltvAllChannels().length} Free Ch</span><span class="p-vs">Timeline Grid</span></div>
         <div class="p-sub"><span>NZ, UK, Movies, Comedy &amp; Cars</span><span>TV Guide ›</span></div>
@@ -34220,36 +34239,36 @@ function glLivePulseHtml(m) {
   } else if (__pulseMode === "streaks") {
     cardsHtml = `
       ${nzxCardHtml}
-      <button type="button" class="pulse-card needed" onclick="go(#todo)">
+      <button type="button" class="pulse-card needed" onclick="go('#todo')">
         <div class="p-top"><span class="p-lbl">☑️ Sitting Tasks</span><span class="p-badge warn">${over5 ? over5 + " >5d" : "All clear"}</span></div>
         <div class="p-main"><span class="p-big">${over5} Sitting >5d</span><span class="p-vs">Clear 1 today</span></div>
         <div class="p-sub"><span>Sorted by due date &amp; sitting time</span><span>Open Tasks ›</span></div>
       </button>
-      <button type="button" class="pulse-card rates" onclick="go(#tidy)">
+      <button type="button" class="pulse-card rates" onclick="go('#tidy')">
         <div class="p-top"><span class="p-lbl">🧹 10-Min Tidy</span><span class="p-badge up">Zero pressure</span></div>
         <div class="p-main"><span class="p-big">${tidyDone} / ${tidyTotal} Spots</span><span class="p-vs">10m timer</span></div>
         <div class="p-sub"><span>One small drawer or shelf at a time</span><span>Pick a spot ›</span></div>
       </button>
-      <button type="button" class="pulse-card kiwi" onclick="go(#watch)">
+      <button type="button" class="pulse-card kiwi" onclick="go('#watch')">
         <div class="p-top"><span class="p-lbl">⌚ Watch &amp; Gym</span><span class="p-badge up">🔥 ${stepStreak}d Streak</span></div>
         <div class="p-main"><span class="p-big">${stepStreak} Days</span><span class="p-vs">Tue/Wed Gym</span></div>
         <div class="p-sub"><span>Huawei watch steps &amp; sleep</span><span>Open Watch ›</span></div>
       </button>`;
   } else {
-    // Default "all": 1 NZX Top 40 Share Market card + 3 General cards (Petrol Prices, Solar & Weather, Today & Needed)
+    // Default "all": 1 NZX Top 40 Share Market card (opens #finance) + 3 General cards (Petrol Prices, Solar & Weather, Today & Coming Up)
     cardsHtml = `
       ${nzxCardHtml}
-      <button type="button" class="pulse-card rates" onclick="fuelBackHash=#home;go(#fuel)">
+      <button type="button" class="pulse-card rates" onclick="fuelBackHash='#home';go('#fuel')">
         <div class="p-top"><span class="p-lbl">⛽ Petrol Prices</span><span class="p-badge ${fl.badgeCls}">${esc(fl.badge)}</span></div>
         <div class="p-main"><span class="p-big">91 $${esc(fl.now91)}<small>/L</small></span><span class="p-vs">95 $${esc(fl.now95)}</span></div>
         <div class="p-sub"><span>Diesel <b>$${esc(fl.nowD)}/L</b> · Marsden Pt</span><span>30d History ›</span></div>
       </button>
-      <button type="button" class="pulse-card kiwi" onclick="go(#power)">
+      <button type="button" class="pulse-card kiwi" onclick="go('#power')">
         <div class="p-top"><span class="p-lbl">☀️ Solar &amp; Weather</span><span class="p-badge up">${esc(wxTemp)} Onerahi</span></div>
         <div class="p-main"><span class="p-big">${esc(pwrSolar)}</span><span class="p-vs">${esc(driveMin)} Town</span></div>
         <div class="p-sub"><span>SolarZero today &amp; Port Rd run</span><span>Power ›</span></div>
       </button>
-      <button type="button" class="pulse-card needed" onclick="go(#todo)">
+      <button type="button" class="pulse-card needed" onclick="go('#todo')">
         <div class="p-top"><span class="p-lbl">⚡ Today &amp; Coming Up</span><span class="p-badge warn">${over5} Tasks &gt;5d</span></div>
         <div class="p-main"><span class="p-big">${dueSoon} Bills <small>7d</small></span><span class="p-vs">Pay 4 Nov</span></div>
         <div class="p-sub"><span>${over5} sitting tasks · ${tidyDone}/${tidyTotal} tidy</span><span>Open Tasks ›</span></div>
@@ -34259,28 +34278,46 @@ function glLivePulseHtml(m) {
   return `<div class="gllivepulse" id="gllivepulse">
     <div class="glzone" style="margin:6px 0 6px">
       <span>📊 Live Pulse · NZX Top 40 &amp; General</span>
-      <button type="button" class="glrotbtn" onclick="setPulseMode(next, event)">↻ Cycle view</button>
+      <button type="button" class="glrotbtn" onclick="setPulseMode('next', event)">↻ Cycle view</button>
     </div>
     <div class="pulse-grid">${cardsHtml}</div>
     <div class="spotlight-bar">
       <div class="sp-pills">
-        <button type="button" class="sp-chip${__pulseMode === "all" ? " on" : ""}" onclick="setPulseMode(all, event)">📊 General</button>
-        <button type="button" class="sp-chip${__pulseMode === "fuel" ? " on" : ""}" onclick="setPulseMode(fuel, event)">⛽ Petrol &amp; Roads</button>
-        <button type="button" class="sp-chip${__pulseMode === "home" ? " on" : ""}" onclick="setPulseMode(home, event)">☀️ Power &amp; TV</button>
-        <button type="button" class="sp-chip${__pulseMode === "streaks" ? " on" : ""}" onclick="setPulseMode(streaks, event)">☑️ Tasks &amp; Tidy</button>
+        <button type="button" class="sp-chip${__pulseMode === "all" ? " on" : ""}" onclick="setPulseMode('all', event)">📊 General</button>
+        <button type="button" class="sp-chip${__pulseMode === "fuel" ? " on" : ""}" onclick="setPulseMode('fuel', event)">⛽ Petrol &amp; Roads</button>
+        <button type="button" class="sp-chip${__pulseMode === "home" ? " on" : ""}" onclick="setPulseMode('home', event)">☀️ Power &amp; TV</button>
+        <button type="button" class="sp-chip${__pulseMode === "streaks" ? " on" : ""}" onclick="setPulseMode('streaks', event)">☑️ Tasks &amp; Tidy</button>
       </div>
-      <button type="button" class="sp-more" onclick="openMarketsRatesSheet(nzx40)">NZX Top 40 ›</button>
+      <button type="button" class="sp-more" onclick="go('#finance')">Finance Page ›</button>
     </div>
   </div>`;
 }
 
-function openMarketsRatesSheet(tab) {
+function financeBodyHtml(tab) {
+  tab = tab || __financeTab || "all";
   const nzx40 = MKT_DATA.nzx40 || { val: "11,920", chg: "+0.48%", up: true };
+  const ratesRows = NZ_MORTGAGE_RATES.map((r, i) => `
+    <div class="row" style="padding:10px 12px;${i === 0 ? "border-left:3px solid #3b82f6;background:color-mix(in srgb,var(--brand) 10%,var(--card))" : ""}">
+      <div class="tx">
+        <div class="t"><b>${esc(r.bank)}</b></div>
+        <div class="s">6m: <b>${r.f6m.toFixed(2)}%</b> · 1yr: <b>${r.f1y.toFixed(2)}%</b> · 18m: <b>${r.f18m.toFixed(2)}%</b> · 2yr: <b>${r.f2y.toFixed(2)}%</b> · 3yr: <b>${r.f3y.toFixed(2)}%</b></div>
+        <div class="s muted">${esc(r.note)}</div>
+      </div>
+    </div>`).join("");
+
+  const kiwiRows = KIWISAVER_FUNDS.map(f => `
+    <div class="row" style="padding:10px 12px">
+      <div class="tx">
+        <div class="t"><b>${esc(f.name)}</b> <span class="pill" style="font-size:.68rem">${esc(f.rank)}</span></div>
+        <div class="s">1-Yr Return: <b style="color:var(--green,#16a34a)">+${f.r1y.toFixed(1)}%</b> · 5-Yr Avg: <b>+${f.r5y.toFixed(1)}%/yr</b> · Annual Fee: <b>${esc(f.fee)}</b></div>
+      </div>
+    </div>`).join("");
+
   const stockRows = NZX_TOP40_STOCKS.map(s => `
-    <div class="row" style="padding:9px 10px">
+    <div class="row" style="padding:9px 12px">
       <div class="tx">
         <div class="t"><b>${esc(s.code)}</b> · ${esc(s.name)} <span class="pill" style="font-size:.68rem">${esc(s.sec)}</span></div>
-        <div class="s">NZX Top 40 constituent</div>
+        <div class="s">NZX Top 40 share</div>
       </div>
       <div style="text-align:right">
         <div style="font-weight:800">${esc(s.price)}</div>
@@ -34288,19 +34325,52 @@ function openMarketsRatesSheet(tab) {
       </div>
     </div>`).join("");
 
-  const html = `
-    <div class="card" style="padding:12px;margin-bottom:10px">
-      <div style="font-weight:800;margin-bottom:6px">📈 NZX Top 40 &amp; Market Overview</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
-        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZX Top 40</div><div style="font-weight:900;font-size:1rem">${esc(nzx40.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(nzx40.chg)}</div></div>
-        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZX 50</div><div style="font-weight:900;font-size:1rem">${esc(MKT_DATA.nzx.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(MKT_DATA.nzx.chg)}</div></div>
-        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZD / USD</div><div style="font-weight:900;font-size:1rem">$${esc(MKT_DATA.nzd)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">Dow ${esc(MKT_DATA.dow.chg)}</div></div>
+  const summaryHero = `
+    <div class="card" style="padding:12px;margin-bottom:12px">
+      <div style="font-weight:800;margin-bottom:8px">📈 Share Markets &amp; Key Indicators</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;text-align:center">
+        <div style="padding:10px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZX Top 40</div><div style="font-weight:900;font-size:1.08rem">${esc(nzx40.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.82rem">▲ ${esc(nzx40.chg)}</div></div>
+        <div style="padding:10px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZX 50</div><div style="font-weight:900;font-size:1.08rem">${esc(MKT_DATA.nzx.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.82rem">▲ ${esc(MKT_DATA.nzx.chg)}</div></div>
+        <div style="padding:10px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">Dow Jones (US)</div><div style="font-weight:900;font-size:1.08rem">${esc(MKT_DATA.dow.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.82rem">▲ ${esc(MKT_DATA.dow.chg)}</div></div>
+        <div style="padding:10px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZD / USD &amp; OCR</div><div style="font-weight:900;font-size:1.08rem">$${esc(MKT_DATA.nzd)}</div><div style="color:var(--brand,#2563eb);font-weight:800;font-size:.82rem">OCR ${esc(MKT_DATA.ocr || "3.75%")}</div></div>
       </div>
-    </div>
-    <div class="sec">🇳🇿 NZX Top 40 Key Shares</div>
-    <div class="list">${stockRows}</div>`;
+    </div>`;
 
-  openSheet("NZX Top 40 Share Market", html, null, "Close", `<button type="button" class="btn primary" onclick="closeSheet().then(()=>{fuelBackHash=#home;go(#fuel)})">⛽ Open 30-Day Petrol Prices ›</button>`);
+  const nzxSec = `<div class="sec">🇳🇿 NZX Top 40 Shares</div><div class="list" style="margin-bottom:14px">${stockRows}</div>`;
+  const ratesSec = `<div class="sec">🏦 NZ Mortgage Rates (ASB vs ANZ, BNZ, Kiwibank, Westpac · OCR ${esc(MKT_DATA.ocr || "3.75%")})</div><div class="list" style="margin-bottom:14px">${ratesRows}</div>`;
+  const kiwiSec = `<div class="sec">🥝 KiwiSaver Growth Funds (1-Yr &amp; 5-Yr Comparison)</div><div class="list" style="margin-bottom:14px">${kiwiRows}</div>`;
+
+  if (tab === "nzx40") return summaryHero + nzxSec;
+  if (tab === "rates") return summaryHero + ratesSec;
+  if (tab === "kiwi") return summaryHero + kiwiSec;
+  return summaryHero + nzxSec + ratesSec + kiwiSec;
+}
+
+function setFinanceTab(t) {
+  __financeTab = t || "all";
+  render();
+}
+
+function FinancePage() {
+  const tabs = [
+    ["all", "📊 All Finance"],
+    ["nzx40", "📈 NZX Top 40"],
+    ["rates", "🏦 Mortgage Rates"],
+    ["kiwi", "🥝 KiwiSaver"]
+  ];
+  return `<button class="back" onclick="go('#home')">${I('left')} Home</button>` +
+    header("Finance & Markets", "NZX Top 40 shares, NZ mortgage rates (ASB vs banks) & KiwiSaver") +
+    `<div class="chips" style="margin-bottom:12px">${tabs.map(([k, l]) => `<button type="button" class="chip${__financeTab === k ? " on" : ""}" onclick="setFinanceTab('${k}')">${l}</button>`).join("")}</div>` +
+    financeBodyHtml(__financeTab) +
+    `<div class="btns" style="margin-top:10px">
+      <button type="button" class="btn primary" onclick="go('#budget')">🏦 My 3 ASB Mortgages &amp; Budget</button>
+      <button type="button" class="btn" onclick="go('#cashflow')">🔄 Cash Flow</button>
+    </div>`;
+}
+
+function openMarketsRatesSheet(tab) {
+  if (tab) __financeTab = tab === "markets" ? "nzx40" : tab;
+  go("#finance");
 }
 
 /* ---- Non-Duplicate Bottom Quick Pills ---- */
