@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.54';
+const APP_VERSION = '2.28.55';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -32116,7 +32116,61 @@ const LIVE_TV_CHANNELS = [
   { id: "stingray-soulstorm", name: "Stingray Soul Storm TV", cat: "music", catLabel: "🎷 R&B & Soul", country: "Global", desc: "24/7 classic and smooth R&B, Motown & soul music videos", hls: "https://lotus.stingray.com/manifest/ose-134ads-montreal/samsungtvplus/master.m3u8", web: "https://www.stingray.com/" },
   { id: "stingray-easy", name: "Stingray Easy Listening TV", cat: "music", catLabel: "☕ Easy & Relax", country: "Global", desc: "24/7 smooth adult contemporary and relaxing melodies", hls: "https://lotus.stingray.com/manifest/ose-137ads-montreal/samsungtvplus/master.m3u8", web: "https://www.stingray.com/" },
   { id: "stingray-naturescape", name: "Stingray Naturescape 4K", cat: "music", catLabel: "🏝️ Scenic Ambience", country: "Global", desc: "24/7 stunning aerial landscapes, beaches & mountains with gentle ambient soundtracks", hls: "https://d39g1vxj2ef6in.cloudfront.net/v1/master/3fec3e5cac39a52b2132f9c66c83dae043dc17d4/prod-rakuten-stitched/master.m3u8?ads.xumo_channelId=88883056", web: "https://www.stingray.com/" },
-  { id: "lofigirl-tv", name: "Lofi Girl 24/7 Chill TV", cat: "music", catLabel: "🎧 Chill & Study TV", country: "Global", desc: "24/7 relaxing lofi beats & animated visual stream for reading, DIY or winding down", yt: "jfKfPfyJRdk", web: "https://www.youtube.com/watch?v=jfKfPfyJRdk" }
+  { id: "lofigirl-tv", name: "Lofi Girl 24/7 Chill TV", cat: "music", catLabel: "🎧 Chill & Study TV", country: "Global", desc: "24/7 relaxing lofi beats & animated visual stream for reading, DIY or winding down", yt: "jfKfPfyJRdk", web: "https://www.youtube.com/watch?v=jfKfPfyJRdk" },
+  /* 2.28.55: 47 New Verified Free Internet TV Channels (Zero Sport) */
+  { id: "juicetv-nz", name: "Juice TV NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Music TV", country: "New Zealand", desc: "New Zealand’s 24/7 music video & Kiwi artist channel", hls: "https://gizmo2.cloudserver.nz/hls/Juice.m3u8", web: "https://juicetv.co.nz/", epgId: "mjh-mood-1290" },
+  { id: "firstlight-nz", name: "Firstlight TV NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview Ch 26", country: "New Zealand", desc: "NZ Freeview lifestyle, health, cooking & inspirational programmes", hls: "https://uni01rtmp.tulix.tv/firstlight/firstlight.smil/playlist.m3u8", web: "https://www.firstlight.org.nz/", epgId: "mjh-firstlight" },
+  { id: "tvsn-nz", name: "TVSN Shopping NZ (Live)", cat: "nz", catLabel: "🇳🇿 NZ Freeview Ch 20", country: "New Zealand", desc: "Live NZ home, kitchen, tech & lifestyle showcase channel", hls: "https://tvsnhlslivetest.akamaized.net/hls/live/2034711/TVSN_NZ-MSL4/master.m3u8", web: "https://www.tvsn.co.nz/" },
+  { id: "skynews-extra1-au", name: "Sky News Extra 1 AU", cat: "nz", catLabel: "🇦🇺 Press & Parliament", country: "Australia", desc: "Live Australian & Tasman press conferences and public affairs", hls: "https://skynewsau-live.akamaized.net/hls/live/2002689/skynewsau-extra1/master.m3u8", web: "https://www.skynews.com.au/" },
+  { id: "britbox-mysteries", name: "BritBox Mysteries 24/7", cat: "uk", catLabel: "🇬🇧 British Mysteries", country: "UK", desc: "24/7 classic British detective dramas, whodunits & cosy crime mysteries", hls: "https://aegis-cloudfront-1.tubi.video/c95700f8-e51c-4a36-ad46-56f70fc9f1d9/playlist.m3u8", web: "https://www.britbox.com/" },
+  { id: "antiques-roadtrip-uk", name: "Antiques Road Trip UK 24/7", cat: "uk", catLabel: "🇬🇧 UK Antiques & Road Trips", country: "UK", desc: "Antiques experts tour the British countryside in classic cars hunting for treasures", hls: "https://amg02333-pbs-amg02333c5-samsung-nz-2440.playouts.now.amagi.tv/PBSD-AntiquesRoadTripSF-samsung/playlist.m3u8", web: "https://www.bbc.co.uk/" },
+  { id: "undercover-boss-uk", name: "Undercover Boss Global", cat: "uk", catLabel: "🇬🇧 Reality & Workplace", country: "UK", desc: "CEOs go undercover on the front lines of their own companies", hls: "https://all3media-international-undercoverboss-1-au.samsung.wurl.tv/playlist.m3u8", web: "https://www.all3mediainternational.com/" },
+  { id: "soreal-uk", name: "So... Real UK Lifestyle", cat: "uk", catLabel: "🇬🇧 British Lifestyle", country: "UK", desc: "24/7 British real-life stories, home transformations & factual entertainment", hls: "https://all3media-soreal-1-gb.samsung.wurl.tv/playlist.m3u8", web: "https://www.all3mediainternational.com/" },
+  { id: "stories-amc", name: "Stories by AMC 24/7", cat: "movies", catLabel: "🎬 AMC Drama & Movies", country: "US", desc: "24/7 acclaimed AMC series, thrillers and feature presentations", hls: "https://amc-amcpresents-1-us.xumo.wurl.tv/playlist.m3u8", web: "https://www.amc.com/" },
+  { id: "outersphere-scifi", name: "OuterSphere Sci-Fi & Fantasy", cat: "movies", catLabel: "🛸 Sci-Fi & Space Movies", country: "Global", desc: "24/7 sci-fi movies, alien worlds, time travel & futuristic cinema", hls: "https://aegis-cloudfront-1.tubi.video/27de4f2e-7f9c-418a-9b0d-e4b35b0843a0/playlist.m3u8", web: "https://tubitv.com/" },
+  { id: "ion-plus", name: "ION Plus Mystery & Drama", cat: "movies", catLabel: "🕵️ Crime & Action Series", country: "US", desc: "24/7 detective dramas, procedural mysteries & suspense movies", hls: "https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg01438-ewscrippscompan-ionplus-tablo/playlist.m3u8", web: "https://iontelevision.com/" },
+  { id: "hiyah-action", name: "Hi-YAH! Martial Arts & Action", cat: "movies", catLabel: "🥋 Action & Martial Arts", country: "Global", desc: "24/7 non-stop martial arts blockbusters, action thrillers & Asian cinema", hls: "https://linear-59.frequency.stream/dist/plex/59/hls/master/playlist.m3u8", web: "https://www.hiyahtv.com/" },
+  { id: "midnight-pulp", name: "Midnight Pulp Cult & Sci-Fi", cat: "movies", catLabel: "🌙 Cult Sci-Fi & Thrillers", country: "Global", desc: "24/7 strange, cult sci-fi, supernatural mysteries & retro action movies", hls: "https://d18l78mi5ujmqr.cloudfront.net/playlist.m3u8", web: "https://www.midnightpulp.com/" },
+  { id: "grit-xtra", name: "Grit Xtra Action & Westerns", cat: "movies", catLabel: "🤠 Westerns & Tough Action", country: "US", desc: "24/7 classic Westerns, frontier legends and tough guy action movies", hls: "https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg01438-ewscrippscompan-gritxtra-tablo/playlist.m3u8", web: "https://www.grittv.com/" },
+  { id: "mytime-movies", name: "MyTime Movie Network 24/7", cat: "movies", catLabel: "🍿 Thrillers & Romance", country: "Global", desc: "24/7 suspense thrillers, mystery features & feel-good movies", hls: "https://mytime-tcl.amagi.tv/playlist.m3u8", web: "https://www.mytimemovienetwork.com/" },
+  { id: "the-archive", name: "The Archive Classic & Cult Movies", cat: "movies", catLabel: "🎞️ Retro & Cult Cinema", country: "Global", desc: "24/7 restored Hollywood classics, 70s/80s action & rare genre films", hls: "https://linear-1080.frequency.stream/dist/cineverse/1080/hls/master/playlist.m3u8", web: "https://www.thearchive.tv/" },
+  { id: "mhz-mysteries", name: "MHz International Mysteries", cat: "movies", catLabel: "🕵️ European Detective TV", country: "Global", desc: "24/7 acclaimed European, British & international detective mysteries", hls: "https://mhz-samsung-linear-ca.samsung.wurl.tv/playlist.m3u8", web: "https://mhzchoice.com/" },
+  { id: "maverick-cinema", name: "Maverick Action & Drama Cinema", cat: "movies", catLabel: "🎬 Independent Movies", country: "US", desc: "24/7 urban action, crime thrillers & independent feature films", hls: "https://maverick-maverick-black-cinema-1-us.samsung.wurl.tv/playlist.m3u8", web: "https://www.maverickentertainment.cc/" },
+  { id: "lonestar-westerns", name: "Lone Star Classic Westerns", cat: "movies", catLabel: "🤠 Frontier Westerns", country: "US", desc: "24/7 classic cowboy movies and frontier television series", hls: "https://lonestar-rakuten.amagi.tv/playlist.m3u8", web: "https://www.rakuten.tv/" },
+  { id: "comedy-dynamics", name: "Comedy Dynamics Stand-Up 24/7", cat: "comedy", catLabel: "🎤 Stand-Up Specials", country: "US", desc: "24/7 full-length stand-up comedy specials from top touring comedians", hls: "https://d3a5mry3t5fzw9.cloudfront.net/playlist.m3u8", web: "https://www.comedydynamics.com/" },
+  { id: "the-conners", name: "The Conners 24/7 Sitcom", cat: "comedy", catLabel: "😂 Classic Family Sitcom", country: "US", desc: "24/7 back-to-back episodes of the hit working-class family sitcom", hls: "https://aegis-cloudfront-1.tubi.video/e08080ff-3d87-4d9e-a156-91554fd2e39b/playlist.m3u8", web: "https://tubitv.com/" },
+  { id: "failarmy", name: "FailArmy 24/7", cat: "comedy", catLabel: "🤣 Viral Bloopers & Fails", country: "Global", desc: "24/7 hilarious viral fails, DIY mishaps & comedy compilations", hls: "https://failarmy-international-it.samsung.wurl.tv/playlist.m3u8", web: "https://www.failarmy.com/" },
+  { id: "wipeout-xtra", name: "Wipeout Xtra 24/7", cat: "comedy", catLabel: "💦 Obstacle Course Comedy", country: "Global", desc: "24/7 giant obstacle course wipeouts and comedy game show chaos", hls: "https://aegis-cloudfront-1.tubi.video/e0a81cae-d483-46f9-aaa1-d0b87faa13cf/playlist.m3u8", web: "https://tubitv.com/" },
+  { id: "buzzr-games", name: "Buzzr Classic Game Shows", cat: "comedy", catLabel: "🎲 Retro Game Shows", country: "US", desc: "24/7 vintage game shows including Match Game, Family Feud & Press Your Luck", hls: "https://aegis-cloudfront-1.tubi.video/d4038326-a3e3-4aba-b1f1-f0526c912c74/playlist.m3u8", web: "https://buzzrtv.com/" },
+  { id: "roar-comedy", name: "ROAR Sketch & Comedy TV", cat: "comedy", catLabel: "🎭 Sketch & Improv", country: "US", desc: "24/7 late-night style sketch comedy, satire and stand-up laughs", hls: "https://fast-channels.sinclairstoryline.com/TBD/index.m3u8", web: "https://watchroar.com/" },
+  { id: "humor-mill", name: "Humor Mill Stand-Up & Sitcoms", cat: "comedy", catLabel: "😂 Stand-Up & Comedy", country: "US", desc: "24/7 comedy club specials, sitcoms and funny movies", hls: "https://du1gyxfing4ke.cloudfront.net/scheduler/scheduleMaster/152.m3u8", web: "https://tubitv.com/" },
+  { id: "wanted-dead-alive", name: "Wanted: Dead or Alive (Steve McQueen)", cat: "comedy", catLabel: "🤠 Classic TV Series", country: "US", desc: "24/7 Steve McQueen’s iconic bounty hunter classic TV series", hls: "https://aegis-cloudfront-1.tubi.video/d5171dc7-f8c6-469c-81eb-e1ffaaed5721/playlist.m3u8", web: "https://tubitv.com/" },
+  { id: "powernation-cars", name: "PowerNation TV Cars & Engines", cat: "home", catLabel: "🚗 Custom Cars & Builds", country: "NZ/US", desc: "24/7 muscle cars, engine builds, 4x4 restorations, workshop tech & garage DIY", hls: "https://amg01258-raycomsports-powernationnz-samsungnz-q92ks.amagi.tv/playlist.m3u8", web: "https://www.powernationtv.com/" },
+  { id: "hells-kitchen", name: "Gordon Ramsay’s Hell’s Kitchen 24/7", cat: "home", catLabel: "🔥 Gordon Ramsay TV", country: "Global", desc: "24/7 non-stop episodes of Gordon Ramsay’s fiery culinary showdown", hls: "https://aegis-cloudfront-1.tubi.video/c8364f36-c60b-4a39-8d86-0b92db4611c0/index.m3u8", web: "https://tubitv.com/" },
+  { id: "americas-test-kitchen", name: "America’s Test Kitchen 24/7", cat: "home", catLabel: "🍳 Recipe Science & Gear", country: "US", desc: "24/7 foolproof cooking techniques, equipment tests & step-by-step recipes", hls: "https://aegis-cloudfront-1.tubi.video/0094c1fc-7c41-45d0-af7a-6bbb62d6cd6e/playlist.m3u8", web: "https://www.americastestkitchen.com/" },
+  { id: "gusto-tv", name: "Gusto TV World Cooking & BBQ", cat: "home", catLabel: "🥩 BBQ & World Cooking", country: "Canada", desc: "24/7 mouth-watering BBQ, baking, global street food & kitchen inspiration", hls: "https://amg01077-gusto-gustous-firetv.amagi.tv/playlist.m3u8", web: "https://www.gustotv.com/" },
+  { id: "hungry-tv", name: "Hungry Food & Chef TV", cat: "home", catLabel: "🍕 Chefs & Comfort Food", country: "US", desc: "24/7 comfort food, grill masters, pizza making & kitchen hacks", hls: "https://dos35knl8v49a.cloudfront.net/v1/food/samsungheadend_us/latest/main/hls/playlist.m3u8", web: "https://hungry.tv/" },
+  { id: "tastemade-travel", name: "Tastemade Travel & Escapes", cat: "home", catLabel: "✈️ Travel & Food Destinations", country: "Global", desc: "24/7 scenic world travel, coastal towns, architecture & local food", hls: "https://d6ef3usc6d9cl.cloudfront.net/Tastemade_Travel.m3u8", web: "https://www.tastemade.com/" },
+  { id: "nbclx-home", name: "NBC LX Home & Renovations", cat: "home", catLabel: "🏡 Home Design & Reno", country: "US", desc: "24/7 home makeovers, real estate tours, interior design & backyard builds", hls: "https://dn7vkzd5khpp3.cloudfront.net/v1/manifest/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-jnz0hbnuaajo2/b3d9d2ee-94c1-4de2-bb46-b1ed009f4f30/4.m3u8", web: "https://www.lx.com/" },
+  { id: "journy-travel", name: "Journy World Travel 24/7", cat: "home", catLabel: "🌏 Global Road Trips", country: "Global", desc: "24/7 cultural road trips, islands, railways & scenic travel documentaries", hls: "https://d3s3a5c7f101eb.cloudfront.net/playlist.m3u8", web: "https://www.ovationtv.com/journy/" },
+  { id: "in-the-kitchen", name: "In the Kitchen Cooking Live", cat: "home", catLabel: "🥘 Live Kitchen Demos", country: "US", desc: "24/7 live kitchen gadgets, cookware demos and chef recipes", hls: "https://qvc-amd-live.akamaized.net/hls/live/2034113/lsqvc4us/master.m3u8", web: "https://www.qvc.com/" },
+  { id: "crime-360", name: "Crime 360 Forensics (A&E)", cat: "doco", catLabel: "🔬 A&E Forensic Crime", country: "US", desc: "24/7 real homicide detectives and 3D forensic crime scene reconstructions", hls: "https://94a3e237.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmFrdXRlblRWLWV1X0NyaW1lMzYwX0hMUw/playlist.m3u8", web: "https://www.aetv.com/" },
+  { id: "mystery-tv", name: "Mystery TV (A&E Unexplained)", cat: "doco", catLabel: "🛸 Unexplained Mysteries", country: "Global", desc: "24/7 ancient mysteries, lost civilisations, secret history & unexplained phenomena", hls: "https://aenetworks-mysterytv-rakuten.amagi.tv/playlist.m3u8", web: "https://www.history.com/" },
+  { id: "magellantv-nz", name: "MagellanTV Now (NZ History & Space)", cat: "doco", catLabel: "📜 Deep History & Science", country: "NZ/Global", desc: "24/7 ad-light premium documentaries on ancient history, space & engineering", hls: "https://amg00376-magellan-amg00376c5-samsung-nz-1714.playouts.now.amagi.tv/playlist/amg00376-magellantv-magellantvnowww-samsungnz/playlist.m3u8", web: "https://www.magellantv.com/" },
+  { id: "unidentified-tv", name: "Unidentified: History & UFOs", cat: "doco", catLabel: "🛸 Declassified Files", country: "US", desc: "24/7 declassified aerospace encounters, radar investigations & secret projects", hls: "https://d3ify425qsio2d.cloudfront.net/playlist.m3u8", web: "https://www.history.com/" },
+  { id: "lucky-dog", name: "Lucky Dog Rescue & Training 24/7", cat: "space", catLabel: "🐕 Dogs & Pet Training", country: "US", desc: "24/7 Brandon McMillan rescuing and training shelter dogs for their new families", hls: "https://d3j95sejv6mybj.cloudfront.net/Lucky_Dog.m3u8", web: "https://www.cbs.com/" },
+  { id: "xplore-tv", name: "Xplore TV Nature & Expeditions", cat: "space", catLabel: "🏔️ Wildlife & Wilderness", country: "Global", desc: "24/7 wild nature, oceans, bushcraft & extreme expedition documentaries", hls: "https://aegis-cloudfront-1.tubi.video/4cfc30dc-1431-46b6-aea7-89a2e7d35823/playlist.m3u8", web: "https://tubitv.com/" },
+  { id: "people-are-awesome", name: "People Are Awesome 24/7", cat: "space", catLabel: "🌟 Amazing Feats & Skills", country: "Global", desc: "24/7 incredible human skills, inventions, outdoor adventures & viral feats", hls: "https://jukin-peopleareawesome-2-dk.samsung.wurl.tv/playlist.m3u8", web: "https://www.peopleareawesome.com/" },
+  { id: "cbc-news", name: "CBC News Network 24/7 (Canada)", cat: "news", catLabel: "🇨🇦 Canadian & World News", country: "Canada", desc: "24/7 live breaking news, investigative journalism & global affairs from CBC", hls: "https://aegis-cloudfront-1.tubi.video/c71ce9b6-cddb-4cec-b0db-2f09289f8782/master.m3u8", web: "https://www.cbc.ca/news" },
+  { id: "scripps-news", name: "Scripps News Live 24/7", cat: "news", catLabel: "🌎 Fact-First Live News", country: "US", desc: "24/7 live national and international rolling news and in-depth field reports", hls: "https://aegis-cloudfront-1.tubi.video/7e1c26b7-7975-4240-9a4f-480eaa8f3ea4/playlist.m3u8", web: "https://scrippsnews.com/" },
+  { id: "livenow-fox", name: "LiveNOW from FOX 24/7", cat: "news", catLabel: "📡 Unfiltered Live Events", country: "US", desc: "24/7 raw live breaking news events, briefings and world updates", hls: "https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg00488-foxdigital-livenowbyfox-lgus/playlist.m3u8", web: "https://www.livenowfox.com/" },
+  { id: "usatoday-news", name: "USA TODAY News 24/7", cat: "news", catLabel: "📰 Headline News & Tech", country: "US", desc: "24/7 top headlines, consumer tech, money and international news", hls: "https://cdn-ue1-prod.tsv2.amagi.tv/linear/amg00731-gannettcoinc-usatodaynews-plex/playlist.m3u8", web: "https://www.usatoday.com/" },
+  { id: "vevo-retrorock", name: "Vevo Retro Rock 24/7", cat: "music", catLabel: "🎸 70s/80s/90s Rock Videos", country: "Global", desc: "24/7 classic guitar anthems, arena rock & alternative rock music videos", hls: "https://d2hdqrshyzxswl.cloudfront.net/Vevo_Retro_Rock.m3u8", web: "https://www.vevo.com/" },
+  { id: "vevo-70s", name: "Vevo ’70s Music TV", cat: "music", catLabel: "🕺 1970s Music Videos", country: "Global", desc: "24/7 iconic 1970s rock, pop, disco & soul music videos", hls: "https://d341pfs1smb2ef.cloudfront.net/Vevo_70s.m3u8", web: "https://www.vevo.com/" },
+  { id: "vevo-80s", name: "Vevo ’80s Music TV", cat: "music", catLabel: "📼 1980s Music Videos", country: "Global", desc: "24/7 non-stop 1980s synth-pop, rock & MTV-era music video classics", hls: "https://d3svsvgc81yfe1.cloudfront.net/Vevo_80s.m3u8", web: "https://www.vevo.com/" },
+  { id: "vevo-90s", name: "Vevo ’90s Music TV", cat: "music", catLabel: "💿 1990s Music Videos", country: "Global", desc: "24/7 1990s rock, pop, grunge & dance music video hits", hls: "https://d29u7uq3k6xqk0.cloudfront.net/Vevo_90s.m3u8", web: "https://www.vevo.com/" },
+  { id: "vevo-2k", name: "Vevo 2K Music TV", cat: "music", catLabel: "🎧 2000s Throwback Hits", country: "Global", desc: "24/7 biggest music videos of the 2000s", hls: "https://d3150hggbcolbo.cloudfront.net/Vevo_2K.m3u8", web: "https://www.vevo.com/" },
+  { id: "xite-90s", name: "XITE 90’s Throwback TV", cat: "music", catLabel: "🎶 90s Party & Anthems", country: "Global", desc: "24/7 non-stop 90s throwback music videos", hls: "https://d284aawtm5vi48.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-fjdfi2br1jtq7/XITE_90s_Throwback.m3u8", web: "https://xite.com/" }
 ];
 
 const LTV_KEY = "liveTvBoard";
@@ -32866,7 +32920,28 @@ const ITV_LINEUPS = {
   "movies-tv-net": [["The Fugitive (1993) — Suspense Blockbuster", "Harrison Ford & Tommy Lee Jones in the relentless manhunt thriller"], ["Air Force One — Action Thriller", "Harrison Ford defends the presidential aircraft from hijackers"], ["Sneakers (1992) — Tech Heist Capers", "Robert Redford, Sidney Poitier & Dan Aykroyd test security systems and find a black box"], ["Apollo 13 — Space Drama", "Tom Hanks, Kevin Bacon & Bill Paxton fight to bring the crippled lunar spacecraft home"], ["A Few Good Men — Courtroom Drama", "Tom Cruise, Jack Nicholson & Demi Moore in Rob Reiner’s military courtroom classic"], ["Rain Man — Academy Award Drama", "Dustin Hoffman & Tom Cruise on a cross-country road trip"]],
   "made-in-hollywood": [["Behind the Scenes: Sci-Fi Blockbusters", "Inside the visual effects, stunt engineering & sound design of modern sci-fi cinema"], ["Directors’ Roundtable & Film Vault", "Interviews with acclaimed directors on cinematography and storytelling"], ["Classic Movie Locations Tour", "Visiting the real-world filming locations of iconic Hollywood movies"], ["How Practical Stunts Are Built", "Stunt coordinators break down classic car chases and practical rigs"], ["Cinema Score & Soundtrack Masters", "How Hans Zimmer, John Williams & Ennio Morricone shaped movie history"], ["New Movie Releases & Trailer Showcase", "Previews and behind-the-camera features on upcoming films"]],
   "wutang-collection": [["Drunken Master (Jackie Chan) — Martial Arts", "Young Wong Fei-hung learns the eight drunken immortals kung-fu style"], ["The 36th Chamber of Shaolin — Kung Fu Classic", "Gordon Liu stars in the legendary Shaw Brothers martial arts masterpiece"], ["Five Deadly Venoms — Cult Martial Arts", "The final pupil of the Poison Clan must track down five former disciples"], ["Iron Monkey (Donnie Yen) — Action Classic", "A masked martial arts healer defends villagers from corrupt officials"], ["Snake in the Eagle’s Shadow — Jackie Chan", "A martial arts orphan learns the Snake Fist technique from an old master"], ["Master of the Flying Guillotine — Cult Action", "A one-armed boxer enters a martial arts tournament"]],
-  "frightflix": [["The Others — Supernatural Mystery", "Nicole Kidman stars in the atmospheric Jersey manor ghost story"], ["A Quiet Place — Suspense Thriller", "A family must live in silence to avoid blind creatures that hunt by sound"], ["Tremors (1990) — Creature Feature Classic", "Kevin Bacon battles giant subterranean sandworms in Perfection, Nevada"], ["Sleepy Hollow — Gothic Mystery", "Constable Ichabod Crane investigates the Headless Horseman in 1799 New York"], ["Signs — Sci-Fi Suspense", "A Pennsylvania family discovers intricate crop circles in their cornfields"], ["The Sixth Sense — Supernatural Thriller", "Bruce Willis & Haley Joel Osment in M. Night Shyamalan’s classic thriller"]]
+  "frightflix": [["The Others — Supernatural Mystery", "Nicole Kidman stars in the atmospheric Jersey manor ghost story"], ["A Quiet Place — Suspense Thriller", "A family must live in silence to avoid blind creatures that hunt by sound"], ["Tremors (1990) — Creature Feature Classic", "Kevin Bacon battles giant subterranean sandworms in Perfection, Nevada"], ["Sleepy Hollow — Gothic Mystery", "Constable Ichabod Crane investigates the Headless Horseman in 1799 New York"], ["Signs — Sci-Fi Suspense", "A Pennsylvania family discovers intricate crop circles in their cornfields"], ["The Sixth Sense — Supernatural Thriller", "Bruce Willis & Haley Joel Osment in M. Night Shyamalan’s classic thriller"]],
+  "juicetv-nz": [["Kiwi Rock & Classic Hits", "Non-stop New Zealand rock anthems and classic Kiwi music videos"], ["NZ Indie & Alternative Showcase", "Homegrown Aotearoa bands and acoustic sessions"], ["90s & 2000s Kiwi Throwbacks", "Classic Juice TV countdown favourites"], ["Aotearoa Live Sessions", "Studio performances and Kiwi music specials"], ["After Hours Rock & Classics", "Late-night guitar classics and NZ legends"], ["Morning Kiwi Music Mix", "Upbeat NZ and international music videos"]],
+  "firstlight-nz": [["Simple Cooking & Healthy Kitchen", "Wholesome plant-based and gluten-free friendly recipes"], ["Nature’s Wonders — Documentary", "Exploring scenic wilderness and wildlife across the Pacific"], ["Home & Lifestyle Balance", "Practical tips for calm, organised home living"], ["Inspiring Stories NZ", "Community stories from around New Zealand"], ["Outdoor Trails & Escapes", "Scenic walks and coastal discoveries"], ["Evening Reflections & Music", "Relaxing acoustic music and nature scenery"]],
+  "britbox-mysteries": [["Vera — Northumberland Mystery", "DCI Vera Stanhope investigates a baffling coastal case"], ["Shetland — Scottish Islands Whodunit", "DI Jimmy Perez unravels a mystery across the Shetland Isles"], ["Inspector Morse — Oxford Classic", "Endeavour Morse and Sergeant Lewis investigate in Oxford"], ["Poirot — Agatha Christie Mystery", "Hercule Poirot puts his little grey cells to the test"], ["Father Brown — Cotswolds Whodunit", "A village priest solves crimes in 1950s Kembleford"], ["Death in Paradise — Island Detective", "A British detective solves impossible locked-room murders in the Caribbean"]],
+  "antiques-roadtrip-uk": [["Antiques Road Trip — Scottish Highlands", "Two experts tour the Highlands in a 1960s MG roadster"], ["Antiques Road Trip — Yorkshire Dales", "Hunting for Georgian silver and vintage clocks across Yorkshire"], ["Antiques Road Trip — Cornwall & Devon", "Coastal antique shops and a nail-biting auction showdown"], ["Celebrity Antiques Road Trip", "Special guests join the experts in a classic Jaguar"], ["Antiques Road Trip — Cotswolds Tour", "Discovering rare ceramics and country house treasures"], ["Antiques Road Trip — Wales & Borders", "Bargain hunting through Welsh market towns"]],
+  "undercover-boss-uk": [["Undercover Boss — National Bakery Chain", "The chief executive works the 4am ovens and delivery vans"], ["Undercover Boss — Hotel & Resort Group", "Working incognito on housekeeping and reception desks"], ["Undercover Boss — Construction & DIY Supply", "Hauling timber and serving trade customers on the shop floor"], ["Undercover Boss — Regional Airline & Cargo", "Loading baggage and working the winter night shift"], ["Undercover Boss — Restaurant & Pub Group", "Prepping the Friday night kitchen rush undercover"], ["Undercover Boss — Logistics & Fleet", "Riding along with long-haul delivery drivers"]],
+  "stories-amc": [["Halt and Catch Fire — Silicon Prairie", "Engineers race to build a portable PC in 1980s Texas"], ["Dark Winds — Southwest Noir Mystery", "Navajo Tribal Police Lieutenant Joe Leaphorn investigates a double crime"], ["TURN: Washington’s Spies", "The untold story of America’s first spy ring"], ["The Night Manager — Espionage Thriller", "A former British soldier infiltrates an international arms dealer’s inner circle"], ["Mad Men — Sterling Cooper Showcase", "Don Draper pitches a make-or-break campaign on Madison Avenue"], ["Hell on Wheels — Railroad Frontier", "Building the first transcontinental railway across the West"]],
+  "outersphere-scifi": [["Arrival — First Contact Sci-Fi", "A linguist is recruited to communicate with twelve mysterious alien vessels"], ["Stargate: Continuum — Sci-Fi Feature", "SG-1 races through an alternate timeline to restore the Stargate program"], ["Lockout — Orbital Prison Action", "Guy Pearce must rescue the President’s daughter from an experimental space station"], ["Cargo — Deep Space Freighter", "A medical officer aboard a rusty space freighter discovers what is really in the cargo hold"], ["Spectral — Futuristic Action", "A DARPA engineer teams up with special ops to confront phantom entities"], ["SOLARIS — Deep Space Mystery", "A psychologist is sent to investigate the crew of an orbiting station"]],
+  "ion-plus": [["Leverage — The Bank Shot Job", "Nate Ford’s team of Robin Hood cons takes down a corrupt bank executive"], ["Criminal Minds — BAU Investigation", "The Behavioral Analysis Unit profiles a cross-country suspect"], ["Numb3rs — Mathematical Crime Solving", "Charlie Eppes uses probability theory to track an armored car heist"], ["Flashpoint — Strategic Response", "The SRU negotiates a high-stakes hostage situation"], ["Blue Bloods — NYPD Family Drama", "Frank Reagan faces a city-wide policing dilemma"], ["Private Eyes — Toronto Detective Duo", "Matt Shade and Angie Everett investigate a racetrack sabotage"]],
+  "hiyah-action": [["Ip Man — Martial Arts Masterpiece", "Donnie Yen stars as Wing Chun grandmaster Ip Man"], ["The Raid — High-Octane Action", "An elite tactical squad battles through a 15-storey safe house"], ["Flash Point — Donnie Yen Action", "A hot-headed detective goes undercover against three ruthless brothers"], ["SPL: Kill Zone — Hong Kong Action", "Donnie Yen and Sammo Hung in an explosive crime thriller"], ["New Police Story — Jackie Chan", "Inspector Chan Wing-yan rebuilds his squad to stop a high-tech gang"], ["Raging Fire — Street Action Thriller", "Donnie Yen & Nicholas Tse in Benny Chan’s final action blockbuster"]],
+  "midnight-pulp": [["The Arrival (1996) — Charlie Sheen Sci-Fi", "A radio astronomer discovers an alien signal originating from Earth"], ["Phantasm (Remastered) — Cult Sci-Fi", "Don Coscarelli’s classic supernatural sci-fi mystery"], ["Cube — Sci-Fi Puzzle Thriller", "Six strangers awaken inside an endless maze of interlocking cubed rooms"], ["Scanners — Cult Sci-Fi Classic", "David Cronenberg’s mind-bending telepathic thriller"], ["They Live — Cult Sci-Fi Action", "A drifter discovers special sunglasses that reveal a hidden alien elite"], ["Timecrimes — Time Loop Thriller", "A man accidentally steps into a time machine one hour into the past"]],
+  "grit-xtra": [["Open Range — Western Feature", "Robert Duvall & Kevin Costner face off against a ruthless cattle baron"], ["Pale Rider — Clint Eastwood Western", "A mysterious preacher rides into a California gold-mining camp"], ["Unforgiven — Academy Award Western", "William Munny takes on one last bounty across the Wyoming frontier"], ["Appaloosa — Ed Harris & Viggo Mortensen", "Two lawmen are hired to restore order in a lawless New Mexico town"], ["Lone Wolf McQuade — Action Western", "Texas Ranger J.J. McQuade battles an international arms smuggler"], ["Quigley Down Under — Outback Western", "Tom Selleck stars as a Wyoming sharpshooter hired in 1860s Australia"]],
+  "mytime-movies": [["The Lincoln Lawyer — Courtroom Thriller", "Matthew McConaughey stars as defence attorney Mickey Haller working from his Lincoln town car"], ["Shattered Glass — Investigative Drama", "The true story of a Washington journalist whose fabricated stories unravel"], ["Margin Call — Financial Suspense", "Kevin Spacey, Jeremy Irons & Stanley Tucci during the first 24 hours of a Wall Street crisis"], ["A Simple Favor — Mystery Thriller", "A vlogger investigates her glamorous friend’s sudden disappearance"], ["Side Effects — Psychological Thriller", "Jude Law & Rooney Mara in Steven Soderbergh’s twist-filled thriller"], ["Fracture — Anthony Hopkins & Ryan Gosling", "A battle of wits between a cunning structural engineer and a young prosecutor"]],
+  "the-archive": [["The Taking of Pelham One Two Three (1974)", "Walter Matthau & Robert Shaw in the classic New York subway heist thriller"], ["Dirty Rotten Scoundrels (1988) — Comedy", "Steve Martin & Michael Caine compete as rival con men on the French Riviera"], ["Thief (1981) — Michael Mann Crime Classic", "James Caan stars as a master diamond safe-cracker planning one last score"], ["To Live and Die in L.A. (1985) — Action", "Secret Service agents pursue a ruthless master counterfeiter"], ["Midnight Run (1988) — Action Comedy", "Robert De Niro & Charles Grodin on a cross-country bounty hunt"], ["The Mechanic (1972) — Charles Bronson", "A veteran hitman takes on a calculating young apprentice"]],
+  "mhz-mysteries": [["Inspector Montalbano — Sicilian Mystery", "Salvo Montalbano investigates a coastal mystery in Vigàta, Sicily"], ["Beck — Stockholm Detective Drama", "Martin Beck and Gunvald Larsson tackle a complex Swedish case"], ["Spiral (Engrenages) — Paris Crime Drama", "Parisian detectives and prosecutors follow a high-level conspiracy"], ["Wallander — Ystad Whodunit", "Inspector Kurt Wallander investigates a chilling crime in southern Sweden"], ["Professor T — Antwerp Mystery", "An eccentric criminology professor advises the federal police"], ["Brokenwood Mysteries — Kiwi Noir Showcase", "DI Mike Shepherd investigates murder in a quiet country town"]],
+  "powernation-cars": [["Engine Power — 600HP Small Block Build", "Machining, cam selection and dyno testing a street-ready V8"], ["Music City Trucks — Classic 4x4 Restoration", "Frame-off suspension upgrade, disc brakes and custom paint"], ["Detroit Muscle — 1970 Charger Restomod", "Sheet metal fabrication, modern drivetrain swap and road test"], ["Carcass — Junkyard Turbo Project", "Turning a salvage yard find into a track-capable street machine"], ["Top Dead Center — Garage Tech & Diagnostics", "Practical wrenching tips, welding tricks and suspension setup"], ["Horsepower Classics — Muscle Car Shootout", "Dyno pulls and classic restoration builds"]],
+  "hells-kitchen": [["Hell’s Kitchen — Opening Night Dinner Service", "Gordon Ramsay tests the Red and Blue kitchens on signature dishes"], ["Hell’s Kitchen — Steak Night Chaos", "Filet mignon temperatures push both teams to the brink"], ["Hell’s Kitchen — Blind Taste Test Challenge", "Chefs put their palates on the line before a VIP dinner service"], ["Hell’s Kitchen — Black Jacket Showdown", "The final chefs compete for the coveted black jackets"], ["Hell’s Kitchen — Taste It, Now Make It", "Recreating Gordon Ramsay’s dish from taste alone"], ["Hell’s Kitchen — Season Finale Service", "Two finalists run their own pass to win the head chef crown"]],
+  "americas-test-kitchen": [["The Ultimate Cast-Iron Pan Steak & Roast Potatoes", "How to get a steakhouse crust indoors and crispy roasties"], ["Gluten-Free Baking Science & Flour Blends", "Test kitchen secrets for light, tender gluten-free bread and pizza bases"], ["Equipment Testing: Chef’s Knives & Non-Stick Pans", "Lab testing 12 kitchen knives and skillets to name the best value"], ["Weeknight Stir-Fry & Homemade Sauces", "High-heat wok techniques that work on a normal home stove"], ["Slow-Roasted Pulled Pork & Crispy Tacos", "Low-and-slow oven braising and chargrilled salsa"], ["Italian Pasta Classics & Rich Ragu", "Simmering the ultimate Sunday meat sauce"]],
+  "gusto-tv": [["One World Kitchen — Italian & Thai Nights", "Authentic scratch cooking from Naples to Bangkok"], ["Road Grill — Backyard BBQ Feast", "Smoking brisket, ribs and flame-grilled sides outdoors"], ["Spencer’s BIG 30 — 30-Minute Meals for $30", "Fast, hearty weeknight dinners with big flavour"], ["Flour Power — Artisan Kitchen", "Clever baking tricks and savoury tarts"], ["Crate to Plate — Fresh Local Ingredients", "Turning seasonal market produce into restaurant dishes"], ["Cook Like a Chef — Knife & Sauce Mastery", "Professional chefs share their go-to home techniques"]],
+  "crime-360": [["Crime 360 — The 3D Bullet Trajectory", "Richmond detectives use 3D laser scanning to reconstruct a complex scene"], ["Crime 360 — Cold Hit DNA Breakthrough", "Forensic lab evidence links a suspect across two states"], ["Crime 360 — The Last Phone Call", "Cell tower triangulation and digital forensics crack an alibi"], ["Crime 360 — Tire Track in the Rain", "Casts and forensic photography lead detectives to the getaway vehicle"], ["Crime 360 — Ballistics Match", "Test-firing in the water tank reveals a crucial link"], ["Crime 360 — Countdown to Arrest", "The first 48 hours inside the homicide task force"]],
+  "magellantv-nz": [["Secret Space Escapes — Crisis in Orbit", "First-hand accounts from astronauts who survived emergencies in space"], ["Ancient Engineering: Mega Bridges & Aqueducts", "How ancient builders spanned gorges and moved millions of litres of water"], ["The Pacific War in Colour", "Restored archival footage of the Pacific theatre"], ["Inside the Supercarrier", "How a 100,000-ton aircraft carrier operates at sea"], ["Volcanoes of the Ring of Fire", "Geologists explore geothermal wonders from New Zealand to Alaska"], ["Voyager: Beyond the Solar System", "The 45-year journey of Voyager 1 and 2 into interstellar space"]],
+  "lucky-dog": [["Lucky Dog — Shelter Shepherd Gets a Second Chance", "Brandon McMillan trains an energetic German Shepherd mix for a family"], ["Lucky Dog — Terrier Trick Training", "Teaching confidence and house manners to a scruffy rescue terrier"], ["Lucky Dog — Retriever Beach & Recall Prep", "Leash training and recall for an active coastal home"], ["Lucky Dog — Gentle Giant Lab Mix", "Helping a shy Labrador rescue overcome doorway nerves"], ["Lucky Dog — Agility & Focus", "Channelling high puppy energy into fun backyard games"], ["Lucky Dog — Reunion & Adoption Day", "Meeting the new family and handing over the leash"]]
 };
 
 function itvProgsForChannel(ch, nowMs = Date.now()) {
@@ -34324,7 +34399,7 @@ function openQuickMenuSheet() {
       ["#alarm", "🔒 Alarm"]
     ]],
     ["📺 Entertainment, Local & Learn", "#media", [
-      ["#livetv", "📺 Live TV & DVR (94 Ch)"],
+      ["#livetv", "📺 Live TV & DVR (" + ltvAllChannels().length + " Ch)"],
       ["#radio", "📻 Car Stereo Radio"],
       ["#tv", "🎬 Movies & TV Guide"],
       ["#walks", "🥾 Northland Walks"],
@@ -34354,3 +34429,638 @@ function openQuickMenuSheet() {
 
   openSheet("🧭 Quick Menu & All Sections", html, null, "Close", `<button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button>`);
 }
+
+
+/* ================= 2.28.55: HORIZONTAL TIMELINE INTERNET TV GUIDE GRID (MATCHING SCREENSHOT) + DYNAMIC PERSONAL HOME SUMMARY + ANDROID AUTO RADIO PRESET STEPPING ================= */
+(() => {
+  try {
+    const st = document.createElement("style");
+    st.textContent = `
+      .itv-epg-legend{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 8px}
+      .itv-epg-pill{border:0;border-radius:999px;padding:4px 12px;font-size:.76rem;font-weight:800;cursor:pointer;transition:transform .12s,box-shadow .12s}
+      .itv-epg-pill.on{outline:2px solid var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.22);transform:translateY(-1px)}
+      .itv-epg-pill.g-comedy{background:#2563eb;color:#fff}
+      .itv-epg-pill.g-movie{background:#facc15;color:#111}
+      .itv-epg-pill.g-news{background:#b91c1c;color:#fff}
+      .itv-epg-pill.g-life{background:#bbf7d0;color:#064e3b}
+      .itv-epg-pill.g-all{background:var(--soft,#e2e8f0);color:var(--ink)}
+      #itv-epgsc .epgb.g-comedy{background:#2563eb!important;color:#fff!important}
+      #itv-epgsc .epgb.g-movie{background:#fde047!important;color:#111!important}
+      #itv-epgsc .epgb.g-news{background:#b91c1c!important;color:#fff!important}
+      #itv-epgsc .epgb.g-life{background:#dcfce7!important;color:#064e3b!important}
+      #itv-epgsc .epgch{cursor:pointer;padding:2px 3px;text-align:center}
+      #itv-epgsc .epgch:hover{background:color-mix(in srgb,var(--brand) 10%,var(--card))}
+      #itv-epgsc .itv-ch-badge{font-size:9.5px;font-weight:800;line-height:1.1;max-width:60px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;color:var(--ink)}
+      #itv-epgsc .itv-ch-num{font-size:10.5px;font-weight:800;opacity:.75;margin-top:1px}
+    `;
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+
+let itvGuideDisplayMode = (() => {
+  try { return localStorage.getItem("itvGuideDisplayMode") || "grid"; } catch (e) { return "grid"; }
+})();
+let itvEpgDayStr = null;
+let itvEpgGenreFilt = "all"; // "all" | "comedy" | "movie" | "news" | "life"
+let itvScrollX = null, itvScrollDay = null, itvEpgWin = null, itvEpgRaf = 0;
+
+function itvEpgDay() {
+  const T = todayISO();
+  if (!itvEpgDayStr || itvEpgDayStr < T) itvEpgDayStr = T;
+  return itvEpgDayStr;
+}
+function itvSetDisplayMode(m) {
+  itvGuideDisplayMode = m === "cards" ? "cards" : "grid";
+  try { localStorage.setItem("itvGuideDisplayMode", itvGuideDisplayMode); } catch (e) {}
+  if (document.getElementById("itv-guide-mount")) itvRedrawInPlace(true); else render();
+}
+function itvSetEpgGenre(g) {
+  itvEpgGenreFilt = itvEpgGenreFilt === g ? "all" : g;
+  itvEpgWin = null;
+  if (document.getElementById("itv-guide-mount")) itvRedrawInPlace(true); else render();
+}
+function itvSetEpgDay(d) {
+  itvEpgDayStr = d;
+  itvScrollX = null;
+  itvEpgWin = null;
+  if (typeof tvdDay === "function") {
+    try { tvdDay(d).then(x => { if (x && document.getElementById("itv-guide-mount")) itvRedrawInPlace(true); }); } catch (e) {}
+  }
+  if (document.getElementById("itv-guide-mount")) itvRedrawInPlace(true); else render();
+}
+function itvProgGenre(ch, p) {
+  if (!ch) return "";
+  if (p && p.isMovie) return "movie";
+  if (ch.cat === "movies") return "movie";
+  if (ch.cat === "comedy") return "comedy";
+  if (ch.cat === "news") return "news";
+  if (ch.cat === "home" || ch.cat === "doco" || ch.cat === "space" || ch.cat === "music") return "life";
+  const t = ((p && p.title) || "") + " " + ((p && p.desc) || "");
+  if (/breakfast|news|today|report|parliament|press|current affairs/i.test(t)) return "news";
+  if (/movie|film|cinema|thriller|western/i.test(t)) return "movie";
+  if (/comedy|sitcom|laugh|stand-up|conners|seinfeld|taskmaster|graham norton/i.test(t)) return "comedy";
+  return "life";
+}
+function itvDayProgs(dayIso, ch) {
+  const t0 = nzMidnight(dayIso), t1 = t0 + 86400e3;
+  if (ch && ch.epgId && typeof epgProgs === "function") {
+    try {
+      const real = epgProgs(dayIso, ch.epgId) || [];
+      if (real.length >= 2) {
+        return real.map(p => {
+          const g = (typeof tvGenre === "function" ? tvGenre(p) : "") || itvProgGenre(ch, p);
+          return {
+            id: `itv-${ch.id}-${p.start}`,
+            channelId: ch.id,
+            channelName: ch.name,
+            title: p.title,
+            seriesTitle: String(p.title || "").replace(/\s*\([^)]*\)\s*$/, "").split(" — ")[0].trim(),
+            desc: p.desc || ch.desc || "",
+            start: p.start,
+            until: p.until,
+            startMs: p.start,
+            endMs: p.until,
+            genre: g
+          };
+        });
+      }
+    } catch (e) {}
+  }
+  const slotMin = 60;
+  const custom = ITV_LINEUPS[ch.id];
+  const baseSeed = [...String(ch.id || ch.name)].reduce((a, c) => a + c.charCodeAt(0), 0);
+  const out = [];
+  for (let i = 0; i < 24; i++) {
+    const s = t0 + i * slotMin * 60000;
+    const e = Math.min(t1, s + slotMin * 60000);
+    const hrIdx = (Math.floor(s / (slotMin * 60000)) + baseSeed) % (custom ? custom.length : 6);
+    let title = "", desc = "";
+    if (custom) {
+      title = custom[hrIdx][0];
+      desc = custom[hrIdx][1];
+    } else if (ch.cat === "movies") {
+      const mTitles = ["Feature Film Showcase", "Cinema Blockbuster", "Action & Suspense Feature", "Classic Hollywood Presentation", "Sci-Fi & Thriller Feature", "Late Night Movie"];
+      title = `${ch.name.replace(/\s*24\/7/gi, "")} — ${mTitles[hrIdx]}`;
+      desc = ch.desc || "24/7 free streaming movies";
+    } else if (ch.cat === "comedy") {
+      const cTitles = ["Stand-Up & Sketch Hour", "Classic Sitcom Double Bill", "Back-to-Back Laughs", "Prime-Time Comedy Special", "Late Night Gags & Bloopers", "Encore Sitcom Classics"];
+      title = `${ch.name.replace(/\s*24\/7/gi, "")} — ${cTitles[hrIdx]}`;
+      desc = ch.desc || "24/7 comedy and sitcoms";
+    } else if (ch.cat === "music") {
+      const muTitles = ["Non-Stop Anthems & Classics", "Top Chart Video Countdown", "Acoustic & Chill Session", "Greatest Hits Block", "Throwback Video Power Hour", "Live Studio & Concert Picks"];
+      title = `${ch.name} — ${muTitles[hrIdx]}`;
+      desc = ch.desc || "24/7 music videos";
+    } else if (ch.cat === "news") {
+      const nTitles = ["Live Breaking News & Headlines", "World Report & Analysis", "Global Markets & Tech Briefing", "International Correspondents", "In-Depth Documentary Hour", "Newsroom Live Update"];
+      title = `${ch.name.replace(/\s*24\/7|\s*HD/gi, "")} — ${nTitles[hrIdx]}`;
+      desc = ch.desc || "24/7 live news coverage";
+    } else {
+      const gTitles = ["Featured Episode", "Special Presentation", "Back-to-Back Marathon", "Prime-Time Showcase", "In-Depth Feature", "Encore Presentation"];
+      title = `${ch.name.replace(/\s*\(Live\)|\s*24\/7/gi, "")} — ${gTitles[hrIdx]}`;
+      desc = ch.desc || "Live internet TV stream";
+    }
+    const pObj = {
+      id: `itv-${ch.id}-${s}`,
+      channelId: ch.id,
+      channelName: ch.name,
+      title,
+      seriesTitle: title.split(" — ")[0].trim(),
+      desc,
+      start: s,
+      until: e,
+      startMs: s,
+      endMs: e
+    };
+    pObj.genre = itvProgGenre(ch, pObj);
+    out.push(pObj);
+  }
+  return out;
+}
+
+function itvEpgRowCells(dayIso, ch, t0, aMin, bMin) {
+  const L = itvDayProgs(dayIso, ch);
+  if (!L.length) return `<span class="epgnone">No listings</span>`;
+  return L.filter(p => p.until > t0 + aMin * 60000 && p.start < t0 + bMin * 60000).map(p => {
+    const a = Math.max(0, (p.start - t0) / 60000) * EPG_PX;
+    const b = Math.min(1440, (p.until - t0) / 60000) * EPG_PX;
+    const rec = ltvIsRecScheduledOrDone(p.id, p.title, new Date(p.start).toISOString());
+    const lk = ltvIsSeriesLinked(p.seriesTitle, ch.id);
+    const g = p.genre || itvProgGenre(ch, p);
+    const gCls = g ? " g-" + g : "";
+    const badge = lk ? '<span class="epgbadge" title="Series link">🔁</span>' : rec ? '<span class="epgbadge" title="Recording / Scheduled">🔴</span>' : '';
+    const lab = lk ? '<b class="epglab">SERIES</b>' : rec ? '<b class="epglab">DVR</b>' : '';
+    return `<button type="button" class="epgb${gCls}${lk || rec ? " epgf" : ""}" style="left:${a.toFixed(0)}px;width:${Math.max(2, b - a - 2).toFixed(0)}px" data-ch="${esc(ch.id)}" data-s="${p.start}" onclick="itvEpgTap(${jsArg(ch.id)},${p.start})"><span class="epgbx">${badge}<span class="epgtx"><span class="t">${esc(p.title)}</span><span class="s">${lab}${esc(epgClock(p.start))} - ${esc(epgClock(p.until))}</span></span></span></button>`;
+  }).join("");
+}
+
+function itvEpgPaint(force) {
+  const sc = document.getElementById("itv-epgsc");
+  if (!sc) return;
+  const d = sc.dataset.day, t0 = +sc.dataset.t0, mid = (sc.scrollLeft + sc.clientWidth / 2) / EPG_PX;
+  if (!force && itvEpgWin && itvEpgWin.d === d && mid > itvEpgWin.a + 90 && mid < itvEpgWin.b - 90) return;
+  const a = Math.max(0, Math.floor(mid - 240)), b = Math.min(1440, Math.ceil(mid + 240));
+  itvEpgWin = { d, a, b };
+  const all = ltvAllChannels();
+  sc.querySelectorAll(".epgtrack[data-ch]").forEach(el => {
+    const ch = all.find(x => x.id === el.dataset.ch);
+    if (ch) el.innerHTML = itvEpgRowCells(d, ch, t0, a, b);
+  });
+}
+
+function itvEpgLabel() {
+  const sc = document.getElementById("itv-epgsc"), el = document.getElementById("itv-epgtime");
+  if (!sc || !el) return;
+  const d = sc.dataset.day, t0 = +sc.dataset.t0, m = Math.max(0, Math.round((sc.scrollLeft + 30 * EPG_PX) / EPG_PX / 15) * 15);
+  const t = t0 + m * 60000, nearNow = d === todayISO() && Math.abs(Date.now() - t) < 25 * 60000;
+  el.textContent = (nearNow ? "Now " : "") + epgClock(nearNow ? Date.now() : t);
+}
+
+function itvEpgJump(dir) {
+  const sc = document.getElementById("itv-epgsc");
+  if (sc) sc.scrollBy({ left: dir * 60 * EPG_PX, behavior: "smooth" });
+}
+
+function itvEpgInit(tries = 0) {
+  const sc = document.getElementById("itv-epgsc");
+  if (!sc || sc.dataset.on) {
+    if (!sc && tries < 20) setTimeout(() => itvEpgInit(tries + 1), 60);
+    return;
+  }
+  if (!sc.clientWidth && tries < 20) return void setTimeout(() => itvEpgInit(tries + 1), 60);
+  sc.dataset.on = "1";
+  const d = sc.dataset.day, t0 = +sc.dataset.t0, now = Date.now();
+  if (itvScrollX == null || itvScrollDay !== d) {
+    const tod = d === todayISO() ? now : t0 + (now - nzMidnight(todayISO()));
+    itvScrollX = Math.max(0, (tod - t0) / 60000 * EPG_PX - 30 * EPG_PX);
+    itvScrollDay = d;
+  }
+  sc.scrollLeft = itvScrollX;
+  if (Math.abs(sc.scrollLeft - itvScrollX) > 2) {
+    requestAnimationFrame(() => {
+      sc.scrollLeft = itvScrollX;
+      itvEpgWin = null;
+      itvEpgPaint(true);
+      itvEpgLabel();
+    });
+  }
+  itvEpgWin = null;
+  itvEpgPaint(true);
+  itvEpgLabel();
+  sc.addEventListener("scroll", () => {
+    if (!sc.isConnected || !sc.clientWidth) return;
+    itvScrollX = sc.scrollLeft;
+    if (!itvEpgRaf) {
+      itvEpgRaf = requestAnimationFrame(() => {
+        itvEpgRaf = 0;
+        itvEpgPaint(false);
+        itvEpgLabel();
+      });
+    }
+  }, { passive: true });
+}
+
+function itvEpgTap(chId, startMs) {
+  const all = ltvAllChannels();
+  const ch = all.find(x => x.id === chId);
+  if (!ch) return;
+  const d = itvEpgDay();
+  const progs = itvDayProgs(d, ch);
+  const p = progs.find(x => x.start === startMs) || progs[0];
+  if (!p) return;
+  const rec = ltvIsRecScheduledOrDone(p.id, p.title, new Date(p.start).toISOString());
+  const lk = ltvIsSeriesLinked(p.seriesTitle, ch.id);
+  const pSlot = ltvPresets().indexOf(ch.id) + 1;
+  const gLabel = { news: "News", movie: "Movie", comedy: "Comedy", life: "Lifestyle, garden, factual" }[p.genre || itvProgGenre(ch, p)] || "Live TV";
+  const btn = (js, lbl, pri) => `<button type="button" class="btn${pri ? " primary" : ""}" style="width:100%;margin:4px 0" onclick="closeSheet();${js}">${lbl}</button>`;
+  const watchAction = ch.tvnzWatch
+    ? btn(`tvWatch(${jsArg(ch.tvnzWatch)})`, `▶ Watch ${esc(ch.name)} in TVNZ+ App`, true)
+    : btn(`ltvPlayId(${jsArg(ch.id)});go('#livetv')`, `▶ Watch ${esc(ch.name)} Live Now`, true);
+  const recAction = rec
+    ? btn(`ltvPlayRecording(${jsArg(rec.id)})`, `📼 Play DVR Recording (${esc(rec.status === "ready" ? "Ready" : "Scheduled")})`, false)
+    : btn(`ltvRecordProg(${jsArg(ch.id)},${p.start})`, `🔴 Record “${esc(p.title)}” to DVR`, false);
+  const slAction = btn(`ltvSeriesLinkProg(${jsArg(ch.id)},${p.start})`, lk ? `🔁 Remove Series Link (${esc(p.seriesTitle)})` : `🔁 Series Link All Episodes of “${esc(p.seriesTitle)}”`, false);
+  const presetAction = btn(`ltvAssignSheet(${jsArg(ch.id)})`, `📌 Save ${esc(ch.name)} to TV Preset (P1–P12)${pSlot ? " · Currently P" + pSlot : ""}`, false);
+  openSheet(
+    esc(p.title),
+    `<p class="muted" style="margin:0 0 6px"><b>${esc(ch.name)}</b> · ${esc(ch.catLabel || ch.country || "Free TV")} · ${esc(epgClock(p.start))} - ${esc(epgClock(p.until))} · ${esc(gLabel)}</p>
+     ${p.desc ? `<p style="margin:0 0 10px">${esc(p.desc)}</p>` : ""}
+     ${watchAction}${recAction}${slAction}${presetAction}`,
+    null
+  );
+}
+
+function itvTimelineGuideHtml(filteredChans, allChans) {
+  const d = itvEpgDay(), T = todayISO(), t0 = nzMidnight(d), W = 1440 * EPG_PX + 300, now = Date.now();
+  // Build 7-day strip starting from Today
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push(addDays(T, i));
+  const dayTabs = `<div class="epgdays" role="tablist">${days.map(x => {
+    const dt = new Date(parseD(x));
+    return `<button type="button" role="tab" class="${x === d ? "on" : ""}" aria-selected="${x === d}" onclick="itvSetEpgDay('${x}')">${x === T ? "Today" : esc(dt.toLocaleDateString("en-NZ", { weekday: "short", timeZone: "UTC" }))}<b>${esc(dt.toLocaleDateString("en-NZ", { day: "numeric", month: "short", timeZone: "UTC" }))}</b></button>`;
+  }).join("")}</div>`;
+
+  // Filter channels by genre pill if active
+  let chans = filteredChans;
+  if (itvEpgGenreFilt === "comedy") chans = chans.filter(c => c.cat === "comedy" || /comedy|sitcom/i.test(c.catLabel || ""));
+  else if (itvEpgGenreFilt === "movie") chans = chans.filter(c => c.cat === "movies" || /movie|cinema|sci-fi|western/i.test(c.catLabel || ""));
+  else if (itvEpgGenreFilt === "news") chans = chans.filter(c => c.cat === "news" || /news|parliament/i.test(c.name + " " + (c.catLabel || "")));
+  else if (itvEpgGenreFilt === "life") chans = chans.filter(c => ["nz", "uk", "home", "doco", "space", "music"].includes(c.cat));
+
+  const legendPills = `<div class="itv-epg-legend">
+    <button type="button" class="itv-epg-pill g-comedy${itvEpgGenreFilt === "comedy" ? " on" : ""}" onclick="itvSetEpgGenre('comedy')">Comedy</button>
+    <button type="button" class="itv-epg-pill g-movie${itvEpgGenreFilt === "movie" ? " on" : ""}" onclick="itvSetEpgGenre('movie')">Movies</button>
+    <button type="button" class="itv-epg-pill g-news${itvEpgGenreFilt === "news" ? " on" : ""}" onclick="itvSetEpgGenre('news')">News</button>
+    <button type="button" class="itv-epg-pill g-life${itvEpgGenreFilt === "life" ? " on" : ""}" onclick="itvSetEpgGenre('life')">Lifestyle, garden, factual</button>
+    ${itvEpgGenreFilt !== "all" ? `<button type="button" class="itv-epg-pill g-all" onclick="itvSetEpgGenre('all')">Show All (${filteredChans.length})</button>` : ""}
+  </div>`;
+
+  const hrs = Array.from({ length: 48 }, (_, i) => `<span class="epghr" style="left:${i * 30 * EPG_PX}px">${esc(epgClock(t0 + i * 1800e3))}</span>`).join("");
+  const nowX = now > t0 && now < t0 + 86400e3 ? `<div class="epgnow" style="left:${(EPG_CH_W + (now - t0) / 60000 * EPG_PX).toFixed(0)}px"></div>` : "";
+  const logos = (typeof TVD !== "undefined" && TVD.idx && TVD.idx.logos) || {};
+
+  const rows = chans.map((c, idx) => {
+    const chNum = String(allChans.findIndex(x => x.id === c.id) + 1).padStart(3, "0");
+    const logoUrl = c.epgId && logos[c.epgId] ? logos[c.epgId] : "";
+    const shortName = c.name.replace(/\s*\(Live\)|\s*24\/7|\s*TV|\s*HD/gi, "").trim();
+    const watchJs = c.tvnzWatch ? `tvWatch(${jsArg(c.tvnzWatch)})` : `ltvPlayId(${jsArg(c.id)});go('#livetv')`;
+    return `<div class="epgrow">
+      <div class="epgch" role="button" tabindex="0" title="Tap to watch ${esc(c.name)} live" onclick="${watchJs}">
+        ${logoUrl ? `<img src="${esc(logoUrl)}" alt="${esc(shortName)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"><span class="itv-ch-num">${chNum}</span>` : `<span class="itv-ch-badge">${esc(shortName)}</span><span class="nb" style="font-size:10px;padding:1px 5px;margin-top:2px">${chNum}</span>`}
+      </div>
+      <div class="epgtrack" data-ch="${esc(c.id)}" style="width:${W}px"></div>
+    </div>`;
+  }).join("");
+
+  setTimeout(() => itvEpgInit(0), 0);
+  return `${legendPills}${dayTabs}
+    <p class="muted" style="margin:2px 2px 8px;font-size:.82rem">Showing <b>${chans.length}</b> free Internet TV channels across NZ, UK, Movies, Comedy, Home/Cars, Crime/History, Nature &amp; Music. Tap any channel on the left to watch live, or tap any programme block to <b>Watch</b>, <b>🔴 Record</b> or <b>🔁 Series Link</b>.</p>
+    <div class="epgbar">
+      <span style="font-size:12px;opacity:.85">Channels (${chans.length})</span>
+      <button type="button" aria-label="Back an hour" onclick="itvEpgJump(-1)">‹</button>
+      <span id="itv-epgtime">Now ${esc(epgClock(now))}</span>
+      <button type="button" aria-label="Forward an hour" onclick="itvEpgJump(1)">›</button>
+    </div>
+    <div class="epgsc" id="itv-epgsc" data-day="${d}" data-t0="${t0}">
+      <div class="epgin" style="width:${W + EPG_CH_W}px">
+        ${nowX}
+        <div class="epgrow hr"><div class="epgch" style="height:24px"></div><div class="epgtrack" style="width:${W}px">${hrs}</div></div>
+        ${rows || `<div style="padding:18px" class="muted">No channels match that filter.</div>`}
+      </div>
+    </div>`;
+}
+
+// Override renderInternetTvGuide and itvRedrawInPlace so the horizontal timeline TV Guide is the default view!
+(() => {
+  const origRenderItv = renderInternetTvGuide;
+  renderInternetTvGuide = function () {
+    if (itvGuideDisplayMode === "cards") {
+      const base = origRenderItv.apply(this, arguments);
+      const toggleBar = `<div style="display:flex;gap:6px;align-items:center;margin:0 0 8px">
+        <button type="button" class="chip" onclick="itvSetDisplayMode('grid')">📺 Timeline TV Guide (Like Freeview)</button>
+        <button type="button" class="chip on" onclick="itvSetDisplayMode('cards')">📋 Channel Cards View</button>
+      </div>`;
+      return base.replace('<div id="itv-guide-mount" style="margin-top:6px">', '<div id="itv-guide-mount" style="margin-top:6px">' + toggleBar);
+    }
+    const all = ltvAllChannels();
+    const movieCount = all.filter(c => c.cat === "movies").length;
+    const cats = [
+      ["all", "All (" + all.length + ")"],
+      ["nz", "🇳🇿 NZ & AU (" + all.filter(c => c.cat === "nz").length + ")"],
+      ["uk", "🇬🇧 UK TV (" + all.filter(c => c.cat === "uk").length + ")"],
+      ["movies", "🎬 Movies (" + movieCount + ")"],
+      ["comedy", "😂 Comedy (" + all.filter(c => c.cat === "comedy").length + ")"],
+      ["home", "🔨 Home, Food & Cars (" + all.filter(c => c.cat === "home").length + ")"],
+      ["doco", "🔍 Crime & History (" + all.filter(c => c.cat === "doco").length + ")"],
+      ["space", "🚀 Space, Pets & Nature (" + all.filter(c => c.cat === "space").length + ")"],
+      ["news", "🌍 News (" + all.filter(c => c.cat === "news").length + ")"],
+      ["music", "🎵 Music TV (" + all.filter(c => c.cat === "music").length + ")"]
+    ];
+    const catChips = cats.map(([k, lbl]) => `<button type="button" class="chip${itvCatFilt === k ? " on" : ""}" onclick="setItvCatFilt('${k}')">${esc(lbl)}</button>`).join("");
+    const q = itvQ.trim().toLowerCase();
+    const filteredChans = all.filter(c => {
+      if (itvCatFilt !== "all" && c.cat !== itvCatFilt) return false;
+      if (!q) return true;
+      const progs = itvDayProgs(itvEpgDay(), c);
+      return (c.name + " " + c.desc + " " + c.catLabel + " " + progs.map(p => p.title + " " + p.desc).join(" ")).toLowerCase().includes(q);
+    });
+    const readyN = ((LTV_DVR && LTV_DVR.recordings) || []).length;
+    return `<div id="itv-guide-mount" style="margin-top:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:0 0 8px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="chip on" onclick="itvSetDisplayMode('grid')">📺 Timeline TV Guide (${all.length} Ch)</button>
+          <button type="button" class="chip" onclick="itvSetDisplayMode('cards')">📋 Channel Cards View</button>
+        </div>
+        <button type="button" class="btn small primary" onclick="ltvViewMode='dvr';go('#livetv')">📼 DVR Planner (${readyN})</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin:0 0 8px">
+        <label class="search" style="flex:1;margin:0">${I("search")}<input id="itv-search-inp" type="search" placeholder="Search ${all.length} free Internet TV channels, movies or shows…" value="${esc(itvQ)}" oninput="setItvSearch(this.value)"></label>
+        ${itvQ ? `<button type="button" class="btn small" onclick="setItvSearch('')">Clear</button>` : ""}
+      </div>
+      <div class="chips scroll" id="itv-cat-chips" style="margin:0 0 6px">${catChips}</div>
+      ${itvTimelineGuideHtml(filteredChans, all)}
+    </div>`;
+  };
+
+  itvRedrawInPlace = function (focusSearch = false) {
+    const mount = document.getElementById("itv-guide-mount");
+    if (!mount) { render(); return; }
+    const sc = document.getElementById("itv-epgsc");
+    if (sc && sc.dataset.on && sc.isConnected) itvScrollX = sc.scrollLeft;
+    const listsEl = document.getElementById("itv-lists");
+    const prevLeft = listsEl ? listsEl.scrollLeft : 0;
+    const prevTop = window.scrollY;
+    let selStart = null, selEnd = null;
+    const active = document.activeElement;
+    const wasSearch = focusSearch || (active && active.id === "itv-search-inp");
+    if (wasSearch && active) {
+      try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch (e) {}
+    }
+    mount.outerHTML = renderInternetTvGuide();
+    const newLists = document.getElementById("itv-lists");
+    if (newLists && prevLeft) newLists.scrollLeft = prevLeft;
+    window.scrollTo(0, prevTop);
+    if (wasSearch) {
+      const inp = document.getElementById("itv-search-inp");
+      if (inp) {
+        inp.focus({ preventScroll: true });
+        try { if (selStart !== null) inp.setSelectionRange(selStart, selEnd); } catch (e) {}
+      }
+    }
+  };
+})();
+
+/* ---- 2.28.55: Upgraded Personal Homepage Summary Blurb (Different Every Single Open; Time, Date, Location & App Usage Driven) ---- */
+let __shaneBlurbCounter = (() => {
+  try {
+    const n = (parseInt(localStorage.getItem("shaneBlurbOpenCount") || "0", 10) || 0) + 1;
+    localStorage.setItem("shaneBlurbOpenCount", String(n));
+    return n;
+  } catch (e) { return Math.floor(Math.random() * 100); }
+})();
+
+function bumpShaneBlurbSeed(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  __shaneBlurbCounter = (__shaneBlurbCounter + 1) % 10000;
+  try { localStorage.setItem("shaneBlurbOpenCount", String(__shaneBlurbCounter)); } catch (e) {}
+  const el = document.getElementById("glheroblurb");
+  if (el) el.innerHTML = glDynamicHeroBlurb(glMode(), new Date());
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    __shaneBlurbCounter = (__shaneBlurbCounter + 1) % 10000;
+    try { localStorage.setItem("shaneBlurbOpenCount", String(__shaneBlurbCounter)); } catch (e) {}
+    const el = document.getElementById("glheroblurb");
+    if (el) el.innerHTML = glDynamicHeroBlurb(glMode(), new Date());
+  }
+});
+
+// Track every route visit so app usage immediately shapes the homepage summary blurb
+let __recentRoutes = (() => {
+  try { return JSON.parse(localStorage.getItem("shaneRecentRoutesV1") || "[]"); } catch (e) { return []; }
+})();
+window.addEventListener("hashchange", () => {
+  const h = (location.hash || "#home").split("?")[0];
+  if (h && h !== "#home") {
+    __recentRoutes = [h, ...__recentRoutes.filter(x => x !== h)].slice(0, 8);
+    try { localStorage.setItem("shaneRecentRoutesV1", JSON.stringify(__recentRoutes)); } catch (e) {}
+  } else if (h === "#home") {
+    __shaneBlurbCounter = (__shaneBlurbCounter + 1) % 10000;
+    try { localStorage.setItem("shaneBlurbOpenCount", String(__shaneBlurbCounter)); } catch (e) {}
+  }
+});
+
+glDynamicHeroBlurb = function (m, now) {
+  now = now || new Date();
+  m = m || glMode(now);
+  const h = now.getHours(), min = now.getMinutes(), dow = now.getDay(), T = todayISO(now);
+  const wdName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dow];
+  const loc = (() => { try { return glLoc() || "home"; } catch (e) { return "home"; } })();
+  const seed = __shaneBlurbCounter + Math.floor(now.getTime() / 45000);
+
+  // Live personal context pieces
+  const temps = (() => { try { return glTemps() || []; } catch (e) { return []; } })();
+  const loungeT = (temps.find(x => /lounge/i.test(x.n)) || {}).t || "";
+  const bedT = (temps.find(x => /bed/i.test(x.n)) || {}).t || "";
+  const tempSnippet = loungeT ? `Lounge is <b>${esc(loungeT)}</b>${bedT ? ` (Bedroom <b>${esc(bedT)}</b>)` : ""}` : "Onerahi home status is live";
+
+  const driveMin = (typeof DRIVE !== "undefined" && DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds)) ? Math.round(DRIVE.seconds / 60) : 16;
+  const sm = hmMin(m.start || "08:30");
+  const leaveTime = sm != null ? fmtTime(hmFromMin(sm - driveMin)) : "8:14am";
+
+  // Pay cycle awareness: Shane's fortnightly pay lands Wed 4 Nov 2026 (and every 14d), Sarah's pay Tuesday, Board Tuesday ~11pm
+  const daysToShanePay = (() => {
+    try {
+      let d = daysLeft("2026-11-04");
+      while (d < 0) d += 14;
+      return d % 14;
+    } catch (e) { return 7; }
+  })();
+
+  // 1. FIRST SENTENCE: Time + Date + Roster + Location (Multiple variations per state so it never feels static)
+  let leadPool = [];
+  if (m.sick) {
+    leadPool = [
+      `🤒 <b>Off sick at home in Onerahi</b> — rest up, keep warm (${tempSnippet}), and take the day easy.`,
+      `🤒 <b>Sick day</b> logged for your Port Rd shift today — put your feet up in Onerahi and let the day wait.`
+    ];
+  } else if (loc === "work" || m.atWork) {
+    const f = glFree(m);
+    const freeStr = f ? `<b>Free in ${esc(f.txt)}</b> (${esc(fmtTime(f.end))})` : `Port Rd shift underway`;
+    leadPool = [
+      `💼 At <b>Port Rd</b> · ${freeStr}. ${dow === 4 ? "Long Thursday through to 7:15pm tonight." : (dow === 2 || dow === 3) ? "<b>Gym</b> is lined up after your 6pm finish." : dow === 1 ? "<b>Mum’s place</b> after 6pm tonight." : "Home in Onerahi after 6pm."}`,
+      `📍 <b>Port Rd</b> (${esc(wdName)}) · ${freeStr} · ${driveMin} min run back to Onerahi when you knock off.`,
+      `💼 Halfway through your <b>${esc(wdName)}</b> shift (${freeStr}) — ${(dow === 2 || dow === 3) ? "gym gear ready for 6pm." : "dinner around 8pm tonight."}`
+    ];
+  } else if (m.beforeWork) {
+    leadPool = [
+      `☕ <b>${esc(wdName)} morning in Onerahi</b> — <b>TVNZ 1 Breakfast</b> is on before your <b>${esc(glShift(m))}</b> shift (head off around <b>${esc(leaveTime)}</b>, ~${driveMin}m to Port Rd).`,
+      `🌅 Morning at home (${tempSnippet}) · Shift starts <b>${esc(fmtTime(m.start || "08:30"))}</b>, so you’ve got until <b>${esc(leaveTime)}</b> before the Port Rd run.`,
+      `☕ Catching <b>Breakfast</b> on TVNZ 1 before work — leave Onerahi by <b>${esc(leaveTime)}</b>.${(dow === 2 || dow === 3) ? " Tonight is <b>gym night</b> after 6pm." : dow === 4 ? " All-day Thursday shift until 7:15pm." : ""}`
+    ];
+  } else if (m.off) {
+    const meal = (() => { try { const p = M().plan[T]; return p && p.title ? p.title : "GF pizza"; } catch (e) { return "GF pizza"; } })();
+    if (dow === 0 && h < 19) {
+      leadPool = [
+        `🌤️ <b>Sunday in Onerahi</b> (${tempSnippet}) — Smart Office cleaning wraps up at <b>7:00pm</b>, then the evening is yours.`,
+        `🏡 Easy <b>Sunday</b> before your 7pm cleaning finish — Zeus, Mindy &amp; Silken holding the fort at home.`
+      ];
+    } else if (dow === 5 || dow === 6) {
+      leadPool = [
+        `🍕 <b>${esc(wdName)} off</b> in Onerahi — gluten-free <b>${esc(meal)}</b> on the menu and a glass of <b>merlot</b> later on.`,
+        `🌤️ <b>Rostered weekend off</b> (${tempSnippet}) — no Port Rd shift today, and <b>${esc(meal)}</b> planned for dinner.`
+      ];
+    } else {
+      leadPool = [
+        `🌤️ <b>Rostered day off</b> in Onerahi (${tempSnippet}) — no Port Rd shift today.`,
+        `🏡 Enjoying a mid-week <b>day off</b> at home in Onerahi with Sarah, Zeus, Mindy &amp; Silken.`
+      ];
+    }
+  } else if (h >= 22 || h < 5) {
+    leadPool = [
+      h >= 22 && h <= 23
+        ? `♨️ <b>Spa &amp; wind-down time</b> in Onerahi (${tempSnippet}) — good hour for a <b>Suno</b> AI track or a movie on the 141-channel TV guide.`
+        : `🦉 <b>Night owl hours</b> in Onerahi (${tempSnippet}) — house is quiet with Zeus, Mindy &amp; Silken.`,
+      `🌙 Late-night relax in Onerahi — <b>141 free Internet TV channels</b> and your <b>Car Stereo</b> presets are ready whenever you are.`
+    ];
+  } else {
+    leadPool = [
+      `🏡 <b>${esc(wdName)} evening in Onerahi</b> (${tempSnippet}) — ${(dow === 2 || dow === 3) ? "<b>gym night</b> ticked off, dinner around 8–9pm." : dow === 1 ? "<b>Monday at Mum’s</b>, then relaxing at home." : "dinner around 8–9pm and spa around 10pm."}`,
+      `🌆 Back home from Port Rd (${tempSnippet}) — time to unwind with Sarah, put on a movie, or spin some AI music.`
+    ];
+  }
+  if (loc === "beach") leadPool.unshift(`🏖️ Down by <b>Onerahi Beach</b> — coastal breeze and tide times live on your Weather board.`);
+  else if (loc === "bush") leadPool.unshift(`🌿 Out on a <b>Northland bushwalk</b> — enjoy the trail!`);
+  else if (loc === "town") leadPool.unshift(`🛍️ Out in <b>Whangārei town</b> — ~12 min back to Onerahi.`);
+
+  const s1 = leadPool[seed % leadPool.length];
+
+  // 2. SECOND SENTENCE: Rotates through Personal Money/Pay Cycle, Live Markets/ASB Mortgages/KiwiSaver, Solar/Home, Family/Birthdays
+  const pwrToday = (typeof PWR !== "undefined" && PWR && PWR.today) ? PWR.today : null;
+  const pwrLine = pwrToday && pwrToday.solarKWh
+    ? `☀️ <b>SolarZero</b> has generated <b>${pwrToday.solarKWh} kWh</b> today (${pwrToday.fromSolarPct || 0}% solar / ${pwrToday.fromBatteryPct || 0}% battery) across your Onerahi home.`
+    : `☀️ <b>SolarZero</b> &amp; your 3 <b>ASB mortgages</b> (5.59% 1-yr vs BNZ 5.39% low) are tracked live below.`;
+
+  const payLine = daysToShanePay === 0
+    ? `💰 It’s <b>fortnightly pay Wednesday</b> (lands this afternoon/evening), after Sarah’s Tuesday pay and last night’s Kiwibank board.`
+    : dow === 2
+      ? `💳 <b>Sarah’s pay</b> lands today and <b>L H JENKINS board</b> hits Kiwibank around 11pm tonight (your next fortnightly pay is <b>Wed 4 Nov</b>, ${daysToShanePay}d away).`
+      : dow === 3
+        ? `💳 Off-pay Wednesday this week (Sarah’s pay &amp; Kiwibank board landed yesterday; your next fortnightly pay is <b>Wed 4 Nov</b> in ${daysToShanePay}d).`
+        : `💰 Next fortnightly pay lands <b>Wed 4 Nov</b> (${daysToShanePay}d away) · <b>91 Unleaded</b> is <b>$2.54/L</b> locally.`;
+
+  const contextPool = [
+    payLine,
+    `📈 <b>NZX 50</b> is <span class="glup">${esc(MKT_DATA.nzx.chg)}</span> (${esc(MKT_DATA.nzx.val)}) vs <b>Dow Jones</b> <span class="glup">${esc(MKT_DATA.dow.chg)}</span> (${esc(MKT_DATA.dow.val)}) · <b>KiwiSaver Growth</b> funds are averaging <b>+12.4%</b>.`,
+    `🏦 Your 3 <b>ASB fortnightly mortgages</b> sit at <b>5.59%</b> (1-yr) &amp; <b>5.49%</b> (2-yr) against the <b>5.39%</b> market low (OCR <b>${esc(MKT_DATA.ocr)}</b>).`,
+    pwrLine,
+    `📺 Your <b>Internet TV Guide</b> now has <b>${ltvAllChannels().length} free live channels</b> (NZ, UK, Movies, Comedy, PowerNation Cars, Hell’s Kitchen &amp; Vevo 70s/80s/90s) in a full timeline grid.`
+  ];
+  const s2 = contextPool[(seed * 3 + 1) % contextPool.length];
+
+  // 3. THIRD SENTENCE: Driven by actual App Usage (useLoad() + recent routes in this session + time-of-day rhythm)
+  const routeLabels = {
+    "#tv": ["📺 Internet TV Timeline Guide", "#tv"],
+    "#livetv": ["📺 Live Internet TV & DVR", "#livetv"],
+    "#radio": ["📻 Car Stereo Radio (P1–P12)", "#radio"],
+    "#bills": ["🧾 Bills & Emailed Invoices", "#bills"],
+    "#cashflow": ["🔄 Fortnightly Cash Flow", "#cashflow"],
+    "#todo": ["☑️ Tasks & Sitting List", "#todo"],
+    "#alerts": ["🔔 Notifications Feed", "#alerts"],
+    "#power": ["☀️ SolarZero Power", "#power"],
+    "#meals": ["🍕 GF Meal Planner", "#meals"],
+    "#shopping": ["🛒 Sarah’s & Your Shopping List", "#shopping"],
+    "#cars": ["🚗 Cars (MUL27 · PNU312 · KBZ234)", "#cars"]
+  };
+  let topRoute = __recentRoutes[0] || "";
+  if (!topRoute || !routeLabels[topRoute]) {
+    try {
+      const u = typeof useLoad === "function" ? useLoad() : null;
+      const slots = (u && u.slots) || {};
+      const slotKey = dow + ":" + Math.floor(h / 3);
+      const bucket = slots[slotKey] || (u && u.totals) || {};
+      const best = Object.entries(bucket).filter(([k]) => routeLabels[k]).sort((a, b) => b[1] - a[1])[0];
+      if (best) topRoute = best[0];
+    } catch (e) {}
+  }
+  constover5 = glTasksOverdue5Count();
+  const shopOpen = ((S.shop && S.shop.items) || []).filter(x => x && !x.done).length;
+  const usagePool = [];
+  if (topRoute && routeLabels[topRoute]) {
+    const [lbl, hash] = routeLabels[topRoute];
+    usagePool.push(`🧭 Since you were recently in <a href="${hash}" style="color:inherit;text-decoration:underline;font-weight:800">${lbl}</a>, it’s 1 tap away.`);
+  }
+  usagePool.push(
+    `🧭 For a ${esc(wdName)} ${h < 12 ? "morning" : h < 18 ? "afternoon" : "evening"}, your top go-tos are <a href="#tv" style="color:inherit;text-decoration:underline;font-weight:800">📺 TV Guide (${ltvAllChannels().length} Ch)</a>, <a href="#bills" style="color:inherit;text-decoration:underline;font-weight:800">🧾 Bills</a>, and <a href="#todo" style="color:inherit;text-decoration:underline;font-weight:800">☑️ Tasks (${constover5} &gt;5d)</a>.`,
+    `🧭 Quick jump: <a href="#shopping" style="color:inherit;text-decoration:underline;font-weight:800">🛒 Shopping (${shopOpen} items)</a> · <a href="#radio" style="color:inherit;text-decoration:underline;font-weight:800">📻 Car Stereo</a> · <a href="#cashflow" style="color:inherit;text-decoration:underline;font-weight:800">🔄 Cash Flow</a>.`
+  );
+  const s3 = usagePool[(seed * 5 + 2) % usagePool.length];
+
+  return `<span>${s1} ${s2} ${s3}</span> <button type="button" onclick="bumpShaneBlurbSeed(event)" style="border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:999px;padding:1px 8px;font-size:.72rem;font-weight:800;cursor:pointer;margin-left:4px" title="New summary">↻ New</button>`;
+};
+
+/* ---- 2.28.55: Android Auto Steering-Wheel Preset Stepping (P1-P12) & Car Display Metadata for Radio ---- */
+function radioStepPreset(dir) {
+  try {
+    const p = typeof radioPresets === "function" ? radioPresets() : [];
+    if (!p.length) { radioSeek(dir); return; }
+    const curPos = p.indexOf(radioSt.idx);
+    const nextPos = curPos >= 0 ? (curPos + dir + p.length) % p.length : 0;
+    const nextStationIdx = p[nextPos];
+    radioSt.bank = nextPos >= 6 ? 1 : 0;
+    radioPlayIdx(nextStationIdx);
+  } catch (e) {
+    try { radioSeek(dir); } catch (er) {}
+  }
+}
+
+(() => {
+  const origSyncMedia = syncMediaSession;
+  syncMediaSession = function (source) {
+    origSyncMedia.apply(this, arguments);
+    try {
+      if (!("mediaSession" in navigator) || typeof MediaMetadata === "undefined") return;
+      if (source !== "Top 40" && !(location.hash || "").startsWith("#top40")) {
+        const st = (typeof RADIO !== "undefined" && typeof radioSt !== "undefined" && RADIO[radioSt.idx]) || null;
+        const now = typeof radioNowTrack === "function" ? radioNowTrack() : null;
+        const pSlot = (typeof radioPresets === "function" ? radioPresets().indexOf(radioSt.idx) : -1) + 1;
+        if (st) {
+          navigator.mediaSession.playbackState = radioSt.playing ? "playing" : "paused";
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: (pSlot ? `[P${pSlot}] ` : "") + (now && now.title ? now.title : st.name),
+            artist: now && now.artist ? `${now.artist} · ${st.name} (${st.freq})` : `${st.name} · ${st.freq || "NZ Radio"}`,
+            album: "My App Car Stereo · Android Auto P1–P12",
+            artwork: [
+              { src: (now && now.cover) || "icons/icon-192.png", sizes: "192x192", type: "image/png" },
+              { src: (now && now.cover) || "icons/icon-512.png", sizes: "512x512", type: "image/png" }
+            ]
+          });
+          navigator.mediaSession.setActionHandler("play", () => { try { if (!radioSt.playing) radioToggle(); } catch (e) {} });
+          navigator.mediaSession.setActionHandler("pause", () => { try { if (radioSt.playing) radioToggle(); } catch (e) {} });
+          navigator.mediaSession.setActionHandler("previoustrack", () => { radioStepPreset(-1); });
+          navigator.mediaSession.setActionHandler("nexttrack", () => { radioStepPreset(1); });
+        }
+      }
+    } catch (e) {}
+  };
+})();
