@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.56';
+const APP_VERSION = '2.28.57';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4196,7 +4196,8 @@ function Home() {
   const clean = cleanOn();
   const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
   homeSumT = !clean && sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
-  const sumUnderWx = homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
+  const dynClassicBlurb = homeTry('dyn blurb', () => typeof glDynamicHeroBlurb === 'function' ? `<div class="card" id="classic-dyn-blurb" style="padding:10px 12px;margin:8px 0;font-size:.86rem;line-height:1.45;border-left:3px solid var(--brand,#2563eb)">${glDynamicHeroBlurb(glMode(now), now)}</div>` : '', '');
+  const sumUnderWx = dynClassicBlurb + homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
   const sum = clean || homeSumT ? '' : !night && sum0 ? homeSumFold(sum0) : sum0;
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
@@ -22047,8 +22048,8 @@ function glHead(name, m, now) {
   const loc = (() => { try { const k = glLoc(); return k === 'work' ? '📍 Port Rd' : k === 'beach' ? '📍 Onerahi Beach' : k === 'bush' ? '📍 Bushwalk' : k === 'town' ? '📍 Town' : '📍 Home (Onerahi)'; } catch (e) { return '📍 Onerahi'; } })();
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${loc}`;
   const shiftPill = m.sick ? '🤒 Off sick today' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
-  const blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || '');
-  const qStrip = typeof glHeroQuoteStrip === 'function' ? glHeroQuoteStrip() : '';
+  let blurb = ''; try { blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || ''); } catch (e) { blurb = esc(glLine(m) || ''); }
+  let qStrip = ''; try { qStrip = typeof glHeroQuoteStrip === 'function' ? glHeroQuoteStrip() : ''; } catch (e) { qStrip = ''; }
   return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open menu" title="All Sections &amp; Menu" onclick="openQuickMenuSheet()"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}${qStrip}</div></div>`;
 }
 /* ---- Home status ---- */
@@ -34844,6 +34845,8 @@ function bumpShaneBlurbSeed(ev) {
   try { localStorage.setItem("shaneBlurbOpenCount", String(__shaneBlurbCounter)); } catch (e) {}
   const el = document.getElementById("glheroblurb");
   if (el) el.innerHTML = glDynamicHeroBlurb(glMode(), new Date());
+  const cl = document.getElementById("classic-dyn-blurb");
+  if (cl) cl.innerHTML = glDynamicHeroBlurb(glMode(), new Date());
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -34852,6 +34855,8 @@ document.addEventListener("visibilitychange", () => {
     try { localStorage.setItem("shaneBlurbOpenCount", String(__shaneBlurbCounter)); } catch (e) {}
     const el = document.getElementById("glheroblurb");
     if (el) el.innerHTML = glDynamicHeroBlurb(glMode(), new Date());
+    const cl = document.getElementById("classic-dyn-blurb");
+    if (cl) cl.innerHTML = glDynamicHeroBlurb(glMode(), new Date());
   }
 });
 
@@ -35003,7 +35008,7 @@ glDynamicHeroBlurb = function (m, now) {
       if (best) topRoute = best[0];
     } catch (e) {}
   }
-  constover5 = glTasksOverdue5Count();
+  const over5 = glTasksOverdue5Count();
   const shopOpen = ((S.shop && S.shop.items) || []).filter(x => x && !x.done).length;
   const usagePool = [];
   if (topRoute && routeLabels[topRoute]) {
@@ -35011,7 +35016,7 @@ glDynamicHeroBlurb = function (m, now) {
     usagePool.push(`🧭 Since you were recently in <a href="${hash}" style="color:inherit;text-decoration:underline;font-weight:800">${lbl}</a>, it’s 1 tap away.`);
   }
   usagePool.push(
-    `🧭 For a ${esc(wdName)} ${h < 12 ? "morning" : h < 18 ? "afternoon" : "evening"}, your top go-tos are <a href="#tv" style="color:inherit;text-decoration:underline;font-weight:800">📺 TV Guide (${ltvAllChannels().length} Ch)</a>, <a href="#bills" style="color:inherit;text-decoration:underline;font-weight:800">🧾 Bills</a>, and <a href="#todo" style="color:inherit;text-decoration:underline;font-weight:800">☑️ Tasks (${constover5} &gt;5d)</a>.`,
+    `🧭 For a ${esc(wdName)} ${h < 12 ? "morning" : h < 18 ? "afternoon" : "evening"}, your top go-tos are <a href="#tv" style="color:inherit;text-decoration:underline;font-weight:800">📺 TV Guide (${ltvAllChannels().length} Ch)</a>, <a href="#bills" style="color:inherit;text-decoration:underline;font-weight:800">🧾 Bills</a>, and <a href="#todo" style="color:inherit;text-decoration:underline;font-weight:800">☑️ Tasks (${over5} &gt;5d)</a>.`,
     `🧭 Quick jump: <a href="#shopping" style="color:inherit;text-decoration:underline;font-weight:800">🛒 Shopping (${shopOpen} items)</a> · <a href="#radio" style="color:inherit;text-decoration:underline;font-weight:800">📻 Car Stereo</a> · <a href="#cashflow" style="color:inherit;text-decoration:underline;font-weight:800">🔄 Cash Flow</a>.`
   );
   const s3 = usagePool[(seed * 5 + 2) % usagePool.length];
