@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.51';
+const APP_VERSION = '2.28.52';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23146,7 +23146,7 @@ function alBriefingHtml(list) {
     host.insertAdjacentHTML('beforeend', bpBtn(on));
   };
 
-  const pinnedNodes = [], yourDayNodes = [], emailBillNodes = [], sarahNodes = [], carOrderNodes = [];
+  const pinnedNodes = [], yourDayNodes = [], emailBillNodes = [], sarahNodes = [], carOrderNodes = [], allPrioritised = [];
   const seenTitles = homeShownKeys();
   if (hero.key) seenTitles.add(hero.key);
 
@@ -23155,6 +23155,90 @@ function alBriefingHtml(list) {
     c.querySelectorAll('.newpill, .bpin, .badge, .glbadge, .jiage, .pill').forEach(x => x.remove());
     const t = (c.querySelector('.t') || c.querySelector('b') || c).textContent || '';
     return cuNorm(t);
+  };
+
+  // 2.28.52: Score every notification item by (1) overdue / due date, (2) how long it has been sitting there, and (3) priority
+  const notifSortMeta = (el, secName) => {
+    const txt = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    const pid = el.dataset && el.dataset.pid ? el.dataset.pid : bpIdOf(el);
+    let firstSeenMap = {};
+    try { firstSeenMap = JSON.parse(localStorage.getItem('notifFirstSeenV1') || '{}') || {}; } catch (e) {}
+    if (pid && !firstSeenMap[pid]) {
+      firstSeenMap[pid] = Date.now();
+      try { localStorage.setItem('notifFirstSeenV1', JSON.stringify(firstSeenMap)); } catch (e) {}
+    }
+    const sittingDays = pid && firstSeenMap[pid] ? Math.max(0, Math.floor((Date.now() - firstSeenMap[pid]) / 86400e3)) : 0;
+
+    // Extract explicit overdue / due days or sitting age from the card text
+    let dueDays = null; // negative = overdue, 0 = today, 1 = tomorrow, >1 = upcoming
+    let ageDays = sittingDays;
+    const mOver = txt.match(/(\d+)\s*days?\s*overdue/i);
+    const mInDays = txt.match(/\b(?:in|due in)\s*(\d+)\s*days?\b/i) || txt.match(/\b(\d+)d\b/);
+    const mAgoDays = txt.match(/(\d+)\s*(?:d|days?)\s*ago\b/i) || txt.match(/sitting\s*(\d+)\s*days?/i);
+    const mAgoHrs = txt.match(/(\d+)\s*(?:h|hrs?|hours?)\s*ago\b/i);
+
+    if (mOver) dueDays = -Math.max(1, parseInt(mOver[1], 10));
+    else if (/\boverdue\b/i.test(txt)) dueDays = -1;
+    else if (/\b(due today|today!|on today|tonight)\b/i.test(txt)) dueDays = 0;
+    else if (/\b(due tomorrow|tomorrow)\b/i.test(txt)) dueDays = 1;
+    else if (mInDays) dueDays = parseInt(mInDays[1], 10);
+    else {
+      // Check for an explicit NZ date like "29 Oct" or "4 Nov"
+      const mDate = txt.match(/\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i);
+      if (mDate) {
+        const mIdx = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(mDate[2].toLowerCase());
+        if (mIdx >= 0) {
+          const yr = new Date().getFullYear();
+          const iso = `${yr}-${String(mIdx + 1).padStart(2, '0')}-${String(parseInt(mDate[1], 10)).padStart(2, '0')}`;
+          const d = daysLeft(iso);
+          if (Number.isFinite(d) && d >= -60 && d <= 90) {
+            if (d < 0 && /emailed|received|sent|paid|landed/i.test(txt) && !/due|overdue/i.test(txt)) {
+              ageDays = Math.max(ageDays, -d);
+            } else {
+              dueDays = d;
+            }
+          }
+        }
+      }
+    }
+    if (mAgoDays) ageDays = Math.max(ageDays, parseInt(mAgoDays[1], 10));
+    else if (mAgoHrs) ageDays = Math.max(ageDays, Math.round(parseInt(mAgoHrs[1], 10) / 24));
+
+    const isRedWarn = el.classList.contains('glwarn') || el.classList.contains('glwarnwrap') || /\b(road closure|warning|emergency|overdue)\b/i.test(txt);
+    const isBill = secName === 'bills' || /\b(bill|invoice|direct debit|kora|ecotricity)\b/i.test(txt);
+    const isSarah = secName === 'sarah';
+
+    // Priority tier + score (higher score = nearer the top)
+    let priBadge = '';
+    let score = 0;
+    if (dueDays != null && dueDays < 0) {
+      // Overdue items at the very top: more days overdue first
+      score = 9000 + Math.min(500, Math.abs(dueDays) * 20) + ageDays * 5;
+      priBadge = `<span class="pill" style="background:#fee2e2;color:#991b1b;font-weight:800;font-size:.7rem;padding:2px 7px;border-radius:999px">🔴 ${Math.abs(dueDays)}d overdue</span>`;
+    } else if (dueDays === 0 || (isRedWarn && dueDays == null)) {
+      score = 7500 + (isRedWarn ? 300 : 0) + ageDays * 10;
+      priBadge = `<span class="pill" style="background:#fef3c7;color:#92400e;font-weight:800;font-size:.7rem;padding:2px 7px;border-radius:999px">${dueDays === 0 ? '🔴 Today' : ('🔴 Active' + (ageDays >= 1 ? ' · ' + ageDays + 'd' : ''))}</span>`;
+    } else if (dueDays === 1) {
+      score = 6500 + ageDays * 8;
+      priBadge = `<span class="pill" style="background:#fef3c7;color:#92400e;font-weight:700;font-size:.7rem;padding:2px 7px;border-radius:999px">🟡 Tomorrow</span>`;
+    } else if (dueDays != null && dueDays > 1) {
+      // Upcoming dated items: sooner dates first, then longer sitting
+      score = Math.max(1000, 5500 - dueDays * 120) + ageDays * 6 + (isBill ? 80 : 0);
+      priBadge = `<span class="pill" style="background:#e0f2fe;color:#075985;font-weight:700;font-size:.7rem;padding:2px 7px;border-radius:999px">📅 In ${dueDays}d</span>`;
+    } else {
+      // Undated items: ordered by how long they have been sitting there (oldest/longest sitting first)
+      score = 3500 + Math.min(1800, ageDays * 90) + (isBill ? 200 : isSarah ? 150 : 0);
+      if (ageDays >= 2) {
+        priBadge = `<span class="pill" style="background:#f3f4f6;color:#374151;font-weight:700;font-size:.7rem;padding:2px 7px;border-radius:999px">⏳ Sitting ${ageDays}d</span>`;
+      }
+    }
+
+    // Add a subtle date/sitting badge if the card does not already have a right-side pill
+    if (priBadge && !el.querySelector('.pill, .glbadge')) {
+      const tNode = el.querySelector('.t') || el.querySelector('b');
+      if (tNode) tNode.insertAdjacentHTML('beforeend', ' ' + priBadge);
+    }
+    return { html: el.outerHTML, score, dueDays, ageDays, secName };
   };
 
   let curSec = 'today';
@@ -23174,33 +23258,35 @@ function alBriefingHtml(list) {
     items.forEach(el => {
       decorateCard(el);
       if (curSec === 'pinned') { pinnedNodes.push(el.outerHTML); return; }
-      if (curSec === 'bills') { emailBillNodes.push(el.outerHTML); return; }
       const tk = cardTitleKey(el);
-      if (tk && seenTitles.has(tk)) return;
+      if (curSec !== 'bills' && tk && seenTitles.has(tk)) return;
       if (tk) seenTitles.add(tk);
-      if (curSec === 'sarah') sarahNodes.push(el.outerHTML);
-      else if (curSec === 'cars') carOrderNodes.push(el.outerHTML);
-      else yourDayNodes.push(el.outerHTML);
+      const meta = notifSortMeta(el, curSec);
+      allPrioritised.push(meta);
+      if (curSec === 'bills') emailBillNodes.push(meta);
+      else if (curSec === 'sarah') sarahNodes.push(meta);
+      else if (curSec === 'cars') carOrderNodes.push(meta);
+      else yourDayNodes.push(meta);
     });
   });
+
+  const sortByScore = arr => arr.slice().sort((a, b) => b.score - a.score).map(x => x.html);
+  const sortedAll = sortByScore(allPrioritised);
+  const sortedBills = sortByScore(emailBillNodes);
+  const sortedYourDay = sortByScore(yourDayNodes);
+  const sortedSarah = sortByScore(sarahNodes);
+  const sortedCars = sortByScore(carOrderNodes);
 
   const block = (title, arr, cls = '') => arr.length ? `<div class="sec al-yd-sec">${title} <span class="al-cnt">${arr.length}</span></div><div class="list al-yd-list ${cls}">${arr.join('')}</div>` : '';
 
   let body = '';
-  if (alBriefFilter === 'all') {
+  if (alBriefFilter === 'all' || alBriefFilter === 'today') {
     body = block('📌 Pinned', pinnedNodes, 'bellpinned') +
-           block('🧾 Bills by Email', emailBillNodes) +
-           block('⚡ Alerts & Updates', yourDayNodes) +
-           block('💌 From Sarah', sarahNodes) +
-           block('📦 Deliveries & Orders', carOrderNodes);
-  } else if (alBriefFilter === 'today') {
-    body = block('📌 Pinned', pinnedNodes, 'bellpinned') +
-           block('🧾 Bills by Email', emailBillNodes) +
-           block('⚡ Alerts & Updates', yourDayNodes);
+           block('🔔 Notifications (by date & time sitting)', sortedAll);
   } else if (alBriefFilter === 'sarah') {
-    body = block('💌 From Sarah', sarahNodes);
+    body = block('💌 From Sarah', sortedSarah);
   } else if (alBriefFilter === 'cars') {
-    body = block('📦 Deliveries & Orders', carOrderNodes);
+    body = block('📦 Deliveries & Orders', sortedCars);
   }
 
   return (alBriefFilter === 'all' || alBriefFilter === 'today' ? heroHtml + gridHtml : '') +
@@ -23235,7 +23321,7 @@ function GlAlerts() {
       ${arcTab()}
     </div>
   </div>`;
-  return pwrWrap(topBar + header('Notifications', isBoard ? 'Swipe sideways between boards · scroll up and down inside each board' : 'Your day first · tap ⋯ or hold a card to pin') + bellReadProg() + (NB.top) + `
+  return pwrWrap(topBar + header('Notifications', isBoard ? 'Swipe sideways between boards · scroll up and down inside each board' : 'Prioritised top to bottom by date & how long items have been sitting here') + (NB.top) + `
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
 }
 function glWxSky(kind, day) {
@@ -28827,7 +28913,7 @@ async function phExport() { const L = await phLoad(); if (!L.length) return toas
 function todoTodayProg() { const T = todayISO(), isT = ms => ms && nzStampLocal(new Date(ms)).slice(0, 10) === T;
   const L = (S.todos || []).filter(t => t && (t.done ? isT(t.doneAt) : t.due && daysLeft(t.due) <= 0));
   return progLine(L.filter(t => t.done).length, L.length, 'Today’s to-dos'); }
-function bellReadProg() { try { const seen = bellSeen(), A = glBellSigs().filter((x, i, A) => A.indexOf(x) === i); return progLine(A.filter(x => seen[x]).length, A.length, 'Notifications read', 'pgsm', { word: 'read' }); } catch (e) { return ''; } }
+function bellReadProg() { return ''; }
 function billsPayProg(pp, items) { try { if (!pp) return ''; const paid = (S.bills || []).reduce((n, b) => n + (Array.isArray(b.paidDues) ? b.paidDues.filter(x => x && x.due >= pp.start && x.due <= pp.end).length : 0), 0);
   const open = items.filter(x => x.kind === 'bill' && !x.late).length; return progLine(paid, paid + open, 'Bills paid this fortnight', 'pgsm', { word: 'paid' }); } catch (e) { return ''; } }
 function xferProg(X) { try { const done = S.settings.xferDone || {}, by = X.list.map(x => x.by).filter(Boolean).sort()[0]; if (!by) return ''; const L = X.list.filter(x => x.by === by);
