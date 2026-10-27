@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.47';
+const APP_VERSION = '2.28.48';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -12891,11 +12891,14 @@ function rwCouncilInYear(start) {
 function rwCouncilItems(data) {
   const list = data && Array.isArray(data.projects) ? data.projects : null;
   if (!list) return null;
-  return list.filter(p => p && p.name && rwCouncilInYear(p.start)).map(p => ({
+  return list.filter(p => p && p.name && (/construction|underway|procurement/i.test(p.status || "") || /2026\s*\/\s*2027/i.test(p.start || "") || /onerahi|pohe|riverside|reyburn|whangarei heads|reotahi|kamo|springsflat|central avenue|maunu/i.test((p.full || p.name || "")) || rwCouncilInYear(p.start))).map(p => ({
     id: 'wdc-' + String(p.id || p.name),
     road: String(p.name),
+    status: String(p.status || ''),
+    startRaw: String(p.start || ''),
+    detail: String(p.detail || ''),
     start: '', end: '', until: false,
-    near: [p.status, p.start ? 'Expected start ' + p.start : '', p.detail].filter(Boolean).join(' · '),
+    near: [p.status, p.start ? 'Start: ' + p.start : '', p.detail].filter(Boolean).join(' · '),
     km: null,
     url: typeof p.url === 'string' && p.url.startsWith('https://www.wdc.govt.nz/') ? p.url : RW_WDC,
     source: 'wdc'
@@ -12919,12 +12922,72 @@ async function refreshRoadworks(force = false) {
   updRoadworks();
 }
 function updRoadworks() {
+  try { if (typeof glWarnRedraw === "function") glWarnRedraw(); } catch (e) {}
   if (sheetOpen) return;
   const h = (location.hash || '#home').slice(1);
   if ((h === 'home' || h === '') && !homeEdit) {
     const v = $('#view'), top = v ? v.scrollTop : 0;
     render(); if (v) v.scrollTop = top;
   }
+}
+function wdcRoadworksSheet() {
+  const all = ((RW && RW.data && RW.data.items) || []).filter(x => x && x.source === "wdc");
+  if (!all.length) {
+    refreshRoadworks(true);
+    openSheet("🚧 WDC Roading Improvements", `<p class="muted">Loading Whangārei District Council roading improvements…</p><p><a class="btn" href="${RW_WDC}" target="_blank" rel="noopener">Open WDC Roading Improvements ↗</a></p>`, null, "");
+    return;
+  }
+  const underway = all.filter(x => /construction|underway/i.test(x.status || x.near || ""));
+  const nextUp = all.filter(x => !underway.includes(x) && (/procurement/i.test(x.status || x.near || "") || /october 2026|november 2026|december 2026|january 2027|february 2027/i.test(x.startRaw || x.near || "")));
+  const later = all.filter(x => !underway.includes(x) && !nextUp.includes(x));
+  const renderRows = arr => arr.map(w => `<a class="row" href="${esc(w.url || RW_WDC)}" target="_blank" rel="noopener"><div class="ic rw">${I('wrench')}</div><div class="tx"><div class="t">${esc(w.road)}</div><div class="s">${esc(w.near)}</div></div></a>`).join("");
+  const html = `<p class="muted" style="margin:0 2px 10px">From Whangārei District Council’s <a href="${RW_WDC}" target="_blank" rel="noopener">Roading improvements</a> programme (${all.length} projects). Tap any project to open its council page.</p>`
+    + (underway.length ? `<div class="sec">🚧 Construction underway (${underway.length})</div><div class="list">${renderRows(underway)}</div>` : "")
+    + (nextUp.length ? `<div class="sec">🗓️ Starting soon &amp; procurement (${nextUp.length})</div><div class="list">${renderRows(nextUp)}</div>` : "")
+    + (later.length ? `<div class="sec">📐 Design &amp; upcoming (${later.length})</div><div class="list">${renderRows(later)}</div>` : "");
+  openSheet("🚧 Council Roading Improvements", html, null, "");
+}
+function wdcRoadworksWarnItems() {
+  const all = ((RW && RW.data && RW.data.items) || []).filter(x => x && x.source === "wdc");
+  if (!all.length) return [];
+  const out = [];
+  const underway = all.filter(x => /construction|underway/i.test(x.status || x.near || ""));
+  const localPriority = all.filter(x => /onerahi|pohe|riverside|reyburn|whangarei heads|reotahi|kamo|springsflat|apotu|pipiwai/i.test(x.road + " " + (x.near || "")));
+  const featured = [];
+  const seen = new Set();
+  underway.concat(localPriority).forEach(x => {
+    if (seen.has(x.id)) return;
+    seen.add(x.id);
+    featured.push(x);
+  });
+  featured.slice(0, 6).forEach(x => {
+    const blob = (x.road + " " + (x.near || "")).toLowerCase();
+    const isCommute = /onerahi|pohe|riverside|reyburn/.test(blob);
+    const isUnderway = /construction|underway/.test(blob);
+    out.push({
+      pri: isCommute && isUnderway ? 88 : isUnderway ? 74 : isCommute ? 68 : 52,
+      red: isCommute && isUnderway,
+      route: isCommute,
+      info: false,
+      tag: (isCommute ? "🚗 Onerahi / Commute project" : isUnderway ? "🚧 Construction underway" : "🛣️ Roading project") + " · WDC",
+      what: x.road,
+      s: x.near,
+      full: x.near + " · Tap to view all " + all.length + " WDC roading improvement projects",
+      go: "wdcRoadworksSheet()"
+    });
+  });
+  out.push({
+    pri: 48,
+    red: false,
+    route: false,
+    info: false,
+    tag: "🚧 WDC Roading Improvements · " + all.length + " projects",
+    what: "Whangārei Roading Improvements (" + underway.length + " underway)",
+    s: underway.map(u => u.road).slice(0, 4).join(", ") + (underway.length > 4 ? " + " + (underway.length - 4) + " more" : ""),
+    full: "Tap to view all " + all.length + " Whangārei District Council roading improvement projects",
+    go: "wdcRoadworksSheet()"
+  });
+  return out;
 }
 function rwWhen(w) {
   let dates = '';
@@ -23059,7 +23122,7 @@ function GlAlerts() {
   setTimeout(() => { try { const el = document.getElementById('glalerts'); if (el) el.style.setProperty('--newage', bellNewAge() + 's'); } catch (e) { } }, 0);
   if (!GlAlerts._lastBg || Date.now() - GlAlerts._lastBg > 90e3) {
     GlAlerts._lastBg = Date.now();
-    setTimeout(() => { try { refreshSarah(); refreshKora(false); refreshMb(false); hwRefresh(false); accLoad(false); if (typeof rdcLoad === 'function') rdcLoad(false); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(false); loadWx16(); refreshClosures(false); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 150);
+    setTimeout(() => { try { refreshSarah(); refreshKora(false); refreshMb(false); hwRefresh(false); accLoad(false); if (typeof rdcLoad === 'function') rdcLoad(false); if (typeof outRefresh === 'function') outRefresh(false); if (typeof plnLoad === 'function') plnLoad(false); if (typeof loadAklConcerts === 'function') loadAklConcerts(false); glTrafficLoad(); refreshAlerts(false); loadWx16(); refreshClosures(false); refreshRoadworks(false); refreshEvents(); fuelRefresh(false); } catch (e) { } }, 150);
   }
   const NB = (() => { try { return nbTopHtml(); } catch (e) { return { top: '', fun: '' }; } })();
   const isBoard = alView === 'board';
@@ -29550,7 +29613,7 @@ function rdcItems() {
   });
   return L;
 }
-(() => { const o = glWarnList; glWarnList = function () { const L = o.apply(this, arguments); try { const A = rdcItems(); if (!A.length) return L;
+(() => { const o = glWarnList; glWarnList = function () { const L = o.apply(this, arguments); try { const A = rdcItems().concat(typeof wdcRoadworksWarnItems === "function" ? wdcRoadworksWarnItems() : []); if (!A.length) return L;
   let gone = []; try { gone = gkDis(); } catch (e) { }
   const add = A.filter(x => x.what && glOk(x.what)).map(x => Object.assign(x, { gk: gkKey(`onclick="${x.url}" class="t">${x.tag}|${x.what}|${x.s || ''}</div>`) })).filter(x => !gone.includes(x.gk));
   const rdcUrls = new Set(add.map(x => x.url).filter(Boolean));

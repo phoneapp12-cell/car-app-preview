@@ -16,7 +16,7 @@
 import { decode, text, get } from './events.js';
 
 export const ROADWORKS_URL = 'https://www.wdc.govt.nz/Council/Projects/Roading-improvements';
-const KV_KEY = 'wdc-roadworks-v2';
+const KV_KEY = 'wdc-roadworks-v3';
 const TTL = 3 * 3600 * 1000;
 const MONTHS = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
 let mem = null;
@@ -84,8 +84,11 @@ export function parseRoadworks(html, now = Date.now()) {
     const full = text(tds[0]);
     if (!full) continue;
     const start = text(tds[1]);
-    if (!startWithinNextYear(start, now)) continue;
     const status = text(tds[2]);
+    const isUnderway = /construction|underway|procurement/i.test(status);
+    const isCurrentYearRange = /2026\s*\/\s*2027/i.test(start);
+    const isLocalKey = /onerahi|pohe|riverside|reyburn|whangarei heads|reotahi|kamo|springsflat|central avenue|maunu/i.test(full);
+    if (!isUnderway && !isCurrentYearRange && !isLocalKey && !startWithinNextYear(start, now)) continue;
     let url = ROADWORKS_URL;
     const href = (tds[0].match(/<a\b[^>]*href="([^"]+)"/i) || [])[1] || '';
     if (href) {
