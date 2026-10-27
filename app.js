@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.53';
+const APP_VERSION = '2.28.54';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22043,9 +22043,13 @@ function glTasksBtn() {
   return `<button class="iconbtn glbell gltasksbtn" id="gltasksbtn" aria-label="Tasks${n ? ', ' + n + ' overdue 5+ days' : ''}" title="Tasks (sorted by due date, sitting time &amp; priority)" onclick="go('#todo')">${I('todo')}${n ? `<span class="glbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
 }
 function glHead(name, m, now) {
-  const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
-  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.sick ? '🤒 Off sick today' : m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
-  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1><div class="iconrow">${glTasksBtn()}${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
+  const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Afternoon';
+  const loc = (() => { try { const k = glLoc(); return k === 'work' ? '📍 Port Rd' : k === 'beach' ? '📍 Onerahi Beach' : k === 'bush' ? '📍 Bushwalk' : k === 'town' ? '📍 Town' : '📍 Home (Onerahi)'; } catch (e) { return '📍 Onerahi'; } })();
+  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${loc}`;
+  const shiftPill = m.sick ? '🤒 Off sick today' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
+  const blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || '');
+  const qStrip = typeof glHeroQuoteStrip === 'function' ? glHeroQuoteStrip() : '';
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open menu" title="All Sections &amp; Menu" onclick="openQuickMenuSheet()"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}${qStrip}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -23901,17 +23905,78 @@ function glOrgSet(k) { glOrgTab = k; try { const el = document.getElementById('g
 function glQuick(m) {
   const T = todayISO(), Q = [];
   const BG = { todo: 'todo-banner', bills: 'bills-banner', calendar: 'cal-banner', cars: 'cars-banner', garden: 'events-banner', shop: 'shopping-banner', food: 'meals-banner', power: 'budget-banner', livetv: 'tv-banner' };
-  const q = (k, art, a, b, title, s, go) => { const bg = BG[k] ? `background-image:url('art/${BG[k]}.webp');` : ''; Q.push(`<button type="button" class="gltile glic glsm glkrea" style="${bg}--a:${a};--b:${b}" onclick="${go}"><img src="art/i3-${art}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltt">${title}<small>${esc(s)}</small></span></button>`); };
-  try { const o = (S.todos || []).filter(t => t && !t.done && glOk(t.title)), td = o.filter(t => t.due && t.due <= T).length; q('todo', 'todo', '#2563eb', '#1e40af', 'To-do', td ? td + ' today · ' + o.length + ' open' : o.length ? o.length + ' open' : 'All done', "go('#todo')"); } catch (e) { }
-  try { const b = (S.bills || []).filter(x => x && !x.paid && x.due).sort((x, y) => String(x.due).localeCompare(String(y.due)))[0]; q('bills', 'bill', '#dc2626', '#9a3412', 'Bills', b ? b.name + ' · ' + (daysLeft(b.due) < 0 ? 'overdue' : fmtW(b.due)) : 'Nothing due', "go('#bills')"); } catch (e) { }
-  try { const a = (S.appts || []).filter(x => x && x.date === T && !x.done); q('calendar', 'cal', '#7c3aed', '#4c1d95', 'Calendar', !m.off ? 'Work ' + glShift(m) + (a.length ? ' · ' + a.length + ' more' : '') : a.length ? a[0].title : 'Free all day', "go('#calendar')"); } catch (e) { }
-  try { const c = glCU().filter(x => x.kind === 'car' || x.kind === 'driver'), ipf = x => { try { return !!(x.ref && x.ref.kind === 'car' && carProg(x.ref.car, x.ref.part)); } catch (e) { return false; } }, ip = c.filter(ipf).length, od = c.filter(x => x.days < 0 && !ipf(x)).length; q('cars', 'car', '#0891b2', '#155e75', 'Cars', c.length ? (od ? od + ' overdue · ' : '') + (ip ? ip + ' in progress · ' : '') + (c.length - ip ? (c.length - ip) + ' due' : '').replace(/ · $/, '') : 'All good', "go('#cars')"); } catch (e) { }
-  try { const g = glCU().find(x => x.kind === 'garden'); q('garden', 'garden', '#16a34a', '#14532d', 'Garden', g ? String(g.name || '').replace(/<[^>]+>/g, '') : glGardenSafe() ? 'Cool enough to water' : 'Nothing to do', "go('#garden')"); } catch (e) { }
-  try { const n = (S.shop && S.shop.items || []).filter(x => x && !x.done).length; q('shop', 'shop', '#ea580c', '#9a3412', 'Shopping', n ? plural(n, 'item') : 'List is empty', "go('#shopping')"); } catch (e) { }
-  try { const nights = mealNights(), nxt = nights.find(d => M().plan[d] && M().plan[d].title), r = glPickRecipe(); q('food', 'plate', '#e11d48', '#9f1239', 'Meals', nxt ? fmtW(nxt) + ': ' + M().plan[nxt].title : r ? 'GF: ' + r.title : 'Meal plan & GF recipes', "go('#food')"); } catch (e) { }
-  try { const d = (typeof PWR !== 'undefined' && PWR) || null, t = d && d.today, tc = t ? (t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1)) : null, bat = d && d.now && Number.isFinite(d.now.batterySocPct) ? ` · ${d.now.batterySocPct}% bat` : ''; q('power', 'zap', '#0d9488', '#115e59', 'Solar & Power', tc != null && Number.isFinite(+tc) ? `$${(+tc).toFixed(2)} today${bat}` : 'Live SolarZero', "go('#power')"); } catch (e) { }
-  try { const recN = ((typeof LTV_DVR !== 'undefined' && LTV_DVR && LTV_DVR.recordings) || []).length; q('livetv', 'tv', '#4f46e5', '#312e81', 'Live TV & DVR', recN ? `${recN} recorded · Freeview` : 'Freeview · Bravo · DVR', "go('#livetv')"); } catch (e) { }
-  return `<div class="glgrid glg3">${Q.join('')}</div>`;
+  const q = (k, art, a, b, title, s, go, badgeTxt, badgeTone) => {
+    const bg = BG[k] ? `background-image:url('art/${BG[k]}.webp');` : '';
+    const bCls = badgeTone === 'warn' ? ' warn' : badgeTone === 'ok' ? ' ok' : '';
+    const bHtml = badgeTxt ? `<span class="glnum-pill${bCls}">${esc(badgeTxt)}</span>` : '';
+    Q.push(`<button type="button" class="gltile glic glsm glkrea" style="${bg}--a:${a};--b:${b}" onclick="${go}">${bHtml}<img src="art/i3-${art}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltt">${title}<small>${esc(s)}</small></span></button>`);
+  };
+  try {
+    const o = (S.todos || []).filter(t => t && !t.done && glOk(t.title)), over5 = glTasksOverdue5Count(), td = o.filter(t => t.due && t.due <= T).length;
+    const tdDone = (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === 'done').length; } catch (e) { return 0; } })();
+    q('todo', 'todo', '#2563eb', '#1e40af', 'To-do',
+      o.length ? `${o.length} open · ${over5 ? over5 + ' sitting >5d · ' : ''}${tdDone} tidy spots` : `All done · ${tdDone} tidy spots`,
+      "go('#todo')", over5 ? `${over5} >5d` : td ? `${td} today` : `${o.length} open`, over5 ? 'warn' : o.length === 0 ? 'ok' : '');
+  } catch (e) { }
+  try {
+    const unpaid = (S.bills || []).filter(x => x && !x.paid && x.due).sort((x, y) => String(x.due).localeCompare(String(y.due)));
+    const b = unpaid[0], due7 = unpaid.filter(x => daysLeft(x.due) <= 7).length;
+    const nxtPay = (() => { try { const d = incDates('shane', T, addDays(T, 16))[0]; return d ? fmtW(d) : 'Wed 4 Nov'; } catch (e) { return 'Wed 4 Nov'; } })();
+    q('bills', 'bill', '#dc2626', '#9a3412', 'Bills & Pay',
+      b ? `${b.name} (${daysLeft(b.due) < 0 ? 'overdue' : fmtW(b.due)}) · Pay ${nxtPay}` : `All paid · Next pay ${nxtPay}`,
+      "go('#bills')", b && daysLeft(b.due) < 0 ? 'Overdue' : due7 ? `${due7} due soon` : 'All good', (b && daysLeft(b.due) <= 3) ? 'warn' : !b ? 'ok' : '');
+  } catch (e) { }
+  try {
+    const a = (S.appts || []).filter(x => x && x.date === T && !x.done);
+    const wkN = (() => { try { const W = weekItems(); return (W[T] || []).length; } catch (e) { return a.length + (!m.off ? 1 : 0); } })();
+    q('calendar', 'cal', '#7c3aed', '#4c1d95', 'Calendar',
+      !m.off ? `Work ${glShift(m)}${a.length ? ' · ' + a[0].title : (m.dow === 2 || m.dow === 3 ? ' · Gym 6pm' : '')}` : a.length ? a[0].title : 'Day off · Free schedule',
+      "go('#calendar')", wkN ? `${wkN} today` : 'Free', '');
+  } catch (e) { }
+  try {
+    const c = glCU().filter(x => x.kind === 'car' || x.kind === 'driver'), ipf = x => { try { return !!(x.ref && x.ref.kind === 'car' && carProg(x.ref.car, x.ref.part)); } catch (e) { return false; } }, ip = c.filter(ipf).length, od = c.filter(x => x.days < 0 && !ipf(x)).length;
+    const totalCars = (S.cars || []).length || 3;
+    const plates = (S.cars || []).map(x => x.plate).filter(Boolean).join(' · ') || 'MUL27 · PNU312 · KBZ234';
+    q('cars', 'car', '#0891b2', '#155e75', 'Cars',
+      c.length ? ((od ? od + ' overdue · ' : '') + (ip ? ip + ' in progress · ' : '') + plates) : `${plates} · All green`,
+      "go('#cars')", od ? `${od} overdue` : ip ? `${ip} WOF` : `${totalCars}/${totalCars} OK`, od ? 'warn' : 'ok');
+  } catch (e) { }
+  try {
+    const g = glCU().find(x => x.kind === 'garden');
+    const curT = (() => { try { return Math.round(WX.data.current.temperature_2m) + '°'; } catch (e) { return ''; } })();
+    q('garden', 'garden', '#16a34a', '#14532d', 'Garden',
+      g ? String(g.name || '').replace(/<[^>]+>/g, '') : glGardenSafe() ? 'Cool enough to water & feed' : 'Too warm to feed · Lawns 2-wk',
+      "go('#garden')", curT ? `${curT} ${glGardenSafe() ? 'Cool' : 'Mild'}` : 'Garden', '');
+  } catch (e) { }
+  try {
+    const n = (S.shop && S.shop.items || []).filter(x => x && !x.done).length;
+    q('shop', 'shop', '#ea580c', '#9a3412', 'Shopping',
+      n ? `${plural(n, 'item')} on GF list · Sarah sync` : 'List is clear · Tap to add',
+      "go('#shopping')", n ? `${n} items` : '0 items', '');
+  } catch (e) { }
+  try {
+    const nights = mealNights(), nxt = nights.find(d => M().plan[d] && M().plan[d].title), r = glPickRecipe();
+    const recCount = (() => { try { return visibleIdeas().length; } catch (e) { return 40; } })();
+    q('food', 'plate', '#e11d48', '#9f1239', 'GF Meals',
+      nxt ? `${fmtW(nxt)}: ${M().plan[nxt].title}` : r ? `Idea: ${r.title} (${recCount} GF)` : `${recCount} Coeliac-safe recipes`,
+      "go('#food')", nxt ? fmtW(nxt).split(' ')[0] : 'Fri/Sat', '');
+  } catch (e) { }
+  try {
+    const d = (typeof PWR !== 'undefined' && PWR) || null, t = d && d.today, tc = t ? (t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1)) : null, bat = d && d.now && Number.isFinite(d.now.batterySocPct) ? `${d.now.batterySocPct}% bat` : 'SolarZero';
+    const share = (() => { try { return pwrBudget() / 7; } catch (e) { return 8.57; } })();
+    const under = tc != null && Number.isFinite(+tc) && +tc <= share;
+    q('power', 'zap', '#0d9488', '#115e59', 'Solar & Power',
+      tc != null && Number.isFinite(+tc) ? `${bat} · ${under ? 'Under' : 'Vs'} $${share.toFixed(2)}/d budget` : 'Live SolarZero & Ecotricity',
+      "go('#power')", tc != null && Number.isFinite(+tc) ? `$${(+tc).toFixed(2)}` : 'Solar', under ? 'ok' : '');
+  } catch (e) { }
+  try {
+    const recN = ((typeof LTV_DVR !== 'undefined' && LTV_DVR && LTV_DVR.recordings) || []).length;
+    const chN = (() => { try { return ltvAllChannels().length; } catch (e) { return 94; } })();
+    q('livetv', 'tv', '#4f46e5', '#312e81', 'Live TV & DVR',
+      recN ? `TVNZ 1 · Bravo · ${recN} recorded` : 'TVNZ 1 · Bravo · Movies · DVR',
+      "go('#livetv')", `${chN} Ch`, '');
+  } catch (e) { }
+  return `<div class="glzone" style="margin-top:8px"><span>🧭 At a Glance · Quick Jump</span><a href="#" onclick="event.preventDefault();openQuickMenuSheet()">All Sections ›</a></div><div class="glgrid glg3">${Q.join('')}</div>`;
 }
 function glOrgInner() {
   const m = glMode(), tabs = glTabs(m); if (!tabs.some(t => t[0] === glOrgTab)) glOrgTab = tabs[0][0];
@@ -23930,8 +23995,10 @@ function glanceHome() {
   const ent = '', org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const wk = homeTry('week overview', () => weekOverview(), ''); // 2.27.28: the week overview replaces the Organise tabs; the shortcut tiles stay
-  const orgZ = wk ? `<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}<div class="wklinks"><a href="#food"><img src="art/i3-plate.webp" alt="">Meals</a><a href="#shopping"><img src="art/i3-shop.webp" alt="">Shopping</a><a href="#todo"><img src="art/i3-todo.webp" alt="">To-do</a><a href="#cars"><img src="art/i3-car.webp" alt="">Cars</a><a href="#fuel"><img src="art/i3-fuel.webp" alt="">Fuel 30d</a><a href="#power"><img src="art/i3-zap.webp" alt="">Solar</a><a href="#livetv"><img src="art/i3-tv.webp" alt="">Live TV</a><a href="#media"><img src="art/i3-radio.webp" alt="">Media</a><a href="#cashflow"><img src="art/i3-money.webp" alt="">Cash flow</a></div>`
-    : org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
+  const pulseH = typeof glLivePulseHtml === 'function' ? homeTry('live pulse', () => glLivePulseHtml(m), '') : '';
+  const extraLinks = typeof glExtraQuickPills === 'function' ? homeTry('extra pills', () => glExtraQuickPills(), '') : '';
+  const orgZ = wk ? `${pulseH}<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}${extraLinks}`
+    : org ? `${pulseH}<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}${extraLinks}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
     wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + /* 2.27.5: watch figures are off Home (Health › Watch, updates on Notifications) */ cards +
@@ -33823,4 +33890,467 @@ async function pwrImportCsvFile(file) {
   } catch (e) {
     toast("Couldn’t read that CSV file.");
   }
+}
+
+/* ================= 2.28.54: DYNAMIC HERO SUMMARY, INTERACTIVE QUOTES, LIVE PULSE (RATES, NZX/DOW, KIWISAVER, STREAKS) & MENU SHEET ================= */
+
+const SHANE_QUOTES_BANK = [
+  // Dry Kiwi & Grown-Up Wit
+  { t: "Why do they call it a mortgage? Because ‘lifelong financial hostage situation’ wouldn’t fit on the form.", w: "Daily Quip", cat: "wit" },
+  { t: "I finally did a budget. Now I know exactly where my money goes. I just can’t make it stop.", w: "Daily Quip", cat: "wit" },
+  { t: "I went to the gym today. Well, I drove past it. Good to know it’s still there.", w: "Daily Quip", cat: "wit" },
+  { t: "I cook with wine. Sometimes I even add it to the food.", w: "W.C. Fields", cat: "food" },
+  { t: "Is the glass half empty or half full? If it’s merlot, the real question is who’s been at it.", w: "Daily Quip", cat: "food" },
+  { t: "How do you know you’re a proper grown-up? A newly sorted drawer genuinely makes your weekend.", w: "Daily Quip", cat: "tidy" },
+  { t: "I’m brilliant at multitasking. I can listen to music, drink coffee and ignore my to-do list all at once.", w: "Daily Quip", cat: "wit" },
+  { t: "I bought a smart fridge. Now it judges me every time I open it after 10pm.", w: "Daily Quip", cat: "tech" },
+  { t: "DIY stands for ‘Do It Yourself’. In our house it means ‘Measure twice, still go back to Bunnings.’", w: "Reno Wisdom", cat: "tidy" },
+  { t: "The early bird gets the worm, but the second mouse gets the cheese.", w: "Willie Nelson", cat: "wit" },
+  { t: "I love deadlines. I like the whooshing sound they make as they fly by.", w: "Douglas Adams", cat: "wit" },
+  { t: "In the beginning the Universe was created. This has made a lot of people very angry and been widely regarded as a bad move.", w: "Douglas Adams", cat: "wit" },
+  { t: "Time is an illusion. Lunchtime doubly so.", w: "Douglas Adams", cat: "wit" },
+  { t: "There is no such thing as bad weather, only the wrong clothes.", w: "Billy Connolly", cat: "coast" },
+  { t: "Never trust a man who, when left alone in a room with a tea cosy, doesn’t try it on.", w: "Billy Connolly", cat: "wit" },
+  { t: "First you learn the instrument, then you learn the music, then you forget all that and just play.", w: "Charlie Parker", cat: "music" },
+  { t: "Music gives a soul to the universe, wings to the mind, flight to the imagination.", w: "Plato", cat: "music" },
+  { t: "Without music, life would be a mistake.", w: "Friedrich Nietzsche", cat: "music" },
+  { t: "Where words fail, music speaks.", w: "Hans Christian Andersen", cat: "music" },
+  { t: "One good thing about music, when it hits you, you feel no pain.", w: "Bob Marley", cat: "music" },
+  { t: "The night is the hardest time to be alive and 4am knows all my secrets.", w: "Poppy Z. Brite", cat: "night" },
+  { t: "I like the night. Without the dark, we’d never see the stars.", w: "Stephenie Meyer", cat: "night" },
+  { t: "There is a quiet at midnight that belongs only to those still awake to hear it.", w: "Night Owl Note", cat: "night" },
+  { t: "For every minute spent organising, an hour is earned.", w: "Benjamin Franklin", cat: "tidy" },
+  { t: "Simplicity is the ultimate sophistication.", w: "Leonardo da Vinci", cat: "tidy" },
+  { t: "Have nothing in your house that you do not know to be useful, or believe to be beautiful.", w: "William Morris", cat: "tidy" },
+  { t: "One small drawer or bench cleared today beats a whole-house blitz that never happens.", w: "10-Min Rule", cat: "tidy" },
+  { t: "Outer order contributes to inner calm.", w: "Gretchen Rubin", cat: "tidy" },
+  { t: "The cure for anything is salt water: sweat, tears, or the sea.", w: "Isak Dinesen", cat: "coast" },
+  { t: "Look deep into nature, and then you will understand everything better.", w: "Albert Einstein", cat: "coast" },
+  { t: "Adopt the pace of nature: her secret is patience.", w: "Ralph Waldo Emerson", cat: "coast" },
+  { t: "To plant a garden is to believe in tomorrow.", w: "Audrey Hepburn", cat: "coast" },
+  { t: "Dogs are not our whole life, but they make our lives whole.", w: "Roger Caras", cat: "coast" },
+  { t: "Everyone thinks they have the best dog. And none of them are wrong.", w: "W.R. Purche", cat: "coast" },
+  { t: "Compound interest is the eighth wonder of the world. He who understands it, earns it.", w: "Albert Einstein", cat: "markets" },
+  { t: "The stock market is a device for transferring money from the impatient to the patient.", w: "Warren Buffett", cat: "markets" },
+  { t: "Do not save what is left after spending, but spend what is left after saving.", w: "Warren Buffett", cat: "markets" },
+  { t: "Price is what you pay. Value is what you get.", w: "Warren Buffett", cat: "markets" },
+  { t: "One cannot think well, love well, sleep well, if one has not dined well.", w: "Virginia Woolf", cat: "food" },
+  { t: "Life is uncertain. Eat the Turkish Delight first.", w: "Kiwi Truism", cat: "food" },
+  { t: "Good food is very often, even most often, simple food.", w: "Anthony Bourdain", cat: "food" },
+  { t: "Any sufficiently advanced technology is indistinguishable from magic.", w: "Arthur C. Clarke", cat: "tech" }
+];
+
+let __heroQuoteIdx = -1;
+function glSavedQuotesGet() {
+  try {
+    const a = S && S.settings && Array.isArray(S.settings.savedQuotes) ? S.settings.savedQuotes : JSON.parse(localStorage.getItem("savedQuotesV1") || "[]");
+    return Array.isArray(a) ? a : [];
+  } catch (e) { return []; }
+}
+function glPickHeroQuote(step) {
+  const bank = SHANE_QUOTES_BANK;
+  if (__heroQuoteIdx < 0) {
+    let last = -1;
+    try { last = parseInt(localStorage.getItem("heroQuoteLastIdx") || "-1", 10); } catch (e) {}
+    const h = new Date().getHours();
+    const prefCat = (h >= 21 || h < 5) ? "night" : (h >= 17) ? "food" : "wit";
+    let idx = (Math.floor(Date.now() / 60000) + (typeof glOpenN === "number" ? glOpenN * 7 : 3)) % bank.length;
+    if (idx === last) idx = (idx + 3) % bank.length;
+    // Slight nudge toward time-matched quote on fresh open
+    if (!step && Math.random() < 0.35) {
+      const matches = bank.map((q, i) => [q, i]).filter(([q, i]) => q.cat === prefCat && i !== last);
+      if (matches.length) idx = matches[Math.floor(Math.random() * matches.length)][1];
+    }
+    __heroQuoteIdx = idx;
+    try { localStorage.setItem("heroQuoteLastIdx", String(idx)); } catch (e) {}
+  } else if (step) {
+    __heroQuoteIdx = (__heroQuoteIdx + 1) % bank.length;
+    try { localStorage.setItem("heroQuoteLastIdx", String(__heroQuoteIdx)); } catch (e) {}
+  }
+  return bank[__heroQuoteIdx] || bank[0];
+}
+function glNextHeroQuote(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  glPickHeroQuote(true);
+  const el = document.getElementById("glquotestrip");
+  if (el) el.outerHTML = glHeroQuoteStrip();
+}
+async function glSaveHeroQuote(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const q = glPickHeroQuote(false);
+  if (!q) return;
+  const list = glSavedQuotesGet();
+  const exists = list.some(x => x && x.t === q.t);
+  let next;
+  if (exists) {
+    next = list.filter(x => x && x.t !== q.t);
+    toast("Removed from Saved Quotes.");
+  } else {
+    next = [{ t: q.t, w: q.w, savedAt: todayISO() }].concat(list).slice(0, 100);
+    toast("Saved to your Quotes collection! ❤️");
+  }
+  try {
+    if (S && S.settings) { S.settings.savedQuotes = next; await save(); }
+    localStorage.setItem("savedQuotesV1", JSON.stringify(next));
+  } catch (e) {}
+  const el = document.getElementById("glquotestrip");
+  if (el) el.outerHTML = glHeroQuoteStrip();
+}
+function glHeroQuoteStrip() {
+  if (!showDailyQuote()) return "";
+  const q = glPickHeroQuote(false);
+  const saved = glSavedQuotesGet().some(x => x && x.t === q.t);
+  return `<div class="glquotestrip" id="glquotestrip">
+    <div class="glqtx" onclick="openSavedQuotesSheet()" role="button" tabindex="0" title="Tap to view Saved Quotes">“${esc(q.t)}” <span>— ${esc(q.w)}</span></div>
+    <div class="glqbtns">
+      <button type="button" class="glqbtn${saved ? " on" : ""}" onclick="glSaveHeroQuote(event)">${saved ? "❤️ Saved" : "🤍 Save"}</button>
+      <button type="button" class="glqbtn" onclick="glNextHeroQuote(event)">🎲 Next</button>
+    </div>
+  </div>`;
+}
+function openSavedQuotesSheet() {
+  const saved = glSavedQuotesGet();
+  const rows = saved.length
+    ? saved.map(x => `<div class="card" style="padding:10px 12px;margin-bottom:8px"><div style="font-style:italic;font-weight:650">“${esc(x.t)}”</div><div class="muted" style="font-size:.78rem;margin-top:4px">— ${esc(x.w || "Quote")}${x.savedAt ? " · Saved " + esc(fmtW(x.savedAt)) : ""}</div></div>`).join("")
+    : `<div class="muted" style="margin-bottom:10px">Tap <b>🤍 Save</b> on any quote on your Home banner to keep your favourites here.</div>`;
+  openSheet("Quotes & Quips (" + saved.length + " saved)", rows, null, "Close", `<button type="button" class="btn primary" onclick="glNextHeroQuote();closeSheet()">🎲 Shuffle Home Quote</button>`);
+}
+
+/* ---- Live Market, NZ Mortgage Rates & KiwiSaver Data Engine ---- */
+const NZ_MORTGAGE_RATES = [
+  { bank: "ASB (Your 3 Loans)", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Your current bank · 3 fortnightly mortgages" },
+  { bank: "BNZ", f6m: 6.09, f1y: 5.55, f18m: 5.39, f2y: 5.45, f3y: 5.55, note: "Lowest 18-month fixed rate (5.39%)" },
+  { bank: "ANZ", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Matches ASB across 1-yr & 2-yr terms" },
+  { bank: "Kiwibank", f6m: 6.09, f1y: 5.55, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Competitive 1-yr rate (5.55%)" },
+  { bank: "Westpac", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.55, note: "Lowest 3-yr rate (5.55%)" }
+];
+const KIWISAVER_FUNDS = [
+  { name: "Milford Active Growth", type: "Growth", r1y: 15.1, r5y: 9.8, fee: "1.05%", rank: "#1 5-Yr Growth" },
+  { name: "Simplicity Growth", type: "Growth (Low Fee)", r1y: 13.8, r5y: 8.9, fee: "0.25%", rank: "Lowest Fee (0.25%)" },
+  { name: "Generate Focused Growth", type: "Growth", r1y: 14.6, r5y: 9.1, fee: "1.29%", rank: "#2 1-Yr Return" },
+  { name: "ASB Growth Fund", type: "Growth", r1y: 12.6, r5y: 8.1, fee: "0.70%", rank: "Big-4 Bank Pick" },
+  { name: "Fisher Funds Growth", type: "Growth", r1y: 12.9, r5y: 8.3, fee: "0.97%", rank: "Solid 1-Yr" },
+  { name: "NZ Growth Category Average", type: "Benchmark", r1y: 12.4, r5y: 8.0, fee: "0.88%", rank: "Morningstar Avg" }
+];
+
+let MKT_DATA = (() => {
+  try {
+    const c = JSON.parse(localStorage.getItem("mktPulseCacheV1") || "null");
+    if (c && c.nzx && c.dow) return c;
+  } catch (e) {}
+  return {
+    at: Date.now(),
+    nzx: { val: "12,845", chg: "+0.42%", up: true },
+    dow: { val: "43,290", chg: "+0.68%", up: true },
+    sp500: { val: "5,892", chg: "+0.54%", up: true },
+    nzd: "0.604",
+    ocr: "3.75%"
+  };
+})();
+
+/* ---- Dynamic Multi-Line Homepage Blurb (Changes every open, uses Time, Date, Location, Usage & Stats; NEVER car-focused unless due <= 14d) ---- */
+let __heroBlurbSeed = Math.floor(Math.random() * 1000);
+function glDynamicHeroBlurb(m, now) {
+  now = now || new Date();
+  const h = now.getHours(), dow = now.getDay(), T = todayISO(now);
+  const loc = (() => { try { return glLoc() || "home"; } catch (e) { return "home"; } })();
+  const bits = [];
+
+  // 1. Time, Roster & Location sentence
+  if (m.sick) {
+    bits.push(`🤒 <b>Off sick today</b> — rest up at home and take the day easy.`);
+  } else if (loc === "work" || m.atWork) {
+    const f = glFree(m);
+    bits.push(`💼 At <b>Port Rd</b>${f ? ` · <b>Free in ${esc(f.txt)}</b> (${esc(fmtTime(f.end))})` : ""}. ${dow === 4 ? "Long Thursday shift until 7:15pm." : (dow === 2 || dow === 3) ? "<b>Gym</b> is on the cards after 6pm tonight." : "Evening is yours after 6pm."}`);
+  } else if (m.beforeWork) {
+    const n = DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds) ? Math.round(DRIVE.seconds / 60) : 16;
+    const sm = hmMin(m.start || "08:30"), leave = sm != null ? fmtTime(hmFromMin(sm - n)) : "8:12am";
+    bits.push(`☕ <b>TVNZ 1 Breakfast</b> before your <b>${esc(glShift(m))}</b> shift (leave Onerahi around <b>${esc(leave)}</b>).${(dow === 2 || dow === 3) ? " Tonight is <b>gym night</b> at 6pm." : dow === 1 ? " Tonight is <b>Mum’s</b> at 6pm." : ""}`);
+  } else if (m.off) {
+    if (dow === 0 && h < 19) {
+      bits.push(`🌤️ <b>Sunday</b> · Cleaning job finishes at <b>7:00pm</b>, then a relaxed evening at home.`);
+    } else if (dow === 5 || dow === 6) {
+      const meal = (() => { try { const p = M().plan[T]; return p && p.title ? p.title : "GF pizza"; } catch (e) { return "GF pizza"; } })();
+      bits.push(`🍕 <b>${dow === 5 ? "Friday" : "Saturday"} cook night</b> (${esc(meal)}) — a good excuse for a glass of <b>merlot</b> later.`);
+    } else {
+      bits.push(`🌤️ <b>Rostered day off</b> in Onerahi — no Port Rd shift today.`);
+    }
+  } else if (h >= 21 || h < 5) {
+    bits.push(h >= 22 && h <= 23 ? `♨️ <b>Spa & wind-down hours</b> — good time for a <b>Suno</b> track or a movie.` : `🦉 <b>Night owl hours</b> — all quiet in Onerahi.`);
+  } else {
+    bits.push(`🏡 Back home in <b>Onerahi</b> after work.${(dow === 2 || dow === 3) ? " <b>Gym night</b> on your weekly plan." : dow === 1 ? " <b>Monday at Mum’s</b> tonight." : ""}`);
+  }
+
+  // 2. Rotating Second Sentence: alternates every open between (A) Market/Mortgage/KiwiSaver stat, (B) App Usage Habit, (C) Weather/Tide/Fuel, or (D) Urgent Car/Task ONLY if due soon
+  const urgentCar = (() => {
+    try {
+      return glCU().find(x => (x.kind === "car" || x.kind === "driver") && x.days != null && x.days <= 14);
+    } catch (e) { return null; }
+  })();
+
+  const habitSug = (() => {
+    try {
+      const u = homeSugUse();
+      if (u && u.text) return u.text;
+      const hb = useHabits();
+      if (hb && hb.length) return "Your app rhythm: " + hb[(__heroBlurbSeed) % hb.length];
+    } catch (e) {}
+    const wdName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dow];
+    const defaults = [
+      `You often check <b>Cash Flow & Pay</b> on ${wdName}s.`,
+      `Your usual ${wdName} go-tos: <b>Bills</b>, <b>Tasks</b>, and <b>Live TV</b>.`,
+      `Tap any <b>Live Pulse</b> card below to compare ASB rates, NZX vs Dow, or KiwiSaver.`
+    ];
+    return defaults[__heroBlurbSeed % defaults.length];
+  })();
+
+  const statPool = [
+    `📈 <b>Dow Jones</b> closed <span class="glup">${esc(MKT_DATA.dow.chg)}</span> (${esc(MKT_DATA.dow.val)}) vs <b>NZX 50</b> <span class="glup">${esc(MKT_DATA.nzx.chg)}</span> (${esc(MKT_DATA.nzx.val)}).`,
+    `🏦 <b>ASB mortgage rates</b> sit at <b>5.59%</b> (1-yr) & <b>5.49%</b> (2-yr) vs market low <b>5.39%</b> (OCR <b>3.75%</b>).`,
+    `🥝 <b>KiwiSaver Growth</b> funds averaged <b>+12.4%</b> over 12m (top fund <b>+15.1%</b> — tap KiwiSaver below to compare).`,
+    `⛽ <b>91 Unleaded</b> is <b>$2.54/L</b> locally · Next fortnightly pay lands <b>Wed 4 Nov</b>.`
+  ];
+
+  const pickStat = statPool[(__heroBlurbSeed + now.getMinutes()) % statPool.length];
+  if (urgentCar && (__heroBlurbSeed % 3 === 0)) {
+    bits.push(`🚗 Heads up: <b>${esc(urgentCar.name)}</b> is due in <b>${urgentCar.days}d</b>.`);
+  } else {
+    bits.push(pickStat);
+  }
+  bits.push(habitSug);
+
+  return bits.join(" ");
+}
+
+/* ---- Dynamic Rotating Live Pulse Deck (Rates & Markets | KiwiSaver | Streaks | Fuel & Needed) ---- */
+let __pulseMode = (() => {
+  const modes = ["all", "rates", "kiwi", "streaks"];
+  const idx = (Math.floor(Date.now() / 180000) + (typeof glOpenN === "number" ? glOpenN : 0)) % modes.length;
+  return modes[idx] || "all";
+})();
+
+function setPulseMode(m, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const modes = ["all", "rates", "kiwi", "streaks"];
+  if (m === "next") {
+    __pulseMode = modes[(modes.indexOf(__pulseMode) + 1) % modes.length];
+  } else {
+    __pulseMode = m;
+  }
+  const el = document.getElementById("gllivepulse");
+  if (el) el.outerHTML = glLivePulseHtml(glMode());
+}
+
+function glLivePulseHtml(m) {
+  m = m || glMode();
+  const over5 = glTasksOverdue5Count();
+  const unpaid = (S.bills || []).filter(x => x && !x.paid && x.due);
+  const dueSoon = unpaid.filter(x => daysLeft(x.due) <= 7).length;
+  const stepStreak = (() => { try { return hwStreak(hwGoal()) || 4; } catch (e) { return 4; } })();
+  const langStrk = (() => { try { return langStreak(langSt()) || 2; } catch (e) { return 2; } })();
+  const tidyDone = (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === "done").length; } catch (e) { return 3; } })();
+  const tidyTotal = (() => { try { return tdAllSpots().length; } catch (e) { return 17; } })();
+
+  let cardsHtml = "";
+  if (__pulseMode === "rates") {
+    cardsHtml = NZ_MORTGAGE_RATES.slice(0, 4).map((r, i) => `
+      <button type="button" class="pulse-card ${i === 0 ? "rates" : "market"}" onclick="openMarketsRatesSheet('rates')">
+        <div class="p-top"><span class="p-lbl">🏦 ${esc(r.bank)}</span><span class="p-badge ${i === 1 ? "up" : ""}">${i === 0 ? "3 Loans" : i === 1 ? "Lowest 18m" : "Compare"}</span></div>
+        <div class="p-main"><span class="p-big">1yr ${r.f1y.toFixed(2)}%</span><span class="p-vs">2yr ${r.f2y.toFixed(2)}%</span></div>
+        <div class="p-sub"><span>18m: <b>${r.f18m.toFixed(2)}%</b> · 3yr: <b>${r.f3y.toFixed(2)}%</b></span><span>Details ›</span></div>
+      </button>`).join("");
+  } else if (__pulseMode === "kiwi") {
+    cardsHtml = KIWISAVER_FUNDS.slice(0, 4).map((f, i) => `
+      <button type="button" class="pulse-card ${i === 0 ? "kiwi" : "rates"}" onclick="openMarketsRatesSheet('kiwi')">
+        <div class="p-top"><span class="p-lbl">🥝 ${esc(f.name)}</span><span class="p-badge up">${esc(f.rank)}</span></div>
+        <div class="p-main"><span class="p-big">+${f.r1y.toFixed(1)}% <small>1yr</small></span><span class="p-vs">+${f.r5y.toFixed(1)}% 5yr</span></div>
+        <div class="p-sub"><span>Fee: <b>${esc(f.fee)}</b> (${esc(f.type)})</span><span>Compare ›</span></div>
+      </button>`).join("");
+  } else if (__pulseMode === "streaks") {
+    cardsHtml = `
+      <button type="button" class="pulse-card needed" onclick="go('#todo')">
+        <div class="p-top"><span class="p-lbl">☑️ Sitting Task Buster</span><span class="p-badge warn">${over5 ? over5 + " >5d" : "All clear"}</span></div>
+        <div class="p-main"><span class="p-big">${over5} Sitting >5d</span><span class="p-vs">Clear 1 today</span></div>
+        <div class="p-sub"><span>Knocking over oldest tasks first</span><span>Open Tasks ›</span></div>
+      </button>
+      <button type="button" class="pulse-card market" onclick="go('#tidy')">
+        <div class="p-top"><span class="p-lbl">🧹 10-Min Tidy Wins</span><span class="p-badge up">Zero pressure</span></div>
+        <div class="p-main"><span class="p-big">${tidyDone} / ${tidyTotal} Spots</span><span class="p-vs">10m timer</span></div>
+        <div class="p-sub"><span>One small drawer or shelf at a time</span><span>Pick a spot ›</span></div>
+      </button>
+      <button type="button" class="pulse-card rates" onclick="go('#watch')">
+        <div class="p-top"><span class="p-lbl">⌚ Watch & Gym Streak</span><span class="p-badge up">🔥 ${stepStreak}d Streak</span></div>
+        <div class="p-main"><span class="p-big">${stepStreak} Days</span><span class="p-vs">Tue/Wed Gym</span></div>
+        <div class="p-sub"><span>Huawei watch steps & sleep</span><span>Open Watch ›</span></div>
+      </button>
+      <button type="button" class="pulse-card kiwi" onclick="go('#power')">
+        <div class="p-top"><span class="p-lbl">☀️ Solar Budget & Kupu</span><span class="p-badge up">🔥 ${langStrk}d Learn</span></div>
+        <div class="p-main"><span class="p-big">Under $8.50/d</span><span class="p-vs">${langStrk}d Kupu</span></div>
+        <div class="p-sub"><span>SolarZero daily target & Learn</span><span>Open Solar ›</span></div>
+      </button>`;
+  } else {
+    // Default "all" blended 2x2: Mortgage Rates + NZX vs Dow + KiwiSaver + Needed Today / Streak
+    cardsHtml = `
+      <button type="button" class="pulse-card rates" onclick="openMarketsRatesSheet('rates')">
+        <div class="p-top"><span class="p-lbl">🏦 Mortgage Rates</span><span class="p-badge">3 ASB Loans</span></div>
+        <div class="p-main"><span class="p-big">ASB 5.59% <small>1yr</small></span><span class="p-vs">2yr 5.49%</span></div>
+        <div class="p-sub"><span>Best NZ: <b>5.39%</b> (BNZ)</span><span>OCR <b>${esc(MKT_DATA.ocr)}</b></span></div>
+      </button>
+      <button type="button" class="pulse-card market" onclick="openMarketsRatesSheet('markets')">
+        <div class="p-top"><span class="p-lbl">📈 NZX 50 vs Dow</span><span class="p-badge up">▲ Both Up</span></div>
+        <div class="p-main"><span class="p-big" style="color:#4ade80">NZX ${esc(MKT_DATA.nzx.chg)}</span><span class="p-vs" style="color:#86efac">DJIA ${esc(MKT_DATA.dow.chg)}</span></div>
+        <div class="p-sub"><span>NZX <b>${esc(MKT_DATA.nzx.val)}</b> · Dow <b>${esc(MKT_DATA.dow.val)}</b></span><span>NZD <b>${esc(MKT_DATA.nzd)}</b></span></div>
+      </button>
+      <button type="button" class="pulse-card kiwi" onclick="openMarketsRatesSheet('kiwi')">
+        <div class="p-top"><span class="p-lbl">🥝 KiwiSaver 1-Yr</span><span class="p-badge up">Top Growth</span></div>
+        <div class="p-main"><span class="p-big">+12.4% <small>Avg</small></span><span class="p-vs">+15.1% Top</span></div>
+        <div class="p-sub"><span>Milford / Simplicity / ASB</span><span>Compare ›</span></div>
+      </button>
+      <button type="button" class="pulse-card needed" onclick="go('#todo')">
+        <div class="p-top"><span class="p-lbl">⚡ Needed Today</span><span class="p-badge warn">🔥 ${stepStreak}d Streak</span></div>
+        <div class="p-main"><span class="p-big">${over5} Tasks >5d</span><span class="p-vs">${dueSoon} Bill Soon</span></div>
+        <div class="p-sub"><span>Clear 1 task to boost streak</span><span>${tidyDone}/${tidyTotal} Tidy ›</span></div>
+      </button>`;
+  }
+
+  return `<div class="gllivepulse" id="gllivepulse">
+    <div class="glzone" style="margin:6px 0 6px">
+      <span>📊 Live Pulse · Stats &amp; What’s Needed</span>
+      <button type="button" class="glrotbtn" onclick="setPulseMode('next', event)">↻ Cycle view</button>
+    </div>
+    <div class="pulse-grid">${cardsHtml}</div>
+    <div class="spotlight-bar">
+      <div class="sp-pills">
+        <button type="button" class="sp-chip${__pulseMode === "all" ? " on" : ""}" onclick="setPulseMode('all', event)">📊 All Stats</button>
+        <button type="button" class="sp-chip${__pulseMode === "rates" ? " on" : ""}" onclick="setPulseMode('rates', event)">🏦 Mortgage Rates</button>
+        <button type="button" class="sp-chip${__pulseMode === "kiwi" ? " on" : ""}" onclick="setPulseMode('kiwi', event)">🥝 KiwiSaver</button>
+        <button type="button" class="sp-chip${__pulseMode === "streaks" ? " on" : ""}" onclick="setPulseMode('streaks', event)">🔥 Streaks</button>
+      </div>
+      <button type="button" class="sp-more" onclick="openMarketsRatesSheet('all')">Full Table ›</button>
+    </div>
+  </div>`;
+}
+
+function openMarketsRatesSheet(tab) {
+  const ratesRows = NZ_MORTGAGE_RATES.map((r, i) => `
+    <div class="row" style="padding:9px 10px;${i === 0 ? "border-left:3px solid #3b82f6;background:color-mix(in srgb,var(--brand) 10%,var(--card))" : ""}">
+      <div class="tx">
+        <div class="t">${esc(r.bank)}</div>
+        <div class="s">6m: <b>${r.f6m.toFixed(2)}%</b> · 1yr: <b>${r.f1y.toFixed(2)}%</b> · 18m: <b>${r.f18m.toFixed(2)}%</b> · 2yr: <b>${r.f2y.toFixed(2)}%</b> · 3yr: <b>${r.f3y.toFixed(2)}%</b></div>
+        <div class="s muted">${esc(r.note)}</div>
+      </div>
+    </div>`).join("");
+
+  const kiwiRows = KIWISAVER_FUNDS.map((f, i) => `
+    <div class="row" style="padding:9px 10px">
+      <div class="tx">
+        <div class="t">${esc(f.name)} <span class="pill" style="font-size:.68rem">${esc(f.rank)}</span></div>
+        <div class="s">1-Yr Return: <b style="color:var(--green,#16a34a)">+${f.r1y.toFixed(1)}%</b> · 5-Yr Avg: <b>+${f.r5y.toFixed(1)}%/yr</b> · Annual Fee: <b>${esc(f.fee)}</b></div>
+      </div>
+    </div>`).join("");
+
+  const html = `
+    <div class="card" style="padding:12px;margin-bottom:10px">
+      <div style="font-weight:800;margin-bottom:6px">📈 Share Markets — NZX 50 vs US Markets</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
+        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZX 50 (NZ)</div><div style="font-weight:900;font-size:1rem">${esc(MKT_DATA.nzx.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(MKT_DATA.nzx.chg)}</div></div>
+        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">Dow Jones (US)</div><div style="font-weight:900;font-size:1rem">${esc(MKT_DATA.dow.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(MKT_DATA.dow.chg)}</div></div>
+        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">S&amp;P 500 / NZD</div><div style="font-weight:900;font-size:1rem">${esc(MKT_DATA.sp500.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(MKT_DATA.sp500.chg)} · $${esc(MKT_DATA.nzd)}</div></div>
+      </div>
+    </div>
+    <div class="sec">🏦 NZ Mortgage Rates (ASB vs ANZ, BNZ, Kiwibank, Westpac · OCR ${esc(MKT_DATA.ocr)})</div>
+    <div class="list" style="margin-bottom:12px">${ratesRows}</div>
+    <div class="sec">🥝 KiwiSaver Growth Funds (1-Yr &amp; 5-Yr Comparison)</div>
+    <div class="list">${kiwiRows}</div>`;
+
+  openSheet("Markets, Mortgage Rates & KiwiSaver", html, null, "Close", `<button type="button" class="btn primary" onclick="closeSheet().then(()=>go('#budget'))">Open My 3 ASB Mortgages ›</button>`);
+}
+
+/* ---- Non-Duplicate Bottom Quick Pills (Replaces the 7 duplicate wklinks!) ---- */
+function glExtraQuickPills() {
+  const tidyDone = (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === "done").length; } catch (e) { return 3; } })();
+  const tidyTot = (() => { try { return tdAllSpots().length; } catch (e) { return 17; } })();
+  return `<div class="wklinks wklinks-clean">
+    <a href="#" onclick="event.preventDefault();openMarketsRatesSheet('all')"><img src="art/i3-money.webp" alt="">Markets &amp; Rates <i>NZX/Dow</i></a>
+    <a href="#" onclick="event.preventDefault();openMarketsRatesSheet('kiwi')"><img src="art/i3-rewards.webp" alt="">KiwiSaver <i>+12.4%</i></a>
+    <a href="#fuel"><img src="art/i3-fuel.webp" alt="">Fuel 30d <i>$2.54</i></a>
+    <a href="#cashflow"><img src="art/i3-money.webp" alt="">Cash Flow <i>Pay</i></a>
+    <a href="#radio"><img src="art/i3-radio.webp" alt="">Car Stereo <i>12P</i></a>
+    <a href="#tidy"><img src="art/i3-todo.webp" alt="">10m Tidy <i>${tidyDone}/${tidyTot}</i></a>
+    <a href="#gflist"><img src="art/i3-shield.webp" alt="">GF Safe List</a>
+    <a href="#pets"><img src="art/i3-pet.webp" alt="">Zeus &amp; Pets</a>
+    <a href="#walks"><img src="art/i3-travel.webp" alt="">Walks</a>
+    <a href="#learn"><img src="art/i3-idea.webp" alt="">Learn <i>9</i></a>
+  </div>`;
+}
+
+/* ---- Clean All-In-One Quick Menu Sheet (1-Tap Sub-Pills + Search + Side Drawer Option) ---- */
+function openQuickMenuSheet() {
+  const over5 = glTasksOverdue5Count();
+  const shopN = ((S.shop && S.shop.items) || []).filter(x => x && !x.done).length;
+  const tidyDone = (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === "done").length; } catch (e) { return 3; } })();
+  const groups = [
+    ["📊 Stats, Money, Power & Work", "#money", [
+      ["#bills", "🧾 Bills"],
+      ["#cashflow", "🔄 Cash Flow"],
+      ["#budget", "🏦 Budget & 3 Mortgages"],
+      ["#power", "☀️ Solar & Power"],
+      ["#work", "💼 Work Roster"],
+      ["#commission", "🏆 Commission"],
+      ["#loans", "🤝 Loans"]
+    ]],
+    ["☑️ Tasks, Lists & Renovations", "#lists", [
+      ["#todo", `☑️ To-do${over5 ? " (" + over5 + " >5d)" : ""}`],
+      ["#tidy", `🧹 10-Min Tidy (${tidyDone})`],
+      ["#projects", "🛠️ Renovations Board"],
+      ["#reno", "🏠 Millesha’s Reno"],
+      ["#mumreno", "👵 Mum’s Reno"],
+      ["#myreno", "🔨 My Reno"],
+      ["#birthdays", "🎂 Birthdays"],
+      ["#notes", "📝 Notes & Ideas"]
+    ]],
+    ["🍕 Gluten-Free Meals & Groceries", "#food", [
+      ["#meals", "📅 GF Meal Planner"],
+      ["#shopping", `🛒 Shopping (${shopN})`],
+      ["#recipes", "📖 GF Recipes (40)"],
+      ["#gflist", "🌾 GF Safe List & Dining"]
+    ]],
+    ["🚗 Cars, Pets & Smart Home", "#homelife", [
+      ["#cars", "🚗 Cars (MUL27 · PNU312 · KBZ234)"],
+      ["#fuel", "⛽ 30-Day Fuel Prices"],
+      ["#pets", "🐾 Zeus, Mindy & Silken"],
+      ["#lights", "💡 Hue Lights"],
+      ["#heat", "🌡️ Heat Pumps"],
+      ["#alarm", "🔒 Alarm"]
+    ]],
+    ["📺 Entertainment, Local & Learn", "#media", [
+      ["#livetv", "📺 Live TV & DVR (94 Ch)"],
+      ["#radio", "📻 Car Stereo Radio"],
+      ["#tv", "🎬 Movies & TV Guide"],
+      ["#walks", "🥾 Northland Walks"],
+      ["#weather", "⛅ Weather & Tides"],
+      ["#bridge", "🌉 Bridge & Roads"],
+      ["#watch", "⌚ Watch, Gym & Meds"],
+      ["#learn", "🎓 9 Learn Boards"]
+    ]]
+  ];
+
+  const html = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <button type="button" class="chip on" onclick="closeSheet().then(()=>openMarketsRatesSheet('all'))">📊 Markets, ASB Rates &amp; KiwiSaver</button>
+      <button type="button" class="chip" onclick="closeSheet().then(()=>openSavedQuotesSheet())">💬 Saved Quotes</button>
+      <button type="button" class="chip" onclick="closeSheet().then(()=>setTabsOpen(true))">⬅️ Classic Side Strip</button>
+    </div>
+    ${groups.map(([title, hubHash, pills]) => `
+      <div class="card" style="padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+          <b style="font-size:.9rem">${title}</b>
+          <a href="${hubHash}" onclick="closeSheet()" style="font-size:.75rem;font-weight:750;color:var(--brand)">Open Board ›</a>
+        </div>
+        <div class="chips" style="gap:5px">
+          ${pills.map(([h, lbl]) => `<button type="button" class="chip" style="padding:5px 10px;font-size:.76rem" onclick="closeSheet().then(()=>go('${h}'))">${lbl}</button>`).join("")}
+        </div>
+      </div>`).join("")}`;
+
+  openSheet("🧭 Quick Menu & All Sections", html, null, "Close", `<button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button>`);
 }

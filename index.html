@@ -2363,7 +2363,7 @@ html body .fngrid>div{background:#fff!important;border:1px solid #e2e8f0;color:#
 .al-dt{font-size:.96rem;font-weight:800;line-height:1.22;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .al-ds{font-size:.76rem;line-height:1.3;opacity:.9;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 video::cue,#ltv-video::cue{display:none!important;opacity:0!important;visibility:hidden!important;color:transparent!important;background:transparent!important;font-size:0!important}video::-webkit-media-text-track-container,video::-webkit-media-text-track-display,video::-webkit-media-text-track-Background,#ltv-video::-webkit-media-text-track-container,#ltv-video::-webkit-media-text-track-display{display:none!important;opacity:0!important;visibility:hidden!important}
-/* 2.28.53: Krea Homepage Polish */
+/* 2.28.54: Krea Homepage Polish */
 .glance .glhead.glhero-card{position:relative;overflow:hidden;border-radius:20px;padding:14px 16px;margin:2px 0 12px;background:linear-gradient(135deg,rgba(15,23,42,.58),rgba(30,58,138,.48)),url("art/cu-banner.webp") right center/cover no-repeat;color:#fff;box-shadow:0 6px 18px rgba(15,23,42,.22),inset 0 1px 0 rgba(255,255,255,.25)}
 .glance.glnight .glhead.glhero-card{background:linear-gradient(135deg,rgba(11,20,56,.76),rgba(49,46,129,.62)),url("art/travel-banner.webp") right center/cover no-repeat;box-shadow:0 6px 20px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.18)}
 html body .glance .glhead.glhero-card :is(h1,h1.glh1){color:#fff!important;-webkit-text-fill-color:#fff!important;text-shadow:0 2px 6px rgba(0,0,0,.55)!important}
@@ -2389,6 +2389,60 @@ html body .glance .glhead.glhero-card :is(.sub,.subhi,.subdate){color:rgba(255,2
 .wklinks a{display:inline-flex;align-items:center;gap:5px;font-weight:650;padding:5px 11px!important;border-radius:999px;box-shadow:0 1px 3px rgba(0,0,0,.1);background:var(--card,#fff)!important;border:1px solid rgba(148,163,184,.22)}
 .wklinks a img{width:16px;height:16px;object-fit:contain}
 
+
+/* 2.28.54: Dynamic Hero Blurb, Quote Strip, Live Pulse (Rates, NZX/Dow, KiwiSaver, Streaks) & Upgraded Quick Tiles */
+.glance .glhead.glhero-card .glmenubtn{width:36px;height:36px;border-radius:11px;background:rgba(15,23,42,.48);border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:inline-flex;align-items:center;justify-content:center;flex:none;color:#fff}
+.glbars{display:flex;flex-direction:column;gap:3.5px}
+.glbars i{display:block;width:15px;height:2px;background:#93c5fd;border-radius:2px}
+.glsubrow{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:4px}
+.glsubrow .sub{margin-top:0!important}
+.glshiftpill{background:rgba(15,23,42,.62);border:1px solid rgba(253,224,71,.45);color:#fde047!important;-webkit-text-fill-color:#fde047!important;font-size:.7rem;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.glheroblurb{margin-top:8px;background:rgba(11,17,32,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);border-radius:13px;padding:8px 11px;font-size:.78rem;line-height:1.38;color:#f8fafc!important;-webkit-text-fill-color:#f8fafc!important;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.glheroblurb b{color:#7dd3fc!important;-webkit-text-fill-color:#7dd3fc!important;font-weight:750}
+.glheroblurb .glup{color:#4ade80!important;-webkit-text-fill-color:#4ade80!important;font-weight:800}
+.glquotestrip{margin-top:7px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(15,23,42,.54);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:11px;padding:6.5px 10px;border-left:3px solid #38bdf8;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.glqtx{font-size:.74rem;line-height:1.3;color:#f1f5f9!important;-webkit-text-fill-color:#f1f5f9!important;font-style:italic;flex:1;cursor:pointer}
+.glqtx span{font-style:normal;font-weight:750;color:#5eead4!important;-webkit-text-fill-color:#5eead4!important}
+.glqbtns{display:flex;gap:4px;flex-shrink:0}
+.glqbtn{background:rgba(30,41,59,.82);border:1px solid rgba(148,163,184,.32);color:#f8fafc!important;-webkit-text-fill-color:#f8fafc!important;font-size:.66rem;font-weight:750;padding:3.5px 7px;border-radius:7px}
+.glqbtn.on{background:rgba(225,29,72,.35);border-color:rgba(251,113,133,.5)}
+
+/* Live Pulse 2x2 Grid & Spotlight Bar — fully theme-aware (incl. Auto Weather gfx theme) */
+.gllivepulse{margin:6px 0 10px}
+.glrotbtn{background:color-mix(in srgb,var(--brand) 14%,var(--card));border:1px solid color-mix(in srgb,var(--brand) 32%,var(--line));color:var(--brand);font-size:.66rem;font-weight:800;padding:2.5px 9px;border-radius:999px}
+.pulse-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.pulse-card{background:var(--card,#fff);border:1px solid var(--line,#e2e8f0);border-radius:15px;padding:8.5px 10px;display:flex;flex-direction:column;gap:4px;text-align:left;box-shadow:0 2px 6px rgba(15,23,42,.06);transition:transform .12s ease}
+.pulse-card:active{transform:scale(.98)}
+html.gfx .pulse-card{background:var(--glass);-webkit-backdrop-filter:blur(8px) saturate(1.15);backdrop-filter:blur(8px) saturate(1.15)}
+.pulse-card.rates{background:linear-gradient(150deg,color-mix(in srgb,#2563eb 13%,var(--card)),var(--card));border-color:color-mix(in srgb,#2563eb 32%,var(--line))}
+.pulse-card.market{background:linear-gradient(150deg,color-mix(in srgb,#16a34a 13%,var(--card)),var(--card));border-color:color-mix(in srgb,#16a34a 32%,var(--line))}
+.pulse-card.kiwi{background:linear-gradient(150deg,color-mix(in srgb,#9333ea 13%,var(--card)),var(--card));border-color:color-mix(in srgb,#9333ea 32%,var(--line))}
+.pulse-card.needed{background:linear-gradient(150deg,color-mix(in srgb,#d97706 14%,var(--card)),var(--card));border-color:color-mix(in srgb,#d97706 36%,var(--line))}
+.p-top{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.p-lbl{font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-badge{font-size:.6rem;font-weight:800;padding:1.5px 6px;border-radius:999px;background:color-mix(in srgb,var(--brand) 14%,var(--soft));color:var(--brand);white-space:nowrap}
+.p-badge.up{background:var(--greenbg,#dcfce7);color:var(--green,#15803d)}
+.p-badge.warn{background:var(--amberbg,#fef3c7);color:var(--amber,#b45309)}
+.p-main{display:flex;align-items:baseline;justify-content:space-between;gap:4px}
+.p-big{font-size:.9rem;font-weight:900;color:var(--ink);letter-spacing:-.01em;white-space:nowrap}
+.p-big small{font-size:.63rem;font-weight:650;color:var(--ink3)}
+.p-vs{font-size:.71rem;font-weight:800;color:var(--brand);white-space:nowrap}
+.p-sub{font-size:.64rem;color:var(--ink2);font-weight:600;line-height:1.2;display:flex;justify-content:space-between;gap:4px}
+.p-sub b{color:var(--ink)}
+.spotlight-bar{margin-top:6px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+html.gfx .spotlight-bar{background:var(--glass);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.sp-pills{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.sp-chip{background:var(--soft);border:1px solid var(--line);color:var(--ink2);font-size:.63rem;font-weight:750;padding:3px 7.5px;border-radius:999px}
+.sp-chip.on{background:var(--brand);border-color:var(--brand);color:var(--onbrand,#fff)}
+.sp-more{font-size:.66rem;font-weight:800;color:var(--brand);white-space:nowrap;padding:2px 4px}
+
+/* Upgraded 3x3 Krea Tiles with Top-Left Number Pill */
+.gltile.glkrea{height:88px!important}
+.glnum-pill{position:absolute;top:6px;left:7px;z-index:2;background:rgba(15,23,42,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.26);color:#fff;font-size:.6rem;font-weight:800;padding:1.5px 6px;border-radius:999px;line-height:1.2}
+.glnum-pill.warn{background:rgba(245,158,11,.94);color:#0f172a;border-color:#fde68a}
+.glnum-pill.ok{background:rgba(22,163,74,.9);color:#fff;border-color:#86efac}
+.wklinks-clean a i{font-style:normal;color:var(--brand);font-weight:800;font-size:.68rem;margin-left:1px}
+
 </style>
 </head>
 <body>
@@ -2405,6 +2459,6 @@ html body .glance .glhead.glhero-card :is(.sub,.subhi,.subdate){color:rgba(255,2
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.28.53"></script>
+<script src="app.js?v=2.28.54"></script>
 </body>
 </html>
