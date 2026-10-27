@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.49';
+const APP_VERSION = '2.28.50';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -21964,7 +21964,7 @@ setInterval(glFreeTick, 20e3); document.addEventListener('visibilitychange', () 
 function glHm(hm) { const m = hmMin(hm); if (m == null) return ''; const h = Math.floor(m / 60), mi = m % 60, h12 = h % 12 || 12; return h12 + (mi ? ':' + String(mi).padStart(2, '0') : '') + (h < 12 ? 'am' : 'pm'); }
 function glShift(m) { return m.start ? glHm(m.start) + (m.end ? '–' + glHm(m.end) : '') : ''; }
 function glBellBtn() { let n = 0; try { n = glWarnList().length; } catch (e) { } return `<button class="iconbtn glbell" id="glbell" aria-label="Notifications${n ? ', ' + n + ' active' : ''}" onclick="go('#alerts')">${I('bell')}${n ? `<span class="glbadge">${n > 9 ? '9+' : n}</span>` : ''}</button>`; }
-function glBellRedraw() { try { const el = document.getElementById('glbell'); if (el) el.outerHTML = glBellBtn(); } catch (e) { } }
+function glBellRedraw() { try { const el = document.getElementById('glbell'); if (el) el.outerHTML = glBellBtn(); const tk = document.getElementById('gltasksbtn'); if (tk) tk.outerHTML = glTasksBtn(); } catch (e) { } }
 
 /* 2.26.10: one friendly personal line under the greeting. Rule-based, no AI. Never nags (bedtime, meds, teeth, lateness, work),
    never Zeus walks, never sport. Rotates each open and never repeats the previous line. */
@@ -22028,10 +22028,24 @@ function glLine(m) {
   return window.__glLine;
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) { window.__glLine = ''; window.__glLineLoc = 0; } });
+function glTasksOverdue5Count() {
+  try {
+    if (!S || !Array.isArray(S.todos)) return 0;
+    return S.todos.filter(t => {
+      if (!t || t.done || !t.title || !glOk(t.title)) return false;
+      if (t.due) return daysLeft(t.due) <= -5 || todoAgeDays(t) >= 5;
+      return todoAgeDays(t) >= 5;
+    }).length;
+  } catch (e) { return 0; }
+}
+function glTasksBtn() {
+  const n = glTasksOverdue5Count();
+  return `<button class="iconbtn glbell gltasksbtn" id="gltasksbtn" aria-label="Tasks${n ? ', ' + n + ' overdue 5+ days' : ''}" title="Tasks (sorted by due date, sitting time &amp; priority)" onclick="go('#todo')">${I('todo')}${n ? `<span class="glbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
+}
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.sick ? '🤒 Off sick today' : m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
-  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1><div class="iconrow"><button class="iconbtn" aria-label="Summary" onclick="go('#summary')">${I('news')}</button>${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1><div class="iconrow">${glTasksBtn()}<button class="iconbtn" aria-label="Summary" onclick="go('#summary')">${I('news')}</button>${glBellBtn()}<button class="iconbtn" aria-label="Settings" onclick="go('#settings')">${I('gear')}</button></div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -23189,8 +23203,7 @@ function alBriefingHtml(list) {
     body = block('📦 Deliveries & Orders', carOrderNodes);
   }
 
-  const topTasks = (alBriefFilter === 'all' || alBriefFilter === 'today') ? topTasksCardHtml("alerts", 6) : "";
-  return (alBriefFilter === 'all' || alBriefFilter === 'today' ? topTasks + heroHtml + gridHtml : '') +
+  return (alBriefFilter === 'all' || alBriefFilter === 'today' ? heroHtml + gridHtml : '') +
     (body || `<div class="card empty" style="margin:10px 0"><div class="t">All caught up for today</div><div class="s">Nothing else needs your action right now.</div></div>`) +
     (alBriefFilter === 'all' ? discHtml : '');
 }
@@ -23830,7 +23843,7 @@ function glanceHome() {
     : org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
-    homeTry('top tasks', () => topTasksCardHtml("home", 5), '') + wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + /* 2.27.5: watch figures are off Home (Health › Watch, updates on Notifications) */ cards +
+    wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + /* 2.27.5: watch figures are off Home (Health › Watch, updates on Notifications) */ cards +
     (m.night ? entZ + asks + orgZ : homeTry('gl work', () => glWorkCard(m), '') + orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
@@ -23984,8 +23997,8 @@ function glDueItems() {
       out.push({ days: d, html: h, noCount: d > 1 });
     });
   } catch (e) { }
-  // 2.26.34 / 2.28.15: every open dated to-do up to 14 days ahead: overdue/today → Urgent, 1–14 days → Coming up.
-  try {
+  // 2.28.50: Tasks are out of Notifications (now accessed via the Home top-bar Tasks icon with 5+ days overdue badge)
+  if (false) try {
     (S.todos || []).forEach(t => {
       if (!t || t.done || !t.due || !t.title || !glOk(t.title) || (glDueItems.nl && glDueItems.nl.has(t.id))) return;
       const d = daysLeft(t.due); if (d > 14) return;
@@ -25620,8 +25633,8 @@ function notifThreeDayBdaysAndSittingTodo() {
       });
   } catch (e) {}
 
-  // 2. ONE To-do item sitting longer than a week (> 7 days) at a time
-  try {
+  // 2. Tasks are now on the Home top-bar Tasks icon (#todo), not in Notifications
+  if (false) try {
     const st = pickOneSittingTodo();
     if (st && st.todo) {
       const t = st.todo;
