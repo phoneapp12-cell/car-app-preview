@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '2.28.48';
+const VERSION = '2.28.49';
 const CACHE = 'due-dates-' + VERSION;
 const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['./reno.js', 'art/i3-house.webp', 'art/cu-banner.webp', 'art/ja-banner.webp', 'art/i3-bill.webp', 'art/i3-car.webp', 'art/i3-bday.webp', 'art/i3-health.webp', 'art/i3-dentist.webp', 'art/i3-hol.webp', 'art/i3-ev.webp', 'art/i3-todo.webp', 'art/i3-shop.webp', 'art/i3-sarah.webp', 'art/i3-news.webp', 'art/i3-radio.webp', 'art/i3-travel.webp', 'art/i3-weather.webp', 'art/i3-money.webp', 'art/i3-gym.webp', 'art/i3-fuel.webp', 'art/i3-cal.webp', 'art/i3-plate.webp', 'art/i3-bin.webp', 'art/i3-rewards.webp', 'art/i3-tv.webp', 'art/i3-garden.webp', 'art/i3-pet.webp', 'art/dog.webp', './', './app.js', './app.js?v=' + VERSION, './sync-logic.js', './move.js', './move.js?v=' + VERSION, './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest', './data/tides-whangarei.json',

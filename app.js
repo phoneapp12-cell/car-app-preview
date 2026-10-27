@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.48';
+const APP_VERSION = '2.28.49';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5582,15 +5582,99 @@ function waterWin() { // null = no forecast (leave as normal); { ok } or { ok:fa
 function waterBlock(t) { if (!t || t.done || !t.due || daysLeft(t.due) > 0 || !WATER_TASK(t)) return null; const w = waterWin(); return w && !w.ok ? w.label : null; }
 const waterPill = lab => `<span class="pill waterlater">💧 ${esc(lab)}</span>`;
 const todoDuePill = (t, d) => { if (todoStatus(t) === 'doing') return progPill(); const b = waterBlock(t); return b ? waterPill(b) : pill(d == null ? daysLeft(t.due) : d); };
+function todoAgeDays(t) {
+  if (!t) return 0;
+  const now = Date.now();
+  if (!t.created) t.created = now - 10 * 86400e3;
+  return Math.max(0, Math.floor((now - (+t.created)) / 86400e3));
+}
+function todoUrgencyScore(t) {
+  // Higher score = further up the list:
+  // 1) Overdue dated tasks & tasks due today/soon
+  // 2) How long the task has been sitting there (oldest first)
+  // 3) Priority (High > Normal > Low)
+  const priBoost = todoPriority(t) === "high" ? 300 : todoPriority(t) === "low" ? -150 : 0;
+  const doingBoost = todoStatus(t) === "doing" ? 180 : 0;
+  const age = todoAgeDays(t);
+  let dateScore = 0;
+  if (t && t.due) {
+    const d = daysLeft(t.due);
+    if (d < 0) dateScore = 1000 + Math.min(365, -d) * 12; // overdue at very top
+    else if (d === 0) dateScore = 900; // due today
+    else if (d === 1) dateScore = 780; // due tomorrow
+    else if (d <= 7) dateScore = 600 - d * 25; // due this week
+    else dateScore = Math.max(50, 350 - d * 5);
+  }
+  const sittingScore = age * 18; // sitting 7 days = 126, sitting 14 days = 252, sitting 30 days = 540
+  return Math.max(dateScore, sittingScore) + priBoost + doingBoost + (age * 2);
+}
 function cmpOpenTodo(a, b) {
-  return (todoStatus(a) === 'doing' ? 0 : 1) - (todoStatus(b) === 'doing' ? 0 : 1)
-    || todoPriRank(a) - todoPriRank(b)
+  const diff = todoUrgencyScore(b) - todoUrgencyScore(a);
+  if (diff !== 0) return diff;
+  return todoPriRank(a) - todoPriRank(b)
     || (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15)
-    || (b.created || 0) - (a.created || 0);
+    || (+a.created || 0) - (+b.created || 0); // oldest sitting first
+}
+function todoPriBadge(t) {
+  const p = todoPriority(t);
+  if (p === "high") return `<span class="pill pri-high" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;font-size:.72rem;padding:2px 7px">🔴 High</span>`;
+  if (p === "low") return `<span class="pill pri-low" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-weight:600;font-size:.72rem;padding:2px 7px">🔵 Low</span>`;
+  return `<span class="pill pri-norm" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:650;font-size:.72rem;padding:2px 7px">🟡 Normal</span>`;
+}
+function todoSittingLabel(t) {
+  const age = todoAgeDays(t);
+  const dueTxt = t && t.due ? (() => {
+    const d = daysLeft(t.due);
+    return d < 0 ? `Overdue ${-d}d (${fmtW(t.due)})` : d === 0 ? "Due today" : d === 1 ? "Due tomorrow" : `Due ${fmtW(t.due)} (in ${d}d)`;
+  })() : "";
+  const sitTxt = age === 0 ? "Added today" : age === 1 ? "Sitting 1 day" : `Sitting ${age} days`;
+  return [dueTxt, sitTxt].filter(Boolean).join(" · ");
+}
+async function cycleTodoPri(id, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const t = (S.todos || []).find(x => x && x.id === id);
+  if (!t) return;
+  const cur = todoPriority(t);
+  t.priority = cur === "high" ? "normal" : cur === "normal" ? "low" : "high";
+  await save();
+  render();
+  toast(`${t.title}: ${t.priority.toUpperCase()} priority`);
+}
+function topTasksCardHtml(where = "home", maxShow = 5) {
+  if (!S || !Array.isArray(S.todos)) return "";
+  const open = S.todos.filter(t => t && !t.done && t.title && glOk(t.title)).sort(cmpOpenTodo);
+  if (!open.length) return "";
+  const showAll = !!window["__topTasksAll_" + where];
+  const shown = showAll ? open : open.slice(0, maxShow);
+  const rows = shown.map(t => {
+    const p = todoPriority(t);
+    const borderCol = p === "high" ? "#ef4444" : p === "low" ? "#64748b" : "#f59e0b";
+    const doing = todoStatus(t) === "doing";
+    const d = t.due ? daysLeft(t.due) : null;
+    return `<div class="row tk-top-row" style="border-left:4px solid ${borderCol};align-items:flex-start;gap:10px;padding:10px 12px">
+      <button type="button" class="tick" aria-label="Mark complete: ${esc(t.title)}" onclick="event.stopPropagation();tick('${t.id}')" style="margin-top:2px"><span>${I('check')}</span></button>
+      <div class="tx" onclick="todoForm('${t.id}')" style="cursor:pointer;min-width:0;flex:1">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+          <span onclick="cycleTodoPri('${t.id}', event)" title="Tap to change priority" style="cursor:pointer">${todoPriBadge(t)}</span>
+          ${doing ? `<span class="pill progpill" style="font-size:.7rem;padding:2px 7px">● In progress</span>` : ""}
+          ${d != null ? `<span class="tkpill">${todoDuePill(t, d)}</span>` : ""}
+          <span class="muted" style="font-size:.74rem;font-weight:600">⏳ ${esc(todoSittingLabel(t))}</span>
+        </div>
+        <div class="t" style="font-weight:700;font-size:.96rem;line-height:1.3">${sarahBadge(t)}${esc(t.title)}</div>
+        <div class="s" style="margin-top:2px"><span class="tktag">${esc(t.list || "To-do")}</span>${t.notes ? " · " + esc(String(t.notes).slice(0, 70)) : ""}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
+        <button type="button" class="btn small primary" style="padding:4px 9px;font-size:.74rem" onclick="tick('${t.id}')">✓ Done</button>
+      </div>
+    </div>`;
+  }).join("");
+  const rest = open.length - maxShow;
+  const moreBtn = rest > 0 ? `<button type="button" class="row" style="justify-content:center;font-weight:700;font-size:.84rem;padding:9px" onclick="window.__topTasksAll_${where}=!window.__topTasksAll_${where};render()">${showAll ? "Show top " + maxShow : `Show all ${open.length} tasks (+${rest} more)`}</button>` : "";
+  return `<div class="sec al-yd-sec" style="display:flex;justify-content:space-between;align-items:center"><span>📋 Tasks to Do · by sitting time, date &amp; priority <span class="al-cnt">${open.length}</span></span><a href="#todo" style="font-size:.8rem;font-weight:700">Open To-do ›</a></div><div class="list al-yd-list" style="margin-bottom:12px">${rows}${moreBtn}</div>`;
 }
 function todoPriMark(t) {
   const p = todoPriority(t);
-  return p === 'high' ? ' · High' : p === 'low' ? ' · Low' : '';
+  return p === 'high' ? ' · 🔴 High' : p === 'low' ? ' · 🔵 Low' : ' · 🟡 Normal';
 }
 function todoMetaDedupe(h) { return String(h).replace(/( · in your calendar)+/g, ' · in your calendar'); } // 2.26.22
 function Todo() {
@@ -5602,8 +5686,8 @@ function Todo() {
   // 2.28.2: task cards (Tasks - Today look). Same actions as before, only the layout changed.
   const TKC = ['#22c55e', '#3b82f6', '#ec4899', '#f59e0b', '#8b5cf6', '#06b6d4'], tkc = l => TKC[Math.max(0, S.lists.indexOf(l)) % TKC.length];
   const row = t => todoMetaDedupe(`<div class="row tkcard ${t.done ? 'done' : ''}" style="--tk:${tkc(t.list)}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-    <div class="tkmain"><button class="tapzone" onclick="todoForm('${t.id}')"><div class="tktop"><div class="t">${sarahBadge(t)}${esc(t.title)}</div>${t.due && !t.done ? `<span class="tkpill">${todoDuePill(t)}</span>` : ''}</div>
-    <div class="s"><span class="tktag">${esc(t.list)}</span>${t.done ? '' : todoPriMark(t)}${t.due && !t.done ? ' · ' + fmtW(t.due) : ''}${!t.due && !t.done ? ' · no date' : ''}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></button>
+    <div class="tkmain"><button class="tapzone" onclick="todoForm('${t.id}')"><div class="tktop" style="gap:6px;flex-wrap:wrap"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">${!t.done ? `<span onclick="cycleTodoPri('${t.id}', event)" title="Tap to change priority">${todoPriBadge(t)}</span>` : ''}${t.due && !t.done ? `<span class="tkpill">${todoDuePill(t)}</span>` : ''}</div></div>
+    <div class="s"><span class="tktag">${esc(t.list)}</span>${!t.done ? " · ⏳ " + esc(todoSittingLabel(t)) : ""}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></button>
     <div class="tkacts">${isMineShared(t) || isSarahTodo(t) ? `<span class="tkshare"><span class="tkav">S</span>Shared with Sarah</span>` : ''}${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}<button type="button" class="paybtn tkdone" onclick="tick('${t.id}')">${t.done ? 'Undo' : 'Done'}</button></div></div></div>`);
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
@@ -23105,7 +23189,8 @@ function alBriefingHtml(list) {
     body = block('📦 Deliveries & Orders', carOrderNodes);
   }
 
-  return (alBriefFilter === 'all' || alBriefFilter === 'today' ? heroHtml + gridHtml : '') +
+  const topTasks = (alBriefFilter === 'all' || alBriefFilter === 'today') ? topTasksCardHtml("alerts", 6) : "";
+  return (alBriefFilter === 'all' || alBriefFilter === 'today' ? topTasks + heroHtml + gridHtml : '') +
     (body || `<div class="card empty" style="margin:10px 0"><div class="t">All caught up for today</div><div class="s">Nothing else needs your action right now.</div></div>`) +
     (alBriefFilter === 'all' ? discHtml : '');
 }
@@ -23745,7 +23830,7 @@ function glanceHome() {
     : org ? `<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
-    wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + /* 2.27.5: watch figures are off Home (Health › Watch, updates on Notifications) */ cards +
+    homeTry('top tasks', () => topTasksCardHtml("home", 5), '') + wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + /* 2.27.5: watch figures are off Home (Health › Watch, updates on Notifications) */ cards +
     (m.night ? entZ + asks + orgZ : homeTry('gl work', () => glWorkCard(m), '') + orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
   return `<div class="glance${m.night ? ' glnight' : ''}">${body}</div>`;
