@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.57';
+const APP_VERSION = '2.28.58';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4197,7 +4197,8 @@ function Home() {
   const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
   homeSumT = !clean && sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
   const dynClassicBlurb = homeTry('dyn blurb', () => typeof glDynamicHeroBlurb === 'function' ? `<div class="card" id="classic-dyn-blurb" style="padding:10px 12px;margin:8px 0;font-size:.86rem;line-height:1.45;border-left:3px solid var(--brand,#2563eb)">${glDynamicHeroBlurb(glMode(now), now)}</div>` : '', '');
-  const sumUnderWx = dynClassicBlurb + homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
+  const classicPulse = homeTry('classic pulse', () => typeof glLivePulseHtml === 'function' ? glLivePulseHtml(glMode(now)) : '', '');
+  const sumUnderWx = dynClassicBlurb + classicPulse + homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
   const sum = clean || homeSumT ? '' : !night && sum0 ? homeSumFold(sum0) : sum0;
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
@@ -34092,129 +34093,69 @@ function openSavedQuotesSheet() {
   openSheet("Quotes & Quips (" + saved.length + " saved)", rows, null, "Close", `<button type="button" class="btn primary" onclick="glNextHeroQuote();closeSheet()">🎲 Shuffle Home Quote</button>`);
 }
 
-/* ---- Live Market, NZ Mortgage Rates & KiwiSaver Data Engine ---- */
-const NZ_MORTGAGE_RATES = [
-  { bank: "ASB (Your 3 Loans)", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Your current bank · 3 fortnightly mortgages" },
-  { bank: "BNZ", f6m: 6.09, f1y: 5.55, f18m: 5.39, f2y: 5.45, f3y: 5.55, note: "Lowest 18-month fixed rate (5.39%)" },
-  { bank: "ANZ", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Matches ASB across 1-yr & 2-yr terms" },
-  { bank: "Kiwibank", f6m: 6.09, f1y: 5.55, f18m: 5.45, f2y: 5.49, f3y: 5.59, note: "Competitive 1-yr rate (5.55%)" },
-  { bank: "Westpac", f6m: 6.15, f1y: 5.59, f18m: 5.45, f2y: 5.49, f3y: 5.55, note: "Lowest 3-yr rate (5.55%)" }
-];
-const KIWISAVER_FUNDS = [
-  { name: "Milford Active Growth", type: "Growth", r1y: 15.1, r5y: 9.8, fee: "1.05%", rank: "#1 5-Yr Growth" },
-  { name: "Simplicity Growth", type: "Growth (Low Fee)", r1y: 13.8, r5y: 8.9, fee: "0.25%", rank: "Lowest Fee (0.25%)" },
-  { name: "Generate Focused Growth", type: "Growth", r1y: 14.6, r5y: 9.1, fee: "1.29%", rank: "#2 1-Yr Return" },
-  { name: "ASB Growth Fund", type: "Growth", r1y: 12.6, r5y: 8.1, fee: "0.70%", rank: "Big-4 Bank Pick" },
-  { name: "Fisher Funds Growth", type: "Growth", r1y: 12.9, r5y: 8.3, fee: "0.97%", rank: "Solid 1-Yr" },
-  { name: "NZ Growth Category Average", type: "Benchmark", r1y: 12.4, r5y: 8.0, fee: "0.88%", rank: "Morningstar Avg" }
+/* ---- NZX Top 40 Share Market & General Stats Engine (2.28.58: 1 NZX Top 40 card + General stuff: Petrol prices, etc.) ---- */
+const NZX_TOP40_STOCKS = [
+  { code: "FPH", name: "Fisher & Paykel Healthcare", price: "$36.40", chg: "+1.4%", up: true, sec: "Healthcare" },
+  { code: "IFT", name: "Infratil", price: "$12.15", chg: "+0.9%", up: true, sec: "Infrastructure" },
+  { code: "AIA", name: "Auckland Intl Airport", price: "$7.82", chg: "+0.6%", up: true, sec: "Transport" },
+  { code: "MEL", name: "Meridian Energy", price: "$6.18", chg: "+0.5%", up: true, sec: "Energy" },
+  { code: "CEN", name: "Contact Energy", price: "$8.94", chg: "+0.7%", up: true, sec: "Energy" },
+  { code: "MFT", name: "Mainfreight", price: "$71.50", chg: "+1.1%", up: true, sec: "Freight & Logistics" },
+  { code: "EBO", name: "EBOS Group", price: "$35.80", chg: "+0.4%", up: true, sec: "Healthcare" },
+  { code: "MCY", name: "Mercury NZ", price: "$6.45", chg: "-0.3%", up: false, sec: "Energy" },
+  { code: "SPK", name: "Spark New Zealand", price: "$3.12", chg: "-0.6%", up: false, sec: "Telecom" },
+  { code: "ATM", name: "The a2 Milk Company", price: "$6.78", chg: "+1.8%", up: true, sec: "Dairy & Food" },
+  { code: "CNU", name: "Chorus", price: "$8.60", chg: "+0.2%", up: true, sec: "Fibre Network" },
+  { code: "SUM", name: "Summerset Group", price: "$12.40", chg: "+0.8%", up: true, sec: "Retirement" },
+  { code: "FBU", name: "Fletcher Building", price: "$3.05", chg: "-0.5%", up: false, sec: "Building" },
+  { code: "AIR", name: "Air New Zealand", price: "$0.56", chg: "+0.9%", up: true, sec: "Aviation" }
 ];
 
 let MKT_DATA = (() => {
   try {
     const c = JSON.parse(localStorage.getItem("mktPulseCacheV1") || "null");
-    if (c && c.nzx && c.dow) return c;
+    if (c && c.nzx) return c;
   } catch (e) {}
   return {
     at: Date.now(),
     nzx: { val: "12,845", chg: "+0.42%", up: true },
+    nzx40: { val: "11,920", chg: "+0.48%", up: true },
     dow: { val: "43,290", chg: "+0.68%", up: true },
     sp500: { val: "5,892", chg: "+0.54%", up: true },
-    nzd: "0.604",
-    ocr: "3.75%"
+    nzd: "0.604"
   };
 })();
 
-/* ---- Dynamic Multi-Line Homepage Blurb (Changes every open, uses Time, Date, Location, Usage & Stats; NEVER car-focused unless due <= 14d) ---- */
 let __heroBlurbSeed = Math.floor(Math.random() * 1000);
-function glDynamicHeroBlurb(m, now) {
-  now = now || new Date();
-  const h = now.getHours(), dow = now.getDay(), T = todayISO(now);
-  const loc = (() => { try { return glLoc() || "home"; } catch (e) { return "home"; } })();
-  const bits = [];
-
-  // 1. Time, Roster & Location sentence
-  if (m.sick) {
-    bits.push(`🤒 <b>Off sick today</b> — rest up at home and take the day easy.`);
-  } else if (loc === "work" || m.atWork) {
-    const f = glFree(m);
-    bits.push(`💼 At <b>Port Rd</b>${f ? ` · <b>Free in ${esc(f.txt)}</b> (${esc(fmtTime(f.end))})` : ""}. ${dow === 4 ? "Long Thursday shift until 7:15pm." : (dow === 2 || dow === 3) ? "<b>Gym</b> is on the cards after 6pm tonight." : "Evening is yours after 6pm."}`);
-  } else if (m.beforeWork) {
-    const n = DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds) ? Math.round(DRIVE.seconds / 60) : 16;
-    const sm = hmMin(m.start || "08:30"), leave = sm != null ? fmtTime(hmFromMin(sm - n)) : "8:12am";
-    bits.push(`☕ <b>TVNZ 1 Breakfast</b> before your <b>${esc(glShift(m))}</b> shift (leave Onerahi around <b>${esc(leave)}</b>).${(dow === 2 || dow === 3) ? " Tonight is <b>gym night</b> at 6pm." : dow === 1 ? " Tonight is <b>Mum’s</b> at 6pm." : ""}`);
-  } else if (m.off) {
-    if (dow === 0 && h < 19) {
-      bits.push(`🌤️ <b>Sunday</b> · Cleaning job finishes at <b>7:00pm</b>, then a relaxed evening at home.`);
-    } else if (dow === 5 || dow === 6) {
-      const meal = (() => { try { const p = M().plan[T]; return p && p.title ? p.title : "GF pizza"; } catch (e) { return "GF pizza"; } })();
-      bits.push(`🍕 <b>${dow === 5 ? "Friday" : "Saturday"} cook night</b> (${esc(meal)}) — a good excuse for a glass of <b>merlot</b> later.`);
-    } else {
-      bits.push(`🌤️ <b>Rostered day off</b> in Onerahi — no Port Rd shift today.`);
-    }
-  } else if (h >= 21 || h < 5) {
-    bits.push(h >= 22 && h <= 23 ? `♨️ <b>Spa & wind-down hours</b> — good time for a <b>Suno</b> track or a movie.` : `🦉 <b>Night owl hours</b> — all quiet in Onerahi.`);
-  } else {
-    bits.push(`🏡 Back home in <b>Onerahi</b> after work.${(dow === 2 || dow === 3) ? " <b>Gym night</b> on your weekly plan." : dow === 1 ? " <b>Monday at Mum’s</b> tonight." : ""}`);
-  }
-
-  // 2. Rotating Second Sentence: alternates every open between (A) Market/Mortgage/KiwiSaver stat, (B) App Usage Habit, (C) Weather/Tide/Fuel, or (D) Urgent Car/Task ONLY if due soon
-  const urgentCar = (() => {
-    try {
-      return glCU().find(x => (x.kind === "car" || x.kind === "driver") && x.days != null && x.days <= 14);
-    } catch (e) { return null; }
-  })();
-
-  const habitSug = (() => {
-    try {
-      const u = homeSugUse();
-      if (u && u.text) return u.text;
-      const hb = useHabits();
-      if (hb && hb.length) return "Your app rhythm: " + hb[(__heroBlurbSeed) % hb.length];
-    } catch (e) {}
-    const wdName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dow];
-    const defaults = [
-      `You often check <b>Cash Flow & Pay</b> on ${wdName}s.`,
-      `Your usual ${wdName} go-tos: <b>Bills</b>, <b>Tasks</b>, and <b>Live TV</b>.`,
-      `Tap any <b>Live Pulse</b> card below to compare ASB rates, NZX vs Dow, or KiwiSaver.`
-    ];
-    return defaults[__heroBlurbSeed % defaults.length];
-  })();
-
-  const statPool = [
-    `📈 <b>Dow Jones</b> closed <span class="glup">${esc(MKT_DATA.dow.chg)}</span> (${esc(MKT_DATA.dow.val)}) vs <b>NZX 50</b> <span class="glup">${esc(MKT_DATA.nzx.chg)}</span> (${esc(MKT_DATA.nzx.val)}).`,
-    `🏦 <b>ASB mortgage rates</b> sit at <b>5.59%</b> (1-yr) & <b>5.49%</b> (2-yr) vs market low <b>5.39%</b> (OCR <b>3.75%</b>).`,
-    `🥝 <b>KiwiSaver Growth</b> funds averaged <b>+12.4%</b> over 12m (top fund <b>+15.1%</b> — tap KiwiSaver below to compare).`,
-    `⛽ <b>91 Unleaded</b> is <b>$2.54/L</b> locally · Next fortnightly pay lands <b>Wed 4 Nov</b>.`
-  ];
-
-  const pickStat = statPool[(__heroBlurbSeed + now.getMinutes()) % statPool.length];
-  if (urgentCar && (__heroBlurbSeed % 3 === 0)) {
-    bits.push(`🚗 Heads up: <b>${esc(urgentCar.name)}</b> is due in <b>${urgentCar.days}d</b>.`);
-  } else {
-    bits.push(pickStat);
-  }
-  bits.push(habitSug);
-
-  return bits.join(" ");
-}
-
-/* ---- Dynamic Rotating Live Pulse Deck (Rates & Markets | KiwiSaver | Streaks | Fuel & Needed) ---- */
-let __pulseMode = (() => {
-  const modes = ["all", "rates", "kiwi", "streaks"];
-  const idx = (Math.floor(Date.now() / 180000) + (typeof glOpenN === "number" ? glOpenN : 0)) % modes.length;
-  return modes[idx] || "all";
-})();
+let __pulseMode = "all"; // Default stays on "all" (1 NZX Top 40 card + General stuff: Petrol, Solar/Weather, Today)
 
 function setPulseMode(m, ev) {
   if (ev && ev.stopPropagation) ev.stopPropagation();
-  const modes = ["all", "rates", "kiwi", "streaks"];
+  const modes = ["all", "fuel", "home", "streaks"];
   if (m === "next") {
     __pulseMode = modes[(modes.indexOf(__pulseMode) + 1) % modes.length];
   } else {
-    __pulseMode = m;
+    __pulseMode = modes.includes(m) ? m : "all";
   }
   const el = document.getElementById("gllivepulse");
   if (el) el.outerHTML = glLivePulseHtml(glMode());
+}
+
+function glFuelSummaryData() {
+  try {
+    const st91 = typeof fuelStats === "function" ? fuelStats("91") : null;
+    const st95 = typeof fuelStats === "function" ? fuelStats("95") : null;
+    const stD = typeof fuelStats === "function" ? fuelStats("diesel") : null;
+    const now91 = st91 && st91.now != null ? (st91.now / 100).toFixed(2) : "2.18";
+    const now95 = st95 && st95.now != null ? (st95.now / 100).toFixed(2) : "2.33";
+    const nowD = stD && stD.now != null ? (stD.now / 100).toFixed(2) : "1.56";
+    const wkDiff = st91 && st91.wk != null ? Math.round(st91.wk * 10) / 10 : 0;
+    const badge = Math.abs(wkDiff) < 0.2 ? "▬ Steady 7d" : (wkDiff < 0 ? "▼ Down " + Math.abs(wkDiff).toFixed(1) + "c" : "▲ Up " + wkDiff.toFixed(1) + "c");
+    const badgeCls = wkDiff <= -0.2 ? "up" : (wkDiff >= 0.2 ? "warn" : "");
+    return { now91, now95, nowD, wkDiff, badge, badgeCls };
+  } catch (e) {
+    return { now91: "2.18", now95: "2.33", nowD: "1.56", wkDiff: 0, badge: "▬ Steady 7d", badgeCls: "" };
+  }
 }
 
 function glLivePulseHtml(m) {
@@ -34223,133 +34164,153 @@ function glLivePulseHtml(m) {
   const unpaid = (S.bills || []).filter(x => x && !x.paid && x.due);
   const dueSoon = unpaid.filter(x => daysLeft(x.due) <= 7).length;
   const stepStreak = (() => { try { return hwStreak(hwGoal()) || 4; } catch (e) { return 4; } })();
-  const langStrk = (() => { try { return langStreak(langSt()) || 2; } catch (e) { return 2; } })();
   const tidyDone = (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === "done").length; } catch (e) { return 3; } })();
   const tidyTotal = (() => { try { return tdAllSpots().length; } catch (e) { return 17; } })();
+  const fl = glFuelSummaryData();
+  const wxTemp = (() => { try { return (typeof WX !== "undefined" && WX && WX.cur && WX.cur.temp != null) ? Math.round(WX.cur.temp) + "°" : "16°"; } catch (e) { return "16°"; } })();
+  const pwrSolar = (() => { try { return (typeof PWR !== "undefined" && PWR && PWR.today && PWR.today.solarKWh != null) ? PWR.today.solarKWh + " kWh" : "Solar live"; } catch (e) { return "Solar live"; } })();
+  const driveMin = (() => { try { return (typeof DRIVE !== "undefined" && DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds)) ? Math.round(DRIVE.seconds / 60) + " min" : "16 min"; } catch (e) { return "16 min"; } })();
+  const nzx40 = MKT_DATA.nzx40 || { val: "11,920", chg: "+0.48%", up: true };
+
+  // Single finance card: NZX Top 40 Share Market
+  const nzxCardHtml = `
+    <button type="button" class="pulse-card market" onclick="openMarketsRatesSheet(nzx40)">
+      <div class="p-top"><span class="p-lbl">📈 NZX Top 40</span><span class="p-badge up">▲ ${esc(nzx40.chg)}</span></div>
+      <div class="p-main"><span class="p-big" style="color:#4ade80">${esc(nzx40.val)}</span><span class="p-vs" style="color:#86efac">NZD $${esc(MKT_DATA.nzd)}</span></div>
+      <div class="p-sub"><span>FPH +1.4% · IFT +0.9% · AIA +0.6%</span><span>Top 40 ›</span></div>
+    </button>`;
 
   let cardsHtml = "";
-  if (__pulseMode === "rates") {
-    cardsHtml = NZ_MORTGAGE_RATES.slice(0, 4).map((r, i) => `
-      <button type="button" class="pulse-card ${i === 0 ? "rates" : "market"}" onclick="openMarketsRatesSheet('rates')">
-        <div class="p-top"><span class="p-lbl">🏦 ${esc(r.bank)}</span><span class="p-badge ${i === 1 ? "up" : ""}">${i === 0 ? "3 Loans" : i === 1 ? "Lowest 18m" : "Compare"}</span></div>
-        <div class="p-main"><span class="p-big">1yr ${r.f1y.toFixed(2)}%</span><span class="p-vs">2yr ${r.f2y.toFixed(2)}%</span></div>
-        <div class="p-sub"><span>18m: <b>${r.f18m.toFixed(2)}%</b> · 3yr: <b>${r.f3y.toFixed(2)}%</b></span><span>Details ›</span></div>
-      </button>`).join("");
-  } else if (__pulseMode === "kiwi") {
-    cardsHtml = KIWISAVER_FUNDS.slice(0, 4).map((f, i) => `
-      <button type="button" class="pulse-card ${i === 0 ? "kiwi" : "rates"}" onclick="openMarketsRatesSheet('kiwi')">
-        <div class="p-top"><span class="p-lbl">🥝 ${esc(f.name)}</span><span class="p-badge up">${esc(f.rank)}</span></div>
-        <div class="p-main"><span class="p-big">+${f.r1y.toFixed(1)}% <small>1yr</small></span><span class="p-vs">+${f.r5y.toFixed(1)}% 5yr</span></div>
-        <div class="p-sub"><span>Fee: <b>${esc(f.fee)}</b> (${esc(f.type)})</span><span>Compare ›</span></div>
-      </button>`).join("");
+  if (__pulseMode === "fuel") {
+    cardsHtml = `
+      ${nzxCardHtml}
+      <button type="button" class="pulse-card rates" onclick="fuelBackHash=#home;go(#fuel)">
+        <div class="p-top"><span class="p-lbl">⛽ 91 Unleaded</span><span class="p-badge ${fl.badgeCls}">${esc(fl.badge)}</span></div>
+        <div class="p-main"><span class="p-big">$${esc(fl.now91)}<small>/L</small></span><span class="p-vs">Marsden Pt</span></div>
+        <div class="p-sub"><span>Kora saves 10c+/L at Mobil/Waitomo</span><span>30d Chart ›</span></div>
+      </button>
+      <button type="button" class="pulse-card kiwi" onclick="fuelBackHash=#home;go(#fuel)">
+        <div class="p-top"><span class="p-lbl">⛽ 95 &amp; Diesel</span><span class="p-badge">Wholesale</span></div>
+        <div class="p-main"><span class="p-big">95 $${esc(fl.now95)}</span><span class="p-vs">Dsl $${esc(fl.nowD)}</span></div>
+        <div class="p-sub"><span>BP &amp; Z terminal list prices</span><span>Compare ›</span></div>
+      </button>
+      <button type="button" class="pulse-card needed" onclick="go(#bridge)">
+        <div class="p-top"><span class="p-lbl">🚗 Port Rd &amp; Bridge</span><span class="p-badge up">${esc(driveMin)}</span></div>
+        <div class="p-main"><span class="p-big">${esc(driveMin)}</span><span class="p-vs">Onerahi → Town</span></div>
+        <div class="p-sub"><span>Te Matau a Pohe &amp; WDC roadworks</span><span>Roads ›</span></div>
+      </button>`;
+  } else if (__pulseMode === "home") {
+    cardsHtml = `
+      ${nzxCardHtml}
+      <button type="button" class="pulse-card kiwi" onclick="go(#power)">
+        <div class="p-top"><span class="p-lbl">☀️ SolarZero Today</span><span class="p-badge up">Under $8.50/d</span></div>
+        <div class="p-main"><span class="p-big">${esc(pwrSolar)}</span><span class="p-vs">Battery + Grid</span></div>
+        <div class="p-sub"><span>Onerahi solar generation today</span><span>Open Power ›</span></div>
+      </button>
+      <button type="button" class="pulse-card rates" onclick="go(#weather)">
+        <div class="p-top"><span class="p-lbl">⛅ Weather &amp; Tides</span><span class="p-badge">${esc(wxTemp)} Now</span></div>
+        <div class="p-main"><span class="p-big">Onerahi ${esc(wxTemp)}</span><span class="p-vs">Tides &amp; UV</span></div>
+        <div class="p-sub"><span>Whangārei forecast &amp; high/low tide</span><span>Weather ›</span></div>
+      </button>
+      <button type="button" class="pulse-card needed" onclick="go(#tv)">
+        <div class="p-top"><span class="p-lbl">📺 Live TV Guide</span><span class="p-badge up">${ltvAllChannels().length} Ch</span></div>
+        <div class="p-main"><span class="p-big">${ltvAllChannels().length} Free Ch</span><span class="p-vs">Timeline Grid</span></div>
+        <div class="p-sub"><span>NZ, UK, Movies, Comedy &amp; Cars</span><span>TV Guide ›</span></div>
+      </button>`;
   } else if (__pulseMode === "streaks") {
     cardsHtml = `
-      <button type="button" class="pulse-card needed" onclick="go('#todo')">
-        <div class="p-top"><span class="p-lbl">☑️ Sitting Task Buster</span><span class="p-badge warn">${over5 ? over5 + " >5d" : "All clear"}</span></div>
+      ${nzxCardHtml}
+      <button type="button" class="pulse-card needed" onclick="go(#todo)">
+        <div class="p-top"><span class="p-lbl">☑️ Sitting Tasks</span><span class="p-badge warn">${over5 ? over5 + " >5d" : "All clear"}</span></div>
         <div class="p-main"><span class="p-big">${over5} Sitting >5d</span><span class="p-vs">Clear 1 today</span></div>
-        <div class="p-sub"><span>Knocking over oldest tasks first</span><span>Open Tasks ›</span></div>
+        <div class="p-sub"><span>Sorted by due date &amp; sitting time</span><span>Open Tasks ›</span></div>
       </button>
-      <button type="button" class="pulse-card market" onclick="go('#tidy')">
-        <div class="p-top"><span class="p-lbl">🧹 10-Min Tidy Wins</span><span class="p-badge up">Zero pressure</span></div>
+      <button type="button" class="pulse-card rates" onclick="go(#tidy)">
+        <div class="p-top"><span class="p-lbl">🧹 10-Min Tidy</span><span class="p-badge up">Zero pressure</span></div>
         <div class="p-main"><span class="p-big">${tidyDone} / ${tidyTotal} Spots</span><span class="p-vs">10m timer</span></div>
         <div class="p-sub"><span>One small drawer or shelf at a time</span><span>Pick a spot ›</span></div>
       </button>
-      <button type="button" class="pulse-card rates" onclick="go('#watch')">
-        <div class="p-top"><span class="p-lbl">⌚ Watch & Gym Streak</span><span class="p-badge up">🔥 ${stepStreak}d Streak</span></div>
+      <button type="button" class="pulse-card kiwi" onclick="go(#watch)">
+        <div class="p-top"><span class="p-lbl">⌚ Watch &amp; Gym</span><span class="p-badge up">🔥 ${stepStreak}d Streak</span></div>
         <div class="p-main"><span class="p-big">${stepStreak} Days</span><span class="p-vs">Tue/Wed Gym</span></div>
-        <div class="p-sub"><span>Huawei watch steps & sleep</span><span>Open Watch ›</span></div>
-      </button>
-      <button type="button" class="pulse-card kiwi" onclick="go('#power')">
-        <div class="p-top"><span class="p-lbl">☀️ Solar Budget & Kupu</span><span class="p-badge up">🔥 ${langStrk}d Learn</span></div>
-        <div class="p-main"><span class="p-big">Under $8.50/d</span><span class="p-vs">${langStrk}d Kupu</span></div>
-        <div class="p-sub"><span>SolarZero daily target & Learn</span><span>Open Solar ›</span></div>
+        <div class="p-sub"><span>Huawei watch steps &amp; sleep</span><span>Open Watch ›</span></div>
       </button>`;
   } else {
-    // Default "all" blended 2x2: Mortgage Rates + NZX vs Dow + KiwiSaver + Needed Today / Streak
+    // Default "all": 1 NZX Top 40 Share Market card + 3 General cards (Petrol Prices, Solar & Weather, Today & Needed)
     cardsHtml = `
-      <button type="button" class="pulse-card rates" onclick="openMarketsRatesSheet('rates')">
-        <div class="p-top"><span class="p-lbl">🏦 Mortgage Rates</span><span class="p-badge">3 ASB Loans</span></div>
-        <div class="p-main"><span class="p-big">ASB 5.59% <small>1yr</small></span><span class="p-vs">2yr 5.49%</span></div>
-        <div class="p-sub"><span>Best NZ: <b>5.39%</b> (BNZ)</span><span>OCR <b>${esc(MKT_DATA.ocr)}</b></span></div>
+      ${nzxCardHtml}
+      <button type="button" class="pulse-card rates" onclick="fuelBackHash=#home;go(#fuel)">
+        <div class="p-top"><span class="p-lbl">⛽ Petrol Prices</span><span class="p-badge ${fl.badgeCls}">${esc(fl.badge)}</span></div>
+        <div class="p-main"><span class="p-big">91 $${esc(fl.now91)}<small>/L</small></span><span class="p-vs">95 $${esc(fl.now95)}</span></div>
+        <div class="p-sub"><span>Diesel <b>$${esc(fl.nowD)}/L</b> · Marsden Pt</span><span>30d History ›</span></div>
       </button>
-      <button type="button" class="pulse-card market" onclick="openMarketsRatesSheet('markets')">
-        <div class="p-top"><span class="p-lbl">📈 NZX 50 vs Dow</span><span class="p-badge up">▲ Both Up</span></div>
-        <div class="p-main"><span class="p-big" style="color:#4ade80">NZX ${esc(MKT_DATA.nzx.chg)}</span><span class="p-vs" style="color:#86efac">DJIA ${esc(MKT_DATA.dow.chg)}</span></div>
-        <div class="p-sub"><span>NZX <b>${esc(MKT_DATA.nzx.val)}</b> · Dow <b>${esc(MKT_DATA.dow.val)}</b></span><span>NZD <b>${esc(MKT_DATA.nzd)}</b></span></div>
+      <button type="button" class="pulse-card kiwi" onclick="go(#power)">
+        <div class="p-top"><span class="p-lbl">☀️ Solar &amp; Weather</span><span class="p-badge up">${esc(wxTemp)} Onerahi</span></div>
+        <div class="p-main"><span class="p-big">${esc(pwrSolar)}</span><span class="p-vs">${esc(driveMin)} Town</span></div>
+        <div class="p-sub"><span>SolarZero today &amp; Port Rd run</span><span>Power ›</span></div>
       </button>
-      <button type="button" class="pulse-card kiwi" onclick="openMarketsRatesSheet('kiwi')">
-        <div class="p-top"><span class="p-lbl">🥝 KiwiSaver 1-Yr</span><span class="p-badge up">Top Growth</span></div>
-        <div class="p-main"><span class="p-big">+12.4% <small>Avg</small></span><span class="p-vs">+15.1% Top</span></div>
-        <div class="p-sub"><span>Milford / Simplicity / ASB</span><span>Compare ›</span></div>
-      </button>
-      <button type="button" class="pulse-card needed" onclick="go('#todo')">
-        <div class="p-top"><span class="p-lbl">⚡ Needed Today</span><span class="p-badge warn">🔥 ${stepStreak}d Streak</span></div>
-        <div class="p-main"><span class="p-big">${over5} Tasks >5d</span><span class="p-vs">${dueSoon} Bill Soon</span></div>
-        <div class="p-sub"><span>Clear 1 task to boost streak</span><span>${tidyDone}/${tidyTotal} Tidy ›</span></div>
+      <button type="button" class="pulse-card needed" onclick="go(#todo)">
+        <div class="p-top"><span class="p-lbl">⚡ Today &amp; Coming Up</span><span class="p-badge warn">${over5} Tasks &gt;5d</span></div>
+        <div class="p-main"><span class="p-big">${dueSoon} Bills <small>7d</small></span><span class="p-vs">Pay 4 Nov</span></div>
+        <div class="p-sub"><span>${over5} sitting tasks · ${tidyDone}/${tidyTotal} tidy</span><span>Open Tasks ›</span></div>
       </button>`;
   }
 
   return `<div class="gllivepulse" id="gllivepulse">
     <div class="glzone" style="margin:6px 0 6px">
-      <span>📊 Live Pulse · Stats &amp; What’s Needed</span>
-      <button type="button" class="glrotbtn" onclick="setPulseMode('next', event)">↻ Cycle view</button>
+      <span>📊 Live Pulse · NZX Top 40 &amp; General</span>
+      <button type="button" class="glrotbtn" onclick="setPulseMode(next, event)">↻ Cycle view</button>
     </div>
     <div class="pulse-grid">${cardsHtml}</div>
     <div class="spotlight-bar">
       <div class="sp-pills">
-        <button type="button" class="sp-chip${__pulseMode === "all" ? " on" : ""}" onclick="setPulseMode('all', event)">📊 All Stats</button>
-        <button type="button" class="sp-chip${__pulseMode === "rates" ? " on" : ""}" onclick="setPulseMode('rates', event)">🏦 Mortgage Rates</button>
-        <button type="button" class="sp-chip${__pulseMode === "kiwi" ? " on" : ""}" onclick="setPulseMode('kiwi', event)">🥝 KiwiSaver</button>
-        <button type="button" class="sp-chip${__pulseMode === "streaks" ? " on" : ""}" onclick="setPulseMode('streaks', event)">🔥 Streaks</button>
+        <button type="button" class="sp-chip${__pulseMode === "all" ? " on" : ""}" onclick="setPulseMode(all, event)">📊 General</button>
+        <button type="button" class="sp-chip${__pulseMode === "fuel" ? " on" : ""}" onclick="setPulseMode(fuel, event)">⛽ Petrol &amp; Roads</button>
+        <button type="button" class="sp-chip${__pulseMode === "home" ? " on" : ""}" onclick="setPulseMode(home, event)">☀️ Power &amp; TV</button>
+        <button type="button" class="sp-chip${__pulseMode === "streaks" ? " on" : ""}" onclick="setPulseMode(streaks, event)">☑️ Tasks &amp; Tidy</button>
       </div>
-      <button type="button" class="sp-more" onclick="openMarketsRatesSheet('all')">Full Table ›</button>
+      <button type="button" class="sp-more" onclick="openMarketsRatesSheet(nzx40)">NZX Top 40 ›</button>
     </div>
   </div>`;
 }
 
 function openMarketsRatesSheet(tab) {
-  const ratesRows = NZ_MORTGAGE_RATES.map((r, i) => `
-    <div class="row" style="padding:9px 10px;${i === 0 ? "border-left:3px solid #3b82f6;background:color-mix(in srgb,var(--brand) 10%,var(--card))" : ""}">
-      <div class="tx">
-        <div class="t">${esc(r.bank)}</div>
-        <div class="s">6m: <b>${r.f6m.toFixed(2)}%</b> · 1yr: <b>${r.f1y.toFixed(2)}%</b> · 18m: <b>${r.f18m.toFixed(2)}%</b> · 2yr: <b>${r.f2y.toFixed(2)}%</b> · 3yr: <b>${r.f3y.toFixed(2)}%</b></div>
-        <div class="s muted">${esc(r.note)}</div>
-      </div>
-    </div>`).join("");
-
-  const kiwiRows = KIWISAVER_FUNDS.map((f, i) => `
+  const nzx40 = MKT_DATA.nzx40 || { val: "11,920", chg: "+0.48%", up: true };
+  const stockRows = NZX_TOP40_STOCKS.map(s => `
     <div class="row" style="padding:9px 10px">
       <div class="tx">
-        <div class="t">${esc(f.name)} <span class="pill" style="font-size:.68rem">${esc(f.rank)}</span></div>
-        <div class="s">1-Yr Return: <b style="color:var(--green,#16a34a)">+${f.r1y.toFixed(1)}%</b> · 5-Yr Avg: <b>+${f.r5y.toFixed(1)}%/yr</b> · Annual Fee: <b>${esc(f.fee)}</b></div>
+        <div class="t"><b>${esc(s.code)}</b> · ${esc(s.name)} <span class="pill" style="font-size:.68rem">${esc(s.sec)}</span></div>
+        <div class="s">NZX Top 40 constituent</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:800">${esc(s.price)}</div>
+        <div style="font-size:.78rem;font-weight:800;color:${s.up ? "var(--green,#16a34a)" : "#dc2626"}">${s.up ? "▲ " : "▼ "}${esc(s.chg)}</div>
       </div>
     </div>`).join("");
 
   const html = `
     <div class="card" style="padding:12px;margin-bottom:10px">
-      <div style="font-weight:800;margin-bottom:6px">📈 Share Markets — NZX 50 vs US Markets</div>
+      <div style="font-weight:800;margin-bottom:6px">📈 NZX Top 40 &amp; Market Overview</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
-        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZX 50 (NZ)</div><div style="font-weight:900;font-size:1rem">${esc(MKT_DATA.nzx.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(MKT_DATA.nzx.chg)}</div></div>
-        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">Dow Jones (US)</div><div style="font-weight:900;font-size:1rem">${esc(MKT_DATA.dow.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(MKT_DATA.dow.chg)}</div></div>
-        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">S&amp;P 500 / NZD</div><div style="font-weight:900;font-size:1rem">${esc(MKT_DATA.sp500.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(MKT_DATA.sp500.chg)} · $${esc(MKT_DATA.nzd)}</div></div>
+        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZX Top 40</div><div style="font-weight:900;font-size:1rem">${esc(nzx40.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(nzx40.chg)}</div></div>
+        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZX 50</div><div style="font-weight:900;font-size:1rem">${esc(MKT_DATA.nzx.val)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">${esc(MKT_DATA.nzx.chg)}</div></div>
+        <div style="padding:8px;border-radius:10px;background:var(--soft)"><div class="muted" style="font-size:.72rem">NZD / USD</div><div style="font-weight:900;font-size:1rem">$${esc(MKT_DATA.nzd)}</div><div style="color:var(--green,#16a34a);font-weight:800;font-size:.8rem">Dow ${esc(MKT_DATA.dow.chg)}</div></div>
       </div>
     </div>
-    <div class="sec">🏦 NZ Mortgage Rates (ASB vs ANZ, BNZ, Kiwibank, Westpac · OCR ${esc(MKT_DATA.ocr)})</div>
-    <div class="list" style="margin-bottom:12px">${ratesRows}</div>
-    <div class="sec">🥝 KiwiSaver Growth Funds (1-Yr &amp; 5-Yr Comparison)</div>
-    <div class="list">${kiwiRows}</div>`;
+    <div class="sec">🇳🇿 NZX Top 40 Key Shares</div>
+    <div class="list">${stockRows}</div>`;
 
-  openSheet("Markets, Mortgage Rates & KiwiSaver", html, null, "Close", `<button type="button" class="btn primary" onclick="closeSheet().then(()=>go('#budget'))">Open My 3 ASB Mortgages ›</button>`);
+  openSheet("NZX Top 40 Share Market", html, null, "Close", `<button type="button" class="btn primary" onclick="closeSheet().then(()=>{fuelBackHash=#home;go(#fuel)})">⛽ Open 30-Day Petrol Prices ›</button>`);
 }
 
-/* ---- Non-Duplicate Bottom Quick Pills (Replaces the 7 duplicate wklinks!) ---- */
+/* ---- Non-Duplicate Bottom Quick Pills ---- */
 function glExtraQuickPills() {
   const tidyDone = (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === "done").length; } catch (e) { return 3; } })();
   const tidyTot = (() => { try { return tdAllSpots().length; } catch (e) { return 17; } })();
+  const fl = glFuelSummaryData();
   return `<div class="wklinks wklinks-clean">
-    <a href="#" onclick="event.preventDefault();openMarketsRatesSheet('all')"><img src="art/i3-money.webp" alt="">Markets &amp; Rates <i>NZX/Dow</i></a>
-    <a href="#" onclick="event.preventDefault();openMarketsRatesSheet('kiwi')"><img src="art/i3-rewards.webp" alt="">KiwiSaver <i>+12.4%</i></a>
-    <a href="#fuel"><img src="art/i3-fuel.webp" alt="">Fuel 30d <i>$2.54</i></a>
+    <a href="#" onclick="event.preventDefault();openMarketsRatesSheet(nzx40)"><img src="art/i3-money.webp" alt="">NZX Top 40 <i>+0.48%</i></a>
+    <a href="#fuel"><img src="art/i3-fuel.webp" alt="">Petrol Prices <i>$${esc(fl.now91)}</i></a>
     <a href="#cashflow"><img src="art/i3-money.webp" alt="">Cash Flow <i>Pay</i></a>
     <a href="#radio"><img src="art/i3-radio.webp" alt="">Car Stereo <i>12P</i></a>
     <a href="#tidy"><img src="art/i3-todo.webp" alt="">10m Tidy <i>${tidyDone}/${tidyTot}</i></a>
@@ -34413,7 +34374,7 @@ function openQuickMenuSheet() {
 
   const html = `
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-      <button type="button" class="chip on" onclick="closeSheet().then(()=>openMarketsRatesSheet('all'))">📊 Markets, ASB Rates &amp; KiwiSaver</button>
+      <button type="button" class="chip on" onclick="closeSheet().then(()=>openMarketsRatesSheet('all'))">📈 NZX Top 40 Share Market</button>
       <button type="button" class="chip" onclick="closeSheet().then(()=>openSavedQuotesSheet())">💬 Saved Quotes</button>
       <button type="button" class="chip" onclick="closeSheet().then(()=>setTabsOpen(true))">⬅️ Classic Side Strip</button>
     </div>
@@ -34964,7 +34925,7 @@ glDynamicHeroBlurb = function (m, now) {
   const pwrToday = (typeof PWR !== "undefined" && PWR && PWR.today) ? PWR.today : null;
   const pwrLine = pwrToday && pwrToday.solarKWh
     ? `☀️ <b>SolarZero</b> has generated <b>${pwrToday.solarKWh} kWh</b> today (${pwrToday.fromSolarPct || 0}% solar / ${pwrToday.fromBatteryPct || 0}% battery) across your Onerahi home.`
-    : `☀️ <b>SolarZero</b> &amp; your 3 <b>ASB mortgages</b> (5.59% 1-yr vs BNZ 5.39% low) are tracked live below.`;
+    : `☀️ <b>SolarZero</b> power, <b>Petrol prices</b>, and the <b>NZX Top 40</b> are tracked live in your cards below.`;
 
   const payLine = daysToShanePay === 0
     ? `💰 It’s <b>fortnightly pay Wednesday</b> (lands this afternoon/evening), after Sarah’s Tuesday pay and last night’s Kiwibank board.`
@@ -34976,8 +34937,8 @@ glDynamicHeroBlurb = function (m, now) {
 
   const contextPool = [
     payLine,
-    `📈 <b>NZX 50</b> is <span class="glup">${esc(MKT_DATA.nzx.chg)}</span> (${esc(MKT_DATA.nzx.val)}) vs <b>Dow Jones</b> <span class="glup">${esc(MKT_DATA.dow.chg)}</span> (${esc(MKT_DATA.dow.val)}) · <b>KiwiSaver Growth</b> funds are averaging <b>+12.4%</b>.`,
-    `🏦 Your 3 <b>ASB fortnightly mortgages</b> sit at <b>5.59%</b> (1-yr) &amp; <b>5.49%</b> (2-yr) against the <b>5.39%</b> market low (OCR <b>${esc(MKT_DATA.ocr)}</b>).`,
+    `📈 <b>NZX Top 40</b> is <span class="glup">+0.48%</span> (11,920 · FPH +1.4%, IFT +0.9%) · <b>91 Petrol</b> is <b>${esc(glFuelSummaryData().now91)}/L</b> (${esc(glFuelSummaryData().badge)}).`,
+    `⛽ <b>Petrol prices</b>: 91 is <b>${esc(glFuelSummaryData().now91)}/L</b>, 95 is <b>${esc(glFuelSummaryData().now95)}/L</b>, and Diesel is <b>${esc(glFuelSummaryData().nowD)}/L</b> (${esc(glFuelSummaryData().badge)}).`,
     pwrLine,
     `📺 Your <b>Internet TV Guide</b> now has <b>${ltvAllChannels().length} free live channels</b> (NZ, UK, Movies, Comedy, PowerNation Cars, Hell’s Kitchen &amp; Vevo 70s/80s/90s) in a full timeline grid.`
   ];
