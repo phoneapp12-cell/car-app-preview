@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.59';
+const APP_VERSION = '2.28.60';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4196,9 +4196,8 @@ function Home() {
   const clean = cleanOn();
   const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
   homeSumT = !clean && sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
-  const dynClassicBlurb = homeTry('dyn blurb', () => typeof glDynamicHeroBlurb === 'function' ? `<div class="card" id="classic-dyn-blurb" style="padding:10px 12px;margin:8px 0;font-size:.86rem;line-height:1.45;border-left:3px solid var(--brand,#2563eb)">${glDynamicHeroBlurb(glMode(now), now)}</div>` : '', '');
   const classicPulse = homeTry('classic pulse', () => typeof glLivePulseHtml === 'function' ? glLivePulseHtml(glMode(now)) : '', '');
-  const sumUnderWx = dynClassicBlurb + classicPulse + homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
+  const sumUnderWx = classicPulse + homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
   const sum = clean || homeSumT ? '' : !night && sum0 ? homeSumFold(sum0) : sum0;
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
@@ -22045,13 +22044,9 @@ function glTasksBtn() {
   return `<button class="iconbtn glbell gltasksbtn" id="gltasksbtn" aria-label="Tasks${n ? ', ' + n + ' overdue 5+ days' : ''}" title="Tasks (sorted by due date, sitting time &amp; priority)" onclick="go('#todo')">${I('todo')}${n ? `<span class="glbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
 }
 function glHead(name, m, now) {
-  const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Afternoon';
-  const loc = (() => { try { const k = glLoc(); return k === 'work' ? '📍 Port Rd' : k === 'beach' ? '📍 Onerahi Beach' : k === 'bush' ? '📍 Bushwalk' : k === 'town' ? '📍 Town' : '📍 Home (Onerahi)'; } catch (e) { return '📍 Onerahi'; } })();
-  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${loc}`;
-  const shiftPill = m.sick ? '🤒 Off sick today' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
-  let blurb = ''; try { blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || ''); } catch (e) { blurb = esc(glLine(m) || ''); }
-  let qStrip = ''; try { qStrip = typeof glHeroQuoteStrip === 'function' ? glHeroQuoteStrip() : ''; } catch (e) { qStrip = ''; }
-  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open sidebar" title="Open sidebar" onclick="setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}</div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}${qStrip}</div></div>`;
+  const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
+  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.sick ? '🤒 Off sick today' : m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open sidebar" title="Open sidebar" onclick="setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}</div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -34691,6 +34686,28 @@ function itvEpgInit(tries = 0) {
   }, { passive: true });
 }
 
+function ltvWatchFromGuide(chId) {
+  const act = () => {
+    const all = ltvAllChannels();
+    const idx = all.findIndex(x => x.id === chId);
+    if (idx >= 0) {
+      ltvCur.custom = null;
+      ltvCur.idx = idx;
+      try { localStorage.setItem("ltvLastIdx", String(idx)); } catch (e) {}
+    }
+    ltvViewMode = "channels";
+    go("#livetv");
+    setTimeout(() => {
+      try {
+        ltvPlayId(chId);
+        document.getElementById("ltvplayer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (e) {}
+    }, 60);
+  };
+  if (sheetOpen) closeSheet().then(act);
+  else act();
+}
+
 function itvEpgTap(chId, startMs) {
   const all = ltvAllChannels();
   const ch = all.find(x => x.id === chId);
@@ -34703,20 +34720,21 @@ function itvEpgTap(chId, startMs) {
   const lk = ltvIsSeriesLinked(p.seriesTitle, ch.id);
   const pSlot = ltvPresets().indexOf(ch.id) + 1;
   const gLabel = { news: "News", movie: "Movie", comedy: "Comedy", life: "Lifestyle, garden, factual" }[p.genre || itvProgGenre(ch, p)] || "Live TV";
-  const btn = (js, lbl, pri) => `<button type="button" class="btn${pri ? " primary" : ""}" style="width:100%;margin:4px 0" onclick="closeSheet();${js}">${lbl}</button>`;
+  const btnStyle = "width:100%;margin:5px 0;white-space:normal;height:auto;min-height:44px;line-height:1.25;padding:10px 14px;text-align:center;display:flex;align-items:center;justify-content:center;box-sizing:border-box";
+  const btn = (js, lbl, pri) => `<button type="button" class="btn${pri ? " primary" : ""}" style="${btnStyle}" onclick="${js}">${lbl}</button>`;
   const watchAction = ch.tvnzWatch
-    ? btn(`tvWatch(${jsArg(ch.tvnzWatch)})`, `▶ Watch ${esc(ch.name)} in TVNZ+ App`, true)
-    : btn(`ltvPlayId(${jsArg(ch.id)});go('#livetv')`, `▶ Watch ${esc(ch.name)} Live Now`, true);
+    ? btn(`closeSheet().then(()=>tvWatch(${jsArg(ch.tvnzWatch)}))`, `▶ Watch ${esc(ch.name)} in TVNZ+ App`, true)
+    : btn(`ltvWatchFromGuide(${jsArg(ch.id)})`, `▶ Watch ${esc(ch.name)} Live Now`, true);
   const recAction = rec
-    ? btn(`ltvPlayRecording(${jsArg(rec.id)})`, `📼 Play DVR Recording (${esc(rec.status === "ready" ? "Ready" : "Scheduled")})`, false)
-    : btn(`ltvRecordProg(${jsArg(ch.id)},${p.start})`, `🔴 Record “${esc(p.title)}” to DVR`, false);
-  const slAction = btn(`ltvSeriesLinkProg(${jsArg(ch.id)},${p.start})`, lk ? `🔁 Remove Series Link (${esc(p.seriesTitle)})` : `🔁 Series Link All Episodes of “${esc(p.seriesTitle)}”`, false);
-  const presetAction = btn(`ltvAssignSheet(${jsArg(ch.id)})`, `📌 Save ${esc(ch.name)} to TV Preset (P1–P12)${pSlot ? " · Currently P" + pSlot : ""}`, false);
+    ? btn(`closeSheet().then(()=>{go('#livetv');setTimeout(()=>ltvPlayRecording(${jsArg(rec.id)}),60)})`, `📼 Play DVR Recording (${esc(rec.status === "ready" ? "Ready" : "Scheduled")})`, false)
+    : btn(`closeSheet().then(()=>ltvRecordProg(${jsArg(ch.id)},${p.start}))`, `🔴 Record to DVR`, false);
+  const slAction = btn(`closeSheet().then(()=>ltvSeriesLinkProg(${jsArg(ch.id)},${p.start}))`, lk ? `🔁 Remove Series Link` : `🔁 Series Link All Episodes`, false);
+  const presetAction = btn(`closeSheet().then(()=>ltvAssignSheet(${jsArg(ch.id)}))`, `📌 Save to TV Preset (P1–P12)${pSlot ? " · P" + pSlot : ""}`, false);
   openSheet(
     esc(p.title),
     `<p class="muted" style="margin:0 0 6px"><b>${esc(ch.name)}</b> · ${esc(ch.catLabel || ch.country || "Free TV")} · ${esc(epgClock(p.start))} - ${esc(epgClock(p.until))} · ${esc(gLabel)}</p>
      ${p.desc ? `<p style="margin:0 0 10px">${esc(p.desc)}</p>` : ""}
-     ${watchAction}${recAction}${slAction}${presetAction}`,
+     <div style="display:flex;flex-direction:column;gap:2px">${watchAction}${recAction}${slAction}${presetAction}</div>`,
     null
   );
 }
@@ -34754,7 +34772,7 @@ function itvTimelineGuideHtml(filteredChans, allChans) {
     const chNum = String(allChans.findIndex(x => x.id === c.id) + 1).padStart(3, "0");
     const logoUrl = c.epgId && logos[c.epgId] ? logos[c.epgId] : "";
     const shortName = c.name.replace(/\s*\(Live\)|\s*24\/7|\s*TV|\s*HD/gi, "").trim();
-    const watchJs = c.tvnzWatch ? `tvWatch(${jsArg(c.tvnzWatch)})` : `ltvPlayId(${jsArg(c.id)});go('#livetv')`;
+    const watchJs = c.tvnzWatch ? `tvWatch(${jsArg(c.tvnzWatch)})` : `ltvWatchFromGuide(${jsArg(c.id)})`;
     return `<div class="epgrow">
       <div class="epgch" role="button" tabindex="0" title="Tap to watch ${esc(c.name)} live" onclick="${watchJs}">
         ${logoUrl ? `<img src="${esc(logoUrl)}" alt="${esc(shortName)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"><span class="itv-ch-num">${chNum}</span>` : `<span class="itv-ch-badge">${esc(shortName)}</span><span class="nb" style="font-size:10px;padding:1px 5px;margin-top:2px">${chNum}</span>`}
