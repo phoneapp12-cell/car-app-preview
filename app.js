@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.67';
+const APP_VERSION = '2.28.68';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -19476,6 +19476,8 @@ function Settings() {
   </div>
   <div class="sec">Notifications page</div>
   <div class="list">
+   <div class="srow"><div class="tx"><div class="t">📋 Show all notifications</div><div class="s">Show every notification across all categories and dates on the Notifications page (including items also on Home, upcoming due dates and open to-dos).</div></div><button class="switch ${notifShowAllOn() ? 'on' : ''}" role="switch" aria-checked="${notifShowAllOn()}" aria-label="Show all notifications" onclick="toggleNotifShowAll()"></button></div>
+   <div class="srow"><div class="tx"><div class="t">⚙️ Choose which notifications to receive</div><div class="s">${notifEnabledCount()} of ${NOTIF_CAT_DEFS.length} notification categories enabled (Warnings, Bills, Calendar, Cars &amp; Pets, Birthdays, To-dos, Sarah, Power, Deliveries, Local).</div></div><button class="btn small primary" onclick="openChooseNotificationsSheet()">Choose…</button></div>
    <div class="srow"><div class="tx"><div class="t">Daily quote</div><div class="s">A short quote and a photo near the top of Notifications. One for each day.</div></div><button class="switch ${showDailyQuote() ? 'on' : ''}" role="switch" aria-checked="${showDailyQuote()}" aria-label="Daily quote" onclick="toggleDailyQuote()"></button></div>
    <div class="srow"><div class="tx"><div class="t">Daily joke</div><div class="s">A dry one each day on Notifications, answer hidden until you tap.</div></div><button class="switch ${dailyJokeOn() ? 'on' : ''}" role="switch" aria-checked="${dailyJokeOn()}" aria-label="Daily joke" id="jokesw" onclick="toggleSetting('dailyJoke', ${!dailyJokeOn()})"></button></div>
    <div class="srow"><div class="tx"><div class="t">Fun fact</div><div class="s">A new fun fact each day, as a card on Notifications.</div></div><button class="switch ${factOn() ? 'on' : ''}" role="switch" aria-checked="${factOn()}" aria-label="Fun fact" id="factsw" onclick="toggleSetting('dailyFact', ${!factOn()})"></button></div>
@@ -22536,7 +22538,7 @@ function alJump(k) {
   if (box && sec) box.scrollTo({ left: Math.max(0, sec.offsetLeft - 14), behavior: 'smooth' });
 }
 function alBoardHtml(list) {
-  list = [];
+  list = notifShowAllOn() ? (list || []).filter(x => x && x.kind !== 'meal') : [];
   const now = [], today = [], week = [], later = [];
   const urgent = x => x.days < 0 || (x.days === 0 && x.pri === 0) || ((x.kind === 'car' || x.kind === 'driver') && x.days <= 0);
   let ja = []; try { ja = justAddedList().filter(x => !nbIsBill(x)); } catch (e) { }
@@ -22699,6 +22701,8 @@ function alTopMenu() {
     <div class="sec">Filter Briefing</div>
     <div class="chips" style="margin-bottom:14px">${filters.map(([k, l]) => `<button type="button" class="chip${alBriefFilter === k ? ' on' : ''}" onclick="setAlFilter('${k}')">${l}</button>`).join('')}</div>
     <div class="btns" style="flex-direction:column;align-items:stretch">
+      <button type="button" class="btn primary" onclick="closeSheet().then(()=>openChooseNotificationsSheet())">⚙️ Choose which notifications to receive</button>
+      <button type="button" class="btn" onclick="closeSheet().then(()=>toggleNotifShowAll())">${notifShowAllOn() ? '📋 Switch to Filtered Notifications' : '📋 Show All Notifications'}</button>
       <button type="button" class="btn" onclick="closeSheet().then(jiAllRead)">✓ Mark all Just in as read</button>
       ${n ? `<button type="button" class="btn" onclick="closeSheet().then(justAddedClear)">Clear new list badges (${n})</button>` : ''}
       <button type="button" class="btn" onclick="closeSheet().then(()=>pwrNav('#archive','l'))">🗂 Open Archived Notifications</button>
@@ -22954,7 +22958,7 @@ function alHeroCandidates(list) {
     });
   } catch (e) {}
 
-  return cands;
+  return cands.filter(c => notifCatOn(classifyHeroCandidate(c)));
 }
 function alPickHero(list) {
   const cands = alHeroCandidates(list);
@@ -23133,8 +23137,208 @@ function alDiscoverHtml() {
   return `<div class="sec al-disc-sec"><span>✨ Discover</span><small class="muted">Swipe for daily picks ›</small></div>
     <div class="al-discover-strip" role="region" aria-label="Discover">${cards.join('')}</div>`;
 }
+
+/* ---- 2.28.68: Show All Notifications & Choose Which Notifications to Receive ---- */
+const NOTIF_CAT_DEFS = [
+  ["warnings",  "⛔", "Roadworks, Crashes, Weather & Quakes", "NZTA roadworks & crashes, WDC closures, MetService warnings, bridge lifts & GeoNet quakes"],
+  ["bills",     "🧾", "Bills, Invoices & Bank Alerts", "Upcoming & overdue bills, emailed invoices (Kora, Ecotricity) and bank alerts"],
+  ["calendar",  "📅", "Appointments, Calendar & Events", "Calendar appointments, health bookings, my events, concerts & flagged events"],
+  ["carsPets",  "🚗", "Cars & Pets Due Dates", "WOF, rego, servicing, driver licences, and pet care for Zeus, Mindy & Silken"],
+  ["birthdays", "🎂", "Birthdays", "Upcoming and today’s birthdays"],
+  ["todos",     "☑️", "To-dos & Reminders", "Open/overdue to-do tasks, sitting tasks, reminders and bedtime/watch nudges"],
+  ["sarah",     "💌", "From Sarah & Shared Lists", "Sarah’s shared shopping additions, ticked to-dos, appointments & new YouTube videos"],
+  ["power",     "⚡", "Power, Outages & Smart Home", "Northpower & fibre/mobile outages, off-peak power alerts, solar & smart home sensors"],
+  ["emails",    "📦", "Deliveries, Deals & Mail", "Parcel deliveries, Click & Collect, Everyday Rewards & shop emails"],
+  ["local",     "🏗️", "Planning, News & Daily Picks", "Whangārei planning & development, council news, cinema & daily picks"]
+];
+
+function notifCatsState() {
+  S.settings = S.settings || {};
+  if (!S.settings.notifCats || typeof S.settings.notifCats !== "object") {
+    S.settings.notifCats = {};
+  }
+  return S.settings.notifCats;
+}
+function notifCatOn(k) {
+  if (!k) return true;
+  const st = (S && S.settings && S.settings.notifCats) || {};
+  return st[k] !== false;
+}
+function notifShowAllOn() {
+  return !!(S && S.settings && S.settings.notifShowAll);
+}
+function notifEnabledCount() {
+  return NOTIF_CAT_DEFS.filter(([k]) => notifCatOn(k)).length;
+}
+async function toggleNotifShowAll(forceVal) {
+  S.settings = S.settings || {};
+  S.settings.notifShowAll = typeof forceVal === "boolean" ? forceVal : !S.settings.notifShowAll;
+  await save();
+  _bellSigsMemo = null;
+  bellMemo = null;
+  if ((location.hash || "") === "#alerts" || (location.hash || "") === "#settings") {
+    render();
+  } else {
+    glWarnRedraw(true);
+  }
+  toast(S.settings.notifShowAll ? "Showing all notifications" : "Showing filtered notifications");
+}
+function refreshChooseNotifSheetUI() {
+  const box = document.getElementById("choose-notif-sheet");
+  if (!box) return;
+  const showAll = notifShowAllOn();
+  const saBtn = box.querySelector("#cn-showall-sw");
+  if (saBtn) {
+    saBtn.classList.toggle("on", showAll);
+    saBtn.setAttribute("aria-checked", String(showAll));
+  }
+  NOTIF_CAT_DEFS.forEach(([k]) => {
+    const sw = box.querySelector(`[data-cn-cat="${k}"]`);
+    if (sw) {
+      const on = notifCatOn(k);
+      sw.classList.toggle("on", on);
+      sw.setAttribute("aria-checked", String(on));
+    }
+  });
+  const cntEl = box.querySelector("#cn-count-sub");
+  if (cntEl) {
+    cntEl.textContent = `${notifEnabledCount()} of ${NOTIF_CAT_DEFS.length} categories enabled`;
+  }
+}
+async function toggleNotifCat(k) {
+  const st = notifCatsState();
+  const next = !notifCatOn(k);
+  st[k] = next;
+  // Sync underlying legacy toggles so push & background checks stay in sync
+  if (k === "birthdays") S.settings.bdayReminders = next;
+  if (k === "calendar") S.settings.apptReminders = next;
+  if (k === "sarah") { S.settings.sarahTicks = next; S.settings.shopPush = next; }
+  if (k === "warnings") { S.settings.accAlerts = next; S.settings.polAlerts = next; }
+  if (k === "power") { S.settings.outAlerts = next; S.settings.netAlerts = next; }
+  if (k === "local") { S.settings.plnAlerts = next; }
+  await save();
+  _bellSigsMemo = null;
+  bellMemo = null;
+  refreshChooseNotifSheetUI();
+  try { glWarnRedraw(true); } catch (e) {}
+  if ((location.hash || "") === "#settings" && !sheetOpen) render();
+  try { scheduleReminders(); } catch (e) {}
+}
+async function setAllNotifCats(on) {
+  const st = notifCatsState();
+  NOTIF_CAT_DEFS.forEach(([k]) => { st[k] = !!on; });
+  S.settings.bdayReminders = !!on;
+  S.settings.apptReminders = !!on;
+  S.settings.sarahTicks = !!on;
+  S.settings.shopPush = !!on;
+  S.settings.accAlerts = !!on;
+  S.settings.polAlerts = !!on;
+  S.settings.outAlerts = !!on;
+  S.settings.netAlerts = !!on;
+  S.settings.plnAlerts = !!on;
+  await save();
+  _bellSigsMemo = null;
+  bellMemo = null;
+  refreshChooseNotifSheetUI();
+  try { glWarnRedraw(true); } catch (e) {}
+  if ((location.hash || "") === "#settings" && !sheetOpen) render();
+  try { scheduleReminders(); } catch (e) {}
+  toast(on ? "All notification categories turned on" : "All notification categories turned off");
+}
+function classifyNotifElement(el, secName) {
+  const sec = String(secName || "").toLowerCase();
+  const txt = ((el && el.textContent) || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const oc = (el && el.getAttribute && el.getAttribute("onclick")) || "";
+  const nk = (el && el.dataset && el.dataset.nk) || "";
+  if (sec === "sarah" || /^stick-/.test(nk) || (el && el.classList && el.classList.contains("shopfs")) || /\bsarah\b/i.test(txt)) return "sarah";
+  if (sec === "bills" || /^cardpaid-|^bank-|^apup-/.test(nk) || (el && el.classList && el.classList.contains("bankrow")) || /#bills|#cashflow|#budget/.test(oc) || /\b(bill|invoice|direct debit|kora|ecotricity|asb credit card|bank transaction|unimed)\b/i.test(txt)) return "bills";
+  if ((el && el.getAttribute && el.getAttribute("data-bday-days") != null) || /#birthdays/.test(oc) || /\bbirthday\b/i.test(txt)) return "birthdays";
+  if (/#todo|#reminders|#tidy/.test(oc) || /^bed-|^sug-wch/.test(nk) || /\b(to-do|todo|reminder|sitting \d+ days|going to bed|charge your watch|put your watch back on)\b/i.test(txt)) return "todos";
+  if (/#cars|#pets|#fuel/.test(oc) || /\b(wof|rego|service|ruc|car due|licence|zeus|mindy|silken|flea|vet|pet care)\b/i.test(txt)) return "carsPets";
+  if ((el && el.classList && (el.classList.contains("glwarn") || el.classList.contains("glwarnwrap"))) || /^nwal-/.test(nk) || /#weather|#bridge|#roadworks/.test(oc) || /\b(road closure|roadworks|crash|earthquake|geonet|metservice|weather warning|weather alert|bridge|emergency|police|ambulance|fire)\b/i.test(txt)) return "warnings";
+  if (sec === "power" || /^out-|^outn-|^offpeak-/.test(nk) || (el && el.dataset && el.dataset.pn) || /#power|#lights|#heat|#alarm/.test(oc) || /\b(power|outage|off-peak|northpower|2degrees|fibre|hue|battery|heat pump|alarm sensor)\b/i.test(txt)) return "power";
+  if (sec === "deliveries" || sec === "cc" || sec === "er" || sec === "gf" || /\b(delivery|deliveries|parcel|tracking|click & collect|everyday rewards|booster|promo)\b/i.test(txt)) return "emails";
+  if (/^bf-pln-|^pln-/.test(nk) || /#planning|#localnews|#news|#movies|#lang|#travel/.test(oc) || /\b(planning & development|event cinemas|word of the day|fun fact|joke of the day|quote of the day|place of the day)\b/i.test(txt)) return "local";
+  if (/#calendar|#cal|#events|#concerts|#nightlife|#health|#meds/.test(oc) || (el && el.classList && el.classList.contains("glflagwrap")) || /\b(appointment|doctor|dentist|concert|event|holiday|countdown)\b/i.test(txt)) return "calendar";
+  return "calendar";
+}
+function classifyHeroCandidate(c) {
+  if (!c) return "calendar";
+  const id = String(c.id || "");
+  if (id.startsWith("bday:")) return "birthdays";
+  if (id.startsWith("sarahvid:")) return "sarah";
+  if (id.startsWith("embill:")) return "bills";
+  if (id.startsWith("warn:")) return "warnings";
+  if (id.startsWith("up:")) {
+    const kind = id.split(":")[1] || "";
+    if (kind === "car" || kind === "driver" || kind === "pet") return "carsPets";
+    if (kind === "bday") return "birthdays";
+    if (kind === "todo") return "todos";
+    if (kind === "bill") return "bills";
+    return "calendar";
+  }
+  return "calendar";
+}
+function openChooseNotificationsSheet() {
+  const showAll = notifShowAllOn();
+  const enCnt = notifEnabledCount();
+  const rowsHtml = NOTIF_CAT_DEFS.map(([k, ic, title, sub]) => {
+    const on = notifCatOn(k);
+    return `<div class="srow" style="padding:10px 12px;align-items:center">
+      <div class="tx" style="padding-right:10px">
+        <div class="t" style="font-weight:700">${ic} ${esc(title)}</div>
+        <div class="s" style="font-size:.78rem;opacity:.85">${esc(sub)}</div>
+      </div>
+      <button type="button" class="switch ${on ? "on" : ""}" data-cn-cat="${k}" role="switch" aria-checked="${on}" aria-label="${esc(title)}" onclick="toggleNotifCat('${k}')"></button>
+    </div>`;
+  }).join("");
+
+  const body = `<div id="choose-notif-sheet">
+    <div class="list" style="margin-bottom:12px">
+      <div class="srow" style="padding:12px;background:rgba(37,99,235,0.08);border-left:4px solid #2563eb">
+        <div class="tx" style="padding-right:10px">
+          <div class="t" style="font-weight:800">📋 Show All Notifications</div>
+          <div class="s" style="font-size:.8rem">Show every notification across all dates &amp; lists (including upcoming bills, cars/pets, calendar items, open to-dos, reminders, and items also shown on Home).</div>
+        </div>
+        <button type="button" id="cn-showall-sw" class="switch ${showAll ? "on" : ""}" role="switch" aria-checked="${showAll}" aria-label="Show all notifications" onclick="toggleNotifShowAll().then(refreshChooseNotifSheetUI)"></button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:8px 2px 6px;gap:8px;flex-wrap:wrap">
+      <div>
+        <div class="sec" style="margin:0">Choose Which Notifications You Receive</div>
+        <div id="cn-count-sub" class="muted" style="font-size:.78rem">${enCnt} of ${NOTIF_CAT_DEFS.length} categories enabled</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="btn small" onclick="setAllNotifCats(true)">All On</button>
+        <button type="button" class="btn small" onclick="setAllNotifCats(false)">All Off</button>
+      </div>
+    </div>
+    <div class="list" style="margin-bottom:12px">${rowsHtml}</div>
+    <div class="btns" style="justify-content:flex-end">
+      <button type="button" class="btn primary" onclick="closeSheet().then(()=>render())">Done</button>
+    </div>
+  </div>`;
+  openSheet("Notifications Options", body, null);
+}
+function notifControlsBarHtml() {
+  const showAll = notifShowAllOn();
+  const enCnt = notifEnabledCount();
+  const totalCnt = NOTIF_CAT_DEFS.length;
+  const catLabel = enCnt === totalCnt ? "All types on" : `${enCnt}/${totalCnt} types`;
+  return `<div class="al-ctrl-bar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 12px">
+    <button type="button" class="chip${showAll ? " on" : ""}" id="notif-showall-btn" style="font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px" onclick="toggleNotifShowAll()" aria-pressed="${showAll}">
+      <span>${showAll ? "✅ Showing All Notifications" : "📋 Show All Notifications"}</span>
+    </button>
+    <button type="button" class="chip${enCnt < totalCnt ? " on" : ""}" id="notif-choose-btn" style="font-weight:700;padding:7px 12px;display:inline-flex;align-items:center;gap:6px" onclick="openChooseNotificationsSheet()">
+      <span>⚙️ Choose Notifications (${catLabel})</span>
+    </button>
+  </div>`;
+}
+
 function alBriefingHtml(list) {
-  list = (list || []).filter(x => !nbIsBill(x) && x.kind !== 'meal' && (x.days == null || x.days <= 14));
+  const showAll = notifShowAllOn();
+  const rawList = (list || []).slice();
+  list = rawList.filter(x => (showAll ? x.kind !== 'meal' : (!nbIsBill(x) && x.kind !== 'meal' && (x.days == null || x.days <= 14))));
   const hero = alPickHero(list);
   const heroHtml = `<div class="al-hero-wrap">
     <div role="button" tabindex="0" class="al-hero ${hero.tone || ''}" onclick="alHeroMarkSeen(${jsArg(hero.id)},false);${esc(hero.go)}">
@@ -23153,12 +23357,42 @@ function alBriefingHtml(list) {
   d.querySelectorAll('.glnewtop').forEach(el => el.classList.add('all'));
   d.querySelectorAll('.jimore').forEach(el => { el.style.display = ''; });
   d.querySelectorAll('.glnewmore, .bfmore, .jimorebtn, .card.empty, .glswipehint, p.glhint, .bflbl, .bflist, .bfrest').forEach(el => el.remove());
-  // Remove Fun/Discover, Quick-Grid duplicate cards & non-Whangārei general news from vertical feed
+  // Remove Fun/Discover, Quick-Grid duplicate cards & non-Whangārei general news from vertical feed unless Show All is on
   const SKIP_NK = /^(joke|fact|place|mi|fr|cowork|fuel-|hw-sleep-|hw-steps-|hw-week-|hw-coach-|bf-nz-|bf-world-)/;
-  d.querySelectorAll('[data-nk]').forEach(el => {
-    const nk = el.getAttribute('data-nk') || '';
-    if (SKIP_NK.test(nk) && !el.closest('.bellpinned')) el.remove();
-  });
+  if (!showAll) {
+    d.querySelectorAll('[data-nk]').forEach(el => {
+      const nk = el.getAttribute('data-nk') || '';
+      if (SKIP_NK.test(nk) && !el.closest('.bellpinned')) el.remove();
+    });
+  }
+  // When Show All is on (or for enabled categories that only live in comingUpList / S.todos), inject upcoming items into d so they appear in the feed
+  try {
+    const extraWrap = document.createElement('div');
+    extraWrap.className = 'list';
+    const extraHtmls = [];
+    // Include upcoming items from comingUpList (bills, cars, pets, appointments, events, birthdays, etc.)
+    rawList.forEach(x => {
+      if (!x || x.kind === 'meal') return;
+      if (!showAll && x.days != null && x.days > 14) return;
+      if (!showAll && x.kind === 'todo') return;
+      try { extraHtmls.push(cuRowHtml(x)); } catch (e) {}
+    });
+    // Include open To-dos when Show All is on or when To-dos category is enabled and sitting > 3 days
+    if (showAll && notifCatOn('todos')) {
+      (S.todos || []).filter(t => t && !t.done && t.title && glOk(t.title)).slice(0, 40).forEach(t => {
+        const dueTxt = t.due ? 'Due ' + fmtW(t.due) : (t.list || 'To-do');
+        extraHtmls.push(`<button class="row" onclick="go('#todo')"><div class="ic todo">☑️</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(dueTxt)}</div></div></button>`);
+      });
+    }
+    if (extraHtmls.length) {
+      extraWrap.innerHTML = extraHtmls.join('');
+      const secEl = document.createElement('div');
+      secEl.className = 'sec';
+      secEl.textContent = 'Coming up';
+      d.appendChild(secEl);
+      d.appendChild(extraWrap);
+    }
+  } catch (e) {}
 
   const P = bellPins(), pinnedSet = new Set(P.map(p => p.id));
   const decorateCard = el => {
@@ -23180,8 +23414,8 @@ function alBriefingHtml(list) {
   };
 
   const pinnedNodes = [], yourDayNodes = [], emailBillNodes = [], sarahNodes = [], carOrderNodes = [], allPrioritised = [];
-  const seenTitles = homeShownKeys();
-  if (hero.key) seenTitles.add(hero.key);
+  const seenTitles = showAll ? new Set() : homeShownKeys();
+  if (!showAll && hero.key) seenTitles.add(hero.key);
 
   const cardTitleKey = el => {
     const c = el.cloneNode(true);
@@ -23287,7 +23521,7 @@ function alBriefingHtml(list) {
       else if (s.startsWith('bills by email')) curSec = 'bills';
       else if (s.startsWith('from sarah')) curSec = 'sarah';
       else if (s.startsWith('deliveries') || s.startsWith('click & collect') || s.startsWith('in progress')) curSec = 'cars';
-      else if (s.startsWith('for you today') || s.startsWith('today') || s.startsWith('reminders') || s.startsWith('new on your lists')) curSec = 'skip';
+      else if (!showAll && (s.startsWith('for you today') || s.startsWith('today') || s.startsWith('reminders') || s.startsWith('new on your lists'))) curSec = 'skip';
       else curSec = 'today';
       return;
     }
@@ -23299,6 +23533,8 @@ function alBriefingHtml(list) {
       const tk = cardTitleKey(el);
       if (curSec !== 'bills' && tk && seenTitles.has(tk)) return;
       if (tk) seenTitles.add(tk);
+      const nCat = classifyNotifElement(el, curSec);
+      if (!notifCatOn(nCat)) return;
       const meta = notifSortMeta(el, curSec);
       allPrioritised.push(meta);
       if (curSec === 'bills') emailBillNodes.push(meta);
@@ -23320,7 +23556,7 @@ function alBriefingHtml(list) {
   let body = '';
   if (alBriefFilter === 'all' || alBriefFilter === 'today') {
     body = block('📌 Pinned', pinnedNodes, 'bellpinned') +
-           block('🔔 Notifications (by date & time sitting)', sortedAll);
+           block(showAll ? '🔔 All Notifications (by date & time sitting)' : '🔔 Notifications (by date & time sitting)', sortedAll);
   } else if (alBriefFilter === 'sarah') {
     body = block('💌 From Sarah', sortedSarah);
   } else if (alBriefFilter === 'cars') {
@@ -23359,7 +23595,7 @@ function GlAlerts() {
       ${arcTab()}
     </div>
   </div>`;
-  return pwrWrap(topBar + header('Notifications', isBoard ? 'Swipe sideways between boards · scroll up and down inside each board' : 'Prioritised top to bottom by date & how long items have been sitting here') + (NB.top) + `
+  return pwrWrap(topBar + header('Notifications', isBoard ? 'Swipe sideways between boards · scroll up and down inside each board' : (notifShowAllOn() ? 'Showing all notifications across your app, prioritised by date & time sitting' : 'Prioritised top to bottom by date & how long items have been sitting here')) + notifControlsBarHtml() + (NB.top) + `
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
 }
 function glWxSky(kind, day) {
@@ -25808,7 +26044,7 @@ async function doneSittingTodo(id, ev) {
 function notifThreeDayBdaysAndSittingTodo() {
   const urgentOut = [], comingOut = [];
   // 1. Upcoming birthdays (up to 14 days away), prioritised by how long until the date
-  try {
+  if (notifCatOn('birthdays')) try {
     (S.birthdays || []).filter(b => b && b.name).map(b => Object.assign({ b }, bdayInfo(b)))
       .filter(x => x.d >= 0 && x.d <= 14 && glOk(x.b.name))
       .sort((a, b) => a.d - b.d)
@@ -25828,8 +26064,8 @@ function notifThreeDayBdaysAndSittingTodo() {
       });
   } catch (e) {}
 
-  // 2. Tasks are now on the Home top-bar Tasks icon (#todo), not in Notifications
-  if (false) try {
+  // 2. Include sitting To-do in Notifications when Show All is on or To-dos category is enabled
+  if (notifCatOn('todos') && notifShowAllOn()) try {
     const st = pickOneSittingTodo();
     if (st && st.todo) {
       const t = st.todo;
