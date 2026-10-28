@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.65';
+const APP_VERSION = '2.28.66';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11601,7 +11601,7 @@ const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'lists', 'food', 'projects', 'settings'] },
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'lists', 'food', 'projects'] },
   { id: 'money', title: 'Life & Local', keys: ['money', 'wellbeing', 'local', 'homelife'] },
   { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'learn'] }
 ];
@@ -21714,10 +21714,11 @@ function wireTabSwipe() {
     if (rd) return;
     const app = appEl(); if (!app) return;
     const left = app.getBoundingClientRect().left;
+    if (e.target.closest('.glmenubtn, [data-bt="more"], #btabs')) return;
     const onBar = !!e.target.closest('#tabbar');
     if (!tabsOpen) {
       if (e.clientX - left > EDGE) return;
-      if (e.target.closest('.reorder')) return;
+      if (e.target.closest('.reorder, .hm-dnd-bar')) return;
     } else if (!onBar) {
       g = { mode: 'outside', x: e.clientX, y: e.clientY, pid: e.pointerId, dx: 0, drag: false, left, t: performance.now(), lx: e.clientX, vx: 0 };
       return;
@@ -22057,9 +22058,7 @@ function glHead(name, m, now) {
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${loc}`;
   const shiftPill = m.sick ? '🤒 Off sick today' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
   let blurb = ''; try { blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || ''); } catch (e) { blurb = esc(glLine(m) || ''); }
-  let qStrip = ''; try { qStrip = typeof glHeroQuoteStrip === 'function' ? glHeroQuoteStrip() : ''; } catch (e) { qStrip = ''; }
-  const lockBtn = typeof glLockBtnHtml === 'function' ? glLockBtnHtml() : '';
-  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open sidebar" title="Open sidebar" onclick="setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${lockBtn}${glTasksBtn()}${glBellBtn()}</div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}${qStrip}</div></div>`;
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open side menu" title="Open side menu" onclick="event.stopPropagation();setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}</div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -35083,7 +35082,13 @@ function glDynamicHeroBlurb(m, now) {
   );
   const s3 = usagePool[(seed * 5 + 2) % usagePool.length];
 
-  return `<span>${s1} ${s2} ${s3}</span> <button type="button" onclick="bumpShaneBlurbSeed(event)" style="border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:999px;padding:1px 8px;font-size:.72rem;font-weight:800;cursor:pointer;margin-left:4px" title="New summary">↻ New</button>`;
+  const shortPool = [
+    s1,
+    `📈 <b>NZX 40</b> <span class="glup">+0.48%</span> · ⛽ <b>91</b> ${esc(glFuelSummaryData().now91)}/L · 💰 Pay in <b>${daysToShanePay}d</b> (Wed 4 Nov).`,
+    pwrToday && pwrToday.solarKWh ? `☀️ <b>SolarZero</b> ${pwrToday.solarKWh} kWh today (${pwrToday.fromSolarPct || 0}% solar) · 🏠 ${tempSnippet}.` : s1
+  ];
+  const pick = shortPool[seed % shortPool.length];
+  return `<span>${pick}</span> <button type="button" onclick="bumpShaneBlurbSeed(event)" style="border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:999px;padding:1px 7px;font-size:.7rem;font-weight:800;cursor:pointer;margin-left:4px" title="Next line">↻</button>`;
 };
 
 /* ---- 2.28.55: Android Auto Steering-Wheel Preset Stepping (P1-P12) & Car Display Metadata for Radio ---- */
@@ -35142,7 +35147,16 @@ function isHomeUnlocked() {
 
 function glLockBtnHtml() {
   const u = isHomeUnlocked();
-  return `<button type="button" class="iconbtn gllockbtn${u ? " unlocked" : ""}" id="gllockbtn" aria-label="${u ? "Lock homepage layout" : "Unlock homepage to drag, drop, add or remove items"}" title="${u ? "Lock homepage layout" : "Unlock homepage to drag, drop, add or remove items"}" onclick="toggleHomeUnlock(event)">${u ? "🔓" : "🔒"}</button>`;
+  return `<div class="hm-bottom-lock-wrap">
+    <button type="button" class="hm-bottom-lock-btn${u ? " unlocked" : ""}" id="gllockbtn" aria-label="${u ? "Lock homepage layout" : "Unlock homepage to drag, drop, add or remove"}" onclick="toggleHomeUnlock(event)">
+      <span class="hm-lock-ico">${u ? "🔓" : "🔒"}</span>
+      <span>${u ? "Unlocked — Tap to Lock Homepage" : "Tap Padlock to Unlock Drag, Drop, Add & Remove"}</span>
+    </button>
+    ${u ? `<div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+      <button type="button" class="btn small primary" onclick="openHomeAddSheet()">＋ Add Section / Card</button>
+      <button type="button" class="btn small" onclick="resetHomeLayoutDefault()">↺ Reset Default</button>
+    </div>` : ""}
+  </div>`;
 }
 
 function getHomeLayoutCfg() {
@@ -35644,7 +35658,7 @@ glanceHome = function () {
     callouts +
     `<div id="hm-sections-dnd" data-dnd-container="section">${orderedSectionsHtml}</div>` +
     asks +
-    `${homeTry("sync note", () => syncNote(), "")}<div class="foot">${homeTry("saved where", () => savedWhere(), "")}</div>`;
+    glLockBtnHtml() + `${homeTry("sync note", () => syncNote(), "")}<div class="foot">${homeTry("saved where", () => savedWhere(), "")}</div>`;
 
   return `<div class="glance${m.night ? " glnight" : ""}${unlocked ? " hm-unlocked" : ""}">${body}</div>`;
 };
@@ -35654,7 +35668,11 @@ glanceHome = function () {
   try {
     const st = document.createElement("style");
     st.textContent = `
-      .gllockbtn.unlocked{background:rgba(245,158,11,.92)!important;color:#0f172a!important;border-color:#fde68a!important;box-shadow:0 0 0 2px rgba(251,191,36,.45)}
+      .hm-bottom-lock-wrap{margin:16px 0 10px;text-align:center}
+      .hm-bottom-lock-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:999px;border:1.5px solid color-mix(in srgb,var(--brand,#0f766e) 35%,var(--line,#cbd5e1));background:var(--card,#fff);color:var(--ink,#0f172a);font-size:.82rem;font-weight:800;box-shadow:0 3px 10px rgba(0,0,0,.08);cursor:pointer;transition:transform .12s,background .15s}
+      .hm-bottom-lock-btn:active{transform:scale(.97)}
+      .hm-bottom-lock-btn .hm-lock-ico{font-size:1.05rem;line-height:1}
+      .hm-bottom-lock-btn.unlocked{background:linear-gradient(135deg,#f59e0b,#d97706)!important;color:#fff!important;border-color:#fde68a!important;box-shadow:0 4px 14px rgba(245,158,11,.38)}
       .hm-edit-banner{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:10px 13px;border-radius:16px;margin:0 0 10px;box-shadow:0 4px 14px rgba(37,99,235,.28)}
       .hm-dnd-item{position:relative;border:1.5px dashed rgba(37,99,235,.55);border-radius:16px;padding:4px;margin-bottom:6px;background:color-mix(in srgb,var(--brand,#2563eb) 4%,transparent);transition:transform .12s,box-shadow .12s}
       .hm-dnd-item.hm-dragging{opacity:.65;transform:scale(.98);box-shadow:0 8px 20px rgba(0,0,0,.22);z-index:20}

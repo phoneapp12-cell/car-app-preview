@@ -236,9 +236,9 @@ html:is([data-theme="dark"],[data-theme="night"]) .notifwx{background:color-mix(
 .empty .t{font-weight:700;font-size:1rem}
 .empty .s{color:var(--ink2);font-size:0.875rem;margin:4px 0 12px;line-height:1.4}
 /* Left tab strip (v1.50.0). Off-screen until a swipe from the left edge. #app clips it while it is hidden. */
-.tabscrim{position:absolute;inset:0;z-index:25;background:color-mix(in srgb,var(--scrim) 40%,transparent)}
+.tabscrim{position:fixed;inset:0;z-index:110;background:color-mix(in srgb,var(--scrim) 45%,transparent)}
 .tabscrim[hidden]{display:none}
-.tabbar{position:absolute;top:0;bottom:0;left:0;width:188px;box-sizing:border-box;z-index:30;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:var(--tabbg);background:color-mix(in srgb,color-mix(in srgb,var(--brand) 20%,var(--card)) 94%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border-right:1px solid color-mix(in srgb,var(--brand) 22%,transparent);border-radius:0 18px 18px 0;box-shadow:8px 0 28px rgba(0,0,0,.16);padding:calc(10px + var(--sat)) 8px calc(10px + var(--sab)) 8px;transform:translateX(calc(-100% - 16px));touch-action:pan-y}
+.tabbar{position:fixed;top:0;bottom:0;left:0;width:210px;max-width:78vw;box-sizing:border-box;z-index:115;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:var(--tabbg);background:color-mix(in srgb,color-mix(in srgb,var(--brand) 20%,var(--card)) 94%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border-right:1px solid color-mix(in srgb,var(--brand) 22%,transparent);border-radius:0 18px 18px 0;box-shadow:8px 0 28px rgba(0,0,0,.16);padding:calc(10px + var(--sat)) 8px calc(10px + var(--sab)) 8px;transform:translateX(calc(-100% - 16px));touch-action:pan-y}
 .tabbar button{display:flex;flex-direction:row;align-items:center;gap:8px;font-size:0.8125rem;font-weight:650;line-height:1.15;text-align:left;color:var(--ink3);padding:7px 6px;min-height:40px;flex-shrink:0;justify-content:flex-start;width:100%}
 .tabbar button.on{color:var(--brand)}
 .tabbar .badge{position:absolute;left:auto;right:-10px;top:-6px;background:var(--red);color:var(--card);font-size:0.625rem;border-radius:999px;padding:1px 5px;font-weight:700;line-height:1.3}
@@ -2448,7 +2448,7 @@ html.gfx .spotlight-bar{background:var(--glass);-webkit-backdrop-filter:blur(8px
 <body>
 <div id="app">
   <main id="view"><noscript>This app needs JavaScript turned on.</noscript></main>
-  <div class="tabscrim" id="tabscrim" hidden></div>
+  <div class="tabscrim" id="tabscrim" onclick="setTabsOpen(false)" hidden></div>
   <nav class="tabbar" id="tabbar" aria-label="Pages" aria-hidden="true"></nav>
   <div class="tabhint" aria-hidden="true"><i></i></div>
 </div>
@@ -2459,7 +2459,7 @@ html.gfx .spotlight-bar{background:var(--glass);-webkit-backdrop-filter:blur(8px
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.28.65"></script>
+<script src="app.js?v=2.28.66"></script>
 <script>
 setTimeout(function () {
   var v = document.getElementById("view");
