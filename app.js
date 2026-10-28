@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.66';
+const APP_VERSION = '2.28.67';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11555,7 +11555,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   reminders: ['bell', 'rem', 'Reminders', 'Reminders'], commission: ['cash', 'comm', 'Commission', 'Commission'], loans: ['coins', 'loan', 'Loans', 'Loans'], events: ['ticket', 'ev', 'Events', 'Events'], news: ['news', 'ln', 'Local news', 'News'],
   tv: ['tv', 'tv', 'TV guide', 'TV'], livetv: ['tv', 'tv', 'Live TV', 'Live TV'],
   meals: ['meal', 'meal', 'Meal planner', 'Meals'], recipes: ['book', 'recipe', 'Recipes', 'Recipes'], shopping: ['cart', 'shop', 'Shopping list', 'Shopping'], pets: ['paw', 'pet', 'Pets &amp; Vet', 'Pets'], garden: ['leaf', 'garden', 'Gardening', 'Garden'], health: ['medkit', 'health', 'Health', 'Health'], watch: ['heart', 'health', 'Watch', 'Watch'], about: ['info', 'about', 'About you', 'About'],
-  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], cashflow: ['coins', 'loan', 'Cash flow', 'Cash flow'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
+  bridge: ['bridge', 'br', 'Lifting bridge', 'Bridge'], bills: ['bill', 'bill', 'Bills', 'Bills'], budget: ['cash', 'loan', 'Budget', 'Budget'], cashflow: ['coins', 'loan', 'Cash flow', 'Cash flow'], finance: ['cash', 'loan', 'Shares & Mortgages', 'Finance'], birthdays: ['cake', 'bday', 'Birthdays', 'Birthdays'], ideas: ['bulb', 'idea', 'Ideas', 'Ideas'],
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
@@ -11601,9 +11601,13 @@ const NAV_DEFAULT = Object.keys(NAV);
 const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[k][0], cls: NAV[k][1], t: NAV[k][2], sub: subs[k] }]));
 /* Side panel groups (1.94.0). Keys are the real sections. Home is with the everyday items. Settings and More sit under the groups. */
 const NAV_GROUPS = [
-  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'lists', 'food', 'projects'] },
-  { id: 'money', title: 'Life & Local', keys: ['money', 'wellbeing', 'local', 'homelife'] },
-  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'learn'] }
+  { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'countdown', 'diary', 'notes', 'photos'] },
+  { id: 'people', title: 'Health', keys: ['watch', 'sleep', 'gym', 'health', 'meds', 'claims', 'birthdays', 'about'] },
+  { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'planning', 'garden', 'events', 'news'] },
+  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
+  { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
+  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
+  { id: 'cars', title: 'Cars & Pets', keys: ['cars', 'fuel', 'pets'] }
 ];
 function navOrder() {
   return NAV_DEFAULT.slice();
@@ -21188,7 +21192,7 @@ async function setRosterDay(day, value) {
    which opens the side strip). Order by press-and-hold drag or the up/down buttons. Long-press a tab to customise.
    Saved in S.settings.bottomTabs, so it goes with sync and backup like other settings. Hidden while typing. */
 const BT_MIN = 3, BT_MAX = 6;
-const BT_DEFAULT = ['home', 'todo', 'shopping', 'bills', 'more'];
+const BT_DEFAULT = ['home', 'lists', 'money', 'media', 'more'];
 function btMeta(k) {
   if (k === 'home') return ['Notifications', 'Home', 'home'];
   if (k === 'weather') return ['Weather', 'Weather', 'cloudsun'];
@@ -21199,11 +21203,18 @@ function btMeta(k) {
 const BT_ALL = () => ['home', 'media', 'food', ...NAV_DEFAULT, 'weather', 'settings', 'more'].filter((k, i, a) => btMeta(k) && a.indexOf(k) === i);
 function btState() {
   S.settings = S.settings || {};
-  const b = S.settings.bottomTabs && typeof S.settings.bottomTabs === 'object' ? S.settings.bottomTabs : (S.settings.bottomTabs = { on: false, keys: BT_DEFAULT.slice() });
+  const b = S.settings.bottomTabs && typeof S.settings.bottomTabs === 'object' ? S.settings.bottomTabs : (S.settings.bottomTabs = { on: true, keys: BT_DEFAULT.slice(), extra: ['food', 'projects', 'wellbeing', 'local', 'homelife'] });
+  if (!S.settings.btCatsMig67) {
+    S.settings.btCatsMig67 = true;
+    b.on = true;
+    b.keys = BT_DEFAULT.slice();
+    b.extra = ['food', 'projects', 'wellbeing', 'local', 'homelife'];
+    try { localStorage.setItem('btCatsMig67', '1'); } catch (e) {}
+  }
   const ok = new Set(BT_ALL());
   b.keys = (Array.isArray(b.keys) ? b.keys : BT_DEFAULT.slice()).filter((k, i, a) => ok.has(k) && a.indexOf(k) === i).slice(0, BT_MAX);
   if (b.keys.length < BT_MIN) b.keys = BT_DEFAULT.slice();
-  b.on = !!b.on;
+  b.on = b.on !== false;
   return b;
 }
 let btPress = null, btLong = false;
@@ -21326,13 +21337,22 @@ function tabbar(active) {
       return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k === 'roster' ? 'work' : k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
     } catch (e) { return ''; }
   };
-  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(btn).join('')}</div>`).join('');
-  bar.innerHTML = groups + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
+  const pwrBtn = (() => { const l = (() => { try { const t = typeof PWR !== 'undefined' && PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })(); return `<button class="${active === 'power' ? 'on' : ''}" ${active === 'power' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#power')"><span class="w"><span style="font-size:1.3rem;line-height:1">⚡</span></span><span class="lbl">${l}</span></button>`; })();
+  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'commission' ? `<button class="${active === 'wage' ? 'on' : ''}" ${active === 'wage' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#wage')"><span class="w"><span style="font-size:1.3rem;line-height:1">💵</span></span><span class="lbl">Wage estimate</span></button>` : '') + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
+  const reno = `<div class="tabgrp g-projects"><div class="tabgh">Projects</div>${btn('projects')}${btn('tidy')}${btn('flagged')}</div>`;
+  bar.innerHTML = groups + reno + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
 function activeTab(r) {
   if (r === 'settings') return 'settings';
   if (r === 'more') return 'more';
+  if (r === 'power' || r === 'compare' || r === 'powertime') return 'power';
+  if (r === 'notbills') return 'notbills';
+  if (r === 'wage') return 'wage';
+  if (r === 'work' || r === 'roster') return 'roster';
+  if (r === 'projects' || r === 'reno' || r === 'mumreno' || r === 'myreno' || r === 'weekend') return 'projects';
+  if (r === 'flagged') return 'flagged';
   if (r === 'home' || r === 'alerts' || r === 'archive' || r === 'summary' || !r) return 'home';
+  if (NAV_GROUPS.some(g => g.keys.includes(r))) return r;
   const item = ROUTE_ITEM[r] || r;
   if (NAV_GROUPS.some(g => g.keys.includes(item))) return item;
   return NAV[item] || MORE_PAGES.includes(r) ? 'more' : 'home';
@@ -27182,7 +27202,7 @@ function bellTodayRows(have) {
    Swipe up on the bar (or tap its handle) and five more tabs slide up above the usual five, same style.
    Swipe down, tap outside or Back folds it away. Long-press the second row (or Settings › Bottom tabs) to choose its five.
    Saved in S.settings.bottomTabs.extra. Only vertical swipes on the bar count, so page scrolling and Android's Back swipe are left alone. */
-const BX_DEFAULT = ['bills', 'calendar', 'cars', 'health', 'alerts'];
+const BX_DEFAULT = ['food', 'projects', 'wellbeing', 'local', 'homelife'];
 const bxMeta = k => k === 'alerts' ? ['Notifications', 'Alerts', 'bell'] : btMeta(k);
 const BX_ALL = () => [...BT_ALL().filter(k => k !== 'more'), 'alerts'].filter((k, i, a) => a.indexOf(k) === i && bxMeta(k));
 function bxKeys() { const b = btState(), ok = new Set(BX_ALL()); let L = Array.isArray(b.extra) ? b.extra.filter((k, i, a) => ok.has(k) && a.indexOf(k) === i) : []; if (L.length !== 5) { const def = BX_DEFAULT.concat(BX_ALL()).filter((k, i, a) => ok.has(k) && a.indexOf(k) === i && !L.includes(k)); L = L.concat(def).slice(0, 5); } return L; }
@@ -36019,9 +36039,8 @@ glStatInner = function () {
 
 // B) 5 Bottom Bar Tiles (#btabs button[data-bt]): flip & rotate subject icon when long-pressed while homescreen is locked
 const BT_ROTATE_SUBJECTS = [
-  "home", "food", "media", "more", "ideas",
-  "todo", "calendar", "bills", "budget", "shopping",
-  "cars", "weather", "tv", "radio", "pets", "projects", "settings"
+  "home", "lists", "money", "media", "food", "projects",
+  "wellbeing", "local", "homelife", "learn", "more"
 ];
 
 async function onBottomTileLongPress(btnEl) {
