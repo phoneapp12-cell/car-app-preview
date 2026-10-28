@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.71';
+const APP_VERSION = '2.28.72';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5969,8 +5969,8 @@ function Todo() {
   const doneToday = (S.todos || []).filter(t => t && t.done && isT(t.doneAt)).length;
   const TKC = ['#22c55e', '#3b82f6', '#ec4899', '#f59e0b', '#8b5cf6', '#06b6d4'], tkc = l => TKC[Math.max(0, S.lists.indexOf(l)) % TKC.length];
   const row = t => todoMetaDedupe(`<div class="row tkcard ${t.done ? 'done' : ''}" style="--tk:${tkc(t.list)}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-    <div class="tkmain"><button class="tapzone" onclick="todoForm('${t.id}')"><div class="tktop" style="gap:6px;flex-wrap:wrap"><div class="t">${sarahBadge(t)}${t.done ? "✅ " + esc(t.title) : todoTitleWithEmoji(t)}</div><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">${!t.done ? `<span onclick="cycleTodoPri('${t.id}', event)" title="Tap to change priority">${todoPriBadge(t)}</span>` : ''}${t.due && !t.done ? `<span class="tkpill">${todoDuePill(t)}</span>` : ''}</div></div>
-    <div class="s"><span class="tktag">${todoListEmoji(t.list)} ${esc(t.list)}</span>${!t.done ? " · " + esc(todoSittingLabel(t)) : ""}${todoAppt(t) ? ' · 🗓️ in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></button>
+    <div class="tkmain"><button class="tapzone" onclick="todoForm('${t.id}')"><div class="tktop" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px"><div class="t" style="width:100%;font-size:1.12rem;line-height:1.3">${sarahBadge(t)}${t.done ? "✅ " + esc(t.title) : todoTitleWithEmoji(t)}</div>${!t.done ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span onclick="cycleTodoPri('${t.id}', event)" title="Tap to change priority">${todoPriBadge(t)}</span>${t.due ? `<span class="tkpill">${todoDuePill(t)}</span>` : ''}</div>` : ''}</div>
+    <div class="s" style="margin-top:6px"><span class="tktag">${todoListEmoji(t.list)} ${esc(t.list)}</span>${!t.done ? " · " + esc(todoSittingLabel(t)) : ""}${todoAppt(t) ? ' · 🗓️ in your calendar' : ''}</div></button>
     <div class="tkacts">${isMineShared(t) || isSarahTodo(t) ? `<span class="tkshare"><span class="tkav">S</span>💌 Shared with Sarah</span>` : ''}${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}<button type="button" class="paybtn tkdone" onclick="tick('${t.id}')">${t.done ? '↩️ Undo' : '✅ Done!'}</button></div></div></div>`);
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
@@ -6818,7 +6818,7 @@ function ideaStepLines(title, notes) {
 }
 /* END_IDEA_STEP_FNS */
 // 2.26.22: on to-dos the 'A simple way to do this' steps only come from the word 'sort' (e.g. 'Sort garage'), not 'clean' or others
-function todoNoSteps(i) { return !!(i && /^todo/.test(String(i.id || '')) && !/\bsort/i.test(String(i.title || ''))); }
+function todoNoSteps(i) { return !!(i && /^todo/.test(String(i.id || ''))); }
 function ensureIdeaSteps(i) {
   if (!i || typeof i !== 'object') return;
   if (Array.isArray(i.steps)) {
@@ -6846,9 +6846,8 @@ function refreshIdeaSteps(i) {
 }
 /* 2.22.4: the step checklists belong on open to-dos (same keyword rules as before). */
 function ensureTodoSteps(t) {
-  if (!t || typeof t !== 'object' || t.done) return;
-  if (todoNoSteps(t)) { if (Array.isArray(t.steps)) { delete t.steps; ideaStepsDirty = true; } return; }
-  ensureIdeaSteps(t);
+  if (!t || typeof t !== 'object') return;
+  if (Array.isArray(t.steps)) { delete t.steps; ideaStepsDirty = true; }
 }
 function copyStepsFrom(src) {
   if (!src || !Array.isArray(src.steps) || !src.steps.length) return null;
@@ -6867,7 +6866,7 @@ function todoListProg(f) { // 2.26.39: All = every to-do on every list, ticked o
   const L = (S.todos || []).filter(t => t && (f === 'All' || t.list === f));
   return progLine(L.filter(t => t.done).length, L.length, f === 'All' ? 'All lists' : f);
 }
-function todoStepsBlock(t, where) {
+function todoStepsBlock(t, where) { return '';
   if (!t || t.done || !Array.isArray(t.steps) || !t.steps.length) return '';
   const rows = t.steps.map(s => {
     const done = !!s.done;
@@ -6876,7 +6875,7 @@ function todoStepsBlock(t, where) {
   }).join('');
   return '<div class="ideasteps todosteps" data-todosteps="' + esc(t.id) + '" data-todowhere="' + where + '"><div class="stepcap">A simple way to do this</div>' + progLine(t.steps.filter(s => s && s.done).length, t.steps.length, 'Steps', 'pgsm') + rows + '</div>';
 }
-function todoStepProg(t) {
+function todoStepProg(t) { return '';
   const lab = ideaProgressLabel(t);
   return lab ? ' · ' + esc(lab) : '';
 }
