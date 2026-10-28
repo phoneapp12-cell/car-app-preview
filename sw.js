@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '2.28.62';
+const VERSION = '2.28.63';
 const CACHE = 'due-dates-' + VERSION;
 const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['./reno.js', 'art/i3-house.webp', 'art/cu-banner.webp', 'art/ja-banner.webp', 'art/i3-bill.webp', 'art/i3-car.webp', 'art/i3-bday.webp', 'art/i3-health.webp', 'art/i3-dentist.webp', 'art/i3-hol.webp', 'art/i3-ev.webp', 'art/i3-todo.webp', 'art/i3-shop.webp', 'art/i3-sarah.webp', 'art/i3-news.webp', 'art/i3-radio.webp', 'art/i3-travel.webp', 'art/i3-weather.webp', 'art/i3-money.webp', 'art/i3-gym.webp', 'art/i3-fuel.webp', 'art/i3-cal.webp', 'art/i3-plate.webp', 'art/i3-bin.webp', 'art/i3-rewards.webp', 'art/i3-tv.webp', 'art/i3-garden.webp', 'art/i3-pet.webp', 'art/dog.webp', './', './app.js', './app.js?v=' + VERSION, './sync-logic.js', './move.js', './move.js?v=' + VERSION, './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest', './data/tides-whangarei.json',
@@ -56,13 +56,17 @@ self.addEventListener('fetch', e => {
       // Order: cached shell → network → plain offline page. Never rejects.
       const clean = async r => (r && r.redirected) ? new Response(await r.blob(), { status: 200, headers: r.headers }) : r;
       try {
+        const res = await fetch(new URL('./', self.registration.scope).href, { cache: 'no-cache' });
+        if (res && res.ok) {
+          const cleaned = await clean(res);
+          try { const c = await caches.open(CACHE); c.put('./', cleaned.clone()); } catch (e) {}
+          return cleaned;
+        }
+      } catch (err) { }
+      try {
         const c = await caches.open(CACHE);
         const hit = (await c.match('./')) || (await c.match('./index.html'));
         if (hit && hit.ok) return await clean(hit);
-      } catch (err) { }
-      try {
-        const res = await fetch(new URL('./', self.registration.scope).href, { cache: 'no-cache' });
-        if (res.ok) return await clean(res);
       } catch (err) { }
       try { return await clean(await fetch(req)); } catch (err) { }
       return new Response('<meta name=viewport content="width=device-width"><p style="font:18px sans-serif;padding:24px">My App can’t load right now. Check the connection, then reopen it.</p>', { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });

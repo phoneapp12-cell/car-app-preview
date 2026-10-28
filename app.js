@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.62';
+const APP_VERSION = '2.28.63';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4093,7 +4093,8 @@ function homeTry(label, fn, fb = '') {
 /* ================= 2.23.75: Clean Home layout (Settings › Appearance › Home layout). The classic layout stays the default.
    Same data and features, just a calmer look: header with the dog, weather card, Priority overview, Today's summary,
    then the strip and every category section, plus a bottom bar with a + quick-add button. ================= */
-const cleanOn = () => !!(S && S.settings && S.settings.homeLayout === 'clean');
+function glanceOn() { return true; }
+const cleanOn = () => false;
 async function setHomeLayout(v) { S.settings.homeLayout = v; await save(); document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'clean' ? 'Clean layout on.' : 'Classic layout on.'); }
 function homeLayoutPicker() {
   const gl = glanceOn(), c = cleanOn();
@@ -4168,8 +4169,8 @@ function cleanFab() {
   openSheet('Add', `<div class="list">${[['todo', 'To-do', 'todoForm()'], ['cal', 'Calendar', 'apptForm()'], ['cart', 'Shopping', 'shopForm()'], ['note', 'Note', 'noteForm()'], ['camera', 'Photo for the strip', 'myPhAdd()']].map(([ic, l, f]) => `<button class="row" onclick="closeSheet().then(()=>${f})"><div class="ic todo">${I(ic)}</div><div class="tx"><div class="t">${l}</div></div>${I('right')}</button>`).join('')}</div>`);
 }
 function Home() {
-  if (homeEdit) return HomeEdit();
-  if (glanceOn()) { const g = homeTry('glance', () => glanceHome(), ''); if (g && g.length > 300) return g; } // 2.26.0: falls back to the classic page on any error
+  homeEdit = false;
+  return glanceHome();
   const now = new Date();
   let cards = '';
   if ('Notification' in window && Notification.permission === 'default' && S.settings.reminders !== false)
@@ -21869,7 +21870,7 @@ async function start() {
     updBridge(); checkBridgeLoc(); checkHere();
   }, 60 * 1000);
 }
-if (!window.__MOVING) start(); // 2.27.46: the new address unpacks a move first (move.js)
+// start() moved to end of app.js so all 2.28.x overrides are initialised first
 
 /* ================= 2.26.0: Glance Home (Settings › Appearance › Home layout › Glance, the default) =================
    Locked night layout and the day layouts Shane approved. Same data as before, laid out for a quick look:
@@ -21879,7 +21880,7 @@ if (!window.__MOVING) start(); // 2.27.46: the new address unpacks a move first 
    Every part is guarded: if anything throws, the classic Home renders instead, so the page never blanks. */
 // 2.26.1: Settings › Notifications layout: New (default) or Classic layout (the pre-2.26.0 page, exactly). Kept on this phone only.
 try { if (localStorage.getItem('notifLayout') === 'classic') localStorage.setItem('notifLayout', 'new'); } catch (e) {}
-const glanceOn = () => true;
+// glanceOn() defined above
 function setNotifLayout(v) { try { localStorage.setItem('notifLayout', v === 'classic' ? 'classic' : 'new'); } catch (e) { } try { if (S && S.settings && S.settings.homeLayout === 'glance') S.settings.homeLayout = 'classic'; } catch (e) { } document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'classic' ? 'Classic layout on.' : 'New layout on.'); }
 const glSportOk = t => !isSport(t);
 const GL_NO = /\bwalk\b.*\bzeus\b|\bzeus\b.*\bwalk\b|\b(teeth|tooth|floss|face ?wash|skin ?care|meds?|medication|pills?|tablets?|bed ?time|go to (bed|sleep)|running late|you'?re late|work hours)\b/i;
@@ -36047,3 +36048,7 @@ async function onBottomTileLongPress(btnEl) {
     console.error("Bottom tile flip error", e);
   }
 }
+
+
+// Start app after all modules and overrides are registered
+if (!window.__MOVING) start();
