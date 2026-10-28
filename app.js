@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.60';
+const APP_VERSION = '2.28.61';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -22046,7 +22046,8 @@ function glTasksBtn() {
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.sick ? '🤒 Off sick today' : m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
-  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open sidebar" title="Open sidebar" onclick="setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}</div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
+  const lockBtn = typeof glLockBtnHtml === 'function' ? glLockBtnHtml() : '';
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open sidebar" title="Open sidebar" onclick="setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${lockBtn}${glTasksBtn()}${glBellBtn()}</div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -35117,4 +35118,634 @@ function radioStepPreset(dir) {
       }
     } catch (e) {}
   };
+})();
+
+
+/* ================= 2.28.61: HOMEPAGE UNLOCK / LOCK DRAG & DROP, ADD & REMOVE CUSTOMISER ================= */
+let __homeEditUnlocked = false;
+
+function isHomeUnlocked() {
+  return !!__homeEditUnlocked;
+}
+
+function glLockBtnHtml() {
+  const u = isHomeUnlocked();
+  return `<button type="button" class="iconbtn gllockbtn${u ? " unlocked" : ""}" id="gllockbtn" aria-label="${u ? "Lock homepage layout" : "Unlock homepage to drag, drop, add or remove items"}" title="${u ? "Lock homepage layout" : "Unlock homepage to drag, drop, add or remove items"}" onclick="toggleHomeUnlock(event)">${u ? "🔓" : "🔒"}</button>`;
+}
+
+function getHomeLayoutCfg() {
+  const def = {
+    sections: ["stat", "wx", "work", "pulse", "week", "quick", "pills"],
+    removedSections: [],
+    pulseCards: ["nzx40", "fuel91", "solarwx", "today"],
+    removedPulseCards: [],
+    quickTiles: ["todo", "bills", "calendar", "cars", "garden", "shop", "food", "power", "livetv"],
+    removedQuickTiles: [],
+    pills: ["nzx40", "fuel", "cashflow", "radio", "tidy", "gflist", "pets", "walks", "learn"],
+    removedPills: []
+  };
+  try {
+    const saved = (S && S.settings && S.settings.homeLayoutV1) || JSON.parse(localStorage.getItem("shaneHomeLayoutV1") || "null");
+    if (!saved || typeof saved !== "object") return def;
+    return {
+      sections: Array.isArray(saved.sections) && saved.sections.length ? saved.sections : def.sections.slice(),
+      removedSections: Array.isArray(saved.removedSections) ? saved.removedSections : [],
+      pulseCards: Array.isArray(saved.pulseCards) && saved.pulseCards.length ? saved.pulseCards : def.pulseCards.slice(),
+      removedPulseCards: Array.isArray(saved.removedPulseCards) ? saved.removedPulseCards : [],
+      quickTiles: Array.isArray(saved.quickTiles) && saved.quickTiles.length ? saved.quickTiles : def.quickTiles.slice(),
+      removedQuickTiles: Array.isArray(saved.removedQuickTiles) ? saved.removedQuickTiles : [],
+      pills: Array.isArray(saved.pills) && saved.pills.length ? saved.pills : def.pills.slice(),
+      removedPills: Array.isArray(saved.removedPills) ? saved.removedPills : []
+    };
+  } catch (e) {
+    return def;
+  }
+}
+
+function saveHomeLayoutCfg(cfg) {
+  try {
+    if (S && S.settings) {
+      S.settings.homeLayoutV1 = cfg;
+      save();
+    }
+    localStorage.setItem("shaneHomeLayoutV1", JSON.stringify(cfg));
+  } catch (e) {}
+}
+
+function toggleHomeUnlock(ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  __homeEditUnlocked = !__homeEditUnlocked;
+  render();
+  if (__homeEditUnlocked) {
+    toast("🔓 Homepage unlocked — drag to reorder, ✕ to remove, or + Add to add items.");
+  } else {
+    toast("🔒 Homepage locked and saved.");
+  }
+}
+
+function resetHomeLayoutDefault() {
+  try {
+    if (S && S.settings) {
+      delete S.settings.homeLayoutV1;
+      save();
+    }
+    localStorage.removeItem("shaneHomeLayoutV1");
+  } catch (e) {}
+  render();
+  toast("Homepage layout restored to default.");
+}
+
+function homeRemItem(group, key, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  const cfg = getHomeLayoutCfg();
+  const listProp = group === "section" ? "sections" : group === "pulse" ? "pulseCards" : group === "quick" ? "quickTiles" : "pills";
+  const remProp = group === "section" ? "removedSections" : group === "pulse" ? "removedPulseCards" : group === "quick" ? "removedQuickTiles" : "removedPills";
+  cfg[listProp] = (cfg[listProp] || []).filter(x => x !== key);
+  if (!(cfg[remProp] || []).includes(key)) cfg[remProp] = (cfg[remProp] || []).concat(key);
+  saveHomeLayoutCfg(cfg);
+  render();
+  toast("Removed from homepage. Tap + Add anytime to bring it back.");
+}
+
+function homeAddItem(group, key, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  const cfg = getHomeLayoutCfg();
+  const listProp = group === "section" ? "sections" : group === "pulse" ? "pulseCards" : group === "quick" ? "quickTiles" : "pills";
+  const remProp = group === "section" ? "removedSections" : group === "pulse" ? "removedPulseCards" : group === "quick" ? "removedQuickTiles" : "removedPills";
+  if (!(cfg[listProp] || []).includes(key)) cfg[listProp] = (cfg[listProp] || []).concat(key);
+  cfg[remProp] = (cfg[remProp] || []).filter(x => x !== key);
+  saveHomeLayoutCfg(cfg);
+  if (sheetOpen) {
+    closeSheet().then(() => {
+      render();
+      toast("Added to homepage!");
+    });
+  } else {
+    render();
+    toast("Added to homepage!");
+  }
+}
+
+function homeMoveItem(group, key, dir, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  const cfg = getHomeLayoutCfg();
+  const listProp = group === "section" ? "sections" : group === "pulse" ? "pulseCards" : group === "quick" ? "quickTiles" : "pills";
+  const arr = (cfg[listProp] || []).slice();
+  const idx = arr.indexOf(key);
+  if (idx < 0) return;
+  const target = idx + dir;
+  if (target < 0 || target >= arr.length) return;
+  const tmp = arr[idx];
+  arr[idx] = arr[target];
+  arr[target] = tmp;
+  cfg[listProp] = arr;
+  saveHomeLayoutCfg(cfg);
+  render();
+}
+
+// Catalogs of all available items that can be on the homepage (including extra ones Shane can add!)
+const HOME_SECTION_META = {
+  stat: { label: "🏠 Smart Home Status Strip (Temps, Doors, Lights, Power, Tide)", icon: "🏠" },
+  wx: { label: "⛅ Onerahi Weather & Sun Banner", icon: "⛅" },
+  work: { label: "💼 Today’s Work Shift & Roster Card", icon: "💼" },
+  pulse: { label: "📊 Live Pulse Cards (NZX Top 40, Petrol, Solar, Today)", icon: "📊" },
+  week: { label: "🗓️ This Week 7-Day Calendar Strip", icon: "🗓️" },
+  quick: { label: "🧭 At a Glance · Quick Jump Tiles", icon: "🧭" },
+  pills: { label: "🔗 Bottom Quick Shortcut Pills", icon: "🔗" },
+  quote: { label: "💬 Daily Quote & Quip Card", icon: "💬" }
+};
+
+const HOME_PULSE_CATALOG = {
+  nzx40: {
+    label: "📈 NZX Top 40 Share Market",
+    render: (ctx) => `<button type="button" class="pulse-card market" onclick="if(!isHomeUnlocked())go('#finance')">
+      <div class="p-top"><span class="p-lbl">📈 NZX Top 40</span><span class="p-badge up">▲ ${esc(ctx.nzx40.chg)}</span></div>
+      <div class="p-main"><span class="p-big" style="color:#4ade80">${esc(ctx.nzx40.val)}</span><span class="p-vs" style="color:#86efac">NZD $${esc(MKT_DATA.nzd)}</span></div>
+      <div class="p-sub"><span>Shares · ASB Rates · KiwiSaver</span><span>Finance ›</span></div>
+    </button>`
+  },
+  fuel91: {
+    label: "⛽ Petrol Prices (91, 95 & Diesel)",
+    render: (ctx) => `<button type="button" class="pulse-card rates" onclick="if(!isHomeUnlocked()){fuelBackHash='#home';go('#fuel');}">
+      <div class="p-top"><span class="p-lbl">⛽ Petrol Prices</span><span class="p-badge ${ctx.fl.badgeCls}">${esc(ctx.fl.badge)}</span></div>
+      <div class="p-main"><span class="p-big">91 $${esc(ctx.fl.now91)}<small>/L</small></span><span class="p-vs">95 $${esc(ctx.fl.now95)}</span></div>
+      <div class="p-sub"><span>Diesel <b>$${esc(ctx.fl.nowD)}/L</b> · Marsden Pt</span><span>30d History ›</span></div>
+    </button>`
+  },
+  solarwx: {
+    label: "☀️ Solar & Weather",
+    render: (ctx) => `<button type="button" class="pulse-card kiwi" onclick="if(!isHomeUnlocked())go('#power')">
+      <div class="p-top"><span class="p-lbl">☀️ Solar &amp; Weather</span><span class="p-badge up">${esc(ctx.wxTemp)} Onerahi</span></div>
+      <div class="p-main"><span class="p-big">${esc(ctx.pwrSolar)}</span><span class="p-vs">${esc(ctx.driveMin)} Town</span></div>
+      <div class="p-sub"><span>SolarZero today &amp; Port Rd run</span><span>Power ›</span></div>
+    </button>`
+  },
+  today: {
+    label: "⚡ Today & Coming Up (Tasks & Bills)",
+    render: (ctx) => `<button type="button" class="pulse-card needed" onclick="if(!isHomeUnlocked())go('#todo')">
+      <div class="p-top"><span class="p-lbl">⚡ Today &amp; Coming Up</span><span class="p-badge warn">${ctx.over5} Tasks &gt;5d</span></div>
+      <div class="p-main"><span class="p-big">${ctx.dueSoon} Bills <small>7d</small></span><span class="p-vs">Pay 4 Nov</span></div>
+      <div class="p-sub"><span>${ctx.over5} sitting tasks · ${ctx.tidyDone}/${ctx.tidyTotal} tidy</span><span>Open Tasks ›</span></div>
+    </button>`
+  },
+  tvguide: {
+    label: "📺 Live TV Guide (141 Ch)",
+    render: (ctx) => `<button type="button" class="pulse-card needed" onclick="if(!isHomeUnlocked())go('#tv')">
+      <div class="p-top"><span class="p-lbl">📺 Live TV Guide</span><span class="p-badge up">${ltvAllChannels().length} Ch</span></div>
+      <div class="p-main"><span class="p-big">${ltvAllChannels().length} Free Ch</span><span class="p-vs">Timeline Grid</span></div>
+      <div class="p-sub"><span>NZ, UK, Movies, Comedy &amp; Cars</span><span>TV Guide ›</span></div>
+    </button>`
+  },
+  bridge: {
+    label: "🚗 Port Rd & Bridge Traffic",
+    render: (ctx) => `<button type="button" class="pulse-card rates" onclick="if(!isHomeUnlocked())go('#bridge')">
+      <div class="p-top"><span class="p-lbl">🚗 Port Rd &amp; Bridge</span><span class="p-badge up">${esc(ctx.driveMin)}</span></div>
+      <div class="p-main"><span class="p-big">${esc(ctx.driveMin)}</span><span class="p-vs">Onerahi → Town</span></div>
+      <div class="p-sub"><span>Te Matau a Pohe &amp; WDC roadworks</span><span>Roads ›</span></div>
+    </button>`
+  },
+  tidy10: {
+    label: "🧹 10-Minute Tidy Tracker",
+    render: (ctx) => `<button type="button" class="pulse-card kiwi" onclick="if(!isHomeUnlocked())go('#tidy')">
+      <div class="p-top"><span class="p-lbl">🧹 10-Min Tidy</span><span class="p-badge up">Zero pressure</span></div>
+      <div class="p-main"><span class="p-big">${ctx.tidyDone} / ${ctx.tidyTotal} Spots</span><span class="p-vs">10m timer</span></div>
+      <div class="p-sub"><span>One small drawer or shelf at a time</span><span>Pick a spot ›</span></div>
+    </button>`
+  },
+  watch: {
+    label: "⌚ Watch & Gym Streak",
+    render: (ctx) => `<button type="button" class="pulse-card market" onclick="if(!isHomeUnlocked())go('#watch')">
+      <div class="p-top"><span class="p-lbl">⌚ Watch &amp; Gym</span><span class="p-badge up">🔥 ${ctx.stepStreak}d Streak</span></div>
+      <div class="p-main"><span class="p-big">${ctx.stepStreak} Days</span><span class="p-vs">Tue/Wed Gym</span></div>
+      <div class="p-sub"><span>Huawei watch steps &amp; sleep</span><span>Open Watch ›</span></div>
+    </button>`
+  }
+};
+
+function buildQuickTilesMap(m) {
+  const T = todayISO(), map = {};
+  const BG = {
+    todo: "todo-banner", bills: "bills-banner", calendar: "cal-banner",
+    cars: "cars-banner", garden: "events-banner", shop: "shopping-banner",
+    food: "meals-banner", power: "budget-banner", livetv: "tv-banner",
+    tv: "tv-banner", radio: "music-banner", finance: "budget-banner",
+    fuel: "cars-banner", pets: "pets-banner", reno: "diy-banner",
+    weather: "cu-banner", tidy: "todo-banner", cashflow: "bills-banner"
+  };
+  const q = (k, label, art, a, b, title, s, go, badgeTxt, badgeTone) => {
+    const bg = BG[k] ? `background-image:url('art/${BG[k]}.webp');` : "";
+    const bCls = badgeTone === "warn" ? " warn" : badgeTone === "ok" ? " ok" : "";
+    const bHtml = badgeTxt ? `<span class="glnum-pill${bCls}">${esc(badgeTxt)}</span>` : "";
+    map[k] = {
+      label,
+      html: `<button type="button" class="gltile glic glsm glkrea" style="${bg}--a:${a};--b:${b}" onclick="if(!isHomeUnlocked()){${go}}">${bHtml}<img src="art/i3-${art}.webp" alt="" loading="lazy" onerror="this.remove()"><span class="gltt">${title}<small>${esc(s)}</small></span></button>`
+    };
+  };
+  try {
+    const o = (S.todos || []).filter(t => t && !t.done && glOk(t.title)), over5 = glTasksOverdue5Count(), td = o.filter(t => t.due && t.due <= T).length;
+    const tdDone = (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === "done").length; } catch (e) { return 0; } })();
+    q("todo", "☑️ To-do Tile", "todo", "#2563eb", "#1e40af", "To-do",
+      o.length ? `${o.length} open · ${over5 ? over5 + " sitting >5d · " : ""}${tdDone} tidy spots` : `All done · ${tdDone} tidy spots`,
+      "go('#todo')", over5 ? `${over5} >5d` : td ? `${td} today` : `${o.length} open`, over5 ? "warn" : o.length === 0 ? "ok" : "");
+  } catch (e) {}
+  try {
+    const unpaid = (S.bills || []).filter(x => x && !x.paid && x.due).sort((x, y) => String(x.due).localeCompare(String(y.due)));
+    const b = unpaid[0], due7 = unpaid.filter(x => daysLeft(x.due) <= 7).length;
+    const nxtPay = (() => { try { const d = incDates("shane", T, addDays(T, 16))[0]; return d ? fmtW(d) : "Wed 4 Nov"; } catch (e) { return "Wed 4 Nov"; } })();
+    q("bills", "🧾 Bills & Pay Tile", "bill", "#dc2626", "#9a3412", "Bills & Pay",
+      b ? `${b.name} (${daysLeft(b.due) < 0 ? "overdue" : fmtW(b.due)}) · Pay ${nxtPay}` : `All paid · Next pay ${nxtPay}`,
+      "go('#bills')", b && daysLeft(b.due) < 0 ? "Overdue" : due7 ? `${due7} due soon` : "All good", (b && daysLeft(b.due) <= 3) ? "warn" : !b ? "ok" : "");
+  } catch (e) {}
+  try {
+    const a = (S.appts || []).filter(x => x && x.date === T && !x.done);
+    const wkN = (() => { try { const W = weekItems(); return (W[T] || []).length; } catch (e) { return a.length + (!m.off ? 1 : 0); } })();
+    q("calendar", "📅 Calendar Tile", "cal", "#7c3aed", "#4c1d95", "Calendar",
+      !m.off ? `Work ${glShift(m)}${a.length ? " · " + a[0].title : (m.dow === 2 || m.dow === 3 ? " · Gym 6pm" : "")}` : a.length ? a[0].title : "Day off · Free schedule",
+      "go('#calendar')", wkN ? `${wkN} today` : "Free", "");
+  } catch (e) {}
+  try {
+    const c = glCU().filter(x => x.kind === "car" || x.kind === "driver"), ipf = x => { try { return !!(x.ref && x.ref.kind === "car" && carProg(x.ref.car, x.ref.part)); } catch (e) { return false; } }, ip = c.filter(ipf).length, od = c.filter(x => x.days < 0 && !ipf(x)).length;
+    const totalCars = (S.cars || []).length || 3;
+    const plates = (S.cars || []).map(x => x.plate).filter(Boolean).join(" · ") || "MUL27 · PNU312 · KBZ234";
+    q("cars", "🚗 Cars Tile", "car", "#0891b2", "#155e75", "Cars",
+      c.length ? ((od ? od + " overdue · " : "") + (ip ? ip + " in progress · " : "") + plates) : `${plates} · All green`,
+      "go('#cars')", od ? `${od} overdue` : ip ? `${ip} WOF` : `${totalCars}/${totalCars} OK`, od ? "warn" : "ok");
+  } catch (e) {}
+  try {
+    const g = glCU().find(x => x.kind === "garden");
+    const curT = (() => { try { return Math.round(WX.data.current.temperature_2m) + "°"; } catch (e) { return ""; } })();
+    q("garden", "🌱 Garden Tile", "garden", "#16a34a", "#14532d", "Garden",
+      g ? String(g.name || "").replace(/<[^>]+>/g, "") : glGardenSafe() ? "Cool enough to water & feed" : "Too warm to feed · Lawns 2-wk",
+      "go('#garden')", curT ? `${curT} ${glGardenSafe() ? "Cool" : "Mild"}` : "Garden", "");
+  } catch (e) {}
+  try {
+    const n = (S.shop && S.shop.items || []).filter(x => x && !x.done).length;
+    q("shop", "🛒 Shopping Tile", "shop", "#ea580c", "#9a3412", "Shopping",
+      n ? `${plural(n, "item")} on GF list · Sarah sync` : "List is clear · Tap to add",
+      "go('#shopping')", n ? `${n} items` : "0 items", "");
+  } catch (e) {}
+  try {
+    const nights = mealNights(), nxt = nights.find(d => M().plan[d] && M().plan[d].title), r = glPickRecipe();
+    const recCount = (() => { try { return visibleIdeas().length; } catch (e) { return 40; } })();
+    q("food", "🍕 GF Meals Tile", "plate", "#e11d48", "#9f1239", "GF Meals",
+      nxt ? `${fmtW(nxt)}: ${M().plan[nxt].title}` : r ? `Idea: ${r.title} (${recCount} GF)` : `${recCount} Coeliac-safe recipes`,
+      "go('#food')", nxt ? fmtW(nxt).split(" ")[0] : "Fri/Sat", "");
+  } catch (e) {}
+  try {
+    const d = (typeof PWR !== "undefined" && PWR) || null, t = d && d.today, tc = t ? (t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1)) : null, bat = d && d.now && Number.isFinite(d.now.batterySocPct) ? `${d.now.batterySocPct}% bat` : "SolarZero";
+    const share = (() => { try { return pwrBudget() / 7; } catch (e) { return 8.57; } })();
+    const under = tc != null && Number.isFinite(+tc) && +tc <= share;
+    q("power", "☀️ Solar & Power Tile", "zap", "#0d9488", "#115e59", "Solar & Power",
+      tc != null && Number.isFinite(+tc) ? `${bat} · ${under ? "Under" : "Vs"} $${share.toFixed(2)}/d budget` : "Live SolarZero & Ecotricity",
+      "go('#power')", tc != null && Number.isFinite(+tc) ? `$${(+tc).toFixed(2)}` : "Solar", under ? "ok" : "");
+  } catch (e) {}
+  try {
+    const recN = ((typeof LTV_DVR !== "undefined" && LTV_DVR && LTV_DVR.recordings) || []).length;
+    const chN = (() => { try { return ltvAllChannels().length; } catch (e) { return 141; } })();
+    q("livetv", "📺 Live TV & DVR Tile", "tv", "#4f46e5", "#312e81", "Live TV & DVR",
+      recN ? `TVNZ 1 · Bravo · ${recN} recorded` : "TVNZ 1 · Bravo · Movies · DVR",
+      "go('#livetv')", `${chN} Ch`, "");
+  } catch (e) {}
+  // Extra optional tiles Shane can add via + Add!
+  try {
+    const chN = (() => { try { return ltvAllChannels().length; } catch (e) { return 141; } })();
+    q("tv", "🎬 TV Guide Grid Tile", "tv", "#1d4ed8", "#1e3a8a", "TV Guide", `${chN} channels · Freeview & World`, "go('#tv')", "Guide", "");
+    q("radio", "📻 Car Stereo Radio Tile", "radio", "#7e22ce", "#581c87", "Car Stereo", "P1–P12 Presets · NZ & World", "go('#radio')", "12P", "");
+    q("finance", "📈 Finance & NZX 40 Tile", "money", "#15803d", "#14532d", "Finance", "NZX Top 40 · ASB Rates · KiwiSaver", "go('#finance')", "NZX 40", "ok");
+    const fl = glFuelSummaryData();
+    q("fuel", "⛽ Petrol Prices Tile", "fuel", "#b45309", "#78350f", "Petrol Prices", `91 $${fl.now91} · 95 $${fl.now95} · Dsl $${fl.nowD}`, "go('#fuel')", `$${fl.now91}`, "");
+    q("pets", "🐾 Zeus, Mindy & Silken Tile", "pet", "#be185d", "#831843", "Pets", "Zeus · Mindy · Silken care & dates", "go('#pets')", "3 Pets", "");
+    q("reno", "🛠️ Renovations Board Tile", "diy", "#0369a1", "#0c4a6e", "Renovations", "Millesha’s, Mum’s & My Reno", "go('#projects')", "Reno", "");
+    q("weather", "⛅ Weather & Tides Tile", "weather", "#0284c7", "#075985", "Weather & Tides", "Onerahi forecast & high/low tide", "go('#weather')", "Onerahi", "");
+    q("tidy", "🧹 10-Min Tidy Tile", "todo", "#0f766e", "#134e4a", "10-Min Tidy", "One small spot at a time", "go('#tidy')", "10m", "ok");
+    q("cashflow", "🔄 Cash Flow Tile", "money", "#047857", "#064e3b", "Cash Flow", "Fortnightly pay & transfers", "go('#cashflow')", "Pay", "");
+  } catch (e) {}
+  return map;
+}
+
+function buildPillsCatalog() {
+  const tidyDone = (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === "done").length; } catch (e) { return 3; } })();
+  const tidyTot = (() => { try { return tdAllSpots().length; } catch (e) { return 17; } })();
+  const fl = glFuelSummaryData();
+  return {
+    nzx40: { label: "📈 NZX Top 40 Pill", html: `<a href="#finance" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-money.webp" alt="">NZX Top 40 <i>+0.48%</i></a>` },
+    fuel: { label: "⛽ Petrol Prices Pill", html: `<a href="#fuel" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-fuel.webp" alt="">Petrol Prices <i>$${esc(fl.now91)}</i></a>` },
+    cashflow: { label: "🔄 Cash Flow Pill", html: `<a href="#cashflow" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-money.webp" alt="">Cash Flow <i>Pay</i></a>` },
+    radio: { label: "📻 Car Stereo Pill", html: `<a href="#radio" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-radio.webp" alt="">Car Stereo <i>12P</i></a>` },
+    tidy: { label: "🧹 10m Tidy Pill", html: `<a href="#tidy" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-todo.webp" alt="">10m Tidy <i>${tidyDone}/${tidyTot}</i></a>` },
+    gflist: { label: "🌾 GF Safe List Pill", html: `<a href="#gflist" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-shield.webp" alt="">GF Safe List</a>` },
+    pets: { label: "🐾 Zeus & Pets Pill", html: `<a href="#pets" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-pet.webp" alt="">Zeus &amp; Pets</a>` },
+    walks: { label: "🥾 Walks Pill", html: `<a href="#walks" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-travel.webp" alt="">Walks</a>` },
+    learn: { label: "🎓 Learn Pill", html: `<a href="#learn" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-idea.webp" alt="">Learn <i>9</i></a>` },
+    tv: { label: "📺 TV Guide Pill", html: `<a href="#tv" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-tv.webp" alt="">TV Guide <i>${ltvAllChannels().length}</i></a>` },
+    reno: { label: "🛠️ Renovations Pill", html: `<a href="#projects" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-diy.webp" alt="">Renovations</a>` },
+    lights: { label: "💡 Hue Lights Pill", html: `<a href="#lights" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-idea.webp" alt="">Hue Lights</a>` },
+    heat: { label: "🌡️ Heat Pumps Pill", html: `<a href="#heat" onclick="if(isHomeUnlocked()){event.preventDefault();return;}"><img src="art/i3-weather.webp" alt="">Heat Pumps</a>` }
+  };
+}
+
+function wrapHomeEditableItem(group, key, innerHtml, label) {
+  if (!isHomeUnlocked()) return innerHtml;
+  return `<div class="hm-dnd-item" data-dnd-group="${esc(group)}" data-dnd-key="${esc(key)}" draggable="true">
+    <div class="hm-dnd-bar">
+      <span class="hm-dnd-grip" title="Drag to reorder">⠿ ${esc(label || key)}</span>
+      <div class="hm-dnd-actions">
+        <button type="button" class="hm-dnd-act" title="Move earlier" onclick="homeMoveItem('${esc(group)}','${esc(key)}',-1,event)">↑</button>
+        <button type="button" class="hm-dnd-act" title="Move later" onclick="homeMoveItem('${esc(group)}','${esc(key)}',1,event)">↓</button>
+        <button type="button" class="hm-dnd-act hm-dnd-del" title="Remove from homepage" onclick="homeRemItem('${esc(group)}','${esc(key)}',event)">✕</button>
+      </div>
+    </div>
+    <div class="hm-dnd-body">${innerHtml}</div>
+  </div>`;
+}
+
+function openHomeAddSheet(filterGroup) {
+  const cfg = getHomeLayoutCfg();
+  const m = glMode();
+  const qMap = buildQuickTilesMap(m);
+  const pMap = buildPillsCatalog();
+
+  const secAvail = Object.keys(HOME_SECTION_META).filter(k => !cfg.sections.includes(k));
+  const pulseAvail = Object.keys(HOME_PULSE_CATALOG).filter(k => !cfg.pulseCards.includes(k));
+  const quickAvail = Object.keys(qMap).filter(k => !cfg.quickTiles.includes(k));
+  const pillsAvail = Object.keys(pMap).filter(k => !cfg.pills.includes(k));
+
+  const renderGroup = (title, grp, keys, getLabel) => {
+    if (filterGroup && filterGroup !== grp && keys.length === 0) return "";
+    const items = keys.length
+      ? keys.map(k => `<button type="button" class="chip" style="padding:7px 11px;font-weight:750" onclick="homeAddItem('${grp}','${k}',event)">＋ ${esc(getLabel(k))}</button>`).join("")
+      : `<span class="muted" style="font-size:.8rem">All items in this section are already on your homepage.</span>`;
+    return `<div class="card" style="padding:10px 12px;margin-bottom:8px">
+      <div style="font-weight:800;font-size:.88rem;margin-bottom:6px">${title}</div>
+      <div class="chips" style="gap:6px;flex-wrap:wrap">${items}</div>
+    </div>`;
+  };
+
+  const body =
+    `<p class="muted" style="margin:0 0 10px">Tap any item below to add it to your homepage, or drag items while unlocked to rearrange them.</p>` +
+    renderGroup("🧱 Homepage Sections", "section", secAvail, k => HOME_SECTION_META[k].label) +
+    renderGroup("📊 Live Pulse Cards", "pulse", pulseAvail, k => HOME_PULSE_CATALOG[k].label) +
+    renderGroup("🧭 Quick Jump Tiles", "quick", quickAvail, k => qMap[k].label) +
+    renderGroup("🔗 Bottom Shortcut Pills", "pill", pillsAvail, k => pMap[k].label);
+
+  openSheet("＋ Add to Homepage", body, null, "Done", `<button type="button" class="btn" onclick="closeSheet().then(()=>resetHomeLayoutDefault())">↺ Reset Default</button>`);
+}
+
+// Override glLivePulseHtml, glQuick, glExtraQuickPills, and glanceHome to support Unlock / Lock Drag-and-Drop, Add & Remove!
+glLivePulseHtml = function (m) {
+  m = m || glMode();
+  const cfg = getHomeLayoutCfg();
+  const unlocked = isHomeUnlocked();
+  const ctx = {
+    over5: glTasksOverdue5Count(),
+    unpaid: (S.bills || []).filter(x => x && !x.paid && x.due),
+    dueSoon: (S.bills || []).filter(x => x && !x.paid && x.due && daysLeft(x.due) <= 7).length,
+    stepStreak: (() => { try { return hwStreak(hwGoal()) || 4; } catch (e) { return 4; } })(),
+    tidyDone: (() => { try { return tdAllSpots().filter(s => tdStatusOf(s.id) === "done").length; } catch (e) { return 3; } })(),
+    tidyTotal: (() => { try { return tdAllSpots().length; } catch (e) { return 17; } })(),
+    fl: glFuelSummaryData(),
+    wxTemp: (() => { try { return (typeof WX !== "undefined" && WX && WX.cur && WX.cur.temp != null) ? Math.round(WX.cur.temp) + "°" : "16°"; } catch (e) { return "16°"; } })(),
+    pwrSolar: (() => { try { return (typeof PWR !== "undefined" && PWR && PWR.today && PWR.today.solarKWh != null) ? PWR.today.solarKWh + " kWh" : "Solar live"; } catch (e) { return "Solar live"; } })(),
+    driveMin: (() => { try { return (typeof DRIVE !== "undefined" && DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds)) ? Math.round(DRIVE.seconds / 60) + " min" : "16 min"; } catch (e) { return "16 min"; } })(),
+    nzx40: MKT_DATA.nzx40 || { val: "11,920", chg: "+0.48%", up: true }
+  };
+
+  let keys = cfg.pulseCards;
+  if (!unlocked && __pulseMode === "fuel") keys = ["nzx40", "fuel91", "bridge", "solarwx"];
+  else if (!unlocked && __pulseMode === "home") keys = ["nzx40", "solarwx", "tvguide", "fuel91"];
+  else if (!unlocked && __pulseMode === "streaks") keys = ["nzx40", "today", "tidy10", "watch"];
+
+  const cardsHtml = keys
+    .filter(k => HOME_PULSE_CATALOG[k])
+    .map(k => {
+      const h = HOME_PULSE_CATALOG[k].render(ctx);
+      return unlocked ? wrapHomeEditableItem("pulse", k, h, HOME_PULSE_CATALOG[k].label.replace(/^[^\s]+\s*/, "")) : h;
+    })
+    .join("");
+
+  return `<div class="gllivepulse" id="gllivepulse">
+    <div class="glzone" style="margin:6px 0 6px">
+      <span>📊 Live Pulse · NZX Top 40 &amp; General</span>
+      <span style="display:flex;gap:6px;align-items:center">
+        ${unlocked ? `<button type="button" class="glrotbtn" onclick="openHomeAddSheet('pulse')">＋ Add Card</button>` : ""}
+        <button type="button" class="glrotbtn" onclick="setPulseMode('next', event)">↻ Cycle view</button>
+      </span>
+    </div>
+    <div class="pulse-grid" data-dnd-container="pulse">${cardsHtml}</div>
+    <div class="spotlight-bar">
+      <div class="sp-pills">
+        <button type="button" class="sp-chip${__pulseMode === "all" ? " on" : ""}" onclick="setPulseMode('all', event)">📊 Custom</button>
+        <button type="button" class="sp-chip${__pulseMode === "fuel" ? " on" : ""}" onclick="setPulseMode('fuel', event)">⛽ Petrol &amp; Roads</button>
+        <button type="button" class="sp-chip${__pulseMode === "home" ? " on" : ""}" onclick="setPulseMode('home', event)">☀️ Power &amp; TV</button>
+        <button type="button" class="sp-chip${__pulseMode === "streaks" ? " on" : ""}" onclick="setPulseMode('streaks', event)">☑️ Tasks &amp; Tidy</button>
+      </div>
+      <button type="button" class="sp-more" onclick="go('#finance')">Finance Page ›</button>
+    </div>
+  </div>`;
+};
+
+glQuick = function (m) {
+  const cfg = getHomeLayoutCfg();
+  const unlocked = isHomeUnlocked();
+  const qMap = buildQuickTilesMap(m || glMode());
+  const tilesHtml = cfg.quickTiles
+    .filter(k => qMap[k])
+    .map(k => unlocked ? wrapHomeEditableItem("quick", k, qMap[k].html, qMap[k].label.replace(/^[^\s]+\s*/, "").replace(/\s*Tile$/, "")) : qMap[k].html)
+    .join("");
+  return `<div class="glzone" style="margin-top:8px">
+    <span>🧭 At a Glance · Quick Jump</span>
+    <span style="display:flex;gap:8px;align-items:center">
+      ${unlocked ? `<button type="button" class="glrotbtn" onclick="openHomeAddSheet('quick')">＋ Add Tile</button>` : ""}
+      <a href="#" onclick="event.preventDefault();openQuickMenuSheet()">All Sections ›</a>
+    </span>
+  </div><div class="glgrid glg3" data-dnd-container="quick">${tilesHtml}</div>`;
+};
+
+glExtraQuickPills = function () {
+  const cfg = getHomeLayoutCfg();
+  const unlocked = isHomeUnlocked();
+  const pMap = buildPillsCatalog();
+  const pillsHtml = cfg.pills
+    .filter(k => pMap[k])
+    .map(k => unlocked ? wrapHomeEditableItem("pill", k, pMap[k].html, pMap[k].label.replace(/^[^\s]+\s*/, "").replace(/\s*Pill$/, "")) : pMap[k].html)
+    .join("");
+  return `<div class="wklinks wklinks-clean" data-dnd-container="pill">${pillsHtml}${unlocked ? `<button type="button" class="chip" style="padding:5px 10px;font-size:.76rem;font-weight:800" onclick="openHomeAddSheet('pill')">＋ Add Pill</button>` : ""}</div>`;
+};
+
+glanceHome = function () {
+  const now = new Date(), m = glMode(now), name = homeTry("name", () => S.settings.name) || "Shane";
+  const cfg = getHomeLayoutCfg();
+  const unlocked = isHomeUnlocked();
+  homeShownNow = new Set(); homeDueCards = new Set();
+  setTimeout(homeStatusRefresh, 0);
+
+  let callouts = "";
+  if ("Notification" in window && Notification.permission === "default" && S.settings.reminders !== false) callouts += `<div class="callout green">${I("bell")}<div style="flex:1"><b>Get reminders on this phone</b><br>We’ll nudge you before WOFs, rego, bills and to-dos are due.<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="turnOnReminders()">Turn on reminders</button></div></div></div>`;
+  if (deferredPrompt && !isStandalone()) callouts += `<div class="callout blue">${I("phoneDown")}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
+
+  const editBanner = unlocked ? `<div class="hm-edit-banner">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div><b>🔓 Homepage Unlocked</b><div style="font-size:.76rem;opacity:.9">Drag any card or section to reorder, tap <b>✕</b> to remove, or tap <b>＋ Add</b>.</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" class="btn small" style="background:#fff;color:#0f172a;font-weight:800" onclick="openHomeAddSheet()">＋ Add Item</button>
+        <button type="button" class="btn small" onclick="resetHomeLayoutDefault()">↺ Reset</button>
+        <button type="button" class="btn small primary" onclick="toggleHomeUnlock(event)">🔒 Lock</button>
+      </div>
+    </div>
+  </div>` : "";
+
+  const statInner = glStatInner();
+  const secRenderers = {
+    stat: () => `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="if(!isHomeUnlocked())glStatToggle()" aria-label="Home status. Tap for details."${statInner ? "" : " hidden"}>${statInner}</div>`,
+    wx: () => `<div class="glwx">${homeTry("gl weather", () => glWxCard(m), "") || homeTry("weather strip", () => notifWxStrip(), "")}</div>`,
+    work: () => m.night ? "" : homeTry("gl work", () => glWorkCard(m), ""),
+    pulse: () => homeTry("live pulse", () => glLivePulseHtml(m), ""),
+    week: () => {
+      const wk = homeTry("week overview", () => weekOverview(), "");
+      if (!wk) return "";
+      return `<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? "Hide bills" : "Show bills"}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}`;
+    },
+    quick: () => homeTry("gl quick", () => glQuick(m), ""),
+    pills: () => homeTry("extra pills", () => glExtraQuickPills(), ""),
+    quote: () => typeof glHeroQuoteStrip === "function" ? glHeroQuoteStrip() : ""
+  };
+
+  const orderedSectionsHtml = cfg.sections
+    .filter(k => secRenderers[k])
+    .map(k => {
+      const raw = secRenderers[k]();
+      if (!raw) return "";
+      const meta = HOME_SECTION_META[k] || { label: k };
+      return unlocked ? wrapHomeEditableItem("section", k, raw, meta.label) : raw;
+    })
+    .filter(Boolean)
+    .join("");
+
+  const asks = m.night ? homeTry("place ask", () => placeAskHtml(), "") + homeTry("sleep ask", () => sleepCheckCard(), "") + homeTry("routine ask", () => routineAskCard(), "") + homeTry("know", () => knowCard(), "") + homeTry("book ask", () => bookAskCard(), "") : "";
+
+  const body =
+    homeTry("commute", () => commuteBanner(), "") +
+    glHead(name, m, now) +
+    editBanner +
+    homeTry("mail strip", () => mailStrip(), "") +
+    homeTry("gym now", () => gymNowHtml(), "") +
+    callouts +
+    `<div id="hm-sections-dnd" data-dnd-container="section">${orderedSectionsHtml}</div>` +
+    asks +
+    `${homeTry("sync note", () => syncNote(), "")}<div class="foot">${homeTry("saved where", () => savedWhere(), "")}</div>`;
+
+  return `<div class="glance${m.night ? " glnight" : ""}${unlocked ? " hm-unlocked" : ""}">${body}</div>`;
+};
+
+// Pointer / Touch / HTML5 Drag-and-Drop Handler for .hm-dnd-item when homepage is unlocked
+(() => {
+  try {
+    const st = document.createElement("style");
+    st.textContent = `
+      .gllockbtn.unlocked{background:rgba(245,158,11,.92)!important;color:#0f172a!important;border-color:#fde68a!important;box-shadow:0 0 0 2px rgba(251,191,36,.45)}
+      .hm-edit-banner{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:10px 13px;border-radius:16px;margin:0 0 10px;box-shadow:0 4px 14px rgba(37,99,235,.28)}
+      .hm-dnd-item{position:relative;border:1.5px dashed rgba(37,99,235,.55);border-radius:16px;padding:4px;margin-bottom:6px;background:color-mix(in srgb,var(--brand,#2563eb) 4%,transparent);transition:transform .12s,box-shadow .12s}
+      .hm-dnd-item.hm-dragging{opacity:.65;transform:scale(.98);box-shadow:0 8px 20px rgba(0,0,0,.22);z-index:20}
+      .hm-dnd-item.hm-drop-target{outline:2.5px solid #f59e0b;background:rgba(245,158,11,.12)}
+      .hm-dnd-bar{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 7px;margin-bottom:4px;border-radius:10px;background:rgba(15,23,42,.78);color:#fff;font-size:.7rem;font-weight:800;touch-action:none;user-select:none;cursor:grab}
+      .hm-dnd-grip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+      .hm-dnd-actions{display:flex;gap:3px;flex-shrink:0}
+      .hm-dnd-act{border:0;background:rgba(255,255,255,.18);color:#fff;border-radius:6px;padding:2px 6px;font-size:.7rem;font-weight:800;cursor:pointer;line-height:1.1}
+      .hm-dnd-act.hm-dnd-del{background:rgba(239,68,68,.85);color:#fff}
+    `;
+    document.head.appendChild(st);
+  } catch (e) {}
+
+  let dragState = null;
+
+  function reorderGroupKeys(group, fromKey, toKey) {
+    if (!group || !fromKey || !toKey || fromKey === toKey) return;
+    const cfg = getHomeLayoutCfg();
+    const listProp = group === "section" ? "sections" : group === "pulse" ? "pulseCards" : group === "quick" ? "quickTiles" : "pills";
+    const arr = (cfg[listProp] || []).slice();
+    const fromIdx = arr.indexOf(fromKey);
+    const toIdx = arr.indexOf(toKey);
+    if (fromIdx < 0 || toIdx < 0) return;
+    arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, fromKey);
+    cfg[listProp] = arr;
+    saveHomeLayoutCfg(cfg);
+    render();
+  }
+
+  // HTML5 Drag & Drop (desktop/mouse)
+  document.addEventListener("dragstart", (e) => {
+    if (!isHomeUnlocked()) return;
+    const item = e.target.closest(".hm-dnd-item");
+    if (!item) return;
+    dragState = { group: item.dataset.dndGroup, key: item.dataset.dndKey };
+    item.classList.add("hm-dragging");
+    try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragState.key); } catch (er) {}
+  });
+  document.addEventListener("dragover", (e) => {
+    if (!dragState || !isHomeUnlocked()) return;
+    const over = e.target.closest(`.hm-dnd-item[data-dnd-group="${dragState.group}"]`);
+    if (!over) return;
+    e.preventDefault();
+    document.querySelectorAll(".hm-drop-target").forEach(el => el.classList.remove("hm-drop-target"));
+    if (over.dataset.dndKey !== dragState.key) over.classList.add("hm-drop-target");
+  });
+  document.addEventListener("drop", (e) => {
+    if (!dragState || !isHomeUnlocked()) return;
+    const over = e.target.closest(`.hm-dnd-item[data-dnd-group="${dragState.group}"]`);
+    document.querySelectorAll(".hm-drop-target,.hm-dragging").forEach(el => el.classList.remove("hm-drop-target", "hm-dragging"));
+    if (over && over.dataset.dndKey !== dragState.key) {
+      e.preventDefault();
+      reorderGroupKeys(dragState.group, dragState.key, over.dataset.dndKey);
+    }
+    dragState = null;
+  });
+  document.addEventListener("dragend", () => {
+    document.querySelectorAll(".hm-drop-target,.hm-dragging").forEach(el => el.classList.remove("hm-drop-target", "hm-dragging"));
+    dragState = null;
+  });
+
+  // Touch Drag & Drop on the .hm-dnd-grip bar (mobile phone touch)
+  let touchDrag = null;
+  document.addEventListener("touchstart", (e) => {
+    if (!isHomeUnlocked()) return;
+    if (e.target.closest(".hm-dnd-act")) return;
+    const bar = e.target.closest(".hm-dnd-bar");
+    if (!bar) return;
+    const item = bar.closest(".hm-dnd-item");
+    if (!item) return;
+    touchDrag = {
+      group: item.dataset.dndGroup,
+      key: item.dataset.dndKey,
+      targetKey: null,
+      el: item
+    };
+    item.classList.add("hm-dragging");
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (e) => {
+    if (!touchDrag || !isHomeUnlocked()) return;
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    if (e.cancelable) e.preventDefault();
+    const under = document.elementFromPoint(t.clientX, t.clientY);
+    const over = under ? under.closest(`.hm-dnd-item[data-dnd-group="${touchDrag.group}"]`) : null;
+    document.querySelectorAll(".hm-drop-target").forEach(el => el.classList.remove("hm-drop-target"));
+    if (over && over.dataset.dndKey !== touchDrag.key) {
+      over.classList.add("hm-drop-target");
+      touchDrag.targetKey = over.dataset.dndKey;
+    } else {
+      touchDrag.targetKey = null;
+    }
+  }, { passive: false });
+
+  document.addEventListener("touchend", () => {
+    if (!touchDrag) return;
+    const { group, key, targetKey } = touchDrag;
+    document.querySelectorAll(".hm-drop-target,.hm-dragging").forEach(el => el.classList.remove("hm-drop-target", "hm-dragging"));
+    touchDrag = null;
+    if (targetKey && targetKey !== key) {
+      reorderGroupKeys(group, key, targetKey);
+    }
+  });
 })();
