@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.63';
+const APP_VERSION = '2.28.64';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4169,8 +4169,8 @@ function cleanFab() {
   openSheet('Add', `<div class="list">${[['todo', 'To-do', 'todoForm()'], ['cal', 'Calendar', 'apptForm()'], ['cart', 'Shopping', 'shopForm()'], ['note', 'Note', 'noteForm()'], ['camera', 'Photo for the strip', 'myPhAdd()']].map(([ic, l, f]) => `<button class="row" onclick="closeSheet().then(()=>${f})"><div class="ic todo">${I(ic)}</div><div class="tx"><div class="t">${l}</div></div>${I('right')}</button>`).join('')}</div>`);
 }
 function Home() {
-  homeEdit = false;
-  return glanceHome();
+  if (homeEdit) return HomeEdit();
+  if (glanceOn()) { const g = homeTry('glance', () => glanceHome(), ''); if (g && g.length > 300) return g; }
   const now = new Date();
   let cards = '';
   if ('Notification' in window && Notification.permission === 'default' && S.settings.reminders !== false)
@@ -21784,10 +21784,16 @@ try { tabbar('home'); } catch (e) { }
 /* ---------- start ---------- */
 async function start() {
   try {
-    let d = await kvGet('data');
-    if (!d) { d = seed(); await kvSet('data', d); }
-    S = normalise(d);
-    if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
+    const kvP = kvGet('data');
+    let d = await Promise.race([kvP, new Promise(res => setTimeout(() => res('__TIMEOUT__'), 1200))]);
+    if (d === '__TIMEOUT__') {
+      S = normalise(seed());
+      kvP.then(realD => { if (realD) { S = normalise(realD); try { render(); } catch (e) {} } }).catch(() => {});
+    } else {
+      if (!d) { d = seed(); await kvSet('data', d); }
+      S = normalise(d);
+      if (ideaStepsDirty) { ideaStepsDirty = false; save().catch(() => { }); }
+    }
   } catch (e) {
     S = normalise(seed());
     toast('This browser won’t let the app save anything. Try Chrome, not a private tab.');

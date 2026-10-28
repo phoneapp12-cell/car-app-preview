@@ -2459,6 +2459,22 @@ html.gfx .spotlight-bar{background:var(--glass);-webkit-backdrop-filter:blur(8px
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.28.63"></script>
+<script src="app.js?v=2.28.64"></script>
+<script>
+setTimeout(function () {
+  var v = document.getElementById("view");
+  if (!v || !v.children || v.children.length === 0) {
+    if ("caches" in window) {
+      caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }).finally(function () {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }).finally(function () { location.reload(); });
+        } else {
+          location.reload();
+        }
+      });
+    }
+  }
+}, 3500);
+</script>
 </body>
 </html>
