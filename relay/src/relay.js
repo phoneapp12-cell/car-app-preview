@@ -737,7 +737,7 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
     let body;
     try { const raw = await request.text(); if (raw.length > 120000) return json(413, 'too_large', origin, env); body = raw ? JSON.parse(raw) : {}; } catch (e) { return json(400, 'bad_request', origin, env); }
     try {
-      const [status, data] = await renoRoute(body, env);
+      const [status, data] = await renoRoute(body, env, Date.now(), fetchImpl);
       if (data && data.error) return json(status, data.error, origin, env);
       return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8' } });
     } catch (e) { return json(502, 'reno_unavailable', origin, env); }

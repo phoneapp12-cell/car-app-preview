@@ -23,14 +23,15 @@ button{font:inherit;cursor:pointer}main{max-width:620px;margin:0 auto;padding:ca
 <div class="a2hs" id="a2hs" hidden><div>📲 <b>Keep this handy:</b> add it to your Home Screen (Safari: Share › Add to Home Screen; Chrome: ⋮ › Add to Home screen). Your ticks and name stay on this phone.</div><button type="button" id="a2hsx" aria-label="Hide">✕</button></div>
 <div id="root"></div>
 </main>
-<script src="reno.js?v=2.27.34"></script>
+<script src="reno.js?v=2.28.70"></script>
 <script>
 (function () {
   let k = ''; const m = /[#&]k=([A-Za-z0-9_-]{32,128})/.exec(location.hash || '');
   try { if (m) { localStorage.setItem('renoKey', m[1]); } k = localStorage.getItem('renoKey') || ''; } catch (e) { k = m ? m[1] : ''; }
   const meIn = document.getElementById('me'); let me = 'Millesha'; try { me = localStorage.getItem('renoMe') || 'Millesha'; } catch (e) { } meIn.value = me;
   const root = document.getElementById('root'), draw = () => { root.innerHTML = k ? Reno.html() : '<div class="nokey">Open this page from the link Shane sent you.</div>'; };
-  meIn.addEventListener('change', () => { try { localStorage.setItem('renoMe', meIn.value.trim() || 'Millesha'); } catch (e) { } Reno.init({ key: k, me: meIn.value.trim() || 'Millesha', onChange: draw }); });
+  meIn.addEventListener('change', () => { try { localStorage.setItem('renoMe', meIn.value.trim() || 'Millesha'); } catch (e) { } if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {}); }
+  Reno.init({ key: k, me: meIn.value.trim() || 'Millesha', onChange: draw }); });
   if (k && !m) { try { history.replaceState(null, '', location.pathname + '#k=' + k); } catch (e) { } } // keep the key in the address so Add to Home Screen keeps it too
   const link = () => location.origin + location.pathname + '#k=' + k;
   const toast = t => { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); };

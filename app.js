@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.69';
+const APP_VERSION = '2.28.70';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23142,7 +23142,7 @@ function alDiscoverHtml() {
     <div class="al-discover-strip" role="region" aria-label="Discover">${cards.join('')}</div>`;
 }
 
-/* ---- 2.28.69: Show All Notifications & Choose Which Notifications to Receive ---- */
+/* ---- 2.28.70: Show All Notifications & Choose Which Notifications to Receive ---- */
 const NOTIF_CAT_DEFS = [
   ["warnings",  "⛔", "Roadworks, Crashes, Weather & Quakes", "NZTA roadworks & crashes, WDC closures, MetService warnings, bridge lifts & GeoNet quakes"],
   ["bills",     "🧾", "Bills, Invoices & Bank Alerts", "Upcoming & overdue bills, emailed invoices (Kora, Ecotricity) and bank alerts"],
@@ -36387,7 +36387,7 @@ async function onBottomTileLongPress(btnEl) {
 if (!window.__MOVING) start();
 
 
-/* ================= 2.28.69: SUGGESTED INTERNET TV FOR SHANE, EXTRA NOTIFICATION CARDS, ONERAHI BUS TIMETABLE (#bus) & SELECT COMMITTEE BILLS (#parlbills) ================= */
+/* ================= 2.28.70: SUGGESTED INTERNET TV FOR SHANE, EXTRA NOTIFICATION CARDS, ONERAHI BUS TIMETABLE (#bus) & SELECT COMMITTEE BILLS (#parlbills) ================= */
 
 const SHANE_ITV_FAV_CHANNELS = [
   { id: "mythbusters", reason: "🔨 Hands-on workshop builds, testing & engineering experiments", badge: "🎯 Top Pick for You · DIY & Science" },
