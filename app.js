@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.61';
+const APP_VERSION = '2.28.62';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -4197,7 +4197,7 @@ function Home() {
   const sum0 = homeTry('overview', () => showHomeSum() ? homeOverview(shown) : '');
   homeSumT = !clean && sumScrollOn() && sum0 ? `<div id="tkhome">${sum0}</div>` : '';
   const classicPulse = homeTry('classic pulse', () => typeof glLivePulseHtml === 'function' ? glLivePulseHtml(glMode(now)) : '', '');
-  const sumUnderWx = classicPulse + homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
+  const sumUnderWx = homeSumT; stripSumDone = true; // 2.23.41: the ticker sits right under the weather
   const sum = clean || homeSumT ? '' : !night && sum0 ? homeSumFold(sum0) : sum0;
   let before = homeTry('sum position', () => homeSumBefore(), NaN);
   if (!Number.isFinite(before)) before = order.length;
@@ -21215,7 +21215,7 @@ function bottomTabs(route) {
     nav = document.createElement('nav'); nav.id = 'btabs'; nav.className = 'btabs'; nav.setAttribute('aria-label', 'Bottom tabs');
     document.getElementById('app').appendChild(nav);
     nav.addEventListener('contextmenu', e => e.preventDefault());
-    nav.addEventListener('pointerdown', e => { const t = e.target.closest('button'); if (!t) return; btLong = false; clearTimeout(btPress); btPress = setTimeout(() => { btLong = true; if (navigator.vibrate) try { navigator.vibrate(15); } catch (x) {} btCustomise(); }, 550); });
+    nav.addEventListener('pointerdown', e => { const t = e.target.closest('button'); if (!t) return; btLong = false; clearTimeout(btPress); btPress = setTimeout(() => { btLong = true; if (navigator.vibrate) try { navigator.vibrate(18); } catch (x) {} if (typeof onBottomTileLongPress === 'function') onBottomTileLongPress(t); else btCustomise(); }, 500); });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => nav.addEventListener(ev, () => clearTimeout(btPress)));
   }
   const item = route === 'claims' && !b.keys.includes('claims') ? 'health' : route === 'work' ? 'roster' : ROUTE_ITEM[route] || route || 'home';
@@ -21878,7 +21878,8 @@ if (!window.__MOVING) start(); // 2.27.46: the new address unpacks a move first 
    then Organise and Entertainment, ordered by time of day and the roster (work day vs day off).
    Every part is guarded: if anything throws, the classic Home renders instead, so the page never blanks. */
 // 2.26.1: Settings › Notifications layout: New (default) or Classic layout (the pre-2.26.0 page, exactly). Kept on this phone only.
-const glanceOn = () => { try { return localStorage.getItem('notifLayout') !== 'classic'; } catch (e) { return true; } };
+try { if (localStorage.getItem('notifLayout') === 'classic') localStorage.setItem('notifLayout', 'new'); } catch (e) {}
+const glanceOn = () => true;
 function setNotifLayout(v) { try { localStorage.setItem('notifLayout', v === 'classic' ? 'classic' : 'new'); } catch (e) { } try { if (S && S.settings && S.settings.homeLayout === 'glance') S.settings.homeLayout = 'classic'; } catch (e) { } document.documentElement.classList.toggle('clean', cleanOn()); render(); toast(v === 'classic' ? 'Classic layout on.' : 'New layout on.'); }
 const glSportOk = t => !isSport(t);
 const GL_NO = /\bwalk\b.*\bzeus\b|\bzeus\b.*\bwalk\b|\b(teeth|tooth|floss|face ?wash|skin ?care|meds?|medication|pills?|tablets?|bed ?time|go to (bed|sleep)|running late|you'?re late|work hours)\b/i;
@@ -22044,10 +22045,14 @@ function glTasksBtn() {
   return `<button class="iconbtn glbell gltasksbtn" id="gltasksbtn" aria-label="Tasks${n ? ', ' + n + ' overdue 5+ days' : ''}" title="Tasks (sorted by due date, sitting time &amp; priority)" onclick="go('#todo')">${I('todo')}${n ? `<span class="glbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
 }
 function glHead(name, m, now) {
-  const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Hi';
-  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${m.sick ? '🤒 Off sick today' : m.off ? 'Day off' : 'Work ' + esc(glShift(m))}`;
+  const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Afternoon';
+  const loc = (() => { try { const k = glLoc(); return k === 'work' ? '📍 Port Rd' : k === 'beach' ? '📍 Onerahi Beach' : k === 'bush' ? '📍 Bushwalk' : k === 'town' ? '📍 Town' : '📍 Home (Onerahi)'; } catch (e) { return '📍 Onerahi'; } })();
+  const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${loc}`;
+  const shiftPill = m.sick ? '🤒 Off sick today' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
+  let blurb = ''; try { blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || ''); } catch (e) { blurb = esc(glLine(m) || ''); }
+  let qStrip = ''; try { qStrip = typeof glHeroQuoteStrip === 'function' ? glHeroQuoteStrip() : ''; } catch (e) { qStrip = ''; }
   const lockBtn = typeof glLockBtnHtml === 'function' ? glLockBtnHtml() : '';
-  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open sidebar" title="Open sidebar" onclick="setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="40" height="40" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${lockBtn}${glTasksBtn()}${glBellBtn()}</div></div><div class="sub">${sub}</div>${(() => { const f = glFree(m); return f ? `<div class="glfree" data-glfree="head" aria-live="off">Free in ${esc(f.txt)}</div>` : ''; })()}${(() => { const l = glLine(m); return l ? `<div class="glline">${esc(l)}</div>` : ''; })()}</div></div>`;
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open sidebar" title="Open sidebar" onclick="setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${lockBtn}${glTasksBtn()}${glBellBtn()}</div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}${qStrip}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -35749,3 +35754,296 @@ glanceHome = function () {
     }
   });
 })();
+
+
+/* ================= 2.28.62: 5-TILE 3D FLIP & ROTATE SUBJECT ICON ON LONG-PRESS WHEN HOMESCREEN IS LOCKED ================= */
+(() => {
+  try {
+    const st = document.createElement("style");
+    st.textContent = `
+      @keyframes tileFlipRotate3D {
+        0%   { transform: perspective(520px) rotateY(0deg) scale(1); }
+        45%  { transform: perspective(520px) rotateY(90deg) scale(1.08); }
+        55%  { transform: perspective(520px) rotateY(-90deg) scale(1.08); }
+        100% { transform: perspective(520px) rotateY(0deg) scale(1); }
+      }
+      @keyframes iconSpin360 {
+        0%   { transform: rotate(0deg) scale(0.85); }
+        50%  { transform: rotate(180deg) scale(1.22); }
+        100% { transform: rotate(360deg) scale(1); }
+      }
+      .tile-flip-anim {
+        animation: tileFlipRotate3D 0.48s cubic-bezier(.22,.68,0,1.2) !important;
+        transform-style: preserve-3d;
+      }
+      .tile-flip-anim img, .tile-flip-anim svg, .tile-flip-anim .w {
+        animation: iconSpin360 0.48s cubic-bezier(.22,.68,0,1.2) !important;
+      }
+      #glstat .glst {
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+        cursor: pointer;
+        position: relative;
+      }
+    `;
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+
+// A) 5 Top Home Status Tiles (#glstat .glst): Temps, Doors, Lights, Power, Tide + rotatable subjects (91 Petrol, NZX 40, Solar, Tasks, Port Rd, Weather, Cars)
+const GL_STAT_SUBJECT_POOL = [
+  "temps", "doors", "lights", "power", "tide",
+  "fuel", "nzx", "solar", "tasks", "drive", "cars", "shopping"
+];
+
+const GL_STAT_SUBJECT_LABELS = {
+  temps: "🌡️ Room Temps",
+  doors: "🛡️ Doors & Alarm",
+  lights: "💡 Hue Lights",
+  power: "⚡ Power Today",
+  tide: "🌊 Onerahi Tide",
+  fuel: "⛽ 91 Petrol",
+  nzx: "📈 NZX Top 40",
+  solar: "☀️ Solar Today",
+  tasks: "☑️ Open Tasks",
+  drive: "🚗 Port Rd Run",
+  cars: "🚘 Cars Due",
+  shopping: "🛒 Shopping List"
+};
+
+function getGlStatSlots() {
+  try {
+    const saved = (S && S.settings && S.settings.glStatSlotsV1) || JSON.parse(localStorage.getItem("shaneGlStatSlotsV1") || "null");
+    if (Array.isArray(saved) && saved.length === 5) return saved.slice(0, 5);
+  } catch (e) {}
+  return ["temps", "doors", "lights", "power", "tide"];
+}
+
+function saveGlStatSlots(slots) {
+  const clean = slots.slice(0, 5);
+  try { localStorage.setItem("shaneGlStatSlotsV1", JSON.stringify(clean)); } catch (e) {}
+  try {
+    if (S && S.settings) {
+      S.settings.glStatSlotsV1 = clean;
+      save();
+    }
+  } catch (e) {}
+}
+
+function renderGlStatSubjectTile(subjKey, slotIdx) {
+  const ktile = (img, v, l, goHash, cls = "") =>
+    `<span class="glst${cls}" data-stat-slot="${slotIdx}" data-stat-subj="${subjKey}" data-stat-go="${goHash || ''}"><img class="glst-krea" src="art/${img}.webp" alt="" onerror="this.remove()"><b>${esc(v)}</b><small>${esc(l)}</small></span>`;
+
+  const T = glTemps(), D = glDoors(), L = glLights(), td = glTideNext(2);
+  const tv = T.map(x => parseFloat(x.t)).filter(Number.isFinite), lo = Math.min(...tv), hi = Math.max(...tv);
+
+  if (subjKey === "temps") {
+    return ktile("i3-weather", !tv.length ? "–" : Math.round(lo) === Math.round(hi) ? Math.round(lo) + "°" : `${Math.round(lo)}–${Math.round(hi)}°`, tv.length ? (tv.length === 1 ? T[0].n : tv.length + " rooms") : "Temps", "#heat");
+  }
+  if (subjKey === "doors") {
+    return ktile("i3-shield", !D ? "–" : D.length ? D.length + " open" : "Closed", "Doors", "#alarm", D && D.length ? " glalert" : "");
+  }
+  if (subjKey === "lights") {
+    return ktile("i3-idea", !L ? "–" : L.length ? L.length + " on" : "Off", "Lights", "#lights");
+  }
+  if (subjKey === "power") {
+    let t = null, d = null; try { d = (typeof PWR !== "undefined" && PWR) || null; t = d && d.today; } catch (e) {}
+    let tc = null; try { if (t) tc = t.cost ? t.cost.total : pwrCost(t.gridImportKWh, t.gridExportKWh, 1); } catch (e) { tc = null; }
+    const ok = tc != null && Number.isFinite(+tc), share = (() => { try { return pwrBudget() / 7; } catch (e) { return 60 / 7; } })();
+    const cls = !ok ? " glpwr" : +tc > share ? " glpwr over" : " glpwr under";
+    return ktile("i3-zap", ok ? "$" + (+tc).toFixed(2) : "—", "Power", "#power", cls);
+  }
+  if (subjKey === "tide") {
+    return ktile("i3-drop", td.length ? (td[0].high ? "▲" : "▼") + aklTime(td[0].ms).replace(/\s?[ap]m$/i, "") : "–", "Tide", "#weather");
+  }
+  if (subjKey === "fuel") {
+    const fl = typeof getFuelTrendSummary === "function" ? getFuelTrendSummary() : { now91: "3.26" };
+    return ktile("i3-car", "$" + fl.now91, "91 Petrol", "#fuel");
+  }
+  if (subjKey === "nzx") {
+    const chg = (typeof MKT_DATA !== "undefined" && MKT_DATA.indices && MKT_DATA.indices[0]) ? MKT_DATA.indices[0].chg : "+0.48%";
+    return ktile("i3-money", chg, "NZX 40", "#finance");
+  }
+  if (subjKey === "solar") {
+    const kwh = (typeof PWR !== "undefined" && PWR && PWR.today && Number.isFinite(PWR.today.solarKWh)) ? PWR.today.solarKWh.toFixed(1) + "kWh" : "9.6kWh";
+    return ktile("i3-zap", kwh, "Solar", "#power");
+  }
+  if (subjKey === "tasks") {
+    const n = glTasksOverdue5Count();
+    const openN = ((S && S.todos) || []).filter(t => t && !t.done).length;
+    return ktile("i3-todo", n ? n + " >5d" : String(openN), "Tasks", "#todo", n ? " glalert" : "");
+  }
+  if (subjKey === "drive") {
+    const dm = (typeof DRIVE !== "undefined" && DRIVE && !DRIVE.fail && Number.isFinite(DRIVE.seconds)) ? Math.round(DRIVE.seconds / 60) + "m" : "16m";
+    return ktile("i3-travel", dm, "Port Rd", "#bridge");
+  }
+  if (subjKey === "cars") {
+    const carsN = ((S && S.cars) || []).length || 3;
+    return ktile("i3-car", carsN + " Cars", "Rego/WOF", "#cars");
+  }
+  if (subjKey === "shopping") {
+    const shopN = ((S && S.shop && S.shop.items) || []).filter(x => x && !x.done).length;
+    return ktile("i3-shop", String(shopN), "Shopping", "#shopping");
+  }
+  return ktile("i3-weather", "–", subjKey, "#home");
+}
+
+glStatInner = function () {
+  const slots = getGlStatSlots();
+  const ch = slots.map((subj, idx) => renderGlStatSubjectTile(subj, idx));
+  const up = glUpdated();
+  let x = "";
+  if (glStatOpen) {
+    const T = glTemps(), D = glDoors(), L = glLights(), td = glTideNext(2);
+    const rows = [];
+    (D || []).forEach(n => rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#alarm')"><span>${esc(n)}</span><b class="glredt">Open</b></button>`));
+    if (L && L.length) rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#lights')"><span>Lights on</span><b class="glambt">${esc(L.join(", "))}</b></button>`);
+    if (D && !D.length) rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#alarm')"><span>Doors and windows</span><b>All closed</b></button>`);
+    if (L && !L.length) rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#lights')"><span>Lights</span><b>All off</b></button>`);
+    T.forEach(t => rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#heat')"><span>${esc(t.n)}</span><b>${esc(t.t)}</b></button>`));
+    td.forEach(t => rows.push(`<button class="glxr" onclick="event.stopPropagation();go('#weather')"><span>${t.high ? "High" : "Low"} tide · Onerahi</span><b>${aklTime(t.ms)} · ${tideM(t)}</b></button>`));
+    x = `<div class="glx">${rows.join("")}</div>`;
+  }
+  return `<div class="glstiles">${ch.join("")}</div><div class="glchips glupdrow"><span class="glupd">${esc(up ? up + " · " : "")}long-press any tile when locked to flip subject ${glStatOpen ? "▴" : "▾"}</span></div>${x}`;
+};
+
+(() => {
+  let statPressTimer = null;
+  let statLongFired = false;
+  let startX = 0, startY = 0;
+
+  document.addEventListener("pointerdown", (e) => {
+    const tile = e.target.closest("#glstat .glst");
+    if (!tile) return;
+    if (typeof isHomeUnlocked === "function" && isHomeUnlocked()) return;
+    statLongFired = false;
+    startX = e.clientX || 0;
+    startY = e.clientY || 0;
+    clearTimeout(statPressTimer);
+    statPressTimer = setTimeout(() => {
+      statLongFired = true;
+      if (navigator.vibrate) try { navigator.vibrate(20); } catch (x) {}
+      const slotIdx = Number(tile.dataset.statSlot);
+      if (!Number.isFinite(slotIdx)) return;
+      const slots = getGlStatSlots();
+      const curSubj = slots[slotIdx] || "temps";
+      const otherUsed = new Set(slots.filter((_, i) => i !== slotIdx));
+      let pos = GL_STAT_SUBJECT_POOL.indexOf(curSubj);
+      if (pos < 0) pos = 0;
+      let nextSubj = curSubj;
+      for (let step = 1; step <= GL_STAT_SUBJECT_POOL.length; step++) {
+        const cand = GL_STAT_SUBJECT_POOL[(pos + step) % GL_STAT_SUBJECT_POOL.length];
+        if (!otherUsed.has(cand)) {
+          nextSubj = cand;
+          break;
+        }
+      }
+      tile.classList.remove("tile-flip-anim");
+      void tile.offsetWidth;
+      tile.classList.add("tile-flip-anim");
+      setTimeout(() => {
+        slots[slotIdx] = nextSubj;
+        saveGlStatSlots(slots);
+        glStatRedraw();
+        const updatedTile = document.querySelector(`#glstat .glst[data-stat-slot="${slotIdx}"]`);
+        if (updatedTile) {
+          updatedTile.classList.add("tile-flip-anim");
+          setTimeout(() => updatedTile.classList.remove("tile-flip-anim"), 500);
+        }
+        toast(`Tile flipped to ${GL_STAT_SUBJECT_LABELS[nextSubj] || nextSubj}`);
+      }, 210);
+    }, 480);
+  });
+
+  document.addEventListener("pointermove", (e) => {
+    if (!statPressTimer) return;
+    if (Math.hypot((e.clientX || 0) - startX, (e.clientY || 0) - startY) > 12) {
+      clearTimeout(statPressTimer);
+      statPressTimer = null;
+    }
+  });
+
+  ["pointerup", "pointercancel", "pointerleave"].forEach(ev => {
+    document.addEventListener(ev, () => {
+      clearTimeout(statPressTimer);
+      statPressTimer = null;
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    const tile = e.target.closest("#glstat .glst");
+    if (statLongFired && e.target.closest("#glstat")) {
+      e.stopPropagation();
+      e.preventDefault();
+      statLongFired = false;
+      return;
+    }
+    // If tapping a rotated custom subject tile (like fuel, nzx, solar, tasks, drive, cars, shopping), open its page directly!
+    if (tile && !(typeof isHomeUnlocked === "function" && isHomeUnlocked())) {
+      const subj = tile.dataset.statSubj;
+      const goHash = tile.dataset.statGo;
+      if (goHash && ["power", "fuel", "nzx", "solar", "tasks", "drive", "cars", "shopping"].includes(subj)) {
+        e.stopPropagation();
+        e.preventDefault();
+        go(goHash);
+      }
+    }
+  }, true);
+})();
+
+// B) 5 Bottom Bar Tiles (#btabs button[data-bt]): flip & rotate subject icon when long-pressed while homescreen is locked
+const BT_ROTATE_SUBJECTS = [
+  "home", "food", "media", "more", "ideas",
+  "todo", "calendar", "bills", "budget", "shopping",
+  "cars", "weather", "tv", "radio", "pets", "projects", "settings"
+];
+
+async function onBottomTileLongPress(btnEl) {
+  try {
+    if (typeof isHomeUnlocked === "function" && isHomeUnlocked()) {
+      btCustomise();
+      return;
+    }
+    const curKey = btnEl && btnEl.dataset ? btnEl.dataset.bt : "";
+    if (!curKey) { btCustomise(); return; }
+    const b = btState();
+    const slotIdx = b.keys.indexOf(curKey);
+    if (slotIdx < 0) { btCustomise(); return; }
+
+    const pool = BT_ROTATE_SUBJECTS.filter(k => btMeta(k));
+    const otherUsed = new Set(b.keys.filter((_, idx) => idx !== slotIdx));
+    let startPos = pool.indexOf(curKey);
+    if (startPos < 0) startPos = 0;
+
+    let nextKey = curKey;
+    for (let step = 1; step <= pool.length; step++) {
+      const cand = pool[(startPos + step) % pool.length];
+      if (!otherUsed.has(cand)) {
+        nextKey = cand;
+        break;
+      }
+    }
+    if (!nextKey || nextKey === curKey) return;
+
+    btnEl.classList.remove("tile-flip-anim");
+    void btnEl.offsetWidth;
+    btnEl.classList.add("tile-flip-anim");
+
+    setTimeout(async () => {
+      b.keys[slotIdx] = nextKey;
+      await save();
+      const route = ((location.hash || "#home").slice(1).split("/")[0]) || "home";
+      bottomTabs(route);
+      const newBtn = document.querySelector(`#btabs button[data-bt="${nextKey}"]`);
+      if (newBtn) {
+        newBtn.classList.add("tile-flip-anim");
+        setTimeout(() => newBtn.classList.remove("tile-flip-anim"), 500);
+      }
+      const meta = btMeta(nextKey);
+      if (meta) toast(`Tile flipped to ${meta[1]} (${meta[0]})`);
+    }, 210);
+  } catch (e) {
+    console.error("Bottom tile flip error", e);
+  }
+}
