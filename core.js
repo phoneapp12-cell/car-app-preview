@@ -421,6 +421,8 @@
       if (c.wof) out.push({ kind: 'car', part: 'wof', id: c.id, car: c, label: 'WOF', title: c.name + ' WOF', date: c.wof, go: '#car/' + c.id });
       if (c.rego) out.push({ kind: 'car', part: 'rego', id: c.id, car: c, label: 'Rego', title: c.name + ' rego', date: c.rego, go: '#car/' + c.id });
       if (c.svcDate) out.push({ kind: 'car', part: 'svc', id: c.id, car: c, label: 'Service', title: c.name + ' service', date: c.svcDate, go: '#car/' + c.id });
+      if (c.rotDate) out.push({ kind: 'car', part: 'rot', id: c.id, car: c, label: 'Tyre rotation', title: c.name + ' tyre rotation', date: c.rotDate, go: '#car/' + c.id });
+      if (c.tyreDate) out.push({ kind: 'car', part: 'tyre', id: c.id, car: c, label: 'Tyres', title: c.name + ' tyres', date: c.tyreDate, go: '#car/' + c.id });
     });
     (data.bills || []).filter(b => !b.paid && b.due).forEach(b => out.push({ kind: 'bill', part: 'bill', id: b.id, bill: b, title: b.name, date: b.due, go: '#bills' }));
     (data.drivers || []).forEach(d => {
@@ -476,7 +478,7 @@
       if (d > 30) return null; if (d > 14) return 's30'; if (d > 3) return 's14'; if (d > 0) return 's3';
       return 'd' + Math.floor(-d / 3);
     }
-    if (x.part === 'svc') return d <= 14 ? 's14' : null;
+    if (x.part === 'svc' || x.part === 'rot' || x.part === 'tyre') return d <= 14 ? 's14' : null;
     if (x.part === 'bill') { if (d <= 0) return 'd0'; if (d <= 3) return 's3'; return null; }
     if (x.part === 'todo') return d < 0 ? 'd0' : null; // due today uses the four daytime slots below, not one nudge
     // AA membership and driver licence: 30, 14 and 3 days before, and on the day (or once, if already expired)
@@ -502,6 +504,8 @@
         if (c.wof && (daysLeft(c.wof, now) < 0 || parseD(c.wof) <= parseD(x.date))) body += ' Get the WOF done first.';
         return { title: d < 0 ? `${c.name}: rego expired` : `${c.name}: rego due ${when}`, body };
       }
+      if (x.part === 'rot') return { title: `${c.name}: tyre rotation due ${when}`, body: `Tyre rotation due ${fmtW(x.date, now)}${c.rotKm ? ' or at ' + Number(c.rotKm).toLocaleString('en-NZ') + ' km' : ''}. Rotate and balance so front and rear wear evenly.` };
+      if (x.part === 'tyre') return { title: `${c.name}: tyres check due ${when}`, body: `Tyre check or replacement due ${fmtW(x.date, now)}${c.tyreSize ? ' (' + c.tyreSize + ')' : ''}. Check tread depth (NZ WOF min is 1.5 mm) and pressure.` };
       return { title: `${c.name}: service due ${when}`, body: `Service due ${fmtW(x.date, now)}${c.svcKm ? ' or at ' + Number(c.svcKm).toLocaleString('en-NZ') + ' km' : ''}. Time to book it in.` };
     }
     if (x.kind === 'bill') {

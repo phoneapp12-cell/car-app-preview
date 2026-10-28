@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.70';
+const APP_VERSION = '2.28.71';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -114,7 +114,7 @@ let bgStatus = 'unknown';
 
 function seed() {
   const car = (id, name, plate, year, model, colour, details, hex, wof, rego) =>
-    ({ id, name, plate, year, model, colour, details, hex, wof, rego, wofMonths: 12, svcDate: '', svcKm: '', odo: '', notes: '' });
+    ({ id, name, plate, year, model, colour, details, hex, wof, rego, wofMonths: 12, svcDate: '', svcKm: '', rotDate: '', rotKm: '', rotMonths: 6, rotEveryKm: '10000', tyreDate: '', tyreKm: '', tyreSize: '', tyreBrand: '', tyrePsi: '', tyreTread: '', odo: '', notes: '' });
   return {
     version: 1, createdAt: new Date().toISOString(),
     cars: [
@@ -141,6 +141,8 @@ function normalise(d) {
   if (!Array.isArray(d.drivers)) d.drivers = seedDrivers(); // first time on this version: Shane, Sarah and Cass
   d.cars.forEach(c => {
     if (!Array.isArray(c.services)) c.services = [];
+    if (!Array.isArray(c.rotations)) c.rotations = [];
+    if (!Array.isArray(c.tyres)) c.tyres = [];
     // Older versions only kept the date of the last service: turn it into a history entry
     if (c.lastService && !c.services.length) c.services.push({ id: 'svc-' + c.id + '-' + c.lastService, date: c.lastService, km: '', garage: '', cost: '', notes: '', migrated: true });
     if (!storedPhoto(c.photo)) delete c.photo; // only a small JPEG taken on this phone, never a web address
@@ -297,7 +299,7 @@ const area = (name, val, ph = '') => `<textarea name="${name}" placeholder="${es
 /* ================= HOME ================= */
 function rowFor(x) {
   let icon = 'todo', sub, cash = '';
-  if (x.kind === 'car') { icon = { wof: 'shield', rego: 'doc', svc: 'wrench' }[x.part]; sub = (x.car.plate ? esc(x.car.plate) + ' · ' : '') + 'Due ' + fmtW(x.date); }
+  if (x.kind === 'car') { icon = { wof: 'shield', rego: 'doc', svc: 'wrench', rot: 'refresh', tyre: 'car' }[x.part] || 'wrench'; sub = (x.car.plate ? esc(x.car.plate) + ' · ' : '') + 'Due ' + fmtW(x.date); }
   else if (x.kind === 'bill') { icon = billIcon(x.bill.name); sub = (x.bill.paidBy === 'card' ? '<span class="oncard">On credit card</span> ' : '') + 'Due ' + fmtW(x.date) + (x.date === x.bill.due && billInvoice(x.bill) ? ' · ' + billInvoiceText(x.bill) : ''); cash = moneyBadge(x.bill.amount, x.bill.name); }
   else if (x.kind === 'pet') { icon = 'paw'; sub = 'Pet · ' + esc(careEvery(x.care)) + ' · Due ' + fmtW(x.date); }
   else if (x.kind === 'health') { icon = HEALTH_ICON[x.item.kind] || 'medkit'; sub = 'Health · ' + (x.item.clinic ? esc(x.item.clinic) + ' · ' : '') + 'Due ' + fmtW(x.date); }
@@ -4360,9 +4362,27 @@ function svcCell(c) {
   if (c.svcKm) return `<div><small>Service</small><b>${Number(c.svcKm).toLocaleString('en-NZ')} km</b><span class="pill none">By km</span></div>`;
   return `<div><small>Service</small><span class="addsvc" role="button" onclick="event.stopPropagation();serviceForm('${c.id}',false)">+ Add service date</span></div>`;
 }
+function rotCell(c) {
+  const cp = carProgShort(c, 'rot');
+  if (c.rotDate) return `<div><small>Tyre rotation</small><b>${fmt(c.rotDate)}</b>${cp ? progPill(cp) : pill(daysLeft(c.rotDate))}</div>`;
+  if (c.rotKm) {
+    const kmTo = c.odo ? Number(c.rotKm) - Number(c.odo) : null;
+    const badge = kmTo != null ? `<span class="pill ${kmTo < 0 ? 'over' : kmTo <= 1500 ? 'soon' : 'fine'}">${kmTo >= 0 ? kmTo.toLocaleString('en-NZ') + ' km left' : (-kmTo).toLocaleString('en-NZ') + ' km over'}</span>` : `<span class="pill none">By km</span>`;
+    return `<div><small>Tyre rotation</small><b>${Number(c.rotKm).toLocaleString('en-NZ')} km</b>${badge}</div>`;
+  }
+  return `<div><small>Tyre rotation</small><span class="addsvc" role="button" onclick="event.stopPropagation();tyreRotForm('${c.id}',false)">+ Add rotation</span></div>`;
+}
+function tyreCell(c) {
+  const cp = carProgShort(c, 'tyre');
+  const subInfo = [c.tyreSize, c.tyrePsi ? c.tyrePsi + (/\bpsi\b/i.test(c.tyrePsi) ? '' : ' PSI') : '', c.tyreTread ? c.tyreTread + (/\bmm\b/i.test(c.tyreTread) ? '' : ' mm') : ''].filter(Boolean).join(' · ');
+  if (c.tyreDate) return `<div><small>Tyres${c.tyreSize ? ' · ' + esc(c.tyreSize) : ''}</small><b>${fmt(c.tyreDate)}</b>${cp ? progPill(cp) : pill(daysLeft(c.tyreDate))}</div>`;
+  if (c.tyreKm) return `<div><small>Tyres${c.tyreSize ? ' · ' + esc(c.tyreSize) : ''}</small><b>${Number(c.tyreKm).toLocaleString('en-NZ')} km</b><span class="pill none">By km</span></div>`;
+  if (subInfo) return `<div><small>Tyres</small><b style="font-size:0.88rem">${esc(subInfo)}</b><span class="addsvc" role="button" onclick="event.stopPropagation();tyreInfoForm('${c.id}')">Edit tyres</span></div>`;
+  return `<div><small>Tyres</small><span class="addsvc" role="button" onclick="event.stopPropagation();tyreInfoForm('${c.id}')">+ Add tyres</span></div>`;
+}
 function carTriple(c) {
   const cell = (l, s) => s ? `<div><small>${l}</small><b>${fmt(s)}</b>${(() => { const pt = { WOF: 'wof', Rego: 'rego' }[l]; const cp = pt ? carProgShort(c, pt) : ''; return cp ? progPill(cp) : pill(daysLeft(s)); })()}</div>` : `<div><small>${l}</small><b>Not set</b><span class="pill none">Add date</span></div>`;
-  return `<div class="triple">${cell('WOF', c.wof)}${cell('Rego', c.rego)}${svcCell(c)}</div>`;
+  return `<div class="triple">${cell('WOF', c.wof)}${cell('Rego', c.rego)}${svcCell(c)}</div><div class="triple" style="grid-template-columns:1fr 1fr;margin-top:6px;padding-top:8px;border-top:1px dashed var(--line)">${rotCell(c)}${tyreCell(c)}</div>`;
 }
 function Cars() {
   return header('Cars', S.cars.length ? plural(S.cars.length, 'car') + ' in the family' : 'WOF, rego and servicing', addBtn('Add a car', 'carForm()')) +
@@ -4418,9 +4438,11 @@ function CarDetail(id) {
      <button class="btn" onclick="regoForm('${c.id}')">${I('check')} Renewed rego</button></div>
    <div class="muted" style="margin-top:8px">Or pop into AA, VTNZ, VINZ or a selected NZ Post shop.</div></div>
   ${svc}
+  ${tyreRotCard(c)}
+  ${tyresCard(c)}
   ${c.notes ? `<div class="dcard"><div class="h">${I('doc')} Notes</div><div class="muted notes" style="margin-top:6px">${esc(c.notes)}</div></div>` : ''}
   <div class="dcard"><div class="h">${I('bell')} Reminders for this car</div>
-   <div class="muted" style="margin-top:6px">WOF and rego: 30, 14 and 3 days before, on the day, then every 3 days until it’s sorted. Service: 14 days before the date.</div></div>
+   <div class="muted" style="margin-top:6px">WOF and rego: 30, 14 and 3 days before, on the day, then every 3 days until it’s sorted. Service, tyre rotation and tyres: 14 days before the date.</div></div>
   <div class="callout blue">${I('info')}<div><b>WOF rules change from 1 Nov 2026.</b> Many cars aged 4–14 years move to a WOF every 2 years (some from 1 Nov 2026, some from 1 Nov 2027). Cars over 14 stay yearly. Always go by the date on the sticker, set how often this car needs one above, and check with your testing station.</div></div>
   <div class="btns"><button class="btn danger" onclick="deleteCar('${c.id}')">${I('trash')} Delete this car</button></div>
   <div class="foot">Fines: $200 for an expired WOF and $200 for expired rego, with no grace period.<br>From 1 Nov 2026, a WOF more than 2 months out of date is $350.</div>`;
@@ -4429,7 +4451,7 @@ async function setWofMonths(id, v) { const c = getCar(id); c.wofMonths = +v; awa
 const digits = s => String(s || '').replace(/[^\d]/g, '');
 
 function carForm(id) {
-  const c = id ? getCar(id) : { name: '', plate: '', year: '', model: '', colour: '', details: '', wof: '', rego: '', wofMonths: 12, svcDate: '', svcKm: '', odo: '', notes: '' };
+  const c = id ? getCar(id) : { name: '', plate: '', year: '', model: '', colour: '', details: '', wof: '', rego: '', wofMonths: 12, svcDate: '', svcKm: '', rotDate: '', rotKm: '', tyreDate: '', tyreKm: '', tyreSize: '', tyreBrand: '', tyrePsi: '', tyreTread: '', odo: '', notes: '' };
   openSheet(id ? 'Edit car' : 'Add a car',
     field('Name', inp('name', c.name, 'placeholder="e.g. Shane’s car" required maxlength="40"')) +
     `<div class="two">${field('Plate', inp('plate', c.plate, 'placeholder="ABC123" maxlength="8" autocapitalize="characters" style="text-transform:uppercase"'))}${field('Year', inp('year', c.year, 'inputmode="numeric" placeholder="2014" maxlength="4"'))}</div>` +
@@ -4438,15 +4460,23 @@ function carForm(id) {
     `<div class="two">${field('WOF expires', inp('wof', c.wof, 'type="date"'))}${field('Rego expires', inp('rego', c.rego, 'type="date"'))}</div>` +
     field('WOF needed every', sel('wofMonths', [[6, '6 months'], [12, '12 months'], [24, '24 months']], c.wofMonths || 12), 'The dates are on the stickers on the windscreen.') +
     `<div class="two">${field('Next service date', inp('svcDate', c.svcDate, 'type="date"'))}${field('Or service at (km)', inp('svcKm', c.svcKm, 'inputmode="numeric" placeholder="e.g. 95000"'))}</div>` +
+    `<div class="subhead">Tyres &amp; tyre rotation</div>` +
+    `<div class="two">${field('Next tyre rotation date', inp('rotDate', c.rotDate || '', 'type="date"'))}${field('Or rotate at (km)', inp('rotKm', c.rotKm || '', 'inputmode="numeric" placeholder="e.g. 100000"'))}</div>` +
+    `<div class="two">${field('Tyre size', inp('tyreSize', c.tyreSize || '', 'placeholder="e.g. 185/60R15" maxlength="30"'))}${field('Tyre pressure (PSI)', inp('tyrePsi', c.tyrePsi || '', 'placeholder="e.g. 34 PSI" maxlength="30"'))}</div>` +
+    `<div class="two">${field('Tyre brand / model', inp('tyreBrand', c.tyreBrand || '', 'placeholder="e.g. Bridgestone" maxlength="50"'))}${field('Tread depth (mm)', inp('tyreTread', c.tyreTread || '', 'placeholder="e.g. 5 mm" maxlength="20"'))}</div>` +
+    `<div class="two">${field('Next tyre check / due date', inp('tyreDate', c.tyreDate || '', 'type="date"'))}${field('Or tyres due at (km)', inp('tyreKm', c.tyreKm || '', 'inputmode="numeric" placeholder="Optional"'))}</div>` +
     field('Odometer now (km)', inp('odo', c.odo, 'inputmode="numeric" placeholder="Optional"')) +
-    field('Notes', area('notes', c.notes, 'Anything handy, e.g. tyre size or where the spare key is')),
+    field('Notes', area('notes', c.notes, 'Anything handy, e.g. wheel lock nut spot or where the spare key is')),
     async v => {
       if (!v.name) return 'Please give the car a name.';
       const upd = { name: v.name, plate: v.plate.toUpperCase().replace(/\s+/g, ''), year: digits(v.year).slice(0, 4), model: v.model, colour: v.colour, details: v.details,
-        wof: v.wof, rego: v.rego, wofMonths: +v.wofMonths || 12, svcDate: v.svcDate, svcKm: digits(v.svcKm), odo: digits(v.odo), notes: v.notes };
+        wof: v.wof, rego: v.rego, wofMonths: +v.wofMonths || 12, svcDate: v.svcDate, svcKm: digits(v.svcKm),
+        rotDate: v.rotDate || '', rotKm: digits(v.rotKm), tyreSize: v.tyreSize || '', tyrePsi: v.tyrePsi || '',
+        tyreBrand: v.tyreBrand || '', tyreTread: v.tyreTread || '', tyreDate: v.tyreDate || '', tyreKm: digits(v.tyreKm),
+        odo: digits(v.odo), notes: v.notes };
       if (!id || upd.colour !== c.colour) upd.hex = colourHex(upd.colour);
       if (id) Object.assign(c, upd);
-      else { upd.id = uid('car'); upd.services = []; S.cars.push(upd); }
+      else { upd.id = uid('car'); upd.services = []; upd.rotations = []; upd.tyres = []; S.cars.push(upd); }
       await save();
       toast(id ? 'Car updated.' : 'Car added.');
       if (id) render(); else return () => go('#car/' + upd.id);
@@ -4603,6 +4633,208 @@ async function deleteServiceEntry(carId, sid) {
   c.services = c.services.filter(e => e.id !== sid); syncLastService(c);
   await save(); await closeSheet(); render(); toast('Service deleted.', 'Undo', undoTo(s));
 }
+
+/* ================= TYRES & TYRE ROTATION (2.28.71) ================= */
+const sortedRotations = c => [...(c.rotations || [])].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+const sortedTyres = c => [...(c.tyres || [])].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+function tyreRotHistory(c) {
+  const list = sortedRotations(c), yr = String(new Date().getFullYear());
+  const sum = xs => xs.reduce((t, x) => t + (Number(x.cost) || 0), 0);
+  const anyCost = list.some(x => x.cost !== '' && x.cost != null);
+  const rows = list.map(x => {
+    const bits = [x.km ? Number(x.km).toLocaleString('en-NZ') + ' km' : '', x.aligned ? 'Wheel alignment & balance' : '', x.garage ? esc(x.garage) : ''].filter(Boolean).join(' · ');
+    return `<button class="hrow" onclick="tyreRotEntryForm('${c.id}','${x.id}')"><div class="tx"><div class="t">${fmtY(x.date)}</div>
+      ${bits ? `<div class="s">${bits}</div>` : ''}${x.notes ? `<div class="s notes">${esc(x.notes)}</div>` : ''}</div>${x.cost !== '' && x.cost != null ? `<b class="cost">${money(x.cost)}</b>` : ''}</button>`;
+  }).join('');
+  return `<div class="hist"><div class="hhead"><b>Rotation &amp; alignment history</b><button onclick="tyreRotEntryForm('${c.id}')">+ Add past rotation</button></div>
+    ${list.length ? `${anyCost ? `<div class="spent"><div><small>Spent in ${yr}</small><b>${money(sum(list.filter(x => (x.date || '').startsWith(yr))))}</b></div><div><small>All time</small><b>${money(sum(list))}</b></div></div>` : ''}
+      <div class="hlist">${rows}</div>` : '<div class="muted" style="margin-top:4px">No tyre rotations logged yet. Rotating every 10,000 km (or 6 months) helps front and rear tyres wear evenly.</div>'}</div>`;
+}
+
+function tyreRotCard(c) {
+  const kmTo = c.rotKm && c.odo ? Number(c.rotKm) - Number(c.odo) : null;
+  const km = c.rotKm ? Number(c.rotKm).toLocaleString('en-NZ') + ' km' : '';
+  const cp = carProgShort(c, 'rot');
+  if (c.rotDate || c.rotKm) {
+    const kmBadge = !c.rotDate && kmTo != null ? `<span class="pill ${kmTo < 0 ? 'over' : kmTo <= 1500 ? 'soon' : 'fine'}">${kmTo >= 0 ? kmTo.toLocaleString('en-NZ') + ' km left' : (-kmTo).toLocaleString('en-NZ') + ' km over'}</span>` : '';
+    return `<div class="dcard"><div class="h">${I('refresh')} Tyre rotation ${cp ? progPill(cp) : c.rotDate ? pill(daysLeft(c.rotDate)) : kmBadge}</div>
+      <div class="big">${c.rotDate ? fmtY(c.rotDate) + (km ? ` <span style="font-size:0.9375rem;color:var(--ink2);font-weight:600">or ${km}</span>` : '') : km}</div>
+      <div class="muted">${c.rotDate && c.rotKm ? 'Whichever comes first. ' : ''}${c.odo ? `Odometer: ${Number(c.odo).toLocaleString('en-NZ')} km${kmTo != null ? ` (${kmTo >= 0 ? kmTo.toLocaleString('en-NZ') + ' km to go' : (-kmTo).toLocaleString('en-NZ') + ' km over'})` : ''}.` : 'Recommended every 10,000 km or 6 months so front and rear tyres wear evenly.'}</div>
+      <div class="btns"><button class="btn" onclick="tyreRotForm('${c.id}',false)">Edit due date / km</button><button class="btn primary" onclick="tyreRotForm('${c.id}',true)">${I('check')} Rotated tyres</button></div>${tyreRotHistory(c)}</div>`;
+  }
+  return `<div class="dcard"><div class="h">${I('refresh')} Tyre rotation <span class="pill none">Not set</span></div>
+    <div class="muted" style="margin-top:8px">No tyre rotation date or km set yet. Rotating tyres every 10,000 km (or 6 months) evens out front and rear wear and extends tyre life.</div>
+    <div class="btns"><button class="btn primary" onclick="tyreRotForm('${c.id}',false)">${I('plus')} Add rotation due date</button><button class="btn" onclick="tyreRotForm('${c.id}',true)">${I('check')} Rotated tyres</button></div>${tyreRotHistory(c)}</div>`;
+}
+
+function tyreRotForm(id, justRotated) {
+  const c = getCar(id); if (!c) return;
+  if (!Array.isArray(c.rotations)) c.rotations = [];
+  if (!justRotated) {
+    openSheet('Tyre rotation due', `<p class="muted" style="margin:-4px 0 12px">When is the next tyre rotation due? Usually every 10,000 km or 6 months.</p>` +
+      field('Next rotation date', inp('rotDate', c.rotDate || '', 'type="date"')) +
+      `<div class="two">${field('Or rotate at (km)', inp('rotKm', c.rotKm || '', 'inputmode="numeric" placeholder="e.g. 100000"'))}${field('Odometer now (km)', inp('odo', c.odo || '', 'inputmode="numeric" placeholder="Optional"'))}</div>`,
+      async v => {
+        if (!v.rotDate && !digits(v.rotKm)) return 'Please add a date or a km reading.';
+        const s = snap(); c.rotDate = v.rotDate; c.rotKm = digits(v.rotKm); if (digits(v.odo)) c.odo = digits(v.odo);
+        try { delete carProgAll()[c.id + '|rot']; } catch (e) {}
+        await save(); render(); toast('Tyre rotation due date saved.', 'Undo', undoTo(s));
+      }, 'Save');
+    return;
+  }
+  const nextKmGuess = c.odo ? String(Number(c.odo) + 10000) : (c.rotKm ? String(Number(c.rotKm) + 10000) : '');
+  openSheet('Rotated tyres', `<p class="muted" style="margin:-4px 0 12px">Nice one. Log the tyre rotation and set when the next one is due.</p>` +
+    `<div class="two">${field('Rotated on', inp('date', todayISO(), 'type="date" required'))}${field('Odometer (km)', inp('km', c.odo || '', 'inputmode="numeric" placeholder="e.g. 95000"'))}</div>` +
+    field('Wheel alignment & balance', sel('aligned', [['yes', 'Yes – rotated, balanced & aligned'], ['', 'Rotation only']], 'yes')) +
+    `<div class="two">${garageField('')}${field('Cost ($)', inp('cost', '', 'inputmode="decimal" placeholder="Optional"'))}</div>` +
+    field('Notes', area('notes', '', 'Optional, e.g. front-to-rear cross, checked pressures at 34 PSI')) +
+    `<div class="subhead">Next tyre rotation</div>` +
+    field('Next rotation date', inp('rotDate', addMonths(todayISO(), 6), 'type="date"'), 'Usually 6 months or 10,000 km from today.') +
+    field('Or at (km)', inp('rotKm', nextKmGuess, 'inputmode="numeric" placeholder="e.g. 105000"')),
+    async v => {
+      if (!parseD(v.date)) return 'Please choose the date the tyres were rotated.';
+      if (parseD(v.date) > todayT()) return 'The rotation date can’t be in the future.';
+      const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 65.00.';
+      const s = snap(), km = digits(v.km);
+      c.rotations.push({ id: uid('rot'), date: v.date, km, aligned: v.aligned === 'yes', garage: v.garage, cost, notes: v.notes });
+      if (km && (!c.odo || Number(km) > Number(c.odo))) c.odo = km;
+      c.rotDate = v.rotDate; c.rotKm = digits(v.rotKm) || (km ? String(Number(km) + 10000) : '');
+      try { delete carProgAll()[c.id + '|rot']; } catch (e) {}
+      await save(); render();
+      toast('Tyre rotation logged.', 'Undo', undoTo(s));
+    }, 'Save');
+}
+
+function tyreRotEntryForm(carId, rid) {
+  const c = getCar(carId); if (!c) return;
+  if (!Array.isArray(c.rotations)) c.rotations = [];
+  const x = rid ? c.rotations.find(e => e.id === rid) : { date: todayISO(), km: c.odo || '', aligned: true, garage: '', cost: '', notes: '' };
+  if (!x) return;
+  openSheet(rid ? 'Edit tyre rotation' : 'Add past tyre rotation',
+    `<div class="two">${field('Rotated on', inp('date', x.date, 'type="date" required'))}${field('Odometer (km)', inp('km', x.km, 'inputmode="numeric" placeholder="Optional"'))}</div>` +
+    field('Wheel alignment & balance', sel('aligned', [['yes', 'Yes – rotated, balanced & aligned'], ['', 'Rotation only']], x.aligned ? 'yes' : '')) +
+    `<div class="two">${garageField(x.garage)}${field('Cost ($)', inp('cost', x.cost === '' || x.cost == null ? '' : Number(x.cost).toFixed(2), 'inputmode="decimal" placeholder="Optional"'))}</div>` +
+    field('Notes', area('notes', x.notes, 'Optional')),
+    async v => {
+      if (!parseD(v.date)) return 'Please choose the date.';
+      if (parseD(v.date) > todayT()) return 'The date can’t be in the future.';
+      const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 65.00.';
+      const s = snap(), upd = { date: v.date, km: digits(v.km), aligned: v.aligned === 'yes', garage: v.garage, cost, notes: v.notes };
+      if (rid) Object.assign(x, upd); else c.rotations.push(Object.assign({ id: uid('rot') }, upd));
+      await save(); render(); toast(rid ? 'Rotation updated.' : 'Past rotation added.', 'Undo', undoTo(s));
+    }, rid ? 'Save' : 'Add',
+    rid ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete rotation" onclick="deleteTyreRotEntry('${carId}','${rid}')">${I('trash')}</button>` : '');
+}
+
+async function deleteTyreRotEntry(carId, rid) {
+  const c = getCar(carId), s = snap();
+  c.rotations = (c.rotations || []).filter(e => e.id !== rid);
+  await save(); await closeSheet(); render(); toast('Tyre rotation deleted.', 'Undo', undoTo(s));
+}
+
+function tyreHistory(c) {
+  const list = sortedTyres(c), yr = String(new Date().getFullYear());
+  const sum = xs => xs.reduce((t, x) => t + (Number(x.cost) || 0), 0);
+  const anyCost = list.some(x => x.cost !== '' && x.cost != null);
+  const rows = list.map(x => {
+    const bits = [x.which ? esc(x.which) : '', x.brand ? esc(x.brand) : '', x.km ? Number(x.km).toLocaleString('en-NZ') + ' km' : '', x.garage ? esc(x.garage) : ''].filter(Boolean).join(' · ');
+    return `<button class="hrow" onclick="tyreEntryForm('${c.id}','${x.id}')"><div class="tx"><div class="t">${fmtY(x.date)}${x.which ? ' · ' + esc(x.which) : ''}</div>
+      ${bits ? `<div class="s">${bits}</div>` : ''}${x.notes ? `<div class="s notes">${esc(x.notes)}</div>` : ''}</div>${x.cost !== '' && x.cost != null ? `<b class="cost">${money(x.cost)}</b>` : ''}</button>`;
+  }).join('');
+  return `<div class="hist"><div class="hhead"><b>Tyre history</b><button onclick="tyreEntryForm('${c.id}')">+ Log tyres / repair</button></div>
+    ${list.length ? `${anyCost ? `<div class="spent"><div><small>Spent in ${yr}</small><b>${money(sum(list.filter(x => (x.date || '').startsWith(yr))))}</b></div><div><small>All time</small><b>${money(sum(list))}</b></div></div>` : ''}
+      <div class="hlist">${rows}</div>` : '<div class="muted" style="margin-top:4px">No new tyres or puncture repairs logged yet.</div>'}</div>`;
+}
+
+function tyresCard(c) {
+  const td = c.tyreDate ? daysLeft(c.tyreDate) : null;
+  const cp = carProgShort(c, 'tyre');
+  const kmTo = c.tyreKm && c.odo ? Number(c.tyreKm) - Number(c.odo) : null;
+  const km = c.tyreKm ? Number(c.tyreKm).toLocaleString('en-NZ') + ' km' : '';
+  const treadNum = c.tyreTread ? parseFloat(String(c.tyreTread).replace(/[^\d.]/g, '')) : null;
+  const lowTread = treadNum != null && !isNaN(treadNum) && treadNum <= 2.0;
+  const specs = [
+    ['Size', c.tyreSize || '—'],
+    ['Pressure', c.tyrePsi ? (c.tyrePsi + (/\bpsi\b/i.test(c.tyrePsi) ? '' : ' PSI')) : '—'],
+    ['Brand', c.tyreBrand || '—'],
+    ['Tread depth', c.tyreTread ? (c.tyreTread + (/\bmm\b/i.test(c.tyreTread) ? '' : ' mm')) : '—']
+  ];
+  const specGrid = `<div class="prices" style="grid-template-columns:repeat(2,1fr);margin-top:8px">${specs.map(([k, v]) => `<div><b style="font-size:0.95rem">${esc(v)}</b>${esc(k)}</div>`).join('')}</div>`;
+  const dueLine = (c.tyreDate || c.tyreKm)
+    ? `<div class="big" style="margin-top:6px">Next check / replacement: ${c.tyreDate ? fmtY(c.tyreDate) + (km ? ` <span style="font-size:0.9375rem;color:var(--ink2);font-weight:600">or ${km}</span>` : '') : km}</div>`
+    : '';
+  return `<div class="dcard"><div class="h">${I('car')} Tyres ${cp ? progPill(cp) : td != null ? pill(td) : lowTread ? '<span class="pill over">Low tread</span>' : (c.tyreSize || c.tyreBrand ? '<span class="pill fine">Tracked</span>' : '<span class="pill none">Add details</span>')}</div>
+    ${lowTread ? `<div class="callout red" style="margin-top:8px">${I('warn')}<div><b>Tread depth is getting low (${esc(c.tyreTread)}).</b> Legal WOF minimum in NZ is 1.5 mm across 75% of the tyre.</div></div>` : ''}
+    ${dueLine}
+    ${specGrid}
+    <div class="muted" style="margin-top:6px">NZ WOF minimum tread depth is 1.5 mm (2–3 mm recommended for wet grip). Check tyre pressure monthly when cold.</div>
+    <div class="btns"><button class="btn primary" onclick="tyreInfoForm('${c.id}')">${I('edit')} Tyre details &amp; due date</button><button class="btn" onclick="tyreEntryForm('${c.id}')">${I('plus')} Fitted new tyres</button></div>
+    ${tyreHistory(c)}</div>`;
+}
+
+function tyreInfoForm(id) {
+  const c = getCar(id); if (!c) return;
+  openSheet(`${c.name} – Tyres`,
+    `<p class="muted" style="margin:-4px 0 12px">Keep the tyre size, pressure, tread depth and next check/replacement date handy.</p>` +
+    `<div class="two">${field('Tyre size', inp('tyreSize', c.tyreSize || '', 'placeholder="e.g. 185/60R15 or 225/60R18" maxlength="30"'))}${field('Pressure (PSI)', inp('tyrePsi', c.tyrePsi || '', 'placeholder="e.g. 34 PSI" maxlength="30"'))}</div>` +
+    `<div class="two">${field('Brand / model', inp('tyreBrand', c.tyreBrand || '', 'placeholder="e.g. Bridgestone Turanza" maxlength="50"'))}${field('Tread depth (mm)', inp('tyreTread', c.tyreTread || '', 'placeholder="e.g. 5.5 mm" maxlength="20"'), 'WOF minimum is 1.5 mm')}</div>` +
+    `<div class="subhead">Next tyre check or replacement</div>` +
+    `<div class="two">${field('Next due date', inp('tyreDate', c.tyreDate || '', 'type="date"'))}${field('Or due at (km)', inp('tyreKm', c.tyreKm || '', 'inputmode="numeric" placeholder="e.g. 120000"'))}</div>`,
+    async v => {
+      const s = snap();
+      c.tyreSize = v.tyreSize; c.tyrePsi = v.tyrePsi; c.tyreBrand = v.tyreBrand; c.tyreTread = v.tyreTread;
+      c.tyreDate = v.tyreDate; c.tyreKm = digits(v.tyreKm);
+      try { delete carProgAll()[c.id + '|tyre']; } catch (e) {}
+      await save(); render(); toast('Tyre details saved.', 'Undo', undoTo(s));
+    }, 'Save');
+}
+
+function tyreEntryForm(carId, tid) {
+  const c = getCar(carId); if (!c) return;
+  if (!Array.isArray(c.tyres)) c.tyres = [];
+  const x = tid ? c.tyres.find(e => e.id === tid) : { date: todayISO(), which: '4 new tyres', brand: c.tyreBrand || '', km: c.odo || '', garage: '', cost: '', notes: '' };
+  if (!x) return;
+  const whichOpts = [
+    ['4 new tyres', '4 new tyres (full set)'],
+    ['2 front tyres', '2 front tyres'],
+    ['2 rear tyres', '2 rear tyres'],
+    ['1 tyre replaced', '1 tyre replaced'],
+    ['Puncture repair', 'Puncture repair'],
+    ['Wheel alignment & balance', 'Wheel alignment & balance']
+  ];
+  openSheet(tid ? 'Edit tyre record' : 'Fitted new tyres / repair',
+    `<div class="two">${field('Date', inp('date', x.date, 'type="date" required'))}${field('Odometer (km)', inp('km', x.km, 'inputmode="numeric" placeholder="Optional"'))}</div>` +
+    field('What was done', sel('which', whichOpts, x.which || '4 new tyres')) +
+    `<div class="two">${field('Tyre brand / model', inp('brand', x.brand || '', 'placeholder="e.g. Bridgestone" maxlength="50"'))}${field('Tread depth now (mm)', inp('tread', !tid ? '8 mm' : (c.tyreTread || ''), 'placeholder="e.g. 8 mm" maxlength="20"'))}</div>` +
+    `<div class="two">${garageField(x.garage)}${field('Cost ($)', inp('cost', x.cost === '' || x.cost == null ? '' : Number(x.cost).toFixed(2), 'inputmode="decimal" placeholder="Optional"'))}</div>` +
+    field('Notes', area('notes', x.notes, 'Optional, e.g. includes wheel alignment and disposal')) +
+    (!tid ? `<div class="subhead">Update rotation &amp; check reminders</div>` +
+      `<div class="two">${field('Next tyre rotation date', inp('rotDate', addMonths(todayISO(), 6), 'type="date"'))}${field('Next tyre check date', inp('tyreDate', addMonths(todayISO(), 12), 'type="date"'))}</div>` : ''),
+    async v => {
+      if (!parseD(v.date)) return 'Please choose the date.';
+      if (parseD(v.date) > todayT()) return 'The date can’t be in the future.';
+      const cost = parseMoney(v.cost); if (Number.isNaN(cost)) return 'Please type the cost as a number, like 580.00.';
+      const s = snap(), km = digits(v.km);
+      const upd = { date: v.date, km, which: v.which, brand: v.brand, garage: v.garage, cost, notes: v.notes };
+      if (tid) Object.assign(x, upd); else c.tyres.push(Object.assign({ id: uid('tyr') }, upd));
+      if (v.brand) c.tyreBrand = v.brand;
+      if (v.tread) c.tyreTread = v.tread;
+      if (km && (!c.odo || Number(km) > Number(c.odo))) c.odo = km;
+      if (!tid && v.rotDate) { c.rotDate = v.rotDate; if (km) c.rotKm = String(Number(km) + 10000); }
+      if (!tid && v.tyreDate) c.tyreDate = v.tyreDate;
+      try { delete carProgAll()[c.id + '|tyre']; } catch (e) {}
+      await save(); render(); toast(tid ? 'Tyre record updated.' : 'Tyres logged.', 'Undo', undoTo(s));
+    }, tid ? 'Save' : 'Save',
+    tid ? `<button type="button" class="btn danger" style="flex:0 0 auto" aria-label="Delete tyre record" onclick="deleteTyreEntry('${carId}','${tid}')">${I('trash')}</button>` : '');
+}
+
+async function deleteTyreEntry(carId, tid) {
+  const c = getCar(carId), s = snap();
+  c.tyres = (c.tyres || []).filter(e => e.id !== tid);
+  await save(); await closeSheet(); render(); toast('Tyre record deleted.', 'Undo', undoTo(s));
+}
+
 
 /* ================= DRIVERS (on the Cars tab) ================= */
 const AA_PHONE = '0800 500 222', AA_RENEW = 'https://www.aa.co.nz/membership/';
@@ -5565,7 +5797,7 @@ function todoPriRank(t) { return todoPriority(t) === 'high' ? 0 : todoPriority(t
 // 2.26.33: a to-do can be To do, In progress or Complete. `done` stays the source of truth (shared lists keep working); `status: 'doing'` marks In progress.
 const todoStatus = t => t && t.done ? 'done' : t && t.status === 'doing' ? 'doing' : 'todo';
 async function todoStart(id) { const t = (S.todos || []).find(x => x.id === id); if (!t || t.done) return; const s = snap(); if (t.status === 'doing') { delete t.status; delete t.startedAt; } else { t.status = 'doing'; t.startedAt = Date.now(); } await save(); render(); toast(t.status === 'doing' ? `In progress: ${t.title}` : `${t.title} back to To do.`, 'Undo', undoTo(s)); }
-const todoStatBtn = t => t.done ? '' : `<button type="button" class="tstat ${todoStatus(t) === 'doing' ? 'doing' : ''}" onclick="todoStart('${t.id}')" aria-label="${todoStatus(t) === 'doing' ? 'In progress. Tap to set back to To do' : 'Start'}: ${esc(t.title)}">${todoStatus(t) === 'doing' ? '● In progress' : '▶ Start'}</button>`;
+const todoStatBtn = t => t.done ? '' : `<button type="button" class="tstat ${todoStatus(t) === 'doing' ? 'doing' : ''}" onclick="todoStart('${t.id}')" aria-label="${todoStatus(t) === 'doing' ? 'In progress. Tap to set back to To do' : 'Start'}: ${esc(t.title)}">${todoStatus(t) === 'doing' ? '⚡ On it!' : '▶️ Start'}</button>`;
 // 2.26.35: garden rule for watering/feeding to-dos: not above 10° now or in the next 5 hours. While blocked, show when it'll be OK instead of overdue.
 const WATER_TASK = t => { const x = String((t && t.title) || ''); return /\b(water|watering|feed|feeding|fertili[sz]e)\b/i.test(x) && /\b(plants?|garden|lawns?|veg\w*|pots?|seedlings?|strawberr\w*|citrus|trees?|flowers?|beds?)\b/i.test(x); };
 function waterWin() { // null = no forecast (leave as normal); { ok } or { ok:false, label }
@@ -5595,7 +5827,7 @@ function todoUrgencyScore(t) {
   // 1) Overdue dated tasks & tasks due today/soon
   // 2) How long the task has been sitting there (oldest first)
   // 3) Priority (High > Normal > Low)
-  const priBoost = todoPriority(t) === "high" ? 300 : todoPriority(t) === "low" ? -150 : 0;
+  const priBoost = todoPriority(t) === "high" ? 550 : todoPriority(t) === "low" ? -200 : 0;
   const doingBoost = todoStatus(t) === "doing" ? 180 : 0;
   const age = todoAgeDays(t);
   let dateScore = 0;
@@ -5617,19 +5849,66 @@ function cmpOpenTodo(a, b) {
     || (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15)
     || (+a.created || 0) - (+b.created || 0); // oldest sitting first
 }
+function todoListEmoji(l) {
+  const s = String(l || "").toLowerCase();
+  if (s === "all") return "🌈";
+  if (/home|house/.test(s)) return "🏠";
+  if (/work|job/.test(s)) return "💼";
+  if (/shop|grocer|buy/.test(s)) return "🛒";
+  if (/car|vehic/.test(s)) return "🚗";
+  if (/garden|yard|lawn/.test(s)) return "🪴";
+  if (/diy|reno|project|fix/.test(s)) return "🛠️";
+  if (/health|med/.test(s)) return "🩺";
+  if (/pet|dog|cat/.test(s)) return "🐾";
+  if (/money|bill|bank/.test(s)) return "💳";
+  return "📋";
+}
+function todoEmoji(t) {
+  if (!t) return "✨";
+  const raw = String(t.title || "").trim();
+  // If title already starts with an emoji, return empty string so we do not double up
+  if (/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(raw)) return "";
+  const txt = (raw + " " + String(t.notes || "")).toLowerCase();
+  if (/\b(lawn|lawns|mow|mowing|grass|edges|weedeat|strim)\b/.test(txt)) return "🌱";
+  if (/\b(water|watering|plant|plants|garden|feed|fertilis|compost|prune|pot|seedling|tree|flower|hedge)\b/.test(txt)) return "🪴";
+  if (/\b(car|cars|wof|rego|tyre|tyres|tire|tires|rotate|rotation|oil|service|wash car|inflate|psi|wiper|haval|brake|battery)\b/.test(txt)) return "🚗";
+  if (/\b(zeus|mindy|silken|dog|cat|pet|vet|flea|worm|kennel|kibble)\b/.test(txt)) return "🐾";
+  if (/\b(clean|vacuum|mop|tidy|dust|wipe|rubbish|bin|bins|recycle|dishes|dishwasher|laundry|washing|fold|iron|bathroom|shower|toilet|kitchen|bench|oven|fridge)\b/.test(txt)) return "🧹";
+  if (/\b(fix|repair|paint|drill|build|shed|garage|fence|diy|reno|renovation|tool|screw|hinge|door|window|gutter|roof|deck|sand|plaster)\b/.test(txt)) return "🛠️";
+  if (/\b(pay|bill|bills|bank|mortgage|asb|anz|kiwibank|tax|ird|claim|unimed|receipt|invoice|insurance|rates|power bill|kora)\b/.test(txt)) return "💳";
+  if (/\b(doctor|gp|dentist|physio|chiro|tui|chemist|pharmacy|script|prescription|med|meds|medication|pill|appointment|health|blood|ears|eyes|optom)\b/.test(txt)) return "🩺";
+  if (/\b(call|ring|phone|text|message|email|reply|contact|ask|check with|talk to)\b/.test(txt)) return "📞";
+  if (/\b(buy|get|shop|shopping|grocer|countdown|woolworths|pak|kmart|bunnings|mitre|warehouse|order|pick up|collect|parcel|post|package|return)\b/.test(txt)) return "🛒";
+  if (/\b(cook|dinner|meal|tea|lunch|breakfast|bake|defrost|chicken|beef|mince|fish|gluten|gf|recipe)\b/.test(txt)) return "🍳";
+  if (/\b(birthday|bday|gift|present|card|party|cake|aranea|millesha|mum)\b/.test(txt)) return "🎁";
+  if (/\b(gym|workout|exercise|weights|stretch|fitness|spa|swim)\b/.test(txt)) return "💪";
+  if (/\b(haircut|barber|hair|book|booking|holiday|trip|flight|hotel|camp)\b/.test(txt)) return "✂️";
+  if (/\b(charge|watch|huawei|laptop|computer|pc|wifi|internet|tv|alexa|echo|hue|light|lights|heat pump|solar)\b/.test(txt)) return "⚡";
+  if (isSarahTodo(t)) return "💌";
+  if (todoPriority(t) === "high") return "🔥";
+  const listEm = todoListEmoji(t.list);
+  if (listEm && listEm !== "📋") return listEm;
+  const funPool = ["✨", "🌟", "🎯", "📌", "🚀", "☀️"];
+  const sum = raw.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  return funPool[sum % funPool.length];
+}
+function todoTitleWithEmoji(t) {
+  const em = todoEmoji(t);
+  return (em ? `<span class="tk-em" style="margin-right:5px">${em}</span>` : "") + esc(t && t.title || "");
+}
 function todoPriBadge(t) {
   const p = todoPriority(t);
-  if (p === "high") return `<span class="pill pri-high" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;font-size:.72rem;padding:2px 7px">🔴 High</span>`;
-  if (p === "low") return `<span class="pill pri-low" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-weight:600;font-size:.72rem;padding:2px 7px">🔵 Low</span>`;
-  return `<span class="pill pri-norm" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:650;font-size:.72rem;padding:2px 7px">🟡 Normal</span>`;
+  if (p === "high") return `<span class="pill pri-high" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;font-size:.72rem;padding:2px 8px">🔥 High</span>`;
+  if (p === "low") return `<span class="pill pri-low" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-weight:600;font-size:.72rem;padding:2px 8px">🌿 Chill</span>`;
+  return `<span class="pill pri-norm" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-weight:650;font-size:.72rem;padding:2px 8px">⭐ Normal</span>`;
 }
 function todoSittingLabel(t) {
   const age = todoAgeDays(t);
   const dueTxt = t && t.due ? (() => {
     const d = daysLeft(t.due);
-    return d < 0 ? `Overdue ${-d}d (${fmtW(t.due)})` : d === 0 ? "Due today" : d === 1 ? "Due tomorrow" : `Due ${fmtW(t.due)} (in ${d}d)`;
+    return d < 0 ? `⏰ Overdue ${-d}d (${fmtW(t.due)})` : d === 0 ? "🎯 Due today" : d === 1 ? "🌤️ Due tomorrow" : `📅 ${fmtW(t.due)} (in ${d}d)`;
   })() : "";
-  const sitTxt = age === 0 ? "Added today" : age === 1 ? "Sitting 1 day" : `Sitting ${age} days`;
+  const sitTxt = age === 0 ? "🌱 Fresh today" : age === 1 ? "🌤️ 1d on list" : `⏳ ${age}d on list`;
   return [dueTxt, sitTxt].filter(Boolean).join(" · ");
 }
 async function cycleTodoPri(id, ev) {
@@ -5640,7 +5919,8 @@ async function cycleTodoPri(id, ev) {
   t.priority = cur === "high" ? "normal" : cur === "normal" ? "low" : "high";
   await save();
   render();
-  toast(`${t.title}: ${t.priority.toUpperCase()} priority`);
+  const lbl = t.priority === "high" ? "🔥 High priority" : t.priority === "low" ? "🌿 Chill priority" : "⭐ Normal priority";
+  toast(`${t.title}: ${lbl}`);
 }
 function topTasksCardHtml(where = "home", maxShow = 5) {
   if (!S || !Array.isArray(S.todos)) return "";
@@ -5658,25 +5938,25 @@ function topTasksCardHtml(where = "home", maxShow = 5) {
       <div class="tx" onclick="todoForm('${t.id}')" style="cursor:pointer;min-width:0;flex:1">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
           <span onclick="cycleTodoPri('${t.id}', event)" title="Tap to change priority" style="cursor:pointer">${todoPriBadge(t)}</span>
-          ${doing ? `<span class="pill progpill" style="font-size:.7rem;padding:2px 7px">● In progress</span>` : ""}
+          ${doing ? `<span class="pill progpill" style="font-size:.7rem;padding:2px 7px">⚡ On it!</span>` : ""}
           ${d != null ? `<span class="tkpill">${todoDuePill(t, d)}</span>` : ""}
-          <span class="muted" style="font-size:.74rem;font-weight:600">⏳ ${esc(todoSittingLabel(t))}</span>
+          <span class="muted" style="font-size:.74rem;font-weight:600">${esc(todoSittingLabel(t))}</span>
         </div>
-        <div class="t" style="font-weight:700;font-size:.96rem;line-height:1.3">${sarahBadge(t)}${esc(t.title)}</div>
-        <div class="s" style="margin-top:2px"><span class="tktag">${esc(t.list || "To-do")}</span>${t.notes ? " · " + esc(String(t.notes).slice(0, 70)) : ""}</div>
+        <div class="t" style="font-weight:700;font-size:.96rem;line-height:1.3">${sarahBadge(t)}${todoTitleWithEmoji(t)}</div>
+        <div class="s" style="margin-top:2px"><span class="tktag">${todoListEmoji(t.list)} ${esc(t.list || "To-do")}</span>${t.notes ? " · 💬 " + esc(String(t.notes).slice(0, 70)) : ""}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
-        <button type="button" class="btn small primary" style="padding:4px 9px;font-size:.74rem" onclick="tick('${t.id}')">✓ Done</button>
+        <button type="button" class="btn small primary" style="padding:4px 9px;font-size:.74rem" onclick="tick('${t.id}')">✅ Done</button>
       </div>
     </div>`;
   }).join("");
   const rest = open.length - maxShow;
-  const moreBtn = rest > 0 ? `<button type="button" class="row" style="justify-content:center;font-weight:700;font-size:.84rem;padding:9px" onclick="window.__topTasksAll_${where}=!window.__topTasksAll_${where};render()">${showAll ? "Show top " + maxShow : `Show all ${open.length} tasks (+${rest} more)`}</button>` : "";
-  return `<div class="sec al-yd-sec" style="display:flex;justify-content:space-between;align-items:center"><span>📋 Tasks to Do · by sitting time, date &amp; priority <span class="al-cnt">${open.length}</span></span><a href="#todo" style="font-size:.8rem;font-weight:700">Open To-do ›</a></div><div class="list al-yd-list" style="margin-bottom:12px">${rows}${moreBtn}</div>`;
+  const moreBtn = rest > 0 ? `<button type="button" class="row" style="justify-content:center;font-weight:700;font-size:.84rem;padding:9px" onclick="window.__topTasksAll_${where}=!window.__topTasksAll_${where};render()">${showAll ? "🔼 Show top " + maxShow : `✨ Show all ${open.length} tasks (+${rest} more)`}</button>` : "";
+  return `<div class="sec al-yd-sec" style="display:flex;justify-content:space-between;align-items:center"><span>✨ Tasks to Do <span class="al-cnt">${open.length}</span></span><a href="#todo" style="font-size:.8rem;font-weight:700">Open To-do ›</a></div><div class="list al-yd-list" style="margin-bottom:12px">${rows}${moreBtn}</div>`;
 }
 function todoPriMark(t) {
   const p = todoPriority(t);
-  return p === 'high' ? ' · 🔴 High' : p === 'low' ? ' · 🔵 Low' : ' · 🟡 Normal';
+  return p === 'high' ? ' · 🔥 High' : p === 'low' ? ' · 🌿 Chill' : ' · ⭐ Normal';
 }
 function todoMetaDedupe(h) { return String(h).replace(/( · in your calendar)+/g, ' · in your calendar'); } // 2.26.22
 function Todo() {
@@ -5685,23 +5965,31 @@ function Todo() {
   const vis = S.todos.filter(t => todoFilter === 'All' || t.list === todoFilter);
   const open = vis.filter(t => !t.done).sort(cmpOpenTodo);
   const done = vis.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
-  // 2.28.2: task cards (Tasks - Today look). Same actions as before, only the layout changed.
+  const T = todayISO(), isT = ms => ms && nzStampLocal(new Date(ms)).slice(0, 10) === T;
+  const doneToday = (S.todos || []).filter(t => t && t.done && isT(t.doneAt)).length;
   const TKC = ['#22c55e', '#3b82f6', '#ec4899', '#f59e0b', '#8b5cf6', '#06b6d4'], tkc = l => TKC[Math.max(0, S.lists.indexOf(l)) % TKC.length];
   const row = t => todoMetaDedupe(`<div class="row tkcard ${t.done ? 'done' : ''}" style="--tk:${tkc(t.list)}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
-    <div class="tkmain"><button class="tapzone" onclick="todoForm('${t.id}')"><div class="tktop" style="gap:6px;flex-wrap:wrap"><div class="t">${sarahBadge(t)}${esc(t.title)}</div><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">${!t.done ? `<span onclick="cycleTodoPri('${t.id}', event)" title="Tap to change priority">${todoPriBadge(t)}</span>` : ''}${t.due && !t.done ? `<span class="tkpill">${todoDuePill(t)}</span>` : ''}</div></div>
-    <div class="s"><span class="tktag">${esc(t.list)}</span>${!t.done ? " · ⏳ " + esc(todoSittingLabel(t)) : ""}${todoAppt(t) ? ' · in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></button>
-    <div class="tkacts">${isMineShared(t) || isSarahTodo(t) ? `<span class="tkshare"><span class="tkav">S</span>Shared with Sarah</span>` : ''}${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}<button type="button" class="paybtn tkdone" onclick="tick('${t.id}')">${t.done ? 'Undo' : 'Done'}</button></div></div></div>`);
+    <div class="tkmain"><button class="tapzone" onclick="todoForm('${t.id}')"><div class="tktop" style="gap:6px;flex-wrap:wrap"><div class="t">${sarahBadge(t)}${t.done ? "✅ " + esc(t.title) : todoTitleWithEmoji(t)}</div><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">${!t.done ? `<span onclick="cycleTodoPri('${t.id}', event)" title="Tap to change priority">${todoPriBadge(t)}</span>` : ''}${t.due && !t.done ? `<span class="tkpill">${todoDuePill(t)}</span>` : ''}</div></div>
+    <div class="s"><span class="tktag">${todoListEmoji(t.list)} ${esc(t.list)}</span>${!t.done ? " · " + esc(todoSittingLabel(t)) : ""}${todoAppt(t) ? ' · 🗓️ in your calendar' : ''}${t.done ? '' : `<span data-todoprog="${esc(t.id)}">${todoStepProg(t)}</span>`}</div></button>
+    <div class="tkacts">${isMineShared(t) || isSarahTodo(t) ? `<span class="tkshare"><span class="tkav">S</span>💌 Shared with Sarah</span>` : ''}${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}<button type="button" class="paybtn tkdone" onclick="tick('${t.id}')">${t.done ? '↩️ Undo' : '✅ Done!'}</button></div></div></div>`);
   const openRow = t => { const st = todoStepsBlock(t, 'list'); return st ? `<div class="ideawrap todowrap">${row(t)}${st}</div>` : row(t); };
   const openCount = S.todos.filter(t => !t.done).length;
-  return `<div class="tkpage"><div class="tkhead"><h1>Tasks - Today</h1><button class="iconbtn" aria-label="Add a to-do" onclick="todoForm()">${I('plus')}</button><button class="iconbtn" aria-label="Open calendar" onclick="go('#calendar')">${I('cal')}</button></div><div class="tksub">${openCount ? plural(openCount, 'thing') + ' to do' : 'Nothing to do'}</div>
-    <div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${esc(l)}</button>`).join('')}
-      <button class="chip plus" onclick="listForm()">+ New list</button></div>
-    ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">Delete list</button></div>` : ''}
-    <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="Add a to-do${todoFilter !== 'All' ? ' to ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
-    <label class="sharechk"><input type="checkbox" id="todoshare"> Also add to Sarah’s list</label>
+  const friendlySub = !openCount
+    ? "🎉 Woohoo! Nothing waiting on your list — feet up!"
+    : doneToday > 0
+    ? `🌟 ${doneToday} ticked off today · ${plural(openCount, "thing")} left to go!`
+    : openCount <= 3
+    ? `🎯 Just ${plural(openCount, "thing")} on your list — you’ve got this!`
+    : `🚀 ${plural(openCount, "thing")} on the go — pick one easy win at a time!`;
+  return `<div class="tkpage"><div class="tkhead"><h1>✨ My To-do List</h1><button class="iconbtn" aria-label="Add a to-do" onclick="todoForm()">${I('plus')}</button><button class="iconbtn" aria-label="Open calendar" onclick="go('#calendar')">${I('cal')}</button></div><div class="tksub">${friendlySub}</div>
+    <div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${todoListEmoji(l)} ${esc(l)}</button>`).join('')}
+      <button class="chip plus" onclick="listForm()">➕ New list</button></div>
+    ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">✏️ Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">🗑️ Delete list</button></div>` : ''}
+    <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="✨ Jot down a to-do${todoFilter !== 'All' ? ' for ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
+    <label class="sharechk"><input type="checkbox" id="todoshare"> 💌 Also add to Sarah’s list</label>
     ${todoTodayProg()}${todoListProg(todoFilter)}
-    ${open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">All done. Good as gold!</div></div>' : empty('Nothing on your list', 'Type a to-do above and tap +, or add one with a due date.', 'Add a to-do', 'todoForm()'))}
-    ${done.length ? `<div class="sec">Done <button onclick="clearDone()">Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}</div>`;
+    ${open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">🎉 All done — good as gold!</div><div class="s">Everything on this list is ticked off. Enjoy a breather! ☕</div></div>' : empty('✨ Nothing on your list yet', 'Pop a task in the box above and tap +, or add one with a due date.', '➕ Add a to-do', 'todoForm()'))}
+    ${done.length ? `<div class="sec">🎉 Ticked Off (${done.length}) <button onclick="clearDone()">🧹 Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}</div>`;
 }
 function setTodoFilter(l) { todoFilter = l; render(); }
 async function quickAdd(e) {
@@ -5864,7 +6152,7 @@ function calItems(fromT, toT) {
   const ev = [];
   const inR = s => { const t = parseD(s); return t != null && t >= fromT && t <= toT; };
   S.cars.forEach(c => {
-    [['wof', 'WOF', 'WOF'], ['rego', 'rego', 'Rego'], ['svcDate', 'service', 'Service']].forEach(([k, l, L]) => { if (c[k] && inR(c[k])) ev.push({ src: 'due', title: `${c.name} ${l} due`, date: c[k], time: L, go: `go('#car/${c.id}')` }); });
+    [['wof', 'WOF', 'WOF'], ['rego', 'rego', 'Rego'], ['svcDate', 'service', 'Service'], ['rotDate', 'tyre rotation', 'Tyres'], ['tyreDate', 'tyres', 'Tyres']].forEach(([k, l, L]) => { if (c[k] && inR(c[k])) ev.push({ src: 'due', title: `${c.name} ${l} due`, date: c[k], time: L, go: `go('#car/${c.id}')` }); });
   });
   S.bills.forEach(b => billDates(b, fromT, toT).forEach(d => ev.push({ src: 'due', title: `${b.name} · ${money(b.amount)}`, date: d, time: 'Bill', go: `go('#bills')`, bid: b.id })));
   loanPlanInRange(fromT, toT).forEach(x => ev.push({ src: 'due', title: `Loan · ${x.l.from} · ${centsMoney(x.cents)}`, date: x.d, time: 'Loan', go: `go('#loan/${x.l.id}')` }));
@@ -19820,6 +20108,8 @@ function diaryCars(iso) {
     if (c.wof === iso) out.push({ text: c.name + ' WOF due', go: `go('#car/${c.id}')` });
     if (c.rego === iso) out.push({ text: c.name + ' rego due', go: `go('#car/${c.id}')` });
     if (c.svcDate === iso) out.push({ text: c.name + ' service due', go: `go('#car/${c.id}')` });
+    if (c.rotDate === iso) out.push({ text: c.name + ' tyre rotation due', go: `go('#car/${c.id}')` });
+    if (c.tyreDate === iso) out.push({ text: c.name + ' tyres due', go: `go('#car/${c.id}')` });
   });
   return out;
 }
@@ -22076,7 +22366,7 @@ function glTasksOverdue5Count() {
 }
 function glTasksBtn() {
   const n = glTasksOverdue5Count();
-  return `<button class="iconbtn glbell gltasksbtn" id="gltasksbtn" aria-label="Tasks${n ? ', ' + n + ' overdue 5+ days' : ''}" title="Tasks (sorted by due date, sitting time &amp; priority)" onclick="go('#todo')">${I('todo')}${n ? `<span class="glbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
+  return `<button class="iconbtn glbell gltasksbtn" id="gltasksbtn" aria-label="Tasks${n ? ', ' + n + ' overdue 5+ days' : ''}" title="✨ To-do List" onclick="go('#todo')">${I('todo')}${n ? `<span class="glbadge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
 }
 function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Afternoon';
@@ -23142,7 +23432,7 @@ function alDiscoverHtml() {
     <div class="al-discover-strip" role="region" aria-label="Discover">${cards.join('')}</div>`;
 }
 
-/* ---- 2.28.70: Show All Notifications & Choose Which Notifications to Receive ---- */
+/* ---- 2.28.71: Show All Notifications & Choose Which Notifications to Receive ---- */
 const NOTIF_CAT_DEFS = [
   ["warnings",  "⛔", "Roadworks, Crashes, Weather & Quakes", "NZTA roadworks & crashes, WDC closures, MetService warnings, bridge lifts & GeoNet quakes"],
   ["bills",     "🧾", "Bills, Invoices & Bank Alerts", "Upcoming & overdue bills, emailed invoices (Kora, Ecotricity) and bank alerts"],
@@ -23160,6 +23450,7 @@ const NOTIF_CAT_DEFS = [
   ["parlBills", "🏛️", "Proposed Bills & Select Committees", "New NZ Parliament bills open for public submission & Select Committee deadlines"],
   ["power",     "⚡", "Power, Outages & Smart Home", "Northpower & fibre/mobile outages, off-peak power alerts, solar & smart home sensors"],
   ["emails",    "📦", "Deliveries, Deals & Mail", "Parcel deliveries, Click & Collect, Everyday Rewards & shop emails"],
+  ["whgPop",    "👥", "Whangārei Area Population & Demographics", "Stats NZ population updates, Onerahi & Whangārei suburb growth, median age & household demographics"],
   ["local",     "🏗️", "Whangārei Planning, Bus & Cinema", "Whangārei planning & development, Onerahi Route 10 bus updates & Event Cinemas"]
 ];
 
@@ -23270,6 +23561,7 @@ function classifyNotifElement(el, secName) {
   if (/^bf-loc-|^bf-nz-|^bf-world-|^newsart-/.test(nk) || /#news|#localnews|openNewsUrl/.test(oc) || /\b(northland news|nz news|rnz)\b/i.test(txt)) return "newsArt";
   if (/^learn-|^lb-/.test(nk) || /#learn|#aitech|#diy|#science|#coding|#astronomy|#space|#lang/.test(oc) || /\b(new learning|word of the day|ai & tech|diy & tools)\b/i.test(txt)) return "learning";
   if (/^parlbill-/.test(nk) || /#parlbills/.test(oc) || /\b(select committee|proposed bill)\b/i.test(txt)) return "parlBills";
+  if (/^whgpop-/.test(nk) || /openWhangareiDemographicsSheet/.test(oc) || /\b(whangārei population|whangarei population|onerahi demographics|stats nz population)\b/i.test(txt)) return "whgPop";
   if (sec === "sarah" || /^stick-/.test(nk) || (el && el.classList && el.classList.contains("shopfs")) || /\bsarah\b/i.test(txt)) return "sarah";
   if (sec === "bills" || /^cardpaid-|^bank-|^apup-/.test(nk) || (el && el.classList && el.classList.contains("bankrow")) || /#bills|#cashflow|#budget/.test(oc) || /\b(bill|invoice|direct debit|kora|ecotricity|asb credit card|bank transaction|unimed)\b/i.test(txt)) return "bills";
   if ((el && el.getAttribute && el.getAttribute("data-bday-days") != null) || /#birthdays/.test(oc) || /\bbirthday\b/i.test(txt)) return "birthdays";
@@ -23580,7 +23872,7 @@ function alBriefingHtml(list) {
   let body = '';
   if (alBriefFilter === 'all' || alBriefFilter === 'today') {
     body = block('📌 Pinned', pinnedNodes, 'bellpinned') +
-           block(showAll ? '🔔 All Notifications (by date & time sitting)' : '🔔 Notifications (by date & time sitting)', sortedAll);
+           block(showAll ? '🔔 All Notifications' : '🔔 Notifications', sortedAll);
   } else if (alBriefFilter === 'sarah') {
     body = block('💌 From Sarah', sortedSarah);
   } else if (alBriefFilter === 'cars') {
@@ -23619,7 +23911,7 @@ function GlAlerts() {
       ${arcTab()}
     </div>
   </div>`;
-  return pwrWrap(topBar + header('Notifications', isBoard ? 'Swipe sideways between boards · scroll up and down inside each board' : (notifShowAllOn() ? 'Showing all notifications across your app, prioritised by date & time sitting' : 'Prioritised top to bottom by date & how long items have been sitting here')) + notifControlsBarHtml() + (NB.top) + `
+  return pwrWrap(topBar + header('Notifications', isBoard ? 'Swipe sideways between boards · scroll up and down inside each board' : '') + notifControlsBarHtml() + (NB.top) + `
   <div class="foot">Weather: MetService and Open-Meteo. Roads: NZ Transport Agency Waka Kotahi (state highways) and Whangārei District Council closures. Commute: ${esc(ME().homeLabel)} to ${esc(ME().workLabel)}.</div>`);
 }
 function glWxSky(kind, day) {
@@ -26210,9 +26502,9 @@ glAlertsBody = function () {
 
 /* 2.26.48: In progress for car due items (WOF / rego / service). Stored per car+part with the due date it was for, so it clears itself when the date is renewed.
    WOF: after a failed inspection there are 28 days from the inspection date to fix and get the recheck. */
-const CAR_PART_NAME = { wof: 'WOF', rego: 'rego', svc: 'service' };
+const CAR_PART_NAME = { wof: 'WOF', rego: 'rego', svc: 'service', rot: 'tyre rotation', tyre: 'tyres' };
 function carProgAll() { S.carProg = S.carProg && typeof S.carProg === 'object' ? S.carProg : {}; return S.carProg; }
-function carPartDate(c, part) { return c ? (part === 'wof' ? c.wof : part === 'rego' ? c.rego : c.svcDate) : ''; }
+function carPartDate(c, part) { return c ? (part === 'wof' ? c.wof : part === 'rego' ? c.rego : part === 'rot' ? c.rotDate : part === 'tyre' ? c.tyreDate : c.svcDate) : ''; }
 function carProg(c, part) { if (!c) return null; const e = (S.carProg || {})[c.id + '|' + part]; return e && e.due === carPartDate(c, part) ? e : null; }
 function carRecheck(e) { return e && e.insp ? addDays(e.insp, 28) : ''; }
 function progPill(txt) { return `<span class="pill progpill">${esc(txt || 'In progress')}</span>`; }
@@ -26257,7 +26549,7 @@ function carDueSheet(carId, part) {
 async function carFixTick(carId, part, i) { const c = getCar(carId), e = carProg(c, part); if (!e || !e.fixes || !e.fixes[i]) return; e.fixes[i].done = !e.fixes[i].done; await save(); render(); }
 function carProgCards() { // bell In progress section (and recheck Coming up / Urgent)
   const out = [];
-  (S.cars || []).forEach(c => ['wof', 'rego', 'svc'].forEach(part => {
+  (S.cars || []).forEach(c => ['wof', 'rego', 'svc', 'rot', 'tyre'].forEach(part => {
     const e = carProg(c, part); if (!e) return;
     const rc = part === 'wof' ? carRecheck(e) : '', rd = rc ? daysLeft(rc) : null;
     const F = e.fixes || [], fx = F.length ? `<div class="fixmini">${F.map((f, i) => `<button type="button" class="fixck ${f.done ? 'on' : ''}" onclick="event.stopPropagation();carFixTick('${c.id}','${part}',${i})"><span class="bx">${f.done ? '✓' : ''}</span>${esc(f.text)}</button>`).join('')}</div>${carFixesLine(e)}` : '';
@@ -26285,7 +26577,7 @@ function abItems() {
       `<div class="abbtns"><button type="button" class="btn primary small" onclick="event.stopPropagation();if(!glSwipe.moved)abAdd('${esc(key)}')">Add bill</button><button type="button" class="btn small" onclick="event.stopPropagation();if(!glSwipe.moved)abNotNow('${esc(key)}',this.closest('.glnew'))">Not now</button></div></div></div>` });
   };
   try {
-    (S.cars || []).forEach(c => [['wof', 'WOF'], ['rego', 'Rego'], ['svc', 'Service']].forEach(([part, L]) => {
+    (S.cars || []).forEach(c => [['wof', 'WOF'], ['rego', 'Rego'], ['svc', 'Service'], ['rot', 'Tyre rotation'], ['tyre', 'Tyres']].forEach(([part, L]) => {
       const due = carPartDate(c, part); if (!due || !parseD(due)) return;
       const e = carProg(c, part), rc = part === 'wof' && e ? carRecheck(e) : '', target = rc || due, d = daysLeft(target);
       if (!(d <= 28 || (part === 'wof' && e))) return;
@@ -29289,7 +29581,7 @@ function xferProg(X) { try { const done = S.settings.xferDone || {}, by = X.list
   return progLine(L.filter(x => done[x.key]).length, L.length, 'Transfers on payday · ' + fmtW(by), 'pgsm'); } catch (e) { return ''; } }
 function claimsProg(todo, sent, paid) { return progLine(sent + paid, todo + sent + paid, 'Claims sent or refunded', 'pgsm', { word: 'sent' }); }
 function stepsProg(td) { try { const g = hwGoal(), s = td && td.steps; if (!g || s == null) return ''; return progLine(Math.min(s, g), g, 'Step goal', 'pgsm', { label: `${Math.min(100, Math.round(s / g * 100))}% · ${hwNum(s)} of ${hwNum(g)}` }); } catch (e) { return ''; } }
-function carTimeProg(c) { try { const P = [['WOF', c.wof, (+c.wofMonths || 12) * 30.44], ['Rego', c.rego, 365], ['Service', c.svcDate, 365]].filter(x => x[1] && !isNaN(parseD(x[1]))).map(x => ({ n: x[0], d: daysLeft(x[1]), cyc: Math.round(x[2]) })).sort((a, b) => a.d - b.d);
+function carTimeProg(c) { try { const P = [['WOF', c.wof, (+c.wofMonths || 12) * 30.44], ['Rego', c.rego, 365], ['Service', c.svcDate, 365], ['Tyre rotation', c.rotDate, 182], ['Tyres', c.tyreDate, 365]].filter(x => x[1] && !isNaN(parseD(x[1]))).map(x => ({ n: x[0], d: daysLeft(x[1]), cyc: Math.round(x[2]) })).sort((a, b) => a.d - b.d);
   const x = P[0]; if (!x) return ''; const left = Math.max(0, Math.min(x.cyc, x.d));
   return progLine(left, x.cyc, `Next: ${x.n} ${x.d < 0 ? 'overdue' : x.d === 0 ? 'due today' : 'in ' + plural(x.d, 'day')}`, 'pgsm cartime', { noParty: 1, label: `${Math.round(left / x.cyc * 100)}% time left` }); } catch (e) { return ''; } }
 async function progToggle() { S.settings = S.settings || {}; S.settings.progLines = !progOn(); await save(); render(); }
@@ -31339,13 +31631,14 @@ function listsHubMenu(k) {
   go(m);
 }
 function ListsHubPage() {
-  const openTodos = (S.todos || []).filter(t => t && !t.done);
+  const openTodos = (S.todos || []).filter(t => t && !t.done).sort(cmpOpenTodo);
   const todoCards = openTodos.slice(0, 6).map(t => {
     const d = t.due ? daysLeft(t.due) : null;
     const col = d != null && d < 0 ? '#dc2626' : d != null && d <= 2 ? '#d97706' : '#2563eb';
-    const lbls = [[t.list || 'To-do', col]];
-    if (t.priority === 'high' || t.priority === 'urgent') lbls.push([t.priority.toUpperCase(), '#dc2626']);
-    return grpCard(lbls, t.title, t.due ? 'Due ' + fmtW(t.due) : (t.notes || 'Tap to view in To-do'), "go('#todo')", isSarahTodo(t) ? '💌 Added by Sarah' : '');
+    const lbls = [[todoListEmoji(t.list) + ' ' + (t.list || 'To-do'), col]];
+    if (t.priority === 'high' || t.priority === 'urgent') lbls.push(['🔥 HIGH', '#dc2626']);
+    const em = todoEmoji(t);
+    return grpCard(lbls, (em ? em + " " : "") + t.title, t.due ? '📅 Due ' + fmtW(t.due) : (t.notes || 'Tap to view in To-do'), "go('#todo')", isSarahTodo(t) ? '💌 Added by Sarah' : '');
   }).join('') + grpLinkBtn('#todo', `Open To-do (${openTodos.length} open)`);
 
   const rems = (S.reminders || []).filter(r => r && !r.done).slice(0, 5);
@@ -34532,7 +34825,7 @@ function glLivePulseHtml(m) {
       <button type="button" class="pulse-card needed" onclick="go('#todo')">
         <div class="p-top"><span class="p-lbl">☑️ Sitting Tasks</span><span class="p-badge warn">${over5 ? over5 + " >5d" : "All clear"}</span></div>
         <div class="p-main"><span class="p-big">${over5} Sitting >5d</span><span class="p-vs">Clear 1 today</span></div>
-        <div class="p-sub"><span>Sorted by due date &amp; sitting time</span><span>Open Tasks ›</span></div>
+        <div class="p-sub"><span>Pick one easy win today 🎯</span><span>Open Tasks ›</span></div>
       </button>
       <button type="button" class="pulse-card rates" onclick="go('#tidy')">
         <div class="p-top"><span class="p-lbl">🧹 10-Min Tidy</span><span class="p-badge up">Zero pressure</span></div>
@@ -36387,7 +36680,7 @@ async function onBottomTileLongPress(btnEl) {
 if (!window.__MOVING) start();
 
 
-/* ================= 2.28.70: SUGGESTED INTERNET TV FOR SHANE, EXTRA NOTIFICATION CARDS, ONERAHI BUS TIMETABLE (#bus) & SELECT COMMITTEE BILLS (#parlbills) ================= */
+/* ================= 2.28.71: SUGGESTED INTERNET TV FOR SHANE, EXTRA NOTIFICATION CARDS, ONERAHI BUS TIMETABLE (#bus) & SELECT COMMITTEE BILLS (#parlbills) ================= */
 
 const SHANE_ITV_FAV_CHANNELS = [
   { id: "mythbusters", reason: "🔨 Hands-on workshop builds, testing & engineering experiments", badge: "🎯 Top Pick for You · DIY & Science" },
@@ -36596,6 +36889,26 @@ function notifExtraCategoryCardsHtml(showAll) {
         <div class="tx">
           <div class="t">Select Committee Bill: ${esc(topBill.title)}</div>
           <div class="s">${esc(topBill.committee)} · Closes ${esc(topBill.closes)} (${openBills.length} proposed bills open for submissions)</div>
+        </div>
+      </button>`);
+    }
+  }
+
+  // 8. Whangārei Area Population & Demographics Updates (Stats NZ)
+  if (notifCatOn("whgPop")) {
+    rows.push(`<button class="row" data-ncat="whgPop" data-nk="whgpop-main" onclick="openWhangareiDemographicsSheet()">
+      <div class="ic ev">👥</div>
+      <div class="tx">
+        <div class="t">Whangārei District Population Passes 100,600 (Stats NZ Update)</div>
+        <div class="s">Up from 96,678 (2023 Census) &amp; 90,960 (2018) · Median age 41.3 yrs · 41,319 dwellings · Tap for suburb &amp; Onerahi breakdown</div>
+      </div>
+    </button>`);
+    if (showAll) {
+      rows.push(`<button class="row" data-ncat="whgPop" data-nk="whgpop-onerahi" onclick="openWhangareiDemographicsSheet()">
+        <div class="ic ev">🏘️</div>
+        <div class="tx">
+          <div class="t">Onerahi &amp; Whangārei Suburbs Demographics Snapshot</div>
+          <div class="s">Onerahi: 5,970 residents in 2,260 households (19.9% under 15) · Kamo ~10,750 · Bream Bay ~8,150 · Tikipunga ~7,720</div>
         </div>
       </button>`);
     }
@@ -36867,4 +37180,65 @@ function ParlBillsPage() {
       <a class="btn primary" href="https://bills.parliament.nz/bills-proposed-laws?Tab=OpenForSubmissions" target="_blank" rel="noopener">🏛️ Open Official NZ Parliament Bills Portal</a>
       <button type="button" class="btn" onclick="openChooseNotificationsSheet()">🔔 Notification Settings</button>
     </div>`;
+}
+
+
+/* ================= WHANGĀREI AREA POPULATION & DEMOGRAPHICS SHEET (2.28.71) ================= */
+function openWhangareiDemographicsSheet() {
+  const suburbs = [
+    ["Onerahi (your suburb)", "5,970", "2,260 households · 19.9% under 15 yrs (1,275 kids)"],
+    ["Kamo", "10,750", "21.1% under 15 yrs (2,268 kids) · growing north-west hub"],
+    ["Bream Bay (Ruakākā / One Tree Pt / Waipū)", "11,410", "Fastest growing coastal area (8,150 Bream Bay + 3,260 Waipū)"],
+    ["Tikipunga", "7,720", "21.5% under 15 yrs (1,659 kids)"],
+    ["Kensington", "5,715", "15.8% under 15 yrs · central suburb"],
+    ["Raumanga – Port Whangārei", "5,440", "26.3% under 15 yrs (1,431 kids)"],
+    ["Whangārei Central", "3,430", "18.7% under 15 yrs · CBD & town basin"],
+    ["Maunu", "2,805", "20.2% under 15 yrs · up from 2,495 in 2018"],
+    ["Whau Valley", "2,785", "18.1% under 15 yrs"],
+    ["Riverside", "2,110", "16.2% under 15 yrs · across the harbour from Onerahi"],
+    ["Horahora", "1,655", "19.4% under 15 yrs"]
+  ];
+  const html = `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="callout blue" style="margin:0">
+        <div><b>Stats NZ Official Update:</b> Whangārei District’s estimated resident population reached <b>100,600</b> (at 30 June 2025, released Nov 2025), crossing the 100,000 milestone for the first time — up from <b>96,678</b> in the 2023 Census and <b>90,960</b> in the 2018 Census (+10.6% since 2018).</div>
+      </div>
+
+      <div class="prices" style="grid-template-columns:repeat(2,1fr);gap:8px;margin:0">
+        <div><b style="font-size:1.1rem;color:#1d4ed8">100,600</b>Whangārei District Pop.</div>
+        <div><b style="font-size:1.1rem;color:#0f766e">5,970</b>Onerahi Residents</div>
+        <div><b style="font-size:1.1rem">41.3 yrs</b>Median Age (NZ: 38.2)</div>
+        <div><b style="font-size:1.1rem">41,319</b>Private Dwellings</div>
+      </div>
+
+      <div class="dcard" style="margin:0;padding:12px">
+        <div style="font-weight:800;font-size:.92rem;margin-bottom:6px">📊 Whangārei District Demographics (Stats NZ Census &amp; Estimates)</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:.83rem">
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:4px"><span>Population Growth</span><b>76,995 (2013) → 90,960 (2018) → 96,678 (2023) → 100,600 (latest)</b></div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:4px"><span>Māori Population</span><b>30,351 people (31.4%) · Median age 27.5 yrs</b></div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:4px"><span>Te Reo Māori Speakers</span><b>7.5% of residents</b></div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:4px"><span>Families &amp; Home Ownership</span><b>24,855 families · 70.4% own home / family trust</b></div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:4px"><span>Median Personal Income &amp; Rent</span><b>$36,500 / yr · Median rent $420 / wk</b></div>
+          <div style="display:flex;justify-content:space-between"><span>Local Businesses &amp; Qualifications</span><b>11,670 businesses · 54.2% post-school qualification</b></div>
+        </div>
+      </div>
+
+      <div class="dcard" style="margin:0;padding:12px">
+        <div style="font-weight:800;font-size:.92rem;margin-bottom:6px">🏘️ Onerahi &amp; Whangārei Suburbs Breakdown (2023 Census SA3)</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:.82rem">
+          ${suburbs.map(([name, pop, note], i) => `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;${i < suburbs.length - 1 ? 'border-bottom:1px solid var(--line);padding-bottom:5px' : ''}">
+              <div><b>${esc(name)}</b><div class="muted" style="font-size:.76rem">${esc(note)}</div></div>
+              <b style="white-space:nowrap;color:var(--brand,#1d4ed8)">${esc(pop)}</b>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn primary small" href="https://tools.summaries.stats.govt.nz/places/TA/whangarei-district" target="_blank" rel="noopener">${I('ext')} Stats NZ Whangārei Profile</a>
+        <button type="button" class="btn small" onclick="closeSheet();go('#planning')">🏗️ Whangārei Planning</button>
+      </div>
+    </div>`;
+  openSheet("Whangārei Population & Demographics", html, null);
 }
