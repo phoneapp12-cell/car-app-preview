@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.68';
+const APP_VERSION = '2.28.69';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11475,6 +11475,8 @@ function More() {
     food: () => 'Meal planner, recipes and shopping',
     projects: () => 'Renovations and your days off plan',
     planning: () => 'Whangārei growth, plans and highways',
+    bus: () => 'CityLink Route 10 Onerahi ↔ Rose St Bus Terminal & live countdown',
+    parlbills: () => 'NZ Parliament bills open for Select Committee submissions',
     recipes: () => plural(visibleIdeas().length, 'recipe') + (M().ideas.some(i => i.fav && !i.hidden) ? ` · ${M().ideas.filter(i => i.fav && !i.hidden).length} favourites` : ''),
     shopping: () => shopMoreSub(),
     pets: () => petsMoreSub(),
@@ -11529,7 +11531,7 @@ function More() {
   ];
   const GROUPS = [
     ['health', '🩺 Health & Wellbeing', ['watch', 'sleep', 'gym', 'health', 'meds', 'claims']],
-    ['local', '📍 Local & Outdoors', ['walks', 'weather', 'bridge', 'roadworks', 'events', 'news', 'planning', 'garden']],
+    ['local', '📍 Local & Outdoors', ['walks', 'weather', 'bridge', 'roadworks', 'bus', 'events', 'news', 'planning', 'parlbills', 'garden']],
     ['explore', '🎓 Entertainment & Learning', ['media', 'learn', 'aitech', 'science', 'diy', 'coding', 'astronomy', 'gardening', 'space', 'travel', 'ideas', 'tv', 'videos', 'top40', 'radio', 'podcasts', 'blogging', 'about']],
     ['home', '🏠 Home & Daily', ['calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'projects', 'flagged', 'birthdays', 'countdown', 'diary', 'notes', 'photos', 'lights', 'heat', 'alarm']],
     ['money', '💰 Money & Bills', ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans']],
@@ -11580,7 +11582,9 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   media: ['play', 'vid', 'Entertainment', 'Entertain'], // 2.27.51
   projects: ['wrench', 'rw', 'Projects', 'Projects'],
   flagged: ['flag', 'todo', 'Flagged', 'Flagged'], // 2.27.87: ClickUp-style flagged items // 2.27.76: Projects page (renovations and days off plan)
-  planning: ['flag', 'rw', 'Planning', 'Planning'], // 2.27.84: Planning & development page (kept copy of the /planning feed)
+  planning: ['flag', 'rw', 'Planning', 'Planning'],
+  bus: ['car', 'appt', 'Onerahi Bus Timetable', 'Bus'],
+  parlbills: ['news', 'bill', 'Proposed Bills (Select Committee)', 'Parl Bills'], // 2.27.84: Planning & development page (kept copy of the /planning feed)
   food: ['meal', 'meal', 'Meals', 'Meals'], // 2.27.74: Meals page (planner, recipes, shopping). #meals stays the planner so old links keep working
   walks: ['pin', 'garden', 'Walks &amp; Beaches', 'Walks'],
   tidy: ['todo', 'todo', 'Tidy &amp; Organise', 'Tidy'],
@@ -11603,7 +11607,7 @@ const navDefs = subs => Object.fromEntries(NAV_DEFAULT.map(k => [k, { icon: NAV[
 const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'countdown', 'diary', 'notes', 'photos'] },
   { id: 'people', title: 'Health', keys: ['watch', 'sleep', 'gym', 'health', 'meds', 'claims', 'birthdays', 'about'] },
-  { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'planning', 'garden', 'events', 'news'] },
+  { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'bus', 'planning', 'parlbills', 'garden', 'events', 'news'] },
   { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
   { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
@@ -21307,7 +21311,7 @@ function bottomTabsSetting() {
 }
 /* ---------- router ---------- */
 const MORE_PAGES = ['more', 'settings', 'pet', 'loan']; // pages that always light up More
-const ROUTE_ITEM = { todo: 'lists', reminders: 'lists', flagged: 'lists', ideas: 'lists', notes: 'lists', birthdays: 'lists', countdown: 'lists', diary: 'lists', photos: 'lists', recipe: 'food', meals: 'food', recipes: 'food', shopping: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', tidy: 'projects', bills: 'money', budget: 'money', cashflow: 'money', notbills: 'money', power: 'money', compare: 'money', powertime: 'money', work: 'money', roster: 'money', commission: 'money', wage: 'money', loans: 'money', loan: 'money', watch: 'wellbeing', sleep: 'wellbeing', gym: 'wellbeing', meds: 'wellbeing', health: 'wellbeing', claims: 'wellbeing', about: 'wellbeing', weather: 'local', walks: 'local', bridge: 'local', roadworks: 'local', garden: 'local', events: 'local', news: 'local', localnews: 'local', planning: 'local', cars: 'homelife', fuel: 'homelife', car: 'homelife', driver: 'homelife', drivers: 'homelife', pets: 'homelife', pet: 'homelife', lights: 'homelife', heat: 'homelife', alarm: 'homelife', aitech: 'learn', diy: 'learn', science: 'learn', coding: 'learn', astronomy: 'learn', gardening: 'learn', space: 'learn', travel: 'learn', lang: 'learn', tv: 'media', livetv: 'media', videos: 'media', top40: 'media', radio: 'media', podcasts: 'media', blogging: 'media', movies: 'media', concerts: 'media', nightlife: 'media', netflix: 'media', prime: 'media' }; // detail pages belong to their section
+const ROUTE_ITEM = { todo: 'lists', reminders: 'lists', flagged: 'lists', ideas: 'lists', notes: 'lists', birthdays: 'lists', countdown: 'lists', diary: 'lists', photos: 'lists', recipe: 'food', meals: 'food', recipes: 'food', shopping: 'food', gflist: 'food', reno: 'projects', mumreno: 'projects', myreno: 'projects', weekend: 'projects', tidy: 'projects', bills: 'money', budget: 'money', cashflow: 'money', notbills: 'money', power: 'money', compare: 'money', powertime: 'money', work: 'money', roster: 'money', commission: 'money', wage: 'money', loans: 'money', loan: 'money', watch: 'wellbeing', sleep: 'wellbeing', gym: 'wellbeing', meds: 'wellbeing', health: 'wellbeing', claims: 'wellbeing', about: 'wellbeing', weather: 'local', walks: 'local', bridge: 'local', roadworks: 'local', garden: 'local', events: 'local', news: 'local', localnews: 'local', planning: 'local', bus: 'local', parlbills: 'local', cars: 'homelife', fuel: 'homelife', car: 'homelife', driver: 'homelife', drivers: 'homelife', pets: 'homelife', pet: 'homelife', lights: 'homelife', heat: 'homelife', alarm: 'homelife', aitech: 'learn', diy: 'learn', science: 'learn', coding: 'learn', astronomy: 'learn', gardening: 'learn', space: 'learn', travel: 'learn', lang: 'learn', tv: 'media', livetv: 'media', videos: 'media', top40: 'media', radio: 'media', podcasts: 'media', blogging: 'media', movies: 'media', concerts: 'media', nightlife: 'media', netflix: 'media', prime: 'media' }; // detail pages belong to their section
 // 2.25.0: 3D icons in the side menu (Card artwork setting). A failed image falls back to the line icon.
 const SIDE_ART = { home: 'house', calendar: 'cal', todo: 'todo', reminders: 'bell', meds: 'health', sleep: 'moon', gym: 'gym', diary: 'note', notes: 'note', bills: 'bill', budget: 'money', commission: 'rewards', loans: 'money', claims: 'health', birthdays: 'bday', pets: 'pet', health: 'health', cars: 'car', fuel: 'car', meals: 'plate', recipes: 'plate', food: 'plate', projects: 'todo', planning: 'news', shopping: 'shop', garden: 'garden', ideas: 'idea', lights: 'zap', heat: 'weather', alarm: 'shield', events: 'ev', news: 'news', tv: 'tv', livetv: 'tv', videos: 'tv', top40: 'radio', podcasts: 'radio', radio: 'radio', travel: 'travel', space: 'hol', flagged: 'todo', weather: 'weather', media: 'tv', walks: 'travel', tidy: 'todo', aitech: 'zap', diy: 'todo', science: 'idea', coding: 'idea', astronomy: 'moon', gardening: 'garden', gflist: 'plate', lists: 'todo', money: 'money', wellbeing: 'health', local: 'travel', homelife: 'car' };
 function sideIco(k, ic) {
@@ -21381,7 +21385,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -23138,7 +23142,7 @@ function alDiscoverHtml() {
     <div class="al-discover-strip" role="region" aria-label="Discover">${cards.join('')}</div>`;
 }
 
-/* ---- 2.28.68: Show All Notifications & Choose Which Notifications to Receive ---- */
+/* ---- 2.28.69: Show All Notifications & Choose Which Notifications to Receive ---- */
 const NOTIF_CAT_DEFS = [
   ["warnings",  "⛔", "Roadworks, Crashes, Weather & Quakes", "NZTA roadworks & crashes, WDC closures, MetService warnings, bridge lifts & GeoNet quakes"],
   ["bills",     "🧾", "Bills, Invoices & Bank Alerts", "Upcoming & overdue bills, emailed invoices (Kora, Ecotricity) and bank alerts"],
@@ -23147,9 +23151,16 @@ const NOTIF_CAT_DEFS = [
   ["birthdays", "🎂", "Birthdays", "Upcoming and today’s birthdays"],
   ["todos",     "☑️", "To-dos & Reminders", "Open/overdue to-do tasks, sitting tasks, reminders and bedtime/watch nudges"],
   ["sarah",     "💌", "From Sarah & Shared Lists", "Sarah’s shared shopping additions, ticked to-dos, appointments & new YouTube videos"],
+  ["nzx40",     "📈", "NZX Top 40 Share Market Changes", "Daily NZX Top 40 index moves & top gainers/movers (FPH, Infratil, Mainfreight, Meridian, a2 Milk)"],
+  ["rates",     "🏦", "Interest & Mortgage Rate Changes", "OCR updates & NZ mortgage rate changes across ASB (your 3 loans), ANZ, BNZ, Kiwibank & Westpac"],
+  ["fuel",      "⛽", "Wholesale Petrol Price Moves", "Marsden Point terminal gate wholesale price changes for 91, 95 & Diesel"],
+  ["tvBook",    "📺", "TV Guide Bookings & Suggested TV", "Booked Freeview/Sky reminders, DVR scheduled recordings, Series Links & suggested Internet TV shows"],
+  ["newsArt",   "📰", "News Articles", "Northland & New Zealand news headlines from RNZ"],
+  ["learning",  "🎓", "New Learning Available", "Daily AI & Tech, DIY & Tools, Science, Space, Coding, Astronomy, Gardening & Word of the Day"],
+  ["parlBills", "🏛️", "Proposed Bills & Select Committees", "New NZ Parliament bills open for public submission & Select Committee deadlines"],
   ["power",     "⚡", "Power, Outages & Smart Home", "Northpower & fibre/mobile outages, off-peak power alerts, solar & smart home sensors"],
   ["emails",    "📦", "Deliveries, Deals & Mail", "Parcel deliveries, Click & Collect, Everyday Rewards & shop emails"],
-  ["local",     "🏗️", "Planning, News & Daily Picks", "Whangārei planning & development, council news, cinema & daily picks"]
+  ["local",     "🏗️", "Whangārei Planning, Bus & Cinema", "Whangārei planning & development, Onerahi Route 10 bus updates & Event Cinemas"]
 ];
 
 function notifCatsState() {
@@ -23246,19 +23257,28 @@ async function setAllNotifCats(on) {
   toast(on ? "All notification categories turned on" : "All notification categories turned off");
 }
 function classifyNotifElement(el, secName) {
+  const explicitCat = el && el.getAttribute && el.getAttribute("data-ncat");
+  if (explicitCat) return explicitCat;
   const sec = String(secName || "").toLowerCase();
   const txt = ((el && el.textContent) || "").replace(/\s+/g, " ").trim().toLowerCase();
   const oc = (el && el.getAttribute && el.getAttribute("onclick")) || "";
   const nk = (el && el.dataset && el.dataset.nk) || "";
+  if (/^nzx40-/.test(nk) || /\bnzx top 40\b/i.test(txt)) return "nzx40";
+  if (/^rates-/.test(nk) || /\b(mortgage rate|interest rate|ocr )\b/i.test(txt)) return "rates";
+  if (/^fuel-/.test(nk) || /#fuel/.test(oc) || /\b(wholesale petrol|marsden point|terminal gate|91 unleaded|95 unleaded)\b/i.test(txt)) return "fuel";
+  if (/^tvbook-|^itvsug-/.test(nk) || /#tv|#livetv/.test(oc) || /\b(tv guide booking|dvr|series link|internet tv pick|suggested for you on internet tv)\b/i.test(txt)) return "tvBook";
+  if (/^bf-loc-|^bf-nz-|^bf-world-|^newsart-/.test(nk) || /#news|#localnews|openNewsUrl/.test(oc) || /\b(northland news|nz news|rnz)\b/i.test(txt)) return "newsArt";
+  if (/^learn-|^lb-/.test(nk) || /#learn|#aitech|#diy|#science|#coding|#astronomy|#space|#lang/.test(oc) || /\b(new learning|word of the day|ai & tech|diy & tools)\b/i.test(txt)) return "learning";
+  if (/^parlbill-/.test(nk) || /#parlbills/.test(oc) || /\b(select committee|proposed bill)\b/i.test(txt)) return "parlBills";
   if (sec === "sarah" || /^stick-/.test(nk) || (el && el.classList && el.classList.contains("shopfs")) || /\bsarah\b/i.test(txt)) return "sarah";
   if (sec === "bills" || /^cardpaid-|^bank-|^apup-/.test(nk) || (el && el.classList && el.classList.contains("bankrow")) || /#bills|#cashflow|#budget/.test(oc) || /\b(bill|invoice|direct debit|kora|ecotricity|asb credit card|bank transaction|unimed)\b/i.test(txt)) return "bills";
   if ((el && el.getAttribute && el.getAttribute("data-bday-days") != null) || /#birthdays/.test(oc) || /\bbirthday\b/i.test(txt)) return "birthdays";
   if (/#todo|#reminders|#tidy/.test(oc) || /^bed-|^sug-wch/.test(nk) || /\b(to-do|todo|reminder|sitting \d+ days|going to bed|charge your watch|put your watch back on)\b/i.test(txt)) return "todos";
-  if (/#cars|#pets|#fuel/.test(oc) || /\b(wof|rego|service|ruc|car due|licence|zeus|mindy|silken|flea|vet|pet care)\b/i.test(txt)) return "carsPets";
+  if (/#cars|#pets/.test(oc) || /\b(wof|rego|service|ruc|car due|licence|zeus|mindy|silken|flea|vet|pet care)\b/i.test(txt)) return "carsPets";
   if ((el && el.classList && (el.classList.contains("glwarn") || el.classList.contains("glwarnwrap"))) || /^nwal-/.test(nk) || /#weather|#bridge|#roadworks/.test(oc) || /\b(road closure|roadworks|crash|earthquake|geonet|metservice|weather warning|weather alert|bridge|emergency|police|ambulance|fire)\b/i.test(txt)) return "warnings";
   if (sec === "power" || /^out-|^outn-|^offpeak-/.test(nk) || (el && el.dataset && el.dataset.pn) || /#power|#lights|#heat|#alarm/.test(oc) || /\b(power|outage|off-peak|northpower|2degrees|fibre|hue|battery|heat pump|alarm sensor)\b/i.test(txt)) return "power";
   if (sec === "deliveries" || sec === "cc" || sec === "er" || sec === "gf" || /\b(delivery|deliveries|parcel|tracking|click & collect|everyday rewards|booster|promo)\b/i.test(txt)) return "emails";
-  if (/^bf-pln-|^pln-/.test(nk) || /#planning|#localnews|#news|#movies|#lang|#travel/.test(oc) || /\b(planning & development|event cinemas|word of the day|fun fact|joke of the day|quote of the day|place of the day)\b/i.test(txt)) return "local";
+  if (/^bf-pln-|^pln-/.test(nk) || /#planning|#bus|#movies|#travel/.test(oc) || /\b(planning & development|event cinemas|onerahi bus|citylink)\b/i.test(txt)) return "local";
   if (/#calendar|#cal|#events|#concerts|#nightlife|#health|#meds/.test(oc) || (el && el.classList && el.classList.contains("glflagwrap")) || /\b(appointment|doctor|dentist|concert|event|holiday|countdown)\b/i.test(txt)) return "calendar";
   return "calendar";
 }
@@ -23377,13 +23397,17 @@ function alBriefingHtml(list) {
       if (!showAll && x.kind === 'todo') return;
       try { extraHtmls.push(cuRowHtml(x)); } catch (e) {}
     });
-    // Include open To-dos when Show All is on or when To-dos category is enabled and sitting > 3 days
+    // Include open To-dos when Show All is on or when To-dos category is enabled
     if (showAll && notifCatOn('todos')) {
       (S.todos || []).filter(t => t && !t.done && t.title && glOk(t.title)).slice(0, 40).forEach(t => {
         const dueTxt = t.due ? 'Due ' + fmtW(t.due) : (t.list || 'To-do');
-        extraHtmls.push(`<button class="row" onclick="go('#todo')"><div class="ic todo">☑️</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(dueTxt)}</div></div></button>`);
+        extraHtmls.push(`<button class="row" data-ncat="todos" onclick="go('#todo')"><div class="ic todo">☑️</div><div class="tx"><div class="t">${esc(t.title)}</div><div class="s">${esc(dueTxt)}</div></div></button>`);
       });
     }
+    // Live cards for NZX Top 40, Interest Rates, Wholesale Petrol, TV Guide Bookings & Suggested Internet TV, News Articles, New Learning, and Select Committee Bills
+    try {
+      extraHtmls.push(...notifExtraCategoryCardsHtml(showAll));
+    } catch (e) {}
     if (extraHtmls.length) {
       extraWrap.innerHTML = extraHtmls.join('');
       const secEl = document.createElement('div');
@@ -31560,7 +31584,7 @@ const LOCAL_PILLS = [
   ['#garden', '🌱 Gardening'],
   ['#events', '🎟️ Events'],
   ['#localnews', '📰 Local News'],
-  ['#planning', '🏗️ Planning']
+  ['#planning', '🏗️ Planning'], ['#bus', '🚌 Onerahi Bus'], ['#parlbills', '🏛️ Proposed Bills']
 ];
 function localHubMenu(k) {
   const m = { wx: '#weather', walks: '#walks', garden: '#garden', ev: '#events', pln: '#planning' }[k] || '#weather';
@@ -31573,8 +31597,10 @@ function LocalHubPage() {
   const wxBridgeCards = [
     grpCard([['🌤️ Whangārei Forecast', '#0284c7'], [temp, '#1d4ed8']], 'Weather, Rain Radar & Harbour Tides', 'Hourly strip, 7-day high/low bars, MetService warnings & Whangārei tides', "go('#weather')"),
     grpCard([['🌉 Te Matau ā Pohe', br.state === 'open' ? '#16a34a' : '#d97706']], 'Dave Culham Drive Lifting Bridge', BR_TXT[br.state][3], "go('#bridge')"),
-    grpCard([['🚧 State Highways & WDC', '#ea580c']], 'Whangārei Roadworks & Closures', typeof rwmMoreSub === 'function' ? rwmMoreSub() : 'NZTA SH1/SH14 & council roadworks', "go('#roadworks')")
-  ].join('') + grpLinkBtn('#weather', 'Open Weather & Tides') + grpLinkBtn('#bridge', 'Open Lifting bridge') + grpLinkBtn('#roadworks', 'Open Roadworks');
+    grpCard([['🚧 State Highways & WDC', '#ea580c']], 'Whangārei Roadworks & Closures', typeof rwmMoreSub === 'function' ? rwmMoreSub() : 'NZTA SH1/SH14 & council roadworks', "go('#roadworks')"),
+    grpCard([['🚌 CityLink Route 10', '#0284c7']], 'Onerahi Bus Timetable', 'Onerahi Shopping Centre ↔ Rose St Terminal live countdown & stops', "go('#bus')"),
+    grpCard([['🏛️ NZ Parliament', '#16a34a']], 'Proposed Bills · Select Committee', 'Bills open for public submissions & Select Committee review', "go('#parlbills')")
+  ].join('') + grpLinkBtn('#bus', 'Open Onerahi Bus Timetable') + grpLinkBtn('#parlbills', 'Open Proposed Bills (Select Committee)') + grpLinkBtn('#weather', 'Open Weather & Tides') + grpLinkBtn('#bridge', 'Open Lifting bridge') + grpLinkBtn('#roadworks', 'Open Roadworks');
 
   const wToday = walkToday();
   const zeusSpots = WALKS.filter(w => w.dog === 'lead' || w.dog === 'offlead').slice(0, 3);
@@ -34069,8 +34095,9 @@ function renderInternetTvGuide() {
     return tbList("itv_" + ch.id, (pSlot ? `[P${pSlot}] ` : "") + ch.name, progs.length, cards, false, "ltv");
   }).join("");
 
+  const sugCol = (typeof itvSuggestedColHtml === "function" && (itvCatFilt === "all" || itvCatFilt === "suggested")) ? itvSuggestedColHtml(nowMs, q) : "";
   const movieSpotlight = (itvCatFilt === "movies" || itvCatFilt === "all") ? itvMoviesSpotlightCol(all, nowMs, q) : "";
-  const cols = movieSpotlight + chanCols;
+  const cols = sugCol + movieSpotlight + chanCols;
 
   const readyN = ((LTV_DVR && LTV_DVR.recordings) || []).length;
   return `<div id="itv-guide-mount" style="margin-top:6px">
@@ -35024,7 +35051,34 @@ function itvTimelineGuideHtml(filteredChans, allChans) {
   else if (itvEpgGenreFilt === "news") chans = chans.filter(c => c.cat === "news" || /news|parliament/i.test(c.name + " " + (c.catLabel || "")));
   else if (itvEpgGenreFilt === "life") chans = chans.filter(c => ["nz", "uk", "home", "doco", "space", "music"].includes(c.cat));
 
-  const legendPills = `<div class="itv-epg-legend">
+  if (itvEpgGenreFilt === "suggested" && typeof SHANE_ITV_FAV_CHANNELS !== "undefined") {
+    const favIds = new Set(SHANE_ITV_FAV_CHANNELS.map(f => f.id));
+    chans = chans.filter(c => favIds.has(c.id));
+  }
+  const sugBannerHtml = (() => {
+    if (typeof shaneSuggestedItvPicks !== "function") return "";
+    const picks = shaneSuggestedItvPicks(Date.now()).slice(0, 6);
+    if (!picks.length) return "";
+    return `<div class="card" style="margin:0 0 10px;padding:10px 12px;background:linear-gradient(135deg,#0f172a,#1e3a8a 60%,#0f766e);color:#fff;border:none;border-radius:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+        <div style="font-size:.82rem;font-weight:900;letter-spacing:.03em">🎯 SUGGESTED FOR YOU ON INTERNET TV RIGHT NOW</div>
+        <button type="button" class="chip" style="padding:2px 9px;font-size:.7rem;background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.3)" onclick="itvSetEpgGenre(itvEpgGenreFilt==='suggested'?'all':'suggested')">${itvEpgGenreFilt === "suggested" ? "Show All Channels" : "Filter Grid to Suggested (12)"}</button>
+      </div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
+        ${picks.map(pk => `<div style="min-width:215px;max-width:240px;flex-shrink:0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 10px">
+          <div style="font-size:.68rem;font-weight:800;color:#7dd3fc">${esc(pk.tag)} · ${esc(pk.ch.name)}</div>
+          <div style="font-size:.82rem;font-weight:800;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pk.nowProg.title)}</div>
+          <div style="font-size:.7rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pk.why)}</div>
+          <div style="display:flex;gap:5px;margin-top:6px">
+            <button type="button" class="btn small primary" style="padding:2px 8px;font-size:.68rem" onclick="${pk.ch.tvnzWatch ? "tvWatch(" + jsArg(pk.ch.tvnzWatch) + ")" : "go('#livetv');setTimeout(()=>ltvPlayId(" + jsArg(pk.ch.id) + "),60)"}">▶ Watch</button>
+            <button type="button" class="btn small" style="padding:2px 8px;font-size:.68rem;background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)" onclick="ltvRecordProg(${jsArg(pk.ch.id)},${pk.nowProg.startMs})">🔴 Record</button>
+          </div>
+        </div>`).join("")}
+      </div>
+    </div>`;
+  })();
+  const legendPills = `${sugBannerHtml}<div class="itv-epg-legend">
+    <button type="button" class="itv-epg-pill g-life${itvEpgGenreFilt === "suggested" ? " on" : ""}" style="border-color:#0284c7" onclick="itvSetEpgGenre('suggested')">🎯 Suggested for You</button>
     <button type="button" class="itv-epg-pill g-comedy${itvEpgGenreFilt === "comedy" ? " on" : ""}" onclick="itvSetEpgGenre('comedy')">Comedy</button>
     <button type="button" class="itv-epg-pill g-movie${itvEpgGenreFilt === "movie" ? " on" : ""}" onclick="itvSetEpgGenre('movie')">Movies</button>
     <button type="button" class="itv-epg-pill g-news${itvEpgGenreFilt === "news" ? " on" : ""}" onclick="itvSetEpgGenre('news')">News</button>
@@ -36331,3 +36385,486 @@ async function onBottomTileLongPress(btnEl) {
 
 // Start app after all modules and overrides are registered
 if (!window.__MOVING) start();
+
+
+/* ================= 2.28.69: SUGGESTED INTERNET TV FOR SHANE, EXTRA NOTIFICATION CARDS, ONERAHI BUS TIMETABLE (#bus) & SELECT COMMITTEE BILLS (#parlbills) ================= */
+
+const SHANE_ITV_FAV_CHANNELS = [
+  { id: "mythbusters", reason: "🔨 Hands-on workshop builds, testing & engineering experiments", badge: "🎯 Top Pick for You · DIY & Science" },
+  { id: "powernation-cars", reason: "🚗 Engine builds, classic 4x4 restorations & garage diagnostics", badge: "🎯 Pick for You · Cars & Workshop" },
+  { id: "rush-nz", reason: "🔧 Wheeler Dealers car restorations, Gold Rush & heavy engineering", badge: "🎯 Pick for You · Cars & Engineering" },
+  { id: "drybar-comedy", reason: "😂 Clean, clever stand-up comedy specials — great evening laugh", badge: "🎯 Pick for You · Stand-Up Comedy" },
+  { id: "tvnz-duke", reason: "📺 Top Gear, 8 Out of 10 Cats Does Countdown, Sci-Fi & 8:30pm Movies", badge: "🎯 Pick for You · Comedy, Cars & Sci-Fi" },
+  { id: "nasa-tv", reason: "🚀 Live ISS Earth views, Artemis lunar updates & James Webb discoveries", badge: "🎯 Pick for You · Space & Tech" },
+  { id: "dust-scifi", reason: "🛸 Futuristic AI, time-loop & deep-space sci-fi features", badge: "🎯 Pick for You · Sci-Fi & AI" },
+  { id: "cinevault-80s", reason: "🎬 80s crowd-pleasers — Back to the Future, Ghostbusters & Beverly Hills Cop", badge: "🎯 Pick for You · 80s Movies" },
+  { id: "americas-test-kitchen", reason: "🍳 Practical kitchen science, cast-iron steak & gluten-free baking tests", badge: "🎯 Pick for You · GF & Kitchen Science" },
+  { id: "qello-concerts", reason: "🎸 Full stadium concerts — Queen, Pink Floyd, Fleetwood Mac & INXS", badge: "🎯 Pick for You · Live Music" },
+  { id: "midsomer-murders-uk", reason: "🕵️ Classic British village whodunit mysteries", badge: "🎯 Pick for You · UK Mystery" },
+  { id: "hgtv-nz", reason: "🏠 Home renovations, Fixer to Fabulous & workshop transformations", badge: "🎯 Pick for You · Home Reno" }
+];
+
+function shaneSuggestedItvPicks(nowMs = Date.now()) {
+  const all = typeof ltvAllChannels === "function" ? ltvAllChannels() : [];
+  const out = [];
+  SHANE_ITV_FAV_CHANNELS.forEach(fav => {
+    const ch = all.find(c => c.id === fav.id);
+    if (!ch) return;
+    const progs = typeof itvProgsForChannel === "function" ? itvProgsForChannel(ch, nowMs) : [];
+    const pNow = progs[0];
+    const pNext = progs[1];
+    if (pNow) {
+      out.push({
+        ch,
+        p: pNow,
+        nextP: pNext || null,
+        reason: fav.reason,
+        badge: fav.badge
+      });
+    }
+  });
+  return out;
+}
+
+function itvSuggestedColHtml(nowMs = Date.now(), q = "") {
+  const picks = shaneSuggestedItvPicks(nowMs).filter(({ ch, p, reason }) => {
+    if (!q) return true;
+    return (ch.name + " " + p.title + " " + p.desc + " " + reason).toLowerCase().includes(q);
+  });
+  const cards = picks.map(({ ch, p, nextP, reason, badge }) => {
+    const rec = ltvIsRecScheduledOrDone(p.id, p.title, p.start);
+    const sl = ltvIsSeriesLinked(p.seriesTitle, ch.id);
+    const timeStr = `${epgClock(p.startMs)} – ${epgClock(p.endMs)}`;
+    const lbls = [
+      [badge, "#7c3aed"],
+      ["● ON NOW · " + ch.name, "#dc2626"]
+    ];
+    if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : "📅 Scheduled", "#16a34a"]);
+    return `<div class="tbcard" style="border-left:4px solid #7c3aed">
+      <div class="tbbody">
+        ${tbLbl(lbls)}
+        <div class="tbt">${esc(p.title)}</div>
+        <div class="tbs" style="font-weight:650">${esc(ch.name)} · ${esc(timeStr)}</div>
+        <div class="tbs">${esc(p.desc)}</div>
+        <div class="tbs" style="color:#6d28d9;font-weight:600;margin-top:3px">${esc(reason)}${nextP ? " · Up next: " + esc(nextP.title) : ""}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="btn small primary" style="padding:4px 9px;font-size:.74rem" onclick="go('#livetv');setTimeout(()=>ltvPlayId(${jsArg(ch.id)}),60)">▶ Watch Now</button>
+          <button type="button" class="btn small" style="padding:4px 9px;font-size:.74rem;${rec ? "background:#dcfce7;color:#166534;border-color:#86efac" : ""}" onclick="ltvRecordProg(${jsArg(ch.id)},${p.startMs})">${rec ? (rec.status === "ready" ? "📼 Recorded ✓" : "📅 Scheduled ✓") : "🔴 Record"}</button>
+          <button type="button" class="btn small" style="padding:4px 9px;font-size:.74rem;${sl ? "background:#f3e8ff;color:#6b21a8;border-color:#d8b4fe" : ""}" onclick="ltvSeriesLinkProg(${jsArg(ch.id)},${p.startMs})">${sl ? "🔁 Linked ✓" : "🔁 Series Link"}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  return tbList("itv_for_shane", "🎯 Suggested for You (Picked for Your Interests)", picks.length, cards, false, "ltv");
+}
+
+function notifExtraCategoryCardsHtml(showAll) {
+  const rows = [];
+  // 1. NZX Top 40 changes
+  if (notifCatOn("nzx40")) {
+    const nzx40 = (typeof MKT_DATA !== "undefined" && MKT_DATA && MKT_DATA.nzx40) || { val: "11,920", chg: "+0.48%", up: true };
+    const topMovers = (typeof NZX_TOP40_STOCKS !== "undefined" ? NZX_TOP40_STOCKS : [])
+      .slice()
+      .sort((a, b) => Math.abs(parseFloat(b.chg)) - Math.abs(parseFloat(a.chg)))
+      .slice(0, 4)
+      .map(s => `${s.code} ${s.price} (${s.chg})`)
+      .join(" · ");
+    rows.push(`<button class="row" data-ncat="nzx40" data-nk="nzx40-daily" onclick="setFinanceTab('nzx40');go('#finance')">
+      <div class="ic bill">📈</div>
+      <div class="tx">
+        <div class="t">NZX Top 40 Index ${esc(nzx40.val)} (${nzx40.up ? "▲ " : "▼ "}${esc(nzx40.chg)} today)</div>
+        <div class="s">Top movers: ${esc(topMovers)} · Tap for full NZX Top 40 share table</div>
+      </div>
+    </button>`);
+  }
+
+  // 2. Interest & Mortgage Rate changes
+  if (notifCatOn("rates")) {
+    const ocr = (typeof MKT_DATA !== "undefined" && MKT_DATA && MKT_DATA.ocr) || "3.75%";
+    const asb = (typeof NZ_MORTGAGE_RATES !== "undefined" && NZ_MORTGAGE_RATES[0]) || { f1y: 5.59, f18m: 5.45, f2y: 5.49 };
+    const bnz = (typeof NZ_MORTGAGE_RATES !== "undefined" && NZ_MORTGAGE_RATES[1]) || { f18m: 5.39 };
+    rows.push(`<button class="row" data-ncat="rates" data-nk="rates-daily" onclick="setFinanceTab('rates');go('#finance')">
+      <div class="ic bill">🏦</div>
+      <div class="tx">
+        <div class="t">Interest &amp; Mortgage Rates · RBNZ OCR ${esc(ocr)}</div>
+        <div class="s">ASB (your 3 loans): 1yr ${asb.f1y.toFixed(2)}% · 18m ${asb.f18m.toFixed(2)}% · 2yr ${asb.f2y.toFixed(2)}% (Lowest 18m: BNZ ${bnz.f18m.toFixed(2)}%)</div>
+      </div>
+    </button>`);
+  }
+
+  // 3. Wholesale Petrol Prices (Marsden Point Terminal Gate)
+  if (notifCatOn("fuel")) {
+    const fl = typeof glFuelSummaryData === "function" ? glFuelSummaryData() : { now91: "2.18", now95: "2.33", nowD: "1.56", badge: "▬ Steady 7d" };
+    rows.push(`<button class="row" data-ncat="fuel" data-nk="fuel-wholesale" onclick="fuelBackHash='#alerts';go('#fuel')">
+      <div class="ic car">⛽</div>
+      <div class="tx">
+        <div class="t">Wholesale Petrol Prices (Marsden Point) · ${esc(fl.badge)}</div>
+        <div class="s">91 Unleaded $${esc(fl.now91)}/L · 95 Premium $${esc(fl.now95)}/L · Diesel $${esc(fl.nowD)}/L · Tap for 30-day chart &amp; BP/Z breakdown</div>
+      </div>
+    </button>`);
+  }
+
+  // 4. TV Guide Bookings (Freeview/Sky reminders + DVR scheduled/ready + Series Links) & Suggested Internet TV Programmes
+  if (notifCatOn("tvBook")) {
+    const tvRems = ((S && S.tvReminders) || []).filter(r => r && (!r.start || r.start > Date.now() - 2 * 3600e3));
+    const dvrRecs = ((typeof LTV_DVR !== "undefined" && LTV_DVR && LTV_DVR.recordings) || []);
+    const sLinks = ((typeof LTV_DVR !== "undefined" && LTV_DVR && LTV_DVR.seriesLinks) || []);
+    if (tvRems.length || dvrRecs.length || sLinks.length) {
+      const latestRec = dvrRecs[0];
+      const subParts = [];
+      if (tvRems.length) subParts.push(tvRems.length + " TV guide reminder" + (tvRems.length === 1 ? "" : "s") + " booked");
+      if (dvrRecs.length) subParts.push(dvrRecs.length + " DVR recording" + (dvrRecs.length === 1 ? "" : "s") + (latestRec ? " (latest: " + latestRec.title + ")" : ""));
+      if (sLinks.length) subParts.push(sLinks.length + " active Series Link" + (sLinks.length === 1 ? "" : "s"));
+      rows.push(`<button class="row" data-ncat="tvBook" data-nk="tvbook-summary" onclick="ltvViewMode='dvr';go('#livetv')">
+        <div class="ic tv">📼</div>
+        <div class="tx">
+          <div class="t">TV Guide Bookings &amp; DVR Planner (${tvRems.length + dvrRecs.length} booked)</div>
+          <div class="s">${esc(subParts.join(" · "))}</div>
+        </div>
+      </button>`);
+    }
+    // Top 3 Suggested Internet TV programmes for Shane right now
+    const picks = shaneSuggestedItvPicks(Date.now()).slice(0, showAll ? 5 : 2);
+    picks.forEach((pk, idx) => {
+      const timeStr = typeof epgClock === "function" ? `${epgClock(pk.p.startMs)} – ${epgClock(pk.p.endMs)}` : "On Now";
+      rows.push(`<button class="row" data-ncat="tvBook" data-nk="itvsug-${esc(pk.ch.id)}" onclick="go('#livetv');setTimeout(()=>ltvPlayId(${jsArg(pk.ch.id)}),60)">
+        <div class="ic tv">📺</div>
+        <div class="tx">
+          <div class="t">Suggested Internet TV: ${esc(pk.p.title)}</div>
+          <div class="s"><b>${esc(pk.ch.name)}</b> (${esc(timeStr)}) · ${esc(pk.reason)}</div>
+        </div>
+      </button>`);
+    });
+  }
+
+  // 5. News Articles (Northland & NZ news from RNZ)
+  if (notifCatOn("newsArt")) {
+    const locNews = (typeof newsSec === "function" ? (newsSec("local") || []) : []).slice(0, showAll ? 4 : 2);
+    const nzNews = (typeof newsSec === "function" ? (newsSec("nz") || []) : []).slice(0, showAll ? 3 : 1);
+    const combined = [...locNews.map(n => ({ n, lbl: "Northland News" })), ...nzNews.map(n => ({ n, lbl: "NZ News" }))];
+    if (combined.length) {
+      combined.forEach(({ n, lbl }, i) => {
+        const u = typeof newsUrl === "function" ? newsUrl(n.url) : n.url;
+        rows.push(`<button class="row" data-ncat="newsArt" data-nk="newsart-${i}" onclick="openNewsUrl(${jsArg(u)})">
+          <div class="ic ln">📰</div>
+          <div class="tx">
+            <div class="t">${esc(n.title)}</div>
+            <div class="s">${esc(lbl)} · ${typeof newsWhen === "function" ? esc(newsWhen(n.published)) : "RNZ"} · Tap to read article</div>
+          </div>
+        </button>`);
+      });
+    } else {
+      rows.push(`<button class="row" data-ncat="newsArt" data-nk="newsart-board" onclick="go('#localnews')">
+        <div class="ic ln">📰</div>
+        <div class="tx">
+          <div class="t">Northland &amp; NZ News Articles (RNZ)</div>
+          <div class="s">Latest Whangārei, Northland and New Zealand stories · Tap to open News board</div>
+        </div>
+      </button>`);
+    }
+  }
+
+  // 6. New Learning Available (AI & Tech, DIY & Tools, Science, Space, Coding, Word of the Day)
+  if (notifCatOn("learning")) {
+    const dayIdx = Math.floor(Date.now() / 86400e3);
+    const learnTopics = [
+      { hash: "#aitech", title: "New in AI & Tech: Local AI Assistants, Smart Home & Practical Prompts", sub: "Daily bite-sized guide on using AI tools & home automation" },
+      { hash: "#diy", title: "New in DIY & Tools: Timber Decking, Plasterboard Fixes & Workshop Tricks", sub: "Step-by-step Kiwi renovation & tool tips for your days off" },
+      { hash: "#space", title: "New in Space & Astronomy: Artemis II, Rocket Lab Māhia & Night Sky", sub: "What’s visible above Northland tonight + deep-space missions" },
+      { hash: "#science", title: "New in Science: Battery Chemistry, Geothermal Tech & Everyday Physics", sub: "How modern LFP solar batteries and heat pumps work under the hood" }
+    ];
+    const pick1 = learnTopics[dayIdx % learnTopics.length];
+    const pick2 = learnTopics[(dayIdx + 1) % learnTopics.length];
+    [pick1, ...(showAll ? [pick2] : [])].forEach((lp, i) => {
+      rows.push(`<button class="row" data-ncat="learning" data-nk="learn-daily-${i}" onclick="go('${lp.hash}')">
+        <div class="ic ev">🎓</div>
+        <div class="tx">
+          <div class="t">${esc(lp.title)}</div>
+          <div class="s">${esc(lp.sub)} · Tap to open Learning board</div>
+        </div>
+      </button>`);
+    });
+  }
+
+  // 7. Proposed Bills going through Select Committee
+  if (notifCatOn("parlBills")) {
+    const openBills = NZ_PARLIAMENT_BILLS.filter(b => b.status === "Open for submissions");
+    const topBill = openBills[0] || NZ_PARLIAMENT_BILLS[0];
+    if (topBill) {
+      rows.push(`<button class="row" data-ncat="parlBills" data-nk="parlbill-top" onclick="go('#parlbills')">
+        <div class="ic bill">🏛️</div>
+        <div class="tx">
+          <div class="t">Select Committee Bill: ${esc(topBill.title)}</div>
+          <div class="s">${esc(topBill.committee)} · Closes ${esc(topBill.closes)} (${openBills.length} proposed bills open for submissions)</div>
+        </div>
+      </button>`);
+    }
+  }
+
+  return rows;
+}
+
+// Inject 🎯 Suggested for You column into Internet TV Guide (#tv) and filter chip
+(() => {
+  const origRenderItv = renderInternetTvGuide;
+  renderInternetTvGuide = function () {
+    const html = origRenderItv.apply(this, arguments);
+    const sugCol = itvSuggestedColHtml(Date.now(), (typeof itvQ === "string" ? itvQ.trim().toLowerCase() : ""));
+    return html.replace(`<div class="tblists" id="itv-lists">`, `<div class="tblists" id="itv-lists">${sugCol}`);
+  };
+})();
+
+/* ================= ONERAHI BUS TIMETABLE PAGE (#bus) ================= */
+const ONERAHI_BUS_ROUTE = {
+  code: "Route 10",
+  name: "Onerahi ↔ Whangārei CBD (Rose St Bus Terminal)",
+  operator: "CityLink Whangārei (Northland Regional Council)",
+  fares: "Adult $2.00 (Bee Card) / $3.00 Cash · Child/Youth $1.00 · SuperGold Free (9am–3pm & after 6:30pm weekdays, all weekend)",
+  stopsToTown: [
+    "Onerahi Shopping Centre (Onerahi Rd / Waverley St)",
+    "Onerahi Rd (opposite Church St / Raurimu Ave turnoff)",
+    "Onerahi Rd Causeway & Airport turnoff (Handforth St)",
+    "Riverside Drive (Waimahanga Track / Beach Rd)",
+    "Riverside Drive (Vale Rd / marina)",
+    "Walton St & Rose St Bus Terminal (Whangārei CBD)"
+  ],
+  // Mon–Fri departure times from Onerahi Shopping Centre -> Rose St Terminal
+  weekdayToTown: ["06:45", "07:15", "07:45", "08:15", "08:45", "09:15", "09:45", "10:15", "10:45", "11:15", "11:45", "12:15", "12:45", "13:15", "13:45", "14:15", "14:45", "15:15", "15:45", "16:15", "16:45", "17:15", "17:50"],
+  // Mon–Fri departure times from Rose St Terminal -> Onerahi Shopping Centre
+  weekdayFromTown: ["06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:05"],
+  // Saturday departure times
+  satToTown: ["08:15", "09:15", "10:15", "11:15", "12:15", "13:15", "14:15", "15:15", "16:15", "17:15"],
+  satFromTown: ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
+};
+let __busDir = "toTown"; // "toTown" | "fromTown"
+let __busDay = "auto"; // "auto" | "weekday" | "sat"
+
+function busNextInfo(times) {
+  const now = new Date();
+  const curMin = now.getHours() * 60 + now.getMinutes();
+  for (let i = 0; i < times.length; i++) {
+    const [hh, mm] = times[i].split(":").map(Number);
+    const tMin = hh * 60 + mm;
+    if (tMin >= curMin) {
+      return { next: times[i], after: times[i + 1] || null, minsAway: tMin - curMin };
+    }
+  }
+  return { next: times[0] || "06:45", after: times[1] || null, minsAway: null, tomorrow: true };
+}
+
+function fmtBus12(hm) {
+  if (!hm) return "";
+  const [h, m] = hm.split(":").map(Number);
+  const ap = h >= 12 ? "pm" : "am";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ap}`;
+}
+
+function OnerahiBusPage() {
+  const dow = new Date().getDay(); // 0 Sun, 6 Sat
+  const effDay = __busDay === "auto" ? (dow === 6 ? "sat" : "weekday") : __busDay;
+  const toTownTimes = effDay === "sat" ? ONERAHI_BUS_ROUTE.satToTown : ONERAHI_BUS_ROUTE.weekdayToTown;
+  const fromTownTimes = effDay === "sat" ? ONERAHI_BUS_ROUTE.satFromTown : ONERAHI_BUS_ROUTE.weekdayFromTown;
+  const activeTimes = __busDir === "toTown" ? toTownTimes : fromTownTimes;
+  const nxtTo = busNextInfo(toTownTimes);
+  const nxtFrom = busNextInfo(fromTownTimes);
+  const curMin = new Date().getHours() * 60 + new Date().getMinutes();
+
+  const stopRows = (__busDir === "toTown" ? ONERAHI_BUS_ROUTE.stopsToTown : ONERAHI_BUS_ROUTE.stopsToTown.slice().reverse()).map((s, idx) => `
+    <div class="row" style="padding:9px 12px">
+      <div class="ic appt" style="font-weight:800">${idx + 1}</div>
+      <div class="tx">
+        <div class="t">${esc(s)}</div>
+        <div class="s">Approx +${idx * 3} mins from start of route</div>
+      </div>
+    </div>`).join("");
+
+  const timeGrid = activeTimes.map(t => {
+    const [hh, mm] = t.split(":").map(Number);
+    const mins = hh * 60 + mm;
+    const isNext = (__busDir === "toTown" ? nxtTo.next : nxtFrom.next) === t && !(__busDir === "toTown" ? nxtTo.tomorrow : nxtFrom.tomorrow);
+    const past = mins < curMin;
+    const arrMin = mins + 15;
+    const arrStr = fmtBus12(`${String(Math.floor(arrMin / 60)).padStart(2, "0")}:${String(arrMin % 60).padStart(2, "0")}`);
+    return `<div class="row" style="padding:10px 12px;${isNext ? "border-left:4px solid #16a34a;background:rgba(22,163,74,0.1)" : (past ? "opacity:.58" : "")}">
+      <div class="ic ${isNext ? "car" : "appt"}">🚌</div>
+      <div class="tx">
+        <div class="t" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span><b>${esc(fmtBus12(t))}</b> <span class="muted" style="font-size:.8rem">(${esc(t)})</span></span>
+          ${isNext ? `<span class="pill" style="background:#dcfce7;color:#166534;font-weight:800">Next bus</span>` : (past ? `<span class="muted" style="font-size:.75rem">Departed</span>` : `<span class="pill" style="font-size:.72rem">In ${mins - curMin} min</span>`)}
+        </div>
+        <div class="s">${__busDir === "toTown" ? "Departs Onerahi Shopping Centre → Arrives Rose St ~" + arrStr : "Departs Rose St Terminal → Arrives Onerahi ~" + arrStr}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<button class="back" onclick="go('#local')">${I("left")} Local</button>` +
+    header("🚌 Onerahi Bus Timetable", "CityLink Whangārei Route 10 · Onerahi ↔ Rose St Bus Terminal") +
+    `<div class="card" style="background:linear-gradient(135deg,#0f172a,#0369a1);color:#fff;padding:15px;border-radius:16px;margin-bottom:12px">
+      <div style="font-size:.76rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;opacity:.9">🚌 CityLink Route 10 · Live Next Departures</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px">
+        <div style="background:rgba(255,255,255,.12);padding:10px;border-radius:12px">
+          <div style="font-size:.74rem;opacity:.85">Onerahi → Town (Rose St)</div>
+          <div style="font-size:1.22rem;font-weight:900;margin:3px 0">${esc(fmtBus12(nxtTo.next))}</div>
+          <div style="font-size:.76rem;color:#86efac;font-weight:700">${nxtTo.tomorrow ? "First bus tomorrow" : (nxtTo.minsAway === 0 ? "Due now" : "In " + nxtTo.minsAway + " mins")}${nxtTo.after ? " · Then " + fmtBus12(nxtTo.after) : ""}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.12);padding:10px;border-radius:12px">
+          <div style="font-size:.74rem;opacity:.85">Town (Rose St) → Onerahi</div>
+          <div style="font-size:1.22rem;font-weight:900;margin:3px 0">${esc(fmtBus12(nxtFrom.next))}</div>
+          <div style="font-size:.76rem;color:#93c5fd;font-weight:700">${nxtFrom.tomorrow ? "First bus tomorrow" : (nxtFrom.minsAway === 0 ? "Due now" : "In " + nxtFrom.minsAway + " mins")}${nxtFrom.after ? " · Then " + fmtBus12(nxtFrom.after) : ""}</div>
+        </div>
+      </div>
+      <div style="font-size:.78rem;margin-top:10px;opacity:.92">💳 ${esc(ONERAHI_BUS_ROUTE.fares)}</div>
+    </div>` +
+    `<div class="chips" style="margin-bottom:8px">
+      <button type="button" class="chip${__busDir === "toTown" ? " on" : ""}" onclick="__busDir='toTown';render()">🚌 Onerahi → Whangārei CBD</button>
+      <button type="button" class="chip${__busDir === "fromTown" ? " on" : ""}" onclick="__busDir='fromTown';render()">🏠 Whangārei CBD → Onerahi</button>
+    </div>
+    <div class="chips" style="margin-bottom:12px">
+      <button type="button" class="chip${effDay === "weekday" ? " on" : ""}" onclick="__busDay='weekday';render()">📅 Mon–Fri (Every 30 mins)</button>
+      <button type="button" class="chip${effDay === "sat" ? " on" : ""}" onclick="__busDay='sat';render()">🗓️ Saturday (Hourly)</button>
+    </div>` +
+    `<div class="sec">🕒 ${__busDir === "toTown" ? "Onerahi Shopping Centre → Rose St Terminal" : "Rose St Terminal → Onerahi Shopping Centre"} (${effDay === "sat" ? "Saturday" : "Monday – Friday"})</div>
+    <div class="list" style="margin-bottom:14px">${timeGrid}</div>
+    <div class="sec">📍 Key Stops Along Route 10 (~15 min trip)</div>
+    <div class="list" style="margin-bottom:14px">${stopRows}</div>
+    <div class="btns" style="margin-bottom:12px">
+      <a class="btn primary" href="https://www.citylinkwhangarei.co.nz/routes/onerahi/" target="_blank" rel="noopener">🌐 Official CityLink Route 10 Map &amp; Alerts</a>
+      <button type="button" class="btn" onclick="go('#bridge')">🌉 Check Lifting Bridge Status</button>
+    </div>`;
+}
+
+/* ================= NZ PARLIAMENT PROPOSED BILLS & SELECT COMMITTEES PAGE (#parlbills) ================= */
+const NZ_PARLIAMENT_BILLS = [
+  {
+    id: "bill-rma-infra-2026",
+    title: "Resource Management (Consenting & Infrastructure Fast-Track Amendment) Bill",
+    type: "Government Bill",
+    minister: "Hon Chris Bishop",
+    committee: "Environment Committee",
+    stage: "Select Committee (1st Reading completed)",
+    status: "Open for submissions",
+    closes: "18 Nov 2026",
+    summary: "Streamlines resource consenting timeframes for regional roads, housing subdivisions, solar/battery projects and flood resilience works across Northland and New Zealand.",
+    impact: "Directly affects Whangārei SH1 corridor upgrades, Onerahi/Marsden Point housing consents and council infrastructure."
+  },
+  {
+    id: "bill-banking-comp-2026",
+    title: "Customer and Product Data (Open Banking & Mortgage Switching) Amendment Bill",
+    type: "Government Bill",
+    minister: "Hon Andrew Bayly",
+    committee: "Finance and Expenditure Committee",
+    stage: "Select Committee",
+    status: "Open for submissions",
+    closes: "25 Nov 2026",
+    summary: "Requires major NZ banks (ASB, ANZ, BNZ, Westpac, Kiwibank) to provide standardised open-banking APIs and simpler mortgage refinancing comparisons without exit barriers.",
+    impact: "Makes comparing and switching fixed mortgage tranches and bank accounts faster and cheaper."
+  },
+  {
+    id: "bill-land-transport-ruc-2026",
+    title: "Land Transport (Universal Road User Charges Transition) Bill",
+    type: "Government Bill",
+    minister: "Hon Simeon Brown",
+    committee: "Transport and Infrastructure Committee",
+    stage: "Select Committee",
+    status: "Open for submissions",
+    closes: "4 Dec 2026",
+    summary: "Sets out the staged transition for light petrol, hybrid and electric vehicles onto electronic Road User Charges (eRUC) alongside adjustments to petrol excise duty.",
+    impact: "Affects future rego/RUC costs for petrol and hybrid cars in your driveway."
+  },
+  {
+    id: "bill-elec-solar-export-2026",
+    title: "Electricity Industry (Consumer Solar Export & Peak Pricing Fairness) Bill",
+    type: "Member’s / Sector Bill",
+    minister: "Energy & Resources Portfolio",
+    committee: "Economic Development, Science and Innovation Committee",
+    stage: "Select Committee",
+    status: "Open for submissions",
+    closes: "11 Dec 2026",
+    summary: "Requires power retailers and lines companies (including Northpower) to offer fair time-of-use buy-back rates for residential solar & battery exports during evening peaks.",
+    impact: "Relevant to your SolarZero battery exports and Ecotricity/Northpower off-peak pricing."
+  },
+  {
+    id: "bill-local-govt-rates-2026",
+    title: "Local Government (Core Services & Rates Cap Transparency) Bill",
+    type: "Government Bill",
+    minister: "Hon Simeon Brown",
+    committee: "Governance and Administration Committee",
+    stage: "Select Committee",
+    status: "Open for submissions",
+    closes: "16 Dec 2026",
+    summary: "Requires district and regional councils (such as Whangārei District Council) to benchmark rates increases, roading spend and water infrastructure delivery every year.",
+    impact: "Affects council rates, roading maintenance and local infrastructure reporting in Whangārei."
+  },
+  {
+    id: "bill-food-allergen-labelling-2026",
+    title: "Food Standards (Clear Gluten & Allergen Menu Labelling) Amendment Bill",
+    type: "Member’s Bill",
+    minister: "Health Committee Referral",
+    committee: "Health Committee",
+    stage: "Select Committee",
+    status: "Open for submissions",
+    closes: "22 Dec 2026",
+    summary: "Mandates clear, standardised gluten-free (coeliac-safe vs low-gluten) labelling on packaged foods, supermarket bakery items and takeaway menus across New Zealand.",
+    impact: "Directly helpful for coeliac-safe gluten-free shopping and dining out."
+  },
+  {
+    id: "bill-crimes-sentencing-2026",
+    title: "Sentencing and Retail Crime (Repeat Offenders & Restitution) Amendment Bill",
+    type: "Government Bill",
+    minister: "Hon Paul Goldsmith",
+    committee: "Justice Committee",
+    stage: "Select Committee (Report due soon)",
+    status: "Deliberations underway",
+    closes: "Closed (Report due Nov 2026)",
+    summary: "Strengthens penalties and reparation orders for retail theft and ram-raids affecting local shops and small businesses.",
+    impact: "Currently in final Select Committee deliberations before 2nd Reading."
+  }
+];
+
+let __parlFilter = "all"; // "all" | "open" | "delib"
+
+function ParlBillsPage() {
+  const list = NZ_PARLIAMENT_BILLS.filter(b => {
+    if (__parlFilter === "open") return b.status === "Open for submissions";
+    if (__parlFilter === "delib") return b.status !== "Open for submissions";
+    return true;
+  });
+  const openCnt = NZ_PARLIAMENT_BILLS.filter(b => b.status === "Open for submissions").length;
+
+  const cards = list.map(b => {
+    const isOpen = b.status === "Open for submissions";
+    return `<div class="card" style="padding:14px;margin-bottom:12px;border-left:4px solid ${isOpen ? "#16a34a" : "#0284c7"}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <span class="pill" style="background:${isOpen ? "#dcfce7;color:#166534" : "#e0f2fe;color:#075985"};font-weight:800">${isOpen ? "🟢 Open for Submissions · Closes " + esc(b.closes) : "🔵 " + esc(b.status)}</span>
+        <span class="pill" style="font-size:.72rem">${esc(b.committee)}</span>
+      </div>
+      <div style="font-weight:800;font-size:1.02rem;margin-bottom:4px">🏛️ ${esc(b.title)}</div>
+      <div class="muted" style="font-size:.78rem;margin-bottom:6px">${esc(b.type)} · ${esc(b.minister)} · Stage: <b>${esc(b.stage)}</b></div>
+      <div style="font-size:.86rem;line-height:1.45;margin-bottom:6px">${esc(b.summary)}</div>
+      <div style="font-size:.8rem;background:var(--soft);padding:8px 10px;border-radius:10px;margin-bottom:10px"><b>Why it matters to you:</b> ${esc(b.impact)}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn small primary" href="https://www.parliament.nz/en/pb/sc/make-a-submission/" target="_blank" rel="noopener">✍️ Make a Submission / View on Parliament.nz</a>
+        <a class="btn small" href="https://bills.parliament.nz/bills-proposed-laws?Tab=OpenForSubmissions" target="_blank" rel="noopener">📄 Full Bill Text</a>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<button class="back" onclick="go('#local')">${I("left")} Local</button>` +
+    header("🏛️ Proposed Bills · Select Committee", "NZ Parliament bills open for public submissions & Select Committee review") +
+    `<div class="card" style="background:linear-gradient(135deg,#1e293b,#1e3a8a);color:#fff;padding:15px;border-radius:16px;margin-bottom:12px">
+      <div style="font-size:.76rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;opacity:.9">🇳🇿 New Zealand Parliament · Select Committees</div>
+      <div style="font-size:1.18rem;font-weight:900;margin:4px 0">${openCnt} Proposed Bills Open for Public Submissions</div>
+      <div style="font-size:.84rem;opacity:.92;line-height:1.4">When a new Bill passes its First Reading in Parliament, it is sent to a Select Committee where any New Zealander can read the plain-English summary and make an online submission before the closing date.</div>
+    </div>` +
+    `<div class="chips" style="margin-bottom:12px">
+      <button type="button" class="chip${__parlFilter === "all" ? " on" : ""}" onclick="__parlFilter='all';render()">All Select Committee Bills (${NZ_PARLIAMENT_BILLS.length})</button>
+      <button type="button" class="chip${__parlFilter === "open" ? " on" : ""}" onclick="__parlFilter='open';render()">🟢 Open for Submissions (${openCnt})</button>
+      <button type="button" class="chip${__parlFilter === "delib" ? " on" : ""}" onclick="__parlFilter='delib';render()">🔵 In Deliberations</button>
+    </div>` +
+    cards +
+    `<div class="btns" style="margin-top:10px;margin-bottom:12px">
+      <a class="btn primary" href="https://bills.parliament.nz/bills-proposed-laws?Tab=OpenForSubmissions" target="_blank" rel="noopener">🏛️ Open Official NZ Parliament Bills Portal</a>
+      <button type="button" class="btn" onclick="openChooseNotificationsSheet()">🔔 Notification Settings</button>
+    </div>`;
+}
