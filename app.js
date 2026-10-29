@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.79';
+const APP_VERSION = '2.28.80';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24600,7 +24600,7 @@ function glanceHome() {
   if (deferredPrompt && !isStandalone()) cards += `<div class="callout blue">${I('phoneDown')}<div style="flex:1"><b>Put this app on your home screen</b><br>It opens like a normal app and works without internet.<div class="btns" style="margin-top:8px"><button class="btn primary small" onclick="installApp()">Install app</button></div></div></div>`;
   const tk = ''; stripSumDone = true; homeSumT = ''; // 2.26.18: the summary feed moved off Home to its own page (top-bar icon)
   const stat = glStatInner();
-  const wx = `<div class="glwx">${homeTry('gl weather', () => glWxCard(m), '') || homeTry('weather strip', () => notifWxStrip(), '')}${tk}</div>`; // 2.26.52: small Onerahi tide strip taken off Home (Tides page and the Tide tile stay)
+  const wx = `<div class="glwx">${homeTry('gl weather rot', () => glWxRotHtml(m), '') || homeTry('gl weather', () => glWxCard(m), '') || homeTry('weather strip', () => notifWxStrip(), '')}${tk}</div>`; // 2.26.52: small Onerahi tide strip taken off Home (Tides page and the Tide tile stay)
   const ent = '', org = homeTry('gl org', () => glOrgInner(), ''), quick = homeTry('gl quick', () => glQuick(m), '');
   const entZ = ent ? `<div class="glzone"><span>🎉 ${m.night ? 'Entertainment' : m.off ? 'Fun today' : 'Later today'}</span><span>${m.night ? 'shuffles each open ↻' : '↻'}</span></div><div id="glent" class="${m.night ? 'glbig' : ''}">${ent}</div>` : '';
   const wk = homeTry('week overview', () => weekOverview(), ''); // 2.27.28: the week overview replaces the Organise tabs; the shortcut tiles stay
@@ -36271,7 +36271,7 @@ glanceHome = function () {
   const statInner = glStatInner();
   const secRenderers = {
     stat: () => `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="if(!isHomeUnlocked())glStatToggle()" aria-label="Home status. Tap for details."${statInner ? "" : " hidden"}>${statInner}</div>`,
-    wx: () => `<div class="glwx">${homeTry("gl weather", () => glWxCard(m), "") || homeTry("weather strip", () => notifWxStrip(), "")}</div>`,
+    wx: () => `<div class="glwx">${homeTry("gl weather rot", () => glWxRotHtml(m), "") || homeTry("gl weather", () => glWxCard(m), "") || homeTry("weather strip", () => notifWxStrip(), "")}</div>`,
     work: () => m.night ? "" : homeTry("gl work", () => glWorkCard(m), ""),
     pulse: () => homeTry("live pulse", () => glLivePulseHtml(m), ""),
     week: () => {
@@ -37315,3 +37315,40 @@ async function ltvDvrSchedTick() {
   } catch (e) { }
 }
 setInterval(ltvDvrSchedTick, 20000); setTimeout(ltvDvrSchedTick, 5000);
+
+/* 2.28.80: Home weather card rotates. It always opens on the weather, then every 10 seconds swaps at random to one of
+   NZX Top 40, petrol, Internet TV picks (sitcoms first), Netflix, Prime Video, council/local events or concerts.
+   Real data only: a slide with nothing loaded is skipped. Tap any slide to open its page. */
+let glRotIdx = 0, glRotLast = 0;
+function glRotSlide(k, a, b, ico, title, sub, go2, tag) {
+  return `<button type="button" class="glwxc glwxc2 gldark glrotc" data-k="${k}" style="--s1:${a};--s2:${b};--s3:#0f172a" onclick="${go2}"><span class="glrottag">${esc(tag)}</span><span class="glwxtop"><span class="glroti">${ico}</span><b class="glwxn">${esc(title)}</b></span>${sub ? `<span class="glwxout">${esc(sub)}</span>` : ''}</button>`;
+}
+function glRotSlides(m) {
+  const out = [];
+  const add = (k, f) => { try { const h = f(); if (h) out.push([k, h]); } catch (e) { } };
+  add('wx', () => glWxCard(m || glMode()) || notifWxStrip());
+  add('nzx', () => { const c = JSON.parse(localStorage.getItem('mktPulseCacheV1') || 'null'); const x = c && c.nzx40; if (!x || !x.val) return ''; return glRotSlide('nzx', '#065f46', '#0f766e', '📈', `NZX Top 40 · ${x.val}`, `${x.up === false ? '▼' : '▲'} ${x.chg || ''} today${c.nzd ? ' · NZD US$' + c.nzd : ''}`, "go('#finance')", 'SHARE MARKET'); });
+  add('gas', () => { const st = typeof fuelStats === 'function' ? fuelStats('91') : null; if (!st || st.now == null) return ''; const d = typeof fuelStats === 'function' ? fuelStats('diesel') : null; const wk = st.wk != null ? Math.round(st.wk * 10) / 10 : null; return glRotSlide('gas', '#9a3412', '#c2410c', '⛽', `91 petrol $${(st.now / 100).toFixed(2)}/L`, [wk == null ? '' : Math.abs(wk) < 0.2 ? 'Steady this week' : (wk < 0 ? 'Down ' : 'Up ') + Math.abs(wk).toFixed(1) + 'c this week', d && d.now != null ? 'Diesel $' + (d.now / 100).toFixed(2) : ''].filter(Boolean).join(' · '), "fuelBackHash='#home';go('#fuel')", 'PETROL'); });
+  add('itv', () => { const P = shaneSuggestedItvPicks(Date.now()); if (!P.length) return ''; const pk = P[Math.floor(Math.random() * Math.min(P.length, 8))]; return glRotSlide('itv', '#1e3a8a', '#4338ca', '📺', pk.p.title, `On now · ${pk.ch.name}${pk.p.endMs ? ' · till ' + epgClock(pk.p.endMs) : ''}`, "go('#tv')", 'INTERNET TV PICK'); });
+  add('nf', () => { const L = (NF && mailConnected('microsoft') && Array.isArray(NF.fresh) && NF.fresh.length ? NF.fresh : (typeof NF_DEFAULT_PICKS !== 'undefined' ? NF_DEFAULT_PICKS.fresh : [])) || []; const x = L[Math.floor(Math.random() * Math.min(L.length, 6))]; if (!x || !x.title) return ''; return glRotSlide('nf', '#991b1b', '#7f1d1d', '🍿', x.title, x.sub || 'New on Netflix', "go('#netflix')", 'NETFLIX'); });
+  add('pr', () => { const t = todayISO(); const L = (PRIME && Array.isArray(PRIME.items) ? PRIME.items : []).filter(x => x && x.title && /^\d{4}-\d\d-\d\d$/.test(x.date || '') && x.date <= t && daysLeft(x.date) >= -31); const x = L[Math.floor(Math.random() * Math.min(L.length, 6))]; if (!x) return ''; return glRotSlide('pr', '#0369a1', '#0c4a6e', '🎬', x.title, 'New on Prime Video · added ' + fmtW(x.date), "go('#prime')", 'PRIME VIDEO'); });
+  add('ev', () => { const G = mdEvGroups(); const L = [].concat(G.other || [], G.markets || []).filter(e => e && e.title); const C = L.filter(e => /wdc\.govt|council/i.test([e.url, e.src, e.source, e.org].join(' '))); const P = C.length ? C : L; const e = P[Math.floor(Math.random() * Math.min(P.length, 6))]; if (!e) return ''; return glRotSlide('ev', '#0f766e', '#115e59', '🎪', e.title, [e.date ? fmtW(e.date) : '', e.venue ? String(e.venue).split(',')[0] : ''].filter(Boolean).join(' · '), "go('#events')", C.length ? 'COUNCIL EVENT' : 'WHAT’S ON'); });
+  add('cn', () => { const G = mdEvGroups(); const L = [].concat(G.concerts || [], (G.akl || []).filter(mdBig)).filter(e => e && e.title); const e = L[Math.floor(Math.random() * Math.min(L.length, 6))]; if (!e) return ''; return glRotSlide('cn', '#7c3aed', '#be185d', '🎸', e.title, [e.date ? fmtW(e.date) : '', e.venue ? String(e.venue).split(',')[0] : ''].filter(Boolean).join(' · '), "go('#concerts')", 'CONCERT'); });
+  return out;
+}
+function glWxRotHtml(m) {
+  glRotIdx = 0; glRotLast = Date.now();
+  const w = glRotSlides(m)[0];
+  return `<div id="glrot" class="glrot" data-k="wx">${w && w[0] === 'wx' ? w[1] : ''}</div>`;
+}
+function glRotTick() {
+  try {
+    const el = document.getElementById('glrot'); if (!el || document.hidden || (typeof sheetOpen !== 'undefined' && sheetOpen)) return;
+    if (typeof isHomeUnlocked === 'function' && isHomeUnlocked()) return;
+    const all = glRotSlides(); if (all.length < 2) return;
+    const cur = el.getAttribute('data-k'); const pool = all.filter(x => x[0] !== cur); const pick = pool[Math.floor(Math.random() * pool.length)];
+    el.classList.add('glrotout');
+    setTimeout(() => { el.innerHTML = pick[1]; el.setAttribute('data-k', pick[0]); el.classList.remove('glrotout'); }, 250);
+  } catch (e) { }
+}
+setInterval(glRotTick, 10000);
