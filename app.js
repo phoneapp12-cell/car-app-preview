@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.77';
+const APP_VERSION = '2.28.78';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -33172,7 +33172,6 @@ function ltvPlayerHtml() {
       <button type="button" class="cs-hbtn" onclick="ltvStep(1)" aria-label="Next channel"><span>▶▶|</span><small>CH +</small></button>
       <button type="button" class="cs-hbtn${saved ? " on" : ""}" style="${saved ? "border-color:#eab308;color:#fde047;background:rgba(234,179,8,.18)" : ""}" onclick="ltvToggleSave(${jsArg(ch.id)})"><span>${saved ? "★" : "☆"}</span><small>${saved ? "SAVED" : "SAVE"}</small></button>
       <button type="button" class="cs-hbtn" onclick="ltvAssignSheet(${jsArg(ch.id)})"><span>📌</span><small>PRESET</small></button>
-      <button type="button" class="cs-hbtn" onclick="openAudioOutputPicker('Live TV')"><span>🔊</span><small>BT / OUT</small></button>
       <button type="button" class="cs-hbtn" onclick="ltvFullscreen()"><span>⛶</span><small>FULL</small></button>
     </div>
     <div class="cs-presets-head">
