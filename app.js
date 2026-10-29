@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.82';
+const APP_VERSION = '2.28.83';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11848,7 +11848,7 @@ function More() {
   const GROUPS = [
     ['health', '🩺 Health & Wellbeing', ['watch', 'sleep', 'gym', 'health', 'meds', 'claims']],
     ['local', '📍 Local & Outdoors', ['walks', 'weather', 'bridge', 'roadworks', 'bus', 'events', 'news', 'planning', 'parlbills', 'garden']],
-    ['explore', '🎓 Entertainment & Learning', ['media', 'learn', 'aitech', 'science', 'diy', 'coding', 'astronomy', 'gardening', 'space', 'travel', 'ideas', 'tv', 'videos', 'top40', 'radio', 'podcasts', 'blogging', 'about']],
+    ['explore', '🎓 Entertainment & Learning', ['media', 'learn', 'aitech', 'science', 'diy', 'coding', 'astronomy', 'gardening', 'space', 'travel', 'ideas', 'tv', 'videos', 'top40', 'radio', 'podcasts', 'blogging', 'books', 'about']],
     ['home', '🏠 Home & Daily', ['calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'projects', 'flagged', 'birthdays', 'countdown', 'diary', 'notes', 'photos', 'lights', 'heat', 'alarm']],
     ['money', '💰 Money & Bills', ['bills', 'budget', 'cashflow', 'roster', 'commission', 'loans']],
     ['cars', '🚗 Cars & Pets', ['cars', 'pets']]
@@ -11877,6 +11877,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   videos: ['play', 'vid', 'Videos', 'Videos'],
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
+  books: ['book', 'blog', 'Kindle books', 'Books'], // 2.28.83
   photos: ['image', 'blog', 'Photos', 'Photos'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
@@ -11924,7 +11925,7 @@ const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'countdown', 'diary', 'notes', 'photos'] },
   { id: 'people', title: 'Health', keys: ['watch', 'sleep', 'gym', 'health', 'meds', 'claims', 'birthdays', 'about'] },
   { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'bus', 'planning', 'parlbills', 'garden', 'events', 'news'] },
-  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
+  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
   { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
   { id: 'cars', title: 'Cars & Pets', keys: ['cars', 'fuel', 'pets'] }
