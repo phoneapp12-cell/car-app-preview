@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.74';
+const APP_VERSION = '2.28.75';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5961,7 +5961,7 @@ function todoPriMark(t) {
   return p === 'high' ? ' · 🔥 High' : p === 'low' ? ' · 🌿 Chill' : ' · ⭐ Normal';
 }
 function todoMetaDedupe(h) { return String(h).replace(/( · in your calendar)+/g, ' · in your calendar'); } // 2.26.22
-/* 2.28.74: the To-do "Shopping" list and the Shopping page are one list. Shane's own shopping to-dos become
+/* 2.28.75: the To-do "Shopping" list and the Shopping page are one list. Shane's own shopping to-dos become
    shopping items (same id, so Sarah sharing carries on), and the To-do Shopping tab shows the Shopping page's items. */
 const isShopListName = l => /^(shopping|groceries|grocery)$/i.test(String(l || '').trim());
 function sweepShopTodos() {
