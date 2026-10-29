@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.76';
+const APP_VERSION = '2.28.77';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -33960,7 +33960,25 @@ async function ltvStopActiveRecording() {
   toast(`⏹ Stopped & saved recording${rec ? ": “" + rec.title + "”" : ""}! Ready to play from 0:00.`, "▶ Play Now", () => ltvPlayRecording(active.recId));
 }
 
-async function ltvRecordProg(chId, startMs) {
+/* 2.28.77: find the exact programme that was tapped, on whichever guide day it's on. Before this, a programme
+   not in the next 12 slots from now (e.g. tonight later, or tomorrow) fell back to whatever was on now. */
+function ltvFindProg(ch, startMs) {
+  const now = Date.now();
+  if (!startMs) return itvProgsForChannel(ch, now)[0] || null;
+  let p = itvProgsForChannel(ch, now).find(x => +x.startMs === +startMs);
+  if (p) return p;
+  const days = [];
+  try { days.push(nzStampLocal(new Date(+startMs)).slice(0, 10)); } catch (e) { }
+  try { days.push(itvEpgDay()); } catch (e) { }
+  for (const d of days) {
+    const q = (itvDayProgs(d, ch) || []).find(x => +(x.startMs || x.start) === +startMs);
+    if (!q) continue;
+    const s0 = +(q.startMs || q.start), e0 = +(q.endMs || q.until || (s0 + 3600e3)), dur = Math.max(15, Math.round((e0 - s0) / 60000));
+    return Object.assign({}, q, { id: q.id || `itv-${ch.id}-${s0}`, start: new Date(s0).toISOString(), end: new Date(e0).toISOString(), startMs: s0, endMs: e0, durationMin: dur, episode: q.episode || `${dur} min`, seriesTitle: q.seriesTitle || String(q.title || '').split(' — ')[0].trim() });
+  }
+  return null;
+}
+async function ltvRecordProg(chId, startMs, auto) {
   const ch = ltvAllChannels().find(c => c.id === chId) || ltvCurrentChannel();
   if (!ch) return;
   // If user taps RECORD on the channel currently being actively recorded, stop & finalize the recording
@@ -33968,15 +33986,15 @@ async function ltvRecordProg(chId, startMs) {
     await ltvStopActiveRecording();
     return;
   }
-  const progs = itvProgsForChannel(ch, Date.now());
-  const p = (startMs ? progs.find(x => x.startMs === startMs) : progs[0]) || progs[0];
+  const p = ltvFindProg(ch, startMs);
+  if (!p) { toast('Sorry, I couldn’t find that programme in the guide any more. Try tapping it again.'); return; }
   const existing = ltvIsRecScheduledOrDone(p.id, p.title, p.start);
-  if (existing && startMs) {
+  if (existing && startMs && !auto) {
     toast(`“${p.title}” is already in your DVR (${existing.status === "ready" ? "Ready to play" : "Scheduled"}).`, "▶ Play Recording", () => ltvPlayRecording(existing.id));
     return;
   }
   const now = Date.now();
-  const isNow = !startMs || p.startMs <= now + 60000;
+  const isNow = !startMs || (p.startMs <= now + 60000 && p.endMs > now);
   const recId = existing ? existing.id : (startMs ? p.id : "rec-" + ch.id + "-" + now);
   const rec = {
     id: recId,
@@ -34106,11 +34124,11 @@ async function ltvSeriesLinkProg(chId, startMs) {
           start: ep.start,
           end: ep.end,
           durationMin: ep.durationMin || 60,
-          status: idx === 0 ? "ready" : "scheduled",
+          status: (Date.parse(ep.start) <= Date.now() + 60000 && Date.parse(ep.end) > Date.now()) ? "ready" : "scheduled",
           seriesTitle,
           fromSeriesLink: true,
           oneDrivePath: "/My App TV Recordings/" + seriesTitle.replace(/[^A-Za-z0-9_-]+/g, "-") + ".json",
-          recordedAt: idx === 0 ? new Date().toISOString() : "",
+          recordedAt: (Date.parse(ep.start) <= Date.now() + 60000 && Date.parse(ep.end) > Date.now()) ? new Date().toISOString() : "",
           sizeMb: 390
         });
       }
@@ -34338,7 +34356,7 @@ function itvMoviesSpotlightCol(allChans, nowMs, q) {
       [idx === 0 ? "🎬 MOVIE ON NOW" : "⏭ UP NEXT · " + epgClock(p.startMs), idx === 0 ? "#e11d48" : "#0284c7"],
       [ch.name, "#334155"]
     ];
-    if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : "📅 Scheduled", "#16a34a"]);
+    if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : rec.status === "missed" ? "⚠️ Missed" : "📅 Scheduled", "#16a34a"]);
     return `<div class="tbcard" style="border-left:4px solid ${idx === 0 ? "#e11d48" : "#0284c7"}">
       <div class="tbbody">
         ${tbLbl(lbls)}
@@ -34397,7 +34415,7 @@ function renderInternetTvGuide() {
         [idx === 0 ? "● ON NOW" : idx === 1 ? "⏭ UP NEXT" : timeStr, idx === 0 ? "#dc2626" : idx === 1 ? "#0284c7" : "#475569"]
       ];
       if (isMovieCh) lbls.push(["🎬 Movie", "#e11d48"]);
-      if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : "📅 Scheduled", "#16a34a"]);
+      if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : rec.status === "missed" ? "⚠️ Missed" : "📅 Scheduled", "#16a34a"]);
       if (sl) lbls.push(["🔁 Series Linked", "#7c3aed"]);
       return `<div class="tbcard" style="${idx === 0 ? "border-left:4px solid #dc2626" : ""}">
         <div class="tbbody">
@@ -36760,7 +36778,7 @@ function itvSuggestedColHtml(nowMs = Date.now(), q = "") {
       [badge, "#7c3aed"],
       ["● ON NOW · " + ch.name, "#dc2626"]
     ];
-    if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : "📅 Scheduled", "#16a34a"]);
+    if (rec) lbls.push([rec.status === "ready" ? "📼 Recorded" : rec.status === "missed" ? "⚠️ Missed" : "📅 Scheduled", "#16a34a"]);
     return `<div class="tbcard" style="border-left:4px solid #7c3aed">
       <div class="tbbody">
         ${tbLbl(lbls)}
@@ -37270,3 +37288,25 @@ function openWhangareiDemographicsSheet() {
     </div>`;
   openSheet("Whangārei Population & Demographics", html, null);
 }
+
+/* 2.28.77: scheduled DVR recordings start themselves at their programme's start time (NZ time) while My App is
+   open, and stop at its end. Ones whose time passed while the app was closed are marked Missed, not left Scheduled. */
+async function ltvDvrSchedTick() {
+  try {
+    if (typeof LTV_DVR === 'undefined' || !LTV_DVR || !Array.isArray(LTV_DVR.recordings)) return;
+    const now = Date.now(); let changed = false;
+    for (const r of LTV_DVR.recordings) {
+      if (r.status !== 'scheduled') continue;
+      const s0 = Date.parse(r.start), e0 = Date.parse(r.end);
+      if (!isFinite(s0) || !isFinite(e0)) continue;
+      if (e0 <= now) { r.status = 'missed'; changed = true; continue; }
+      if (s0 <= now + 30000 && !ltvActiveRec) { await ltvRecordProg(r.channelId, s0, true); return; }
+    }
+    if (ltvActiveRec) {
+      const r = LTV_DVR.recordings.find(x => x.id === ltvActiveRec.recId);
+      if (r && Date.parse(r.end) <= now) await ltvStopActiveRecording();
+    }
+    if (changed) { try { localStorage.setItem('ltvDvrCache', JSON.stringify(LTV_DVR)); } catch (e) { } }
+  } catch (e) { }
+}
+setInterval(ltvDvrSchedTick, 20000); setTimeout(ltvDvrSchedTick, 5000);
