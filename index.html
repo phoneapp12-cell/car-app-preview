@@ -2451,7 +2451,7 @@ html.gfx .spotlight-bar{background:var(--glass);-webkit-backdrop-filter:blur(8px
 .row.shopitem .t,.row.shopitem .s,.row.shopitem .brandln,.row.shopitem .wwprice,.row.shopitem .wwprice b,.row.shopitem .wwprice small,.row.shopitem .chk{color:#000!important;-webkit-text-fill-color:#000!important;opacity:1}
 .row.shopitem.done{background:#fef9c3!important;border-color:#fde047;opacity:.85}
 .row.shopitem .tick{border-color:#000!important;color:#000!important}
-.glrot{transition:opacity .25s ease}.glrot.glrotout{opacity:0}.glrotc{position:relative;color:#fff!important;min-height:96px}.glrotc .glwxn,.glrotc .glwxout{color:#fff!important}.glrotc .glroti{font-size:2rem;line-height:1}.glrottag{position:relative;z-index:1;font-size:.68rem;font-weight:900;letter-spacing:.06em;opacity:.85}
+.glrot{transition:opacity .25s ease}.glrot.glrotout{opacity:0}.glrot{overflow:hidden}.glrot>*{height:100%;box-sizing:border-box}.glrotc{position:relative;color:#fff!important;min-height:96px;overflow:hidden}.glrotc .glwxn,.glrotc .glwxout{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.glrotc .glwxn,.glrotc .glwxout{color:#fff!important}.glrotc .glroti{font-size:2rem;line-height:1}.glrottag{position:relative;z-index:1;font-size:.68rem;font-weight:900;letter-spacing:.06em;opacity:.85}
 </style>
 </head>
 <body>
@@ -2468,7 +2468,7 @@ html.gfx .spotlight-bar{background:var(--glass);-webkit-backdrop-filter:blur(8px
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.28.83"></script>
+<script src="app.js?v=2.28.84"></script>
 <script>
 setTimeout(function () {
   var v = document.getElementById("view");

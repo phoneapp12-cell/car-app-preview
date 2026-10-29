@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.83';
+const APP_VERSION = '2.28.84';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -37346,7 +37346,7 @@ function BooksPage() {
     + `<div class="s muted" style="margin:12px 4px">Taken from your Kindle app screenshots on 30 Oct 2026. Send new screenshots any time to update it. Tap a book to open it in Kindle.</div>`;
 }
 function glRotSlide(k, a, b, ico, title, sub, go2, tag) {
-  return `<button type="button" class="glwxc glwxc2 gldark glrotc" data-k="${k}" style="--s1:${a};--s2:${b};--s3:#0f172a" onclick="${go2}"><span class="glrottag">${esc(tag)}</span><span class="glwxtop"><span class="glroti">${ico}</span><b class="glwxn">${esc(title)}</b></span>${sub ? `<span class="glwxout">${esc(sub)}</span>` : ''}</button>`;
+  return `<button type="button" class="glwxc glwxc2 gldark glrotc" data-k="${k}" style="--s1:${a};--s2:${b};--s3:#0f172a" onclick="glRotTap('${k}');${go2}"><span class="glrottag">${esc(tag)}</span><span class="glwxtop"><span class="glroti">${ico}</span><b class="glwxn">${esc(title)}</b></span>${sub ? `<span class="glwxout">${esc(sub)}</span>` : ''}</button>`;
 }
 function glRotSlides(m) {
   const out = [];
@@ -37372,6 +37372,7 @@ function glRotSlides(m) {
   add('nznews', () => { const x = pick(newsSec('nz') || [], 4); if (!x) return ''; return glRotSlide('nznews', '#1e293b', '#334155', '🗞️', x.title, 'New Zealand', "go('#news')", 'NZ NEWS'); });
   add('tide', () => { const L = tideRange(2), now = Date.now(); const n = L.find(x => x.ms > now); if (!n) return ''; const a = L.find(x => x.ms > n.ms); const mins = Math.round((n.ms - now) / 60000); return glRotSlide('tide', '#075985', '#0e7490', '🌊', `${n.high ? 'High' : 'Low'} tide ${aklTime(n.ms)} · ${tideM(n)}`, (mins < 60 ? `In ${Math.max(1, mins)} min` : `In ${Math.floor(mins / 60)} h ${mins % 60} min`) + (a ? ` · then ${a.high ? 'high' : 'low'} ${aklTime(a.ms)}` : ''), "go('#weather')", 'TIDES'); });
   add('book', () => { const r = KINDLE_BOOKS.find(b => b.st === 'reading'); const b = r && Math.random() < 0.5 ? r : pick(KINDLE_BOOKS, KINDLE_BOOKS.length); if (!b) return ''; return glRotSlide('book', '#7c2d12', '#9a3412', '📚', b.title, [b.author, b.note || KB_ST[b.st][1]].filter(Boolean).join(' · '), "go('#books')", 'KINDLE BOOKS'); });
+  add('food', () => { const st = typeof wwStore === 'function' ? wwStore() : {}; const L = Object.values(st || {}).map(e => e && e.product).filter(p => p && p.special && p.name && p.price != null); const p = pick(L, L.length); if (!p) return ''; return glRotSlide('food', '#166534', '#15803d', '🛒', `${wwTitle(p.name)}${p.size ? ' ' + p.size : ''}`, `${p.club ? 'Club price' : 'On special'} ${wwMoney(p.price)}${p.was ? ' (was ' + wwMoney(p.was) + ')' : ''} at Woolworths` + (L.length > 1 ? ` · ${L.length - 1} more on your list` : ''), "go('#shopping')", 'FOOD SPECIALS'); });
   add('moon', () => { const nm = moonPhaseName(); if (!nm) return ''; const ic = { 'New moon': '🌑', 'Waxing crescent': '🌒', 'First quarter': '🌓', 'Waxing gibbous': '🌔', 'Full moon': '🌕', 'Waning gibbous': '🌖', 'Last quarter': '🌗', 'Waning crescent': '🌘' }[nm] || '🌙'; return glRotSlide('moon', '#1e1b4b', '#312e81', ic, nm, 'Moon phase tonight', "go('#space')", 'MOON'); });
   return out;
 }
@@ -37380,12 +37381,29 @@ function glWxRotHtml(m) {
   const w = glRotSlides(m)[0];
   return `<div id="glrot" class="glrot" data-k="wx">${w && w[0] === 'wx' ? w[1] : ''}</div>`;
 }
+/* 2.28.84: slides picked by interest. Base weights from Shane's known interests (sitcoms/TV, cars, alerts that matter),
+   time of day, and how often he taps each kind of slide on this phone. */
+let glRotRecent = [];
+const GLROT_BASE = { wx: 2, storm: 5, out: 5, bday: 4, car: 3, itv: 3, nzx: 2, food: 2, gas: 2, pwr: 2, lnews: 2, nznews: 1.5, vid: 1.5, nf: 1.5, pr: 1.2, ev: 1.5, cn: 1, blog: 1, book: 1.2, tide: 1, moon: 1 };
+function glRotTaps() { try { return JSON.parse(localStorage.getItem('glRotTapsV1') || '{}') || {}; } catch (e) { return {}; } }
+function glRotTap(k) { try { const t = glRotTaps(); t[k] = (t[k] || 0) + 1; localStorage.setItem('glRotTapsV1', JSON.stringify(t)); } catch (e) { } }
+function glRotWeight(k) {
+  const h = new Date().getHours(); let w = GLROT_BASE[k] || 1;
+  if (h >= 5 && h < 11 && /news|nzx|gas|wx|storm/.test(k)) w *= 1.6;      // mornings: news, markets, petrol, weather
+  if (h >= 17 && /itv|nf|pr|vid|book|cn/.test(k)) w *= 1.6;               // evenings: TV, videos, books
+  if ((h >= 19 || h < 4) && /moon/.test(k)) w *= 1.5;
+  const t = glRotTaps(), tot = Object.values(t).reduce((a, b) => a + b, 0) || 1;
+  return w * (1 + Math.min(2, 6 * (t[k] || 0) / tot));
+}
+function glRotChoose(pool) { const ws = pool.map(x => glRotWeight(x[0])); let r = Math.random() * ws.reduce((a, b) => a + b, 0); for (let i = 0; i < pool.length; i++) { r -= ws[i]; if (r <= 0) return pool[i]; } return pool[pool.length - 1]; }
 function glRotTick() {
   try {
     const el = document.getElementById('glrot'); if (!el || document.hidden || (typeof sheetOpen !== 'undefined' && sheetOpen)) return;
     if (typeof isHomeUnlocked === 'function' && isHomeUnlocked()) return;
     const all = glRotSlides(); if (all.length < 2) return;
-    const cur = el.getAttribute('data-k'); const pool = all.filter(x => x[0] !== cur); const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (!el.dataset.fixh && el.offsetHeight > 40) { el.style.height = el.offsetHeight + 'px'; el.dataset.fixh = '1'; } // 2.28.84: keep the box the same size
+    const cur = el.getAttribute('data-k'); const pick = glRotChoose(all.filter(x => x[0] !== cur && !glRotRecent.includes(x[0])).length ? all.filter(x => x[0] !== cur && !glRotRecent.includes(x[0])) : all.filter(x => x[0] !== cur));
+    glRotRecent.push(pick[0]); if (glRotRecent.length > Math.min(5, Math.floor(all.length / 2))) glRotRecent.shift();
     el.classList.add('glrotout');
     setTimeout(() => { el.innerHTML = pick[1]; el.setAttribute('data-k', pick[0]); el.classList.remove('glrotout'); }, 250);
   } catch (e) { }
