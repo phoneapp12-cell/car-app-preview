@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.75';
+const APP_VERSION = '2.28.76';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5961,7 +5961,7 @@ function todoPriMark(t) {
   return p === 'high' ? ' · 🔥 High' : p === 'low' ? ' · 🌿 Chill' : ' · ⭐ Normal';
 }
 function todoMetaDedupe(h) { return String(h).replace(/( · in your calendar)+/g, ' · in your calendar'); } // 2.26.22
-/* 2.28.75: the To-do "Shopping" list and the Shopping page are one list. Shane's own shopping to-dos become
+/* 2.28.76: the To-do "Shopping" list and the Shopping page are one list. Shane's own shopping to-dos become
    shopping items (same id, so Sarah sharing carries on), and the To-do Shopping tab shows the Shopping page's items. */
 const isShopListName = l => /^(shopping|groceries|grocery)$/i.test(String(l || '').trim());
 function sweepShopTodos() {
@@ -35387,12 +35387,12 @@ function itvTimelineGuideHtml(filteredChans, allChans) {
       </div>
       <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
         ${picks.map(pk => `<div style="min-width:215px;max-width:240px;flex-shrink:0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 10px">
-          <div style="font-size:.68rem;font-weight:800;color:#7dd3fc">${esc(pk.tag)} · ${esc(pk.ch.name)}</div>
-          <div style="font-size:.82rem;font-weight:800;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pk.nowProg.title)}</div>
-          <div style="font-size:.7rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pk.why)}</div>
+          <div style="font-size:.68rem;font-weight:800;color:#7dd3fc">${esc(pk.badge || "Suggested")} · ${esc(pk.ch.name)}</div>
+          <div style="font-size:.82rem;font-weight:800;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pk.p.title)}</div>
+          <div style="font-size:.7rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pk.reason || "")}</div>
           <div style="display:flex;gap:5px;margin-top:6px">
             <button type="button" class="btn small primary" style="padding:2px 8px;font-size:.68rem" onclick="${pk.ch.tvnzWatch ? "tvWatch(" + jsArg(pk.ch.tvnzWatch) + ")" : "go('#livetv');setTimeout(()=>ltvPlayId(" + jsArg(pk.ch.id) + "),60)"}">▶ Watch</button>
-            <button type="button" class="btn small" style="padding:2px 8px;font-size:.68rem;background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)" onclick="ltvRecordProg(${jsArg(pk.ch.id)},${pk.nowProg.startMs})">🔴 Record</button>
+            <button type="button" class="btn small" style="padding:2px 8px;font-size:.68rem;background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)" onclick="ltvRecordProg(${jsArg(pk.ch.id)},${pk.p.startMs})">🔴 Record</button>
           </div>
         </div>`).join("")}
       </div>
