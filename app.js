@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.81';
+const APP_VERSION = '2.28.82';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -21703,7 +21703,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { books: () => BooksPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -23971,6 +23971,7 @@ function glTiles() {
   add('podcasts', 'listen', 'Podcasts', () => (glFirst(HOME_CARD.podcasts()) || {}).t, 'i3-phone', ['#9333ea', '#4c1d95'], "go('#podcasts')");
   add('learn', 'read', 'Learn', () => { const ai = lbToday('ai'), dy = lbToday('dy'), sc = lbToday('sc'); return [langToday('mi')[0], ai && ai.name, sc && sc.name, dy && dy.name].filter(Boolean).slice(0, 3).join(' · '); }, 'i3-idea', ['#0d9488', '#1e3a8a'], "go('#learn')");
   add('blogs', 'read', 'Blogs', () => (glFirst(HOME_CARD.blogging()) || {}).t, 'i3-note', ['#0d9488', '#155e75'], "go('#blogging')");
+  add('books', 'read', 'Kindle books', () => { const r = KINDLE_BOOKS.find(b => b.st === 'reading'); return r ? 'Reading: ' + r.title : KINDLE_BOOKS.length + ' books'; }, 'i3-note', ['#9a3412', '#7c2d12'], "go('#books')");
   add('localnews', 'read', 'Local news', () => { const n = (newsSec('local') || []).filter(newsOk); return n.length ? n[0].title : ''; }, B('news'), '', "go('#localnews')");
   add('nznews', 'read', 'NZ news', () => { const n = (newsSec('nz') || []).filter(newsOk); return n.length ? n[0].title : ''; }, 'i3-news', ['#475569', '#1e293b'], "go('#news')");
   add('events', 'out', 'Events', () => { const e = upcomingEvents().filter(evPlain); return e.length ? e[0].title + (e[0].date ? ' · ' + fmtW(e[0].date) : '') : ''; }, B('events'), '', "go('#events')");
@@ -37320,6 +37321,29 @@ setInterval(ltvDvrSchedTick, 20000); setTimeout(ltvDvrSchedTick, 5000);
    NZX Top 40, petrol, Internet TV picks (sitcoms first), Netflix, Prime Video, council/local events or concerts.
    Real data only: a slide with nothing loaded is skipped. Tap any slide to open its page. */
 let glRotIdx = 0, glRotLast = 0;
+
+/* ---- 2.28.82: Shane's Kindle library (read off his Kindle app screenshots, 30 Oct 2026) ---- */
+const KINDLE_BOOKS = [
+  ['One Moment in Time', 'Shari Low', 'reading'], ['How to Lose Weight Fast', 'Kay Hines', 'started', '4% read'],
+  ['I’m Still Standing', 'Colleen Coleman', 'read'],
+  ['The Place We Call Home', 'Faith Hogan', 'own'], ['The Brighton Guest House Girls', 'Lesley Eames', 'own'], ['Three Gold Coins', 'Josephine Moon', 'own'],
+  ['The Hating Game', 'Sally Thorne', 'own'], ['Her Long Walk Home', 'Linda Barrett', 'own'], ['How to Relax', 'Thich Nhat Hanh', 'own'],
+  ['The Wave', 'L.E. Luttrell', 'own'], ['Rosie’s Little Cafe on the Riviera', 'Jennifer Bohnet', 'own'],
+  ['Love, Chocolate, and a Dog Named Al Capone', 'Abigail Drake', 'sample'], ['When Life Gives You Lululemons', 'Lauren Weisberger', 'sample'],
+  ['The Dictionary of Body Language', 'Joe Navarro', 'sample'], ['For Once in My Life', 'Colleen Coleman', 'sample'], ['The Chocolate Promise', 'Josephine Moon', 'sample'],
+  ['The 5 Love Languages for Men', 'Gary Chapman', 'sample'], ['Spare', 'Prince Harry', 'sample'], ['Fence Building 101', 'Robertson Shock', 'sample'],
+  ['How to Eat', 'Thich Nhat Hanh', 'sample'], ['How to Love', 'Thich Nhat Hanh', 'sample'], ['Your Place or Mine?', 'Portia MacIntosh', 'sample'],
+  ['It’s Not About You', 'Tom Rath', 'sample'], ['Divine Wedding', 'Hope Callaghan', 'sample'], ['How to Make People Like You in 90 Seconds', 'Nicholas Boothman', 'sample'],
+  ['Convince Them in 90 Seconds', 'Nicholas Boothman', 'sample'], ['Games People Play', 'Eric Berne', 'sample'], ['The Library of Lost and Found', '', 'sample']
+].map(([title, author, st, note]) => ({ title, author, st, note: note || '' }));
+const KB_ST = { reading: ['📖', 'Reading now'], started: ['📖', 'Started'], read: ['✅', 'Finished'], own: ['📚', 'In your library'], sample: ['🔖', 'Sample'] };
+function kindleOpen(t) { const q = encodeURIComponent(t || ''); window.open('https://read.amazon.com/kindle-library?query=' + q, '_blank', 'noopener'); }
+function BooksPage() {
+  const grp = [['Reading', x => x.st === 'reading' || x.st === 'started'], ['Finished', x => x.st === 'read'], ['In your library', x => x.st === 'own'], ['Samples', x => x.st === 'sample']];
+  const row = b => `<button type="button" class="row" onclick="kindleOpen(${esc(JSON.stringify(b.title))})"><div class="ic">${KB_ST[b.st][0]}</div><div class="tx"><div class="t">${esc(b.title)}</div><div class="s">${esc([b.author, b.note || KB_ST[b.st][1]].filter(Boolean).join(' · '))}</div></div></button>`;
+  return header('Kindle books', KINDLE_BOOKS.length + ' books from your Kindle library') + grp.map(([t, f]) => { const L = KINDLE_BOOKS.filter(f); return L.length ? `<div class="sec"><span class="sechead">${t} (${L.length})</span></div><div class="list">${L.map(row).join('')}</div>` : ''; }).join('')
+    + `<div class="s muted" style="margin:12px 4px">Taken from your Kindle app screenshots on 30 Oct 2026. Send new screenshots any time to update it. Tap a book to open it in Kindle.</div>`;
+}
 function glRotSlide(k, a, b, ico, title, sub, go2, tag) {
   return `<button type="button" class="glwxc glwxc2 gldark glrotc" data-k="${k}" style="--s1:${a};--s2:${b};--s3:#0f172a" onclick="${go2}"><span class="glrottag">${esc(tag)}</span><span class="glwxtop"><span class="glroti">${ico}</span><b class="glwxn">${esc(title)}</b></span>${sub ? `<span class="glwxout">${esc(sub)}</span>` : ''}</button>`;
 }
@@ -37344,8 +37368,9 @@ function glRotSlides(m) {
   add('blog', () => { const L = (typeof blogPosts === 'function' ? blogPosts() || [] : []).filter(x => Date.now() - Date.parse(x.published) < 7 * 864e5); const x = pick(L, 6); if (!x) return ''; return glRotSlide('blog', '#4c1d95', '#6d28d9', '✍️', x.title, x.blog, "go('#blogging')", 'BLOGS'); });
   add('vid', () => { const L = (typeof VIDEOS !== 'undefined' && Array.isArray(VIDEOS) ? VIDEOS : []).filter(v => v && v.title); const v = pick(L, 10); if (!v) return ''; return glRotSlide('vid', '#991b1b', '#dc2626', '▶️', v.title, v.channel || '', "go('#videos')", 'VIDEOS'); });
   add('lnews', () => { const x = pick(newsSec('local') || [], 4); if (!x) return ''; return glRotSlide('lnews', '#0c4a6e', '#0369a1', '📰', x.title, 'Northland', "go('#localnews')", 'LOCAL NEWS'); });
-  add('nznews', () => { const x = pick(newsSec('nz') || [], 4); if (!x) return ''; return glRotSlide('nznews', '#1e293b', '#334155', '🗞️', x.title, 'New Zealand', "go('#localnews')", 'NZ NEWS'); });
+  add('nznews', () => { const x = pick(newsSec('nz') || [], 4); if (!x) return ''; return glRotSlide('nznews', '#1e293b', '#334155', '🗞️', x.title, 'New Zealand', "go('#news')", 'NZ NEWS'); });
   add('tide', () => { const L = tideRange(2), now = Date.now(); const n = L.find(x => x.ms > now); if (!n) return ''; const a = L.find(x => x.ms > n.ms); const mins = Math.round((n.ms - now) / 60000); return glRotSlide('tide', '#075985', '#0e7490', '🌊', `${n.high ? 'High' : 'Low'} tide ${aklTime(n.ms)} · ${tideM(n)}`, (mins < 60 ? `In ${Math.max(1, mins)} min` : `In ${Math.floor(mins / 60)} h ${mins % 60} min`) + (a ? ` · then ${a.high ? 'high' : 'low'} ${aklTime(a.ms)}` : ''), "go('#weather')", 'TIDES'); });
+  add('book', () => { const r = KINDLE_BOOKS.find(b => b.st === 'reading'); const b = r && Math.random() < 0.5 ? r : pick(KINDLE_BOOKS, KINDLE_BOOKS.length); if (!b) return ''; return glRotSlide('book', '#7c2d12', '#9a3412', '📚', b.title, [b.author, b.note || KB_ST[b.st][1]].filter(Boolean).join(' · '), "go('#books')", 'KINDLE BOOKS'); });
   add('moon', () => { const nm = moonPhaseName(); if (!nm) return ''; const ic = { 'New moon': '🌑', 'Waxing crescent': '🌒', 'First quarter': '🌓', 'Waxing gibbous': '🌔', 'Full moon': '🌕', 'Waning gibbous': '🌖', 'Last quarter': '🌗', 'Waning crescent': '🌘' }[nm] || '🌙'; return glRotSlide('moon', '#1e1b4b', '#312e81', ic, nm, 'Moon phase tonight', "go('#space')", 'MOON'); });
   return out;
 }
