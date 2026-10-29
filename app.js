@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.72';
+const APP_VERSION = '2.28.73';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5842,12 +5842,13 @@ function todoUrgencyScore(t) {
   const sittingScore = age * 18; // sitting 7 days = 126, sitting 14 days = 252, sitting 30 days = 540
   return Math.max(dateScore, sittingScore) + priBoost + doingBoost + (age * 2);
 }
+function todoOverdueDays(t) { if (!t || !t.due) return 0; const d = daysLeft(t.due); return d < 0 ? -d : 0; }
 function cmpOpenTodo(a, b) {
-  const diff = todoUrgencyScore(b) - todoUrgencyScore(a);
-  if (diff !== 0) return diff;
+  // 2.28.73: High priority at the top, then most days overdue first, then due soonest, then oldest
   return todoPriRank(a) - todoPriRank(b)
+    || todoOverdueDays(b) - todoOverdueDays(a)
     || (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15)
-    || (+a.created || 0) - (+b.created || 0); // oldest sitting first
+    || (+a.created || 0) - (+b.created || 0);
 }
 function todoListEmoji(l) {
   const s = String(l || "").toLowerCase();
@@ -5968,7 +5969,7 @@ function Todo() {
   const T = todayISO(), isT = ms => ms && nzStampLocal(new Date(ms)).slice(0, 10) === T;
   const doneToday = (S.todos || []).filter(t => t && t.done && isT(t.doneAt)).length;
   const TKC = ['#22c55e', '#3b82f6', '#ec4899', '#f59e0b', '#8b5cf6', '#06b6d4'], tkc = l => TKC[Math.max(0, S.lists.indexOf(l)) % TKC.length];
-  const row = t => todoMetaDedupe(`<div class="row tkcard ${t.done ? 'done' : ''}" style="--tk:${tkc(t.list)}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
+  const row = t => todoMetaDedupe(`<div class="row tkcard ${t.done ? 'done' : ''}${!t.done && todoOverdueDays(t) >= 21 ? ' tk-red21' : ''}" style="--tk:${tkc(t.list)}"><button type="button" class="tick" aria-label="${t.done ? 'Mark not done' : 'Mark complete'}: ${esc(t.title)}" onclick="tick('${t.id}')"><span>${I('check')}</span></button>
     <div class="tkmain"><button class="tapzone" onclick="todoForm('${t.id}')"><div class="tktop" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px"><div class="t" style="width:100%;font-size:1.12rem;line-height:1.3">${sarahBadge(t)}${t.done ? "✅ " + esc(t.title) : todoTitleWithEmoji(t)}</div>${!t.done ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span onclick="cycleTodoPri('${t.id}', event)" title="Tap to change priority">${todoPriBadge(t)}</span>${t.due ? `<span class="tkpill">${todoDuePill(t)}</span>` : ''}</div>` : ''}</div>
     <div class="s" style="margin-top:6px"><span class="tktag">${todoListEmoji(t.list)} ${esc(t.list)}</span>${!t.done ? " · " + esc(todoSittingLabel(t)) : ""}${todoAppt(t) ? ' · 🗓️ in your calendar' : ''}</div></button>
     <div class="tkacts">${isMineShared(t) || isSarahTodo(t) ? `<span class="tkshare"><span class="tkav">S</span>💌 Shared with Sarah</span>` : ''}${todoStatBtn(t)}${t.done ? '' : todoCalBtn(t)}<button type="button" class="paybtn tkdone" onclick="tick('${t.id}')">${t.done ? '↩️ Undo' : '✅ Done!'}</button></div></div></div>`);
