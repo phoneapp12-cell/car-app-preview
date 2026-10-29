@@ -5847,7 +5847,7 @@ function cmpOpenTodo(a, b) {
   // 2.28.73: High priority at the top, then most days overdue first, then due soonest, then oldest
   return todoPriRank(a) - todoPriRank(b)
     || todoOverdueDays(b) - todoOverdueDays(a)
-    || (a.due ? parseD(a.due) : 9e15) - (b.due ? parseD(b.due) : 9e15)
+    || (a.due ? daysLeft(a.due) : 1e9) - (b.due ? daysLeft(b.due) : 1e9)
     || (+a.created || 0) - (+b.created || 0);
 }
 function todoListEmoji(l) {
