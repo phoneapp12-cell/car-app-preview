@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.73';
+const APP_VERSION = '2.28.74';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -167,6 +167,7 @@ function normalise(d) {
   return d;
 }
 async function save() { try { _cuCache = null; _bellSigsMemo = null; _mbCache = null; } catch (e) {}
+  try { sweepShopTodos(); } catch (e) { }
   S.updatedAt = new Date().toISOString();
   try { sharedNote(); } catch (e) { }
   try { await kvSet('data', S); } catch (e) { toast('Sorry, that couldn’t be saved on this phone.'); throw e; }
@@ -5960,7 +5961,33 @@ function todoPriMark(t) {
   return p === 'high' ? ' · 🔥 High' : p === 'low' ? ' · 🌿 Chill' : ' · ⭐ Normal';
 }
 function todoMetaDedupe(h) { return String(h).replace(/( · in your calendar)+/g, ' · in your calendar'); } // 2.26.22
+/* 2.28.74: the To-do "Shopping" list and the Shopping page are one list. Shane's own shopping to-dos become
+   shopping items (same id, so Sarah sharing carries on), and the To-do Shopping tab shows the Shopping page's items. */
+const isShopListName = l => /^(shopping|groceries|grocery)$/i.test(String(l || '').trim());
+function sweepShopTodos() {
+  if (!S || !S.shop || !Array.isArray(S.shop.items) || !Array.isArray(S.todos)) return 0;
+  const mv = S.todos.filter(t => t && !t.done && !isSarahTodo(t) && isShopListName(t.list) && String(t.title || '').trim());
+  if (!mv.length) return 0;
+  const open = new Map(S.shop.items.filter(x => !x.done).map(x => [mNorm(x.name), x]));
+  mv.forEach((t, n) => {
+    const name = shopName(t.title) || String(t.title).trim(), k = mNorm(name), had = open.get(k);
+    if (had) { if (t.sharedS && !had.sharedS && !isSarahShop(had)) had.sharedS = true; return; }
+    const it = { id: t.id, name: name.slice(0, 120), done: false, created: t.created || (Date.now() + n), meals: t.notes && /^For /.test(t.notes) ? t.notes.slice(4).split(', ') : [] };
+    if (t.brand) it.brand = t.brand; if (t.sharedS) it.sharedS = true; if (t.notes && !/^For /.test(t.notes)) it.notes = t.notes;
+    S.shop.items.push(it); open.set(k, it);
+  });
+  const ids = new Set(mv.map(t => t.id)); S.todos = S.todos.filter(t => !ids.has(t.id));
+  return mv.length;
+}
+function todoShopBlock(full) {
+  const items = (S.shop && S.shop.items) || [], open = items.filter(x => !x.done).sort((a, b) => (a.created || 0) - (b.created || 0)), got = items.filter(x => x.done);
+  if (!full) return open.length ? `<div class="sec">🛒 Shopping list (${open.length} to get) <button onclick="go('#shopping')">Open</button></div><div class="list">${open.slice(0, 6).map(shopRow).join('')}</div>${open.length > 6 ? `<button class="linkbtn" style="margin:4px 4px 12px;color:var(--brand);font-weight:600" onclick="setTodoFilter(${jsArg(S.lists.find(isShopListName) || 'Shopping')})">See all ${open.length} shopping items</button>` : ''}` : '';
+  return `<p class="muted" style="margin:0 4px 10px">🛒 This is the same list as your Shopping page. Anything added or ticked here shows there too, and with Sarah if it’s shared.</p>` +
+    (open.length ? `<div class="list">${open.map(shopRow).join('')}</div>` : '<div class="card empty"><div class="t">🎉 Shopping list is clear</div><div class="s">Type an item above and tap + to add it.</div></div>') +
+    (got.length ? `<div class="sec">✅ Got (${got.length}) <button onclick="go('#shopping')">Open Shopping</button></div><div class="list">${got.slice(-10).reverse().map(shopRow).join('')}</div>` : '');
+}
 function Todo() {
+  try { if (sweepShopTodos()) save(); } catch (e) { }
   if (todoFilter !== 'All' && !S.lists.includes(todoFilter)) todoFilter = 'All';
   sweepIdeaSteps(); // 2.22.4: open to-dos that match get their checklist
   const vis = S.todos.filter(t => todoFilter === 'All' || t.list === todoFilter);
@@ -5989,13 +6016,14 @@ function Todo() {
     <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="✨ Jot down a to-do${todoFilter !== 'All' ? ' for ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="todoshare"> 💌 Also add to Sarah’s list</label>
     ${todoTodayProg()}${todoListProg(todoFilter)}
-    ${open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">🎉 All done — good as gold!</div><div class="s">Everything on this list is ticked off. Enjoy a breather! ☕</div></div>' : empty('✨ Nothing on your list yet', 'Pop a task in the box above and tap +, or add one with a due date.', '➕ Add a to-do', 'todoForm()'))}
-    ${done.length ? `<div class="sec">🎉 Ticked Off (${done.length}) <button onclick="clearDone()">🧹 Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}</div>`;
+    ${isShopListName(todoFilter) ? todoShopBlock(true) : (open.length ? `<div class="list">${open.map(openRow).join('')}</div>` : (S.todos.length ? '<div class="card empty"><div class="t">🎉 All done — good as gold!</div><div class="s">Everything on this list is ticked off. Enjoy a breather! ☕</div></div>' : empty('✨ Nothing on your list yet', 'Pop a task in the box above and tap +, or add one with a due date.', '➕ Add a to-do', 'todoForm()')))}${todoFilter === 'All' ? todoShopBlock(false) : ''}
+    ${done.length && !isShopListName(todoFilter) ? `<div class="sec">🎉 Ticked Off (${done.length}) <button onclick="clearDone()">🧹 Clear done</button></div><div class="list">${done.map(row).join('')}</div>` : ''}</div>`;
 }
 function setTodoFilter(l) { todoFilter = l; render(); }
 async function quickAdd(e) {
   e.preventDefault();
   const v = $('#newtodo').value.trim(); if (!v) return;
+  if (isShopListName(todoFilter)) { const share = !!($('#todoshare') && $('#todoshare').checked); const before = new Set(S.shop.items.map(x => x.id)); const n = addToShop(v.split(/\s*[,\n]\s*/)); if (share) S.shop.items.forEach(x => { if (!before.has(x.id)) x.sharedS = true; }); await save(); render(); try { wwSoon(); } catch (e) { } const el = $('#newtodo'); if (el) el.focus(); toast(n ? `Added ${plural(n, 'item')} to your shopping list.` : 'That’s already on your shopping list.'); return; }
   const td = { id: uid('todo'), title: v, list: todoFilter === 'All' ? S.lists[0] : todoFilter, due: '', notes: '', priority: 'normal', done: false, created: Date.now() };
   const share = !!($('#todoshare') && $('#todoshare').checked);
   if (share) { td.sharedS = true; td.sharedList = 'Home'; }
