@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.86';
+const APP_VERSION = '2.28.87';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11897,6 +11897,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
   books: ['book', 'blog', 'Kindle books', 'Books'], // 2.28.83
+  freemovies: ['play', 'vid', 'Free movies', 'Free movies'], // 2.28.87
   photos: ['image', 'blog', 'Photos', 'Photos'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
@@ -11944,7 +11945,7 @@ const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'countdown', 'diary', 'notes', 'photos'] },
   { id: 'people', title: 'Health', keys: ['watch', 'sleep', 'gym', 'health', 'meds', 'claims', 'birthdays', 'about'] },
   { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'bus', 'planning', 'parlbills', 'garden', 'events', 'news'] },
-  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
+  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'freemovies', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
   { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
   { id: 'cars', title: 'Cars & Pets', keys: ['cars', 'fuel', 'pets'] }
@@ -21756,7 +21757,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { books: () => BooksPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { books: () => BooksPage(), freemovies: () => FreeMoviesPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -24017,6 +24018,7 @@ function glTiles() {
   const add = (k, cat, title, fn, art, grad, go) => { try { const s = fn(); if (s && glOk(s) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(String(s))) T.push({ k, cat, title, s: String(s).slice(0, 70), art, grad, go }); } catch (e) { } };
   add('netflix', 'watch', 'New on Netflix', () => { const f = NF && mailConnected('microsoft') ? (NF.fresh || []) : []; return f.length ? f.slice(0, 2).map(x => x.title).join(', ') : ''; }, B('ideas'), '', "go('#netflix')");
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#prime')");
+  add('freemovies', 'watch', 'Free movies on demand', () => FM_SRC.length + ' free sources · comedies first', 'i3-tv', ['#16a34a', '#1e3a8a'], "go('#freemovies')"); // 2.28.87
   add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
   add('videos', 'watch', 'Videos', () => { let t = ''; try { const sv = currentSarahVideo(); const l = preferFilmVideoTitles(videoSuggestions() || []); const v = (sv ? [sv] : []).concat(l || []).find(x => x && x.title && glOk(x.title) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(x.title)); t = v ? v.title : ''; } catch (e) { } return t || 'Your video categories'; }, B('tv'), '', "go('#videos')");
   add('top40', 'listen', 'Top 40 NZ', () => { const t = (typeof TOP40 !== 'undefined' && TOP40[0]) || null; return t ? '#1 ' + t.title + ' · ' + t.artist : 'This week’s NZ chart'; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
@@ -24087,7 +24089,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
+const MEDIA_TILES = new Set(['freemovies', 'livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
@@ -37391,6 +37393,34 @@ const KINDLE_BOOKS = [
 ].map(([title, author, st, note]) => ({ title, author, st, note: note || '' }));
 const KB_ST = { reading: ['📖', 'Reading now'], started: ['📖', 'Started'], read: ['✅', 'Finished'], own: ['📚', 'In your library'], sample: ['🔖', 'Sample'] };
 function kindleOpen(t) { const q = encodeURIComponent(t || ''); window.open('https://read.amazon.com/kindle-library?query=' + q, '_blank', 'noopener'); }
+/* 2.28.87: Free on-demand movies (#freemovies). Legal, free-in-NZ sources only. Comedies lead; no sport titles.
+   Per-title links only where the title page itself was checked (Internet Archive public-domain films, NZ On Screen docos).
+   TVNZ+ and ThreeNow titles were read off their NZ movie pages on 30 Oct 2026; tapping opens that service's movie page. */
+const FM_SRC = [
+  { k: 'tvnz', n: 'TVNZ+', ic: '📺', u: 'https://www.tvnz.co.nz/movies', s: 'Free with a TVNZ+ account, with ads. A few new releases are paid rentals, so skip anything marked Rental Pass.',
+    t: ["Sione's Wedding", "Sione's 2: Unfinished Business", 'Step Brothers', 'Mr Deeds', 'Big Daddy', 'Miss Congeniality', 'Bridget Jones\u2019s Diary', 'My Big Fat Greek Wedding', 'Two Weeks Notice', 'Hitch', 'Men In Black', 'Alien Addiction', 'The Pā Boys', 'Whale Rider', 'Smash Palace', 'Sleeping Dogs', 'Charlie And The Chocolate Factory', 'Chitty Chitty Bang Bang'] },
+  { k: 'three', n: 'ThreeNow', ic: '3️⃣', u: 'https://www.threenow.co.nz/categories/movie', s: 'Free with ads, no subscription.',
+    t: ['Grown Ups', 'Grown Ups 2', 'Guess Who', 'What Happens in Vegas', 'The Bounty Hunter', 'Superhero Movie', 'Knight and Day', 'Fantastic Mr. Fox', 'Scooby-Doo', 'Lock, Stock and Two Smoking Barrels', 'Birdman', 'Miss Potter', 'Empire Records'] },
+  { k: 'beama', n: 'Beamafilm (Whangārei library)', ic: '📚', u: 'https://www.wdc.govt.nz/library/Explore/The-library/eLibrary/eMovies', s: 'Free and ad-free with your Whangārei District Libraries card. Movies, documentaries and NZ films.' },
+  { k: 'plex', n: 'Plex Free Movies', ic: '🟧', u: 'https://watch.plex.tv/movies-and-shows', s: 'Free with ads, no account needed. Plex shows its NZ catalogue, which changes each month.' },
+  { k: 'tubi', n: 'Tubi', ic: '🟪', u: 'https://tubitv.com/category/comedy', s: 'Free with ads. Opens on the comedy shelf; what\u2019s there depends on Tubi\u2019s NZ catalogue.' },
+  { k: 'nzos', n: 'NZ On Screen', ic: '🥝', u: 'https://www.nzonscreen.com/', s: 'Thousands of free Kiwi TV shows and documentaries. Its feature films are rentals ($6.99), the docos below are free.',
+    l: [['Cinema of Unease (Sam Neill)', 1995, 'https://www.nzonscreen.com/title/cinema-of-unease-1995'], ['Dirty Bloody Hippies', 2009, 'https://www.nzonscreen.com/title/dirty-bloody-hippies-2009'], ['Catching the Tide: Sam Hunt\u2019s Cook Strait', 1988, 'https://www.nzonscreen.com/title/catching-the-tide-sam-hunts-cook-strait-1988']] },
+  { k: 'ia', n: 'Internet Archive classics', ic: '🎞️', u: 'https://archive.org/details/feature_films', s: 'Old public-domain films, free and legal anywhere. Comedies first.',
+    l: [['His Girl Friday', 1940, 'his_girl_friday'], ['Charlie Chaplin Festival', 1938, 'charlie_chaplin_film_fest'], ['The Flying Deuces (Laurel & Hardy)', 1939, 'TheFlyingDeuces'], ['My Favorite Brunette (Bob Hope)', 1947, 'my_favorite_brunette'], ['Africa Screams (Abbott & Costello)', 1949, 'AfricaScreams'], ['Disorder in the Court (Three Stooges)', 1936, 'disorder_in_the_court'], ['Topper Returns', 1941, 'Topper_Returns_41'], ['Nothing Sacred', 1937, 'NothingSacred'], ['The Inspector General (Danny Kaye)', 1949, 'the_inspector_general'], ['McLintock! (John Wayne)', 1963, 'mclintok_widescreen'], ['Meet John Doe', 1941, 'meet_john_doe'], ['Penny Serenade', 1941, 'penny_serenade'], ['Royal Wedding', 1951, 'royal_wedding'], ['Pygmalion', 1938, 'Pygmalion']].map(x => [x[0], x[1], 'https://archive.org/details/' + x[2]]) },
+  { k: 'kanopy', n: 'Kanopy (Far North library card)', ic: '🎬', u: 'https://www.fndc.govt.nz/Services/Libraries/our-elibrary/movies', s: 'Free with a Far North District Libraries card, 5 films a month. Whangārei libraries use Beamafilm instead.' }
+];
+const fmOpen = u => `window.open('${esc(u).replace(/'/g, '%27')}','_blank','noopener')`;
+function FreeMoviesPage() {
+  const back = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>`;
+  const card = x => {
+    const titles = x.t ? `<div class="list">${x.t.map(t => `<button type="button" class="row" onclick="hab('tap:freemovies',${esc(JSON.stringify(x.n))});${fmOpen(x.u)}"><div class="ic">${x.ic}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">Opens ${esc(x.n)} movies</div></div></button>`).join('')}</div>` : '';
+    const links = x.l ? `<div class="list">${x.l.map(([t, y, u]) => `<button type="button" class="row" onclick="hab('tap:freemovies',${esc(JSON.stringify(x.n))});${fmOpen(u)}"><div class="ic">${x.ic}</div><div class="tx"><div class="t">${esc(t)}</div><div class="s">${y} · watch free</div></div></button>`).join('')}</div>` : '';
+    return `<div class="sec"><span class="sechead">${x.ic} ${esc(x.n)}</span><a href="javascript:void 0" onclick="${fmOpen(x.u)}">Open ›</a></div><div class="s muted" style="margin:0 4px 8px">${esc(x.s)}</div>` + titles + links + (!x.t && !x.l ? `<button type="button" class="btn small" style="margin:0 0 12px" onclick="${fmOpen(x.u)}">Open ${esc(x.n)}</button>` : '');
+  };
+  return back + header('Free movies on demand', 'Legal and free in NZ · comedies first') + FM_SRC.map(card).join('')
+    + `<div class="s muted" style="margin:12px 4px">TVNZ+ and ThreeNow titles were checked on their NZ movie pages on 30 Oct 2026 and change often. Tubi and Plex catalogues vary by country, so those open their own pages.</div>`;
+}
 function BooksPage() {
   const grp = [['Reading', x => x.st === 'reading' || x.st === 'started'], ['Finished', x => x.st === 'read'], ['In your library', x => x.st === 'own'], ['Samples', x => x.st === 'sample']];
   const row = b => `<button type="button" class="row" onclick="kindleOpen(${esc(JSON.stringify(b.title))})"><div class="ic">${KB_ST[b.st][0]}</div><div class="tx"><div class="t">${esc(b.title)}</div><div class="s">${esc([b.author, b.note || KB_ST[b.st][1]].filter(Boolean).join(' · '))}</div></div></button>`;
