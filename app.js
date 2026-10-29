@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.85';
+const APP_VERSION = '2.28.86';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -16225,7 +16225,30 @@ function musHtml() {
     homeSec('Similar picks', '<span class="muted" style="font-size:12px">New set each week</span>') + `<div class="list" id="muspicks">${musPicks().map(musRow).join('')}</div>`;
 }
 const T40_KEY = 'top40Board';
-let t40Cur = { idx: 0, mode: 'video', autoPlay: false, custom: null, preview: {} };
+let t40Cur = { idx: 0, mode: 'video', autoPlay: false, custom: null, preview: {}, queue: null, shuffle: localStorage.getItem('t40Shuffle') === '1', autoNext: localStorage.getItem('t40AutoNext') !== '0' };
+/* 2.28.86: full songs. A song with no YouTube video linked used to fall back to Apple's 30-second preview. Now the
+   player looks the song up on YouTube (through the relay's /videos search) and plays the whole thing. The preview is
+   only used if no video is found, and is labelled as a 30-second preview. */
+const t40YtCache = () => { try { return JSON.parse(localStorage.getItem('t40YtV1') || '{}') || {}; } catch (e) { return {}; } };
+const t40YtBusy = new Set();
+function t40YtFor(t) { if (!t) return ''; if (/^[A-Za-z0-9_-]{11}$/.test(t.id || '')) return t.id; const v = t40YtCache()[(t.title + '|' + t.artist).toLowerCase()]; return v && v.id ? v.id : ''; }
+async function t40FindYt(t) {
+  const k = (t.title + '|' + t.artist).toLowerCase(); const c = t40YtCache();
+  if (c[k] && (c[k].id || Date.now() - c[k].at < 864e5)) return c[k].id || '';
+  if (t40YtBusy.has(k)) return ''; t40YtBusy.add(k);
+  try {
+    const clean = x => String(x || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/\(.*?\)|\[.*?\]/g, ' ').replace(/[^A-Za-z0-9 '&+.,-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const q = (clean(t.title) + ' ' + clean(t.artist)).slice(0, 66).trim() + ' official audio';
+    const r = await fetch(RELAY_URL + '/videos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: q.replace(/^[^A-Za-z0-9]+/, '') }), cache: 'no-store' });
+    const j = r.ok ? await r.json() : {}; const v = (Array.isArray(j.videos) ? j.videos : []).find(x => x && /^[A-Za-z0-9_-]{11}$/.test(x.id || ''));
+    const c2 = t40YtCache(); c2[k] = { id: v ? v.id : '', at: Date.now() }; localStorage.setItem('t40YtV1', JSON.stringify(c2));
+    return v ? v.id : '';
+  } catch (e) { return ''; } finally { t40YtBusy.delete(k); }
+}
+function t40YtFrameLoad(f) { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 't40' }), '*'); } catch (e) { } }
+window.addEventListener('message', e => { try { if (!/youtube/.test(e.origin)) return; const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; const st = d && (d.event === 'onStateChange' ? d.info : d.info && d.info.playerState); if (st === 0 && t40Cur.autoNext && document.getElementById('t40player')) { t40Cur._endAt = t40Cur._endAt || 0; if (Date.now() - t40Cur._endAt > 4000) { t40Cur._endAt = Date.now(); t40Step(1); } } } catch (er) { } });
+function t40ToggleShuffle() { t40Cur.shuffle = !t40Cur.shuffle; localStorage.setItem('t40Shuffle', t40Cur.shuffle ? '1' : '0'); t40RedrawPlayer(); toast(t40Cur.shuffle ? 'Shuffle is on.' : 'Shuffle is off.'); }
+function t40ToggleAutoNext() { t40Cur.autoNext = !t40Cur.autoNext; localStorage.setItem('t40AutoNext', t40Cur.autoNext ? '1' : '0'); t40RedrawPlayer(); }
 function t40Get() {
   let o = null; try { o = JSON.parse(localStorage.getItem(T40_KEY) || 'null'); } catch (e) { }
   if (!o || typeof o !== 'object') o = {};
@@ -16268,24 +16291,26 @@ async function t40EnsurePreview(t) {
 function t40PlayerHtml() {
   const t = t40NowTrack(); if (!t) return '';
   const fav = t40IsFav(t), k = (t.title + '|' + t.artist).toLowerCase(), pv = t40Cur.preview[k];
-  const hasYt = /^[A-Za-z0-9_-]{11}$/.test(t.id || '');
-  const mode = !hasYt ? 'audio' : t40Cur.mode;
+  const ytId = t40YtFor(t), hasYt = !!ytId, ytKey = (t.title + '|' + t.artist).toLowerCase(), ytC = t40YtCache()[ytKey];
+  const ytLooking = !hasYt && !(ytC && Date.now() - ytC.at < 864e5);
+  if (ytLooking) setTimeout(() => { t40FindYt(t).then(id => { if (id) t40RedrawPlayer(); else { t40Cur.preview[ytKey] = undefined; t40RedrawPlayer(); } }); }, 0);
+  const mode = hasYt ? 'video' : 'audio';
   let screen = '';
   if (mode === 'video' && hasYt) {
     if (t40Cur.autoPlay) {
-      screen = `<iframe src="https://www.youtube-nocookie.com/embed/${esc(t.id)}?autoplay=1&playsinline=1&rel=0" title="${esc(t.title)}" style="width:100%;height:100%;border:0;display:block" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+      screen = `<iframe onload="t40YtFrameLoad(this)" src="https://www.youtube-nocookie.com/embed/${esc(ytId)}?autoplay=1&playsinline=1&rel=0&enablejsapi=1" title="${esc(t.title)}" style="width:100%;height:100%;border:0;display:block" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
     } else {
       screen = `<button type="button" onclick="t40Cur.autoPlay=true;t40RedrawPlayer()" style="width:100%;height:100%;border:0;padding:0;background:#000;position:relative;cursor:pointer;display:block" aria-label="Play ${esc(t.title)}">
-        <img src="https://i.ytimg.com/vi/${esc(t.id)}/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;opacity:.88">
+        <img src="https://i.ytimg.com/vi/${esc(ytId)}/hqdefault.jpg" alt="" style="width:100%;height:100%;object-fit:cover;display:block;opacity:.88">
         <span style="position:absolute;inset:0;display:grid;place-items:center"><span style="width:62px;height:62px;border-radius:50%;background:rgba(220,38,38,.92);color:#fff;display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.45)"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></span></span>
       </button>`;
     }
   } else {
-    if (pv === undefined) setTimeout(() => { t40EnsurePreview(t).then(() => t40RedrawPlayer()); }, 0);
-    const art = (pv && pv.art) || (hasYt ? `https://i.ytimg.com/vi/${esc(t.id)}/hqdefault.jpg` : '');
+    if (pv === undefined && !ytLooking) setTimeout(() => { t40EnsurePreview(t).then(() => t40RedrawPlayer()); }, 0);
+    const art = (pv && pv.art) || (hasYt ? `https://i.ytimg.com/vi/${esc(ytId)}/hqdefault.jpg` : '');
     screen = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;background:linear-gradient(145deg,#1e1b4b,#0f172a);color:#fff;text-align:center;box-sizing:border-box">
       ${art ? `<img src="${esc(art)}" alt="" style="width:92px;height:92px;border-radius:14px;object-fit:cover;box-shadow:0 6px 20px rgba(0,0,0,.4);margin-bottom:10px">` : `<div style="font-size:2.2rem;margin-bottom:8px">🎵</div>`}
-      ${pv && pv.audio ? `<audio id="t40audio" controls ${t40Cur.autoPlay ? 'autoplay' : ''} src="${esc(pv.audio)}" style="width:min(100%,340px);height:38px" onended="if(t40Cur.autoNext)t40Step(1)"></audio>` : `<div class="s" style="color:#cbd5e1;margin-bottom:8px">${pv === undefined ? 'Loading audio preview…' : 'No preview clip — tap YouTube Music below to listen'}</div>`}
+      ${ytLooking ? `<div class="s" style="color:#cbd5e1;margin-bottom:8px">Finding the full song…</div>` : pv && pv.audio ? `<div class="s" style="color:#fbbf24;font-size:.75rem;margin-bottom:6px">Full song not found, so this is a 30-second preview. Tap YouTube Music below for the whole song.</div><audio id="t40audio" controls ${t40Cur.autoPlay ? 'autoplay' : ''} src="${esc(pv.audio)}" style="width:min(100%,340px);height:38px" onended="if(t40Cur.autoNext)t40Step(1)"></audio>` : `<div class="s" style="color:#cbd5e1;margin-bottom:8px">${pv === undefined ? 'Loading audio preview…' : 'No preview clip — tap YouTube Music below to listen'}</div>`}
     </div>`;
   }
   const badge = t.rank ? `#${t.rank} NZ TOP 40` : (t.tag || 'YOUR MUSIC');
@@ -16294,7 +16319,7 @@ function t40PlayerHtml() {
       <span class="tblbl" style="background:#e11d48;font-size:.72rem;padding:3px 9px">${esc(badge)}</span>
       <div style="display:flex;gap:6px">
         ${hasYt ? `<button type="button" class="chip ${mode === 'video' ? 'on' : ''}" style="padding:4px 10px;font-size:.75rem" onclick="t40SetMode('video')">🎬 Video</button>` : ''}
-        <button type="button" class="chip ${mode === 'audio' ? 'on' : ''}" style="padding:4px 10px;font-size:.75rem" onclick="t40SetMode('audio')">🎧 Audio</button>
+        
         <button type="button" class="chip ${fav ? 'on' : ''}" style="padding:4px 10px;font-size:.75rem" onclick="t40ToggleFav()" aria-label="Save favourite">${fav ? '★ Saved' : '☆ Save'}</button>
       </div>
     </div>
@@ -16313,8 +16338,8 @@ function t40PlayerHtml() {
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button type="button" class="btn small" style="background:rgba(37,99,235,.85);color:#fff;border:0;font-weight:700" onclick="openAudioOutputPicker('Top 40')">🔊 Bluetooth / Output</button>
       <button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="musOpen(${jsArg(t.title)},${jsArg(t.artist)})">🎵 YouTube Music</button>
-      ${hasYt ? `<button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="vbTv(${jsArg(t.id)})">📺 Cast to TV</button>` : ''}
-      ${mode === 'audio' ? `<button type="button" class="btn small ${t40Cur.autoNext ? 'primary' : ''}" style="${t40Cur.autoNext ? '' : 'background:rgba(255,255,255,.12);color:#fff;border:0'}" onclick="t40Cur.autoNext=!t40Cur.autoNext;t40RedrawPlayer()">🔁 Auto-next: ${t40Cur.autoNext ? 'On' : 'Off'}</button>` : ''}
+      ${hasYt ? `<button type="button" class="btn small" style="background:rgba(255,255,255,.12);color:#fff;border:0" onclick="vbTv(${jsArg(ytId)})">📺 Cast to TV</button>` : ''}
+      <button type="button" class="btn small ${t40Cur.shuffle ? 'primary' : ''}" style="${t40Cur.shuffle ? '' : 'background:rgba(255,255,255,.12);color:#fff;border:0'}" onclick="t40ToggleShuffle()">🔀 Shuffle: ${t40Cur.shuffle ? 'On' : 'Off'}</button><button type="button" class="btn small ${t40Cur.autoNext ? 'primary' : ''}" style="${t40Cur.autoNext ? '' : 'background:rgba(255,255,255,.12);color:#fff;border:0'}" onclick="t40ToggleAutoNext()">🔁 Auto-next: ${t40Cur.autoNext ? 'On' : 'Off'}</button>
     </div>
   </div>`;
 }
@@ -16342,14 +16367,22 @@ function t40PlayCustom(title, artist, tag, ytId) {
   const match = TOP40.findIndex(x => x.title.toLowerCase() === String(title || '').toLowerCase());
   if (match >= 0) { t40PlayRank(TOP40[match].rank); return; }
   t40Cur.custom = { id: ytId || '', rank: null, title, artist, tag: tag || 'YOUR MUSIC' };
+  { const F = t40Get().favs, k = (title + '|' + artist).toLowerCase(); t40Cur.queue = F.some(x => (x.title + '|' + x.artist).toLowerCase() === k) ? F.slice() : null; }
   t40Cur.autoPlay = true;
   t40EnsurePreview(t40Cur.custom).then(() => t40RedrawPlayer());
   t40Redraw();
   try { document.getElementById('t40player')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) { }
 }
 function t40Step(dir) {
+  const Q = t40Cur.queue;
+  if (t40Cur.custom && Q && Q.length > 1) { // playing from your favourites: stay in them
+    let i = Q.findIndex(x => (x.title + '|' + x.artist).toLowerCase() === (t40Cur.custom.title + '|' + t40Cur.custom.artist).toLowerCase());
+    if (t40Cur.shuffle && dir > 0) { let n = i; while (n === i) n = Math.floor(Math.random() * Q.length); i = n; } else i = (i + dir + Q.length) % Q.length;
+    const x = Q[i]; t40Cur.custom = { id: x.id || '', rank: null, title: x.title, artist: x.artist, tag: t40Cur.custom.tag || 'YOUR MUSIC' }; t40Cur.autoPlay = true; t40Redraw(); return;
+  }
   t40Cur.custom = null;
-  t40Cur.idx = (t40Cur.idx + dir + TOP40.length) % TOP40.length;
+  if (t40Cur.shuffle && dir > 0 && TOP40.length > 1) { let n = t40Cur.idx; while (n === t40Cur.idx) n = Math.floor(Math.random() * TOP40.length); t40Cur.idx = n; }
+  else t40Cur.idx = (t40Cur.idx + dir + TOP40.length) % TOP40.length;
   t40Cur.autoPlay = true;
   if (t40Cur.mode === 'audio') t40EnsurePreview(TOP40[t40Cur.idx]);
   t40Redraw();
