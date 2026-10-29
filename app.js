@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.78';
+const APP_VERSION = '2.28.79';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -35400,7 +35400,7 @@ function itvTimelineGuideHtml(filteredChans, allChans) {
     return `<div class="card" style="margin:0 0 10px;padding:10px 12px;background:linear-gradient(135deg,#0f172a,#1e3a8a 60%,#0f766e);color:#fff;border:none;border-radius:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
         <div style="font-size:.82rem;font-weight:900;letter-spacing:.03em">🎯 SUGGESTED FOR YOU ON INTERNET TV RIGHT NOW</div>
-        <button type="button" class="chip" style="padding:2px 9px;font-size:.7rem;background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.3)" onclick="itvSetEpgGenre(itvEpgGenreFilt==='suggested'?'all':'suggested')">${itvEpgGenreFilt === "suggested" ? "Show All Channels" : "Filter Grid to Suggested (12)"}</button>
+        <button type="button" class="chip" style="padding:2px 9px;font-size:.7rem;background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.3)" onclick="itvSetEpgGenre(itvEpgGenreFilt==='suggested'?'all':'suggested')">${itvEpgGenreFilt === "suggested" ? "Show All Channels" : `Filter Grid to Suggested (${SHANE_ITV_FAV_CHANNELS.length})`}</button>
       </div>
       <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">
         ${picks.map(pk => `<div style="min-width:215px;max-width:240px;flex-shrink:0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 10px">
@@ -36728,7 +36728,13 @@ if (!window.__MOVING) start();
 /* ================= 2.28.71: SUGGESTED INTERNET TV FOR SHANE, EXTRA NOTIFICATION CARDS, ONERAHI BUS TIMETABLE (#bus) & SELECT COMMITTEE BILLS (#parlbills) ================= */
 
 const SHANE_ITV_FAV_CHANNELS = [
-  { id: "mythbusters", reason: "🔨 Hands-on workshop builds, testing & engineering experiments", badge: "🎯 Top Pick for You · DIY & Science" },
+  { id: "the-conners", reason: "😂 Back-to-back episodes of the working-class family sitcom", badge: "🎯 Top Pick for You · Sitcom" },
+  { id: "nbc-comedy-vault", reason: "📺 Classic NBC sitcoms and comedy series", badge: "🎯 Pick for You · Classic Sitcoms" },
+  { id: "anger-management", reason: "😂 Charlie Sheen's Anger Management, back to back", badge: "🎯 Pick for You · Sitcom" },
+  { id: "laff-tv", reason: "😂 Modern sitcoms and comedy movies", badge: "🎯 Pick for You · Sitcoms" },
+  { id: "filmrise-classictv", reason: "📺 Retro sitcoms and classic TV favourites", badge: "🎯 Pick for You · Retro Sitcoms" },
+  { id: "humor-mill", reason: "😂 Sitcoms, comedy club specials and funny films", badge: "🎯 Pick for You · Sitcoms & Stand-Up" },
+  { id: "mythbusters", reason: "🔨 Hands-on workshop builds, testing & engineering experiments", badge: "🎯 Pick for You · DIY & Science" },
   { id: "powernation-cars", reason: "🚗 Engine builds, classic 4x4 restorations & garage diagnostics", badge: "🎯 Pick for You · Cars & Workshop" },
   { id: "rush-nz", reason: "🔧 Wheeler Dealers car restorations, Gold Rush & heavy engineering", badge: "🎯 Pick for You · Cars & Engineering" },
   { id: "drybar-comedy", reason: "😂 Clean, clever stand-up comedy specials — great evening laugh", badge: "🎯 Pick for You · Stand-Up Comedy" },
