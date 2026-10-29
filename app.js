@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.84';
+const APP_VERSION = '2.28.85';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5087,16 +5087,26 @@ const sarahBadge = t => isSarahTodo(t) ? '<span class="sbadge" title="Added by S
 // (no pink S, just "shared with Sarah"); on her list it has a blue S. Nothing else of yours is sent.
 const isMineShared = t => !!(t && t.sharedS && t.from !== 'sarah');
 const sharedMark = t => isMineShared(t) ? ' · shared with Sarah' : '';
-const mineTodoView = t => ({ id: t.id, title: t.title, list: t.sharedList || 'Home', due: t.due || '', notes: t.notes || '', priority: todoPriority(t), done: !!t.done, doneAt: t.doneAt, created: t.created, by: 'shane', _todo: t });
+/* 2.28.85: shared lists. A list shared with Sarah travels as a small marker item (list '#lists') so it shows in her
+   app too, and her lists show here. To-dos you add to a shared list go to her list of the same name. */
+const LST = '#lists';
+const listSlug = n => { const b = String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40); let h = 0; for (const c of String(n || '').toLowerCase()) h = (h * 31 + c.codePointAt(0)) >>> 0; return 'lst-' + (b || h.toString(36)); };
+const shLists = () => { S.settings.shLists = Array.isArray(S.settings.shLists) ? S.settings.shLists : []; return S.settings.shLists; };
+const listIsShared = l => !!l && (S.lists || []).includes(l) && !isShopListName(l) && shLists().includes(l);
+function setListShared(l, on) { const a = shLists().filter(x => x !== l && (S.lists || []).includes(x)); if (on) a.push(l); S.settings.shLists = a; }
+let lstDrop = new Set();
+const mineTodoView = t => ({ id: t.id, title: t.title, list: listIsShared(t.list) ? t.list : (t.sharedList || 'Home'), due: t.due || '', notes: t.notes || '', priority: todoPriority(t), done: !!t.done, doneAt: t.doneAt, created: t.created, by: 'shane', _todo: t });
 const SH = {
   state: () => { S.settings.shared = S.settings.shared && typeof S.settings.shared === 'object' ? S.settings.shared : {}; return S.settings.shared; },
-  items: () => [...(S.todos || []).filter(isSarahTodo), ...(S.todos || []).filter(isMineShared).map(mineTodoView),
+  items: () => [...(S.todos || []).filter(t => { if (t && !t.from && !t.sharedS && listIsShared(t.list)) t.sharedS = true; return isSarahTodo(t); }), ...(S.todos || []).filter(isMineShared).map(mineTodoView),
+    ...(S.lists || []).filter(listIsShared).map(l => ({ id: listSlug(l), title: l, list: LST, due: '', notes: '', priority: 'normal', done: false, created: 1, by: 'shane', _lst: l })),
     ...((S.shop && S.shop.items) || []).filter(x => isSarahShop(x) || isMineShared(x)).map(sarahShopView),
     ...(S.appts || []).filter(a => a && a.from === 'sarah').map(sarahApptView),
     ...(S.appts || []).filter(apptForSarah).map(mineApptView), ...healthSarahItems().map(healthApptView)],
   by: t => (t && t.by) || (isSarahTodo(t) ? 'sarah' : 'shane'),
   want: () => true,
   add: x => {
+    if (x.list === LST) { const l = String(x.title || '').trim(); if (!l || l === 'All' || isShopListName(l)) return; const have = (S.lists || []).find(y => y.toLowerCase() === l.toLowerCase()); if (!have) S.lists.push(l); setListShared(have || l, true); lstDrop.delete(listSlug(have || l)); return; }
     const mine = x.by === 'shane';
     if (x.list === 'Appointments' && mine) { // 2.24.2: one of his shared to Sarah that came back (restored): put it back here
       const ap = x.appt || {};
@@ -5109,20 +5119,24 @@ const SH = {
       S.appts.push(row); return; }
     if (x.list === 'Appointments' && !mine) { S.appts.push(sarahApptFrom(x)); return; } // 2.23.17: her doctor/dentist appointments go in the calendar
     if (isSarahShopList(x.list)) { const it = sarahShopItem(x); if (mine) { delete it.from; it.sharedS = true; } S.shop.items.push(it); return; }
-    if (mine) { S.todos.push({ id: x.id, title: x.title, list: (S.lists && S.lists[0]) || 'To-do', sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), sharedS: true }); return; }
+    if (mine) { S.todos.push({ id: x.id, title: x.title, list: listIsShared(x.list) ? x.list : (S.lists && S.lists[0]) || 'To-do', sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), sharedS: true }); return; }
     S.todos.push({ id: x.id, title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done, doneAt: x.done ? x.doneAt || Date.now() : undefined, created: x.created || Date.now(), from: 'sarah' }); },
   update: (t, x) => {
+    if (t._lst) return;
     if (t._appt) { Object.assign(t._appt, sarahApptFrom(x), { id: t._appt.id }); return; }
     if (t._mine || t._hitem) { const ap = x.appt || {}; // 2.23.23: Sarah changed one he shared with her
       if (t._mine) { Object.assign(t._mine, { title: String(x.title || t._mine.title).slice(0, 80), date: x.due || t._mine.date, time: ap.time || '', notes: x.notes || '', place: ap.place || '' }); if (x.claim) t._mine.claim = claimNorm(x.claim); }
       else { Object.assign(t._hitem, { name: String(x.title || t._hitem.name).slice(0, 40), apptDate: x.due || t._hitem.apptDate, apptTime: ap.time || '' }); if (ap.place) t._hitem.clinic = String(ap.place).slice(0, 60); if (x.claim) t._hitem.claim = claimNorm(x.claim); }
       return; }
     if (!!t._shop !== isSarahShopList(x.list)) { SH.remove(t.id); SH.add(Object.assign({}, x, { created: t.created || x.created, by: SH.by(t) })); return; } // moved to or from her Shopping list
-    if (t._todo) { const o = t._todo; Object.assign(o, { title: x.title, sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) o.doneAt = o.doneAt || x.doneAt || Date.now(); else delete o.doneAt; return; } // your own: stays on your list
+    if (t._todo) { const o = t._todo; if (listIsShared(x.list)) o.list = x.list; Object.assign(o, { title: x.title, sharedList: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) o.doneAt = o.doneAt || x.doneAt || Date.now(); else delete o.doneAt; return; } // your own: stays on your list
     if (t._shop) { const it = t._shop; Object.assign(it, { name: String(x.title || '').slice(0, 120), list: x.list, due: x.due || '', notes: x.notes || '', priority: x.priority || '', done: !!x.done }); if (x.brand) it.brand = x.brand; else delete it.brand; if (x.done) it.doneAt = it.doneAt || x.doneAt || Date.now(); else delete it.doneAt; return; }
     Object.assign(t, { title: x.title, list: x.list, due: x.due, notes: x.notes, priority: x.priority, done: x.done }); if (x.done) t.doneAt = x.doneAt || Date.now(); else delete t.doneAt; },
-  remove: id => { healthSarahItems().forEach(({ it }) => { if ('hs-' + it.id === id) { it.apptDate = ''; it.apptTime = ''; } }); S.appts = (S.appts || []).filter(a => !(a.id === id && (a.from === 'sarah' || apptForSarah(a)))); S.todos = S.todos.filter(t => !(t.id === id && (isSarahTodo(t) || isMineShared(t)))); S.shop.items = S.shop.items.filter(x => !(x.id === id && (isSarahShop(x) || isMineShared(x)))); },
+  remove: id => { if (/^lst-/.test(id)) { const l = (S.lists || []).find(y => listSlug(y) === id); if (l) { setListShared(l, false); lstDrop.add(l); } return; }
+    healthSarahItems().forEach(({ it }) => { if ('hs-' + it.id === id) { it.apptDate = ''; it.apptTime = ''; } }); S.appts = (S.appts || []).filter(a => !(a.id === id && (a.from === 'sarah' || apptForSarah(a)))); S.todos = S.todos.filter(t => !(t.id === id && (isSarahTodo(t) || isMineShared(t)))); S.shop.items = S.shop.items.filter(x => !(x.id === id && (isSarahShop(x) || isMineShared(x)))); },
   persist: async changed => {
+    lstDrop.forEach(l => { if (S.lists.length > 1 && !S.todos.some(t => t.list === l && !t.done) && !shLists().includes(l)) { const dest = S.lists.find(y => y !== l); S.todos.forEach(t => { if (t.list === l) t.list = dest; }); S.lists = S.lists.filter(y => y !== l); if (todoFilter === l) todoFilter = 'All'; changed = true; } });
+    lstDrop.clear();
     sharedApplying = true;
     try { await save(); } finally { sharedApplying = false; }
     if (changed && !sheetOpen) render();
@@ -6010,9 +6024,9 @@ function Todo() {
     ? `🎯 Just ${plural(openCount, "thing")} on your list — you’ve got this!`
     : `🚀 ${plural(openCount, "thing")} on the go — pick one easy win at a time!`;
   return `<div class="tkpage"><div class="tkhead"><h1>✨ My To-do List</h1><button class="iconbtn" aria-label="Add a to-do" onclick="todoForm()">${I('plus')}</button><button class="iconbtn" aria-label="Open calendar" onclick="go('#calendar')">${I('cal')}</button></div><div class="tksub">${friendlySub}</div>
-    <div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${todoListEmoji(l)} ${esc(l)}</button>`).join('')}
+    <div class="chips">${['All', ...S.lists].map(l => `<button class="chip ${l === todoFilter ? 'on' : ''}" onclick="setTodoFilter(${jsArg(l)})">${todoListEmoji(l)} ${esc(l)}${l !== 'All' && listIsShared(l) ? ' <span class="sbadge" style="background:#3b82f6" title="Shared with Sarah">S</span>' : ''}</button>`).join('')}
       <button class="chip plus" onclick="listForm()">➕ New list</button></div>
-    ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">✏️ Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">🗑️ Delete list</button></div>` : ''}
+    ${todoFilter !== 'All' ? `<div style="display:flex;gap:18px;margin:-2px 4px 10px;font-size:0.875rem;font-weight:600"><button style="color:var(--brand);padding:4px 0" onclick="listForm(${jsArg(todoFilter)})">✏️ Rename list</button><button style="color:var(--red);padding:4px 0" onclick="deleteList(${jsArg(todoFilter)})">🗑️ Delete list</button>${isShopListName(todoFilter) ? '' : `<button style="color:#3b82f6;padding:4px 0" onclick="toggleListShare(${jsArg(todoFilter)})">${listIsShared(todoFilter) ? '💌 Shared with Sarah ✓' : '💌 Share with Sarah'}</button>`}</div>` : ''}
     <form class="addbar" onsubmit="quickAdd(event)"><input id="newtodo" placeholder="✨ Jot down a to-do${todoFilter !== 'All' ? ' for ' + esc(todoFilter) : ''}…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New to-do"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="todoshare"> 💌 Also add to Sarah’s list</label>
     ${todoTodayProg()}${todoListProg(todoFilter)}
@@ -6156,13 +6170,17 @@ async function addTodoCal(id) {
   toast(own ? `Added to your calendar at ${fmtTime(time)}.` : `Added to your calendar at ${fmtTime(time)}. Change the time if you want.`, 'Change', () => apptForm(appt.id));
 }
 function listForm(name) {
-  openSheet(name ? 'Rename list' : 'New list', field('List name', inp('name', name || '', 'placeholder="e.g. Garden" required maxlength="24"')), async v => {
+  const on = name ? listIsShared(name) : true;
+  openSheet(name ? 'Rename list' : 'New list', field('List name', inp('name', name || '', 'placeholder="e.g. Garden" required maxlength="24"')) + (name && isShopListName(name) ? '' : `<label class="gfcheck sharebox"><input type="checkbox" name="shl"${on ? ' checked' : ''}><span><b>Share this list with Sarah</b><small>It shows in her To-do app too, and anything either of you adds to it shows on both phones.</small></span></label>`), async v => {
+    v.name = String(v.name || '').trim();
     if (!v.name) return 'Please type a name.';
-    if (v.name === 'All') return 'Please pick a different name.';
-    if (S.lists.includes(v.name) && v.name !== name) return 'You already have a list with that name.';
-    if (name) { S.lists = S.lists.map(l => l === name ? v.name : l); S.todos.forEach(t => { if (t.list === name) t.list = v.name; }); }
+    if (v.name === 'All' || v.name === LST) return 'Please pick a different name.';
+    if (S.lists.some(l => l.toLowerCase() === v.name.toLowerCase() && l !== name)) return 'You already have a list with that name.';
+    if (name) { const was = shLists().includes(name); S.lists = S.lists.map(l => l === name ? v.name : l); S.todos.forEach(t => { if (t.list === name) t.list = v.name; }); if (was) setListShared(name, false); }
     else S.lists.push(v.name);
+    if (!isShopListName(v.name)) setListShared(v.name, v.shl === 'on');
     todoFilter = v.name; await save(); render();
+    if (v.shl === 'on' && !isShopListName(v.name)) toast(`${v.name} is shared with Sarah.`);
   }, name ? 'Save' : 'Add list');
 }
 function deleteList(name) {
@@ -6170,10 +6188,11 @@ function deleteList(name) {
   const n = S.todos.filter(t => t.list === name).length;
   const dest = S.lists.find(l => l !== name);
   confirmSheet(`Delete the ${esc(name)} list?`, n ? `Its ${plural(n, 'to-do')} will move to ${esc(dest)}.` : 'The list is empty.', 'Delete list', async () => {
-    const s = snap(); S.lists = S.lists.filter(l => l !== name); S.todos.forEach(t => { if (t.list === name) t.list = dest; });
+    const s = snap(); S.lists = S.lists.filter(l => l !== name); S.todos.forEach(t => { if (t.list === name) t.list = dest; }); setListShared(name, false);
     todoFilter = 'All'; await save(); render(); toast('List deleted.', 'Undo', undoTo(s));
   });
 }
+async function toggleListShare(name) { const on = !listIsShared(name); setListShared(name, on); await save(); render(); toast(on ? `${name} now shows in Sarah’s app too.` : `${name} is just on your phone now.`); }
 
 /* ================= CALENDAR ================= */
 const apptSort = (a, b) => parseD(a.date) - parseD(b.date) || (a.time || '').localeCompare(b.time || '');

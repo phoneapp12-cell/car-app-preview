@@ -27,7 +27,7 @@ export function apptLine(x) {
 // Newly added open items by Shane, not Shopping
 export function newShaneItems(before, after) {
   const had = new Set((before || []).map(x => x && x.id));
-  return (after || []).filter(x => x && !x.deleted && !x.done && x.by === 'shane' && !isShop(x) && !had.has(x.id));
+  return (after || []).filter(x => x && !x.deleted && !x.done && x.by === 'shane' && !isShop(x) && x.list !== '#lists' && !had.has(x.id));
 }
 export function batchMsg(items) {
   const ap = items.filter(i => i.k === 'a'), n = items.length;
