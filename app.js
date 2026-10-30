@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.92';
+const APP_VERSION = '2.28.93';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24713,7 +24713,7 @@ function weekItems() {
   return out;
 }
 /* 2.28.92: This week as a TV guide: days down the side, times across the top (6am–midnight), All day first. */
-const WKG_H0 = 6, WKG_H1 = 24, WKG_PX = 84, WKG_AD = 128;
+const WKG_H0 = 6, WKG_H1 = 24, WKG_PX = 124, WKG_AD = 156;
 function wkgMin(s) { const m = String(s || '').match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i); if (!m) return null; let h = +m[1]; const mi = +(m[2] || 0), ap = (m[3] || '').toLowerCase(); if (ap === 'pm' && h < 12) h += 12; if (ap === 'am' && h === 12) h = 0; return h > 23 || mi > 59 ? null : h * 60 + mi; }
 function weekGuide(D) {
   const T = todayISO(), x0 = WKG_H0 * 60, W = (WKG_H1 - WKG_H0) * WKG_PX, nowD = new Date(), nowM = nowD.getHours() * 60 + nowD.getMinutes();
@@ -24725,16 +24725,17 @@ function weekGuide(D) {
       if (sm == null || it.type === 'pay' || it.type === 'xfer') { allday.push(it); return; }
       const parts = String(it.time || '').split(/\s*[–-]\s*/); let em = parts[1] ? wkgMin(parts[1]) : null; if (em != null && em <= sm) em += 24 * 60; if (em == null) em = sm + 60;
       timed.push({ it, sm, em }); });
-    const lanes = []; timed.sort((a, b) => a.sm - b.sm).forEach(t => { const x = xOf(t.sm), w = Math.max(96, xOf(t.em) - x - 3); let l = lanes.findIndex(e => e <= x); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = x + w + 3; t.x = x; t.w = w; t.l = l; });
-    const nl = Math.max(1, lanes.length, allday.length ? Math.min(allday.length, 3) : 1), H = 46;
-    const tile = (it, x, w, l, sub) => { const [ic0, col0] = WK_TYPE[it.type] || WK_TYPE.due, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
-      return `<button type="button" class="wkg-p" style="left:${x}px;top:${4 + l * H}px;width:${w}px;--wc:${esc(it.color || it.color2 || col0)}" onclick="if(window.glSwipe&&glSwipe.moved)return;${oc}"><b>${it.ic || ic0} ${it.sarah ? sarahBadge({ from: 'sarah' }) + ' ' : ''}${esc(it.title)}</b><small>${esc(sub || '')}</small></button>`; };
-    const ad = allday.slice(0, 3).map((it, i) => tile(it, 4, WKG_AD - 8, i, i === 2 && allday.length > 3 ? '+' + (allday.length - 2) + ' more · ' + (it.time || '') : (it.time || it.line || ''))).join('');
+    const lanes = []; timed.sort((a, b) => a.sm - b.sm).forEach(t => { const x = xOf(t.sm), w = Math.max(132, xOf(t.em) - x - 4); let l = lanes.findIndex(e => e <= x); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = x + w + 4; t.x = x; t.w = w; t.l = l; });
+    const nl = Math.max(1, lanes.length, 1), H = 70;
+    const tile = (it, x, w, l, sub, ch) => { const [ic0, col0] = WK_TYPE[it.type] || WK_TYPE.due, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
+      return `<button type="button" class="wkg-p${ch ? ' wkg-pc' : ''}" style="left:${x}px;top:${ch ? 6 + l * (ch + 3) : 6 + l * H}px;width:${w}px;${ch ? 'height:' + ch + 'px;' : ''}--wc:${esc(it.color || it.color2 || col0)}" onclick="if(window.glSwipe&&glSwipe.moved)return;${oc}"><b>${it.ic || ic0} ${it.sarah ? sarahBadge({ from: 'sarah' }) + ' ' : ''}${esc(it.title)}</b><small>${esc(sub || '')}</small></button>`; };
+    const adn = Math.min(allday.length, 3), adh = adn ? Math.floor((nl * H - 2 - (adn - 1) * 3) / adn) : 0;
+    const ad = allday.slice(0, 3).map((it, i) => tile(it, 4, WKG_AD - 8, i, i === 2 && allday.length > 3 ? '+' + (allday.length - 2) + ' more · ' + (it.time || '') : (it.time || it.line || ''), adn > 1 ? adh : 0)).join('');
     const tm = timed.map(t => tile(t.it, t.x, t.w, t.l, (t.it.time || '') + (t.it.warn ? ' · ' + t.it.warn : ''))).join('');
     const nowLine = d === T && nowM >= x0 ? `<div class="wkg-now" style="left:${xOf(nowM)}px"></div>` : '';
-    return `<div class="wkg-row${d === T ? ' today' : ''}" style="height:${nl * H + 8}px"><div class="wkg-day"><i>${d === T ? 'TODAY' : ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][dt.getUTCDay()]}</i><b>${dt.getUTCDate()}</b>${allday.length ? `<span class="wkg-adn" onclick="document.getElementById('wkgscroll').scrollTo({left:0,behavior:'smooth'})">${allday.length} all-day</span>` : ''}<button type="button" class="wkg-add" aria-label="Add on ${esc(fmtW(d))}" onclick="wkAdd('${d}')">+</button></div><div class="wkg-lane" style="width:${WKG_AD + W}px">${ad}${tm}${nowLine}</div></div>`;
+    return `<div class="wkg-row${d === T ? ' today' : ''}" style="height:${nl * H + 12}px"><div class="wkg-day"><i>${d === T ? 'TODAY' : ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][dt.getUTCDay()]}</i><b>${dt.getUTCDate()}</b>${allday.length ? `<span class="wkg-adn" onclick="document.getElementById('wkgscroll').scrollTo({left:0,behavior:'smooth'})">${allday.length} all-day</span>` : ''}<button type="button" class="wkg-add" aria-label="Add on ${esc(fmtW(d))}" onclick="wkAdd('${d}')">+</button></div><div class="wkg-lane" style="width:${WKG_AD + W}px">${ad}${tm}${nowLine}</div></div>`;
   }).join('');
-  const wkgGo = n => { try { const el = document.getElementById('wkgscroll'); if (el && !el.dataset.done && el.clientWidth > 0) { el.dataset.done = '1'; el.scrollLeft = Math.max(0, xOf(Math.max(x0, nowM - 60)) - WKG_AD); } else if ((!el || !el.clientWidth) && n < 40) setTimeout(() => wkgGo(n + 1), 250); } catch (e) {} };
+  const wkgGo = n => { try { const el = document.getElementById('wkgscroll'); if (el && !el.dataset.done && el.clientWidth > 0) { el.dataset.done = '1'; el.scrollLeft = Math.max(0, xOf(Math.max(x0, nowM - 90)) - WKG_AD); } else if ((!el || !el.clientWidth) && n < 40) setTimeout(() => wkgGo(n + 1), 250); } catch (e) {} };
   setTimeout(() => wkgGo(0), 60);
   return `<div class="wkg" id="wkgscroll"><div class="wkg-times"><div class="wkg-corner">📺</div><div class="wkg-tl" style="width:${WKG_AD + W}px">${hrs}</div></div>${rows}</div>`;
 }
