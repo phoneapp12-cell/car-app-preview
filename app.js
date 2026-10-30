@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.97';
+const APP_VERSION = '2.28.98';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11948,6 +11948,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   books: ['book', 'blog', 'Kindle books', 'Books'], // 2.28.83
   accounts: ['cash', 'loan', 'My accounts', 'Accounts'], // 2.28.90
   freemovies: ['play', 'vid', 'Free movies', 'Free movies'], // 2.28.87
+  discover: ['search', 'vid', 'Discover', 'Discover'], // 2.28.98
   webcams: ['play', 'vid', 'Live NZ webcams', 'Webcams'], // 2.28.88
   photos: ['image', 'blog', 'Photos', 'Photos'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
@@ -11996,7 +11997,7 @@ const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'countdown', 'diary', 'notes', 'photos'] },
   { id: 'people', title: 'Health', keys: ['watch', 'sleep', 'gym', 'health', 'meds', 'claims', 'birthdays', 'about'] },
   { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'bus', 'planning', 'parlbills', 'garden', 'events', 'news'] },
-  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'freemovies', 'webcams', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
+  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'freemovies', 'discover', 'webcams', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
   { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
   { id: 'money', title: 'Money', keys: ['bills', 'accounts', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
   { id: 'cars', title: 'Cars & Pets', keys: ['cars', 'fuel', 'pets'] }
@@ -21808,7 +21809,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { guide: () => GuidePage(), accounts: () => AccountsPage(), books: () => BooksPage(), freemovies: () => FreeMoviesPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { guide: () => GuidePage(), accounts: () => AccountsPage(), books: () => BooksPage(), freemovies: () => FreeMoviesPage(), discover: () => DiscoverPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -24071,6 +24072,7 @@ function glTiles() {
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#prime')");
   add('webcams', 'watch', 'Live NZ webcams', () => 'Volcanoes, mountains & roads · live', 'i3-tv', ['#0ea5e9', '#1e3a8a'], "go('#webcams')"); // 2.28.88
   add('freemovies', 'watch', 'Free movies on demand', () => FM_SRC.length + ' free sources · comedies first', 'i3-tv', ['#16a34a', '#1e3a8a'], "go('#freemovies')"); // 2.28.87
+  add('discover', 'watch', 'Discover', () => 'Site of the day: ' + discSiteToday().n, 'i3-travel', ['#0ea5e9', '#6366f1'], "go('#discover')"); // 2.28.98
   add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
   add('videos', 'watch', 'Videos', () => { let t = ''; try { const sv = currentSarahVideo(); const l = preferFilmVideoTitles(videoSuggestions() || []); const v = (sv ? [sv] : []).concat(l || []).find(x => x && x.title && glOk(x.title) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(x.title)); t = v ? v.title : ''; } catch (e) { } return t || 'Your video categories'; }, B('tv'), '', "go('#videos')");
   add('top40', 'listen', 'Top 40 NZ', () => { const t = (typeof TOP40 !== 'undefined' && TOP40[0]) || null; return t ? '#1 ' + t.title + ' · ' + t.artist : 'This week’s NZ chart'; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
@@ -24141,7 +24143,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['freemovies', 'webcams', 'livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
+const MEDIA_TILES = new Set(['freemovies', 'discover', 'webcams', 'livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
@@ -37715,7 +37717,7 @@ function sylHtml() {
   const row = r => `<button type="button" class="sylr" ${r.go ? `onclick="${esc(r.go)}"` : 'disabled'}><span class="sylic">${r.ic}</span><span class="syltx"><b>${esc(r.t)}</b><small>${esc(r.s)}</small></span></button>`;
   return `<div class="syl">${head}${R.slice(0, 6).map(row).join('')}${more ? `<div class="sylm">+ ${more} more change${more > 1 ? 's' : ''}</div>` : ''}</div>`;
 }
-function SURP_T() { return ['otd', 'fact', 'song']; }
+function SURP_T() { return ['otd', 'fact', 'site', 'song']; }
 function SURP_NZ() { return /New Zealand|Aotearoa|M[āa]ori|Wellington|Auckland|Christchurch|Dunedin|Northland|Whang[āa]rei|Waitangi|Rotorua|Otago|Waikato|Napier|Tauranga|Kiwi\b/i; }
 function SURP_BAD() { return /kill|murder|war\b|bomb|attack|massacre|shoot|terror|dies|died|death|crash|earthquake|rugby|cricket|football|olympic|sport|\bcup\b|sex|rape|execut|genocide|riot/i; }
 function surpIdx() { let off = 0; try { off = +(sessionStorage.getItem('surpOff') || 0); } catch (e) { } return ((glDay() + off) % SURP_T().length + SURP_T().length) % SURP_T().length; }
@@ -37738,6 +37740,7 @@ function surpriseHtml() {
   if (S.settings && S.settings.surpOff) return '';
   let k = SURP_T()[surpIdx()], ic = '', lab = '', body = '', tap = '';
   if (k === 'otd') { const o = otdGet(); if (!o) { setTimeout(otdLoad, 0); k = 'fact'; } else { ic = '📜'; lab = o.nz ? 'On this day in NZ' : 'On this day'; body = `<b>${esc(String(o.y))}</b> · ${esc(o.t)}`; tap = o.link ? `window.open('${esc(o.link)}','_blank')` : ''; } }
+  if (k === 'site') { const x = discSiteToday(); ic = x.ic; lab = 'Site of the day'; body = `<b>${esc(x.n)}</b> · ${esc(x.s)}`; tap = "go('#discover')"; }
   if (k === 'fact') { const f = typeof factToday === 'function' ? factToday() : ''; if (f) { ic = '🇳🇿'; lab = 'NZ fact'; body = esc(f); tap = "glInfo('fact')"; } else k = 'song'; }
   if (k === 'song') { const L = typeof GL_SUNO !== 'undefined' ? GL_SUNO : []; ic = '🎵'; lab = 'Song idea for Suno'; body = esc(L.length ? L[glDay() % L.length] : 'A Suno track about Onerahi and the harbour'); tap = "window.open('https://suno.com/create','_blank')"; }
   return `<div class="surp" id="surp"><div class="surph"><span>🎁 Daily surprise · ${lab}</span><button type="button" onclick="event.stopPropagation();surpNext()" aria-label="Another one">↻</button></div><div class="surpb" ${tap ? `role="button" tabindex="0" onclick="${tap}"` : ''}><span class="surpic">${ic}</span><span>${body}</span></div></div>`;
@@ -37777,3 +37780,29 @@ function todayView(D) {
 
 /* 2.28.97: let the app turn sideways with the phone (manifest orientation is now "any"; this also lifts any lock at runtime). */
 (() => { try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) { } })();
+
+/* 2.28.98: Discover (#discover). Fun and interesting websites Shane found, plus a few more. One shows each day on Home
+   as "Site of the day" in the Daily surprise card. Wayback tool: see how any website looked in a chosen year. */
+function DISC() { return [
+  { n: 'My Retro TVs', ic: '📺', u: 'https://www.myretrotvs.com', s: 'Channel-surf old TV shows, cartoons and ads from the 1950s to the 2000s on a vintage telly.' },
+  { n: 'WindowSwap', ic: '🪟', u: 'https://www.window-swap.com', s: 'Look out of someone else’s window, somewhere in the world, with the real sounds.' },
+  { n: 'The Scale of the Universe', ic: '🔭', u: 'https://scaleofuniverse.com', s: 'Zoom from the tiniest particles out to the edge of the observable universe.' },
+  { n: 'Cloudhiker', ic: '☁️', u: 'https://cloudhiker.net', s: 'Hand-picked random websites. Tap and see where you land.' },
+  { n: 'The Useless Web', ic: '🎲', u: 'https://theuselessweb.com', s: 'One button sends you to a random, pointless and often hilarious website.' },
+  { n: 'Radio Garden', ic: '🌍', u: 'https://radio.garden', s: 'Spin a globe and listen to live radio from almost anywhere in the world.' },
+  { n: 'Atlas Obscura', ic: '🗺️', u: 'https://www.atlasobscura.com', s: 'Strange and wonderful places around the world, including plenty in New Zealand.' },
+  { n: 'Neal.fun', ic: '🧩', u: 'https://neal.fun', s: 'Clever little interactive toys, like spending a billionaire’s money or the deep sea scroller.' },
+  { n: 'The Wayback Machine', ic: '⏳', u: 'https://web.archive.org', s: 'An archive of the internet. Use the box above to see how a website looked years ago.' }
+]; }
+function discSiteToday() { const L = DISC(); return L[((glDay() * 7) % L.length + L.length) % L.length]; }
+function discWayback() { try { let u = String((document.getElementById('wbUrl') || {}).value || '').trim(), y = String((document.getElementById('wbYear') || {}).value || '').trim(); if (!u) { alert('Type a website first, like nzherald.co.nz'); return; } u = u.replace(/^https?:\/\//i, ''); if (!/^\d{4}$/.test(y)) y = '2005'; window.open('https://web.archive.org/web/' + y + '0601000000/' + encodeURIComponent(u).replace(/%2F/g, '/'), '_blank', 'noopener'); } catch (e) { } }
+function discRandom() { const L = DISC(), x = L[Math.floor(Math.random() * L.length)]; try { hab('tap:discover', x.n); } catch (e) { } window.open(x.u, '_blank', 'noopener'); }
+function DiscoverPage() {
+  const back = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>`, t = discSiteToday(), yrs = [];
+  for (let y = new Date().getFullYear() - 1; y >= 1996; y--) yrs.push(`<option${y === 2005 ? ' selected' : ''}>${y}</option>`);
+  const row = x => `<button type="button" class="row" onclick="try{hab('tap:discover',${esc(JSON.stringify(x.n))})}catch(e){};${fmOpen(x.u)}"><div class="ic" style="font-size:1.5rem">${x.ic}</div><div class="tx"><div class="t">${esc(x.n)}</div><div class="s">${esc(x.s)}</div></div>${I('right')}</button>`;
+  return back + header('Discover', 'Fun and interesting corners of the internet') +
+    `<div class="card" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff"><div style="font-size:.85rem;font-weight:700;opacity:.9">✨ Site of the day</div><div style="font-size:1.2rem;font-weight:800;margin:4px 0">${t.ic} ${esc(t.n)}</div><div style="opacity:.95">${esc(t.s)}</div><div class="btns" style="margin-top:10px"><button class="btn small" onclick="${fmOpen(t.u)}">Open it</button><button class="btn small" onclick="discRandom()">🎲 Surprise me</button></div></div>` +
+    `<div class="card"><b>⏳ Time machine</b><div class="s muted" style="margin:2px 0 8px">See how any website looked in a year of your choice, using the Wayback Machine.</div><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="wbUrl" type="text" placeholder="e.g. nzherald.co.nz" style="flex:1;min-width:150px;padding:8px;border-radius:8px;border:1px solid var(--line)"><select id="wbYear" style="padding:8px;border-radius:8px;border:1px solid var(--line)">${yrs.join('')}</select><button class="btn small primary" onclick="discWayback()">Go back</button></div></div>` +
+    `<div class="list">${DISC().map(row).join('')}</div>`;
+}
