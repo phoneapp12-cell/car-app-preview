@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.98';
+const APP_VERSION = '2.28.99';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -37792,6 +37792,7 @@ function DISC() { return [
   { n: 'Radio Garden', ic: '🌍', u: 'https://radio.garden', s: 'Spin a globe and listen to live radio from almost anywhere in the world.' },
   { n: 'Atlas Obscura', ic: '🗺️', u: 'https://www.atlasobscura.com', s: 'Strange and wonderful places around the world, including plenty in New Zealand.' },
   { n: 'Neal.fun', ic: '🧩', u: 'https://neal.fun', s: 'Clever little interactive toys, like spending a billionaire’s money or the deep sea scroller.' },
+  { n: 'Narrow Design', ic: '🌀', u: 'https://narrowdesign.com', s: 'Nick Jones’s portfolio. Scroll and fly through his work in 3D. The inspiration for this page.' },
   { n: 'The Wayback Machine', ic: '⏳', u: 'https://web.archive.org', s: 'An archive of the internet. Use the box above to see how a website looked years ago.' }
 ]; }
 function discSiteToday() { const L = DISC(); return L[((glDay() * 7) % L.length + L.length) % L.length]; }
@@ -37804,5 +37805,28 @@ function DiscoverPage() {
   return back + header('Discover', 'Fun and interesting corners of the internet') +
     `<div class="card" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff"><div style="font-size:.85rem;font-weight:700;opacity:.9">✨ Site of the day</div><div style="font-size:1.2rem;font-weight:800;margin:4px 0">${t.ic} ${esc(t.n)}</div><div style="opacity:.95">${esc(t.s)}</div><div class="btns" style="margin-top:10px"><button class="btn small" onclick="${fmOpen(t.u)}">Open it</button><button class="btn small" onclick="discRandom()">🎲 Surprise me</button></div></div>` +
     `<div class="card"><b>⏳ Time machine</b><div class="s muted" style="margin:2px 0 8px">See how any website looked in a year of your choice, using the Wayback Machine.</div><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="wbUrl" type="text" placeholder="e.g. nzherald.co.nz" style="flex:1;min-width:150px;padding:8px;border-radius:8px;border:1px solid var(--line)"><select id="wbYear" style="padding:8px;border-radius:8px;border:1px solid var(--line)">${yrs.join('')}</select><button class="btn small primary" onclick="discWayback()">Go back</button></div></div>` +
-    `<div class="list">${DISC().map(row).join('')}</div>`;
+    (S.settings && S.settings.discFlat ? `<div style="text-align:right;margin:0 0 6px"><a href="#" onclick="event.preventDefault();S.settings.discFlat=false;save();render()">🌀 3D view</a></div><div class="list">${DISC().map(row).join('')}</div>` : disc3dHtml());
 }
+const D3_GAP = 520;
+const D3_COL = [['#7c3aed', '#db2777'], ['#0ea5e9', '#6366f1'], ['#f59e0b', '#ef4444'], ['#10b981', '#0e7490'], ['#ec4899', '#8b5cf6'], ['#22c55e', '#15803d'], ['#f97316', '#be123c'], ['#06b6d4', '#1d4ed8'], ['#a855f7', '#4c1d95'], ['#eab308', '#a16207']];
+function disc3dHtml() {
+  const L = DISC(), H = 560;
+  const panels = L.map((x, i) => { const [a, b] = D3_COL[i % D3_COL.length]; return `<div class="d3p" data-i="${i}" style="background:linear-gradient(135deg,${a},${b})" onclick="disc3dTap(${i})"><div class="d3n">${String(i + 1).padStart(2, '0')} / ${String(L.length).padStart(2, '0')}</div><div class="d3ic">${x.ic}</div><div class="d3t">${esc(x.n)}</div><div class="d3s">${esc(x.s)}</div><div class="d3go">Tap to open ›</div></div>`; }).join('');
+  setTimeout(disc3dInit, 0);
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 6px"><b>🌀 Scroll to fly through</b><a href="#" onclick="event.preventDefault();S.settings.discFlat=true;save();render()">Flat list</a></div><div id="d3" class="d3" style="height:${H}px"><div class="d3stage" style="height:${H}px">${panels}<div class="d3hint">↓ Scroll</div></div><div style="height:${(L.length - 1) * D3_GAP + 60}px"></div></div>`;
+}
+function disc3dTap(i) { const el = document.getElementById('d3'); if (!el) return; const cur = Math.round(el.scrollTop / D3_GAP); if (cur !== i) { el.scrollTo({ top: i * D3_GAP, behavior: 'smooth' }); return; } const x = DISC()[i]; try { hab('tap:discover', x.n); } catch (e) { } window.open(x.u, '_blank', 'noopener'); }
+function disc3dInit() {
+  const el = document.getElementById('d3'); if (!el || el.dataset.on) return; el.dataset.on = '1';
+  const P = [...el.querySelectorAll('.d3p')], hint = el.querySelector('.d3hint'); let raf = 0;
+  const draw = () => { raf = 0; const st = el.scrollTop;
+    P.forEach((p, i) => { const d = i * D3_GAP - st, side = i % 2 ? 1 : -1;
+      if (d < -D3_GAP * 0.6 || d > D3_GAP * 4.5) { p.style.visibility = 'hidden'; return; } p.style.visibility = 'visible';
+      const z = d < 0 ? -d * 2.2 : -d * 1.15, x = d > 0 ? side * Math.min(d, 1600) * 0.26 : 0, ry = d > 0 ? -side * Math.min(d / 60, 18) : 0, rx = d < 0 ? d / 25 : 0;
+      const op = d < 0 ? Math.max(0, 1 + d / (D3_GAP * 0.55)) : Math.max(0, Math.min(1, 1.15 - d / (D3_GAP * 4)));
+      p.style.transform = `translate(-50%,-50%) translate3d(${x}px,${d > 0 ? -Math.min(d, 1600) * 0.14 : 0}px,${z}px) rotateY(${ry}deg) rotateX(${rx}deg)`;
+      p.style.opacity = op.toFixed(3); p.style.zIndex = String(1000 - Math.round(Math.abs(d))); p.classList.toggle('d3front', Math.abs(d) < D3_GAP / 2); });
+    if (hint) hint.style.opacity = st > 40 ? '0' : '1'; };
+  el.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(draw); }, { passive: true }); draw();
+}
+(() => { try { const st = document.createElement('style'); st.textContent = '.d3{position:relative;overflow-y:auto;overflow-x:hidden;border-radius:18px;background:radial-gradient(ellipse at center,#1e1b4b 0%,#020617 75%);margin:0 0 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.d3::-webkit-scrollbar{display:none}.d3stage{position:sticky;top:0;perspective:700px;perspective-origin:50% 45%;overflow:hidden;transform-style:preserve-3d}.d3p{position:absolute;left:50%;top:50%;width:78%;max-width:340px;min-height:300px;box-sizing:border-box;padding:22px 20px;border-radius:22px;color:#fff;box-shadow:0 20px 50px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.18);display:flex;flex-direction:column;gap:8px;will-change:transform,opacity;cursor:pointer;backface-visibility:hidden}.d3n{font-size:.75rem;font-weight:800;letter-spacing:.12em;opacity:.75}.d3ic{font-size:3.6rem;line-height:1.1}.d3t{font-size:1.6rem;font-weight:900;line-height:1.1}.d3s{font-size:1rem;line-height:1.4;opacity:.95}.d3go{margin-top:auto;align-self:flex-start;background:rgba(255,255,255,.22);padding:6px 14px;border-radius:999px;font-weight:700;font-size:.9rem;opacity:.4;transition:opacity .2s}.d3front .d3go{opacity:1}.d3hint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#c7d2fe;font-weight:700;letter-spacing:.1em;font-size:.85rem;transition:opacity .3s;animation:d3b 1.6s ease-in-out infinite}@keyframes d3b{50%{transform:translateY(6px)}}'; document.head.appendChild(st); } catch (e) { } })();
