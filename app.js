@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.87';
+const APP_VERSION = '2.28.88';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11898,6 +11898,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
   books: ['book', 'blog', 'Kindle books', 'Books'], // 2.28.83
   freemovies: ['play', 'vid', 'Free movies', 'Free movies'], // 2.28.87
+  webcams: ['play', 'vid', 'Live NZ webcams', 'Webcams'], // 2.28.88
   photos: ['image', 'blog', 'Photos', 'Photos'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
   radio: ['radio', 'rad', 'Radio', 'Radio'],
@@ -11945,7 +11946,7 @@ const NAV_GROUPS = [
   { id: 'day', title: 'Everyday', keys: ['home', 'calendar', 'todo', 'tidy', 'reminders', 'food', 'meals', 'recipes', 'shopping', 'gflist', 'countdown', 'diary', 'notes', 'photos'] },
   { id: 'people', title: 'Health', keys: ['watch', 'sleep', 'gym', 'health', 'meds', 'claims', 'birthdays', 'about'] },
   { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'bus', 'planning', 'parlbills', 'garden', 'events', 'news'] },
-  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'freemovies', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
+  { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'freemovies', 'webcams', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
   { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
   { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
   { id: 'cars', title: 'Cars & Pets', keys: ['cars', 'fuel', 'pets'] }
@@ -21757,7 +21758,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { books: () => BooksPage(), freemovies: () => FreeMoviesPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { books: () => BooksPage(), freemovies: () => FreeMoviesPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -24018,6 +24019,7 @@ function glTiles() {
   const add = (k, cat, title, fn, art, grad, go) => { try { const s = fn(); if (s && glOk(s) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(String(s))) T.push({ k, cat, title, s: String(s).slice(0, 70), art, grad, go }); } catch (e) { } };
   add('netflix', 'watch', 'New on Netflix', () => { const f = NF && mailConnected('microsoft') ? (NF.fresh || []) : []; return f.length ? f.slice(0, 2).map(x => x.title).join(', ') : ''; }, B('ideas'), '', "go('#netflix')");
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#prime')");
+  add('webcams', 'watch', 'Live NZ webcams', () => 'Volcanoes, mountains & roads · live', 'i3-tv', ['#0ea5e9', '#1e3a8a'], "go('#webcams')"); // 2.28.88
   add('freemovies', 'watch', 'Free movies on demand', () => FM_SRC.length + ' free sources · comedies first', 'i3-tv', ['#16a34a', '#1e3a8a'], "go('#freemovies')"); // 2.28.87
   add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
   add('videos', 'watch', 'Videos', () => { let t = ''; try { const sv = currentSarahVideo(); const l = preferFilmVideoTitles(videoSuggestions() || []); const v = (sv ? [sv] : []).concat(l || []).find(x => x && x.title && glOk(x.title) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(x.title)); t = v ? v.title : ''; } catch (e) { } return t || 'Your video categories'; }, B('tv'), '', "go('#videos')");
@@ -24089,7 +24091,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['freemovies', 'livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
+const MEDIA_TILES = new Set(['freemovies', 'webcams', 'livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
@@ -37420,6 +37422,33 @@ function FreeMoviesPage() {
   };
   return back + header('Free movies on demand', 'Legal and free in NZ · comedies first') + FM_SRC.map(card).join('')
     + `<div class="s muted" style="margin:12px 4px">TVNZ+ and ThreeNow titles were checked on their NZ movie pages on 30 Oct 2026 and change often. Tubi and Plex catalogues vary by country, so those open their own pages.</div>`;
+}
+/* 2.28.88: Live NZ webcams (#webcams). Public still cams that refresh about once a minute: GeoNet volcano cams and NZTA highway cams (checked 30 Oct 2026). No public Northland road cams exist. */
+const WC_GEO = 'https://images.geonet.org.nz/volcano/cameras/latest/';
+const WC_TNZ = 'https://trafficnz.info/camera/';
+const WC_GROUPS = [
+  { n: 'Volcanoes & mountains', ic: '🌋', src: 'GeoNet', c: [['Ruapehu from the north', WC_GEO + 'ruapehunorth.jpg'], ['Ruapehu from the east', WC_GEO + 'ruapehueast.jpg'], ['Ruapehu from the south', WC_GEO + 'ruapehusouth.jpg'], ['Ngāuruhoe', WC_GEO + 'ngauruhoe.jpg'], ['Ngāuruhoe & Tongariro', WC_GEO + 'ngauruhoetongariro.jpg'], ['Tongariro', WC_GEO + 'tongariro.jpg'], ['Tongariro Te Maari crater', WC_GEO + 'tongarirotemaaricrater.jpg'], ['Taranaki Maunga', WC_GEO + 'taranaki.jpg'], ['Whakaari from Whakatāne', WC_GEO + 'whakatane.jpg'], ['Whakaari from Te Kaha', WC_GEO + 'tekaha.jpg'], ['Raoul Island (Kermadecs)', WC_GEO + 'raoulisland.jpg']] },
+  { n: 'Heading to Auckland', ic: '🚗', src: 'NZTA', c: [['SH1 Puhoi Viaduct', WC_TNZ + '824.jpg'], ['SH1 Johnstones Hill Tunnels', WC_TNZ + '825.jpg'], ['SH18 Upper Harbour Bridge', WC_TNZ + '177.jpg']] },
+  { n: 'Scenic roads & passes', ic: '🏔️', src: 'NZTA', c: [['SH1 Desert Road summit', WC_TNZ + '608.jpg'], ['SH73 Arthur\u2019s Pass', WC_TNZ + '665.jpg'], ['SH8 Lindis Pass', WC_TNZ + '725.jpg'], ['SH6 Haast River Bridge', WC_TNZ + '745.jpg'], ['SH6 Kawarau River Bridge, Queenstown', WC_TNZ + '623.jpg'], ['SH1 Ngauranga Gorge, Wellington', WC_TNZ + '228.jpg']] }
+];
+const WC_MORE = [['GeoNet volcano cameras', 'https://www.geonet.org.nz/volcano/cameras'], ['NZTA traffic cameras', 'https://www.journeys.nzta.govt.nz/traffic-cameras'], ['Windy: more NZ webcams', 'https://www.windy.com/-Webcams/New-Zealand/webcams'], ['MetService mountains & parks', 'https://www.metservice.com/mountains-and-parks']];
+let wcTimer = null;
+function wcRefresh() {
+  if (location.hash !== '#webcams') { clearInterval(wcTimer); wcTimer = null; return; }
+  const t = Date.now();
+  document.querySelectorAll('img.wcimg').forEach(im => { im.src = im.dataset.u + '?t=' + t; });
+  const el = document.getElementById('wcstamp'); if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' });
+}
+function WebcamsPage() {
+  const back = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>`;
+  const t = Date.now();
+  const cam = ([n, u]) => `<div style="background:#0f172a;border-radius:14px;overflow:hidden;margin:0 0 12px"><img class="wcimg" data-u="${esc(u)}" src="${esc(u)}?t=${t}" alt="${esc(n)}" loading="lazy" style="display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:#1e293b" onclick="${fmOpen(u)}" onerror="this.style.opacity=.3"><div style="padding:8px 12px;color:#fff;font-weight:600">${esc(n)}</div></div>`;
+  if (!wcTimer) wcTimer = setInterval(wcRefresh, 60000);
+  return back + header('Live NZ webcams', WC_GROUPS.reduce((a, g) => a + g.c.length, 0) + ' cams · refresh every minute')
+    + `<div class="s muted" id="wcstamp" style="margin:0 4px 8px">Updated ${new Date().toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}</div>`
+    + WC_GROUPS.map(g => `<div class="sec"><span class="sechead">${g.ic} ${esc(g.n)}</span><span class="s muted">${g.src}</span></div>` + g.c.map(cam).join('')).join('')
+    + `<div class="sec"><span class="sechead">🔗 More webcams</span></div><div class="list">${WC_MORE.map(([n, u]) => `<button type="button" class="row" onclick="${fmOpen(u)}"><div class="ic">📷</div><div class="tx"><div class="t">${esc(n)}</div><div class="s">Opens in your browser</div></div></button>`).join('')}</div>`
+    + `<div class="s muted" style="margin:12px 4px">Volcano cams are from GeoNet and road cams from NZTA. Tap a picture to open it full size. There are no public road cams in Northland yet. Night shots can look dark.</div>`;
 }
 function BooksPage() {
   const grp = [['Reading', x => x.st === 'reading' || x.st === 'started'], ['Finished', x => x.st === 'read'], ['In your library', x => x.st === 'own'], ['Samples', x => x.st === 'sample']];
