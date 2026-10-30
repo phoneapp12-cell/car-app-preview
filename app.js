@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.99';
+const APP_VERSION = '2.29.0';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11948,7 +11948,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   books: ['book', 'blog', 'Kindle books', 'Books'], // 2.28.83
   accounts: ['cash', 'loan', 'My accounts', 'Accounts'], // 2.28.90
   freemovies: ['play', 'vid', 'Free movies', 'Free movies'], // 2.28.87
-  discover: ['search', 'vid', 'Discover', 'Discover'], // 2.28.98
+  discover: ['search', 'vid', 'Giggles', 'Giggles'], // 2.28.98, 2.29.0 Giggles
   webcams: ['play', 'vid', 'Live NZ webcams', 'Webcams'], // 2.28.88
   photos: ['image', 'blog', 'Photos', 'Photos'],
   podcasts: ['podcast', 'pod', 'Podcasts', 'Podcasts'],
@@ -24072,7 +24072,7 @@ function glTiles() {
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#prime')");
   add('webcams', 'watch', 'Live NZ webcams', () => 'Volcanoes, mountains & roads · live', 'i3-tv', ['#0ea5e9', '#1e3a8a'], "go('#webcams')"); // 2.28.88
   add('freemovies', 'watch', 'Free movies on demand', () => FM_SRC.length + ' free sources · comedies first', 'i3-tv', ['#16a34a', '#1e3a8a'], "go('#freemovies')"); // 2.28.87
-  add('discover', 'watch', 'Discover', () => 'Site of the day: ' + discSiteToday().n, 'i3-travel', ['#0ea5e9', '#6366f1'], "go('#discover')"); // 2.28.98
+  add('discover', 'watch', 'Giggles', () => 'Funny pics, fresh every day', 'i3-travel', ['#0ea5e9', '#6366f1'], "go('#discover')"); // 2.28.98
   add('movies', 'watch', 'Movies', () => mvTileSub(), B('events'), '', "go('#movies')"); // 2.27.55: Event Cinemas Whangārei only
   add('videos', 'watch', 'Videos', () => { let t = ''; try { const sv = currentSarahVideo(); const l = preferFilmVideoTitles(videoSuggestions() || []); const v = (sv ? [sv] : []).concat(l || []).find(x => x && x.title && glOk(x.title) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(x.title)); t = v ? v.title : ''; } catch (e) { } return t || 'Your video categories'; }, B('tv'), '', "go('#videos')");
   add('top40', 'listen', 'Top 40 NZ', () => { const t = (typeof TOP40 !== 'undefined' && TOP40[0]) || null; return t ? '#1 ' + t.title + ' · ' + t.artist : 'This week’s NZ chart'; }, 'i3-radio', ['#f97316', '#be123c'], "go('#top40')");
@@ -37717,7 +37717,7 @@ function sylHtml() {
   const row = r => `<button type="button" class="sylr" ${r.go ? `onclick="${esc(r.go)}"` : 'disabled'}><span class="sylic">${r.ic}</span><span class="syltx"><b>${esc(r.t)}</b><small>${esc(r.s)}</small></span></button>`;
   return `<div class="syl">${head}${R.slice(0, 6).map(row).join('')}${more ? `<div class="sylm">+ ${more} more change${more > 1 ? 's' : ''}</div>` : ''}</div>`;
 }
-function SURP_T() { return ['otd', 'fact', 'site', 'song']; }
+function SURP_T() { return ['otd', 'fact', 'song']; }
 function SURP_NZ() { return /New Zealand|Aotearoa|M[āa]ori|Wellington|Auckland|Christchurch|Dunedin|Northland|Whang[āa]rei|Waitangi|Rotorua|Otago|Waikato|Napier|Tauranga|Kiwi\b/i; }
 function SURP_BAD() { return /kill|murder|war\b|bomb|attack|massacre|shoot|terror|dies|died|death|crash|earthquake|rugby|cricket|football|olympic|sport|\bcup\b|sex|rape|execut|genocide|riot/i; }
 function surpIdx() { let off = 0; try { off = +(sessionStorage.getItem('surpOff') || 0); } catch (e) { } return ((glDay() + off) % SURP_T().length + SURP_T().length) % SURP_T().length; }
@@ -37798,24 +37798,69 @@ function DISC() { return [
 function discSiteToday() { const L = DISC(); return L[((glDay() * 7) % L.length + L.length) % L.length]; }
 function discWayback() { try { let u = String((document.getElementById('wbUrl') || {}).value || '').trim(), y = String((document.getElementById('wbYear') || {}).value || '').trim(); if (!u) { alert('Type a website first, like nzherald.co.nz'); return; } u = u.replace(/^https?:\/\//i, ''); if (!/^\d{4}$/.test(y)) y = '2005'; window.open('https://web.archive.org/web/' + y + '0601000000/' + encodeURIComponent(u).replace(/%2F/g, '/'), '_blank', 'noopener'); } catch (e) { } }
 function discRandom() { const L = DISC(), x = L[Math.floor(Math.random() * L.length)]; try { hab('tap:discover', x.n); } catch (e) { } window.open(x.u, '_blank', 'noopener'); }
+/* 2.29.0: Giggles (#discover). Shane: "delete this and replace it with funny pictures ... I like the method".
+   Same 3D fly-through, now filled with funny and cute pictures from public Lemmy communities (fresh daily, no login,
+   the phone reads them directly), mixed with the app's jokes (tap to reveal) and NZ facts. Clean only: no NSFW,
+   politics, sport, violence. */
+var GIG_SRC = ['funny@lemmy.world', 'animalsbeingderps@lemmy.world', 'cat@lemmy.world', 'dogs@lemmy.world', 'funny@lemmy.world', 'aww@lemmy.world', 'mildlyinteresting@lemmy.world'];
+var GIG_BAD = /passed|\brip\b|seizure|cancer|sick\b|twin tower|9\/11|cannibal|knife|knives|slop|american|sadness|grief|funeral|trump|biden|harris|elon|musk|vote|voting|election|democrat|republican|gop|maga|congress|senate|politic|president|putin|ukrain|russia|israel|gaza|palestin|hamas|iran|war\b|nazi|fascis|capitalis|communis|socialis|billionaire|tax|police|cop\b|cops\b|ice\b|immigra|gun|shoot|kill|dead|death|die\b|died|murder|abuse|rape|suicide|blood|religio|church|god\b|jesus|sex|nsfw|nude|porn|boob|penis|dick|ass\b|fuck|shit|bitch|drunk|weed|cocaine|drug|rugby|football|soccer|nfl|nba|cricket|basket|baseball|olympic|sport|league/i;
+var GIG = { list: null, busy: false, at: 0, open: {} };
+function gigLoad(force) {
+  if (GIG.busy) return; if (!force && GIG.list && Date.now() - GIG.at < 3 * 3600e3) return;
+  if (!force && !GIG.list) { try { const c = JSON.parse(localStorage.getItem('gigFeed') || 'null'); if (c && c.l && c.l.length && Date.now() - c.t < 3 * 3600e3) { GIG.list = c.l; GIG.at = c.t; return; } } catch (e) { } }
+  GIG.busy = true;
+  const srcs = [...new Set(GIG_SRC)];
+  Promise.all(srcs.map(c => fetch('https://lemmy.world/api/v3/post/list?community_name=' + encodeURIComponent(c) + '&sort=Hot&limit=40').then(r => r.ok ? r.json() : { posts: [] }).catch(() => ({ posts: [] })).then(d => (d.posts || []).map(p => ({ c, p })))))
+    .then(all => {
+      const seen = new Set(), by = {};
+      all.flat().forEach(({ c, p }) => { const P = p.post || {}, u = P.url || '', t = (P.name || '').trim();
+        if (P.nsfw || (p.community && p.community.nsfw) || P.removed || P.deleted) return;
+        if (!/^https:\/\/[^\s"'<>]+\.(jpe?g|png|webp|gif)(\?[^\s"'<>]*)?$/i.test(u)) return;
+        if (!t || t.length > 140 || GIG_BAD.test(t + ' ' + (P.body || '').slice(0, 300))) return;
+        if (seen.has(u)) return; seen.add(u);
+        (by[c] = by[c] || []).push({ img: u, t, src: c.split('@')[0], link: P.ap_id || ('https://lemmy.world/post/' + P.id), score: (p.counts && p.counts.score) || 0 }); });
+      const qs = Object.values(by).map(a => a.sort((x, y) => y.score - x.score)), out = [];
+      for (let k = 0; out.length < 60 && qs.some(q => q.length); k++) { const q = qs[k % qs.length]; if (q.length) out.push(q.shift()); }
+      if (out.length) { GIG.list = out; GIG.at = Date.now(); try { localStorage.setItem('gigFeed', JSON.stringify({ t: GIG.at, l: out })); } catch (e) { } }
+    }).finally(() => { GIG.busy = false; if (location.hash === '#discover') { const el = document.getElementById('d3'); if (!el || el.scrollTop < 40) render(); } });
+}
+function gigItems() {
+  const day = glDay(), out = [], pics = (GIG.list || []).slice(), J = DAILY_JOKES, F = HOME_FACTS;
+  let j = 0, f = 0;
+  const extra = n => n % 2 ? { k: 'fact', t: F[(day * 3 + f++) % F.length] } : { k: 'joke', q: J[(day * 2 + j) % J.length][0], a: J[(day * 2 + j++) % J.length][1] };
+  if (!pics.length) { for (let n = 0; n < 8; n++) out.push(extra(n)); return out; }
+  pics.forEach((p, n) => { out.push(Object.assign({ k: 'pic' }, p)); if (n % 4 === 3) out.push(extra(Math.floor(n / 4))); });
+  return out;
+}
+const SRC_LAB = { funny: '😂 Funny', animalsbeingderps: '🐾 Animals being derps', cat: '🐱 Cats', dogs: '🐶 Dogs', aww: '🥰 Aww', mildlyinteresting: '🤔 Mildly interesting' };
 function DiscoverPage() {
-  const back = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>`, t = discSiteToday(), yrs = [];
-  for (let y = new Date().getFullYear() - 1; y >= 1996; y--) yrs.push(`<option${y === 2005 ? ' selected' : ''}>${y}</option>`);
-  const row = x => `<button type="button" class="row" onclick="try{hab('tap:discover',${esc(JSON.stringify(x.n))})}catch(e){};${fmOpen(x.u)}"><div class="ic" style="font-size:1.5rem">${x.ic}</div><div class="tx"><div class="t">${esc(x.n)}</div><div class="s">${esc(x.s)}</div></div>${I('right')}</button>`;
-  return back + header('Discover', 'Fun and interesting corners of the internet') +
-    `<div class="card" style="background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff"><div style="font-size:.85rem;font-weight:700;opacity:.9">✨ Site of the day</div><div style="font-size:1.2rem;font-weight:800;margin:4px 0">${t.ic} ${esc(t.n)}</div><div style="opacity:.95">${esc(t.s)}</div><div class="btns" style="margin-top:10px"><button class="btn small" onclick="${fmOpen(t.u)}">Open it</button><button class="btn small" onclick="discRandom()">🎲 Surprise me</button></div></div>` +
-    `<div class="card"><b>⏳ Time machine</b><div class="s muted" style="margin:2px 0 8px">See how any website looked in a year of your choice, using the Wayback Machine.</div><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="wbUrl" type="text" placeholder="e.g. nzherald.co.nz" style="flex:1;min-width:150px;padding:8px;border-radius:8px;border:1px solid var(--line)"><select id="wbYear" style="padding:8px;border-radius:8px;border:1px solid var(--line)">${yrs.join('')}</select><button class="btn small primary" onclick="discWayback()">Go back</button></div></div>` +
-    (S.settings && S.settings.discFlat ? `<div style="text-align:right;margin:0 0 6px"><a href="#" onclick="event.preventDefault();S.settings.discFlat=false;save();render()">🌀 3D view</a></div><div class="list">${DISC().map(row).join('')}</div>` : disc3dHtml());
+  gigLoad(false);
+  const back = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>`;
+  const L = gigItems(), H = 600;
+  window._gigL = L;
+  const panels = L.map((x, i) => {
+    const n = `<div class="d3n">${String(i + 1).padStart(2, '0')} / ${String(L.length).padStart(2, '0')}</div>`;
+    if (x.k === 'pic') return `<div class="d3p d3pic" data-i="${i}" onclick="disc3dTap(${i})">${n.replace('d3n', 'd3n d3src').replace(/>\d.*</, '>' + (SRC_LAB[x.src] || x.src) + '<')}<div class="d3img"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(x.img)}" alt="" onerror="this.closest('.d3p').classList.add('d3broke')"></div><div class="d3cap">${esc(x.t)}</div></div>`;
+    const [a, b] = D3_COL[i % D3_COL.length];
+    if (x.k === 'joke') return `<div class="d3p" data-i="${i}" style="background:linear-gradient(135deg,${a},${b})" onclick="disc3dTap(${i})">${n}<div class="d3ic">🤣</div><div class="d3t" style="font-size:1.3rem">${esc(x.q)}</div><div class="d3s d3pun" style="${GIG.open[i] ? '' : 'filter:blur(7px)'}">${esc(x.a)}</div><div class="d3go">${GIG.open[i] ? 'Ha!' : 'Tap for the punchline'}</div></div>`;
+    return `<div class="d3p" data-i="${i}" style="background:linear-gradient(135deg,#065f46,#0f766e)" onclick="disc3dTap(${i})">${n}<div class="d3ic">🇳🇿</div><div class="d3t" style="font-size:1.2rem">Did you know?</div><div class="d3s">${esc(x.t)}</div></div>`;
+  }).join('');
+  setTimeout(disc3dInit, 0);
+  const sub = GIG.list ? `${GIG.list.length} funny pics, plus jokes and NZ facts` : (GIG.busy ? 'Grabbing today’s funny pics…' : 'Jokes and NZ facts while the pics load');
+  return back + header('😂 Giggles', sub) +
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 6px"><b>🌀 Scroll to fly through</b><a href="#" onclick="event.preventDefault();GIG.open={};gigLoad(true);render()">🔄 New batch</a></div><div id="d3" class="d3" style="height:${H}px"><div class="d3stage" style="height:${H}px">${panels}<div class="d3hint">↓ Scroll</div></div><div style="height:${(L.length - 1) * D3_GAP + 60}px"></div></div>` +
+    `<div class="s muted" style="text-align:center;margin:-4px 0 14px">Pictures come from public Lemmy communities and change through the day. Tap a picture twice to see where it came from.</div>`;
 }
 const D3_GAP = 520;
 const D3_COL = [['#7c3aed', '#db2777'], ['#0ea5e9', '#6366f1'], ['#f59e0b', '#ef4444'], ['#10b981', '#0e7490'], ['#ec4899', '#8b5cf6'], ['#22c55e', '#15803d'], ['#f97316', '#be123c'], ['#06b6d4', '#1d4ed8'], ['#a855f7', '#4c1d95'], ['#eab308', '#a16207']];
-function disc3dHtml() {
-  const L = DISC(), H = 560;
-  const panels = L.map((x, i) => { const [a, b] = D3_COL[i % D3_COL.length]; return `<div class="d3p" data-i="${i}" style="background:linear-gradient(135deg,${a},${b})" onclick="disc3dTap(${i})"><div class="d3n">${String(i + 1).padStart(2, '0')} / ${String(L.length).padStart(2, '0')}</div><div class="d3ic">${x.ic}</div><div class="d3t">${esc(x.n)}</div><div class="d3s">${esc(x.s)}</div><div class="d3go">Tap to open ›</div></div>`; }).join('');
-  setTimeout(disc3dInit, 0);
-  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 6px"><b>🌀 Scroll to fly through</b><a href="#" onclick="event.preventDefault();S.settings.discFlat=true;save();render()">Flat list</a></div><div id="d3" class="d3" style="height:${H}px"><div class="d3stage" style="height:${H}px">${panels}<div class="d3hint">↓ Scroll</div></div><div style="height:${(L.length - 1) * D3_GAP + 60}px"></div></div>`;
+function disc3dTap(i) {
+  const el = document.getElementById('d3'); if (!el) return; const cur = Math.round(el.scrollTop / D3_GAP);
+  if (cur !== i) { el.scrollTo({ top: i * D3_GAP, behavior: 'smooth' }); return; }
+  const x = (window._gigL || [])[i]; if (!x) return;
+  try { hab('tap:giggles', x.k); } catch (e) { }
+  if (x.k === 'joke') { GIG.open[i] = 1; const p = el.querySelector(`.d3p[data-i="${i}"]`); if (p) { p.querySelector('.d3pun').style.filter = ''; p.querySelector('.d3go').textContent = 'Ha!'; } return; }
+  if (x.k === 'pic') window.open(x.link, '_blank', 'noopener');
 }
-function disc3dTap(i) { const el = document.getElementById('d3'); if (!el) return; const cur = Math.round(el.scrollTop / D3_GAP); if (cur !== i) { el.scrollTo({ top: i * D3_GAP, behavior: 'smooth' }); return; } const x = DISC()[i]; try { hab('tap:discover', x.n); } catch (e) { } window.open(x.u, '_blank', 'noopener'); }
 function disc3dInit() {
   const el = document.getElementById('d3'); if (!el || el.dataset.on) return; el.dataset.on = '1';
   const P = [...el.querySelectorAll('.d3p')], hint = el.querySelector('.d3hint'); let raf = 0;
@@ -37829,4 +37874,4 @@ function disc3dInit() {
     if (hint) hint.style.opacity = st > 40 ? '0' : '1'; };
   el.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(draw); }, { passive: true }); draw();
 }
-(() => { try { const st = document.createElement('style'); st.textContent = '.d3{position:relative;overflow-y:auto;overflow-x:hidden;border-radius:18px;background:radial-gradient(ellipse at center,#1e1b4b 0%,#020617 75%);margin:0 0 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.d3::-webkit-scrollbar{display:none}.d3stage{position:sticky;top:0;perspective:700px;perspective-origin:50% 45%;overflow:hidden;transform-style:preserve-3d}.d3p{position:absolute;left:50%;top:50%;width:78%;max-width:340px;min-height:300px;box-sizing:border-box;padding:22px 20px;border-radius:22px;color:#fff;box-shadow:0 20px 50px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.18);display:flex;flex-direction:column;gap:8px;will-change:transform,opacity;cursor:pointer;backface-visibility:hidden}.d3n{font-size:.75rem;font-weight:800;letter-spacing:.12em;opacity:.75}.d3ic{font-size:3.6rem;line-height:1.1}.d3t{font-size:1.6rem;font-weight:900;line-height:1.1}.d3s{font-size:1rem;line-height:1.4;opacity:.95}.d3go{margin-top:auto;align-self:flex-start;background:rgba(255,255,255,.22);padding:6px 14px;border-radius:999px;font-weight:700;font-size:.9rem;opacity:.4;transition:opacity .2s}.d3front .d3go{opacity:1}.d3hint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#c7d2fe;font-weight:700;letter-spacing:.1em;font-size:.85rem;transition:opacity .3s;animation:d3b 1.6s ease-in-out infinite}@keyframes d3b{50%{transform:translateY(6px)}}'; document.head.appendChild(st); } catch (e) { } })();
+(() => { try { const st = document.createElement('style'); st.textContent = '.d3{position:relative;overflow-y:auto;overflow-x:hidden;border-radius:18px;background:radial-gradient(ellipse at center,#1e1b4b 0%,#020617 75%);margin:0 0 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.d3::-webkit-scrollbar{display:none}.d3stage{position:sticky;top:0;perspective:700px;perspective-origin:50% 45%;overflow:hidden;transform-style:preserve-3d}.d3p{position:absolute;left:50%;top:50%;width:78%;max-width:340px;min-height:300px;box-sizing:border-box;padding:22px 20px;border-radius:22px;color:#fff;box-shadow:0 20px 50px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.18);display:flex;flex-direction:column;gap:8px;will-change:transform,opacity;cursor:pointer;backface-visibility:hidden}.d3n{font-size:.75rem;font-weight:800;letter-spacing:.12em;opacity:.75}.d3ic{font-size:3.6rem;line-height:1.1}.d3t{font-size:1.6rem;font-weight:900;line-height:1.1}.d3s{font-size:1rem;line-height:1.4;opacity:.95}.d3go{margin-top:auto;align-self:flex-start;background:rgba(255,255,255,.22);padding:6px 14px;border-radius:999px;font-weight:700;font-size:.9rem;opacity:.4;transition:opacity .2s}.d3front .d3go{opacity:1}.d3pic{background:#111827;padding:14px 12px 16px;min-height:0}.d3src{letter-spacing:.04em}.d3img{border-radius:14px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;height:330px}.d3img img{max-width:100%;max-height:330px;object-fit:contain;display:block}.d3cap{font-size:1.05rem;font-weight:700;line-height:1.35;margin-top:6px}.d3broke{display:none!important}.d3hint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#c7d2fe;font-weight:700;letter-spacing:.1em;font-size:.85rem;transition:opacity .3s;animation:d3b 1.6s ease-in-out infinite}@keyframes d3b{50%{transform:translateY(6px)}}'; document.head.appendChild(st); } catch (e) { } })();
