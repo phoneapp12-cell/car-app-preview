@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.95';
+const APP_VERSION = '2.28.96';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1283,17 +1283,65 @@ const HOME_JOKES = [
   'My wife says I’ve only got two faults. I don’t listen, and something else.',
   'I used to think I was indecisive. Now I’m not so sure.'
 ];
-const HOME_FACTS = [
-  'Whangārei’s name is often said to mean a cherished harbour.',
-  'Honey never really spoils. A sealed jar can sit for years.',
-  'Octopuses have three hearts, and two of them stop when they swim.',
-  'Bananas are berries. Strawberries are not.',
-  'A group of puffins is called a circus.',
-  'Hot water can freeze faster than cold water. That’s the Mpemba effect.',
-  'Gluten-free buckwheat isn’t wheat at all. It’s a seed.',
-  'Te Matau ā Pohe, the lifting bridge, is named for a fish hook.',
-  'A day on Venus is longer than a year on Venus.',
-  'Onerahi was an early flying-boat spot for Whangārei.'
+const HOME_FACTS = [ // 2.28.96: all New Zealand facts, at Shane's request
+  "Whangārei Falls drops about 26 metres over old basalt lava flows.",
+  "Mount Manaia at Whangārei Heads is the remains of an ancient volcano, around 20 million years old.",
+  "Northland’s Tāne Mahuta is the largest known living kauri tree, thought to be between 1,250 and 2,500 years old.",
+  "The Treaty of Waitangi was first signed at Waitangi in the Bay of Islands on 6 February 1840.",
+  "New Zealand’s first capital was Okiato, near Russell in the Bay of Islands, from 1840 to 1841.",
+  "Auckland was New Zealand’s capital from 1841 until Wellington took over in 1865.",
+  "In 1893 New Zealand became the first self-governing country where women could vote in national elections.",
+  "Kate Sheppard, who led the fight for women’s votes, is on the New Zealand $10 note.",
+  "Aoraki/Mount Cook is New Zealand’s highest mountain, at about 3,724 metres.",
+  "Lake Taupō fills a caldera left by huge volcanic eruptions. The last big one, about 1,800 years ago, was one of the largest in the last 5,000 years.",
+  "The Waikato is New Zealand’s longest river, at about 425 kilometres.",
+  "Kiwi lay one of the largest eggs for their body size of any bird. An egg can be about a fifth of the mother’s weight.",
+  "The kākāpō is the world’s heaviest parrot, and it can’t fly.",
+  "The kea, from the Southern Alps, is the world’s only alpine parrot.",
+  "The tuatara isn’t a lizard. It’s the last survivor of an ancient group of reptiles that lived alongside the dinosaurs.",
+  "New Zealand has no native land snakes.",
+  "Bats are New Zealand’s only native land mammals.",
+  "Ernest Rutherford, the first person to split the atom, was born near Nelson, and he’s on the $100 note.",
+  "Sir Edmund Hillary and Tenzing Norgay were the first confirmed climbers to reach the top of Everest, in 1953.",
+  "Bungy jumping went commercial in New Zealand, at Queenstown’s Kawarau Bridge in 1988.",
+  "Rotorua’s Pōhutu geyser at Te Puia can shoot water up to about 30 metres high.",
+  "Wellington is the southernmost capital city of a sovereign country in the world.",
+  "Baldwin Street in Dunedin has been called the world’s steepest street.",
+  "Stewart Island/Rakiura is New Zealand’s third-largest island, and most of it is national park.",
+  "Te reo Māori became an official language of New Zealand in 1987.",
+  "New Zealand Sign Language became an official language in 2006.",
+  "The Chatham Islands are among the first places in the world to see each new day.",
+  "Ninety Mile Beach in Northland is actually about 88 kilometres long.",
+  "Cape Rēinga is where Māori tradition says spirits leave the land on their journey to Hawaiki.",
+  "Hokianga Harbour is where the explorer Kupe is said to have set off home after reaching Aotearoa.",
+  "The Pink and White Terraces near Rotorua were buried when Mount Tarawera erupted in 1886.",
+  "The pōhutukawa is often called New Zealand’s Christmas tree because it flowers red in December.",
+  "The kauri gum dug up in Northland was once a big export, used to make varnish and linoleum.",
+  "The Bay of Islands has about 144 islands.",
+  "Lake Taupō is the largest lake in New Zealand, covering about 616 square kilometres.",
+  "Fiordland National Park is New Zealand’s biggest national park, at more than 12,000 square kilometres.",
+  "Milford Sound/Piopiotahi is one of the wettest places in New Zealand, with about 6.7 metres of rain a year.",
+  "The Franz Josef and Fox glaciers flow down almost to temperate rainforest.",
+  "New Zealand sits across the boundary of the Pacific and Australian tectonic plates.",
+  "The Alpine Fault runs about 600 kilometres along the Southern Alps.",
+  "The pavlova’s homeland is hotly argued between New Zealand and Australia.",
+  "Hokey pokey ice cream, vanilla with little lumps of honeycomb toffee, is a Kiwi classic.",
+  "L&P was first made in Paeroa, and the town has a giant L&P bottle.",
+  "The jandal was popularised in New Zealand in the 1950s, and the name comes from “Japanese sandal”.",
+  "Whangārei’s Hundertwasser Art Centre opened in 2022, based on designs by the artist Friedensreich Hundertwasser.",
+  "The Hundertwasser toilets in Kawakawa, Northland, are probably the most famous public toilets in the country.",
+  "Te Matau ā Pohe bridge in Whangārei is shaped like a Māori fish hook, and its two halves lift to let boats through.",
+  "The Kawiti Glow Worm Caves near Kawakawa have been guided by the Kawiti whānau for generations.",
+  "The tūī can mimic sounds and has two voice boxes, so it can sing two notes at once.",
+  "The pūkeko was one of the birds that arrived in New Zealand on its own, probably from Australia.",
+  "The giant wētā is one of the heaviest insects in the world.",
+  "Mānuka honey comes from bees that feed on the flowers of the mānuka bush.",
+  "The silver fern became a national symbol in the 1800s and is still used everywhere today.",
+  "Kiwifruit used to be called Chinese gooseberries until growers renamed them in 1959.",
+  "New Zealand is roughly the same size as the United Kingdom, but with far fewer people.",
+  "No part of New Zealand is more than about 130 kilometres from the sea.",
+  "Matariki, the Māori New Year, became a public holiday in 2022.",
+  "Poor Knights Islands, off Tutukaka in Northland, are often called one of the world’s best dive spots."
 ];
 // One light aside. From about 9pm, a soft “still awake” line. No hours, no lecture, no smart-home controls.
 // A work start comes only from the roster, and only before that time. Never a nag once it has passed.
@@ -37690,7 +37738,7 @@ function surpriseHtml() {
   if (S.settings && S.settings.surpOff) return '';
   let k = SURP_T()[surpIdx()], ic = '', lab = '', body = '', tap = '';
   if (k === 'otd') { const o = otdGet(); if (!o) { setTimeout(otdLoad, 0); k = 'fact'; } else { ic = '📜'; lab = o.nz ? 'On this day in NZ' : 'On this day'; body = `<b>${esc(String(o.y))}</b> · ${esc(o.t)}`; tap = o.link ? `window.open('${esc(o.link)}','_blank')` : ''; } }
-  if (k === 'fact') { const f = typeof factToday === 'function' ? factToday() : ''; if (f) { ic = '💡'; lab = 'Fun fact'; body = esc(f); tap = "glInfo('fact')"; } else k = 'song'; }
+  if (k === 'fact') { const f = typeof factToday === 'function' ? factToday() : ''; if (f) { ic = '🇳🇿'; lab = 'NZ fact'; body = esc(f); tap = "glInfo('fact')"; } else k = 'song'; }
   if (k === 'song') { const L = typeof GL_SUNO !== 'undefined' ? GL_SUNO : []; ic = '🎵'; lab = 'Song idea for Suno'; body = esc(L.length ? L[glDay() % L.length] : 'A Suno track about Onerahi and the harbour'); tap = "window.open('https://suno.com/create','_blank')"; }
   return `<div class="surp" id="surp"><div class="surph"><span>🎁 Daily surprise · ${lab}</span><button type="button" onclick="event.stopPropagation();surpNext()" aria-label="Another one">↻</button></div><div class="surpb" ${tap ? `role="button" tabindex="0" onclick="${tap}"` : ''}><span class="surpic">${ic}</span><span>${body}</span></div></div>`;
 }
