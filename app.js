@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.91';
+const APP_VERSION = '2.28.92';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24666,7 +24666,7 @@ function glanceHome() {
   const wk = homeTry('week overview', () => weekOverview(), ''); // 2.27.28: the week overview replaces the Organise tabs; the shortcut tiles stay
   const pulseH = typeof glLivePulseHtml === 'function' ? homeTry('live pulse', () => glLivePulseHtml(m), '') : '';
   const extraLinks = typeof glExtraQuickPills === 'function' ? homeTry('extra pills', () => glExtraQuickPills(), '') : '';
-  const orgZ = wk ? `${pulseH}<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}${extraLinks}`
+  const orgZ = wk ? `${pulseH}<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#" onclick="event.preventDefault();homeWeekStyleToggle()">${S.settings && S.settings.homeWeekStyle === 'cards' ? '📺 Guide' : 'Cards'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}${extraLinks}`
     : org ? `${pulseH}<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}${extraLinks}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
   const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
@@ -24712,14 +24712,42 @@ function weekItems() {
   Object.values(out).forEach(L => L.sort((a, b) => (a.sort ? 0 : 1) - (b.sort ? 0 : 1) || String(a.sort).localeCompare(String(b.sort))));
   return out;
 }
+/* 2.28.92: This week as a TV guide: days down the side, times across the top (6am–midnight), All day first. */
+const WKG_H0 = 6, WKG_H1 = 24, WKG_PX = 84, WKG_AD = 128;
+function wkgMin(s) { const m = String(s || '').match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i); if (!m) return null; let h = +m[1]; const mi = +(m[2] || 0), ap = (m[3] || '').toLowerCase(); if (ap === 'pm' && h < 12) h += 12; if (ap === 'am' && h === 12) h = 0; return h > 23 || mi > 59 ? null : h * 60 + mi; }
+function weekGuide(D) {
+  const T = todayISO(), x0 = WKG_H0 * 60, W = (WKG_H1 - WKG_H0) * WKG_PX, nowD = new Date(), nowM = nowD.getHours() * 60 + nowD.getMinutes();
+  const xOf = m => WKG_AD + (Math.max(x0, Math.min(WKG_H1 * 60, m)) - x0) * WKG_PX / 60;
+  let hrs = `<div class="wkg-ad">All day</div>`; for (let h = WKG_H0; h < WKG_H1; h++) hrs += `<div class="wkg-hr" style="left:${WKG_AD + (h - WKG_H0) * WKG_PX}px">${h === 12 ? '12pm' : h > 12 ? (h - 12) + 'pm' : h + 'am'}</div>`;
+  const rows = Object.keys(D).sort().map(d => {
+    const dt = new Date(parseD(d)), items = D[d], timed = [], allday = [];
+    items.forEach(it => { const sm = /^\d{1,2}:\d{2}$/.test(String(it.sort || '')) && it.time && !/^Landed|^about/.test(it.time) ? wkgMin(it.sort) : null;
+      if (sm == null || it.type === 'pay' || it.type === 'xfer') { allday.push(it); return; }
+      const parts = String(it.time || '').split(/\s*[–-]\s*/); let em = parts[1] ? wkgMin(parts[1]) : null; if (em != null && em <= sm) em += 24 * 60; if (em == null) em = sm + 60;
+      timed.push({ it, sm, em }); });
+    const lanes = []; timed.sort((a, b) => a.sm - b.sm).forEach(t => { const x = xOf(t.sm), w = Math.max(96, xOf(t.em) - x - 3); let l = lanes.findIndex(e => e <= x); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = x + w + 3; t.x = x; t.w = w; t.l = l; });
+    const nl = Math.max(1, lanes.length, allday.length ? Math.min(allday.length, 3) : 1), H = 46;
+    const tile = (it, x, w, l, sub) => { const [ic0, col0] = WK_TYPE[it.type] || WK_TYPE.due, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
+      return `<button type="button" class="wkg-p" style="left:${x}px;top:${4 + l * H}px;width:${w}px;--wc:${esc(it.color || it.color2 || col0)}" onclick="if(window.glSwipe&&glSwipe.moved)return;${oc}"><b>${it.ic || ic0} ${it.sarah ? sarahBadge({ from: 'sarah' }) + ' ' : ''}${esc(it.title)}</b><small>${esc(sub || '')}</small></button>`; };
+    const ad = allday.slice(0, 3).map((it, i) => tile(it, 4, WKG_AD - 8, i, i === 2 && allday.length > 3 ? '+' + (allday.length - 2) + ' more · ' + (it.time || '') : (it.time || it.line || ''))).join('');
+    const tm = timed.map(t => tile(t.it, t.x, t.w, t.l, (t.it.time || '') + (t.it.warn ? ' · ' + t.it.warn : ''))).join('');
+    const nowLine = d === T && nowM >= x0 ? `<div class="wkg-now" style="left:${xOf(nowM)}px"></div>` : '';
+    return `<div class="wkg-row${d === T ? ' today' : ''}" style="height:${nl * H + 8}px"><div class="wkg-day"><i>${d === T ? 'TODAY' : ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][dt.getUTCDay()]}</i><b>${dt.getUTCDate()}</b>${allday.length ? `<span class="wkg-adn" onclick="document.getElementById('wkgscroll').scrollTo({left:0,behavior:'smooth'})">${allday.length} all-day</span>` : ''}<button type="button" class="wkg-add" aria-label="Add on ${esc(fmtW(d))}" onclick="wkAdd('${d}')">+</button></div><div class="wkg-lane" style="width:${WKG_AD + W}px">${ad}${tm}${nowLine}</div></div>`;
+  }).join('');
+  const wkgGo = n => { try { const el = document.getElementById('wkgscroll'); if (el && !el.dataset.done && el.clientWidth > 0) { el.dataset.done = '1'; el.scrollLeft = Math.max(0, xOf(Math.max(x0, nowM - 60)) - WKG_AD); } else if ((!el || !el.clientWidth) && n < 40) setTimeout(() => wkgGo(n + 1), 250); } catch (e) {} };
+  setTimeout(() => wkgGo(0), 60);
+  return `<div class="wkg" id="wkgscroll"><div class="wkg-times"><div class="wkg-corner">📺</div><div class="wkg-tl" style="width:${WKG_AD + W}px">${hrs}</div></div>${rows}</div>`;
+}
 function weekOverview() {
   const D = weekItems(), T = todayISO(); if (!(S.settings && S.settings.homeWeekBills)) Object.keys(D).forEach(d => { D[d] = D[d].filter(it => it.type !== 'bill' && it.type !== 'loan' && it.type !== 'xfer'); }); // 2.28.5: bills hidden on Home This week unless shown
   const card = it => { const [ic0, col0] = WK_TYPE[it.type] || WK_TYPE.due, ic = it.ic || ic0, col = it.color2 || col0, g = String(it.go || ''), oc = g.includes('&quot;') ? g : esc(g);
     return `<button type="button" class="wkcard" style="--wc:${esc(it.color || col)}" onclick="if(window.glSwipe&&glSwipe.moved)return;${oc}"><div class="wkh"><span class="wkt">${it.sarah ? sarahBadge({ from: 'sarah' }) + ' ' : ''}${esc(it.title)}</span><span class="wki">${ic}</span></div>${it.time ? `<div class="wktm">${esc(it.time)}</div>` : ''}${it.line || it.warn ? `<div class="wkb">${it.line ? `<div>${esc(it.line)}</div>` : ''}${it.warn ? `<div class="wkwarn">⚠️ ${esc(it.warn)}</div>` : ''}</div>` : ''}</button>`; };
   const cols = Object.keys(D).sort().map(d => { const dt = new Date(parseD(d));
     return `<div class="wkcol${d === T ? ' wktoday' : ''}"><div class="wkday"><div><span class="wkdn">${d === T ? 'Today' : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getUTCDay()]}</span><span class="wkdd">${dt.getUTCDate()}</span></div><button type="button" class="wkadd" aria-label="Add on ${esc(fmtW(d))}" onclick="wkAdd('${d}')">+</button></div>${D[d].map(card).join('') || '<div class="wkfree">Nothing on</div>'}</div>`; }).join('');
+  if (!(S.settings && S.settings.homeWeekStyle === 'cards')) return weekGuide(D); // 2.28.92: TV guide by default
   return `<div class="wkscroll" id="wkscroll">${cols}</div>`;
 }
+async function homeWeekStyleToggle() { try { S.settings = S.settings || {}; S.settings.homeWeekStyle = S.settings.homeWeekStyle === 'cards' ? 'guide' : 'cards'; await save(); const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; } catch (e) { } }
 async function homeWeekBillsToggle() { try { S.settings = S.settings || {}; S.settings.homeWeekBills = !S.settings.homeWeekBills; await save(); const v = $('#view'), top = v ? v.scrollTop : 0; render(); if (v) v.scrollTop = top; } catch (e) { } }
 function wkAdd(d) { openSheet('Add on ' + fmtW(d), `<div class="btns" style="flex-direction:column;gap:8px"><button type="button" class="btn primary" onclick="closeSheet().then(()=>todoForm(null,{due:'${d}'}))">☑️ To-do for this day</button><button type="button" class="btn" onclick="closeSheet().then(()=>mineForm(null,'${d}'))">📅 Event on this day</button></div>`, null, ''); }
 (() => { try { const st = document.createElement('style'); st.textContent = '.wkscroll{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:2px 2px 10px;margin:0 -2px;touch-action:pan-x pan-y}.wkcol{box-sizing:border-box;margin:0;flex:0 0 40%;min-width:140px;scroll-snap-align:start;background:var(--card,#fff);border-radius:14px;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,.08)}.wktoday{outline:0;box-shadow:inset 0 0 0 2.5px #F59E0B,0 1px 3px rgba(0,0,0,.08);background:rgba(245,158,11,.08)}.wkday{display:flex;justify-content:space-between;align-items:center;margin:0 0 8px}.wkdn{display:block;font-size:.78rem;font-weight:700;opacity:.75;text-transform:uppercase}.wkdd{font-size:1.4rem;font-weight:800}.wktoday .wkdd{color:#DC2626}.wkadd{width:30px;height:30px;border-radius:50%;border:0;background:#F59E0B;color:#111;font-size:1.25rem;font-weight:800;line-height:1}.wkcard{display:block;width:100%;text-align:left;border:0;padding:0;margin:0 0 8px;border-radius:10px;overflow:hidden;background:var(--card,#fff);box-shadow:0 1px 3px rgba(0,0,0,.12);font:inherit;color:inherit}.wkh{display:flex;gap:4px;justify-content:space-between;background:var(--wc);color:#fff;padding:6px 7px 2px;font-weight:700;font-size:.86rem;line-height:1.2}.wktm{background:var(--wc);color:#fff;padding:0 7px 6px;font-size:.78rem;opacity:.95}.wkb{padding:5px 7px;font-size:.78rem;line-height:1.3}.wkwarn{color:#DC2626;font-weight:700;margin-top:2px}.wkfree{font-size:.8rem;opacity:.6;padding:6px 2px}.wklinks{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}.wklinks a{font-size:.82rem;padding:4px 10px;border-radius:999px;background:rgba(127,127,127,.12);color:inherit;text-decoration:none}'; document.head.appendChild(st); } catch (e) { } })();
