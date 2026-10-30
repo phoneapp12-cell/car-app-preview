@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.90';
+const APP_VERSION = '2.28.91';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -21760,7 +21760,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { accounts: () => AccountsPage(), books: () => BooksPage(), freemovies: () => FreeMoviesPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { guide: () => GuidePage(), accounts: () => AccountsPage(), books: () => BooksPage(), freemovies: () => FreeMoviesPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -22459,7 +22459,7 @@ function glHead(name, m, now) {
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${loc}`;
   const shiftPill = m.sick ? '🤒 Off sick today' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
   let blurb = ''; try { blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || ''); } catch (e) { blurb = esc(glLine(m) || ''); }
-  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open side menu" title="Open side menu" onclick="event.stopPropagation();setTabsOpen(!tabsOpen)"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}</div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}</div></div>`;
+  return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open menu guide" title="Menu guide" onclick="event.stopPropagation();setTabsOpen(false);go('#guide')"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}</div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}</div></div>`;
 }
 /* ---- Home status ---- */
 function glTemps() { // 2.26.6: heat pump rooms plus every Hue temperature sensor (Hallway etc.), last known values
@@ -37486,6 +37486,41 @@ function AccountsPage() {
     return `<div class="card"><div class="t">${a.ic || '•'} ${esc(a.n)}</div>${nums}${a.bal ? `<div class="s" style="margin-top:4px;font-weight:600">${esc(a.bal)}</div>` : ''}${a.note ? `<div class="s">${esc(a.note)}</div>` : ''}${ph}${a.em ? `<div class="s">✉️ ${esc(a.em)}</div>` : ''}${a.web ? `<div class="s"><a href="${esc(a.web)}" target="_blank" rel="noopener" style="color:#2563eb">Website</a></div>` : ''}</div>`;
   }).join('');
   return h + `<div class="s" style="margin:0 4px 8px">Balances are from the latest emails, so check the provider's app for today's figure.</div>` + cards + `<button class="btn" style="background:#64748b;margin:8px 0 20px" onclick="acctLock()">🔒 Lock on this phone</button>`;
+}
+
+/* 2.28.91 TV-guide style menu (#guide). Opened from the ☰ button on Home. */
+const GUIDE_COL = { day: '#0369a1', people: '#be123c', near: '#15803d', media: '#7c3aed', life: '#b45309', money: '#047857', cars: '#1d4ed8' };
+const GUIDE_ICO = { day: '⭐', people: '❤️', near: '📍', media: '🎬', life: '🏠', money: '💰', cars: '🚗' };
+function guideSub(k) {
+  try {
+    if (k === 'bills') { const u = (S.bills || []).filter(b => !b.paid), o = u.filter(b => daysLeft(b.due) < 0).length; return o ? o + ' overdue' : u.length ? u.length + ' unpaid' : 'All clear'; }
+    if (k === 'todo') { const n = (S.todos || []).filter(t => !t.done).length; return n ? n + ' to do' : 'All done'; }
+    if (k === 'cars') return (S.cars || []).length + ' cars · rego & WOF';
+    if (k === 'accounts') return ACCT ? ACCT.length + ' accounts' : '🔒 Locked';
+    if (k === 'books') { const r = KINDLE_BOOKS.find(b => b.st === 'reading'); return r ? 'Reading now' : ''; }
+    if (k === 'livetv' || k === 'webcams') return 'Live';
+    if (k === 'freemovies') return 'Comedies first';
+    if (k === 'birthdays') { const nb = (S.birthdays || []).map(b => daysLeft(nextBday(b))).sort((a, b) => a - b)[0]; return nb === 0 ? 'Today! 🎂' : nb != null && nb <= 7 ? 'In ' + nb + ' days' : ''; }
+  } catch (e) {}
+  return '';
+}
+function GuidePage() {
+  const now = new Date();
+  let hero = '';
+  try {
+    const nx = (S.bills || []).filter(b => !b.paid && daysLeft(b.due) >= 0).sort((a, b) => String(a.due).localeCompare(String(b.due)))[0];
+    hero = `<div class="gd-hero" onclick="go('#alerts')"><div><b>ON NOW</b><div>${esc(typeof glanceOn === 'function' ? 'Home & notifications' : 'Home')}</div></div>${nx ? `<div style="text-align:right"><b>NEXT</b><div>${esc(nx.name)} · ${esc(fmtW(nx.due))}</div></div>` : ''}</div>`;
+  } catch (e) {}
+  const GL = { home: 'Home', weather: 'Weather', garden: 'Garden', events: 'Events', news: 'News', health: 'Health', livetv: 'Live TV', power: 'Power', bus: 'Bus', blogging: 'Blogging', commission: 'Commission' };
+  const label = k => GL[k] || (NAV[k] ? NAV[k][2] : k.charAt(0).toUpperCase() + k.slice(1));
+  const rows = NAV_GROUPS.map((g, gi) => {
+    const c = GUIDE_COL[g.id] || '#334155';
+    const keys = g.keys.slice();
+    return `<div class="gd-row"><div class="gd-ch" style="border-left:4px solid ${c}"><i>CH ${gi + 1}</i><span>${GUIDE_ICO[g.id] || ''} ${esc(g.title.replace(' & Learning', ''))}</span></div><div class="gd-progs">${keys.map((k, i) => { const s = guideSub(k); return `<button class="gd-p${i ? '' : ' first'}" style="background:${c}${i ? 'd9' : ''}" onclick="go('#${k === 'roster' ? 'work' : k}')">${label(k)}${s ? `<small>${esc(s)}</small>` : i ? '' : '<small>Now showing</small>'}</button>`; }).join('')}</div></div>`;
+  }).join('');
+  return header('📺 My App Guide', `${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${now.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}`, `<button class="iconbtn" aria-label="Side menu" title="Side menu" onclick="event.stopPropagation();setTabsOpen(true)"><span class="glbars"><i></i><i></i><i></i></span></button>`)
+    + `<div class="gd">${hero}<div class="gd-times"><span></span><span>Now</span><span>Next</span><span>Later →</span></div>${rows}
+    <div class="gd-foot">Swipe a channel sideways to browse · tap to open · ☰ at the top for the side menu</div></div>`;
 }
 
 function BooksPage() {
