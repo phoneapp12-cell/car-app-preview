@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.89';
+const APP_VERSION = '2.28.90';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11819,6 +11819,7 @@ function More() {
     health: () => healthMoreSub(),
     watch: () => { try { return hwWatchSub(); } catch (e) { return 'Steps, sleep and heart rate'; } },
     bridge: () => 'Dave Culham Drive · ' + BR_TXT[brStatus().state][3],
+    accounts: () => ACCT ? ACCT.length + ' accounts · numbers & contacts' : '🔒 Account numbers & contacts',
     bills: () => S.bills.length ? `${plural(due30, 'bill')} due in the next 30 days` : 'Power, phone, insurance…',
     birthdays: () => nb ? `Next: ${esc(nb.b.name)}, ${nb.d === 0 ? 'today!' : nb.d === 1 ? 'tomorrow' : fmtW(nb.iso)}` : 'Never miss one',
     ideas: () => S.ideas.length ? plural(S.ideas.length, 'idea') + (starred ? ` · ${starred} starred` : '') : 'Jot things down',
@@ -11897,6 +11898,7 @@ const NAV = { // key: [icon, icon colour class, name, short name for the tab]
   top40: ['music', 't40', 'Top 40', 'Top 40'],
   blogging: ['pen', 'blog', 'Blogging', 'Blog'],
   books: ['book', 'blog', 'Kindle books', 'Books'], // 2.28.83
+  accounts: ['cash', 'loan', 'My accounts', 'Accounts'], // 2.28.90
   freemovies: ['play', 'vid', 'Free movies', 'Free movies'], // 2.28.87
   webcams: ['play', 'vid', 'Live NZ webcams', 'Webcams'], // 2.28.88
   photos: ['image', 'blog', 'Photos', 'Photos'],
@@ -11948,7 +11950,7 @@ const NAV_GROUPS = [
   { id: 'near', title: 'Local', keys: ['weather', 'walks', 'bridge', 'roadworks', 'bus', 'planning', 'parlbills', 'garden', 'events', 'news'] },
   { id: 'media', title: 'Entertainment & Learning', keys: ['media', 'books', 'freemovies', 'webcams', 'livetv', 'tv', 'radio', 'top40', 'videos', 'podcasts', 'learn', 'aitech', 'science', 'diy', 'space', 'ideas'] },
   { id: 'life', title: 'Smart Home', keys: ['lights', 'heat', 'alarm'] },
-  { id: 'money', title: 'Money', keys: ['bills', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
+  { id: 'money', title: 'Money', keys: ['bills', 'accounts', 'budget', 'cashflow', 'finance', 'roster', 'commission', 'loans'] },
   { id: 'cars', title: 'Cars & Pets', keys: ['cars', 'fuel', 'pets'] }
 ];
 function navOrder() {
@@ -21758,7 +21760,7 @@ function render() {
   if (/^#roster(\/|$)/.test(location.hash || '')) { history.replaceState(history.state, '', '#work'); renderedHash = '#work'; } // 2.26.90: old link → Money › Work
   const h = (location.hash || '#home').slice(1), [r, arg] = h.split('/');
   try { if (render.habH !== h) { render.habH = h; if (r && !/^(home|alerts|archive|settings|more|meds|sleep|roster|work|pets|health|watch|gym|claims)$/.test(r)) hab('page:' + r); } } catch (e) { } // 2.27.60
-  const map = { books: () => BooksPage(), freemovies: () => FreeMoviesPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
+  const map = { accounts: () => AccountsPage(), books: () => BooksPage(), freemovies: () => FreeMoviesPage(), webcams: () => WebcamsPage(), photos: () => PhotosPage(), work: () => moneyTabs('work') + workTabs('hours') + Roster(), power: PowerPage, compare: ComparePage, powertime: PowerTimePage, weekend: WeekendPage, mumreno: MumRenoPage, myreno: MyRenoPage, reno: RenoPage, alerts: GlAlerts, archive: BellArchive, watch: WatchPage, cashflow: CashFlow, notbills: NotBills, wage: WagePage, summary: SummaryPage, media: MediaPage, food: FoodPage, projects: ProjectsPage, planning: PlanningPage, bus: OnerahiBusPage, parlbills: ParlBillsPage, movies: MoviesPage, concerts: ConcertsPage, nightlife: NightlifePage, netflix: NetflixPage, prime: PrimePage, lang: Languages, claims: Claims, home: Home, finance: FinancePage, cars: Cars, fuel: FuelHistoryPage, bills: () => moneyTabs('bills') + Bills(), todo: Todo, calendar: Calendar, settings: Settings, more: More, birthdays: Birthdays, ideas: Ideas, events: Events, news: LocalNews, localnews: LocalNewsBoard, weather: Weather, bridge: Bridge, meals: Meals, recipes: Recipes, shopping: Shopping, pets: Pets, loans: Loans, budget: () => moneyTabs('budget') + Budget(), videos: Videos, top40: Top40, reminders: Reminders, tv: TvGuide, livetv: LiveTvPage, podcasts: Podcasts, radio: Radio, diary: Diary, countdown: Countdown, notes: Notes, about: About, roster: Roster, roadworks: RoadworksMail, travel: Travel, space: SpacePage, aitech: () => lbPage('ai'), diy: () => lbPage('dy'), science: () => lbPage('sc'), coding: () => lbPage('cd'), astronomy: () => lbPage('as'), gardening: () => lbPage('gd'), lists: ListsHubPage, money: MoneyHubPage, wellbeing: WellbeingHubPage, local: LocalHubPage, homelife: HomeLifeHubPage, walks: WalksPage, tidy: TidyPage, gflist: GfListPage, learn: LearnPage, flagged: FlaggedPage, sleep: Sleep, gym: Gym, meds: Meds, lights: Lights, alarm: (typeof Alarm === 'function' ? Alarm : function(){ return header('Alarm','') + '<div class="card empty"><div class="t">Alarm unavailable</div></div>'; }), heat: (typeof Heat === 'function' ? Heat : function(){ return header('Heat pumps','') + '<div class="card empty"><div class="t">Heat pumps unavailable</div></div>'; }) };
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
@@ -37452,6 +37454,40 @@ function WebcamsPage() {
     + `<div class="sec"><span class="sechead">🔗 More webcams</span></div><div class="list">${WC_MORE.map(([n, u]) => `<button type="button" class="row" onclick="${fmOpen(u)}"><div class="ic">📷</div><div class="tx"><div class="t">${esc(n)}</div><div class="s">Opens in your browser</div></div></button>`).join('')}</div>`
     + `<div class="s muted" style="margin:12px 4px">Volcano cams are from GeoNet and road cams from NZTA. Tap a picture to open it full size. Northland has no public road cams yet, so the Whangārei section has the council dam cam and the Tutukākā marina cams. Night shots can look dark.</div>`;
 }
+const ACCT_BLOB = { s: 'KI76h6pjuDtog7lcHGyqNw==', i: '0yLefu+Xhfj7Jvaz', c: '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' }; // 2.28.90 encrypted: unlocks only with Shane's passphrase
+/* 2.28.90 My accounts: details from Shane's email. Encrypted in the public code; decrypted on his phone with his passphrase and kept only there. */
+let ACCT = null; try { ACCT = JSON.parse(localStorage.getItem('acctData') || 'null'); } catch (e) { ACCT = null; }
+const acctB64 = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
+async function acctUnlock() {
+  const inp = document.getElementById('acctPass'), msg = document.getElementById('acctMsg');
+  const pw = (inp && inp.value || '').trim(); if (!pw) return;
+  if (msg) msg.textContent = 'Unlocking…';
+  try {
+    const enc = new TextEncoder(), cs = crypto.subtle;
+    const base = await cs.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
+    const key = await cs.deriveKey({ name: 'PBKDF2', salt: acctB64(ACCT_BLOB.s), iterations: 250000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const pt = await cs.decrypt({ name: 'AES-GCM', iv: acctB64(ACCT_BLOB.i) }, key, acctB64(ACCT_BLOB.c));
+    ACCT = JSON.parse(new TextDecoder().decode(pt));
+    try { localStorage.setItem('acctData', JSON.stringify(ACCT)); } catch (e) {}
+    render();
+  } catch (e) { if (msg) msg.textContent = 'That passphrase didn\'t match. Try again.'; }
+}
+function acctLock() { if (!confirm('Lock My accounts on this phone? You\'ll need your passphrase again.')) return; ACCT = null; try { localStorage.removeItem('acctData'); } catch (e) {} render(); }
+function acctEye(btn) { const s = btn.previousElementSibling; const on = s.dataset.open === '1'; s.textContent = on ? s.dataset.m : s.dataset.f; s.dataset.open = on ? '0' : '1'; btn.textContent = on ? '👁' : '🙈'; }
+function AccountsPage() {
+  const h = header('My accounts', 'From your email · kept on this phone only');
+  if (!ACCT) return h + `<div class="card"><div class="t">🔒 Locked</div><div class="s" style="margin:6px 0 10px">Type your My accounts passphrase to unlock. It stays unlocked on this phone.</div>
+    <input id="acctPass" type="password" autocomplete="current-password" placeholder="Passphrase" style="width:100%;padding:10px;border-radius:10px;border:1px solid #cbd5e1;font-size:16px" onkeydown="if(event.key==='Enter')acctUnlock()">
+    <button class="btn" style="margin-top:10px" onclick="acctUnlock()">Unlock</button><div id="acctMsg" class="s" style="margin-top:8px;color:#dc2626"></div></div>`;
+  const tel = p => `<a href="tel:${esc(p.replace(/[^\d+]/g, ''))}" style="color:#2563eb;font-weight:600">${esc(p)}</a>`;
+  const cards = ACCT.map(a => {
+    const nums = (a.nums || []).map(([l, v]) => { const m = v.length > 4 ? '••••' + v.slice(-4) : v; return `<div class="s">${esc(l)}: <span data-f="${esc(v)}" data-m="${esc(m)}" style="font-family:monospace;font-weight:700">${esc(m)}</span>${v.length > 4 ? ` <button onclick="acctEye(this)" style="border:0;background:none;font-size:16px;cursor:pointer" aria-label="Show number">👁</button>` : ''}</div>`; }).join('');
+    const ph = (a.ph || []).map(([l, p]) => `<div class="s">📞 ${esc(l)}: ${tel(p)}</div>`).join('');
+    return `<div class="card"><div class="t">${a.ic || '•'} ${esc(a.n)}</div>${nums}${a.bal ? `<div class="s" style="margin-top:4px;font-weight:600">${esc(a.bal)}</div>` : ''}${a.note ? `<div class="s">${esc(a.note)}</div>` : ''}${ph}${a.em ? `<div class="s">✉️ ${esc(a.em)}</div>` : ''}${a.web ? `<div class="s"><a href="${esc(a.web)}" target="_blank" rel="noopener" style="color:#2563eb">Website</a></div>` : ''}</div>`;
+  }).join('');
+  return h + `<div class="s" style="margin:0 4px 8px">Balances are from the latest emails, so check the provider's app for today's figure.</div>` + cards + `<button class="btn" style="background:#64748b;margin:8px 0 20px" onclick="acctLock()">🔒 Lock on this phone</button>`;
+}
+
 function BooksPage() {
   const grp = [['Reading', x => x.st === 'reading' || x.st === 'started'], ['Finished', x => x.st === 'read'], ['In your library', x => x.st === 'own'], ['Samples', x => x.st === 'sample']];
   const row = b => `<button type="button" class="row" onclick="kindleOpen(${esc(JSON.stringify(b.title))})"><div class="ic">${KB_ST[b.st][0]}</div><div class="tx"><div class="t">${esc(b.title)}</div><div class="s">${esc([b.author, b.note || KB_ST[b.st][1]].filter(Boolean).join(' · '))}</div></div></button>`;
