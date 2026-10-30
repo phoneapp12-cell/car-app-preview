@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.88';
+const APP_VERSION = '2.28.89';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -37427,6 +37427,8 @@ function FreeMoviesPage() {
 const WC_GEO = 'https://images.geonet.org.nz/volcano/cameras/latest/';
 const WC_TNZ = 'https://trafficnz.info/camera/';
 const WC_GROUPS = [
+  { n: 'Whangārei', ic: '🏡', src: 'NRC', c: [['Hopua te Nihotetea dam, Whangārei (live video)', 'https://www.cameraftp.com/Camera/Cameraplayer.aspx?parentID=395433274&shareID=17922084&isEmbedded=true&mode=live', 'frame']],
+    l: [['Tutukākā marina, east view (Pacific Rendezvous)', 'http://webcams.pacificrendezvous.co.nz:8081/mjpeg/mjpeg4.html'], ['Tutukākā marina, west view (Pacific Rendezvous)', 'http://webcams.pacificrendezvous.co.nz:8082/mjpeg/mjpeg4.html'], ['Northland Regional Council webcams', 'https://www.nrc.govt.nz/environment/environmental-data/webcams/']] },
   { n: 'Volcanoes & mountains', ic: '🌋', src: 'GeoNet', c: [['Ruapehu from the north', WC_GEO + 'ruapehunorth.jpg'], ['Ruapehu from the east', WC_GEO + 'ruapehueast.jpg'], ['Ruapehu from the south', WC_GEO + 'ruapehusouth.jpg'], ['Ngāuruhoe', WC_GEO + 'ngauruhoe.jpg'], ['Ngāuruhoe & Tongariro', WC_GEO + 'ngauruhoetongariro.jpg'], ['Tongariro', WC_GEO + 'tongariro.jpg'], ['Tongariro Te Maari crater', WC_GEO + 'tongarirotemaaricrater.jpg'], ['Taranaki Maunga', WC_GEO + 'taranaki.jpg'], ['Whakaari from Whakatāne', WC_GEO + 'whakatane.jpg'], ['Whakaari from Te Kaha', WC_GEO + 'tekaha.jpg'], ['Raoul Island (Kermadecs)', WC_GEO + 'raoulisland.jpg']] },
   { n: 'Heading to Auckland', ic: '🚗', src: 'NZTA', c: [['SH1 Puhoi Viaduct', WC_TNZ + '824.jpg'], ['SH1 Johnstones Hill Tunnels', WC_TNZ + '825.jpg'], ['SH18 Upper Harbour Bridge', WC_TNZ + '177.jpg']] },
   { n: 'Scenic roads & passes', ic: '🏔️', src: 'NZTA', c: [['SH1 Desert Road summit', WC_TNZ + '608.jpg'], ['SH73 Arthur\u2019s Pass', WC_TNZ + '665.jpg'], ['SH8 Lindis Pass', WC_TNZ + '725.jpg'], ['SH6 Haast River Bridge', WC_TNZ + '745.jpg'], ['SH6 Kawarau River Bridge, Queenstown', WC_TNZ + '623.jpg'], ['SH1 Ngauranga Gorge, Wellington', WC_TNZ + '228.jpg']] }
@@ -37442,13 +37444,13 @@ function wcRefresh() {
 function WebcamsPage() {
   const back = `<button class="back" onclick="go('#media')">${I('left')} Entertainment</button>`;
   const t = Date.now();
-  const cam = ([n, u]) => `<div style="background:#0f172a;border-radius:14px;overflow:hidden;margin:0 0 12px"><img class="wcimg" data-u="${esc(u)}" src="${esc(u)}?t=${t}" alt="${esc(n)}" loading="lazy" style="display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:#1e293b" onclick="${fmOpen(u)}" onerror="this.style.opacity=.3"><div style="padding:8px 12px;color:#fff;font-weight:600">${esc(n)}</div></div>`;
+  const cam = ([n, u, ty]) => ty === 'frame' ? `<div style="background:#0f172a;border-radius:14px;overflow:hidden;margin:0 0 12px"><iframe src="${esc(u)}" title="${esc(n)}" loading="lazy" allow="autoplay; fullscreen" style="display:block;width:100%;aspect-ratio:16/10;border:0;background:#1e293b"></iframe><div style="padding:8px 12px;color:#fff;font-weight:600">${esc(n)}</div></div>` : `<div style="background:#0f172a;border-radius:14px;overflow:hidden;margin:0 0 12px"><img class="wcimg" data-u="${esc(u)}" src="${esc(u)}?t=${t}" alt="${esc(n)}" loading="lazy" style="display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:#1e293b" onclick="${fmOpen(u)}" onerror="this.style.opacity=.3"><div style="padding:8px 12px;color:#fff;font-weight:600">${esc(n)}</div></div>`;
   if (!wcTimer) wcTimer = setInterval(wcRefresh, 60000);
   return back + header('Live NZ webcams', WC_GROUPS.reduce((a, g) => a + g.c.length, 0) + ' cams · refresh every minute')
     + `<div class="s muted" id="wcstamp" style="margin:0 4px 8px">Updated ${new Date().toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}</div>`
-    + WC_GROUPS.map(g => `<div class="sec"><span class="sechead">${g.ic} ${esc(g.n)}</span><span class="s muted">${g.src}</span></div>` + g.c.map(cam).join('')).join('')
+    + WC_GROUPS.map(g => `<div class="sec"><span class="sechead">${g.ic} ${esc(g.n)}</span><span class="s muted">${g.src}</span></div>` + g.c.map(cam).join('') + (g.l ? `<div class="list">${g.l.map(([n, u]) => `<button type="button" class="row" onclick="${fmOpen(u)}"><div class="ic">📷</div><div class="tx"><div class="t">${esc(n)}</div><div class="s">Opens in your browser</div></div></button>`).join('')}</div>` : '')).join('')
     + `<div class="sec"><span class="sechead">🔗 More webcams</span></div><div class="list">${WC_MORE.map(([n, u]) => `<button type="button" class="row" onclick="${fmOpen(u)}"><div class="ic">📷</div><div class="tx"><div class="t">${esc(n)}</div><div class="s">Opens in your browser</div></div></button>`).join('')}</div>`
-    + `<div class="s muted" style="margin:12px 4px">Volcano cams are from GeoNet and road cams from NZTA. Tap a picture to open it full size. There are no public road cams in Northland yet. Night shots can look dark.</div>`;
+    + `<div class="s muted" style="margin:12px 4px">Volcano cams are from GeoNet and road cams from NZTA. Tap a picture to open it full size. Northland has no public road cams yet, so the Whangārei section has the council dam cam and the Tutukākā marina cams. Night shots can look dark.</div>`;
 }
 function BooksPage() {
   const grp = [['Reading', x => x.st === 'reading' || x.st === 'started'], ['Finished', x => x.st === 'read'], ['In your library', x => x.st === 'own'], ['Samples', x => x.st === 'sample']];
