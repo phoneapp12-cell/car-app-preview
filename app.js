@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.28.93';
+const APP_VERSION = '2.28.94';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -24669,7 +24669,7 @@ function glanceHome() {
   const orgZ = wk ? `${pulseH}<div class="glzone"><span>🗓️ This week</span><span><a href="#" onclick="event.preventDefault();homeWeekBillsToggle()">${S.settings && S.settings.homeWeekBills ? 'Hide bills' : 'Show bills'}</a> · <a href="#" onclick="event.preventDefault();homeWeekStyleToggle()">${S.settings && S.settings.homeWeekStyle === 'cards' ? '📺 Guide' : 'Cards'}</a> · <a href="#calendar">Calendar ›</a></span></div>${wk}${quick}${extraLinks}`
     : org ? `${pulseH}<div class="glzone"><span>📋 Organise</span><a href="#calendar">All ›</a></div><div id="glorg">${org}</div>${m.night ? '' : quick}${extraLinks}` : '';
   const asks = m.night ? homeTry('place ask', () => placeAskHtml(), '') + homeTry('sleep ask', () => sleepCheckCard(), '') + homeTry('routine ask', () => routineAskCard(), '') + homeTry('know', () => knowCard(), '') + homeTry('book ask', () => bookAskCard(), '') : '';
-  const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + '' /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
+  const body = homeTry('commute', () => commuteBanner(), '') + glHead(name, m, now) + homeTry('since you looked', () => sylHtml(), '') + homeTry('surprise', () => surpriseHtml(), '') /* 2.26.51: 'Your day off' card taken off Home at Shane's request (Days off plan still on #weekend) */ + `<div id="glstat" class="glstat" role="button" tabindex="0" onclick="glStatToggle()" aria-label="Home status. Tap for details."${stat ? '' : ' hidden'}>${stat}</div>` +
     wx + homeTry('mail strip', () => mailStrip(), '') + homeTry('gym now', () => gymNowHtml(), '') + /* 2.27.5: watch figures are off Home (Health › Watch, updates on Notifications) */ cards +
     (m.night ? entZ + asks + orgZ : homeTry('gl work', () => glWorkCard(m), '') + orgZ + entZ) +
     `${homeTry('sync note', () => syncNote(), '')}<div class="foot">${homeTry('saved where', () => savedWhere(), '')}</div>`;
@@ -36389,6 +36389,8 @@ glanceHome = function () {
   const body =
     homeTry("commute", () => commuteBanner(), "") +
     glHead(name, m, now) +
+    homeTry('since you looked', () => sylHtml(), '') +
+    homeTry('surprise', () => surpriseHtml(), '') +
     editBanner +
     homeTry("mail strip", () => mailStrip(), "") +
     homeTry("gym now", () => gymNowHtml(), "") +
@@ -37622,3 +37624,74 @@ function glRotTick() {
   } catch (e) { }
 }
 setInterval(glRotTick, 10000);
+
+/* 2.28.94: "Since you last looked" strip and a Daily surprise card at the top of Home.
+   The strip compares the next 30 days of the calendar (bills, to-dos, appointments, Sarah's items, car dates, birthdays),
+   landed pays and the important-mail line with a snapshot taken on the previous visit. A visit = opening the app, or coming
+   back after 10+ minutes away. The surprise rotates daily: on this day in NZ history (Wikipedia), fun fact, Suno song idea. */
+var SYL, sylHidden, sylAway;
+document.addEventListener('visibilitychange', () => { try { if (document.hidden) { sylAway = Date.now(); if (SYL && SYL.t0 && Date.now() - SYL.t0 > 5e3) try { localStorage.setItem('sylSnap', JSON.stringify({ at: Date.now(), items: sylNow() })); } catch (e) { } } else if (sylAway && Date.now() - sylAway > 10 * 60e3) { SYL = null; sylHidden = false; sylAway = 0; if ((location.hash || '#home').replace('#', '') === 'home' || !location.hash) render(); } } catch (e) { } });
+function sylNow() {
+  const snap = {};
+  try { const T0 = parseD(todayISO()); calItems(T0, T0 + 30 * DAY).forEach(e => { if (!e || !e.title || !e.date) return; if (typeof glOk === 'function' && !glOk(e.title)) return; if (/^busy$/i.test(String(e.title).trim())) return; snap['c|' + e.date + '|' + e.title] = { t: e.title, d: e.date, v: String(e.time || ''), go: String(e.go || '') }; }); } catch (e) { }
+  try { const W = weekItems(); Object.keys(W).forEach(d => W[d].forEach(it => { if (it.type === 'pay' && it.time === 'Landed ✓') snap['p|' + d + '|' + it.title] = { t: it.title + ' landed', d, v: it.line || '', go: "go('#cashflow')", pay: 1 }; })); } catch (e) { }
+  try { const ml = typeof homeMailLine === 'function' && mailStripOn() ? homeMailLine() : ''; if (ml) snap['m|mail'] = { t: ml, d: '', v: ml, go: 'mailOpenInbox()', mail: 1 }; } catch (e) { }
+  return snap;
+}
+function sylAgo(ms) { const m = Math.round(ms / 60e3); if (m < 60) return m <= 1 ? 'a minute ago' : m + ' min ago'; const h = Math.round(m / 60); if (h < 24) return h === 1 ? 'an hour ago' : h + ' hours ago'; const d = Math.round(h / 24); return d === 1 ? 'yesterday' : d + ' days ago'; }
+function sylCompute() {
+  // The diff is worked out against the snapshot from the last visit (kept as SYL.base for this visit). Calendars and bills
+  // that load a few seconds late are picked up by re-diffing on later renders; the new snapshot is saved 25s into the visit.
+  if (!SYL || !SYL.t0) { let old = null; try { old = JSON.parse(localStorage.getItem('sylSnap') || 'null'); } catch (e) { }
+    SYL = { t0: Date.now(), base: old, first: !old, since: old ? old.at : 0, rows: [] };
+    setTimeout(() => { try { localStorage.setItem('sylSnap', JSON.stringify({ at: Date.now(), items: sylNow() })); } catch (e) { } }, 25e3); }
+  const old = SYL.base, cur = sylNow(), T = todayISO(), rows = [], tm = v => /\d/.test(v || '');
+  if (old && old.items) {
+    const O = old.items;
+    Object.keys(cur).forEach(k => { const c = cur[k], o = O[k];
+      if (!o) rows.push({ ic: c.pay ? '💰' : c.mail ? '✉️' : '🆕', t: c.mail ? 'New important mail' : c.t, s: c.mail ? c.t : c.pay ? (c.v || 'Landed') : 'Added' + (c.d ? ' · ' + fmtW(c.d) : '') + (tm(c.v) ? ' · ' + c.v : ''), go: c.go, w: c.pay ? 0 : c.mail ? 1 : 2 });
+      else if (o.v !== c.v && tm(o.v) && tm(c.v) && !c.mail && !c.pay) rows.push({ ic: '🔁', t: c.t, s: 'Changed · ' + (c.d ? fmtW(c.d) + ' · ' : '') + 'now ' + c.v, go: c.go, w: 3 }); });
+    if (Date.now() - SYL.t0 > 8e3) Object.keys(O).forEach(k => { const o = O[k]; if (cur[k] || o.mail || o.pay || !o.d || o.d < T) return; rows.push({ ic: '✅', t: o.t, s: 'Done or removed · was ' + fmtW(o.d), go: '', w: 4 }); });
+    rows.sort((a, b) => a.w - b.w);
+  }
+  SYL.rows = rows;
+}
+function sylHtml() {
+  if (S.settings && S.settings.sylOff) return '';
+  if (!SYL || !SYL.t0 || Date.now() - SYL.t0 < 30e3) sylCompute();
+  if (sylHidden) return '';
+  const R = SYL.rows, more = R.length > 6 ? R.length - 6 : 0;
+  const head = `<div class="sylh"><b>👀 Since you last looked</b><span>${SYL.since ? sylAgo(Date.now() - SYL.since) : ''}<button type="button" aria-label="Hide" onclick="sylHidden=true;render()">✕</button></span></div>`;
+  if (SYL.first) return `<div class="syl">${head}<div class="syle">From your next visit, anything new or changed shows up here.</div></div>`;
+  if (!R.length) return `<div class="syl sylq">${head}<div class="syle">Nothing new since then. All quiet.</div></div>`;
+  const row = r => `<button type="button" class="sylr" ${r.go ? `onclick="${esc(r.go)}"` : 'disabled'}><span class="sylic">${r.ic}</span><span class="syltx"><b>${esc(r.t)}</b><small>${esc(r.s)}</small></span></button>`;
+  return `<div class="syl">${head}${R.slice(0, 6).map(row).join('')}${more ? `<div class="sylm">+ ${more} more change${more > 1 ? 's' : ''}</div>` : ''}</div>`;
+}
+function SURP_T() { return ['otd', 'fact', 'song']; }
+function SURP_NZ() { return /New Zealand|Aotearoa|M[āa]ori|Wellington|Auckland|Christchurch|Dunedin|Northland|Whang[āa]rei|Waitangi|Rotorua|Otago|Waikato|Napier|Tauranga|Kiwi\b/i; }
+function SURP_BAD() { return /kill|murder|war\b|bomb|attack|massacre|shoot|terror|dies|died|death|crash|earthquake|rugby|cricket|football|olympic|sport|\bcup\b|sex|rape|execut|genocide|riot/i; }
+function surpIdx() { let off = 0; try { off = +(sessionStorage.getItem('surpOff') || 0); } catch (e) { } return ((glDay() + off) % SURP_T().length + SURP_T().length) % SURP_T().length; }
+function surpNext() { try { sessionStorage.setItem('surpOff', String(+(sessionStorage.getItem('surpOff') || 0) + 1)); } catch (e) { } const el = document.getElementById('surp'); if (el) el.outerHTML = surpriseHtml(); }
+function otdGet() { const T = todayISO(); try { const o = JSON.parse(localStorage.getItem('otdNZ') || 'null'); if (o && o.d === T) return o; } catch (e) { } return null; }
+async function otdLoad() {
+  if (otdLoad.busy) return; otdLoad.busy = true;
+  try { const T = todayISO(), mm = T.slice(5, 7), dd = T.slice(8, 10);
+    const r = await fetch(`https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/all/${mm}/${dd}`); if (!r.ok) throw 0; const j = await r.json();
+    const L = [].concat(j.selected || [], j.events || [], j.births || []).filter(e => e && e.text && e.year && !SURP_BAD().test(e.text));
+    const nzOf = e => SURP_NZ().test(e.text) || (e.pages || []).some(p => /New Zealand/i.test(p.description || '')), nz = L.filter(nzOf).sort((a, b) => ((j.births || []).includes(a) ? 1 : 0) - ((j.births || []).includes(b) ? 1 : 0));
+    const pick = (nz.length ? nz : L.filter(e => (j.selected || []).includes(e)))[0] || L[0];
+    if (pick) { const pg = (pick.pages || [])[0] || {}, link = (pg.content_urls && pg.content_urls.mobile && pg.content_urls.mobile.page) || '';
+      const isB = (j.births || []).includes(pick);
+      localStorage.setItem('otdNZ', JSON.stringify({ d: T, y: pick.year, t: (isB ? 'Born: ' : '') + pick.text, nz: nz.includes(pick), link }));
+      const el = document.getElementById('surp'); if (el) el.outerHTML = surpriseHtml(); }
+  } catch (e) { } otdLoad.busy = false;
+}
+function surpriseHtml() {
+  if (S.settings && S.settings.surpOff) return '';
+  let k = SURP_T()[surpIdx()], ic = '', lab = '', body = '', tap = '';
+  if (k === 'otd') { const o = otdGet(); if (!o) { setTimeout(otdLoad, 0); k = 'fact'; } else { ic = '📜'; lab = o.nz ? 'On this day in NZ' : 'On this day'; body = `<b>${esc(String(o.y))}</b> · ${esc(o.t)}`; tap = o.link ? `window.open('${esc(o.link)}','_blank')` : ''; } }
+  if (k === 'fact') { const f = typeof factToday === 'function' ? factToday() : ''; if (f) { ic = '💡'; lab = 'Fun fact'; body = esc(f); tap = "glInfo('fact')"; } else k = 'song'; }
+  if (k === 'song') { const L = typeof GL_SUNO !== 'undefined' ? GL_SUNO : []; ic = '🎵'; lab = 'Song idea for Suno'; body = esc(L.length ? L[glDay() % L.length] : 'A Suno track about Onerahi and the harbour'); tap = "window.open('https://suno.com/create','_blank')"; }
+  return `<div class="surp" id="surp"><div class="surph"><span>🎁 Daily surprise · ${lab}</span><button type="button" onclick="event.stopPropagation();surpNext()" aria-label="Another one">↻</button></div><div class="surpb" ${tap ? `role="button" tabindex="0" onclick="${tap}"` : ''}><span class="surpic">${ic}</span><span>${body}</span></div></div>`;
+}
+(() => { try { const st = document.createElement('style'); st.textContent = '.syl,.surp{margin:0 0 12px;border-radius:16px;padding:12px 14px;background:var(--card,#fff);box-shadow:0 1px 4px rgba(0,0,0,.1)}.syl{border-left:5px solid #facc15}.sylh,.surph{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.sylh b{font-size:1.05rem}.sylh span{font-size:.82rem;opacity:.7;display:flex;align-items:center;gap:8px}.sylh button,.surph button{border:0;background:rgba(127,127,127,.15);color:inherit;border-radius:999px;width:28px;height:28px;font-size:.95rem;line-height:1;padding:0}.sylr{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;color:inherit;font:inherit;padding:7px 0;border-top:1px solid rgba(127,127,127,.15)}.sylr:disabled{opacity:.75}.sylic{font-size:1.3rem;width:28px;text-align:center}.syltx{display:flex;flex-direction:column;min-width:0}.syltx b{font-size:.98rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.syltx small{font-size:.84rem;opacity:.75}.syle,.sylm{font-size:.9rem;opacity:.75;padding:2px 0}.surp{background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff}.surph span{font-size:.85rem;font-weight:700;opacity:.92}.surph button{background:rgba(255,255,255,.22)}.surpb{display:flex;gap:10px;align-items:flex-start;font-size:1.02rem;line-height:1.4}.surpic{font-size:1.6rem;line-height:1}'; document.head.appendChild(st); } catch (e) { } })();
