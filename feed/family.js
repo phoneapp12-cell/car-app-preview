@@ -53,7 +53,7 @@ async function famInit() {
     try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { }
     if (!PICK) { onboarding(); }
   }
-  loadShares();
+  loadShares(); loadPop();
   fam('/people').then(p => { FAM_PEOPLE = p; }).catch(() => { });
 }
 function giveDefaults() { // a new default chip is switched on once for people who already chose their interests
@@ -114,6 +114,7 @@ function weaveShares(order) { // one shared card near the top, then every 6–8 
 }
 function drawFamily() {
   const m = $('#feed'), sh = sharesFor('family');
+  setTimeout(() => { if (tab === 'family') { ls.set('likeSeen', Date.now()); document.querySelectorAll('.chip[data-tab="family"] .dot').forEach(d => d.remove()); } }, 2500);
   order = sh; shown = 0;
   m.innerHTML = `<button class="btn pri upb" data-upload>📷 Share a photo</button><div class="load" style="padding-top:0">💬 Shared in the family · only people Shane invited can see this</div>` + (sh.length ? '' : '<div class="empty">Nothing shared yet. Share a photo, or tap 🔁 on any post to share it with the family.</div>');
   more();
@@ -150,8 +151,9 @@ async function unshare(sid, up) {
 /* ---- card extras: 💬 comments and 🔁 share ---- */
 function famBar(i) {
   if (!FAM_ON || !isPublicCard(i)) return '';
+  const lk = i._share ? likeBtn(i._share) : '';
   const c = COUNTS[i.id], n = c ? c[0] : 0, fresh = c && c[1] > (CSEEN[i.id] || 0);
-  return `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button>${i.kind === 'upload' ? '' : `<button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`}`;
+  return lk + `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button>${i.kind === 'upload' ? '' : `<button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`}`;
 }
 function famLifeBar(x) { return canShareLife(x) ? `<button class="fb" data-share-life="${esc(x.id)}" aria-label="Share with the family">🔁</button>` : ''; }
 function shareHead(i) {
@@ -258,6 +260,8 @@ document.addEventListener('click', async e => {
   const pk = t.closest('[data-pick]'); if (pk) { pk.classList.toggle('on'); return; }
   if (t.id === 'obgo') { obGo(); return; }
   if (t.closest('[data-upload]')) { pickPhotos(); return; }
+  const lkb = t.closest('[data-like]'); if (lkb) { toggleLike(lkb.dataset.like); return; }
+  const lkn = t.closest('[data-likers]'); if (lkn) { showLikers(lkn.dataset.likers); return; }
   if (t.id === 'upgo') { postPhotos(); return; }
   if (t.id === 'upx' || t.id === 'upbox') { $('#upbox').remove(); UP = []; return; }
   const fp = t.closest('img[data-fph]'); if (fp && fp.src) { e.preventDefault(); const v = document.createElement('div'); v.className = 'lbx'; v.innerHTML = `<img src="${fp.src}" alt="">`; v.onclick = () => v.remove(); document.body.append(v); return; }
@@ -351,3 +355,98 @@ async function postPhotos() {
     tab = 'family'; ls.set('tab', tab); await loadShares(); draw();
   } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Post'; }
 }
+
+/* ---- 1.8.1 ❤️ and 👍 on family posts (member photos and reposts): everyone in the family sees how many and who.
+   The same taps also teach this person's own feed: ❤️ counts as a strong 👍 (2), 👍 as usual. 👎 stays private (no count,
+   no names) and takes back their ❤️/👍. On ordinary public cards 👍/👎 are private, as before. ---- */
+const HEART = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.4C1.5 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.5 3.4 4.3 6.6-1.8 4.8-9.3 9.4-9.3 9.4z" fill="var(--hf,none)" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>';
+const isMe = l => l.mid === MEMBER.id;
+const likeName = l => isMe(l) ? 'You' : l.name;
+function whoText(list) {
+  if (!list.length) return '';
+  const n = list.map(likeName);
+  return `${list.length} · ${esc(n.length > 3 ? n.slice(0, 2).join(', ') + ' +' + (n.length - 2) : n.join(', '))}`;
+}
+const freshFor = (s, list) => s.mine && list.some(l => !isMe(l) && l.at > (ls.get('likeSeen') || 0));
+function upNames(i) { const s = i._share; return FAM_ON && s && (s.ups || []).length ? `<span class="rxc">${s.ups.length}</span>` : ''; }
+function rxLine(i) { // '❤️ 2 · Sarah, Millesha   👍 1 · Shane' under family posts; tap for the full list
+  const s = i._share; if (!FAM_ON || !s) return '';
+  const L = s.likes || [], U = s.ups || []; if (!L.length && !U.length) return '';
+  return `<button class="rxl" data-likers="${esc(s.card)}">${L.length ? `<span>❤️ ${whoText(L)}${freshFor(s, L) ? '<i class="ndot"></i>' : ''}</span>` : ''}${U.length ? `<span>👍 ${whoText(U)}${freshFor(s, U) ? '<i class="ndot"></i>' : ''}</span>` : ''}</button>`;
+}
+function likeBtn(s) {
+  const likes = s.likes || [], on = likes.some(isMe);
+  return `<button class="fb lk${on ? ' on' : ''}" data-like="${esc(s.card)}" aria-pressed="${on}" aria-label="${on ? 'Take back your love' : 'Love it'}">${HEART}${likes.length ? `<span class="rxc">${likes.length}</span>` : ''}${freshFor(s, likes) ? '<i class="dot"></i>' : ''}</button>`;
+}
+function famNewLikes() { return FAM_ON && SHARES.some(s => freshFor(s, (s.likes || []).concat(s.ups || []))); }
+function syncVote(s) { // this person's private ranking follows their family taps
+  const it = shareItem(s), id = s.card, loved = (s.likes || []).some(isMe), up = (s.ups || []).some(isMe), v = loved ? 2 : up ? 1 : 0;
+  if (v) { const { _share, photos, ...snap } = it; VOTES[id] = { v, topic: it.topic, src: it.src, ints: itemInts(it).slice(0, 4), at: Date.now(), item: snap }; }
+  else if (VOTES[id] && VOTES[id].v > 0) delete VOTES[id];
+  ls.set('votes', VOTES);
+}
+function redrawFoot(card) {
+  const s = SHARES.find(x => x.card === card); if (!s) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = window.card(shareItem(s));
+  document.querySelectorAll(`.card[data-id="${CSS.escape(card)}"] .ft`).forEach(ft => { ft.parentNode.querySelector('.rxl')?.remove(); const nr = tmp.querySelector('.rxl'); if (nr) ft.before(nr.cloneNode(true)); ft.replaceWith(tmp.querySelector('.ft').cloneNode(true)); });
+  famCounts([shareItem(s)]);
+}
+async function react(card, kind, on) {
+  const r = await fam('/likes', { method: 'POST', body: JSON.stringify({ card, kind, on }) }); setTimeout(() => loadPop(true), 500);
+  for (const x of SHARES) if (x.card === card) { x.likes = r.likes; x.ups = r.ups; }
+  const s = SHARES.find(x => x.card === card); if (s) syncVote(s);
+  return s;
+}
+async function toggleLike(card) {
+  const s = SHARES.find(x => x.card === card); if (!s) return;
+  const on = !(s.likes || []).some(isMe);
+  try { await react(card, 'love', on); redrawFoot(card); if (on) { try { navigator.vibrate && navigator.vibrate(12); } catch (e) { } } } catch (e) { toast(e.message); }
+}
+async function famVote(c, item, v) { // called by vote() for family cards; returns true when it handled the tap
+  const s = item._share; if (!FAM_ON || !s) return false;
+  if (v > 0) {
+    const on = !(s.ups || []).some(isMe);
+    try { await react(s.card, 'up', on); redrawFoot(s.card); if (on) toast('👍 More like this'); } catch (e) { toast(e.message); }
+    return true;
+  }
+  if ((s.likes || []).some(isMe) || (s.ups || []).some(isMe)) react(s.card, 'none').catch(() => { }); // a 👎 is private: just take back their ❤️/👍
+  return false; // the usual private 👎 (hide + rank down) carries on
+}
+function showLikers(card) {
+  const s = SHARES.find(x => x.card === card); if (!s) return;
+  const row = (l, e) => `<div class="row"><span>${e} ${esc(likeName(l))}</span><small class="sst">${esc(nzTime(l.at))}</small></div>`;
+  document.querySelector('#upbox')?.remove();
+  const box = document.createElement('div'); box.id = 'upbox'; box.className = 'upbox';
+  box.innerHTML = `<div class="upin"><h2>Who liked this</h2><div class="lkl">${(s.likes || []).length ? `<h3>❤️ ${s.likes.length}</h3>${s.likes.map(l => row(l, '❤️')).join('')}` : ''}${(s.ups || []).length ? `<h3>👍 ${s.ups.length}</h3>${s.ups.map(l => row(l, '👍')).join('')}` : ''}</div><div class="uprow"><button class="btn" id="upx">Close</button></div></div>`;
+  document.body.append(box);
+}
+
+/* ---- 1.8.1 family popularity: what members ❤️/👍 moves up everyone's feed ----
+   Points per other person: ❤️ 2, 👍 1, each fading by half every 2.5 days. Boost = 1 + 0.3 × points, capped at ×1.8 –
+   enough to lift a post within its topic, never enough to break the topic mix (sitcoms first, your interests). It's
+   applied after everyone's own filters, so no sport, the family-safe filter, your 👎 and switched-off interests still win.
+   Your own taps aren't counted twice (they're already in your private 👍). 👎 is never sent. */
+let POP = {};
+async function loadPop(force) {
+  if (!FAM_ON) return;
+  const c = ls.get('pop', null); if (c && Date.now() - c.got < 30 * 60e3) POP = c.pop; if (!force && c && Date.now() - c.got < 5 * 60e3) return;
+  try { const r = await fam('/popular'); POP = r.pop || {}; ls.set('pop', { got: Date.now(), pop: POP }); } catch (e) { }
+}
+function popW(i) {
+  if (!FAM_ON) return 1;
+  const l = POP[i.id] || (i._share && POP[i._share.card]); if (!l) return 1;
+  const now = Date.now(); let pts = 0;
+  for (const [mid, , w, at] of l) if (mid !== MEMBER.id) pts += w * Math.pow(0.5, (now - at) / (2.5 * 864e5));
+  return Math.min(1.8, 1 + 0.3 * pts);
+}
+function popLine(i) { // "Liked by Sarah, Millesha" on ordinary cards the family liked (members only)
+  if (!FAM_ON || i._share || !isPublicCard(i)) return '';
+  const l = (POP[i.id] || []).filter(x => x[0] !== MEMBER.id); if (!l.length) return '';
+  const names = [...new Set(l.map(x => x[1]))], loved = l.some(x => x[2] === 2);
+  return `<p class="popl">${loved ? '❤️' : '👍'} Liked by ${esc(names.length > 3 ? names.slice(0, 2).join(', ') + ' +' + (names.length - 2) : names.join(', '))}</p>`;
+}
+function famPublicVote(i, v) { // v: 1 = 👍 on, 0 = taken back, -1 = 👎 (private: only takes back a 👍)
+  if (!FAM_ON || i._share || !isPublicCard(i)) return;
+  fam('/likes', { method: 'POST', body: JSON.stringify({ card: i.id, kind: v > 0 ? 'up' : 'none', on: v > 0 }) }).then(() => loadPop(true)).catch(() => { });
+}
+setInterval(() => { if (document.visibilityState === 'visible') loadPop(); }, 5 * 60e3 + 7e3);

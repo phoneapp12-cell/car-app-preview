@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -212,7 +212,7 @@ function rank(items) {
     const media = i.vid ? 1.15 : i.img ? 1.1 : i.kind === 'tip' ? 0.8 : 0.6; // pictures and videos first
     const seen = Math.pow(0.8, SEEN[i.id] || 0);                   // seen a few times: let new things through
     const hot = i.hot ? 1.5 : 1;                                   // e.g. fireworks this week
-    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) };
+    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) * popW(i) }; // 1.8.1 popW: family likes
   }).sort((a, b) => b.sc - a.sc);
   // Mix: each step takes the best next post from the topic that's due, so every interest gets a turn
   // (higher-voted topics, and sitcoms, come round more often). About 1 in 7 slots explores further down a list.
@@ -682,9 +682,9 @@ function card(i) {
   return `<article class="card${i._share ? ' shared' : ''}" data-id="${esc(i.id)}" style="${style}">${shareHead(i)}
     <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.party ? ' · ' + esc(i.party) : i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
     ${media}
-    <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${when}</div>
-    <div class="ft">
-      <button class="vote up${v > 0 ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>
+    <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${when}${popLine(i)}</div>
+    ${rxLine(i)}<div class="ft">
+      <button class="vote up${(i._share && FAM_ON ? (i._share.ups || []).some(isMe) : v > 0) ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>${upNames(i)}
       <button class="vote dn${v < 0 ? ' on' : ''}" data-vote="-1" aria-pressed="${v < 0}" aria-label="Thumbs down">${THUMB.dn}</button>
       ${famBar(i)}${i.url ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">Open ↗</a>` : ''}
     </div></article>`;
@@ -692,7 +692,7 @@ function card(i) {
 function chips() {
   const list = TOPICS.filter(t => (t[0] !== 'photos' || PHOTOS.length) && (t[0] !== 'life' || PRIVATE_OK) && (t[0] !== 'family' || FAM_ON) && topicOn(t[0]) && (t[0] !== 'election' || (Date.now() < ELECTION_END && FEED && FEED.items.some(i => i.topic === 'election')))), at = list.findIndex(t => t[0] === 'photos' || t[0] === 'liked');
   list.splice(at, 0, ...YOU_CHIPS.map(id => TOPIC[id]));
-  $('#chips').innerHTML = list.map(t => `<button class="chip${t[0] === tab ? ' on' : ''}" data-tab="${t[0]}">${t[2]} ${t[1]}</button>`).join('');
+  $('#chips').innerHTML = list.map(t => `<button class="chip${t[0] === tab ? ' on' : ''}" data-tab="${t[0]}">${t[2]} ${t[1]}${t[0] === 'family' && famNewLikes() ? '<i class="dot"></i>' : ''}</button>`).join('');
   const on = $('#chips .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
 function draw() {
@@ -748,7 +748,9 @@ function vote(el, v) {
   const c = el.closest('.card'), id = c.dataset.id;
   const item = order.find(x => x.id === id) || (FEED.items || []).find(x => x.id === id) || LIFE_BY_ID.get(id) || (VOTES[id] && VOTES[id].item);
   if (!item) return;
+  if (item._share && FAM_ON) { if (v > 0) { famVote(c, item, v); return; } if (!(VOTES[id] && VOTES[id].v < 0)) famVote(c, item, v); } // 1.8.1 family cards: 👍 is shown to the family
   const prev = VOTES[id];
+  famPublicVote(item, prev && prev.v === v ? 0 : v); // 1.8.1 the family sees 👍 counts (👎 stays private)
   if (prev && prev.v === v) { delete VOTES[id]; ls.set('votes', VOTES); c.querySelectorAll('.vote').forEach(b => { b.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); }); toast('Vote removed'); return; }
   const { _x, _ints, ...snap } = item; if (snap.img && /^(data|blob):/.test(snap.img)) delete snap.img; delete snap.photo; // a car, pet or own photo stays in My App
   VOTES[id] = { v, topic: item.topic, src: item.src, ints: item.topic === 'life' ? undefined : itemInts(item).slice(0, 4), at: Date.now(), item: v > 0 ? snap : undefined };
