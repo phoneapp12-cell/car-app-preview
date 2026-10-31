@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.6';
+const APP_VERSION = '2.29.7';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -15294,7 +15294,7 @@ function homeEvents() {
 
 
 /* ================= VIDEOS ================= */
-// VIDEO_LIST_UPDATED = '2026-10-31'
+// VIDEO_LIST_UPDATED = '2026-11-01'
 const VIDEO_CATS = [
   { id: 'tech', name: 'Latest technology', sub: 'New technology, explained' },
   { id: 'nz', name: 'NZ product reviews', sub: 'Product tech reviews from New Zealand' },
@@ -15313,12 +15313,12 @@ const VIDEO_CATS = [
 const VIDEOS = [
   { id: '2reQut8WNGc', title: 'Macbook PROLED XDR Impressions: They Said They Wouldn’t!', channel: 'Marques Brownlee', category: 'tech', url: 'https://www.youtube.com/watch?v=2reQut8WNGc', reason: 'Marques Brownlee’s first impressions of Apple’s new PROLED XDR MacBook.' },
   { id: 'G_em1hHPnXY', title: 'China just dropped a new frontier model... and nobody can explain how', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=G_em1hHPnXY', reason: 'Fireship on a new top-end AI model just released in China.' },
-  { id: 'ULWD2IAfH1c', title: 'iPhone Duo Review: I See Why Apple Took Its Time', channel: 'CNET', category: 'tech', url: 'https://www.youtube.com/watch?v=ULWD2IAfH1c', reason: 'CNET reviews the iPhone Duo, Apple’s new foldable iPhone that’s out this week.' },
+  { id: 'zpVXbJv0sLE', title: 'Unboxing Apple’s $149 HomePod Mini 2 in Green', channel: 'CNET', category: 'tech', url: 'https://www.youtube.com/watch?v=zpVXbJv0sLE', reason: 'CNET unboxes Apple’s new HomePod Mini 2 smart speaker in green.' },
   { id: 'nEaJMdM1djM', title: 'Did the AI bubble just pop?', channel: 'Fireship', category: 'tech', url: 'https://www.youtube.com/watch?v=nEaJMdM1djM', reason: 'Fireship’s quick take on whether the AI bubble has just popped.' },
   { id: 'O9kNF_xOM5s', title: 'AV Access iDock C10 vs M10 vs B23 — Which One Do You Need?', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=O9kNF_xOM5s', reason: 'PB Tech compares three docks that let a laptop and a desktop share one screen and keyboard.' },
-  { id: '0jIQ10Jrm1U', title: 'PB Live: Samsung Price Smash', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=0jIQ10Jrm1U', reason: 'A PB Tech live showcase of Samsung gear on sale.' },
+  { id: 'EokMz0pxlSc', title: 'iPhone Duo Review: It\'s Got PROBLEMS...', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=EokMz0pxlSc', reason: 'TechSauce reviews the new iPhone Duo and the problems he found with it.' },
   { id: '4XkoerzEWuk', title: 'I BOUGHT the CHEAPEST pre-built gaming PC from JB HiFi 😬', channel: 'TechSauce', category: 'nz', url: 'https://www.youtube.com/watch?v=4XkoerzEWuk', reason: 'TechSauce unboxes the cheapest pre-built gaming PC from JB Hi-Fi.' },
-  { id: 'IyhCKPotZkk', title: 'PB Live: iPhone 18 Accessories Showcase & Save', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=IyhCKPotZkk', reason: 'A PB Tech live showcase of accessories for the new iPhone 18.' },
+  { id: '_b2KoLUPtog', title: 'Vacuum and mop at the same time!', channel: 'PB Tech', category: 'nz', url: 'https://www.youtube.com/watch?v=_b2KoLUPtog', reason: 'PB Tech shows a vacuum that mops the floor at the same time.' },
   { id: 'hbGkK4VgU60', title: 'Spring Jobs for Root Crops, Fruit Trees and Tomatoes | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=hbGkK4VgU60', reason: 'Spring jobs for root crops, fruit trees and tomatoes, well timed for a New Zealand spring.' },
   { id: 'CkAg3RLv1-E', title: 'Top Tips for Citrus Success! | Gardening Australia', channel: 'Gardening Australia', category: 'garden', url: 'https://www.youtube.com/watch?v=CkAg3RLv1-E', reason: 'Gardening Australia’s top tips for healthier citrus trees.' },
   { id: 'kK-8suaOaP0', title: 'What to plant in November - Subtropical Australia', channel: 'Love of Dirt', category: 'garden', url: 'https://www.youtube.com/watch?v=kK-8suaOaP0', reason: 'What to plant in November in a warm subtropical climate, a good match for Northland gardens.' },
@@ -15599,6 +15599,10 @@ function videoReason(v) {
 // Publish dates read from each video's YouTube watch page (publishDate). oEmbed does not include a date.
 // Stored here so the phone shows a real date and does not look it up again on every tap.
 const VIDEO_DATES = {
+  // 1 Nov 2026 additions.
+  'zpVXbJv0sLE': '2026-10-30',
+  'EokMz0pxlSc': '2026-10-22',
+  '_b2KoLUPtog': '2026-10-28',
   '3iRUwVzRDZQ': '2026-10-02',
   'LttGyjX-QxE': '2026-10-08',
   'WrCjAAl9okA': '2026-10-07',
