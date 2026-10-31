@@ -1,7 +1,7 @@
 /* My Feed – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // My Feed lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -223,8 +223,8 @@ async function commonsPic(q, id) { // a different real photo per card from Wikim
   const k = 'c:' + q; let list = WIKI[k];
   if (!Array.isArray(list)) {
     try {
-      const d = await getJSON('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrlimit=24&prop=imageinfo&iiprop=url|size&iiurlwidth=960&format=json&origin=*&gsrsearch=' + encodeURIComponent('filetype:bitmap ' + q.replace(/_/g, ' ')));
-      list = Object.values((d.query && d.query.pages) || {}).sort((a, b) => a.index - b.index).map(p => p.imageinfo && p.imageinfo[0]).filter(i => i && i.thumburl && i.width >= 600 && i.width >= i.height * 0.6).map(i => i.thumburl).filter(u => !/\.(tiff?|pdf|djvu|xcf)(\?|$)/i.test(u)).slice(0, 12);
+      const d = await getJSON('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrlimit=24&prop=imageinfo&iiprop=url|size&iiurlwidth=960&format=json&origin=*&gsrsearch=' + encodeURIComponent('filemime:image/jpeg ' + q.replace(/_/g, ' ')));
+      list = Object.values((d.query && d.query.pages) || {}).sort((a, b) => a.index - b.index).map(p => p.imageinfo && p.imageinfo[0]).filter(i => i && i.thumburl && i.width >= 600 && i.width >= i.height * 0.6).map(i => i.thumburl).filter(u => !/\.(tiff?|pdf|djvu|xcf)(\?|$)/i.test(u)).slice(0, 8);
     } catch (e) { return ''; }
     WIKI[k] = list; ls.set('wiki', WIKI);
   }
