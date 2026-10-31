@@ -1,4 +1,4 @@
-/* My Feed 1.7.0 – Family: a private network for Shane and the people he invites (Sarah, Millesha, …).
+/* Info Book 1.7.0 – Family: a private network for Shane and the people he invites (Sarah, Millesha, …).
    - Invite link: …/feed/?invite=<long random token>. The phone keeps the token; the same link works again on a new phone.
      Shane (admin) adds people, makes new links (the old one stops working) and removes people in ⚙️ → Family.
    - Everyone gets their own feed from the shared public sources, with the interests they pick. On anyone else's phone
@@ -75,7 +75,7 @@ function onboarding() {
   const list = TOPICS.filter(t => !['all', 'life', 'photos', 'liked', 'family'].includes(t[0]) && (t[0] !== 'election' || Date.now() < ELECTION_END));
   const sel = new Set(PICK || DEFAULT_ON);
   $('#sheetin').innerHTML = `<h2>Kia ora ${esc(MEMBER.name)} 👋</h2>
-    <p>This is your own My Feed: photos, videos and stories from public sources, picked for you. Tap what you’re into (you can change it any time in ⚙️). Your 👍 and 👎 only change your own feed.</p>
+    <p>This is your own Info Book: photos, videos and stories from public sources, picked for you. Tap what you’re into (you can change it any time in ⚙️). Your 👍 and 👎 only change your own feed.</p>
     <p>💬 You can comment on posts and 🔁 share them with the family. Only people Shane has invited can see those.</p>
     <div class="obg">${list.map(t => `<button class="obt${sel.has(t[0]) ? ' on' : ''}" data-pick="${t[0]}" style="--c1:${t[3]};--c2:${t[4]}"><span>${t[2]}</span>${esc(t[1])}</button>`).join('')}</div>
     <p class="mute" style="font-size:.85rem">No sport, no bills or money stuff. Ever.</p>
@@ -97,6 +97,7 @@ async function loadShares() {
 }
 function shareItem(s) {
   const x = s.snap || {};
+  if (s.up) return { id: s.card, t: x.t || '', s: '', photos: (x.photos || []).slice(0, 4), sn: s.name, topic: 'family', src: 'family', kind: 'upload', at: s.at, _share: s };
   return { id: s.card, t: x.t, s: x.s, url: x.url, img: x.img, vid: x.vid, sn: x.sn || 'Shared', topic: s.priv ? 'family' : (TOPIC[x.topic] ? x.topic : 'family'), src: x.src || 'family', kind: x.kind || (x.img ? 'photo' : 'news'), ev: x.ev || 0, at: s.at, _share: s };
 }
 function sharesFor(t) { // reposts shown to everyone, whatever they picked (newest first)
@@ -114,7 +115,7 @@ function weaveShares(order) { // one shared card near the top, then every 6–8 
 function drawFamily() {
   const m = $('#feed'), sh = sharesFor('family');
   order = sh; shown = 0;
-  m.innerHTML = `<div class="load" style="padding-top:0">💬 Shared in the family · only people Shane invited can see this</div>` + (sh.length ? '' : '<div class="empty">Nothing shared yet. Tap 🔁 on any post to share it with the family.</div>');
+  m.innerHTML = `<button class="btn pri upb" data-upload>📷 Share a photo</button><div class="load" style="padding-top:0">💬 Shared in the family · only people Shane invited can see this</div>` + (sh.length ? '' : '<div class="empty">Nothing shared yet. Share a photo, or tap 🔁 on any post to share it with the family.</div>');
   more();
   fam('/recent').then(r => { // cards people have talked about, that aren't reposts
     const have = new Set(sh.map(i => i.id)), talk = r.filter(x => !have.has(x.card) && x.snap && x.snap.t).slice(0, 20).map(x => ({ id: x.card, ...x.snap, kind: x.snap.img ? 'photo' : 'news', at: x.last, topic: TOPIC[x.snap.topic] ? x.snap.topic : 'family' }));
@@ -141,8 +142,8 @@ async function shareCard(id, isLife) {
   try { const r = await fam('/shares', { method: 'POST', body: JSON.stringify({ orig: id, priv, snap, caption }) }); toast(r.dup ? 'Already shared' : '🔁 Shared with the family'); await loadShares(); }
   catch (e) { toast(e.message); }
 }
-async function unshare(sid) {
-  if (!confirm('Stop sharing this with the family?')) return;
+async function unshare(sid, up) {
+  if (!confirm(up ? 'Delete this photo post for everyone?' : 'Stop sharing this with the family?')) return;
   try { await fam('/shares/' + sid, { method: 'DELETE' }); toast('Not shared any more'); SHARES = SHARES.filter(s => s.id !== +sid); draw(); } catch (e) { toast(e.message); }
 }
 
@@ -150,11 +151,12 @@ async function unshare(sid) {
 function famBar(i) {
   if (!FAM_ON || !isPublicCard(i)) return '';
   const c = COUNTS[i.id], n = c ? c[0] : 0, fresh = c && c[1] > (CSEEN[i.id] || 0);
-  return `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button><button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`;
+  return `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button>${i.kind === 'upload' ? '' : `<button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`}`;
 }
 function famLifeBar(x) { return canShareLife(x) ? `<button class="fb" data-share-life="${esc(x.id)}" aria-label="Share with the family">🔁</button>` : ''; }
 function shareHead(i) {
   const s = i._share; if (!s) return '';
+  if (s.up) return `<div class="shby">📷 Photo from <b>${esc(s.name)}</b> · ${esc(nzTime(s.at))}${s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}" data-up="1">Delete</button>` : ''}</div>`;
   const del = s.mine || IS_ADMIN ? `<button class="mini" data-unshare="${s.id}">Un-share</button>` : '';
   return `<div class="shby">🔁 Shared by <b>${esc(s.name)}</b> · ${esc(nzTime(s.at))}${del}${s.caption ? `<p>“${esc(s.caption)}”</p>` : ''}</div>`;
 }
@@ -207,22 +209,22 @@ const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator
 const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 let DEFER = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); DEFER = e; document.querySelectorAll('.inst').forEach(el => { el.outerHTML = installBox(); }); });
-addEventListener('appinstalled', () => { DEFER = null; document.querySelectorAll('.inst').forEach(el => el.remove()); toast('📲 My Feed is on your home screen'); });
+addEventListener('appinstalled', () => { DEFER = null; document.querySelectorAll('.inst').forEach(el => el.remove()); toast('📲 Info Book is on your home screen'); });
 function prepIOS() { // carry the family link into the Home Screen app (its storage starts empty)
   if (!IOS || STANDALONE || !MEMBER || !MEMBER.tok || MEMBER.pending) return;
   const q = new URLSearchParams(location.search); q.set('invite', MEMBER.tok); history.replaceState(null, '', location.pathname + '?' + q + location.hash);
-  const base = new URL('./', location.href).href, man = { name: 'My Feed', short_name: 'My Feed', id: './', start_url: base + '?invite=' + MEMBER.tok, scope: base, display: 'standalone', background_color: '#0b0d11', theme_color: '#7c3aed', icons: [192, 512].map(n => ({ src: base + 'icons/icon-' + n + '.png', sizes: n + 'x' + n, type: 'image/png' })) };
+  const base = new URL('./', location.href).href, man = { name: 'Info Book', short_name: 'Info Book', id: './', start_url: base + '?invite=' + MEMBER.tok, scope: base, display: 'standalone', background_color: '#0b0d11', theme_color: '#7c3aed', icons: [192, 512].map(n => ({ src: base + 'icons/icon-' + n + '.png', sizes: n + 'x' + n, type: 'image/png' })) };
   const l = document.querySelector('link[rel=manifest]'); if (l) l.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man));
 }
 const IOS_PIC = `<svg class="ipic" viewBox="0 0 240 120" aria-hidden="true"><rect x="8" y="8" width="224" height="104" rx="16" fill="#f1f5f9" stroke="#cbd5e1"/><rect x="20" y="78" width="200" height="24" rx="8" fill="#e2e8f0"/><g transform="translate(108 80)" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v12M7 7l5-5 5 5"/><path d="M5 10v9h14v-9"/></g><text x="120" y="40" text-anchor="middle" font-size="13" fill="#334155" font-family="system-ui">1. Tap Share ⬆︎ below</text><text x="120" y="60" text-anchor="middle" font-size="13" fill="#334155" font-family="system-ui">2. Add to Home Screen ＋</text></svg>`;
 function installBox() {
   if (STANDALONE) return '';
-  if (DEFER) return `<div class="inst"><b>📲 Put My Feed on your home screen</b><p>It opens like an app, full screen.</p><button class="btn pri" data-install>Install My Feed</button></div>`;
-  if (IOS) { setTimeout(prepIOS, 0); return `<div class="inst"><b>📲 Put My Feed on your home screen</b><p>In Safari: tap the <b>Share</b> button ⬆︎ at the bottom, then <b>Add to Home Screen</b>, then <b>Add</b>.</p>${IOS_PIC}${MEMBER && MEMBER.tok ? '<p class="mute" style="font-size:.8rem">Your family link goes with it, so the app opens your feed.</p>' : ''}</div>`; }
-  return `<div class="inst"><b>📲 Put My Feed on your home screen</b><p>Open your browser’s menu (⋮) and choose <b>Install app</b> or <b>Add to Home screen</b>.</p></div>`;
+  if (DEFER) return `<div class="inst"><b>📲 Put Info Book on your home screen</b><p>It opens like an app, full screen.</p><button class="btn pri" data-install>Install Info Book</button></div>`;
+  if (IOS) { setTimeout(prepIOS, 0); return `<div class="inst"><b>📲 Put Info Book on your home screen</b><p>In Safari: tap the <b>Share</b> button ⬆︎ at the bottom, then <b>Add to Home Screen</b>, then <b>Add</b>.</p>${IOS_PIC}${MEMBER && MEMBER.tok ? '<p class="mute" style="font-size:.8rem">Your family link goes with it, so the app opens your feed.</p>' : ''}</div>`; }
+  return `<div class="inst"><b>📲 Put Info Book on your home screen</b><p>Open your browser’s menu (⋮) and choose <b>Install app</b> or <b>Add to Home screen</b>.</p></div>`;
 }
 function pasteLink() { // an installed app with no family link yet (an iPhone Home Screen app starts with empty storage)
-  $('#sheetin').innerHTML = `<h2>Open your family link</h2><p>If Shane sent you a My Feed link, paste it here once and this app will open your feed.</p>
+  $('#sheetin').innerHTML = `<h2>Open your family link</h2><p>If Shane sent you a Info Book link, paste it here once and this app will open your feed.</p>
     <input id="plink" class="plink" placeholder="https://shane-my-app.pages.dev/feed/?invite=…" aria-label="Your link"><button class="btn pri" id="plgo">Open my feed</button>
     <button class="btn" id="plskip">I don’t have a link</button>`;
   $('#sheet').classList.add('on', 'ob');
@@ -233,11 +235,11 @@ function famSettings() {
   const inst = installBox();
   if (!FAM_ON) return inst;
   if (!IS_ADMIN) return `<h2 style="margin-top:4px">👪 Family</h2><p>You’re in Shane’s private family network as <b>${esc(MEMBER.name)}</b>. Comments and shares are only seen by the family.</p>
-    <button class="btn" id="obre">Change what I’m into</button><button class="btn" id="famleave">Leave on this phone</button>` + inst;
-  return `<h2 style="margin-top:4px">👪 Family</h2><p>Invite people to their own My Feed. Each gets a private link: it opens their own feed (their own interests, nothing of yours) and lets them comment and share with the family. Making a new link stops the old one.</p>
+    <button class="btn pri" data-upload>📷 Share a photo</button> <button class="btn" id="obre">Change what I’m into</button><button class="btn" id="famleave">Leave on this phone</button>` + inst;
+  return `<h2 style="margin-top:4px">👪 Family</h2><p>Invite people to their own Info Book. Each gets a private link: it opens their own feed (their own interests, nothing of yours) and lets them comment and share with the family. Making a new link stops the old one.</p>
     <div id="famlist" class="famlist">Loading…</div>
     <div class="famadd"><input id="famname" maxlength="40" placeholder="Name, e.g. Aranea" aria-label="Name"><button class="btn pri" id="famaddb">Add & make link</button></div>
-    <div id="famlink"></div>` + inst;
+    <div id="famlink"></div><p><button class="btn pri" data-upload>📷 Share a photo</button></p><p class="sst">Family photos are kept privately in the data service (only people with a link can see them), shrunk on the phone and with location data removed. You and whoever posted a photo can delete it.</p>` + inst;
 }
 async function famList() {
   const el = $('#famlist'); if (!el) return;
@@ -255,15 +257,19 @@ document.addEventListener('click', async e => {
   if (t.id === 'sheet' && t.classList.contains('ob')) { e.stopPropagation(); return; } // the welcome screen stays until they pick
   const pk = t.closest('[data-pick]'); if (pk) { pk.classList.toggle('on'); return; }
   if (t.id === 'obgo') { obGo(); return; }
+  if (t.closest('[data-upload]')) { pickPhotos(); return; }
+  if (t.id === 'upgo') { postPhotos(); return; }
+  if (t.id === 'upx' || t.id === 'upbox') { $('#upbox').remove(); UP = []; return; }
+  const fp = t.closest('img[data-fph]'); if (fp && fp.src) { e.preventDefault(); const v = document.createElement('div'); v.className = 'lbx'; v.innerHTML = `<img src="${fp.src}" alt="">`; v.onclick = () => v.remove(); document.body.append(v); return; }
   if (t.closest('[data-install]')) { if (DEFER) { DEFER.prompt(); const r = await DEFER.userChoice.catch(() => ({})); if (r.outcome === 'accepted') { DEFER = null; document.querySelectorAll('.inst').forEach(el => el.remove()); } } return; }
-  if (t.id === 'plgo') { const m = ($('#plink').value || '').match(/invite=([\w-]{30,80})/) || ($('#plink').value || '').trim().match(/^([\w-]{30,80})$/); if (!m) { toast('That doesn’t look like a My Feed link'); return; } localStorage.setItem('mf.member', JSON.stringify({ tok: m[1], pending: 1 })); location.reload(); return; }
+  if (t.id === 'plgo') { const m = ($('#plink').value || '').match(/invite=([\w-]{30,80})/) || ($('#plink').value || '').trim().match(/^([\w-]{30,80})$/); if (!m) { toast('That doesn’t look like a Info Book link'); return; } localStorage.setItem('mf.member', JSON.stringify({ tok: m[1], pending: 1 })); location.reload(); return; }
   if (t.id === 'plskip') { ls.set('noLink', true); $('#sheet').classList.remove('on', 'ob'); return; }
   if (t.id === 'obre') { onboarding(); return; }
   if (t.id === 'famleave') { if (confirm('Take your feed off this phone? Your link will still work to come back.')) { localStorage.removeItem('mf.member'); location.reload(); } return; }
   const cb = t.closest('[data-cmt]'); if (cb) { openThread(cb); return; }
   const sb = t.closest('[data-share]'); if (sb) { shareCard(sb.dataset.share, false); return; }
   const sl = t.closest('[data-share-life]'); if (sl) { shareCard(sl.dataset.shareLife, true); return; }
-  const us = t.closest('[data-unshare]'); if (us) { unshare(us.dataset.unshare); return; }
+  const us = t.closest('[data-unshare]'); if (us) { unshare(us.dataset.unshare, us.dataset.up); return; }
   const dc = t.closest('[data-delc]'); if (dc) { delComment(dc); return; }
   if (t.id === 'famaddb') { const n = $('#famname').value.trim(); if (!n) return; try { const r = await fam('/members', { method: 'POST', body: JSON.stringify({ name: n }) }); $('#famname').value = ''; showLink(r.name, r.token); famList(); } catch (er) { toast(er.message); } return; }
   const tk = t.closest('[data-famtok]'); if (tk) { if (!confirm('Make a new link for ' + tk.dataset.n + '? Their old link stops working.')) return; try { const r = await fam('/members/' + tk.dataset.famtok + '/token', { method: 'POST' }); showLink(tk.dataset.n, r.token); } catch (er) { toast(er.message); } return; }
@@ -271,3 +277,77 @@ document.addEventListener('click', async e => {
   const cp = t.closest('[data-copy]'); if (cp) { try { await navigator.clipboard.writeText(cp.dataset.copy); toast('Link copied'); } catch (er) { cp.previousElementSibling.select(); } return; }
 }, true);
 document.addEventListener('submit', e => { if (e.target.matches('.cf')) { e.preventDefault(); sendComment(e.target); } });
+
+/* ---- 1.8.0 📷 Share a photo: from the camera or gallery, up to 4 a post, only for the family ----
+   Each photo is shrunk on the phone (longest side 1600px, JPEG ~80%). Re-drawing it through a canvas keeps only the
+   pixels, so EXIF and GPS location never leave the phone (the server strips any metadata again). Pictures are fetched
+   with the member's token and shown from memory, never from a public link. */
+const PH_POST = 4, PH_PX = 1600;
+let UP = [];
+const PHOTO_URL = new Map();
+function famPhotos(i) {
+  const ps = i.photos || [];
+  return `<div class="fph n${ps.length}">${ps.map(p => `<img data-fph="${+p.id}" alt="${esc(i.t || 'Family photo')}"${p.w && p.h && ps.length === 1 ? ` style="aspect-ratio:${+p.w}/${+p.h}"` : ''}>`).join('')}</div>`;
+}
+function fillFamPhotos() {
+  if (!FAM_ON) return;
+  document.querySelectorAll('img[data-fph]:not([data-ld])').forEach(async img => {
+    img.dataset.ld = 1; const id = img.dataset.fph;
+    try {
+      let url = PHOTO_URL.get(id);
+      if (!url) { const r = await fetch(FAM_API + '/photos/' + id, { headers: { Authorization: 'Bearer ' + MEMBER.tok } }); if (!r.ok) throw 0; url = URL.createObjectURL(await r.blob()); PHOTO_URL.set(id, url); }
+      img.src = url;
+    } catch (e) { img.classList.add('gone'); }
+  });
+}
+function pickPhotos() {
+  if (!FAM_ON) return;
+  const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.multiple = true; // the phone offers Camera or Photo Library
+  f.onchange = () => { const files = [...f.files]; if (files.length > PH_POST) toast(`Up to ${PH_POST} photos a post – using the first ${PH_POST}`); prepPhotos(files.slice(0, PH_POST)); };
+  f.click();
+}
+async function shrink(file) {
+  let src;
+  try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) { src = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = URL.createObjectURL(file); }); }
+  const W = src.width || src.naturalWidth, H = src.height || src.naturalHeight;
+  for (const [px, q] of [[PH_PX, 0.8], [PH_PX, 0.68], [1280, 0.7], [1024, 0.65]]) {
+    const k = Math.min(1, px / Math.max(W, H)), w = Math.round(W * k), h = Math.round(H * k);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(src, 0, 0, w, h);
+    const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', q));
+    if (blob && blob.size < 1.4e6) return { blob, w, h, url: URL.createObjectURL(blob) };
+  }
+  throw new Error('That photo is too big');
+}
+async function prepPhotos(files) {
+  if (!files.length) return;
+  document.querySelector('#upbox')?.remove();
+  const box = document.createElement('div'); box.id = 'upbox'; box.className = 'upbox';
+  box.innerHTML = `<div class="upin"><h2>📷 Share with the family</h2><div class="upth">Getting your photos ready…</div>
+    <textarea id="upcap" maxlength="300" rows="2" placeholder="Say something about it (optional)"></textarea>
+    <p class="sst">Only your family sees this. Location data is removed.</p>
+    <div class="uprow"><button class="btn" id="upx">Cancel</button><button class="btn pri" id="upgo" disabled>Post</button></div></div>`;
+  document.body.append(box);
+  UP = [];
+  for (const f of files) { try { UP.push(await shrink(f)); } catch (e) { toast(e.message || 'Couldn’t read one photo'); } }
+  if (!document.body.contains(box)) return;
+  box.querySelector('.upth').innerHTML = UP.length ? UP.map(p => `<img src="${p.url}" alt="">`).join('') : 'No photos could be read';
+  $('#upgo').disabled = !UP.length;
+}
+async function postPhotos() {
+  const b = $('#upgo'); if (!UP.length || b.disabled) return; b.disabled = true; b.textContent = 'Posting…';
+  const caption = ($('#upcap').value || '').trim();
+  if (unsafe({ t: caption })) { toast('Please keep it family-friendly'); b.disabled = false; b.textContent = 'Post'; return; }
+  try {
+    const ids = [];
+    for (const p of UP) {
+      const r = await fetch(`${FAM_API}/photos?w=${p.w}&h=${p.h}`, { method: 'POST', headers: { Authorization: 'Bearer ' + MEMBER.tok, 'Content-Type': 'image/jpeg' }, body: p.blob });
+      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.err || 'Upload failed');
+      PHOTO_URL.set(String(j.id), p.url); ids.push(j.id);
+    }
+    await fam('/shares?photos', { method: 'POST', body: JSON.stringify({ photos: ids, caption }) });
+    $('#upbox').remove(); UP = []; $('#sheet').classList.remove('on'); toast('📷 Shared with the family');
+    tab = 'family'; ls.set('tab', tab); await loadShares(); draw();
+  } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Post'; }
+}

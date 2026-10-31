@@ -1,6 +1,6 @@
 {
-  "name": "My Feed",
-  "short_name": "My Feed",
+  "name": "Info Book",
+  "short_name": "Info Book",
   "description": "A private, family-safe photo and video feed, with comments and shares only for the family.",
   "id": "./",
   "start_url": "./",
@@ -8,7 +8,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b0d11",
-  "theme_color": "#7c3aed",
+  "theme_color": "#8b5cf6",
   "lang": "en-NZ",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

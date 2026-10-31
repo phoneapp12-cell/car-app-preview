@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>My Feed</title>
+<title>Info Book</title>
 <meta name="description" content="Shane's private photo and video feed. No likes, comments or followers.">
 <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32"><link rel="icon" href="icons/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="My Feed">
+<meta name="apple-mobile-web-app-title" content="Info Book">
 <style>
-:root{--bg:#f4f5f8;--card:#fff;--ink:#14161b;--mute:#6b7280;--line:#e7e8ee;--chip:#eceef3;--acc:#7c3aed;--acc2:#ec4899;--up:#16a34a;--down:#dc2626;--shadow:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06)}
+:root{--bg:#f4f5f8;--card:#fff;--ink:#14161b;--mute:#6b7280;--line:#e7e8ee;--chip:#eceef3;--acc:#8b5cf6;--acc2:#ec4899;--up:#16a34a;--down:#dc2626;--shadow:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06)}
 @media (prefers-color-scheme:dark){:root{--bg:#0b0d11;--card:#15181e;--ink:#eef0f4;--mute:#9aa1ad;--line:#242833;--chip:#1e222b;--shadow:0 1px 0 rgba(255,255,255,.03)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
@@ -45,7 +45,7 @@ a{color:inherit}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:6px 14px 10px;scrollbar-width:none;max-width:640px;margin:0 auto}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;padding:7px 14px;border-radius:999px;background:var(--chip);font-weight:600;font-size:.9rem;white-space:nowrap;transition:transform .15s}
-.chip.on{background:linear-gradient(135deg,var(--acc2),var(--acc));color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.3)}
+.chip.on{background:linear-gradient(135deg,var(--acc2),var(--acc));color:#fff;box-shadow:0 4px 12px rgba(139,92,246,.32)}
 .chip:active{transform:scale(.95)}
 main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-inset-bottom))}
 .card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin:0 0 16px;overflow:hidden;border:1px solid var(--line);animation:in .35s ease both}
@@ -141,12 +141,22 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .mini{font:inherit;font-size:.78rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:inherit}
 .sgh{margin:14px 0 2px;font-size:.85rem}
 .ichs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}.ich{font:inherit;font-size:.8rem;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--mute)}.ich.on{background:var(--chip);color:inherit;font-weight:600;border-color:transparent}
+.upb{display:block;width:calc(100% - 24px);margin:4px 12px 10px;padding:13px;font-size:1rem}
+.fph{display:grid;gap:3px;background:var(--line)}.fph.n2,.fph.n4{grid-template-columns:1fr 1fr}.fph.n3{grid-template-columns:1fr 1fr}.fph.n3 img:first-child{grid-column:1/3}
+.fph img{width:100%;display:block;object-fit:cover;background:var(--chip);min-height:120px;cursor:zoom-in}.fph.n1 img{max-height:70vh}.fph:not(.n1) img{aspect-ratio:1}.fph img.gone{display:none}
+.upbox{position:fixed;inset:0;z-index:60;background:rgba(10,10,20,.55);display:flex;align-items:flex-end;justify-content:center}
+.upin{background:var(--card);color:var(--ink);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+.upth{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0;color:var(--mute)}.upth img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px}
+#upcap{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit;background:var(--bg);color:var(--ink)}
+.uprow{display:flex;gap:8px;justify-content:flex-end}
+.lbx{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.92);display:grid;place-items:center}.lbx img{max-width:100%;max-height:100%}
+.logo img{width:30px;height:30px;border-radius:9px;display:block;box-shadow:0 3px 10px rgba(236,72,153,.3)}
 </style>
 </head>
 <body>
 <header class="top">
   <div class="bar">
-    <div class="logo"><i>✦</i><span>My Feed</span></div>
+    <div class="logo"><img src="icons/logo.svg" width="30" height="30" alt=""><span>Info Book</span></div>
     <div class="mood" id="mood"></div>
     <div class="upd" id="upd"></div>
     <button class="ib" id="rf" aria-label="Refresh">↻</button>
@@ -157,7 +167,7 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.7.1"></script>
-<script src="app.js?v=1.7.1"></script>
+<script src="family.js?v=1.8.0"></script>
+<script src="app.js?v=1.8.0"></script>
 </body>
 </html>

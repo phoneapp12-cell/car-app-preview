@@ -1,9 +1,9 @@
-/* My Feed – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
+/* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.8.0';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
-const MY_APP = '../'; // My Feed lives at My App's address + feed/, so My App is one level up
+const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
   ['all', 'All', '✨', '#7c3aed', '#ec4899'],
   ['life', 'For You', '📌', '#0f766e', '#2563eb'],
@@ -426,6 +426,7 @@ async function findPic(x) {
 }
 let picBusy = 0; const picQueue = [];
 function fillPics() {
+  fillFamPhotos();
   document.querySelectorAll('.media.need:not(.asked)').forEach(el => { el.classList.add('asked'); picQueue.push(el); });
   while (picBusy < 4 && picQueue.length) {
     const el = picQueue.shift(), x = LIFE_BY_ID.get(el.dataset.pic); if (!x) continue;
@@ -672,11 +673,12 @@ function card(i) {
   const T = TOPIC[i.topic] || TOPIC.all, v = VOTES[i.id] ? VOTES[i.id].v : 0;
   const style = `--c1:${T[3]};--c2:${T[4]}`;
   let media = '';
-  if (i.vid) media = vidMedia(i.vid, i.img, i.t);
+  if (i.photos) media = famPhotos(i);
+  else if (i.vid) media = vidMedia(i.vid, i.img, i.t);
   else if (i.img) media = `<a class="media${i.kind === 'tv' ? ' tall' : ''}" href="${esc(i.url)}" target="_blank" rel="noopener"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(i.img)}" alt="${esc(i.t)}" onerror="if(!this.dataset.r){this.dataset.r=1;var s=this.src;setTimeout(()=>{this.src=s},1500)}else this.closest('.media').remove()"></a>`;
   else media = `<div class="hero"><span class="em">${T[2]}</span><h3>${esc(i.t)}</h3></div>`;
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
-  const showTitle = i.img || i.vid;
+  const showTitle = (i.img || i.vid || i.photos) && i.t;
   return `<article class="card${i._share ? ' shared' : ''}" data-id="${esc(i.id)}" style="${style}">${shareHead(i)}
     <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.party ? ' · ' + esc(i.party) : i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
     ${media}
@@ -786,10 +788,10 @@ function settings() {
   const row = x => { const [st, c] = status(x.id); const T = x.you ? ['', '', '💭'] : (TOPIC[x.topic] || TOPIC.all); return `<div class="row"><span>${T[2]} ${esc(x.name)}<small class="sst ${c}">${st}${W.up(x.id) || W.dn(x.id) ? ' · ' + W.up(x.id) + '👍 ' + W.dn(x.id) + '👎' : ''}</small></span><span>${c === 'drop' ? `<button class="mini" data-revive="${esc(x.id)}">Bring back</button>` : x.you ? 'on this phone' : x.ok ? esc(ago(x.ok)) + ' ago' : 'waiting'}</span></div>`; };
   const groups = []; srcs.slice().sort((a, b) => tIdx(a.topic) - tIdx(b.topic)).forEach(x => { const g = groups[groups.length - 1]; if (!g || g.t !== x.topic) groups.push({ t: x.topic, l: [x] }); else g.l.push(x); });
   const you = YOU.map(x => `<div class="row"><span>${(TOPIC[x.topic] || TOPIC.all)[2]} ${esc(x.term)}<small class="sst">${esc(x.q || '')}</small></span><span>${esc((TOPIC[x.topic] || TOPIC.all)[1])}</span></div>`).join('');
-  $('#sheetin').innerHTML = famSettings() + `<h2>My Feed</h2>
+  $('#sheetin').innerHTML = famSettings() + `<h2>Info Book</h2>
     <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself through the day from ${(FEED && FEED.sources || []).length || 'about 180'} public sources. Sport is always left out.</p>
     <p>👍 / 👎 teach it which <b>sources</b> and <b>topics</b> you like. New sources get a short trial (“Trying”) so you can judge them; a source you give about four more 👎 than 👍 is dropped (you can bring it back below).</p>
-    <p>▶️ Videos play by themselves (muted) when they’re on screen and pause when you scroll past. Tap the speaker on a video for sound; it stays on until you close My Feed.</p>
+    <p>▶️ Videos play by themselves (muted) when they’re on screen and pause when you scroll past. Tap the speaker on a video for sound; it stays on until you close Info Book.</p>
     ${PRIVATE_OK ? `<a class="btn pri" href="${MY_APP}">← Back to My App</a>
     <p>📌 <b>For You</b> cards come from My App on this phone and are mixed through All at random: cars, birthdays, calendar, to-dos, garden, pets, meals and recipes (your own recipe photos too), weather, UV and power (kWh), roads, deliveries, plus every board and hub. Your own things never leave this phone, and bills and money are always left out.</p>
     <p>🖼️ <b>My Photos</b>: ${PHOTO_INFO.all ? `${PHOTO_INFO.used} of the ${PHOTO_INFO.all} photos on My App’s Photos page${PHOTO_INFO.approved ? ' (the ones you tagged approved, feed, keep or favourite)' : ''}` : 'photos from My App’s Photos page'}. Receipts, warranties, documents, screenshots and anything tagged <b>nofeed</b> or <b>private</b> are left out. Tag photos <b>approved</b> or <b>feed</b> in My App to show only those. Read on this phone only.</p>
@@ -825,7 +827,7 @@ document.addEventListener('click', e => {
   const u = t.closest('[data-undo]'); if (u) { const id = u.dataset.undo; delete VOTES[id]; ls.set('votes', VOTES); const it = order.find(x => x.id === id); const card0 = u.closest('.card'); if (it && card0) { card0.outerHTML = it.topic === 'life' ? lifeCard(it) : card(it); fillPics(); watchVids(); } return; }
   const sb = t.closest('[data-snd]'); if (sb) { e.preventDefault(); toggleSound(sb.closest('.media.vid')); return; }
   const p = t.closest('.media.vid'); if (p) { if (!p.classList.contains('playing') || curVid !== p) playVid(p, true); return; } // tap: play this one with sound
-  const dm = t.closest('[data-dismiss]'); if (dm) { DISMISS[dm.dataset.dismiss] = Date.now(); ls.set('dismiss', DISMISS); const c0 = dm.closest('.card'); if (c0) { c0.style.transition = 'opacity .25s, transform .25s'; c0.style.opacity = 0; c0.style.transform = 'scale(.97)'; setTimeout(() => c0.remove(), 260); } toast('Hidden from My Feed'); return; }
+  const dm = t.closest('[data-dismiss]'); if (dm) { DISMISS[dm.dataset.dismiss] = Date.now(); ls.set('dismiss', DISMISS); const c0 = dm.closest('.card'); if (c0) { c0.style.transition = 'opacity .25s, transform .25s'; c0.style.opacity = 0; c0.style.transform = 'scale(.97)'; setTimeout(() => c0.remove(), 260); } toast('Hidden from Info Book'); return; }
   const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); return; }
   if (t.id === 'rf') { load(true); return; }
   if (t.id === 'st') { settings(); return; }
