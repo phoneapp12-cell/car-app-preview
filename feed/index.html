@@ -25,6 +25,18 @@ a{color:inherit}
 .logo i{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#f59e0b,var(--acc2) 55%,var(--acc));display:grid;place-items:center;font-style:normal;font-size:1rem;color:#fff}
 .logo span{background:linear-gradient(90deg,var(--acc2),var(--acc));-webkit-background-clip:text;background-clip:text;color:transparent}
 .mood{margin-left:auto;font-size:.74rem;font-weight:600;color:var(--mute);background:color-mix(in srgb,var(--mute) 12%,transparent);border-radius:99px;padding:3px 9px;white-space:nowrap}.mood:empty{display:none}.mood+.upd{margin-left:8px}
+.fb{border:0;background:none;font-size:1.05rem;padding:8px 6px;border-radius:10px;color:var(--mute);display:inline-flex;align-items:center;gap:3px;position:relative;cursor:pointer}
+.fb .cc{font-size:.85rem;font-weight:700}.fb .dot{width:7px;height:7px;border-radius:50%;background:#e11d48;position:absolute;top:6px;right:2px}
+.cmts{border-top:1px solid var(--line);padding:8px 12px 12px}.cm{padding:6px 0;position:relative}.cm b{font-size:.9rem}.cm small{color:var(--mute);font-size:.75rem}.cm p{margin:2px 0 0;white-space:pre-wrap;word-break:break-word}
+.cm0{color:var(--mute);font-size:.9rem;padding:4px 0}.cx{position:absolute;right:0;top:4px;border:0;background:none;color:var(--mute);font-size:.85rem;padding:4px 6px}
+.cf{display:flex;gap:8px;margin-top:8px}.cf textarea{flex:1;resize:vertical;min-height:40px;border:1px solid var(--line);border-radius:12px;padding:9px 11px;font:inherit;background:var(--bg);color:inherit}.cf .btn{margin:0;width:auto;padding:0 16px}
+.shby{padding:10px 14px 0;font-size:.85rem;color:var(--mute)}.shby b{color:inherit}.shby p{margin:4px 0 0;color:inherit;font-style:italic}.shby .mini{float:right;margin-top:-3px}
+.card.shared{box-shadow:0 0 0 2px color-mix(in srgb,var(--c1) 45%,transparent)}
+.famh{margin:18px 16px 8px;font-size:1rem}
+.obg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.obt{display:flex;align-items:center;gap:8px;text-align:left;border:2px solid var(--line);background:var(--card,transparent);color:inherit;border-radius:14px;padding:10px;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer}
+.obt span{font-size:1.3rem}.obt.on{border-color:var(--c1);background:color-mix(in srgb,var(--c1) 16%,transparent)}
+.famadd{display:flex;gap:8px;margin:10px 0}.famadd input,.famlnk input{flex:1;width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit;background:var(--bg);color:inherit;box-sizing:border-box}.famadd .btn{margin:0;width:auto;white-space:nowrap}
+.famlnk{border:1px dashed var(--line);border-radius:14px;padding:12px;margin:8px 0 14px}.famlnk p{font-size:.85rem;color:var(--mute);margin:4px 0 8px}.famlnk .btn{margin-top:8px}
 .upd{margin-left:auto;font-size:.78rem;color:var(--mute);text-align:right;line-height:1.2}
 .ib{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:1.1rem;background:var(--chip)}
 .ib.spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
@@ -143,6 +155,7 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="app.js?v=1.6.1"></script>
+<script src="family.js?v=1.7.0"></script>
+<script src="app.js?v=1.7.0"></script>
 </body>
 </html>
