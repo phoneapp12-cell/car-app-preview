@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.7';
+const APP_VERSION = '2.29.8';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -21015,9 +21015,23 @@ function aboutState() {
   if (!S.about || typeof S.about !== 'object' || !Array.isArray(S.about.answers)) S.about = normAbout(S.about);
   return S.about;
 }
-function rosterState() {
+function rosterRaw() {
   if (!S.roster || typeof S.roster !== 'object' || !S.roster.days || !S.roster.ends) S.roster = normRoster(S.roster);
   return S.roster;
+}
+// 2.29.8: annual leave. Days marked 'leave' (S.settings.sickDays[iso]) count as days off everywhere that reads the roster
+// for the coming week. The Work roster editor and the wage estimate still use the real roster (leave is paid).
+function leaveSeed() { try { const m = workSickMap(); if (!S.settings.leaveSeed1101) { S.settings.leaveSeed1101 = 1; if (todayISO() <= '2026-11-02') { m['2026-11-01'] = 'leave'; m['2026-11-02'] = 'leave'; } try { save(); } catch (e) {} } } catch (e) {} }
+function onLeave(iso) { try { leaveSeed(); return workSickMap()[iso || todayISO()] === 'leave'; } catch (e) { return false; } }
+function rosterState() {
+  const r = rosterRaw();
+  try {
+    const T = todayISO(), drop = [];
+    for (let i = 0; i < 7; i++) { const d = addDays(T, i); if (onLeave(d)) drop.push(String(new Date(parseD(d)).getUTCDay())); }
+    if (!drop.length) return r;
+    const days = { ...r.days }, ends = { ...(r.ends || {}) }; drop.forEach(k => { delete days[k]; delete ends[k]; });
+    return { ...r, days, ends };
+  } catch (e) { return r; }
 }
 function aboutKnown(id) {
   try {
@@ -21574,7 +21588,7 @@ async function deleteAbout(id) {
   toast('Answer deleted.', 'Undo', undoTo(snapS));
 }
 function Roster() {
-  const r = rosterState(), days = r.days, ends = r.ends || {};
+  const r = rosterRaw(), days = r.days, ends = r.ends || {};
   const rows = ROSTER_DAYS.map(([k, name]) => {
     const sub = days[k] ? 'Starts ' + esc(fmtTime(days[k])) + (ends[k] ? ' · Finishes ' + esc(fmtTime(ends[k])) : '') : 'Day off';
     return `<div class="srow rosterrow"><div class="tx"><div class="t">${name}</div><div class="s">${sub}</div></div>` +
@@ -21582,13 +21596,14 @@ function Roster() {
       `<label class="rt"><span>Finish</span><input type="time" aria-label="${name} finish" value="${esc(ends[k] || '')}" onchange="setRosterEnd('${k}', this.value)"${days[k] ? '' : ' disabled'}></label></div></div>`;
   }).join('');
   const T = todayISO(), m = glMode(), curOvr = workSickMap()[T] || "";
-  const statusCard = m.rostered ? `<div class="card" style="padding:12px 14px;margin-bottom:12px">
-    <div class="t" style="font-weight:800">${m.sick ? "🤒 Today’s Status: Off Sick" : "💼 Today’s Status: Rostered (" + esc(glShift(m)) + ")"}</div>
-    <div class="s" style="margin:4px 0 8px">${m.sick ? "You’re rostered today, and your location shows you’re not at work (treated as off sick)." : "If you’re rostered on and your location isn’t at work during shift hours, My App automatically marks you as off sick."}</div>
+  const statusCard = (m.rostered || curOvr === 'leave') ? `<div class="card" style="padding:12px 14px;margin-bottom:12px">
+    <div class="t" style="font-weight:800">${curOvr === "leave" ? "🏖️ Today’s Status: Annual leave" : m.sick ? "🤒 Today’s Status: Off Sick" : "💼 Today’s Status: Rostered (" + esc(glShift(m)) + ")"}</div>
+    <div class="s" style="margin:4px 0 8px">${curOvr === "leave" ? "Today counts as a day off everywhere in My App. Your wage estimate still includes it." : m.sick ? "You’re rostered today, and your location shows you’re not at work (treated as off sick)." : "If you’re rostered on and your location isn’t at work during shift hours, My App automatically marks you as off sick."}</div>
     <div class="chips">
       <button type="button" class="chip${!curOvr ? " on" : ""}" onclick="setWorkSickToday('')">📍 Auto (by location)</button>
       <button type="button" class="chip${curOvr === 'sick' ? " on" : ""}" onclick="setWorkSickToday('sick')">🤒 Off sick today</button>
       <button type="button" class="chip${curOvr === 'working' ? " on" : ""}" onclick="setWorkSickToday('working')">💼 At work today</button>
+      <button type="button" class="chip${curOvr === 'leave' ? " on" : ""}" onclick="setWorkSickToday('leave')">🏖️ On leave today</button>
     </div>
   </div>` : "";
   return header('Work hours', 'Your roster: the days and times you start and finish') +
@@ -21600,7 +21615,7 @@ function Roster() {
 async function setRosterEnd(day, value) {
   if (!ROSTER_DAYS.some(d => d[0] === day)) return;
   const snapS = snap();
-  const r = rosterState();
+  const r = rosterRaw();
   if (!r.ends) r.ends = {};
   if (value && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)) r.ends[day] = value;
   else delete r.ends[day];
@@ -21611,7 +21626,7 @@ async function setRosterEnd(day, value) {
 async function setRosterDay(day, value) {
   if (!ROSTER_DAYS.some(d => d[0] === day)) return;
   const snapS = snap();
-  const r = rosterState();
+  const r = rosterRaw();
   if (value && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)) r.days[day] = value;
   else delete r.days[day];
   await save();
@@ -22516,6 +22531,7 @@ function isSickOnDate(iso) {
   const m = workSickMap();
   if (m[iso] === "working") return false;
   if (m[iso] === "sick") return true;
+  if (m[iso] === "leave") return false;
   if (iso !== todayISO()) return false;
   try {
     const a = homeAklParts(new Date()) || {}, min = a.min || 0;
@@ -22536,7 +22552,7 @@ async function setWorkSickToday(mode) {
   else m[T] = mode;
   await save();
   render();
-  toast(mode === "sick" ? "Marked as off sick today. Rest up!" : mode === "working" ? "Marked as working today." : "Using automatic location detection.");
+  toast(mode === "leave" ? "Annual leave today. Enjoy!" : mode === "sick" ? "Marked as off sick today. Rest up!" : mode === "working" ? "Marked as working today." : "Using automatic location detection.");
 }
 function glMode(now = new Date()) {
   const a = homeAklParts(now) || {}, min = a.min || 0, h = min / 60;
@@ -22642,7 +22658,7 @@ function glHead(name, m, now) {
   const hi = m.night ? 'Good evening' : m.h < 12 ? 'Morning' : 'Afternoon';
   const loc = (() => { try { const k = glLoc(); return k === 'work' ? '📍 Port Rd' : k === 'beach' ? '📍 Onerahi Beach' : k === 'bush' ? '📍 Bushwalk' : k === 'town' ? '📍 Town' : '📍 Home (Onerahi)'; } catch (e) { return '📍 Onerahi'; } })();
   const sub = `${hi} ${esc(name)} · ${WDL[now.getDay()].slice(0, 3)} ${now.getDate()} ${MONL[now.getMonth()].slice(0, 3)} · ${loc}`;
-  const shiftPill = m.sick ? '🤒 Off sick today' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
+  const shiftPill = m.sick ? '🤒 Off sick today' : onLeave() ? '🏖️ Annual leave' : m.off ? '🌤️ Day off' : ('💼 ' + esc(glShift(m)) + (() => { const f = glFree(m); return f ? ' · Free in ' + esc(f.txt) : ''; })());
   let blurb = ''; try { blurb = typeof glDynamicHeroBlurb === 'function' ? glDynamicHeroBlurb(m, now) : esc(glLine(m) || ''); } catch (e) { blurb = esc(glLine(m) || ''); }
   return `<div class="top glhead glhero-card"><div style="min-width:0;flex:1"><div class="glrow"><div style="display:flex;align-items:center;gap:8px;min-width:0"><button type="button" class="iconbtn glmenubtn" aria-label="Open menu guide" title="Menu guide" onclick="event.stopPropagation();setTabsOpen(false);go('#guide')"><span class="glbars"><i></i><i></i><i></i></span></button><h1 class="glh1"><span class="glhome"><img src="art/i3-house.webp" alt="" width="36" height="36" onerror="this.parentNode.classList.add('glnoimg');this.remove()"></span>Home</h1></div><div class="iconrow">${glTasksBtn()}${glBellBtn()}</div></div><div class="glsubrow"><div class="sub">${sub}</div><span class="glshiftpill" data-glfree="head">${shiftPill}</span></div>${blurb ? `<div class="glheroblurb" id="glheroblurb">${blurb}</div>` : ''}</div></div>`;
 }
@@ -27642,7 +27658,7 @@ function wgSt() { S.settings = S.settings || {}; const w = S.settings.wageEst &&
   if (!(+w.brk >= 0)) w.brk = 30; w.brk = +w.brk; if (!(+w.social >= 0)) w.social = 5; w.social = +w.social; if (w.socialPer !== 'week') w.socialPer = 'pay';
   if (!(+w.ph > 0)) w.ph = 1.5; w.arrears = +w.arrears === 1 ? 1 : 0; if (!Array.isArray(w.other)) w.other = []; if (!w.commBy || typeof w.commBy !== 'object') w.commBy = {};
   return w; }
-const wgRostered0 = () => { try { const r = rosterState(); return Object.keys(r.days || {}).filter(k => hmMin(r.days[k]) != null).length * 2; } catch (e) { return 0; } };
+const wgRostered0 = () => { try { const r = rosterRaw(); return Object.keys(r.days || {}).filter(k => hmMin(r.days[k]) != null).length * 2; } catch (e) { return 0; } };
 const wgOn = () => { try { return wgSt().rate > 0; } catch (e) { return false; } };
 const wgTrunc = v => Math.floor(v * 100 + 1e-6) / 100;
 // PAYE for one fortnightly pay. Returns income tax and ACC separately (PAYE in the IRD tables includes both).
@@ -27665,7 +27681,7 @@ function wgWorkFor(payDate) { const w = wgSt(); let end;
   if (w.arrears) end = addDays(end, -7);
   return { start: addDays(end, -13), end }; }
 function wgHolSet(a, b) { const s = new Map(); try { for (let y = +a.slice(0, 4); y <= +b.slice(0, 4); y++) (nzHolidays(y) || []).forEach(h => s.set(h.date, h.name)); } catch (e) { } try { PWR_NL_ANNIV.forEach(d => s.set(d, 'Auckland Anniversary Day')); } catch (e) { } return s; }
-function wgHours(ws, we) { const w = wgSt(), r = rosterState(), hol = wgHolSet(ws, we), out = { days: 0, hrs: 0, late: 0, phHrs: 0, ph: [], rows: [] };
+function wgHours(ws, we) { const w = wgSt(), r = rosterRaw(), hol = wgHolSet(ws, we), out = { days: 0, hrs: 0, late: 0, phHrs: 0, ph: [], rows: [] };
   for (let d = ws; d <= we; d = addDays(d, 1)) { const k = String(new Date(parseD(d)).getUTCDay()), st = hmMin(r.days[k]); if (st == null) continue;
     const en = hmMin((r.ends || {})[k] || WG_END_DEF[k] || '18:00'); if (en == null || en <= st) continue;
     const h = Math.max(0, (en - st - w.brk) / 60), late = w.lateRate > 0 ? Math.max(0, Math.min(en, 24 * 60) - Math.max(st, 18 * 60)) / 60 : 0;
@@ -27675,7 +27691,7 @@ function wgHours(ws, we) { const w = wgSt(), r = rosterState(), hol = wgHolSet(w
 // dates) + a projection for the rostered days still to come (average commission per rostered day from recent tracker
 // history, else his "Usual per day"). Once the fortnight is over it's just the earned total. A future fortnight is the
 // projection only. A typed amount for that pay still wins.
-const wgRostered = (a, b) => { let n = 0; try { const r = rosterState(); for (let d = a; d <= b; d = addDays(d, 1)) if (hmMin(r.days[String(new Date(parseD(d)).getUTCDay())]) != null) n++; } catch (e) { } return n; };
+const wgRostered = (a, b) => { let n = 0; try { const r = rosterRaw(); for (let d = a; d <= b; d = addDays(d, 1)) if (hmMin(r.days[String(new Date(parseD(d)).getUTCDay())]) != null) n++; } catch (e) { } return n; };
 function wgPerDay() { const w = wgSt();
   try { const c = CM(); if (c && c.entries.length) { const T = todayISO(), cur = wgWorkFor(wgPayFor0(T)), to = addDays(cur.start, -1), from = addDays(to, -41), first = c.entries.reduce((m, e) => e.date < m ? e.date : m, '9999');
     const st = first > from ? first : from, days = st <= to ? wgRostered(st, to) : 0, tot = st <= to ? commSum(c.entries, st, to) / 100 : 0;
@@ -27733,7 +27749,7 @@ function WagePage() {
   const w = wgSt(), T = todayISO(), pps = [0, 1, 2].map(o => payPeriod(o)).filter(Boolean), nextPP = pps.find(p => myPending(p, T)) || pps[pps.length - 1];
   const head = moneyTabs('work') + workTabs('wage') + header('Wage estimate', 'Your take-home pay worked out from your roster, commission and tax code');
   if (!nextPP) return head + `<div class="callout green">${I('cal')}<div style="flex:1"><b>Set your payday first</b><br>The estimate uses the same pay fortnights as Bills.<div style="margin-top:10px"><button class="btn small primary" onclick="paydayForm()">Set payday</button></div></div></div>`;
-  const pd = wgPayFor(nextPP), e = wgEst(pd), r = rosterState(), rosterSet = Object.keys(r.days || {}).length > 0, opt = (v, l, cur) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(l)}</option>`;
+  const pd = wgPayFor(nextPP), e = wgEst(pd), r = rosterRaw(), rosterSet = Object.keys(r.days || {}).length > 0, opt = (v, l, cur) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(l)}</option>`;
   const num = (k, label, hint, ph) => field(label, `<div class="moneyin"><span>$</span><input inputmode="decimal" placeholder="${ph || '0.00'}" value="${w[k] ? w[k] : ''}" aria-label="${esc(label)}" onchange="wgSet('${k}', this.value)"></div>`, hint);
   const set = `<div class="card wgset"><div class="sec" style="margin-top:0">Your details</div>
     ${field('Tax code', `<select onchange="wgSet('code', this.value)">${WG_CODES.map(c => opt(c, c + (c === 'M' ? ' (main job)' : c === 'ME' ? ' (main job, independent earner credit)' : / SL$/.test(c) ? ' (with student loan)' : ''), w.code)).join('')}</select>`, 'It’s on your payslip.')}
