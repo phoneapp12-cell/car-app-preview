@@ -1,7 +1,7 @@
 /* My Feed – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // My Feed lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -20,11 +20,20 @@ const TOPICS = [
   ['diy', 'DIY', '🛠️', '#9a3412', '#f59e0b'],
   ['science', 'Science', '🔬', '#0e7490', '#2563eb'],
   ['travel', 'Travel', '✈️', '#0369a1', '#14b8a6'],
+  ['fitness', 'Fitness & weights', '💪', '#0f766e', '#14b8a6'],
+  ['selling', 'Selling & side hustles', '💰', '#15803d', '#ca8a04'],
+  ['creative', 'Creative & crafts', '🎨', '#c026d3', '#f97316'],
+  ['culture', 'Culture & stage', '🎭', '#7c2d12', '#be123c'],
+  ['learn', 'Learning & ideas', '📖', '#1e40af', '#0891b2'],
+  ['games', 'Games & puzzles', '🎲', '#6d28d9', '#2563eb'],
+  ['collect', 'Collecting', '🏺', '#92400e', '#a16207'],
+  ['outdoors', 'Outdoors', '🏕️', '#166534', '#0d9488'],
+  ['cars', 'Cars & machines', '🚗', '#1e3a8a', '#475569'],
   ['photos', 'My Photos', '🖼️', '#be185d', '#f59e0b'],
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
-const BASE = { sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85 }; // sitcoms lead
+const BASE = { sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const PAGE = 12;
@@ -36,6 +45,68 @@ const THUMB = {
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ls = { get(k, d) { try { const v = localStorage.getItem('mf.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('mf.' + k, JSON.stringify(v)); } catch (e) { } } };
+
+/* ---- 1.5.0: Interests. Shane's list (simplicable.com/life/interests) plus cooking, exercise, weights and selling.
+   Sport is left out entirely. Each interest belongs to a topic chip (new groups, or an existing tab it fits). Switch
+   any of them off in ⚙️ → Manage interests: their sources and matching posts disappear from the feed. ---- */
+const INTERESTS = [ // name, topic, words that mark a post as being about it
+  ['Cooking', 'food', 'cook(ing)?|recipes?|dinner|kitchen'], ['Baking', 'food', 'bak(e|ing|ed)|bread|cake|muffins?|pastry|tart'], ['Cuisine', 'food', 'cuisine|dish(es)?|flavou?rs?|street food'],
+  ['Exercise', 'fitness', 'exercises?|workouts?|home workout|hiit|cardio|stretch(ing)?'], ['Weights', 'fitness', 'weights?|weight training|strength|lifting|dumbbells?|barbells?|kettlebells?|squats?|deadlifts?|bench press|muscle|hypertrophy|home gym'],
+  ['Fitness', 'fitness', 'fitness|fit\\b|get fit|training plan'], ['Yoga', 'fitness', 'yoga'], ['Meditation', 'fitness', 'meditat(e|ion|ing)|mindful(ness)?'], ['Health', 'fitness', 'health(y)?|sleep|nutrition'], ['Wellness', 'fitness', 'wellness|wellbeing|well-being|self-care'],
+  ['Selling', 'selling', 'sell(ing)?|resell(ing)?|resale|flip(ping|ped)?|trade me|marketplace|thrift(ing)?|garage sale|op shop|car boot|declutter(ing)?|ebay|etsy'], ['Shopping', 'selling', 'shopping|haul|thrift store'],
+  ['Entrepreneurship', 'selling', 'entrepreneurs?|side hustles?|start-?ups?|small business'], ['Business', 'selling', 'business(es)?'],
+  ['Art', 'creative', 'art(ist|work)?s?|painting|paintings|sculpture|gallery|mural'], ['Drawing', 'creative', 'drawing|sketch(es|ing)?|illustrat(ion|or)'], ['Calligraphy', 'creative', 'calligraphy|lettering'], ['Crafts', 'creative', 'crafts?|handmade|crochet|embroider(y|ed)|quilt(ing)?'],
+  ['Creative Pursuits', 'creative', 'creativ(e|ity)'], ['Knitting', 'creative', 'knit(ting|ted)?|yarn|wool'], ['Sewing', 'creative', 'sew(ing|n)?|sewing machine|quilt'], ['Origami', 'creative', 'origami|paper ?craft'],
+  ['Photography', 'creative', 'photograph(y|er|s)?|camera|lens|itap'], ['Design', 'creative', 'design(er|ed)?'], ['Interior Design', 'creative', 'interior|living room|bedroom|home decor|cozy|cosy'], ['Architecture', 'creative', 'architect(ure|s)?|building|house design'],
+  ['Fashion', 'creative', 'fashion|outfit|clothing|style'], ['Writing', 'learn', 'writ(ing|er|ers)|novel(ist)?|author'], ['Storytelling', 'learn', 'stor(y|ies|ytelling)'], ['Media Production', 'creative', 'video editing|film-?making|podcast(ing)?|youtube(r)?'], ['Cosplay', 'culture', 'cosplay|costumes?'],
+  ['Acting', 'culture', 'act(ing|or|ors|ress)'], ['Ballet', 'culture', 'ballet|ballerina'], ['Dance', 'culture', 'danc(e|ing|er)'], ['Theatre', 'culture', 'theat(re|er)|musical|broadway|west end|stage'],
+  ['Culture', 'culture', 'cultur(e|al)'], ['Traditional Culture', 'culture', 'tradition(al)?|māori|maori|te reo|heritage|folk'], ['Languages', 'learn', 'languages?|te reo|french|spanish|japanese|learn(ing)? to speak'],
+  ['History', 'culture', 'histor(y|ic|ical)|ancient|century|war|medieval|archaeolog(y|ists?)'], ['Museums', 'culture', 'museums?|exhibit(ion)?s?|artefacts?|artifacts?'], ['Anime & Manga', 'sitcoms', 'anime|manga|studio ghibli'],
+  ['Learning', 'learn', 'learn(ing)?|lessons?'], ['Education', 'learn', 'educat(ion|ional)|school|universit(y|ies)|students?'], ['Reading', 'learn', 'books?|reading|read|novel|library'],
+  ['Philosophy', 'learn', 'philosoph(y|er|ers|ical)|stoic(ism)?|ethics'], ['Psychology', 'learn', 'psycholog(y|ists?|ical)|brain|personality|anxiety'], ['Sociology', 'learn', 'sociolog(y|ists?)|societ(y|ies)|social'],
+  ['Self-Improvement', 'learn', 'self-?improvement|habits?|productiv(e|ity)|motivation'], ['Debate', 'learn', 'debat(e|es|ing)|argument'], ['Public Speaking', 'learn', 'public speaking|speech|talks?|ted'], ['Leadership', 'learn', 'leader(s|ship)?|manag(er|ing|ement)'],
+  ['Law', 'learn', 'law|legal|court|lawyer'], ['Medicine', 'science', 'medic(ine|al)|doctors?|disease|vaccines?|hospital'], ['Politics', 'nz', 'politic(s|al|ians?)|election|parliament|government|minister'], ['Religion & Spirituality', 'learn', 'relig(ion|ious)|spiritual(ity)?|faith|church|buddhis(m|t)'],
+  ['Family', 'learn', 'famil(y|ies)|parent(s|ing)?|kids|grandparents?'], ['Simple Living', 'learn', 'simple living|minimalis(m|t)|declutter(ing)?|frugal|slow living'], ['Volunteering', 'outdoors', 'volunteer(s|ing)?|charity|community'],
+  ['Research', 'science', 'research(ers)?|study|studies|scientists?'], ['Game Theory', 'games', 'game theory'], ['Strategy', 'games', 'strateg(y|ic)|tactics'],
+  ['Board Games', 'games', 'board ?games?|tabletop|card games?|dice|catan'], ['Chess', 'games', 'chess|checkmate'], ['Puzzles', 'games', 'puzzles?|jigsaw|crossword|sudoku|wordle'], ['Trivia', 'games', 'trivia|quiz|fun facts?|did you know'], ['Video Games', 'games', 'video ?games?|gaming|nintendo|playstation|xbox|steam|switch 2'],
+  ['Collecting', 'collect', 'collect(ing|ion|or|ors|ible|ibles)|antiques?|vintage|vinyl|records?|coins?|stamps?|figures?'], ['Model Building', 'collect', 'model (kit|building|car|ship|train)|scale model|lego|miniatures?|diorama'],
+  ['Camping', 'outdoors', 'camp(ing|site|er|ground)?|tent'], ['Hiking', 'outdoors', 'hik(e|ing|er)|tramp(ing)?|trail|walkway|track'], ['Walking', 'outdoors', 'walk(s|ing)?|stroll'], ['Diving & Snorkelling', 'outdoors', 'div(e|ing)|scuba|snorkel(ling|ing)?|reef'],
+  ['Environmental Action', 'outdoors', 'environment(al)?|climate|conservation|pollution|plastic|recycl(e|ing)|sustainab(le|ility)'],
+  ['Cars & Driving', 'cars', 'cars?|driv(e|ing|er)|road trip|ute|sedan|ev\\b|electric vehicle|engine'], ['Machines', 'cars', 'machines?|machinery|engines?|tractors?|excavators?|cranes?|locomotives?|mechanic(al)?'],
+  ['Engineering', 'science', 'engineer(s|ing)?|bridge|construction'], ['Mathematics', 'science', 'math(s|ematics|ematicians?)?|equations?|numbers?|geometry'], ['Science', 'science', 'scien(ce|tific|tists?)|physics|chemistry|biology'],
+  ['Astronomy', 'scifi', 'astronom(y|ers?)|telescope|stargaz(e|ing)|planets?|stars?|galax(y|ies)|nebula|comet|eclipse'], ['Space', 'scifi', 'space|nasa|rockets?|astronauts?|moon|mars|spacex'],
+  ['Gardening', 'garden', 'garden(s|ing|er)?|plants?|seeds?|grow(ing)?|soil|compost'], ['Beekeeping', 'garden', 'bees?|beekeep(ing|er)|hives?|honey'],
+  ['Nature', 'nature', 'nature|wildlife|forest|ocean|landscape'], ['Animals', 'nature', 'animals?|cats?|kittens?|birds?|wildlife|zoo'], ['Birdwatching', 'nature', 'birds?|birding|birdwatch(ing)?|tūī|tui|kererū|kiwi bird'],
+  ['Travel', 'travel', 'travel|trip|holiday|destination|tourism'], ['Theme Parks', 'travel', 'theme parks?|roller ?coasters?|rides?|disneyland|rainbow’s end|rainbows end'],
+  ['Technology', 'tech', 'tech(nology)?|gadgets?|smartphones?|iphone|android'], ['Computers', 'tech', 'computers?|pcs?|laptops?|windows|mac(book)?|linux'], ['Coding', 'tech', 'cod(e|ing)|programming|developers?|software|python|javascript'],
+  ['Robotics', 'tech', 'robot(s|ics)?|automation|drones?'], ['Low Technology', 'diy', 'low-?tech|off-?grid|hand tools?|solar oven|repair'], ['Social Media', 'tech', 'social media|instagram|facebook|tiktok|youtube|reddit'],
+  ['DIY', 'diy', 'diy|how to|build|built|made|fix(ed|ing)?'], ['Carpentry', 'diy', 'carpentry|carpenter|joinery|framing'], ['Woodworking', 'diy', 'wood(working|work|en)?|lathe|chisel'], ['Maker Culture', 'diy', 'maker|3d print(ed|ing|er)?|arduino|raspberry pi|electronics'],
+  ['Creative Reuse', 'diy', 'upcycl(e|ed|ing)|repurpos(e|ed|ing)|reus(e|ed|ing)|second life|salvag(e|ed)'], ['Cleaning', 'diy', 'clean(ing|ed|er)?|tidy|stain|mould|mold|pressure wash'],
+  ['Television', 'sitcoms', 'tv|television|series|season|episode|show'], ['Comedy', 'sitcoms', 'comed(y|ian|ians)|funny|sitcom|stand-?up|sketch'], ['Film', 'sitcoms', 'films?|movies?|cinema|trailer|director'], ['Pop Culture', 'sitcoms', 'pop culture|celebrit(y|ies)|viral'], ['Fandom', 'sitcoms', 'fans?|fandom|marvel|star wars|star trek|doctor who|lord of the rings'],
+  ['Music Appreciation', 'music', 'music|albums?|songs?|bands?|singers?|records?'], ['Music Production', 'music', 'synth(s|esizers?)?|producer|studio|mixing|daw|beats?'], ['Singing', 'music', 'sing(ing|er|ers)?|vocal(s|ist)?|choir'], ['Concerts', 'music', 'concerts?|gigs?|tours?|live music'],
+  ['Festivals', 'events', 'festivals?|fair|carnival|parade|fireworks'], ['Nightlife', 'events', 'nightlife|bars?|pub|club|comedy night|quiz night'], ['Socializing', 'events', 'meet-?ups?|social(ising|izing)|friends|community event']
+].map(([name, topic, words]) => ({ name, topic, re: new RegExp('\\b(' + words + ')\\b', 'i') }));
+// From Shane's list, left out as sport: Sports, Golf, Martial Arts, Darts, Pool, Frisbee, Cycling, Running, Swimming, Sailing,
+// Canoeing, Climbing, Horseback Riding, Skateboarding, Skating, Inline Skating, Skiing & Snowboarding, Surfing & Bodyboarding.
+// Left out as money: Investing.
+const INT_BY_NAME = new Map(INTERESTS.map(x => [x.name, x]));
+let INT_OFF = ls.get('intOff', {});     // interest name -> 1 when he's switched it off
+let SRC_INT = {};                        // source id -> its interests (from the feed's source list)
+function noteSrcInts() { SRC_INT = {}; for (const s of (FEED && FEED.sources) || []) if (Array.isArray(s.int)) SRC_INT[s.id] = s.int; }
+function itemInts(i) { // the interests a post belongs to: its source's, then any it clearly mentions in its title
+  if (i._ints) return i._ints;
+  const out = (SRC_INT[i.src] || []).slice(), title = (i.t || '') + ' ' + (i.tag || '');
+  for (const x of INTERESTS) if (!out.includes(x.name) && x.topic === i.topic && x.re.test(title)) out.push(x.name);
+  return (i._ints = out);
+}
+function intHidden(i) {
+  const s = SRC_INT[i.src];
+  if (s && s.length && s.every(n => INT_OFF[n])) return true;                 // every interest this source serves is off
+  if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
+  return false;
+}
+const GROUP_TOPICS = ['fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
+const topicOn = t => !GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]);
 
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
@@ -56,10 +127,11 @@ let order = [], shown = 0, io = null;
 
 /* ---- ranking (all on this phone) ---- */
 function weights() {
-  const t = {}, s = {}, up = {}, dn = {}, lastUp = {}, now = Date.now();
+  const t = {}, s = {}, up = {}, dn = {}, lastUp = {}, ints = {}, now = Date.now();
   for (const v of Object.values(VOTES)) {
     const age = Math.max(0, (now - (v.at || 0)) / 864e5), fade = Math.pow(0.5, age / 45); // votes fade over ~6 weeks
     t[v.topic] = (t[v.topic] || 0) + v.v * fade;
+    for (const n of v.ints || []) ints[n] = (ints[n] || 0) + v.v * fade;
     if (REVIVE[v.src] && (v.at || 0) < REVIVE[v.src]) continue;
     s[v.src] = (s[v.src] || 0) + v.v * fade;
     if (v.v > 0) { up[v.src] = (up[v.src] || 0) + 1; lastUp[v.src] = Math.max(lastUp[v.src] || 0, v.at || 0); } else dn[v.src] = (dn[v.src] || 0) + 1;
@@ -69,8 +141,9 @@ function weights() {
   // gets a trial boost for its first ~30 cards so you get to judge it.
   const drop = k => (s[k] || 0) <= -3.5 && !((lastUp[k] || 0) > now - 30 * 864e5);
   const trial = k => isNewSrc(k) && !up[k] && !dn[k] && (IMP[k] || 0) < 30;
-  return { topic: k => clamp(1 + 0.12 * (t[k] || 0), 0.3, 2.5), src: k => drop(k) ? 0 : clamp(1 + 0.2 * (s[k] || 0), 0.15, 3) * (trial(k) ? 1.35 : 1), drop, trial, up: k => up[k] || 0, dn: k => dn[k] || 0, net: k => s[k] || 0 };
+  return { int: k => clamp(1 + 0.15 * (ints[k] || 0), 0.4, 2.5), topic: k => clamp(1 + 0.12 * (t[k] || 0), 0.3, 2.5), src: k => drop(k) ? 0 : clamp(1 + 0.2 * (s[k] || 0), 0.15, 3) * (trial(k) ? 1.35 : 1), drop, trial, up: k => up[k] || 0, dn: k => dn[k] || 0, net: k => s[k] || 0 };
 }
+function intW(W, i) { const n = itemInts(i).slice(0, 3); return n.length ? n.reduce((a, k) => a * W.int(k), 1) ** (1 / n.length) : 1; } // 👍/👎 also teach it which interests you like
 function rand(seed) { let x = seed % 2147483647; if (x <= 0) x += 2147483646; return () => (x = x * 16807 % 2147483647) / 2147483647; }
 function rank(items) {
   const W = weights(), now = Date.now();
@@ -81,7 +154,7 @@ function rank(items) {
     const media = i.vid ? 1.15 : i.img ? 1.1 : i.kind === 'tip' ? 0.8 : 0.6; // pictures and videos first
     const seen = Math.pow(0.8, SEEN[i.id] || 0);                   // seen a few times: let new things through
     const hot = i.hot ? 1.5 : 1;                                   // e.g. fireworks this week
-    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) };
+    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) };
   }).sort((a, b) => b.sc - a.sc);
   // Mix: each step takes the best next post from the topic that's due, so every interest gets a turn
   // (higher-voted topics, and sitcoms, come round more often). About 1 in 7 slots explores further down a list.
@@ -94,8 +167,8 @@ function rank(items) {
     let bestT = null, best = -1;
     for (const t in Q) {
       if (!Q[t].length) continue;
-      const gap = t in lastAt ? n - lastAt[t] : 8;
-      const v = Math.sqrt(Q[t][0].sc) * gap * baseOf(t) * W.topic(t) * (0.8 + 0.4 * r()); // sitcoms and liked topics come round more often
+      const gap = n - (t in lastAt ? lastAt[t] : -8); // 1.5.0: topics not shown yet keep getting more due too
+      const v = Math.sqrt(Q[t][0].sc) * gap * Math.pow(baseOf(t), 3) * W.topic(t) * (0.8 + 0.4 * r()); // sitcoms and liked topics come round more often
       if (v > best) { best = v; bestT = t; }
     }
     lastAt[bestT] = n;
@@ -115,6 +188,7 @@ function visible() {
     if (VOTES[i.id] && VOTES[i.id].v < 0) return false;          // thumbs-down: gone
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
     if (W.drop(i.src)) return false;                               // a source you've voted out
+    if (!topicOn(i.topic) || intHidden(i)) return false;           // interests you've switched off
     return tab === 'all' || i.topic === tab;
   });
 }
@@ -539,7 +613,7 @@ function card(i) {
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
   const showTitle = i.img || i.vid;
   return `<article class="card" data-id="${esc(i.id)}" style="${style}">
-    <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.tag ? ' · ' + esc(i.tag) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
+    <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
     ${media}
     <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${when}</div>
     <div class="ft">
@@ -549,7 +623,7 @@ function card(i) {
     </div></article>`;
 }
 function chips() {
-  const list = TOPICS.filter(t => t[0] !== 'photos' || PHOTOS.length), at = list.findIndex(t => t[0] === 'photos' || t[0] === 'liked');
+  const list = TOPICS.filter(t => (t[0] !== 'photos' || PHOTOS.length) && topicOn(t[0])), at = list.findIndex(t => t[0] === 'photos' || t[0] === 'liked');
   list.splice(at, 0, ...YOU_CHIPS.map(id => TOPIC[id]));
   $('#chips').innerHTML = list.map(t => `<button class="chip${t[0] === tab ? ' on' : ''}" data-tab="${t[0]}">${t[2]} ${t[1]}</button>`).join('');
   const on = $('#chips .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
@@ -560,7 +634,7 @@ function draw() {
   if (!FEED) { m.innerHTML = '<div class="sk"></div><div class="sk"></div>'; return; }
   if (tab === 'life') { drawLife(); return; }
   if (tab === 'photos') { drawPhotos(); return; }
-  if (!TOPIC[tab]) tab = 'all';
+  if (!TOPIC[tab] || !topicOn(tab)) tab = 'all';
   order = tab === 'liked' ? visible() : rank(visible()); shown = 0;
   if (tab === 'all') order = weave(order, lifeMix()); // My App cards mixed in at random, different every refresh
   m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'Nothing new here right now. Check back soon.'}</div>`);
@@ -597,8 +671,8 @@ function vote(el, v) {
   if (!item) return;
   const prev = VOTES[id];
   if (prev && prev.v === v) { delete VOTES[id]; ls.set('votes', VOTES); c.querySelectorAll('.vote').forEach(b => { b.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); }); toast('Vote removed'); return; }
-  const { _x, ...snap } = item; if (snap.img && /^(data|blob):/.test(snap.img)) delete snap.img; delete snap.photo; // a car, pet or own photo stays in My App
-  VOTES[id] = { v, topic: item.topic, src: item.src, at: Date.now(), item: v > 0 ? snap : undefined };
+  const { _x, _ints, ...snap } = item; if (snap.img && /^(data|blob):/.test(snap.img)) delete snap.img; delete snap.photo; // a car, pet or own photo stays in My App
+  VOTES[id] = { v, topic: item.topic, src: item.src, ints: item.topic === 'life' ? undefined : itemInts(item).slice(0, 4), at: Date.now(), item: v > 0 ? snap : undefined };
   ls.set('votes', VOTES);
   c.querySelectorAll('.vote').forEach(b => { const on = +b.dataset.vote === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
@@ -618,7 +692,7 @@ async function load(force) {
     const f = await r.json();
     if (f && Array.isArray(f.items) && f.items.length) {
       const first = !FEED || FEED.updated !== f.updated;
-      FEED = f; ls.set('feed', f); noteSources();
+      FEED = f; ls.set('feed', f); noteSources(); noteSrcInts();
       if (first || force) draw();
       if (force) toast('Feed is up to date');
     }
@@ -636,7 +710,7 @@ function settings() {
   const groups = []; srcs.slice().sort((a, b) => tIdx(a.topic) - tIdx(b.topic)).forEach(x => { const g = groups[groups.length - 1]; if (!g || g.t !== x.topic) groups.push({ t: x.topic, l: [x] }); else g.l.push(x); });
   const you = YOU.map(x => `<div class="row"><span>${(TOPIC[x.topic] || TOPIC.all)[2]} ${esc(x.term)}<small class="sst">${esc(x.q || '')}</small></span><span>${esc((TOPIC[x.topic] || TOPIC.all)[1])}</span></div>`).join('');
   $('#sheetin').innerHTML = `<h2>My Feed</h2>
-    <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself through the day from about 90 public sources. Sport is always left out.</p>
+    <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself through the day from ${(FEED && FEED.sources || []).length || 'about 180'} public sources. Sport is always left out.</p>
     <p>👍 / 👎 teach it which <b>sources</b> and <b>topics</b> you like. New sources get a short trial (“Trying”) so you can judge them; a source you give about four more 👎 than 👍 is dropped (you can bring it back below).</p>
     <p>▶️ Videos play by themselves (muted) when they’re on screen and pause when you scroll past. Tap the speaker on a video for sound; it stays on until you close My Feed.</p>
     <a class="btn pri" href="${MY_APP}">← Back to My App</a>
@@ -644,6 +718,9 @@ function settings() {
     <p>🖼️ <b>My Photos</b>: ${PHOTO_INFO.all ? `${PHOTO_INFO.used} of the ${PHOTO_INFO.all} photos on My App’s Photos page${PHOTO_INFO.approved ? ' (the ones you tagged approved, feed, keep or favourite)' : ''}` : 'photos from My App’s Photos page'}. Receipts, warranties, documents, screenshots and anything tagged <b>nofeed</b> or <b>private</b> are left out. Tag photos <b>approved</b> or <b>feed</b> in My App to show only those. Read on this phone only.</p>
     <h2 style="margin-top:18px">From About you</h2>
     ${you || `<p>Answer questions in My App’s About you and your interests (music, shows, food, garden, dog, outdoors, books…) turn into cards here. Money, family and routine answers are never used.</p>`}
+    <h2 style="margin-top:18px">Manage interests</h2>
+    <p>Tap to switch an interest off or back on. Off means its sources and posts about it are hidden, and a chip goes when all its interests are off. No sport is ever included.</p>
+    ${TOPICS.filter(t => INTERESTS.some(x => x.topic === t[0])).map(t => `<h4 class="sgh">${t[2]} ${esc(t[1])}</h4><div class="ichs">${INTERESTS.filter(x => x.topic === t[0]).map(x => `<button class="ich${INT_OFF[x.name] ? '' : ' on'}" data-int="${esc(x.name)}" aria-pressed="${!INT_OFF[x.name]}">${INT_OFF[x.name] ? '' : '✓ '}${esc(x.name)}${W.int(x.name) > 1.05 ? ' 👍' : W.int(x.name) < 0.95 ? ' 👎' : ''}</button>`).join('')}</div>`).join('')}
     <div class="row"><span>Your votes</span><span>${ups} 👍 · ${downs} 👎</span></div>
     ${TOPICS.filter(t => !['all', 'life', 'liked', 'photos'].includes(t[0])).concat(YOU_CHIPS.map(id => TOPIC[id])).map(t => `<div class="row"><span>${t[2]} ${esc(t[1])}</span><span>${W.topic(t[0]) > 1.05 ? 'More' : W.topic(t[0]) < 0.95 ? 'Less' : 'Normal'}</span></div>`).join('')}
     <button class="btn" id="resetv">Clear my votes</button>
@@ -669,6 +746,7 @@ document.addEventListener('click', e => {
   const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); return; }
   if (t.id === 'rf') { load(true); return; }
   if (t.id === 'st') { settings(); return; }
+  const ib = t.closest('[data-int]'); if (ib) { const n = ib.dataset.int; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); const y = $('#sheet').scrollTop; for (const i of (FEED && FEED.items) || []) delete i._ints; settings(); $('#sheet').scrollTop = y; draw(); toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
   const rv = t.closest('[data-revive]'); if (rv) { REVIVE[rv.dataset.revive] = Date.now(); ls.set('revive', REVIVE); settings(); draw(); toast('Brought back'); return; }
   if (t.id === 'resetv') { if (confirm('Clear all your 👍 and 👎?')) { VOTES = {}; ls.set('votes', VOTES); $('#sheet').classList.remove('on'); draw(); toast('Votes cleared'); } return; }
   if (t.id === 'sheet' || t.closest('[data-close]')) $('#sheet').classList.remove('on');
@@ -678,6 +756,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 window.addEventListener('storage', e => { if (e.key !== 'myFeedLife') return; const before = YOU.map(x => x.term).join('|'); setupYou(); if (YOU.map(x => x.term).join('|') !== before) refreshYou(); if ((tab === 'life' || !TOPIC[tab]) && scrollY < 200) draw(); }); // My App updated your items or About you
 { const cut = Date.now() - 30 * 864e5; for (const k in DISMISS) if (DISMISS[k] < cut) delete DISMISS[k]; ls.set('dismiss', DISMISS); }
 noteSources();
+noteSrcInts();
 setupYou();
 draw();
 load(false);
