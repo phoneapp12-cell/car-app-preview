@@ -1,6 +1,7 @@
 import { seriesFor, cleanLinks } from './tv.js';
 import { getOutages, outageReminders, netReminders } from './outages.js';
 import { getCrashes, crashReminders } from './crashes.js';
+import { tollReminders } from './tolls.js';
 import { cacheGet, cachePut } from './kvguard.js';
 /* Push notifications for bridge closures (Web Push, no third-party service).
  *
@@ -399,7 +400,7 @@ function scheduleNext(item, now) {
 export function cleanReminder(r, now = Date.now()) {
   if (!r || typeof r !== 'object') return null;
   const id = String(r.id || '');
-  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug|tv|bed|pwr|out|sms)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
+  if (!/^(rem-[a-z0-9]{4,32}|(med|due|zeus|sug|tv|bed|pwr|out|sms|toll)-[a-z0-9_-]{1,80})$/i.test(id)) return null;
   const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
   if (!title) return null;
   const date = String(r.date || ''), time = String(r.time || '');
@@ -513,6 +514,15 @@ export async function applyCrashes(env, rec, now = Date.now()) {
     const items = Array.isArray(e.items) ? e.items : (e.items = []), have = new Set(items.map(x => x && x.id)), sent = new Set(e.accSent || []);
     for (const r of crashReminders(rec, e.accPref, now, e.polPref !== 'off')) { if (items.length >= MAX_REMS || sent.has(r.id)) continue; const c = cleanReminder(r, now); if (c && !have.has(c.id)) { have.add(c.id); sent.add(r.id); items.push(c); added++; } }
     e.accSent = [...sent].slice(-80); }
+  if (added) await saveRem(env, book); return added;
+}
+// 2.29.2: one push per new unpaid toll trip on every phone with reminders (tolls off only if tollPref === 'off')
+export async function applyTolls(env, rec, now = Date.now()) {
+  if (!env.EVENTS_KV || !rec) return 0; const book = await loadRem(env); let added = 0; const list = tollReminders(rec, now);
+  for (const id of Object.keys(book)) { const e = book[id]; if (!e || e.tollPref === 'off') continue;
+    const items = Array.isArray(e.items) ? e.items : (e.items = []), have = new Set(items.map(x => x && x.id)), sent = new Set(e.tollSent || []);
+    for (const r of list) { if (items.length >= MAX_REMS || sent.has(r.id)) continue; const c = cleanReminder(r, now); if (c && !have.has(c.id)) { have.add(c.id); sent.add(r.id); items.push(c); added++; } }
+    e.tollSent = [...sent].slice(-80); }
   if (added) await saveRem(env, book); return added;
 }
 // 2.27.44: a kept appointment or delivery text becomes a push (sms- id, due now) on phones with text alerts on.

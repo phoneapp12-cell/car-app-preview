@@ -321,6 +321,7 @@ import { alarmRoute } from './alarm.js';
 import { fuelRoute } from './fuel.js';
 import { getOutages, runOutages } from './outages.js';
 import { getCrashes, runCrashes } from './crashes.js';
+import { getTolls, runTolls } from './tolls.js';
 // 2.27.45: routes that take a key in the body or header get a per-IP limit on wrong keys (30 an hour).
 const KEYED_RE = /^\/(cars\/alexa|shared-todo|shared-photo|shared-car|reno|sync|sunshine\/|shared-push\/|brands|prices|pair\/redeem)/;
 export async function handle(request, env = {}, fetchImpl = fetch) {
@@ -387,6 +388,12 @@ async function handleInner(request, env = {}, fetchImpl = fetch) {
   if (path.startsWith('/hue/')) { // 2.23.79: Philips Hue
     try { return await hueRoute(path, request, env, fetchImpl, okOrigin, (status, data) => new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })); }
     catch (e) { return json(502, 'hue_unavailable', origin, env); }
+  }
+  if (path === '/tolls') { // 2.29.2: unpaid toll trips for the three cars (NZTA lookup, about every 3 hours)
+    if (request.method !== 'GET') return json(405, 'get_only', origin, env);
+    if (!okOrigin) return json(403, 'forbidden_origin', origin, env);
+    try { let d = await getTolls(env); if (!d) d = await runTolls(env, fetchImpl, Date.now(), true); return new Response(JSON.stringify(d || { trips: [] }), { status: 200, headers: { ...corsHeaders(origin, env), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }); }
+    catch (e) { return json(502, 'tolls_unavailable', origin, env); }
   }
   if (path === '/crashes') { // 2.27.67 / 2.28.18: NZTA crashes, Whangārei Police/emergency updates, and GeoNet/USGS large earthquakes
     if (request.method !== 'GET') return json(405, 'get_only', origin, env);

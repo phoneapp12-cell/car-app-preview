@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.1';
+const APP_VERSION = '2.29.2';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -36439,6 +36439,7 @@ glanceHome = function () {
   const body =
     homeTry("commute", () => commuteBanner(), "") +
     glHead(name, m, now) +
+    homeTry('tolls', () => tollHtml(), '') +
     homeTry('since you looked', () => sylHtml(), '') +
     homeTry('surprise', () => surpriseHtml(), '') +
     editBanner +
@@ -37875,3 +37876,25 @@ function disc3dInit() {
   el.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(draw); }, { passive: true }); draw();
 }
 (() => { try { const st = document.createElement('style'); st.textContent = '.d3{position:relative;overflow-y:auto;overflow-x:hidden;border-radius:18px;background:radial-gradient(ellipse at center,#1e1b4b 0%,#020617 75%);margin:0 0 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.d3::-webkit-scrollbar{display:none}.d3stage{position:sticky;top:0;perspective:700px;perspective-origin:50% 45%;overflow:hidden;transform-style:preserve-3d}.d3p{position:absolute;left:50%;top:50%;width:78%;max-width:340px;min-height:300px;box-sizing:border-box;padding:22px 20px;border-radius:22px;color:#fff;box-shadow:0 20px 50px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.18);display:flex;flex-direction:column;gap:8px;will-change:transform,opacity;cursor:pointer;backface-visibility:hidden}.d3n{font-size:.75rem;font-weight:800;letter-spacing:.12em;opacity:.75}.d3ic{font-size:3.6rem;line-height:1.1}.d3t{font-size:1.6rem;font-weight:900;line-height:1.1}.d3s{font-size:1rem;line-height:1.4;opacity:.95}.d3go{margin-top:auto;align-self:flex-start;background:rgba(255,255,255,.22);padding:6px 14px;border-radius:999px;font-weight:700;font-size:.9rem;opacity:.4;transition:opacity .2s}.d3front .d3go{opacity:1}.d3pic{background:#111827;padding:14px 12px 16px;min-height:0}.d3src{letter-spacing:.04em}.d3img{border-radius:14px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;height:330px}.d3img img{max-width:100%;max-height:330px;object-fit:contain;display:block}.d3cap{font-size:1.05rem;font-weight:700;line-height:1.35;margin-top:6px}.d3broke{display:none!important}.d3hint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#c7d2fe;font-weight:700;letter-spacing:.1em;font-size:.85rem;transition:opacity .3s;animation:d3b 1.6s ease-in-out infinite}@keyframes d3b{50%{transform:translateY(6px)}}'; document.head.appendChild(st); } catch (e) { } })();
+
+/* 2.29.2: Unpaid tolls. The relay checks NZTA's "Buy or pay a toll" lookup for MUL27, PNU312 and KBZ234 about every
+   3 hours (free, runs on the relay, not Grok Bot) and pushes a notification for each new trip. Home shows a card while
+   any trip is unpaid; it disappears once paid. */
+var TOLLS = null, TOLL_BUSY = false;
+try { TOLLS = JSON.parse(localStorage.getItem('tolls') || 'null'); } catch (e) { }
+function tollLoad() {
+  if (TOLL_BUSY || (TOLLS && Date.now() - TOLLS.t < 20 * 60e3)) return; TOLL_BUSY = true;
+  fetch(RELAY_URL + '/tolls', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+    if (!d || !Array.isArray(d.trips)) return; const before = JSON.stringify(TOLLS && TOLLS.d && TOLLS.d.trips);
+    TOLLS = { t: Date.now(), d }; try { localStorage.setItem('tolls', JSON.stringify(TOLLS)); } catch (e) { }
+    if (before !== JSON.stringify(d.trips) && (location.hash === '' || location.hash === '#home')) render();
+  }).catch(() => { }).finally(() => { TOLL_BUSY = false; });
+}
+function tollWhen(iso) { const d = new Date(iso); return d.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Pacific/Auckland' }) + ', ' + d.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', timeZone: 'Pacific/Auckland' }); }
+function tollHtml() {
+  tollLoad();
+  const L = (TOLLS && TOLLS.d && TOLLS.d.trips) || []; if (!L.length) return '';
+  const tot = L.reduce((a, t) => a + (+t.cost || 0), 0);
+  const rows = L.map(t => { const age = Math.floor((Date.now() - Date.parse(t.at)) / 86400e3); return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.25)"><div><b>${esc(t.car)}</b> <span style="opacity:.85">(${esc(t.plate)})</span><div style="font-size:.85rem;opacity:.9">${esc(t.road)} · ${esc(tollWhen(t.at))}${age >= 3 ? ' · ⚠️ ' + age + ' days ago' : ''}</div></div><div style="font-weight:800">$${(+t.cost).toFixed(2)}</div></div>`; }).join('');
+  return `<div class="card" style="background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff"><div style="display:flex;justify-content:space-between;align-items:center"><b>🛣️ ${L.length === 1 ? 'Toll to pay' : L.length + ' tolls to pay'}</b><b>$${tot.toFixed(2)}</b></div>${rows}<div style="font-size:.82rem;opacity:.92;margin:6px 0 8px">Pay within 5 working days of the trip to avoid a toll payment notice and fee. On the NZTA site, choose “Buy or pay a toll” and enter the plate.</div><button class="btn small" onclick="${fmOpen('https://tollingonline.nzta.govt.nz/#/welcome')}">Pay on NZTA</button></div>`;
+}
