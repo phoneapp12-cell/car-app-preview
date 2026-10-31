@@ -24,6 +24,7 @@ a{color:inherit}
 .logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.35rem;letter-spacing:-.02em}
 .logo i{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#f59e0b,var(--acc2) 55%,var(--acc));display:grid;place-items:center;font-style:normal;font-size:1rem;color:#fff}
 .logo span{background:linear-gradient(90deg,var(--acc2),var(--acc));-webkit-background-clip:text;background-clip:text;color:transparent}
+.mood{margin-left:auto;font-size:.74rem;font-weight:600;color:var(--mute);background:color-mix(in srgb,var(--mute) 12%,transparent);border-radius:99px;padding:3px 9px;white-space:nowrap}.mood:empty{display:none}.mood+.upd{margin-left:8px}
 .upd{margin-left:auto;font-size:.78rem;color:var(--mute);text-align:right;line-height:1.2}
 .ib{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:1.1rem;background:var(--chip)}
 .ib.spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
@@ -132,6 +133,7 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <header class="top">
   <div class="bar">
     <div class="logo"><i>✦</i><span>My Feed</span></div>
+    <div class="mood" id="mood"></div>
     <div class="upd" id="upd"></div>
     <button class="ib" id="rf" aria-label="Refresh">↻</button>
     <button class="ib" id="st" aria-label="Settings">⚙︎</button>
@@ -141,6 +143,6 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="app.js?v=1.5.1"></script>
+<script src="app.js?v=1.6.0"></script>
 </body>
 </html>

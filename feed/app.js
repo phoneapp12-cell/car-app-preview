@@ -1,12 +1,13 @@
 /* My Feed – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.6.0';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // My Feed lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
   ['all', 'All', '✨', '#7c3aed', '#ec4899'],
   ['life', 'For You', '📌', '#0f766e', '#2563eb'],
+  ['election', 'Election 2026', '🗳️', '#1d4ed8', '#b91c1c'], // 1.6.0: until election night (7 Nov 2026), then it goes by itself
   ['sitcoms', 'Sitcoms', '😂', '#f59e0b', '#ef4444'],
   ['garden', 'Gardening', '🌱', '#16a34a', '#65a30d'],
   ['music', 'Music', '🎵', '#db2777', '#9333ea'],
@@ -33,7 +34,7 @@ const TOPICS = [
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
-const BASE = { sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
+const BASE = { election: 1.2, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const PAGE = 12;
@@ -50,6 +51,7 @@ const ls = { get(k, d) { try { const v = localStorage.getItem('mf.' + k); return
    Sport is left out entirely. Each interest belongs to a topic chip (new groups, or an existing tab it fits). Switch
    any of them off in ⚙️ → Manage interests: their sources and matching posts disappear from the feed. ---- */
 const INTERESTS = [ // name, topic, words that mark a post as being about it
+  ['Election 2026', 'election', 'election|vote|voting|candidates?|polls?|policy|policies|manifesto'],
   ['Cooking', 'food', 'cook(ing)?|recipes?|dinner|kitchen'], ['Baking', 'food', 'bak(e|ing|ed)|bread|cake|muffins?|pastry|tart'], ['Cuisine', 'food', 'cuisine|dish(es)?|flavou?rs?|street food'],
   ['Exercise', 'fitness', 'exercises?|workouts?|home workout|hiit|cardio|stretch(ing)?'], ['Weights', 'fitness', 'weights?|weight training|strength|lifting|dumbbells?|barbells?|kettlebells?|squats?|deadlifts?|bench press|muscle|hypertrophy|home gym'],
   ['Fitness', 'fitness', 'fitness|fit\\b|get fit|training plan'], ['Yoga', 'fitness', 'yoga'], ['Meditation', 'fitness', 'meditat(e|ion|ing)|mindful(ness)?'], ['Health', 'fitness', 'health(y)?|sleep|nutrition'], ['Wellness', 'fitness', 'wellness|wellbeing|well-being|self-care'],
@@ -105,7 +107,7 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
+const GROUP_TOPICS = ['election', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
 const topicOn = t => !GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]);
 
 let FEED = ls.get('feed', null);
@@ -139,12 +141,56 @@ function weights() {
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
   // A source is dropped after about four more 👎 than 👍 (and no 👍 for a month). A new source with no votes yet
   // gets a trial boost for its first ~30 cards so you get to judge it.
-  const drop = k => (s[k] || 0) <= -3.5 && !((lastUp[k] || 0) > now - 30 * 864e5);
-  const trial = k => isNewSrc(k) && !up[k] && !dn[k] && (IMP[k] || 0) < 30;
-  return { int: k => clamp(1 + 0.15 * (ints[k] || 0), 0.4, 2.5), topic: k => clamp(1 + 0.12 * (t[k] || 0), 0.3, 2.5), src: k => drop(k) ? 0 : clamp(1 + 0.2 * (s[k] || 0), 0.15, 3) * (trial(k) ? 1.35 : 1), drop, trial, up: k => up[k] || 0, dn: k => dn[k] || 0, net: k => s[k] || 0 };
+  const drop = k => !isElSrc(k) && (s[k] || 0) <= -3.5 && !((lastUp[k] || 0) > now - 30 * 864e5);
+  const trial = k => !isElSrc(k) && isNewSrc(k) && !up[k] && !dn[k] && (IMP[k] || 0) < 30;
+  return { int: k => clamp(1 + 0.15 * (ints[k] || 0), 0.4, 2.5), topic: k => clamp(1 + 0.12 * (t[k] || 0), 0.3, 2.5), src: k => isElSrc(k) ? 1 : drop(k) ? 0 : clamp(1 + 0.2 * (s[k] || 0), 0.15, 3) * (trial(k) ? 1.35 : 1), drop, trial, up: k => up[k] || 0, dn: k => dn[k] || 0, net: k => s[k] || 0 };
 }
 function intW(W, i) { const n = itemInts(i).slice(0, 3); return n.length ? n.reduce((a, k) => a * W.int(k), 1) ** (1 / n.length) : 1; } // 👍/👎 also teach it which interests you like
 function rand(seed) { let x = seed % 2147483647; if (x <= 0) x += 2147483646; return () => (x = x * 16807 % 2147483647) / 2147483647; }
+/* ---- 1.6.0 Election 2026: Whangārei candidates, the six parties' news and videos, Electoral Commission, RNZ politics.
+   Gone after election night (8 Nov 2026 06:00 NZDT) here and in the data service. Kept neutral: every party gets the same kinds
+   of source, the queue takes the parties in turn, and 👍/👎 never favour or drop one party's sources (only the topic as a whole). ---- */
+const ELECTION_END = Date.UTC(2026, 10, 7, 17, 0, 0);
+const isElSrc = k => /^el-/.test(k || '');
+function elLive(i) {
+  if (Date.now() >= ELECTION_END) return false;
+  const s = ((FEED && FEED.sources) || []).find(x => x.id === i.src);
+  return !(s && s.until && Date.now() >= s.until);
+}
+function partyTurns(q, seed) { // round robin by party, best post of each first; the starting party changes every hour
+  const by = {}; for (const p of q) (by[p.i.party || '~'] = by[p.i.party || '~'] || []).push(p);
+  const ks = Object.keys(by).sort(), out = [], st = seed % (ks.length || 1);
+  const order = ks.slice(st).concat(ks.slice(0, st));
+  for (let n = 0; out.length < q.length; n++) for (const k of order) if (by[k][n]) out.push(by[k][n]);
+  return out;
+}
+
+/* ---- 1.6.0 time of day (phone's own clock, NZ): mornings lean to news, evenings and late night to calm and cute.
+   Weighting only: nothing is hidden, votes still count and sitcoms still lead. Off in ⚙️. ---- */
+let MOOD_OFF = !!ls.get('moodOff', false);
+const MOODS = { // band: [label, news, calm, loud]
+  morning: ['☀️ Morning news', 1.7, 0.9, 1],
+  day: ['', 1, 1, 1],
+  evening: ['🌆 Winding down', 0.75, 1.4, 0.8],
+  night: ['🌙 Cosy evening', 0.5, 1.8, 0.6],
+  small: ['🌙 Cosy late night', 0.7, 1.4, 0.7]
+};
+function moodBand(d = new Date()) { const h = d.getHours(); return h >= 5 && h < 11 ? 'morning' : h >= 11 && h < 19 ? 'day' : h >= 19 && h < 21 ? 'evening' : h >= 21 || h < 3 ? 'night' : 'small'; }
+const NEWS_SRC = /^(rnz|stuff|nzh|1news|newsroom|advocate|nz-nzh|nz-rnz|nz-itbrief|el-|events)/;
+const LOUD_SRC = /trailers|^yt-rt$|^yt-ign/;
+const CALM_SRC = /apod|nasa|astro|lofi|chillhop|aww|eyebleach|puppers|dodo|werate|cozy|kakapo|birds|doc$/;
+function moodOf(i) {
+  const s = ((FEED && FEED.sources) || []).find(x => x.id === i.src);
+  if (s && s.mood) return s.mood;
+  const k = i.src || '';
+  if (i.topic === 'election' || i.topic === 'events' || NEWS_SRC.test(k)) return 'news';
+  if (LOUD_SRC.test(k) || i.topic === 'games' || i.topic === 'cars') return 'loud';
+  if (CALM_SRC.test(k) || ['dogs', 'nature', 'garden', 'food', 'outdoors'].includes(i.topic)) return 'calm';
+  return 'neutral';
+}
+function moodW(i) { if (MOOD_OFF) return 1; const m = MOODS[moodBand()], k = moodOf(i); return k === 'news' ? m[1] : k === 'calm' ? m[2] : k === 'loud' ? m[3] : 1; }
+function moodLabel() { const el = $('#mood'); if (el) el.textContent = MOOD_OFF ? '' : MOODS[moodBand()][0]; }
+
 function rank(items) {
   const W = weights(), now = Date.now();
   const scored = items.map(i => {
@@ -154,12 +200,14 @@ function rank(items) {
     const media = i.vid ? 1.15 : i.img ? 1.1 : i.kind === 'tip' ? 0.8 : 0.6; // pictures and videos first
     const seen = Math.pow(0.8, SEEN[i.id] || 0);                   // seen a few times: let new things through
     const hot = i.hot ? 1.5 : 1;                                   // e.g. fireworks this week
-    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) };
+    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) };
   }).sort((a, b) => b.sc - a.sc);
   // Mix: each step takes the best next post from the topic that's due, so every interest gets a turn
   // (higher-voted topics, and sitcoms, come round more often). About 1 in 7 slots explores further down a list.
   const r = rand(Math.floor(now / 36e5) + Object.keys(VOTES).length * 7), out = [], Q = {};
   for (const p of scored) (Q[p.i.topic] = Q[p.i.topic] || []).push(p);
+  if (Q.election) Q.election = partyTurns(Q.election, Math.floor(now / 36e5));
+  const TM = {}; for (const t in Q) TM[t] = Math.sqrt(Q[t].reduce((a, p) => a + moodW(p.i), 0) / Q[t].length); // a topic that's mostly calm comes round more at night
   const total = scored.length;
   const lastAt = {}; // step when each topic was last shown: the longer since, the more it's due
   while (out.length < total) {
@@ -168,7 +216,7 @@ function rank(items) {
     for (const t in Q) {
       if (!Q[t].length) continue;
       const gap = n - (t in lastAt ? lastAt[t] : -8); // 1.5.0: topics not shown yet keep getting more due too
-      const v = Math.sqrt(Q[t][0].sc) * gap * Math.pow(baseOf(t), 3) * W.topic(t) * (0.8 + 0.4 * r()); // sitcoms and liked topics come round more often
+      const v = Math.sqrt(Q[t][0].sc) * gap * Math.pow(baseOf(t), 3) * W.topic(t) * TM[t] * (0.8 + 0.4 * r()); // sitcoms and liked topics come round more often
       if (v > best) { best = v; bestT = t; }
     }
     lastAt[bestT] = n;
@@ -189,6 +237,7 @@ function visible() {
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
     if (W.drop(i.src)) return false;                               // a source you've voted out
     if (!topicOn(i.topic) || intHidden(i)) return false;           // interests you've switched off
+    if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
     return tab === 'all' || i.topic === tab;
   });
 }
@@ -614,7 +663,7 @@ function card(i) {
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
   const showTitle = i.img || i.vid;
   return `<article class="card" data-id="${esc(i.id)}" style="${style}">
-    <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
+    <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.party ? ' · ' + esc(i.party) : i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
     ${media}
     <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${when}</div>
     <div class="ft">
@@ -624,7 +673,7 @@ function card(i) {
     </div></article>`;
 }
 function chips() {
-  const list = TOPICS.filter(t => (t[0] !== 'photos' || PHOTOS.length) && topicOn(t[0])), at = list.findIndex(t => t[0] === 'photos' || t[0] === 'liked');
+  const list = TOPICS.filter(t => (t[0] !== 'photos' || PHOTOS.length) && topicOn(t[0]) && (t[0] !== 'election' || (Date.now() < ELECTION_END && FEED && FEED.items.some(i => i.topic === 'election')))), at = list.findIndex(t => t[0] === 'photos' || t[0] === 'liked');
   list.splice(at, 0, ...YOU_CHIPS.map(id => TOPIC[id]));
   $('#chips').innerHTML = list.map(t => `<button class="chip${t[0] === tab ? ' on' : ''}" data-tab="${t[0]}">${t[2]} ${t[1]}</button>`).join('');
   const on = $('#chips .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
@@ -635,11 +684,12 @@ function draw() {
   if (!FEED) { m.innerHTML = '<div class="sk"></div><div class="sk"></div>'; return; }
   if (tab === 'life') { drawLife(); return; }
   if (tab === 'photos') { drawPhotos(); return; }
-  if (!TOPIC[tab] || !topicOn(tab)) tab = 'all';
+  if (!TOPIC[tab] || !topicOn(tab) || (tab === 'election' && Date.now() >= ELECTION_END)) tab = 'all';
   order = tab === 'liked' ? visible() : rank(visible()); shown = 0;
   if (tab === 'all') order = weave(order, lifeMix()); // My App cards mixed in at random, different every refresh
   m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'Nothing new here right now. Check back soon.'}</div>`);
   more();
+  moodLabel();
   $('#upd').innerHTML = FEED.updated ? `Updated<br>${esc(ago(FEED.updated))} ago` : '';
 }
 function drawLife() { // For You: only My App cards. Yours first (soonest first), then the boards and hubs at random.
@@ -647,6 +697,10 @@ function drawLife() { // For You: only My App cards. Yours first (soonest first)
   if (!L) { m.innerHTML = `<div class="empty">📌 Your own things show here: cars, birthdays, calendar, to-dos, garden, pets, meals, weather, power, and every board and hub in My App.<br><br>Open <a href="${MY_APP}">My App</a> once on this phone and they’ll appear. They stay on this phone.</div>`; return; }
   const mine = L.filter(x => x.mine).sort((a, b) => (a.days == null ? 999 : a.days) - (b.days == null ? 999 : b.days) || a.n - b.n);
   order = mine.concat(wshuffle(L.filter(x => !x.mine), lifeWeight)); shown = 0;
+  if (Date.now() < ELECTION_END && topicOn('election')) { // until election night: a Election 2026 card every few For You cards, parties in turn
+    const W = weights(), el = rank(FEED.items.filter(i => i.topic === 'election' && elLive(i) && !(VOTES[i.id] && VOTES[i.id].v < 0) && !intHidden(i) && !SPORT.test((i.t || '') + ' ' + (i.s || '')))).slice(0, 12);
+    if (el.length) { const out = []; let k = 0; order.forEach((x, n) => { out.push(x); if (n >= mine.length && (n - mine.length) % 4 === 3 && k < el.length) out.push(el[k++]); }); while (k < Math.min(el.length, 3)) out.push(el[k++]); order = out; }
+  }
   const snap = lifeSnap() || {};
   m.innerHTML = `<div class="load" style="padding-top:0">From My App on this phone${snap.at ? ' · updated ' + esc(ago(snap.at)) + ' ago' : ''} · bills and money are never shown</div>`;
   more();
@@ -717,6 +771,9 @@ function settings() {
     <a class="btn pri" href="${MY_APP}">← Back to My App</a>
     <p>📌 <b>For You</b> cards come from My App on this phone and are mixed through All at random: cars, birthdays, calendar, to-dos, garden, pets, meals and recipes (your own recipe photos too), weather, UV and power (kWh), roads, deliveries, plus every board and hub. Your own things never leave this phone, and bills and money are always left out.</p>
     <p>🖼️ <b>My Photos</b>: ${PHOTO_INFO.all ? `${PHOTO_INFO.used} of the ${PHOTO_INFO.all} photos on My App’s Photos page${PHOTO_INFO.approved ? ' (the ones you tagged approved, feed, keep or favourite)' : ''}` : 'photos from My App’s Photos page'}. Receipts, warranties, documents, screenshots and anything tagged <b>nofeed</b> or <b>private</b> are left out. Tag photos <b>approved</b> or <b>feed</b> in My App to show only those. Read on this phone only.</p>
+    <h2 style="margin-top:18px">Time of day</h2>
+    <p>Mornings (5–11am) lean to news, what’s on and the election; 11am–7pm is the normal mix; from 7pm it winds down, and 9pm–3am leans hardest to cute animals, calm nature, lofi, cosy cooking, gardening and space, with less hard news and fewer loud trailers. Nothing is hidden, and your votes still count. Uses this phone’s clock.</p>
+    <button class="ich${MOOD_OFF ? '' : ' on'}" id="moodt" aria-pressed="${!MOOD_OFF}">${MOOD_OFF ? 'Off: same mix all day' : '✓ On' + (MOODS[moodBand()][0] ? ' · now ' + MOODS[moodBand()][0] : ' · now the normal mix')}</button>
     <h2 style="margin-top:18px">From About you</h2>
     ${you || `<p>Answer questions in My App’s About you and your interests (music, shows, food, garden, dog, outdoors, books…) turn into cards here. Money, family and routine answers are never used.</p>`}
     <h2 style="margin-top:18px">Manage interests</h2>
@@ -747,12 +804,14 @@ document.addEventListener('click', e => {
   const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); return; }
   if (t.id === 'rf') { load(true); return; }
   if (t.id === 'st') { settings(); return; }
+  if (t.id === 'moodt') { MOOD_OFF = !MOOD_OFF; ls.set('moodOff', MOOD_OFF); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; draw(); toast(MOOD_OFF ? 'Time of day: off' : 'Time of day: on'); return; }
   const ib = t.closest('[data-int]'); if (ib) { const n = ib.dataset.int; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); const y = $('#sheet').scrollTop; for (const i of (FEED && FEED.items) || []) delete i._ints; settings(); $('#sheet').scrollTop = y; draw(); toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
   const rv = t.closest('[data-revive]'); if (rv) { REVIVE[rv.dataset.revive] = Date.now(); ls.set('revive', REVIVE); settings(); draw(); toast('Brought back'); return; }
   if (t.id === 'resetv') { if (confirm('Clear all your 👍 and 👎?')) { VOTES = {}; ls.set('votes', VOTES); $('#sheet').classList.remove('on'); draw(); toast('Votes cleared'); } return; }
   if (t.id === 'sheet' || t.closest('[data-close]')) $('#sheet').classList.remove('on');
 });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; setupYou(); refreshYou(); loadPhotos(); if (FEED && Date.now() - (FEED._got || 0) > 20 * 60e3) { FEED._got = Date.now(); load(false); } });
+let lastBand = moodBand();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (moodBand() !== lastBand) { lastBand = moodBand(); if (scrollY < 200) draw(); else moodLabel(); } /* e.g. opened again in the evening */ setupYou(); refreshYou(); loadPhotos(); if (FEED && Date.now() - (FEED._got || 0) > 20 * 60e3) { FEED._got = Date.now(); load(false); } });
 
 window.addEventListener('storage', e => { if (e.key !== 'myFeedLife') return; const before = YOU.map(x => x.term).join('|'); setupYou(); if (YOU.map(x => x.term).join('|') !== before) refreshYou(); if ((tab === 'life' || !TOPIC[tab]) && scrollY < 200) draw(); }); // My App updated your items or About you
 { const cut = Date.now() - 30 * 864e5; for (const k in DISMISS) if (DISMISS[k] < cut) delete DISMISS[k]; ls.set('dismiss', DISMISS); }
