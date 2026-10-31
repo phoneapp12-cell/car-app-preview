@@ -43,7 +43,16 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .tp{font-size:.72rem;font-weight:700;padding:4px 9px;border-radius:999px;background:color-mix(in srgb,var(--c1) 16%,transparent);color:color-mix(in srgb,var(--c1) 80%,var(--ink));white-space:nowrap}
 .media{position:relative;background:#000;display:block;width:100%}
 .media img{display:block;width:100%;max-height:560px;object-fit:cover;background:var(--chip)}
-.media.vid img{aspect-ratio:16/9;object-fit:cover}
+.media.vid{aspect-ratio:16/9;overflow:hidden;cursor:pointer}
+.media.vid .vthumb{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:cover;z-index:2;transition:opacity .35s}
+.media.vid .vslot,.media.vid .vslot iframe{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:1}
+.media.vid .play{z-index:3;pointer-events:none;transition:opacity .25s}
+.media.vid.playing .vthumb,.media.vid.playing .play{opacity:0;pointer-events:none}
+.media.vid .snd{position:absolute;right:10px;bottom:10px;z-index:4;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.6);color:#fff;backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.35);border:0;padding:0}
+.media.vid .snd svg{width:22px;height:22px}
+.media.vid .snd.on{background:rgba(255,255,255,.92);color:#111}
+.media.vid.verr .snd{display:none}
+.media.vid .lwhen{z-index:4}
 .media.tall img{max-height:620px}
 .play{position:absolute;inset:0;display:grid;place-items:center}
 .play span{width:68px;height:68px;border-radius:50%;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);display:grid;place-items:center;box-shadow:0 6px 20px rgba(0,0,0,.35)}
@@ -128,6 +137,6 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="app.js?v=1.2.2"></script>
+<script src="app.js?v=1.3.0"></script>
 </body>
 </html>

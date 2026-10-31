@@ -1,7 +1,7 @@
 /* My Feed – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.3.0';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // My Feed lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -283,7 +283,7 @@ function lifeCard(x) {
   const badge = `${w ? `<span class="lwhen${hot ? ' now' : ''}">${esc(w)}</span>` : ''}`;
   const ph = `<div class="lph"><span>${em}</span></div>`;
   const media = x.vid
-    ? `<button class="media vid" data-play="${esc(x.vid)}" aria-label="Play video: ${esc(x.t)}"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(img)}" alt="" onerror="this.src='https://i.ytimg.com/vi/${esc(x.vid)}/mqdefault.jpg'"><span class="play"><span></span></span>${badge}</button>`
+    ? vidMedia(x.vid, img, x.t, badge)
     : img ? `<a class="media lm" href="${esc(go)}"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(img)}" alt="${esc(x.t)}" onerror="var m=this.closest('.media');m.classList.add('need');m.dataset.pic=this.dataset.id;this.remove();fillPics()" data-id="${esc(x.id)}">${badge}</a>`
       : `<a class="media lm need" data-pic="${esc(x.id)}" href="${esc(go)}">${ph}${badge}</a>`;
   return `<article class="card life${hot ? ' hot' : ''}${['cinema', 'prime', 'book', 'tv'].includes(x.cat) ? ' tallpic' : ''}" data-id="${esc(x.id)}" style="--c1:${C[2]};--c2:${C[3]}">
@@ -296,6 +296,94 @@ function lifeCard(x) {
       <a class="open-l" href="${esc(go)}">Open in My App</a>${x.url ? `<a class="open-l" href="${esc(x.url)}" target="_blank" rel="noopener">Source ↗</a>` : ''}
     </div></article>`;
 }
+
+/* ---- 1.3.0: videos play by themselves, Instagram-style. A video starts (muted, as browsers require) when about 60% of
+   it is on screen and pauses when it scrolls away. Only one plays at a time. Tap the speaker to hear it; after that,
+   later videos start with sound too for this visit if the browser allows it. Short clips loop. The YouTube player is
+   only loaded when a card is close to the screen, and the thumbnail shows until the video is actually playing. ---- */
+const SPK = {
+  off: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="m22 9-6 6M16 9l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  on: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+};
+let SOUND = sessionStorage.getItem('mf.sound') === '1';
+function vidMedia(id, img, title, extra = '') {
+  return `<div class="media vid" data-vid="${esc(id)}" role="button" tabindex="0" aria-label="Video: ${esc(title)}"><div class="vslot"></div><img class="vthumb" loading="lazy" referrerpolicy="no-referrer" src="${esc(img || 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg')}" alt="" onerror="this.src='https://i.ytimg.com/vi/${esc(id)}/mqdefault.jpg'"><span class="play"><span></span></span><button class="snd" data-snd aria-label="${SOUND ? 'Mute' : 'Turn sound on'}">${SOUND ? SPK.on : SPK.off}</button>${extra}</div>`;
+}
+const PLAYERS = new Map(), RATIO = new Map(); let curVid = null, ytP = null;
+function ytApi() {
+  if (ytP) return ytP;
+  ytP = new Promise(res => {
+    if (window.YT && YT.Player) return res();
+    const prev = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = () => { if (prev) prev(); res(); };
+    const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; s.async = true; s.onerror = () => { ytP = null; }; document.head.appendChild(s);
+  });
+  return ytP;
+}
+function sndBtn(el, on) { const b = el.querySelector('.snd'); if (b) { b.innerHTML = on ? SPK.on : SPK.off; b.setAttribute('aria-label', on ? 'Mute' : 'Turn sound on'); b.classList.toggle('on', on); } }
+function mountVid(el) {
+  if (PLAYERS.has(el)) return;
+  const rec = { ready: false, want: false, p: null }; PLAYERS.set(el, rec);
+  ytApi().then(() => {
+    if (PLAYERS.get(el) !== rec) return;
+    const div = document.createElement('div'); el.querySelector('.vslot').appendChild(div);
+    rec.p = new YT.Player(div, {
+      videoId: el.dataset.vid, host: 'https://www.youtube-nocookie.com', width: '100%', height: '100%',
+      playerVars: { autoplay: 0, mute: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 1, iv_load_policy: 3, fs: 1 },
+      events: {
+        onReady: () => { rec.ready = true; try { rec.p.mute(); } catch (e) { } if (rec.want) playVid(el); },
+        onStateChange: e => {
+          if (e.data === 1) { el.classList.add('playing'); if (curVid && curVid !== el) pauseVid(el); }
+          else if (e.data === 0) { let d = 0; try { d = rec.p.getDuration(); } catch (x) { } if (d && d <= 90 && curVid === el) { rec.p.seekTo(0, true); rec.p.playVideo(); } else el.classList.remove('playing'); } // loop short clips
+        },
+        onError: () => { el.classList.add('verr'); el.classList.remove('playing'); }
+      }
+    });
+  });
+}
+function unmountVid(el) {
+  const rec = PLAYERS.get(el); if (!rec || curVid === el) return;
+  try { rec.p && rec.p.destroy(); } catch (e) { }
+  const s = el.querySelector('.vslot'); if (s) s.innerHTML = '';
+  el.classList.remove('playing'); PLAYERS.delete(el);
+}
+function playVid(el, withSound) {
+  if (curVid && curVid !== el) pauseVid(curVid);
+  curVid = el; mountVid(el);
+  const rec = PLAYERS.get(el); rec.want = true;
+  if (!rec.ready) return;
+  const loud = withSound || SOUND;
+  try { if (loud) { rec.p.unMute(); rec.p.setVolume(100); } else rec.p.mute(); rec.p.playVideo(); } catch (e) { }
+  sndBtn(el, loud);
+  if (loud) { let n = 0; const chk = () => { // if the browser won't start it with sound, play it muted instead
+    try { if (curVid !== el) return; const st = rec.p.getPlayerState(); if (st === 1 && !rec.p.isMuted()) return; if (st === 3 && n < 12) { n++; return setTimeout(chk, 500); } if (n++ < 4 && st !== 2) return setTimeout(chk, 500); rec.p.mute(); rec.p.playVideo(); sndBtn(el, false); } catch (e) { } }; setTimeout(chk, 700); }
+}
+function pauseVid(el) {
+  const rec = PLAYERS.get(el); if (rec) { rec.want = false; try { rec.ready && rec.p.pauseVideo(); } catch (e) { } }
+  if (curVid === el) curVid = null;
+}
+function pickVid() {
+  let best = null, br = 0;
+  for (const [el, r] of RATIO) { if (!el.isConnected) { RATIO.delete(el); continue; } if (r > br && !el.classList.contains('verr')) { best = el; br = r; } }
+  if (best && br >= 0.6) { if (best !== curVid) playVid(best); }
+  else if (curVid && (RATIO.get(curVid) || 0) < 0.6) pauseVid(curVid);
+}
+const nearIO = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? mountVid(e.target) : unmountVid(e.target)), { rootMargin: '350px 0px' });
+const visIO = new IntersectionObserver(es => { es.forEach(e => RATIO.set(e.target, e.isIntersecting ? e.intersectionRatio : 0)); pickVid(); }, { threshold: [0, 0.3, 0.6, 0.8, 1] });
+function watchVids() {
+  for (const el of [...PLAYERS.keys()]) if (!el.isConnected) { if (curVid === el) curVid = null; unmountVid(el); }
+  document.querySelectorAll('.media.vid:not(.watched)').forEach(el => { el.classList.add('watched'); nearIO.observe(el); visIO.observe(el); });
+}
+function toggleSound(el) {
+  const rec = PLAYERS.get(el); let muted = true;
+  try { muted = rec && rec.ready ? rec.p.isMuted() : !SOUND; } catch (e) { }
+  SOUND = muted; sessionStorage.setItem('mf.sound', SOUND ? '1' : '0');
+  document.querySelectorAll('.media.vid').forEach(v => sndBtn(v, SOUND));
+  if (SOUND) { if (curVid !== el || !rec || !rec.ready || rec.p.getPlayerState() !== 1) playVid(el, true); else { rec.p.unMute(); rec.p.setVolume(100); } toast('🔊 Sound on'); }
+  else { try { rec && rec.ready && rec.p.mute(); } catch (e) { } toast('🔇 Sound off'); }
+}
+let vScrollT = 0; // belt and braces: when scrolling stops, measure what's on screen directly
+addEventListener('scroll', () => { clearTimeout(vScrollT); vScrollT = setTimeout(() => { const H = innerHeight; document.querySelectorAll('.media.vid.watched').forEach(el => { const r = el.getBoundingClientRect(), vis = Math.max(0, Math.min(r.bottom, H) - Math.max(r.top, 0)); RATIO.set(el, r.height ? vis / r.height : 0); if (r.bottom > -350 && r.top < H + 350) mountVid(el); }); pickVid(); }, 250); }, { passive: true });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && curVid) { const el = curVid; pauseVid(el); } else if (document.visibilityState === 'visible') pickVid(); });
 
 /* ---- rendering ---- */
 function ago(ms) {
@@ -311,7 +399,7 @@ function card(i) {
   const T = TOPIC[i.topic] || TOPIC.all, v = VOTES[i.id] ? VOTES[i.id].v : 0;
   const style = `--c1:${T[3]};--c2:${T[4]}`;
   let media = '';
-  if (i.vid) media = `<button class="media vid" data-play="${esc(i.vid)}" aria-label="Play video: ${esc(i.t)}"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(i.img)}" alt="" onerror="this.src='https://i.ytimg.com/vi/${esc(i.vid)}/mqdefault.jpg'"><span class="play"><span></span></span></button>`;
+  if (i.vid) media = vidMedia(i.vid, i.img, i.t);
   else if (i.img) media = `<a class="media${i.kind === 'tv' ? ' tall' : ''}" href="${esc(i.url)}" target="_blank" rel="noopener"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(i.img)}" alt="${esc(i.t)}" onerror="if(!this.dataset.r){this.dataset.r=1;var s=this.src;setTimeout(()=>{this.src=s},1500)}else this.closest('.media').remove()"></a>`;
   else media = `<div class="hero"><span class="em">${T[2]}</span><h3>${esc(i.t)}</h3></div>`;
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
@@ -357,7 +445,7 @@ function more() {
   m.insertAdjacentHTML('beforeend', next.map(i => i.topic === 'life' ? lifeCard(i) : card(i)).join('') + (shown < order.length ? '<div class="load" id="sentinel">Loading more…</div>' : '<div class="load">You’re all caught up ✨</div>'));
   const old = m.querySelectorAll('#sentinel'); old.forEach((s, n) => { if (n < old.length - 1) s.remove(); });
   for (const i of next) SEEN[i.id] = (SEEN[i.id] || 0) + 1;
-  saveSeen(); fillPics();
+  saveSeen(); fillPics(); watchVids();
   const s = $('#sentinel');
   if (s) { if (io) io.disconnect(); io = new IntersectionObserver(e => { if (e[0].isIntersecting) { io.disconnect(); s.remove(); more(); } }, { rootMargin: '900px' }); io.observe(s); }
 }
@@ -406,6 +494,7 @@ function settings() {
   const src = (FEED && FEED.sources || []).slice().sort((a, b) => (TOPICS.findIndex(t => t[0] === a.topic) - TOPICS.findIndex(t => t[0] === b.topic)));
   $('#sheetin').innerHTML = `<h2>My Feed</h2>
     <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself every couple of hours from public sources. Sport is always left out.</p>
+    <p>▶️ Videos play by themselves (muted) when they’re on screen and pause when you scroll past. Tap the speaker on a video for sound; it stays on until you close My Feed.</p>
     <a class="btn pri" href="${MY_APP}">← Back to My App</a>
     <p>📌 <b>For You</b> cards come from My App on this phone and are mixed through All at random: cars, birthdays, calendar, to-dos, garden, pets, meals and recipes, weather, UV and power (kWh), roads, deliveries, plus every board and hub (space, travel, learn, walks, videos, Top 40, cinema, TV, Prime, events, concerts, news, radio, podcasts, webcams, quotes, facts and jokes). Your own things never leave this phone, and bills and money are always left out. Pictures come from My App, Wikimedia Commons, Wikipedia, TVmaze and Open Library.</p>
     <div class="row"><span>Your votes</span><span>${ups} 👍 · ${downs} 👎</span></div>
@@ -426,8 +515,9 @@ document.addEventListener('click', e => {
   const t = e.target;
   const c = t.closest('[data-tab]'); if (c) { tab = c.dataset.tab; ls.set('tab', tab); draw(); window.scrollTo({ top: 0 }); return; }
   const v = t.closest('[data-vote]'); if (v) { vote(v, +v.dataset.vote); return; }
-  const u = t.closest('[data-undo]'); if (u) { const id = u.dataset.undo; delete VOTES[id]; ls.set('votes', VOTES); const it = order.find(x => x.id === id); const card0 = u.closest('.card'); if (it && card0) { card0.outerHTML = it.topic === 'life' ? lifeCard(it) : card(it); fillPics(); } return; }
-  const p = t.closest('[data-play]'); if (p) { const id = p.dataset.play; p.outerHTML = `<div class="media"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="Video"></iframe></div>`; return; }
+  const u = t.closest('[data-undo]'); if (u) { const id = u.dataset.undo; delete VOTES[id]; ls.set('votes', VOTES); const it = order.find(x => x.id === id); const card0 = u.closest('.card'); if (it && card0) { card0.outerHTML = it.topic === 'life' ? lifeCard(it) : card(it); fillPics(); watchVids(); } return; }
+  const sb = t.closest('[data-snd]'); if (sb) { e.preventDefault(); toggleSound(sb.closest('.media.vid')); return; }
+  const p = t.closest('.media.vid'); if (p) { if (!p.classList.contains('playing') || curVid !== p) playVid(p, true); return; } // tap: play this one with sound
   const dm = t.closest('[data-dismiss]'); if (dm) { DISMISS[dm.dataset.dismiss] = Date.now(); ls.set('dismiss', DISMISS); const c0 = dm.closest('.card'); if (c0) { c0.style.transition = 'opacity .25s, transform .25s'; c0.style.opacity = 0; c0.style.transform = 'scale(.97)'; setTimeout(() => c0.remove(), 260); } toast('Hidden from My Feed'); return; }
   const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); return; }
   if (t.id === 'rf') { load(true); return; }
