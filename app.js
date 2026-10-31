@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.2';
+const APP_VERSION = '2.29.3';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -21744,6 +21744,10 @@ function sideIco(k, ic) {
     return `<img src="art/i3-${SIDE_ART[k]}.webp" alt="" class="sideico" onerror="var n=this.nextElementSibling;if(n)n.style.display='';this.remove()"><span class="sideline" style="display:none">${I(ic)}</span>`;
   } catch (e) { return I(ic); }
 }
+/* 2.29.3: My Feed is its own app (Shane's private photo and video feed, https://shane-my-feed.pages.dev).
+   Opened from the side menu (under Entertainment) and the Entertainment page tile. Nothing else in My App changes. */
+const MY_FEED_URL = 'https://shane-my-feed.pages.dev/';
+function openMyFeed() { try { window.open(MY_FEED_URL, '_blank', 'noopener'); } catch (e) { location.href = MY_FEED_URL; } } // noopener: window.open returns null, so don't test it
 function tabbar(active) {
   const bar = document.getElementById('tabbar');
   if (!bar) return;
@@ -21767,8 +21771,9 @@ function tabbar(active) {
       return `<button class="${k === active ? 'on' : ''}" ${k === active ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#${k === 'roster' ? 'work' : k}')"><span class="w">${sideIco(k, ic)}${badge(k)}</span><span class="lbl">${l}</span></button>`;
     } catch (e) { return ''; }
   };
+  const myFeedBtn = `<button onclick="setTabsOpen(false);openMyFeed()"><span class="w"><span style="font-size:1.3rem;line-height:1">✨</span></span><span class="lbl">My Feed ↗</span></button>`; // 2.29.3
   const pwrBtn = (() => { const l = (() => { try { const t = typeof PWR !== 'undefined' && PWR && PWR.today; return t && t.date === todayISO() && t.cost ? 'Power ' + pwrD(t.cost.total) : 'Power'; } catch (e) { return 'Power'; } })(); return `<button class="${active === 'power' ? 'on' : ''}" ${active === 'power' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#power')"><span class="w"><span style="font-size:1.3rem;line-height:1">⚡</span></span><span class="lbl">${l}</span></button>`; })();
-  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'money' && k === 'commission' ? `<button class="${active === 'wage' ? 'on' : ''}" ${active === 'wage' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#wage')"><span class="w"><span style="font-size:1.3rem;line-height:1">💵</span></span><span class="lbl">Wage estimate</span></button>` : '') + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
+  const groups = NAV_GROUPS.map(g => `<div class="tabgrp g-${g.id}">${g.title ? `<div class="tabgh">${g.title}</div>` : ''}${g.keys.map(k => btn(k) + (g.id === 'media' && k === 'media' ? myFeedBtn : '') + (g.id === 'money' && k === 'commission' ? `<button class="${active === 'wage' ? 'on' : ''}" ${active === 'wage' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#wage')"><span class="w"><span style="font-size:1.3rem;line-height:1">💵</span></span><span class="lbl">Wage estimate</span></button>` : '') + (g.id === 'money' && k === 'cashflow' ? `<button class="${active === 'notbills' ? 'on' : ''}" ${active === 'notbills' ? 'aria-current="page"' : ''} onclick="setTabsOpen(false);go('#notbills')"><span class="w"><span style="font-size:1.3rem;line-height:1">🧾</span></span><span class="lbl">Not bills</span></button>` + pwrBtn : '')).join('')}</div>`).join('');
   const reno = `<div class="tabgrp g-projects"><div class="tabgh">Projects</div>${btn('projects')}${btn('tidy')}${btn('flagged')}</div>`;
   bar.innerHTML = groups + reno + `<div class="tabend">${['settings', 'more'].map(btn).join('')}</div>`;
 }
@@ -24070,6 +24075,7 @@ function glTiles() {
   const add = (k, cat, title, fn, art, grad, go) => { try { const s = fn(); if (s && glOk(s) && !/^\s*(not available|nothing|no |none|loading|couldn|can.t|isn.t|tap to|getting)/i.test(String(s))) T.push({ k, cat, title, s: String(s).slice(0, 70), art, grad, go }); } catch (e) { } };
   add('netflix', 'watch', 'New on Netflix', () => { const f = NF && mailConnected('microsoft') ? (NF.fresh || []) : []; return f.length ? f.slice(0, 2).map(x => x.title).join(', ') : ''; }, B('ideas'), '', "go('#netflix')");
   add('prime', 'watch', 'New on Prime Video', () => { const p = primeList(); return p ? (p.fresh[0] || p.coming[0]).title : ''; }, 'i3-tv', ['#0ea5e9', '#1e40af'], "go('#prime')");
+  add('myfeed', 'watch', 'My Feed', () => 'Photos & videos for you', 'i3-tv', ['#ec4899', '#7c3aed'], 'openMyFeed()'); // 2.29.3: separate app
   add('webcams', 'watch', 'Live NZ webcams', () => 'Volcanoes, mountains & roads · live', 'i3-tv', ['#0ea5e9', '#1e3a8a'], "go('#webcams')"); // 2.28.88
   add('freemovies', 'watch', 'Free movies on demand', () => FM_SRC.length + ' free sources · comedies first', 'i3-tv', ['#16a34a', '#1e3a8a'], "go('#freemovies')"); // 2.28.87
   add('discover', 'watch', 'Giggles', () => 'Funny pics, fresh every day', 'i3-travel', ['#0ea5e9', '#6366f1'], "go('#discover')"); // 2.28.98
@@ -24143,7 +24149,7 @@ function glEntRedraw() { try { const el = document.getElementById('glent'); if (
 /* ---- 2.27.51: Media page. Its own item in the side menu: the watch, listen and read tiles, news and events (moved off Home).
    Events are grouped as Concerts, Whangārei nightlife, Movies at Event Cinemas, Markets and Other, from the same relay list as
    the Events page. No sport. Concerts and nightlife during a roster shift are left out, like everywhere else. */
-const MEDIA_TILES = new Set(['freemovies', 'discover', 'webcams', 'livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
+const MEDIA_TILES = new Set(['myfeed', 'freemovies', 'discover', 'webcams', 'livetv', 'netflix', 'prime', 'movies', 'videos', 'top40', 'radio', 'podcasts', 'blogs', 'localnews', 'nznews', 'events', 'nightlife', 'tvguide', 'quote', 'joke', 'learn', 'concerts']); // 2.27.53: every tile is here now; Home has no entertainment section // 2.27.52: quote, joke and travel too
 let mdFilt = 'all';
 function mdEvCat(e) {
   const hay = [e.title, (e.cats || []).join(' '), e.desc].join(' ');
