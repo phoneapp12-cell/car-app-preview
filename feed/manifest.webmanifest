@@ -1,7 +1,7 @@
 {
   "name": "My Feed",
   "short_name": "My Feed",
-  "description": "Shane's private photo and video feed: sitcoms, gardening, music, sci-fi, NZ, dogs and nature. No comments or followers.",
+  "description": "A private, family-safe photo and video feed, with comments and shares only for the family.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

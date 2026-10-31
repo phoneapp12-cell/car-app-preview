@@ -24,6 +24,7 @@ const LS_PREFIX = MEMBER && MEMBER.id && MEMBER.role !== 'admin' ? 'mf.m.' + MEM
 // Board cards from My App that Shane may share on purpose. Personal reminders (cars, birthdays, health, to-dos, holidays,
 // deliveries, his garden, weather/power at home, photos, shopping, Kindle) are never shareable.
 const SHARE_BOARDS = new Set(['gardening', 'space', 'astro', 'travel', 'science', 'aitech', 'diy', 'coding', 'walk', 'video', 'top40', 'recipe', 'quote', 'fact', 'joke', 'webcam', 'cinema', 'prime', 'tv', 'concert', 'news', 'radio', 'lang', 'blog', 'podcast']);
+const DEFAULT_ON = ['kids']; // 1.7.1: on for everyone, and added once to anyone who picked before it existed
 let PICK = null;          // topics this person picked at the start (members); null = everything (Shane)
 let SHARES = [], COUNTS = {}, CSEEN = {}, FAM_PEOPLE = [];
 
@@ -40,13 +41,13 @@ const canShareLife = x => IS_ADMIN && x && SHARE_BOARDS.has(x.cat) && !LIFE_MONE
 
 /* ---- start-up ---- */
 async function famInit() {
-  if (!MEMBER) return;
+  if (!MEMBER) { if (STANDALONE && !ls.get('noLink', false)) pasteLink(); return; }
   if (MEMBER.pending) {
     try { const me = await fam('/me'); localStorage.setItem('mf.member', JSON.stringify({ tok: MEMBER.tok, id: me.id, name: me.name, role: me.role })); location.reload(); }
     catch (e) { if (e.status === 401) { localStorage.removeItem('mf.member'); $('#feed').insertAdjacentHTML('afterbegin', '<div class="empty">This invite link doesn’t work any more. Ask Shane for a new one.</div>'); } }
     return;
   }
-  PICK = MEMBER.role === 'admin' ? null : ls.get('pick', null);
+  PICK = MEMBER.role === 'admin' ? null : ls.get('pick', null); giveDefaults();
   CSEEN = ls.get('cseen', {});
   if (MEMBER.role !== 'admin' && !PICK) { // a new phone: their settings from the server, or the welcome screen
     try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { }
@@ -55,31 +56,36 @@ async function famInit() {
   loadShares();
   fam('/people').then(p => { FAM_PEOPLE = p; }).catch(() => { });
 }
+function giveDefaults() { // a new default chip is switched on once for people who already chose their interests
+  if (!PICK) return; const got = ls.get('defaultsGiven', []); let ch = false;
+  for (const d of DEFAULT_ON) if (!got.includes(d)) { if (!PICK.includes(d)) PICK.push(d); got.push(d); ch = true; }
+  if (ch) { ls.set('defaultsGiven', got); ls.set('pick', PICK); }
+}
 function applyPrefs(p) {
-  PICK = p.pick; ls.set('pick', PICK);
+  PICK = p.pick; if (Array.isArray(p.given)) ls.set('defaultsGiven', p.given); giveDefaults(); ls.set('pick', PICK);
   if (p.intOff) { INT_OFF = p.intOff; ls.set('intOff', INT_OFF); }
   if (typeof p.moodOff === 'boolean') { MOOD_OFF = p.moodOff; ls.set('moodOff', MOOD_OFF); }
   draw();
 }
 let prefsT = 0;
-function famPrefsChanged() { if (!FAM_ON) return; clearTimeout(prefsT); prefsT = setTimeout(() => fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, intOff: INT_OFF, moodOff: MOOD_OFF }) }).catch(() => { }), 1500); }
+function famPrefsChanged() { if (!FAM_ON) return; clearTimeout(prefsT); prefsT = setTimeout(() => fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), intOff: INT_OFF, moodOff: MOOD_OFF }) }).catch(() => { }), 1500); }
 
 /* ---- welcome: pick interests ---- */
 function onboarding() {
   const list = TOPICS.filter(t => !['all', 'life', 'photos', 'liked', 'family'].includes(t[0]) && (t[0] !== 'election' || Date.now() < ELECTION_END));
-  const sel = new Set(PICK || []);
+  const sel = new Set(PICK || DEFAULT_ON);
   $('#sheetin').innerHTML = `<h2>Kia ora ${esc(MEMBER.name)} 👋</h2>
     <p>This is your own My Feed: photos, videos and stories from public sources, picked for you. Tap what you’re into (you can change it any time in ⚙️). Your 👍 and 👎 only change your own feed.</p>
     <p>💬 You can comment on posts and 🔁 share them with the family. Only people Shane has invited can see those.</p>
     <div class="obg">${list.map(t => `<button class="obt${sel.has(t[0]) ? ' on' : ''}" data-pick="${t[0]}" style="--c1:${t[3]};--c2:${t[4]}"><span>${t[2]}</span>${esc(t[1])}</button>`).join('')}</div>
     <p class="mute" style="font-size:.85rem">No sport, no bills or money stuff. Ever.</p>
-    <button class="btn pri" id="obgo">Start my feed</button>`;
+    <button class="btn pri" id="obgo">Start my feed</button>${installBox()}`;
   $('#sheet').classList.add('on', 'ob');
 }
 function obGo() {
   const p = [...document.querySelectorAll('.obt.on')].map(b => b.dataset.pick);
   if (!p.length) { toast('Pick at least one'); return; }
-  PICK = p; ls.set('pick', PICK); famPrefsChanged();
+  PICK = p; ls.set('defaultsGiven', DEFAULT_ON.slice()); ls.set('pick', PICK); famPrefsChanged();
   $('#sheet').classList.remove('on', 'ob'); tab = 'all'; ls.set('tab', tab); draw(); toast('Your feed is ready ✨');
 }
 
@@ -95,7 +101,7 @@ function shareItem(s) {
 }
 function sharesFor(t) { // reposts shown to everyone, whatever they picked (newest first)
   const now = Date.now();
-  return SHARES.filter(s => t === 'family' || now - s.at < 21 * 864e5).map(shareItem).filter(i => !(VOTES[i.id] && VOTES[i.id].v < 0));
+  return SHARES.filter(s => t === 'family' || now - s.at < 21 * 864e5).map(shareItem).filter(i => !(VOTES[i.id] && VOTES[i.id].v < 0) && !unsafe(i) && !unsafe({ t: i._share.caption }));
 }
 function weaveShares(order) { // one shared card near the top, then every 6–8 posts
   const sh = sharesFor('all'); if (!sh.length) return order;
@@ -191,15 +197,47 @@ async function sendComment(form) {
 }
 async function delComment(b) { if (!confirm('Delete this comment?')) return; const box = b.closest('.cmts'), id = b.closest('.card').dataset.id; try { await fam('/comments/' + b.dataset.delc, { method: 'DELETE' }); await loadThread(box, id); } catch (e) { toast(e.message); } }
 
+/* ---- 1.7.1 Install to the home screen ----
+   Android / Chrome: the browser's own install prompt (beforeinstallprompt); the installed app shares this browser's
+   storage, so the family link stays signed in. iPhone / iPad: Safari has no prompt, so we show "Share → Add to Home
+   Screen". A Home Screen app on iPhone keeps its own storage, so for family members the page address and the app's
+   start address carry their link while the steps are showing, and the installed app signs itself in on first open.
+   If that ever fails, the installed app asks them to paste their link once. Hidden once installed. */
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+let DEFER = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); DEFER = e; document.querySelectorAll('.inst').forEach(el => { el.outerHTML = installBox(); }); });
+addEventListener('appinstalled', () => { DEFER = null; document.querySelectorAll('.inst').forEach(el => el.remove()); toast('📲 My Feed is on your home screen'); });
+function prepIOS() { // carry the family link into the Home Screen app (its storage starts empty)
+  if (!IOS || STANDALONE || !MEMBER || !MEMBER.tok || MEMBER.pending) return;
+  const q = new URLSearchParams(location.search); q.set('invite', MEMBER.tok); history.replaceState(null, '', location.pathname + '?' + q + location.hash);
+  const base = new URL('./', location.href).href, man = { name: 'My Feed', short_name: 'My Feed', id: './', start_url: base + '?invite=' + MEMBER.tok, scope: base, display: 'standalone', background_color: '#0b0d11', theme_color: '#7c3aed', icons: [192, 512].map(n => ({ src: base + 'icons/icon-' + n + '.png', sizes: n + 'x' + n, type: 'image/png' })) };
+  const l = document.querySelector('link[rel=manifest]'); if (l) l.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man));
+}
+const IOS_PIC = `<svg class="ipic" viewBox="0 0 240 120" aria-hidden="true"><rect x="8" y="8" width="224" height="104" rx="16" fill="#f1f5f9" stroke="#cbd5e1"/><rect x="20" y="78" width="200" height="24" rx="8" fill="#e2e8f0"/><g transform="translate(108 80)" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v12M7 7l5-5 5 5"/><path d="M5 10v9h14v-9"/></g><text x="120" y="40" text-anchor="middle" font-size="13" fill="#334155" font-family="system-ui">1. Tap Share ⬆︎ below</text><text x="120" y="60" text-anchor="middle" font-size="13" fill="#334155" font-family="system-ui">2. Add to Home Screen ＋</text></svg>`;
+function installBox() {
+  if (STANDALONE) return '';
+  if (DEFER) return `<div class="inst"><b>📲 Put My Feed on your home screen</b><p>It opens like an app, full screen.</p><button class="btn pri" data-install>Install My Feed</button></div>`;
+  if (IOS) { setTimeout(prepIOS, 0); return `<div class="inst"><b>📲 Put My Feed on your home screen</b><p>In Safari: tap the <b>Share</b> button ⬆︎ at the bottom, then <b>Add to Home Screen</b>, then <b>Add</b>.</p>${IOS_PIC}${MEMBER && MEMBER.tok ? '<p class="mute" style="font-size:.8rem">Your family link goes with it, so the app opens your feed.</p>' : ''}</div>`; }
+  return `<div class="inst"><b>📲 Put My Feed on your home screen</b><p>Open your browser’s menu (⋮) and choose <b>Install app</b> or <b>Add to Home screen</b>.</p></div>`;
+}
+function pasteLink() { // an installed app with no family link yet (an iPhone Home Screen app starts with empty storage)
+  $('#sheetin').innerHTML = `<h2>Open your family link</h2><p>If Shane sent you a My Feed link, paste it here once and this app will open your feed.</p>
+    <input id="plink" class="plink" placeholder="https://shane-my-app.pages.dev/feed/?invite=…" aria-label="Your link"><button class="btn pri" id="plgo">Open my feed</button>
+    <button class="btn" id="plskip">I don’t have a link</button>`;
+  $('#sheet').classList.add('on', 'ob');
+}
+
 /* ---- ⚙️ Family ---- */
 function famSettings() {
-  if (!FAM_ON) return '';
+  const inst = installBox();
+  if (!FAM_ON) return inst;
   if (!IS_ADMIN) return `<h2 style="margin-top:4px">👪 Family</h2><p>You’re in Shane’s private family network as <b>${esc(MEMBER.name)}</b>. Comments and shares are only seen by the family.</p>
-    <button class="btn" id="obre">Change what I’m into</button><button class="btn" id="famleave">Leave on this phone</button>`;
+    <button class="btn" id="obre">Change what I’m into</button><button class="btn" id="famleave">Leave on this phone</button>` + inst;
   return `<h2 style="margin-top:4px">👪 Family</h2><p>Invite people to their own My Feed. Each gets a private link: it opens their own feed (their own interests, nothing of yours) and lets them comment and share with the family. Making a new link stops the old one.</p>
     <div id="famlist" class="famlist">Loading…</div>
     <div class="famadd"><input id="famname" maxlength="40" placeholder="Name, e.g. Aranea" aria-label="Name"><button class="btn pri" id="famaddb">Add & make link</button></div>
-    <div id="famlink"></div>`;
+    <div id="famlink"></div>` + inst;
 }
 async function famList() {
   const el = $('#famlist'); if (!el) return;
@@ -217,6 +255,9 @@ document.addEventListener('click', async e => {
   if (t.id === 'sheet' && t.classList.contains('ob')) { e.stopPropagation(); return; } // the welcome screen stays until they pick
   const pk = t.closest('[data-pick]'); if (pk) { pk.classList.toggle('on'); return; }
   if (t.id === 'obgo') { obGo(); return; }
+  if (t.closest('[data-install]')) { if (DEFER) { DEFER.prompt(); const r = await DEFER.userChoice.catch(() => ({})); if (r.outcome === 'accepted') { DEFER = null; document.querySelectorAll('.inst').forEach(el => el.remove()); } } return; }
+  if (t.id === 'plgo') { const m = ($('#plink').value || '').match(/invite=([\w-]{30,80})/) || ($('#plink').value || '').trim().match(/^([\w-]{30,80})$/); if (!m) { toast('That doesn’t look like a My Feed link'); return; } localStorage.setItem('mf.member', JSON.stringify({ tok: m[1], pending: 1 })); location.reload(); return; }
+  if (t.id === 'plskip') { ls.set('noLink', true); $('#sheet').classList.remove('on', 'ob'); return; }
   if (t.id === 'obre') { onboarding(); return; }
   if (t.id === 'famleave') { if (confirm('Take your feed off this phone? Your link will still work to come back.')) { localStorage.removeItem('mf.member'); location.reload(); } return; }
   const cb = t.closest('[data-cmt]'); if (cb) { openThread(cb); return; }
