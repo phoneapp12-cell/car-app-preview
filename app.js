@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.3';
+const APP_VERSION = '2.29.4';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -21746,8 +21746,62 @@ function sideIco(k, ic) {
 }
 /* 2.29.3: My Feed is its own app (Shane's private photo and video feed, https://shane-my-feed.pages.dev).
    Opened from the side menu (under Entertainment) and the Entertainment page tile. Nothing else in My App changes. */
-const MY_FEED_URL = 'https://shane-my-feed.pages.dev/';
-function openMyFeed() { try { window.open(MY_FEED_URL, '_blank', 'noopener'); } catch (e) { location.href = MY_FEED_URL; } } // noopener: window.open returns null, so don't test it
+/* 2.29.4: My Feed now lives at ./feed/ on My App's own address, so it can read "For You" items that My App leaves on
+   this phone (localStorage key myFeedLife). Nothing is sent anywhere. Bills and money are never included. */
+const MY_FEED_URL = new URL('feed/', location.origin + location.pathname.replace(/[^/]*$/, '')).href;
+function openMyFeed() { myFeedSnap(true); try { window.open(MY_FEED_URL, '_blank', 'noopener'); } catch (e) { location.href = MY_FEED_URL; } } // noopener: window.open returns null, so don't test it
+const MF_MONEY = /\$\s?\d|\b(bills?|billing|pay|payday|payment|payments|paid|pays|budget|mortgages?|bank|banking|loans?|wages?|salary|commission|akahu|asb|anz|kiwibank|westpac|bnz|invoices?|refunds?|direct debit|credit card|debit|kora|ecotricity|unimed|claims?|tolls?|cash ?flow|prices?|costs?|savings|kiwisaver|shares?|nzx|interest rate|fuel price|petrol price|rewards|booster|promo|transfer)\b/i;
+const MF_MONEY_KINDS = new Set(['bill', 'loan', 'pay', 'comm', 'budget', 'xfer', 'move', 'claim', 'huebatt']);
+let mfSnapAt = 0;
+function mfRow(html) {
+  const tp = document.createElement('template'); tp.innerHTML = String(html || '');
+  const el = tp.content.firstElementChild; if (!el) return null;
+  el.querySelectorAll('.newpill, .bpin, .badge, .pill, .glbadge, button.paybtn, .jaago').forEach(x => x.remove());
+  const txt = n => (n ? n.textContent : '').replace(/\s+/g, ' ').trim();
+  const t = txt(el.querySelector('.t') || el.querySelector('b')), sub = txt(el.querySelector('.s') || el.querySelector('b + span'));
+  const tag = txt(el.querySelector('.glwtag'));
+  const oc = [el, ...el.querySelectorAll('[onclick]')].map(n => n.getAttribute && n.getAttribute('onclick') || '').join(' ');
+  const href = (el.getAttribute('href') || (el.querySelector('a[href^="http"]') || { getAttribute: () => '' }).getAttribute('href') || '');
+  const go = (oc.match(/go\('(#[\w/-]+)'\)/) || [])[1] || (/calOpenDay/.test(oc) ? '#calendar' : '');
+  return { t, s: sub, tag, go, url: /^https:\/\//.test(href) ? href : '' };
+}
+function mfCat(x) {
+  const k = x.kind || '';
+  if (k === 'car' || k === 'driver') return 'car'; if (k === 'pet') return 'pet'; if (k === 'bday') return 'bday';
+  if (k === 'health' || k === 'med') return 'health'; if (k === 'todo' || k === 'rem') return 'todo'; if (k === 'gym') return 'gym';
+  if (k === 'meal') return 'meal'; if (k === 'hol' || k === 'cd') return 'hol';
+  try { const c = cuCat(x); if (c) return c; } catch (e) { }
+  return /reno|millesha/i.test(String(x.name || x.html || '')) ? 'reno' : 'event';
+}
+function myFeedSnap(force) {
+  try {
+    if (!S || (!force && Date.now() - mfSnapAt < 60e3)) return;
+    mfSnapAt = Date.now();
+    const out = [], seen = new Set(), T = todayT();
+    const push = o => { if (!o || !o.t) return; const all = [o.t, o.s, o.tag].join(' '); if (MF_MONEY.test(all)) return; const k = (o.cat + '|' + o.t + '|' + (o.iso || '')).toLowerCase(); if (seen.has(k)) return; seen.add(k); out.push(o); };
+    // Coming up: cars, WOF, rego, service, birthdays, appointments, calendars, my events, to-dos, reminders, pets, health, reno, holidays…
+    let cu = []; try { cu = comingUpList(); } catch (e) { }
+    cu.forEach(x => { try {
+      if (!x || MF_MONEY_KINDS.has(x.kind) || nbIsBill(x) || cuCat(x) === 'money') return;
+      const r = mfRow(x.html); if (!r) return;
+      push({ cat: mfCat(x), kind: x.kind || '', t: r.t, s: r.s, iso: x.iso || isoT(T + (x.days || 0) * DAY), go: r.go, url: r.url });
+    } catch (e) { } });
+    // Undated open to-dos (the dated ones are in Coming up)
+    try { (S.todos || []).filter(t => t && !t.done && t.title && !t.due).slice(0, 15).forEach(t => push({ cat: 'todo', kind: 'todo', t: t.title, s: t.list || 'To-do', go: '#todo' })); } catch (e) { }
+    // Warnings: weather outlook, roads and bridge near you, events you flagged
+    try { glWarnList().forEach(x => push({ cat: x.flag ? 'flag' : /road|commute|bridge|closure|crash/i.test(x.tag + ' ' + x.what) ? 'road' : 'alert', kind: 'warn', t: x.what, s: x.s || '', tag: x.tag || '', red: !!x.red, go: (String(x.go || '').match(/#[\w/-]+/) || [''])[0], url: x.url || '' })); } catch (e) { }
+    // Deliveries, click & collect, appointments and events found in email (never bills)
+    try { mbItems().filter(x => ['dl', 'cc', 'ev', 'ap'].includes(x.sec)).forEach(x => { const r = mfRow(x.html); if (r) push({ cat: x.sec === 'dl' || x.sec === 'cc' ? 'delivery' : 'event', kind: 'mail-' + x.sec, t: r.t, s: r.s, go: r.go || '#alerts', url: r.url }); }); } catch (e) { }
+    // Weather now
+    try { if (WX && validWx(WX.data)) { const c = WX.data.current, w = wmo(c.weather_code, wxIsDay(), c.wind_speed_10m); let o = ''; try { o = notifWxOutlook(w, notifWxNext()); } catch (e) { } push({ cat: 'weather', kind: 'wx', t: (num(c.temperature_2m) ? Math.round(c.temperature_2m) + '° ' : '') + w.words, s: o || 'Whangārei now', wx: w.kind, go: '#weather', iso: todayISO() }); } } catch (e) { }
+    // Solar today (energy only, no prices)
+    try { const t = PWR && PWR.today; if (t && t.date === todayISO() && Number.isFinite(t.solarKWh)) push({ cat: 'solar', kind: 'solar', t: 'Solar today: ' + t.solarKWh.toFixed(1) + ' kWh', s: 'From your panels so far today', go: '#power', iso: todayISO() }); } catch (e) { }
+    localStorage.setItem('myFeedLife', JSON.stringify({ v: 1, at: Date.now(), today: todayISO(), items: out.slice(0, 80) }));
+  } catch (e) { }
+}
+setTimeout(() => myFeedSnap(true), 9000); // after the first load and data refreshes
+setInterval(() => { if (document.visibilityState === 'visible') myFeedSnap(false); }, 5 * 60e3);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') myFeedSnap(true); });
 function tabbar(active) {
   const bar = document.getElementById('tabbar');
   if (!bar) return;
