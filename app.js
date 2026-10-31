@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.4';
+const APP_VERSION = '2.29.5';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -21773,6 +21773,56 @@ function mfCat(x) {
   try { const c = cuCat(x); if (c) return c; } catch (e) { }
   return /reno|millesha/i.test(String(x.name || x.html || '')) ? 'reno' : 'event';
 }
+const MF_SPORT = /\b(sports?|rugby|cricket|netball|football|soccer|league|nrl|afl|nba|nfl|golf|tennis|boxing|ufc|motorsport|formula 1|f1|supercars|all blacks|black caps|silver ferns|olympics?|hockey|basketball|baseball|super rugby|wrestling|racing|athletics|tournament|grand prix|v8)\b/i;
+// 2.29.5: picture hints for each item (photos My App already has, or a subject for My Feed to find a picture of),
+// plus a "pool" of public cards from every board and hub (space, travel, learn, walks, videos, Top 40, recipes,
+// quotes, facts, webcams, cinema, TV, Prime, events, concerts, news, blogs, podcasts, radio, books, languages,
+// power in kWh, UV). Still only on this phone, and still nothing about bills or money.
+function mfAbs(u) { try { return u ? new URL(u, location.href).href : ''; } catch (e) { return ''; } }
+function mfCarQ(c) { const m = String((c && c.model) || '').replace(/\b(ultra|hybrid|petrol|diesel|ev|plug-in|phev|gt|rs)\b/gi, '').trim(); const w = m.split(/\s+/).filter(Boolean); return [w.join('_'), w.slice(0, 2).join('_'), w[0]].filter(Boolean).concat(['Car']); }
+function mfPersonalPic(x, o) {
+  try {
+    const ref = x.ref || {}, getC = v => !v ? null : typeof v === 'object' ? v : (typeof getCar === 'function' ? getCar(v) : null);
+    let car = getC(ref.car) || getC(ref.carId);
+    if (!car && o.cat === 'car') car = (S.cars || []).find(c => c && ((c.plate && o.t.toUpperCase().includes(String(c.plate).toUpperCase())) || (c.name && o.t.includes(c.name))));
+    if (car) { o.img = storedPhoto(car.photo) && car.photo.length < 400e3 ? car.photo : ''; o.q = mfCarQ(car); o.sub = [car.year, car.model, car.colour].filter(Boolean).join(' '); return; }
+    if (o.cat === 'pet') { const p = (typeof ref.pet === 'object' && ref.pet) || (S.pets || []).find(p => p && p.name && (o.t + ' ' + o.s).includes(p.name)); if (p) { o.img = storedPhoto(p.photo) && p.photo.length < 400e3 ? p.photo : ''; o.q = [p.breed && p.breed.replace(/\s+/g, '_'), p.type === 'cat' ? 'Cat' : 'Dog'].filter(Boolean); if (!o.img && p.type !== 'cat') o.img2 = mfAbs('art/dog.webp'); } else o.q = ['Dog']; return; }
+    if (o.cat === 'meal') { const m = ((S.meals && S.meals.ideas) || []).find(i => i && i.title && o.t.toLowerCase().includes(String(i.title).toLowerCase())); if (m && m.image) o.img = mfAbs(m.image); return; }
+  } catch (e) { }
+}
+function mfPool() {
+  const P = [], seen = new Set();
+  const add = o => { try { if (!o || !o.t || /^(not available|no .* yet\.?|loading)/i.test(o.t)) return; const all = [o.t, o.s, o.tag].join(' '); if (MF_MONEY.test(all) || MF_SPORT.test(all)) return; o.id = o.id || (o.cat + ':' + o.t).toLowerCase().slice(0, 90); if (seen.has(o.id)) return; seen.add(o.id); if (o.img) o.img = mfAbs(o.img); if (o.s) o.s = String(o.s).replace(/\s+/g, ' ').slice(0, 260); P.push(o); } catch (e) { (window.mfErr = window.mfErr || []).push('add ' + (o && o.cat) + ' ' + e.message); } };
+  const T = (f) => { try { f(); } catch (e) { (window.mfErr = window.mfErr || []).push(String(e && e.message)); } };
+  const board = (rows, cat, src, go) => (rows || []).forEach(r => add({ cat, t: r[0], s: (Array.isArray(r[6]) ? r[6][0] : r[6]) || r[1], tag: r[1], img: r[2], credit: r[3], src, go, url: r[5] ? 'https://en.wikipedia.org/wiki/' + encodeURIComponent(String(r[5]).replace(/ /g, '_')) : '' }));
+  T(() => board(SPACE, 'space', 'Space board', '#space'));
+  T(() => TRAVEL.forEach(r => add({ cat: 'travel', t: r[0], tag: r[1], s: (r[9] || [])[0] || r[1], img: r[5], credit: r[6], src: 'Travel board', go: '#travel', url: r[8] ? 'https://en.wikipedia.org/wiki/' + encodeURIComponent(String(r[8]).replace(/ /g, '_')) : '' })));
+  T(() => Object.entries({ astronomy: ['astro', 'Astronomy board'], gardening: ['gardening', 'Gardening board'], science: ['science', 'Science board'], aitech: ['aitech', 'AI & tech board'], diy: ['diy', 'DIY board'], coding: ['coding', 'Coding board'] }).forEach(([k, [cat, src]]) => board(LB_DATA[k], cat, src, '#' + k)));
+  T(() => WALKS.forEach(w => add({ cat: 'walk', t: w.name, tag: w.area, s: [w.dogBadge, (w.paras || [])[0]].filter(Boolean).join(' · '), img: w.img, credit: w.credit, src: 'Walks', go: '#walks' })));
+  T(() => VIDEOS.forEach(v => add({ cat: 'video', t: v.title, tag: v.channel, s: v.reason, vid: v.id, img: 'https://i.ytimg.com/vi/' + v.id + '/hqdefault.jpg', url: v.url, src: 'Videos', go: '#videos' })));
+  T(() => TOP40.forEach(v => add({ cat: 'top40', t: '#' + v.rank + ' ' + v.title, tag: v.artist, s: v.artist + ' · NZ Top 40', vid: v.id, img: 'https://i.ytimg.com/vi/' + v.id + '/hqdefault.jpg', url: v.url, src: 'Top 40', go: '#top40' })));
+  T(() => { const ideas = (S.meals && S.meals.ideas) || []; ideas.concat(MEAL_STARTERS.filter(m => !ideas.some(i => i.title === m.title))).forEach(m => m && m.title && add({ cat: 'recipe', t: m.title, tag: m.tag, s: [m.time, m.serves && 'serves ' + m.serves, Array.isArray(m.ingr) ? m.ingr.slice(0, 5).join(', ') : String(m.ingr || '').split(',').slice(0, 5).join(',')].filter(Boolean).join(' · '), img: m.image, q: m.image ? null : [m.title.replace(/\s+/g, '_')], src: 'Recipes', go: '#recipes' })); });
+  T(() => DAILY_QUOTES.forEach(q => add({ cat: 'quote', t: '“' + q.t + '”', s: '— ' + q.w, img: q.img, src: 'Daily quote', go: '#home' })));
+  T(() => HOME_FACTS.forEach(f => add({ cat: 'fact', t: 'Did you know?', s: f, id: 'fact:' + f.slice(0, 60), q: mfFactQ(f), src: 'NZ facts', go: '#home' })));
+  T(() => DAILY_JOKES.forEach(j => add({ cat: 'joke', t: j[0], s: j[1], src: 'Joke of the day', go: '#home', q: ['Laughter', 'Smile'] })));
+  T(() => WC_GROUPS.forEach(g => (g.c || []).filter(c => /\.jpe?g/i.test(c[1])).forEach(c => add({ cat: 'webcam', t: c[0], tag: g.n, s: g.src + ' live camera · ' + g.n, img: c[1], live: 1, src: 'Webcams', go: '#webcams' }))));
+  T(() => { const c = cineData(); (c && c.movies || []).forEach(m => add({ cat: 'cinema', t: m.title, tag: m.soon ? 'Coming soon' : 'Now showing', s: [m.soon ? 'Coming soon' : 'Now showing', 'Event Cinemas Whangārei', m.rating, m.mins && m.mins + ' min'].filter(Boolean).join(' · '), img: m.poster, vid: m.trailer || '', url: m.url, src: 'Cinema', go: '#movies' })); });
+  T(() => (PRIME && PRIME.items || []).forEach(x => add({ cat: 'prime', t: x.title, s: 'Prime Video · ' + (x.date > todayISO() ? 'coming ' : 'new ') + x.date, img: x.img, src: 'Prime Video', go: '#prime' })));
+  T(() => { const now = Date.now(), seenT = new Set(); TV_CHANNELS.forEach(ch => (TV.data.slots[ch.id] || []).filter(s => s && s.title && s.until > now && s.start < now + 30 * 3600e3 && !/news|weather|infomercial|teleshopping|paid programming/i.test(s.title)).forEach(s => { if (seenT.has(s.title)) return; seenT.add(s.title); add({ cat: 'tv', t: s.title, tag: ch.name, s: ch.name + ' · ' + new Date(s.start).toLocaleString('en-NZ', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + (s.cats && s.cats.length ? ' · ' + s.cats.join(', ') : ''), q: [s.title.replace(/\s+/g, '_') + '_(TV_series)', s.title.replace(/\s+/g, '_')], src: 'TV guide', go: '#tv' }); })); });
+  T(() => upcomingEvents().filter(e => !/^mov-/.test(e.id || '')).slice(0, 60).forEach(e => add({ cat: 'event', id: 'ev:' + e.id, t: e.title, tag: e.cats && e.cats[0], s: [e.date, e.time, e.venue].filter(Boolean).join(' · '), iso: e.date, url: e.url, q: mfEventQ(e.title + ' ' + (e.cats || []).join(' ')), src: 'Events', go: '#events' })));
+  T(() => Object.values(mdEvGroups()).forEach(g => (Array.isArray(g) ? g : []).slice(0, 15).forEach(e => add({ cat: 'concert', id: 'cc:' + e.id, t: e.title, s: [e.date, e.time, e.venue].filter(Boolean).join(' · '), iso: e.date, url: e.url, q: ['Concert', 'Live_music', 'Rock_concert'], src: 'Concerts', go: '#concerts' }))));
+  T(() => ['local', 'nz'].forEach(k => (newsSec(k) || []).slice(0, 15).forEach(n => !/\b(rugby|cricket|netball|league|football|sport)/i.test(n.title + ' ' + n.src) && add({ cat: 'news', t: n.title, tag: n.src, s: n.summary || n.src, url: n.url, img: n.img || n.image || '', q: k === 'local' ? ['Whangārei', 'Whangārei_Falls', 'Northland_Region'] : ['New_Zealand', 'Wellington', 'Auckland'], src: k === 'local' ? 'Local news' : 'NZ news', go: '#news' }))));
+  T(() => RADIO.forEach(r => add({ cat: 'radio', t: r.name, tag: r.freq, s: [r.freq, r.where].filter(Boolean).join(' · ') + ' · tap to listen in My App', url: r.home, q: ['Radio_broadcasting', 'Microphone', 'Radio_receiver'], src: 'Radio', go: '#radio' })));
+  T(() => KINDLE_BOOKS.forEach(r => { const b = Array.isArray(r) ? r : [r.title, r.author, r.st, r.note]; add({ cat: 'book', t: b[0], tag: b[1], s: 'by ' + b[1] + (b[2] ? ' · ' + ({ reading: 'reading now', started: 'started', read: 'finished' }[b[2]] || b[2]) : '') + (b[3] ? ' · ' + b[3] : ''), book: [b[0], b[1]], src: 'Kindle', go: '#home' }); }));
+  T(() => Object.entries(LANGS).forEach(([k, L]) => { const w = langToday(k); add({ cat: 'lang', id: 'lang:' + k + ':' + w[0], t: w[0], tag: L.name, s: w[1] + (w[2] ? ' · say “' + w[2] + '”' : ''), q: k === 'mi' ? ['Māori_people', 'Wharenui', 'Waitangi_Treaty_Grounds'] : ['Paris', 'Eiffel_Tower', 'France'], src: L.name + ' word of the day', go: '#lang' }); }));
+  T(() => { const t = PWR && PWR.today; if (t && t.date === todayISO()) add({ cat: 'power', id: 'pwr:' + t.date, t: 'Power today: ' + (+t.usedKWh || 0).toFixed(1) + ' kWh used', s: [Number.isFinite(t.solarKWh) && t.solarKWh.toFixed(1) + ' kWh from solar', Number.isFinite(t.fromSolarPct) && t.fromSolarPct + '% from sun', Number.isFinite(t.batteryPct) && 'battery ' + t.batteryPct + '%'].filter(Boolean).join(' · '), q: ['Solar_panel', 'Photovoltaic_system', 'Solar_power'], src: 'Power (kWh)', go: '#power', iso: t.date, now: 1 }); });
+  T(() => { const u = wxUV(); if (u && Number.isFinite(u.n)) add({ cat: 'uv', id: 'uv:' + todayISO(), t: 'UV today: ' + u.n + ' · ' + u.words, s: u.n >= 6 ? 'Slip, slop, slap and wrap before you head out.' : 'Low to moderate sun today.', q: ['Ultraviolet_index', 'Sunscreen', 'Sun'], src: 'Weather', go: '#weather', iso: todayISO(), now: 1 }); });
+  // Homepage hubs (rows straight off the home cards): roadworks, blogs, podcasts, countdowns, diary, pets, cars
+  T(() => ['roadworks', 'blogging', 'podcasts', 'countdown', 'shopping', 'ideas', 'holidays'].forEach(k => { let h = ''; try { h = HOME_CARD[k](); } catch (e) { } if (!h) return; const tp = document.createElement('template'); tp.innerHTML = h; tp.content.querySelectorAll('.row').forEach(el => { const r = mfRow(el.outerHTML); if (!r || !r.t) return; const im = el.querySelector('img[src]'); add({ cat: k === 'roadworks' ? 'road' : k === 'blogging' ? 'blog' : k === 'podcasts' ? 'podcast' : k === 'countdown' || k === 'holidays' ? 'hol' : k === 'shopping' ? 'shop' : 'idea', t: r.t, s: r.s, url: r.url, img: im && /^(https:|images\/|art\/)/.test(im.getAttribute('src')) ? im.getAttribute('src') : '', src: k[0].toUpperCase() + k.slice(1), go: r.go || '#' + k }); }); }));
+  return P;
+}
+function mfFactQ(f) { const m = String(f).match(/\b(Whangārei Falls|Mount Manaia|Poor Knights|Tutukākā|Kauri|Tāne Mahuta|Waipoua|Kiwi|Tūī|Pōhutukawa|Bay of Islands|Cape Reinga|Rangitoto|Milford Sound|Aoraki|Mount Cook|Lake Taupō|Rotorua|Waitomo|Ruapehu|Tongariro|Auckland|Wellington|Christchurch|Queenstown|Kākāpō|Weta|Moa|Haka|Pavlova|Hokey pokey|Kiwifruit|Sheep|Fiordland|Stewart Island|Abel Tasman|Hobbit|Hobbiton|Treaty of Waitangi|Waitangi|Southern Alps|Dunedin|Nelson|Napier|Gisborne)\b/i); return [m ? m[1].replace(/\s+/g, '_') : '', 'New_Zealand', 'Whangārei_Falls'].filter(Boolean); }
+function mfEventQ(s) { const R = [[/market/i, 'Farmers\'_market'], [/movie|film|cinema/i, 'Movie_theater'], [/concert|music|band|gig|choir|jazz|orchestra/i, 'Concert'], [/firework|guy fawkes/i, 'Fireworks'], [/garden|plant/i, 'Garden'], [/art|exhibit|gallery/i, 'Art_exhibition'], [/comedy|laugh/i, 'Stand-up_comedy'], [/theatre|play|musical/i, 'Theatre'], [/kids|family|child/i, 'Playground'], [/food|wine|beer|tasting/i, 'Food_festival'], [/walk|hike|tramp/i, 'Hiking'], [/church|carol|christmas/i, 'Christmas_lights'], [/halloween/i, 'Jack-o\'-lantern'], [/craft|workshop/i, 'Handicraft'], [/quiz/i, 'Pub_quiz'], [/dance/i, 'Dance'], [/car|motor/i, 'Car_show']]; const out = R.filter(r => r[0].test(s)).map(r => r[1]); return out.concat(['Town_Basin', 'Whangārei']).slice(0, 3); }
 function myFeedSnap(force) {
   try {
     if (!S || (!force && Date.now() - mfSnapAt < 60e3)) return;
@@ -21784,7 +21834,7 @@ function myFeedSnap(force) {
     cu.forEach(x => { try {
       if (!x || MF_MONEY_KINDS.has(x.kind) || nbIsBill(x) || cuCat(x) === 'money') return;
       const r = mfRow(x.html); if (!r) return;
-      push({ cat: mfCat(x), kind: x.kind || '', t: r.t, s: r.s, iso: x.iso || isoT(T + (x.days || 0) * DAY), go: r.go, url: r.url });
+      const o = { cat: mfCat(x), kind: x.kind || '', t: r.t, s: r.s, iso: x.iso || isoT(T + (x.days || 0) * DAY), go: r.go, url: r.url }; mfPersonalPic(x, o); push(o);
     } catch (e) { } });
     // Undated open to-dos (the dated ones are in Coming up)
     try { (S.todos || []).filter(t => t && !t.done && t.title && !t.due).slice(0, 15).forEach(t => push({ cat: 'todo', kind: 'todo', t: t.title, s: t.list || 'To-do', go: '#todo' })); } catch (e) { }
@@ -21792,11 +21842,15 @@ function myFeedSnap(force) {
     try { glWarnList().forEach(x => push({ cat: x.flag ? 'flag' : /road|commute|bridge|closure|crash/i.test(x.tag + ' ' + x.what) ? 'road' : 'alert', kind: 'warn', t: x.what, s: x.s || '', tag: x.tag || '', red: !!x.red, go: (String(x.go || '').match(/#[\w/-]+/) || [''])[0], url: x.url || '' })); } catch (e) { }
     // Deliveries, click & collect, appointments and events found in email (never bills)
     try { mbItems().filter(x => ['dl', 'cc', 'ev', 'ap'].includes(x.sec)).forEach(x => { const r = mfRow(x.html); if (r) push({ cat: x.sec === 'dl' || x.sec === 'cc' ? 'delivery' : 'event', kind: 'mail-' + x.sec, t: r.t, s: r.s, go: r.go || '#alerts', url: r.url }); }); } catch (e) { }
+    // 2.29.5: garden jobs for the plants he grows (next three weeks)
+    try { const today = todayISO(), to = isoT(T + 21 * DAY); Object.keys(GARDEN_META).filter(id => gardenGrowing(id)).forEach(id => gardenYearJobs(id).filter(j => !j.done && j.date >= today && j.date <= to).slice(0, 2).forEach(j => push({ cat: 'garden', kind: 'garden', t: j.title, s: GARDEN_META[id].name + (j.body ? ' · ' + j.body : ''), iso: j.date, go: '#garden/' + id, q: [String(GARDEN_META[id].name).replace(/\s*\(.*\)/, '').replace(/\s+/g, '_'), 'Gardening'] }))); } catch (e) { }
     // Weather now
     try { if (WX && validWx(WX.data)) { const c = WX.data.current, w = wmo(c.weather_code, wxIsDay(), c.wind_speed_10m); let o = ''; try { o = notifWxOutlook(w, notifWxNext()); } catch (e) { } push({ cat: 'weather', kind: 'wx', t: (num(c.temperature_2m) ? Math.round(c.temperature_2m) + '° ' : '') + w.words, s: o || 'Whangārei now', wx: w.kind, go: '#weather', iso: todayISO() }); } } catch (e) { }
     // Solar today (energy only, no prices)
     try { const t = PWR && PWR.today; if (t && t.date === todayISO() && Number.isFinite(t.solarKWh)) push({ cat: 'solar', kind: 'solar', t: 'Solar today: ' + t.solarKWh.toFixed(1) + ' kWh', s: 'From your panels so far today', go: '#power', iso: todayISO() }); } catch (e) { }
-    localStorage.setItem('myFeedLife', JSON.stringify({ v: 1, at: Date.now(), today: todayISO(), items: out.slice(0, 80) }));
+    let pool = []; try { pool = mfPool(); } catch (e) { }
+    const snap = n => JSON.stringify({ v: 2, at: Date.now(), today: todayISO(), items: out.slice(0, 80), pool: n == null ? pool : pool.sort(() => Math.random() - 0.5).slice(0, n) });
+    try { localStorage.setItem('myFeedLife', snap()); } catch (e) { try { localStorage.setItem('myFeedLife', snap(250)); } catch (e2) { localStorage.setItem('myFeedLife', JSON.stringify({ v: 2, at: Date.now(), today: todayISO(), items: out.slice(0, 80).map(o => Object.assign({}, o, { img: o.img && o.img.length > 2000 ? '' : o.img })), pool: [] })); } }
   } catch (e) { }
 }
 setTimeout(() => myFeedSnap(true), 9000); // after the first load and data refreshes
