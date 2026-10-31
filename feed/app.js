@@ -1,7 +1,7 @@
 /* My Feed – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // My Feed lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -182,7 +182,7 @@ function picQ(x) {
     case 'todo': return KW(s, [[/mow|lawn/i, 'Lawn_mower'], [/dish/i, 'Dishwasher'], [/washing|laundry|clothes/i, 'Laundry'], [/vacuum|hoover/i, 'Vacuum_cleaner'], [/bin|rubbish|recycl/i, 'Waste_container'], [/shop|grocer/i, 'Supermarket'], [/garden|weed|prune|plant|hedge/i, 'Gardening'], [/clean|tidy/i, 'Housekeeping'], [/car|tyre|oil|wof/i, 'Car_wash'], [/paint/i, 'Paint'], [/hair/i, 'Hairdresser'], [/dentist/i, 'Dentistry'], [/doctor|\bgp\b/i, 'Physician'], [/pool|spa/i, 'Swimming_pool'], [/light|bulb/i, 'Light_bulb'], [/book|read/i, 'Book']], ['Checklist']);
     case 'health': return KW(s, [[/dentist|teeth/i, 'Dentistry'], [/med|pill|script|tablet/i, 'Tablet_(pharmacy)'], [/vaccin|flu jab|shot/i, 'Vaccine'], [/hospital/i, 'Hospital'], [/doctor|\bgp\b/i, 'Physician']], ['Stethoscope']);
     case 'gym': return ['Gym'];
-    case 'meal': return ['Dinner', 'Cooking'];
+    case 'meal': return ['Roast dinner', 'Home cooking'];
     case 'hol': return KW(s, [[/christmas|boxing/i, 'Christmas'], [/new year/i, 'Fireworks'], [/easter/i, 'Easter_egg'], [/labour/i, 'Labour_Day'], [/waitangi/i, 'Waitangi_Treaty_Grounds'], [/anzac/i, 'Anzac_Day'], [/matariki/i, 'Matariki'], [/guy fawkes|fireworks/i, 'Fireworks'], [/halloween/i, "Jack-o'-lantern"]], ['Fireworks', 'Beach']);
     case 'event': case 'flag': return KW(s, [[/market/i, "Farmers'_market"], [/movie|film|cinema/i, 'Movie_theater'], [/concert|music|band|gig|choir|jazz/i, 'Concert'], [/firework/i, 'Fireworks'], [/garden|plant/i, 'Garden'], [/art|exhibit|gallery/i, 'Art_exhibition'], [/comedy/i, 'Stand-up_comedy'], [/theatre|musical/i, 'Theatre'], [/kids|family/i, 'Playground'], [/food|wine|beer/i, 'Food_festival'], [/christmas|carol/i, 'Christmas_lights'], [/halloween/i, "Jack-o'-lantern"], [/quiz/i, 'Pub_quiz'], [/dance/i, 'Dance'], [/meeting|appointment/i, 'Calendar']], ['Whangārei', 'Calendar']);
     case 'reno': return ['Renovation', 'Carpentry'];

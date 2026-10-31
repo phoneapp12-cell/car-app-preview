@@ -1,6 +1,6 @@
 /* My Feed – service worker. To ship an update: change VERSION. */
 const CACHE = 'my-feed-';
-const VERSION = '1.2.1';
+const VERSION = '1.2.2';
 const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'manifest.webmanifest', 'icons/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE + VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith(CACHE) && n !== CACHE + VERSION).map(n => caches.delete(n)))).then(() => self.clients.claim())); });
