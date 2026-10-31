@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.8.1';
+const APP_VERSION = '1.8.2';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -766,7 +766,7 @@ function vote(el, v) {
 
 /* ---- data ---- */
 async function load(force) {
-  $('#rf').classList.add('spin');
+  $('#rf').classList.add('spin'); if (force) famFresh(true);
   try {
     const r = await fetch(FEED_URL + (force ? '?t=' + Date.now() : ''), { cache: force ? 'no-store' : 'default' });
     if (!r.ok) throw new Error(r.status);
@@ -824,7 +824,7 @@ function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add
 /* ---- events ---- */
 document.addEventListener('click', e => {
   const t = e.target;
-  const c = t.closest('[data-tab]'); if (c) { tab = c.dataset.tab; ls.set('tab', tab); draw(); window.scrollTo({ top: 0 }); return; }
+  const c = t.closest('[data-tab]'); if (c) { tab = c.dataset.tab; ls.set('tab', tab); draw(); window.scrollTo({ top: 0 }); if (tab === 'family') famFresh(); return; }
   const v = t.closest('[data-vote]'); if (v) { vote(v, +v.dataset.vote); return; }
   const u = t.closest('[data-undo]'); if (u) { const id = u.dataset.undo; delete VOTES[id]; ls.set('votes', VOTES); const it = order.find(x => x.id === id); const card0 = u.closest('.card'); if (it && card0) { card0.outerHTML = it.topic === 'life' ? lifeCard(it) : card(it); fillPics(); watchVids(); } return; }
   const sb = t.closest('[data-snd]'); if (sb) { e.preventDefault(); toggleSound(sb.closest('.media.vid')); return; }

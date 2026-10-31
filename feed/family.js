@@ -29,7 +29,7 @@ let PICK = null;          // topics this person picked at the start (members); n
 let SHARES = [], COUNTS = {}, CSEEN = {}, FAM_PEOPLE = [];
 
 async function fam(path, opt = {}) {
-  const r = await fetch(FAM_API + path, { ...opt, headers: { Authorization: 'Bearer ' + MEMBER.tok, ...(opt.body ? { 'Content-Type': 'application/json' } : {}) } });
+  const r = await fetch(FAM_API + path, { ...opt, headers: { Authorization: 'Bearer ' + MEMBER.tok, 'X-App-Version': APP_VERSION, ...(opt.body ? { 'Content-Type': 'application/json' } : {}) } });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { const e = new Error(j.err || 'HTTP ' + r.status); e.status = r.status; throw e; }
   return j;
@@ -90,8 +90,10 @@ function obGo() {
 }
 
 /* ---- reposts ---- */
+let sharesAt = 0;
 async function loadShares() {
-  try { SHARES = await fam('/shares'); } catch (e) { return; }
+  try { SHARES = await fam('/shares'); sharesAt = Date.now(); } catch (e) { return; }
+  migrateVotes();
   if (tab === 'family' || (tab === 'all' && scrollY < 200)) draw(); else chips();
   famCounts(SHARES.map(shareItem));
 }
@@ -450,3 +452,45 @@ function famPublicVote(i, v) { // v: 1 = 👍 on, 0 = taken back, -1 = 👎 (pri
   fam('/likes', { method: 'POST', body: JSON.stringify({ card: i.id, kind: v > 0 ? 'up' : 'none', on: v > 0 }) }).then(() => loadPop(true)).catch(() => { });
 }
 setInterval(() => { if (document.visibilityState === 'visible') loadPop(); }, 5 * 60e3 + 7e3);
+
+/* ---- 1.8.2 keeping family likes in step ----
+   Before 1.8.1 a 👍 on a family post only stayed on the phone, so nobody else saw it (Millesha's likes on Shane's photos).
+   Now, once per post, any 👍/❤️ still saved on this phone for a family post goes up to the family (👍 → 👍, ❤️ → ❤️).
+   Public cards: 👍s from the last 4 days go up too, so they count for the family's "liked" boost. 👎 never leaves the phone. */
+let migDone = false;
+async function migrateVotes() {
+  if (!FAM_ON || migDone) return; migDone = true;
+  const done = ls.get('votesUp', {}), now = Date.now(); let n = 0, changed = false;
+  for (const s of SHARES) {
+    const v = VOTES[s.card]; if (!v || v.v <= 0 || done[s.card]) continue;
+    const kind = v.v >= 2 ? 'love' : 'up', have = (kind === 'love' ? s.likes : s.ups || []).some(isMe);
+    done[s.card] = 1; changed = true; if (have) continue;
+    try { const r = await fam('/likes', { method: 'POST', body: JSON.stringify({ card: s.card, kind, on: true }) }); s.likes = r.likes; s.ups = r.ups; n++; } catch (e) { delete done[s.card]; }
+  }
+  for (const [id, v] of Object.entries(VOTES)) {
+    if (n >= 40 || done[id] || !v || v.v <= 0 || now - (v.at || 0) > 4 * 864e5 || !isPublicCard({ id, topic: v.topic, src: v.src })) continue;
+    if (/^sh\d+$/.test(id) || SHARES.some(s => s.card === id)) continue;
+    done[id] = 1; changed = true;
+    try { await fam('/likes', { method: 'POST', body: JSON.stringify({ card: id, kind: 'up', on: true }) }); n++; } catch (e) { delete done[id]; }
+  }
+  if (changed) ls.set('votesUp', done);
+  if (n) { loadPop(true); if (tab === 'family') draw(); }
+}
+async function famFresh(force) { // Family tab, ↻ and coming back to the app: fresh likes and comments, not up to 5 minutes old
+  if (!FAM_ON || (!force && Date.now() - sharesAt < 20e3)) return;
+  sharesAt = Date.now(); await Promise.all([loadShares(), loadPop(true)]);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { famFresh(); checkUpdate(); } });
+// A phone that keeps the app open (or an iPhone Home Screen app) can sit on old code: tell them, one tap reloads.
+async function checkUpdate() {
+  try {
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) reg.update().catch(() => { });
+    const t = await (await fetch('sw.js?x=' + Date.now(), { cache: 'no-store' })).text(), v = (t.match(/VERSION = '([\d.]+)'/) || [])[1];
+    if (v && v !== APP_VERSION && !document.querySelector('#updbar')) {
+      const b = document.createElement('button'); b.id = 'updbar'; b.className = 'updbar'; b.textContent = '✨ Update available — tap to refresh';
+      b.onclick = async () => { b.textContent = 'Updating…'; try { const r = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (r) await r.update(); const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith('my-feed-')).map(k => caches.delete(k))); } catch (e) { } location.reload(); };
+      document.body.append(b);
+    }
+  } catch (e) { }
+}
+setTimeout(checkUpdate, 4000);
