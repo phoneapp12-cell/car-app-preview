@@ -1,7 +1,7 @@
 /* My Feed – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // My Feed lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -14,10 +14,18 @@ const TOPICS = [
   ['nz', 'Around NZ', '🇳🇿', '#0891b2', '#1d4ed8'],
   ['dogs', 'Dogs', '🐶', '#ea580c', '#a16207'],
   ['nature', 'Nature', '🌿', '#059669', '#0e7490'],
+  ['events', 'NZ events', '🎆', '#be123c', '#7c3aed'],
+  ['food', 'Food (GF)', '🍲', '#c2410c', '#eab308'],
+  ['tech', 'AI & tech', '🤖', '#4f46e5', '#06b6d4'],
+  ['diy', 'DIY', '🛠️', '#9a3412', '#f59e0b'],
+  ['science', 'Science', '🔬', '#0e7490', '#2563eb'],
+  ['travel', 'Travel', '✈️', '#0369a1', '#14b8a6'],
+  ['photos', 'My Photos', '🖼️', '#be185d', '#f59e0b'],
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
-const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t]));
-const BASE = { sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95 }; // sitcoms lead
+const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
+const BASE = { sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85 }; // sitcoms lead
+const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const PAGE = 12;
 const THUMB = {
@@ -32,19 +40,36 @@ const ls = { get(k, d) { try { const v = localStorage.getItem('mf.' + k); return
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
 let SEEN = ls.get('seen', {});          // id -> times shown (keeps the feed fresh)
+let IMP = ls.get('imp', {});            // 1.4.0: source -> cards shown (new sources get a trial, then your votes decide)
+let REVIVE = ls.get('revive', {});
+let KNOWN = ls.get('known', null);      // source -> when it first turned up here (0 = it was already here before 1.4.0)
+const NEW14 = /^(decider|tvline|denofgeek-tv|kings-|yates|gw|pitchfork|stereogum|consequence|utr|universetoday|earthsky|esa|rd-astrophoto|advocate|nzh|1news|newsroom|nzgeo|events-|akc|rd-puppies|doc|inat-nz|rd-birdphoto|verge|ars|hackaday|rd-diy|rd-woodworking|sciencealert|physorg|nasa-earth|atlas|nzh-travel|rd-travel|rd-cityporn|gfshoestring|recipetin|rd-glutenfree|rd-food|you-)/;
+function noteSources() {
+  const first = !KNOWN; KNOWN = KNOWN || {};
+  const ids = (FEED && FEED.sources || []).map(x => x.id).concat(['you-itunes', 'you-tvmaze', 'you-mealdb', 'you-openlib', 'you-wiki']);
+  let ch = false; for (const id of ids) if (!(id in KNOWN)) { KNOWN[id] = first && !NEW14.test(id) ? 0 : Date.now(); ch = true; }
+  if (ch) ls.set('known', KNOWN);
+}
+const isNewSrc = k => !!(KNOWN && KNOWN[k] && Date.now() - KNOWN[k] < 28 * 864e5);      // source -> when you brought it back (older 👎 for it no longer count)
 let tab = ls.get('tab', 'all');
 let order = [], shown = 0, io = null;
 
 /* ---- ranking (all on this phone) ---- */
 function weights() {
-  const t = {}, s = {};
+  const t = {}, s = {}, up = {}, dn = {}, lastUp = {}, now = Date.now();
   for (const v of Object.values(VOTES)) {
-    const age = Math.max(0, (Date.now() - (v.at || 0)) / 864e5), fade = Math.pow(0.5, age / 45); // votes fade over ~6 weeks
+    const age = Math.max(0, (now - (v.at || 0)) / 864e5), fade = Math.pow(0.5, age / 45); // votes fade over ~6 weeks
     t[v.topic] = (t[v.topic] || 0) + v.v * fade;
+    if (REVIVE[v.src] && (v.at || 0) < REVIVE[v.src]) continue;
     s[v.src] = (s[v.src] || 0) + v.v * fade;
+    if (v.v > 0) { up[v.src] = (up[v.src] || 0) + 1; lastUp[v.src] = Math.max(lastUp[v.src] || 0, v.at || 0); } else dn[v.src] = (dn[v.src] || 0) + 1;
   }
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-  return { topic: k => clamp(1 + 0.12 * (t[k] || 0), 0.3, 2.5), src: k => clamp(1 + 0.2 * (s[k] || 0), 0.15, 3) };
+  // A source is dropped after about four more 👎 than 👍 (and no 👍 for a month). A new source with no votes yet
+  // gets a trial boost for its first ~30 cards so you get to judge it.
+  const drop = k => (s[k] || 0) <= -3.5 && !((lastUp[k] || 0) > now - 30 * 864e5);
+  const trial = k => isNewSrc(k) && !up[k] && !dn[k] && (IMP[k] || 0) < 30;
+  return { topic: k => clamp(1 + 0.12 * (t[k] || 0), 0.3, 2.5), src: k => drop(k) ? 0 : clamp(1 + 0.2 * (s[k] || 0), 0.15, 3) * (trial(k) ? 1.35 : 1), drop, trial, up: k => up[k] || 0, dn: k => dn[k] || 0, net: k => s[k] || 0 };
 }
 function rand(seed) { let x = seed % 2147483647; if (x <= 0) x += 2147483646; return () => (x = x * 16807 % 2147483647) / 2147483647; }
 function rank(items) {
@@ -56,7 +81,7 @@ function rank(items) {
     const media = i.vid ? 1.15 : i.img ? 1.1 : i.kind === 'tip' ? 0.8 : 0.6; // pictures and videos first
     const seen = Math.pow(0.8, SEEN[i.id] || 0);                   // seen a few times: let new things through
     const hot = i.hot ? 1.5 : 1;                                   // e.g. fireworks this week
-    return { i, sc: (0.15 + fresh) * media * seen * hot * (BASE[i.topic] || 1) * W.topic(i.topic) * W.src(i.src) };
+    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) };
   }).sort((a, b) => b.sc - a.sc);
   // Mix: each step takes the best next post from the topic that's due, so every interest gets a turn
   // (higher-voted topics, and sitcoms, come round more often). About 1 in 7 slots explores further down a list.
@@ -70,7 +95,7 @@ function rank(items) {
     for (const t in Q) {
       if (!Q[t].length) continue;
       const gap = t in lastAt ? n - lastAt[t] : 8;
-      const v = Math.sqrt(Q[t][0].sc) * gap * (0.8 + 0.4 * r());
+      const v = Math.sqrt(Q[t][0].sc) * gap * baseOf(t) * W.topic(t) * (0.8 + 0.4 * r()); // sitcoms and liked topics come round more often
       if (v > best) { best = v; bestT = t; }
     }
     lastAt[bestT] = n;
@@ -84,11 +109,12 @@ function rank(items) {
 function visible() {
   if (!FEED) return [];
   if (tab === 'liked') return Object.values(VOTES).filter(v => v.v > 0 && v.item).sort((a, b) => b.at - a.at).map(v => v.item);
-  const seenIds = new Set();
-  return FEED.items.filter(i => {
+  const seenIds = new Set(), W = weights();
+  return FEED.items.concat(youItems()).filter(i => {
     if (seenIds.has(i.id)) return false; seenIds.add(i.id);
     if (VOTES[i.id] && VOTES[i.id].v < 0) return false;          // thumbs-down: gone
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
+    if (W.drop(i.src)) return false;                               // a source you've voted out
     return tab === 'all' || i.topic === tab;
   });
 }
@@ -112,6 +138,7 @@ const LIFE_CAT = { // emoji, label, colour 1, colour 2, My App page
   cinema: ['🎬', 'Cinema', '#7f1d1d', '#dc2626', '#movies'], prime: ['🍿', 'Prime Video', '#0c4a6e', '#0ea5e9', '#prime'], tv: ['📺', 'TV guide', '#1e3a8a', '#6366f1', '#tv'],
   concert: ['🎤', 'Concerts', '#86198f', '#e11d48', '#concerts'], news: ['📰', 'News', '#334155', '#0ea5e9', '#news'], radio: ['📻', 'Radio', '#7c2d12', '#ea580c', '#radio'],
   book: ['📚', 'Kindle', '#78350f', '#a16207', '#home'], lang: ['🗣️', 'Word of the day', '#0f766e', '#7c3aed', '#lang'], blog: ['✍️', 'Blogs', '#475569', '#64748b', '#blogging'],
+  photo: ['🖼️', 'My Photos', '#be185d', '#f59e0b', '#photos'],
   podcast: ['🎧', 'Podcasts', '#6b21a8', '#4c1d95', '#podcasts'], shop: ['🛒', 'Shopping list', '#15803d', '#0d9488', '#shopping'], idea: ['💡', 'Ideas', '#a16207', '#eab308', '#ideas']
 };
 const PERSONAL = new Set(['car', 'pet', 'bday', 'health', 'todo', 'gym', 'meal', 'hol', 'event', 'reno', 'delivery', 'flag', 'road', 'alert', 'weather', 'solar', 'garden']);
@@ -123,17 +150,17 @@ let DISMISS = ls.get('dismiss', {});
 function lifeSnap() { try { return JSON.parse(localStorage.getItem('myFeedLife') || 'null'); } catch (e) { return null; } }
 function lifeItems(withPool) {
   const snap = lifeSnap();
-  if (!snap || !Array.isArray(snap.items)) return null;
+  if (!snap || !Array.isArray(snap.items)) return PHOTOS.length && withPool ? PHOTOS.filter(x => !DISMISS[x.id] && !(VOTES[x.id] && VOTES[x.id].v < 0)) : null;
   const stale = snap.today !== nzToday();
   const mine = snap.items.map((x, n) => ({ ...x, id: 'life:' + (x.cat + '|' + x.t + '|' + (x.iso || '')).toLowerCase(), days: daysTo(x.iso), n, mine: 1 }));
-  const pool = withPool && Array.isArray(snap.pool) ? snap.pool.map((x, n) => ({ ...x, id: 'app:' + x.id, days: x.iso ? daysTo(x.iso) : null, n: 1000 + n })) : [];
+  const pool = withPool && Array.isArray(snap.pool) ? snap.pool.map((x, n) => ({ ...x, img: /^data:image\//.test(x.photo || '') ? x.photo : x.img, id: 'app:' + x.id, days: x.iso ? daysTo(x.iso) : null, n: 1000 + n })) : []; // x.photo: his own recipe photo
   return mine.concat(pool).filter(x => {
     if (DISMISS[x.id] || (VOTES[x.id] && VOTES[x.id].v < 0)) return false;
     if (LIFE_MONEY.test([x.t, x.s, x.tag].join(' ')) || SPORT.test([x.t, x.s, x.tag].join(' '))) return false;
     if (stale && (x.cat === 'weather' || x.cat === 'solar' || x.kind === 'warn' || x.now)) return false; // yesterday's weather, power and warnings
     if (x.days != null && x.days < 0 && !['car', 'todo', 'pet', 'health'].includes(x.cat)) return false; // past events (overdue jobs stay)
     return true;
-  }).map(x => ({ ...x, topic: 'life', src: 'myapp-' + x.cat, sn: x.mine ? 'My App' : (x.src || (LIFE_CAT[x.cat] || LIFE_CAT.event)[1]) }));
+  }).map(x => ({ ...x, topic: 'life', src: 'myapp-' + x.cat, sn: x.mine ? 'My App' : (x.src || (LIFE_CAT[x.cat] || LIFE_CAT.event)[1]) })).concat(withPool ? PHOTOS.filter(x => !DISMISS[x.id] && !(VOTES[x.id] && VOTES[x.id].v < 0)) : []);
 }
 const isSoon = x => x.mine && (x.cat === 'weather' || x.red || (x.days != null && x.days <= 1));
 function whenChip(x) {
@@ -153,7 +180,7 @@ function lifeWeight(x) {
 function wshuffle(arr, wf) { return arr.map(x => ({ x, k: Math.pow(Math.random(), 1 / Math.max(0.01, wf(x))) })).sort((a, b) => b.k - a.k).map(o => o.x); } // weighted random order, new every refresh
 function lifeMix() { // the My App cards for All, in a fresh random order (today and overdue things lean early)
   const L = lifeItems(true); if (!L) return [];
-  const mine = wshuffle(L.filter(x => x.mine), x => lifeWeight(x) * (isSoon(x) ? 6 : 1)), pool = wshuffle(L.filter(x => !x.mine), lifeWeight), out = [];
+  const mine = wshuffle(L.filter(x => x.mine), x => lifeWeight(x) * (isSoon(x) ? 6 : 1)), pool = wshuffle(L.filter(x => !x.mine), x => lifeWeight(x) * (x.cat === 'photo' ? 2.5 : 1)), out = []; // your photos come round often
   while (mine.length || pool.length) out.push((mine.length && (Math.random() < 0.4 || !pool.length) ? mine : pool).shift()); // about 2 in 5 are your own things
   return out;
 }
@@ -297,6 +324,113 @@ function lifeCard(x) {
     </div></article>`;
 }
 
+/* ---- 1.4.0: My Photos. Read on this phone straight from My App's Photos page (IndexedDB "myPhotos", same address),
+   never uploaded anywhere. My App has no "approved" switch, so: photos tagged approved / feed / keep / favourite are
+   used if there are any; otherwise every photo you kept, except receipts, warranties, documents, screenshots and
+   anything tagged private or nofeed. Money is always left out. ---- */
+const PHOTO_SKIP = /\b(receipts?|warrant(y|ies)|guarantee|invoices?|bills?|statements?|screen ?shots?|screenshot|licen[cs]es?|passports?|id cards?|documents?|docs?|private|no ?feed|passwords?|tax|insurance|polic(y|ies)|payslips?|contracts?|medical|prescriptions?|scripts?|forms?|tickets?|boarding pass|qr)\b/i;
+const PHOTO_OK = /\b(approved?|feed|my ?feed|keep|keepers?|fav(ou?rites?)?|best|share)\b/i;
+let PHOTOS = [], PHOTO_INFO = { all: 0, used: 0, approved: 0 };
+function phOpen() {
+  return new Promise((ok, no) => {
+    let r; try { r = indexedDB.open('myPhotos'); } catch (e) { return no(e); }
+    r.onupgradeneeded = e => { if (!e.oldVersion && !r.result.objectStoreNames.contains('p')) r.result.createObjectStore('p', { keyPath: 'id' }); }; // same as My App makes it
+    r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); r.onblocked = () => no(new Error('blocked'));
+  });
+}
+async function loadPhotos() {
+  if (!window.indexedDB) return;
+  let db; try { db = await phOpen(); } catch (e) { return; }
+  try {
+    if (!db.objectStoreNames.contains('p')) return;
+    const L = await new Promise((ok, no) => { const q = db.transaction('p', 'readonly').objectStore('p').getAll(); q.onsuccess = () => ok(q.result || []); q.onerror = () => no(q.error); });
+    const txt = x => [x.title, x.note, x.name, ...(x.tags || [])].join(' ');
+    const okPh = L.filter(x => x && (x.blob || x.thumb) && !PHOTO_SKIP.test(txt(x)) && !/screen.?shot|receipt|invoice/i.test(x.name || '') && !LIFE_MONEY.test(txt(x)));
+    const appr = okPh.filter(x => (x.tags || []).some(t => PHOTO_OK.test(t)));
+    const use = appr.length ? appr : okPh;
+    const had = new Map(PHOTOS.map(x => [x.id, x.img])), want = new Set(use.map(x => 'ph:' + x.id));
+    had.forEach((u, id) => { if (!want.has(id)) try { URL.revokeObjectURL(u); } catch (e) { } });
+    PHOTOS = use.map(x => {
+      const d = x.added ? new Date(x.added).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Pacific/Auckland' }) : '';
+      return { cat: 'photo', id: 'ph:' + x.id, t: x.title || 'From your Photos', s: x.note || '', tag: (x.tags || []).filter(t => !PHOTO_OK.test(t)).join(' · ') || (d ? 'Saved ' + d : ''), img: had.get('ph:' + x.id) || URL.createObjectURL(x.blob || x.thumb), topic: 'life', src: 'myapp-photo', sn: 'My Photos', go: '#photos', added: x.added || 0 };
+    });
+    PHOTO_INFO = { all: L.length, used: PHOTOS.length, approved: appr.length };
+  } catch (e) { } finally { try { db.close(); } catch (e) { } }
+}
+function drawPhotos() {
+  const m = $('#feed');
+  order = PHOTOS.filter(x => !DISMISS[x.id] && !(VOTES[x.id] && VOTES[x.id].v < 0)).sort(() => Math.random() - 0.5); shown = 0;
+  m.innerHTML = `<div class="load" style="padding-top:0">${PHOTO_INFO.approved ? 'Your approved photos' : 'Your photos'} from My App, on this phone only</div>` + (order.length ? '' : `<div class="empty">🖼️ Add photos on My App’s Photos page and they’ll show here. Tag one <b>nofeed</b> to keep it out.</div>`);
+  more();
+}
+
+/* ---- 1.4.0: About you. My App shares your About-you answers on this phone (myFeedLife.about: music, screen, food,
+   gluten-free, garden, dog, outdoors, tech, weekend…; never money, family or routine). Each interest gets cards from a
+   free public source that fits it, searched from this phone: Apple Music (music), TVmaze (shows and films),
+   TheMealDB (meals, gluten-free only), Open Library (books) and Wikipedia (everything else). Interests that fit a
+   topic go into that topic; the rest get their own chip. Change an answer in My App and the feed follows. ---- */
+const YOU_TOPIC = { food: 'food', music: 'music', sitcoms: 'sitcoms', garden: 'garden', dogs: 'dogs', nature: 'nature', tech: 'tech', nz: 'nz' };
+const YOU_EM = { book: ['📚', '#78350f', '#a16207'], weekend: ['🏖️', '#0369a1', '#f59e0b'], fit: ['💪', '#0f766e', '#14b8a6'], misc: ['💭', '#6d28d9', '#db2777'] };
+const YOU_HINT = { food: ' food', garden: ' plant', dogs: ' dog', nz: ' New Zealand', music: ' music' };
+const GENERIC = /^(something|depends|it depends|mostly|now and then|not\b|a bit|either|any|whatever|i\b|i’|i'|mix|a mix|just\b|both|neither|none|nothing|no\b|yes\b|sometimes|often|rarely|never|always|other|someone else|all of them|n\/a|skip|very|fairly|careful|strict|from a recipe|by feel|under|about|up to|happy to|shop-bought|homemade mix|keep them|share with|post them|use them|for me|leftovers|depends on)/i;
+const SLUG = s => String(s).toLowerCase().normalize('NFD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+let YOU = [], YOU_CHIPS = [], YOU_CACHE = ls.get('you', {});
+function interests() {
+  const snap = lifeSnap(), A = snap && Array.isArray(snap.about) ? snap.about : [], out = [], seen = new Set();
+  for (const n of A) {
+    if (!n || !n.a || !n.k) continue;
+    const parts = /^k/.test(n.id || '') ? [n.a] : String(n.a).split(/,|;|\/|&|\band\b|\bor\b|\bplus\b/i);
+    for (let p of parts) {
+      p = p.trim().replace(/^\s*(i (like|love|enjoy|grow|play|watch|read)|we|probably|maybe|usually|definitely|lots of|some|my|our)\s+/i, '').replace(['book', 'sitcoms', 'music'].includes(n.k) ? /^$/ : /^(a|an|the)\s+/i, '').replace(/[.!?"“”]+/g, '').trim();
+      const w = p.split(/\s+/).length;
+      if (p.length < 3 || w > 4 || GENERIC.test(p) || /\d{3,}|@|https?:/.test(p) || LIFE_MONEY.test(p) || SPORT.test(p)) continue;
+      const key = p.toLowerCase(); if (seen.has(key)) continue; seen.add(key);
+      out.push({ term: p, k: n.k, q: n.q, topic: YOU_TOPIC[n.k] || 'you:' + SLUG(p) });
+    }
+    if (out.length >= 16) break;
+  }
+  return out;
+}
+function setupYou() {
+  YOU = interests();
+  const own = YOU.filter(x => x.topic.startsWith('you:')).slice(0, 8);
+  YOU = YOU.filter(x => !x.topic.startsWith('you:') || own.includes(x));
+  YOU_CHIPS = own.map(x => x.topic);
+  own.forEach(x => { const E = YOU_EM[x.k] || YOU_EM.misc; TOPIC[x.topic] = [x.topic, x.term.length > 18 ? x.term.slice(0, 17) + '…' : x.term, E[0], E[1], E[2]]; });
+}
+function youItems() {
+  const out = [];
+  for (const x of YOU) { const c = YOU_CACHE[x.k + '|' + x.term.toLowerCase()]; if (c && c.items) c.items.forEach(i => out.push({ ...i, topic: x.topic, tag: 'You said “' + x.term + '”' })); }
+  return out;
+}
+const strip = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+const GLUTEN = /flour|bread|pasta|spaghetti|penne|macaroni|lasagne|noodle|soy sauce|breadcrumb|pastry|tortilla|couscous|barley|beer|biscuit|cracker|wheat|bulgur|semolina|filo|puff|naan|pitta|pita|bun|bagel|dumpling|brioche|cake|digestive/i;
+const YOU_FETCH = {
+  async itunes(x) { const d = await getJSON('https://itunes.apple.com/search?country=nz&entity=album&limit=10&term=' + encodeURIComponent(x.term)); return (d.results || []).filter(r => r.artworkUrl100 && r.collectionExplicitness !== 'explicit').slice(0, 8).map(r => ({ t: r.collectionName, s: [r.artistName, r.primaryGenreName, (r.releaseDate || '').slice(0, 4)].filter(Boolean).join(' · '), img: r.artworkUrl100.replace(/100x100bb/, '600x600bb'), url: r.collectionViewUrl, sn: 'Apple Music', src: 'you-itunes' })); },
+  async tvmaze(x) { const d = await getJSON('https://api.tvmaze.com/search/shows?q=' + encodeURIComponent(x.term)); return (d || []).map(r => r.show).filter(r => r && r.image && !/sports?/i.test(r.type + ' ' + (r.genres || []).join(' '))).slice(0, 6).map(r => ({ t: r.name, s: [(r.genres || []).join(', '), r.premiered && r.premiered.slice(0, 4), strip(r.summary).slice(0, 180)].filter(Boolean).join(' · '), img: r.image.original || r.image.medium, url: r.url, sn: 'TVmaze', src: 'you-tvmaze', kind: 'tv' })); },
+  async mealdb(x) { const d = await getJSON('https://www.themealdb.com/api/json/v1/1/search.php?s=' + encodeURIComponent(x.term)); return (d.meals || []).filter(m => { const ing = Object.keys(m).filter(k => /^strIngredient\d+$/.test(k)).map(k => m[k] || '').join(' '); return !GLUTEN.test(ing) || /gluten.?free/i.test(m.strTags || ''); }).slice(0, 6).map(m => ({ t: m.strMeal, s: 'No gluten ingredients listed · ' + [m.strArea, m.strCategory].filter(Boolean).join(' · ') + ' · check labels on stock and sauces', img: m.strMealThumb, url: m.strSource || 'https://www.themealdb.com/meal/' + m.idMeal, sn: 'TheMealDB', src: 'you-mealdb' })); },
+  async openlib(x) { const d = await getJSON('https://openlibrary.org/search.json?limit=10&fields=title,author_name,cover_i,key,first_publish_year&q=' + encodeURIComponent(x.term)); return (d.docs || []).filter(b => b.cover_i).slice(0, 6).map(b => ({ t: b.title, s: [b.author_name && 'by ' + b.author_name.slice(0, 2).join(', '), b.first_publish_year].filter(Boolean).join(' · '), img: 'https://covers.openlibrary.org/b/id/' + b.cover_i + '-L.jpg', url: 'https://openlibrary.org' + b.key, sn: 'Open Library', src: 'you-openlib', kind: 'tv' })); },
+  async wiki(x) { const d = await getJSON('https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit=12&prop=pageimages|extracts&piprop=thumbnail&pithumbsize=960&exintro=1&explaintext=1&exsentences=2&exlimit=max&gsrsearch=' + encodeURIComponent(x.term + (YOU_HINT[x.k] || ''))); return Object.values((d.query && d.query.pages) || {}).sort((a, b) => a.index - b.index).filter(p => p.thumbnail && p.thumbnail.width >= 400 && !/\.svg/i.test(p.thumbnail.source) && !/disambiguation|^list of/i.test(p.title + ' ' + (p.extract || ''))).slice(0, 6).map(p => ({ t: p.title, s: String(p.extract || '').slice(0, 220), img: p.thumbnail.source, url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(p.title.replace(/ /g, '_')), sn: 'Wikipedia', src: 'you-wiki' })); }
+};
+const YOU_SRC = { music: ['itunes', 'wiki'], sitcoms: ['tvmaze', 'wiki'], food: ['mealdb', 'wiki'], book: ['openlib', 'wiki'] };
+let youBusy = false;
+async function refreshYou() {
+  if (youBusy || !YOU.length || !navigator.onLine) return;
+  youBusy = true; let changed = false;
+  try {
+    for (const x of YOU) {
+      const key = x.k + '|' + x.term.toLowerCase(), c = YOU_CACHE[key];
+      if (c && Date.now() - c.at < 12 * 36e5) continue;
+      const old = new Map(((c && c.items) || []).map(i => [i.id, i])), items = [];
+      for (const pv of YOU_SRC[x.k] || ['wiki']) { try { (await YOU_FETCH[pv](x)).forEach(i => { if (!i.img || SPORT.test(i.t + ' ' + i.s)) return; const id = 'you:' + hash(i.url || i.img).toString(36); items.push({ ...i, id, at: (old.get(id) || {}).at || Date.now() - 8 * 36e5 }); }); } catch (e) { } }
+      if (items.length || !c) { YOU_CACHE[key] = { at: Date.now(), items: items.slice(0, 12) }; changed = true; }
+    }
+    const keep = new Set(YOU.map(x => x.k + '|' + x.term.toLowerCase())); for (const k in YOU_CACHE) if (!keep.has(k)) delete YOU_CACHE[k];
+    ls.set('you', YOU_CACHE);
+  } finally { youBusy = false; }
+  if (changed && scrollY < 200 && tab !== 'life' && tab !== 'photos' && tab !== 'liked') draw();
+}
+
 /* ---- 1.3.0: videos play by themselves, Instagram-style. A video starts (muted, as browsers require) when about 60% of
    it is on screen and pauses when it scrolls away. Only one plays at a time. Tap the speaker to hear it; after that,
    later videos start with sound too for this visit if the browser allows it. Short clips loop. The YouTube player is
@@ -405,7 +539,7 @@ function card(i) {
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
   const showTitle = i.img || i.vid;
   return `<article class="card" data-id="${esc(i.id)}" style="${style}">
-    <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.tag ? ' · ' + esc(i.tag) : ''}${i._x ? '<span class="mx">new for you</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
+    <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.tag ? ' · ' + esc(i.tag) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
     ${media}
     <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${when}</div>
     <div class="ft">
@@ -415,7 +549,9 @@ function card(i) {
     </div></article>`;
 }
 function chips() {
-  $('#chips').innerHTML = TOPICS.map(t => `<button class="chip${t[0] === tab ? ' on' : ''}" data-tab="${t[0]}">${t[2]} ${t[1]}</button>`).join('');
+  const list = TOPICS.filter(t => t[0] !== 'photos' || PHOTOS.length), at = list.findIndex(t => t[0] === 'photos' || t[0] === 'liked');
+  list.splice(at, 0, ...YOU_CHIPS.map(id => TOPIC[id]));
+  $('#chips').innerHTML = list.map(t => `<button class="chip${t[0] === tab ? ' on' : ''}" data-tab="${t[0]}">${t[2]} ${t[1]}</button>`).join('');
   const on = $('#chips .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
 function draw() {
@@ -423,6 +559,8 @@ function draw() {
   const m = $('#feed');
   if (!FEED) { m.innerHTML = '<div class="sk"></div><div class="sk"></div>'; return; }
   if (tab === 'life') { drawLife(); return; }
+  if (tab === 'photos') { drawPhotos(); return; }
+  if (!TOPIC[tab]) tab = 'all';
   order = tab === 'liked' ? visible() : rank(visible()); shown = 0;
   if (tab === 'all') order = weave(order, lifeMix()); // My App cards mixed in at random, different every refresh
   m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'Nothing new here right now. Check back soon.'}</div>`);
@@ -444,13 +582,13 @@ function more() {
   shown += next.length;
   m.insertAdjacentHTML('beforeend', next.map(i => i.topic === 'life' ? lifeCard(i) : card(i)).join('') + (shown < order.length ? '<div class="load" id="sentinel">Loading more…</div>' : '<div class="load">You’re all caught up ✨</div>'));
   const old = m.querySelectorAll('#sentinel'); old.forEach((s, n) => { if (n < old.length - 1) s.remove(); });
-  for (const i of next) SEEN[i.id] = (SEEN[i.id] || 0) + 1;
+  for (const i of next) { SEEN[i.id] = (SEEN[i.id] || 0) + 1; if (i.src) IMP[i.src] = (IMP[i.src] || 0) + 1; }
   saveSeen(); fillPics(); watchVids();
   const s = $('#sentinel');
   if (s) { if (io) io.disconnect(); io = new IntersectionObserver(e => { if (e[0].isIntersecting) { io.disconnect(); s.remove(); more(); } }, { rootMargin: '900px' }); io.observe(s); }
 }
 let seenT = 0;
-function saveSeen() { clearTimeout(seenT); seenT = setTimeout(() => { const keep = new Set((FEED ? FEED.items : []).map(i => i.id)); for (const k of Object.keys(SEEN)) if (!keep.has(k) && !/^(life|app):/.test(k)) delete SEEN[k]; ls.set('seen', SEEN); }, 800); }
+function saveSeen() { clearTimeout(seenT); seenT = setTimeout(() => { const keep = new Set((FEED ? FEED.items : []).map(i => i.id)); for (const k of Object.keys(SEEN)) if (!keep.has(k) && !/^(life|app|ph|you):/.test(k)) delete SEEN[k]; ls.set('seen', SEEN); ls.set('imp', IMP); }, 800); }
 
 /* ---- votes ---- */
 function vote(el, v) {
@@ -459,7 +597,7 @@ function vote(el, v) {
   if (!item) return;
   const prev = VOTES[id];
   if (prev && prev.v === v) { delete VOTES[id]; ls.set('votes', VOTES); c.querySelectorAll('.vote').forEach(b => { b.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); }); toast('Vote removed'); return; }
-  const { _x, ...snap } = item; if (snap.img && /^data:/.test(snap.img)) delete snap.img; // a car or pet photo stays in My App
+  const { _x, ...snap } = item; if (snap.img && /^(data|blob):/.test(snap.img)) delete snap.img; delete snap.photo; // a car, pet or own photo stays in My App
   VOTES[id] = { v, topic: item.topic, src: item.src, at: Date.now(), item: v > 0 ? snap : undefined };
   ls.set('votes', VOTES);
   c.querySelectorAll('.vote').forEach(b => { const on = +b.dataset.vote === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
@@ -480,7 +618,7 @@ async function load(force) {
     const f = await r.json();
     if (f && Array.isArray(f.items) && f.items.length) {
       const first = !FEED || FEED.updated !== f.updated;
-      FEED = f; ls.set('feed', f);
+      FEED = f; ls.set('feed', f); noteSources();
       if (first || force) draw();
       if (force) toast('Feed is up to date');
     }
@@ -491,19 +629,28 @@ async function load(force) {
 /* ---- settings ---- */
 function settings() {
   const W = weights(), ups = Object.values(VOTES).filter(v => v.v > 0).length, downs = Object.values(VOTES).filter(v => v.v < 0).length;
-  const src = (FEED && FEED.sources || []).slice().sort((a, b) => (TOPICS.findIndex(t => t[0] === a.topic) - TOPICS.findIndex(t => t[0] === b.topic)));
+  const srcs = (FEED && FEED.sources || []).concat([['you-itunes', 'Apple Music'], ['you-tvmaze', 'TVmaze'], ['you-mealdb', 'TheMealDB'], ['you-openlib', 'Open Library'], ['you-wiki', 'Wikipedia']].map(([id, name]) => ({ id, name, topic: 'you', you: 1 })));
+  const tIdx = t => { const n = TOPICS.findIndex(x => x[0] === t); return n < 0 ? 99 : n; };
+  const status = id => W.drop(id) ? ['Dropped', 'drop'] : W.trial(id) ? ['Trying', 'try'] : W.src(id) > 1.05 ? ['More', 'more'] : W.src(id) < 0.95 ? ['Less', 'less'] : ['Kept', ''];
+  const row = x => { const [st, c] = status(x.id); const T = x.you ? ['', '', '💭'] : (TOPIC[x.topic] || TOPIC.all); return `<div class="row"><span>${T[2]} ${esc(x.name)}<small class="sst ${c}">${st}${W.up(x.id) || W.dn(x.id) ? ' · ' + W.up(x.id) + '👍 ' + W.dn(x.id) + '👎' : ''}</small></span><span>${c === 'drop' ? `<button class="mini" data-revive="${esc(x.id)}">Bring back</button>` : x.you ? 'on this phone' : x.ok ? esc(ago(x.ok)) + ' ago' : 'waiting'}</span></div>`; };
+  const groups = []; srcs.slice().sort((a, b) => tIdx(a.topic) - tIdx(b.topic)).forEach(x => { const g = groups[groups.length - 1]; if (!g || g.t !== x.topic) groups.push({ t: x.topic, l: [x] }); else g.l.push(x); });
+  const you = YOU.map(x => `<div class="row"><span>${(TOPIC[x.topic] || TOPIC.all)[2]} ${esc(x.term)}<small class="sst">${esc(x.q || '')}</small></span><span>${esc((TOPIC[x.topic] || TOPIC.all)[1])}</span></div>`).join('');
   $('#sheetin').innerHTML = `<h2>My Feed</h2>
-    <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself every couple of hours from public sources. Sport is always left out.</p>
+    <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself through the day from about 90 public sources. Sport is always left out.</p>
+    <p>👍 / 👎 teach it which <b>sources</b> and <b>topics</b> you like. New sources get a short trial (“Trying”) so you can judge them; a source you give about four more 👎 than 👍 is dropped (you can bring it back below).</p>
     <p>▶️ Videos play by themselves (muted) when they’re on screen and pause when you scroll past. Tap the speaker on a video for sound; it stays on until you close My Feed.</p>
     <a class="btn pri" href="${MY_APP}">← Back to My App</a>
-    <p>📌 <b>For You</b> cards come from My App on this phone and are mixed through All at random: cars, birthdays, calendar, to-dos, garden, pets, meals and recipes, weather, UV and power (kWh), roads, deliveries, plus every board and hub (space, travel, learn, walks, videos, Top 40, cinema, TV, Prime, events, concerts, news, radio, podcasts, webcams, quotes, facts and jokes). Your own things never leave this phone, and bills and money are always left out. Pictures come from My App, Wikimedia Commons, Wikipedia, TVmaze and Open Library.</p>
+    <p>📌 <b>For You</b> cards come from My App on this phone and are mixed through All at random: cars, birthdays, calendar, to-dos, garden, pets, meals and recipes (your own recipe photos too), weather, UV and power (kWh), roads, deliveries, plus every board and hub. Your own things never leave this phone, and bills and money are always left out.</p>
+    <p>🖼️ <b>My Photos</b>: ${PHOTO_INFO.all ? `${PHOTO_INFO.used} of the ${PHOTO_INFO.all} photos on My App’s Photos page${PHOTO_INFO.approved ? ' (the ones you tagged approved, feed, keep or favourite)' : ''}` : 'photos from My App’s Photos page'}. Receipts, warranties, documents, screenshots and anything tagged <b>nofeed</b> or <b>private</b> are left out. Tag photos <b>approved</b> or <b>feed</b> in My App to show only those. Read on this phone only.</p>
+    <h2 style="margin-top:18px">From About you</h2>
+    ${you || `<p>Answer questions in My App’s About you and your interests (music, shows, food, garden, dog, outdoors, books…) turn into cards here. Money, family and routine answers are never used.</p>`}
     <div class="row"><span>Your votes</span><span>${ups} 👍 · ${downs} 👎</span></div>
-    ${TOPICS.filter(t => !['all', 'life', 'liked'].includes(t[0])).map(t => `<div class="row"><span>${t[2]} ${t[1]}</span><span>${W.topic(t[0]) > 1.05 ? 'More' : W.topic(t[0]) < 0.95 ? 'Less' : 'Normal'}</span></div>`).join('')}
+    ${TOPICS.filter(t => !['all', 'life', 'liked', 'photos'].includes(t[0])).concat(YOU_CHIPS.map(id => TOPIC[id])).map(t => `<div class="row"><span>${t[2]} ${esc(t[1])}</span><span>${W.topic(t[0]) > 1.05 ? 'More' : W.topic(t[0]) < 0.95 ? 'Less' : 'Normal'}</span></div>`).join('')}
     <button class="btn" id="resetv">Clear my votes</button>
     <h2 style="margin-top:18px">Sources</h2>
-    ${src.map(s => `<div class="row"><span>${(TOPIC[s.topic] || TOPIC.all)[2]} ${esc(s.name)}</span><span>${s.ok ? esc(ago(s.ok)) + ' ago' : 'waiting'}</span></div>`).join('')}
+    ${groups.map(g => `<h4 class="sgh">${g.t === 'you' ? '💭 About-you searches' : esc((TOPIC[g.t] || TOPIC.all)[2] + ' ' + (TOPIC[g.t] || TOPIC.all)[1])}</h4>` + g.l.map(row).join('')).join('')}
     <div class="row"><span>🌱 Northland garden calendar</span><span>monthly</span></div>
-    <p>Feed data: TVmaze, YouTube, Reddit, RNZ, Stuff, Eventfinda, NASA, Space.com, NME and Rolling Stone. Every post links back to where it came from. Version ${APP_VERSION}.</p>
+    <p>Every post shows its source at the top and links back to where it came from. Version ${APP_VERSION}.</p>
     <button class="btn" data-close>Close</button>`;
   $('#sheet').classList.add('on');
 }
@@ -522,13 +669,18 @@ document.addEventListener('click', e => {
   const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); return; }
   if (t.id === 'rf') { load(true); return; }
   if (t.id === 'st') { settings(); return; }
+  const rv = t.closest('[data-revive]'); if (rv) { REVIVE[rv.dataset.revive] = Date.now(); ls.set('revive', REVIVE); settings(); draw(); toast('Brought back'); return; }
   if (t.id === 'resetv') { if (confirm('Clear all your 👍 and 👎?')) { VOTES = {}; ls.set('votes', VOTES); $('#sheet').classList.remove('on'); draw(); toast('Votes cleared'); } return; }
   if (t.id === 'sheet' || t.closest('[data-close]')) $('#sheet').classList.remove('on');
 });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && FEED && Date.now() - (FEED._got || 0) > 20 * 60e3) { FEED._got = Date.now(); load(false); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; setupYou(); refreshYou(); loadPhotos(); if (FEED && Date.now() - (FEED._got || 0) > 20 * 60e3) { FEED._got = Date.now(); load(false); } });
 
-window.addEventListener('storage', e => { if (e.key === 'myFeedLife' && tab === 'life' && scrollY < 200) draw(); }); // My App updated your items
+window.addEventListener('storage', e => { if (e.key !== 'myFeedLife') return; const before = YOU.map(x => x.term).join('|'); setupYou(); if (YOU.map(x => x.term).join('|') !== before) refreshYou(); if ((tab === 'life' || !TOPIC[tab]) && scrollY < 200) draw(); }); // My App updated your items or About you
 { const cut = Date.now() - 30 * 864e5; for (const k in DISMISS) if (DISMISS[k] < cut) delete DISMISS[k]; ls.set('dismiss', DISMISS); }
+noteSources();
+setupYou();
 draw();
 load(false);
+loadPhotos().then(() => { if (PHOTOS.length && scrollY < 200 && (tab === 'all' || tab === 'life' || tab === 'photos')) draw(); else chips(); });
+setTimeout(refreshYou, 1200);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
