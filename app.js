@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.5';
+const APP_VERSION = '2.29.6';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -21801,7 +21801,7 @@ function mfPool() {
   T(() => WALKS.forEach(w => add({ cat: 'walk', t: w.name, tag: w.area, s: [w.dogBadge, (w.paras || [])[0]].filter(Boolean).join(' · '), img: w.img, credit: w.credit, src: 'Walks', go: '#walks' })));
   T(() => VIDEOS.forEach(v => add({ cat: 'video', t: v.title, tag: v.channel, s: v.reason, vid: v.id, img: 'https://i.ytimg.com/vi/' + v.id + '/hqdefault.jpg', url: v.url, src: 'Videos', go: '#videos' })));
   T(() => TOP40.forEach(v => add({ cat: 'top40', t: '#' + v.rank + ' ' + v.title, tag: v.artist, s: v.artist + ' · NZ Top 40', vid: v.id, img: 'https://i.ytimg.com/vi/' + v.id + '/hqdefault.jpg', url: v.url, src: 'Top 40', go: '#top40' })));
-  T(() => { const ideas = (S.meals && S.meals.ideas) || []; ideas.concat(MEAL_STARTERS.filter(m => !ideas.some(i => i.title === m.title))).forEach(m => m && m.title && add({ cat: 'recipe', t: m.title, tag: m.tag, s: [m.time, m.serves && 'serves ' + m.serves, Array.isArray(m.ingr) ? m.ingr.slice(0, 5).join(', ') : String(m.ingr || '').split(',').slice(0, 5).join(',')].filter(Boolean).join(' · '), img: m.image, q: m.image ? null : [m.title.replace(/\s+/g, '_')], src: 'Recipes', go: '#recipes' })); });
+  T(() => { const ideas = (S.meals && S.meals.ideas) || []; let own = 0; ideas.concat(MEAL_STARTERS.filter(m => !ideas.some(i => i.title === m.title))).forEach(m => m && m.title && add({ cat: 'recipe', t: m.title, tag: m.tag, photo: storedPhoto(m.photo) && m.photo.length < 300e3 && own++ < 8 ? m.photo : '', s: [m.time, m.serves && 'serves ' + m.serves, Array.isArray(m.ingr) ? m.ingr.slice(0, 5).join(', ') : String(m.ingr || '').split(',').slice(0, 5).join(',')].filter(Boolean).join(' · '), img: m.image, q: m.image ? null : [m.title.replace(/\s+/g, '_')], src: 'Recipes', go: '#recipes' })); });
   T(() => DAILY_QUOTES.forEach(q => add({ cat: 'quote', t: '“' + q.t + '”', s: '— ' + q.w, img: q.img, src: 'Daily quote', go: '#home' })));
   T(() => HOME_FACTS.forEach(f => add({ cat: 'fact', t: 'Did you know?', s: f, id: 'fact:' + f.slice(0, 60), q: mfFactQ(f), src: 'NZ facts', go: '#home' })));
   T(() => DAILY_JOKES.forEach(j => add({ cat: 'joke', t: j[0], s: j[1], src: 'Joke of the day', go: '#home', q: ['Laughter', 'Smile'] })));
@@ -21823,6 +21823,24 @@ function mfPool() {
 }
 function mfFactQ(f) { const m = String(f).match(/\b(Whangārei Falls|Mount Manaia|Poor Knights|Tutukākā|Kauri|Tāne Mahuta|Waipoua|Kiwi|Tūī|Pōhutukawa|Bay of Islands|Cape Reinga|Rangitoto|Milford Sound|Aoraki|Mount Cook|Lake Taupō|Rotorua|Waitomo|Ruapehu|Tongariro|Auckland|Wellington|Christchurch|Queenstown|Kākāpō|Weta|Moa|Haka|Pavlova|Hokey pokey|Kiwifruit|Sheep|Fiordland|Stewart Island|Abel Tasman|Hobbit|Hobbiton|Treaty of Waitangi|Waitangi|Southern Alps|Dunedin|Nelson|Napier|Gisborne)\b/i); return [m ? m[1].replace(/\s+/g, '_') : '', 'New_Zealand', 'Whangārei_Falls'].filter(Boolean); }
 function mfEventQ(s) { const R = [[/market/i, 'Farmers\'_market'], [/movie|film|cinema/i, 'Movie_theater'], [/concert|music|band|gig|choir|jazz|orchestra/i, 'Concert'], [/firework|guy fawkes/i, 'Fireworks'], [/garden|plant/i, 'Garden'], [/art|exhibit|gallery/i, 'Art_exhibition'], [/comedy|laugh/i, 'Stand-up_comedy'], [/theatre|play|musical/i, 'Theatre'], [/kids|family|child/i, 'Playground'], [/food|wine|beer|tasting/i, 'Food_festival'], [/walk|hike|tramp/i, 'Hiking'], [/church|carol|christmas/i, 'Christmas_lights'], [/halloween/i, 'Jack-o\'-lantern'], [/craft|workshop/i, 'Handicraft'], [/quiz/i, 'Pub_quiz'], [/dance/i, 'Dance'], [/car|motor/i, 'Car_show']]; const out = R.filter(r => r[0].test(s)).map(r => r[1]); return out.concat(['Town_Basin', 'Whangārei']).slice(0, 3); }
+/* 2.29.6: My Feed reads his About you interests (on this phone only) so the feed follows them. Money, family,
+   routine, app and mood answers are never shared; sport answers are dropped. */
+const MF_ABOUT_TEXT = { meal: 'food', food: 'food', place: 'nz', walk: 'nature', music: 'music', film: 'sitcoms', films: 'sitcoms', book: 'book', dog: 'dogs', garden: 'garden', weekend: 'weekend' };
+const MF_ABOUT_CATS = { food: 'food', gf: 'food', music: 'music', screen: 'sitcoms', garden: 'garden', fit: 'fit', tech: 'tech', dog: 'dogs', outdoors: 'nature', weekend: 'weekend', misc: 'misc' };
+function mfAbout() {
+  const out = [], seen = new Set();
+  try {
+    ((aboutState() || {}).answers || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0)).forEach(n => {
+      const q = aboutQ(n.qid); if (!q) return;
+      const k = q.cat ? MF_ABOUT_CATS[q.cat] : MF_ABOUT_TEXT[q.id]; if (!k) return;
+      const a = String(n.text || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if (!a || /^(skip|skipped|none|neither|nothing|no|yes|both|n\/a)$/i.test(a) || MF_MONEY.test(a + ' ' + q.ask) || MF_SPORT.test(a)) return;
+      const key = (q.id + '|' + a).toLowerCase(); if (seen.has(key)) return; seen.add(key);
+      out.push({ q: q.ask, a, k, id: q.id, at: n.at || 0 });
+    });
+  } catch (e) { }
+  return out.slice(0, 60);
+}
 function myFeedSnap(force) {
   try {
     if (!S || (!force && Date.now() - mfSnapAt < 60e3)) return;
@@ -21849,8 +21867,9 @@ function myFeedSnap(force) {
     // Solar today (energy only, no prices)
     try { const t = PWR && PWR.today; if (t && t.date === todayISO() && Number.isFinite(t.solarKWh)) push({ cat: 'solar', kind: 'solar', t: 'Solar today: ' + t.solarKWh.toFixed(1) + ' kWh', s: 'From your panels so far today', go: '#power', iso: todayISO() }); } catch (e) { }
     let pool = []; try { pool = mfPool(); } catch (e) { }
-    const snap = n => JSON.stringify({ v: 2, at: Date.now(), today: todayISO(), items: out.slice(0, 80), pool: n == null ? pool : pool.sort(() => Math.random() - 0.5).slice(0, n) });
-    try { localStorage.setItem('myFeedLife', snap()); } catch (e) { try { localStorage.setItem('myFeedLife', snap(250)); } catch (e2) { localStorage.setItem('myFeedLife', JSON.stringify({ v: 2, at: Date.now(), today: todayISO(), items: out.slice(0, 80).map(o => Object.assign({}, o, { img: o.img && o.img.length > 2000 ? '' : o.img })), pool: [] })); } }
+    let about = []; try { about = mfAbout(); } catch (e) { }
+    const snap = n => JSON.stringify({ v: 2, at: Date.now(), today: todayISO(), items: out.slice(0, 80), about, pool: n == null ? pool : pool.sort(() => Math.random() - 0.5).slice(0, n) });
+    try { localStorage.setItem('myFeedLife', snap()); } catch (e) { try { localStorage.setItem('myFeedLife', snap(250)); } catch (e2) { localStorage.setItem('myFeedLife', JSON.stringify({ v: 2, at: Date.now(), today: todayISO(), items: out.slice(0, 80).map(o => Object.assign({}, o, { img: o.img && o.img.length > 2000 ? '' : o.img })), about, pool: [] })); } }
   } catch (e) { }
 }
 setTimeout(() => myFeedSnap(true), 9000); // after the first load and data refreshes
