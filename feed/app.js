@@ -1,7 +1,7 @@
 /* My Feed – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // My Feed lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -17,6 +17,7 @@ const TOPICS = [
   ['nature', 'Nature', '🌿', '#059669', '#0e7490'],
   ['events', 'NZ events', '🎆', '#be123c', '#7c3aed'],
   ['food', 'Food (GF)', '🍲', '#c2410c', '#eab308'],
+  ['gf', 'Gluten free & food brands', '🌾', '#a16207', '#16a34a'], // 1.6.1: NZ meal kits, GF bread and brands, vegan and GF events (also shown in Food and For You)
   ['tech', 'AI & tech', '🤖', '#4f46e5', '#06b6d4'],
   ['diy', 'DIY', '🛠️', '#9a3412', '#f59e0b'],
   ['science', 'Science', '🔬', '#0e7490', '#2563eb'],
@@ -34,7 +35,7 @@ const TOPICS = [
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
-const BASE = { election: 1.2, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
+const BASE = { election: 1.2, gf: 1.0, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const PAGE = 12;
@@ -51,6 +52,7 @@ const ls = { get(k, d) { try { const v = localStorage.getItem('mf.' + k); return
    Sport is left out entirely. Each interest belongs to a topic chip (new groups, or an existing tab it fits). Switch
    any of them off in ⚙️ → Manage interests: their sources and matching posts disappear from the feed. ---- */
 const INTERESTS = [ // name, topic, words that mark a post as being about it
+  ['Gluten free', 'gf', 'gluten[ -]?free|coeliac|celiac|gf'], ['Vegan', 'gf', 'vegan|plant[ -]?based|dairy[ -]?free'], ['Meal kits', 'gf', 'meal kits?|my food bag|bargain box|fresh start|woop|hellofresh|recipe box'],
   ['Election 2026', 'election', 'election|vote|voting|candidates?|polls?|policy|policies|manifesto'],
   ['Cooking', 'food', 'cook(ing)?|recipes?|dinner|kitchen'], ['Baking', 'food', 'bak(e|ing|ed)|bread|cake|muffins?|pastry|tart'], ['Cuisine', 'food', 'cuisine|dish(es)?|flavou?rs?|street food'],
   ['Exercise', 'fitness', 'exercises?|workouts?|home workout|hiit|cardio|stretch(ing)?'], ['Weights', 'fitness', 'weights?|weight training|strength|lifting|dumbbells?|barbells?|kettlebells?|squats?|deadlifts?|bench press|muscle|hypertrophy|home gym'],
@@ -107,7 +109,7 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['election', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
+const GROUP_TOPICS = ['election', 'gf', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
 const topicOn = t => !GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]);
 
 let FEED = ls.get('feed', null);
@@ -238,7 +240,8 @@ function visible() {
     if (W.drop(i.src)) return false;                               // a source you've voted out
     if (!topicOn(i.topic) || intHidden(i)) return false;           // interests you've switched off
     if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
-    return tab === 'all' || i.topic === tab;
+    if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
+    return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf');
   });
 }
 
@@ -700,6 +703,10 @@ function drawLife() { // For You: only My App cards. Yours first (soonest first)
   if (Date.now() < ELECTION_END && topicOn('election')) { // until election night: a Election 2026 card every few For You cards, parties in turn
     const W = weights(), el = rank(FEED.items.filter(i => i.topic === 'election' && elLive(i) && !(VOTES[i.id] && VOTES[i.id].v < 0) && !intHidden(i) && !SPORT.test((i.t || '') + ' ' + (i.s || '')))).slice(0, 12);
     if (el.length) { const out = []; let k = 0; order.forEach((x, n) => { out.push(x); if (n >= mine.length && (n - mine.length) % 4 === 3 && k < el.length) out.push(el[k++]); }); while (k < Math.min(el.length, 3)) out.push(el[k++]); order = out; }
+  }
+  if (topicOn('gf')) { // 1.6.1: a gluten-free / meal-kit / vegan-event card every few For You cards
+    const gf = rank(FEED.items.filter(i => i.topic === 'gf' && !(VOTES[i.id] && VOTES[i.id].v < 0) && !intHidden(i) && !(i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) && !weights().drop(i.src))).slice(0, 10);
+    if (gf.length) { const out = []; let k = 0; order.forEach((x, n) => { out.push(x); if (n >= mine.length && (n - mine.length) % 5 === 2 && k < gf.length) out.push(gf[k++]); }); while (k < Math.min(gf.length, 3)) out.push(gf[k++]); order = out; }
   }
   const snap = lifeSnap() || {};
   m.innerHTML = `<div class="load" style="padding-top:0">From My App on this phone${snap.at ? ' · updated ' + esc(ago(snap.at)) + ' ago' : ''} · bills and money are never shown</div>`;
