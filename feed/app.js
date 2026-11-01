@@ -31,7 +31,7 @@ const TOPICS = [
   ['tarot', 'Tarot', '🔮', '#6d28d9', '#db2777'], // 1.8.5 (off unless picked)
   ['parent', 'Parenting & family', '👪', '#0e7490', '#db2777'], // 1.9.0 off unless picked (suggested by life stage)
   ['rainbow', 'Drag & LGBTQ+', '🌈', '#e11d48', '#7c3aed'], // 1.9.0 off unless picked
-  ['candy', 'Candy Crush tips', '🍬', '#ec4899', '#f97316'], ['pets', 'Cute & funny pets', '🐾', '#f59e0b', '#ec4899'], ['nd', 'ADHD ['nd', 'ADHD & autism parenting', '🧩' autism', '🧩', '#0ea5e9', '#8b5cf6'], // 1.9.1 off unless picked
+  ['candy', 'Candy Crush tips', '🍬', '#ec4899', '#f97316'], ['pets', 'Cute & funny pets', '🐾', '#f59e0b', '#ec4899'], ['nd', 'ADHD & autism', '🧩', '#0ea5e9', '#8b5cf6'], // 1.9.1 off unless picked
   ['social', 'Social work & community (NZ)', '🤝', '#0f766e', '#2563eb'], // 1.9.0 off unless picked
   ['culture', 'Culture & stage', '🎭', '#7c2d12', '#be123c'],
   ['learn', 'Learning & ideas', '📖', '#1e40af', '#0891b2'],
