@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.8.6';
+const APP_VERSION = '1.8.7';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -284,7 +284,8 @@ function visible() {
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
     if (unsafe(i)) return false;                                   // 1.7.1: never any nudity
     if (W.drop(i.src)) return false;                               // a source you've voted out
-    if (!topicOn(i.topic) || intHidden(i)) return false;           // interests you've switched off
+    if (!topicOn(i.topic) || intHidden(i)) return false;
+    if (i.topic === 'parent' && !(PICK && PICK.includes('parent'))) return false; // 1.9.0 parenting: only when picked           // interests you've switched off
     if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
@@ -726,7 +727,7 @@ function pinBox(i) {
   const t = x => new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).format(x).replace(/\s/g, '');
   return `<div class="pinbox"><div class="cd${i.status ? ' warn' : ''}">${esc(countdown(i))}</div>
     ${i.status === 'postponed' ? `<p class="pnote">The organisers have postponed it${i.note ? ' – ' + esc(i.note) : ''}. Check the event page for the new date.</p>` : ''}
-    <div class="prow">📅 ${esc(tm.format(i.ev))}${i.end ? '–' + esc(t(i.end)) : ''}</div>
+    <div class="prow">📅 ${esc(new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short' }).format(i.ev))} · ${esc(t(i.ev).replace(/:00/, ''))}${i.end ? '–' + esc(t(i.end).replace(/:00/, '')) : ''}</div>
     ${i.show ? `<div class="prow">🎆 Fireworks about ${esc(t(i.show))}</div>` : ''}
     ${i.where ? `<div class="prow">📍 ${esc(i.where)}</div>` : ''}
     <a class="pbtn" href="${esc(i.url)}" target="_blank" rel="noopener">See event &amp; tickets ↗</a>
@@ -846,6 +847,8 @@ async function load(force) {
 }
 
 /* ---- settings ---- */
+// 1.8.7 text size: Normal / Large (default) / Extra large, per person on this phone (the class is also set early in index.html)
+function setTextSize(k) { ls.set('textSize', k); const c = document.documentElement.classList; c.remove('ts-l', 'ts-xl'); if (k === 'l') c.add('ts-l'); if (k === 'xl') c.add('ts-xl'); }
 function settings() {
   const W = weights(), ups = Object.values(VOTES).filter(v => v.v > 0).length, downs = Object.values(VOTES).filter(v => v.v < 0).length;
   const srcs = (FEED && FEED.sources || []).concat([['you-itunes', 'Apple Music'], ['you-tvmaze', 'TVmaze'], ['you-mealdb', 'TheMealDB'], ['you-openlib', 'Open Library'], ['you-wiki', 'Wikipedia']].map(([id, name]) => ({ id, name, topic: 'you', you: 1 })));
@@ -854,7 +857,8 @@ function settings() {
   const row = x => { const [st, c] = status(x.id); const T = x.you ? ['', '', '💭'] : (TOPIC[x.topic] || TOPIC.all); return `<div class="row"><span>${T[2]} ${esc(x.name)}<small class="sst ${c}">${st}${W.up(x.id) || W.dn(x.id) ? ' · ' + W.up(x.id) + '👍 ' + W.dn(x.id) + '👎' : ''}</small></span><span>${c === 'drop' ? `<button class="mini" data-revive="${esc(x.id)}">Bring back</button>` : x.you ? 'on this phone' : x.ok ? esc(ago(x.ok)) + ' ago' : 'waiting'}</span></div>`; };
   const groups = []; srcs.slice().sort((a, b) => tIdx(a.topic) - tIdx(b.topic)).forEach(x => { const g = groups[groups.length - 1]; if (!g || g.t !== x.topic) groups.push({ t: x.topic, l: [x] }); else g.l.push(x); });
   const you = YOU.map(x => `<div class="row"><span>${(TOPIC[x.topic] || TOPIC.all)[2]} ${esc(x.term)}<small class="sst">${esc(x.q || '')}</small></span><span>${esc((TOPIC[x.topic] || TOPIC.all)[1])}</span></div>`).join('');
-  $('#sheetin').innerHTML = famSettings() + `<h2>Info Book</h2>
+  const ts = ls.get('textSize', 'l');
+  $('#sheetin').innerHTML = `<h2>Text size</h2><div class="tsz">${[['n', 'Normal'], ['l', 'Large'], ['xl', 'Extra large']].map(([k, l]) => `<button class="ich${ts === k ? ' on' : ''}" data-ts="${k}" aria-pressed="${ts === k}">${ts === k ? '✓ ' : ''}${l}</button>`).join('')}</div><p class="tsp">Saved on this phone for you. Your phone’s own text size setting still applies on top.</p>` + famSettings() + `<h2>Info Book</h2>
     <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself through the day from ${(FEED && FEED.sources || []).length || 'about 180'} public sources. Sport is always left out.</p>
     <p>👍 / 👎 teach it which <b>sources</b> and <b>topics</b> you like. New sources get a short trial (“Trying”) so you can judge them; a source you give about four more 👎 than 👍 is dropped (you can bring it back below).</p>
     <p>▶️ Videos play by themselves (muted) when they’re on screen and pause when you scroll past. Tap the speaker on a video for sound; it stays on until you close Info Book.</p>
@@ -897,6 +901,7 @@ document.addEventListener('click', e => {
   const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); return; }
   if (t.id === 'rf') { load(true); return; }
   if (t.id === 'st') { settings(); return; }
+  if (t.dataset && t.dataset.ts) { setTextSize(t.dataset.ts); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; toast('Text size: ' + t.textContent.replace('✓ ', '')); return; } // 1.8.7
   if (t.id === 'moodt') { MOOD_OFF = !MOOD_OFF; ls.set('moodOff', MOOD_OFF); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; draw(); toast(MOOD_OFF ? 'Time of day: off' : 'Time of day: on'); return; }
   const ib = t.closest('[data-int]'); if (ib) { const n = ib.dataset.int; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); const y = $('#sheet').scrollTop; for (const i of (FEED && FEED.items) || []) delete i._ints; settings(); $('#sheet').scrollTop = y; draw(); toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
   const rv = t.closest('[data-revive]'); if (rv) { REVIVE[rv.dataset.revive] = Date.now(); ls.set('revive', REVIVE); settings(); draw(); toast('Brought back'); return; }
