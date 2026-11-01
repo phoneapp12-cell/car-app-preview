@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.27';
+const APP_VERSION = '1.9.28';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -74,13 +74,13 @@ const ls = { get(k, d) { try { const v = localStorage.getItem(LS_PREFIX + k); re
    any of them off in ⚙️ → Manage interests: their sources and matching posts disappear from the feed. ---- */
 const INTERESTS = [ // name, topic, words that mark a post as being about it
   ['Tarot meanings', 'tarot', 'tarot|cards? of the day|spreads?|readings?|major arcana|minor arcana|wands|cups|swords|pentacles'], ['Tarot decks & art', 'tarot', 'decks?|tarot art|oracle cards?'],
-  ['Knitting', 'craft', 'knit(s|ting|ted)?|yarn|wool|sweater|jumper|beanie|cable'], ['Crochet', 'craft', 'crochet(ed|ing)?|amigurumi|granny squares?'], ['Sewing & quilting', 'craft', 'sew(ing|n)?|quilt(s|ed|ing)?|fabric|dressmaking'], ['Embroidery', 'craft', 'embroider(y|ed)?|cross[ -]?stitch|stitch(es|ing)?'], ['Paper crafts', 'craft', 'card ?making|cards?|scrapbook(ing)?|paper|cricut|pop[ -]?up'], ['Crafts', 'craft', 'crafts?|handmade|felting|macram[eé]|weav(e|ing)'],
+  ['Knitting', 'craft', 'knit(s|ting|ted)?|yarn|wool|sweater|jumper|beanie|cable'], ['Crochet', 'craft', 'crochet(ed|ing)?|amigurumi|granny squares?|plushies?|magic ring|safety eyes|yarn'], ['Sewing & quilting', 'craft', 'sew(ing|n)?|quilt(s|ed|ing)?|fabric|dressmaking'], ['Embroidery', 'craft', 'embroider(y|ed)?|cross[ -]?stitch|stitch(es|ing)?'], ['Paper crafts', 'craft', 'card ?making|cards?|scrapbook(ing)?|paper|cricut|pop[ -]?up'], ['Crafts', 'craft', 'crafts?|handmade|felting|macram[eé]|weav(e|ing)'],
   ['Video gaming', 'vgames', 'video ?games?|gaming|gamers?|trailer|consoles?'], ['Nintendo', 'vgames', 'nintendo|switch|mario|pok[eé]mon|kirby|pikmin|animal crossing'], ['PlayStation & Xbox', 'vgames', 'playstation|ps5|xbox'], ['PC games', 'vgames', '\\bpc\\b|steam'], ['Cosy games', 'vgames', 'cosy|cozy|wholesome|farming|stardew|island'],
   ['Board game news & nights', 'boardg', 'board ?games?|tabletop|card games?|dice|meeples?|lorcana|how to play|games? night'],
   ['D&D & tabletop RPGs', 'fantasy', 'd&d|dungeons|dragons|rpgs?|role[ -]?play|campaign|dungeon master|battle ?maps?'], ['Warhammer & miniatures', 'fantasy', 'warhammer|miniatures?|minis|painting|games workshop|40k|sigmar|necromunda|ogors?'], ['Fantasy video games', 'fantasy', 'zelda|elder scrolls|skyrim|baldur|final fantasy|witcher|fantasy'],
   ['Baby & toddler', 'parent', 'bab(y|ies)|toddlers?|newborns?|infants?|sleep|feeding|breastfeed\\w*|bottle|wean(ing)?|milestones?|plunket|teething|nappy|nappies|preschool'], ['Primary-age kids', 'parent', 'child(ren)?|kids|siblings?|school|homework|big feelings|meltdowns?|tantrums?|sleepovers?'],
   ['Autism & sensory parenting', 'parent', 'autism|autistic|sensory|neurodivergen\\w*|adhd|ot\\b|occupational therap\\w*|stim(ming)?|regulation'], ['Parenting teens', 'parent', 'teens?|teenagers?|tweens?|adolescen\\w*|rangatahi|secondary school|study'], ['Grandparenting', 'parent', 'grand(parents?|kids|children|ma|pa|mother|father)|nana|koro|kuia|mokopuna'],
-  ['Candy Crush tips', 'candy', 'candy crush|candies|booster|level|combo|colou?r bomb|striped|wrapped'], ['Cute & funny pets', 'pets', 'pets?|dogs?|pupp(y|ies)|cats?|kittens?|bunn(y|ies)|animals?|aww|derp'], ['Harry Potter', 'hp', 'harry potter|hogwarts|wizarding|slytherin|gryffindor|hufflepuff|ravenclaw|butterbeer|snape|draco|malfoy|dumbledore|hermione|quidditch'], ['Monarch butterflies', 'monarch', 'monarchs?|butterfl\\w*|swan plants?|caterpillars?|chrysalis|milkweed'], ['ADHD & autism parenting', 'nd', 'adhd|autis\\w*|takiw[aā]tanga|aroreretini|neurodiver\\w*|sensory|meltdowns?|executive function'],
+  ['Candy Crush tips', 'candy', 'candy crush|candies|booster|level|combo|colou?r bomb|striped|wrapped'], ['Horses', 'pets', 'horses?|foals?|pon(y|ies)|equine|mares?|stallions?|horsepics'], ['Cute & funny pets', 'pets', 'pets?|dogs?|pupp(y|ies)|cats?|kittens?|bunn(y|ies)|animals?|aww|derp'], ['Harry Potter', 'hp', 'harry potter|hogwarts|wizarding|slytherin|gryffindor|hufflepuff|ravenclaw|butterbeer|snape|draco|malfoy|dumbledore|hermione|quidditch'], ['Monarch butterflies', 'monarch', 'monarchs?|butterfl\\w*|swan plants?|caterpillars?|chrysalis|milkweed'], ['ADHD & autism parenting', 'nd', 'adhd|autis\\w*|takiw[aā]tanga|aroreretini|neurodiver\\w*|sensory|meltdowns?|executive function'],
   ['Drag', 'rainbow', 'drag|drag race|rupaul|queens?|lip ?sync|pit stop'], ['NZ rainbow community', 'rainbow', 'rainbow|pride|lgbt\\w*|queer|takatāpui|takatapui|trans|gay|lesbian|bi(sexual)?|insideout|express'], ['Makeup & style', 'rainbow', 'makeup|make-up|beauty|lipstick|eyeshadow|fashion|style|looks?'],
   ['Social work practice', 'social', 'social work(ers?)?|swrb|registration|practice|supervision|anzasw|oranga tamariki|tauwhiro|cpd'], ['Community & wellbeing', 'social', 'community|wellbeing|well-being|mental health|whānau ora|whanau ora|youth work|volunteer\\w*|self-care|disabilit(y|ies)|carers?'],
   ['Kids activities', 'kids', 'kids?|children|tamariki|school holidays?|family day|whānau day|play(ground|group)?'], ['Kids crafts', 'kids', 'how to draw|craft|colou?ring|paper|folding'], ['Kids science', 'kids', 'science|experiment|volcano|dinosaur|space|animals'], ['Sensory-friendly', 'kids', 'sensory|autism|autistic|quiet|calm|fine motor|ot\\b'], ['Family days out', 'kids', 'family|days? out|outing|market|museum|park'],
@@ -151,7 +151,7 @@ const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPIC
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
 let SEEN = ls.get('seen', {});          // id -> times shown (keeps the feed fresh)
-/* 1.9.27 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
+/* 1.9.28 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
    on this phone; the last 5,000, for 60 days). Warnings, outages, pinned/private cards, countdowns, the daily cards and
    family posts stay (family posts come back only when there's a new comment or like). The same story from two sources
    shows once. SEEN_BASE is what was seen before this load, so nothing vanishes while you're looking at it. */
@@ -339,7 +339,7 @@ function visible() {
     if (VOTES[i.id] && VOTES[i.id].v < 0) return false;          // thumbs-down: gone
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
     if (unsafe(i)) return false;                                   // 1.7.1: never any nudity
-    if (typeof toneW === 'function' && !toneW(i)) return false;   // 1.9.27 upbeat: no heavy news (deaths, crime, war, court…)
+    if (typeof toneW === 'function' && !toneW(i)) return false;   // 1.9.28 upbeat: no heavy news (deaths, crime, war, court…)
     if (W.drop(i.src)) return false;                               // a source you've voted out
     if (!topicOn(i.topic) || intHidden(i)) return false;
     if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; // 1.9.0 parenting / drag & LGBTQ+ / social work: only when picked           // interests you've switched off
@@ -347,7 +347,7 @@ function visible() {
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
   });
-  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.27 once seen, gone (and one card per story)
+  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.28 once seen, gone (and one card per story)
 }
 
 /* ---- For You: Shane's own things plus every board and hub in My App, read on this phone from what My App left in
