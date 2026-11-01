@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.8.3';
+const APP_VERSION = '1.8.4';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -210,7 +210,15 @@ function moodOf(i) {
   return 'neutral';
 }
 function moodW(i) { if (MOOD_OFF) return 1; const m = MOODS[moodBand()], k = moodOf(i); return k === 'news' ? m[1] : k === 'calm' ? m[2] : k === 'loud' ? m[3] : 1; }
-function moodLabel() { const el = $('#mood'); if (el) el.textContent = MOOD_OFF ? '' : MOODS[moodBand()][0]; }
+// 1.8.4 greeting under the title, from the phone's own clock: morning 5am–12pm, afternoon 12–5pm, evening 5pm–5am
+function greetText(d = new Date()) {
+  const h = d.getHours(), part = h >= 5 && h < 12 ? 'morning' : h >= 12 && h < 17 ? 'afternoon' : 'evening';
+  const name = MEMBER && MEMBER.name && !MEMBER.pending ? MEMBER.name : '';
+  return 'Good ' + part + (name ? ', ' + name : '');
+}
+function greet() { const el = $('#greet'); if (el) { const t = greetText(); if (el.textContent !== t) el.textContent = t; } }
+setInterval(greet, 60e3); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') greet(); });
+function moodLabel() { greet(); const el = $('#mood'); if (el) el.textContent = MOOD_OFF ? '' : MOODS[moodBand()][0]; }
 
 function rank(items) {
   const W = weights(), now = Date.now();
@@ -858,7 +866,7 @@ noteSrcInts();
 setupYou();
 draw();
 load(false);
-famInit();
+famInit(); greet(); setTimeout(greet, 3000);
 loadPhotos().then(() => { if (PHOTOS.length && scrollY < 200 && (tab === 'all' || tab === 'life' || tab === 'photos')) draw(); else chips(); });
 setTimeout(refreshYou, 1200);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });

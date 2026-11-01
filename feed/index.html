@@ -24,6 +24,7 @@ a{color:inherit}
 .logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.35rem;letter-spacing:-.02em}
 .logo i{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#f59e0b,var(--acc2) 55%,var(--acc));display:grid;place-items:center;font-style:normal;font-size:1rem;color:#fff}
 .logo span{background:linear-gradient(90deg,var(--acc2),var(--acc));-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo .lt{display:flex;flex-direction:column;line-height:1.08;min-width:0}.greet{font-size:.74rem;font-weight:700;letter-spacing:0;color:color-mix(in srgb,var(--acc2) 70%,var(--acc));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}.greet:empty{display:none}
 .mood{margin-left:auto;font-size:.74rem;font-weight:600;color:var(--mute);background:color-mix(in srgb,var(--mute) 12%,transparent);border-radius:99px;padding:3px 9px;white-space:nowrap}.mood:empty{display:none}.mood+.upd{margin-left:8px}
 .fb{border:0;background:none;font-size:1.05rem;padding:8px 6px;border-radius:10px;color:var(--mute);display:inline-flex;align-items:center;gap:3px;position:relative;cursor:pointer}
 .fb .cc{font-size:.85rem;font-weight:700}.fb .dot{width:7px;height:7px;border-radius:50%;background:#e11d48;position:absolute;top:6px;right:2px}
@@ -160,7 +161,7 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <body>
 <header class="top">
   <div class="bar">
-    <div class="logo"><img src="icons/logo.svg" width="30" height="30" alt=""><span>Info Book</span></div>
+    <div class="logo"><img src="icons/logo.svg" width="30" height="30" alt=""><div class="lt"><span>Info Book</span><small class="greet" id="greet"></small></div></div>
     <div class="mood" id="mood"></div>
     <div class="upd" id="upd"></div>
     <button class="ib" id="rf" aria-label="Refresh">↻</button>
@@ -171,7 +172,7 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.8.3"></script>
-<script src="app.js?v=1.8.3"></script>
+<script src="family.js?v=1.8.4"></script>
+<script src="app.js?v=1.8.4"></script>
 </body>
 </html>
