@@ -189,10 +189,35 @@ async function openThread(btn) {
   c.insertAdjacentHTML('beforeend', `<div class="cmts"><div class="cl">Loading…</div><form class="cf"><textarea rows="1" maxlength="1000" placeholder="Write a comment…" aria-label="Write a comment"></textarea><button class="btn pri">Send</button></form></div>`);
   box = c.querySelector('.cmts'); await loadThread(box, id);
 }
+/* 1.9.14 ❤️ on comments: tap the heart to like/unlike, tap the names (or hold the heart) to see everyone who liked it */
+const CLIKES = {};
+function cmLikeBar(x) {
+  const L = Array.isArray(x.likes) ? x.likes : []; CLIKES[x.id] = L; const on = L.some(isMe);
+  return `<div class="cmlk" data-cmlk="${x.id}"><button class="cml${on ? ' on' : ''}" data-clike="${x.id}" aria-pressed="${on}" aria-label="${on ? 'Unlike this comment' : 'Like this comment'}">${on ? '❤️' : '🤍'}${L.length ? `<span class="cmlc">${L.length}</span>` : ''}</button>${L.length ? `<button class="cmln" data-clikers="${x.id}">${esc(L.map(likeName).slice(0, 3).join(', '))}${L.length > 3 ? ' +' + (L.length - 3) : ''}</button>` : ''}</div>`;
+}
+async function toggleCLike(cid) {
+  const bar = document.querySelector(`[data-cmlk="${cid}"]`), L = CLIKES[cid] || [], on = !L.some(isMe);
+  try { const r = await fam('/comments/' + cid + '/like', { method: 'POST', body: JSON.stringify({ on }) }); const nb = document.querySelector(`[data-cmlk="${cid}"]`); if (nb && r && Array.isArray(r.likes)) nb.outerHTML = cmLikeBar({ id: cid, likes: r.likes }); if (on) { try { navigator.vibrate && navigator.vibrate(12); } catch (e) { } } } catch (e) { toast(e.message); }
+}
+function showCLikers(cid) {
+  const L = CLIKES[cid] || []; if (!L.length) return;
+  document.querySelector('#upbox')?.remove();
+  const box = document.createElement('div'); box.id = 'upbox'; box.className = 'upbox';
+  box.innerHTML = `<div class="upin"><h2>Who liked this comment</h2><div class="lkl"><h3>❤️ ${L.length}</h3>${L.map(l => `<div class="row"><span>❤️ ${esc(likeName(l))}</span><small class="sst">${esc(nzTime(l.at))}</small></div>`).join('')}</div><div class="uprow"><button class="btn" id="upx">Close</button></div></div>`;
+  document.body.append(box);
+}
+let CLK_HOLD = null, CLK_HELD = false;
+document.addEventListener('pointerdown', e => { const b = e.target.closest && e.target.closest('[data-clike]'); if (!b) return; CLK_HELD = false; clearTimeout(CLK_HOLD); CLK_HOLD = setTimeout(() => { CLK_HELD = true; showCLikers(b.dataset.clike); }, 550); });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => document.addEventListener(ev, () => clearTimeout(CLK_HOLD), true));
+document.addEventListener('click', e => {
+  const t = e.target; if (!t || !t.closest) return;
+  const b = t.closest('[data-clike]'); if (b) { e.preventDefault(); e.stopPropagation(); if (CLK_HELD) { CLK_HELD = false; return; } toggleCLike(+b.dataset.clike); return; }
+  const n = t.closest('[data-clikers]'); if (n) { e.preventDefault(); e.stopPropagation(); showCLikers(+n.dataset.clikers); }
+}, true);
 async function loadThread(box, id) {
   try {
     const list = await fam('/comments?card=' + encodeURIComponent(id));
-    box.querySelector('.cl').innerHTML = list.length ? list.map(x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p></div>`).join('') : '<div class="cm0">No comments yet. Say something 👋</div>';
+    box.querySelector('.cl').innerHTML = list.length ? list.map(x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p>${cmLikeBar(x)}</div>`).join('') : '<div class="cm0">No comments yet. Say something 👋</div>';
     COUNTS[id] = [list.length, list.length ? list[list.length - 1].at : 0]; CSEEN[id] = Date.now(); ls.set('cseen', CSEEN); refreshBar(id);
   } catch (e) { const cl = box && box.querySelector('.cl'); if (cl) cl.textContent = 'Couldn’t load comments – tap 💬 to try again.'; console.warn('comments', e); }
 }
