@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.8.7';
+const APP_VERSION = '1.9.0';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -29,6 +29,9 @@ const TOPICS = [
   ['creative', 'Creative & crafts', '🎨', '#c026d3', '#f97316'],
   ['craft', 'Knitting & crafts', '🧶', '#db2777', '#a855f7'], // 1.8.3: calm, for cosy evenings
   ['tarot', 'Tarot', '🔮', '#6d28d9', '#db2777'], // 1.8.5 (off unless picked)
+  ['parent', 'Parenting & family', '👪', '#0e7490', '#db2777'], // 1.9.0 off unless picked (suggested by life stage)
+  ['rainbow', 'Drag & LGBTQ+', '🌈', '#e11d48', '#7c3aed'], // 1.9.0 off unless picked
+  ['social', 'Social work & community (NZ)', '🤝', '#0f766e', '#2563eb'], // 1.9.0 off unless picked
   ['culture', 'Culture & stage', '🎭', '#7c2d12', '#be123c'],
   ['learn', 'Learning & ideas', '📖', '#1e40af', '#0891b2'],
   ['games', 'Games & puzzles', '🎲', '#6d28d9', '#2563eb'],
@@ -42,13 +45,13 @@ const TOPICS = [
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
-const BASE = { tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
+const BASE = { parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 // 1.7.1 family-safe: no nudity or adult content, anywhere (same rules as the data service's safe.js)
 const NUDE = /\b(nud(e|es|ity|ist|ists|ism)|semi-?nude|naked|nsfw|nsfl|topless|bottomless|erotic(a|ism|ally)?|lingerie|boudoir|sensual(ity)?|figure (study|studies|drawing|model)|life drawing|live model|nude model|odalisques?|breasts?|nipples?|genital(s|ia)?|penis|vagina|porn(o|ography|ographic)?|pin-?ups?|burlesque|undress(ed|ing)?|strip(per|pers|tease|club)|playboy|onlyfans|bikinis?|thongs?|skinny[- ]?dip\w*|sexy|sexual(ly|ity)?|sex (worker|work|toy|toys|scene|scenes)|fetish\w*|kinky|xxx|adult (content|film|films|only))\b/i;
 const ART_NUDE = /\b(venus|birth of venus|nymphs?|bathers|bathing|the bath|shower|reclining|olympia|adam and eve|the three graces|danaë|danae|leda|susanna|bathsheba|schiele|modigliani|bouguereau|klimt|courbet|rubens|titian|ingres|egon|figurative|the body|bodies|torso|male gaze)\b/i;
-const ART_TOPICS = new Set(['creative', 'culture', 'learn', 'collect', 'travel', 'kids', 'craft', 'vgames', 'boardg', 'fantasy', 'tarot']);
+const ART_TOPICS = new Set(['rainbow', 'parent', 'social', 'creative', 'culture', 'learn', 'collect', 'travel', 'kids', 'craft', 'vgames', 'boardg', 'fantasy', 'tarot']);
 const GAME_TOPICS = new Set(['vgames', 'boardg', 'fantasy']), GAME_BAD = /\besports?\b|tournament|\bgore\b|gory|bloody|dismember|decapitat|mutilat|torture|\bR18\b|adults? only|seductive|succubus|bikini armou?r/i; // 1.8.3
 const BLOCKED = new Set(['4qrdzz', '4ek9op']); // the r/museum nude photos Shane reported (1 Nov 2026)
 const BLOCKED_SRC = new Set(['rd-museum', 'rd-historyporn', 'hyperallergic', 'openculture', 'yt-proko', 'rd-drawing']);
@@ -72,6 +75,10 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
   ['Video gaming', 'vgames', 'video ?games?|gaming|gamers?|trailer|consoles?'], ['Nintendo', 'vgames', 'nintendo|switch|mario|pok[eé]mon|kirby|pikmin|animal crossing'], ['PlayStation & Xbox', 'vgames', 'playstation|ps5|xbox'], ['PC games', 'vgames', '\\bpc\\b|steam'], ['Cosy games', 'vgames', 'cosy|cozy|wholesome|farming|stardew|island'],
   ['Board game news & nights', 'boardg', 'board ?games?|tabletop|card games?|dice|meeples?|lorcana|how to play|games? night'],
   ['D&D & tabletop RPGs', 'fantasy', 'd&d|dungeons|dragons|rpgs?|role[ -]?play|campaign|dungeon master|battle ?maps?'], ['Warhammer & miniatures', 'fantasy', 'warhammer|miniatures?|minis|painting|games workshop|40k|sigmar|necromunda|ogors?'], ['Fantasy video games', 'fantasy', 'zelda|elder scrolls|skyrim|baldur|final fantasy|witcher|fantasy'],
+  ['Baby & toddler', 'parent', 'bab(y|ies)|toddlers?|newborns?|infants?|sleep|feeding|breastfeed\\w*|bottle|wean(ing)?|milestones?|plunket|teething|nappy|nappies|preschool'], ['Primary-age kids', 'parent', 'child(ren)?|kids|siblings?|school|homework|big feelings|meltdowns?|tantrums?|sleepovers?'],
+  ['Autism & sensory parenting', 'parent', 'autism|autistic|sensory|neurodivergen\\w*|adhd|ot\\b|occupational therap\\w*|stim(ming)?|regulation'], ['Parenting teens', 'parent', 'teens?|teenagers?|tweens?|adolescen\\w*|rangatahi|secondary school|study'], ['Grandparenting', 'parent', 'grand(parents?|kids|children|ma|pa|mother|father)|nana|koro|kuia|mokopuna'],
+  ['Drag', 'rainbow', 'drag|drag race|rupaul|queens?|lip ?sync|pit stop'], ['NZ rainbow community', 'rainbow', 'rainbow|pride|lgbt\\w*|queer|takatāpui|takatapui|trans|gay|lesbian|bi(sexual)?|insideout|express'], ['Makeup & style', 'rainbow', 'makeup|make-up|beauty|lipstick|eyeshadow|fashion|style|looks?'],
+  ['Social work practice', 'social', 'social work(ers?)?|swrb|registration|practice|supervision|anzasw|oranga tamariki|tauwhiro|cpd'], ['Community & wellbeing', 'social', 'community|wellbeing|well-being|mental health|whānau ora|whanau ora|youth work|volunteer\\w*|self-care|disabilit(y|ies)|carers?'],
   ['Kids activities', 'kids', 'kids?|children|tamariki|school holidays?|family day|whānau day|play(ground|group)?'], ['Kids crafts', 'kids', 'how to draw|craft|colou?ring|paper|folding'], ['Kids science', 'kids', 'science|experiment|volcano|dinosaur|space|animals'], ['Sensory-friendly', 'kids', 'sensory|autism|autistic|quiet|calm|fine motor|ot\\b'], ['Family days out', 'kids', 'family|days? out|outing|market|museum|park'],
   ['Gluten free', 'gf', 'gluten[ -]?free|coeliac|celiac|gf'], ['Vegan', 'gf', 'vegan|plant[ -]?based|dairy[ -]?free'], ['Meal kits', 'gf', 'meal kits?|my food bag|bargain box|fresh start|woop|hellofresh|recipe box'],
   ['Election 2026', 'election', 'election|vote|voting|candidates?|polls?|policy|policies|manifesto'],
@@ -131,8 +138,11 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
-const topicOn = t => pickOk(t) && (!GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]));
+const GROUP_TOPICS = ['parent', 'rainbow', 'social', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
+// 1.9.0 topics nobody gets unless they pick them (members: in their interests; Shane: switched on in a suggestion or ⚙️)
+const OPTIN = new Set(['parent', 'rainbow', 'social']);
+function optedIn(t) { return PICK ? PICK.includes(t) : ls.get('optIn', []).includes(t); }
+const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]));
 
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
@@ -285,7 +295,7 @@ function visible() {
     if (unsafe(i)) return false;                                   // 1.7.1: never any nudity
     if (W.drop(i.src)) return false;                               // a source you've voted out
     if (!topicOn(i.topic) || intHidden(i)) return false;
-    if (i.topic === 'parent' && !(PICK && PICK.includes('parent'))) return false; // 1.9.0 parenting: only when picked           // interests you've switched off
+    if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; // 1.9.0 parenting / drag & LGBTQ+ / social work: only when picked           // interests you've switched off
     if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));

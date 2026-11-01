@@ -50,9 +50,10 @@ async function famInit() {
   PICK = MEMBER.role === 'admin' ? null : ls.get('pick', null); giveDefaults();
   CSEEN = ls.get('cseen', {});
   if (MEMBER.role !== 'admin' && !PICK) { // a new phone: their settings from the server, or the welcome screen
-    try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.adds)) ls.set('addsPre', r.prefs.adds.filter(t => TOPIC[t])); if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { } // 1.8.5 addsPre: interests Shane switched on for them, ticked on the welcome screen
+    try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.adds)) ls.set('addsPre', r.prefs.adds.filter(t => TOPIC[t])); if (r.nudge && Array.isArray(r.nudge.topics)) { ls.set('nudge', r.nudge); ls.set('addsPre', [...new Set([...ls.get('addsPre', []), ...r.nudge.topics.filter(t => TOPIC[t])])]); } if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { } // 1.8.5 addsPre: interests Shane switched on for them, ticked on the welcome screen
     if (!PICK) { onboarding(); }
   }
+  if (PICK || MEMBER.role === 'admin') fam('/prefs').then(r => { ls.set('nudge', r.nudge || null); }).catch(() => { }); // 1.9.0 suggestions from Shane (life stage)
   if (MEMBER.role !== 'admin' && PICK) fam('/prefs').then(r => { // 1.8.5 interests Shane switched on for them (e.g. 🔮 Tarot for Monique), once each
     const adds = (r.prefs && r.prefs.adds) || [], got = ls.get('addsGot', []); let ch = false;
     for (const t of adds) if (!got.includes(t)) { got.push(t); if (TOPIC[t] && !PICK.includes(t)) { PICK.push(t); ch = true; } }
@@ -311,8 +312,9 @@ function fillFamPhotos() {
     } catch (e) { img.classList.add('gone'); }
   });
 }
-function pickPhotos() {
-  if (!FAM_ON) return;
+let UP_TAG = ''; // 1.9.0 a photo post's tag (e.g. today's photo challenge 'dq20261101'; later maybe 'reno')
+function pickPhotos(tag) {
+  if (!FAM_ON) return; UP_TAG = typeof tag === 'string' ? tag : '';
   const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.multiple = true; // the phone offers Camera or Photo Library
   f.onchange = () => { const files = [...f.files]; if (files.length > PH_POST) toast(`Up to ${PH_POST} photos a post – using the first ${PH_POST}`); prepPhotos(files.slice(0, PH_POST)); };
   f.click();
@@ -357,7 +359,7 @@ async function postPhotos() {
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.err || 'Upload failed');
       PHOTO_URL.set(String(j.id), p.url); ids.push(j.id);
     }
-    await fam('/shares?photos', { method: 'POST', body: JSON.stringify({ photos: ids, caption }) });
+    await fam('/shares?photos', { method: 'POST', body: JSON.stringify({ photos: ids, caption, ...(UP_TAG ? { tag: UP_TAG } : {}) }) }); UP_TAG = ''; if (typeof xAfterPost === 'function') xAfterPost();
     $('#upbox').remove(); UP = []; $('#sheet').classList.remove('on'); toast('📷 Shared with the family');
     tab = 'family'; ls.set('tab', tab); await loadShares(); draw();
   } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Post'; }
