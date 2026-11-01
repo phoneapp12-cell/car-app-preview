@@ -87,7 +87,7 @@ function wxNzCard(i) {
     <div class="bd"><ul class="rnl">${i.list.slice(0, 6).map(w => `<li><span>${w.colour === 'red' ? '🔴' : '🟠'} ${WXE[w.event] || '⚠️'} <b>${esc(w.head.replace(/\s*-\s*(Orange|Red)$/i, ''))}</b> · ${esc(w.area.split(';')[0].slice(0, 70))}</span><em>${esc(wxWhen(w))}</em></li>`).join('')}</ul>
     <div class="xbtns"><a class="btn" href="https://www.metservice.com/warnings/home" target="_blank" rel="noopener">All MetService warnings ↗</a></div></div></article>`;
 }
-/* ---- 1.9.5 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
+/* ---- 1.9.6 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
    steps (iPhone), or "open in Chrome/Safari first" with a copy-my-link button (Messenger/Facebook). "Later" hides it for 3 days. ---- */
 let BIP = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); BIP = e; installBanner(true); });
@@ -123,7 +123,7 @@ let PIN_URLS = null, PIN_FOR = null;
 const pinUrls = () => (PIN_FOR === FEED && PIN_URLS) || (PIN_FOR = FEED, PIN_URLS = new Set((typeof FEED !== 'undefined' && FEED && FEED.items || []).filter(i => i.pin).map(i => urlBase(i.url))));
 window.pins = function () {
   const out = [];
-  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.5: only warnings and watches that cover Whangārei
+  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.6: only warnings and watches that cover Whangārei
   for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Whangārei warnings go right to the top
   if (FAM_ON) {
     for (const c of X.cars) if (c.car && c.mid === MEMBER.id) out.push({ id: 'car:' + c.plate, x: 'car', c: c.car, at: c.at, topic: 'family' });
@@ -250,7 +250,7 @@ function pushHint() {
 }
 function pushBox() {
   const P = (X.push && X.push.prefs) || {}, on = X.push && X.push.on && Notification.permission === 'granted', hint = pushHint();
-  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['dates', '🎂 Birthdays, events & car dates'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)'], ['weather', '🔴 Red weather warnings (any time, even at night)']];
+  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['event', '⭐ Reminders for events I’m interested in'], ['dates', '🎂 Birthdays, events & car dates'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)'], ['weather', '🔴 Red weather warnings (any time, even at night)']];
   return `<h3>🔔 Notifications</h3>${hint ? `<p class="hint">${hint}</p>` : on ? `<p class="sst">On for this phone. At most one every 30 minutes (replies to you come straight away). Quiet from ${P.qFrom}:00 to ${P.qTo}:00 – anything then waits until morning.</p>
     ${T.map(([k, l]) => `<button class="ich${P[k] ? ' on' : ''}" data-np="${k}">${P[k] ? '✓ ' : ''}${l}</button>`).join('')}
     <div class="bdf"><label>Quiet from <select id="qf">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qFrom ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label><label>to <select id="qt">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qTo ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label></div>
@@ -303,7 +303,7 @@ function suggApply(add) {
 /* ---- ranking: Shane's gentle life-stage nudge (never more than ×1.15, and not for topics they've 👎'd) and local events first ---- */
 const basePopW = popW;
 const REGION_NL = /whang[aā]rei|northland|kerikeri|paihia|russell|dargaville|kaitaia|kaikohe|ruak[aā]k[aā]|waipu|tutukaka|ngunguru|hikurangi|kamo|onerahi|bream bay|mangawhai|kawakawa|opua|hokianga|maungakaramea|tikipunga/i;
-/* ---- 1.9.5 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
+/* ---- 1.9.6 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
    Weather: My App's own Whangārei forecast on this phone if there is one (the one the auto theme uses), otherwise the same open-meteo
    forecast fetched here (once every 30 min). Nothing about the theme changes. */
 const NZ_RX = /\.nz\b|new zealand|aotearoa|\bkiwis?\b|whang[aā]rei|northland|auckland|wellington|christchurch|queenstown|rotorua|tauranga|hamilton|dunedin|nelson|napier|taup[oō]|coromandel|bay of islands|countdown|woolworths nz|pak'?n'?save|new world|the warehouse|mitre ?10|bunnings nz|kmart nz|briscoes|farmers|rnz|stuff\.co|nz ?herald|1news|newshub|te reo|m[aā]ori|matariki|waitangi|p[oō]hutukawa|kūmara|kumara|pavlova|\bl&p\b|whitebait|feijoa/i;
@@ -329,9 +329,20 @@ function wxKindIB() { // warm / mild / wet / cold / storm (windy counts with sto
   return WXK;
 }
 const WXM_LABEL = { warm: '☀️ Good for today’s sunshine', mild: '🌤️ Nice day for it', wet: '🌧️ Rainy-day pick', cold: '🧣 Cosy pick for today', storm: '🌪️ Stormy-day pick', windy: '💨 Windy-day pick' };
+const PRAC_TOPICS = new Set(['garden', 'diy', 'food', 'gf', 'craft', 'creative', 'fitness', 'outdoors', 'travel', 'cars', 'collect', 'selling', 'dogs', 'kids', 'parent', 'nature']);
+const TIP_RE_C = /\b(how to|how i|how we|tips?|guides?|step[- ]by[- ]step|checklist|ways to|\d+ (ways|things|ideas|tips|steps)|what to (plant|do|grow|sow|pack|bring|cook|make)|when to|beginners?'?|tutorial|diy|advice|recipes?|easy|quick|hacks?|ideas?|planner|care|growing|grow|prun\w*|fix(ing)?|repair\w*|clean(ing)?|make|making|build(ing)?|patterns?|free pattern|lesson|explained|tricks?|basics|essentials|for kids|activities|routine|plan)\b/i, SHOW_RE_C = /(look at (this|my|these|him|her)|\bi (did|made|finished|built|painted|knitted|crocheted|grew|caught|found|got|bought)\b|\bmy (first|latest|new|finished|little|current|husband'?s|wife'?s)\b|rate my|finished (my|this|it)|show(ing)? off|\[oc\]|\(oc\)|\boc\b|proud of|just (finished|completed|made|got)|after \d+ (years|months|weeks|hours)|before (and|&) after|\bmy (garden|haul|collection|setup|build|car|ride|dog|cat|boy|girl|baby)\b|what do you think|thoughts\?|first attempt|finally (finished|done|got)|\bi (decided|planted|harvested|picked|tried|caught|restored|refinished)\b|\b(this year|today)'?s? (harvest|haul|bloom)|\bhaul\b|appreciation post|happy (cake|birth)day)/i;
+const NZ_SRC = /^(nz-|kings-|yates|doc$|rnz|stuff|advocate|nzh|1news|newsroom|nzgeo|inat-nz|rd-nz|rd-whangarei|rd-tramping|par-|kids-kkn|kids-autismnz|nd-(autismnz|altogether|kidshealth|pp|tips)|sw-|gf-(mfb|freshstart|bargainbox|woop|hellofresh|venerdi|ceres|puredelish|ev)|events|tvm-nz)/;
+const isNZ = (i, txt) => NZ_SRC.test(i.src || '') || /^https?:\/\/[^/]+\.nz(\/|$)/i.test(i.url || '') || NZ_RX.test(txt);
 function nzWeatherNudge(i) {
   if (!i || i.pin || i.x) return 1; const txt = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''); let f = 1; i._wxm = '';
-  if (i.kind !== 'event') { if (NZ_RX.test(txt)) f *= 1.15; } // events already lean Northland, then Auckland
+  if (i.kind !== 'event') { // events already lean Whangārei/Northland
+    if (PRAC_TOPICS.has(i.topic)) { // 1.9.6 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
+      const chip = tab !== 'all', nz = isNZ(i, txt), tipT = TIP_RE_C.test(i.t || ''), show = SHOW_RE_C.test(i.t || '');
+      f *= nz ? (chip ? 1.8 : 1.3) : tipT ? (chip ? 0.9 : 0.95) : (chip ? 0.55 : 0.75);
+      if (REGION_NL.test(txt)) f *= 1.15;
+      if (tipT) f *= chip ? 1.35 : 1.15; if (show) f *= chip ? 0.4 : 0.6;
+    } else if (NZ_RX.test(txt)) f *= 1.15;
+  }
   if (FOREIGN_RX.test(txt)) f *= 0.7;
   const se = nzSeason(), offSeason = (se === 'summer' || se === 'late spring') && (WRONG_SUMMER_RX.test(txt) || /\b(autumn|winter)\b/i.test(i.t || '')); if (offSeason) f *= 0.7; if (se === 'winter' && /\b(summer|beach day|bbq season)\b/i.test(txt)) f *= 0.85;
   const tt = /news|politic|world|nzlocal/.test(i.topic || '') ? '' : (i.t || ''), lab = (k2, rx) => { if (!offSeason && rx.test(tt)) i._wxm = WXM_LABEL[k2]; };
@@ -440,4 +451,121 @@ const baseFamList = famList;
 window.famList = async function () { await baseFamList(); const l = $('#famlist'); if (l && IS_ADMIN && !$('#famx')) l.insertAdjacentHTML('afterend', '<div id="famx" class="famx">Loading…</div>'); adminExtras(); };
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') xVisit(); });
 if (FAM_ON) { setTimeout(() => { xVisit(); xLoad(true); if (X.push === null) { } }, 1200); if ('serviceWorker' in navigator && Notification && Notification.permission === 'granted') swAuth(); }
-if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.5 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
+if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.6 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
+
+/* ---- 1.9.6 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
+const WGR_AREA = /whang[aā]rei|kamo|onerahi|tikipunga|kensington|maunu|morningside|raumanga|otangarei|regent|parahaki|riverside|town basin|hundertwasser|forum north|tutuk[aā]k[aā]|ngunguru|matapouri|ruak[aā]k[aā]|waip[uū]\b|one tree point|marsden|hikurangi|parua bay|pataua|maungakaramea|maungatapere|portland|glenbervie|whareora|whananaki|oakleigh|tamaterau|mckinnon/i;
+const INT = { mine: new Map(), who: {}, got: 0 }, INT_META = {};
+async function intLoad(force) {
+  if (!FAM_ON || (!force && Date.now() - INT.got < 60e3)) return; INT.got = Date.now();
+  try { const r = await fam('/interest'); INT.mine = new Map((r.mine || []).map(x => [x.eid, x])); INT.who = r.who || {}; if ((tab === 'all' && scrollY < 300) || tab === 'family') draw(); } catch (e) { }
+}
+setTimeout(() => intLoad(true), 1200);
+const evVenue = s => String(s || '').split(/,\s*/).filter(x => x && !/\b(mon|tues|wednes|thurs|fri|satur|sun)day\b|\b\d{1,2}(st|nd|rd|th)\b|\d[.:]?\d*\s*[ap]m\b/i.test(x)).join(', ').replace(/\s+/g, ' ').trim();
+const evAway = ev => { const d = nzDayNum(ev) - nzDayNum(Date.now()); return d <= 0 ? 'Today' : d === 1 ? 'Tomorrow' : `${d} days away`; };
+const evWhen = ev => NZ(ev, { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + NZ(ev, { hour: 'numeric', minute: '2-digit' }).replace(':00', '').replace(' ', '');
+const intNames = id => (INT.who[id] || []);
+function intLine(id) {
+  const n = intNames(id); if (!n.length) return '';
+  const first = n[0] === 'You' ? (n.length === 1 ? 'You’re' : 'You and ' + (n.length - 1 === 1 ? n[1] : (n.length - 1) + ' others') + ' are') : n.length === 1 ? n[0] + ' is' : n[0] + ' and ' + (n.length - 1 === 1 ? n[1] : (n.length - 1) + ' others') + ' are';
+  return `<button class="intwho" data-intwho="${esc(id)}">⭐ ${esc(first)} interested</button>`;
+}
+function intBar(i, ev) { // ⭐ Interested toggle + who's interested (family only)
+  const id = String(i.id); INT_META[id] = { id, t: i.t, ev: ev || i.ev || 0, url: i.url || '', img: i.img || '', where: evVenue(i.s) || i.where || '', topic: i.topic || '' };
+  if (!FAM_ON) return '';
+  const on = INT.mine.has(id);
+  return `<div class="intbar"><button class="intb${on ? ' on' : ''}" data-int="${esc(id)}" aria-pressed="${on}">${on ? '⭐ Interested' : '☆ Interested'}</button>${intLine(id)}</div>`;
+}
+const isEventItem = i => i && (i.kind === 'event' || i.x === 'promo');
+const EV_KW = { music: /\b(gig|concert|band|music|jazz|choir|orchestra|dj|live|singer|songwriter|blues|rock|folk)\b/i, garden: /\b(garden\w*|plants?|seeds?|orchard|flower show|botanic)\b/i, craft: /\b(craft\w*|knit\w*|crochet|sew\w*|quilt\w*|weav\w*|pottery|ceramics?|makers?)\b/i,
+  creative: /\b(art|arts|artists?|exhibition|gallery|sculpture|painting|photograph\w*|design)\b/i, culture: /\b(theatre|museum|history|heritage|kapa haka|m[aā]ori|film|poetry|book|author|play)\b/i, kids: /\b(kids?|children|family|families|toddlers?|bab(y|ies)|school holidays?|wh[aā]nau|tamariki|junior)\b/i, parent: /\b(parents?|parenting|kids?|children|family|toddlers?|bab(y|ies)|wh[aā]nau)\b/i,
+  food: /\b(food|market|cook\w*|wine|tasting|bak\w*|growers|feast|cafe|kai)\b/i, gf: /\b(gluten|food|market|growers)\b/i, dogs: /\b(dogs?|pupp(y|ies)|pets?)\b/i, pets: /\b(pets?|dogs?|cats?|animals?)\b/i, nature: /\b(walk|nature|birds?|planting|clean ?up|wildlife|bush|beach|reserve)\b/i, outdoors: /\b(walk|hike|tramp\w*|beach|kayak\w*|outdoors?|swim|camp\w*)\b/i,
+  fitness: /\b(yoga|pilates|fitness|dance class|zumba|tai chi|bootcamp)\b/i, tarot: /\b(tarot|psychic|crystals?|spiritual|wellbeing|meditation)\b/i, games: /\b(games?|quiz|trivia|board ?games?|puzzles?)\b/i, boardg: /\b(board ?games?|tabletop|games? night)\b/i, vgames: /\b(gaming|video games?|esports?|lan)\b/i, fantasy: /\b(cosplay|comics?|fantasy|d&d|dungeons|warhammer)\b/i,
+  diy: /\b(diy|repair caf[eé]|workshop|woodwork\w*|build)\b/i, collect: /\b(vintage|antiques?|collect\w*|swap|car boot|records?)\b/i, cars: /\b(car show|classic cars?|motor\w*|hot rods?|cars and coffee)\b/i, tech: /\b(tech|coding|robot\w*|digital)\b/i, science: /\b(science|astronomy|stargaz\w*|planetarium)\b/i, scifi: /\b(sci-?fi|space|astronomy|stargaz\w*)\b/i,
+  travel: /\b(tours?|cruise|day trip)\b/i, sitcoms: /\b(comedy|comedian|stand-?up|laughs?)\b/i, rainbow: /\b(pride|rainbow|drag|lgbt\w*|queer)\b/i, social: /\b(community|hui|volunteer\w*|wellbeing|support group)\b/i, nd: /\b(sensory|autism|adhd|neurodiver\w*|quiet)\b/i };
+function promoScore(e, now = Date.now()) {
+  const W = weights(), base = W.topic(e.topic) || (e.topic === 'events' ? 1 : 0); if (!base) return 0;
+  const d = (e.ev - now) / 864e5, span = (String(e.s).match(/\b\d{1,2}(st|nd|rd|th)\b/g) || []).length > 1 ? 0.6 : 1; // long-running classes a bit less
+  const txt = e.t + ' ' + e.s, picks = (typeof PICK !== 'undefined' && PICK) || Object.keys(EV_KW).filter(k => W.topic(k) >= 1), hit = picks.filter(k => EV_KW[k] && EV_KW[k].test(txt)).length;
+  const weekly = /\b(mon|tues|wednes|thurs|fri|satur|sun)day (morning|evening|afternoon|night)?\s*(yoga|class|session|pilates)?\b/i.test(e.t) || /\b(weekly|every week|term \d)\b/i.test(txt);
+  const salesy = /open day|lifestyle village|retirement|real estate|show ?home|\bsale\b|clearance|expo|seminar|investment/i.test(txt) ? 0 : 1; // not company sales pitches
+  let w = base * (typeof popW === 'function' ? popW(e) : 1) * (d <= 7 ? 2.2 : d <= 14 ? 1.2 : 0.8) * span * (hit ? 1.5 + hit : 0.5) * (weekly ? 0.3 : 1) * salesy;
+  const mine = [...INT.mine.values()]; if (mine.some(m => m.topic && m.topic === e.topic)) w *= 1.3;
+  const words = new Set(mine.flatMap(m => String(m.t || '').toLowerCase().match(/[a-zā]{5,}/g) || [])); if ((String(e.t).toLowerCase().match(/[a-zā]{5,}/g) || []).some(x => words.has(x))) w *= 1.3;
+  return w;
+}
+function promoPool(now = Date.now()) {
+  if (!FEED) return []; const seen = new Set();
+  return FEED.items.filter(e => e.kind === 'event' && !e.pin && e.ev > now - 2 * 36e5 && e.ev < now + 30 * 864e5 && e.img && WGR_AREA.test(e.t + ' ' + e.s + ' ' + e.url) && !/auckland|t[aā]maki/i.test(e.s + ' ' + e.url) && !unsafe(e) && !(VOTES[e.id] && VOTES[e.id].v < 0) && !seen.has(e.t) && seen.add(e.t))
+    .map(e => ({ e, w: promoScore(e, now) })).filter(x => x.w > 0);
+}
+let PROMO_FOR = null, PROMO = null;
+const evKind = e => ((String(e.t).toLowerCase().match(/\b(yoga|pilates|market|quiz|choir|jazz|exhibition|workshop|class|tai chi|zumba|meditation)\b/) || [])[1]) || e.id;
+function pickPromos(nPins, len) {
+  const now = Date.now(), recent = ls.get('promoSeen', {}); for (const k in recent) if (now - recent[k] > 3 * 864e5) delete recent[k];
+  let pool = promoPool(now); const fresh = pool.filter(x => !recent[x.e.id]); if (fresh.length >= 3) pool = fresh; // never the same promo again within ~3 days, unless there's little else on
+  const out = [], slots = []; let pos = Math.max(2, nPins) + 7 + Math.floor(Math.random() * 3);
+  while (pos < len + 10 && slots.length < 8) { slots.push(pos); pos += 8 + Math.floor(Math.random() * 3); }
+  const kinds = new Set(); for (const _ of slots) { pool = pool.filter(x => !kinds.has(evKind(x.e))); const tot = pool.reduce((a, x) => a + x.w, 0); if (!tot) break; let r = Math.random() * tot, k = 0; while (k < pool.length - 1 && (r -= pool[k].w) > 0) k++; out.push(pool[k].e); kinds.add(evKind(pool[k].e)); pool.splice(k, 1); }
+  const wk = (() => { const ks = new Set(); return promoPool(now).filter(x => x.e.ev < now + 7 * 864e5).sort((a, b) => b.w - a.w).filter(x => { const k = evKind(x.e); if (ks.has(k)) return false; ks.add(k); return true; }); })().slice(0, 5).map(x => x.e).sort((a, b) => a.ev - b.ev);
+  return { slots, list: out, wk, recent };
+}
+const baseFestive = window.festive;
+window.festive = function (order, nPins) {
+  order = baseFestive ? baseFestive(order, nPins) : order;
+  if (!FEED || order.length < 6) return order;
+  if (!PROMO || PROMO_FOR !== FEED) { PROMO_FOR = FEED; PROMO = pickPromos(nPins, order.length); const now = Date.now(); for (const e of PROMO.list) PROMO.recent[e.id] = now; ls.set('promoSeen', PROMO.recent); }
+  const ids = new Set(PROMO.list.map(e => e.id)), out = order.filter(i => !ids.has(i.id)), lo = Math.max(2, nPins);
+  if (PROMO.wk.length >= 2) out.splice(Math.min(lo + 3, out.length), 0, { id: 'wk-' + nzKey().slice(0, 6) + Math.floor(nzDayNum(Date.now()) / 7), x: 'wk', list: PROMO.wk, topic: 'events', t: 'This week in Whangārei for you' });
+  PROMO.list.forEach((e, k) => { const at = PROMO.slots[k]; if (at <= out.length) out.splice(at, 0, { ...e, id: e.id, x: 'promo', e }); });
+  return out;
+};
+function icsHref(m) {
+  const z = t => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''), x = s => String(s || '').replace(/([,;\\])/g, '\\$1').replace(/\n/g, ' ');
+  const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Info Book//EN', 'BEGIN:VEVENT', 'UID:' + m.id + '@infobook', 'DTSTAMP:' + z(Date.now()), 'DTSTART:' + z(m.ev), 'DTEND:' + z(m.ev + 2 * 36e5), 'SUMMARY:' + x(m.t), m.where ? 'LOCATION:' + x(m.where) : '', m.url ? 'URL:' + m.url : '', 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+  return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(body);
+}
+function promoCard(i) {
+  const e = i.e, bar = intBar(e, e.ev), m = INT_META[String(e.id)], away = evAway(e.ev);
+  return `<article class="card xc promo" data-id="${esc(e.id)}">${xHead('📍', 'Event near you', (e.sn || 'Eventfinda') + ' · picked for you', TOPIC[e.topic] ? TOPIC[e.topic][1] : 'Events')}
+    <a class="pimg" href="${esc(e.url)}" target="_blank" rel="noopener"><img src="${esc(e.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="away${/Today|Tomorrow/.test(away) ? ' soon' : ''}">${esc(away)}</span></a>
+    <div class="bd"><h3>${esc(e.t)}</h3><p class="pwhen">🗓️ ${esc(evWhen(e.ev))}</p>${m.where ? `<p class="pwhere">📍 ${esc(m.where)}</p>` : ''}
+    <div class="xbtns"><a class="btn pri" href="${esc(e.url)}" target="_blank" rel="noopener">Details & tickets ↗</a><a class="btn" href="${icsHref(m)}" download="${esc(String(e.t).replace(/[^\w ]+/g, '').slice(0, 40) || 'event')}.ics">📅 Add to calendar</a></div>${bar}</div></article>`;
+}
+function wkCard(i) {
+  return `<article class="card xc wkr" data-id="${esc(i.id)}">${xHead('🗓️', 'This week in Whangārei for you', 'Events near you, matched to your picks', 'Events')}
+    <div class="bd"><ul class="wkl">${i.list.map(e => { const b = intBar(e, e.ev); return `<li><a href="${esc(e.url)}" target="_blank" rel="noopener"><img src="${esc(e.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span><b>${esc(e.t)}</b><em>${esc(evWhen(e.ev))} · ${esc(evAway(e.ev))}</em>${evVenue(e.s) ? `<em>📍 ${esc(evVenue(e.s))}</em>` : ''}</span></a>${b}</li>`; }).join('')}</ul></div></article>`;
+}
+function intListCard() {
+  const L = [...INT.mine.values()];
+  return `<article class="card xc intl" data-id="intlist">${xHead('⭐', 'Events you’re interested in', 'Only the family can see who’s interested', 'Events')}
+    <div class="bd"><ul class="wkl">${L.map(m => `<li><a href="${esc(m.url || '#')}" target="_blank" rel="noopener">${m.img ? `<img src="${esc(m.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<span><b>${esc(m.t)}</b>${m.ev ? `<em>${esc(evWhen(m.ev))} · ${esc(evAway(m.ev))}</em>` : ''}${m.where ? `<em>📍 ${esc(m.where)}</em>` : ''}</span></a>${intBar({ id: m.eid, t: m.t, url: m.url, img: m.img, where: m.where, topic: m.topic }, m.ev)}</li>`).join('')}</ul>
+    <p class="xwho">You’ll get a reminder the day before and about 2 hours before (if notifications are on).</p></div></article>`;
+}
+const cardInt = window.card;
+window.card = function (i) {
+  if (i && i.x === 'promo') return promoCard(i);
+  if (i && i.x === 'wk') return wkCard(i);
+  if (i && i.x === 'intlist') return intListCard();
+  const h = cardInt(i);
+  if (i && !i.x && i.kind === 'event' && FAM_ON) { const k = String(h).lastIndexOf('</article>'); if (k > 0) return h.slice(0, k) + `<div class="intpad">${intBar(i, i.ev)}</div>` + h.slice(k); }
+  return h;
+};
+const drawFamilyInt = drawFamily;
+drawFamily = function () { drawFamilyInt(); if (INT.mine.size && !$('#feed [data-id="intlist"]')) { const f = $('#feed'), d = document.createElement('div'); d.innerHTML = intListCard(); const at = f.querySelector('article:nth-of-type(2)'); at ? f.insertBefore(d.firstElementChild, at) : f.appendChild(d.firstElementChild); } };
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-int]');
+  if (b) { e.preventDefault(); const id = b.dataset.int, m = INT_META[id] || { id }, on = !INT.mine.has(id);
+    document.querySelectorAll(`[data-int="${CSS.escape(id)}"]`).forEach(x => { x.classList.toggle('on', on); x.textContent = on ? '⭐ Interested' : '☆ Interested'; });
+    try { const r = await fam('/interest', { method: 'POST', body: JSON.stringify({ ...m, on }) }); INT.mine = new Map((r.mine || []).map(x => [x.eid, x])); INT.who = r.who || {}; INT.got = Date.now();
+      document.querySelectorAll(`[data-int="${CSS.escape(id)}"]`).forEach(x => { const bar = x.parentElement, w = bar.querySelector('.intwho'), nl = intLine(id); if (w) w.outerHTML = nl || ''; else if (nl) x.insertAdjacentHTML('afterend', nl); });
+      toast(on ? '⭐ Saved to your Interested events' + (X.push && X.push.on ? ' – we’ll remind you' : '') : 'Removed from Interested'); if (on && typeof pushAsk === 'function') setTimeout(pushAsk, 1500);
+    } catch (err) { toast('Couldn’t save that – try again'); }
+    return; }
+  const w = e.target.closest('[data-intwho]'); if (w) { e.preventDefault(); const n = intNames(w.dataset.intwho); toast('⭐ Interested: ' + n.join(', ')); }
+});
+const popWInt = window.popW;
+window.popW = function (i) { // ⭐ Interested: similar events (same interest, shared words) rank a little higher
+  let w = popWInt(i); if (i && i.kind === 'event' && INT.mine.size) { const mine = [...INT.mine.values()]; if (mine.some(m => m.topic && m.topic === i.topic && m.topic !== 'events')) w *= 1.25; const words = new Set(mine.flatMap(m => String(m.t || '').toLowerCase().match(/[a-zā]{5,}/g) || [])); if ((String(i.t).toLowerCase().match(/[a-zā]{5,}/g) || []).some(x => words.has(x))) w *= 1.25; }
+  return w;
+};
