@@ -76,7 +76,7 @@ function festCard(i) {
 const WXE = { rain: '🌧️', wind: '💨', snow: '❄️', thunderstorm: '⛈️', heat: '🥵', swell: '🌊', fog: '🌫️' };
 const wxWhen = w => { const f = t => NZ(t, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).replace(':00', ''); return (w.onset > Date.now() ? 'From ' + f(w.onset) : 'Now') + ' until ' + f(w.expires); };
 function wxCard(i) {
-  const w = i.w, lvl = w.colour === 'red' ? 'RED warning' : w.colour === 'orange' ? 'Orange warning' : 'Watch', reg = w.region === 'nl' ? 'Northland' : w.region === 'akl' ? 'Auckland' : 'New Zealand';
+  const w = i.w, lvl = w.colour === 'red' ? 'RED warning' : w.colour === 'orange' ? 'Orange warning' : 'Watch', reg = 'Covers Whangārei';
   return `<article class="card xc wx ${esc(w.colour)}" data-id="${esc(i.id)}">${xHead(WXE[w.event] || '⚠️', (w.test ? 'TEST – ' : '') + w.head.replace(/\s*-\s*(Orange|Red)$/i, ''), 'MetService · ' + reg, lvl)}
     <div class="bd"><div class="wxlv">${w.colour === 'red' ? '🔴' : w.colour === 'orange' ? '🟠' : '🟡'} ${esc(lvl)}${w.test ? ' · <b>TEST ONLY – not a real warning</b>' : ''}</div><p class="wxa"><b>${esc(w.area)}</b></p><p class="wxt">🕑 ${esc(wxWhen(w))}</p>
     <p class="xwho">${esc(w.desc)}</p>${w.act ? `<p class="xwho">👉 ${esc(w.act)}</p>` : ''}<div class="xbtns"><a class="btn pri" href="${esc(w.web)}" target="_blank" rel="noopener">MetService warnings ↗</a>${w.link ? `<a class="btn" href="${esc(w.link)}" target="_blank" rel="noopener">Official alert</a>` : ''}</div></div></article>`;
@@ -122,8 +122,8 @@ let PIN_URLS = null, PIN_FOR = null;
 const pinUrls = () => (PIN_FOR === FEED && PIN_URLS) || (PIN_FOR = FEED, PIN_URLS = new Set((typeof FEED !== 'undefined' && FEED && FEED.items || []).filter(i => i.pin).map(i => urlBase(i.url))));
 window.pins = function () {
   const out = [];
-  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.region !== 'nz'), wn = W.filter(w => w.region === 'nz');
-  for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Northland / Auckland warnings go right to the top
+  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.3: only warnings and watches that cover Whangārei
+  for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Whangārei warnings go right to the top
   if (FAM_ON) {
     for (const c of X.cars) if (c.car && c.mid === MEMBER.id) out.push({ id: 'car:' + c.plate, x: 'car', c: c.car, at: c.at, topic: 'family' });
     for (const d of X.dates) if (d.days <= 14 && !(VOTES['date' + d.id] && VOTES['date' + d.id].v < 0)) out.push({ id: 'date' + d.id + '-' + new Date().getFullYear(), x: 'date', d, topic: 'family', t: (d.kind === 'bday' ? '🎂 ' : '🎉 ') + d.title, sn: 'Family dates' });
