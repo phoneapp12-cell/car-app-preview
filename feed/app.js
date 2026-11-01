@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.17';
+const APP_VERSION = '1.9.18';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -149,6 +149,48 @@ const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPIC
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
 let SEEN = ls.get('seen', {});          // id -> times shown (keeps the feed fresh)
+/* 1.9.18 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
+   on this phone; the last 5,000, for 60 days). Warnings, outages, pinned/private cards, countdowns, the daily cards and
+   family posts stay (family posts come back only when there's a new comment or like). The same story from two sources
+   shows once. SEEN_BASE is what was seen before this load, so nothing vanishes while you're looking at it. */
+const SEEN_MAX = 5000, SEEN_DAYS = 60, dayN = () => Math.floor(Date.now() / 864e5);
+let SEEN1 = ls.get('seen1', {}), SHSEEN = ls.get('shseen', {}), SEEN_BASE = new Set(Object.keys(SEEN1)), SH_BASE = { ...SHSEEN };
+let hidAt = 0; document.addEventListener('visibilitychange', () => { if (document.hidden) hidAt = Date.now(); else if (hidAt && Date.now() - hidAt > 10 * 60e3) seenRebase(); });
+function seenRebase() { SEEN_BASE = new Set(Object.keys(SEEN1)); SH_BASE = { ...SHSEEN }; }
+let s1T = 0;
+function seenSave() { clearTimeout(s1T); s1T = setTimeout(() => { const d = dayN(); let e = Object.entries(SEEN1).filter(([, v]) => d - v <= SEEN_DAYS); if (e.length > SEEN_MAX) { e.sort((a, b) => b[1] - a[1]); e.length = SEEN_MAX; } SEEN1 = Object.fromEntries(e); const sh = Object.entries(SHSEEN); if (sh.length > 400) SHSEEN = Object.fromEntries(sh.slice(-400)); ls.set('seen1', SEEN1); ls.set('shseen', SHSEEN); }, 1500); }
+const seenOk = i => !!i && !i.x && !i.pin && i.topic !== 'life' && !i._share && !/^(tarotday|sly-|fest)/.test(i.id || '');
+const shSig = i => { const s = i._share || {}; return (s.nc || 0) + '/' + ((s.likes || []).length + (s.ups || []).length); };
+function wasSeen(i) { return seenOk(i) && (SEEN_BASE.has(i.id) || (i._dups || []).some(d => SEEN_BASE.has(d))); }
+function shareSeen(i) { const k = i._share && i._share.card || i.id; return k in SH_BASE && SH_BASE[k] === shSig(i); }
+function markSeen(id) {
+  const i = (typeof order !== 'undefined' && order.find(x => x.id === id)) || null; if (!i) return;
+  if (i._share) { SHSEEN[i._share.card || i.id] = shSig(i); seenSave(); return; }
+  if (!seenOk(i)) return; const d = dayN(); SEEN1[i.id] = d; for (const x of i._dups || []) SEEN1[x] = d; seenSave();
+}
+let seenIO = null; const seenTm = new Map();
+function watchSeen(root) {
+  if (!('IntersectionObserver' in window)) return;
+  if (!seenIO) seenIO = new IntersectionObserver(es => { for (const e of es) { const id = e.target.dataset.id; if (!id) continue;
+    if (e.isIntersecting && e.intersectionRatio >= 0.5) { if (!seenTm.has(id)) seenTm.set(id, setTimeout(() => { seenTm.delete(id); markSeen(id); seenIO.unobserve(e.target); }, 1000)); }
+    else { clearTimeout(seenTm.get(id)); seenTm.delete(id); } } }, { threshold: [0, 0.5] });
+  (root || document).querySelectorAll('#feed article.card[data-id]:not([data-sw])').forEach(el => { el.dataset.sw = 1; seenIO.observe(el); });
+}
+/* the same story from different sources: one card (the one with a picture), and seeing either counts for both */
+const STOP = new Set('the and for with that this from have will your about after over into what when where which their there been were they them than then more most just says said year years new zealand nz kiwi kiwis'.split(' '));
+const storyWords = t => [...new Set(String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter(w => w.length > 3 && !STOP.has(w)))];
+function collapseStories(list) {
+  const kept = [], sets = [];
+  for (const i of list) {
+    if (!seenOk(i) || i.kind === 'event' || i.kind === 'tv') { kept.push(i); sets.push(null); continue; }
+    const w = storyWords(i.t); let hit = -1;
+    if (w.length >= 4) for (let k = 0; k < kept.length; k++) { const o = sets[k]; if (!o) continue; let n = 0; for (const x of w) if (o.has(x)) n++; if (n >= 4 && n / Math.min(w.length, o.size) >= 0.7) { hit = k; break; } }
+    if (hit < 0) { kept.push(i); sets.push(w.length >= 4 ? new Set(w) : null); continue; }
+    const a = kept[hit], best = (!a.img && !a.vid && (i.img || i.vid)) ? i : a, other = best === a ? i : a;
+    kept[hit] = { ...best, _dups: [...new Set([...(best._dups || []), other.id, ...(other._dups || [])])] };
+  }
+  return kept;
+}
 let IMP = ls.get('imp', {});            // 1.4.0: source -> cards shown (new sources get a trial, then your votes decide)
 let REVIVE = ls.get('revive', {});
 let KNOWN = ls.get('known', null);      // source -> when it first turned up here (0 = it was already here before 1.4.0)
@@ -290,7 +332,7 @@ function visible() {
   if (!FEED) return [];
   if (tab === 'liked') return Object.values(VOTES).filter(v => v.v > 0 && v.item).sort((a, b) => b.at - a.at).map(v => v.item);
   const seenIds = new Set(), W = weights();
-  return FEED.items.concat(youItems(), topicOn("tarot") && pickOk("tarot") ? [tarotOfDay()] : []).filter(i => {
+  const list = FEED.items.concat(youItems(), topicOn("tarot") && pickOk("tarot") ? [tarotOfDay()] : []).filter(i => {
     if (seenIds.has(i.id)) return false; seenIds.add(i.id);
     if (VOTES[i.id] && VOTES[i.id].v < 0) return false;          // thumbs-down: gone
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
@@ -302,6 +344,7 @@ function visible() {
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
   });
+  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.18 once seen, gone (and one card per story)
 }
 
 /* ---- For You: Shane's own things plus every board and hub in My App, read on this phone from what My App left in
@@ -762,7 +805,7 @@ function card(i) {
     ${rxLine(i)}<div class="ft">
       <button class="vote up${(FAM_ON && rxOf(i) ? (rxOf(i).ups || []).some(isMe) : v > 0) ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>${upNames(i)}
       <button class="vote dn${v < 0 ? ' on' : ''}" data-vote="-1" aria-pressed="${v < 0}" aria-label="Thumbs down">${THUMB.dn}</button>
-      ${famBar(i)}${i.url && !i.pin ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">Open ↗</a>` : ''}
+      ${famBar(i)}${i.url && !i.pin ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">${i._share && i.kind === 'link' ? 'Open on ' + esc(i.sn || 'the site') + ' ↗' : 'Open ↗'}</a>` : ''}
     </div></article>`;
 }
 function chips() {
@@ -784,7 +827,7 @@ function draw() {
   if (tab === 'all') order = weave(order.filter(i => !i.pin), lifeMix()); // My App cards mixed in at random, different every refresh
   if (tab === 'all' && FAM_ON) order = weaveShares(order); // 1.7.0: family reposts for everyone
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
-  m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'Nothing new here right now. Check back soon.'}</div>`);
+  m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'You’re all caught up ✨ New posts arrive through the day – check back soon.'}</div>`);
   more();
   moodLabel();
   $('#upd').innerHTML = FEED.updated ? `Updated<br>${esc(ago(FEED.updated))} ago` : '';
@@ -813,7 +856,7 @@ function more() {
   m.insertAdjacentHTML('beforeend', next.map(i => i.topic === 'life' ? lifeCard(i) : card(i)).join('') + (shown < order.length ? '<div class="load" id="sentinel">Loading more…</div>' : '<div class="load">You’re all caught up ✨</div>'));
   const old = m.querySelectorAll('#sentinel'); old.forEach((s, n) => { if (n < old.length - 1) s.remove(); });
   for (const i of next) { SEEN[i.id] = (SEEN[i.id] || 0) + 1; if (i.src) IMP[i.src] = (IMP[i.src] || 0) + 1; }
-  saveSeen(); fillPics(); watchVids(); famCounts(next);
+  saveSeen(); fillPics(); watchVids(); famCounts(next); watchSeen(m);
   const s = $('#sentinel');
   if (s) { if (io) io.disconnect(); io = new IntersectionObserver(e => { if (e[0].isIntersecting) { io.disconnect(); s.remove(); more(); } }, { rootMargin: '900px' }); io.observe(s); }
 }
@@ -843,7 +886,7 @@ function vote(el, v) {
 
 /* ---- data ---- */
 async function load(force) {
-  $('#rf').classList.add('spin'); if (force) famFresh(true);
+  $('#rf').classList.add('spin'); if (force) { famFresh(true); seenRebase(); }
   try {
     const r = await fetch(FEED_URL + (force ? '?t=' + Date.now() : ''), { cache: force ? 'no-store' : 'default' });
     if (!r.ok) throw new Error(r.status);

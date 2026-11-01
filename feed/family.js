@@ -106,14 +106,14 @@ async function loadShares() {
 function shareItem(s) {
   const x = s.snap || {};
   if (s.up) return { id: s.card, t: x.t || '', s: '', photos: (x.photos || []).slice(0, 4), sn: s.name, topic: 'family', src: 'family', kind: 'upload', at: s.at, _share: s };
-  return { id: s.card, t: x.t, s: x.s, url: x.url, img: x.img, vid: x.vid, sn: x.sn || 'Shared', topic: s.priv ? 'family' : (TOPIC[x.topic] ? x.topic : 'family'), src: x.src || 'family', kind: x.kind || (x.img ? 'photo' : 'news'), ev: x.ev || 0, at: s.at, _share: s };
+  return { id: s.card, t: x.t, s: x.s, url: x.url, img: x.img, vid: x.vid, photos: x.kind === 'link' && Array.isArray(x.photos) ? x.photos.slice(0, 1) : undefined, sn: x.sn || 'Shared', topic: s.priv ? 'family' : (TOPIC[x.topic] ? x.topic : 'family'), src: x.src || 'family', kind: x.kind || (x.img ? 'photo' : 'news'), ev: x.ev || 0, at: s.at, _share: s };
 }
 function sharesFor(t) { // reposts shown to everyone, whatever they picked (newest first)
   const now = Date.now();
   return SHARES.filter(s => t === 'family' || now - s.at < 21 * 864e5).map(shareItem).filter(i => !(VOTES[i.id] && VOTES[i.id].v < 0) && !unsafe(i) && !unsafe({ t: i._share.caption }));
 }
 function weaveShares(order) { // one shared card near the top, then every 6–8 posts
-  const sh = sharesFor('all'); if (!sh.length) return order;
+  const sh = sharesFor('all').filter(i => !(typeof shareSeen === 'function' && shareSeen(i))); if (!sh.length) return order; // 1.9.18 back only with a new comment or like
   const ids = new Set(sh.map(i => i.id)), rest = order.filter(i => !ids.has(i.id)), out = [];
   let k = 0, gap = 1;
   for (const i of rest) { if (--gap <= 0 && k < sh.length) { out.push(sh[k++]); gap = 6 + Math.floor(Math.random() * 3); } out.push(i); }

@@ -16,6 +16,7 @@ async function xLoad(force) {
   if (!FAM_ON || (!force && Date.now() - X.got < 60e3)) return; X.got = Date.now();
   const g = (p, d) => fam(p).catch(() => d);
   const [daily, triv, mems, dates, cars, prof, push, streaks, reno, wx, sap] = await Promise.all([g('/daily', null), g('/trivia', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/reno', { reno: null }), g('/weather', { list: [] }), g('/sappts', { list: [] })]);
+  const pw = await g('/power', { list: [] }); X.pwr = (pw && pw.list) || []; X.pwrAt = (pw && pw.checked) || 0;
   Object.assign(X, { daily, triv, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: (reno && reno.reno) || null, wx: (wx && wx.list) || [], sappt: (sap && sap.list) || [], saCfg: (sap && sap.cfg) || null });
   if (prof && prof.streak) stChip(prof.streak);
   if (IS_ADMIN) { carSync(); apptSync(); }
@@ -78,16 +79,37 @@ const WXE = { rain: '🌧️', wind: '💨', snow: '❄️', thunderstorm: '⛈�
 const wxWhen = w => { const f = t => NZ(t, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).replace(':00', ''); return (w.onset > Date.now() ? 'From ' + f(w.onset) : 'Now') + ' until ' + f(w.expires); };
 function wxCard(i) {
   const w = i.w, lvl = w.colour === 'red' ? 'RED warning' : w.colour === 'orange' ? 'Orange warning' : 'Watch', reg = 'Covers Whangārei';
+  const pic = { rain: 'rain', wind: 'wind', thunderstorm: 'thunderstorm', snow: 'snow', swell: 'swell' }[w.event] || 'warn';
   return `<article class="card xc wx ${esc(w.colour)}" data-id="${esc(i.id)}">${xHead(WXE[w.event] || '⚠️', (w.test ? 'TEST – ' : '') + w.head.replace(/\s*-\s*(Orange|Red)$/i, ''), 'MetService · ' + reg, lvl)}
-    <div class="bd"><div class="wxlv">${w.colour === 'red' ? '🔴' : w.colour === 'orange' ? '🟠' : '🟡'} ${esc(lvl)}${w.test ? ' · <b>TEST ONLY – not a real warning</b>' : ''}</div><p class="wxa"><b>${esc(w.area)}</b></p><p class="wxt">🕑 ${esc(wxWhen(w))}</p>
+    <a class="media" href="${esc(w.web)}" target="_blank" rel="noopener"><img src="img/alert-${pic}.svg" alt="${esc(w.head)}"></a><div class="bd"><div class="wxlv">${w.colour === 'red' ? '🔴' : w.colour === 'orange' ? '🟠' : '🟡'} ${esc(lvl)}${w.test ? ' · <b>TEST ONLY – not a real warning</b>' : ''}</div><p class="wxa"><b>${esc(w.area)}</b></p><p class="wxt">🕑 ${esc(wxWhen(w))}</p>
     <p class="xwho">${esc(w.desc)}</p>${w.act ? `<p class="xwho">👉 ${esc(w.act)}</p>` : ''}<div class="xbtns"><a class="btn pri" href="${esc(w.web)}" target="_blank" rel="noopener">MetService warnings ↗</a>${w.link ? `<a class="btn" href="${esc(w.link)}" target="_blank" rel="noopener">Official alert</a>` : ''}</div></div></article>`;
+}
+/* ---- 1.9.18 ⚡ Northpower power cuts in Whangārei District (unplanned now, planned within 48 hours) ---- */
+const pwT = t => NZ(t, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).replace(':00', '');
+function pwrCard(i) {
+  const o = i.o, un = o.kind === 'unplanned', ar = (o.areas || []).join(', ') || o.title;
+  return `<article class="card xc pwr ${un ? 'un' : 'pl'}" data-id="${esc(i.id)}">${xHead('⚡', (o.test ? 'TEST – ' : '') + (un ? 'Power cut: ' : 'Planned power cut: ') + ar, 'Northpower · Whangārei District', un ? 'Unplanned' : 'Planned')}
+    <a class="media" href="https://outages.northpower.nz/" target="_blank" rel="noopener"><img src="img/alert-power${un ? '' : '-planned'}.svg" alt="Power cut"></a>
+    <div class="bd"><div class="wxlv">${un ? '🔴 Unplanned outage – happening now' : '🗓️ Planned (scheduled) – not a fault'}${o.test ? ' · <b>TEST ONLY – not a real outage</b>' : ''}</div>
+    <p class="wxa"><b>${esc(ar)}</b>${o.roads && o.roads.length ? ` · ${esc(o.roads.slice(0, 4).join(', '))}` : ''}${o.locality ? ` · ${esc(o.locality)}` : ''}</p>
+    <p class="wxt">🏠 About ${+o.customers || 'some'} ${+o.customers === 1 ? 'property' : 'properties'} affected</p>
+    <p class="wxt">🕑 ${un ? (o.start ? 'Off since ' + esc(pwT(o.start)) : 'Off now') + (o.etr ? ' · back on by about ' + esc(pwT(o.etr)) : ' · no restoration time yet') : esc(pwT(o.start)) + (o.end ? ' until ' + esc(pwT(o.end)) : '')}</p>
+    ${o.cause ? `<p class="xwho">🔧 ${un ? 'Cause' : 'Reason'}: ${esc(o.cause)}</p>` : ''}${o.status ? `<p class="xwho">📋 ${esc(o.status)}</p>` : ''}${o.msg ? `<p class="xwho">${esc(o.msg)}</p>` : ''}
+    <p class="sst">No power and not listed? Phone Northpower on <a href="tel:0800104040">0800 10 40 40</a>. Emergencies: 111.</p>
+    <div class="xbtns"><a class="btn pri" href="https://outages.northpower.nz/" target="_blank" rel="noopener">Northpower outages ↗</a></div></div></article>`;
+}
+function pwrListCard(i) { // several planned ones: one card
+  return `<article class="card xc pwr pl" data-id="${esc(i.id)}">${xHead('⚡', 'Planned power cuts – next 48 hours', 'Northpower · Whangārei District', 'Planned')}
+    <a class="media" href="https://outages.northpower.nz/" target="_blank" rel="noopener"><img src="img/alert-power-planned.svg" alt="Planned power cuts"></a>
+    <div class="bd"><div class="wxlv">🗓️ Planned (scheduled) maintenance – not faults</div><ul class="rnl">${i.list.map(o => `<li><span>${o.test ? '<b>TEST</b> ' : ''}<b>${esc((o.areas || []).join(', ') || o.title)}</b> · ${+o.customers || '?'} ${+o.customers === 1 ? 'property' : 'properties'}${o.cause ? ' · ' + esc(o.cause) : ''}</span><em>${esc(pwT(o.start))}${o.end ? ' – ' + esc(NZ(o.end, { hour: 'numeric', minute: '2-digit' })) : ''}</em></li>`).join('')}</ul>
+    <div class="xbtns"><a class="btn" href="https://outages.northpower.nz/" target="_blank" rel="noopener">Northpower outages ↗</a></div></div></article>`;
 }
 function wxNzCard(i) {
   return `<article class="card xc wx nzsum" data-id="wx-nz">${xHead('⚠️', 'Severe weather elsewhere in NZ', 'MetService warnings now and coming up', 'Weather')}
     <div class="bd"><ul class="rnl">${i.list.slice(0, 6).map(w => `<li><span>${w.colour === 'red' ? '🔴' : '🟠'} ${WXE[w.event] || '⚠️'} <b>${esc(w.head.replace(/\s*-\s*(Orange|Red)$/i, ''))}</b> · ${esc(w.area.split(';')[0].slice(0, 70))}</span><em>${esc(wxWhen(w))}</em></li>`).join('')}</ul>
     <div class="xbtns"><a class="btn" href="https://www.metservice.com/warnings/home" target="_blank" rel="noopener">All MetService warnings ↗</a></div></div></article>`;
 }
-/* ---- 1.9.17 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
+/* ---- 1.9.18 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
    steps (iPhone), or "open in Chrome/Safari first" with a copy-my-link button (Messenger/Facebook). "Later" hides it for 3 days. ---- */
 let BIP = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); BIP = e; installBanner(true); });
@@ -123,8 +145,12 @@ let PIN_URLS = null, PIN_FOR = null;
 const pinUrls = () => (PIN_FOR === FEED && PIN_URLS) || (PIN_FOR = FEED, PIN_URLS = new Set((typeof FEED !== 'undefined' && FEED && FEED.items || []).filter(i => i.pin).map(i => urlBase(i.url))));
 window.pins = function () {
   const out = [];
-  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.17: only warnings and watches that cover Whangārei
+  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.18: only warnings and watches that cover Whangārei
   for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Whangārei warnings go right to the top
+  const PW = X.pwr || [], un = PW.filter(o => o.kind === 'unplanned'), pl = PW.filter(o => o.kind !== 'unplanned'); // 1.9.18 ⚡ then power cuts
+  for (const o of un.slice(0, 4)) out.push({ id: 'pw:' + o.id, x: 'pwr', o, topic: 'family', t: 'Power cut: ' + (o.areas || []).join(', ') });
+  if (pl.length === 1) out.push({ id: 'pw:' + pl[0].id, x: 'pwr', o: pl[0], topic: 'family', t: 'Planned power cut' });
+  else if (pl.length) out.push({ id: 'pw-planned', x: 'pwrl', list: pl.slice(0, 8), topic: 'family', t: 'Planned power cuts' });
   if (FAM_ON) {
     for (const c of X.cars) if (c.car && c.mid === MEMBER.id) out.push({ id: 'car:' + c.plate, x: 'car', c: c.car, at: c.at, topic: 'family' });
     for (const d of X.dates) if (d.days <= 14 && !(VOTES['date' + d.id] && VOTES['date' + d.id].v < 0)) out.push({ id: 'date' + d.id + '-' + new Date().getFullYear(), x: 'date', d, topic: 'family', t: (d.kind === 'bday' ? '🎂 ' : '🎉 ') + d.title, sn: 'Family dates' });
@@ -156,6 +182,8 @@ window.card = function (i) {
   if (i && i.x === 'fest') return festCard(i);
   if (i && i.x === 'wx') return wxCard(i);
   if (i && i.x === 'wxnz') return wxNzCard(i);
+  if (i && i.x === 'pwr') return pwrCard(i);
+  if (i && i.x === 'pwrl') return pwrListCard(i);
   if (i && i.x === 'trivia') return triviaCard(i);
   if (i && i.x === 'sugg') return suggCard(i);
   const h = baseCard(i);
@@ -254,7 +282,7 @@ function pushHint() {
 }
 function pushBox() {
   const P = (X.push && X.push.prefs) || {}, on = X.push && X.push.on && Notification.permission === 'granted', hint = pushHint();
-  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['event', '⭐ Reminders for events I’m interested in'], ...((X.sappt || []).length || IS_ADMIN ? [['appt', '📅 My appointments (the day before and ~2 hours before)']] : []), ['dates', '🎂 Birthdays, events & car dates'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)'], ['weather', '🔴 Red weather warnings (any time, even at night)']];
+  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['event', '⭐ Reminders for events I’m interested in'], ...((X.sappt || []).length || IS_ADMIN ? [['appt', '📅 My appointments (the day before and ~2 hours before)']] : []), ['dates', '🎂 Birthdays, events & car dates'], ['alerts', '⚠️ Weather & outage alerts (orange/red warnings, power cuts)'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)'], ['weather', '🔴 Red weather warnings (any time, even at night)']];
   return `<h3>🔔 Notifications</h3>${hint ? `<p class="hint">${hint}</p>` : on ? `<p class="sst">On for this phone. At most one every 30 minutes (replies to you come straight away). Quiet from ${P.qFrom}:00 to ${P.qTo}:00 – anything then waits until morning.</p>
     ${T.map(([k, l]) => `<button class="ich${P[k] ? ' on' : ''}" data-np="${k}">${P[k] ? '✓ ' : ''}${l}</button>`).join('')}
     <div class="bdf"><label>Quiet from <select id="qf">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qFrom ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label><label>to <select id="qt">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qTo ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label></div>
@@ -307,7 +335,7 @@ function suggApply(add) {
 /* ---- ranking: Shane's gentle life-stage nudge (never more than ×1.15, and not for topics they've 👎'd) and local events first ---- */
 const basePopW = popW;
 const REGION_NL = /whang[aā]rei|northland|kerikeri|paihia|russell|dargaville|kaitaia|kaikohe|ruak[aā]k[aā]|waipu|tutukaka|ngunguru|hikurangi|kamo|onerahi|bream bay|mangawhai|kawakawa|opua|hokianga|maungakaramea|tikipunga/i;
-/* ---- 1.9.17 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
+/* ---- 1.9.18 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
    Weather: My App's own Whangārei forecast on this phone if there is one (the one the auto theme uses), otherwise the same open-meteo
    forecast fetched here (once every 30 min). Nothing about the theme changes. */
 const NZ_RX = /\.nz\b|new zealand|aotearoa|\bkiwis?\b|whang[aā]rei|northland|auckland|wellington|christchurch|queenstown|rotorua|tauranga|hamilton|dunedin|nelson|napier|taup[oō]|coromandel|bay of islands|countdown|woolworths nz|pak'?n'?save|new world|the warehouse|mitre ?10|bunnings nz|kmart nz|briscoes|farmers|rnz|stuff\.co|nz ?herald|1news|newshub|te reo|m[aā]ori|matariki|waitangi|p[oō]hutukawa|kūmara|kumara|pavlova|\bl&p\b|whitebait|feijoa/i;
@@ -340,7 +368,7 @@ const isNZ = (i, txt) => NZ_SRC.test(i.src || '') || /^https?:\/\/[^/]+\.nz(\/|$
 function nzWeatherNudge(i) {
   if (!i || i.pin || i.x) return 1; const txt = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''); let f = 1; i._wxm = '';
   if (i.kind !== 'event') { // events already lean Whangārei/Northland
-    if (PRAC_TOPICS.has(i.topic)) { // 1.9.17 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
+    if (PRAC_TOPICS.has(i.topic)) { // 1.9.18 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
       const chip = tab !== 'all', nz = isNZ(i, txt), tipT = TIP_RE_C.test(i.t || ''), show = SHOW_RE_C.test(i.t || '');
       f *= nz ? (chip ? 1.8 : 1.3) : tipT ? (chip ? 0.9 : 0.95) : (chip ? 0.55 : 0.75);
       if (REGION_NL.test(txt)) f *= 1.15;
@@ -460,9 +488,9 @@ const baseFamList = famList;
 window.famList = async function () { await baseFamList(); const l = $('#famlist'); if (l && IS_ADMIN && !$('#famx')) l.insertAdjacentHTML('afterend', '<div id="famx" class="famx">Loading…</div>'); adminExtras(); };
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') xVisit(); });
 if (FAM_ON) { setTimeout(() => { xVisit(); xLoad(true); if (X.push === null) { } }, 1200); if ('serviceWorker' in navigator && Notification && Notification.permission === 'granted') swAuth(); }
-if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.17 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
+if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.18 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
 
-/* ---- 1.9.17 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
+/* ---- 1.9.18 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
 const WGR_AREA = /whang[aā]rei|kamo|onerahi|tikipunga|kensington|maunu|morningside|raumanga|otangarei|regent|parahaki|riverside|town basin|hundertwasser|forum north|tutuk[aā]k[aā]|ngunguru|matapouri|ruak[aā]k[aā]|waip[uū]\b|one tree point|marsden|hikurangi|parua bay|pataua|maungakaramea|maungatapere|portland|glenbervie|whareora|whananaki|oakleigh|tamaterau|mckinnon/i;
 const INT = { mine: new Map(), who: {}, got: 0 }, INT_META = {};
 async function intLoad(force) {
@@ -579,7 +607,7 @@ window.popW = function (i) { // ⭐ Interested: similar events (same interest, s
   return w;
 };
 
-/* ---- 1.9.17 🪄 Harry Potter with a Slytherin lean: Slytherin items rank higher, show-off posts lower, plus a daily 'Slytherin of the day' fact ---- */
+/* ---- 1.9.18 🪄 Harry Potter with a Slytherin lean: Slytherin items rank higher, show-off posts lower, plus a daily 'Slytherin of the day' fact ---- */
 const SLY_RE = /slytherin|snape|draco|malfoy|scorpius|green (and|&) silver|emerald|serpent|salazar|bloody baron|slughorn|regulus/i;
 const popWHp = window.popW;
 window.popW = function (i) { let w = popWHp(i); if (i && i.topic === 'hp') { const t = (i.t || '') + ' ' + (i.s || ''); if (SLY_RE.test(t)) w *= 1.5; if (SHOW_RE_C.test(i.t || '')) w *= 0.45; if (TIP_RE_C.test(i.t || '')) w *= 1.2; } return w; };
@@ -609,7 +637,7 @@ window.festive = function (order, nPins) { order = festHp(order, nPins); if (opt
 const cardHp = window.card;
 window.card = function (i) { if (i && i.x === 'sly') return slyCard(); return cardHp(i); };
 
-/* ---- 1.9.17 📅 Sarah's appointments: read on Shane's phone from My App's own storage (same as the shared cars). Only her own
+/* ---- 1.9.18 📅 Sarah's appointments: read on Shane's phone from My App's own storage (same as the shared cars). Only her own
    appointments (ones she shared from her To-do app, ones Shane marked For: Sarah, and her booked Health check-ups) go –
    title, date, time and place only, never notes, costs or claims. Only Sarah (and Shane) can read them. ---- */
 const SA_MONEY = /\$|\b(bills?|pay(ment|ing)?|invoice|loan|bank|rent|mortgage|insurance|ird|tax|debt|budget|direct debit)\b(?!\s+(st|street|rd|road)\b)/i;
@@ -666,7 +694,7 @@ function saCard(i) {
     <p class="xwho">🔒 Only you (and Shane) can see this card. From your appointments in My App.</p></div></article>`;
 }
 
-/* ---- 1.9.17 🤖 Info Bot settings ---- */
+/* ---- 1.9.18 🤖 Info Bot settings ---- */
 function aiAdmin(a) {
   if (!a || !a.cfg) return '';
   const u = a.usage || {}, neu = Math.round((u.tin || 0) * 26668 / 1e6 + (u.tout || 0) * 204805 / 1e6);
@@ -675,12 +703,12 @@ function aiAdmin(a) {
     <div class="row"><span>How often (when not asked)</span><select id="aifreq">${[['rare', 'Now and then (1 in 7)'], ['some', 'Sometimes (1 in 3)'], ['often', 'Often (1 in 2)']].map(([k, l]) => `<option value="${k}"${a.cfg.freq === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
 }
 
-/* ---- 1.9.17 pronouns: optional, wording only; not set = they/them ---- */
+/* ---- 1.9.18 pronouns: optional, wording only; not set = they/them ---- */
 const PRON_OPTS = [['', 'Pronouns – not set (they)'], ['she', 'she/her'], ['he', 'he/him'], ['they', 'they/them']];
 const PRON_LABEL = { she: 'she/her', he: 'he/him', they: 'they/them' };
 function pronOf(k) { const t = k === 'she' ? { sub: 'she', obj: 'her', pos: 'her' } : k === 'he' ? { sub: 'he', obj: 'him', pos: 'his' } : { sub: 'they', obj: 'them', pos: 'their' }; t.Sub = t.sub[0].toUpperCase() + t.sub.slice(1); t.Pos = t.pos[0].toUpperCase() + t.pos.slice(1); return t; }
 
-/* ---- 1.9.17 🔗 share a link (Android: Info Book in the phone's Share menu; iPhone/desktop: paste a link) ---- */
+/* ---- 1.9.18 🔗 share a link (Android: Info Book in the phone's Share menu; iPhone/desktop: paste a link) ---- */
 let LS = null;
 const LINK_WHY = { sport: 'Info Book keeps sport out of the feeds, so this one can’t be shared.', money: 'Money and bills stay out of Info Book, so this one can’t be shared.', unsafe: 'That one isn’t family-safe, so it can’t be shared here.' };
 function linkSheet(pre) {
@@ -700,29 +728,57 @@ function linkSheet(pre) {
 let lkT = 0;
 async function linkPreview() {
   const v = ($('#lkurl') || {}).value || '', box = $('#lkpv'); if (!box) return;
-  LS.pv = null; $('#lkpost').disabled = true;
+  LS.pv = null; LS.img = ''; LS.photo = 0; LS.pk = 0; lkReady();
   if (!/https?:\/\/\S+/i.test(v)) { box.innerHTML = v.trim() ? '<p class="sst">No link found yet – paste the whole link (it starts with https://).</p>' : ''; return; }
-  box.innerHTML = '<p class="sst">Getting a preview…</p>';
+  box.innerHTML = '<p class="sst">🤖 Reading the public post and finding a picture…</p>';
   try {
     const r = await fam('/preview?text=' + encodeURIComponent(v.slice(0, 2000)));
     if (($('#lkurl') || {}).value !== v) return;
     if (r.blocked) { box.innerHTML = `<p class="lkno">🙅 ${esc(LINK_WHY[r.blocked] || LINK_WHY.unsafe)}</p>`; return; }
-    LS.pv = r; $('#lkpost').disabled = false;
-    box.innerHTML = `<div class="lkcard"><img src="${esc(r.img)}" alt="" referrerpolicy="no-referrer" onerror="this.src='img/share-${esc(r.plat === 'web' ? 'web' : r.plat)}.svg'"><div><small>${esc(r.site)}</small><b>${esc(r.t)}</b>${r.s ? `<span>${esc(r.s.slice(0, 140))}</span>` : ''}${r.fallback && /facebook|instagram/.test(r.plat) ? `<em>${esc(r.site)} doesn’t share previews, so the family will see this card with your link.</em>` : ''}</div></div>`;
-  } catch (e) { box.innerHTML = `<p class="lkno">${esc(e.message)}</p>`; }
+    LS.pv = r; LS.img = r.img || ''; LS.pics = (r.pics || []).map(p => p.img); if (LS.img && !LS.pics.includes(LS.img)) LS.pics.unshift(LS.img);
+    box.innerHTML = `<div class="lkcard"><div class="lkpic"><img id="lkimg" alt="" referrerpolicy="no-referrer"${LS.img ? ` src="${esc(LS.img)}"` : ''} onerror="this.removeAttribute('src');lkReady()"><div class="lkpb"><button class="btn" id="lknext">🔄 Another picture</button><button class="btn" id="lkmine">📷 Use my photo</button></div></div>
+      <div><small>${esc(r.site)}${r.stock ? ' · picture: free photo (Wikimedia Commons)' : ''}</small><b>${esc(r.t)}</b></div></div>
+      <label class="lkdl">${r.needDesc ? '✏️ <b>Write a line about it</b> – there’s no public description to use' : '🤖 Description (written by Info Bot from the public post – change it if you like)'}</label>
+      <textarea id="lkdesc" rows="3" maxlength="300" placeholder="What’s it about? (at least 10 letters)">${esc(r.desc || '')}</textarea>`;
+    lkReady();
+  } catch (e) { box.innerHTML = `<p class="lkno">${/public/i.test(e.message) ? '🔒 ' : ''}${esc(e.message)}</p>`; }
+}
+function lkReady() { // Share needs a real description and a picture
+  const b = $('#lkpost'); if (!b) return; const d = (($('#lkdesc') || {}).value || '').replace(/\s/g, ''), im = $('#lkimg');
+  b.disabled = !(LS && LS.pv && d.length >= 10 && (LS.photo || (im && im.getAttribute('src'))));
+}
+async function lkNextPic() {
+  if (!LS || !LS.pv) return;
+  if (LS.pics.length < 2 || LS.pk >= LS.pics.length - 1) { // ask for more, from the description's words
+    const q = (LS.pv.picq || LS.pv.q || ((($('#lkdesc') || {}).value || '').split(/\s+/).filter(w => w.length > 4).slice(0, 2).join(' ')) || 'New Zealand');
+    try { const r = await fam('/preview/pics?q=' + encodeURIComponent(q)); for (const p of r.pics || []) if (!LS.pics.includes(p.img)) LS.pics.push(p.img); } catch (e) { }
+  }
+  if (!LS.pics.length) { toast('No other pictures found – try “Use my photo”'); return; }
+  LS.pk = (LS.pk + 1) % LS.pics.length; LS.img = LS.pics[LS.pk]; LS.photo = 0; const im = $('#lkimg'); if (im) im.src = LS.img; lkReady();
+}
+function lkMine() {
+  const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*';
+  f.onchange = async () => { const file = f.files[0]; if (!file) return; const im = $('#lkimg');
+    try { toast('Getting your photo ready…'); const p = await shrink(file);
+      const r = await fetch(FAM_API + '/photos?w=' + p.w + '&h=' + p.h, { method: 'POST', headers: { Authorization: 'Bearer ' + MEMBER.tok, 'Content-Type': 'image/jpeg' }, body: p.blob });
+      const j = await r.json(); if (!r.ok) throw new Error(j.err || 'Couldn’t add that photo');
+      LS.photo = j.id; LS.img = ''; if (im) im.src = p.url; lkReady();
+    } catch (e) { toast(e.message); } };
+  f.click();
 }
 async function linkPost() {
   if (!LS || !LS.pv) return;
   const some = (document.querySelector('input[name="lkto"]:checked') || {}).value === 'some', to = some ? [...document.querySelectorAll('[data-lkp].on')].map(b => b.dataset.lkp) : [];
   if (some && !to.length) { toast('Pick who should see it'); return; }
+  const d = (($('#lkdesc') || {}).value || '').trim();
   const btn = $('#lkpost'); btn.disabled = true; btn.textContent = 'Sharing…';
   try {
-    const r = await fam('/shares/link', { method: 'POST', body: JSON.stringify({ url: LS.pv.url, caption: ($('#lkcap') || {}).value || '', to }) });
+    const r = await fam('/shares/link', { method: 'POST', body: JSON.stringify({ url: LS.pv.url, caption: ($('#lkcap') || {}).value || '', desc: d === (LS.pv.desc || '') ? '' : d, img: LS.photo ? '' : LS.img, photo: LS.photo || 0, to }) });
     $('#sheet').classList.remove('on'); toast(r.dup ? 'You shared that one already' : some ? '🔒 Shared with ' + to.length + (to.length === 1 ? ' person' : ' people') : '🔗 Shared with the family');
     await loadShares(); if (typeof tab !== 'undefined' && tab !== 'family') { const b = document.querySelector('[data-tab="family"]'); if (b) b.click(); }
-  } catch (e) { btn.disabled = false; btn.textContent = 'Share'; toast(e.message); }
+  } catch (e) { btn.disabled = false; btn.textContent = 'Share'; toast(e.message); lkReady(); }
 }
-document.addEventListener('input', e => { if (e.target && e.target.id === 'lkurl') { clearTimeout(lkT); lkT = setTimeout(linkPreview, 500); } });
+document.addEventListener('input', e => { if (e.target && e.target.id === 'lkurl') { clearTimeout(lkT); lkT = setTimeout(linkPreview, 500); } if (e.target && e.target.id === 'lkdesc') lkReady(); });
 document.addEventListener('change', e => { if (e.target && e.target.name === 'lkto') { const p = $('#lkppl'); if (p) p.hidden = e.target.value !== 'some'; } });
 document.addEventListener('click', async e => {
   const t = e.target; if (!t || !t.closest) return;
@@ -730,6 +786,8 @@ document.addEventListener('click', async e => {
   if (t.id === 'lkpaste') { try { const v = await navigator.clipboard.readText(); if (v) { $('#lkurl').value = v; linkPreview(); } } catch (er) { toast('Long-press the box and tap Paste'); } return; }
   const lp = t.closest('[data-lkp]'); if (lp) { lp.classList.toggle('on'); return; }
   if (t.id === 'lkpost') { linkPost(); return; }
+  if (t.id === 'lknext') { lkNextPic(); return; }
+  if (t.id === 'lkmine') { lkMine(); return; }
   if (t.id === 'lktipok') { ls.set('shareTip', 1); document.querySelector('#lktip')?.remove(); return; }
 });
 // Android Share sheet → Info Book (manifest share_target, GET ./?share=1&title=&text=&url=)
