@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.21';
+const APP_VERSION = '1.9.22';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -149,7 +149,7 @@ const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPIC
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
 let SEEN = ls.get('seen', {});          // id -> times shown (keeps the feed fresh)
-/* 1.9.21 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
+/* 1.9.22 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
    on this phone; the last 5,000, for 60 days). Warnings, outages, pinned/private cards, countdowns, the daily cards and
    family posts stay (family posts come back only when there's a new comment or like). The same story from two sources
    shows once. SEEN_BASE is what was seen before this load, so nothing vanishes while you're looking at it. */
@@ -344,7 +344,7 @@ function visible() {
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
   });
-  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.21 once seen, gone (and one card per story)
+  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.22 once seen, gone (and one card per story)
 }
 
 /* ---- For You: Shane's own things plus every board and hub in My App, read on this phone from what My App left in

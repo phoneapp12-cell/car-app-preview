@@ -185,10 +185,10 @@ function refreshBar(id) { // 1.9.10: null-safe – the daily-question and date b
   document.querySelectorAll(`.card[data-id="${CSS.escape(id)}"] [data-cmt]`).forEach(b => { const c = COUNTS[id]; let cc = b.querySelector('.cc'); if (!cc) { b.insertAdjacentHTML('beforeend', '<span class="cc"></span>'); cc = b.querySelector('.cc'); } if (cc) cc.textContent = c && c[0] ? c[0] : ''; const d = b.querySelector('.dot'); const fresh = c && c[1] > (CSEEN[id] || 0); if (fresh && !d) b.insertAdjacentHTML('beforeend', '<i class="dot"></i>'); if (!fresh && d) d.remove(); });
 }
 async function openThread(btn) {
-  const c = btn.closest('.card'), id = btn.dataset.cmt; let box = c.querySelector('.cmts');
+  const c = btn.closest('.card'), id = btn.dataset.cmt; let box = c.querySelector('.cmts:not(.dqt)');
   if (box) { box.remove(); c.dataset.cmshut = 1; return; }
   c.insertAdjacentHTML('beforeend', `<div class="cmts"><div class="cl">Loading…</div><form class="cf"><textarea rows="1" maxlength="1000" placeholder="Write a comment…" aria-label="Write a comment"></textarea><button class="btn pri">Send</button></form></div>`);
-  box = c.querySelector('.cmts'); await loadThread(box, id);
+  box = c.querySelector('.cmts:not(.dqt)'); await loadThread(box, id);
 }
 /* 1.9.14 ❤️ on comments: tap the heart to like/unlike, tap the names (or hold the heart) to see everyone who liked it */
 const CLIKES = {};
@@ -221,7 +221,7 @@ const cmRow = x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>$
 function autoThread(id) {
   const c = COUNTS[id]; if (!c || !c[0] || !Array.isArray(c[2]) || !c[2].length) return;
   document.querySelectorAll(`.card[data-id="${CSS.escape(id)}"]`).forEach(card => {
-    if (!card || card.querySelector('.cmts') || card.dataset.cmshut) return;
+    if (!card || card.querySelector('.cmts:not(.dqt)') || card.dataset.cmshut) return;
     const more = c[0] > c[2].length ? `<button class="cmall" data-cmall="${esc(id)}">View all ${c[0]} comments</button>` : '';
     card.insertAdjacentHTML('beforeend', `<div class="cmts auto">${more}<div class="cl">${c[2].map(cmRow).join('')}</div><form class="cf"><textarea rows="1" maxlength="1000" placeholder="Write a reply…" aria-label="Write a comment"></textarea><button class="btn pri">Send</button></form></div>`);
   });
@@ -235,7 +235,7 @@ async function loadThread(box, id) {
   } catch (e) { const cl = box && box.querySelector('.cl'); if (cl) cl.textContent = 'Couldn’t load comments – tap 💬 to try again.'; console.warn('comments', e); }
 }
 async function sendComment(form) {
-  const c = form.closest('.card'), id = c.dataset.id, ta = form.querySelector('textarea'), text = ta.value.trim(); if (!text) return;
+  const c = form.closest('.card'), id = (form.closest('.cmts') || {dataset:{}}).dataset.cid || c.dataset.id, ta = form.querySelector('textarea'), text = ta.value.trim(); if (!text) return;
   const i = order.find(x => x.id === id) || ((FEED && FEED.items) || []).find(x => x.id === id) || {};
   if (!isPublicCard({ ...i, id })) { toast('That one stays private'); return; }
   const sh = i._share ? i._share.snap : null, base = sh || i;
@@ -245,7 +245,7 @@ async function sendComment(form) {
   catch (e) { toast(e.message); }
   form.querySelector('button').disabled = false;
 }
-async function delComment(b) { if (!confirm('Delete this comment?')) return; const box = b.closest('.cmts'), id = b.closest('.card').dataset.id; try { await fam('/comments/' + b.dataset.delc, { method: 'DELETE' }); await loadThread(box, id); } catch (e) { toast(e.message); } }
+async function delComment(b) { if (!confirm('Delete this comment?')) return; const box = b.closest('.cmts'), id = (box && box.dataset.cid) || b.closest('.card').dataset.id; try { await fam('/comments/' + b.dataset.delc, { method: 'DELETE' }); await loadThread(box, id); } catch (e) { toast(e.message); } }
 
 /* ---- 1.7.1 Install to the home screen ----
    Android / Chrome: the browser's own install prompt (beforeinstallprompt); the installed app shares this browser's
