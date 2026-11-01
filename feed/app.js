@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.8.3';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -27,9 +27,13 @@ const TOPICS = [
   ['fitness', 'Fitness & weights', '💪', '#0f766e', '#14b8a6'],
   ['selling', 'Selling & side hustles', '💰', '#15803d', '#ca8a04'],
   ['creative', 'Creative & crafts', '🎨', '#c026d3', '#f97316'],
+  ['craft', 'Knitting & crafts', '🧶', '#db2777', '#a855f7'], // 1.8.3: calm, for cosy evenings
   ['culture', 'Culture & stage', '🎭', '#7c2d12', '#be123c'],
   ['learn', 'Learning & ideas', '📖', '#1e40af', '#0891b2'],
   ['games', 'Games & puzzles', '🎲', '#6d28d9', '#2563eb'],
+  ['vgames', 'Video gaming', '🎮', '#7c3aed', '#22c55e'], // 1.8.3: also shown in the Games & puzzles chip
+  ['boardg', 'Board games', '🎲', '#b45309', '#7c3aed'],
+  ['fantasy', 'Fantasy games', '🐉', '#065f46', '#7c3aed'],
   ['collect', 'Collecting', '🏺', '#92400e', '#a16207'],
   ['outdoors', 'Outdoors', '🏕️', '#166534', '#0d9488'],
   ['cars', 'Cars & machines', '🚗', '#1e3a8a', '#475569'],
@@ -37,16 +41,17 @@ const TOPICS = [
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
-const BASE = { election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
+const BASE = { craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 // 1.7.1 family-safe: no nudity or adult content, anywhere (same rules as the data service's safe.js)
 const NUDE = /\b(nud(e|es|ity|ist|ists|ism)|semi-?nude|naked|nsfw|nsfl|topless|bottomless|erotic(a|ism|ally)?|lingerie|boudoir|sensual(ity)?|figure (study|studies|drawing|model)|life drawing|live model|nude model|odalisques?|breasts?|nipples?|genital(s|ia)?|penis|vagina|porn(o|ography|ographic)?|pin-?ups?|burlesque|undress(ed|ing)?|strip(per|pers|tease|club)|playboy|onlyfans|bikinis?|thongs?|skinny[- ]?dip\w*|sexy|sexual(ly|ity)?|sex (worker|work|toy|toys|scene|scenes)|fetish\w*|kinky|18\+|xxx|adult (content|film|films|only))\b/i;
 const ART_NUDE = /\b(venus|birth of venus|nymphs?|bathers|bathing|the bath|shower|reclining|olympia|adam and eve|the three graces|danaë|danae|leda|susanna|bathsheba|schiele|modigliani|bouguereau|klimt|courbet|rubens|titian|ingres|egon|figurative|the body|bodies|torso|male gaze)\b/i;
-const ART_TOPICS = new Set(['creative', 'culture', 'learn', 'collect', 'travel', 'kids']);
+const ART_TOPICS = new Set(['creative', 'culture', 'learn', 'collect', 'travel', 'kids', 'craft', 'vgames', 'boardg', 'fantasy']);
+const GAME_TOPICS = new Set(['vgames', 'boardg', 'fantasy']), GAME_BAD = /\besports?\b|tournament|\bgore\b|gory|bloody|dismember|decapitat|mutilat|torture|\bR18\b|adults? only|seductive|succubus|bikini armou?r/i; // 1.8.3
 const BLOCKED = new Set(['4qrdzz', '4ek9op']); // the r/museum nude photos Shane reported (1 Nov 2026)
 const BLOCKED_SRC = new Set(['rd-museum', 'rd-historyporn', 'hyperallergic', 'openculture', 'yt-proko', 'rd-drawing']);
-function unsafe(i) { if (!i) return false; if (BLOCKED.has(i.id) || BLOCKED_SRC.has(i.src)) return true; const t = [i.t, i.s, i.url, i.tag, i.sub].join(' '); return NUDE.test(t) || /\bnsfw\b|over_?18/i.test(t) || (ART_TOPICS.has(i.topic) && ART_NUDE.test(t)); }
+function unsafe(i) { if (!i) return false; if (BLOCKED.has(i.id) || BLOCKED_SRC.has(i.src)) return true; const t = [i.t, i.s, i.url, i.tag, i.sub].join(' '); if (GAME_TOPICS.has(i.topic) && GAME_BAD.test(t)) return true; return NUDE.test(t) || /\bnsfw\b|over_?18/i.test(t) || (ART_TOPICS.has(i.topic) && ART_NUDE.test(t)); }
 const PAGE = 12;
 const THUMB = {
   up: '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path class="sh" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/><path class="ln" d="M7 10v12"/></svg>',
@@ -61,6 +66,10 @@ const ls = { get(k, d) { try { const v = localStorage.getItem(LS_PREFIX + k); re
    Sport is left out entirely. Each interest belongs to a topic chip (new groups, or an existing tab it fits). Switch
    any of them off in ⚙️ → Manage interests: their sources and matching posts disappear from the feed. ---- */
 const INTERESTS = [ // name, topic, words that mark a post as being about it
+  ['Knitting', 'craft', 'knit(s|ting|ted)?|yarn|wool|sweater|jumper|beanie|cable'], ['Crochet', 'craft', 'crochet(ed|ing)?|amigurumi|granny squares?'], ['Sewing & quilting', 'craft', 'sew(ing|n)?|quilt(s|ed|ing)?|fabric|dressmaking'], ['Embroidery', 'craft', 'embroider(y|ed)?|cross[ -]?stitch|stitch(es|ing)?'], ['Paper crafts', 'craft', 'card ?making|cards?|scrapbook(ing)?|paper|cricut|pop[ -]?up'], ['Crafts', 'craft', 'crafts?|handmade|felting|macram[eé]|weav(e|ing)'],
+  ['Video gaming', 'vgames', 'video ?games?|gaming|gamers?|trailer|consoles?'], ['Nintendo', 'vgames', 'nintendo|switch|mario|pok[eé]mon|kirby|pikmin|animal crossing'], ['PlayStation & Xbox', 'vgames', 'playstation|ps5|xbox'], ['PC games', 'vgames', '\\bpc\\b|steam'], ['Cosy games', 'vgames', 'cosy|cozy|wholesome|farming|stardew|island'],
+  ['Board game news & nights', 'boardg', 'board ?games?|tabletop|card games?|dice|meeples?|lorcana|how to play|games? night'],
+  ['D&D & tabletop RPGs', 'fantasy', 'd&d|dungeons|dragons|rpgs?|role[ -]?play|campaign|dungeon master|battle ?maps?'], ['Warhammer & miniatures', 'fantasy', 'warhammer|miniatures?|minis|painting|games workshop|40k|sigmar|necromunda|ogors?'], ['Fantasy video games', 'fantasy', 'zelda|elder scrolls|skyrim|baldur|final fantasy|witcher|fantasy'],
   ['Kids activities', 'kids', 'kids?|children|tamariki|school holidays?|family day|whānau day|play(ground|group)?'], ['Kids crafts', 'kids', 'how to draw|craft|colou?ring|paper|folding'], ['Kids science', 'kids', 'science|experiment|volcano|dinosaur|space|animals'], ['Sensory-friendly', 'kids', 'sensory|autism|autistic|quiet|calm|fine motor|ot\\b'], ['Family days out', 'kids', 'family|days? out|outing|market|museum|park'],
   ['Gluten free', 'gf', 'gluten[ -]?free|coeliac|celiac|gf'], ['Vegan', 'gf', 'vegan|plant[ -]?based|dairy[ -]?free'], ['Meal kits', 'gf', 'meal kits?|my food bag|bargain box|fresh start|woop|hellofresh|recipe box'],
   ['Election 2026', 'election', 'election|vote|voting|candidates?|polls?|policy|policies|manifesto'],
@@ -119,7 +128,7 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['election', 'gf', 'kids', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
+const GROUP_TOPICS = ['election', 'gf', 'kids', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
 const topicOn = t => pickOk(t) && (!GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]));
 
 let FEED = ls.get('feed', null);
@@ -197,7 +206,7 @@ function moodOf(i) {
   const k = i.src || '';
   if (i.topic === 'election' || i.topic === 'events' || NEWS_SRC.test(k)) return 'news';
   if (LOUD_SRC.test(k) || i.topic === 'games' || i.topic === 'cars') return 'loud';
-  if (CALM_SRC.test(k) || ['dogs', 'nature', 'garden', 'food', 'outdoors'].includes(i.topic)) return 'calm';
+  if (CALM_SRC.test(k) || ['dogs', 'nature', 'garden', 'food', 'outdoors', 'craft'].includes(i.topic) || i.mood === 'calm') return 'calm';
   return 'neutral';
 }
 function moodW(i) { if (MOOD_OFF) return 1; const m = MOODS[moodBand()], k = moodOf(i); return k === 'news' ? m[1] : k === 'calm' ? m[2] : k === 'loud' ? m[3] : 1; }
@@ -252,7 +261,7 @@ function visible() {
     if (!topicOn(i.topic) || intHidden(i)) return false;           // interests you've switched off
     if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
-    return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf');
+    return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
   });
 }
 
