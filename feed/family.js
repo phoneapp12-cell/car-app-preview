@@ -177,7 +177,7 @@ function famCounts(items) {
   for (const i of items) if (isPublicCard(i)) cntQ.add(i.id);
   clearTimeout(cntT); cntT = setTimeout(async () => {
     const ids = [...cntQ].slice(0, 80); cntQ = new Set([...cntQ].slice(80)); if (!ids.length) return;
-    try { const r = await fam('/counts?ids=' + ids.map(encodeURIComponent).join(',')); Object.assign(COUNTS, r); for (const id of ids) refreshBar(id); } catch (e) { }
+    try { const r = await fam('/counts?last=3&ids=' + ids.map(encodeURIComponent).join(',')); Object.assign(COUNTS, r); for (const id of ids) { refreshBar(id); try { autoThread(id); } catch (er) { } } } catch (e) { }
     if (cntQ.size) famCounts([]);
   }, 300);
 }
@@ -186,7 +186,7 @@ function refreshBar(id) { // 1.9.10: null-safe – the daily-question and date b
 }
 async function openThread(btn) {
   const c = btn.closest('.card'), id = btn.dataset.cmt; let box = c.querySelector('.cmts');
-  if (box) { box.remove(); return; }
+  if (box) { box.remove(); c.dataset.cmshut = 1; return; }
   c.insertAdjacentHTML('beforeend', `<div class="cmts"><div class="cl">Loading…</div><form class="cf"><textarea rows="1" maxlength="1000" placeholder="Write a comment…" aria-label="Write a comment"></textarea><button class="btn pri">Send</button></form></div>`);
   box = c.querySelector('.cmts'); await loadThread(box, id);
 }
@@ -215,10 +215,22 @@ document.addEventListener('click', e => {
   const b = t.closest('[data-clike]'); if (b) { e.preventDefault(); e.stopPropagation(); if (CLK_HELD) { CLK_HELD = false; return; } toggleCLike(+b.dataset.clike); return; }
   const n = t.closest('[data-clikers]'); if (n) { e.preventDefault(); e.stopPropagation(); showCLikers(+n.dataset.clikers); }
 }, true);
+const cmRow = x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>${x.pron && { she: 1, he: 1, they: 1 }[x.pron] ? ` <small class="prn">(${{ she: 'she/her', he: 'he/him', they: 'they/them' }[x.pron]})</small>` : ''}${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p>${cmLikeBar(x)}</div>`;
+/* 1.9.19 💬 threads open by themselves: any card with comments shows the latest 2–3 (with ❤️ and a reply box) and
+   "View all N comments" when there are more. They arrive in the same one batch request as the counts. */
+function autoThread(id) {
+  const c = COUNTS[id]; if (!c || !c[0] || !Array.isArray(c[2]) || !c[2].length) return;
+  document.querySelectorAll(`.card[data-id="${CSS.escape(id)}"]`).forEach(card => {
+    if (!card || card.querySelector('.cmts') || card.dataset.cmshut) return;
+    const more = c[0] > c[2].length ? `<button class="cmall" data-cmall="${esc(id)}">View all ${c[0]} comments</button>` : '';
+    card.insertAdjacentHTML('beforeend', `<div class="cmts auto">${more}<div class="cl">${c[2].map(cmRow).join('')}</div><form class="cf"><textarea rows="1" maxlength="1000" placeholder="Write a reply…" aria-label="Write a comment"></textarea><button class="btn pri">Send</button></form></div>`);
+  });
+}
+document.addEventListener('click', e => { const b = e.target && e.target.closest && e.target.closest('[data-cmall]'); if (!b) return; const box = b.closest('.cmts'); b.remove(); if (box) loadThread(box, b.dataset.cmall); });
 async function loadThread(box, id) {
   try {
     const list = await fam('/comments?card=' + encodeURIComponent(id));
-    box.querySelector('.cl').innerHTML = list.length ? list.map(x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>${x.pron && { she: 1, he: 1, they: 1 }[x.pron] ? ` <small class="prn">(${{ she: 'she/her', he: 'he/him', they: 'they/them' }[x.pron]})</small>` : ''}${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p>${cmLikeBar(x)}</div>`).join('') : '<div class="cm0">No comments yet. Say something 👋</div>';
+    box.querySelector('.cl').innerHTML = list.length ? list.map(cmRow).join('') : '<div class="cm0">No comments yet. Say something 👋</div>';
     COUNTS[id] = [list.length, list.length ? list[list.length - 1].at : 0]; CSEEN[id] = Date.now(); ls.set('cseen', CSEEN); refreshBar(id);
   } catch (e) { const cl = box && box.querySelector('.cl'); if (cl) cl.textContent = 'Couldn’t load comments – tap 💬 to try again.'; console.warn('comments', e); }
 }
