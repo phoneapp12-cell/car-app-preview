@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.2';
+const APP_VERSION = '1.9.3';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -31,7 +31,7 @@ const TOPICS = [
   ['tarot', 'Tarot', '🔮', '#6d28d9', '#db2777'], // 1.8.5 (off unless picked)
   ['parent', 'Parenting & family', '👪', '#0e7490', '#db2777'], // 1.9.0 off unless picked (suggested by life stage)
   ['rainbow', 'Drag & LGBTQ+', '🌈', '#e11d48', '#7c3aed'], // 1.9.0 off unless picked
-  ['candy', 'Candy Crush tips', '🍬', '#ec4899', '#f97316'], ['pets', 'Cute & funny pets', '🐾', '#f59e0b', '#ec4899'], // 1.9.1 off unless picked
+  ['candy', 'Candy Crush tips', '🍬', '#ec4899', '#f97316'], ['pets', 'Cute & funny pets', '🐾', '#f59e0b', '#ec4899'], ['nd', 'ADHD & autism parenting', '🧩', '#0ea5e9', '#8b5cf6'], // 1.9.1 off unless picked
   ['social', 'Social work & community (NZ)', '🤝', '#0f766e', '#2563eb'], // 1.9.0 off unless picked
   ['culture', 'Culture & stage', '🎭', '#7c2d12', '#be123c'],
   ['learn', 'Learning & ideas', '📖', '#1e40af', '#0891b2'],
@@ -46,7 +46,7 @@ const TOPICS = [
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
-const BASE = { candy: 0.9, pets: 1, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
+const BASE = { nd: 0.9, candy: 0.9, pets: 1, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 // 1.7.1 family-safe: no nudity or adult content, anywhere (same rules as the data service's safe.js)
@@ -78,7 +78,7 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
   ['D&D & tabletop RPGs', 'fantasy', 'd&d|dungeons|dragons|rpgs?|role[ -]?play|campaign|dungeon master|battle ?maps?'], ['Warhammer & miniatures', 'fantasy', 'warhammer|miniatures?|minis|painting|games workshop|40k|sigmar|necromunda|ogors?'], ['Fantasy video games', 'fantasy', 'zelda|elder scrolls|skyrim|baldur|final fantasy|witcher|fantasy'],
   ['Baby & toddler', 'parent', 'bab(y|ies)|toddlers?|newborns?|infants?|sleep|feeding|breastfeed\\w*|bottle|wean(ing)?|milestones?|plunket|teething|nappy|nappies|preschool'], ['Primary-age kids', 'parent', 'child(ren)?|kids|siblings?|school|homework|big feelings|meltdowns?|tantrums?|sleepovers?'],
   ['Autism & sensory parenting', 'parent', 'autism|autistic|sensory|neurodivergen\\w*|adhd|ot\\b|occupational therap\\w*|stim(ming)?|regulation'], ['Parenting teens', 'parent', 'teens?|teenagers?|tweens?|adolescen\\w*|rangatahi|secondary school|study'], ['Grandparenting', 'parent', 'grand(parents?|kids|children|ma|pa|mother|father)|nana|koro|kuia|mokopuna'],
-  ['Candy Crush tips', 'candy', 'candy crush|candies|booster|level|combo|colou?r bomb|striped|wrapped'], ['Cute & funny pets', 'pets', 'pets?|dogs?|pupp(y|ies)|cats?|kittens?|bunn(y|ies)|animals?|aww|derp'],
+  ['Candy Crush tips', 'candy', 'candy crush|candies|booster|level|combo|colou?r bomb|striped|wrapped'], ['Cute & funny pets', 'pets', 'pets?|dogs?|pupp(y|ies)|cats?|kittens?|bunn(y|ies)|animals?|aww|derp'], ['ADHD & autism parenting', 'nd', 'adhd|autis\\w*|takiw[aā]tanga|aroreretini|neurodiver\\w*|sensory|meltdowns?|executive function'],
   ['Drag', 'rainbow', 'drag|drag race|rupaul|queens?|lip ?sync|pit stop'], ['NZ rainbow community', 'rainbow', 'rainbow|pride|lgbt\\w*|queer|takatāpui|takatapui|trans|gay|lesbian|bi(sexual)?|insideout|express'], ['Makeup & style', 'rainbow', 'makeup|make-up|beauty|lipstick|eyeshadow|fashion|style|looks?'],
   ['Social work practice', 'social', 'social work(ers?)?|swrb|registration|practice|supervision|anzasw|oranga tamariki|tauwhiro|cpd'], ['Community & wellbeing', 'social', 'community|wellbeing|well-being|mental health|whānau ora|whanau ora|youth work|volunteer\\w*|self-care|disabilit(y|ies)|carers?'],
   ['Kids activities', 'kids', 'kids?|children|tamariki|school holidays?|family day|whānau day|play(ground|group)?'], ['Kids crafts', 'kids', 'how to draw|craft|colou?ring|paper|folding'], ['Kids science', 'kids', 'science|experiment|volcano|dinosaur|space|animals'], ['Sensory-friendly', 'kids', 'sensory|autism|autistic|quiet|calm|fine motor|ot\\b'], ['Family days out', 'kids', 'family|days? out|outing|market|museum|park'],
@@ -140,9 +140,9 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
+const GROUP_TOPICS = ['nd', 'parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
 // 1.9.0 topics nobody gets unless they pick them (members: in their interests; Shane: switched on in a suggestion or ⚙️)
-const OPTIN = new Set(['parent', 'rainbow', 'social', 'candy', 'pets']);
+const OPTIN = new Set(['parent', 'rainbow', 'social', 'candy', 'pets', 'nd']);
 function optedIn(t) { return PICK ? PICK.includes(t) : ls.get('optIn', []).includes(t); }
 const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]));
 
