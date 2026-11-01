@@ -1,6 +1,6 @@
 /* Car & Life Due Dates – service worker.
    To ship an update: change VERSION. The new worker precaches the new files and removes old caches. */
-const VERSION = '2.29.9';
+const VERSION = '2.29.10';
 const CACHE = 'due-dates-' + VERSION;
 const OCR_CACHE = 'dd-ocr-tesseract-5.1.1';
 const SHELL = ['./reno.js', 'art/i3-house.webp', 'art/cu-banner.webp', 'art/ja-banner.webp', 'art/i3-bill.webp', 'art/i3-car.webp', 'art/i3-bday.webp', 'art/i3-health.webp', 'art/i3-dentist.webp', 'art/i3-hol.webp', 'art/i3-ev.webp', 'art/i3-todo.webp', 'art/i3-shop.webp', 'art/i3-sarah.webp', 'art/i3-news.webp', 'art/i3-radio.webp', 'art/i3-travel.webp', 'art/i3-weather.webp', 'art/i3-money.webp', 'art/i3-gym.webp', 'art/i3-fuel.webp', 'art/i3-cal.webp', 'art/i3-plate.webp', 'art/i3-bin.webp', 'art/i3-rewards.webp', 'art/i3-tv.webp', 'art/i3-garden.webp', 'art/i3-pet.webp', 'art/dog.webp', './', './app.js', './app.js?v=' + VERSION, './sync-logic.js', './move.js', './move.js?v=' + VERSION, './core.js', './ical-import.js', './vendor/ical.min.js', './manifest.webmanifest', './data/tides-whangarei.json',
@@ -36,7 +36,13 @@ self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'POST' || u.origin !== location.origin || !/\/share-photo$/.test(u.pathname)) return;
   e.respondWith((async () => {
-    try { const fd = await e.request.formData(), files = fd.getAll('photos').filter(f => f && f.type && /^image\//.test(f.type));
+    let fd = null;
+    try { fd = await e.request.formData(); const files0 = fd.getAll('photos').filter(f => f && f.size);
+      // 2.29.10: a shared link (no photos) goes to Info Book's Share-a-link sheet instead
+      const txt = ['url', 'text', 'title'].map(k => String(fd.get(k) || '')).join(' ');
+      if (!files0.length && /https?:\/\/\S+/i.test(txt)) { const q = new URLSearchParams({ share: '1' }); ['url', 'text', 'title'].forEach(k => { if (fd.get(k)) q.set(k, String(fd.get(k)).slice(0, 2000)); }); return Response.redirect(new URL('./feed/?' + q, self.registration.scope).href, 303); }
+    } catch (err) { }
+    try { const files = fd.getAll('photos').filter(f => f && f.type && /^image\//.test(f.type));
       const db = await new Promise((ok, no) => { const r = indexedDB.open('myPhotos', 1); r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('p')) r.result.createObjectStore('p', { keyPath: 'id' }); }; r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
       await new Promise((ok, no) => { const t = db.transaction('p', 'readwrite'), st = t.objectStore('p'); files.forEach((f, i) => st.put({ id: 'ph-' + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6), blob: f, thumb: null, raw: true, shared: true, title: '', note: String(fd.get('text') || fd.get('title') || '').slice(0, 2000), tags: [], added: Date.now(), name: f.name || '' })); t.oncomplete = ok; t.onerror = () => no(t.error); });
     } catch (err) { }
