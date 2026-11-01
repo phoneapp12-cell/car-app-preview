@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF0000"/><stop offset=".6" stop-color="#FF0000"/><stop offset="1" stop-color="#b30000"/></linearGradient>
+<radialGradient id="h" cx=".85" cy=".1" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+<rect width="1200" height="630" fill="url(#g)"/><rect width="1200" height="630" fill="url(#h)"/>
+<circle cx="600" cy="255" r="128" fill="#fff" fill-opacity=".18" stroke="#fff" stroke-opacity=".55" stroke-width="6"/>
+<text x="600" y="300" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="140" font-weight="800" fill="#fff" text-anchor="middle">▶</text>
+<text x="600" y="475" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="64" font-weight="800" fill="#fff" text-anchor="middle">YouTube</text>
+<text x="600" y="545" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="34" font-weight="600" fill="#fff" fill-opacity=".85" text-anchor="middle">Shared in Info Book · tap to open</text>
+</svg>

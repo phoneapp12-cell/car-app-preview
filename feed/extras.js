@@ -87,7 +87,7 @@ function wxNzCard(i) {
     <div class="bd"><ul class="rnl">${i.list.slice(0, 6).map(w => `<li><span>${w.colour === 'red' ? '🔴' : '🟠'} ${WXE[w.event] || '⚠️'} <b>${esc(w.head.replace(/\s*-\s*(Orange|Red)$/i, ''))}</b> · ${esc(w.area.split(';')[0].slice(0, 70))}</span><em>${esc(wxWhen(w))}</em></li>`).join('')}</ul>
     <div class="xbtns"><a class="btn" href="https://www.metservice.com/warnings/home" target="_blank" rel="noopener">All MetService warnings ↗</a></div></div></article>`;
 }
-/* ---- 1.9.15 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
+/* ---- 1.9.16 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
    steps (iPhone), or "open in Chrome/Safari first" with a copy-my-link button (Messenger/Facebook). "Later" hides it for 3 days. ---- */
 let BIP = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); BIP = e; installBanner(true); });
@@ -123,7 +123,7 @@ let PIN_URLS = null, PIN_FOR = null;
 const pinUrls = () => (PIN_FOR === FEED && PIN_URLS) || (PIN_FOR = FEED, PIN_URLS = new Set((typeof FEED !== 'undefined' && FEED && FEED.items || []).filter(i => i.pin).map(i => urlBase(i.url))));
 window.pins = function () {
   const out = [];
-  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.15: only warnings and watches that cover Whangārei
+  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.16: only warnings and watches that cover Whangārei
   for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Whangārei warnings go right to the top
   if (FAM_ON) {
     for (const c of X.cars) if (c.car && c.mid === MEMBER.id) out.push({ id: 'car:' + c.plate, x: 'car', c: c.car, at: c.at, topic: 'family' });
@@ -307,7 +307,7 @@ function suggApply(add) {
 /* ---- ranking: Shane's gentle life-stage nudge (never more than ×1.15, and not for topics they've 👎'd) and local events first ---- */
 const basePopW = popW;
 const REGION_NL = /whang[aā]rei|northland|kerikeri|paihia|russell|dargaville|kaitaia|kaikohe|ruak[aā]k[aā]|waipu|tutukaka|ngunguru|hikurangi|kamo|onerahi|bream bay|mangawhai|kawakawa|opua|hokianga|maungakaramea|tikipunga/i;
-/* ---- 1.9.15 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
+/* ---- 1.9.16 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
    Weather: My App's own Whangārei forecast on this phone if there is one (the one the auto theme uses), otherwise the same open-meteo
    forecast fetched here (once every 30 min). Nothing about the theme changes. */
 const NZ_RX = /\.nz\b|new zealand|aotearoa|\bkiwis?\b|whang[aā]rei|northland|auckland|wellington|christchurch|queenstown|rotorua|tauranga|hamilton|dunedin|nelson|napier|taup[oō]|coromandel|bay of islands|countdown|woolworths nz|pak'?n'?save|new world|the warehouse|mitre ?10|bunnings nz|kmart nz|briscoes|farmers|rnz|stuff\.co|nz ?herald|1news|newshub|te reo|m[aā]ori|matariki|waitangi|p[oō]hutukawa|kūmara|kumara|pavlova|\bl&p\b|whitebait|feijoa/i;
@@ -340,7 +340,7 @@ const isNZ = (i, txt) => NZ_SRC.test(i.src || '') || /^https?:\/\/[^/]+\.nz(\/|$
 function nzWeatherNudge(i) {
   if (!i || i.pin || i.x) return 1; const txt = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''); let f = 1; i._wxm = '';
   if (i.kind !== 'event') { // events already lean Whangārei/Northland
-    if (PRAC_TOPICS.has(i.topic)) { // 1.9.15 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
+    if (PRAC_TOPICS.has(i.topic)) { // 1.9.16 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
       const chip = tab !== 'all', nz = isNZ(i, txt), tipT = TIP_RE_C.test(i.t || ''), show = SHOW_RE_C.test(i.t || '');
       f *= nz ? (chip ? 1.8 : 1.3) : tipT ? (chip ? 0.9 : 0.95) : (chip ? 0.55 : 0.75);
       if (REGION_NL.test(txt)) f *= 1.15;
@@ -460,9 +460,9 @@ const baseFamList = famList;
 window.famList = async function () { await baseFamList(); const l = $('#famlist'); if (l && IS_ADMIN && !$('#famx')) l.insertAdjacentHTML('afterend', '<div id="famx" class="famx">Loading…</div>'); adminExtras(); };
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') xVisit(); });
 if (FAM_ON) { setTimeout(() => { xVisit(); xLoad(true); if (X.push === null) { } }, 1200); if ('serviceWorker' in navigator && Notification && Notification.permission === 'granted') swAuth(); }
-if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.15 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
+if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.16 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
 
-/* ---- 1.9.15 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
+/* ---- 1.9.16 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
 const WGR_AREA = /whang[aā]rei|kamo|onerahi|tikipunga|kensington|maunu|morningside|raumanga|otangarei|regent|parahaki|riverside|town basin|hundertwasser|forum north|tutuk[aā]k[aā]|ngunguru|matapouri|ruak[aā]k[aā]|waip[uū]\b|one tree point|marsden|hikurangi|parua bay|pataua|maungakaramea|maungatapere|portland|glenbervie|whareora|whananaki|oakleigh|tamaterau|mckinnon/i;
 const INT = { mine: new Map(), who: {}, got: 0 }, INT_META = {};
 async function intLoad(force) {
@@ -579,7 +579,7 @@ window.popW = function (i) { // ⭐ Interested: similar events (same interest, s
   return w;
 };
 
-/* ---- 1.9.15 🪄 Harry Potter with a Slytherin lean: Slytherin items rank higher, show-off posts lower, plus a daily 'Slytherin of the day' fact ---- */
+/* ---- 1.9.16 🪄 Harry Potter with a Slytherin lean: Slytherin items rank higher, show-off posts lower, plus a daily 'Slytherin of the day' fact ---- */
 const SLY_RE = /slytherin|snape|draco|malfoy|scorpius|green (and|&) silver|emerald|serpent|salazar|bloody baron|slughorn|regulus/i;
 const popWHp = window.popW;
 window.popW = function (i) { let w = popWHp(i); if (i && i.topic === 'hp') { const t = (i.t || '') + ' ' + (i.s || ''); if (SLY_RE.test(t)) w *= 1.5; if (SHOW_RE_C.test(i.t || '')) w *= 0.45; if (TIP_RE_C.test(i.t || '')) w *= 1.2; } return w; };
@@ -609,7 +609,7 @@ window.festive = function (order, nPins) { order = festHp(order, nPins); if (opt
 const cardHp = window.card;
 window.card = function (i) { if (i && i.x === 'sly') return slyCard(); return cardHp(i); };
 
-/* ---- 1.9.15 📅 Sarah's appointments: read on Shane's phone from My App's own storage (same as the shared cars). Only her own
+/* ---- 1.9.16 📅 Sarah's appointments: read on Shane's phone from My App's own storage (same as the shared cars). Only her own
    appointments (ones she shared from her To-do app, ones Shane marked For: Sarah, and her booked Health check-ups) go –
    title, date, time and place only, never notes, costs or claims. Only Sarah (and Shane) can read them. ---- */
 const SA_MONEY = /\$|\b(bills?|pay(ment|ing)?|invoice|loan|bank|rent|mortgage|insurance|ird|tax|debt|budget|direct debit)\b(?!\s+(st|street|rd|road)\b)/i;
@@ -666,7 +666,7 @@ function saCard(i) {
     <p class="xwho">🔒 Only you (and Shane) can see this card. From your appointments in My App.</p></div></article>`;
 }
 
-/* ---- 1.9.15 🤖 Info Bot settings ---- */
+/* ---- 1.9.16 🤖 Info Bot settings ---- */
 function aiAdmin(a) {
   if (!a || !a.cfg) return '';
   const u = a.usage || {}, neu = Math.round((u.tin || 0) * 26668 / 1e6 + (u.tout || 0) * 204805 / 1e6);
@@ -675,7 +675,74 @@ function aiAdmin(a) {
     <div class="row"><span>How often (when not asked)</span><select id="aifreq">${[['rare', 'Now and then (1 in 7)'], ['some', 'Sometimes (1 in 3)'], ['often', 'Often (1 in 2)']].map(([k, l]) => `<option value="${k}"${a.cfg.freq === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
 }
 
-/* ---- 1.9.15 pronouns: optional, wording only; not set = they/them ---- */
+/* ---- 1.9.16 pronouns: optional, wording only; not set = they/them ---- */
 const PRON_OPTS = [['', 'Pronouns – not set (they)'], ['she', 'she/her'], ['he', 'he/him'], ['they', 'they/them']];
 const PRON_LABEL = { she: 'she/her', he: 'he/him', they: 'they/them' };
 function pronOf(k) { const t = k === 'she' ? { sub: 'she', obj: 'her', pos: 'her' } : k === 'he' ? { sub: 'he', obj: 'him', pos: 'his' } : { sub: 'they', obj: 'them', pos: 'their' }; t.Sub = t.sub[0].toUpperCase() + t.sub.slice(1); t.Pos = t.pos[0].toUpperCase() + t.pos.slice(1); return t; }
+
+/* ---- 1.9.16 🔗 share a link (Android: Info Book in the phone's Share menu; iPhone/desktop: paste a link) ---- */
+let LS = null;
+const LINK_WHY = { sport: 'Info Book keeps sport out of the feeds, so this one can’t be shared.', money: 'Money and bills stay out of Info Book, so this one can’t be shared.', unsafe: 'That one isn’t family-safe, so it can’t be shared here.' };
+function linkSheet(pre) {
+  if (!FAM_ON) { toast('Join the family in Info Book first'); return; }
+  LS = { pv: null, to: [], text: pre || '' };
+  const people = (FAM_PEOPLE || []).filter(p => p.id !== MEMBER.id);
+  $('#sheet').classList.add('on');
+  $('#sheetin').innerHTML = `<h2>🔗 Share a link</h2><p class="sst">From Facebook, Instagram, TikTok, YouTube or any website: tap <b>Share → Copy link</b> there, then paste it here.${IS_IOS ? '' : ' On Android you can also pick <b>Info Book</b> straight from the Share menu.'}</p>
+    <div class="lkin"><textarea id="lkurl" rows="2" placeholder="Paste a link…" aria-label="Link to share">${esc(pre || '')}</textarea>${navigator.clipboard && navigator.clipboard.readText ? '<button class="btn" id="lkpaste">📋 Paste</button>' : ''}</div>
+    <div id="lkpv" class="lkpv"></div>
+    <textarea id="lkcap" rows="2" maxlength="300" placeholder="Say something about it (optional)" aria-label="Your comment"></textarea>
+    <h3>Who sees it?</h3><div class="lkto"><label><input type="radio" name="lkto" value="all" checked> 👨‍👩‍👧 The whole family</label><label><input type="radio" name="lkto" value="some"> 🔒 Just some people</label></div>
+    <div id="lkppl" class="sgx" hidden>${people.map(p => `<button class="chip" data-lkp="${esc(p.id)}">${esc(p.name)}</button>`).join('') || '<p class="sst">Nobody else has joined yet.</p>'}</div>
+    <div class="xbtns"><button class="btn pri" id="lkpost" disabled>Share</button><button class="btn" data-close>Cancel</button></div>`;
+  if (pre) linkPreview();
+}
+let lkT = 0;
+async function linkPreview() {
+  const v = ($('#lkurl') || {}).value || '', box = $('#lkpv'); if (!box) return;
+  LS.pv = null; $('#lkpost').disabled = true;
+  if (!/https?:\/\/\S+/i.test(v)) { box.innerHTML = v.trim() ? '<p class="sst">No link found yet – paste the whole link (it starts with https://).</p>' : ''; return; }
+  box.innerHTML = '<p class="sst">Getting a preview…</p>';
+  try {
+    const r = await fam('/preview?text=' + encodeURIComponent(v.slice(0, 2000)));
+    if (($('#lkurl') || {}).value !== v) return;
+    if (r.blocked) { box.innerHTML = `<p class="lkno">🙅 ${esc(LINK_WHY[r.blocked] || LINK_WHY.unsafe)}</p>`; return; }
+    LS.pv = r; $('#lkpost').disabled = false;
+    box.innerHTML = `<div class="lkcard"><img src="${esc(r.img)}" alt="" referrerpolicy="no-referrer" onerror="this.src='img/share-${esc(r.plat === 'web' ? 'web' : r.plat)}.svg'"><div><small>${esc(r.site)}</small><b>${esc(r.t)}</b>${r.s ? `<span>${esc(r.s.slice(0, 140))}</span>` : ''}${r.fallback && /facebook|instagram/.test(r.plat) ? `<em>${esc(r.site)} doesn’t share previews, so the family will see this card with your link.</em>` : ''}</div></div>`;
+  } catch (e) { box.innerHTML = `<p class="lkno">${esc(e.message)}</p>`; }
+}
+async function linkPost() {
+  if (!LS || !LS.pv) return;
+  const some = (document.querySelector('input[name="lkto"]:checked') || {}).value === 'some', to = some ? [...document.querySelectorAll('[data-lkp].on')].map(b => b.dataset.lkp) : [];
+  if (some && !to.length) { toast('Pick who should see it'); return; }
+  const btn = $('#lkpost'); btn.disabled = true; btn.textContent = 'Sharing…';
+  try {
+    const r = await fam('/shares/link', { method: 'POST', body: JSON.stringify({ url: LS.pv.url, caption: ($('#lkcap') || {}).value || '', to }) });
+    $('#sheet').classList.remove('on'); toast(r.dup ? 'You shared that one already' : some ? '🔒 Shared with ' + to.length + (to.length === 1 ? ' person' : ' people') : '🔗 Shared with the family');
+    await loadShares(); if (typeof tab !== 'undefined' && tab !== 'family') { const b = document.querySelector('[data-tab="family"]'); if (b) b.click(); }
+  } catch (e) { btn.disabled = false; btn.textContent = 'Share'; toast(e.message); }
+}
+document.addEventListener('input', e => { if (e.target && e.target.id === 'lkurl') { clearTimeout(lkT); lkT = setTimeout(linkPreview, 500); } });
+document.addEventListener('change', e => { if (e.target && e.target.name === 'lkto') { const p = $('#lkppl'); if (p) p.hidden = e.target.value !== 'some'; } });
+document.addEventListener('click', async e => {
+  const t = e.target; if (!t || !t.closest) return;
+  if (t.closest('[data-sharelink]')) { linkSheet(''); return; }
+  if (t.id === 'lkpaste') { try { const v = await navigator.clipboard.readText(); if (v) { $('#lkurl').value = v; linkPreview(); } } catch (er) { toast('Long-press the box and tap Paste'); } return; }
+  const lp = t.closest('[data-lkp]'); if (lp) { lp.classList.toggle('on'); return; }
+  if (t.id === 'lkpost') { linkPost(); return; }
+  if (t.id === 'lktipok') { ls.set('shareTip', 1); document.querySelector('#lktip')?.remove(); return; }
+});
+// Android Share sheet → Info Book (manifest share_target, GET ./?share=1&title=&text=&url=)
+(function shareTarget() {
+  const q = new URLSearchParams(location.search); if (!q.has('share') && !q.has('url') && !q.has('text')) return;
+  const pre = [q.get('url'), q.get('text'), q.get('title')].filter(Boolean).join(' ').trim();
+  history.replaceState(null, '', location.pathname);
+  if (!pre) return;
+  const go = (n = 0) => { if (typeof FAM_ON !== 'undefined' && FAM_ON && $('#sheetin')) { if ($('#sheet').classList.contains('on') && !$('#lkurl')) $('#sheet').classList.remove('on'); linkSheet(pre); } else if (n < 40) setTimeout(() => go(n + 1), 250); else toast('Open Info Book from your family link first'); };
+  setTimeout(go, 600);
+})();
+// a one-time tip on installed Android phones: Info Book can now be picked in the Share menu
+setTimeout(() => {
+  if (!FAM_ON || ls.get('shareTip', 0) || !/Android/i.test(navigator.userAgent) || !STANDALONE) return;
+  $('#feed').insertAdjacentHTML('beforebegin', `<section id="lktip" class="instb"><div class="tx"><b>🔗 New: share into Info Book</b><p>In Facebook, Instagram, TikTok or Chrome tap <b>Share</b> and pick <b>Info Book</b>. If it isn’t in the list yet, your phone updates Info Book within a day – or remove it from your home screen and add it again.</p><div class="xbtns"><button class="btn pri" id="lktipok">Got it</button></div></div></section>`);
+}, 5000);
