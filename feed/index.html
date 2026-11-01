@@ -160,12 +160,12 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .lkn{border:0;background:none;color:var(--ink);font:inherit;font-size:.85rem;font-weight:600;padding:8px 6px 8px 0;cursor:pointer;max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chip{position:relative}.rxl{display:flex;flex-wrap:wrap;gap:4px 14px;width:100%;text-align:left;border:0;background:none;font:inherit;font-size:.86rem;font-weight:600;color:var(--ink);padding:2px 16px 0;cursor:pointer}.rxc{font-size:.85rem;font-weight:700;margin-left:3px}.vote .rxc{color:inherit}.updbar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:80;border:0;border-radius:14px;padding:14px;font:inherit;font-weight:700;color:#fff;background:linear-gradient(135deg,#ec4899,#8b5cf6);box-shadow:0 8px 24px rgba(139,92,246,.4)}.popl{margin:8px 0 0;font-size:.82rem;font-weight:600;color:#be185d}.ndot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#e11d48;margin:0 4px 0 -2px;vertical-align:middle}.lkl h3{margin:12px 0 2px}.chip .dot{width:8px;height:8px;border-radius:50%;background:#e11d48;position:absolute;top:4px;right:6px}
 .lkl .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
-</style>
+.gline{display:flex;align-items:center;gap:5px;min-width:0}.stchip{flex:none;font-size:.66rem;font-weight:800;line-height:1.3;padding:0 6px;border-radius:999px;background:color-mix(in srgb,#ff8a00 16%,var(--card,#fff));color:#c2410c;border:1px solid color-mix(in srgb,#ff8a00 35%,transparent);white-space:nowrap;cursor:pointer}.stchip.hot{background:linear-gradient(90deg,#ff8a00,#ff3d6e);color:#fff;border-color:transparent}.stchip[hidden]{display:none}html.ts-xl .stchip{font-size:.58rem}.srows{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px}.srow{display:flex;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:12px;background:color-mix(in srgb,var(--acc) 7%,transparent)}.srow.me{outline:2px solid color-mix(in srgb,var(--acc) 40%,transparent)}.srow .sn{font-weight:700}.srow .sb{font-weight:800;white-space:nowrap}.srow small{font-weight:600;opacity:.6}.celeb{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(0,0,0,.45);padding:20px}.celeb .cin{position:relative;overflow:hidden;background:var(--card,#fff);color:var(--ink,#222);border-radius:22px;padding:26px 20px 18px;max-width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}.celeb .cbig{font-size:3rem;font-weight:900}.celeb h2{margin:4px 0}.cfx{position:absolute;inset:0;pointer-events:none}.cfx i{position:absolute;top:-30px;left:var(--x);font-style:normal;animation:cfall 2.4s var(--d) ease-in forwards}@keyframes cfall{to{transform:translateY(420px) rotate(320deg);opacity:0}}@media (prefers-reduced-motion:reduce){.cfx{display:none}}.reno .rnbig{font-size:1.5rem;font-weight:900;margin:2px 0 8px;color:var(--acc)}.reno .rnbig.soon{color:#ea580c}.rnbar{height:12px;border-radius:99px;background:color-mix(in srgb,var(--acc) 14%,transparent);overflow:hidden}.rnbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#22c55e,#16a34a)}.rnh{margin:10px 0 4px;font-size:.92rem}.rnl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}.rnl li{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.9rem}.rnl em{font-style:normal;opacity:.7;font-size:.82rem}.logo{min-width:0;flex:1 1 auto}.logo .lt{min-width:0}.gline{max-width:100%;overflow:hidden}.greet{max-width:none}.gline .greet{flex:0 1 auto;min-width:0}.stchip .stn{display:none}@media (max-width:440px){.stchip .stw{display:none}.stchip .stn{display:inline}}</style>
 </head>
 <body>
 <header class="top">
   <div class="bar">
-    <div class="logo"><img src="icons/logo.svg" width="30" height="30" alt=""><div class="lt"><span>Info Book</span><small class="greet" id="greet"></small></div></div>
+    <div class="logo"><img src="icons/logo.svg" width="30" height="30" alt=""><div class="lt"><span>Info Book</span><span class="gline"><small class="greet" id="greet"></small><small id="stchip" class="stchip" hidden></small></span></div></div>
     <div class="mood" id="mood"></div>
     <div class="upd" id="upd"></div>
     <button class="ib" id="rf" aria-label="Refresh">↻</button>
@@ -176,8 +176,8 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.0"></script>
-<script src="app.js?v=1.9.0"></script>
-<script src="extras.js?v=1.9.0"></script>
+<script src="family.js?v=1.9.1"></script>
+<script src="app.js?v=1.9.1"></script>
+<script src="extras.js?v=1.9.1"></script>
 </body>
 </html>

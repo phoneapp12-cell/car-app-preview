@@ -3,7 +3,8 @@
    🎂 birthdays & family events, 🚗 car due dates Shane shares with one person, and the gentle per-person suggestions Shane
    sets (life stage). Loaded after app.js; it adds cards through pins(), card() and popW(). */
 'use strict';
-const X = { daily: null, triv: null, mems: [], dates: [], cars: [], prof: null, push: null, got: 0 };
+const X = { daily: null, triv: null, mems: [], dates: [], cars: [], prof: null, push: null, streaks: [], st: null, reno: null, got: 0 };
+const MILES = [3, 7, 14, 30, 50, 100], MILE_NAME = { 3: '✨ Warming up', 7: '🔥 One week', 14: '⚡ Fortnight', 30: '🌟 One month', 50: '🏅 Fifty days', 100: '👑 Century' };
 const NZ = (t, o) => new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', ...o }).format(t);
 const nzKey = (t = Date.now()) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }).replace(/-/g, '');
 const dayN = iso => Math.round(Date.parse(iso + 'T00:00:00Z') / 864e5), todayN = () => dayN(new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }));
@@ -14,12 +15,52 @@ const ICON = '🎂';
 async function xLoad(force) {
   if (!FAM_ON || (!force && Date.now() - X.got < 60e3)) return; X.got = Date.now();
   const g = (p, d) => fam(p).catch(() => d);
-  const [daily, triv, mems, dates, cars, prof, push] = await Promise.all([g('/daily', null), g('/trivia', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null)]);
-  Object.assign(X, { daily, triv, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], cars: (cars && cars.cars) || [], prof, push });
+  const [daily, triv, mems, dates, cars, prof, push, streaks, reno] = await Promise.all([g('/daily', null), g('/trivia', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/reno', { reno: null })]);
+  Object.assign(X, { daily, triv, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: (reno && reno.reno) || null });
+  if (prof && prof.streak) stChip(prof.streak);
   if (IS_ADMIN) carSync();
   if (tab === 'all' && scrollY < 300) draw(); else if (tab === 'family') draw();
 }
-async function xVisit() { if (!FAM_ON) return; const k = nzKey(); if (ls.get('visitDay', '') === k) return; try { const r = await fam('/visit', { method: 'POST' }); ls.set('visitDay', k); if (r.cur >= 2 && [3, 7, 14, 30, 50, 100].includes(r.cur)) toast(`🔥 ${r.cur} days in a row – nice!`); } catch (e) { } }
+async function xVisit() { // 1.9.1 just opening Info Book counts for the day's streak (NZ time)
+  if (!FAM_ON) return; const k = nzKey(); if (ls.get('visitDay', '') === k && X.st) return;
+  try { const r = await fam('/visit', { method: 'POST' }); ls.set('visitDay', k); X.st = r; stChip(r); celebrate(r); } catch (e) { }
+}
+function stChip(s) { // 🔥 N-day streak, next to the greeting
+  const el = $('#stchip'); if (!el || !s) return; X.st = s;
+  if (!s.cur) { el.hidden = true; return; }
+  el.hidden = false; el.innerHTML = `🔥 ${s.cur}<span class="stw">-day streak</span><span class="stn"> day${s.cur === 1 ? '' : 's'}</span>`; el.setAttribute('aria-label', `${s.cur}-day streak`); el.title = `Best ${s.best} days${s.freezeLeft ? ' · streak freeze ready this week' : ' · this week’s freeze used'}`;
+  el.classList.toggle('hot', s.cur >= 7);
+}
+function celebrate(s) { // milestones 3/7/14/30/50/100 – once each; and a note when the weekly freeze saved the streak
+  const last = ls.get('stCeleb', 0), fz = (s.frozen || []).slice(-1)[0];
+  if (fz && ls.get('stFrozeSeen', '') !== fz && s.cur >= 2) { ls.set('stFrozeSeen', fz); setTimeout(() => toast(`🧊 Your weekly streak freeze covered a missed day – still on ${s.cur} days!`), 2500); }
+  if (!s.milestone || s.milestone <= last) return; ls.set('stCeleb', s.milestone);
+  const m = s.milestone; document.body.insertAdjacentHTML('beforeend', `<div id="celeb" class="celeb" role="dialog" aria-label="Streak milestone"><div class="cin"><div class="cfx" aria-hidden="true">${'🎉✨🔥⭐🎊'.repeat(4).match(/./gu).map((e, k) => `<i style="--x:${(k * 37) % 100}%;--d:${(k % 5) * .15}s">${e}</i>`).join('')}</div>
+    <div class="cbig">🔥 ${m}</div><h2>${m}-day streak!</h2><p>You’ve opened Info Book ${m} days in a row. New badge: <b>${MILE_NAME[m]}</b></p>${s.next ? `<p class="sst">Next milestone: ${s.next} days</p>` : ''}<button class="btn pri" id="celebok">Yay!</button></div></div>`);
+}
+/* ---- 🏠 Millesha's renovation: same for everyone, live countdown to the finish date (jobs come from My App's reno list) ---- */
+function renoItem() {
+  const r = X.reno; if (!r || !r.deadline) return null;
+  const n = dayN(r.deadline) - todayN(); if (n < 0 && !r.finished) return null; if (r.finished && n < -3) return null; // gone once the deadline has passed
+  return { id: 'reno', x: 'reno', r, n, topic: 'family', t: 'Millesha’s renovation', sn: 'Renovation' };
+}
+function renoCard(i) {
+  const r = i.r, n = i.n, dl = new Date(r.deadline + 'T12:00:00Z').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const dshort = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const big = r.finished ? 'Finished! 🎉' : n === 0 ? 'Finish day – today!' : n === 1 ? '1 day to go' : n + ' days to go';
+  return `<article class="card xc reno" data-id="reno">${xHead('🏠', 'Millesha’s renovation', 'Finish by ' + dl + ' · from Millesha’s checklist', 'Reno')}
+    <div class="bd"><div class="rnbig${n <= 7 && !r.finished ? ' soon' : ''}">${big}</div>
+    <div class="rnbar" role="progressbar" aria-valuenow="${r.pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${r.pct}%"></i></div>
+    <p class="xwho"><b>${r.pct}% done</b> · ${r.done} of ${r.total} jobs ticked off · ${r.left} to go${r.doing ? ` (${r.doing} in progress)` : ''}</p>
+    ${r.finished ? '' : `<h4 class="rnh">Next up</h4><ul class="rnl">${(r.next || []).map(j => `<li><span>${j.e} <b>${esc(j.area)}</b> · ${esc(j.job)}</span><em>${j.st === 'doing' ? '🔨 in progress' : j.due ? 'due ' + esc(dshort(j.due)) : 'to do'}${j.who ? ' · ' + esc(j.who) : ''}</em></li>`).join('')}</ul>`}</div></article>`;
+}
+function streakCard() { // Family tab: who's on a streak, top streaks
+  const L = X.streaks || []; if (!L.length) return '';
+  const on = L.filter(r => r.cur > 0), top = L.slice().sort((a, b) => b.best - a.best)[0];
+  return `<article class="card xc streaks" data-id="streaks">${xHead('🔥', 'Family streaks', 'Open Info Book each day to keep yours going', 'Streaks')}
+    <div class="bd">${on.length ? `<div class="srows">${on.slice(0, 9).map((r, k) => `<div class="srow${r.me ? ' me' : ''}"><span class="sn">${k < 3 ? ['🥇', '🥈', '🥉'][k] : '·'} ${esc(r.me ? 'You' : r.name)}</span><span class="sb">🔥 ${r.cur} day${r.cur === 1 ? '' : 's'}${r.today ? '' : ' <small>(not in yet today)</small>'}</span></div>`).join('')}</div>` : '<p class="xwho">Nobody’s on a streak yet – open the app tomorrow too and you’ll start one.</p>'}
+    ${top && top.best > 1 ? `<p class="xwho">🏆 Longest ever: <b>${esc(top.me ? 'You' : top.name)}</b> · ${top.best} days</p>` : ''}<p class="sst">🧊 Everyone gets one free streak freeze a week, so one missed day won’t reset it. Milestones at 3, 7, 14, 30, 50 and 100 days.</p></div></article>`;
+}
 
 /* ---- cards added at the top of All (and the daily one in Family) ---- */
 const basePins = pins;
@@ -35,14 +76,14 @@ window.pins = function () {
     if (X.triv && X.triv.qs) out.push({ id: 'trivia' + X.triv.day, x: 'trivia', q: X.triv, topic: 'family' });
     const sg = suggestion(); if (sg) out.push(sg);
   }
-  return out.concat(basePins());
+  const rn = renoItem(); return out.concat(basePins(), rn ? [rn] : []); // 🏠 reno sits just under the fireworks card
 };
 const baseDrawFamily = drawFamily;
 window.drawFamily = function () {
   baseDrawFamily();
   if (!FAM_ON) return;
   const m = $('#feed'), first = m.querySelector('.load');
-  const extra = [X.daily && { id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: X.daily.text, sn: 'Daily question' }, ...memItems()].filter(Boolean); order = extra.concat(order);
+  const extra = [X.daily && { id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: X.daily.text, sn: 'Daily question' }, X.streaks.length && { id: 'streaks', x: 'streaks', topic: 'family' }, ...memItems()].filter(Boolean); order = extra.concat(order);
   if (extra.length && first) { first.insertAdjacentHTML('afterend', extra.map(i => window.card(i)).join('')); fillFamPhotos(); famCounts(extra.filter(i => !i.x || i.x === 'daily')); }
 };
 function memItems() { return X.mems.slice(0, 3).map(r => { const s = { id: r.id, card: r.card, name: r.name, snap: r.snap, up: r.up, at: r.at, priv: true, likes: [], ups: [] }; const it = shareItem(s); it._mem = r.when; delete it._share; it.id = r.card; return it; }); }
@@ -51,6 +92,8 @@ window.card = function (i) {
   if (i && i.x === 'car') return carCard(i);
   if (i && i.x === 'date') return dateCard(i);
   if (i && i.x === 'daily') return dailyCard(i);
+  if (i && i.x === 'streaks') return streakCard();
+  if (i && i.x === 'reno') return renoCard(i);
   if (i && i.x === 'trivia') return triviaCard(i);
   if (i && i.x === 'sugg') return suggCard(i);
   const h = baseCard(i);
@@ -67,7 +110,7 @@ function dailyCard(i) {
 }
 function triviaCard(i) {
   const t = i.q, m = t.mine;
-  return `<article class="card xc trivia" data-id="trivia${esc(t.day)}">${xHead('🧠', 'Daily trivia', '5 questions · same for everyone · one go a day', 'Trivia')}
+  return `<article class="card xc trivia" data-id="trivia${esc(t.day)}">${xHead('🧠', 'Daily trivia', '5 easy questions · same for everyone · one go a day', 'Trivia')}
     <div class="bd">${m ? `<h3 class="xq">You got ${m.score}/5 today ${m.score === 5 ? '🏆' : m.score >= 3 ? '🎉' : '👍'}</h3><p class="xwho">New questions tomorrow. ${t.played > 1 ? t.played + ' in the family have played today.' : ''}</p>` : `<h3 class="xq">Today’s 5 questions are ready</h3><p class="xwho">A mix of TV, science & garden, Aotearoa, music & games, and general knowledge. ${t.played ? t.played + ' played so far today.' : ''}</p>`}
     <div class="xbtns">${m ? '' : '<button class="btn pri" data-trivia="play">▶️ Play</button>'}<button class="btn" data-trivia="board">🏅 Leaderboard</button></div></div></article>`;
 }
@@ -126,7 +169,7 @@ async function profileSheet(id) {
   const mine = p.id === MEMBER.id, s = p.streak, got = p.badges.filter(b => b.got);
   const bd = p.birthday;
   $('#sheetin').innerHTML = `<h2>${mine ? 'You' : esc(p.name)}</h2>
-    <div class="streak"><span class="fl">🔥</span><div><b>${s.cur} day${s.cur === 1 ? '' : 's'} in a row</b><small>Best: ${s.best} · ${s.total} days visited${s.cur ? '' : ' · pop in tomorrow to start a new streak'}</small></div></div>
+    <div class="streak"><span class="fl">🔥</span><div><b>${s.cur}-day streak</b><small>Best: ${s.best} · ${s.total} days opened${s.cur ? '' : ' · open Info Book tomorrow to start a new streak'}<br>${s.freezeLeft ? '🧊 Streak freeze ready this week (covers one missed day)' : '🧊 This week’s streak freeze is used'}${s.next ? ` · next milestone ${s.next} days` : ''}</small></div></div>
     <h3>Badges · ${got.length} of ${p.badges.length}</h3><div class="badges">${p.badges.map(b => `<div class="badge${b.got ? ' got' : ''}" title="${esc(b.d)}"><span>${b.e}</span><b>${esc(b.n)}</b><small>${esc(b.d)}</small></div>`).join('')}</div>
     ${mine ? `<h3>🎂 My birthday (optional)</h3><p class="sst">Shown to the family as a countdown card two weeks before, and a celebration card on the day. The year is optional (it shows the age they turn).</p>
     <div class="bdf"><select id="bdd" aria-label="Day">${['<option value="">Day</option>', ...Array.from({ length: 31 }, (_, k) => `<option${bd && bd.d === k + 1 ? ' selected' : ''}>${k + 1}</option>`)].join('')}</select><select id="bdm" aria-label="Month">${['<option value="">Month</option>', ...['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, k) => `<option value="${k + 1}"${bd && bd.m === k + 1 ? ' selected' : ''}>${m}</option>`)].join('')}</select><input id="bdy" inputmode="numeric" maxlength="4" placeholder="Year" value="${bd && bd.y ? bd.y : ''}" aria-label="Year (optional)"><button class="btn pri" id="bdsave">Save</button>${bd ? `<button class="btn" data-datedel="${bd.id}">Remove</button>` : ''}</div>
@@ -145,7 +188,7 @@ function pushHint() {
 }
 function pushBox() {
   const P = (X.push && X.push.prefs) || {}, on = X.push && X.push.on && Notification.permission === 'granted', hint = pushHint();
-  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['dates', '🎂 Birthdays, events & car dates']];
+  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['dates', '🎂 Birthdays, events & car dates'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)']];
   return `<h3>🔔 Notifications</h3>${hint ? `<p class="hint">${hint}</p>` : on ? `<p class="sst">On for this phone. At most one every 30 minutes (replies to you come straight away). Quiet from ${P.qFrom}:00 to ${P.qTo}:00 – anything then waits until morning.</p>
     ${T.map(([k, l]) => `<button class="ich${P[k] ? ' on' : ''}" data-np="${k}">${P[k] ? '✓ ' : ''}${l}</button>`).join('')}
     <div class="bdf"><label>Quiet from <select id="qf">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qFrom ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label><label>to <select id="qt">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qTo ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label></div>
@@ -267,6 +310,8 @@ document.addEventListener('click', async e => {
   if (t.id === 'sgadd' || t.id === 'sgno') { suggApply(t.id === 'sgadd'); return; }
   if (t.closest('#greet') || t.closest('[data-profile]')) { if (FAM_ON) profileSheet(); return; }
   if (t.id === 'pushon' || t.id === 'pushask-on') { document.querySelector('#pushask')?.remove(); if (await pushOn() && $('#sheet').classList.contains('on')) profileSheet(); return; }
+  if (t.id === 'celebok' || t.id === 'celeb') { $('#celeb')?.remove(); return; }
+  if (t.closest('#stchip')) { if (FAM_ON) profileSheet(); return; }
   if (t.id === 'pushask-no') { document.querySelector('#pushask')?.remove(); return; }
   if (t.id === 'pushoff') { await pushOff(); profileSheet(); return; }
   if (t.id === 'pushtest') { try { await swAuth(); await fam('/push/test', { method: 'POST' }); toast('Sent – it should arrive in a few seconds'); } catch (er) { toast(er.message); } return; }
@@ -289,4 +334,5 @@ const baseFamFresh = famFresh;
 window.famFresh = async function (force) { await baseFamFresh(force); xLoad(force); };
 const baseFamList = famList;
 window.famList = async function () { await baseFamList(); const l = $('#famlist'); if (l && IS_ADMIN && !$('#famx')) l.insertAdjacentHTML('afterend', '<div id="famx" class="famx">Loading…</div>'); adminExtras(); };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') xVisit(); });
 if (FAM_ON) { setTimeout(() => { xVisit(); xLoad(true); if (X.push === null) { } }, 1200); if ('serviceWorker' in navigator && Notification && Notification.permission === 'granted') swAuth(); }
