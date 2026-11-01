@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.3';
+const APP_VERSION = '1.9.4';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -31,7 +31,7 @@ const TOPICS = [
   ['tarot', 'Tarot', '🔮', '#6d28d9', '#db2777'], // 1.8.5 (off unless picked)
   ['parent', 'Parenting & family', '👪', '#0e7490', '#db2777'], // 1.9.0 off unless picked (suggested by life stage)
   ['rainbow', 'Drag & LGBTQ+', '🌈', '#e11d48', '#7c3aed'], // 1.9.0 off unless picked
-  ['candy', 'Candy Crush tips', '🍬', '#ec4899', '#f97316'], ['pets', 'Cute & funny pets', '🐾', '#f59e0b', '#ec4899'], ['nd', 'ADHD & autism parenting', '🧩', '#0ea5e9', '#8b5cf6'], // 1.9.1 off unless picked
+  ['candy', 'Candy Crush tips', '🍬', '#ec4899', '#f97316'], ['pets', 'Cute & funny pets', '🐾', '#f59e0b', '#ec4899'], ['nd', 'ADHD ['nd', 'ADHD & autism parenting', '🧩' autism', '🧩', '#0ea5e9', '#8b5cf6'], // 1.9.1 off unless picked
   ['social', 'Social work & community (NZ)', '🤝', '#0f766e', '#2563eb'], // 1.9.0 off unless picked
   ['culture', 'Culture & stage', '🎭', '#7c2d12', '#be123c'],
   ['learn', 'Learning & ideas', '📖', '#1e40af', '#0891b2'],
