@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.26';
+const APP_VERSION = '1.9.27';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -48,7 +48,9 @@ const TOPICS = [
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
 const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
-const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
+const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
+const SPORT2 = /\b(\d+ tries|four tries|three tries|two tries|scored (a |\w+ )?tr(y|ies)|conversions?|penalty (goal|kick)|kicked (all|a|the) |scores? (the )?winner|match-?winning|test match|semi-?finals?|quarter-?finals?|grand final|premiership|half-?time|full-?time|pacific championships?|world cup|olympi\w+|commonwealth games|tournament|playoffs?|championship|wicket|innings|goalkeeper|striker|touchdown|darts|snooker|golf(er)?|marathon|triathlon|wrestl\w+|boxing|ufc|grand prix|f1|motorsport|speedway|velodrome)\b/i; // 1.9.24 match reports that never say 'sport'
+const SPORT = { test: t => SPORT1.test(t) || SPORT2.test(t) };
 // 1.7.1 family-safe: no nudity or adult content, anywhere (same rules as the data service's safe.js)
 const NUDE = /\b(nud(e|es|ity|ist|ists|ism)|semi-?nude|naked|nsfw|nsfl|topless|bottomless|erotic(a|ism|ally)?|lingerie|boudoir|sensual(ity)?|figure (study|studies|drawing|model)|life drawing|live model|nude model|odalisques?|breasts?|nipples?|genital(s|ia)?|penis|vagina|porn(o|ography|ographic)?|pin-?ups?|burlesque|undress(ed|ing)?|strip(per|pers|tease|club)|playboy|onlyfans|bikinis?|thongs?|skinny[- ]?dip\w*|sexy|sexual(ly|ity)?|sex (worker|work|toy|toys|scene|scenes)|fetish\w*|kinky|xxx|adult (content|film|films|only))\b/i;
 const ART_NUDE = /\b(venus|birth of venus|nymphs?|bathers|bathing|the bath|shower|reclining|olympia|adam and eve|the three graces|danaë|danae|leda|susanna|bathsheba|schiele|modigliani|bouguereau|klimt|courbet|rubens|titian|ingres|egon|figurative|the body|bodies|torso|male gaze)\b/i;
@@ -149,7 +151,7 @@ const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPIC
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
 let SEEN = ls.get('seen', {});          // id -> times shown (keeps the feed fresh)
-/* 1.9.26 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
+/* 1.9.27 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
    on this phone; the last 5,000, for 60 days). Warnings, outages, pinned/private cards, countdowns, the daily cards and
    family posts stay (family posts come back only when there's a new comment or like). The same story from two sources
    shows once. SEEN_BASE is what was seen before this load, so nothing vanishes while you're looking at it. */
@@ -337,7 +339,7 @@ function visible() {
     if (VOTES[i.id] && VOTES[i.id].v < 0) return false;          // thumbs-down: gone
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
     if (unsafe(i)) return false;                                   // 1.7.1: never any nudity
-    if (typeof toneW === 'function' && !toneW(i)) return false;   // 1.9.26 upbeat: no heavy news (deaths, crime, war, court…)
+    if (typeof toneW === 'function' && !toneW(i)) return false;   // 1.9.27 upbeat: no heavy news (deaths, crime, war, court…)
     if (W.drop(i.src)) return false;                               // a source you've voted out
     if (!topicOn(i.topic) || intHidden(i)) return false;
     if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; // 1.9.0 parenting / drag & LGBTQ+ / social work: only when picked           // interests you've switched off
@@ -345,7 +347,7 @@ function visible() {
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
   });
-  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.26 once seen, gone (and one card per story)
+  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.27 once seen, gone (and one card per story)
 }
 
 /* ---- For You: Shane's own things plus every board and hub in My App, read on this phone from what My App left in
