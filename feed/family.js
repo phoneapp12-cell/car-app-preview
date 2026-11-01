@@ -180,8 +180,8 @@ function famCounts(items) {
     if (cntQ.size) famCounts([]);
   }, 300);
 }
-function refreshBar(id) {
-  document.querySelectorAll(`.card[data-id="${CSS.escape(id)}"] [data-cmt]`).forEach(b => { const c = COUNTS[id]; b.querySelector('.cc').textContent = c && c[0] ? c[0] : ''; const d = b.querySelector('.dot'); const fresh = c && c[1] > (CSEEN[id] || 0); if (fresh && !d) b.insertAdjacentHTML('beforeend', '<i class="dot"></i>'); if (!fresh && d) d.remove(); });
+function refreshBar(id) { // 1.9.10: null-safe – the daily-question and date buttons had no count span
+  document.querySelectorAll(`.card[data-id="${CSS.escape(id)}"] [data-cmt]`).forEach(b => { const c = COUNTS[id]; let cc = b.querySelector('.cc'); if (!cc) { b.insertAdjacentHTML('beforeend', '<span class="cc"></span>'); cc = b.querySelector('.cc'); } if (cc) cc.textContent = c && c[0] ? c[0] : ''; const d = b.querySelector('.dot'); const fresh = c && c[1] > (CSEEN[id] || 0); if (fresh && !d) b.insertAdjacentHTML('beforeend', '<i class="dot"></i>'); if (!fresh && d) d.remove(); });
 }
 async function openThread(btn) {
   const c = btn.closest('.card'), id = btn.dataset.cmt; let box = c.querySelector('.cmts');
@@ -194,7 +194,7 @@ async function loadThread(box, id) {
     const list = await fam('/comments?card=' + encodeURIComponent(id));
     box.querySelector('.cl').innerHTML = list.length ? list.map(x => `<div class="cm"><b>${esc(x.name)}</b> <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p></div>`).join('') : '<div class="cm0">No comments yet. Say something 👋</div>';
     COUNTS[id] = [list.length, list.length ? list[list.length - 1].at : 0]; CSEEN[id] = Date.now(); ls.set('cseen', CSEEN); refreshBar(id);
-  } catch (e) { box.querySelector('.cl').textContent = e.message; }
+  } catch (e) { const cl = box && box.querySelector('.cl'); if (cl) cl.textContent = 'Couldn’t load comments – tap 💬 to try again.'; console.warn('comments', e); }
 }
 async function sendComment(form) {
   const c = form.closest('.card'), id = c.dataset.id, ta = form.querySelector('textarea'), text = ta.value.trim(); if (!text) return;
