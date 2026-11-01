@@ -137,7 +137,8 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .btn.pri{background:linear-gradient(135deg,var(--acc2),var(--acc));color:#fff}
 .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(120px);background:#111827;color:#fff;padding:10px 16px;border-radius:999px;font-size:.88rem;font-weight:600;transition:transform .25s;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.3);white-space:nowrap}
 .toast.on{transform:translateX(-50%) translateY(0)}
-.mx{font-size:.7rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--acc2);margin-left:6px}
+.mx{font-size:.66rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--acc2);margin-left:6px;white-space:nowrap;display:inline-block}
+.media.lowres{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--chip);min-height:180px}.media.lowres::before{content:'';position:absolute;inset:-30px;background:var(--lr) center/cover;filter:blur(26px) saturate(1.3);opacity:.55}.media.lowres img{position:relative;height:auto!important;max-height:none;object-fit:contain;margin:16px auto;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
 .sst{display:block;font-size:.72rem;color:var(--mute);margin-top:1px}.sst.try{color:#2563eb}.sst.more{color:#16a34a}.sst.less{color:#b45309}.sst.drop{color:#dc2626}
 .mini{font:inherit;font-size:.78rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:inherit}
 .sgh{margin:14px 0 2px;font-size:.85rem}
@@ -172,7 +173,7 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.8.4"></script>
-<script src="app.js?v=1.8.4"></script>
+<script src="family.js?v=1.8.5"></script>
+<script src="app.js?v=1.8.5"></script>
 </body>
 </html>

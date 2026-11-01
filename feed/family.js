@@ -50,9 +50,14 @@ async function famInit() {
   PICK = MEMBER.role === 'admin' ? null : ls.get('pick', null); giveDefaults();
   CSEEN = ls.get('cseen', {});
   if (MEMBER.role !== 'admin' && !PICK) { // a new phone: their settings from the server, or the welcome screen
-    try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { }
+    try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.adds)) ls.set('addsPre', r.prefs.adds.filter(t => TOPIC[t])); if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { } // 1.8.5 addsPre: interests Shane switched on for them, ticked on the welcome screen
     if (!PICK) { onboarding(); }
   }
+  if (MEMBER.role !== 'admin' && PICK) fam('/prefs').then(r => { // 1.8.5 interests Shane switched on for them (e.g. 🔮 Tarot for Monique), once each
+    const adds = (r.prefs && r.prefs.adds) || [], got = ls.get('addsGot', []); let ch = false;
+    for (const t of adds) if (!got.includes(t)) { got.push(t); if (TOPIC[t] && !PICK.includes(t)) { PICK.push(t); ch = true; } }
+    ls.set('addsGot', got); if (ch) { ls.set('pick', PICK); famPrefsChanged(); draw(); }
+  }).catch(() => { });
   loadShares(); loadPop();
   fam('/people').then(p => { FAM_PEOPLE = p; }).catch(() => { });
 }
@@ -68,12 +73,12 @@ function applyPrefs(p) {
   draw();
 }
 let prefsT = 0;
-function famPrefsChanged() { if (!FAM_ON) return; clearTimeout(prefsT); prefsT = setTimeout(() => fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), intOff: INT_OFF, moodOff: MOOD_OFF }) }).catch(() => { }), 1500); }
+function famPrefsChanged() { if (!FAM_ON) return; clearTimeout(prefsT); prefsT = setTimeout(() => fam('/prefs', { method: 'PUT', body: JSON.stringify({ pick: PICK, given: ls.get('defaultsGiven', []), adds: ls.get('addsGot', []), intOff: INT_OFF, moodOff: MOOD_OFF }) }).catch(() => { }), 1500); }
 
 /* ---- welcome: pick interests ---- */
 function onboarding() {
   const list = TOPICS.filter(t => !['all', 'life', 'photos', 'liked', 'family'].includes(t[0]) && (t[0] !== 'election' || Date.now() < ELECTION_END));
-  const sel = new Set(PICK || DEFAULT_ON);
+  const sel = new Set(PICK || [...DEFAULT_ON, ...ls.get('addsPre', [])]);
   $('#sheetin').innerHTML = `<h2>Kia ora ${esc(MEMBER.name)} 👋</h2>
     <p>This is your own Info Book: photos, videos and stories from public sources, picked for you. Tap what you’re into (you can change it any time in ⚙️). Your 👍 and 👎 only change your own feed.</p>
     <p>💬 You can comment on posts and 🔁 share them with the family. Only people Shane has invited can see those.</p>
@@ -85,7 +90,7 @@ function onboarding() {
 function obGo() {
   const p = [...document.querySelectorAll('.obt.on')].map(b => b.dataset.pick);
   if (!p.length) { toast('Pick at least one'); return; }
-  PICK = p; ls.set('defaultsGiven', DEFAULT_ON.slice()); ls.set('pick', PICK); famPrefsChanged();
+  PICK = p; ls.set('defaultsGiven', DEFAULT_ON.slice()); ls.set('addsGot', [...new Set([...ls.get('addsGot', []), ...ls.get('addsPre', [])])]); ls.set('pick', PICK); famPrefsChanged();
   $('#sheet').classList.remove('on', 'ob'); tab = 'all'; ls.set('tab', tab); draw(); toast('Your feed is ready ✨');
 }
 

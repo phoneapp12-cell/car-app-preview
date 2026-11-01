@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.8.4';
+const APP_VERSION = '1.8.5';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -28,6 +28,7 @@ const TOPICS = [
   ['selling', 'Selling & side hustles', '💰', '#15803d', '#ca8a04'],
   ['creative', 'Creative & crafts', '🎨', '#c026d3', '#f97316'],
   ['craft', 'Knitting & crafts', '🧶', '#db2777', '#a855f7'], // 1.8.3: calm, for cosy evenings
+  ['tarot', 'Tarot', '🔮', '#6d28d9', '#db2777'], // 1.8.5 (off unless picked)
   ['culture', 'Culture & stage', '🎭', '#7c2d12', '#be123c'],
   ['learn', 'Learning & ideas', '📖', '#1e40af', '#0891b2'],
   ['games', 'Games & puzzles', '🎲', '#6d28d9', '#2563eb'],
@@ -41,13 +42,13 @@ const TOPICS = [
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
-const BASE = { craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
+const BASE = { tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 // 1.7.1 family-safe: no nudity or adult content, anywhere (same rules as the data service's safe.js)
-const NUDE = /\b(nud(e|es|ity|ist|ists|ism)|semi-?nude|naked|nsfw|nsfl|topless|bottomless|erotic(a|ism|ally)?|lingerie|boudoir|sensual(ity)?|figure (study|studies|drawing|model)|life drawing|live model|nude model|odalisques?|breasts?|nipples?|genital(s|ia)?|penis|vagina|porn(o|ography|ographic)?|pin-?ups?|burlesque|undress(ed|ing)?|strip(per|pers|tease|club)|playboy|onlyfans|bikinis?|thongs?|skinny[- ]?dip\w*|sexy|sexual(ly|ity)?|sex (worker|work|toy|toys|scene|scenes)|fetish\w*|kinky|18\+|xxx|adult (content|film|films|only))\b/i;
+const NUDE = /\b(nud(e|es|ity|ist|ists|ism)|semi-?nude|naked|nsfw|nsfl|topless|bottomless|erotic(a|ism|ally)?|lingerie|boudoir|sensual(ity)?|figure (study|studies|drawing|model)|life drawing|live model|nude model|odalisques?|breasts?|nipples?|genital(s|ia)?|penis|vagina|porn(o|ography|ographic)?|pin-?ups?|burlesque|undress(ed|ing)?|strip(per|pers|tease|club)|playboy|onlyfans|bikinis?|thongs?|skinny[- ]?dip\w*|sexy|sexual(ly|ity)?|sex (worker|work|toy|toys|scene|scenes)|fetish\w*|kinky|xxx|adult (content|film|films|only))\b/i;
 const ART_NUDE = /\b(venus|birth of venus|nymphs?|bathers|bathing|the bath|shower|reclining|olympia|adam and eve|the three graces|danaë|danae|leda|susanna|bathsheba|schiele|modigliani|bouguereau|klimt|courbet|rubens|titian|ingres|egon|figurative|the body|bodies|torso|male gaze)\b/i;
-const ART_TOPICS = new Set(['creative', 'culture', 'learn', 'collect', 'travel', 'kids', 'craft', 'vgames', 'boardg', 'fantasy']);
+const ART_TOPICS = new Set(['creative', 'culture', 'learn', 'collect', 'travel', 'kids', 'craft', 'vgames', 'boardg', 'fantasy', 'tarot']);
 const GAME_TOPICS = new Set(['vgames', 'boardg', 'fantasy']), GAME_BAD = /\besports?\b|tournament|\bgore\b|gory|bloody|dismember|decapitat|mutilat|torture|\bR18\b|adults? only|seductive|succubus|bikini armou?r/i; // 1.8.3
 const BLOCKED = new Set(['4qrdzz', '4ek9op']); // the r/museum nude photos Shane reported (1 Nov 2026)
 const BLOCKED_SRC = new Set(['rd-museum', 'rd-historyporn', 'hyperallergic', 'openculture', 'yt-proko', 'rd-drawing']);
@@ -66,6 +67,7 @@ const ls = { get(k, d) { try { const v = localStorage.getItem(LS_PREFIX + k); re
    Sport is left out entirely. Each interest belongs to a topic chip (new groups, or an existing tab it fits). Switch
    any of them off in ⚙️ → Manage interests: their sources and matching posts disappear from the feed. ---- */
 const INTERESTS = [ // name, topic, words that mark a post as being about it
+  ['Tarot meanings', 'tarot', 'tarot|cards? of the day|spreads?|readings?|major arcana|minor arcana|wands|cups|swords|pentacles'], ['Tarot decks & art', 'tarot', 'decks?|tarot art|oracle cards?'],
   ['Knitting', 'craft', 'knit(s|ting|ted)?|yarn|wool|sweater|jumper|beanie|cable'], ['Crochet', 'craft', 'crochet(ed|ing)?|amigurumi|granny squares?'], ['Sewing & quilting', 'craft', 'sew(ing|n)?|quilt(s|ed|ing)?|fabric|dressmaking'], ['Embroidery', 'craft', 'embroider(y|ed)?|cross[ -]?stitch|stitch(es|ing)?'], ['Paper crafts', 'craft', 'card ?making|cards?|scrapbook(ing)?|paper|cricut|pop[ -]?up'], ['Crafts', 'craft', 'crafts?|handmade|felting|macram[eé]|weav(e|ing)'],
   ['Video gaming', 'vgames', 'video ?games?|gaming|gamers?|trailer|consoles?'], ['Nintendo', 'vgames', 'nintendo|switch|mario|pok[eé]mon|kirby|pikmin|animal crossing'], ['PlayStation & Xbox', 'vgames', 'playstation|ps5|xbox'], ['PC games', 'vgames', '\\bpc\\b|steam'], ['Cosy games', 'vgames', 'cosy|cozy|wholesome|farming|stardew|island'],
   ['Board game news & nights', 'boardg', 'board ?games?|tabletop|card games?|dice|meeples?|lorcana|how to play|games? night'],
@@ -114,6 +116,7 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
 // Left out as money: Investing.
 const INT_BY_NAME = new Map(INTERESTS.map(x => [x.name, x]));
 let INT_OFF = ls.get('intOff', {});     // interest name -> 1 when he's switched it off
+if (PRIVATE_OK && !ls.get('tarotDefault', 0)) { INT_OFF['Tarot meanings'] = 1; INT_OFF['Tarot decks & art'] = 1; ls.set('intOff', INT_OFF); ls.set('tarotDefault', 1); } // 1.8.5 Tarot is off on Shane's phone until he turns it on
 let SRC_INT = {};                        // source id -> its interests (from the feed's source list)
 function noteSrcInts() { SRC_INT = {}; for (const s of (FEED && FEED.sources) || []) if (Array.isArray(s.int)) SRC_INT[s.id] = s.int; }
 function itemInts(i) { // the interests a post belongs to: its source's, then any it clearly mentions in its title
@@ -128,7 +131,7 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['election', 'gf', 'kids', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
+const GROUP_TOPICS = ['election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
 const topicOn = t => pickOk(t) && (!GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]));
 
 let FEED = ls.get('feed', null);
@@ -206,7 +209,7 @@ function moodOf(i) {
   const k = i.src || '';
   if (i.topic === 'election' || i.topic === 'events' || NEWS_SRC.test(k)) return 'news';
   if (LOUD_SRC.test(k) || i.topic === 'games' || i.topic === 'cars') return 'loud';
-  if (CALM_SRC.test(k) || ['dogs', 'nature', 'garden', 'food', 'outdoors', 'craft'].includes(i.topic) || i.mood === 'calm') return 'calm';
+  if (CALM_SRC.test(k) || ['dogs', 'nature', 'garden', 'food', 'outdoors', 'craft', 'tarot'].includes(i.topic) || i.mood === 'calm') return 'calm';
   return 'neutral';
 }
 function moodW(i) { if (MOOD_OFF) return 1; const m = MOODS[moodBand()], k = moodOf(i); return k === 'news' ? m[1] : k === 'calm' ? m[2] : k === 'loud' ? m[3] : 1; }
@@ -256,11 +259,26 @@ function rank(items) {
   }
   return out;
 }
+/* 1.8.5 🔮 Card of the day for anyone with Tarot on: the same card for everyone each day (NZ date), from the public-domain
+   1909 Rider–Waite–Smith deck on Wikimedia Commons. Cards that are drawn with nudity (Lovers, Devil, Star, Sun, Judgement,
+   World) are left out. */
+const TAROT_MAJ = [['00_Fool', 'The Fool', 'New beginnings, a leap of faith, curiosity'], ['01_Magician', 'The Magician', 'You have what you need – make it happen'], ['02_High_Priestess', 'The High Priestess', 'Trust your intuition; quiet knowing'], ['03_Empress', 'The Empress', 'Nurturing, abundance, creativity'], ['04_Emperor', 'The Emperor', 'Structure, steadiness, leadership'], ['05_Hierophant', 'The Hierophant', 'Tradition, learning, guidance'], ['07_Chariot', 'The Chariot', 'Determination and moving forward'], ['08_Strength', 'Strength', 'Gentle courage and patience'], ['09_Hermit', 'The Hermit', 'Time to reflect and recharge'], ['10_Wheel_of_Fortune', 'Wheel of Fortune', 'Change is turning in your favour'], ['11_Justice', 'Justice', 'Fairness, honesty, clear choices'], ['12_Hanged_Man', 'The Hanged Man', 'Pause and see things differently'], ['13_Death', 'Death', 'An ending that makes room for something new'], ['14_Temperance', 'Temperance', 'Balance, moderation, calm'], ['16_Tower', 'The Tower', 'A shake-up that clears the way'], ['18_Moon', 'The Moon', 'Dreams, imagination, trust your gut']];
+const TAROT_SUIT = [['Wands', 'Wands', 'energy, ideas and passion'], ['Cups', 'Cups', 'feelings, love and friendship'], ['Swords', 'Swords', 'thoughts, words and decisions'], ['Pents', 'Pentacles', 'home, work and the practical']];
+const TAROT_RANK = ['Ace', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Page', 'Knight', 'Queen', 'King'];
+const TAROT_RANK_MEAN = ['a fresh start in', 'choices and balance in', 'growth and teamwork in', 'rest and stability in', 'a small challenge in', 'kindness and harmony in', 'patience with', 'steady progress in', 'nearly there with', 'a full circle in', 'curiosity and news about', 'action and adventure in', 'warm, wise care for', 'calm mastery of'];
+function tarotOfDay() {
+  const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }), n = hash('tarot' + day) % (TAROT_MAJ.length + 56);
+  let file, name, mean;
+  if (n < TAROT_MAJ.length) { const c = TAROT_MAJ[n]; file = 'RWS_Tarot_' + c[0] + '.jpg'; name = c[1]; mean = c[2]; }
+  else { const k = n - TAROT_MAJ.length, s = TAROT_SUIT[Math.floor(k / 14)], r = k % 14; file = s[0] + String(r + 1).padStart(2, '0') + '.jpg'; name = TAROT_RANK[r] + ' of ' + s[1]; mean = 'Today’s theme: ' + TAROT_RANK_MEAN[r] + ' ' + s[2]; }
+  return { id: 'tarotday' + day.replace(/-/g, ''), t: '🔮 Card of the day: ' + name, s: mean + '. (Rider–Waite–Smith deck, 1909)', img: 'https://commons.wikimedia.org/wiki/Special:FilePath/' + file + '?width=800', url: 'https://commons.wikimedia.org/wiki/File:' + file, topic: 'tarot', src: 'tarot-day', sn: 'Card of the day', kind: 'photo', at: Date.now() - 60e3, hot: 1 };
+}
+
 function visible() {
   if (!FEED) return [];
   if (tab === 'liked') return Object.values(VOTES).filter(v => v.v > 0 && v.item).sort((a, b) => b.at - a.at).map(v => v.item);
   const seenIds = new Set(), W = weights();
-  return FEED.items.concat(youItems()).filter(i => {
+  return FEED.items.concat(youItems(), topicOn("tarot") && pickOk("tarot") ? [tarotOfDay()] : []).filter(i => {
     if (seenIds.has(i.id)) return false; seenIds.add(i.id);
     if (VOTES[i.id] && VOTES[i.id].v < 0) return false;          // thumbs-down: gone
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
@@ -597,8 +615,10 @@ const SPK = {
   on: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
 };
 let SOUND = sessionStorage.getItem('mf.sound') === '1';
+// 1.8.5 sharp video pictures: YouTube's 1280px picture when the video has one (small grey stand-in → fall back to 480px)
+function ytThumb(id, img) { return !img || /i\.ytimg\.com\/vi\/[^/]+\/(hq|mq|sd)?default\.jpg/.test(img) ? 'https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg' : img; }
 function vidMedia(id, img, title, extra = '') {
-  return `<div class="media vid" data-vid="${esc(id)}" role="button" tabindex="0" aria-label="Video: ${esc(title)}"><div class="vslot"></div><img class="vthumb" loading="lazy" referrerpolicy="no-referrer" src="${esc(img || 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg')}" alt="" onerror="this.src='https://i.ytimg.com/vi/${esc(id)}/mqdefault.jpg'"><span class="play"><span></span></span><button class="snd" data-snd aria-label="${SOUND ? 'Mute' : 'Turn sound on'}">${SOUND ? SPK.on : SPK.off}</button>${extra}</div>`;
+  return `<div class="media vid" data-vid="${esc(id)}" role="button" tabindex="0" aria-label="Video: ${esc(title)}"><div class="vslot"></div><img class="vthumb" loading="lazy" referrerpolicy="no-referrer" src="${esc(ytThumb(id, img))}" alt="" data-yt="${esc(id)}" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg'"><span class="play"><span></span></span><button class="snd" data-snd aria-label="${SOUND ? 'Mute' : 'Turn sound on'}">${SOUND ? SPK.on : SPK.off}</button>${extra}</div>`;
 }
 const PLAYERS = new Map(), RATIO = new Map(); let curVid = null, ytP = null;
 function ytApi() {
@@ -870,3 +890,16 @@ famInit(); greet(); setTimeout(greet, 3000);
 loadPhotos().then(() => { if (PHOTOS.length && scrollY < 200 && (tab === 'all' || tab === 'life' || tab === 'photos')) draw(); else chips(); });
 setTimeout(refreshYou, 1200);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+
+/* 1.8.5 no fuzzy pictures: when a picture is much smaller than the space it's shown in, show it at its own size, sharp,
+   on a soft blurred copy of itself, instead of stretching it. */
+document.addEventListener('load', e => {
+  const im = e.target; if (!(im instanceof HTMLImageElement)) return;
+  if (im.dataset.yt && im.naturalWidth > 0 && im.naturalWidth <= 120 && !im.dataset.f) { im.dataset.f = 1; im.src = 'https://i.ytimg.com/vi/' + im.dataset.yt + '/hqdefault.jpg'; return; }
+  const box = im.closest('.media, .fph'); if (!box || box.classList.contains('vid') || !im.naturalWidth) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3), boxW = box.clientWidth || 400;
+  if (im.naturalWidth * 1.6 < boxW * dpr) {
+    box.classList.add('lowres'); box.style.setProperty('--lr', `url("${im.currentSrc || im.src}")`);
+    im.style.width = Math.max(160, Math.min(boxW, Math.round(im.naturalWidth * 1.6 / dpr))) + 'px';
+  }
+}, true);
