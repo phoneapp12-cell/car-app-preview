@@ -217,7 +217,7 @@ document.addEventListener('click', e => {
 async function loadThread(box, id) {
   try {
     const list = await fam('/comments?card=' + encodeURIComponent(id));
-    box.querySelector('.cl').innerHTML = list.length ? list.map(x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p>${cmLikeBar(x)}</div>`).join('') : '<div class="cm0">No comments yet. Say something 👋</div>';
+    box.querySelector('.cl').innerHTML = list.length ? list.map(x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>${x.pron && { she: 1, he: 1, they: 1 }[x.pron] ? ` <small class="prn">(${{ she: 'she/her', he: 'he/him', they: 'they/them' }[x.pron]})</small>` : ''}${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p>${cmLikeBar(x)}</div>`).join('') : '<div class="cm0">No comments yet. Say something 👋</div>';
     COUNTS[id] = [list.length, list.length ? list[list.length - 1].at : 0]; CSEEN[id] = Date.now(); ls.set('cseen', CSEEN); refreshBar(id);
   } catch (e) { const cl = box && box.querySelector('.cl'); if (cl) cl.textContent = 'Couldn’t load comments – tap 💬 to try again.'; console.warn('comments', e); }
 }
