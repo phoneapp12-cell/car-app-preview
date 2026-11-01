@@ -33,6 +33,11 @@ function stChip(s) { // 🔥 N-day streak, next to the greeting
   el.classList.toggle('hot', s.cur >= 7);
 }
 function celebrate(s) { // milestones 3/7/14/30/50/100 – once each; and a note when the weekly freeze saved the streak
+  if (s.award && !$('#celeb')) { // 1.9.24 🎉 one-time streak award (+2 days), shown once; the server remembers it was seen
+    document.body.insertAdjacentHTML('beforeend', `<div id="celeb" class="celeb award" role="dialog" aria-label="Streak award"><div class="cin"><div class="cfx" aria-hidden="true">${'🎉✨🔥⭐🎊'.repeat(4).match(/./gu).map((e, k) => `<i style="--x:${(k * 37) % 100}%;--d:${(k % 5) * 0.15}s">${e}</i>`).join('')}</div>
+      <div class="cbig">🎉 +2</div><h2>Streak award!</h2><p>+2 days added to your 🔥 streak${s.cur ? ` – you’re on <b>${s.cur} days</b>` : ''}. Keep opening Info Book each day to keep it growing.</p><p class="sst">New badge: 🎉 Streak award</p><button class="btn pri" id="celebok">Yay!</button></div></div>`);
+    fam('/visit/award', { method: 'POST', body: '{}' }).catch(() => { }); return;
+  }
   const last = ls.get('stCeleb', 0), fz = (s.frozen || []).slice(-1)[0];
   if (fz && ls.get('stFrozeSeen', '') !== fz && s.cur >= 2) { ls.set('stFrozeSeen', fz); setTimeout(() => toast(`🧊 Your weekly streak freeze covered a missed day – still on ${s.cur} days!`), 2500); }
   if (!s.milestone || s.milestone <= last) return; ls.set('stCeleb', s.milestone);
@@ -84,7 +89,7 @@ function wxCard(i) {
     <a class="media" href="${esc(w.web)}" target="_blank" rel="noopener"><img src="img/alert-${pic}.svg" alt="${esc(w.head)}"></a><div class="bd"><div class="wxlv">${w.colour === 'red' ? '🔴' : w.colour === 'orange' ? '🟠' : '🟡'} ${esc(lvl)}${w.test ? ' · <b>TEST ONLY – not a real warning</b>' : ''}</div><p class="wxa"><b>${esc(w.area)}</b></p><p class="wxt">🕑 ${esc(wxWhen(w))}</p>
     <p class="xwho">${esc(w.desc)}</p>${w.act ? `<p class="xwho">👉 ${esc(w.act)}</p>` : ''}<div class="xbtns"><a class="btn pri" href="${esc(w.web)}" target="_blank" rel="noopener">MetService warnings ↗</a>${w.link ? `<a class="btn" href="${esc(w.link)}" target="_blank" rel="noopener">Official alert</a>` : ''}</div></div></article>`;
 }
-/* ---- 1.9.23 ⚡ Northpower power cuts in Whangārei District (unplanned now, planned within 48 hours) ---- */
+/* ---- 1.9.24 ⚡ Northpower power cuts in Whangārei District (unplanned now, planned within 48 hours) ---- */
 const pwT = t => NZ(t, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).replace(':00', '');
 function pwrCard(i) {
   const o = i.o, un = o.kind === 'unplanned', ar = (o.areas || []).join(', ') || o.title;
@@ -109,7 +114,7 @@ function wxNzCard(i) {
     <div class="bd"><ul class="rnl">${i.list.slice(0, 6).map(w => `<li><span>${w.colour === 'red' ? '🔴' : '🟠'} ${WXE[w.event] || '⚠️'} <b>${esc(w.head.replace(/\s*-\s*(Orange|Red)$/i, ''))}</b> · ${esc(w.area.split(';')[0].slice(0, 70))}</span><em>${esc(wxWhen(w))}</em></li>`).join('')}</ul>
     <div class="xbtns"><a class="btn" href="https://www.metservice.com/warnings/home" target="_blank" rel="noopener">All MetService warnings ↗</a></div></div></article>`;
 }
-/* ---- 1.9.23 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
+/* ---- 1.9.24 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
    steps (iPhone), or "open in Chrome/Safari first" with a copy-my-link button (Messenger/Facebook). "Later" hides it for 3 days. ---- */
 let BIP = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); BIP = e; installBanner(true); });
@@ -145,9 +150,9 @@ let PIN_URLS = null, PIN_FOR = null;
 const pinUrls = () => (PIN_FOR === FEED && PIN_URLS) || (PIN_FOR = FEED, PIN_URLS = new Set((typeof FEED !== 'undefined' && FEED && FEED.items || []).filter(i => i.pin).map(i => urlBase(i.url))));
 window.pins = function () {
   const out = [];
-  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.23: only warnings and watches that cover Whangārei
+  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.24: only warnings and watches that cover Whangārei
   for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Whangārei warnings go right to the top
-  const PW = X.pwr || [], un = PW.filter(o => o.kind === 'unplanned'), pl = PW.filter(o => o.kind !== 'unplanned'); // 1.9.23 ⚡ then power cuts
+  const PW = X.pwr || [], un = PW.filter(o => o.kind === 'unplanned'), pl = PW.filter(o => o.kind !== 'unplanned'); // 1.9.24 ⚡ then power cuts
   for (const o of un.slice(0, 4)) out.push({ id: 'pw:' + o.id, x: 'pwr', o, topic: 'family', t: 'Power cut: ' + (o.areas || []).join(', ') });
   if (pl.length === 1) out.push({ id: 'pw:' + pl[0].id, x: 'pwr', o: pl[0], topic: 'family', t: 'Planned power cut' });
   else if (pl.length) out.push({ id: 'pw-planned', x: 'pwrl', list: pl.slice(0, 8), topic: 'family', t: 'Planned power cuts' });
@@ -191,7 +196,7 @@ window.card = function (i) {
 };
 const xHead = (em, who, sub, tag) => `<div class="hd"><div class="av">${em}</div><div class="who"><b>${esc(who)}</b><small>${esc(sub)}</small></div><span class="tp">${esc(tag)}</span></div>`;
 
-/* 1.9.23 the answers right on the card: photo answers (name, words, a thumbnail – tap to enlarge), the latest 3 first,
+/* 1.9.24 the answers right on the card: photo answers (name, words, a thumbnail – tap to enlarge), the latest 3 first,
    "View all N" for the rest. Written answers show as the card's open comment thread. (Trivia never shows anyone's answers.) */
 function dqLikeBtn(card, L) { L = Array.isArray(L) ? L : []; const on = L.some(x => typeof isMe === 'function' && isMe(x)); return `<button class="dqlk${on ? ' on' : ''}" data-dqlike="${esc(card)}" data-on="${on ? 1 : 0}" data-n="${L.length}" aria-pressed="${on}" title="${esc(L.map(x => x.name).join(', '))}">${on ? '❤️' : '🤍'} ${L.length || ''}</button>`; }
 document.addEventListener('click', async e => {
@@ -304,7 +309,7 @@ function pushHint() {
 }
 function pushBox() {
   const P = (X.push && X.push.prefs) || {}, on = X.push && X.push.on && Notification.permission === 'granted', hint = pushHint();
-  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['event', '⭐ Reminders for events I’m interested in'], ...((X.sappt || []).length || IS_ADMIN ? [['appt', '📅 My appointments (the day before and ~2 hours before)']] : []), ['dates', '🎂 Birthdays, events & car dates'], ['alerts', '⚠️ Weather & outage alerts (orange/red warnings, power cuts)'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)'], ['weather', '🔴 Red weather warnings (any time, even at night)']];
+  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['event', '⭐ Reminders for events & shows I’m interested in'], ['comeback', '👋 Come-back reminders (if I haven’t been in for a couple of days)'], ...((X.sappt || []).length || IS_ADMIN ? [['appt', '📅 My appointments (the day before and ~2 hours before)']] : []), ['dates', '🎂 Birthdays, events & car dates'], ['alerts', '⚠️ Weather & outage alerts (orange/red warnings, power cuts)'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)'], ['weather', '🔴 Red weather warnings (any time, even at night)']];
   return `<h3>🔔 Notifications</h3>${hint ? `<p class="hint">${hint}</p>` : on ? `<p class="sst">On for this phone. At most one every 30 minutes (replies to you come straight away). Quiet from ${P.qFrom}:00 to ${P.qTo}:00 – anything then waits until morning.</p>
     ${T.map(([k, l]) => `<button class="ich${P[k] ? ' on' : ''}" data-np="${k}">${P[k] ? '✓ ' : ''}${l}</button>`).join('')}
     <div class="bdf"><label>Quiet from <select id="qf">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qFrom ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label><label>to <select id="qt">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qTo ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label></div>
@@ -357,7 +362,7 @@ function suggApply(add) {
 /* ---- ranking: Shane's gentle life-stage nudge (never more than ×1.15, and not for topics they've 👎'd) and local events first ---- */
 const basePopW = popW;
 const REGION_NL = /whang[aā]rei|northland|kerikeri|paihia|russell|dargaville|kaitaia|kaikohe|ruak[aā]k[aā]|waipu|tutukaka|ngunguru|hikurangi|kamo|onerahi|bream bay|mangawhai|kawakawa|opua|hokianga|maungakaramea|tikipunga/i;
-/* ---- 1.9.23 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
+/* ---- 1.9.24 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
    Weather: My App's own Whangārei forecast on this phone if there is one (the one the auto theme uses), otherwise the same open-meteo
    forecast fetched here (once every 30 min). Nothing about the theme changes. */
 const NZ_RX = /\.nz\b|new zealand|aotearoa|\bkiwis?\b|whang[aā]rei|northland|auckland|wellington|christchurch|queenstown|rotorua|tauranga|hamilton|dunedin|nelson|napier|taup[oō]|coromandel|bay of islands|countdown|woolworths nz|pak'?n'?save|new world|the warehouse|mitre ?10|bunnings nz|kmart nz|briscoes|farmers|rnz|stuff\.co|nz ?herald|1news|newshub|te reo|m[aā]ori|matariki|waitangi|p[oō]hutukawa|kūmara|kumara|pavlova|\bl&p\b|whitebait|feijoa/i;
@@ -390,7 +395,7 @@ const isNZ = (i, txt) => NZ_SRC.test(i.src || '') || /^https?:\/\/[^/]+\.nz(\/|$
 function nzWeatherNudge(i) {
   if (!i || i.pin || i.x) return 1; const txt = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''); let f = 1; i._wxm = '';
   if (i.kind !== 'event') { // events already lean Whangārei/Northland
-    if (PRAC_TOPICS.has(i.topic)) { // 1.9.23 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
+    if (PRAC_TOPICS.has(i.topic)) { // 1.9.24 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
       const chip = tab !== 'all', nz = isNZ(i, txt), tipT = TIP_RE_C.test(i.t || ''), show = SHOW_RE_C.test(i.t || '');
       f *= nz ? (chip ? 1.8 : 1.3) : tipT ? (chip ? 0.9 : 0.95) : (chip ? 0.55 : 0.75);
       if (REGION_NL.test(txt)) f *= 1.15;
@@ -407,10 +412,42 @@ function nzWeatherNudge(i) {
   return f;
 }
 wxFetchNow();
+/* 1.9.24 situation: parenting tips for young kids, teen tips for teens, grandparent ideas, fun for singles; other people's
+   life stages lower. Only soft weights from the server (the labels never reach the phone). */
+const SIT_KW = { kids: /\b(bab(y|ies)|toddlers?|newborns?|preschool\w*|kindy|primary|nappy|nappies|sensory|autism|autistic|playground|school holidays?|kids?|bluey|peppa)\b/i, teens: /\b(teens?|teenagers?|tweens?|high school|ncea|secondary school|year (9|1[0-3]))\b/i, grand: /\b(grand(kids|children|child|parents?|ma|pa|parenting)|nana|koro|kuia|retire\w*)\b/i, single: /\b(meet ?ups?|make friends|solo|social club|night out|weekend away|road trip|festival|gig)\b/i, couple: /\b(date night|couples?|weekend away|for two)\b/i };
+const BABY_KW = /\b(bab(y|ies)|toddlers?|newborns?|breastfeed\w*|nappy|nappies|pregnan\w*|maternity|plunket)\b/i, TEEN_KW = SIT_KW.teens, DATING = /\b(dating|tinder|hinge|bumble|first date|hook ?up)\b/i;
+function sitW(i, sit) {
+  if (!sit || !Object.keys(sit).length || i.pin || i.topic === 'life') return 1;
+  const txt = (i.t || '') + ' ' + (i.s || ''); let f = 1;
+  if (sit.kids && SIT_KW.kids.test(txt)) f *= 1.25; if (sit.teens && SIT_KW.teens.test(txt)) f *= 1.25; if (sit.grand && SIT_KW.grand.test(txt)) f *= 1.25;
+  if (sit.single && SIT_KW.single.test(txt)) f *= 1.15; if (sit.couple && SIT_KW.couple.test(txt)) f *= 1.15;
+  if (!sit.kids && !sit.grand && BABY_KW.test(txt)) f *= 0.55; // baby and toddler stuff for someone without little ones
+  if (!sit.teens && !sit.kids && TEEN_KW.test(txt) && i.topic === 'parent') f *= 0.7;
+  if (sit.young && i.topic === 'parent' && !sit.kids) f *= 0.6;
+  if (DATING.test(txt)) f *= 0.3; // dating-free
+  return f;
+}
+/* 1.9.24 upbeat: heavy news (deaths, crime, war, disasters, court, tragedies, political fights, health scares) is dropped from
+   news topics and well down everywhere else; fun, quirky, useful, local good news and how-tos come up. (Whangārei warnings and
+   outages are pinned separately and never touched.) The data service also flags clearly negative headlines (Workers AI). */
+const HEAVY_HARD = /\b(died|dies|dead|death|deaths|deadly|killed|killing|murder\w*|homicide|manslaughter|stabb\w*|shot dead|shooting|gunman|rape\w*|sexual assault|assault\w*|abuse[ds]?|child abuse|war|warfare|airstrikes?|missiles?|invasion|bomb\w*|terror\w*|hostages?|massacre|genocide|tragedy|tragic|fatal\w*|crash victims?|drown\w*|body found|remains found|funeral|mourn\w*|suicide|overdose|earthquake kills|disaster|devastat\w*|catastroph\w*|court|sentenced|jailed|prison|trial|charged|accused|guilty|convicted|police (hunt|appeal)|arrested|ram raid|burglar\w*|robbery|gang\w*|meth)\b/i;
+const HEAVY_SOFT = /\b(slams?|blasts?|attacks?|row|feud|clash\w*|backlash|outrage|furious|scandal|crisis|cuts?|job losses|layoffs?|redundanc\w*|strike action|recession|inflation|cancer|tumou?r|outbreak|pandemic|virus|measles|superbug|warning|warns?|fears?|alarm\w*|toxic|dangerous|threat\w*|risk of|shortage|collapse\w*|fire kills|evacuat\w*|flood\w*|storm damage|protest\w*|lawsuit|sued|blame\w*|controvers\w*)\b/i;
+const FUN = /\b(fun|funny|hilarious|cute|adorable|wholesome|heart-?warming|delight\w*|quirky|weird|amazing|incredible|best|favourite|tips?|how to|hacks?|easy|diy|recipe|ideas?|guide|free|family day|celebrat\w*|festival|win(s|ner)?|record-breaking|first ever|rescued|reunited|kindness|volunteers?|good news|joy|smile|laugh\w*|beautiful|stunning|discover\w*|secret|surprising|clever)\b/i;
+const NEWSY = new Set(['nz', 'election', 'science', 'tech', 'travel', 'social', 'events']);
+function toneW(i) {
+  if (i.pin || i.topic === 'life' || i._share || i.kind === 'tip') return 1;
+  const txt = (i.t || '') + ' ' + (i.s || ''); let f = 1;
+  if (HEAVY_HARD.test(txt)) f *= NEWSY.has(i.topic) ? 0 : 0.35; else if (HEAVY_SOFT.test(txt)) f *= 0.55;
+  if (i.neg) f *= 0.5; // the data service's sentiment pass says it's a downer
+  if (FUN.test(txt)) f *= 1.25; if (i.pos) f *= 1.1;
+  if (i.topic === 'election' && /\b(slams?|attacks?|row|feud|clash\w*|blasts?|accus\w*)\b/i.test(txt)) f *= 0.4; // politics fights
+  return f;
+}
 window.popW = function (i) {
   let w = basePopW(i) * nzWeatherNudge(i);
   const n = ls.get('nudge', null);
   if (n && n.boost && n.boost[i.topic] && weights().topic(i.topic) >= 1) w *= Math.min(1.15, n.boost[i.topic]);
+  w *= sitW(i, (n && n.sit) || {}) * toneW(i);
   if (i.kind === 'event') { const u = (i.url || '') + ' ' + (i.where || '') + ' ' + (i.t || ''); w *= REGION_NL.test(u) ? 1.3 : /auckland|tāmaki|tamaki/i.test(u) ? 1 : 0.55; if (!i.pin && pinUrls().has(urlBase(i.url))) w = 0; }
   return w;
 };
@@ -435,13 +472,16 @@ async function adminExtras() {
   const el = $('#famx'); if (!el || !IS_ADMIN) return;
   try {
     STG = STG || await fam('/stages');
-    const [mem, dates, cars, S, sap, aib] = await Promise.all([fam('/members'), fam('/dates'), fam('/cars'), myAppData(), fam('/sappts').catch(() => null), fam('/aibot').catch(() => null)]);
+    const [mem, dates, cars, S, sap, aib, cbk] = await Promise.all([fam('/members'), fam('/dates'), fam('/cars'), myAppData(), fam('/sappts').catch(() => null), fam('/aibot').catch(() => null), fam('/comeback').catch(() => null)]);
     const people = mem.filter(m => m.role !== 'admin'), sugT = ['parent', 'rainbow', 'social', 'tarot', 'craft', 'vgames', 'music', 'travel', 'food', 'fitness'];
     const myCars = ((S && S.cars) || []).map(c => ({ plate: plateOf(c.plate), name: c.name })).filter(c => c.plate);
     for (const c of cars.cars) if (!myCars.some(x => x.plate === c.plate)) myCars.push({ plate: c.plate, name: '' });
     el.innerHTML = `<h3>👤 Age & life stage <small class="sst">only you see these</small></h3><p class="sst">Used only to suggest interests (they get a ✨ card and choose) and to nudge their feed a little. Never shown to anyone else.</p>
       ${mem.map(m => `<div class="prof" data-mid="${m.id}"><b>${esc(m.name)}</b><select data-pr="${m.id}" aria-label="Pronouns for ${esc(m.name)}">${PRON_OPTS.map(([k, l]) => `<option value="${k}"${(m.pron || '') === k ? ' selected' : ''}>${l}</option>`).join('')}</select><select data-pf="age">${STG.ages.map(a => `<option value="${esc(a)}"${(m.age || '') === a ? ' selected' : ''}>${a || 'Age –'}</option>`).join('')}</select><select data-pf="stage"><option value="">Life stage –</option>${Object.entries(STG.stages).map(([k, l]) => `<option value="${k}"${m.stage === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        <div class="sgx sitx"><small class="sst">Situation:</small>${Object.entries(STG.sits || {}).map(([k, l]) => `<button class="chip${(m.sit || '').split(',').includes(k) ? ' on' : ''}" data-psit="${k}">${esc(l)}</button>`).join('')}</div>
         <div class="sgx">${sugT.map(t => `<button class="chip${(m.sugg || '').split(',').includes(t) ? ' on' : ''}" data-pfs="${t}">${TOPIC[t][2]} ${esc(TOPIC[t][1])}</button>`).join('')}</div></div>`).join('')}
+      <h3>👋 Come-back reminders</h3><p class="sst">One friendly push (5–7pm) when someone with notifications on hasn’t been in for 2+ days – at most every 2 days, weekly after 3 with no visit. Each person can switch it off.</p>
+      ${cbk && cbk.list ? `<ul class="cbl">${cbk.list.filter(r => !/^Test /.test(r.name)).map(r => `<li><b>${esc(r.name)}</b> <small class="sst">${r.lastVisit ? (r.away === 0 ? 'in today' : r.away === 1 ? 'in yesterday' : r.away + ' days away') : 'never joined'} · ${r.push ? (r.on ? '🔔 on' : '🔕 switched off') : 'no notifications'}${r.sent ? ` · ${r.sent} sent, last ${esc(ago(r.lastNudge))} ago${r.inRow >= 3 ? ' (weekly now)' : ''}` : ''}</small>${r.txt ? `<br><small class="sst">“${esc(r.txt)}”</small>` : ''}</li>`).join('')}</ul>` : ''}
       <h3>🎂 Family birthdays & events</h3>${dates.list.map(d => `<div class="row"><span>${d.kind === 'bday' ? '🎂' : '🎉'} ${esc(d.title)}<small class="sst">${d.d} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.m - 1]} · ${inDays(d.days)}</small></span><button class="btn" data-datedel="${d.id}">Remove</button></div>`).join('') || '<p class="sst">None yet.</p>'}
       <div class="bdf"><select id="dk"><option value="bday">🎂 Birthday</option><option value="event">🎉 Event</option></select><input id="dt" maxlength="60" placeholder="e.g. Aranea"><input id="dd" type="date" aria-label="Date"><button class="btn pri" id="dadd">Add</button></div>
       <p class="sst">Birthdays repeat every year (the year is optional and only used for the age); events happen once. They show as countdowns two weeks ahead and a card on the day. Your own My App birthdays stay private unless you tap “➕ Add to family” on one.</p>
@@ -450,8 +490,8 @@ async function adminExtras() {
   } catch (e) { el.textContent = e.message; }
 }
 async function saveProf(row) {
-  const mid = row.dataset.mid, age = row.querySelector('[data-pf="age"]').value, stage = row.querySelector('[data-pf="stage"]').value, sugg = [...row.querySelectorAll('[data-pfs].on')].map(b => b.dataset.pfs);
-  try { await fam('/members/' + mid + '/profile', { method: 'PUT', body: JSON.stringify({ age, stage, sugg }) }); toast('Saved (private)'); } catch (e) { toast(e.message); }
+  const mid = row.dataset.mid, age = row.querySelector('[data-pf="age"]').value, stage = row.querySelector('[data-pf="stage"]').value, sugg = [...row.querySelectorAll('[data-pfs].on')].map(b => b.dataset.pfs); const sit = [...row.querySelectorAll('[data-psit].on')].map(b => b.dataset.psit);
+  try { await fam('/members/' + mid + '/profile', { method: 'PUT', body: JSON.stringify({ age, stage, sugg, sit }) }); toast('Saved (private)'); } catch (e) { toast(e.message); }
 }
 // ➕ Add to family on Shane's own My App birthday cards (one tap, explicit; nothing is copied otherwise)
 async function addBdayToFamily(id) {
@@ -488,6 +528,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'bdsave') { const d = +$('#bdd').value, m = +$('#bdm').value, y = +$('#bdy').value || null; if (!d || !m) { toast('Pick a day and month'); return; } try { await fam('/dates', { method: 'POST', body: JSON.stringify({ kind: 'bday', m, d, y }) }); toast('🎂 Saved'); xLoad(true); profileSheet(); } catch (er) { toast(er.message); } return; }
   const dd = t.closest('[data-datedel]'); if (dd) { if (!confirm('Remove this date?')) return; try { await fam('/dates/' + dd.dataset.datedel, { method: 'DELETE' }); toast('Removed'); xLoad(true); if ($('#famx')) adminExtras(); else profileSheet(); } catch (er) { toast(er.message); } return; }
   if (t.id === 'dadd') { const v = $('#dd').value, title = $('#dt').value.trim(), kind = $('#dk').value; const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v); if (!m || !title) { toast('Add a name and a date'); return; } try { await fam('/dates', { method: 'POST', body: JSON.stringify({ kind, title: kind === 'bday' && !/birthday/i.test(title) ? title + '’s birthday' : title, m: +m[2], d: +m[3], y: kind === 'event' ? +m[1] : null, mid: null }) }); toast('Added'); xLoad(true); adminExtras(); } catch (er) { toast(er.message); } return; }
+  const psit = t.closest('[data-psit]'); if (psit) { psit.classList.toggle('on'); saveProf(psit.closest('.prof')); return; }
   const pfs = t.closest('[data-pfs]'); if (pfs) { pfs.classList.toggle('on'); saveProf(pfs.closest('.prof')); return; }
   const af = t.closest('[data-addfam]'); if (af) { addBdayToFamily(af.dataset.addfam); return; }
 });
@@ -510,9 +551,9 @@ const baseFamList = famList;
 window.famList = async function () { await baseFamList(); const l = $('#famlist'); if (l && IS_ADMIN && !$('#famx')) l.insertAdjacentHTML('afterend', '<div id="famx" class="famx">Loading…</div>'); adminExtras(); };
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') xVisit(); });
 if (FAM_ON) { setTimeout(() => { xVisit(); xLoad(true); if (X.push === null) { } }, 1200); if ('serviceWorker' in navigator && Notification && Notification.permission === 'granted') swAuth(); }
-if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.23 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
+if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.24 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
 
-/* ---- 1.9.23 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
+/* ---- 1.9.24 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
 const WGR_AREA = /whang[aā]rei|kamo|onerahi|tikipunga|kensington|maunu|morningside|raumanga|otangarei|regent|parahaki|riverside|town basin|hundertwasser|forum north|tutuk[aā]k[aā]|ngunguru|matapouri|ruak[aā]k[aā]|waip[uū]\b|one tree point|marsden|hikurangi|parua bay|pataua|maungakaramea|maungatapere|portland|glenbervie|whareora|whananaki|oakleigh|tamaterau|mckinnon/i;
 const INT = { mine: new Map(), who: {}, got: 0 }, INT_META = {};
 async function intLoad(force) {
@@ -629,7 +670,7 @@ window.popW = function (i) { // ⭐ Interested: similar events (same interest, s
   return w;
 };
 
-/* ---- 1.9.23 🪄 Harry Potter with a Slytherin lean: Slytherin items rank higher, show-off posts lower, plus a daily 'Slytherin of the day' fact ---- */
+/* ---- 1.9.24 🪄 Harry Potter with a Slytherin lean: Slytherin items rank higher, show-off posts lower, plus a daily 'Slytherin of the day' fact ---- */
 const SLY_RE = /slytherin|snape|draco|malfoy|scorpius|green (and|&) silver|emerald|serpent|salazar|bloody baron|slughorn|regulus/i;
 const popWHp = window.popW;
 window.popW = function (i) { let w = popWHp(i); if (i && i.topic === 'hp') { const t = (i.t || '') + ' ' + (i.s || ''); if (SLY_RE.test(t)) w *= 1.5; if (SHOW_RE_C.test(i.t || '')) w *= 0.45; if (TIP_RE_C.test(i.t || '')) w *= 1.2; } return w; };
@@ -659,7 +700,7 @@ window.festive = function (order, nPins) { order = festHp(order, nPins); if (opt
 const cardHp = window.card;
 window.card = function (i) { if (i && i.x === 'sly') return slyCard(); return cardHp(i); };
 
-/* ---- 1.9.23 📅 Sarah's appointments: read on Shane's phone from My App's own storage (same as the shared cars). Only her own
+/* ---- 1.9.24 📅 Sarah's appointments: read on Shane's phone from My App's own storage (same as the shared cars). Only her own
    appointments (ones she shared from her To-do app, ones Shane marked For: Sarah, and her booked Health check-ups) go –
    title, date, time and place only, never notes, costs or claims. Only Sarah (and Shane) can read them. ---- */
 const SA_MONEY = /\$|\b(bills?|pay(ment|ing)?|invoice|loan|bank|rent|mortgage|insurance|ird|tax|debt|budget|direct debit)\b(?!\s+(st|street|rd|road)\b)/i;
@@ -716,7 +757,7 @@ function saCard(i) {
     <p class="xwho">🔒 Only you (and Shane) can see this card. From your appointments in My App.</p></div></article>`;
 }
 
-/* ---- 1.9.23 🤖 Info Bot settings ---- */
+/* ---- 1.9.24 🤖 Info Bot settings ---- */
 function aiAdmin(a) {
   if (!a || !a.cfg) return '';
   const u = a.usage || {}, neu = Math.round((u.tin || 0) * 26668 / 1e6 + (u.tout || 0) * 204805 / 1e6);
@@ -725,12 +766,12 @@ function aiAdmin(a) {
     <div class="row"><span>How often (when not asked)</span><select id="aifreq">${[['rare', 'Now and then (1 in 7)'], ['some', 'Sometimes (1 in 3)'], ['often', 'Often (1 in 2)']].map(([k, l]) => `<option value="${k}"${a.cfg.freq === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
 }
 
-/* ---- 1.9.23 pronouns: optional, wording only; not set = they/them ---- */
+/* ---- 1.9.24 pronouns: optional, wording only; not set = they/them ---- */
 const PRON_OPTS = [['', 'Pronouns – not set (they)'], ['she', 'she/her'], ['he', 'he/him'], ['they', 'they/them']];
 const PRON_LABEL = { she: 'she/her', he: 'he/him', they: 'they/them' };
 function pronOf(k) { const t = k === 'she' ? { sub: 'she', obj: 'her', pos: 'her' } : k === 'he' ? { sub: 'he', obj: 'him', pos: 'his' } : { sub: 'they', obj: 'them', pos: 'their' }; t.Sub = t.sub[0].toUpperCase() + t.sub.slice(1); t.Pos = t.pos[0].toUpperCase() + t.pos.slice(1); return t; }
 
-/* ---- 1.9.23 🔗 share a link (Android: Info Book in the phone's Share menu; iPhone/desktop: paste a link) ---- */
+/* ---- 1.9.24 🔗 share a link (Android: Info Book in the phone's Share menu; iPhone/desktop: paste a link) ---- */
 let LS = null;
 const LINK_WHY = { sport: 'Info Book keeps sport out of the feeds, so this one can’t be shared.', money: 'Money and bills stay out of Info Book, so this one can’t be shared.', unsafe: 'That one isn’t family-safe, so it can’t be shared here.' };
 function linkSheet(pre) {
@@ -826,3 +867,59 @@ setTimeout(() => {
   if (!FAM_ON || ls.get('shareTip', 0) || !/Android/i.test(navigator.userAgent) || !STANDALONE) return;
   $('#feed').insertAdjacentHTML('beforebegin', `<section id="lktip" class="instb"><div class="tx"><b>🔗 New: share into Info Book</b><p>In Facebook, Instagram, TikTok or Chrome tap <b>Share</b> and pick <b>Info Book</b>. If it isn’t in the list yet, your phone updates Info Book within a day – or remove it from your home screen and add it again.</p><div class="xbtns"><button class="btn pri" id="lktipok">Got it</button></div></div></section>`);
 }, 5000);
+
+/* ---- 1.9.24 📺 Coming up to watch: new and upcoming shows and movies on Netflix NZ, TVNZ+ and ThreeNow (from JustWatch's NZ
+   catalogue, refreshed by the data service every ~6 hours). One or two a load, matched to this person's interests and
+   situation; sitcoms lead for anyone with Sitcoms on. Seen once, gone; dropped a week after release. ⭐ Interested = a
+   reminder on the day it comes out. Never sport, R18, money or anything that isn't family-safe. */
+const WT_G2T = { cmy: ['sitcoms'], fnt: ['fantasy', 'hp'], ani: ['kids'], fml: ['kids', 'parent'], scf: ['scifi'], doc: ['learn', 'science', 'nature'], msc: ['music'], hst: ['learn', 'culture'], rly: ['food'] };
+const WT_KW = { hp: /harry potter|hogwarts|wizard|witch|magic|fantastic beasts|dragon/i, rainbow: /\bdrag\b|ru ?paul|queer|lgbt\w*|\bgay\b|lesbian|trans\b|pride/i, pets: /\b(dogs?|pupp(y|ies)|cats?|kittens?|pets?|animals?|vet)\b/i, dogs: /\b(dogs?|pupp(y|ies))\b/i, tarot: /\b(psychic|tarot|witch\w*|spirit\w*|medium|astrolog\w*|zodiac|haunted|ghosts?|signos)\b/i,
+  food: /\b(cook\w*|bak\w*|kitchen|chef|food|recipes?|feast|diners?)\b/i, garden: /\b(garden\w*|farm\w*|grow\w*)\b/i, travel: /\b(travel|adventure|journey|road trip|abroad|paris|istanbul|world)\b/i, music: /\b(music\w*|singer|band|concert|song\w*|pop star)\b/i, cars: /\b(cars?|garage|motor\w*|race car)\b/i,
+  diy: /\b(renovat\w*|fixer|house|home makeover|build\w*|diy)\b/i, craft: /\b(craft\w*|knit\w*|sew\w*|quilt\w*|make\w*)\b/i, vgames: /\b(gam(e|er|ing)|anime|video game)\b/i, scifi: /\b(space|star trek|aliens?|sci-?fi|robots?)\b/i, kids: /\b(kids?|children|family|families|cartoon|powerpuff|gabby|bluey|peppa)\b/i, sitcoms: /\b(sitcom|comedy|comedian|stand-?up|funny|laugh\w*)\b/i };
+const WT_HEAVY = /\b(murder\w*|killer|kill(ed|ing)?|serial|crime|cartel|mafia|prison|parolees|court|trial|abuse|dark side|deadly|death|dead|war|horror|haunt(ed|ing)|cult|kidnap\w*|missing|snapped|sinister|jane doe)\b/i;
+function wtSit() { const n = ls.get('nudge', null) || {}; return n.sit || {}; }
+function wtScore(w, now = Date.now()) {
+  const W = weights(), sit = wtSit(), txt = w.t + ' ' + (w.label || '') + ' ' + (w.s || ''); let s = 1;
+  for (const g of w.genres || []) for (const t of WT_G2T[g] || []) if (topicOn(t)) s *= 1 + 0.45 * Math.min(2, W.topic(t)) * (t === 'sitcoms' ? (w.movie ? 1.6 : 2.6) : 1); // Shane: sitcoms first
+  let hits = 0; for (const k in WT_KW) if (topicOn(k) && WT_KW[k].test(txt)) hits++; s *= 1 + 0.7 * Math.min(3, hits);
+  if ((w.genres || []).some(g => g === 'crm' || g === 'hrr' || g === 'war') || WT_HEAVY.test(txt)) s *= 0.35; // upbeat: true crime, horror and war well down
+  if ((w.genres || []).includes('trl')) s *= 0.7;
+  if (sit.kids && (w.genres || []).some(g => g === 'fml' || g === 'ani') && /^(G|PG|)$/.test(w.cert || '')) s *= 1.6; // young kids at home: family films and cartoons
+  if (sit.teens && /\b(teen\w*|high school|school|coming of age|young adult)\b/i.test(txt)) s *= 1.5;
+  if (sit.grand && (w.genres || []).some(g => g === 'fml' || g === 'ani') && /^(G|PG|)$/.test(w.cert || '')) s *= 1.3; // something to watch with the grandkids
+  if (sit.young && /\b(reality|dating|love|friends|gaming|anime|music|road trip|adventure)\b/i.test(txt)) s *= 1.25;
+  if (!sit.kids && !sit.grand && (w.genres || []).length === 1 && w.genres[0] === 'fml') s *= 0.6; // kids-only titles for people without kids around
+  if (/^(R16|16|R15|MA 15\+|R13|13)$/.test(w.cert || '') && sit.kids && !sit.adultOk) s *= 0.85;
+  const d = (w.ev - now) / 864e5; s *= w.up ? (d <= 3 ? 1.4 : d <= 8 ? 1.2 : 1) : Math.max(0.35, 1 + d / 9); // coming soon > just out > a week old
+  if (INT.mine.has(w.id)) s *= 0.2; // already starred: the reminder will do the rest
+  if (VOTES[w.id] && VOTES[w.id].v < 0) return 0;
+  return s;
+}
+function wtPool(now = Date.now()) { return ((FEED && FEED.watch) || []).filter(w => w.img && w.ev > now - 7 * 864e5 && !SPORT.test(w.t + ' ' + w.s) && !unsafe(w) && !SEEN_BASE.has(w.id)).map(w => ({ w, sc: wtScore(w, now) })).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc); }
+let WT_FOR = null, WT = [];
+function wtPick() { // two per load at most: the best match, and a second from the next few (a different platform if possible) for variety
+  const P = wtPool(); if (!P.length) return [];
+  const top = P.slice(0, 8), a = top[0].w, rest = top.slice(1).filter(x => x.w.t !== a.t), b = (rest.find(x => x.w.pk !== a.pk && x.sc > top[0].sc * 0.35) || rest[Math.floor(Math.random() * Math.min(3, rest.length))] || {}).w;
+  return b ? [a, b] : [a];
+}
+const wtDay = ev => NZ(ev, { weekday: 'short', day: 'numeric', month: 'short' });
+function wtWhen(w, now = Date.now()) { const dd = nzDayNum(w.ev) - nzDayNum(now); return w.up && dd > 0 ? (dd === 1 ? `On ${w.plat} tomorrow, ${wtDay(w.ev)}` : `On ${w.plat} ${wtDay(w.ev)}`) : dd === 0 ? `New on ${w.plat} today` : `New on ${w.plat} · since ${wtDay(w.ev)}`; }
+function watchCard(i) {
+  const w = i.w, dd = nzDayNum(w.ev) - nzDayNum(Date.now()), bar = intBar({ id: w.id, t: w.t + (w.label && !/^\d{4}$/.test(w.label) ? ' – ' + w.label : ''), ev: w.ev, url: w.url, img: w.poster || w.img, where: w.plat, topic: 'watch' }, w.ev);
+  const badge = w.up && dd > 0 ? (dd === 1 ? 'Tomorrow' : `In ${dd} days`) : dd === 0 ? 'Out today' : 'Just added';
+  return `<article class="card xc promo watch" data-id="${esc(w.id)}">${xHead('📺', 'Coming up to watch', w.plat + ' · picked for you', w.gl || (w.movie ? 'Movie' : 'Series'))}
+    <a class="pimg" href="${esc(w.url)}" target="_blank" rel="noopener"><img src="${esc(w.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="plat p-${esc(w.pk)}">${esc(w.plat)}</span><span class="away${dd <= 1 ? ' soon' : ''}">${esc(badge)}</span></a>
+    <div class="bd"><h3>${esc(w.t)}${w.label ? ` <small>${esc(w.label)}</small>` : ''}</h3><p class="pwhen">🗓️ ${esc(wtWhen(w))}</p>${w.s ? `<p class="wtb">${esc(w.s)}</p>` : ''}<p class="sst">${esc([w.movie ? 'Movie' : 'Series', w.gl, w.cert].filter(Boolean).join(' · '))}</p>
+    <div class="xbtns"><a class="btn pri" href="${esc(w.url)}" target="_blank" rel="noopener">▶️ Watch on ${esc(w.plat)} ↗</a></div>${bar}${FAM_ON ? '' : ''}</div></article>`;
+}
+const wtFestive = window.festive;
+window.festive = function (order, nPins) {
+  order = wtFestive ? wtFestive(order, nPins) : order;
+  if (!FEED || !FEED.watch || order.length < 4) return order;
+  if (WT_FOR !== FEED) { WT_FOR = FEED; WT = wtPick(); }
+  const lo = Math.max(2, nPins), slots = [lo + 4 + Math.floor(Math.random() * 2), lo + 13 + Math.floor(Math.random() * 3)], out = order.slice();
+  WT.forEach((w, k) => { const at = Math.min(slots[k], out.length); out.splice(at, 0, { id: w.id, x: 'watch', w, topic: 'watch', t: w.t }); });
+  return out;
+};
+const cardWt = window.card;
+window.card = function (i) { if (i && i.x === 'watch') return watchCard(i); return cardWt(i); };

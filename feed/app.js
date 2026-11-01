@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.23';
+const APP_VERSION = '1.9.24';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -149,7 +149,7 @@ const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPIC
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
 let SEEN = ls.get('seen', {});          // id -> times shown (keeps the feed fresh)
-/* 1.9.23 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
+/* 1.9.24 👀 show each thing once: a card that's been on screen for a second isn't shown again on later loads (per member,
    on this phone; the last 5,000, for 60 days). Warnings, outages, pinned/private cards, countdowns, the daily cards and
    family posts stay (family posts come back only when there's a new comment or like). The same story from two sources
    shows once. SEEN_BASE is what was seen before this load, so nothing vanishes while you're looking at it. */
@@ -159,7 +159,7 @@ let hidAt = 0; document.addEventListener('visibilitychange', () => { if (documen
 function seenRebase() { SEEN_BASE = new Set(Object.keys(SEEN1)); SH_BASE = { ...SHSEEN }; }
 let s1T = 0;
 function seenSave() { clearTimeout(s1T); s1T = setTimeout(() => { const d = seenDayN(); let e = Object.entries(SEEN1).filter(([, v]) => d - v <= SEEN_DAYS); if (e.length > SEEN_MAX) { e.sort((a, b) => b[1] - a[1]); e.length = SEEN_MAX; } SEEN1 = Object.fromEntries(e); const sh = Object.entries(SHSEEN); if (sh.length > 400) SHSEEN = Object.fromEntries(sh.slice(-400)); ls.set('seen1', SEEN1); ls.set('shseen', SHSEEN); }, 1500); }
-const seenOk = i => !!i && !i.x && !i.pin && i.topic !== 'life' && !i._share && !/^(tarotday|sly-|fest)/.test(i.id || '');
+const seenOk = i => !!i && (!i.x || i.x === 'watch') && !i.pin && i.topic !== 'life' && !i._share && !/^(tarotday|sly-|fest)/.test(i.id || '');
 const shSig = i => { const s = i._share || {}; return (s.nc || 0) + '/' + ((s.likes || []).length + (s.ups || []).length); };
 function wasSeen(i) { return seenOk(i) && (SEEN_BASE.has(i.id) || (i._dups || []).some(d => SEEN_BASE.has(d))); }
 function shareSeen(i) { const k = i._share && i._share.card || i.id; return k in SH_BASE && SH_BASE[k] === shSig(i); }
@@ -337,6 +337,7 @@ function visible() {
     if (VOTES[i.id] && VOTES[i.id].v < 0) return false;          // thumbs-down: gone
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
     if (unsafe(i)) return false;                                   // 1.7.1: never any nudity
+    if (typeof toneW === 'function' && !toneW(i)) return false;   // 1.9.24 upbeat: no heavy news (deaths, crime, war, court…)
     if (W.drop(i.src)) return false;                               // a source you've voted out
     if (!topicOn(i.topic) || intHidden(i)) return false;
     if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; // 1.9.0 parenting / drag & LGBTQ+ / social work: only when picked           // interests you've switched off
@@ -344,7 +345,7 @@ function visible() {
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
   });
-  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.23 once seen, gone (and one card per story)
+  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.24 once seen, gone (and one card per story)
 }
 
 /* ---- For You: Shane's own things plus every board and hub in My App, read on this phone from what My App left in
