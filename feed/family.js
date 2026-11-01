@@ -158,7 +158,7 @@ async function unshare(sid, up) {
 /* ---- card extras: 💬 comments and 🔁 share ---- */
 function famBar(i) {
   if (!FAM_ON || !isPublicCard(i)) return '';
-  const lk = i._share ? likeBtn(i._share) : '';
+  const r = rxOf(i), lk = r ? likeBtn(r) : '';
   const c = COUNTS[i.id], n = c ? c[0] : 0, fresh = c && c[1] > (CSEEN[i.id] || 0);
   return lk + `<button class="fb" data-cmt="${esc(i.id)}" aria-label="Comments">💬<span class="cc">${n || ''}</span>${fresh ? '<i class="dot"></i>' : ''}</button>${i.kind === 'upload' ? '' : `<button class="fb" data-share="${esc(i.id)}" aria-label="Share with the family">🔁</button>`}`;
 }
@@ -375,9 +375,19 @@ function whoText(list) {
   return `${list.length} · ${esc(n.length > 3 ? n.slice(0, 2).join(', ') + ' +' + (n.length - 2) : n.join(', '))}`;
 }
 const freshFor = (s, list) => s.mine && list.some(l => !isMe(l) && l.at > (ls.get('likeSeen') || 0));
-function upNames(i) { const s = i._share; return FAM_ON && s && (s.ups || []).length ? `<span class="rxc">${s.ups.length}</span>` : ''; }
+// 1.8.6 the pinned specials get the same ❤️/👍-with-names as family posts
+let PINRX = {};
+const rxOf = i => i._share || (i.pin && FAM_ON ? (PINRX[i.id] = PINRX[i.id] || { card: i.id, likes: [], ups: [], pin: 1 }) : null);
+const rxCard = card => SHARES.find(x => x.card === card) || PINRX[card];
+const rxItem = s => s.pin ? (FEED && FEED.items.find(i => i.id === s.card)) : shareItem(s);
+async function loadPinRx() {
+  if (!FAM_ON || typeof pins !== 'function') return;
+  const ids = pins().map(i => i.id); if (!ids.length) return;
+  try { const r = await fam('/likes?cards=' + encodeURIComponent(ids.join(','))); for (const k in r.rx || {}) { PINRX[k] = { card: k, pin: 1, ...r.rx[k] }; redrawFoot(k); } } catch (e) { }
+}
+function upNames(i) { const s = rxOf(i); return FAM_ON && s && (s.ups || []).length ? `<span class="rxc">${s.ups.length}</span>` : ''; }
 function rxLine(i) { // '❤️ 2 · Sarah, Millesha   👍 1 · Shane' under family posts; tap for the full list
-  const s = i._share; if (!FAM_ON || !s) return '';
+  const s = rxOf(i); if (!FAM_ON || !s) return '';
   const L = s.likes || [], U = s.ups || []; if (!L.length && !U.length) return '';
   return `<button class="rxl" data-likers="${esc(s.card)}">${L.length ? `<span>❤️ ${whoText(L)}${freshFor(s, L) ? '<i class="ndot"></i>' : ''}</span>` : ''}${U.length ? `<span>👍 ${whoText(U)}${freshFor(s, U) ? '<i class="ndot"></i>' : ''}</span>` : ''}</button>`;
 }
@@ -387,30 +397,31 @@ function likeBtn(s) {
 }
 function famNewLikes() { return FAM_ON && SHARES.some(s => freshFor(s, (s.likes || []).concat(s.ups || []))); }
 function syncVote(s) { // this person's private ranking follows their family taps
-  const it = shareItem(s), id = s.card, loved = (s.likes || []).some(isMe), up = (s.ups || []).some(isMe), v = loved ? 2 : up ? 1 : 0;
+  const it = rxItem(s), id = s.card; if (!it) return; const loved = (s.likes || []).some(isMe), up = (s.ups || []).some(isMe), v = loved ? 2 : up ? 1 : 0;
   if (v) { const { _share, photos, ...snap } = it; VOTES[id] = { v, topic: it.topic, src: it.src, ints: itemInts(it).slice(0, 4), at: Date.now(), item: snap }; }
   else if (VOTES[id] && VOTES[id].v > 0) delete VOTES[id];
   ls.set('votes', VOTES);
 }
 function redrawFoot(card) {
-  const s = SHARES.find(x => x.card === card); if (!s) return;
-  const tmp = document.createElement('div'); tmp.innerHTML = window.card(shareItem(s));
+  const s = rxCard(card); if (!s) return; const it = rxItem(s); if (!it) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = window.card(it);
   document.querySelectorAll(`.card[data-id="${CSS.escape(card)}"] .ft`).forEach(ft => { ft.parentNode.querySelector('.rxl')?.remove(); const nr = tmp.querySelector('.rxl'); if (nr) ft.before(nr.cloneNode(true)); ft.replaceWith(tmp.querySelector('.ft').cloneNode(true)); });
-  famCounts([shareItem(s)]);
+  famCounts([it]);
 }
 async function react(card, kind, on) {
   const r = await fam('/likes', { method: 'POST', body: JSON.stringify({ card, kind, on }) }); setTimeout(() => loadPop(true), 500);
   for (const x of SHARES) if (x.card === card) { x.likes = r.likes; x.ups = r.ups; }
-  const s = SHARES.find(x => x.card === card); if (s) syncVote(s);
+  if (PINRX[card]) { PINRX[card].likes = r.likes; PINRX[card].ups = r.ups; }
+  const s = rxCard(card); if (s) syncVote(s);
   return s;
 }
 async function toggleLike(card) {
-  const s = SHARES.find(x => x.card === card); if (!s) return;
+  const s = rxCard(card); if (!s) return;
   const on = !(s.likes || []).some(isMe);
   try { await react(card, 'love', on); redrawFoot(card); if (on) { try { navigator.vibrate && navigator.vibrate(12); } catch (e) { } } } catch (e) { toast(e.message); }
 }
 async function famVote(c, item, v) { // called by vote() for family cards; returns true when it handled the tap
-  const s = item._share; if (!FAM_ON || !s) return false;
+  const s = rxOf(item); if (!FAM_ON || !s) return false;
   if (v > 0) {
     const on = !(s.ups || []).some(isMe);
     try { await react(s.card, 'up', on); redrawFoot(s.card); if (on) toast('👍 More like this'); } catch (e) { toast(e.message); }
@@ -420,7 +431,7 @@ async function famVote(c, item, v) { // called by vote() for family cards; retur
   return false; // the usual private 👎 (hide + rank down) carries on
 }
 function showLikers(card) {
-  const s = SHARES.find(x => x.card === card); if (!s) return;
+  const s = rxCard(card); if (!s) return;
   const row = (l, e) => `<div class="row"><span>${e} ${esc(likeName(l))}</span><small class="sst">${esc(nzTime(l.at))}</small></div>`;
   document.querySelector('#upbox')?.remove();
   const box = document.createElement('div'); box.id = 'upbox'; box.className = 'upbox';
@@ -447,13 +458,13 @@ function popW(i) {
   return Math.min(1.8, 1 + 0.3 * pts);
 }
 function popLine(i) { // "Liked by Sarah, Millesha" on ordinary cards the family liked (members only)
-  if (!FAM_ON || i._share || !isPublicCard(i)) return '';
+  if (!FAM_ON || i._share || i.pin || !isPublicCard(i)) return '';
   const l = (POP[i.id] || []).filter(x => x[0] !== MEMBER.id); if (!l.length) return '';
   const names = [...new Set(l.map(x => x[1]))], loved = l.some(x => x[2] === 2);
   return `<p class="popl">${loved ? '❤️' : '👍'} Liked by ${esc(names.length > 3 ? names.slice(0, 2).join(', ') + ' +' + (names.length - 2) : names.join(', '))}</p>`;
 }
 function famPublicVote(i, v) { // v: 1 = 👍 on, 0 = taken back, -1 = 👎 (private: only takes back a 👍)
-  if (!FAM_ON || i._share || !isPublicCard(i)) return;
+  if (!FAM_ON || i._share || i.pin || !isPublicCard(i)) return;
   fam('/likes', { method: 'POST', body: JSON.stringify({ card: i.id, kind: v > 0 ? 'up' : 'none', on: v > 0 }) }).then(() => loadPop(true)).catch(() => { });
 }
 setInterval(() => { if (document.visibilityState === 'visible') loadPop(); }, 5 * 60e3 + 7e3);
@@ -483,7 +494,7 @@ async function migrateVotes() {
 }
 async function famFresh(force) { // Family tab, ↻ and coming back to the app: fresh likes and comments, not up to 5 minutes old
   if (!FAM_ON || (!force && Date.now() - sharesAt < 20e3)) return;
-  sharesAt = Date.now(); await Promise.all([loadShares(), loadPop(true)]);
+  sharesAt = Date.now(); await Promise.all([loadShares(), loadPop(true), loadPinRx()]);
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { famFresh(); checkUpdate(); } });
 // A phone that keeps the app open (or an iPhone Home Screen app) can sit on old code: tell them, one tap reloads.

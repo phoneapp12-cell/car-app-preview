@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.8.5';
+const APP_VERSION = '1.8.6';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -706,6 +706,32 @@ function ago(ms) {
   return new Date(ms).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
 }
 const evDate = ms => new Date(ms).toLocaleString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Pacific/Auckland' });
+// 1.8.6 pinned specials (e.g. the Whangārei fireworks): everyone sees them at the top of All, whatever their interests, until the event ends
+const PIN_GRACE = 30 * 60e3;
+function pins() {
+  if (!FEED) return [];
+  const now = Date.now();
+  return FEED.items.filter(i => i.pin && i.status !== 'cancelled' && now < (i.end || i.ev || 0) + (i.status === 'postponed' ? 7 * 864e5 : PIN_GRACE) && !unsafe(i) && !(VOTES[i.id] < 0));
+}
+function nzDayNum(t) { const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(t); return Math.round(Date.parse(p + 'T00:00:00Z') / 864e5); }
+function countdown(i, now = Date.now()) {
+  if (i.status === 'postponed') return '⚠️ Postponed';
+  if (now >= i.ev && now < (i.end || i.ev)) return now >= (i.show || i.end) - 15 * 60e3 && i.show ? '🎆 Fireworks any minute!' : '🎉 On now!';
+  if (now >= (i.end || i.ev)) return 'Finished – hope you had fun!';
+  const d = nzDayNum(i.ev) - nzDayNum(now);
+  return d <= 0 ? 'Tonight!' : d === 1 ? 'Tomorrow!' : `In ${d} days`;
+}
+function pinBox(i) {
+  const tm = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+  const t = x => new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit' }).format(x).replace(/\s/g, '');
+  return `<div class="pinbox"><div class="cd${i.status ? ' warn' : ''}">${esc(countdown(i))}</div>
+    ${i.status === 'postponed' ? `<p class="pnote">The organisers have postponed it${i.note ? ' – ' + esc(i.note) : ''}. Check the event page for the new date.</p>` : ''}
+    <div class="prow">📅 ${esc(tm.format(i.ev))}${i.end ? '–' + esc(t(i.end)) : ''}</div>
+    ${i.show ? `<div class="prow">🎆 Fireworks about ${esc(t(i.show))}</div>` : ''}
+    ${i.where ? `<div class="prow">📍 ${esc(i.where)}</div>` : ''}
+    <a class="pbtn" href="${esc(i.url)}" target="_blank" rel="noopener">See event &amp; tickets ↗</a>
+    ${i.credit ? `<small class="pcred">${esc(i.credit)}</small>` : ''}</div>`;
+}
 function card(i) {
   const T = TOPIC[i.topic] || TOPIC.all, v = VOTES[i.id] ? VOTES[i.id].v : 0;
   const style = `--c1:${T[3]};--c2:${T[4]}`;
@@ -716,14 +742,14 @@ function card(i) {
   else media = `<div class="hero"><span class="em">${T[2]}</span><h3>${esc(i.t)}</h3></div>`;
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
   const showTitle = (i.img || i.vid || i.photos) && i.t;
-  return `<article class="card${i._share ? ' shared' : ''}" data-id="${esc(i.id)}" style="${style}">${shareHead(i)}
-    <div class="hd"><div class="av">${T[2]}</div><div class="who"><b>${esc(i.sn || '')}</b><small>${esc(ago(i.at))}${i.party ? ' · ' + esc(i.party) : i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small></div><span class="tp">${esc(T[1])}</span></div>
+  return `<article class="card${i._share ? ' shared' : ''}${i.pin ? ' pinned' : ''}" data-id="${esc(i.id)}" style="${style}">${shareHead(i)}
+    <div class="hd"><div class="av">${i.pin ? '📌' : T[2]}</div><div class="who"><b>${esc(i.pin ? 'Pinned for everyone' : i.sn || '')}</b>${i.pin ? '<small>Whangārei · this week</small>' : `<small>${esc(ago(i.at))}${i.party ? ' · ' + esc(i.party) : i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small>`}</div><span class="tp">${i.pin ? '🎆 Special' : esc(T[1])}</span></div>
     ${media}
-    <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${when}${popLine(i)}</div>
+    <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${i.pin ? pinBox(i) : when}${popLine(i)}</div>
     ${rxLine(i)}<div class="ft">
-      <button class="vote up${(i._share && FAM_ON ? (i._share.ups || []).some(isMe) : v > 0) ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>${upNames(i)}
+      <button class="vote up${(FAM_ON && rxOf(i) ? (rxOf(i).ups || []).some(isMe) : v > 0) ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>${upNames(i)}
       <button class="vote dn${v < 0 ? ' on' : ''}" data-vote="-1" aria-pressed="${v < 0}" aria-label="Thumbs down">${THUMB.dn}</button>
-      ${famBar(i)}${i.url ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">Open ↗</a>` : ''}
+      ${famBar(i)}${i.url && !i.pin ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">Open ↗</a>` : ''}
     </div></article>`;
 }
 function chips() {
@@ -742,8 +768,9 @@ function draw() {
   if (tab === 'photos') { drawPhotos(); return; }
   if (!TOPIC[tab] || !topicOn(tab) || (tab === 'election' && Date.now() >= ELECTION_END)) tab = 'all';
   order = tab === 'liked' ? visible() : rank(visible()); shown = 0;
-  if (tab === 'all') order = weave(order, lifeMix()); // My App cards mixed in at random, different every refresh
+  if (tab === 'all') order = weave(order.filter(i => !i.pin), lifeMix()); // My App cards mixed in at random, different every refresh
   if (tab === 'all' && FAM_ON) order = weaveShares(order); // 1.7.0: family reposts for everyone
+  if (tab === 'all') order = pins().concat(order); // 1.8.6 pinned specials first, for everyone
   m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'Nothing new here right now. Check back soon.'}</div>`);
   more();
   moodLabel();
@@ -785,7 +812,7 @@ function vote(el, v) {
   const c = el.closest('.card'), id = c.dataset.id;
   const item = order.find(x => x.id === id) || (FEED.items || []).find(x => x.id === id) || LIFE_BY_ID.get(id) || (VOTES[id] && VOTES[id].item);
   if (!item) return;
-  if (item._share && FAM_ON) { if (v > 0) { famVote(c, item, v); return; } if (!(VOTES[id] && VOTES[id].v < 0)) famVote(c, item, v); } // 1.8.1 family cards: 👍 is shown to the family
+  if ((item._share || item.pin) && FAM_ON) { if (v > 0) { famVote(c, item, v); return; } if (!(VOTES[id] && VOTES[id].v < 0)) famVote(c, item, v); } // 1.8.1 family cards: 👍 is shown to the family
   const prev = VOTES[id];
   famPublicVote(item, prev && prev.v === v ? 0 : v); // 1.8.1 the family sees 👍 counts (👎 stays private)
   if (prev && prev.v === v) { delete VOTES[id]; ls.set('votes', VOTES); c.querySelectorAll('.vote').forEach(b => { b.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); }); toast('Vote removed'); return; }
@@ -810,7 +837,7 @@ async function load(force) {
     const f = await r.json();
     if (f && Array.isArray(f.items) && f.items.length) {
       const first = !FEED || FEED.updated !== f.updated;
-      FEED = f; ls.set('feed', f); noteSources(); noteSrcInts();
+      FEED = f; ls.set('feed', f); noteSources(); noteSrcInts(); if (typeof loadPinRx === 'function') loadPinRx();
       if (first || force) draw();
       if (force) toast('Feed is up to date');
     }
