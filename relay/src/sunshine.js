@@ -188,6 +188,7 @@ export async function runSunshine(env, fetchImpl = fetch, now = Date.now(), rnd 
   const st = doc.st || {};
   if (!subs.length) return { skipped: 'nobody' };
   if (st.sentDay === nzNow(now).date) return { skipped: 'sent' };
+  { const h = nzNow(now).hour; if (h < SUN_FROM - 1 || h >= SUN_TO) return { skipped: 'night' }; } // 2.29.11: no weather reads (or KV writes) overnight
   if (st.lastAt && now - st.lastAt < CHECK_MS) return { skipped: 'soon' };
   let cur = null;
   try {

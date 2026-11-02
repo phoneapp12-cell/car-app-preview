@@ -3,7 +3,7 @@
    and get() checks memory + caches.default first, then KV. If KV hits its daily put quota, put() succeeds via caches.default
    instead of throwing HTTP 1101. */
 const CU = n => "https://kv-cache.relay.internal/" + encodeURIComponent(n);
-const KVCU = k => "https://kv-store.relay.internal/" + encodeURIComponent(k);
+const KVCU = k => "https://kv-store2.relay.internal/" + encodeURIComponent(k); // 2.29.11: new name, so the old 7-day edge copies (stale in some data centres) are never read again
 const mem = new Map();
 const kvMem = new Map();
 
