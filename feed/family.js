@@ -194,11 +194,18 @@ async function openThread(btn) {
 const CLIKES = {};
 function cmLikeBar(x) {
   const L = Array.isArray(x.likes) ? x.likes : []; CLIKES[x.id] = L; const on = L.some(isMe);
-  return `<div class="cmlk" data-cmlk="${x.id}"><button class="cml${on ? ' on' : ''}" data-clike="${x.id}" aria-pressed="${on}" aria-label="${on ? 'Unlike this comment' : 'Like this comment'}">${on ? '❤️' : '🤍'}${L.length ? `<span class="cmlc">${L.length}</span>` : ''}</button>${L.length ? `<button class="cmln" data-clikers="${x.id}">${esc(L.map(likeName).slice(0, 3).join(', '))}${L.length > 3 ? ' +' + (L.length - 3) : ''}</button>` : ''}</div>`;
+  return `<div class="cmlk" data-cmlk="${x.id}"><button class="cml${on ? ' on' : ''}" data-clike="${x.id}" aria-pressed="${on}" aria-label="${on ? 'You liked this comment' : 'Like this comment'}">${on ? '❤️' : '🤍'}${L.length ? `<span class="cmlc">${L.length}</span>` : ''}</button>${L.length ? `<button class="cmln" data-clikers="${x.id}">${esc(L.map(likeName).slice(0, 3).join(', '))}${L.length > 3 ? ' +' + (L.length - 3) : ''}</button>` : ''}</div>`;
 }
 async function toggleCLike(cid) {
-  const bar = document.querySelector(`[data-cmlk="${cid}"]`), L = CLIKES[cid] || [], on = !L.some(isMe);
-  try { const r = await fam('/comments/' + cid + '/like', { method: 'POST', body: JSON.stringify({ on }) }); const nb = document.querySelector(`[data-cmlk="${cid}"]`); if (nb && r && Array.isArray(r.likes)) nb.outerHTML = cmLikeBar({ id: cid, likes: r.likes }); if (on) { try { navigator.vibrate && navigator.vibrate(12); } catch (e) { } } } catch (e) { toast(e.message); }
+  if (RX_BUSY.has('cl:' + cid)) return;
+  const L = CLIKES[cid] || [];
+  const send = on => rxOnce('cl:' + cid, async () => {
+    if (on) document.querySelectorAll(`[data-clike="${cid}"]`).forEach(b => b.classList.add('on', 'pend'));
+    try { const r = await fam('/comments/' + cid + '/like', { method: 'POST', body: JSON.stringify({ on }) }); if (r && Array.isArray(r.likes)) document.querySelectorAll(`[data-cmlk="${cid}"]`).forEach(nb => nb.outerHTML = cmLikeBar({ id: cid, likes: r.likes })); if (on) buzz(); else toast('Like removed'); }
+    catch (e) { document.querySelectorAll(`[data-cmlk="${cid}"]`).forEach(nb => nb.outerHTML = cmLikeBar({ id: cid, likes: CLIKES[cid] || [] })); toast(e.message); }
+  });
+  if (L.some(isMe)) { toastUndo('You already liked this ❤️', () => send(false)); return; } // 1.9.33 one like per person
+  await send(true);
 }
 function showCLikers(cid) {
   const L = CLIKES[cid] || []; if (!L.length) return;
@@ -433,7 +440,7 @@ function rxLine(i) { // '❤️ 2 · Sarah, Millesha   👍 1 · Shane' under fa
 }
 function likeBtn(s) {
   const likes = s.likes || [], on = likes.some(isMe);
-  return `<button class="fb lk${on ? ' on' : ''}" data-like="${esc(s.card)}" aria-pressed="${on}" aria-label="${on ? 'Take back your love' : 'Love it'}">${HEART}${likes.length ? `<span class="rxc">${likes.length}</span>` : ''}${freshFor(s, likes) ? '<i class="dot"></i>' : ''}</button>`;
+  return `<button class="fb lk${on ? ' on' : ''}" data-like="${esc(s.card)}" aria-pressed="${on}" aria-label="${on ? 'You loved this' : 'Love it'}">${HEART}${likes.length ? `<span class="rxc">${likes.length}</span>` : ''}${freshFor(s, likes) ? '<i class="dot"></i>' : ''}</button>`;
 }
 function famNewLikes() { return FAM_ON && SHARES.some(s => freshFor(s, (s.likes || []).concat(s.ups || []))); }
 function syncVote(s) { // this person's private ranking follows their family taps
@@ -455,16 +462,37 @@ async function react(card, kind, on) {
   const s = rxCard(card); if (s) syncVote(s);
   return s;
 }
+/* 1.9.33 one like per person: taps are ignored while a request is in flight, and tapping something you already liked
+   doesn't like it again – it shows "You already liked this" with an Undo (the server also never toggles on a repeat). */
+const RX_BUSY = new Set();
+async function rxOnce(key, fn) {
+  if (RX_BUSY.has(key)) return; RX_BUSY.add(key); document.documentElement.classList.add('rxbusy');
+  try { return await fn(); } finally { setTimeout(() => { RX_BUSY.delete(key); if (!RX_BUSY.size) document.documentElement.classList.remove('rxbusy'); }, 300); }
+}
+function toastUndo(text, undo) {
+  const el = document.getElementById('toast'); el.innerHTML = `<span>${esc(text)}</span><button type="button" class="tundo">Undo</button>`; el.classList.add('on', 'act');
+  el.querySelector('.tundo').onclick = async ev => { ev.preventDefault(); ev.stopPropagation(); el.classList.remove('on'); try { await undo(); } catch (e) { toast(e.message || 'Couldn’t undo – try again'); } };
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on', 'act'), 4500);
+}
+const buzz = () => { try { navigator.vibrate && navigator.vibrate(12); } catch (e) { } };
 async function toggleLike(card) {
+  if (RX_BUSY.has('love:' + card)) return;
   const s = rxCard(card); if (!s) return;
-  const on = !(s.likes || []).some(isMe);
-  try { await react(card, 'love', on); redrawFoot(card); if (on) { try { navigator.vibrate && navigator.vibrate(12); } catch (e) { } } } catch (e) { toast(e.message); }
+  if ((s.likes || []).some(isMe)) { toastUndo('You already liked this ❤️', () => rxOnce('love:' + card, async () => { await react(card, 'love', false); redrawFoot(card); toast('Like removed'); })); return; }
+  await rxOnce('love:' + card, async () => {
+    document.querySelectorAll(`.card[data-id="${CSS.escape(card)}"] [data-like]`).forEach(b => b.classList.add('on', 'pend'));
+    try { await react(card, 'love', true); redrawFoot(card); buzz(); } catch (e) { redrawFoot(card); toast(e.message); }
+  });
 }
 async function famVote(c, item, v) { // called by vote() for family cards; returns true when it handled the tap
   const s = rxOf(item); if (!FAM_ON || !s) return false;
   if (v > 0) {
-    const on = !(s.ups || []).some(isMe);
-    try { await react(s.card, 'up', on); redrawFoot(s.card); if (on) toast('👍 More like this'); } catch (e) { toast(e.message); }
+    if (RX_BUSY.has('up:' + s.card)) return true;
+    if ((s.ups || []).some(isMe)) { toastUndo('You already liked this 👍', () => rxOnce('up:' + s.card, async () => { await react(s.card, 'up', false); redrawFoot(s.card); toast('Like removed'); })); return true; }
+    await rxOnce('up:' + s.card, async () => {
+      c.querySelectorAll('.vote.up').forEach(b => b.classList.add('on', 'pend'));
+      try { await react(s.card, 'up', true); redrawFoot(s.card); toast('👍 More like this'); } catch (e) { redrawFoot(s.card); toast(e.message); }
+    });
     return true;
   }
   if ((s.likes || []).some(isMe) || (s.ups || []).some(isMe)) react(s.card, 'none').catch(() => { }); // a 👎 is private: just take back their ❤️/👍

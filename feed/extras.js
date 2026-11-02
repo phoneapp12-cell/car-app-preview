@@ -203,7 +203,11 @@ document.addEventListener('click', async e => {
   const t = e.target && e.target.closest; if (!t) return;
   const dm = e.target.closest('[data-dqmore]'); if (dm) { const b = dm.closest('.cmts'); b.querySelectorAll('.cl > [hidden]').forEach(x => x.hidden = false); dm.remove(); return; }
   const lk = e.target.closest('[data-dqlike]');
-  if (lk) { const on = lk.dataset.on !== '1'; lk.disabled = true; try { const r = await fam('/likes', { method: 'POST', body: JSON.stringify({ card: lk.dataset.dqlike, kind: 'love', on }) }); lk.outerHTML = dqLikeBtn(lk.dataset.dqlike, r.likes); } catch (er) { lk.disabled = false; toast('Couldn’t like that – try again'); } return; }
+  if (lk) { // 1.9.33 one like per person: a repeat tap offers Undo instead
+    const card = lk.dataset.dqlike, send = on => rxOnce('love:' + card, async () => { const b = document.querySelector(`[data-dqlike="${CSS.escape(card)}"]`); if (b) { b.disabled = true; if (on) b.classList.add('on', 'pend'); } try { const r = await fam('/likes', { method: 'POST', body: JSON.stringify({ card, kind: 'love', on }) }); document.querySelectorAll(`[data-dqlike="${CSS.escape(card)}"]`).forEach(x => x.outerHTML = dqLikeBtn(card, r.likes)); if (!on) toast('Like removed'); } catch (er) { if (b) { b.disabled = false; b.classList.remove('pend'); if (on) b.classList.remove('on'); } toast('Couldn’t like that – try again'); } });
+    if (lk.disabled || RX_BUSY.has('love:' + card)) return;
+    if (lk.dataset.on === '1') { toastUndo('You already liked this ❤️', () => send(false)); return; }
+    await send(true); return; }
   const rp = e.target.closest('[data-dqrep]');
   if (rp) { const a = rp.closest('.dqa'), cid = rp.dataset.dqrep; let box = a.nextElementSibling && a.nextElementSibling.matches('.cmts.dqt') ? a.nextElementSibling : null; if (box) { if (box.dataset.auto) { const ta = box.querySelector('textarea'); if (ta) ta.focus(); } else box.remove(); return; }
     a.insertAdjacentHTML('afterend', `<div class="cmts dqt" data-cid="${esc(cid)}"><div class="cl">Loading…</div><form class="cf"><textarea rows="1" maxlength="1000" placeholder="Reply to ${esc((a.querySelector('b') || {}).textContent || 'this')}…" aria-label="Write a reply"></textarea><button class="btn pri">Send</button></form></div>`);

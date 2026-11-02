@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.32';
+const APP_VERSION = '1.9.33';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -873,6 +873,10 @@ function vote(el, v) {
   if (!item) return;
   if ((item._share || item.pin) && FAM_ON) { if (v > 0) { famVote(c, item, v); return; } if (!(VOTES[id] && VOTES[id].v < 0)) famVote(c, item, v); } // 1.8.1 family cards: 👍 is shown to the family
   const prev = VOTES[id];
+  if (prev && prev.v === v && v > 0) { // 1.9.33 one like per person: a repeat 👍 doesn't toggle; Undo is in the toast
+    toastUndo('You already liked this 👍', () => { famPublicVote(item, 0); delete VOTES[id]; ls.set('votes', VOTES); c.querySelectorAll('.vote').forEach(b => { b.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); }); toast('Like removed'); });
+    return;
+  }
   famPublicVote(item, prev && prev.v === v ? 0 : v); // 1.8.1 the family sees 👍 counts (👎 stays private)
   if (prev && prev.v === v) { delete VOTES[id]; ls.set('votes', VOTES); c.querySelectorAll('.vote').forEach(b => { b.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); }); toast('Vote removed'); return; }
   const { _x, _ints, ...snap } = item; if (snap.img && /^(data|blob):/.test(snap.img)) delete snap.img; delete snap.photo; // a car, pet or own photo stays in My App
@@ -945,7 +949,7 @@ function settings() {
   famList();
 }
 let toastT = 0;
-function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2200); }
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.remove('act'); el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2200); }
 
 /* ---- events ---- */
 document.addEventListener('click', e => {
