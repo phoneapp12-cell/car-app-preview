@@ -948,7 +948,7 @@ function cnPick() {
   if (!P.length) return null; const top = P.slice(0, 4), sum = top.reduce((x, y) => x + y.sc, 0); let r = Math.random() * sum, k = 0; while (k < top.length - 1 && (r -= top[k].sc) > 0) k++;
   return top[k].c;
 }
-const cnDays = c => { const ds = c.days || [c.day]; const f = d => NZ(Date.parse(d + 'T00:00:00Z') + 12 * 36e5, { weekday: 'short', day: 'numeric', month: 'short' }); return ds.length > 1 ? ds.slice(0, 3).map(f).join(' & ') + (ds.length > 3 ? ' +' + (ds.length - 3) : '') : f(ds[0]); };
+const cnDays = c => { const ds = c.days || [c.day]; const f = d => NZ(Date.parse(d + 'T00:00:00Z'), { weekday: 'short', day: 'numeric', month: 'short' }); return ds.length > 1 ? ds.slice(0, 3).map(f).join(' & ') + (ds.length > 3 ? ' +' + (ds.length - 3) : '') : f(ds[0]); };
 function concertCard(i) {
   const c = i.c, dd = nzDayNum(c.ev) - nzDayNum(Date.now()), badge = dd <= 0 ? 'Tonight' : dd === 1 ? 'Tomorrow' : dd < 7 ? `In ${dd} days` : dd < 14 ? 'Next week' : `In ${Math.round(dd / 7)} weeks`;
   const bar = intBar({ id: c.id, t: c.t + ' – ' + c.venue, ev: c.ev, url: c.url, img: c.img, where: c.venue + ', Auckland', topic: 'events' }, c.ev);
