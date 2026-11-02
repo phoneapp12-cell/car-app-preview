@@ -932,3 +932,40 @@ window.festive = function (order, nPins) {
 };
 const cardWt = window.card;
 window.card = function (i) { if (i && i.x === 'watch') return watchCard(i); return cardWt(i); };
+
+/* ---- 1.9.31 🎤 Big Auckland concerts in the next month (everyone's feed). The data service reads Spark Arena, Eden Park and
+   Auckland Stadiums every ~6 hours on its own (no Grok Bot usage). One concert a load, soonest and best-matched first; each is
+   shown once (👀 rule), and ⭐ Interested sets the usual event reminder. ---- */
+function cnScore(c, now = Date.now()) {
+  const W = weights(), d = (c.ev - now) / 864e5; if (d < -0.5 || d > 32) return 0;
+  if (VOTES[c.id] && VOTES[c.id].v < 0) return 0; if (INT.mine.has(c.id)) return 0;
+  let s = 1 + Math.max(0, W.topic('music') || 0) * 0.6 + (W.topic('events') ? 0.3 : 0);
+  s *= d <= 7 ? 1.6 : d <= 14 ? 1.3 : 1; if (c.venue === 'Eden Park' || /stadium|springs/i.test(c.venue)) s *= 1.25; // the very big ones
+  return s;
+}
+function cnPick() {
+  const P = ((FEED && FEED.concerts) || []).filter(c => c.img && !SPORT.test(c.t) && !unsafe(c) && !SEEN_BASE.has(c.id)).map(c => ({ c, sc: cnScore(c) })).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc);
+  if (!P.length) return null; const top = P.slice(0, 4), sum = top.reduce((x, y) => x + y.sc, 0); let r = Math.random() * sum, k = 0; while (k < top.length - 1 && (r -= top[k].sc) > 0) k++;
+  return top[k].c;
+}
+const cnDays = c => { const ds = c.days || [c.day]; const f = d => NZ(Date.parse(d + 'T00:00:00Z') + 12 * 36e5, { weekday: 'short', day: 'numeric', month: 'short' }); return ds.length > 1 ? ds.slice(0, 3).map(f).join(' & ') + (ds.length > 3 ? ' +' + (ds.length - 3) : '') : f(ds[0]); };
+function concertCard(i) {
+  const c = i.c, dd = nzDayNum(c.ev) - nzDayNum(Date.now()), badge = dd <= 0 ? 'Tonight' : dd === 1 ? 'Tomorrow' : dd < 7 ? `In ${dd} days` : dd < 14 ? 'Next week' : `In ${Math.round(dd / 7)} weeks`;
+  const bar = intBar({ id: c.id, t: c.t + ' – ' + c.venue, ev: c.ev, url: c.url, img: c.img, where: c.venue + ', Auckland', topic: 'events' }, c.ev);
+  return `<article class="card xc promo concert" data-id="${esc(c.id)}">${xHead('🎤', 'Big concerts in Auckland', 'Coming up in the next month', 'Concert')}
+    <a class="pimg" href="${esc(c.url)}" target="_blank" rel="noopener"><img src="${esc(c.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="away${dd <= 1 ? ' soon' : ''}">${esc(badge)}</span></a>
+    <div class="bd"><h3>${esc(c.t)}</h3><p class="pwhen">🗓️ ${esc(cnDays(c))}</p><p class="sst">📍 ${esc(c.venue)}, Auckland</p>
+    <div class="xbtns"><a class="btn pri" href="${esc(c.url)}" target="_blank" rel="noopener">🎟️ Details ↗</a></div>${bar}</div></article>`;
+}
+let CN_FOR = null, CN = null;
+const cnFestive = window.festive;
+window.festive = function (order, nPins) {
+  order = cnFestive ? cnFestive(order, nPins) : order;
+  if (!FEED || !FEED.concerts || order.length < 6) return order;
+  const k = (FEED.updated || 0) + '|' + INT.mine.size; if (CN_FOR !== k) { CN_FOR = k; CN = cnPick(); }
+  if (!CN) return order;
+  const out = order.slice(), at = Math.min(Math.max(2, nPins) + 8 + Math.floor(Math.random() * 3), out.length);
+  out.splice(at, 0, { id: CN.id, x: 'concert', c: CN, topic: 'events', t: CN.t }); return out;
+};
+const cardCn = window.card;
+window.card = function (i) { if (i && i.x === 'concert') return concertCard(i); return cardCn(i); };
