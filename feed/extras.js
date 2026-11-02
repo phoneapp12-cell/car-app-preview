@@ -33,7 +33,7 @@ function stChip(s) { // 🔥 N-day streak, next to the greeting
   el.classList.toggle('hot', s.cur >= 7);
 }
 function celebrate(s) { // milestones 3/7/14/30/50/100 – once each; and a note when the weekly freeze saved the streak
-  if (s.award && !$('#celeb')) { // 1.9.28 🎉 one-time streak award (+2 days), shown once; the server remembers it was seen
+  if (s.award && !$('#celeb')) { // 1.9.29 🎉 one-time streak award (+2 days), shown once; the server remembers it was seen
     document.body.insertAdjacentHTML('beforeend', `<div id="celeb" class="celeb award" role="dialog" aria-label="Streak award"><div class="cin"><div class="cfx" aria-hidden="true">${'🎉✨🔥⭐🎊'.repeat(4).match(/./gu).map((e, k) => `<i style="--x:${(k * 37) % 100}%;--d:${(k % 5) * 0.15}s">${e}</i>`).join('')}</div>
       <div class="cbig">🎉 +2</div><h2>Streak award!</h2><p>+2 days added to your 🔥 streak${s.cur ? ` – you’re on <b>${s.cur} days</b>` : ''}. Keep opening Info Book each day to keep it growing.</p><p class="sst">New badge: 🎉 Streak award</p><button class="btn pri" id="celebok">Yay!</button></div></div>`);
     fam('/visit/award', { method: 'POST', body: '{}' }).catch(() => { }); return;
@@ -89,7 +89,7 @@ function wxCard(i) {
     <a class="media" href="${esc(w.web)}" target="_blank" rel="noopener"><img src="img/alert-${pic}.svg" alt="${esc(w.head)}"></a><div class="bd"><div class="wxlv">${w.colour === 'red' ? '🔴' : w.colour === 'orange' ? '🟠' : '🟡'} ${esc(lvl)}${w.test ? ' · <b>TEST ONLY – not a real warning</b>' : ''}</div><p class="wxa"><b>${esc(w.area)}</b></p><p class="wxt">🕑 ${esc(wxWhen(w))}</p>
     <p class="xwho">${esc(w.desc)}</p>${w.act ? `<p class="xwho">👉 ${esc(w.act)}</p>` : ''}<div class="xbtns"><a class="btn pri" href="${esc(w.web)}" target="_blank" rel="noopener">MetService warnings ↗</a>${w.link ? `<a class="btn" href="${esc(w.link)}" target="_blank" rel="noopener">Official alert</a>` : ''}</div></div></article>`;
 }
-/* ---- 1.9.28 ⚡ Northpower power cuts in Whangārei District (unplanned now, planned within 48 hours) ---- */
+/* ---- 1.9.29 ⚡ Northpower power cuts in Whangārei District (unplanned now, planned within 48 hours) ---- */
 const pwT = t => NZ(t, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).replace(':00', '');
 function pwrCard(i) {
   const o = i.o, un = o.kind === 'unplanned', ar = (o.areas || []).join(', ') || o.title;
@@ -114,7 +114,7 @@ function wxNzCard(i) {
     <div class="bd"><ul class="rnl">${i.list.slice(0, 6).map(w => `<li><span>${w.colour === 'red' ? '🔴' : '🟠'} ${WXE[w.event] || '⚠️'} <b>${esc(w.head.replace(/\s*-\s*(Orange|Red)$/i, ''))}</b> · ${esc(w.area.split(';')[0].slice(0, 70))}</span><em>${esc(wxWhen(w))}</em></li>`).join('')}</ul>
     <div class="xbtns"><a class="btn" href="https://www.metservice.com/warnings/home" target="_blank" rel="noopener">All MetService warnings ↗</a></div></div></article>`;
 }
-/* ---- 1.9.28 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
+/* ---- 1.9.29 📲 install prompt for anyone using Info Book in a browser tab: one-tap install (Chrome/Android), Share → Add to Home Screen
    steps (iPhone), or "open in Chrome/Safari first" with a copy-my-link button (Messenger/Facebook). "Later" hides it for 3 days. ---- */
 let BIP = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); BIP = e; installBanner(true); });
@@ -150,9 +150,9 @@ let PIN_URLS = null, PIN_FOR = null;
 const pinUrls = () => (PIN_FOR === FEED && PIN_URLS) || (PIN_FOR = FEED, PIN_URLS = new Set((typeof FEED !== 'undefined' && FEED && FEED.items || []).filter(i => i.pin).map(i => urlBase(i.url))));
 window.pins = function () {
   const out = [];
-  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.28: only warnings and watches that cover Whangārei
+  const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.29: only warnings and watches that cover Whangārei
   for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Whangārei warnings go right to the top
-  const PW = X.pwr || [], un = PW.filter(o => o.kind === 'unplanned'), pl = PW.filter(o => o.kind !== 'unplanned'); // 1.9.28 ⚡ then power cuts
+  const PW = X.pwr || [], un = PW.filter(o => o.kind === 'unplanned'), pl = PW.filter(o => o.kind !== 'unplanned'); // 1.9.29 ⚡ then power cuts
   for (const o of un.slice(0, 4)) out.push({ id: 'pw:' + o.id, x: 'pwr', o, topic: 'family', t: 'Power cut: ' + (o.areas || []).join(', ') });
   if (pl.length === 1) out.push({ id: 'pw:' + pl[0].id, x: 'pwr', o: pl[0], topic: 'family', t: 'Planned power cut' });
   else if (pl.length) out.push({ id: 'pw-planned', x: 'pwrl', list: pl.slice(0, 8), topic: 'family', t: 'Planned power cuts' });
@@ -196,7 +196,7 @@ window.card = function (i) {
 };
 const xHead = (em, who, sub, tag) => `<div class="hd"><div class="av">${em}</div><div class="who"><b>${esc(who)}</b><small>${esc(sub)}</small></div><span class="tp">${esc(tag)}</span></div>`;
 
-/* 1.9.28 the answers right on the card: photo answers (name, words, a thumbnail – tap to enlarge), the latest 3 first,
+/* 1.9.29 the answers right on the card: photo answers (name, words, a thumbnail – tap to enlarge), the latest 3 first,
    "View all N" for the rest. Written answers show as the card's open comment thread. (Trivia never shows anyone's answers.) */
 function dqLikeBtn(card, L) { L = Array.isArray(L) ? L : []; const on = L.some(x => typeof isMe === 'function' && isMe(x)); return `<button class="dqlk${on ? ' on' : ''}" data-dqlike="${esc(card)}" data-on="${on ? 1 : 0}" data-n="${L.length}" aria-pressed="${on}" title="${esc(L.map(x => x.name).join(', '))}">${on ? '❤️' : '🤍'} ${L.length || ''}</button>`; }
 document.addEventListener('click', async e => {
@@ -362,7 +362,7 @@ function suggApply(add) {
 /* ---- ranking: Shane's gentle life-stage nudge (never more than ×1.15, and not for topics they've 👎'd) and local events first ---- */
 const basePopW = popW;
 const REGION_NL = /whang[aā]rei|northland|kerikeri|paihia|russell|dargaville|kaitaia|kaikohe|ruak[aā]k[aā]|waipu|tutukaka|ngunguru|hikurangi|kamo|onerahi|bream bay|mangawhai|kawakawa|opua|hokianga|maungakaramea|tikipunga/i;
-/* ---- 1.9.28 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
+/* ---- 1.9.29 🇳🇿 NZ-first and weather/season-aware ranking (a gentle nudge on top of interests, 👍/👎 and the time-of-day mood) ----
    Weather: My App's own Whangārei forecast on this phone if there is one (the one the auto theme uses), otherwise the same open-meteo
    forecast fetched here (once every 30 min). Nothing about the theme changes. */
 const NZ_RX = /\.nz\b|new zealand|aotearoa|\bkiwis?\b|whang[aā]rei|northland|auckland|wellington|christchurch|queenstown|rotorua|tauranga|hamilton|dunedin|nelson|napier|taup[oō]|coromandel|bay of islands|countdown|woolworths nz|pak'?n'?save|new world|the warehouse|mitre ?10|bunnings nz|kmart nz|briscoes|farmers|rnz|stuff\.co|nz ?herald|1news|newshub|te reo|m[aā]ori|matariki|waitangi|p[oō]hutukawa|kūmara|kumara|pavlova|\bl&p\b|whitebait|feijoa/i;
@@ -395,7 +395,7 @@ const isNZ = (i, txt) => NZ_SRC.test(i.src || '') || /^https?:\/\/[^/]+\.nz(\/|$
 function nzWeatherNudge(i) {
   if (!i || i.pin || i.x) return 1; const txt = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''); let f = 1; i._wxm = '';
   if (i.kind !== 'event') { // events already lean Whangārei/Northland
-    if (PRAC_TOPICS.has(i.topic)) { // 1.9.28 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
+    if (PRAC_TOPICS.has(i.topic)) { // 1.9.29 interests: closer to home and practical. Stronger inside an interest chip than in All (sitcoms stay first)
       const chip = tab !== 'all', nz = isNZ(i, txt), tipT = TIP_RE_C.test(i.t || ''), show = SHOW_RE_C.test(i.t || '');
       f *= nz ? (chip ? 1.8 : 1.3) : tipT ? (chip ? 0.9 : 0.95) : (chip ? 0.55 : 0.75);
       if (REGION_NL.test(txt)) f *= 1.15;
@@ -412,7 +412,7 @@ function nzWeatherNudge(i) {
   return f;
 }
 wxFetchNow();
-/* 1.9.28 situation: parenting tips for young kids, teen tips for teens, grandparent ideas, fun for singles; other people's
+/* 1.9.29 situation: parenting tips for young kids, teen tips for teens, grandparent ideas, fun for singles; other people's
    life stages lower. Only soft weights from the server (the labels never reach the phone). */
 const SIT_KW = { kids: /\b(bab(y|ies)|toddlers?|newborns?|preschool\w*|kindy|primary|nappy|nappies|sensory|autism|autistic|playground|school holidays?|kids?|bluey|peppa)\b/i, teens: /\b(teens?|teenagers?|tweens?|high school|ncea|secondary school|year (9|1[0-3]))\b/i, grand: /\b(grand(kids|children|child|parents?|ma|pa|parenting)|nana|koro|kuia|retire\w*)\b/i, single: /\b(meet ?ups?|make friends|solo|social club|night out|weekend away|road trip|festival|gig)\b/i, couple: /\b(date night|couples?|weekend away|for two)\b/i };
 const BABY_KW = /\b(bab(y|ies)|toddlers?|newborns?|breastfeed\w*|nappy|nappies|pregnan\w*|maternity|plunket)\b/i, TEEN_KW = SIT_KW.teens, DATING = /\b(dating|tinder|hinge|bumble|first date|hook ?up)\b/i;
@@ -427,7 +427,7 @@ function sitW(i, sit) {
   if (DATING.test(txt)) f *= 0.3; // dating-free
   return f;
 }
-/* 1.9.28 upbeat: heavy news (deaths, crime, war, disasters, court, tragedies, political fights, health scares) is dropped from
+/* 1.9.29 upbeat: heavy news (deaths, crime, war, disasters, court, tragedies, political fights, health scares) is dropped from
    news topics and well down everywhere else; fun, quirky, useful, local good news and how-tos come up. (Whangārei warnings and
    outages are pinned separately and never touched.) The data service also flags clearly negative headlines (Workers AI). */
 const HEAVY_HARD = /\b(died|dies|dead|death|deaths|deadly|killed|killing|murder\w*|homicide|manslaughter|stabb\w*|shot dead|shooting|gunman|rape\w*|sexual assault|assault\w*|abuse[ds]?|child abuse|war|warfare|airstrikes?|missiles?|invasion|bomb\w*|terror\w*|hostages?|massacre|genocide|tragedy|tragic|fatal\w*|crash victims?|drown\w*|body found|remains found|funeral|mourn\w*|suicide|overdose|earthquake kills|disaster|devastat\w*|catastroph\w*|court|sentenced|jailed|prison|trial|charged|accused|guilty|convicted|police (hunt|appeal)|arrested|ram raid|burglar\w*|robbery|gang\w*|meth)\b/i;
@@ -451,7 +451,7 @@ window.popW = function (i) {
   const n = ls.get('nudge', null);
   if (n && n.boost && n.boost[i.topic] && weights().topic(i.topic) >= 1) w *= Math.min(1.15, n.boost[i.topic]);
   w *= sitW(i, (n && n.sit) || {}) * toneW(i);
-  if (n && n.ib && !i.pin) { let b = 1; for (const k of itemInts(i)) if (n.ib[k]) b = Math.max(b, Math.min(1.8, n.ib[k])); w *= b; } // 1.9.28 interests Shane boosted for them (🧶 crochet, 🐴 horses…)
+  if (n && n.ib && !i.pin) { let b = 1; for (const k of itemInts(i)) if (n.ib[k]) b = Math.max(b, Math.min(1.8, n.ib[k])); if (b > 1) { const ageD = (Date.now() - (i.at || Date.now())) / 864e5; if (ageD > 2) b *= Math.min(4, 1 + ageD / 7); } w *= b; } // patterns and tips are evergreen, so an older one still comes up // 1.9.29 interests Shane boosted for them (🧶 crochet, 🐴 horses…)
   if (i.kind === 'event') { const u = (i.url || '') + ' ' + (i.where || '') + ' ' + (i.t || ''); w *= REGION_NL.test(u) ? 1.3 : /auckland|tāmaki|tamaki/i.test(u) ? 1 : 0.55; if (!i.pin && pinUrls().has(urlBase(i.url))) w = 0; }
   return w;
 };
@@ -555,9 +555,9 @@ const baseFamList = famList;
 window.famList = async function () { await baseFamList(); const l = $('#famlist'); if (l && IS_ADMIN && !$('#famx')) l.insertAdjacentHTML('afterend', '<div id="famx" class="famx">Loading…</div>'); adminExtras(); };
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') xVisit(); });
 if (FAM_ON) { setTimeout(() => { xVisit(); xLoad(true); if (X.push === null) { } }, 1200); if ('serviceWorker' in navigator && Notification && Notification.permission === 'granted') swAuth(); }
-if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.28 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
+if (FEED && tab === 'all') { try { draw(); } catch (e) { } } // 1.9.29 the first paint from cache can run before this file loads – redraw so the countdowns and extras appear
 
-/* ---- 1.9.28 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
+/* ---- 1.9.29 📍 'Event near you' promos (Whangārei area only), weekly 'This week in Whangārei for you', and ⭐ Interested on every event ---- */
 const WGR_AREA = /whang[aā]rei|kamo|onerahi|tikipunga|kensington|maunu|morningside|raumanga|otangarei|regent|parahaki|riverside|town basin|hundertwasser|forum north|tutuk[aā]k[aā]|ngunguru|matapouri|ruak[aā]k[aā]|waip[uū]\b|one tree point|marsden|hikurangi|parua bay|pataua|maungakaramea|maungatapere|portland|glenbervie|whareora|whananaki|oakleigh|tamaterau|mckinnon/i;
 const INT = { mine: new Map(), who: {}, got: 0 }, INT_META = {};
 async function intLoad(force) {
@@ -674,7 +674,7 @@ window.popW = function (i) { // ⭐ Interested: similar events (same interest, s
   return w;
 };
 
-/* ---- 1.9.28 🪄 Harry Potter with a Slytherin lean: Slytherin items rank higher, show-off posts lower, plus a daily 'Slytherin of the day' fact ---- */
+/* ---- 1.9.29 🪄 Harry Potter with a Slytherin lean: Slytherin items rank higher, show-off posts lower, plus a daily 'Slytherin of the day' fact ---- */
 const SLY_RE = /slytherin|snape|draco|malfoy|scorpius|green (and|&) silver|emerald|serpent|salazar|bloody baron|slughorn|regulus/i;
 const popWHp = window.popW;
 window.popW = function (i) { let w = popWHp(i); if (i && i.topic === 'hp') { const t = (i.t || '') + ' ' + (i.s || ''); if (SLY_RE.test(t)) w *= 1.5; if (SHOW_RE_C.test(i.t || '')) w *= 0.45; if (TIP_RE_C.test(i.t || '')) w *= 1.2; } return w; };
@@ -704,7 +704,7 @@ window.festive = function (order, nPins) { order = festHp(order, nPins); if (opt
 const cardHp = window.card;
 window.card = function (i) { if (i && i.x === 'sly') return slyCard(); return cardHp(i); };
 
-/* ---- 1.9.28 📅 Sarah's appointments: read on Shane's phone from My App's own storage (same as the shared cars). Only her own
+/* ---- 1.9.29 📅 Sarah's appointments: read on Shane's phone from My App's own storage (same as the shared cars). Only her own
    appointments (ones she shared from her To-do app, ones Shane marked For: Sarah, and her booked Health check-ups) go –
    title, date, time and place only, never notes, costs or claims. Only Sarah (and Shane) can read them. ---- */
 const SA_MONEY = /\$|\b(bills?|pay(ment|ing)?|invoice|loan|bank|rent|mortgage|insurance|ird|tax|debt|budget|direct debit)\b(?!\s+(st|street|rd|road)\b)/i;
@@ -761,7 +761,7 @@ function saCard(i) {
     <p class="xwho">🔒 Only you (and Shane) can see this card. From your appointments in My App.</p></div></article>`;
 }
 
-/* ---- 1.9.28 🤖 Info Bot settings ---- */
+/* ---- 1.9.29 🤖 Info Bot settings ---- */
 function aiAdmin(a) {
   if (!a || !a.cfg) return '';
   const u = a.usage || {}, neu = Math.round((u.tin || 0) * 26668 / 1e6 + (u.tout || 0) * 204805 / 1e6);
@@ -770,12 +770,12 @@ function aiAdmin(a) {
     <div class="row"><span>How often (when not asked)</span><select id="aifreq">${[['rare', 'Now and then (1 in 7)'], ['some', 'Sometimes (1 in 3)'], ['often', 'Often (1 in 2)']].map(([k, l]) => `<option value="${k}"${a.cfg.freq === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`;
 }
 
-/* ---- 1.9.28 pronouns: optional, wording only; not set = they/them ---- */
+/* ---- 1.9.29 pronouns: optional, wording only; not set = they/them ---- */
 const PRON_OPTS = [['', 'Pronouns – not set (they)'], ['she', 'she/her'], ['he', 'he/him'], ['they', 'they/them']];
 const PRON_LABEL = { she: 'she/her', he: 'he/him', they: 'they/them' };
 function pronOf(k) { const t = k === 'she' ? { sub: 'she', obj: 'her', pos: 'her' } : k === 'he' ? { sub: 'he', obj: 'him', pos: 'his' } : { sub: 'they', obj: 'them', pos: 'their' }; t.Sub = t.sub[0].toUpperCase() + t.sub.slice(1); t.Pos = t.pos[0].toUpperCase() + t.pos.slice(1); return t; }
 
-/* ---- 1.9.28 🔗 share a link (Android: Info Book in the phone's Share menu; iPhone/desktop: paste a link) ---- */
+/* ---- 1.9.29 🔗 share a link (Android: Info Book in the phone's Share menu; iPhone/desktop: paste a link) ---- */
 let LS = null;
 const LINK_WHY = { sport: 'Info Book keeps sport out of the feeds, so this one can’t be shared.', money: 'Money and bills stay out of Info Book, so this one can’t be shared.', unsafe: 'That one isn’t family-safe, so it can’t be shared here.' };
 function linkSheet(pre) {
@@ -872,7 +872,7 @@ setTimeout(() => {
   $('#feed').insertAdjacentHTML('beforebegin', `<section id="lktip" class="instb"><div class="tx"><b>🔗 New: share into Info Book</b><p>In Facebook, Instagram, TikTok or Chrome tap <b>Share</b> and pick <b>Info Book</b>. If it isn’t in the list yet, your phone updates Info Book within a day – or remove it from your home screen and add it again.</p><div class="xbtns"><button class="btn pri" id="lktipok">Got it</button></div></div></section>`);
 }, 5000);
 
-/* ---- 1.9.28 📺 Coming up to watch: new and upcoming shows and movies on Netflix NZ, TVNZ+ and ThreeNow (from JustWatch's NZ
+/* ---- 1.9.29 📺 Coming up to watch: new and upcoming shows and movies on Netflix NZ, TVNZ+ and ThreeNow (from JustWatch's NZ
    catalogue, refreshed by the data service every ~6 hours). One or two a load, matched to this person's interests and
    situation; sitcoms lead for anyone with Sitcoms on. Seen once, gone; dropped a week after release. ⭐ Interested = a
    reminder on the day it comes out. Never sport, R18, money or anything that isn't family-safe. */
