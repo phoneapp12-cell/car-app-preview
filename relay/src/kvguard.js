@@ -71,14 +71,16 @@ export function guardKV(env) {
       const raw = typeof value === "string" ? value : JSON.stringify(value);
       const ttl = (opts && opts.expirationTtl) || 604800;
       const prev = await edgeGet(key);
-      await edgePut(key, raw, ttl);
+      await edgePut(key, raw, 120); // 2.29.11: short edge copy; a 7-day copy went stale in other data centres and caused rewrites
       if (prev !== null && stripVolatile(prev) === stripVolatile(raw)) return;
       try {
-        const cur = prev !== null ? prev : await kv.get(key, "text");
+        // 2.29.11: the edge copy can be an older value from this data centre, so check the real KV value before writing
+        // (before, a stale edge copy meant an unchanged record was written again every minute: ~1,000 extra writes a day)
+        const cur = await kv.get(key, "text");
         if (cur !== null && stripVolatile(cur) === stripVolatile(raw)) return;
         await kv.put(key, raw, opts);
       } catch (e) {
-        // Daily KV write limit reached: value is safely stored in caches.default + kvMem
+        await edgePut(key, raw, ttl); // Daily KV write limit reached: keep the value in caches.default + kvMem until KV takes writes again
       }
     }
   };

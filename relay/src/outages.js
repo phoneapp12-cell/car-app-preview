@@ -58,7 +58,8 @@ export async function runOutages(env, fetchImpl = fetch, now = Date.now(), force
   let d2 = null; try { d2 = await fetch2d(fetchImpl); } catch (e) { d2 = null; }
   const net = netMerge(got.fibre || [], d2 === null ? ((prev && prev.net) || []).filter(o => o.prov === '2degrees') : d2, (prev && prev.net) || [], now);
   const rec = { planned: got.planned, unplanned: got.unplanned, restored: keepR, net, netOk: { npf: true, d2: d2 !== null }, updated: got.updated, source: 'Northpower Outages Centre' };
-  await kv.put(OUT_KEY, JSON.stringify(rec));
+  const same = prev && JSON.stringify({ ...prev, updated: 0 }) === JSON.stringify({ ...rec, updated: 0 }); // 2.29.11: Northpower's 'last updated' alone isn't a change
+  if (!same) await kv.put(OUT_KEY, JSON.stringify(rec));
   return rec;
 }
 export async function getOutages(env) { try { return JSON.parse(await env.EVENTS_KV.get(OUT_KEY) || 'null'); } catch (e) { return null; } }
