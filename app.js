@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.13';
+const APP_VERSION = '2.29.14';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -37018,7 +37018,34 @@ async function onBottomTileLongPress(btnEl) {
 
 
 // Start app after all modules and overrides are registered
-if (!window.__MOVING) start();
+/* 2.29.14 🎂 Info Book → My App birthdays. On Shane's phone (his Info Book admin link is saved in this same site's storage),
+   birthdays that family members enter in Info Book are added to My App's Birthdays when they aren't already here.
+   Matched by first name (already here = left alone; never overwrites or duplicates). Runs on open and on resume, at most
+   every 10 minutes. Nothing is sent from My App: it only reads the family's birthday list. */
+const famBdFirst = n => String(n || '').trim().toLowerCase().split(/\s+/)[0].replace(/[^a-zāēīōū'-]/g, '');
+function famBdayMerge(D, list) {
+  if (!Array.isArray(D.birthdays)) D.birthdays = [];
+  const have = new Set(D.birthdays.map(b => famBdFirst(b && b.name)).filter(Boolean)), out = [];
+  for (const x of list || []) {
+    const k = famBdFirst(x && x.name), mo = +x.m, d = +x.d, y = +x.y || '';
+    if (!k || have.has(k) || !(mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) continue;
+    D.birthdays.push({ id: uid('bday'), name: String(x.name).trim().slice(0, 60), day: d, month: mo, year: y && y >= 1900 && y <= new Date().getFullYear() ? y : '', notes: 'From Info Book' });
+    have.add(k); out.push(String(x.name).trim() + ' ' + d + ' ' + MONTHS[mo - 1].slice(0, 3));
+  }
+  return out;
+}
+async function famBdaySync(force) {
+  try {
+    const M = JSON.parse(localStorage.getItem('mf.member') || 'null'); if (!M || M.role !== 'admin' || !M.tok || !S || sheetOpen) return;
+    const last = +localStorage.getItem('ma.famBdayAt') || 0; if (!force && Date.now() - last < 10 * 60e3) return;
+    localStorage.setItem('ma.famBdayAt', String(Date.now()));
+    const r = await fetch('https://shane-my-feed-data.phoneapp12.workers.dev/api/bdays', { headers: { Authorization: 'Bearer ' + M.tok } }); if (!r.ok) return;
+    const j = await r.json(), added = famBdayMerge(S, j.list);
+    if (added.length) { await save(); try { render(); } catch (e) { } toast('🎂 Added from Info Book: ' + added.join(', ')); }
+  } catch (e) { }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(() => famBdaySync(), 1500); });
+if (!window.__MOVING) { start(); setTimeout(() => famBdaySync(), 4000); }
 
 
 /* ================= 2.28.71: SUGGESTED INTERNET TV FOR SHANE, EXTRA NOTIFICATION CARDS, ONERAHI BUS TIMETABLE (#bus) & SELECT COMMITTEE BILLS (#parlbills) ================= */
