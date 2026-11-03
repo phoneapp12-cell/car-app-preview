@@ -992,7 +992,7 @@ function htScore(t) {
 }
 function htPick() {
   const today = seenDayN(), last = htLastDay(); if (last >= 0 && today - last < 2) return null; // every other day at most
-  const P = ((FEED && FEED.hometips) || []).filter(t => t.img && !SEEN_BASE.has(t.id) && !unsafe(t) && !SPORT.test(t.t + ' ' + (t.s || '')) && !LIFE_MONEY.test(t.t + ' ' + (t.s || '')) && !(VOTES[t.id] && VOTES[t.id].v < 0));
+  const P = ((FEED && FEED.hometips) || []).filter(t => t.img && !SEEN_BASE.has(t.id) && !unsafe(t) && !SPORT.test(t.t + ' ' + (t.s || '')) && !LIFE_MONEY.test(t.t + ' ' + (t.s || '')) && !/sponsor\w*|affiliate|nuffnang|giveaway/i.test(t.t + ' ' + (t.s || '')) && !(VOTES[t.id] && VOTES[t.id].v < 0));
   if (!P.length) return null; return P.map(t => ({ t, sc: htScore(t) })).sort((a, b) => b.sc - a.sc)[0].t;
 }
 function homeTipCard(i) {
