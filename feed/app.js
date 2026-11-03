@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.36';
+const APP_VERSION = '1.9.37';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -676,8 +676,8 @@ const SPK = {
 let SOUND = sessionStorage.getItem('mf.sound') === '1';
 // 1.8.5 sharp video pictures: YouTube's 1280px picture when the video has one (small grey stand-in → fall back to 480px)
 function ytThumb(id, img) { return !img || /i\.ytimg\.com\/vi\/[^/]+\/(hq|mq|sd)?default\.jpg/.test(img) ? 'https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg' : img; }
-function vidMedia(id, img, title, extra = '') {
-  return `<div class="media vid" data-vid="${esc(id)}" role="button" tabindex="0" aria-label="Video: ${esc(title)}"><div class="vslot"></div><img class="vthumb" loading="lazy" referrerpolicy="no-referrer" src="${esc(ytThumb(id, img))}" alt="" data-yt="${esc(id)}" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg'"><span class="play"><span></span></span><button class="snd" data-snd aria-label="${SOUND ? 'Mute' : 'Turn sound on'}">${SOUND ? SPK.on : SPK.off}</button>${extra}</div>`;
+function vidMedia(id, img, title, extra = '', tall = false) {
+  return `<div class="media vid${tall ? ' tall' : ''}" data-vid="${esc(id)}" role="button" tabindex="0" aria-label="Video: ${esc(title)}"><div class="vslot"></div><img class="vthumb" loading="lazy" referrerpolicy="no-referrer" src="${esc(ytThumb(id, img))}" alt="" data-yt="${esc(id)}" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg'"><span class="play"><span></span></span><button class="snd" data-snd aria-label="${SOUND ? 'Mute' : 'Turn sound on'}">${SOUND ? SPK.on : SPK.off}</button><button class="fsb" data-fs aria-label="Full screen">⛶</button>${extra}</div>`;
 }
 const PLAYERS = new Map(), RATIO = new Map(); let curVid = null, ytP = null;
 function ytApi() {
@@ -693,6 +693,7 @@ function sndBtn(el, on) { const b = el.querySelector('.snd'); if (b) { b.innerHT
 function mountVid(el) {
   if (PLAYERS.has(el)) return;
   const rec = { ready: false, want: false, p: null }; PLAYERS.set(el, rec);
+  if (el.dataset.vk) { rec.p = otherPlayer(el, rec); rec.ready = true; if (rec.want) playVid(el); return; } // 1.9.37 Reddit, Vimeo, TikTok, Facebook, Instagram, MP4
   ytApi().then(() => {
     if (PLAYERS.get(el) !== rec) return;
     const div = document.createElement('div'); el.querySelector('.vslot').appendChild(div);
@@ -734,7 +735,7 @@ function pauseVid(el) {
 function pickVid() {
   let best = null, br = 0;
   for (const [el, r] of RATIO) { if (!el.isConnected) { RATIO.delete(el); continue; } if (r > br && !el.classList.contains('verr')) { best = el; br = r; } }
-  if (best && br >= 0.6) { if (best !== curVid) playVid(best); }
+  if (best && br >= 0.6) { if (best !== curVid && !VID_SAVE) playVid(best); }
   else if (curVid && (RATIO.get(curVid) || 0) < 0.6) pauseVid(curVid);
 }
 const nearIO = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? mountVid(e.target) : unmountVid(e.target)), { rootMargin: '350px 0px' });
@@ -796,7 +797,8 @@ function card(i) {
   const style = `--c1:${T[3]};--c2:${T[4]}`;
   let media = '';
   if (i.photos) media = famPhotos(i);
-  else if (i.vid) media = vidMedia(i.vid, i.img, i.t);
+  else if (i.vid) media = vidMedia(i.vid, i.img, i.t, '', /\/shorts\//.test(i.url || ''));
+  else if (i.img && vidOf(i)) media = anyVidMedia(vidOf(i), i.img, i.t);
   else if (i.img) media = `<a class="media${i.kind === 'tv' ? ' tall' : ''}" href="${esc(i.url)}" target="_blank" rel="noopener"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(i.img)}" alt="${esc(i.t)}" onerror="if(!this.dataset.r){this.dataset.r=1;var s=this.src;setTimeout(()=>{this.src=s},1500)}else this.closest('.media').remove()"></a>`;
   else media = `<div class="hero"><span class="em">${T[2]}</span><h3>${esc(i.t)}</h3></div>`;
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
@@ -957,6 +959,7 @@ document.addEventListener('click', e => {
   const c = t.closest('[data-tab]'); if (c) { tab = c.dataset.tab; ls.set('tab', tab); draw(); window.scrollTo({ top: 0 }); if (tab === 'family') famFresh(); return; }
   const v = t.closest('[data-vote]'); if (v) { vote(v, +v.dataset.vote); return; }
   const u = t.closest('[data-undo]'); if (u) { const id = u.dataset.undo; delete VOTES[id]; ls.set('votes', VOTES); const it = order.find(x => x.id === id); const card0 = u.closest('.card'); if (it && card0) { card0.outerHTML = it.topic === 'life' ? lifeCard(it) : card(it); fillPics(); watchVids(); } return; }
+  const fb = t.closest('[data-fs]'); if (fb) { e.preventDefault(); vidFull(fb.closest('.media.vid')); return; }
   const sb = t.closest('[data-snd]'); if (sb) { e.preventDefault(); toggleSound(sb.closest('.media.vid')); return; }
   const p = t.closest('.media.vid'); if (p) { if (!p.classList.contains('playing') || curVid !== p) playVid(p, true); return; } // tap: play this one with sound
   const dm = t.closest('[data-dismiss]'); if (dm) { DISMISS[dm.dataset.dismiss] = Date.now(); ls.set('dismiss', DISMISS); const c0 = dm.closest('.card'); if (c0) { c0.style.transition = 'opacity .25s, transform .25s'; c0.style.opacity = 0; c0.style.transform = 'scale(.97)'; setTimeout(() => c0.remove(), 260); } toast('Hidden from Info Book'); return; }
@@ -997,3 +1000,61 @@ document.addEventListener('load', e => {
     im.style.width = Math.max(160, Math.min(boxW, Math.round(im.naturalWidth * 1.6 / dpr))) + 'px';
   }
 }, true);
+
+/* ---- 1.9.37 🎬 videos from more places, all playing in the card like YouTube does (muted until you tap the speaker, one at a
+   time, paused when scrolled away, not started by themselves on Data Saver or a low battery): Reddit's own clips (v.redd.it,
+   picture + sound tracks), Vimeo, TikTok, Facebook and Instagram videos (their official embed players), and plain MP4 links.
+   Bigger: edge to edge on phones and wider on big screens; 9:16 for Shorts, TikTok and Reels; ⛶ goes full screen. ---- */
+let VID_SAVE = !!(navigator.connection && navigator.connection.saveData);
+try { navigator.getBattery && navigator.getBattery().then(b => { const f = () => { VID_SAVE = !!(navigator.connection && navigator.connection.saveData) || (!b.charging && b.level < 0.15); }; f(); b.addEventListener('levelchange', f); b.addEventListener('chargingchange', f); }); } catch (e) { }
+function vidOf(i) {
+  if (!i) return null; if (i.vk && i.vu) return { k: i.vk, u: i.vu, tall: !!i.vtall };
+  const u = String(i.url || i.ext || ''); let m;
+  if ((m = u.match(/vimeo\.com\/(?:channels\/[\w-]+\/|video\/)?(\d{6,12})(?:$|[/?#])/))) return { k: 'vimeo', u: m[1] };
+  if ((m = u.match(/tiktok\.com\/@[\w.-]+\/video\/(\d{8,25})/))) return { k: 'tiktok', u: m[1], tall: true };
+  if ((m = u.match(/instagram\.com\/(?:[\w.]+\/)?(reel|reels|tv)\/([\w-]{5,})/))) return { k: 'ig', u: m[2], tall: true };
+  if (/facebook\.com\/(.+\/videos\/|watch\/?\?v=|reel\/|share\/v\/|share\/r\/)|fb\.watch\//.test(u)) return { k: 'fb', u, tall: /\/(reel|share\/r)\//.test(u) };
+  if ((m = u.match(/^https:\/\/v\.redd\.it\/([a-z0-9]{8,20})\/?$/i))) return { k: 'reddit', u: m[1] };
+  if (/^https:\/\/[^?#\s]+\.mp4(\?|$)/i.test(u)) return { k: 'mp4', u };
+  return null;
+}
+function anyVidMedia(v, img, title) {
+  return `<div class="media vid${v.tall ? ' tall' : ''}" data-vk="${esc(v.k)}" data-vu="${esc(v.u)}" role="button" tabindex="0" aria-label="Video: ${esc(title)}"><div class="vslot"></div><img class="vthumb" loading="lazy" referrerpolicy="no-referrer" src="${esc(img)}" alt=""><span class="play"><span></span></span>${v.k === 'ig' ? '' : `<button class="snd" data-snd aria-label="${SOUND ? 'Mute' : 'Turn sound on'}">${SOUND ? SPK.on : SPK.off}</button>`}<button class="fsb" data-fs aria-label="Full screen">⛶</button></div>`;
+}
+function vidFull(el) {
+  if (!el) return; if (!PLAYERS.has(el) || curVid !== el) playVid(el, true);
+  const v = el.querySelector('video'), go = () => { try { (el.requestFullscreen || el.webkitRequestFullscreen).call(el); } catch (e) { try { v && v.webkitEnterFullscreen && v.webkitEnterFullscreen(); } catch (x) { } } };
+  if (document.fullscreenElement) document.exitFullscreen(); else go();
+}
+function otherPlayer(el, rec) {
+  const k = el.dataset.vk, u = el.dataset.vu, slot = el.querySelector('.vslot'); let muted = true, state = -1;
+  const mark = on => { state = on ? 1 : 2; el.classList.toggle('playing', !!on); };
+  if (k === 'reddit' || k === 'mp4') {
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.loop = true; v.preload = 'metadata'; v.poster = (el.querySelector('.vthumb') || {}).src || '';
+    const RES = ['480', '360', '720', '270', '220']; let ri = 0, au = null;
+    const vsrc = () => k === 'mp4' ? u : `https://v.redd.it/${u}/CMAF_${RES[ri]}.mp4`;
+    v.src = vsrc(); v.onerror = () => { if (k === 'reddit' && ++ri < RES.length) { v.src = vsrc(); if (rec.want) v.play().catch(() => { }); } else { el.classList.add('verr'); mark(false); } };
+    v.onloadedmetadata = () => { if (v.videoHeight > v.videoWidth * 1.15) el.classList.add('tall'); };
+    v.onplaying = () => { mark(true); if (au && !muted) { au.currentTime = v.currentTime; au.play().catch(() => { }); } }; v.onpause = () => { mark(false); au && au.pause(); };
+    v.onseeked = () => { if (au) au.currentTime = v.currentTime; };
+    slot.appendChild(v);
+    const audio = () => { if (k !== 'reddit' || au) return; au = new Audio(); au.preload = 'auto'; const A = ['CMAF_AUDIO_128', 'CMAF_AUDIO_64', 'DASH_AUDIO_128', 'DASH_audio']; let ai = 0; au.src = `https://v.redd.it/${u}/${A[0]}.mp4`; au.onerror = () => { if (++ai < A.length) au.src = `https://v.redd.it/${u}/${A[ai]}.mp4`; else { au = null; toast('This clip has no sound'); } }; };
+    return { mute() { muted = true; v.muted = true; au && au.pause(); }, unMute() { muted = false; if (k === 'reddit') { audio(); if (au && !v.paused) { au.currentTime = v.currentTime; au.play().catch(() => { }); } } else v.muted = false; }, setVolume() { }, isMuted: () => muted,
+      playVideo() { v.play().catch(() => { }); }, pauseVideo() { v.pause(); }, getPlayerState: () => v.paused ? (state === -1 ? 3 : 2) : 1, getDuration: () => v.duration || 0, seekTo(t) { v.currentTime = t; }, destroy() { v.pause(); v.removeAttribute('src'); v.load(); au && au.pause(); } };
+  }
+  // the platforms' own embed players (an iframe); Vimeo and TikTok can be told to play/pause/mute, Facebook is (re)loaded on play
+  let f = null; const ifr = src => { f = document.createElement('iframe'); f.src = src; f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true; f.setAttribute('loading', 'lazy'); f.referrerPolicy = 'strict-origin-when-cross-origin'; slot.innerHTML = ''; slot.appendChild(f); };
+  const post = (msg, origin) => { try { f && f.contentWindow.postMessage(typeof msg === 'string' ? msg : JSON.stringify(msg), origin); } catch (e) { } };
+  if (k === 'vimeo') { ifr(`https://player.vimeo.com/video/${u}?muted=1&playsinline=1&loop=1&dnt=1&title=0&byline=0&portrait=0`);
+    const vm = (method, value) => post(value === undefined ? { method } : { method, value }, 'https://player.vimeo.com');
+    return { mute() { muted = true; vm('setMuted', true); vm('setVolume', 0); }, unMute() { muted = false; vm('setMuted', false); vm('setVolume', 1); }, setVolume() { }, isMuted: () => muted, playVideo() { vm('play'); setTimeout(() => mark(true), 700); }, pauseVideo() { vm('pause'); mark(false); }, getPlayerState: () => state, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } }; }
+  if (k === 'tiktok') { ifr(`https://www.tiktok.com/player/v1/${u}?autoplay=0&muted=1&loop=1&rel=0&description=0&music_info=0&controls=1&progress_bar=1&play_button=1&volume_control=1&fullscreen_button=1`);
+    const tt = type => { try { f && f.contentWindow.postMessage({ type, value: null, 'x-tiktok-player': true }, '*'); } catch (e) { } };
+    return { mute() { muted = true; tt('mute'); }, unMute() { muted = false; tt('unMute'); }, setVolume() { }, isMuted: () => muted, playVideo() { tt('play'); setTimeout(() => mark(true), 700); }, pauseVideo() { tt('pause'); mark(false); }, getPlayerState: () => state, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } }; }
+  if (k === 'ig') { ifr(`https://www.instagram.com/reel/${u}/embed/`); mark(true); // Instagram's embed has its own play button (no autoplay control)
+    return { mute() { }, unMute() { }, setVolume() { }, isMuted: () => true, playVideo() { }, pauseVideo() { }, getPlayerState: () => 1, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } }; }
+  // facebook
+  const fbSrc = m => `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u)}&show_text=false&autoplay=true&mute=${m ? 'true' : 'false'}`;
+  return { mute() { if (!muted) { muted = true; if (state === 1) ifr(fbSrc(true)); } }, unMute() { if (muted) { muted = false; ifr(fbSrc(false)); mark(true); } }, setVolume() { }, isMuted: () => muted,
+    playVideo() { if (state !== 1) { ifr(fbSrc(muted)); setTimeout(() => mark(true), 900); } }, pauseVideo() { slot.innerHTML = ''; f = null; mark(false); }, getPlayerState: () => state, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } };
+}

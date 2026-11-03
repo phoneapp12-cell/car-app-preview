@@ -19,7 +19,7 @@ async function xLoad(force) {
   const pw = await g('/power', { list: [] }); X.pwr = (pw && pw.list) || []; X.pwrAt = (pw && pw.checked) || 0;
   Object.assign(X, { daily, triv, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], myBday: dates && 'mine' in dates ? dates.mine : undefined, bdImp: (dates && dates.imp) || 0, cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: (reno && reno.reno) || null, wx: (wx && wx.list) || [], sappt: (sap && sap.list) || [], saCfg: (sap && sap.cfg) || null });
   if (prof && prof.streak) stChip(prof.streak);
-  if (IS_ADMIN) { carSync(); apptSync(); bdImport(); }
+  if (IS_ADMIN) { carSync(); apptSync(); bdImport().then(bdToMyApp); }
   setTimeout(bdAsk, 3500); // 1.9.35 🎂 ask once for a birthday if we don't have one
   if (tab === 'all' && scrollY < 300) draw(); else if (tab === 'family') draw();
 }
@@ -804,22 +804,22 @@ async function linkPreview() {
   const v = ($('#lkurl') || {}).value || '', box = $('#lkpv'); if (!box) return;
   LS.pv = null; LS.img = ''; LS.photo = 0; LS.pk = 0; lkReady();
   if (!/https?:\/\/\S+/i.test(v)) { box.innerHTML = v.trim() ? '<p class="sst">No link found yet – paste the whole link (it starts with https://).</p>' : ''; return; }
-  box.innerHTML = '<p class="sst">🤖 Reading the public post and finding a picture…</p>';
+  box.innerHTML = '<p class="sst">🤖 Reading the post and finding a picture…</p>';
   try {
     const r = await fam('/preview?text=' + encodeURIComponent(v.slice(0, 2000)));
     if (($('#lkurl') || {}).value !== v) return;
     if (r.blocked) { box.innerHTML = `<p class="lkno">🙅 ${esc(LINK_WHY[r.blocked] || LINK_WHY.unsafe)}</p>`; return; }
     LS.pv = r; LS.img = r.img || ''; LS.pics = (r.pics || []).map(p => p.img); if (LS.img && !LS.pics.includes(LS.img)) LS.pics.unshift(LS.img);
-    box.innerHTML = `<div class="lkcard"><div class="lkpic"><img id="lkimg" alt="" referrerpolicy="no-referrer"${LS.img ? ` src="${esc(LS.img)}"` : ''} onerror="this.removeAttribute('src');lkReady()"><div class="lkpb"><button class="btn" id="lknext">🔄 Another picture</button><button class="btn" id="lkmine">📷 Use my photo</button></div></div>
+    box.innerHTML = `<div class="lkcard"><div class="lkpic"><img id="lkimg" alt="" referrerpolicy="no-referrer"${LS.img ? ` src="${esc(LS.img)}"` : ''} onerror="if(LS&&LS.pv&&LS.pv.brand&&this.src!==LS.pv.brand){this.src=LS.pv.brand;LS.img=LS.pv.brand}else{this.removeAttribute('src')};lkReady()"><div class="lkpb"><button class="btn" id="lknext">🔄 Another picture</button><button class="btn" id="lkmine">📷 Use my photo</button></div></div>
       <div><small>${esc(r.site)}${r.stock ? ' · picture: free photo (Wikimedia Commons)' : ''}</small><b>${esc(r.t)}</b></div></div>
-      <label class="lkdl">${r.needDesc ? '✏️ <b>Write a line about it</b> – there’s no public description to use' : '🤖 Description (written by Info Bot from the public post – change it if you like)'}</label>
-      <textarea id="lkdesc" rows="3" maxlength="300" placeholder="What’s it about? (at least 10 letters)">${esc(r.desc || '')}</textarea>`;
+      <label class="lkdl">${r.needDesc ? '✏️ <b>Add a line about it</b> (optional – we couldn’t read this one)' : '🤖 Description (written by Info Bot – change it if you like)'}</label>
+      <textarea id="lkdesc" rows="3" maxlength="300" placeholder="What’s it about? (optional)">${esc(r.desc || '')}</textarea>`;
     lkReady();
   } catch (e) { box.innerHTML = `<p class="lkno">${/public/i.test(e.message) ? '🔒 ' : ''}${esc(e.message)}</p>`; }
 }
 function lkReady() { // Share needs a real description and a picture
   const b = $('#lkpost'); if (!b) return; const d = (($('#lkdesc') || {}).value || '').replace(/\s/g, ''), im = $('#lkimg');
-  b.disabled = !(LS && LS.pv && d.length >= 10 && (LS.photo || (im && im.getAttribute('src'))));
+  b.disabled = !(LS && LS.pv && (LS.photo || (im && im.getAttribute('src')) || LS.pv.brand)); // 1.9.37 a line about it is optional
 }
 async function lkNextPic() {
   if (!LS || !LS.pv) return;
@@ -1065,3 +1065,29 @@ document.addEventListener('click', async e => {
     if (y && (y < 1900 || y > new Date().getFullYear())) { toast('Check the year (or leave it blank)'); return; }
     t.disabled = true; try { await fam('/dates', { method: 'POST', body: JSON.stringify({ kind: 'bday', m, d, y }) }); ls.set('bdAsk', { done: 1 }); $('#sheet').classList.remove('on'); toast('🎂 Thanks! Saved'); xLoad(true); } catch (er) { t.disabled = false; toast(er.message); } }
 });
+
+/* ---- 1.9.37 🎂 Info Book → My App: on Shane's phone, family birthdays that aren't in My App's Birthdays yet are added there
+   (first-name match = already there, never overwritten or duplicated; the year too if known). My App does the same on its
+   own open/resume (2.29.14), so whichever opens first adds them. At most every 10 minutes; reads the family list once. ---- */
+async function bdToMyApp() {
+  if (!IS_ADMIN) return; const last = +localStorage.getItem('mf.bdToMyAppAt') || 0; if (Date.now() - last < 10 * 60e3) return;
+  localStorage.setItem('mf.bdToMyAppAt', String(Date.now()));
+  try {
+    const j = await fam('/bdays'); const list = (j && j.list) || []; if (!list.length) return;
+    const db = await new Promise(res => { try { const r = indexedDB.open('due-dates', 1); r.onupgradeneeded = () => { try { r.transaction.abort(); } catch (e) { } res(null); }; r.onerror = () => res(null); r.onsuccess = () => res(r.result); } catch (e) { res(null); } });
+    if (!db) return; // My App isn't on this phone
+    const added = await new Promise(res => {
+      const tx = db.transaction('kv', 'readwrite'), st = tx.objectStore('kv'), q = st.get('data'); let out = [];
+      q.onsuccess = () => { const D = q.result; if (!D || typeof D !== 'object') return;
+        if (!Array.isArray(D.birthdays)) D.birthdays = [];
+        const have = new Set(D.birthdays.map(b => bdFirst(b && b.name)).filter(Boolean));
+        for (const x of list) { const k = bdFirst(x.name), mo = +x.m, d = +x.d, y = +x.y || ''; if (!k || have.has(k) || !(mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) continue;
+          D.birthdays.push({ id: 'bday-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: String(x.name).trim().slice(0, 60), day: d, month: mo, year: y && y >= 1900 && y <= new Date().getFullYear() ? y : '', notes: 'From Info Book' });
+          have.add(k); out.push(String(x.name).trim() + ' ' + d + ' ' + MON3[mo - 1]); }
+        if (out.length) { D.updatedAt = new Date().toISOString(); st.put(D, 'data'); } };
+      tx.oncomplete = () => res(out); tx.onerror = tx.onabort = () => res([]);
+    });
+    db.close();
+    if (added.length) toast('🎂 Added to My App: ' + added.slice(0, 3).join(', ') + (added.length > 3 ? ' +' + (added.length - 3) : ''));
+  } catch (e) { }
+}

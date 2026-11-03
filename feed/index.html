@@ -72,6 +72,12 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .media.vid .snd.on{background:rgba(255,255,255,.92);color:#111}
 .media.vid.verr .snd{display:none}
 .media.vid .lwhen{z-index:4}
+.media.vid video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.media.vid.tall{aspect-ratio:9/16;width:min(100%,calc(82vh*9/16));margin:0 auto}
+.media.vid .fsb{position:absolute;left:10px;bottom:10px;z-index:4;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:0;font-size:20px;line-height:40px;padding:0}
+.media.vid:fullscreen{width:100vw;height:100vh;max-height:none;aspect-ratio:auto}
+@media (max-width:660px){.card:has(.media.vid){margin-left:-10px;margin-right:-10px;border-radius:0;border-left:0;border-right:0}}
+@media (min-width:900px){.card:has(.media.vid){margin-left:-110px;margin-right:-110px}}
 .media.tall img{max-height:620px}
 .play{position:absolute;inset:0;display:grid;place-items:center}
 .play span{width:68px;height:68px;border-radius:50%;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);display:grid;place-items:center;box-shadow:0 6px 20px rgba(0,0,0,.35)}
@@ -189,8 +195,8 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.36"></script>
-<script src="app.js?v=1.9.36"></script>
-<script src="extras.js?v=1.9.36"></script>
+<script src="family.js?v=1.9.37"></script>
+<script src="app.js?v=1.9.37"></script>
+<script src="extras.js?v=1.9.37"></script>
 </body>
 </html>
