@@ -17,9 +17,10 @@ async function xLoad(force) {
   const g = (p, d) => fam(p).catch(() => d);
   const [daily, triv, mems, dates, cars, prof, push, streaks, reno, wx, sap] = await Promise.all([g('/daily', null), g('/trivia', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/reno', { reno: null }), g('/weather', { list: [] }), g('/sappts', { list: [] })]);
   const pw = await g('/power', { list: [] }); X.pwr = (pw && pw.list) || []; X.pwrAt = (pw && pw.checked) || 0;
-  Object.assign(X, { daily, triv, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: (reno && reno.reno) || null, wx: (wx && wx.list) || [], sappt: (sap && sap.list) || [], saCfg: (sap && sap.cfg) || null });
+  Object.assign(X, { daily, triv, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], myBday: dates && 'mine' in dates ? dates.mine : undefined, bdImp: (dates && dates.imp) || 0, cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: (reno && reno.reno) || null, wx: (wx && wx.list) || [], sappt: (sap && sap.list) || [], saCfg: (sap && sap.cfg) || null });
   if (prof && prof.streak) stChip(prof.streak);
-  if (IS_ADMIN) { carSync(); apptSync(); }
+  if (IS_ADMIN) { carSync(); apptSync(); bdImport(); }
+  setTimeout(bdAsk, 3500); // 1.9.35 🎂 ask once for a birthday if we don't have one
   if (tab === 'all' && scrollY < 300) draw(); else if (tab === 'family') draw();
 }
 async function xVisit() { // 1.9.1 just opening Info Book counts for the day's streak (NZ time)
@@ -158,7 +159,7 @@ window.pins = function () {
   else if (pl.length) out.push({ id: 'pw-planned', x: 'pwrl', list: pl.slice(0, 8), topic: 'family', t: 'Planned power cuts' });
   if (FAM_ON) {
     for (const c of X.cars) if (c.car && c.mid === MEMBER.id) out.push({ id: 'car:' + c.plate, x: 'car', c: c.car, at: c.at, topic: 'family' });
-    for (const d of X.dates) if (d.days <= 14 && !(VOTES['date' + d.id] && VOTES['date' + d.id].v < 0)) out.push({ id: 'date' + d.id + '-' + new Date().getFullYear(), x: 'date', d, topic: 'family', t: (d.kind === 'bday' ? '🎂 ' : '🎉 ') + d.title, sn: 'Family dates' });
+    for (const d of X.dates) if (d.days <= (d.kind === 'bday' ? 7 : 14) && !(VOTES['date' + d.id] && VOTES['date' + d.id].v < 0)) out.push({ id: 'date' + d.id + '-' + new Date().getFullYear(), x: 'date', d, topic: 'family', t: (d.kind === 'bday' ? '🎂 ' : '🎉 ') + d.title, sn: 'Family dates' });
     if (X.daily) out.push({ id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: (X.daily.type === 'photo' ? '📸 ' : '💭 ') + X.daily.text, sn: 'Daily question' });
     if (X.triv && X.triv.qs) out.push({ id: 'trivia' + X.triv.day, x: 'trivia', q: X.triv, topic: 'family' });
     const sg = suggestion(); if (sg) out.push(sg);
@@ -239,7 +240,8 @@ function dateCard(i) {
   const d = i.d, bd = d.kind === 'bday', today = d.days === 0, who = bd && d.mid === MEMBER.id;
   const when = new Date(Date.UTC(2000, d.m - 1, d.d)).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', timeZone: 'UTC' });
   return `<article class="card xc date${today ? ' party' : ''}" data-id="${esc(i.id)}">${xHead(bd ? ICON : '🎉', today ? (bd ? (who ? 'Happy birthday to you!' : 'Happy birthday!') : 'It’s today!') : bd ? 'Birthday coming up' : 'Family event coming up', when, today ? 'Today' : 'Countdown')}
-    <div class="bd"><h3 class="xq">${today ? (bd ? '🎉 ' : '🎊 ') : ''}${esc(d.title)}${d.turns ? ` <small>(${d.turns})</small>` : ''}</h3>
+    <div class="media bdpic"><img src="img/${bd ? 'birthday' : 'event'}.svg" alt="${bd ? 'Birthday cake and balloons' : 'Party'}"></div>
+    <div class="bd"><h3 class="xq">${today ? (bd ? '🎉 ' : '🎊 ') : ''}${esc(d.title)}${d.turns && (who || IS_ADMIN) ? ` <small>(${d.turns})</small>` : ''}</h3>${bd && !who && d.mid ? `<p class="xwho">${today ? `Send ${esc(d.title.replace(/[’']s birthday$/i, ''))} some birthday love 💜` : `Get your birthday wishes ready 🎈`}</p>` : ''}
     <div class="pinbox"><div class="cd">${today ? (bd ? '🎂 Today!' : '🎊 Today!') : d.days === 1 ? 'Tomorrow!' : 'In ' + d.days + ' days'}</div></div>
     <div class="xbtns"><button class="btn${today ? ' pri' : ''}" data-cmt="${esc(i.id)}">💬 ${today ? (who ? 'See messages' : 'Send a message') : 'Say something'}<span class="cc"></span></button></div></div></article>`;
 }
@@ -485,7 +487,7 @@ async function adminExtras() {
     const myCars = ((S && S.cars) || []).map(c => ({ plate: plateOf(c.plate), name: c.name })).filter(c => c.plate);
     for (const c of cars.cars) if (!myCars.some(x => x.plate === c.plate)) myCars.push({ plate: c.plate, name: '' });
     el.innerHTML = `<h3>👤 Age & life stage <small class="sst">only you see these</small></h3><p class="sst">Used only to suggest interests (they get a ✨ card and choose) and to nudge their feed a little. Never shown to anyone else.</p>
-      ${mem.map(m => `<div class="prof" data-mid="${m.id}"><b>${esc(m.name)}</b><select data-pr="${m.id}" aria-label="Pronouns for ${esc(m.name)}">${PRON_OPTS.map(([k, l]) => `<option value="${k}"${(m.pron || '') === k ? ' selected' : ''}>${l}</option>`).join('')}</select><select data-pf="age">${STG.ages.map(a => `<option value="${esc(a)}"${(m.age || '') === a ? ' selected' : ''}>${a || 'Age –'}</option>`).join('')}</select><select data-pf="stage"><option value="">Life stage –</option>${Object.entries(STG.stages).map(([k, l]) => `<option value="${k}"${m.stage === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
+      ${mem.map(m => `<div class="prof" data-mid="${m.id}"><b>${esc(m.name)}</b>${bdRow(m, dates.list)}<select data-pr="${m.id}" aria-label="Pronouns for ${esc(m.name)}">${PRON_OPTS.map(([k, l]) => `<option value="${k}"${(m.pron || '') === k ? ' selected' : ''}>${l}</option>`).join('')}</select><select data-pf="age">${STG.ages.map(a => `<option value="${esc(a)}"${(m.age || '') === a ? ' selected' : ''}>${a || 'Age –'}</option>`).join('')}</select><select data-pf="stage"><option value="">Life stage –</option>${Object.entries(STG.stages).map(([k, l]) => `<option value="${k}"${m.stage === k ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>
         <div class="sgx sitx"><small class="sst">Situation:</small>${Object.entries(STG.sits || {}).map(([k, l]) => `<button class="chip${(m.sit || '').split(',').includes(k) ? ' on' : ''}" data-psit="${k}">${esc(l)}</button>`).join('')}</div>
         <div class="sgx">${sugT.map(t => `<button class="chip${(m.sugg || '').split(',').includes(t) ? ' on' : ''}" data-pfs="${t}">${(SUGL[t] || TOPIC[t])[SUGL[t] ? 0 : 2]} ${esc((SUGL[t] || TOPIC[t])[1])}</button>`).join('')}</div></div>`).join('')}
       <h3>👋 Come-back reminders</h3><p class="sst">One friendly push (5–7pm) when someone with notifications on hasn’t been in for 2+ days – at most every 2 days, weekly after 3 with no visit. Each person can switch it off.</p>
@@ -506,7 +508,7 @@ async function addBdayToFamily(id) {
   const x = LIFE_BY_ID.get(id); if (!x || !IS_ADMIN) return;
   const name = String(x.t || '').replace(/[’']s birthday.*$/i, '').replace(/^🎂\s*/, '').trim();
   const S = await myAppData(), b = S && (S.birthdays || []).find(b => b && b.name && b.name.trim().toLowerCase() === name.toLowerCase());
-  const iso = b && (b.date || b.dob || b.birthday); const mm = /(\d{4})?-?(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  const iso = b && (b.day && b.month ? `${b.year || ''}-${String(b.month).padStart(2, '0')}-${String(b.day).padStart(2, '0')}` : (b.date || b.dob || b.birthday)); const mm = /(\d{4})?-?(\d{2})-(\d{2})$/.exec(String(iso || '')); // 1.9.35 My App keeps {day, month, year}
   if (!mm) { toast('Couldn’t find that birthday’s date in My App'); return; }
   if (!confirm(`Add ${name}’s birthday (${+mm[3]}/${+mm[2]}) to the family calendar? Everyone in the family will see a countdown.`)) return;
   try { await fam('/dates', { method: 'POST', body: JSON.stringify({ kind: 'bday', title: name + '’s birthday', m: +mm[2], d: +mm[3], y: null, mid: null }) }); toast('🎂 Added to the family'); xLoad(true); } catch (e) { toast(e.message); }
@@ -543,6 +545,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.matches('[data-pf]')) { saveProf(t.closest('.prof')); return; }
+  if (t.matches('[data-bdm],[data-bdd]')) { const r = t.closest('.bdrow'); const d = +r.querySelector('[data-bdd]').value, mo = +r.querySelector('[data-bdm]').value; if (d && mo) { try { await fam('/dates', { method: 'POST', body: JSON.stringify({ kind: 'bday', mid: r.dataset.bdmid, m: mo, d, y: +r.dataset.y || null }) }); toast('🎂 Birthday saved'); xLoad(true); } catch (er) { toast(er.message); } } return; }
   if (t.matches('[data-pr]')) { try { await fam('/members/' + t.dataset.pr + '/pron', { method: 'PUT', body: JSON.stringify({ pron: t.value || null }) }); toast('Saved – only used for wording'); } catch (er) { toast(er.message); } return; }
   if (t.id === 'mypron' || t.id === 'mypshow') { try { await fam('/pron', { method: 'PUT', body: JSON.stringify(t.id === 'mypron' ? { pron: t.value || null } : { show: t.checked }) }); toast('Saved'); } catch (er) { toast(er.message); } return; }
   if (t.id === 'aion' || t.id === 'aifreq') { try { await fam('/aibot/cfg', { method: 'PUT', body: JSON.stringify(t.id === 'aion' ? { on: t.checked } : { freq: t.value }) }); toast(t.id === 'aion' ? (t.checked ? '🤖 Info Bot is on' : 'Info Bot is off') : 'Saved'); adminExtras(); } catch (er) { toast(er.message); } return; }
@@ -973,3 +976,92 @@ window.festive = function (order, nPins) {
 };
 const cardCn = window.card;
 window.card = function (i) { if (i && i.x === 'concert') return concertCard(i); return cardCn(i); };
+
+/* ---- 1.9.34 🏡 Home & time-saving tips (everyone's feed, rarely): organising, decluttering, cleaning shortcuts, laundry,
+   meal prep and routines from Kiwi Families (NZ) first, then The Organised Housewife, OrganizedHome, Good Housekeeping,
+   House Digest and Apartment Therapy (all free to read; the data service drops paywalls, shopping, money and house tours).
+   At most one tip every other day per person, well down the feed, each shown once. Kid-mess / lunchbox / routine tips
+   lead for homes with young kids and stay rare for everyone else. ---- */
+const HT_KIDS = /\b(kids?|child\w*|toddlers?|school|lunch ?box\w*|chores?|toys?|baby|babies|nursery|playroom)\b/i;
+function htLastDay() { let m = -1; for (const k in SEEN1) if (k.startsWith('ht-') && SEEN1[k] > m) m = SEEN1[k]; return m; }
+function htScore(t) {
+  const sit = wtSit(), kid = HT_KIDS.test(t.t + ' ' + (t.s || ''));
+  let s = t.nz ? 1.5 : 1; s *= kid ? (sit.kids ? 2.2 : sit.grand || sit.teens ? 0.8 : 0.3) : 1;
+  if (/\b(quick|fast|minutes?|easy|easier|simple|hacks?|tricks?|shortcuts?|time)\b/i.test(t.t)) s *= 1.3; // the time-savers
+  return s * (0.7 + Math.random() * 0.6);
+}
+function htPick() {
+  const today = seenDayN(), last = htLastDay(); if (last >= 0 && today - last < 2) return null; // every other day at most
+  const P = ((FEED && FEED.hometips) || []).filter(t => t.img && !SEEN_BASE.has(t.id) && !unsafe(t) && !SPORT.test(t.t + ' ' + (t.s || '')) && !LIFE_MONEY.test(t.t + ' ' + (t.s || '')) && !(VOTES[t.id] && VOTES[t.id].v < 0));
+  if (!P.length) return null; return P.map(t => ({ t, sc: htScore(t) })).sort((a, b) => b.sc - a.sc)[0].t;
+}
+function homeTipCard(i) {
+  const t = i.h, host = (() => { try { return new URL(t.url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } })();
+  return `<article class="card xc promo hometip" data-id="${esc(t.id)}">${xHead('🏡', 'Home & time-saving tip', t.sn || host, t.nz ? 'NZ tip' : 'Tip')}
+    <a class="pimg" href="${esc(t.url)}" target="_blank" rel="noopener"><img src="${esc(t.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>
+    <div class="bd"><h3>${esc(t.t)}</h3>${t.s ? `<p class="wtb">${esc(t.s)}</p>` : ''}
+    <div class="xbtns"><a class="btn pri" href="${esc(t.url)}" target="_blank" rel="noopener">✨ Read the tip ↗</a></div></div></article>`;
+}
+let HT_FOR = null, HT = null;
+const htFestive = window.festive;
+window.festive = function (order, nPins) {
+  order = htFestive ? htFestive(order, nPins) : order;
+  if (!FEED || !FEED.hometips || order.length < 14) return order;
+  const k = (FEED.updated || 0) + '|' + seenDayN(); if (HT_FOR !== k) { HT_FOR = k; HT = htPick(); }
+  if (!HT || order.some(x => x.id === HT.id)) return order;
+  const out = order.slice(), at = Math.min(Math.max(2, nPins) + 15 + Math.floor(Math.random() * 5), out.length);
+  out.splice(at, 0, { id: HT.id, x: 'hometip', h: HT, topic: 'hometips', t: HT.t }); return out;
+};
+const cardHt = window.card;
+window.card = function (i) { if (i && i.x === 'hometip') return homeTipCard(i); return cardHt(i); };
+
+/* ---- 1.9.35 🎂 birthdays for everyone in Info Book. On Shane's phone, birthdays already in My App (name, day, month) are
+   matched to members by name – exact first name, only when exactly one My App birthday and one member fit – and saved to
+   the family (once each; nothing is changed for anyone who already has one). Anyone still without a birthday gets one
+   friendly "When's your birthday? 🎂" ask (skip = asked again in 4 days, at most 3 times). Others only ever see the day and
+   month; the age is just for the person and Shane. Stored in the family Durable Object (no KV). ---- */
+const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function bdRow(m, list) {
+  const b = (list || []).find(d => d.kind === 'bday' && d.mid === m.id);
+  return `<div class="bdrow" data-bdmid="${m.id}"><small class="sst">🎂</small><select data-bdd aria-label="Birthday day for ${esc(m.name)}"><option value="">Day</option>${Array.from({ length: 31 }, (_, k) => `<option${b && b.d === k + 1 ? ' selected' : ''}>${k + 1}</option>`).join('')}</select><select data-bdm aria-label="Birthday month for ${esc(m.name)}"><option value="">Month</option>${MON3.map((x, k) => `<option value="${k + 1}"${b && b.m === k + 1 ? ' selected' : ''}>${x}</option>`).join('')}</select>${b ? '' : '<small class="sst">not set – they’ll be asked</small>'}</div>`;
+}
+const bdFirst = n => String(n || '').trim().toLowerCase().split(/\s+/)[0].replace(/[^a-zāēīōū'-]/g, '');
+let BD_IMP_RUN = false;
+async function bdImport() {
+  if (BD_IMP_RUN || !IS_ADMIN) return; BD_IMP_RUN = true;
+  try {
+    const S = await myAppData(); if (!S || !Array.isArray(S.birthdays)) return; // My App isn't on this phone
+    const mem = await fam('/members'), done = ls.get('bdImported', {}), got = [];
+    const have = new Set((X.dates || []).filter(d => d.kind === 'bday' && d.mid).map(d => d.mid));
+    for (const m of mem) {
+      if (have.has(m.id) || done[m.id]) continue;
+      const nm = bdFirst(m.name); if (!nm || mem.filter(x => bdFirst(x.name) === nm).length !== 1) continue; // two members with that name: don't guess
+      const hits = S.birthdays.filter(b => b && b.day && b.month && bdFirst(b.name) === nm); if (hits.length !== 1) continue; // none, or ambiguous
+      const b = hits[0]; if (!(+b.month >= 1 && +b.month <= 12 && +b.day >= 1 && +b.day <= 31)) continue;
+      try { await fam('/dates', { method: 'POST', body: JSON.stringify({ kind: 'bday', mid: m.id, m: +b.month, d: +b.day, y: +b.year || null }) }); done[m.id] = Date.now(); got.push(m.name + ' ' + b.day + ' ' + MON3[b.month - 1]); } catch (e) { }
+    }
+    ls.set('bdImported', done);
+    if (!X.bdImp) { try { await fam('/dates/imported', { method: 'POST', body: '{}' }); } catch (e) { } }
+    if (got.length) { toast('🎂 Birthdays from My App: ' + got.slice(0, 3).join(', ') + (got.length > 3 ? ' +' + (got.length - 3) : '')); xLoad(true); }
+  } catch (e) { }
+}
+const BD_ROLL = Date.parse('2026-11-03T15:00:00+13:00'); // members are asked once Shane's phone has matched My App, or 2 days after this anyway
+let BD_SHOWN = false, BD_WAIT = 0;
+function bdAsk() {
+  if (BD_SHOWN) return;
+  if (!FAM_ON || !MEMBER || X.myBday !== null) return; // undefined = old server; an object = we have it
+  if (!X.bdImp && Date.now() < BD_ROLL + 2 * 864e5 && !IS_ADMIN) return;
+  const a = ls.get('bdAsk', { n: 0, at: 0 }); if (a.done || a.n >= 3 || (a.n && Date.now() - a.at < 4 * 864e5)) return;
+  if ($('#sheet.on') || $('#celeb') || document.querySelector('.upbox')) { if (++BD_WAIT < 8) setTimeout(bdAsk, 8000); return; } // never on top of another pop-up
+  $('#sheetin').innerHTML = `<h2>When’s your birthday? 🎂</h2><p>So the family can wish you a happy birthday! Everyone sees just the day and month – never your age.</p>
+    <div class="bdf"><select id="bdd" aria-label="Day"><option value="">Day</option>${Array.from({ length: 31 }, (_, k) => `<option>${k + 1}</option>`).join('')}</select><select id="bdm" aria-label="Month"><option value="">Month</option>${MON3.map((m, k) => `<option value="${k + 1}">${m}</option>`).join('')}</select><input id="bdy" inputmode="numeric" maxlength="4" placeholder="Year (optional)"></div>
+    <div class="xbtns"><button class="btn pri" id="bdasksave">🎉 Save</button><button class="btn" id="bdasklater">Not now</button></div><p class="sst">You can change it any time in 👤 My profile.</p>`;
+  $('#sheet').classList.add('on'); BD_SHOWN = true;
+}
+document.addEventListener('click', async e => {
+  const t = e.target; if (!t || !t.id) return;
+  if (t.id === 'bdasklater') { const a = ls.get('bdAsk', { n: 0, at: 0 }); ls.set('bdAsk', { n: a.n + 1, at: Date.now() }); $('#sheet').classList.remove('on'); toast('No worries – maybe another day 🙂'); }
+  if (t.id === 'bdasksave') { const d = +$('#bdd').value, m = +$('#bdm').value, y = +$('#bdy').value || null; if (!d || !m) { toast('Pick a day and month'); return; }
+    if (y && (y < 1900 || y > new Date().getFullYear())) { toast('Check the year (or leave it blank)'); return; }
+    t.disabled = true; try { await fam('/dates', { method: 'POST', body: JSON.stringify({ kind: 'bday', m, d, y }) }); ls.set('bdAsk', { done: 1 }); $('#sheet').classList.remove('on'); toast('🎂 Thanks! Saved'); xLoad(true); } catch (er) { t.disabled = false; toast(er.message); } }
+});
