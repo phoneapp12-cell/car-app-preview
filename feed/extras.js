@@ -1097,9 +1097,10 @@ async function bdToMyApp() {
    light comedy and fun science. Up to 2 a day per person, spaced well apart in the feed, each shown once, matched to the
    topics they follow (and kids / teens at home). They play in the card with the inline player (muted until tapped). ---- */
 function vlScore(v) {
-  const sit = wtSit(), tags = String(v.vt || '').split(',');
+  const sit = wtSit(), tags = String(v.vt || '').split(','), mine = ls.get('vlTags', []);
   let s = v.nz ? 1.6 : 1, hit = 0;
-  for (const t of tags) { if (t === 'horses') { const ib = (ls.get('nudge', null) || {}).ib || {}; if (topicOn('pets') && !INT_OFF['Horses']) hit += ib['Horses'] > 1 ? 2 : 0.5; continue; }
+  for (const t of tags) { if (mine.includes(t)) { hit += 2.5; continue; } if (t === 'cruise' || t === 'famvlog') continue; // 1.9.40 only for people who like them (Sarah)
+ if (t === 'horses') { const ib = (ls.get('nudge', null) || {}).ib || {}; if (topicOn('pets') && !INT_OFF['Horses']) hit += ib['Horses'] > 1 ? 2 : 0.5; continue; }
     if (t === 'teen') { if (sit.teens) hit++; continue; } if (t === 'ya') { if (sit.single || sit.young) hit++; continue; }
     if ((t === 'kids' || t === 'parent') && !(sit.kids || sit.grand)) continue; if (topicOn(t)) hit++; }
   s *= 1 + 0.9 * Math.min(3, hit); if (!hit) s *= 0.35; // still possible for anyone, just much less likely

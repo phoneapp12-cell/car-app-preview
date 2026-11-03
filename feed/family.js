@@ -70,6 +70,7 @@ function giveDefaults() { // a new default chip is switched on once for people w
 function applyPrefs(p) {
   PICK = p.pick; if (Array.isArray(p.given)) ls.set('defaultsGiven', p.given); giveDefaults(); ls.set('pick', PICK);
   if (p.intOff) { INT_OFF = p.intOff; ls.set('intOff', INT_OFF); }
+  if (Array.isArray(p.vlTags)) ls.set('vlTags', p.vlTags); // 1.9.40 vlog likes Shane set for them
   if (typeof p.moodOff === 'boolean') { MOOD_OFF = p.moodOff; ls.set('moodOff', MOOD_OFF); }
   draw();
 }
