@@ -1091,3 +1091,43 @@ async function bdToMyApp() {
     if (added.length) toast('🎂 Added to My App: ' + added.slice(0, 3).join(', ') + (added.length > 3 ? ' +' + (added.length - 3) : ''));
   } catch (e) { }
 }
+
+/* ---- 1.9.39 🎥 Vlogs for everyone (Shane too): upbeat, family-friendly video blogs from YouTube channels' public feeds,
+   NZ first (van life, caravan families, motorhome road trips), then dogs & pets, horses, gardening, crochet, DIY, travel,
+   light comedy and fun science. Up to 2 a day per person, spaced well apart in the feed, each shown once, matched to the
+   topics they follow (and kids / teens at home). They play in the card with the inline player (muted until tapped). ---- */
+function vlScore(v) {
+  const sit = wtSit(), tags = String(v.vt || '').split(',');
+  let s = v.nz ? 1.6 : 1, hit = 0;
+  for (const t of tags) { if (t === 'horses') { const ib = (ls.get('nudge', null) || {}).ib || {}; if (topicOn('pets') && !INT_OFF['Horses']) hit += ib['Horses'] > 1 ? 2 : 0.5; continue; }
+    if (t === 'teen') { if (sit.teens) hit++; continue; } if (t === 'ya') { if (sit.single || sit.young) hit++; continue; }
+    if ((t === 'kids' || t === 'parent') && !(sit.kids || sit.grand)) continue; if (topicOn(t)) hit++; }
+  s *= 1 + 0.9 * Math.min(3, hit); if (!hit) s *= 0.35; // still possible for anyone, just much less likely
+  return s * (0.6 + Math.random() * 0.8) * (v.at ? Math.max(0.5, 1 - (Date.now() - v.at) / (30 * 864e5)) : 0.8);
+}
+function vlToday() { const d = seenDayN(); let n = 0; for (const k in SEEN1) if (k.startsWith('vl-') && SEEN1[k] === d) n++; return n; }
+function vlPick(n) {
+  const P = ((FEED && FEED.vlogs) || []).filter(v => v.img && v.vid && !SEEN_BASE.has(v.id) && !unsafe(v) && !SPORT.test(v.t) && !LIFE_MONEY.test(v.t + ' ' + (v.s || '')) && !(VOTES[v.id] && VOTES[v.id].v < 0));
+  const out = [], used = new Set();
+  for (const x of P.map(v => ({ v, sc: vlScore(v) })).sort((a, b) => b.sc - a.sc)) { if (out.length >= n) break; if (used.has(x.v.src)) continue; used.add(x.v.src); out.push(x.v); } // two different channels
+  return out;
+}
+function vlogCard(i) {
+  const v = i.h, who = String(v.sn || '').replace(/\s*\(.*\)$/, '');
+  return `<article class="card xc promo vlog" data-id="${esc(v.id)}">${xHead('🎥', 'Vlog', esc(v.sn || 'YouTube'), v.nz ? 'NZ vlog' : 'Vlog')}
+    ${vidMedia(v.vid, v.img, v.t)}
+    <div class="bd"><h3>${esc(v.t)}</h3><p class="wtb">${v.nz ? '🇳🇿 ' : ''}A video diary from ${esc(who)} – tap for sound 🔊</p>
+    <div class="xbtns"><a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener">▶️ Watch on YouTube ↗</a></div></div></article>`;
+}
+let VL_FOR = null, VL = [];
+const vlFestive = window.festive;
+window.festive = function (order, nPins) {
+  order = vlFestive ? vlFestive(order, nPins) : order;
+  if (!FEED || !FEED.vlogs || order.length < 10) return order;
+  const k = (FEED.updated || 0) + '|' + seenDayN(); if (VL_FOR !== k) { VL_FOR = k; VL = vlPick(Math.max(0, 2 - vlToday())); }
+  const out = order.slice(), base = Math.max(2, nPins);
+  VL.forEach((v, n) => { if (out.some(x => x.id === v.id)) return; const at = Math.min(base + (n ? 22 : 6) + Math.floor(Math.random() * 4), out.length); out.splice(at, 0, { id: v.id, x: 'vlog', h: v, topic: 'vlogs', t: v.t }); });
+  return out;
+};
+const cardVl = window.card;
+window.card = function (i) { if (i && i.x === 'vlog') return vlogCard(i); return cardVl(i); };
