@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.10';
+const APP_VERSION = '2.29.11';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -5066,7 +5066,7 @@ function Bills() {
       ${sorted.length ? `<div class="list">${sorted.map(row).join('')}</div>` : (hasLoanPlans && !S.bills.length ? '<div class="card muted">No other bills yet. Loan repayments are in the pay list above.</div>' : '<div class="card muted">All paid up. Good as gold!</div>')}
       ${paid.length ? `<div class="sec">Paid</div><div class="list">${paid.map(row).join('')}</div>` : ''}`
     : empty('No bills yet', 'Add your regular bills, like power, phone or insurance, and we’ll remind you 3 days before each one is due. Loan repayment plans also show here once you’ve set a payday.', 'Add a bill', 'billForm()');
-  return banHeader('Bills', 'Regular bills, loan plans, and due dates', addBtn('Add a bill', 'billForm()'), 'bills') + body;
+  return banHeader('Bills', 'Regular bills, loan plans, and due dates', addBtn('Add a bill', 'billForm()'), 'bills') + cardBillHtml() + body;
 }
 async function markPaid(id) {
   const b = S.bills.find(x => x.id === id), s = snap();
@@ -26030,6 +26030,7 @@ const dayIn = (y, m, d) => { const L = new Date(Date.UTC(y, m + 1, 0)).getUTCDat
 // 2.26.62: ASB statement on the 26th (Shane), due a set number of days after it (default 14, his figure; editable)
 const CARD_STMT = 26, CARD_GAP = 14;
 function cardDays() {
+  cardSeed1101();
   const c = debtsSt().card, gap = Math.round(+c.payDays) >= 1 && Math.round(+c.payDays) <= 40 ? Math.round(+c.payDays) : CARD_GAP;
   return { stmt: cardDayOk(c.stmtDay) || CARD_STMT, gap, due: 1, dueGuess: false };
 }
@@ -38051,3 +38052,26 @@ function tollHtml() {
   const rows = L.map(t => { const age = Math.floor((Date.now() - Date.parse(t.at)) / 86400e3); return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.25)"><div><b>${esc(t.car)}</b> <span style="opacity:.85">(${esc(t.plate)})</span><div style="font-size:.85rem;opacity:.9">${esc(t.road)} · ${esc(tollWhen(t.at))}${age >= 3 ? ' · ⚠️ ' + age + ' days ago' : ''}</div></div><div style="font-weight:800">$${(+t.cost).toFixed(2)}</div></div>`; }).join('');
   return `<div class="card" style="background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff"><div style="display:flex;justify-content:space-between;align-items:center"><b>🛣️ ${L.length === 1 ? 'Toll to pay' : L.length + ' tolls to pay'}</b><b>$${tot.toFixed(2)}</b></div>${rows}<div style="font-size:.82rem;opacity:.92;margin:6px 0 8px">Pay within 5 working days of the trip to avoid a toll payment notice and fee. On the NZTA site, choose “Buy or pay a toll” and enter the plate.</div><button class="btn small" onclick="${fmOpen('https://tollingonline.nzta.govt.nz/#/welcome')}">Pay on NZTA</button></div>`;
 }
+
+// 2.29.11: ASB credit card statement from the email of 1 Nov 2026 (statement dated 1 Nov, closing $885.70, due 26 Nov).
+// The real cycle is statement on the 1st, due 25 days later. Seeded once; Shane can still change it in the card plan.
+function cardSeed1101() {
+  try { S.settings = S.settings || {}; if (S.settings.cardSeed1101) return; S.settings.cardSeed1101 = 1;
+    const c = debtsSt().card; c.stmtDay = 1; c.payDays = 25;
+    if (!(c.stmtFor === '2026-11-01' && dnum(c.stmtBal))) { c.stmtFor = '2026-11-01'; c.stmtBal = '885.70'; }
+    try { save(); } catch (e) {} } catch (e) {}
+}
+// Bills: the card payment as a bill. Goal is to clear the statement balance in full by the due date.
+// New charges after the statement date roll onto the next statement, so they don't change this amount.
+function cardBillHtml() {
+  try {
+    const g = cardGoal(); if (!g || !g.due) return '';
+    const T = todayISO(), d = daysLeft(g.due), full = g.full;
+    const amt = g.sb ? money(g.goal) : 'about ' + money(g.goal);
+    const sub = full ? `Paid in full for the ${esc(fmtW(g.stmt))} statement 🎉`
+      : `Pay ${g.paid ? money(g.left) + ' more (' + money(g.paid) + ' paid so far)' : amt} in full by ${esc(fmtW(g.due))}${d >= 0 ? ' · ' + (d === 0 ? 'today' : d === 1 ? 'tomorrow' : d + ' days') : ' · overdue'}`;
+    const note = full ? '' : `<div class="s" style="margin-top:4px;opacity:.85">Statement ${esc(fmtW(g.stmt))}: ${amt}${g.min && !full ? ' · minimum ' + money(g.min) + ' (paying the lot means no interest)' : ''}. Anything you put on the card from now goes on the next statement, so it won’t change this amount.</div>`;
+    return `<div class="sec">Credit card</div><div class="list"><button type="button" class="row bill" onclick="go('#cashflow')"><div class="ic bill">💳</div><div class="tx"><div class="t">ASB credit card · pay in full</div><div class="s">${sub}</div>${note}</div><div class="amt" style="font-weight:800;white-space:nowrap">${full ? '✓' : money(g.paid ? g.left : g.goal)}</div></button></div>`;
+  } catch (e) { return ''; }
+}
+
