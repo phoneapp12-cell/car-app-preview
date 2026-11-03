@@ -53,7 +53,7 @@ async function famInit() {
     try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.adds)) ls.set('addsPre', r.prefs.adds.filter(t => TOPIC[t])); if (r.nudge && Array.isArray(r.nudge.topics)) { ls.set('nudge', r.nudge); ls.set('addsPre', [...new Set([...ls.get('addsPre', []), ...r.nudge.topics.filter(t => TOPIC[t])])]); } if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { } // 1.8.5 addsPre: interests Shane switched on for them, ticked on the welcome screen
     if (!PICK) { onboarding(); }
   }
-  if (PICK || MEMBER.role === 'admin') fam('/prefs').then(r => { ls.set('nudge', r.nudge || null); }).catch(() => { }); // 1.9.0 suggestions from Shane (life stage)
+  if (PICK || MEMBER.role === 'admin') fam('/prefs').then(r => { ls.set('nudge', r.nudge || null); if (r.prefs && Array.isArray(r.prefs.vlTags)) ls.set('vlTags', r.prefs.vlTags); }).catch(() => { }); // 1.9.0 suggestions from Shane (life stage)
   if (MEMBER.role !== 'admin' && PICK) fam('/prefs').then(r => { // 1.8.5 interests Shane switched on for them (e.g. 🔮 Tarot for Monique), once each
     const adds = (r.prefs && r.prefs.adds) || [], got = ls.get('addsGot', []); let ch = false;
     for (const t of adds) if (!got.includes(t)) { got.push(t); if (TOPIC[t] && !PICK.includes(t)) { PICK.push(t); ch = true; } }
