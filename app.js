@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.11';
+const APP_VERSION = '2.29.12';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10900,7 +10900,7 @@ function budgetPeriodFor(b) {
   if (b && b.start && b.end && parseD(b.start) != null && parseD(b.end) != null) return { start: b.start, end: b.end, next: b.next || '' };
   return payPeriod(0);
 }
-function ecoFix() { try { const w = +S.settings.ecoWeek > 0 ? +S.settings.ecoWeek : 75, T = todayISO(); (S.bills || []).forEach(b => { if (!b || !/ecotricity/i.test(b.name || '')) return; // 2.27.14: paid $75 a week, not the emailed total
+function ecoFix() { try { billsFresh1103(); if (S.settings.billsFresh1103) return; } catch (e) { } try { const w = +S.settings.ecoWeek > 0 ? +S.settings.ecoWeek : 75, T = todayISO(); (S.bills || []).forEach(b => { if (!b || !/ecotricity/i.test(b.name || '')) return; // 2.27.14: paid $75 a week, not the emailed total
   if (b.repeat !== 'weekly' || +b.amount !== w) { b.repeat = 'weekly'; b.amount = w; b.paidBy = ''; b.paid = false; } if (b.due && b.due < addDays(T, -6)) { let d = b.due; while (d < addDays(T, -6)) d = addDays(d, 7); b.due = d; } }); } catch (e) { } }
 function budgetBillRows(b) {
   ecoFix();
@@ -38064,6 +38064,12 @@ function cardSeed1101() {
 // Bills: the card payment as a bill. Goal is to clear the statement balance in full by the due date.
 // New charges after the statement date roll onto the next statement, so they don't change this amount.
 function cardBillHtml() {
+  try { billsFresh1103(); } catch (e) { }
+  var fresh = '';
+  try { fresh = freshBillsNote(); } catch (e) { }
+  return fresh + cardBillHtml0();
+}
+function cardBillHtml0() {
   try {
     const g = cardGoal(); if (!g || !g.due) return '';
     const T = todayISO(), d = daysLeft(g.due), full = g.full;
@@ -38075,3 +38081,42 @@ function cardBillHtml() {
   } catch (e) { return ''; }
 }
 
+
+/* 2.29.12: Bills fresh start (3 Nov 2026). Rebuilt from what actually goes out of the bank (Akahu), old list kept for Undo.
+   Mortgages and car-linked bills (rego, WOF, service) are kept as they were. */
+var FRESH_BILLS_1103 = [
+  ['Ecotricity – overdue balance (acct 222510)', 652.86, '2026-11-06', 'none', 'Second reminder 31 Oct: pay in full within 5 business days or a late fee is added. Pay to Kiwibank 38-9018-0841909-00, code CC2026, ref 222510.'],
+  ['Whangarei DC Rates', 146.25, '2026-11-05', 'fortnightly', 'Direct debit from ANZ Bill Account, every second Thursday.'],
+  ['Whangarei DC Water (WTM)', 30, '2026-11-05', 'fortnightly', 'Direct debit from ANZ Bill Account, with the rates.'],
+  ['First Union', 9.6, '2026-11-05', 'weekly', 'Union fees from ANZ Groceries, Thursdays.'],
+  ['UniMed', 37.17, '2026-11-06', 'fortnightly', 'Direct debit from ANZ Bill Account, every second Friday.'],
+  ['Lawns S Jenkins', 45, '2026-11-11', 'fortnightly', 'Paid from ANZ Bill Account about every 2 weeks.'],
+  ['Kora fuel', 100, '2026-11-13', 'fortnightly', 'Direct debit every second Friday. Varies with fuel used (last $58.29, before that about $100–$148).'],
+  ['Netflix', 33.99, '2026-11-17', 'monthly', 'From ANZ Bill Account.'],
+  ['Kensington Fit (gym)', 60.33, '2026-11-25', 'monthly', 'Direct debit from ANZ Bill Account.'],
+  ['NZ Cover Direct', 34.15, '2026-11-29', 'monthly', 'Insurance, from ANZ Bill Account.'],
+  ['SolarZero', 143.75, '2026-12-01', 'monthly', 'Direct debit from ANZ Bill Account on the 1st.']
+];
+function billsKeepOld(b) { return !!(b && (b.link || /\bmortgage\b/i.test(String(b.name || '')))); }
+function billsFresh1103() {
+  if (!S || !S.settings || S.settings.billsFresh1103 || S.settings.billsFresh1103Undone) return;
+  if (todayISO() > '2026-11-20') return;
+  var old = (S.bills || []).slice();
+  try { localStorage.setItem('billsBackup1103', JSON.stringify(old)); } catch (e) { }
+  S.settings.billsBackup1103 = JSON.parse(JSON.stringify(old));
+  var kept = old.filter(billsKeepOld), made = FRESH_BILLS_1103.map(function (r) { return { id: uid('bill'), name: r[0], amount: r[1], due: r[2], repeat: r[3], notes: r[4], paid: false, fresh1103: 1 }; });
+  S.bills = kept.concat(made);
+  S.settings.billsFresh1103 = Date.now();
+  save();
+}
+function billsFreshUndo() {
+  var old = S.settings.billsBackup1103; if (!old) { try { old = JSON.parse(localStorage.getItem('billsBackup1103') || 'null'); } catch (e) { } }
+  if (!old) { toast('No old list to put back.'); return; }
+  S.bills = old; S.settings.billsFresh1103 = 0; S.settings.billsFresh1103Undone = 1; save(); render(); toast('Your old bills list is back.');
+}
+function billsFreshHide() { S.settings.billsFreshSeen = 1; save(); render(); }
+function freshBillsNote() {
+  if (!S.settings.billsFresh1103 || S.settings.billsFreshSeen) return '';
+  return '<div class="card" style="border-left:4px solid #22c55e"><b>✨ Fresh start</b><p class="muted" style="margin:6px 0">Your bills were rebuilt on 3 Nov from what actually goes out of your bank. Mortgages and car bills stayed as they were. Payments are ticked off automatically as your bank shows them, and Transfers to make on Cash flow works out what to move on each payday.</p>'
+    + '<button class="btn" onclick="billsFreshHide()">Got it</button> <button class="btn ghost" onclick="billsFreshUndo()">Undo, put my old list back</button></div>';
+}
