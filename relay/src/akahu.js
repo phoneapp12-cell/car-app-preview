@@ -171,9 +171,10 @@ export async function runAkahu(env, fetchImpl = fetch, now = Date.now()) {
 export async function runAkahuInsight(env) {
   const req = env.EVENTS_KV && env.AKAHU_ENC_KEY && await env.EVENTS_KV.get('akahu-insight-req'); if (!req) return 'none';
   const deb = req === 'debits';
-  if (req === 'plan') {
+  if (req === 'plan' || req === 'planfresh') {
     let D = null, fresh = false; const cred = await getCred(env);
-    try { const old = await open(env, await env.EVENTS_KV.get(K_DATA)); if (cred && (!old || Date.now() - Date.parse(old.at) > 3600e3)) { D = await refetch(env, cred, fetch); fresh = true; } else D = old; } catch (e) { D = await open(env, await env.EVENTS_KV.get(K_DATA)); }
+    if (req === 'planfresh') await env.EVENTS_KV.put('akahu-insight-req', 'plan'); // 2.29.12: one forced refetch (a bank just reconnected)
+    try { const old = await open(env, await env.EVENTS_KV.get(K_DATA)); if (cred && (req === 'planfresh' || !old || Date.now() - Date.parse(old.at) > 3600e3)) { D = await refetch(env, cred, fetch); fresh = true; } else D = old; } catch (e) { D = await open(env, await env.EVENTS_KV.get(K_DATA)); }
     if (!D) return 'nodata';
     const mk = s => String(s || '').replace(/\d{4,}/g, '#').replace(/\s+/g, ' ').trim().toUpperCase();
     const an = Object.fromEntries(D.accounts.map(a => [a.id, a.name + ' · ' + a.bank]));

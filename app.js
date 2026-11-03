@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.12';
+const APP_VERSION = '2.29.13';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -38077,7 +38077,7 @@ function cardBillHtml0() {
     const sub = full ? `Paid in full for the ${esc(fmtW(g.stmt))} statement 🎉`
       : `Pay ${g.paid ? money(g.left) + ' more (' + money(g.paid) + ' paid so far)' : amt} in full by ${esc(fmtW(g.due))}${d >= 0 ? ' · ' + (d === 0 ? 'today' : d === 1 ? 'tomorrow' : d + ' days') : ' · overdue'}`;
     const note = full ? '' : `<div class="s" style="margin-top:4px;opacity:.85">Statement ${esc(fmtW(g.stmt))}: ${amt}${g.min && !full ? ' · minimum ' + money(g.min) + ' (paying the lot means no interest)' : ''}. Anything you put on the card from now goes on the next statement, so it won’t change this amount.</div>`;
-    return `<div class="sec">Credit card</div><div class="list"><button type="button" class="row bill" onclick="go('#cashflow')"><div class="ic bill">💳</div><div class="tx"><div class="t">ASB credit card · pay in full</div><div class="s">${sub}</div>${note}</div><div class="amt" style="font-weight:800;white-space:nowrap">${full ? '✓' : money(g.paid ? g.left : g.goal)}</div></button></div>`;
+    return `<div class="sec">Credit card</div><div class="list"><button type="button" class="row bill" onclick="go('#cashflow')"><div class="ic bill">💳</div><div class="tx"><div class="t">ASB credit card · pay in full</div><div class="s">${sub}</div>${note}</div><div class="amt" style="font-weight:800;white-space:nowrap">${full ? '✓' : money(g.paid ? g.left : g.goal)}</div></button></div>` + (full ? '' : cardWeeklyHtml(g));
   } catch (e) { return ''; }
 }
 
@@ -38119,4 +38119,33 @@ function freshBillsNote() {
   if (!S.settings.billsFresh1103 || S.settings.billsFreshSeen) return '';
   return '<div class="card" style="border-left:4px solid #22c55e"><b>✨ Fresh start</b><p class="muted" style="margin:6px 0">Your bills were rebuilt on 3 Nov from what actually goes out of your bank. Mortgages and car bills stayed as they were. Payments are ticked off automatically as your bank shows them, and Transfers to make on Cash flow works out what to move on each payday.</p>'
     + '<button class="btn" onclick="billsFreshHide()">Got it</button> <button class="btn ghost" onclick="billsFreshUndo()">Undo, put my old list back</button></div>';
+}
+
+/* 2.29.13: the card statement paid off weekly (Wednesdays, after pay), in full by the due date. $250 a week kept for food.
+   The next payment = what should be paid by then, less what the bank shows paid since the statement, so a short or missed week rolls into the next. */
+function cardWeeks(g) {
+  var W = [], d = addDays(g.stmt, 1);
+  while (new Date(d + 'T12:00:00').getDay() !== 3) d = addDays(d, 1);
+  for (; d <= g.due; d = addDays(d, 7)) W.push(d);
+  if (!W.length) W.push(g.due);
+  var goal = +g.goal || 0, P = S.settings.cardWeekPlan, parts;
+  if (P && P.stmt === g.stmt && P.parts && P.parts.length === W.length) parts = P.parts.slice();
+  else { var each = Math.floor(goal / W.length * 100) / 100; parts = W.map(function () { return each; }); parts[parts.length - 1] = Math.round((goal - each * (W.length - 1)) * 100) / 100; }
+  var cum = 0;
+  return W.map(function (w, i) { cum = Math.round((cum + parts[i]) * 100) / 100; return { d: w, a: parts[i], cum: cum }; });
+}
+function cardWeeklyHtml(g) {
+  try {
+    if (!S.settings.cardWeekPlan && g.stmt === '2026-11-01') { S.settings.cardWeekPlan = { stmt: '2026-11-01', parts: [200, 200, 250, 235.7] }; S.settings.foodWeek = 250; save(); }
+    var T = todayISO(), paid = +g.paid || 0, W = cardWeeks(g), food = +S.settings.foodWeek || 250, nextShown = false;
+    var rows = W.map(function (w) {
+      var st, amt;
+      if (paid >= w.cum - 0.005) { st = '✓ done'; amt = money(w.a); }
+      else if (w.d < T) { st = '⚠️ behind ' + money(Math.round((w.cum - paid) * 100) / 100); amt = money(w.a); }
+      else if (!nextShown) { nextShown = true; var need = Math.max(0, Math.round((w.cum - paid) * 100) / 100); st = need > w.a + 0.005 ? 'pay ' + money(need) + ' (catching up)' : 'pay ' + money(need); amt = money(need); }
+      else { st = 'planned'; amt = money(w.a); }
+      return '<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid rgba(0,0,0,.06)"><span>' + esc(fmtW(w.d)) + '</span><span class="muted">' + st + '</span><b>' + amt + '</b></div>';
+    }).join('');
+    return '<div class="card" style="margin-top:8px"><b>💳 Weekly card payments</b><p class="muted" style="margin:4px 0 6px">Pay the card each Wednesday after money lands, so it\u2019s clear by ' + esc(fmtW(g.due)) + '. If a week is short or missed, the next one grows to catch up. Keep ' + money(food) + ' a week for food first.</p>' + rows + '</div>';
+  } catch (e) { return ''; }
 }
