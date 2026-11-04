@@ -195,28 +195,30 @@ async function openThread(btn) {
 const CLIKES = {};
 function cmLikeBar(x) {
   const L = Array.isArray(x.likes) ? x.likes : []; CLIKES[x.id] = L; const on = L.some(isMe);
-  return `<div class="cmlk" data-cmlk="${x.id}"><button class="cml${on ? ' on' : ''}" data-clike="${x.id}" aria-pressed="${on}" aria-label="${on ? 'You liked this comment' : 'Like this comment'}">${on ? '❤️' : '🤍'}${L.length ? `<span class="cmlc">${L.length}</span>` : ''}</button>${L.length ? `<button class="cmln" data-clikers="${x.id}">${esc(L.map(likeName).slice(0, 3).join(', '))}${L.length > 3 ? ' +' + (L.length - 3) : ''}</button>` : ''}</div>`;
+  const mine = L.find(isMe);
+  return `<div class="cmlk" data-cmlk="${x.id}"><button class="cml${on ? ' on' : ''}" data-clike="${x.id}" aria-pressed="${on}" aria-label="${on ? 'You reacted – hold to change' : 'Like this comment (hold for more)'}">${mine ? emoOf(mine) : '🤍'}${L.length ? `<span class="cmlc">${topEmo(L, mine ? emoOf(mine) : '')}${L.length}</span>` : ''}</button>${L.length ? `<button class="cmln" data-clikers="${x.id}">${esc(L.map(likeName).slice(0, 3).join(', '))}${L.length > 3 ? ' +' + (L.length - 3) : ''}</button>` : ''}</div>`;
 }
-async function toggleCLike(cid) {
+let CL_EMO = 'love';
+async function toggleCLike(cid, emo) {
   if (RX_BUSY.has('cl:' + cid)) return;
   const L = CLIKES[cid] || [];
   const send = on => rxOnce('cl:' + cid, async () => {
     if (on) document.querySelectorAll(`[data-clike="${cid}"]`).forEach(b => b.classList.add('on', 'pend'));
-    try { const r = await fam('/comments/' + cid + '/like', { method: 'POST', body: JSON.stringify({ on }) }); if (r && Array.isArray(r.likes)) document.querySelectorAll(`[data-cmlk="${cid}"]`).forEach(nb => nb.outerHTML = cmLikeBar({ id: cid, likes: r.likes })); if (on) buzz(); else toast('Like removed'); }
+    try { const r = await fam('/comments/' + cid + '/like', { method: 'POST', body: JSON.stringify({ on, emo: CL_EMO }) }); if (r && Array.isArray(r.likes)) document.querySelectorAll(`[data-cmlk="${cid}"]`).forEach(nb => nb.outerHTML = cmLikeBar({ id: cid, likes: r.likes })); if (on) buzz(); else toast('Like removed'); }
     catch (e) { document.querySelectorAll(`[data-cmlk="${cid}"]`).forEach(nb => nb.outerHTML = cmLikeBar({ id: cid, likes: CLIKES[cid] || [] })); toast(e.message); }
   });
-  if (L.some(isMe)) { toastUndo('You already liked this ❤️', () => send(false)); return; } // 1.9.33 one like per person
+  const mine = L.find(isMe); CL_EMO = emo || 'love';
+  if (mine && emoKey(mine) === CL_EMO) { toastUndo(`You already reacted ${emoOf(mine)}`, () => send(false)); return; } // 1.9.33 one per person (1.9.42 another emoji switches it)
   await send(true);
 }
 function showCLikers(cid) {
   const L = CLIKES[cid] || []; if (!L.length) return;
   document.querySelector('#upbox')?.remove();
   const box = document.createElement('div'); box.id = 'upbox'; box.className = 'upbox';
-  box.innerHTML = `<div class="upin"><h2>Who liked this comment</h2><div class="lkl"><h3>❤️ ${L.length}</h3>${L.map(l => `<div class="row"><span>❤️ ${esc(likeName(l))}</span><small class="sst">${esc(nzTime(l.at))}</small></div>`).join('')}</div><div class="uprow"><button class="btn" id="upx">Close</button></div></div>`;
+  box.innerHTML = `<div class="upin"><h2>Who liked this comment</h2><div class="lkl"><h3>${topEmo(L)} ${L.length}</h3>${L.map(l => `<div class="row"><span>${emoOf(l)} ${esc(likeName(l))}</span><small class="sst">${esc(nzTime(l.at))}</small></div>`).join('')}</div><div class="uprow"><button class="btn" id="upx">Close</button></div></div>`;
   document.body.append(box);
 }
 let CLK_HOLD = null, CLK_HELD = false;
-document.addEventListener('pointerdown', e => { const b = e.target.closest && e.target.closest('[data-clike]'); if (!b) return; CLK_HELD = false; clearTimeout(CLK_HOLD); CLK_HOLD = setTimeout(() => { CLK_HELD = true; showCLikers(b.dataset.clike); }, 550); });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => document.addEventListener(ev, () => clearTimeout(CLK_HOLD), true));
 document.addEventListener('click', e => {
   const t = e.target; if (!t || !t.closest) return;
@@ -434,18 +436,24 @@ async function loadPinRx() {
   try { const r = await fam('/likes?cards=' + encodeURIComponent(ids.join(','))); for (const k in r.rx || {}) { PINRX[k] = { card: k, pin: 1, ...r.rx[k] }; redrawFoot(k); } } catch (e) { }
 }
 function upNames(i) { const s = rxOf(i); return FAM_ON && s && (s.ups || []).length ? `<span class="rxc">${s.ups.length}</span>` : ''; }
+/* ---- 1.9.42 ❤️😂😠😮😐😎 reactions: hold the heart (on posts and comments) for the picker; a quick tap is still ❤️.
+   One reaction each – picking another emoji switches it. 😠 and 😐 don't boost a post in anyone's feed. ---- */
+const EMOS = [['love', '❤️', 'Heart'], ['laugh', '😂', 'Laugh'], ['angry', '😠', 'Angry'], ['wow', '😮', 'Surprised'], ['meh', '😐', 'Meh'], ['cool', '😎', 'Cool']];
+const EMO_CH = Object.fromEntries(EMOS.map(e => [e[0], e[1]]));
+const emoKey = l => (l && EMO_CH[l.emo]) ? l.emo : 'love', emoOf = l => EMO_CH[emoKey(l)];
+function topEmo(L, skip = '') { const n = {}; for (const l of L) n[emoOf(l)] = (n[emoOf(l)] || 0) + 1; return Object.keys(n).sort((a, b) => n[b] - n[a]).filter(e => e !== skip).slice(0, 3).join(''); }
 function rxLine(i) { // '❤️ 2 · Sarah, Millesha   👍 1 · Shane' under family posts; tap for the full list
   const s = rxOf(i); if (!FAM_ON || !s) return '';
   const L = s.likes || [], U = s.ups || []; if (!L.length && !U.length) return '';
-  return `<button class="rxl" data-likers="${esc(s.card)}">${L.length ? `<span>❤️ ${whoText(L)}${freshFor(s, L) ? '<i class="ndot"></i>' : ''}</span>` : ''}${U.length ? `<span>👍 ${whoText(U)}${freshFor(s, U) ? '<i class="ndot"></i>' : ''}</span>` : ''}</button>`;
+  return `<button class="rxl" data-likers="${esc(s.card)}">${L.length ? `<span>${topEmo(L)} ${whoText(L)}${freshFor(s, L) ? '<i class="ndot"></i>' : ''}</span>` : ''}${U.length ? `<span>👍 ${whoText(U)}${freshFor(s, U) ? '<i class="ndot"></i>' : ''}</span>` : ''}</button>`;
 }
 function likeBtn(s) {
-  const likes = s.likes || [], on = likes.some(isMe);
-  return `<button class="fb lk${on ? ' on' : ''}" data-like="${esc(s.card)}" aria-pressed="${on}" aria-label="${on ? 'You loved this' : 'Love it'}">${HEART}${likes.length ? `<span class="rxc">${likes.length}</span>` : ''}${freshFor(s, likes) ? '<i class="dot"></i>' : ''}</button>`;
+  const likes = s.likes || [], mine = likes.find(isMe), on = !!mine, me = mine && emoKey(mine) !== 'love' ? `<span class="rxe">${emoOf(mine)}</span>` : HEART;
+  return `<button class="fb lk${on ? ' on' : ''}" data-like="${esc(s.card)}" aria-pressed="${on}" aria-label="${on ? 'You reacted – hold to change' : 'Love it (hold for more)'}">${me}${likes.length ? `<span class="rxc">${likes.length}</span>` : ''}${freshFor(s, likes) ? '<i class="dot"></i>' : ''}</button>`;
 }
 function famNewLikes() { return FAM_ON && SHARES.some(s => freshFor(s, (s.likes || []).concat(s.ups || []))); }
 function syncVote(s) { // this person's private ranking follows their family taps
-  const it = rxItem(s), id = s.card; if (!it) return; const loved = (s.likes || []).some(isMe), up = (s.ups || []).some(isMe), v = loved ? 2 : up ? 1 : 0;
+  const it = rxItem(s), id = s.card; if (!it) return; const loved = (s.likes || []).some(l => isMe(l) && !['angry', 'meh'].includes(l.emo)), up = (s.ups || []).some(isMe), v = loved ? 2 : up ? 1 : 0;
   if (v) { const { _share, photos, ...snap } = it; VOTES[id] = { v, topic: it.topic, src: it.src, ints: itemInts(it).slice(0, 4), at: Date.now(), item: snap }; }
   else if (VOTES[id] && VOTES[id].v > 0) delete VOTES[id];
   ls.set('votes', VOTES);
@@ -456,8 +464,8 @@ function redrawFoot(card) {
   document.querySelectorAll(`.card[data-id="${CSS.escape(card)}"] .ft`).forEach(ft => { ft.parentNode.querySelector('.rxl')?.remove(); const nr = tmp.querySelector('.rxl'); if (nr) ft.before(nr.cloneNode(true)); ft.replaceWith(tmp.querySelector('.ft').cloneNode(true)); });
   famCounts([it]);
 }
-async function react(card, kind, on) {
-  const r = await fam('/likes', { method: 'POST', body: JSON.stringify({ card, kind, on }) }); setTimeout(() => loadPop(true), 500);
+async function react(card, kind, on, emo) {
+  const r = await fam('/likes', { method: 'POST', body: JSON.stringify({ card, kind, on, emo }) }); setTimeout(() => loadPop(true), 500);
   for (const x of SHARES) if (x.card === card) { x.likes = r.likes; x.ups = r.ups; }
   if (PINRX[card]) { PINRX[card].likes = r.likes; PINRX[card].ups = r.ups; }
   const s = rxCard(card); if (s) syncVote(s);
@@ -476,13 +484,13 @@ function toastUndo(text, undo) {
   clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on', 'act'), 4500);
 }
 const buzz = () => { try { navigator.vibrate && navigator.vibrate(12); } catch (e) { } };
-async function toggleLike(card) {
+async function toggleLike(card, emo = 'love') {
   if (RX_BUSY.has('love:' + card)) return;
-  const s = rxCard(card); if (!s) return;
-  if ((s.likes || []).some(isMe)) { toastUndo('You already liked this ❤️', () => rxOnce('love:' + card, async () => { await react(card, 'love', false); redrawFoot(card); toast('Like removed'); })); return; }
+  const s = rxCard(card); if (!s) return; const mine = (s.likes || []).find(isMe);
+  if (mine && emoKey(mine) === emo) { toastUndo(`You already reacted ${emoOf(mine)}`, () => rxOnce('love:' + card, async () => { await react(card, 'love', false); redrawFoot(card); toast('Like removed'); })); return; }
   await rxOnce('love:' + card, async () => {
     document.querySelectorAll(`.card[data-id="${CSS.escape(card)}"] [data-like]`).forEach(b => b.classList.add('on', 'pend'));
-    try { await react(card, 'love', true); redrawFoot(card); buzz(); } catch (e) { redrawFoot(card); toast(e.message); }
+    try { await react(card, 'love', true, emo); redrawFoot(card); buzz(); if (mine) toast('Changed to ' + EMO_CH[emo]); } catch (e) { redrawFoot(card); toast(e.message); }
   });
 }
 async function famVote(c, item, v) { // called by vote() for family cards; returns true when it handled the tap
@@ -504,7 +512,7 @@ function showLikers(card) {
   const row = (l, e) => `<div class="row"><span>${e} ${esc(likeName(l))}</span><small class="sst">${esc(nzTime(l.at))}</small></div>`;
   document.querySelector('#upbox')?.remove();
   const box = document.createElement('div'); box.id = 'upbox'; box.className = 'upbox';
-  box.innerHTML = `<div class="upin"><h2>Who liked this</h2><div class="lkl">${(s.likes || []).length ? `<h3>❤️ ${s.likes.length}</h3>${s.likes.map(l => row(l, '❤️')).join('')}` : ''}${(s.ups || []).length ? `<h3>👍 ${s.ups.length}</h3>${s.ups.map(l => row(l, '👍')).join('')}` : ''}</div><div class="uprow"><button class="btn" id="upx">Close</button></div></div>`;
+  box.innerHTML = `<div class="upin"><h2>Who reacted</h2><div class="lkl">${(s.likes || []).length ? `<h3>${topEmo(s.likes)} ${s.likes.length}</h3>${s.likes.map(l => row(l, emoOf(l))).join('')}` : ''}${(s.ups || []).length ? `<h3>👍 ${s.ups.length}</h3>${s.ups.map(l => row(l, '👍')).join('')}` : ''}</div><div class="uprow"><button class="btn" id="upx">Close</button></div></div>`;
   document.body.append(box);
 }
 
@@ -579,3 +587,33 @@ async function checkUpdate() {
   } catch (e) { }
 }
 setTimeout(checkUpdate, 4000);
+
+/* 1.9.42 the reaction picker: hold ❤️ ~0.4s (finger or mouse) → a bar of six; slide to one and let go, or tap one */
+let RXP = null, RXP_T = null, RXP_HELD = false;
+function rxPickClose() { if (RXP) { RXP.el.remove(); RXP = null; } }
+function rxPickOpen(btn) {
+  rxPickClose(); const r = btn.getBoundingClientRect(), el = document.createElement('div'); el.className = 'rxpick'; el.setAttribute('role', 'menu');
+  el.innerHTML = EMOS.map(e => `<button type="button" role="menuitem" data-emo="${e[0]}" aria-label="${e[2]}"><span>${e[1]}</span><small>${e[2]}</small></button>`).join('');
+  document.body.append(el); const w = el.offsetWidth, x = Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2)), y = r.top - el.offsetHeight - 10;
+  el.style.left = x + 'px'; el.style.top = (y < 6 ? r.bottom + 10 : y) + 'px';
+  RXP = { el, btn, hot: null }; buzz();
+}
+function rxPickHot(x, y) { if (!RXP) return; const t = document.elementFromPoint(x, y), b = t && t.closest && t.closest('.rxpick [data-emo]'); RXP.el.querySelectorAll('[data-emo]').forEach(z => z.classList.toggle('hot', z === b)); RXP.hot = b; }
+function rxPickDo(emo) { if (!RXP) return; const b = RXP.btn; rxPickClose(); if (b.dataset.like) toggleLike(b.dataset.like, emo); else if (b.dataset.clike) toggleCLike(+b.dataset.clike, emo); }
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest && e.target.closest('[data-like],[data-clike]');
+  if (!b) { if (RXP && !e.target.closest('.rxpick')) rxPickClose(); return; }
+  RXP_HELD = false; clearTimeout(RXP_T); const x0 = e.clientX, y0 = e.clientY;
+  RXP_T = setTimeout(() => { RXP_HELD = true; rxPickOpen(b); rxPickHot(x0, y0); }, 400);
+  b.__rxMove = ev => { if (!RXP && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 12) clearTimeout(RXP_T); };
+}, true);
+document.addEventListener('pointermove', e => { const b = e.target.closest && e.target.closest('[data-like],[data-clike]'); if (b && b.__rxMove) b.__rxMove(e); if (RXP && RXP_HELD) rxPickHot(e.clientX, e.clientY); }, true);
+document.addEventListener('pointerup', e => { clearTimeout(RXP_T); if (RXP && RXP_HELD) { rxPickHot(e.clientX, e.clientY); if (RXP.hot) rxPickDo(RXP.hot.dataset.emo); } }, true);
+document.addEventListener('pointercancel', () => clearTimeout(RXP_T), true);
+document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('[data-like],[data-clike],.rxpick')) e.preventDefault(); }, true);
+document.addEventListener('click', e => {
+  const t = e.target; if (!t || !t.closest) return;
+  const p = t.closest('.rxpick [data-emo]'); if (p) { e.preventDefault(); e.stopPropagation(); rxPickDo(p.dataset.emo); return; }
+  if (RXP_HELD && t.closest('[data-like],[data-clike]')) { e.preventDefault(); e.stopPropagation(); RXP_HELD = false; return; } // the hold opened the picker: not a tap
+}, true);
+addEventListener('scroll', () => { if (RXP && !RXP_HELD) rxPickClose(); }, { passive: true });

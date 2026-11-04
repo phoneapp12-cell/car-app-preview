@@ -147,6 +147,23 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .btn.pri{background:linear-gradient(135deg,var(--acc2),var(--acc));color:#fff}
 .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(120px);background:#111827;color:#fff;padding:10px 16px;border-radius:999px;font-size:.88rem;font-weight:600;transition:transform .25s;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.3);white-space:nowrap}
 .toast.on{transform:translateX(-50%) translateY(0)}
+[data-like],[data-clike]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+.rxpick{position:fixed;z-index:9999;display:flex;gap:2px;padding:6px;background:var(--card,#fff);border-radius:40px;box-shadow:0 8px 28px rgba(0,0,0,.28);animation:rxin .16s ease-out;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+.rxpick button{display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;height:62px;border:0;background:none;border-radius:30px;padding:0;cursor:pointer;transition:transform .12s}
+.rxpick button span{font-size:32px;line-height:1}.rxpick button small{font-size:10px;color:var(--mute,#666);margin-top:3px;font-weight:600}
+.rxpick button.hot,.rxpick button:hover{transform:translateY(-8px) scale(1.25);background:rgba(0,0,0,.05)}
+.lk .rxe{font-size:21px;line-height:1}
+#mfbtn{font-size:22px;margin-right:4px}
+.mfchip{padding:0 12px 6px}.mfchip[hidden]{display:none}.mfchip button{border:0;border-radius:20px;padding:6px 12px;font:inherit;font-size:.85em;font-weight:700;background:var(--acc,#7c3aed);color:#fff}.mfchip b{margin-left:6px;opacity:.85}
+.mfdrawer{position:fixed;inset:0;z-index:9000;pointer-events:none}.mfdrawer.on{pointer-events:auto}
+.mfscrim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;transition:opacity .22s}.mfdrawer.on .mfscrim{opacity:1}
+.mfpanel{position:absolute;top:0;bottom:0;left:0;width:min(78vw,320px);background:var(--card,#fff);color:var(--ink,inherit);box-shadow:4px 0 24px rgba(0,0,0,.25);transform:translateX(-102%);transition:transform .24s ease-out;padding:max(16px,env(safe-area-inset-top)) 14px 16px;display:flex;flex-direction:column;gap:8px}
+.mfdrawer.on .mfpanel{transform:none}
+.mfhd{display:flex;align-items:center;justify-content:space-between;font-size:1.15em;margin-bottom:6px}
+.mfopt{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 14px;border:2px solid transparent;border-radius:14px;background:rgba(127,127,127,.1);color:inherit;font:inherit;font-weight:600;text-align:left;cursor:pointer}
+.mfopt.on{border-color:var(--acc,#7c3aed);background:rgba(124,58,237,.12)}.mfopt i{margin-left:auto;font-style:normal;color:var(--acc,#7c3aed);font-weight:800}.mfe{font-size:1.3em;min-width:2.2em}
+.mfnote{font-size:.8em;opacity:.7;margin:8px 4px}
+@keyframes rxin{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:none}}
 .bdpic img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}.bdrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
 .toast.act{display:flex;align-items:center;gap:12px;padding:6px 6px 6px 16px}.toast .tundo{background:#fff;color:#111827;border:0;border-radius:999px;padding:6px 14px;font:inherit;font-weight:700;cursor:pointer}.pend{opacity:.7;pointer-events:none}
 .mx{font-size:.66rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--acc2);margin-left:6px;white-space:nowrap;display:inline-block}
@@ -196,8 +213,8 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.41"></script>
-<script src="app.js?v=1.9.41"></script>
-<script src="extras.js?v=1.9.41"></script>
+<script src="family.js?v=1.9.42"></script>
+<script src="app.js?v=1.9.42"></script>
+<script src="extras.js?v=1.9.42"></script>
 </body>
 </html>

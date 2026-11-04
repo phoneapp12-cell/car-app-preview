@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.41';
+const APP_VERSION = '1.9.42';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -832,6 +832,7 @@ function draw() {
   if (tab === 'all') order = weave(order.filter(i => !i.pin), lifeMix()); // My App cards mixed in at random, different every refresh
   if (tab === 'all' && FAM_ON) order = weaveShares(order); // 1.7.0: family reposts for everyone
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
+  if (typeof mediaFilter === 'function') order = mediaFilter(order); // 1.9.42 ☰ Videos & pictures / Videos only / Pictures only
   m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'You’re all caught up ✨ New posts arrive through the day – check back soon.'}</div>`);
   more();
   moodLabel();
@@ -1058,3 +1059,46 @@ function otherPlayer(el, rec) {
   return { mute() { if (!muted) { muted = true; if (state === 1) ifr(fbSrc(true)); } }, unMute() { if (muted) { muted = false; ifr(fbSrc(false)); mark(true); } }, setVolume() { }, isMuted: () => muted,
     playVideo() { if (state !== 1) { ifr(fbSrc(muted)); setTimeout(() => mark(true), 900); } }, pauseVideo() { slot.innerHTML = ''; f = null; mark(false); }, getPlayerState: () => state, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } };
 }
+
+/* ---- 1.9.42 ☰ side menu: swipe in from the left edge (or tap ☰) – Videos & pictures (all), Videos only, Pictures only.
+   Remembered on this phone; a chip under the topics shows it's on, with ✕ to go back to everything. Alerts, pinned
+   specials (weather, power, birthdays, countdowns) and your own My App cards always show. ---- */
+const MF_OPTS = [['all', '🎬🖼️', 'Videos & pictures'], ['vid', '🎬', 'Videos only'], ['pic', '🖼️', 'Pictures only']];
+let MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF = 'all';
+const mfAlways = i => !!(i.pin || (i.x && !['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) || /^(life|app|ph|you|date|cd|alert)[:-]/.test(String(i.id || '')) || i.topic === 'alerts');
+function mfIsVid(i) { try { return !!(i.vid || i.x === 'vlog' || i.kind === 'video' || (i.h && (i.h.vid || i.h.trailer)) || vidOf(i) || (i._share && (i._share.snap || {}).vid)); } catch (e) { return false; } }
+function mediaFilter(order) {
+  mfChip(); if (MF === 'all') return order;
+  return order.filter(i => mfAlways(i) || (MF === 'vid' ? mfIsVid(i) : !mfIsVid(i)));
+}
+function mfChip() {
+  let c = document.getElementById('mfchip');
+  if (!c) { c = document.createElement('div'); c.id = 'mfchip'; c.className = 'mfchip'; const n = document.getElementById('chips'); n && n.after(c); }
+  const o = MF_OPTS.find(x => x[0] === MF); c.hidden = MF === 'all';
+  c.innerHTML = MF === 'all' ? '' : `<button type="button" data-mfset="all" aria-label="Show videos and pictures">${o[1]} ${o[2]} <b>✕</b></button>`;
+}
+function mfSet(v) { MF = v; ls.set('mediaFilter', v); mfDrawer(false); try { draw(); scrollTo(0, 0); } catch (e) { } toast(MF_OPTS.find(x => x[0] === v)[2]); }
+function mfDrawer(open) {
+  let d = document.getElementById('mfdrawer');
+  if (!d) {
+    d = document.createElement('div'); d.id = 'mfdrawer'; d.className = 'mfdrawer';
+    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Show me</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><p class="mfnote">Alerts, birthdays and pinned specials always show.</p></nav>`;
+    document.body.append(d);
+  }
+  d.querySelector('.mfopts').innerHTML = MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
+  requestAnimationFrame(() => d.classList.toggle('on', !!open));
+}
+(function () {
+  const bar = document.querySelector('header.top .bar'); if (bar && !document.getElementById('mfbtn')) { const b = document.createElement('button'); b.id = 'mfbtn'; b.className = 'ib mfbtn'; b.setAttribute('aria-label', 'Menu'); b.textContent = '☰'; bar.prepend(b); }
+  document.addEventListener('click', e => {
+    const t = e.target; if (!t || !t.closest) return;
+    if (t.closest('#mfbtn')) { mfDrawer(true); return; }
+    const sb = t.closest('[data-mfset]'); if (sb) { e.preventDefault(); mfSet(sb.dataset.mfset); return; }
+    if (t.closest('[data-mfclose]')) mfDrawer(false);
+  });
+  let sx = null, sy = 0, mode = '';
+  addEventListener('touchstart', e => { const p = e.touches[0], open = document.querySelector('#mfdrawer.on'); if (open) { sx = p.clientX; sy = p.clientY; mode = 'close'; } else if (p.clientX < 30) { sx = p.clientX; sy = p.clientY; mode = 'open'; } else sx = null; }, { passive: true });
+  addEventListener('touchmove', e => { if (sx == null) return; const p = e.touches[0], dx = p.clientX - sx, dy = Math.abs(p.clientY - sy);
+    if (mode === 'open' && dx > 50 && dx > dy * 1.5) { sx = null; mfDrawer(true); } else if (mode === 'close' && dx < -50 && -dx > dy * 1.5) { sx = null; mfDrawer(false); } }, { passive: true });
+  addEventListener('keydown', e => { if (e.key === 'Escape') mfDrawer(false); });
+})();
