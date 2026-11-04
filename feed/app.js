@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.46';
+const APP_VERSION = '1.9.47';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -722,7 +722,7 @@ function playVid(el, withSound) {
   curVid = el; mountVid(el);
   const rec = PLAYERS.get(el); rec.want = true;
   if (!rec.ready) return;
-  const loud = withSound || SOUND;
+  const loud = withSound || (SOUND && (!navigator.userActivation || navigator.userActivation.hasBeenActive)); // 1.9.47 autoplay always starts muted until they've touched the page (browsers block sound before that)
   try { if (loud) { rec.p.unMute(); rec.p.setVolume(100); } else rec.p.mute(); rec.p.playVideo(); } catch (e) { }
   sndBtn(el, loud);
   if (loud) { let n = 0; const chk = () => { // if the browser won't start it with sound, play it muted instead
@@ -735,8 +735,10 @@ function pauseVid(el) {
 function pickVid() {
   let best = null, br = 0;
   for (const [el, r] of RATIO) { if (!el.isConnected) { RATIO.delete(el); continue; } if (r > br && !el.classList.contains('verr')) { best = el; br = r; } }
-  if (best && br >= 0.6) { if (best !== curVid && !VID_SAVE) playVid(best); }
-  else if (curVid && (RATIO.get(curVid) || 0) < 0.6) pauseVid(curVid);
+  const thr = typeof MF !== 'undefined' && MF === 'vid' ? 0.45 : 0.6; // 1.9.47 Videos only: big/tall players start a bit sooner
+  if (curVid && !curVid.isConnected) curVid = null; // the list was redrawn (filter changed)
+  if (best && br >= thr) { if (best !== curVid && !VID_SAVE) playVid(best); else if (best === curVid && !VID_SAVE) { const r0 = PLAYERS.get(best); if (r0 && !r0.want) playVid(best); } }
+  else if (curVid && (RATIO.get(curVid) || 0) < thr) pauseVid(curVid);
 }
 const nearIO = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? mountVid(e.target) : unmountVid(e.target)), { rootMargin: '350px 0px' });
 const visIO = new IntersectionObserver(es => { es.forEach(e => RATIO.set(e.target, e.isIntersecting ? e.intersectionRatio : 0)); pickVid(); }, { threshold: [0, 0.3, 0.6, 0.8, 1] });
@@ -1044,7 +1046,7 @@ function otherPlayer(el, rec) {
       playVideo() { v.play().catch(() => { }); }, pauseVideo() { v.pause(); }, getPlayerState: () => v.paused ? (state === -1 ? 3 : 2) : 1, getDuration: () => v.duration || 0, seekTo(t) { v.currentTime = t; }, destroy() { v.pause(); v.removeAttribute('src'); v.load(); au && au.pause(); } };
   }
   // the platforms' own embed players (an iframe); Vimeo and TikTok can be told to play/pause/mute, Facebook is (re)loaded on play
-  let f = null; const ifr = src => { f = document.createElement('iframe'); f.src = src; f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true; f.setAttribute('loading', 'lazy'); f.referrerPolicy = 'strict-origin-when-cross-origin'; slot.innerHTML = ''; slot.appendChild(f); };
+  let f = null; const ifr = src => { f = document.createElement('iframe'); f.src = src; f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true; f.onload = () => setTimeout(() => { if (rec.want && curVid === el && k !== 'fb') playVid(el); }, 400); f.referrerPolicy = 'strict-origin-when-cross-origin'; slot.innerHTML = ''; slot.appendChild(f); };
   const post = (msg, origin) => { try { f && f.contentWindow.postMessage(typeof msg === 'string' ? msg : JSON.stringify(msg), origin); } catch (e) { } };
   if (k === 'vimeo') { ifr(`https://player.vimeo.com/video/${u}?muted=1&playsinline=1&loop=1&dnt=1&title=0&byline=0&portrait=0`);
     const vm = (method, value) => post(value === undefined ? { method } : { method, value }, 'https://player.vimeo.com');
@@ -1086,7 +1088,7 @@ function mfVideos(order) {
 }
 function mediaFilter(order) {
   mfChip(); if (MF === 'all') return order;
-  if (MF === 'vid') return mfVideos(order);
+  if (MF === 'vid') { try { ytApi(); } catch (e) { } setTimeout(() => { try { pickVid(); } catch (e) { } }, 900); setTimeout(() => { try { pickVid(); } catch (e) { } }, 2500); return mfVideos(order); }
   return order.filter(i => mfContent(i) && !mfIsVid(i) && mfPic(i));
 }
 function mfChip() {
