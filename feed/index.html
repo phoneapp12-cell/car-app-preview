@@ -198,18 +198,18 @@ html.mf-only #instb,html.mf-only #feed > :not(.card):not(.load):not(.empty):not(
 .cmts.auto{border-top:1px solid var(--line)}.cmall{background:none;border:0;color:var(--accent,#7c3aed);font:600 .85rem inherit;padding:8px 12px 0;cursor:pointer}
 .dqas{margin:8px 0;display:flex;flex-direction:column;gap:8px}.dqa{display:flex;gap:10px;align-items:flex-start;background:color-mix(in srgb,var(--line) 35%,transparent);border-radius:12px;padding:8px}.dqa img{width:84px;height:84px;object-fit:cover;border-radius:10px;flex:none;background:var(--line);cursor:zoom-in}.dqa p{margin:2px 0 0;font-size:.92rem}.dqa small{color:var(--mute)}.dqa>div{flex:1;min-width:0}.dqbar{display:flex;gap:8px;margin-top:6px}.dqbar button{border:1px solid var(--line);background:var(--card);color:inherit;border-radius:999px;padding:4px 10px;font-size:.85rem}.dqlk.on{border-color:#e0245e}.cmts.dqt{margin:-4px 0 4px 12px}
 .card.concert{border-color:#a21caf}.card.watch{border-color:#e50914}.card.watch .plat{position:absolute;right:12px;top:12px;font-weight:800;font-size:.8rem;padding:4px 10px;border-radius:999px;color:#fff;background:#111;letter-spacing:.02em}.card.watch .p-nfx{background:#e50914}.card.watch .p-tnz{background:#1d1d1b;border:1px solid #fff3}.card.watch .p-thn{background:#00a6e4}.card.watch h3 small{font-weight:500;color:var(--mute);font-size:.8em}.card.watch .wtb{margin:6px 0}
-/* 🍬 Candy accent layer (live from 1.9.49, on for everyone). Pastel-bright sweets colours on top of whatever theme is active
+/* 🍬 Candy accent layer (live from 1.9.50, on for everyone). Pastel-bright sweets colours on top of whatever theme is active
    (light/dark/auto weather): only the header, chips, buttons, reactions, menu and small accents change; cards stay
    light and readable, text sizes untouched. Go live later = paste into index.html and add class "candy" to <html>. */
 html.candy{--c-pink:#ff7eb6;--c-lemon:#ffd84d;--c-mint:#5fe0b6;--c-sky:#6cc7ff;--c-grape:#b18cff;--c-orange:#ffa24c;--c-gloss:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0) 55%)}
 html.candy .top{background:linear-gradient(100deg,color-mix(in srgb,var(--c-pink) 22%,var(--bg)) 0%,color-mix(in srgb,var(--c-lemon) 20%,var(--bg)) 30%,color-mix(in srgb,var(--c-mint) 20%,var(--bg)) 55%,color-mix(in srgb,var(--c-sky) 22%,var(--bg)) 78%,color-mix(in srgb,var(--c-grape) 24%,var(--bg)) 100%);border-bottom:2px solid color-mix(in srgb,var(--c-pink) 35%,transparent)}
 html.candy .chips .chip{border:2px solid transparent;box-shadow:inset 0 -2px 0 rgba(0,0,0,.06)}
-html.candy .chips .chip:nth-child(6n+1){background:color-mix(in srgb,var(--c-pink) 24%,var(--card))}
-html.candy .chips .chip:nth-child(6n+2){background:color-mix(in srgb,var(--c-lemon) 30%,var(--card))}
-html.candy .chips .chip:nth-child(6n+3){background:color-mix(in srgb,var(--c-mint) 26%,var(--card))}
-html.candy .chips .chip:nth-child(6n+4){background:color-mix(in srgb,var(--c-sky) 26%,var(--card))}
-html.candy .chips .chip:nth-child(6n+5){background:color-mix(in srgb,var(--c-grape) 26%,var(--card))}
-html.candy .chips .chip:nth-child(6n){background:color-mix(in srgb,var(--c-orange) 26%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n+1){background:color-mix(in srgb,var(--c-pink) 24%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n+2){background:color-mix(in srgb,var(--c-lemon) 30%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n+3){background:color-mix(in srgb,var(--c-mint) 26%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n+4){background:color-mix(in srgb,var(--c-sky) 26%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n+5){background:color-mix(in srgb,var(--c-grape) 26%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n){background:color-mix(in srgb,var(--c-orange) 26%,var(--card))}
 html.candy .chips .chip.on{background:var(--c-gloss),linear-gradient(135deg,var(--c-pink),var(--c-grape));color:#fff;border-color:rgba(255,255,255,.7);box-shadow:0 4px 14px rgba(255,126,182,.45),inset 0 -3px 0 rgba(0,0,0,.12)}
 html.candy .btn.pri{background:var(--c-gloss),linear-gradient(135deg,var(--c-pink),var(--c-orange));color:#fff;box-shadow:0 4px 14px rgba(255,126,182,.35),inset 0 -3px 0 rgba(0,0,0,.12);text-shadow:0 1px 1px rgba(0,0,0,.15)}
 html.candy .btn:not(.pri){background:color-mix(in srgb,var(--c-sky) 14%,var(--chip))}
@@ -236,9 +236,9 @@ html.candy .media.vid .play{filter:drop-shadow(0 4px 10px rgba(255,126,182,.5))}
 @media (prefers-color-scheme:dark){
 html.candy{--c-gloss:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,0) 55%)}
 html.candy .top{background:linear-gradient(100deg,color-mix(in srgb,var(--c-pink) 16%,var(--bg)),color-mix(in srgb,var(--c-grape) 16%,var(--bg)) 40%,color-mix(in srgb,var(--c-sky) 14%,var(--bg)) 75%,color-mix(in srgb,var(--c-mint) 12%,var(--bg)))}
-html.candy .chips .chip:nth-child(6n+2){background:color-mix(in srgb,var(--c-sky) 22%,var(--card))}
-html.candy .chips .chip:nth-child(6n){background:color-mix(in srgb,var(--c-pink) 20%,var(--card))}
-html.candy .chips .chip:nth-child(6n+1){background:color-mix(in srgb,var(--c-grape) 24%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n+2){background:color-mix(in srgb,var(--c-sky) 22%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n){background:color-mix(in srgb,var(--c-pink) 20%,var(--card))}
+html.candy .chips .chip:not(.on):nth-child(6n+1){background:color-mix(in srgb,var(--c-grape) 24%,var(--card))}
 html.candy .ib{background:var(--c-gloss),color-mix(in srgb,var(--c-grape) 26%,var(--card))}
 html.candy #mfbtn{background:var(--c-gloss),color-mix(in srgb,var(--c-mint) 24%,var(--card))}
 html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transparent)}
@@ -260,8 +260,8 @@ html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transpa
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.49"></script>
-<script src="app.js?v=1.9.49"></script>
-<script src="extras.js?v=1.9.49"></script>
+<script src="family.js?v=1.9.50"></script>
+<script src="app.js?v=1.9.50"></script>
+<script src="extras.js?v=1.9.50"></script>
 </body>
 </html>
