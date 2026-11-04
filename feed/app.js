@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.43';
+const APP_VERSION = '1.9.44';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1092,7 +1092,7 @@ function mediaFilter(order) {
 function mfChip() {
   let c = document.getElementById('mfchip');
   if (!c) { c = document.createElement('div'); c.id = 'mfchip'; c.className = 'mfchip'; const n = document.getElementById('chips'); n && n.after(c); }
-  const o = MF_OPTS.find(x => x[0] === MF); c.hidden = MF === 'all';
+  const o = MF_OPTS.find(x => x[0] === MF); c.hidden = MF === 'all'; document.documentElement.classList.toggle('mf-only', MF !== 'all'); // 1.9.43 strict: no install/extra banners either
   c.innerHTML = MF === 'all' ? '' : `<button type="button" data-mfset="all" aria-label="Show videos and pictures">${o[1]} ${o[2]} <b>✕</b></button>`;
 }
 function mfSet(v) { MF = v; ls.set('mediaFilter', v); mfDrawer(false); try { draw(); scrollTo(0, 0); } catch (e) { } toast(MF_OPTS.find(x => x[0] === v)[2]); }
