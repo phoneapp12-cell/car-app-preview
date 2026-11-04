@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.15';
+const APP_VERSION = '2.29.16';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -15599,6 +15599,12 @@ function videoReason(v) {
 // Publish dates read from each video's YouTube watch page (publishDate). oEmbed does not include a date.
 // Stored here so the phone shows a real date and does not look it up again on every tap.
 const VIDEO_DATES = {
+  // 5 Nov 2026 additions.
+  'g6Die8gVFn0': '2026-11-03',
+  'k2ruCf_z75I': '2026-11-03',
+  'HJ-Xea2FiE4': '2026-11-03',
+  'HZ9xL8Qz8lU': '2026-11-02',
+  '4fCBEDsaYyM': '2026-11-01',
   // 1 Nov 2026 additions.
   'zpVXbJv0sLE': '2026-10-30',
   'EokMz0pxlSc': '2026-10-22',
