@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-NZ">
+<html lang="en-NZ" class="candy">
 <head>
 <script>try{var M=JSON.parse(localStorage.getItem('mf.member')||'null'),P=M&&M.id&&M.role!=='admin'?'mf.m.'+M.id+'.':'mf.',T=JSON.parse(localStorage.getItem(P+'textSize')||'"l"');if(T!=='n')document.documentElement.classList.add(T==='xl'?'ts-xl':'ts-l')}catch(e){document.documentElement.classList.add('ts-l')}</script>
 <meta charset="utf-8">
@@ -198,6 +198,41 @@ html.mf-only #instb,html.mf-only #feed > :not(.card):not(.load):not(.empty):not(
 .cmts.auto{border-top:1px solid var(--line)}.cmall{background:none;border:0;color:var(--accent,#7c3aed);font:600 .85rem inherit;padding:8px 12px 0;cursor:pointer}
 .dqas{margin:8px 0;display:flex;flex-direction:column;gap:8px}.dqa{display:flex;gap:10px;align-items:flex-start;background:color-mix(in srgb,var(--line) 35%,transparent);border-radius:12px;padding:8px}.dqa img{width:84px;height:84px;object-fit:cover;border-radius:10px;flex:none;background:var(--line);cursor:zoom-in}.dqa p{margin:2px 0 0;font-size:.92rem}.dqa small{color:var(--mute)}.dqa>div{flex:1;min-width:0}.dqbar{display:flex;gap:8px;margin-top:6px}.dqbar button{border:1px solid var(--line);background:var(--card);color:inherit;border-radius:999px;padding:4px 10px;font-size:.85rem}.dqlk.on{border-color:#e0245e}.cmts.dqt{margin:-4px 0 4px 12px}
 .card.concert{border-color:#a21caf}.card.watch{border-color:#e50914}.card.watch .plat{position:absolute;right:12px;top:12px;font-weight:800;font-size:.8rem;padding:4px 10px;border-radius:999px;color:#fff;background:#111;letter-spacing:.02em}.card.watch .p-nfx{background:#e50914}.card.watch .p-tnz{background:#1d1d1b;border:1px solid #fff3}.card.watch .p-thn{background:#00a6e4}.card.watch h3 small{font-weight:500;color:var(--mute);font-size:.8em}.card.watch .wtb{margin:6px 0}
+/* 🍬 Candy accent layer (PREVIEW – not live). Pastel-bright sweets colours on top of whatever theme is active
+   (light/dark/auto weather): only the header, chips, buttons, reactions, menu and small accents change; cards stay
+   light and readable, text sizes untouched. Go live later = paste into index.html and add class "candy" to <html>. */
+html.candy{--c-pink:#ff7eb6;--c-lemon:#ffd84d;--c-mint:#5fe0b6;--c-sky:#6cc7ff;--c-grape:#b18cff;--c-orange:#ffa24c;--c-gloss:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0) 55%)}
+html.candy .top{background:linear-gradient(100deg,color-mix(in srgb,var(--c-pink) 22%,var(--bg)) 0%,color-mix(in srgb,var(--c-lemon) 20%,var(--bg)) 30%,color-mix(in srgb,var(--c-mint) 20%,var(--bg)) 55%,color-mix(in srgb,var(--c-sky) 22%,var(--bg)) 78%,color-mix(in srgb,var(--c-grape) 24%,var(--bg)) 100%);border-bottom:2px solid color-mix(in srgb,var(--c-pink) 35%,transparent)}
+html.candy .chips .chip{border:2px solid transparent;box-shadow:inset 0 -2px 0 rgba(0,0,0,.06)}
+html.candy .chips .chip:nth-child(6n+1){background:color-mix(in srgb,var(--c-pink) 24%,var(--card))}
+html.candy .chips .chip:nth-child(6n+2){background:color-mix(in srgb,var(--c-lemon) 30%,var(--card))}
+html.candy .chips .chip:nth-child(6n+3){background:color-mix(in srgb,var(--c-mint) 26%,var(--card))}
+html.candy .chips .chip:nth-child(6n+4){background:color-mix(in srgb,var(--c-sky) 26%,var(--card))}
+html.candy .chips .chip:nth-child(6n+5){background:color-mix(in srgb,var(--c-grape) 26%,var(--card))}
+html.candy .chips .chip:nth-child(6n){background:color-mix(in srgb,var(--c-orange) 26%,var(--card))}
+html.candy .chips .chip.on{background:var(--c-gloss),linear-gradient(135deg,var(--c-pink),var(--c-grape));color:#fff;border-color:rgba(255,255,255,.7);box-shadow:0 4px 14px rgba(255,126,182,.45),inset 0 -3px 0 rgba(0,0,0,.12)}
+html.candy .btn.pri{background:var(--c-gloss),linear-gradient(135deg,var(--c-pink),var(--c-orange));color:#fff;box-shadow:0 4px 14px rgba(255,126,182,.35),inset 0 -3px 0 rgba(0,0,0,.12);text-shadow:0 1px 1px rgba(0,0,0,.15)}
+html.candy .btn:not(.pri){background:color-mix(in srgb,var(--c-sky) 14%,var(--chip))}
+html.candy .ib{background:var(--c-gloss),color-mix(in srgb,var(--c-lemon) 30%,var(--card));box-shadow:inset 0 -2px 0 rgba(0,0,0,.08)}
+html.candy #mfbtn{background:var(--c-gloss),color-mix(in srgb,var(--c-mint) 35%,var(--card))}
+html.candy .card{border-radius:20px;box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 18%,transparent),0 8px 22px rgba(177,140,255,.12)}
+html.candy .card:nth-child(5n+1){border-top:4px solid color-mix(in srgb,var(--c-pink) 55%,transparent)}
+html.candy .card:nth-child(5n+2){border-top:4px solid color-mix(in srgb,var(--c-sky) 55%,transparent)}
+html.candy .card:nth-child(5n+3){border-top:4px solid color-mix(in srgb,var(--c-mint) 55%,transparent)}
+html.candy .card:nth-child(5n+4){border-top:4px solid color-mix(in srgb,var(--c-lemon) 70%,transparent)}
+html.candy .card:nth-child(5n){border-top:4px solid color-mix(in srgb,var(--c-grape) 55%,transparent)}
+html.candy .vote.up.on,html.candy .fb.lk.on{color:var(--c-pink)}
+html.candy .rxpick{background:var(--c-gloss),linear-gradient(100deg,color-mix(in srgb,var(--c-pink) 18%,var(--card)),color-mix(in srgb,var(--c-lemon) 18%,var(--card)),color-mix(in srgb,var(--c-mint) 18%,var(--card)),color-mix(in srgb,var(--c-sky) 18%,var(--card)),color-mix(in srgb,var(--c-grape) 20%,var(--card)));border:2px solid rgba(255,255,255,.8);box-shadow:0 8px 28px rgba(255,126,182,.35)}
+html.candy .rxpick button.hot,html.candy .rxpick button:hover{background:rgba(255,255,255,.6);box-shadow:0 4px 12px rgba(177,140,255,.35)}
+html.candy .mfpanel{background:linear-gradient(180deg,color-mix(in srgb,var(--c-pink) 14%,var(--card)),var(--card) 40%)}
+html.candy .mfopt:nth-child(1){background:color-mix(in srgb,var(--c-grape) 16%,var(--card))}
+html.candy .mfopt:nth-child(2){background:color-mix(in srgb,var(--c-sky) 18%,var(--card))}
+html.candy .mfopt:nth-child(3){background:color-mix(in srgb,var(--c-mint) 18%,var(--card))}
+html.candy .mfopt.on{border-color:var(--c-pink);box-shadow:0 4px 14px rgba(255,126,182,.3)}
+html.candy .mfopt i{color:var(--c-pink)}
+html.candy .mfchip button{background:var(--c-gloss),linear-gradient(135deg,var(--c-sky),var(--c-grape));box-shadow:0 3px 10px rgba(108,199,255,.4)}
+html.candy .media.vid .play{filter:drop-shadow(0 4px 10px rgba(255,126,182,.5))}
+
 </style>
 </head>
 <body>
@@ -214,8 +249,8 @@ html.mf-only #instb,html.mf-only #feed > :not(.card):not(.load):not(.empty):not(
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.47"></script>
-<script src="app.js?v=1.9.47"></script>
-<script src="extras.js?v=1.9.47"></script>
+<script src="family.js?v=1.9.48"></script>
+<script src="app.js?v=1.9.48"></script>
+<script src="extras.js?v=1.9.48"></script>
 </body>
 </html>
