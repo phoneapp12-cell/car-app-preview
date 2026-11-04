@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.55';
+const APP_VERSION = '1.9.56';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -835,6 +835,7 @@ function draw() {
   if (tab === 'all' && FAM_ON) order = weaveShares(order); // 1.7.0: family reposts for everyone
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
   if (typeof mediaFilter === 'function') order = mediaFilter(order); // 1.9.42 ☰ Videos & pictures / Videos only / Pictures only
+  if (typeof carouselize === 'function') { try { order = carouselize(order); } catch (e) { } } // 1.9.56 ↔ swipe rows
   m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'You’re all caught up ✨ New posts arrive through the day – check back soon.'}</div>`);
   more();
   moodLabel();
@@ -863,8 +864,9 @@ function more() {
   shown += next.length;
   m.insertAdjacentHTML('beforeend', next.map(i => i.topic === 'life' ? lifeCard(i) : card(i)).join('') + (shown < order.length ? '<div class="load" id="sentinel">Loading more…</div>' : `<div class="load">${typeof MF !== 'undefined' && MF === 'vid' ? 'You’re all caught up on videos 🎬' : typeof MF !== 'undefined' && MF === 'pic' ? 'You’re all caught up on pictures 🖼️' : 'You’re all caught up ✨'}</div>`));
   const old = m.querySelectorAll('#sentinel'); old.forEach((s, n) => { if (n < old.length - 1) s.remove(); });
-  for (const i of next) { SEEN[i.id] = (SEEN[i.id] || 0) + 1; if (i.src) IMP[i.src] = (IMP[i.src] || 0) + 1; }
-  saveSeen(); fillPics(); watchVids(); famCounts(next); watchSeen(m);
+  const flat = next.flatMap(i => i.x === 'row' ? i.items : [i]); // 1.9.56 swipe rows: their cards count like any other
+  for (const i of flat) { SEEN[i.id] = (SEEN[i.id] || 0) + 1; if (i.src) IMP[i.src] = (IMP[i.src] || 0) + 1; }
+  saveSeen(); fillPics(); watchVids(); famCounts(flat); watchSeen(m);
   const s = $('#sentinel');
   if (s) { if (io) io.disconnect(); io = new IntersectionObserver(e => { if (e[0].isIntersecting) { io.disconnect(); s.remove(); more(); } }, { rootMargin: '900px' }); io.observe(s); }
 }
@@ -1118,7 +1120,7 @@ function mfDrawer(open) {
     if (t.closest('[data-mfclose]')) mfDrawer(false);
   });
   let sx = null, sy = 0, mode = '';
-  addEventListener('touchstart', e => { const p = e.touches[0], open = document.querySelector('#mfdrawer.on'); if (open) { sx = p.clientX; sy = p.clientY; mode = 'close'; } else if (p.clientX < 30) { sx = p.clientX; sy = p.clientY; mode = 'open'; } else sx = null; }, { passive: true });
+  addEventListener('touchstart', e => { const p = e.touches[0], open = document.querySelector('#mfdrawer.on'); if (open) { sx = p.clientX; sy = p.clientY; mode = 'close'; } else if (p.clientX < 24 && !(e.target.closest && e.target.closest('.hscroll'))) { sx = p.clientX; sy = p.clientY; mode = 'open'; } else sx = null; }, { passive: true });
   addEventListener('touchmove', e => { if (sx == null) return; const p = e.touches[0], dx = p.clientX - sx, dy = Math.abs(p.clientY - sy);
     if (mode === 'open' && dx > 50 && dx > dy * 1.5) { sx = null; mfDrawer(true); } else if (mode === 'close' && dx < -50 && -dx > dy * 1.5) { sx = null; mfDrawer(false); } }, { passive: true });
   addEventListener('keydown', e => { if (e.key === 'Escape') mfDrawer(false); });
@@ -1127,3 +1129,52 @@ function mfDrawer(open) {
 /* 1.9.52 a picture on every card: if a card picture still hasn't loaded 3s after failing (the card's own retry/fill had its go), show the soft candy fallback instead of a gap or broken icon */
 document.addEventListener('error', e => { const im = e.target; if (!(im instanceof HTMLImageElement) || !im.closest('#feed .card') || im.dataset.fb) return;
   setTimeout(() => { if (im.isConnected && !(im.complete && im.naturalWidth) && !im.dataset.fb) { im.dataset.fb = 1; im.dataset.broken = 1; im.src = 'img/card-fallback.svg'; } }, 3000); }, true);
+
+/* ---- 1.9.56 ↔ swipe rows: every 6 cards or so the feed has a sideways row of cards on one theme (funny animals, videos,
+   amazing facts, life hacks, coming up on TV, vlogs for you…). Their order follows what each person likes most (the rows
+   whose cards rank highest in their own feed come first – sitcoms for Shane, cruises & vlogs for Sarah…). Cards are taken
+   out of the main list so nothing shows twice; the ☰ filters apply; show-once, reactions and comments work as usual. ---- */
+const ROWS = [
+  ['tv', '📺 Coming up on TV', i => i.topic === 'sitcoms' || i.x === 'watch'],
+  ['ani', '😂 Funny & cute animals', i => /aww|derp|eyebleach|dog|cat|pupp|animal|pets?-|bros|rarepup|startled|caturday|simonscat/i.test(i.src || '') || ['dogs', 'pets'].includes(i.topic)],
+  ['vid', '🎬 Videos to watch', i => typeof mfIsVid === 'function' && mfIsVid(i)],
+  ['facts', '🤯 Amazing & interesting', i => ['games', 'learn', 'science', 'scifi'].includes(i.topic) || /^fun-/.test(i.src || '')],
+  ['hacks', '💡 Life hacks & making', i => ['diy', 'creative', 'craft'].includes(i.topic) || i.x === 'hometip'],
+  ['food', '🍰 Food & treats', i => i.topic === 'food' || i.topic === 'gf'],
+  ['out', '🌏 Travel & nature', i => ['travel', 'nature', 'outdoors', 'garden'].includes(i.topic)],
+];
+function carouselize(order) {
+  if (order.length < 14) return order;
+  const keep = i => i && !i.pin && i.topic !== 'life' && !i._share && (!i.x || ['vlog', 'watch', 'hometip'].includes(i.x)) && (i.img || (i.h && i.h.img) || i.vid);
+  const used = new Set(), rows = [];
+  const start = Math.min(6, order.length); // never take the first few cards
+  for (const [k, title, test] of ROWS) {
+    const its = []; let pos = 0;
+    order.forEach((i, n) => { if (n < start || used.has(i.id) || its.length >= 8 || !keep(i) || !test(i)) return; its.push(i); pos += n; });
+    if (its.length >= 3) { its.forEach(i => used.add(i.id)); rows.push({ id: 'row-' + k, x: 'row', k, title, items: its, rank: pos / its.length }); }
+  }
+  // vlogs picked for them (Sarah: cruises & family vlogs) that aren't already in the feed
+  if (typeof MF === 'undefined' || MF !== 'pic') {
+    const inFeed = new Set(order.map(i => i.id));
+    const vl = ((FEED && FEED.vlogs) || []).filter(v => v.vid && v.img && !inFeed.has(v.id) && !SEEN_BASE.has(v.id) && !(VOTES[v.id] && VOTES[v.id].v < 0) && !unsafe(v) && !SPORT.test(v.t))
+      .map(v => ({ v, sc: typeof vlScore === 'function' ? vlScore(v) : 1 })).sort((a, b) => b.sc - a.sc).slice(0, 6).map(x => ({ id: x.v.id, x: 'vlog', h: x.v, topic: 'vlogs', t: x.v.t }));
+    if (vl.length >= 3) rows.push({ id: 'row-vlog', x: 'row', k: 'vlog', title: '🎥 Vlogs for you', items: vl, rank: 30 });
+  }
+  if (!rows.length) return order;
+  rows.sort((a, b) => a.rank - b.rank);
+  const main = order.filter(i => !used.has(i.id)), out = []; let r = 0, since = 0;
+  main.forEach((i, n) => { out.push(i); if (!i.pin) since++; if (since >= 6 + (r % 3) && r < rows.length && n >= 4) { out.push(rows[r++]); since = 0; } });
+  while (r < rows.length && r < 2) out.push(rows[r++]);
+  return out;
+}
+function rowCard(row) {
+  return `<section class="hrow" data-row="${esc(row.k)}" aria-label="${esc(row.title)}"><div class="hrhd"><h2>${esc(row.title)}</h2><span class="hrhint" aria-hidden="true">Swipe ›</span></div>
+  <div class="hscroll">${row.items.map(i => card(i)).join('')}</div>
+  <div class="hdots" aria-hidden="true">${row.items.map((_, n) => `<i${n ? '' : ' class="on"'}></i>`).join('')}</div></section>`;
+}
+const cardRow = window.card;
+window.card = function (i) { if (i && i.x === 'row') return rowCard(i); return cardRow(i); };
+document.addEventListener('scroll', e => { const h = e.target; if (!h || !h.classList || !h.classList.contains('hscroll')) return;
+  const cs = [...h.children], mid = h.scrollLeft + h.clientWidth / 2; let best = 0, bd = 1e9; cs.forEach((c, n) => { const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (d < bd) { bd = d; best = n; } });
+  const dots = h.parentNode.querySelectorAll('.hdots i'); dots.forEach((d, n) => d.classList.toggle('on', n === best)); h.parentNode.classList.add('swiped');
+  if (typeof pickVid === 'function') { clearTimeout(h.__pv); h.__pv = setTimeout(pickVid, 150); } }, true);
