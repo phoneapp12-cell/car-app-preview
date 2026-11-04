@@ -289,8 +289,9 @@ html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transpa
 .hdots i{width:7px;height:7px;border-radius:50%;background:var(--line);transition:all .2s}
 .hdots i.on{width:18px;border-radius:4px;background:var(--acc)}
 html.candy .hdots i.on{background:linear-gradient(90deg,var(--c-pink),var(--c-grape))}
-html.candy .hrhd h2{background:linear-gradient(90deg,var(--c-pink),var(--c-grape));-webkit-background-clip:text;background-clip:text;color:transparent}
-@media (prefers-color-scheme:dark){html.candy .hrhd h2{background:linear-gradient(90deg,#ff9cc8,#c9b0ff);-webkit-background-clip:text;background-clip:text}}
+html.candy .hrhd h2{color:#c2448a}
+@media (prefers-color-scheme:dark){html.candy .hrhd h2{color:#ffa6cf}}
+@media (max-width:440px){.top .mood{display:none}}
 </style>
 </head>
 <body>
@@ -307,9 +308,9 @@ html.candy .hrhd h2{background:linear-gradient(90deg,var(--c-pink),var(--c-grape
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.57"></script>
-<script src="app.js?v=1.9.57"></script>
-<script src="extras.js?v=1.9.57"></script>
+<script src="family.js?v=1.9.58"></script>
+<script src="app.js?v=1.9.58"></script>
+<script src="extras.js?v=1.9.58"></script>
 <script>
 /* 1.9.51 self-heal: if the feed is still skeletons after 9s (a crash or a stale cached build), say so and offer a fresh reload
    that clears this app's caches and service worker. Also: when a new version takes over, reload once to use it. */
