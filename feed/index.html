@@ -266,7 +266,7 @@ html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transpa
 /* text-only cards get a picture band (emoji on a pastel candy gradient) */
 #feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{content:var(--band-e,'✨');display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:16/6;font-size:56px;line-height:1;background:linear-gradient(120deg,#ffd1e6,#fff1b8 35%,#c9f5e6 65%,#d9ccff);text-shadow:0 4px 14px rgba(0,0,0,.12)}
 @media (prefers-color-scheme:dark){#feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{background:linear-gradient(120deg,#4a2a40,#3d3a26 35%,#1f3d36 65%,#33295a)}}
-#feed > .card.daily{--band-e:'🧠'}#feed > .card.trivia{--band-e:'❓'}#feed > .card.sugg{--band-e:'💡'}#feed > .card.reno{--band-e:'🏠'}#feed > .card.wkr{--band-e:'📅'}#feed > .card.fest.ny{--band-e:'🎆'}#feed > .card.fest.xmas{--band-e:'🎄'}#feed > .card.wx-nz{--band-e:'⛅'}
+#feed > .card.daily{--band-e:'📸'}#feed > .card.trivia{--band-e:'❓'}#feed > .card.sugg{--band-e:'💡'}#feed > .card.reno{--band-e:'🏠'}#feed > .card.wkr{--band-e:'📅'}#feed > .card.fest.ny{--band-e:'🎆'}#feed > .card.fest.xmas{--band-e:'🎄'}#feed > .card.wx-nz{--band-e:'⛅'}
 </style>
 </head>
 <body>
@@ -283,9 +283,9 @@ html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transpa
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.52"></script>
-<script src="app.js?v=1.9.52"></script>
-<script src="extras.js?v=1.9.52"></script>
+<script src="family.js?v=1.9.53"></script>
+<script src="app.js?v=1.9.53"></script>
+<script src="extras.js?v=1.9.53"></script>
 <script>
 /* 1.9.51 self-heal: if the feed is still skeletons after 9s (a crash or a stale cached build), say so and offer a fresh reload
    that clears this app's caches and service worker. Also: when a new version takes over, reload once to use it. */
