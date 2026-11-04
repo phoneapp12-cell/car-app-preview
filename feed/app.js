@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.42';
+const APP_VERSION = '1.9.43';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -859,7 +859,7 @@ function more() {
   const m = $('#feed'), next = order.slice(shown, shown + PAGE);
   if (!next.length) return;
   shown += next.length;
-  m.insertAdjacentHTML('beforeend', next.map(i => i.topic === 'life' ? lifeCard(i) : card(i)).join('') + (shown < order.length ? '<div class="load" id="sentinel">Loading more…</div>' : '<div class="load">You’re all caught up ✨</div>'));
+  m.insertAdjacentHTML('beforeend', next.map(i => i.topic === 'life' ? lifeCard(i) : card(i)).join('') + (shown < order.length ? '<div class="load" id="sentinel">Loading more…</div>' : `<div class="load">${typeof MF !== 'undefined' && MF === 'vid' ? 'You’re all caught up on videos 🎬' : typeof MF !== 'undefined' && MF === 'pic' ? 'You’re all caught up on pictures 🖼️' : 'You’re all caught up ✨'}</div>`));
   const old = m.querySelectorAll('#sentinel'); old.forEach((s, n) => { if (n < old.length - 1) s.remove(); });
   for (const i of next) { SEEN[i.id] = (SEEN[i.id] || 0) + 1; if (i.src) IMP[i.src] = (IMP[i.src] || 0) + 1; }
   saveSeen(); fillPics(); watchVids(); famCounts(next); watchSeen(m);
@@ -1067,9 +1067,27 @@ const MF_OPTS = [['all', '🎬🖼️', 'Videos & pictures'], ['vid', '🎬', 'V
 let MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF = 'all';
 const mfAlways = i => !!(i.pin || (i.x && !['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) || /^(life|app|ph|you|date|cd|alert)[:-]/.test(String(i.id || '')) || i.topic === 'alerts');
 function mfIsVid(i) { try { return !!(i.vid || i.x === 'vlog' || i.kind === 'video' || (i.h && (i.h.vid || i.h.trailer)) || vidOf(i) || (i._share && (i._share.snap || {}).vid)); } catch (e) { return false; } }
+/* 1.9.43 strict: Videos only = only video cards (from every video source: the feed's clips and trailers, vlogs, Reddit/Vimeo,
+   family shares – unseen first, then ones you've already seen so it's never empty); Pictures only = only picture cards
+   (no videos, no alerts, My App, birthdays, countdowns or text-only cards). Videos & pictures = the normal feed. */
+const mfContent = i => !!i && !i.pin && i.topic !== 'life' && !/^(life|app|ph|you|date|cd|alert|bd)[:-]/.test(String(i.id || '')) && (!i.x || ['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) && i.kind !== 'alert' && i.topic !== 'alerts';
+const mfPic = i => !!(i.img || (i.photos && i.photos.length) || (i.h && i.h.img) || (i._share && ((i._share.snap || {}).img || (i._share.photos || []).length)));
+function mfOk(i) { if (!i) return false; if (VOTES[i.id] && VOTES[i.id].v < 0) return false; const t = (i.t || '') + ' ' + (i.s || ''); if (SPORT.test(t) || unsafe(i)) return false; if (typeof toneW === 'function' && !toneW(i)) return false; if (i.src && weights().drop(i.src)) return false; if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; return true; }
+function mfVideos(order) {
+  const out = [], ids = new Set(), add = i => { if (!i || ids.has(i.id) || !mfContent(i) || !mfIsVid(i)) return; ids.add(i.id); out.push(i); };
+  order.forEach(add); // what the feed already picked for them, in its order
+  const seen = i => SEEN_BASE.has(i.id) || (SEEN[i.id] || 0) > 0;
+  const vl = ((FEED && FEED.vlogs) || []).filter(v => v.vid && v.img && mfOk(v)).map(v => ({ id: v.id, x: 'vlog', h: v, topic: 'vlogs', t: v.t, at: v.at }));
+  const fv = ((FEED && FEED.items) || []).filter(i => mfIsVid(i) && mfOk(i));
+  const mine = fv.filter(i => topicOn(i.topic) && !intHidden(i)), other = fv.filter(i => !(topicOn(i.topic) && !intHidden(i)));
+  const rest = (typeof rank === 'function' ? rank(mine) : mine).concat(typeof vlScore === 'function' ? vl.sort((a, b) => vlScore(b.h) - vlScore(a.h)) : vl, other.sort((a, b) => (b.at || 0) - (a.at || 0)));
+  rest.filter(i => !seen(i)).forEach(add); rest.filter(seen).forEach(add); // unseen first, then already-seen ones
+  return out;
+}
 function mediaFilter(order) {
   mfChip(); if (MF === 'all') return order;
-  return order.filter(i => mfAlways(i) || (MF === 'vid' ? mfIsVid(i) : !mfIsVid(i)));
+  if (MF === 'vid') return mfVideos(order);
+  return order.filter(i => mfContent(i) && !mfIsVid(i) && mfPic(i));
 }
 function mfChip() {
   let c = document.getElementById('mfchip');
@@ -1082,7 +1100,7 @@ function mfDrawer(open) {
   let d = document.getElementById('mfdrawer');
   if (!d) {
     d = document.createElement('div'); d.id = 'mfdrawer'; d.className = 'mfdrawer';
-    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Show me</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><p class="mfnote">Alerts, birthdays and pinned specials always show.</p></nav>`;
+    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Show me</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><p class="mfnote">Videos only and Pictures only show just those cards. Alerts still come as notifications.</p></nav>`;
     document.body.append(d);
   }
   d.querySelector('.mfopts').innerHTML = MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
