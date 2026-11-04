@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.59';
+const APP_VERSION = '1.9.60';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -279,6 +279,9 @@ function greet() { const el = $('#greet'); if (el) { const t = greetText(); if (
 setInterval(greet, 60e3); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') greet(); });
 function moodLabel() { greet(); const el = $('#mood'); if (el) el.textContent = MOOD_OFF ? '' : MOODS[moodBand()][0]; }
 
+/* 1.9.60 keep it local: NZ & Northland posts (and TVNZ / Three programmes) weigh more, overseas less */
+function isNZ(i) { return !!i && !!(i.nz || /^(nz|ef|epg|tvm-nz|rnz|stuff|1news|nzgeo|doc|nzh|na-|wdc)/i.test(i.src || '') || /\.nz(\/|$|:)/i.test(((i.url || '').match(/^https?:\/\/[^/]+/) || [''])[0]) || /new zealand|aotearoa|kiwi|whang[aā]rei|northland|auckland|wellington|christchurch|tvnz|threenow|\bnz\b/i.test((i.t || '') + ' ' + (i.s || ''))); }
+function nzW(i) { return isNZ(i) ? (i.src === 'nz-epg' ? 2.2 : 1.6) : (i.topic === 'sitcoms' ? 0.55 : 0.8); }
 function rank(items) {
   const W = weights(), now = Date.now();
   const scored = items.map(i => {
@@ -288,7 +291,7 @@ function rank(items) {
     const media = i.vid ? 1.15 : i.img ? 1.1 : i.kind === 'tip' ? 0.8 : 0.6; // pictures and videos first
     const seen = Math.pow(0.8, SEEN[i.id] || 0);                   // seen a few times: let new things through
     const hot = i.hot ? 1.5 : 1;                                   // e.g. fireworks this week
-    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) * popW(i) }; // 1.8.1 popW: family likes
+    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) * popW(i) * nzW(i) }; // 1.8.1 popW: family likes
   }).sort((a, b) => b.sc - a.sc);
   // Mix: each step takes the best next post from the topic that's due, so every interest gets a turn
   // (higher-voted topics, and sitcoms, come round more often). About 1 in 7 slots explores further down a list.
@@ -1135,7 +1138,7 @@ document.addEventListener('error', e => { const im = e.target; if (!(im instance
    whose cards rank highest in their own feed come first – sitcoms for Shane, cruises & vlogs for Sarah…). Cards are taken
    out of the main list so nothing shows twice; the ☰ filters apply; show-once, reactions and comments work as usual. ---- */
 const ROWS = [
-  ['tv', '📺 Coming up on TV', i => i.topic === 'sitcoms' || i.x === 'watch'],
+  ['tv', '📺 Coming up on TV', i => (i.topic === 'sitcoms' || i.x === 'watch') && !/election|midterm|politic|how to watch/i.test(i.t || '')],
   ['ani', '😂 Funny & cute animals', i => /aww|derp|eyebleach|dog|cat|pupp|animal|pets?-|bros|rarepup|startled|caturday|simonscat/i.test(i.src || '') || ['dogs', 'pets'].includes(i.topic)],
   ['vid', '🎬 Videos to watch', i => typeof mfIsVid === 'function' && mfIsVid(i)],
   ['facts', '🤯 Amazing & interesting', i => ['games', 'learn', 'science', 'scifi'].includes(i.topic) || /^fun-/.test(i.src || '')],
@@ -1150,7 +1153,8 @@ function carouselize(order) {
   const start = Math.min(6, order.length); // never take the first few cards
   for (const [k, title, test] of ROWS) {
     const its = []; let pos = 0;
-    order.forEach((i, n) => { if (n < start || used.has(i.id) || its.length >= 8 || !keep(i) || !test(i)) return; its.push(i); pos += n; });
+    order.forEach((i, n) => { if (n < start || used.has(i.id) || its.length >= (k === 'tv' ? 30 : 8) || !keep(i) || !test(i)) return; its.push(i); pos += n; });
+    if (k === 'tv') { const tvS = i => (i.src === 'nz-epg' ? 4 : 0) + (isNZ(i) ? 2 : 0) + (i.com || i.nzm ? 1 : 0); its.sort((a, b) => tvS(b) - tvS(a)); its.length = Math.min(its.length, 8); pos = its.length * 3; } // 1.9.60 TVNZ & Three first
     if (its.length >= 3) { its.forEach(i => used.add(i.id)); rows.push({ id: 'row-' + k, x: 'row', k, title, items: its, rank: (pos / its.length) * (k === 'tv' && topicOn('sitcoms') ? 0.25 : 1) }); } // sitcom fans: 📺 first
   }
   // vlogs picked for them (Sarah: cruises & family vlogs) that aren't already in the feed
