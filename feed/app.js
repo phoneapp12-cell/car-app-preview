@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.56';
+const APP_VERSION = '1.9.57';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1151,14 +1151,14 @@ function carouselize(order) {
   for (const [k, title, test] of ROWS) {
     const its = []; let pos = 0;
     order.forEach((i, n) => { if (n < start || used.has(i.id) || its.length >= 8 || !keep(i) || !test(i)) return; its.push(i); pos += n; });
-    if (its.length >= 3) { its.forEach(i => used.add(i.id)); rows.push({ id: 'row-' + k, x: 'row', k, title, items: its, rank: pos / its.length }); }
+    if (its.length >= 3) { its.forEach(i => used.add(i.id)); rows.push({ id: 'row-' + k, x: 'row', k, title, items: its, rank: (pos / its.length) * (k === 'tv' && topicOn('sitcoms') ? 0.25 : 1) }); } // sitcom fans: 📺 first
   }
   // vlogs picked for them (Sarah: cruises & family vlogs) that aren't already in the feed
   if (typeof MF === 'undefined' || MF !== 'pic') {
     const inFeed = new Set(order.map(i => i.id));
     const vl = ((FEED && FEED.vlogs) || []).filter(v => v.vid && v.img && !inFeed.has(v.id) && !SEEN_BASE.has(v.id) && !(VOTES[v.id] && VOTES[v.id].v < 0) && !unsafe(v) && !SPORT.test(v.t))
       .map(v => ({ v, sc: typeof vlScore === 'function' ? vlScore(v) : 1 })).sort((a, b) => b.sc - a.sc).slice(0, 6).map(x => ({ id: x.v.id, x: 'vlog', h: x.v, topic: 'vlogs', t: x.v.t }));
-    if (vl.length >= 3) rows.push({ id: 'row-vlog', x: 'row', k: 'vlog', title: '🎥 Vlogs for you', items: vl, rank: 30 });
+    if (vl.length >= 3) rows.push({ id: 'row-vlog', x: 'row', k: 'vlog', title: '🎥 Vlogs for you', items: vl, rank: (ls.get('vlTags', []).length ? 8 : 60) });
   }
   if (!rows.length) return order;
   rows.sort((a, b) => a.rank - b.rank);
