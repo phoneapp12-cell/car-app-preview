@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.50';
+const APP_VERSION = '1.9.51';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1008,7 +1008,7 @@ document.addEventListener('load', e => {
    time, paused when scrolled away, not started by themselves on Data Saver or a low battery): Reddit's own clips (v.redd.it,
    picture + sound tracks), Vimeo, TikTok, Facebook and Instagram videos (their official embed players), and plain MP4 links.
    Bigger: edge to edge on phones and wider on big screens; 9:16 for Shorts, TikTok and Reels; ⛶ goes full screen. ---- */
-let VID_SAVE = !!(navigator.connection && navigator.connection.saveData);
+var VID_SAVE = !!(navigator.connection && navigator.connection.saveData);
 try { navigator.getBattery && navigator.getBattery().then(b => { const f = () => { VID_SAVE = !!(navigator.connection && navigator.connection.saveData) || (!b.charging && b.level < 0.15); }; f(); b.addEventListener('levelchange', f); b.addEventListener('chargingchange', f); }); } catch (e) { }
 function vidOf(i) {
   if (!i) return null; if (i.vk && i.vu) return { k: i.vk, u: i.vu, tall: !!i.vtall };
@@ -1065,8 +1065,8 @@ function otherPlayer(el, rec) {
 /* ---- 1.9.42 ☰ side menu: swipe in from the left edge (or tap ☰) – Videos & pictures (all), Videos only, Pictures only.
    Remembered on this phone; a chip under the topics shows it's on, with ✕ to go back to everything. Alerts, pinned
    specials (weather, power, birthdays, countdowns) and your own My App cards always show. ---- */
-const MF_OPTS = [['all', '🎬🖼️', 'Videos & pictures'], ['vid', '🎬', 'Videos only'], ['pic', '🖼️', 'Pictures only']];
-let MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF = 'all';
+var MF_OPTS = [['all', '🎬🖼️', 'Videos & pictures'], ['vid', '🎬', 'Videos only'], ['pic', '🖼️', 'Pictures only']]; // 1.9.51 var, not const: draw() can run before this line (cached feed) – a const here crashed it
+var MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF = 'all';
 const mfAlways = i => !!(i.pin || (i.x && !['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) || /^(life|app|ph|you|date|cd|alert)[:-]/.test(String(i.id || '')) || i.topic === 'alerts');
 function mfIsVid(i) { try { return !!(i.vid || (i.x === 'vlog' && i.h && i.h.vid) || (i.h && i.h.vid) || (i.img && vidOf(i)) || (i._share && (i._share.snap || {}).vid)); } catch (e) { return false; } }
 /* 1.9.43 strict: Videos only = only video cards (from every video source: the feed's clips and trailers, vlogs, Reddit/Vimeo,
@@ -1087,6 +1087,7 @@ function mfVideos(order) {
   return out;
 }
 function mediaFilter(order) {
+  if (!MF_OPTS || !MF) return order; // 1.9.51 still starting up
   mfChip(); if (MF === 'all') return order;
   if (MF === 'vid') { try { ytApi(); } catch (e) { } setTimeout(() => { try { pickVid(); } catch (e) { } }, 900); setTimeout(() => { try { pickVid(); } catch (e) { } }, 2500); return mfVideos(order); }
   return order.filter(i => mfContent(i) && !mfIsVid(i) && mfPic(i));

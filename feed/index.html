@@ -154,7 +154,8 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .rxpick button.hot,.rxpick button:hover{transform:translateY(-8px) scale(1.25);background:rgba(0,0,0,.05)}
 .lk .rxe{font-size:21px;line-height:1}
 html.mf-only #instb,html.mf-only #feed > :not(.card):not(.load):not(.empty):not(#sentinel){display:none}
-#mfbtn{font-size:22px;margin-right:4px}
+#mfbtn{font-size:22px;margin-right:4px;flex:none;width:40px;height:40px;padding:0}
+@media (max-width:420px){.top .bar{gap:6px}.top .upd{font-size:.7rem;max-width:64px}}
 .mfchip{padding:0 12px 6px}.mfchip[hidden]{display:none}.mfchip button{border:0;border-radius:20px;padding:6px 12px;font:inherit;font-size:.85em;font-weight:700;background:var(--acc,#7c3aed);color:#fff}.mfchip b{margin-left:6px;opacity:.85}
 .mfdrawer{position:fixed;inset:0;z-index:9000;pointer-events:none}.mfdrawer.on{pointer-events:auto}
 .mfscrim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;transition:opacity .22s}.mfdrawer.on .mfscrim{opacity:1}
@@ -260,8 +261,24 @@ html.candy .card{box-shadow:0 2px 0 color-mix(in srgb,var(--c-grape) 22%,transpa
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.50"></script>
-<script src="app.js?v=1.9.50"></script>
-<script src="extras.js?v=1.9.50"></script>
+<script src="family.js?v=1.9.51"></script>
+<script src="app.js?v=1.9.51"></script>
+<script src="extras.js?v=1.9.51"></script>
+<script>
+/* 1.9.51 self-heal: if the feed is still skeletons after 9s (a crash or a stale cached build), say so and offer a fresh reload
+   that clears this app's caches and service worker. Also: when a new version takes over, reload once to use it. */
+(function () {
+  var fix = function () { var done = function () { location.replace(location.pathname + '?fresh=' + Date.now()); };
+    try { Promise.all([caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }), navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.update(); })); }) : 0]).then(done, done); } catch (e) { done(); } };
+  window.__ibErr = 0; addEventListener('error', function () { window.__ibErr++; });
+  setTimeout(function () {
+    var f = document.getElementById('feed'); if (!f || f.querySelector('.card,.empty,.load') || !f.querySelector('.sk')) return;
+    f.insertAdjacentHTML('afterbegin', '<div class="empty" id="ibheal">😕 Info Book didn’t load properly.<br><br><button class="btn pri" id="ibfix">↻ Reload Info Book</button></div>');
+    document.getElementById('ibfix').onclick = fix;
+    if (window.__ibErr && !sessionStorage.getItem('ibAutoFix')) { sessionStorage.setItem('ibAutoFix', 1); fix(); } // a crash: try one fresh reload by itself
+  }, 9000);
+  if (navigator.serviceWorker) { var had = !!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange', function () { if (had && !sessionStorage.getItem('ibSwReload')) { sessionStorage.setItem('ibSwReload', 1); location.reload(); } }); }
+})();
+</script>
 </body>
 </html>
