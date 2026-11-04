@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.45';
+const APP_VERSION = '1.9.46';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1066,7 +1066,7 @@ function otherPlayer(el, rec) {
 const MF_OPTS = [['all', '🎬🖼️', 'Videos & pictures'], ['vid', '🎬', 'Videos only'], ['pic', '🖼️', 'Pictures only']];
 let MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF = 'all';
 const mfAlways = i => !!(i.pin || (i.x && !['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) || /^(life|app|ph|you|date|cd|alert)[:-]/.test(String(i.id || '')) || i.topic === 'alerts');
-function mfIsVid(i) { try { return !!(i.vid || i.x === 'vlog' || i.kind === 'video' || (i.h && (i.h.vid || i.h.trailer)) || vidOf(i) || (i._share && (i._share.snap || {}).vid)); } catch (e) { return false; } }
+function mfIsVid(i) { try { return !!(i.vid || (i.x === 'vlog' && i.h && i.h.vid) || (i.h && i.h.vid) || (i.img && vidOf(i)) || (i._share && (i._share.snap || {}).vid)); } catch (e) { return false; } }
 /* 1.9.43 strict: Videos only = only video cards (from every video source: the feed's clips and trailers, vlogs, Reddit/Vimeo,
    family shares – unseen first, then ones you've already seen so it's never empty); Pictures only = only picture cards
    (no videos, no alerts, My App, birthdays, countdowns or text-only cards). Videos & pictures = the normal feed. */
