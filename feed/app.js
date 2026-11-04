@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.51';
+const APP_VERSION = '1.9.52';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1123,3 +1123,7 @@ function mfDrawer(open) {
     if (mode === 'open' && dx > 50 && dx > dy * 1.5) { sx = null; mfDrawer(true); } else if (mode === 'close' && dx < -50 && -dx > dy * 1.5) { sx = null; mfDrawer(false); } }, { passive: true });
   addEventListener('keydown', e => { if (e.key === 'Escape') mfDrawer(false); });
 })();
+
+/* 1.9.52 a picture on every card: if a card picture still hasn't loaded 3s after failing (the card's own retry/fill had its go), show the soft candy fallback instead of a gap or broken icon */
+document.addEventListener('error', e => { const im = e.target; if (!(im instanceof HTMLImageElement) || !im.closest('#feed .card') || im.dataset.fb) return;
+  setTimeout(() => { if (im.isConnected && !(im.complete && im.naturalWidth) && !im.dataset.fb) { im.dataset.fb = 1; im.dataset.broken = 1; im.src = 'img/card-fallback.svg'; } }, 3000); }, true);
