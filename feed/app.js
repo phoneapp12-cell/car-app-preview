@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.67';
+const APP_VERSION = '1.9.68';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -339,6 +339,7 @@ function visible() {
   const seenIds = new Set(), W = weights();
   const list = FEED.items.concat(youItems(), topicOn("tarot") && pickOk("tarot") ? [tarotOfDay()] : []).filter(i => {
     if (seenIds.has(i.id)) return false; seenIds.add(i.id);
+    if (/^crys-/.test(i.src || '') && !(((ls.get('nudge', null) || {}).ib || {})['Crystals & gemstones'])) return false; // 1.9.67 💎 only for people Shane switched crystals on for (Monique)
     if (VOTES[i.id] && VOTES[i.id].v < 0) return false;          // thumbs-down: gone
     if (SPORT.test((i.t || '') + ' ' + (i.s || ''))) return false; // never any sport
     if (unsafe(i)) return false;                                   // 1.7.1: never any nudity
