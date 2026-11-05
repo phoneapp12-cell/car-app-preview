@@ -193,10 +193,10 @@ async function openThread(btn) {
 }
 /* 1.9.14 ❤️ on comments: tap the heart to like/unlike, tap the names (or hold the heart) to see everyone who liked it */
 const CLIKES = {};
-function cmLikeBar(x) {
-  const L = Array.isArray(x.likes) ? x.likes : []; CLIKES[x.id] = L; const on = L.some(isMe);
-  const mine = L.find(isMe);
-  return `<div class="cmlk" data-cmlk="${x.id}"><button class="cml${on ? ' on' : ''}" data-clike="${x.id}" aria-pressed="${on}" aria-label="${on ? 'You reacted – hold to change' : 'Like this comment (hold for more)'}">${mine ? emoOf(mine) : '🤍'}${L.length ? `<span class="cmlc">${topEmo(L, mine ? emoOf(mine) : '')}${L.length}</span>` : ''}</button>${L.length ? `<button class="cmln" data-clikers="${x.id}">${esc(L.map(likeName).slice(0, 3).join(', '))}${L.length > 3 ? ' +' + (L.length - 3) : ''}</button>` : ''}</div>`;
+function cmLikeBar(x) { // 1.9.61 ❤️ (hold for more) + its own 👍; still one reaction per person per comment
+  const L = Array.isArray(x.likes) ? x.likes : []; CLIKES[x.id] = L;
+  const mine = L.find(isMe), mineUp = !!mine && mine.emo === 'up', H = L.filter(l => l.emo !== 'up'), U = L.length - H.length, mh = mine && !mineUp ? mine : null;
+  return `<div class="cmlk" data-cmlk="${x.id}"><button class="cml${mh ? ' on' : ''}" data-clike="${x.id}" aria-pressed="${!!mh}" aria-label="${mh ? 'You reacted – hold to change' : 'Like this comment (hold for more)'}">${mh ? emoOf(mh) : '🤍'}${H.length ? `<span class="cmlc">${topEmo(H, mh ? emoOf(mh) : '')}${H.length}</span>` : ''}</button><button class="cml cmup${mineUp ? ' on' : ''}" data-cthumb="${x.id}" aria-pressed="${mineUp}" aria-label="${mineUp ? 'You gave this a thumbs up' : 'Thumbs up this comment'}">👍${U ? `<span class="cmlc">${U}</span>` : ''}</button>${L.length ? `<button class="cmln" data-clikers="${x.id}">${esc(L.map(likeName).slice(0, 3).join(', '))}${L.length > 3 ? ' +' + (L.length - 3) : ''}</button>` : ''}</div>`;
 }
 let CL_EMO = 'love';
 async function toggleCLike(cid, emo) {
@@ -223,6 +223,7 @@ let CLK_HOLD = null, CLK_HELD = false;
 document.addEventListener('click', e => {
   const t = e.target; if (!t || !t.closest) return;
   const b = t.closest('[data-clike]'); if (b) { e.preventDefault(); e.stopPropagation(); if (CLK_HELD) { CLK_HELD = false; return; } toggleCLike(+b.dataset.clike); return; }
+  const th = t.closest('[data-cthumb]'); if (th) { e.preventDefault(); e.stopPropagation(); toggleCLike(+th.dataset.cthumb, 'up'); return; }
   const n = t.closest('[data-clikers]'); if (n) { e.preventDefault(); e.stopPropagation(); showCLikers(+n.dataset.clikers); }
 }, true);
 const cmRow = x => `<div class="cm${x.bot ? ' bot' : ''}"><b>${esc(x.name)}</b>${x.pron && { she: 1, he: 1, they: 1 }[x.pron] ? ` <small class="prn">(${{ she: 'she/her', he: 'he/him', they: 'they/them' }[x.pron]})</small>` : ''}${x.bot ? '<span class="aib" title="Replies written by AI">AI</span>' : ''} <small>${esc(nzTime(x.at))}</small>${x.mine || IS_ADMIN ? `<button class="cx" data-delc="${x.id}" aria-label="Delete comment">✕</button>` : ''}<p>${esc(x.text)}</p>${cmLikeBar(x)}</div>`;
@@ -439,7 +440,7 @@ function upNames(i) { const s = rxOf(i); return FAM_ON && s && (s.ups || []).len
 /* ---- 1.9.42 ❤️😂😠😮😐😎 reactions: hold the heart (on posts and comments) for the picker; a quick tap is still ❤️.
    One reaction each – picking another emoji switches it. 😠 and 😐 don't boost a post in anyone's feed. ---- */
 const EMOS = [['love', '❤️', 'Heart'], ['laugh', '😂', 'Laugh'], ['angry', '😠', 'Angry'], ['wow', '😮', 'Surprised'], ['meh', '😐', 'Meh'], ['cool', '😎', 'Cool']];
-const EMO_CH = Object.fromEntries(EMOS.map(e => [e[0], e[1]]));
+const EMO_CH = Object.fromEntries([...EMOS.map(e => [e[0], e[1]]), ['up', '👍']]); // 1.9.61 👍 on comments (own button, not in the hold picker)
 const emoKey = l => (l && EMO_CH[l.emo]) ? l.emo : 'love', emoOf = l => EMO_CH[emoKey(l)];
 function topEmo(L, skip = '') { const n = {}; for (const l of L) n[emoOf(l)] = (n[emoOf(l)] || 0) + 1; return Object.keys(n).sort((a, b) => n[b] - n[a]).filter(e => e !== skip).slice(0, 3).join(''); }
 function rxLine(i) { // '❤️ 2 · Sarah, Millesha   👍 1 · Shane' under family posts; tap for the full list
