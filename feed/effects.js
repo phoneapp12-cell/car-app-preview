@@ -62,12 +62,13 @@ function glow() { const el = document.getElementById('stchip'); if (!el || el.hi
   el.style.setProperty('--glow', Math.min(1, n / 30).toFixed(2)); el.classList.toggle('glow', n >= 2); }
 const sc = document.getElementById('stchip'); if (sc) { new MutationObserver(glow).observe(sc, { childList: true, attributes: true, attributeFilter: ['hidden'] }); glow(); }
 
-/* ✨ shimmer once on each card as it first scrolls in; slow gentle zoom on big photos while they're on screen;
+/* ✨ shimmer once on the first card of each swipe row (and a quick highlight on its "Swipe" hint); slow gentle zoom on big photos while they're on screen;
    🎈 balloons the first time a birthday card shows */
 const shimmered = new Set();
 const io = new IntersectionObserver(es => es.forEach(e => { const c = e.target;
   if (e.isIntersecting) { c.classList.add('inv'); const id = c.dataset.id || '';
-    if (!shimmered.has(id)) { shimmered.add(id); c.classList.add('shim'); setTimeout(() => c.classList.remove('shim'), 1400);
+    if (!shimmered.has(id)) { shimmered.add(id);
+      if (c.matches('.hscroll > .card:first-child') && !off()) { c.classList.add('shim'); setTimeout(() => c.classList.remove('shim'), 1400); const h = c.closest('.hrow')?.querySelector('.hrhint'); if (h) { h.classList.remove('hrflash'); void h.offsetWidth; h.classList.add('hrflash'); setTimeout(() => h.classList.remove('hrflash'), 1800); } }
       if (c.classList.contains('party')) { const r = c.getBoundingClientRect(); setTimeout(() => { drift(['🎈', '🎈', '🎉', '🎂'], 14, 6, 'fxb'); confetti(innerWidth / 2, r.top + 60, 40); }, 400); } } }
   else c.classList.remove('inv'); }), { threshold: .25 });
 const watch = () => document.querySelectorAll('#feed .card:not([data-fxw])').forEach(c => { c.dataset.fxw = 1; io.observe(c); });
