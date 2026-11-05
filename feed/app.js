@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.66';
+const APP_VERSION = '1.9.67';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -73,7 +73,7 @@ const ls = { get(k, d) { try { const v = localStorage.getItem(LS_PREFIX + k); re
    Sport is left out entirely. Each interest belongs to a topic chip (new groups, or an existing tab it fits). Switch
    any of them off in ⚙️ → Manage interests: their sources and matching posts disappear from the feed. ---- */
 const INTERESTS = [ // name, topic, words that mark a post as being about it
-  ['Tarot meanings', 'tarot', 'tarot|cards? of the day|spreads?|readings?|major arcana|minor arcana|wands|cups|swords|pentacles'], ['Tarot decks & art', 'tarot', 'decks?|tarot art|oracle cards?'],
+  ['Tarot meanings', 'tarot', 'tarot|cards? of the day|spreads?|readings?|major arcana|minor arcana|wands|cups|swords|pentacles'], ['Tarot decks & art', 'tarot', 'decks?|tarot art|oracle cards?'], ['Crystals & gemstones', 'tarot', 'crystals?|gem ?stones?|quartz|amethyst|citrine|obsidian|agate|geodes?|minerals?|selenite|labradorite|moonstone|tourmaline|rose quartz'],
   ['Knitting', 'craft', 'knit(s|ting|ted)?|yarn|wool|sweater|jumper|beanie|cable'], ['Crochet', 'craft', 'crochet(ed|ing)?|amigurumi|granny squares?|plushies?|magic ring|safety eyes|yarn'], ['Sewing & quilting', 'craft', 'sew(ing|n)?|quilt(s|ed|ing)?|fabric|dressmaking'], ['Embroidery', 'craft', 'embroider(y|ed)?|cross[ -]?stitch|stitch(es|ing)?'], ['Paper crafts', 'craft', 'card ?making|cards?|scrapbook(ing)?|paper|cricut|pop[ -]?up'], ['Crafts', 'craft', 'crafts?|handmade|felting|macram[eé]|weav(e|ing)'],
   ['Video gaming', 'vgames', 'video ?games?|gaming|gamers?|trailer|consoles?'], ['Nintendo', 'vgames', 'nintendo|switch|mario|pok[eé]mon|kirby|pikmin|animal crossing'], ['PlayStation & Xbox', 'vgames', 'playstation|ps5|xbox'], ['PC games', 'vgames', '\\bpc\\b|steam'], ['Cosy games', 'vgames', 'cosy|cozy|wholesome|farming|stardew|island'],
   ['Board game news & nights', 'boardg', 'board ?games?|tabletop|card games?|dice|meeples?|lorcana|how to play|games? night'],
@@ -127,7 +127,7 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
 // Left out as money: Investing.
 const INT_BY_NAME = new Map(INTERESTS.map(x => [x.name, x]));
 let INT_OFF = ls.get('intOff', {});     // interest name -> 1 when he's switched it off
-if (PRIVATE_OK && !ls.get('tarotDefault', 0)) { INT_OFF['Tarot meanings'] = 1; INT_OFF['Tarot decks & art'] = 1; ls.set('intOff', INT_OFF); ls.set('tarotDefault', 1); } // 1.8.5 Tarot is off on Shane's phone until he turns it on
+if (PRIVATE_OK && !ls.get('tarotDefault', 0)) { INT_OFF['Tarot meanings'] = 1; INT_OFF['Tarot decks & art'] = 1; ls.set('intOff', INT_OFF); ls.set('tarotDefault', 1); } if (PRIVATE_OK && !ls.get('crysDefault', 0)) { INT_OFF['Crystals & gemstones'] = 1; ls.set('intOff', INT_OFF); ls.set('crysDefault', 1); } // 1.9.67 💎 crystals are Monique's: off on Shane's phone // 1.8.5 Tarot is off on Shane's phone until he turns it on
 let SRC_INT = {};                        // source id -> its interests (from the feed's source list)
 function noteSrcInts() { SRC_INT = {}; for (const s of (FEED && FEED.sources) || []) if (Array.isArray(s.int)) SRC_INT[s.id] = s.int; }
 function itemInts(i) { // the interests a post belongs to: its source's, then any it clearly mentions in its title

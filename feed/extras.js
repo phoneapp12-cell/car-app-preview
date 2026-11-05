@@ -509,7 +509,7 @@ async function adminExtras() {
   try {
     STG = STG || await fam('/stages');
     const [mem, dates, cars, S, sap, aib, cbk] = await Promise.all([fam('/members'), fam('/dates'), fam('/cars'), myAppData(), fam('/sappts').catch(() => null), fam('/aibot').catch(() => null), fam('/comeback').catch(() => null)]);
-    const people = mem.filter(m => m.role !== 'admin'), sugT = ['crochet', 'animals', 'parent', 'rainbow', 'social', 'tarot', 'craft', 'vgames', 'music', 'travel', 'food', 'fitness'], SUGL = { crochet: ['🧶', 'Crochet & amigurumi'], animals: ['🐴', 'Cute horses, cats & dogs'] };
+    const people = mem.filter(m => m.role !== 'admin'), sugT = ['crystals', 'crochet', 'animals', 'parent', 'rainbow', 'social', 'tarot', 'craft', 'vgames', 'music', 'travel', 'food', 'fitness'], SUGL = { crystals: ['💎', 'Crystals & gemstones'], crochet: ['🧶', 'Crochet & amigurumi'], animals: ['🐴', 'Cute horses, cats & dogs'] };
     const myCars = ((S && S.cars) || []).map(c => ({ plate: plateOf(c.plate), name: c.name })).filter(c => c.plate);
     for (const c of cars.cars) if (!myCars.some(x => x.plate === c.plate)) myCars.push({ plate: c.plate, name: '' });
     el.innerHTML = `<h3>👤 Age & life stage <small class="sst">only you see these</small></h3><p class="sst">Used only to suggest interests (they get a ✨ card and choose) and to nudge their feed a little. Never shown to anyone else.</p>
