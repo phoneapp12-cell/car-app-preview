@@ -37,14 +37,14 @@ function stChip(s) { // 🔥 N-day streak, next to the greeting
 function celebrate(s) { // milestones 3/7/14/30/50/100 – once each; and a note when the weekly freeze saved the streak
   if (s.award && !$('#celeb')) { // 1.9.30 🎉 one-time streak award (+2 days), shown once; the server remembers it was seen
     document.body.insertAdjacentHTML('beforeend', `<div id="celeb" class="celeb award" role="dialog" aria-label="Streak award"><div class="cin"><div class="cfx" aria-hidden="true">${'🎉✨🔥⭐🎊'.repeat(4).match(/./gu).map((e, k) => `<i style="--x:${(k * 37) % 100}%;--d:${(k % 5) * 0.15}s">${e}</i>`).join('')}</div>
-      <div class="cbig">🎉 +2</div><h2>Streak award!</h2><p>+2 days added to your 🔥 streak${s.cur ? ` – you’re on <b>${s.cur} days</b>` : ''}. Keep opening Info Book each day to keep it growing.</p><p class="sst">New badge: 🎉 Streak award</p><button class="btn pri" id="celebok">Yay!</button></div></div>`);
+      <div class="cbig">🎉 +2</div><h2>Streak award${myName() ? ', ' + esc(myName()) : ''}!</h2><p>+2 days added to your 🔥 streak${s.cur ? ` – you’re on <b>${s.cur} days</b>` : ''}. Keep opening Info Book each day to keep it growing.</p><p class="sst">New badge: 🎉 Streak award</p><button class="btn pri" id="celebok">Yay!</button></div></div>`);
     fam('/visit/award', { method: 'POST', body: '{}' }).catch(() => { }); return;
   }
   const last = ls.get('stCeleb', 0), fz = (s.frozen || []).slice(-1)[0];
-  if (fz && ls.get('stFrozeSeen', '') !== fz && s.cur >= 2) { ls.set('stFrozeSeen', fz); setTimeout(() => toast(`🧊 Your weekly streak freeze covered a missed day – still on ${s.cur} days!`), 2500); }
+  if (fz && ls.get('stFrozeSeen', '') !== fz && s.cur >= 2) { ls.set('stFrozeSeen', fz); setTimeout(() => toast(`🧊 ${myName() ? myName() + ', your' : 'Your'} weekly streak freeze covered a missed day – still on ${s.cur} days!`), 2500); }
   if (!s.milestone || s.milestone <= last) return; ls.set('stCeleb', s.milestone);
   const m = s.milestone; document.body.insertAdjacentHTML('beforeend', `<div id="celeb" class="celeb" role="dialog" aria-label="Streak milestone"><div class="cin"><div class="cfx" aria-hidden="true">${'🎉✨🔥⭐🎊'.repeat(4).match(/./gu).map((e, k) => `<i style="--x:${(k * 37) % 100}%;--d:${(k % 5) * .15}s">${e}</i>`).join('')}</div>
-    <div class="cbig">🔥 ${m}</div><h2>${m}-day streak!</h2><p>You’ve opened Info Book ${m} days in a row. New badge: <b>${MILE_NAME[m]}</b></p>${s.next ? `<p class="sst">Next milestone: ${s.next} days</p>` : ''}<button class="btn pri" id="celebok">Yay!</button></div></div>`);
+    <div class="cbig">🔥 ${m}</div><h2>${m}-day streak${myName() ? ', ' + esc(myName()) : ''}!</h2><p>You’ve opened Info Book ${m} days in a row. New badge: <b>${MILE_NAME[m]}</b></p>${s.next ? `<p class="sst">Next milestone: ${s.next} days</p>` : ''}<button class="btn pri" id="celebok">Yay!</button></div></div>`);
 }
 /* ---- 🏠 Millesha's renovation: same for everyone, live countdown to the finish date (jobs come from My App's reno list) ---- */
 function renoItem() {
@@ -229,7 +229,7 @@ function dailyCard(i) {
   const q = i.q, photo = q.type === 'photo', ans = q.answered || [], me = ans.some(a => a.me);
   return `<article class="card xc daily" data-id="${esc(q.key)}">${xHead(photo ? '📸' : '💭', photo ? 'Today’s photo challenge' : 'Today’s family question', NZ(Date.now(), { weekday: 'long', day: 'numeric', month: 'long' }), 'Daily')}
     <div class="bd"><h3 class="xq">${esc(q.text)}</h3>
-    ${dqPics(q)}${ans.length ? '' : '<p class="xwho">Nobody’s answered yet – be the first!</p>'}
+    ${dqPics(q)}${ans.length ? '' : `<p class="xwho">Nobody’s answered yet – be the first${myName() ? ', ' + esc(myName()) : ''}!</p>`}
     <div class="xbtns">${photo ? `<button class="btn pri" data-dqphoto="${esc(q.key)}">📷 ${me ? 'Post another' : 'Post your photo'}</button>` : ''}<button class="btn${photo ? '' : ' pri'}" data-cmt="${esc(q.key)}">💬 ${photo ? 'Or say something' : me ? 'See answers' : 'Answer'}<span class="cc"></span></button></div></div></article>`;
 }
 /* 1.9.63 📊 daily family poll: tap to vote (tap another to change), live tallies and who picked what */
@@ -276,7 +276,7 @@ function carCard(i) {
   const row = (lab, iso, extra) => { if (!iso) return ''; const n = dayN(iso) - t, cls = n < 0 ? 'over' : n <= 30 ? 'soon' : ''; return `<div class="crow ${cls}"><span>${lab}</span><b>${esc(new Date(iso + 'T00:00:00Z').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }))}</b><em>${n < 0 ? '⚠️ overdue ' + -n + 'd' : n === 0 ? 'today' : n <= 30 ? inDays(n) : inDays(n)}</em>${extra || ''}</div>`; };
   const pic = c.photo ? `<div class="media"><img src="${esc(c.photo)}" alt="${esc(c.plate)}"></div>` : `<div class="hero carh" style="--c1:${esc(c.hex || '#2563eb')};--c2:#0ea5e9"><span class="em">🚗</span><h3>${esc(c.plate)}</h3></div>`;
   const wofDoing = c.wofSt && c.wofSt.st === 'doing' ? `<div class="crow soon"><span>WOF recheck</span><b>${c.wofSt.recheck ? esc(new Date(c.wofSt.recheck + 'T00:00:00Z').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', timeZone: 'UTC' })) : 'booked'}</b><em>in progress</em></div>` : '';
-  return `<article class="card xc car" data-id="${esc(i.id)}">${xHead('🚗', c.plate + (c.model ? ' · ' + c.model : ''), 'Shared with you by Shane · updated ' + ago(i.at || c.updated) + ' ago', 'Your car')}
+  return `<article class="card xc car" data-id="${esc(i.id)}">${xHead('🚗', c.plate + (c.model ? ' · ' + c.model : ''), 'Shared with you by Shane · updated ' + ago(i.at || c.updated) + ' ago', mine(1) + ' car')}
     ${pic}<div class="bd">${wofDoing}${row('Rego due', c.rego)}${row('WOF due', c.wof)}${row('Service due', c.svc, c.svcKm ? `<small> or ${Number(c.svcKm).toLocaleString('en-NZ')} km</small>` : '')}
     ${!c.rego && !c.wof && !c.svc ? '<p class="xwho">No dates yet – Shane’s phone will fill these in.</p>' : ''}<p class="xwho">Only you (and Shane) can see this card.</p></div></article>`;
 }
@@ -376,7 +376,7 @@ function suggestion() {
   return want.length ? { id: 'sugg', x: 'sugg', want, ints: n.ints || [], topic: 'family' } : null;
 }
 function suggCard(i) {
-  return `<article class="card xc sugg" data-id="sugg">${xHead('✨', 'Suggested for you', 'Things you might like – tap to untick any', 'For you')}
+  return `<article class="card xc sugg" data-id="sugg">${xHead('✨', 'Suggested ' + forMe(), (myName() ? myName() + ', here are things' : 'Things') + ' you might like – tap to untick any', forMe(1))}
     <div class="bd"><div class="obg">${i.want.map(t => `<button class="obt on" data-sg="${t}" style="--c1:${TOPIC[t][3]};--c2:${TOPIC[t][4]}"><span>${TOPIC[t][2]}</span>${esc(TOPIC[t][1])}</button>`).join('')}</div>
     <div class="xbtns"><button class="btn pri" id="sgadd">Add these</button><button class="btn" id="sgno">No thanks</button></div></div></article>`;
 }
@@ -653,7 +653,7 @@ window.festive = function (order, nPins) {
   if (!FEED || order.length < 6) return order;
   if (!PROMO || PROMO_FOR !== FEED) { PROMO_FOR = FEED; PROMO = pickPromos(nPins, order.length); const now = Date.now(); for (const e of PROMO.list) PROMO.recent[e.id] = now; ls.set('promoSeen', PROMO.recent); }
   const ids = new Set(PROMO.list.map(e => e.id)), out = order.filter(i => !ids.has(i.id)), lo = Math.max(2, nPins);
-  if (PROMO.wk.length >= 2) out.splice(Math.min(lo + 3, out.length), 0, { id: 'wk-' + nzKey().slice(0, 6) + Math.floor(nzDayNum(Date.now()) / 7), x: 'wk', list: PROMO.wk, topic: 'events', t: 'This week in Whangārei for you' });
+  if (PROMO.wk.length >= 2) out.splice(Math.min(lo + 3, out.length), 0, { id: 'wk-' + nzKey().slice(0, 6) + Math.floor(nzDayNum(Date.now()) / 7), x: 'wk', list: PROMO.wk, topic: 'events', t: 'This week in Whangārei ' + forMe() });
   PROMO.list.forEach((e, k) => { const at = PROMO.slots[k]; if (at <= out.length) out.splice(at, 0, { ...e, id: e.id, x: 'promo', e }); });
   return out;
 };
@@ -664,13 +664,13 @@ function icsHref(m) {
 }
 function promoCard(i) {
   const e = i.e, bar = intBar(e, e.ev), m = INT_META[String(e.id)], away = evAway(e.ev);
-  return `<article class="card xc promo" data-id="${esc(e.id)}">${xHead('📍', 'Event near you', (e.sn || 'Eventfinda') + ' · picked for you', TOPIC[e.topic] ? TOPIC[e.topic][1] : 'Events')}
+  return `<article class="card xc promo" data-id="${esc(e.id)}">${xHead('📍', 'Event near you', (e.sn || 'Eventfinda') + ' · picked ' + forMe(), TOPIC[e.topic] ? TOPIC[e.topic][1] : 'Events')}
     <a class="pimg" href="${esc(e.url)}" target="_blank" rel="noopener"><img src="${esc(e.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="away${/Today|Tomorrow/.test(away) ? ' soon' : ''}">${esc(away)}</span></a>
     <div class="bd"><h3>${esc(e.t)}</h3><p class="pwhen">🗓️ ${esc(evWhen(e.ev))}</p>${m.where ? `<p class="pwhere">📍 ${esc(m.where)}</p>` : ''}
     <div class="xbtns"><a class="btn pri" href="${esc(e.url)}" target="_blank" rel="noopener">Details & tickets ↗</a><a class="btn" href="${icsHref(m)}" download="${esc(String(e.t).replace(/[^\w ]+/g, '').slice(0, 40) || 'event')}.ics">📅 Add to calendar</a></div>${bar}</div></article>`;
 }
 function wkCard(i) {
-  return `<article class="card xc wkr" data-id="${esc(i.id)}">${xHead('🗓️', 'This week in Whangārei for you', 'Events near you, matched to your picks', 'Events')}
+  return `<article class="card xc wkr" data-id="${esc(i.id)}">${xHead('🗓️', 'This week in Whangārei ' + forMe(), 'Events near you, matched to ' + mine() + ' picks', 'Events')}
     <div class="bd"><ul class="wkl">${i.list.map(e => { const b = intBar(e, e.ev); return `<li><a href="${esc(e.url)}" target="_blank" rel="noopener"><img src="${esc(e.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span><b>${esc(e.t)}</b><em class="wkw">${esc(evAway(e.ev))}</em><em>🗓️ ${esc(evWhen(e.ev))}</em>${evVenue(e.s) ? `<em>📍 ${esc(evVenue(e.s))}</em>` : ''}</span></a>${b}</li>`; }).join('')}</ul></div></article>`;
 }
 function intListCard() {
@@ -788,7 +788,7 @@ function saCard(i) {
   const tm = a.time ? (h => (h % 12 || 12) + (a.time.slice(3) === '00' ? '' : ':' + a.time.slice(3)) + (h < 12 ? 'am' : 'pm'))(+a.time.slice(0, 2)) : '';
   const big = n === 0 ? 'Today' + (tm ? ' at ' + tm : '') : n === 1 ? 'Tomorrow' + (tm ? ' at ' + tm : '') : 'In ' + n + ' days';
   const maps = a.place ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.place)}` : '';
-  return `<article class="card xc sappt${n <= 1 ? ' soon' : ''}" data-id="${esc(i.id)}">${xHead(em, 'Your appointment', n <= 1 ? 'Coming up ' + (n ? 'tomorrow' : 'today') : 'Countdown', n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : 'Appointment')}
+  return `<article class="card xc sappt${n <= 1 ? ' soon' : ''}" data-id="${esc(i.id)}">${xHead(em, mine(1) + ' appointment', n <= 1 ? 'Coming up ' + (n ? 'tomorrow' : 'today') : 'Countdown', n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : 'Appointment')}
     <div class="hero sah" style="--c1:${n <= 1 ? '#db2777' : '#7c3aed'};--c2:${n <= 1 ? '#f97316' : '#2563eb'}"><span class="em">${em}</span><div class="sabig">${esc(big)}</div><h3>${esc(a.t)}</h3></div>
     <div class="bd"><div class="crow${n <= 1 ? ' soon' : ''}"><span>When</span><b>${esc(when)}${tm ? ' · ' + tm : ''}</b><em>${inDays(n)}</em></div>${a.place ? `<div class="crow"><span>Where</span><b>${esc(a.place)}</b>${maps ? `<em><a href="${maps}" target="_blank" rel="noopener">Map ↗</a></em>` : ''}</div>` : ''}
     <p class="xwho">🔒 Only you (and Shane) can see this card. From your appointments in My App.</p></div></article>`;
@@ -949,7 +949,7 @@ function wtWhen(w, now = Date.now()) { const dd = nzDayNum(w.ev) - nzDayNum(now)
 function watchCard(i) {
   const w = i.w, dd = nzDayNum(w.ev) - nzDayNum(Date.now()), bar = intBar({ id: w.id, t: w.t + (w.label && !/^\d{4}$/.test(w.label) ? ' – ' + w.label : ''), ev: w.ev, url: w.url, img: w.poster || w.img, where: w.plat, topic: 'watch' }, w.ev);
   const badge = w.up && dd > 0 ? (dd === 1 ? 'Tomorrow' : `In ${dd} days`) : dd === 0 ? 'Out today' : 'Just added';
-  return `<article class="card xc promo watch" data-id="${esc(w.id)}">${xHead('📺', 'Coming up to watch', w.plat + ' · picked for you', w.gl || (w.movie ? 'Movie' : 'Series'))}
+  return `<article class="card xc promo watch" data-id="${esc(w.id)}">${xHead('📺', 'Coming up to watch', w.plat + ' · picked ' + forMe(), w.gl || (w.movie ? 'Movie' : 'Series'))}
     <a class="pimg" href="${esc(w.url)}" target="_blank" rel="noopener"><img src="${esc(w.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="plat p-${esc(w.pk)}">${esc(w.plat)}</span><span class="away${dd <= 1 ? ' soon' : ''}">${esc(badge)}</span></a>
     <div class="bd"><h3>${esc(w.t)}${w.label ? ` <small>${esc(w.label)}</small>` : ''}</h3><p class="pwhen">🗓️ ${esc(wtWhen(w))}</p>${w.s ? `<p class="wtb">${esc(w.s)}</p>` : ''}<p class="sst">${esc([w.movie ? 'Movie' : 'Series', w.gl, w.cert].filter(Boolean).join(' · '))}</p>
     <div class="xbtns"><a class="btn pri" href="${esc(w.url)}" target="_blank" rel="noopener">▶️ Watch on ${esc(w.plat)} ↗</a></div>${bar}${FAM_ON ? '' : ''}</div></article>`;

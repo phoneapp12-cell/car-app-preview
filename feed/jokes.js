@@ -44,7 +44,7 @@ const JK_E = ['😂', '🤣', '😆', '😹', '🙃', '😜', '🤭', '😝'];
 function jokesToday() { const d = seenDayN(), n = JOKES.length; return [0, 1].map(k => { const j = (d * 2 + k) * 13 % n; return { id: 'joke-' + j, j, q: JOKES[j][0], a: JOKES[j][1], cheeky: !!JOKES[j][2], e: JK_E[(d + k) % JK_E.length] }; }); }
 function jokeCard(i) {
   const k = i.k;
-  return `<article class="card xc joke${k.cheeky ? ' cheeky' : ''}" data-id="${esc(k.id)}" style="--band-e:'${k.e}'">${xHead(k.e, k.cheeky ? 'A cheeky one' : 'Joke of the day', k.cheeky ? 'Grown-up giggle, nothing rude' : 'Guaranteed groan or your money back', 'Joke')}
+  return `<article class="card xc joke${k.cheeky ? ' cheeky' : ''}" data-id="${esc(k.id)}" style="--band-e:'${k.e}'">${xHead(k.e, k.cheeky ? 'A cheeky one ' + forMe() : 'Joke of the day ' + forMe(), k.cheeky ? 'Grown-up giggle, nothing rude' : 'Guaranteed groan or your money back', 'Joke')}
     <div class="bd"><h3 class="xq jkq">${esc(k.q)}</h3><button class="jka" data-joke aria-expanded="false"><span class="jkh">👀 Tap for the punchline</span><span class="jkp" hidden>${esc(k.a)}</span></button></div></article>`;
 }
 document.addEventListener('click', e => { const b = e.target && e.target.closest && e.target.closest('[data-joke]'); if (!b) return; const p = b.querySelector('.jkp'), h = b.querySelector('.jkh'), on = p.hidden; p.hidden = !on; h.hidden = on; b.setAttribute('aria-expanded', on); b.classList.toggle('on', on); if (on && navigator.vibrate) navigator.vibrate(12); });

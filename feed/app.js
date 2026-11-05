@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.73';
+const APP_VERSION = '1.9.74';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -45,7 +45,8 @@ const TOPICS = [
   ['photos', 'My Photos', '🖼️', '#be185d', '#f59e0b'],
   ['liked', 'Liked', '👍', '#16a34a', '#0d9488']
 ];
-const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t])); // 1.4.0: About-you chips are added to this as they're found
+const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t]));
+Object.defineProperty(TOPIC.life, 1, { get: () => forMe(1), enumerable: true }); // 1.9.74 📌 For Shane / For Sarah … // 1.4.0: About-you chips are added to this as they're found
 const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
@@ -552,7 +553,7 @@ function lifeCard(x) {
     : img ? `<a class="media lm" href="${esc(go)}"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(img)}" alt="${esc(x.t)}" onerror="var m=this.closest('.media');m.classList.add('need');m.dataset.pic=this.dataset.id;this.remove();fillPics()" data-id="${esc(x.id)}">${badge}</a>`
       : `<a class="media lm need" data-pic="${esc(x.id)}" href="${esc(go)}">${ph}${badge}</a>`;
   return `<article class="card life${hot ? ' hot' : ''}${['cinema', 'prime', 'book', 'tv'].includes(x.cat) ? ' tallpic' : ''}" data-id="${esc(x.id)}" style="--c1:${C[2]};--c2:${C[3]}">
-    <div class="hd"><div class="av">${em}</div><div class="who"><b>${esc(x.sn)}</b><small>${esc(x.sn === C[1] ? (x.tag || (x.mine ? '' : 'From My App')) : x.tag && x.tag !== C[1] ? C[1] + ' · ' + x.tag : C[1])}</small></div><span class="tp">For You</span></div>
+    <div class="hd"><div class="av">${em}</div><div class="who"><b>${esc(x.sn)}</b><small>${esc(x.sn === C[1] ? (x.tag || (x.mine ? '' : 'From My App')) : x.tag && x.tag !== C[1] ? C[1] + ' · ' + x.tag : C[1])}</small></div><span class="tp">${esc(forMe(1))}</span></div>
     ${media}
     <div class="bd"><h3>${esc(x.t)}</h3>${x.sub ? `<p class="lsub">${esc(x.sub)}</p>` : ''}${x.s ? `<p data-more>${esc(x.s)}</p>` : ''}${x.credit ? `<small class="cred">📷 ${esc(x.credit)}</small>` : ''}</div>
     <div class="ft">
@@ -1163,7 +1164,7 @@ function carouselize(order) {
     const inFeed = new Set(order.map(i => i.id));
     const vl = ((FEED && FEED.vlogs) || []).filter(v => v.vid && v.img && !inFeed.has(v.id) && !SEEN_BASE.has(v.id) && !(VOTES[v.id] && VOTES[v.id].v < 0) && !unsafe(v) && !SPORT.test(v.t))
       .map(v => ({ v, sc: typeof vlScore === 'function' ? vlScore(v) : 1 })).sort((a, b) => b.sc - a.sc).slice(0, 6).map(x => ({ id: x.v.id, x: 'vlog', h: x.v, topic: 'vlogs', t: x.v.t }));
-    if (vl.length >= 3) rows.push({ id: 'row-vlog', x: 'row', k: 'vlog', title: '🎥 Vlogs for you', items: vl, rank: (ls.get('vlTags', []).length ? 8 : 60) });
+    if (vl.length >= 3) rows.push({ id: 'row-vlog', x: 'row', k: 'vlog', title: '🎥 Vlogs ' + forMe(), items: vl, rank: (ls.get('vlTags', []).length ? 8 : 60) });
   }
   if (!rows.length) return order;
   rows.sort((a, b) => a.rank - b.rank);

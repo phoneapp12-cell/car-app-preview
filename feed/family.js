@@ -9,6 +9,10 @@
    Loaded before app.js; the functions here are used once app.js has set up. */
 const FAM_API = 'https://shane-my-feed-data.phoneapp12.workers.dev/api';
 let MEMBER = (() => { try { return JSON.parse(localStorage.getItem('mf.member') || 'null'); } catch (e) { return null; } })();
+/* 1.9.74 personal words: "For Shane" instead of "For You" (first name; falls back to you/your) */
+function myName() { const n = MEMBER && !MEMBER.pending && MEMBER.name ? String(MEMBER.name).trim().split(/\s+/)[0] : ''; return n; }
+function forMe(cap) { const n = myName(); return (cap ? 'For ' : 'for ') + (n || 'you'); }
+function mine(cap) { const n = myName(); return n ? n + '’s' : (cap ? 'Your' : 'your'); }
 (() => { // ?invite=… : keep the token, take it out of the address bar, check it below (famInit)
   const q = new URLSearchParams(location.search), inv = q.get('invite');
   if (inv && /^[\w-]{30,80}$/.test(inv)) {
@@ -93,7 +97,7 @@ function obGo() {
   const p = [...document.querySelectorAll('.obt.on')].map(b => b.dataset.pick);
   if (!p.length) { toast('Pick at least one'); return; }
   PICK = p; ls.set('defaultsGiven', DEFAULT_ON.slice()); ls.set('addsGot', [...new Set([...ls.get('addsGot', []), ...ls.get('addsPre', [])])]); ls.set('pick', PICK); famPrefsChanged();
-  $('#sheet').classList.remove('on', 'ob'); tab = 'all'; ls.set('tab', tab); draw(); toast('Your feed is ready ✨');
+  $('#sheet').classList.remove('on', 'ob'); tab = 'all'; ls.set('tab', tab); draw(); toast((myName() ? myName() + ', your' : 'Your') + ' feed is ready ✨');
 }
 
 /* ---- reposts ---- */
