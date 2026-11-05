@@ -294,6 +294,24 @@ html.candy .hrhd h2{color:#c2448a}
 @media (max-width:440px){.top .mood,.top .upd{display:none}}
 #feed .hscroll .card .media.tall:not(.vid):not(.lowres) img{aspect-ratio:16/9!important;max-height:none!important}
 .pollos{display:flex;flex-direction:column;gap:10px;margin:12px 0 6px}.pollo{position:relative;overflow:hidden;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;border:2px solid color-mix(in srgb,var(--acc,#a78bfa) 45%,transparent);background:color-mix(in srgb,var(--acc,#a78bfa) 8%,var(--card,#fff));color:inherit;font:inherit;font-size:1.08em;font-weight:600;cursor:pointer;transition:transform .12s}.pollo:active{transform:scale(.98)}.pollo::before{content:'';position:absolute;inset:0 auto 0 0;width:var(--pc,0%);background:linear-gradient(90deg,#fbcfe8aa,#c4b5fdaa,#a5f3fcaa);transition:width .6s ease;z-index:0}.pollo>*{position:relative;z-index:1}.pollo .pl{flex:1}.pollo .pn{font-weight:800}.pollo .pw{flex-basis:100%;font-weight:400;opacity:.75;font-size:.85em}.pollo.on{border-color:#ec4899;box-shadow:0 0 0 3px #f9a8d455}.pollo.on .pl::after{content:' ✓'}
+/* 1.9.64 consistency & colour pass: every built-in card gets a bright, colour-coded picture band (same size, same place),
+   one primary button style everywhere, brighter poll bars. Layered on top of the themes (auto weather included). */
+#feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{font-size:64px;background:radial-gradient(circle at 18% 25%,rgba(255,255,255,.55) 0 8%,transparent 9%),radial-gradient(circle at 82% 70%,rgba(255,255,255,.4) 0 6%,transparent 7%),var(--band-g,linear-gradient(135deg,#ff9ccc,#ffd36b 40%,#7ee8c4 70%,#9fb8ff));text-shadow:0 6px 16px rgba(0,0,0,.18);animation:bandpop .6s ease-out both}
+@keyframes bandpop{from{background-position:0 0;opacity:.6}to{opacity:1}}
+#feed > .card.poll{--band-e:'📊';--band-g:linear-gradient(135deg,#ff7eb6,#b18cff 60%,#6cc7ff)}
+#feed > .card.daily{--band-g:linear-gradient(135deg,#ffa24c,#ff7eb6)}
+#feed > .card.sugg{--band-g:linear-gradient(135deg,#ffd84d,#ffa24c)}
+#feed > .card.reno{--band-g:linear-gradient(135deg,#5fe0b6,#6cc7ff)}
+#feed > .card.wkr{--band-g:linear-gradient(135deg,#6cc7ff,#b18cff)}
+#feed > .card.fest.ny{--band-g:linear-gradient(135deg,#7c5cff,#ff7eb6 55%,#ffd84d)}
+#feed > .card.fest.xmas{--band-g:linear-gradient(135deg,#ff6b6b,#5fe0b6)}
+#feed > .card.nzsum{--band-g:linear-gradient(135deg,#6cc7ff,#a5f3fc)}
+#feed > .card.streaks{--band-e:'🔥';--band-g:linear-gradient(135deg,#ffa24c,#ff5e7e)}
+@media (prefers-color-scheme:dark){#feed > .card.xc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{filter:saturate(.9) brightness(.78)}}
+.pbtn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 18px;border-radius:14px;background:linear-gradient(135deg,#ff7eb6,#ffa24c);box-shadow:0 4px 14px rgba(255,126,182,.35),inset 0 -3px 0 rgba(0,0,0,.12);text-shadow:0 1px 1px rgba(0,0,0,.15)}
+.xbtns .btn,.pbtn{min-height:44px;font-size:1rem}
+.pollo::before{background:linear-gradient(90deg,#ff9ccc,#c4a8ff,#8fdcff)}.pollo.on{border-color:#ff5ea8;box-shadow:0 0 0 3px #ff9ccc66}
+.pollo:not(.shown):hover{border-color:#ff7eb6}
 </style>
 </head>
 <body>
@@ -310,9 +328,9 @@ html.candy .hrhd h2{color:#c2448a}
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.63"></script>
-<script src="app.js?v=1.9.63"></script>
-<script src="extras.js?v=1.9.63"></script>
+<script src="family.js?v=1.9.64"></script>
+<script src="app.js?v=1.9.64"></script>
+<script src="extras.js?v=1.9.64"></script>
 <script>
 /* 1.9.51 self-heal: if the feed is still skeletons after 9s (a crash or a stale cached build), say so and offer a fresh reload
    that clears this app's caches and service worker. Also: when a new version takes over, reload once to use it. */
