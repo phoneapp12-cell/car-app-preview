@@ -360,8 +360,8 @@ html.candy .hrhd h2{color:#c2448a}
 .stchip.glow{box-shadow:0 0 calc(4px + 12px*var(--glow,0)) color-mix(in srgb,#ff6a00 calc(35% + 50%*var(--glow,0)),transparent);animation:stglow 2.4s ease-in-out infinite}
 @keyframes stglow{50%{box-shadow:0 0 calc(8px + 18px*var(--glow,0)) color-mix(in srgb,#ff3d6e calc(45% + 45%*var(--glow,0)),transparent)}}
 @media (prefers-reduced-motion:reduce){#fxl{display:none}#feed .card.shim::after{display:none}.stchip.glow{animation:none}.jka.jpop{animation:none}#feed .card.inv .pimg img,#feed .card.inv .media > img{transform:none}}
-.hrhint.hrflash{animation:hrflash 1.6s ease-out both;border-radius:999px;padding:1px 8px;margin:-1px -8px}
-@keyframes hrflash{0%{background:transparent;color:var(--acc)}20%,65%{background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff;transform:scale(1.12);box-shadow:0 0 12px rgba(255,126,182,.6)}100%{background:transparent;color:var(--acc);transform:none}}
+.hrhint.hrflash{display:inline-block;transform-origin:center;animation:hrflash 2.6s ease-in-out both;border-radius:999px;padding:1px 8px;margin:-1px -8px;position:relative;z-index:2}
+@keyframes hrflash{0%{background:transparent;color:var(--acc);transform:scale(1)}15%{background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff;transform:scale(1.7);box-shadow:0 0 18px rgba(255,126,182,.75)}30%{transform:scale(1);background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff}45%{transform:scale(1.5);box-shadow:0 0 14px rgba(255,126,182,.6);background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff}60%{transform:scale(1);background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff}75%{transform:scale(1.3);background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff}100%{background:transparent;color:var(--acc);transform:scale(1)}}
 @media (prefers-reduced-motion:reduce){.hrhint.hrflash{animation:none}}
 /* 1.9.77 🎨 coloured backdrop between the cards (soft lavender, pink and peach to match the candy colours) so white cards pop */
 :root{--bg:#f1e9ff}
@@ -375,17 +375,6 @@ html{scroll-snap-type:y mandatory;scroll-padding-top:calc(var(--hdr,120px) + 10p
 html.nosnap{scroll-snap-type:none}
 #feed > .card.disc{--band-e:'🧭';--band-g:linear-gradient(135deg,#6cc7ff,#b18cff 50%,#ff7eb6)}
 .obt small{font-size:.68em;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff;border-radius:999px;padding:1px 6px;margin-left:4px}
-
-/* 1.9.77 📍 explain pills: soft pastel chips under the blurb for places/people/orgs people might question */
-.exrow{display:flex;flex-wrap:wrap;gap:8px;padding:4px 14px 10px}
-.expill{display:inline-flex;align-items:center;gap:5px;border:0;border-radius:999px;padding:7px 12px;font:inherit;font-size:.88rem;font-weight:700;cursor:pointer;color:#6b21a8;background:linear-gradient(135deg,#f3e8ff,#fce7f3 55%,#ffedd5);box-shadow:inset 0 0 0 1.5px #e9d5ff,0 2px 6px rgba(168,85,247,.12);transition:transform .12s}
-.expill:active{transform:scale(.96)}
-.exbody{display:flex;gap:12px;align-items:flex-start;margin:8px 0 14px}
-.eximg{width:96px;height:72px;object-fit:cover;border-radius:12px;flex:none;background:var(--chip);box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.exa{margin:0;font-size:1.02rem;line-height:1.4;color:inherit}
-.exmore{margin:8px 0 0;font-weight:700}
-.exmore a{color:var(--acc);text-decoration:none}
-@media (prefers-color-scheme:dark){.expill{color:#f5d0fe;background:linear-gradient(135deg,#2a1a4d,#3a1530 55%,#3a2414);box-shadow:inset 0 0 0 1.5px #5b21b6,0 2px 6px rgba(0,0,0,.35)}.exa{color:var(--ink)}}
 </style>
 </head>
 <body>
@@ -407,7 +396,6 @@ html.nosnap{scroll-snap-type:none}
 <script src="extras.js?v=1.9.77"></script>
 <script src="jokes.js?v=1.9.77"></script>
 <script src="learn.js?v=1.9.77"></script>
-<script src="explain.js?v=1.9.77"></script>
 <script src="effects.js?v=1.9.77"></script>
 <script>
 /* 1.9.51 self-heal: if the feed is still skeletons after 9s (a crash or a stale cached build), say so and offer a fresh reload

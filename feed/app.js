@@ -815,7 +815,7 @@ function card(i) {
     <div class="hd"><div class="av">${i.pin ? '📌' : T[2]}</div><div class="who"><b>${esc(i.pin ? 'Pinned for everyone' : i.sn || '')}</b>${i.pin ? '<small>Whangārei · this week</small>' : `<small>${esc(ago(i.at))}${i.party ? ' · ' + esc(i.party) : i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small>`}</div><span class="tp">${i.pin ? '🎆 Special' : esc(T[1])}</span></div>
     ${media}
     <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${i.pin ? pinBox(i) : when}${popLine(i)}</div>
-    ${typeof exLine === 'function' ? exLine(i) : ''}${rxLine(i)}<div class="ft">
+    ${rxLine(i)}<div class="ft">
       <button class="vote up${(FAM_ON && rxOf(i) ? (rxOf(i).ups || []).some(isMe) : v > 0) ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>${upNames(i)}
       <button class="vote dn${v < 0 ? ' on' : ''}" data-vote="-1" aria-pressed="${v < 0}" aria-label="Thumbs down">${THUMB.dn}</button>
       ${famBar(i)}${i.url && !i.pin ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">${i._share && i.kind === 'link' ? 'Open on ' + esc(i.sn || 'the site') + ' ↗' : 'Open ↗'}</a>` : ''}
