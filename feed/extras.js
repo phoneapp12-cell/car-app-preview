@@ -15,10 +15,11 @@ const ICON = '🎂';
 async function xLoad(force) {
   if (!FAM_ON || (!force && Date.now() - X.got < 60e3)) return; X.got = Date.now();
   const g = (p, d) => fam(p).catch(() => d);
-  const [daily, triv, mems, dates, cars, prof, push, streaks, reno, wx, sap] = await Promise.all([g('/daily', null), g('/trivia', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/reno', { reno: null }), g('/weather', { list: [] }), g('/sappts', { list: [] })]);
+  const [daily, poll, mems, dates, cars, prof, push, streaks, reno, wx, sap] = await Promise.all([g('/daily', null), g('/poll', null), g('/memories', []), g('/dates', { list: [] }), g('/cars', { cars: [] }), g('/profile', null), g('/push/prefs', null), g('/streaks', { list: [] }), g('/reno', { reno: null }), g('/weather', { list: [] }), g('/sappts', { list: [] })]);
   const pw = await g('/power', { list: [] }); X.pwr = (pw && pw.list) || []; X.pwrAt = (pw && pw.checked) || 0;
-  Object.assign(X, { daily, triv, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], myBday: dates && 'mine' in dates ? dates.mine : undefined, bdImp: (dates && dates.imp) || 0, cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: (reno && reno.reno) || null, wx: (wx && wx.list) || [], sappt: (sap && sap.list) || [], saCfg: (sap && sap.cfg) || null });
+  Object.assign(X, { daily, poll, mems: Array.isArray(mems) ? mems : [], dates: (dates && dates.list) || [], myBday: dates && 'mine' in dates ? dates.mine : undefined, bdImp: (dates && dates.imp) || 0, cars: (cars && cars.cars) || [], prof, push, streaks: (streaks && streaks.list) || [], reno: (reno && reno.reno) || null, wx: (wx && wx.list) || [], sappt: (sap && sap.list) || [], saCfg: (sap && sap.cfg) || null });
   if (prof && prof.streak) stChip(prof.streak);
+  badgeCheck(prof);
   if (IS_ADMIN) { carSync(); apptSync(); bdImport().then(bdToMyApp); }
   setTimeout(bdAsk, 3500); // 1.9.35 🎂 ask once for a birthday if we don't have one
   if (tab === 'all' && scrollY < 300) draw(); else if (tab === 'family') draw();
@@ -160,8 +161,8 @@ window.pins = function () {
   if (FAM_ON) {
     for (const c of X.cars) if (c.car && c.mid === MEMBER.id) out.push({ id: 'car:' + c.plate, x: 'car', c: c.car, at: c.at, topic: 'family' });
     for (const d of X.dates) if (d.days <= (d.kind === 'bday' ? 7 : 14) && !(VOTES['date' + d.id] && VOTES['date' + d.id].v < 0)) out.push({ id: 'date' + d.id + '-' + new Date().getFullYear(), x: 'date', d, topic: 'family', t: (d.kind === 'bday' ? '🎂 ' : '🎉 ') + d.title, sn: 'Family dates' });
-    if (X.daily) out.push({ id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: (X.daily.type === 'photo' ? '📸 ' : '💭 ') + X.daily.text, sn: 'Daily question' });
-    if (X.triv && X.triv.qs) out.push({ id: 'trivia' + X.triv.day, x: 'trivia', q: X.triv, topic: 'family' });
+    if (X.poll && X.poll.q) out.push({ id: X.poll.key, x: 'poll', p: X.poll, topic: 'family', t: '📊 ' + X.poll.q, sn: 'Family poll' }); // 1.9.63 polls replace trivia
+    if (X.daily && X.daily.type === 'photo') out.push({ id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: '📸 ' + X.daily.text, sn: 'Photo challenge' }); // 1.9.63 no more daily question
     const sg = suggestion(); if (sg) out.push(sg);
   }
   const rn = renoItem(); return out.concat(basePins(), wn.length ? [{ id: 'wx-nz', x: 'wxnz', list: wn, topic: 'family', t: 'Severe weather elsewhere in NZ' }] : [], rn ? [rn] : []); // 🏠 reno sits just under the fireworks card
@@ -171,7 +172,7 @@ window.drawFamily = function () {
   baseDrawFamily();
   if (!FAM_ON) return;
   const m = $('#feed'), first = m.querySelector('.load');
-  const extra = [X.daily && { id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: X.daily.text, sn: 'Daily question' }, X.streaks.length && { id: 'streaks', x: 'streaks', topic: 'family' }, ...memItems()].filter(Boolean); order = extra.concat(order);
+  const extra = [X.poll && X.poll.q && { id: X.poll.key, x: 'poll', p: X.poll, topic: 'family', t: '📊 ' + X.poll.q, sn: 'Family poll' }, X.daily && X.daily.type === 'photo' && { id: X.daily.key, x: 'daily', q: X.daily, topic: 'family', t: X.daily.text, sn: 'Daily question' }, X.streaks.length && { id: 'streaks', x: 'streaks', topic: 'family' }, ...memItems()].filter(Boolean); order = extra.concat(order);
   if (extra.length && first) { first.insertAdjacentHTML('afterend', extra.map(i => window.card(i)).join('')); fillFamPhotos(); famCounts(extra.filter(i => !i.x || i.x === 'daily')); }
 };
 function memItems() { return X.mems.slice(0, 3).map(r => { const s = { id: r.id, card: r.card, name: r.name, snap: r.snap, up: r.up, at: r.at, priv: true, likes: [], ups: [] }; const it = shareItem(s); it._mem = r.when; delete it._share; it.id = r.card; return it; }); }
@@ -183,6 +184,7 @@ window.card = function (i) {
   if (i && i.x === 'car') return carCard(i);
   if (i && i.x === 'date') return dateCard(i);
   if (i && i.x === 'daily') return dailyCard(i);
+  if (i && i.x === 'poll') return pollCard(i.p);
   if (i && i.x === 'streaks') return streakCard();
   if (i && i.x === 'reno') return renoCard(i);
   if (i && i.x === 'fest') return festCard(i);
@@ -229,6 +231,30 @@ function dailyCard(i) {
     <div class="bd"><h3 class="xq">${esc(q.text)}</h3>
     ${dqPics(q)}${ans.length ? '' : '<p class="xwho">Nobody’s answered yet – be the first!</p>'}
     <div class="xbtns">${photo ? `<button class="btn pri" data-dqphoto="${esc(q.key)}">📷 ${me ? 'Post another' : 'Post your photo'}</button>` : ''}<button class="btn${photo ? '' : ' pri'}" data-cmt="${esc(q.key)}">💬 ${photo ? 'Or say something' : me ? 'See answers' : 'Answer'}<span class="cc"></span></button></div></div></article>`;
+}
+/* 1.9.63 📊 daily family poll: tap to vote (tap another to change), live tallies and who picked what */
+function pollCard(p) {
+  const voted = p.mine !== null && p.mine !== undefined, tot = p.total || 0;
+  const opt = (o, k) => { const n = (p.counts || [])[k] || 0, pc = tot ? Math.round(n * 100 / tot) : 0, w = (p.who || [])[k] || [];
+    return `<button class="pollo${voted && p.mine === k ? ' on' : ''}${voted ? ' shown' : ''}" data-pollv="${k}" data-pk="${esc(p.key)}" style="--pc:${voted ? pc : 0}%"><span class="pl">${esc(o)}</span>${voted ? `<span class="pn">${pc}%</span>${w.length ? `<small class="pw">${esc(w.join(', '))}</small>` : ''}` : ''}</button>`; };
+  return `<article class="card xc poll" data-id="${esc(p.key)}">${xHead('📊', 'Today’s family poll', NZ(Date.now(), { weekday: 'long', day: 'numeric', month: 'long' }), 'Poll')}
+    <div class="bd"><h3 class="xq">${esc(p.q)}</h3><div class="pollos">${p.opts.map(opt).join('')}</div>
+    <p class="xwho">${voted ? `${tot} vote${tot === 1 ? '' : 's'} so far · tap another to change yours` : tot ? `${tot} in the family ${tot === 1 ? 'has' : 'have'} voted – your turn!` : 'Be the first to vote!'} · new poll tomorrow</p></div></article>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target && e.target.closest && e.target.closest('[data-pollv]'); if (!b || b.disabled) return;
+  const card = b.closest('.poll'); card.querySelectorAll('[data-pollv]').forEach(x => x.disabled = true);
+  try { const r = await fam('/poll', { method: 'POST', body: JSON.stringify({ opt: +b.dataset.pollv }) }); X.poll = r; document.querySelectorAll(`.poll[data-id="${CSS.escape(r.key)}"]`).forEach(c => c.outerHTML = pollCard(r)); if (navigator.vibrate) navigator.vibrate(15);
+    fam('/profile').then(badgeCheck).catch(() => { }); }
+  catch (er) { card.querySelectorAll('[data-pollv]').forEach(x => x.disabled = false); toast('Couldn’t save your vote – try again'); }
+});
+/* 1.9.63 🏅 a pop-up the moment you earn a new badge (the first look just remembers what you already have) */
+function badgeCheck(prof) {
+  if (!prof || !Array.isArray(prof.badges)) return; const got = prof.badges.filter(b => b.got), seen = ls.get('badgesSeen', null);
+  ls.set('badgesSeen', got.map(b => b.n)); if (!seen) return; const nw = got.filter(b => !seen.includes(b.n)); if (!nw.length || $('#celeb')) return;
+  const b = nw[0], left = prof.badges.filter(x => !x.got).length;
+  setTimeout(() => { if ($('#celeb')) return; document.body.insertAdjacentHTML('beforeend', `<div id="celeb" class="celeb" role="dialog" aria-label="New badge"><div class="cin"><div class="cfx" aria-hidden="true">${'🏅✨⭐🎊🎉'.repeat(4).match(/./gu).map((e, k) => `<i style="--x:${(k * 37) % 100}%;--d:${(k % 5) * .15}s">${e}</i>`).join('')}</div>
+    <div class="cbig">${b.e}</div><h2>New badge!</h2><p><b>${esc(b.n)}</b> – ${esc(b.d)}${nw.length > 1 ? ` (and ${nw.length - 1} more)` : ''}</p><p class="sst">${got.length} badge${got.length === 1 ? '' : 's'} earned${left ? ` · ${left} still to unlock` : ' · you’ve got them all!'}</p><button class="btn pri" id="celebok">Yay!</button></div></div>`); }, 1200);
 }
 function triviaCard(i) {
   const t = i.q, m = t.mine;
@@ -315,7 +341,7 @@ function pushHint() {
 }
 function pushBox() {
   const P = (X.push && X.push.prefs) || {}, on = X.push && X.push.on && Notification.permission === 'granted', hint = pushHint();
-  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '💭 Daily question & trivia (after 8am)'], ['event', '⭐ Reminders for events & shows I’m interested in'], ['comeback', '👋 Come-back reminders (if I haven’t been in for a couple of days)'], ...((X.sappt || []).length || IS_ADMIN ? [['appt', '📅 My appointments (the day before and ~2 hours before)']] : []), ['dates', '🎂 Birthdays, events & car dates'], ['alerts', '⚠️ Weather & outage alerts (orange/red warnings, power cuts)'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)'], ['weather', '🔴 Red weather warnings (any time, even at night)']];
+  const T = [['reply', '↩️ Replies to me'], ['mine', '💬 Comments & likes on my posts'], ['photo', '📷 New family photos'], ['daily', '📊 Daily poll & photo challenge (after 8am)'], ['event', '⭐ Reminders for events & shows I’m interested in'], ['comeback', '👋 Come-back reminders (if I haven’t been in for a couple of days)'], ...((X.sappt || []).length || IS_ADMIN ? [['appt', '📅 My appointments (the day before and ~2 hours before)']] : []), ['dates', '🎂 Birthdays, events & car dates'], ['alerts', '⚠️ Weather & outage alerts (orange/red warnings, power cuts)'], ['streak', '🔥 Streak reminder (about 7pm, only if it’s about to break)'], ['weather', '🔴 Red weather warnings (any time, even at night)']];
   return `<h3>🔔 Notifications</h3>${hint ? `<p class="hint">${hint}</p>` : on ? `<p class="sst">On for this phone. At most one every 30 minutes (replies to you come straight away). Quiet from ${P.qFrom}:00 to ${P.qTo}:00 – anything then waits until morning.</p>
     ${T.map(([k, l]) => `<button class="ich${P[k] ? ' on' : ''}" data-np="${k}">${P[k] ? '✓ ' : ''}${l}</button>`).join('')}
     <div class="bdf"><label>Quiet from <select id="qf">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qFrom ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label><label>to <select id="qt">${Array.from({ length: 24 }, (_, h) => `<option value="${h}"${h === P.qTo ? ' selected' : ''}>${h}:00</option>`).join('')}</select></label></div>
