@@ -671,7 +671,7 @@ function promoCard(i) {
 }
 function wkCard(i) {
   return `<article class="card xc wkr" data-id="${esc(i.id)}">${xHead('🗓️', 'This week in Whangārei for you', 'Events near you, matched to your picks', 'Events')}
-    <div class="bd"><ul class="wkl">${i.list.map(e => { const b = intBar(e, e.ev); return `<li><a href="${esc(e.url)}" target="_blank" rel="noopener"><img src="${esc(e.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span><b>${esc(e.t)}</b><em>${esc(evWhen(e.ev))} · ${esc(evAway(e.ev))}</em>${evVenue(e.s) ? `<em>📍 ${esc(evVenue(e.s))}</em>` : ''}</span></a>${b}</li>`; }).join('')}</ul></div></article>`;
+    <div class="bd"><ul class="wkl">${i.list.map(e => { const b = intBar(e, e.ev); return `<li><a href="${esc(e.url)}" target="_blank" rel="noopener"><img src="${esc(e.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span><b>${esc(e.t)}</b><em class="wkw">${esc(evAway(e.ev))}</em><em>🗓️ ${esc(evWhen(e.ev))}</em>${evVenue(e.s) ? `<em>📍 ${esc(evVenue(e.s))}</em>` : ''}</span></a>${b}</li>`; }).join('')}</ul></div></article>`;
 }
 function intListCard() {
   const L = [...INT.mine.values()];
