@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.74';
+const APP_VERSION = '1.9.75';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -628,6 +628,7 @@ function interests() {
     }
     if (out.length >= 16) break;
   }
+  for (const d of ls.get('discAdd', [])) { const key = String(d.term || '').toLowerCase(); if (key && !seen.has(key)) { seen.add(key); out.unshift({ term: d.term, k: 'misc', topic: 'you:' + SLUG(d.term), disc: 1 }); } } // 1.9.75 🧭 subjects added from New ideas (every member)
   return out;
 }
 function setupYou() {
@@ -639,7 +640,7 @@ function setupYou() {
 }
 function youItems() {
   const out = [];
-  for (const x of YOU) { const c = YOU_CACHE[x.k + '|' + x.term.toLowerCase()]; if (c && c.items) c.items.forEach(i => out.push({ ...i, topic: x.topic, tag: 'You said “' + x.term + '”' })); }
+  for (const x of YOU) { const c = YOU_CACHE[x.k + '|' + x.term.toLowerCase()]; if (c && c.items) c.items.forEach(i => out.push({ ...i, topic: x.topic, tag: x.disc ? '🧭 New idea: ' + x.term : 'You said “' + x.term + '”' })); }
   return out;
 }
 const strip = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
