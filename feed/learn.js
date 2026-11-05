@@ -54,7 +54,7 @@ function picks() {
   Object.entries(ts).sort((a, b) => b[1] - a[1]).slice(0, 2).filter(([, v]) => v >= 4).forEach(([t]) => out.push({ k: 't:' + t, kind: 'topic', t, label: TOPIC[t][1], em: TOPIC[t][2] }));
   const ns = NEW.map(([s, rel]) => [s, rel.reduce((a, r) => a + Math.max(0, (L.t[r] || 0)), 0)]).filter(([s, v]) => v >= 4 && !no.has('n:' + s) && !have.has(s.toLowerCase()));
   ns.sort((a, b) => b[1] - a[1] + (Math.random() - .5) * 2).slice(0, 2).forEach(([s]) => out.push({ k: 'n:' + s, kind: 'new', label: s, em: '🆕' }));
-  const ws = Object.entries(L.w).filter(([w, v]) => v >= 6 && w.length > 4 && !no.has('n:' + w) && !have.has(w) && !known(w) && !BAD.test(w) && !SPORT.test(w) && !LIFE_MONEY.test(w)).sort((a, b) => b[1] - a[1]);
+  const ws = Object.entries(L.w).filter(([w, v]) => v >= 6 && w.length > 4 && !no.has('n:' + w) && !have.has(w) && !known(w) && !NEW.some(s => s[0].toLowerCase().includes(w)) && !BAD.test(w) && !SPORT.test(w) && !LIFE_MONEY.test(w)).sort((a, b) => b[1] - a[1]);
   if (ws[0] && out.length < 5) { const s = ws[0][0][0].toUpperCase() + ws[0][0].slice(1); out.push({ k: 'n:' + ws[0][0], kind: 'new', label: s, em: '💡', why: 'keeps coming up in what you like' }); }
   return out.slice(0, 5);
 }
