@@ -60,6 +60,7 @@ function pillsHtml(ex) {
 
 window.exLine = function (i) {
   if (!i || i.x || i.topic === 'life' || i.pin || i._share) return '';
+  if (i.kind === 'event' || i.kind === 'tip' || i.kind === 'tv') return ''; // news/articles only
   if (i.ex && i.ex.length) return pillsHtml(i.ex);
   return `<div class="exrow" data-expend="${esc(i.id)}" hidden></div>`;
 };
@@ -95,7 +96,7 @@ async function fillPending() {
       el.dataset.exdone = 1;
       const id = el.dataset.expend;
       const it = (typeof order !== 'undefined' && order.find(x => x.id === id)) || (FEED.items && FEED.items.find(x => x.id === id));
-      if (!it || (it.ex && it.ex.length) || it.exc) continue;
+      if (!it || (it.ex && it.ex.length) || it.exc || it.kind === "event" || it.kind === "tip" || it.kind === "tv") continue;
       if (!/^(nz|election|science|tech|travel|social|events|food|fitness|parent|culture|learn|diy|outdoors|nature)$/.test(it.topic || '')) continue;
       const list = [];
       for (const c of cands(it.t, it.s)) {
