@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.61';
+const APP_VERSION = '1.9.62';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -280,8 +280,8 @@ setInterval(greet, 60e3); document.addEventListener('visibilitychange', () => { 
 function moodLabel() { greet(); const el = $('#mood'); if (el) el.textContent = MOOD_OFF ? '' : MOODS[moodBand()][0]; }
 
 /* 1.9.60 keep it local: NZ & Northland posts (and TVNZ / Three programmes) weigh more, overseas less */
-function isNZ(i) { return !!i && !!(i.nz || /^(nz|ef|epg|tvm-nz|rnz|stuff|1news|nzgeo|doc|nzh|na-|wdc)/i.test(i.src || '') || /\.nz(\/|$|:)/i.test(((i.url || '').match(/^https?:\/\/[^/]+/) || [''])[0]) || /new zealand|aotearoa|kiwi|whang[aā]rei|northland|auckland|wellington|christchurch|tvnz|threenow|\bnz\b/i.test((i.t || '') + ' ' + (i.s || ''))); }
-function nzW(i) { return isNZ(i) ? (i.src === 'nz-tvg2' ? 2.2 : 1.6) : (i.topic === 'sitcoms' ? 0.55 : 0.8); }
+function isNZc(i) { return !!i && !!(i.nz || /^(nz|ef|epg|tvm-nz|rnz|stuff|1news|nzgeo|doc|nzh|na-|wdc)/i.test(i.src || '') || /\.nz(\/|$|:)/i.test(((i.url || '').match(/^https?:\/\/[^/]+/) || [''])[0]) || /new zealand|aotearoa|kiwi|whang[aā]rei|northland|auckland|wellington|christchurch|tvnz|threenow|\bnz\b/i.test((i.t || '') + ' ' + (i.s || ''))); }
+function nzW(i) { return isNZc(i) ? (i.src === 'nz-tvg2' ? 2.2 : 1.6) : (i.topic === 'sitcoms' ? 0.55 : 0.8); }
 function rank(items) {
   const W = weights(), now = Date.now();
   const scored = items.map(i => {
@@ -1154,7 +1154,7 @@ function carouselize(order) {
   for (const [k, title, test] of ROWS) {
     const its = []; let pos = 0;
     order.forEach((i, n) => { if (n < start || used.has(i.id) || its.length >= (k === 'tv' ? 30 : 8) || !keep(i) || !test(i)) return; its.push(i); pos += n; });
-    if (k === 'tv') { const tvS = i => (i.src === 'nz-tvg2' ? 4 : 0) + (isNZ(i) ? 2 : 0) + (i.com || i.nzm ? 1 : 0); its.sort((a, b) => tvS(b) - tvS(a)); its.length = Math.min(its.length, 8); pos = its.length * 3; } // 1.9.60 TVNZ & Three first
+    if (k === 'tv') { const tvS = i => (i.src === 'nz-tvg2' ? 4 : 0) + (isNZc(i) ? 2 : 0) + (i.com || i.nzm ? 1 : 0); its.sort((a, b) => tvS(b) - tvS(a)); its.length = Math.min(its.length, 8); pos = its.length * 3; } // 1.9.60 TVNZ & Three first
     if (its.length >= 3) { its.forEach(i => used.add(i.id)); rows.push({ id: 'row-' + k, x: 'row', k, title, items: its, rank: (pos / its.length) * (k === 'tv' && topicOn('sitcoms') ? 0.25 : 1) }); } // sitcom fans: 📺 first
   }
   // vlogs picked for them (Sarah: cruises & family vlogs) that aren't already in the feed
