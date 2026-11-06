@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.104';
+const APP_VERSION = '1.9.105';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -718,7 +718,11 @@ const SPK = {
   off: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="m22 9-6 6M16 9l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   on: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
 };
-let SOUND = sessionStorage.getItem('mf.sound') === '1';
+let SOUND = sessionStorage.getItem('mf.sound') !== '0'; // 1.9.105 sound on for every clip unless they mute it
+// 1.9.105 browsers only allow sound after the first touch, so on that first touch turn the playing clip's sound on
+(() => { const go = e => { if (e.target && e.target.closest && e.target.closest('[data-snd]')) return; ['pointerdown', 'keydown', 'touchend'].forEach(t => removeEventListener(t, go, true));
+  setTimeout(() => { if (SOUND && curVid && curVid.isConnected) { const r = PLAYERS.get(curVid); try { if (r && r.ready && r.p.isMuted()) playVid(curVid, true); } catch (x) { } } }, 60); };
+  ['pointerdown', 'keydown', 'touchend'].forEach(t => addEventListener(t, go, true)); })();
 // 1.8.5 sharp video pictures: YouTube's 1280px picture when the video has one (small grey stand-in → fall back to 480px)
 function ytThumb(id, img) { return !img || /i\.ytimg\.com\/vi\/[^/]+\/(hq|mq|sd)?default\.jpg/.test(img) ? 'https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg' : img; }
 function vidMedia(id, img, title, extra = '', tall = false) {
@@ -995,7 +999,7 @@ function settings() {
   $('#sheetin').innerHTML = `<h2>Text size</h2><div class="tsz">${[['n', 'Normal'], ['l', 'Large'], ['xl', 'Extra large']].map(([k, l]) => `<button class="ich${ts === k ? ' on' : ''}" data-ts="${k}" aria-pressed="${ts === k}">${ts === k ? '✓ ' : ''}${l}</button>`).join('')}</div><p class="tsp">Saved on this phone for you. Your phone’s own text size setting still applies on top.</p>` + famSettings() + `<h2>Info Book</h2>
     <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself through the day from ${(FEED && FEED.sources || []).length || 'about 180'} public sources. Sport is always left out.</p>
     <p>👍 / 👎 teach it which <b>sources</b> and <b>topics</b> you like. New sources get a short trial (“Trying”) so you can judge them; a source you give about four more 👎 than 👍 is dropped (you can bring it back below).</p>
-    <p>▶️ Videos play by themselves (muted) when they’re on screen and pause when you scroll past. Tap the speaker on a video for sound; it stays on until you close Info Book.</p>
+    <p>▶️ Videos play by themselves with sound when they’re on screen (after your first tap, as phones require) and pause when you scroll past. Tap the speaker to mute.</p>
     ${PRIVATE_OK ? `<a class="btn pri" href="${MY_APP}">← Back to My App</a>
     <p>📌 <b>For You</b> cards come from My App on this phone and are mixed through All at random: cars, birthdays, calendar, to-dos, garden, pets, meals and recipes (your own recipe photos too), weather, UV and power (kWh), roads, deliveries, plus every board and hub. Your own things never leave this phone, and bills and money are always left out.</p>
     <p>🖼️ <b>My Photos</b>: ${PHOTO_INFO.all ? `${PHOTO_INFO.used} of the ${PHOTO_INFO.all} photos on My App’s Photos page${PHOTO_INFO.approved ? ' (the ones you tagged approved, feed, keep or favourite)' : ''}` : 'photos from My App’s Photos page'}. Receipts, warranties, documents, screenshots and anything tagged <b>nofeed</b> or <b>private</b> are left out. Tag photos <b>approved</b> or <b>feed</b> in My App to show only those. Read on this phone only.</p>

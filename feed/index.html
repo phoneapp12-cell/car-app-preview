@@ -506,6 +506,14 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 /* 1.9.104 What's new + Crystal of the week */
 .wnl{list-style:none;margin:4px 0 10px;padding:0;display:grid;gap:8px}.wnl li{display:flex;gap:10px;align-items:flex-start;line-height:1.35}.wnl li>span:first-child{font-size:1.2em;flex:0 0 auto}
 .card.wnew{background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 14%,var(--card)),color-mix(in srgb,var(--acc2) 14%,var(--card)))}
+
+/* 1.9.105 bigger pictures and videos */
+#feed > .card .media:not(.vid):not(.lowres) img,#feed > .card .pimg img,#feed > .card .bdpic img{aspect-ratio:4/3!important}
+#feed > .card .media.tall:not(.vid):not(.lowres) img{aspect-ratio:4/5!important;max-height:82vh!important}
+#feed > .card .media.vid.tall{width:min(100%,calc(84vh*9/16))}
+#feed > .card .fph.n1 img{aspect-ratio:1/1}
+.stmedia.stv iframe,.stmedia.stv video{max-height:88vh!important;width:100%!important}
+.stmedia img{object-fit:contain}
 </style>
 </head>
 <body>
@@ -525,16 +533,16 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.104"></script>
-<script src="app.js?v=1.9.104"></script>
-<script src="extras.js?v=1.9.104"></script>
-<script src="jokes.js?v=1.9.104"></script>
-<script src="learn.js?v=1.9.104"></script>
-<script src="common-en.js?v=1.9.104"></script>
-<script src="explain.js?v=1.9.104"></script>
-<script src="effects.js?v=1.9.104"></script>
-<script src="stories.js?v=1.9.104"></script>
-<script src="weekly.js?v=1.9.104"></script>
+<script src="family.js?v=1.9.105"></script>
+<script src="app.js?v=1.9.105"></script>
+<script src="extras.js?v=1.9.105"></script>
+<script src="jokes.js?v=1.9.105"></script>
+<script src="learn.js?v=1.9.105"></script>
+<script src="common-en.js?v=1.9.105"></script>
+<script src="explain.js?v=1.9.105"></script>
+<script src="effects.js?v=1.9.105"></script>
+<script src="stories.js?v=1.9.105"></script>
+<script src="weekly.js?v=1.9.105"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

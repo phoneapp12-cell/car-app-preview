@@ -125,7 +125,7 @@ function paint() {
   const bars = TILES.map((_, k) => `<i class="${k < ST_I ? 'done' : k === ST_I ? 'on' : ''}"></i>`).join('');
   const vo = t.item && !t.item.vid && typeof vidOf === 'function' ? vidOf(t.item) : null;
   const media = t.item && t.item.vid
-    ? `<div class="stmedia stv"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" onload="stCdHook(this)" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
+    ? `<div class="stmedia stv"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" onload="stCdHook(this)" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
     : vo && (vo.k === 'reddit' || vo.k === 'mp4')
     ? `<div class="stmedia stv"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_720.mp4')}" data-rv="${esc(vo.k === 'reddit' ? vo.u : '')}" poster="${esc(t.img)}" autoplay muted playsinline ontimeupdate="stCdSet(this.duration-this.currentTime)" onerror="stVidErr(this)" onplay="stAud(this)" onended="stCdSet(0)"></video></div>`
     : `<div class="stmedia"><img src="${esc(t.img)}" alt=""></div>`;
@@ -137,6 +137,8 @@ function paint() {
     <div class="stmeta"><b>${esc(t.title || t.label)}</b>${t.text ? `<p>${esc(String(t.text).slice(0, 180))}</p>` : ''}
       ${t.url ? `<button type="button" class="btn pri" data-stopen>Open ↗</button>` : ''}</div>`;
   v.classList.add('on');
+  // 1.9.105 sound on: MP4 clips play with their own sound (Reddit clips get a separate sound track); if the phone blocks it, play silently
+  const sv = v.querySelector('.stmedia.stv video'); if (sv && !sv.dataset.rv) { sv.muted = false; sv.play().catch(() => { sv.muted = true; sv.play().catch(() => { }); }); }
 }
 
 function arm() {
