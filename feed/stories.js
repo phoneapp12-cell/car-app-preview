@@ -106,9 +106,9 @@ function paint() {
   const bars = TILES.map((_, k) => `<i class="${k < ST_I ? 'done' : k === ST_I ? 'on' : ''}"></i>`).join('');
   const vo = t.item && !t.item.vid && typeof vidOf === 'function' ? vidOf(t.item) : null;
   const media = t.item && t.item.vid
-    ? `<div class="stmedia stv"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=1&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
+    ? `<div class="stmedia stv"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" onload="stCdHook(this)" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
     : vo && (vo.k === 'reddit' || vo.k === 'mp4')
-    ? `<div class="stmedia stv"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_480.mp4')}" poster="${esc(t.img)}" autoplay muted loop playsinline controls></video></div>`
+    ? `<div class="stmedia stv"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_480.mp4')}" poster="${esc(t.img)}" autoplay muted loop playsinline controls ontimeupdate="stCdSet(this.duration-this.currentTime)"></video></div>`
     : `<div class="stmedia"><img src="${esc(t.img)}" alt=""></div>`;
   v.innerHTML = `<div class="stbars">${bars}</div>
     <button type="button" class="stx" data-stclose aria-label="Close">✕</button>
@@ -171,3 +171,14 @@ document.addEventListener('load', e => { const im = e.target; if (!(im instanceo
   if ((im.naturalWidth === 161 && im.naturalHeight === 81) || /imgur\.com\/removed/i.test(im.currentSrc || '')) {
     const c = im.closest('#feed .card'), tl = im.closest('.stile, .story, [data-story]');
     if (c) c.remove(); else if (tl) tl.remove(); else { im.dataset.fb = 1; im.src = 'img/card-fallback.svg'; } } }, true);
+
+/* 1.9.92 ⏱ countdown on short videos in the story viewer */
+const stFmt = x => { x = Math.max(0, Math.ceil(x || 0)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); };
+window.stCdSet = function (left) { const m = document.querySelector('.stmedia.stv'); if (!m || !isFinite(left)) return;
+  let b = m.querySelector('.stcd'); if (!b) { b = document.createElement('div'); b.className = 'stcd'; m.appendChild(b); }
+  b.textContent = '⏱ ' + stFmt(left); b.classList.toggle('low', left <= 5); };
+window.stCdHook = function (f) { ST_DUR = 0; const ping = () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch (e) { } };
+  ping(); let n = 0; const t = setInterval(() => { if (!f.isConnected || ++n > 10) clearInterval(t); else ping(); }, 500); };
+let ST_DUR = 0;
+addEventListener('message', e => { if (!/youtube(-nocookie)?\.com$/.test(new URL(e.origin || 'http://x').hostname)) return; let d; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (x) { return; }
+  const i = d && d.info; if (!i) return; if (i.duration) ST_DUR = i.duration; if (i.currentTime != null && ST_DUR) stCdSet(ST_DUR - i.currentTime); });
