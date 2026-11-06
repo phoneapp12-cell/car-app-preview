@@ -217,4 +217,7 @@ window.stAud = function (v) { const id = v.dataset.rv; if (!id) return; if (ST_A
 
 /* 1.9.106 Reddit's "image deleted" stand-in is a tiny 130×60 picture: drop any tile or card showing it */
 document.addEventListener('load', e => { const i = e.target; if (!(i instanceof HTMLImageElement) || !/redd\.it|imgur/.test(i.currentSrc || i.src)) return;
-  if (i.naturalWidth <= 140 && i.naturalHeight <= 70) { const t = i.closest('.stile') || i.closest('#feed .card'); if (t) t.remove(); } }, true);
+  if (i.naturalWidth <= 140 && i.naturalHeight <= 70) {
+    const b = i.closest('.stile'), it = b && TILES[+b.dataset.st] && TILES[+b.dataset.st].item;
+    if (it && it.vk === 'reddit' && it.vu) { const v = document.createElement('video'); v.className = i.className; v.muted = true; v.playsInline = true; v.preload = 'metadata'; v.src = 'https://v.redd.it/' + it.vu + '/CMAF_480.mp4#t=1'; v.style.objectFit = 'cover'; v.onerror = () => b.remove(); i.replaceWith(v); return; } // the clip still works: show its own frame
+    const t = b || i.closest('#feed .card'); if (t) t.remove(); } }, true);
