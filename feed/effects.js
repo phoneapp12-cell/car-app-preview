@@ -114,13 +114,8 @@ async function weatherFx() {
 setTimeout(() => { if (off() || document.hidden) return; if (!seasonal(season())) weatherFx(); }, 1800);
 /* 📐 keep the snap line just under the sticky header (its height changes with text size and chips) */
 const top = document.querySelector('header.top');
-const setH = () => {
-  const host = document.getElementById('stories-host');
-  const h = (top ? top.offsetHeight : 0) + (host && host.offsetHeight ? host.offsetHeight : 0);
-  if (h) document.documentElement.style.setProperty('--hdr', h + 'px');
-};
+const setH = () => { if (top) document.documentElement.style.setProperty('--hdr', top.offsetHeight + 'px'); };
 setH(); if (top && 'ResizeObserver' in window) new ResizeObserver(setH).observe(top);
-const sh = document.getElementById('stories-host'); if (sh && 'ResizeObserver' in window) new ResizeObserver(setH).observe(sh);
 /* no snapping while a sheet/menu is open or when jumping to the top */
 new MutationObserver(() => document.documentElement.classList.toggle('nosnap', document.body.classList.contains('noscroll') || !!document.querySelector('.sheet.on,.drawer.on,.celeb'))).observe(document.body, { childList: true, attributes: true, attributeFilter: ['class'] });
 })();

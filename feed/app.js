@@ -860,12 +860,7 @@ function draw() {
   // 1.9.82 Stories under header (outside #feed so snap does not skip them)
   const sh = document.getElementById('stories-host');
   if (sh) sh.innerHTML = (tab === 'all' && window.ibStories && typeof ibStories.html === 'function') ? ibStories.html() : '';
-  try {
-    const top = document.querySelector('header.top');
-    const host = document.getElementById('stories-host');
-    const h = (top ? top.offsetHeight : 0) + (tab === 'all' && host ? host.offsetHeight : 0);
-    if (h) document.documentElement.style.setProperty('--hdr', h + 'px');
-  } catch (e) { }
+  try { const top = document.querySelector('header.top'); if (top) document.documentElement.style.setProperty('--hdr', top.offsetHeight + 'px'); } catch (e) { }
   // 1.9.82 FAB: post photo/link when family is on
   let fab = document.getElementById('fabpost');
   if (!fab) { fab = document.createElement('button'); fab.id = 'fabpost'; fab.className = 'fabpost'; fab.type = 'button'; fab.setAttribute('aria-label', 'Post'); fab.textContent = '+'; document.body.append(fab); }
