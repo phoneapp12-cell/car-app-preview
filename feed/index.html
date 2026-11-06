@@ -389,7 +389,18 @@ html.force-light{--bg:#f1e9ff}html.force-light body::before{background:radial-gr
 html{scroll-snap-type:y mandatory;scroll-padding-top:calc(var(--hdr,120px) + 10px)}
 #feed > .card,#feed > .hrow,#feed > section{scroll-snap-align:start;scroll-snap-stop:normal}
 html.nosnap{scroll-snap-type:none}
-#feed > .card.disc{--band-e:'🧭';--band-g:linear-gradient(135deg,#6cc7ff,#b18cff 50%,#ff7eb6)}
+
+/* 1.9.82 New ideas (.disc) compact on ~412px: wrap pills, clamp Discover tag, side-by-side buttons, short band */
+#feed > .card.disc{--band-e:'🧭';--band-g:linear-gradient(135deg,#6cc7ff,#b18cff 50%,#ff7eb6);overflow:hidden}
+#feed > .card.disc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{aspect-ratio:16/4.2;font-size:40px;flex:0 0 auto}
+#feed > .card.disc .hd .tp{max-width:38%;-webkit-line-clamp:2}
+#feed > .card.disc .bd{padding:8px 14px 10px;flex:1 1 auto;min-height:0;overflow:auto}
+#feed > .card.disc .obg.discpills{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 8px;grid-template-columns:unset}
+#feed > .card.disc .obt{flex:1 1 calc(50% - 8px);min-width:0;max-width:100%;padding:7px 9px;font-size:.82rem;gap:6px;border-radius:12px;box-sizing:border-box}
+#feed > .card.disc .obt span{font-size:1.05rem;flex:none}
+#feed > .card.disc .obt small{flex:none;margin-left:auto}
+#feed > .card.disc .xbtns.discbtns{display:flex;flex-wrap:nowrap;gap:8px;margin:6px 0 0;padding-left:0;padding-right:0}
+#feed > .card.disc .xbtns.discbtns .btn{flex:1 1 0;min-width:0;min-height:40px;width:auto;font-size:.92rem;padding:8px 10px}
 .obt small{font-size:.68em;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff;border-radius:999px;padding:1px 6px;margin-left:4px}
 
 /* 1.9.79 📍 explain pills: soft pastel chips under the blurb for places/people/orgs people might question */
