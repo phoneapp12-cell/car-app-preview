@@ -54,7 +54,7 @@ function buildTiles() {
   try {
     if (typeof jokesToday === 'function') {
       const j = jokesToday()[0];
-      if (j) push({ id: 'today-joke-' + j.id, img: 'img/joke.svg', label: 'Joke of the day', em: j.e || '😂', kind: 'joke', title: 'Joke of the day', text: j.q, url: null, _joke: j });
+      if (j) push({ id: 'today-joke-' + j.id, img: 'img/joke.svg', label: 'Joke of the day', em: j.e || '😂', kind: 'joke', title: 'Joke of the day', text: j.q + '  😂 ' + j.a, url: null, _joke: j });
     }
   } catch (e) { }
 
@@ -180,4 +180,13 @@ document.addEventListener('click', e => {
 });
 
 window.ibStories = { html, open: openViewer, build: buildTiles, close: closeViewer };
+})();
+
+/* 1.9.86 open at the top so the stories row is always the first thing you see (late redraws used to re-snap the page down to a card) */
+(function () {
+  try { history.scrollRestoration = 'manual'; } catch (e) { }
+  const de = document.documentElement; let user = false, n = 0; de.classList.add('nosnap');
+  const mark = () => { user = true; }; ['touchstart', 'wheel', 'keydown', 'mousedown'].forEach(ev => addEventListener(ev, mark, { passive: true, once: true }));
+  const tick = setInterval(() => { if (!user && scrollY > 0) scrollTo(0, 0); if (user || ++n > 20) { clearInterval(tick); de.classList.remove('nosnap'); } }, 200);
+  scrollTo(0, 0);
 })();

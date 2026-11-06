@@ -58,7 +58,7 @@ function jokesToday() { const d = seenDayN(), n = JOKES.length; return [0, 1].ma
 function jokeCard(i) {
   const k = i.k;
   return `<article class="card xc joke${k.cheeky ? ' cheeky' : ''}" data-id="${esc(k.id)}" style="--band-e:'${k.e}'">${xHead(k.e, k.cheeky ? 'A cheeky one ' + forMe() : 'Joke of the day ' + forMe(), k.cheeky ? 'Grown-up giggle, nothing rude' : 'Guaranteed groan or your money back', 'Joke')}
-    <div class="bd"><h3 class="xq jkq">${esc(k.q)}</h3><button class="jka" data-joke aria-expanded="false"><span class="jkh">👀 Tap for the punchline</span><span class="jkp" hidden>${esc(k.a)}</span></button></div></article>`;
+    <div class="bd"><h3 class="xq jkq">${esc(k.q)}</h3><p class="jka jkshow"><span class="jkp">😂 ${esc(k.a)}</span></p></div></article>`;
 }
 document.addEventListener('click', e => { const b = e.target && e.target.closest && e.target.closest('[data-joke]'); if (!b) return; const p = b.querySelector('.jkp'), h = b.querySelector('.jkh'), on = p.hidden; p.hidden = !on; h.hidden = on; b.setAttribute('aria-expanded', on); b.classList.toggle('on', on); if (on && navigator.vibrate) navigator.vibrate(12); });
 const jkCard = window.card; window.card = function (i) { return i && i.x === 'joke' ? jokeCard(i) : jkCard(i); };
