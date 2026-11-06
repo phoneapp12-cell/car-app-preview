@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.18';
+const APP_VERSION = '2.29.19';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9518,23 +9518,17 @@ function homeShop() {
   return homeSec('Shopping list', '<a href="#shopping">See all</a>') + `<div class="list" id="homeshop">${open.slice(0, 5).map(shopRow).join('')}</div>` +
     (open.length > 5 ? `<div class="homemore"><a href="#shopping">${plural(open.length - 5, 'more item')}</a></div>` : '');
 }
-/* 2.29.17: Scan a screenshot / Messenger photo onto the shopping list (Tesseract on this phone, same as recipe scan). */
+/* 2.29.19: Scan a screenshot / Messenger photo onto the shopping list (Tesseract on this phone),
+   then match each line against Woolworths NZ offers via /prices so gibberish OCR is dropped. */
 let shopScanBusy = false, shopScanItems = [];
 function shopScanForm() {
   shopScanBusy = false; shopScanItems = [];
-  openSheet('Scan to shopping list', shopScanInner(), async () => {
-    if (shopScanBusy) return 'Still reading the photo. Hang on a moment.';
-    const picked = [...document.querySelectorAll('#shopscanlist input[data-i]:checked')].map(el => shopScanItems[+el.dataset.i]).filter(Boolean);
-    if (!picked.length) return shopScanItems.length ? 'Tick at least one item to add.' : 'Choose a screenshot or photo first.';
-    const n = addToShop(picked, '');
-    await save();
-    return () => { render(); toast(n ? (n === 1 ? 'Added to the shopping list.' : `Added ${n} items.`) : 'Those were already on the list.'); };
-  }, 'Add to list');
+  openSheet('Scan to shopping list', shopScanInner(), shopScanSave, 'Add to list');
   shopScanButtons();
 }
 function shopScanInner() {
-  return `<p class="muted" style="margin:-4px 0 10px">Sarah sends shopping pics on Messenger? Share the photo into My App, or pick it here. Text is read on your phone — nothing is uploaded.</p>
-    <div class="scantips">A clear shot of the product name or a written list works best. Prices and store chrome are skipped when we can.</div>
+  return `<p class="muted" style="margin:-4px 0 10px">Share Sarah’s Messenger pic into My App, or pick it here. Text is read on your phone, then matched to what’s on offer at Woolworths.</p>
+    <div class="scantips">A clear product name or written list works best. Only lines that match a real product stay ticked; leftovers you can still add if you want.</div>
     <input type="file" accept="image/*" capture="environment" id="shopscancam" hidden onchange="shopScanFile(this)">
     <input type="file" accept="image/*" id="shopscanpick" hidden onchange="shopScanFile(this)">
     <div class="btns" id="shopscanbtns"></div>
@@ -9551,30 +9545,127 @@ function shopScanStatus(msg, pct) {
   const box = $('#shopscanstat'); if (!box) return;
   box.hidden = !msg; $('#shopscanmsg').textContent = msg || ''; $('#shopscanbar').style.width = Math.round((pct || 0) * 100) + '%';
 }
+function shopScanLabel(it) {
+  if (it.matched && it.product) {
+    const p = it.product;
+    const bits = [p.special ? (p.club ? 'Club special' : 'Special') : '', p.price != null ? wwMoney(p.price) : '', p.size || ''].filter(Boolean).join(' · ');
+    return { title: p.name, sub: bits || 'Matched at Woolworths' };
+  }
+  return { title: it.name, sub: it.matched === false ? 'No Woolworths match — check before adding' : '' };
+}
 function shopScanRenderList() {
   const box = $('#shopscanlist'); if (!box) return;
   if (!shopScanItems.length) { box.innerHTML = ''; return; }
   const open = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
-  box.innerHTML = `<p class="muted" style="margin:8px 0 6px">Tick what to add (${shopScanItems.length} found).</p>` +
-    shopScanItems.map((name, i) => {
-      const already = open.has(mNorm(name));
-      return `<label class="srow"><input type="checkbox" data-i="${i}" ${already ? '' : 'checked'}><div class="tx"><div class="t">${esc(name)}</div>${already ? '<div class="s">Already on the list</div>' : ''}</div></label>`;
-    }).join('');
+  const matched = shopScanItems.filter(x => x.matched);
+  const other = shopScanItems.filter(x => !x.matched);
+  const row = (it, i) => {
+    const lab = shopScanLabel(it), already = open.has(mNorm(it.name));
+    const on = it.matched && !already;
+    return `<label class="srow"><input type="checkbox" data-i="${i}" ${on ? 'checked' : ''}><div class="tx"><div class="t">${esc(lab.title)}</div><div class="s">${[lab.sub, already ? 'Already on the list' : ''].filter(Boolean).join(' · ')}</div></div></label>`;
+  };
+  let html = '';
+  if (matched.length) html += `<p class="muted" style="margin:8px 0 6px">On offer at Woolworths (${matched.length}).</p>` + matched.map(it => row(it, shopScanItems.indexOf(it))).join('');
+  if (other.length) html += `<p class="muted" style="margin:12px 0 6px">Couldn’t match these — tick only if they’re right (${other.length}).</p>` + other.map(it => row(it, shopScanItems.indexOf(it))).join('');
+  box.innerHTML = html || `<p class="muted" style="margin:8px 0">Nothing usable yet.</p>`;
 }
-function parseShopScan(text) {
-  const SKIP = /^(ingredients?|method|directions?|instructions?|you will need|page\s*\d+|total|subtotal|gst|tax|change|eftpos|visa|mastercard|receipt|thank you|www\.|http|woolworths|countdown|new world|pak'?n?save|freshchoice|the warehouse|kmart|mitre\s*10|bunnings|messenger|facebook|instagram|screenshot)\b/i;
+async function shopScanSave() {
+  if (shopScanBusy) return 'Still reading the photo. Hang on a moment.';
+  const picked = [...document.querySelectorAll('#shopscanlist input[data-i]:checked')].map(el => shopScanItems[+el.dataset.i]).filter(Boolean);
+  if (!picked.length) return shopScanItems.length ? 'Tick at least one item to add.' : 'Choose a screenshot or photo first.';
+  const names = picked.map(x => x.name);
+  const n = addToShop(names, '');
+  // stash WW brand/size on newly added open items when we matched
+  try {
+    picked.forEach(it => {
+      if (!it.matched || !it.product) return;
+      const x = S.shop.items.find(s => !s.done && mNorm(s.name) === mNorm(it.name));
+      if (!x || x.brand) return;
+      const p = it.product;
+      x.brand = { brand: p.brand || '', product: p.name || '', size: p.size || '', price: p.price, store: 'Woolworths', at: todayISO(), gf: false };
+    });
+  } catch (e) { }
+  await save();
+  return () => { render(); toast(n ? (n === 1 ? 'Added to the shopping list.' : `Added ${n} items.`) : 'Those were already on the list.'); };
+}
+function shopScanLooksLikeItem(l) {
+  if (!l || l.length < 3 || l.length > 70) return false;
+  if (!/[aeiouAEIOU]/.test(l)) return false;
+  if (!/[a-zA-Z]{3}/.test(l)) return false;
+  const letters = (l.match(/[a-zA-Z]/g) || []).length, digits = (l.match(/\d/g) || []).length;
+  if (letters < 3 || digits > letters) return false;
+  if (/^[A-Z0-9\s\-_]{10,}$/.test(l) && (l.match(/[AEIOU]/g) || []).length < 2) return false;
+  return true;
+}
+function parseShopScan(text, data) {
+  const SKIP = /^(ingredients?|method|directions?|instructions?|you will need|page\s*\d+|total|subtotal|gst|tax|change|eftpos|visa|mastercard|receipt|thank you|www\.|http|woolworths|countdown|new world|pak'?n?save|freshchoice|the warehouse|kmart|mitre\s*10|bunnings|messenger|facebook|instagram|screenshot|specials?|clubcard|everyday|rewards?|save\b|off\b|each\b|qty|quantity|barcode)\b/i;
   const PRICE_ONLY = /^\$?\d+([.,]\d{2})?$/;
-  const lines = String(text || '').split('\n').map(l => l.replace(/^[•·●○▪■*\-–—]\s*/, '').replace(/\s{2,}/g, ' ').trim());
-  const out = [], seen = new Set();
-  for (let l of lines) {
-    if (!l || PRICE_ONLY.test(l) || SKIP.test(l) || /^page\s*\d+$/i.test(l) || /^\d+$/.test(l)) continue;
-    l = l.replace(/\s+\$?\d+[.,]\d{2}\s*$/, '').replace(/\s+\$\d+(?:\.\d{2})?\s*$/, '').trim();
-    if (l.length < 2 || l.length > 80 || !/[a-zA-Z]{2}/.test(l)) continue;
-    if (/^[A-Z0-9\s\-_]{12,}$/.test(l) && !/[aeiou]/i.test(l)) continue; // barcode-ish
-    const k = mNorm(l); if (seen.has(k)) continue; seen.add(k);
-    out.push(l.slice(0, 120));
-    if (out.length >= 40) break;
+  const rawLines = [];
+  if (data && Array.isArray(data.lines) && data.lines.length) {
+    data.lines.forEach(L => {
+      const conf = +L.confidence || 0;
+      const textL = cleanOcr(String(L.text || ''));
+      if (!textL || conf < 45) return;
+      textL.split('\n').forEach(part => rawLines.push({ t: part.trim(), conf }));
+    });
   }
+  if (!rawLines.length) {
+    String(text || '').split('\n').forEach(part => rawLines.push({ t: part.trim(), conf: 60 }));
+  }
+  const out = [], seen = new Set();
+  rawLines.forEach(({ t, conf }) => {
+    let l = t.replace(/^[•·●○▪■*\-–—]\s*/, '').replace(/\s{2,}/g, ' ').trim();
+    if (!l || PRICE_ONLY.test(l) || SKIP.test(l) || /^page\s*\d+$/i.test(l) || /^\d+$/.test(l)) return;
+    l = l.replace(/\s+\$?\d+[.,]\d{2}\s*[a-zA-Z]*$/, '').replace(/\s+\$\d+(?:\.\d{2})?\s*$/, '').replace(/\b\d+[.,]\d{2}\b/g, '').replace(/\s{2,}/g, ' ').trim();
+    // drop OCR junk chars
+    l = l.replace(/[|_~`^]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    if (!shopScanLooksLikeItem(l)) return;
+    if (conf < 55 && l.length < 6) return;
+    const k = mNorm(l); if (seen.has(k)) return; seen.add(k);
+    out.push(l.slice(0, 120));
+  });
+  return out.slice(0, 30);
+}
+async function shopScanMatchOffers(cands) {
+  if (!cands.length || !RELAY_URL || navigator.onLine === false) return cands.map(q => ({ raw: q, name: q, matched: false }));
+  shopScanStatus('Matching with Woolworths offers…', 0.15);
+  const byQ = new Map();
+  let left = cands.map(q => ({ q, brand: '' }));
+  for (let round = 0; round < 8 && left.length; round++) {
+    shopScanStatus('Matching with Woolworths offers…', Math.min(0.9, 0.15 + round * 0.1));
+    let d = null;
+    try {
+      const r = await fetch(RELAY_URL + '/prices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: sharedKey(), items: left.slice(0, 25) }) });
+      d = await r.json().catch(() => null);
+      if (!r.ok || !d || !Array.isArray(d.items)) break;
+    } catch (e) { break; }
+    const next = [];
+    d.items.forEach((it, i) => {
+      const q = left[i] && left[i].q; if (!q) return;
+      if (it && it.pending) { next.push(left[i]); return; }
+      if (it && it.product && it.product.name) {
+        const p = it.product;
+        // Prefer the real product name; keep OCR only as raw
+        byQ.set(mNorm(q), { raw: q, name: String(p.name).slice(0, 120), matched: true, product: p });
+      } else if (!byQ.has(mNorm(q))) {
+        byQ.set(mNorm(q), { raw: q, name: q, matched: false });
+      }
+    });
+    left = next;
+    if (left.length) await new Promise(res => setTimeout(res, 1200));
+  }
+  left.forEach(it => { if (!byQ.has(mNorm(it.q))) byQ.set(mNorm(it.q), { raw: it.q, name: it.q, matched: false }); });
+  // Prefer matched; keep unmatched only if they still look like food words
+  const matched = [], unmatched = [];
+  cands.forEach(q => {
+    const it = byQ.get(mNorm(q)) || { raw: q, name: q, matched: false };
+    if (it.matched) matched.push(it); else if (shopScanLooksLikeItem(it.name)) unmatched.push(it);
+  });
+  // Dedup by matched product name
+  const seen = new Set(), out = [];
+  matched.concat(unmatched).forEach(it => {
+    const k = mNorm(it.name); if (seen.has(k)) return; seen.add(k); out.push(it);
+  });
   return out;
 }
 async function shopScanFile(input) {
@@ -9595,13 +9686,16 @@ async function shopScanFile(input) {
     const { data } = await w.recognize(img);
     const text = cleanOcr(data.text || '');
     if (!sheetOpen) return;
-    const found = parseShopScan(text);
+    const found = parseShopScan(text, data);
     if (!found.length) { shopScanStatus(''); toast('Couldn’t find shopping items in that photo. Try a closer shot of the names.'); }
     else {
-      const have = new Set(shopScanItems.map(mNorm));
-      found.forEach(n => { if (!have.has(mNorm(n))) { have.add(mNorm(n)); shopScanItems.push(n); } });
+      const matched = await shopScanMatchOffers(found);
+      if (!sheetOpen) return;
+      const have = new Set(shopScanItems.map(x => mNorm(x.name)));
+      matched.forEach(it => { if (!have.has(mNorm(it.name))) { have.add(mNorm(it.name)); shopScanItems.push(it); } });
       shopScanStatus(''); shopScanRenderList();
-      toast(found.length === 1 ? 'Found 1 item. Tick what to add.' : `Found ${found.length} items. Tick what to add.`);
+      const nOk = matched.filter(x => x.matched).length;
+      toast(nOk ? (nOk === 1 ? 'Matched 1 Woolworths offer. Tick what to add.' : `Matched ${nOk} Woolworths offers. Tick what to add.`) : 'No clear Woolworths matches — check the leftover lines carefully.');
     }
   } catch (e) {
     shopScanStatus('');
@@ -9611,14 +9705,7 @@ async function shopScanFile(input) {
 async function shopScanFromBlob(blob, label) {
   if (!blob || shopScanBusy) return;
   shopScanBusy = false; shopScanItems = [];
-  openSheet('Scan to shopping list', shopScanInner(), async () => {
-    if (shopScanBusy) return 'Still reading the photo. Hang on a moment.';
-    const picked = [...document.querySelectorAll('#shopscanlist input[data-i]:checked')].map(el => shopScanItems[+el.dataset.i]).filter(Boolean);
-    if (!picked.length) return shopScanItems.length ? 'Tick at least one item to add.' : 'Still reading — hang on a moment.';
-    const n = addToShop(picked, '');
-    await save();
-    return () => { render(); toast(n ? (n === 1 ? 'Added to the shopping list.' : `Added ${n} items.`) : 'Those were already on the list.'); };
-  }, 'Add to list');
+  openSheet('Scan to shopping list', shopScanInner(), shopScanSave, 'Add to list');
   shopScanButtons();
   const file = blob instanceof File ? blob : new File([blob], label || 'photo.jpg', { type: blob.type || 'image/jpeg' });
   const fake = { files: [file], value: '' };
