@@ -155,7 +155,7 @@ window.pins = function () {
   const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.30: only warnings and watches that cover Whangārei
   for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Whangārei warnings go right to the top
   const PW = X.pwr || [], un = PW.filter(o => o.kind === 'unplanned'), pl = []; // 1.9.54 only unplanned power cuts // 1.9.30 ⚡ then power cuts
-  for (const o of un.slice(0, 4)) out.push({ id: 'pw:' + o.id, x: 'pwr', o, topic: 'family', t: 'Power cut: ' + (o.areas || []).join(', ') });
+  // 1.9.98 Shane: power cuts only as tiles in the stories row, never as feed cards
   if (pl.length === 1) out.push({ id: 'pw:' + pl[0].id, x: 'pwr', o: pl[0], topic: 'family', t: 'Planned power cut' });
   else if (pl.length) out.push({ id: 'pw-planned', x: 'pwrl', list: pl.slice(0, 8), topic: 'family', t: 'Planned power cuts' });
   if (FAM_ON) {

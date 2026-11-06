@@ -30,6 +30,24 @@ function buildTiles() {
       push({ id: 'today-wx', img: svg, label: 'Whangārei ' + temp + '°', em, kind: 'weather', title: 'Whangārei weather', text: em + ' ' + temp + '°C right now', url: null, _wx: true });
     }
   } catch (e) { }
+  // 1.9.98 ⚠️ Whangārei weather warnings and ⚡ unplanned Northpower power cuts, only when there are any
+  try {
+    const xs = typeof X !== 'undefined' ? X : {}, now = Date.now();
+    const T = t => new Date(t).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'short', hour: 'numeric', minute: '2-digit' }).replace(':00', '');
+    for (const w of (xs.wx || []).filter(w => w.wg && w.expires > now).slice(0, 3)) {
+      const pic = { rain: 'rain', wind: 'wind', thunderstorm: 'thunderstorm', snow: 'snow', swell: 'swell' }[w.event] || 'warn';
+      const lvl = w.colour === 'red' ? 'Red warning' : w.colour === 'orange' ? 'Orange warning' : 'Weather watch';
+      push({ id: 'wxw-' + w.id, img: 'img/alert-' + pic + '.svg', label: lvl, em: w.colour === 'red' ? '🔴' : w.colour === 'orange' ? '🟠' : '🟡', kind: 'alert',
+        title: (w.test ? 'TEST – ' : '') + String(w.head || 'Weather warning').replace(/\s*-\s*(Orange|Red)$/i, ''),
+        text: (w.onset > now ? 'From ' + T(w.onset) : 'Now') + ' until ' + T(w.expires) + '. ' + (w.desc || ''), url: w.web || 'https://www.metservice.com/warnings/home' });
+    }
+    for (const o of (xs.pwr || []).filter(o => o.kind === 'unplanned').slice(0, 3)) {
+      const ar = (o.areas || []).join(', ') || o.title || 'Whangārei';
+      push({ id: 'pwr-' + o.id, img: 'img/alert-power.svg', label: 'Power cut', em: '⚡', kind: 'alert', title: (o.test ? 'TEST – ' : '') + 'Power cut: ' + ar,
+        text: 'About ' + (+o.customers || 'some') + ' properties. ' + (o.start ? 'Off since ' + T(o.start) : 'Off now') + (o.etr ? ', back on by about ' + T(o.etr) : ', no restoration time yet') + '.' + (o.cause ? ' Cause: ' + o.cause + '.' : ''),
+        url: 'https://outages.northpower.nz/' });
+    }
+  } catch (e) { }
   try {
     if (typeof jokesToday === 'function') {
       const j = jokesToday()[0];
