@@ -16,6 +16,11 @@
 <style>
 :root{--bg:#f4f5f8;--card:#fff;--ink:#14161b;--mute:#6b7280;--line:#e7e8ee;--chip:#eceef3;--acc:#8b5cf6;--acc2:#ec4899;--up:#16a34a;--down:#dc2626;--shadow:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06)}
 @media (prefers-color-scheme:dark){:root{--bg:#0b0d11;--card:#15181e;--ink:#eef0f4;--mute:#9aa1ad;--line:#242833;--chip:#1e222b;--shadow:0 1px 0 rgba(255,255,255,.03)}}
+/* 1.9.79 Appearance: force dark/light regardless of phone setting */
+html.force-dark{--bg:#0b0d11;--card:#15181e;--ink:#eef0f4;--mute:#9aa1ad;--line:#242833;--chip:#1e222b;--shadow:0 1px 0 rgba(255,255,255,.03);color-scheme:dark}
+html.force-light{--bg:#f4f5f8;--card:#fff;--ink:#14161b;--mute:#6b7280;--line:#e7e8ee;--chip:#eceef3;--shadow:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06);color-scheme:light}
+html.force-dark.candy,html.force-light.candy{/* candy layers keep using var(--bg) etc. */}
+
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{font-size:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%}html.ts-l{font-size:113%}html.ts-xl{font-size:126%}html.ts-xl .logo{font-size:1.12rem}html.ts-xl .upd{font-size:.6rem}html.ts-xl .greet{max-width:42vw}html.ts-l .logo{font-size:1.25rem}html,body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
@@ -161,6 +166,10 @@ html.mf-only #instb,html.mf-only #feed > :not(.card):not(.load):not(.empty):not(
 .mfscrim{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;transition:opacity .22s}.mfdrawer.on .mfscrim{opacity:1}
 .mfpanel{position:absolute;top:0;bottom:0;left:0;width:min(78vw,320px);background:var(--card,#fff);color:var(--ink,inherit);box-shadow:4px 0 24px rgba(0,0,0,.25);transform:translateX(-102%);transition:transform .24s ease-out;padding:max(16px,env(safe-area-inset-top)) 14px 16px;display:flex;flex-direction:column;gap:8px}
 .mfdrawer.on .mfpanel{transform:none}
+.mfsec{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:14px 4px 6px}
+.mfextra{padding:0 0 8px}
+.mfappear{display:flex;flex-direction:column;gap:0}
+
 .mfhd{display:flex;align-items:center;justify-content:space-between;font-size:1.15em;margin-bottom:6px}
 .mfopt{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 14px;border:2px solid transparent;border-radius:14px;background:rgba(127,127,127,.1);color:inherit;font:inherit;font-weight:600;text-align:left;cursor:pointer}
 .mfopt.on{border-color:var(--acc,#7c3aed);background:rgba(124,58,237,.12)}.mfopt i{margin-left:auto;font-style:normal;color:var(--acc,#7c3aed);font-weight:800}.mfe{font-size:1.3em;min-width:2.2em}
@@ -369,6 +378,9 @@ html,body{background:var(--bg)}
 body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(120% 60% at 0% 0%,#e9dcff 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#ffdcec 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#ffe6cc 0%,transparent 60%),linear-gradient(180deg,#efe6ff,#fde8f2 50%,#fff0df)}
 #feed > .card,#feed .hscroll > .card{box-shadow:0 2px 4px rgba(120,60,160,.08),0 10px 28px rgba(150,70,170,.14)!important;border-color:rgba(255,255,255,.9)!important}
 @media (prefers-color-scheme:dark){:root{--bg:#120e22}body::before{background:radial-gradient(120% 60% at 0% 0%,#2a1a4d 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#3a1530 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#3a2414 0%,transparent 60%),linear-gradient(180deg,#151029,#1a0f22 50%,#1c140e)}#feed > .card,#feed .hscroll > .card{box-shadow:0 2px 4px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45)!important;border-color:rgba(255,255,255,.06)!important}}
+html.force-dark{--bg:#120e22}html.force-dark body::before{background:radial-gradient(120% 60% at 0% 0%,#2a1a4d 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#3a1530 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#3a2414 0%,transparent 60%),linear-gradient(180deg,#151029,#1a0f22 50%,#1c140e)}html.force-dark #feed > .card,html.force-dark #feed .hscroll > .card{box-shadow:0 2px 4px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.45)!important;border-color:rgba(255,255,255,.06)!important}
+html.force-light{--bg:#f1e9ff}html.force-light body::before{background:radial-gradient(120% 60% at 0% 0%,#e9dcff 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#ffdcec 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#ffe6cc 0%,transparent 60%),linear-gradient(180deg,#efe6ff,#fde8f2 50%,#fff0df)}html.force-light #feed > .card,html.force-light #feed .hscroll > .card{box-shadow:0 2px 4px rgba(120,60,160,.08),0 10px 28px rgba(150,70,170,.14)!important;border-color:rgba(255,255,255,.9)!important}
+
 /* 1.9.77 📐 cards snap into line under the header as you scroll (tall cards still scroll freely inside) */
 html{scroll-snap-type:y mandatory;scroll-padding-top:calc(var(--hdr,120px) + 10px)}
 #feed > .card,#feed > .hrow,#feed > section{scroll-snap-align:start;scroll-snap-stop:normal}
@@ -376,7 +388,7 @@ html.nosnap{scroll-snap-type:none}
 #feed > .card.disc{--band-e:'🧭';--band-g:linear-gradient(135deg,#6cc7ff,#b18cff 50%,#ff7eb6)}
 .obt small{font-size:.68em;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff;border-radius:999px;padding:1px 6px;margin-left:4px}
 
-/* 1.9.78 📍 explain pills: soft pastel chips under the blurb for places/people/orgs people might question */
+/* 1.9.79 📍 explain pills: soft pastel chips under the blurb for places/people/orgs people might question */
 .exrow{display:flex;flex-wrap:wrap;gap:8px;padding:4px 14px 10px}
 .expill{display:inline-flex;align-items:center;gap:5px;border:0;border-radius:999px;padding:7px 12px;font:inherit;font-size:.88rem;font-weight:700;cursor:pointer;color:#6b21a8;background:linear-gradient(135deg,#f3e8ff,#fce7f3 55%,#ffedd5);box-shadow:inset 0 0 0 1.5px #e9d5ff,0 2px 6px rgba(168,85,247,.12);transition:transform .12s}
 .expill:active{transform:scale(.96)}
@@ -410,13 +422,14 @@ html.nosnap{scroll-snap-type:none}
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.80"></script>
-<script src="app.js?v=1.9.80"></script>
-<script src="extras.js?v=1.9.80"></script>
-<script src="jokes.js?v=1.9.80"></script>
-<script src="learn.js?v=1.9.80"></script>
-<script src="explain.js?v=1.9.80"></script>
-<script src="effects.js?v=1.9.80"></script>
+<script src="family.js?v=1.9.81"></script>
+<script src="app.js?v=1.9.81"></script>
+<script src="extras.js?v=1.9.81"></script>
+<script src="jokes.js?v=1.9.81"></script>
+<script src="learn.js?v=1.9.81"></script>
+<script src="common-en.js?v=1.9.81"></script>
+<script src="explain.js?v=1.9.81"></script>
+<script src="effects.js?v=1.9.81"></script>
 <script>
 /* 1.9.51 self-heal: if the feed is still skeletons after 9s (a crash or a stale cached build), say so and offer a fresh reload
    that clears this app's caches and service worker. Also: when a new version takes over, reload once to use it. */

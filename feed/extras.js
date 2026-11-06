@@ -642,19 +642,32 @@ function pickPromos(nPins, len) {
   const now = Date.now(), recent = ls.get('promoSeen', {}); for (const k in recent) if (now - recent[k] > 3 * 864e5) delete recent[k];
   let pool = promoPool(now); const fresh = pool.filter(x => !recent[x.e.id]); if (fresh.length >= 3) pool = fresh; // never the same promo again within ~3 days, unless there's little else on
   const out = [], slots = []; let pos = Math.max(2, nPins) + 7 + Math.floor(Math.random() * 3);
-  while (pos < len + 10 && slots.length < 8) { slots.push(pos); pos += 8 + Math.floor(Math.random() * 3); }
+  while (pos < len + 10 && slots.length < 3) { slots.push(pos); pos += 8 + Math.floor(Math.random() * 3); }
   const kinds = new Set(); for (const _ of slots) { pool = pool.filter(x => !kinds.has(evKind(x.e))); const tot = pool.reduce((a, x) => a + x.w, 0); if (!tot) break; let r = Math.random() * tot, k = 0; while (k < pool.length - 1 && (r -= pool[k].w) > 0) k++; out.push(pool[k].e); kinds.add(evKind(pool[k].e)); pool.splice(k, 1); }
   const wk = (() => { const ks = new Set(); return promoPool(now).filter(x => x.e.ev < now + 7 * 864e5).sort((a, b) => b.w - a.w).filter(x => { const k = evKind(x.e); if (ks.has(k)) return false; ks.add(k); return true; }); })().slice(0, 5).map(x => x.e).sort((a, b) => a.ev - b.ev);
   return { slots, list: out, wk, recent };
 }
+/* 1.9.79 events only occasionally on All: week roundup ≤ every 2–3 days; ~1 promo event per load with cooldown. Events chip still shows them all. */
+const EV_WK_GAP = 2, EV_PROMO_GAP = 1;
 const baseFestive = window.festive;
 window.festive = function (order, nPins) {
   order = baseFestive ? baseFestive(order, nPins) : order;
   if (!FEED || order.length < 6) return order;
+  if (typeof tab !== 'undefined' && tab && tab !== 'all') return order;
   if (!PROMO || PROMO_FOR !== FEED) { PROMO_FOR = FEED; PROMO = pickPromos(nPins, order.length); const now = Date.now(); for (const e of PROMO.list) PROMO.recent[e.id] = now; ls.set('promoSeen', PROMO.recent); }
-  const ids = new Set(PROMO.list.map(e => e.id)), out = order.filter(i => !ids.has(i.id)), lo = Math.max(2, nPins);
-  if (PROMO.wk.length >= 2) out.splice(Math.min(lo + 3, out.length), 0, { id: 'wk-' + nzKey().slice(0, 6) + Math.floor(nzDayNum(Date.now()) / 7), x: 'wk', list: PROMO.wk, topic: 'events', t: 'This week in Whangārei ' + forMe() });
-  PROMO.list.forEach((e, k) => { const at = PROMO.slots[k]; if (at <= out.length) out.splice(at, 0, { ...e, id: e.id, x: 'promo', e }); });
+  const ids = new Set(PROMO.list.map(e => e.id)), out = order.filter(i => !(ids.has(i.id) || (i.kind === 'event' && !i.pin && !i.x))), lo = Math.max(2, nPins);
+  const day = typeof nzDayNum === 'function' ? nzDayNum(Date.now()) : Math.floor(Date.now() / 864e5);
+  const lastWk = ls.get('evWkDay', 0);
+  if (PROMO.wk.length >= 2 && day - lastWk >= EV_WK_GAP) {
+    out.splice(Math.min(lo + 3, out.length), 0, { id: 'wk-' + (typeof nzKey === 'function' ? nzKey().slice(0, 6) : '') + Math.floor(day / 7), x: 'wk', list: PROMO.wk, topic: 'events', t: 'This week in Whangārei ' + forMe() });
+    ls.set('evWkDay', day);
+  }
+  const lastPromo = ls.get('evPromoDay', 0);
+  if (day - lastPromo >= EV_PROMO_GAP && PROMO.list.length) {
+    const e = PROMO.list[0], at = Math.min((PROMO.slots && PROMO.slots[0]) || (lo + 8), out.length);
+    out.splice(at, 0, { ...e, id: e.id, x: 'promo', e });
+    ls.set('evPromoDay', day);
+  }
   return out;
 };
 function icsHref(m) {

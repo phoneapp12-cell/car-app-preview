@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.80';
+const APP_VERSION = '1.9.81';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -50,6 +50,7 @@ Object.defineProperty(TOPIC.life, 1, { get: () => forMe(1), enumerable: true });
 const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
+const NON_NZ_FOOD = /\b(walmart|wal-?mart|trader joe'?s|traderjoes|kroger|aldi\b|tesco|asda|sainsbury'?s?|waitrose|lidl|costco\s*(usa?|us|america)|sam'?s club|target(?!\s*(nz|new zealand))|whole foods|heb\b|publix|meijer|wegmans|shoprite|food lion|dollar general|walgreens|cvs\b|home depot|lowe'?s|usd\b|usda\b)\b/i; // 1.9.79
 const SPORT2 = /\b(\d+ tries|four tries|three tries|two tries|scored (a |\w+ )?tr(y|ies)|conversions?|penalty (goal|kick)|kicked (all|a|the) |scores? (the )?winner|match-?winning|test match|semi-?finals?|quarter-?finals?|grand final|premiership|half-?time|full-?time|pacific championships?|world cup|olympi\w+|commonwealth games|tournament|playoffs?|championship|wicket|innings|goalkeeper|striker|touchdown|darts|snooker|golf(er)?|marathon|triathlon|wrestl\w+|boxing|ufc|grand prix|f1|motorsport|speedway|velodrome)\b/i; // 1.9.24 match reports that never say 'sport'
 const SPORT = { test: t => SPORT1.test(t) || SPORT2.test(t) };
 // 1.7.1 family-safe: no nudity or adult content, anywhere (same rules as the data service's safe.js)
@@ -350,6 +351,7 @@ function visible() {
     if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; // 1.9.0 parenting / drag & LGBTQ+ / social work: only when picked           // interests you've switched off
     if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
+    if ((i.topic === 'food' || i.topic === 'gf') && NON_NZ_FOOD.test((i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''))) return false; // 1.9.79 NZ food only
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
   });
   return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.30 once seen, gone (and one card per story)
@@ -833,11 +835,11 @@ function draw() {
   if (!FEED) { m.innerHTML = '<div class="sk"></div><div class="sk"></div>'; return; }
   if (tab === 'life' && !PRIVATE_OK) tab = 'all';
   if (tab === 'family') { if (FAM_ON) { drawFamily(); $('#upd').innerHTML = ''; moodLabel(); return; } tab = 'all'; }
-  if (tab === 'life') { drawLife(); return; }
+  if (tab === 'life') { if (SHOW_LIFE === false) { $('#feed').innerHTML = '<div class="empty">📌 My App stuff is hidden. Open ☰ and turn on <b>Show My App stuff</b> to see it again.</div>'; return; } drawLife(); return; }
   if (tab === 'photos') { drawPhotos(); return; }
   if (!TOPIC[tab] || !topicOn(tab) || (tab === 'election' && Date.now() >= ELECTION_END)) tab = 'all';
   order = tab === 'liked' ? visible() : rank(visible()); shown = 0;
-  if (tab === 'all') order = weave(order.filter(i => !i.pin), lifeMix()); // My App cards mixed in at random, different every refresh
+  if (tab === 'all') order = weave(order.filter(i => !i.pin), (SHOW_LIFE !== false && typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK) ? lifeMix() : []); // 1.9.79 Show My App stuff toggle
   if (tab === 'all' && FAM_ON) order = weaveShares(order); // 1.7.0: family reposts for everyone
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
   if (typeof mediaFilter === 'function') order = mediaFilter(order); // 1.9.42 ☰ Videos & pictures / Videos only / Pictures only
@@ -1075,6 +1077,29 @@ function otherPlayer(el, rec) {
    specials (weather, power, birthdays, countdowns) and your own My App cards always show. ---- */
 var MF_OPTS = [['all', '🎬🖼️', 'Videos & pictures'], ['vid', '🎬', 'Videos only'], ['pic', '🖼️', 'Pictures only']]; // 1.9.51 var, not const: draw() can run before this line (cached feed) – a const here crashed it
 var MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF = 'all';
+/* 1.9.79 Show My App stuff (Shane's phone only) + Appearance (default dark for everyone) */
+var SHOW_LIFE = ls.get('showLife', 1) !== 0; // default ON
+var APPEAR = ls.get('appear', null); if (APPEAR !== 'light' && APPEAR !== 'dark' && APPEAR !== 'auto') { APPEAR = 'dark'; ls.set('appear', 'dark'); } // default dark, including existing users
+
+function applyAppear() {
+  const r = document.documentElement;
+  r.classList.remove('force-dark', 'force-light');
+  if (APPEAR === 'dark') r.classList.add('force-dark');
+  else if (APPEAR === 'light') r.classList.add('force-light');
+  // theme-color meta
+  const dark = APPEAR === 'dark' || (APPEAR === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  let m = document.querySelector('meta[name="theme-color"]:not([media])');
+  if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.append(m); }
+  m.content = dark ? '#0f1115' : '#ffffff';
+  // also update media-specific ones so iOS picks the forced colour
+  document.querySelectorAll('meta[name="theme-color"][media]').forEach(el => {
+    if (/dark/.test(el.media)) el.content = dark ? '#0f1115' : '#ffffff';
+    if (/light/.test(el.media)) el.content = dark ? '#0f1115' : '#ffffff';
+  });
+}
+applyAppear();
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (APPEAR === 'auto') applyAppear(); }); } catch (e) { }
+
 const mfAlways = i => !!(i.pin || (i.x && !['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) || /^(life|app|ph|you|date|cd|alert)[:-]/.test(String(i.id || '')) || i.topic === 'alerts');
 function mfIsVid(i) { try { return !!(i.vid || (i.x === 'vlog' && i.h && i.h.vid) || (i.h && i.h.vid) || (i.img && vidOf(i)) || (i._share && (i._share.snap || {}).vid)); } catch (e) { return false; } }
 /* 1.9.43 strict: Videos only = only video cards (from every video source: the feed's clips and trailers, vlogs, Reddit/Vimeo,
@@ -1111,10 +1136,18 @@ function mfDrawer(open) {
   let d = document.getElementById('mfdrawer');
   if (!d) {
     d = document.createElement('div'); d.id = 'mfdrawer'; d.className = 'mfdrawer';
-    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Show me</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><p class="mfnote">Videos only and Pictures only show just those cards. Alerts still come as notifications.</p></nav>`;
+    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Menu</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><div class="mfextra"></div><p class="mfnote">Videos only and Pictures only show just those cards. Alerts still come as notifications.</p></nav>`;
     document.body.append(d);
   }
-  d.querySelector('.mfopts').innerHTML = MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
+  d.querySelector('.mfopts').innerHTML = `<p class="mfsec">Show me</p>` + MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
+  const extra = d.querySelector('.mfextra');
+  let x = `<p class="mfsec">Appearance</p><div class="mfappear">` +
+    [['dark','🌙','Dark'],['light','☀️','Light'],['auto','📱','Match phone']].map(([k,em,l]) =>
+      `<button type="button" class="mfopt${APPEAR===k?' on':''}" data-appear="${k}" role="menuitemradio" aria-checked="${APPEAR===k}"><span class="mfe">${em}</span><span>${l}</span>${APPEAR===k?'<i>✓</i>':''}</button>`).join('') + `</div>`;
+  if (typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK) {
+    x = `<p class="mfsec">My App</p><button type="button" class="mfopt${SHOW_LIFE?' on':''}" data-showlife="1" role="switch" aria-checked="${!!SHOW_LIFE}"><span class="mfe">📌</span><span>Show My App stuff</span>${SHOW_LIFE?'<i>✓</i>':''}</button>` + x;
+  }
+  extra.innerHTML = x;
   requestAnimationFrame(() => d.classList.toggle('on', !!open));
 }
 (function () {
@@ -1123,6 +1156,8 @@ function mfDrawer(open) {
     const t = e.target; if (!t || !t.closest) return;
     if (t.closest('#mfbtn')) { mfDrawer(true); return; }
     const sb = t.closest('[data-mfset]'); if (sb) { e.preventDefault(); mfSet(sb.dataset.mfset); return; }
+    const ab = t.closest('[data-appear]'); if (ab) { e.preventDefault(); APPEAR = ab.dataset.appear; ls.set('appear', APPEAR); applyAppear(); mfDrawer(true); toast(APPEAR === 'dark' ? 'Appearance: Dark' : APPEAR === 'light' ? 'Appearance: Light' : 'Appearance: Match phone'); return; }
+    const lb = t.closest('[data-showlife]'); if (lb) { e.preventDefault(); SHOW_LIFE = !SHOW_LIFE; ls.set('showLife', SHOW_LIFE ? 1 : 0); mfDrawer(true); try { draw(); } catch (err) { } toast(SHOW_LIFE ? 'My App stuff: on' : 'My App stuff: off'); return; }
     if (t.closest('[data-mfclose]')) mfDrawer(false);
   });
   let sx = null, sy = 0, mode = '';
