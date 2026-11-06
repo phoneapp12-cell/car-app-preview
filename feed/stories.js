@@ -182,11 +182,16 @@ document.addEventListener('click', e => {
 window.ibStories = { html, open: openViewer, build: buildTiles, close: closeViewer };
 })();
 
-/* 1.9.86 open at the top so the stories row is always the first thing you see (late redraws used to re-snap the page down to a card) */
+/* 1.9.86 open at the top so the stories row is always the first thing you see (late feed redraws used to re-snap the page down to a card) */
 (function () {
   try { history.scrollRestoration = 'manual'; } catch (e) { }
-  const de = document.documentElement; let user = false, n = 0; de.classList.add('nosnap');
-  const mark = () => { user = true; }; ['touchstart', 'wheel', 'keydown', 'mousedown'].forEach(ev => addEventListener(ev, mark, { passive: true, once: true }));
-  const tick = setInterval(() => { if (!user && scrollY > 0) scrollTo(0, 0); if (user || ++n > 20) { clearInterval(tick); de.classList.remove('nosnap'); } }, 200);
-  scrollTo(0, 0);
+  let user = false; const mark = () => { user = true; };
+  ['touchstart', 'wheel', 'keydown', 'mousedown'].forEach(ev => addEventListener(ev, mark, { passive: true, once: true }));
+  const top = () => { if (!user && scrollY > 0) { const de = document.documentElement; de.classList.add('nosnap'); scrollTo(0, 0); requestAnimationFrame(() => de.classList.remove('nosnap')); } };
+  const mo = new MutationObserver(() => requestAnimationFrame(top));
+  const go = () => { const f = document.getElementById('feed'), h = document.getElementById('stories-host'); if (f) mo.observe(f, { childList: true }); if (h) mo.observe(h, { childList: true }); top(); };
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', go); else go();
+  const tick = setInterval(top, 250); setTimeout(() => { clearInterval(tick); }, 15000);
+  addEventListener('pageshow', () => { user = false; top(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && scrollY < 200) { user = false; top(); } });
 })();
