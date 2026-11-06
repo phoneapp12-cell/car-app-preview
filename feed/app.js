@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.81';
+const APP_VERSION = '1.9.82';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1098,6 +1098,8 @@ function applyAppear() {
   });
 }
 applyAppear();
+/* 1.9.82: new version applied on this open (SW waited) — tiny toast, no reload */
+try { const _lv = ls.get('ibLastVer', ''); if (_lv && _lv !== APP_VERSION) { setTimeout(() => { try { toast('✨ Updated to ' + APP_VERSION); } catch (e) { } }, 1200); } ls.set('ibLastVer', APP_VERSION); } catch (e) { }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (APPEAR === 'auto') applyAppear(); }); } catch (e) { }
 
 const mfAlways = i => !!(i.pin || (i.x && !['hometip', 'vlog', 'watch', 'concert'].includes(i.x)) || /^(life|app|ph|you|date|cd|alert)[:-]/.test(String(i.id || '')) || i.topic === 'alerts');

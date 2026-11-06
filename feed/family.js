@@ -47,7 +47,15 @@ const canShareLife = x => IS_ADMIN && x && SHARE_BOARDS.has(x.cat) && !LIFE_MONE
 async function famInit() {
   if (!MEMBER) { if (STANDALONE && !ls.get('noLink', false)) pasteLink(); return; }
   if (MEMBER.pending) {
-    try { const me = await fam('/me'); localStorage.setItem('mf.member', JSON.stringify({ tok: MEMBER.tok, id: me.id, name: me.name, role: me.role })); location.reload(); }
+    try {
+      const me = await fam('/me');
+      const next = { tok: MEMBER.tok, id: me.id, name: me.name, role: me.role };
+      localStorage.setItem('mf.member', JSON.stringify(next));
+      // 1.9.82: only one pending→ready reload per token (avoids open-time restart loops)
+      const key = 'ibPendRel:' + MEMBER.tok.slice(0, 12);
+      if (localStorage.getItem(key) !== me.id) { localStorage.setItem(key, me.id); location.reload(); }
+      else { MEMBER = next; /* already reloaded once; continue without another restart */ }
+    }
     catch (e) { if (e.status === 401) { localStorage.removeItem('mf.member'); $('#feed').insertAdjacentHTML('afterbegin', '<div class="empty">This invite link doesn’t work any more. Ask Shane for a new one.</div>'); } }
     return;
   }

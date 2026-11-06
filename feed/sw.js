@@ -1,9 +1,10 @@
 /* Info Book – service worker. To ship an update: change VERSION. */
 const CACHE = 'my-feed-';
-const VERSION = '1.9.81';
+const VERSION = '1.9.82';
 const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'family.js?v=' + VERSION, 'extras.js?v=' + VERSION, 'jokes.js?v=' + VERSION, 'learn.js?v=' + VERSION, 'common-en.js?v=' + VERSION, 'explain.js?v=' + VERSION, 'effects.js?v=' + VERSION, 'manifest.webmanifest', 'icons/icon-192.png', 'icons/logo.svg', 'img/xmas.webp', 'img/newyear.webp'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE + VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith(CACHE) && n !== CACHE + VERSION).map(n => caches.delete(n)))).then(() => self.clients.claim())); });
+/* 1.9.82: don't skipWaiting/claim — new SW waits until the next open so the page never reloads mid-session */
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE + VERSION).then(c => c.addAll(SHELL))); });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith(CACHE) && n !== CACHE + VERSION).map(n => caches.delete(n))))); });
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return; // feed data and pictures go straight to the network
