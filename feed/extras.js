@@ -153,7 +153,7 @@ const pinUrls = () => (PIN_FOR === FEED && PIN_URLS) || (PIN_FOR = FEED, PIN_URL
 window.pins = function () {
   const out = [];
   const W = (X.wx || []).filter(w => w.expires > Date.now()), wl = W.filter(w => w.wg), wn = []; // 1.9.30: only warnings and watches that cover Whangārei
-  for (const w of wl) out.push({ id: 'wx:' + w.id, x: 'wx', w, topic: 'family', t: w.head }); // ⚠️ Whangārei warnings go right to the top
+  // 1.9.100 Shane: weather warnings only as tiles in the stories row, never as feed cards
   const PW = X.pwr || [], un = PW.filter(o => o.kind === 'unplanned'), pl = []; // 1.9.54 only unplanned power cuts // 1.9.30 ⚡ then power cuts
   // 1.9.98 Shane: power cuts only as tiles in the stories row, never as feed cards
   if (pl.length === 1) out.push({ id: 'pw:' + pl[0].id, x: 'pwr', o: pl[0], topic: 'family', t: 'Planned power cut' });
