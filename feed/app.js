@@ -384,6 +384,7 @@ function visible() {
     if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; // 1.9.0 parenting / drag & LGBTQ+ / social work: only when picked           // interests you've switched off
     if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
     if (tab === 'all' && (i.topic === 'election' || isElSrc(i.src))) return false; // 1.9.84 election only via its chip, not All
+    if (tab === 'all' && !i.pin && /\b(crash|court|sentenced|jailed|charged|election|parliament|politic|murder|stabbing)\b/i.test((i.t || '') + ' ' + (i.s || ''))) return false;
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     if ((i.topic === 'food' || i.topic === 'gf') && NON_NZ_FOOD.test((i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''))) return false; // 1.9.79 NZ food only
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
