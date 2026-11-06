@@ -54,7 +54,7 @@ function buildTiles() {
   try {
     if (typeof jokesToday === 'function') {
       const j = jokesToday()[0];
-      if (j) push({ id: 'today-joke-' + j.id, img: 'img/card-fallback.svg', label: 'Joke of the day', em: j.e || '😂', kind: 'joke', title: 'Joke of the day', text: j.q, url: null, _joke: j });
+      if (j) push({ id: 'today-joke-' + j.id, img: 'img/joke.svg', label: 'Joke of the day', em: j.e || '😂', kind: 'joke', title: 'Joke of the day', text: j.q, url: null, _joke: j });
     }
   } catch (e) { }
 
@@ -62,9 +62,12 @@ function buildTiles() {
   const POL = /\b(election|labour|national|act party|greens?|politic|mp\b|parliament|vote|voting|trump|biden)\b/i;
   const items = (typeof FEED !== 'undefined' && FEED && FEED.items) ? FEED.items : [];
   const ok = i => i && i.img && !SPORT.test((i.t || '') + ' ' + (i.s || '')) && i.topic !== 'election' && !POL.test((i.t || '') + ' ' + (i.s || ''));
-  const vid = items.filter(i => ok(i) && (i.vid || i.kind === 'video')).sort((a, b) => (b.at || 0) - (a.at || 0))[0];
-  if (vid) push({ id: 'hl-vid-' + vid.id, img: vid.img, label: 'Best video', em: '🎥', kind: 'highlight', item: vid, title: vid.t, text: vid.s || '', url: vid.url });
-  const animal = items.filter(i => ok(i) && (i.topic === 'dogs' || i.topic === 'nature' || /\b(dog|cat|puppy|kitten|bird|wildlife|animal|pet)\b/i.test(i.t || ''))).sort((a, b) => (b.at || 0) - (a.at || 0))[0];
+  const FUNV = /funny|hilarious|best of|bloopers?|fails?|cold open|prank|laugh|comedy|try not to|cute|adorable|epic|amazing|wow|unexpected|reaction/i, DULLV = /news|interview|explained|lecture|review|update|podcast|full episode|documentary|budget|report/i;
+  const fs = i => { const t = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.sn || ''); let s = 0; if (/^fun-|^yt-(cc|nbc|fox|neon)/.test(i.src || i.id || '')) s += 3; if (['sitcoms', 'dogs', 'pets', 'comedy'].includes(i.topic)) s += 3; if (FUNV.test(t)) s += 4; if (DULLV.test(t)) s -= 6; if (['news', 'science', 'nz', 'election'].includes(i.topic)) s -= 4; return s + Math.min(2, ((i.at || 0) - Date.now() + 864e5 * 3) / 864e5); };
+  const vids = items.filter(i => ok(i) && (i.vid || i.kind === 'video')).map(i => [fs(i), i]).filter(p => p[0] > 0).sort((a, b) => b[0] - a[0]);
+  const vid = vids.length ? vids[0][1] : null;
+  if (vid) push({ id: 'hl-vid-' + vid.id, img: vid.img, label: 'Funny video', em: '🎥', kind: 'highlight', item: vid, title: vid.t, text: vid.s || '', url: vid.url });
+  const animal = items.filter(i => ok(i) && i !== vid && (['dogs', 'pets'].includes(i.topic) || /\b(dogs?|cats?|pupp(y|ies)|kittens?|parrots?|otters?|goats?|pets?|animals?)\b/i.test(i.t || ''))).map(i => [fs(i) + (i.vid ? 2 : 0), i]).sort((a, b) => b[0] - a[0]).map(p => p[1])[0];
   if (animal) push({ id: 'hl-an-' + animal.id, img: animal.img, label: 'Cute animal', em: '🐾', kind: 'highlight', item: animal, title: animal.t, text: animal.s || '', url: animal.url });
   const local = items.filter(i => ok(i) && (i.topic === 'nz' || /\b(whang[aā]rei|northland|nz herald|stuff\.co\.nz|rnz)\b/i.test((i.sn || '') + ' ' + (i.url || '') + ' ' + (i.t || '')))).sort((a, b) => (b.at || 0) - (a.at || 0))[0];
   if (local) push({ id: 'hl-nz-' + local.id, img: local.img, label: 'Local news', em: '📰', kind: 'highlight', item: local, title: local.t, text: local.s || '', url: local.url });

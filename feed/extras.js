@@ -67,7 +67,7 @@ function renoCard(i) {
 const FEST = [{ k: 'xmas', iso: '2026-12-25', em: '🎄', what: 'Christmas', day: 'Merry Christmas! 🎄', img: 'img/xmas.webp' }, { k: 'ny', iso: '2027-01-01', em: '🎆', what: 'New Year’s Day', day: 'Happy New Year! 🎆', img: 'img/newyear.webp' }];
 let FEST_POS = null, FEST_FOR;
 window.festive = function (order, nPins) {
-  const T = todayN(), list = FEST.map(f => ({ ...f, n: dayN(f.iso) - T })).filter(f => f.n >= 0); if (!list.length || order.length < 4) return order;
+  const T = todayN(), list = FEST.map(f => ({ ...f, n: dayN(f.iso) - T })).filter(f => f.n >= 0 && f.n <= 5); if (!list.length || order.length < 4) return order;
   const lo = Math.max(2, nPins); // always below every pinned card, even when more pins arrive later
   if (!FEST_POS || FEST_FOR !== FEED) { FEST_FOR = FEED; const span = Math.max(6, Math.min(12, order.length - lo)), r = () => Math.floor(Math.random() * span);
     let a = r(), b = r(), g = 0; while (Math.abs(a - b) < 2 && g++ < 20) b = r(); FEST_POS = [a, b]; }
@@ -76,7 +76,7 @@ window.festive = function (order, nPins) {
   return out;
 };
 function festCard(i) {
-  const f = i.f, n = dayN(f.iso) - todayN(); if (n < 0) return '';
+  const f = i.f, n = dayN(f.iso) - todayN(); if (n < 0 || n > 5) return '';
   const when = new Date(f.iso + 'T12:00:00Z').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
   const big = n === 0 ? f.day : `${f.em} ${n} ${n === 1 ? 'day' : 'days'} to ${f.what}`, sub = n === 0 ? `Have a wonderful day, whānau!` : `${n === 1 ? '1 sleep' : n + ' sleeps'} · ${when}`;
   return `<article class="card xc fest ${f.k}" data-id="fest-${f.k}"><div class="fsbg" style="background-image:url('${f.img}')"><div class="fsin"><b>${esc(big)}</b><small>${esc(sub)}</small></div></div></article>`;
