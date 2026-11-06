@@ -476,6 +476,17 @@ html.force-light .stview,html:not(.force-dark) .stview{/* viewer always dark for
 /* 1.9.92 video countdown */.stmedia.stv{position:relative}.stcd{position:absolute;top:10px;right:10px;z-index:3;padding:5px 11px;border-radius:999px;font-weight:800;font-size:.95rem;color:#fff;background:linear-gradient(135deg,#ff6fb1,#ff9a5a);box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none;font-variant-numeric:tabular-nums}.stcd.low{animation:stcdp .6s ease-in-out infinite alternate}@keyframes stcdp{to{transform:scale(1.15)}}
 /* 1.9.95 Shane: no + button */.fabpost{display:none!important}
 /* 1.9.95 Shane: no topic-label highlight */.tp.tplash{animation:none!important}
+
+/* 1.9.101 colour themes: Ocean (dark), Spring (light), Candy Crush (light) */
+html.th-ocean{--bg:#04202f;--card:#0a3146;--ink:#e6f7ff;--mute:#8fc3d6;--line:#14506b;--chip:#0d3d55;--acc:#22d3ee;--acc2:#38bdf8}
+html.th-ocean body::before{background:radial-gradient(120% 60% at 0% 0%,#0e4a66 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#075e6e 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#0b3a5c 0%,transparent 60%),linear-gradient(180deg,#03263a,#021a29)!important}
+html.th-ocean .card{border-color:#14506b}
+html.th-spring{--bg:#f2fbe9;--card:#ffffff;--ink:#1f3a1a;--mute:#5f7a55;--line:#d6ecc4;--chip:#e5f6d6;--acc:#4caf50;--acc2:#f472b6}
+html.th-spring body::before{background:radial-gradient(120% 60% at 0% 0%,#dff7c8 0%,transparent 60%),radial-gradient(110% 55% at 100% 35%,#ffe0ef 0%,transparent 60%),radial-gradient(120% 60% at 20% 100%,#fff6c2 0%,transparent 60%),linear-gradient(180deg,#f3fde9,#fdf5fa)!important}
+html.th-spring .card{border-color:#d6ecc4}
+html.th-candy{--bg:#ffe3f4;--card:#fffafd;--ink:#3b0a3f;--mute:#8a4f86;--line:#ffc2e5;--chip:#ffd6ef;--acc:#ff3fa4;--acc2:#ff8a00}
+html.th-candy body::before{background:radial-gradient(90% 50% at 0% 0%,#ff9ad5 0%,transparent 60%),radial-gradient(90% 50% at 100% 30%,#b28dff 0%,transparent 60%),radial-gradient(90% 50% at 10% 70%,#7ee8ff 0%,transparent 55%),radial-gradient(90% 50% at 100% 100%,#ffd36e 0%,transparent 60%),linear-gradient(180deg,#ffd6f0,#ffe9c9)!important}
+html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px rgba(255,63,164,.15)}
 </style>
 </head>
 <body>
@@ -495,15 +506,15 @@ html.force-light .stview,html:not(.force-dark) .stview{/* viewer always dark for
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.100"></script>
-<script src="app.js?v=1.9.100"></script>
-<script src="extras.js?v=1.9.100"></script>
-<script src="jokes.js?v=1.9.100"></script>
-<script src="learn.js?v=1.9.100"></script>
-<script src="common-en.js?v=1.9.100"></script>
-<script src="explain.js?v=1.9.100"></script>
-<script src="effects.js?v=1.9.100"></script>
-<script src="stories.js?v=1.9.100"></script>
+<script src="family.js?v=1.9.101"></script>
+<script src="app.js?v=1.9.101"></script>
+<script src="extras.js?v=1.9.101"></script>
+<script src="jokes.js?v=1.9.101"></script>
+<script src="learn.js?v=1.9.101"></script>
+<script src="common-en.js?v=1.9.101"></script>
+<script src="explain.js?v=1.9.101"></script>
+<script src="effects.js?v=1.9.101"></script>
+<script src="stories.js?v=1.9.101"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

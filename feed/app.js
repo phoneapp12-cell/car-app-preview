@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.100';
+const APP_VERSION = '1.9.101';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1136,22 +1136,23 @@ var MF_OPTS = [['all', '🎬🖼️', 'Videos & pictures'], ['vid', '🎬', 'Vid
 var MF = ls.get('mediaFilter', 'all'); if (!MF_OPTS.some(o => o[0] === MF)) MF = 'all';
 /* 1.9.79 Show My App stuff (Shane's phone only) + Appearance (default dark for everyone) */
 var SHOW_LIFE = ls.get('showLife', 1) !== 0; // default ON
-var APPEAR = ls.get('appear', null); if (APPEAR !== 'light' && APPEAR !== 'dark' && APPEAR !== 'auto') { APPEAR = 'dark'; ls.set('appear', 'dark'); } // default dark, including existing users
+var APPEAR = ls.get('appear', null); if (!['light', 'dark', 'auto', 'ocean', 'spring', 'candy'].includes(APPEAR)) { APPEAR = 'dark'; ls.set('appear', 'dark'); } // default dark, including existing users
 
 function applyAppear() {
   const r = document.documentElement;
-  r.classList.remove('force-dark', 'force-light');
+  r.classList.remove('force-dark', 'force-light', 'th-ocean', 'th-spring', 'th-candy');
+  const TH = { ocean: ['dark', '#06263a'], spring: ['light', '#f0fbe9'], candy: ['light', '#ffe1f3'] }[APPEAR]; // 1.9.101 colour themes
+  if (TH) r.classList.add('force-' + TH[0], 'th-' + APPEAR);
   if (APPEAR === 'dark') r.classList.add('force-dark');
   else if (APPEAR === 'light') r.classList.add('force-light');
   // theme-color meta
-  const dark = APPEAR === 'dark' || (APPEAR === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const dark = APPEAR === 'dark' || APPEAR === 'ocean' || (APPEAR === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
   let m = document.querySelector('meta[name="theme-color"]:not([media])');
   if (!m) { m = document.createElement('meta'); m.name = 'theme-color'; document.head.append(m); }
-  m.content = dark ? '#0f1115' : '#ffffff';
+  m.content = TH ? TH[1] : dark ? '#0f1115' : '#ffffff';
   // also update media-specific ones so iOS picks the forced colour
   document.querySelectorAll('meta[name="theme-color"][media]').forEach(el => {
-    if (/dark/.test(el.media)) el.content = dark ? '#0f1115' : '#ffffff';
-    if (/light/.test(el.media)) el.content = dark ? '#0f1115' : '#ffffff';
+    el.content = TH ? TH[1] : dark ? '#0f1115' : '#ffffff';
   });
 }
 applyAppear();
@@ -1201,7 +1202,7 @@ function mfDrawer(open) {
   d.querySelector('.mfopts').innerHTML = `<p class="mfsec">Show me</p>` + MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
   const extra = d.querySelector('.mfextra');
   let x = `<p class="mfsec">Appearance</p><div class="mfappear">` +
-    [['dark','🌙','Dark'],['light','☀️','Light'],['auto','📱','Match phone']].map(([k,em,l]) =>
+    [['dark','🌙','Dark'],['light','☀️','Light'],['auto','📱','Match phone'],['ocean','🌊','Ocean'],['spring','🌸','Spring'],['candy','🍬','Candy Crush']].map(([k,em,l]) =>
       `<button type="button" class="mfopt${APPEAR===k?' on':''}" data-appear="${k}" role="menuitemradio" aria-checked="${APPEAR===k}"><span class="mfe">${em}</span><span>${l}</span>${APPEAR===k?'<i>✓</i>':''}</button>`).join('') + `</div>`;
   if (typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK) {
     x = `<p class="mfsec">My App</p><button type="button" class="mfopt${SHOW_LIFE?' on':''}" data-showlife="1" role="switch" aria-checked="${!!SHOW_LIFE}"><span class="mfe">📌</span><span>Show My App stuff</span>${SHOW_LIFE?'<i>✓</i>':''}</button>` + x;
@@ -1220,7 +1221,7 @@ function mfDrawer(open) {
     const t = e.target; if (!t || !t.closest) return;
     if (t.closest('#mfbtn')) { mfDrawer(true); return; }
     const sb = t.closest('[data-mfset]'); if (sb) { e.preventDefault(); mfSet(sb.dataset.mfset); return; }
-    const ab = t.closest('[data-appear]'); if (ab) { e.preventDefault(); APPEAR = ab.dataset.appear; ls.set('appear', APPEAR); applyAppear(); mfDrawer(true); toast(APPEAR === 'dark' ? 'Appearance: Dark' : APPEAR === 'light' ? 'Appearance: Light' : 'Appearance: Match phone'); return; }
+    const ab = t.closest('[data-appear]'); if (ab) { e.preventDefault(); APPEAR = ab.dataset.appear; ls.set('appear', APPEAR); applyAppear(); mfDrawer(true); toast('Appearance: ' + ({ dark: 'Dark', light: 'Light', auto: 'Match phone', ocean: 'Ocean 🌊', spring: 'Spring 🌸', candy: 'Candy Crush 🍬' }[APPEAR] || APPEAR)); return; }
     const lb = t.closest('[data-showlife]'); if (lb) { e.preventDefault(); SHOW_LIFE = !SHOW_LIFE; ls.set('showLife', SHOW_LIFE ? 1 : 0); mfDrawer(true); try { draw(); } catch (err) { } toast(SHOW_LIFE ? 'My App stuff: on' : 'My App stuff: off'); return; }
     if (t.closest('[data-mfclose]')) mfDrawer(false);
   });
