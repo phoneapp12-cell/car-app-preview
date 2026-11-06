@@ -19,20 +19,7 @@ function buildTiles() {
   const out = [], used = new Set();
   const push = t => { if (!t || !t.img || used.has(t.id) || out.length >= MAX) return; used.add(t.id); out.push(t); };
 
-  // (1) Family — members who posted in last 24h
-  if (typeof SHARES !== 'undefined' && Array.isArray(SHARES)) {
-    const cut = Date.now() - 864e5, by = new Map();
-    for (const s of SHARES) {
-      if (!s || !s.at || s.at < cut) continue;
-      const it = typeof shareItem === 'function' ? shareItem(s) : null;
-      const img = (it && (it.img || (it.photos && it.photos[0]))) || (s.snap && (s.snap.img || (s.snap.photos && s.snap.photos[0])));
-      if (!img) continue;
-      const who = s.name || (it && it.sn) || 'Family';
-      if (!by.has(who) || s.at > by.get(who).at) by.set(who, { id: 'fam-' + (s.id || who), img, label: who, em: '💬', kind: 'family', item: it, at: s.at, title: (it && it.t) || who, text: (s.caption || (it && it.s) || ''), url: it && it.url });
-    }
-    [...by.values()].sort((a, b) => b.at - a.at).forEach(push);
-  }
-
+  // 1.9.89 Shane: only weather + joke, then short videos (family posts, dates, news and topic tiles removed)
   // (2) Today — weather, next birthday/event ≤7d, joke
   try {
     const c = JSON.parse(localStorage.getItem('fxWx') || 'null');
@@ -41,14 +28,6 @@ function buildTiles() {
       // soft sky-ish fallback image via picsum-less: use a static candy gradient as data — better: open-meteo no img; use Wikipedia weather commons or a CSS-only tile
       const svg = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 105 170"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#5b9fff"/><stop offset="1" stop-color="#c6e4ff"/></linearGradient></defs><rect width="105" height="170" fill="url(#g)"/><text x="52" y="90" font-size="42" text-anchor="middle">' + em + '</text></svg>');
       push({ id: 'today-wx', img: svg, label: 'Whangārei ' + temp + '°', em, kind: 'weather', title: 'Whangārei weather', text: em + ' ' + temp + '°C right now', url: null, _wx: true });
-    }
-  } catch (e) { }
-  // birthday / family date within 7 days (extras X.dates) — only if Show My App / family dates available
-  try {
-    if (typeof SHOW_LIFE !== 'undefined' && SHOW_LIFE !== false && typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK && typeof lifeItems === 'function') {
-      const L = lifeItems(true) || [];
-      const d = L.filter(x => (x.cat === 'bday' || x.cat === 'event') && x.mine && x.days != null && x.days >= 0 && x.days <= 7).sort((a, b) => a.days - b.days)[0];
-      if (d) push({ id: 'today-life-' + d.id, img: d.cat === 'bday' ? 'img/birthday.svg' : 'img/event.svg', label: String(d.t || d.sub || 'Coming up').slice(0, 22), em: d.cat === 'bday' ? '🎂' : '🎉', kind: 'date', title: d.t || 'Coming up', text: d.days === 0 ? 'Today!' : 'In ' + d.days + ' day' + (d.days === 1 ? '' : 's'), url: null });
     }
   } catch (e) { }
   try {
@@ -64,31 +43,16 @@ function buildTiles() {
   const ok = i => i && i.img && !SPORT.test((i.t || '') + ' ' + (i.s || '')) && i.topic !== 'election' && !POL.test((i.t || '') + ' ' + (i.s || ''));
   const FUNV = /funny|hilarious|best of|bloopers?|fails?|cold open|prank|laugh|comedy|try not to|cute|adorable|epic|amazing|wow|unexpected|reaction/i, DULLV = /news|interview|explained|lecture|review|update|podcast|full episode|documentary|budget|report/i;
   const fs = i => { const t = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.sn || ''); let s = 0; if (/^fun-|^yt-(cc|nbc|fox|neon)/.test(i.src || i.id || '')) s += 3; if (['sitcoms', 'dogs', 'pets', 'comedy'].includes(i.topic)) s += 3; if (FUNV.test(t)) s += 4; if (DULLV.test(t)) s -= 6; if (['news', 'science', 'nz', 'election'].includes(i.topic)) s -= 4; return s + Math.min(2, ((i.at || 0) - Date.now() + 864e5 * 3) / 864e5); };
-  const vids = items.filter(i => ok(i) && (i.vid || i.kind === 'video')).map(i => [fs(i), i]).filter(p => p[0] > 0).sort((a, b) => b[0] - a[0]);
-  const vid = vids.length ? vids[0][1] : null;
-  if (vid) push({ id: 'hl-vid-' + vid.id, img: vid.img, label: 'Funny video', em: '🎥', kind: 'highlight', item: vid, title: vid.t, text: vid.s || '', url: vid.url });
-  const animal = items.filter(i => ok(i) && i !== vid && (['dogs', 'pets'].includes(i.topic) || /\b(dogs?|cats?|pupp(y|ies)|kittens?|parrots?|otters?|goats?|pets?|animals?)\b/i.test(i.t || ''))).map(i => [fs(i) + (i.vid ? 2 : 0), i]).sort((a, b) => b[0] - a[0]).map(p => p[1])[0];
-  if (animal) push({ id: 'hl-an-' + animal.id, img: animal.img, label: 'Cute animal', em: '🐾', kind: 'highlight', item: animal, title: animal.t, text: animal.s || '', url: animal.url });
-  const local = items.filter(i => ok(i) && (i.topic === 'nz' || /\b(whang[aā]rei|northland|nz herald|stuff\.co\.nz|rnz)\b/i.test((i.sn || '') + ' ' + (i.url || '') + ' ' + (i.t || '')))).sort((a, b) => (b.at || 0) - (a.at || 0))[0];
-  if (local) push({ id: 'hl-nz-' + local.id, img: local.img, label: 'Local news', em: '📰', kind: 'highlight', item: local, title: local.t, text: local.s || '', url: local.url });
-
-  // (4) Favourite topics — learn.js scores else PICK order
-  let topics = [];
-  try {
-    const L = window.ibLearn && window.ibLearn.get && window.ibLearn.get();
-    if (L && L.t) topics = Object.entries(L.t).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([t]) => t);
-  } catch (e) { }
-  if (!topics.length && typeof PICK !== 'undefined' && Array.isArray(PICK)) topics = PICK.slice();
-  if (!topics.length && typeof TOPICS !== 'undefined') topics = TOPICS.map(t => t[0]).filter(t => !['all', 'life', 'liked', 'photos', 'family', 'election'].includes(t));
-  for (const t of topics) {
-    if (out.length >= MAX) break;
-    if (typeof topicOn === 'function' && !topicOn(t)) continue;
-    if (t === 'election') continue;
-    const T = TOPIC[t]; if (!T) continue;
-    const it = items.filter(i => i.topic === t && i.img && ok(i)).sort((a, b) => (b.at || 0) - (a.at || 0))[0];
-    if (!it) continue;
-    push({ id: 'top-' + t, img: it.img, label: T[1], em: T[2], kind: 'topic', topic: t, item: it, title: it.t, text: it.s || '', url: it.url });
-  }
+  const SHORT = i => /youtube\.com\/shorts\/|v\.redd\.it|tiktok|reel/i.test((i.url || '') + ' ' + (i.vid || '') + ' ' + (i.v || ''));
+  const playable = i => { if (i.vid) return true; const v = typeof vidOf === 'function' && vidOf(i); return !!(v && (v.k === 'reddit' || v.k === 'mp4')); };
+  const vids = items.filter(i => ok(i) && playable(i))
+    .map(i => [fs(i) + (SHORT(i) ? 3 : 0), i]).filter(p => p[0] > 0).sort((a, b) => b[0] - a[0]).map(p => p[1]);
+  const LAB = i => { const t = (i.t || '') + ' ' + (i.topic || ''); if (['dogs', 'pets'].includes(i.topic) || /\b(dogs?|cats?|pupp(y|ies)|kittens?|animals?|pets?|birds?|otters?)\b/i.test(t)) return ['Cute animal', '🐾'];
+    if (i.topic === 'sitcoms' || /sitcom|comedy|cold open|bloopers?/i.test(t)) return ['Sitcom clip', '📺']; if (/fail|prank|funny|hilarious|laugh/i.test(t)) return ['Funny', '😂']; if (/wow|amazing|epic|incredible/i.test(t)) return ['Wow', '🤩'];
+    const T = typeof TOPIC !== 'undefined' && TOPIC[i.topic]; return T ? [T[1], T[2]] : ['Video', '🎥']; };
+  const seenTopic = {};
+  for (const v of vids) { if (out.length >= MAX) break; const k = v.topic || 'x'; if ((seenTopic[k] = (seenTopic[k] || 0) + 1) > 3) continue; const [label, em] = LAB(v);
+    push({ id: 'hl-vid-' + v.id, img: v.img, label, em, kind: 'highlight', item: v, title: v.t, text: v.s || '', url: v.url }); }
 
   return out.slice(0, MAX);
 }
@@ -137,8 +101,11 @@ function paint() {
   const btn = document.querySelector(`.stile[data-st="${ST_I}"]`);
   if (btn) { btn.classList.add('seen'); btn.classList.remove('fresh'); const a = btn.querySelector('.stav'); if (a) { a.classList.add('seen'); a.classList.remove('fresh'); } }
   const bars = TILES.map((_, k) => `<i class="${k < ST_I ? 'done' : k === ST_I ? 'on' : ''}"></i>`).join('');
+  const vo = t.item && !t.item.vid && typeof vidOf === 'function' ? vidOf(t.item) : null;
   const media = t.item && t.item.vid
-    ? `<div class="stmedia"><img src="${esc(t.img)}" alt=""><div class="stplay">▶</div></div>`
+    ? `<div class="stmedia stv"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=1&playsinline=1&rel=0&modestbranding=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
+    : vo && (vo.k === 'reddit' || vo.k === 'mp4')
+    ? `<div class="stmedia stv"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_480.mp4')}" poster="${esc(t.img)}" autoplay muted loop playsinline controls></video></div>`
     : `<div class="stmedia"><img src="${esc(t.img)}" alt=""></div>`;
   v.innerHTML = `<div class="stbars">${bars}</div>
     <button type="button" class="stx" data-stclose aria-label="Close">✕</button>

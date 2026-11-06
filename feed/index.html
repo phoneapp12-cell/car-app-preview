@@ -471,6 +471,8 @@ html.force-light .stview,html:not(.force-dark) .stview{/* viewer always dark for
 #stories-host{scroll-snap-align:start;scroll-margin-top:calc(var(--hdr,120px) + 4px)}
 /* 1.9.85 side menu scrolls by itself, page stays put */html:has(.mfdrawer.on),html:has(.mfdrawer.on) body{overflow:hidden}
 /* 1.9.86 joke answer always showing */.jka.jkshow{cursor:default;margin:10px 0 0}
+/* 1.9.89 stories play short videos right in the viewer */.stmedia.stv{display:flex;align-items:center;justify-content:center;background:#000}.stmedia.stv iframe,.stmedia.stv video{width:100%;aspect-ratio:9/16;max-height:72vh;border:0;background:#000;object-fit:contain}
+*:has(> .stmedia.stv) > .sttap{width:14%}
 </style>
 </head>
 <body>
@@ -490,15 +492,15 @@ html.force-light .stview,html:not(.force-dark) .stview{/* viewer always dark for
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.88"></script>
-<script src="app.js?v=1.9.88"></script>
-<script src="extras.js?v=1.9.88"></script>
-<script src="jokes.js?v=1.9.88"></script>
-<script src="learn.js?v=1.9.88"></script>
-<script src="common-en.js?v=1.9.88"></script>
-<script src="explain.js?v=1.9.88"></script>
-<script src="effects.js?v=1.9.88"></script>
-<script src="stories.js?v=1.9.88"></script>
+<script src="family.js?v=1.9.89"></script>
+<script src="app.js?v=1.9.89"></script>
+<script src="extras.js?v=1.9.89"></script>
+<script src="jokes.js?v=1.9.89"></script>
+<script src="learn.js?v=1.9.89"></script>
+<script src="common-en.js?v=1.9.89"></script>
+<script src="explain.js?v=1.9.89"></script>
+<script src="effects.js?v=1.9.89"></script>
+<script src="stories.js?v=1.9.89"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —
