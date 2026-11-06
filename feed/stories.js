@@ -214,3 +214,7 @@ window.stAud = function (v) { const id = v.dataset.rv; if (!id) return; if (ST_A
   au.currentTime = v.currentTime; au.play().catch(() => { });
   v.addEventListener('pause', () => au.pause()); v.addEventListener('ended', () => au.pause());
   const iv = setInterval(() => { if (!v.isConnected) { au.pause(); clearInterval(iv); return; } if (Math.abs(au.currentTime - v.currentTime) > .4) au.currentTime = v.currentTime; }, 1000); };
+
+/* 1.9.106 Reddit's "image deleted" stand-in is a tiny 130×60 picture: drop any tile or card showing it */
+document.addEventListener('load', e => { const i = e.target; if (!(i instanceof HTMLImageElement) || !/redd\.it|imgur/.test(i.currentSrc || i.src)) return;
+  if (i.naturalWidth <= 140 && i.naturalHeight <= 70) { const t = i.closest('.stile') || i.closest('#feed .card'); if (t) t.remove(); } }, true);
