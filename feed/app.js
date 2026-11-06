@@ -285,22 +285,24 @@ function moodLabel() { greet(); const el = $('#mood'); if (el) el.textContent = 
 function isNZc(i) { return !!i && !!(i.nz || /^(nz|ef|epg|tvm-nz|rnz|stuff|1news|nzgeo|doc|nzh|na-|wdc)/i.test(i.src || '') || /\.nz(\/|$|:)/i.test(((i.url || '').match(/^https?:\/\/[^/]+/) || [''])[0]) || /new zealand|aotearoa|kiwi|whang[aā]rei|northland|auckland|wellington|christchurch|tvnz|threenow|\bnz\b/i.test((i.t || '') + ' ' + (i.s || ''))); }
 function nzW(i) { return isNZc(i) ? (i.src === 'nz-tvg2' ? 2.2 : 1.6) : (i.topic === 'sitcoms' ? 0.55 : 0.8); }
 /* 1.9.84 boost funny videos, animals, sitcom clips, wow pictures, amazing facts, Northland */
-const FUN_SRC = /^(fun-|yt-dodo|cosy-dodo|pets-yt|vid-animal|rd-dog|rd-rare|rd-pup|rd-earth|rd-aww|apod|nasa|colossal|mentalfloss|fun-bored|fun-good|nl-|advocate|doc$)/;
+const FUN_SRC = /^(fun-|pets-|vid-|cosy-|map-|nl-|apod|nasa|colossal|mentalfloss|bored|goodnews|positive|futility|laughing|mildly|oddly|uplifting|simon|dodo|werate|eyebleach|aww|likeus|beamazed|interesting|mymodern|wikipotd|wikiotd|advocate|doc$)/;
 function funW(i) {
   let f = 1;
-  if (i.vid || i.kind === 'video') f *= 1.35;
+  if (i.vid || i.kind === 'video' || i.kind === 'tv') f *= 1.35;
   if (['dogs', 'nature', 'pets', 'sitcoms'].includes(i.topic)) f *= 1.4;
   if (['creative', 'learn', 'games', 'scifi'].includes(i.topic) && (i.img || i.vid)) f *= 1.25;
   if (FUN_SRC.test(i.src || '')) f *= 1.45;
-  if (/northland|whang[aā]rei|advocate|doc|nl-/i.test(i.src || '') || /whang[aā]rei|northland|bay of islands/i.test((i.t || '') + ' ' + (i.sn || ''))) f *= 1.3;
-  if (['nz', 'science', 'tech', 'election'].includes(i.topic) && !i.vid) f *= 0.55;
+  if (/^(nl-|advocate|doc)|northland|whang/i.test(i.src || '') || /whang[aā]rei|northland|bay of islands/i.test((i.t || '') + ' ' + (i.sn || ''))) f *= 1.3;
+  if (['nz', 'science', 'tech', 'election'].includes(i.topic) && !i.vid && !FUN_SRC.test(i.src || '')) f *= 0.55;
   if (i.kind === 'news' || (!i.vid && !i.img)) f *= 0.7;
   if (i.pos) f *= 1.15;
   return f;
 }
-function isDullCard(i) { // text-heavy dry news/science without wow media
+function isDullCard(i) { // dry news/science (fun/wow/Northland good-news sources stay in the fun pile)
   if (!i || i.vid || i.pin || i.kind === 'tv' || i.kind === 'video') return false;
-  if (['dogs', 'nature', 'pets', 'sitcoms', 'garden', 'food', 'creative'].includes(i.topic)) return false;
+  if (FUN_SRC.test(i.src || '')) return false;
+  if (['dogs', 'nature', 'pets', 'sitcoms', 'garden', 'food', 'creative', 'learn', 'games'].includes(i.topic)) return false;
+  if (i.pos && i.img) return false;
   return ['nz', 'science', 'tech', 'election', 'social'].includes(i.topic) || (!i.img && i.kind === 'news');
 }
 
@@ -338,24 +340,17 @@ function rank(items) {
     else if (q[0].i.src === prevSrc) { const j = q.findIndex(p => p.i.src !== prevSrc); if (j > 0 && j < 6) k = j; }
     const [p] = q.splice(k, 1); p.i._x = explore; out.push(p.i);
   }
-  // 1.9.84: no two dull text-heavy cards in a row; keep news+science to about 1 in 8
+  // 1.9.84: interleave dull news/science about 1 in 8; leftovers go at the end (still browsable via topic chips)
   const fun = [], dry = [];
   for (const i of out) (isDullCard(i) ? dry : fun).push(i);
-  if (!fun.length) return out;
+  if (!fun.length || !dry.length) return out;
   const mixed = [];
   let di = 0, sinceDry = 0;
   for (const i of fun) {
     mixed.push(i); sinceDry++;
-    if (di < dry.length && sinceDry >= 7) {
-      mixed.push(dry[di++]); sinceDry = 0;
-    }
+    if (di < dry.length && sinceDry >= 7) { mixed.push(dry[di++]); sinceDry = 0; }
   }
-  // leftover dry: only append if we still need a little variety, never adjacent
-  while (di < dry.length && mixed.length < out.length) {
-    if (isDullCard(mixed[mixed.length - 1])) break;
-    mixed.push(dry[di++]);
-    if (di < dry.length) break; // at most one extra
-  }
+  while (di < dry.length) mixed.push(dry[di++]);
   return mixed;
 }
 /* 1.8.5 🔮 Card of the day for anyone with Tarot on: the same card for everyone each day (NZ date), from the public-domain
