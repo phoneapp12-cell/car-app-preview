@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.98';
+const APP_VERSION = '1.9.99';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -883,6 +883,7 @@ function draw() {
   if (tab === 'photos') { drawPhotos(); return; }
   if (!TOPIC[tab] || !topicOn(tab) || (tab === 'election' && Date.now() >= ELECTION_END)) tab = 'all';
   order = tab === 'liked' ? visible() : rank(visible()); shown = 0;
+  { const RD = i => i && !i.pin && (/^r\//i.test(String(i.sn || '')) || /(^|\.)(reddit\.com|redd\.it)\//i.test(String(i.url || '').replace(/^https?:\/\//, ''))); if (tab !== 'liked') order = order.filter(i => !RD(i)); } // 1.9.99 Shane: no Reddit (r/) posts in the feed; the stories row still uses Reddit clips
   if (tab === 'all') order = weave(order.filter(i => !i.pin), (SHOW_LIFE !== false && typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK) ? lifeMix() : []); // 1.9.79 Show My App stuff toggle
   if (tab === 'all' && FAM_ON) order = weaveShares(order); // 1.7.0: family reposts for everyone
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
