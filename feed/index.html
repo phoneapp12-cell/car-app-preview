@@ -497,6 +497,15 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .hscroll > .card > .media.vid{position:relative}
 .hscroll > .card > .media:not(.vid) img,.hscroll > .card > a > .media img{flex:1 1 auto;height:100%;max-height:none;min-height:180px;object-fit:cover}
 .hscroll > .card > .bd,.hscroll > .card > .exrow,.hscroll > .card > .ft{flex:0 0 auto}
+
+/* 1.9.104 install pop-up when someone opens their invite link */
+.instwrap{position:fixed;inset:0;z-index:10050;background:rgba(10,6,24,.62);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:18px}
+.instb.instpop{margin:0;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.45);animation:instin .35s ease-out}
+.instwel{font-size:1.15em;font-weight:800;margin:0 0 6px}
+@keyframes instin{from{transform:translateY(20px) scale(.96);opacity:0}to{transform:none;opacity:1}}
+/* 1.9.104 What's new + Crystal of the week */
+.wnl{list-style:none;margin:4px 0 10px;padding:0;display:grid;gap:8px}.wnl li{display:flex;gap:10px;align-items:flex-start;line-height:1.35}.wnl li>span:first-child{font-size:1.2em;flex:0 0 auto}
+.card.wnew{background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 14%,var(--card)),color-mix(in srgb,var(--acc2) 14%,var(--card)))}
 </style>
 </head>
 <body>
@@ -516,15 +525,16 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.103"></script>
-<script src="app.js?v=1.9.103"></script>
-<script src="extras.js?v=1.9.103"></script>
-<script src="jokes.js?v=1.9.103"></script>
-<script src="learn.js?v=1.9.103"></script>
-<script src="common-en.js?v=1.9.103"></script>
-<script src="explain.js?v=1.9.103"></script>
-<script src="effects.js?v=1.9.103"></script>
-<script src="stories.js?v=1.9.103"></script>
+<script src="family.js?v=1.9.104"></script>
+<script src="app.js?v=1.9.104"></script>
+<script src="extras.js?v=1.9.104"></script>
+<script src="jokes.js?v=1.9.104"></script>
+<script src="learn.js?v=1.9.104"></script>
+<script src="common-en.js?v=1.9.104"></script>
+<script src="explain.js?v=1.9.104"></script>
+<script src="effects.js?v=1.9.104"></script>
+<script src="stories.js?v=1.9.104"></script>
+<script src="weekly.js?v=1.9.104"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

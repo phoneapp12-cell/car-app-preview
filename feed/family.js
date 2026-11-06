@@ -18,6 +18,7 @@ function mine(cap) { const n = myName(); return n ? n + '’s' : (cap ? 'Your' :
   if (inv && /^[\w-]{30,80}$/.test(inv)) {
     if (!MEMBER || MEMBER.tok !== inv) { MEMBER = { tok: inv, pending: 1 }; localStorage.setItem('mf.member', JSON.stringify(MEMBER)); }
   }
+  if (inv) { try { sessionStorage.setItem('ibFromInvite', '1'); } catch (e) { } } // 1.9.104 opened from an invite link: install pop-up straight away
   if (inv) { q.delete('invite'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash); }
 })();
 const FAM_ON = !!(MEMBER && MEMBER.id && !MEMBER.pending);
@@ -60,6 +61,7 @@ async function famInit() {
     return;
   }
   PICK = MEMBER.role === 'admin' ? null : ls.get('pick', null); giveDefaults();
+  if (PICK && !ls.get('seed104', 0)) { if (!PICK.includes('meals')) PICK.push('meals'); ls.set('pick', PICK); ls.set('seed104', 1); } // 1.9.104 easy weeknight meals on for everyone
   if (MEMBER.role === 'admin' && !ls.get('seed103', 0)) { ls.set('optIn', [...new Set([...ls.get('optIn', []), 'aiassist', 'smart', 'innov'])]); ls.set('seed103', 1); } // 1.9.103 Shane's new tech topics on
   CSEEN = ls.get('cseen', {});
   if (MEMBER.role !== 'admin' && !PICK) { // a new phone: their settings from the server, or the welcome screen

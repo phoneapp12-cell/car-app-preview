@@ -120,23 +120,28 @@ function wxNzCard(i) {
    steps (iPhone), or "open in Chrome/Safari first" with a copy-my-link button (Messenger/Facebook). "Later" hides it for 3 days. ---- */
 let BIP = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); BIP = e; installBanner(true); });
-addEventListener('appinstalled', () => { ls.set('installed', 1); document.querySelector('#instb')?.remove(); toast('📲 Installed – open Info Book from your home screen'); });
+addEventListener('appinstalled', () => { ls.set('installed', 1); document.querySelector('#instb')?.remove(); document.querySelector('#instwrap')?.remove(); toast('📲 Installed – open Info Book from your home screen'); });
 const SHARE_SVG = '<svg class="shic" viewBox="0 0 24 24" width="18" height="18" aria-label="Share"><path d="M12 3v12M7 8l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 function installKind() { if (IN_APP) return 'inapp'; if (IS_IOS) return 'ios'; if (BIP) return 'android'; if (/Android/i.test(navigator.userAgent)) return 'android-menu'; return ''; }
 function installBanner(redo) {
-  if (STANDALONE || ls.get('installed', 0) || Date.now() - ls.get('instLater', 0) < 3 * 864e5) return;
-  const k = installKind(); if (!k) return; const old = document.querySelector('#instb'); if (old && !redo) return; old?.remove();
-  const body = k === 'inapp' ? `<b>Open Info Book in Chrome or Safari first</b><p>Messenger and Facebook open links in their own little browser, where Info Book can’t be installed or send notifications.</p><ol><li>Tap <b>⋯</b> (top right) → <b>Open in Chrome</b> / <b>Open in Safari</b> – or copy your link and paste it there.</li><li>Then install it from there.</li></ol><div class="xbtns"><button class="btn pri" id="instcopy">📋 Copy my link</button><button class="btn" id="instlater">Later</button></div><small class="sst">Your link keeps you signed in – don’t share it with anyone else.</small>`
+  const POP = (() => { try { return sessionStorage.getItem('ibFromInvite') === '1'; } catch (e) { return false; } })(); // 1.9.104 invite link: pop-up, ignores Later
+  if (STANDALONE || ls.get('installed', 0) || (!POP && Date.now() - ls.get('instLater', 0) < 3 * 864e5)) return;
+  const k = installKind(); if (!k) return; const old = document.querySelector('#instb'); if (old && !redo) return; old?.remove(); document.querySelector('#instwrap')?.remove();
+  const ANDR = /Android/i.test(navigator.userAgent), tok = MEMBER && MEMBER.tok ? '?invite=' + encodeURIComponent(MEMBER.tok) : '';
+  const CHROME = 'intent://' + location.host + location.pathname.replace(/[^/]*$/, '') + tok + '#Intent;scheme=https;package=com.android.chrome;end';
+  const body = k === 'inapp' ? `<b>Open Info Book in Chrome or Safari first</b><p>Messenger and Facebook open links in their own little browser, where Info Book can’t be installed or send notifications.</p><ol><li>Tap <b>⋯</b> (top right) → <b>Open in Chrome</b> / <b>Open in Safari</b> – or copy your link and paste it there.</li><li>Then install it from there.</li></ol><div class="xbtns">${ANDR ? `<a class="btn pri" id="instchrome" href="${CHROME}">🌐 Open in Chrome</a>` : ''}<button class="btn${ANDR ? '' : ' pri'}" id="instcopy">📋 Copy my link</button><button class="btn" id="instlater">Later</button></div><small class="sst">Your link keeps you signed in – don’t share it with anyone else.</small>`
     : k === 'ios' ? `<b>Add Info Book to your Home Screen</b><p>It opens full screen like an app, and can send family notifications.</p><ol class="iost"><li>Tap the <b>Share</b> button ${SHARE_SVG} at the bottom of Safari.</li><li>Scroll down and tap <b>Add to Home Screen</b> <span class="plus">＋</span>.</li><li>Tap <b>Add</b>, then open <b>Info Book</b> from your Home Screen.</li></ol><div class="xbtns"><button class="btn" id="instlater">Later</button></div>`
     : k === 'android' ? `<b>Install Info Book</b><p>One tap – it goes on your home screen, opens like an app and can send family notifications.</p><div class="xbtns"><button class="btn pri" id="instgo">📲 Install Info Book</button><button class="btn" id="instlater">Later</button></div>`
     : `<b>Install Info Book</b><p>Tap the <b>⋮</b> menu in Chrome → <b>Install app</b> (or <b>Add to Home screen</b>). It then opens like an app and can send notifications.</p><div class="xbtns"><button class="btn" id="instlater">Later</button></div>`;
-  $('#feed').insertAdjacentHTML('beforebegin', `<section id="instb" class="instb ${k}" role="region" aria-label="Install Info Book"><div class="ic"><img src="icons/icon-192.png" width="44" height="44" alt=""></div><div class="tx">${body}</div></section>`);
+  const sec = `<section id="instb" class="instb ${k}${POP ? ' instpop' : ''}" role="region" aria-label="Install Info Book"><div class="ic"><img src="icons/icon-192.png" width="44" height="44" alt=""></div><div class="tx">${POP ? '<p class="instwel">👋 Welcome to Info Book!</p>' : ''}${body}</div></section>`;
+  if (POP) document.body.insertAdjacentHTML('beforeend', `<div id="instwrap" class="instwrap">${sec}</div>`);
+  else $('#feed').insertAdjacentHTML('beforebegin', sec);
 }
 async function copyLink() {
   const link = location.origin + location.pathname.replace(/[^/]*$/, '') + (MEMBER && MEMBER.tok ? '?invite=' + encodeURIComponent(MEMBER.tok) : '');
   try { await navigator.clipboard.writeText(link); toast('📋 Link copied – paste it into Chrome or Safari'); } catch (e) { prompt('Copy this link and open it in Chrome or Safari:', link); }
 }
-setTimeout(() => installBanner(), 2500);
+setTimeout(() => installBanner(), (() => { try { return sessionStorage.getItem('ibFromInvite') === '1'; } catch (e) { return false; } })() ? 700 : 2500);
 function streakCard() { // Family tab: who's on a streak, top streaks
   const L = X.streaks || []; if (!L.length) return '';
   const on = L.filter(r => r.cur > 0), top = L.slice().sort((a, b) => b.best - a.best)[0];
@@ -553,9 +558,9 @@ document.addEventListener('click', async e => {
   if (t.id === 'sgadd' || t.id === 'sgno') { suggApply(t.id === 'sgadd'); return; }
   if (t.closest('#greet') || t.closest('[data-profile]')) { if (FAM_ON) profileSheet(); return; }
   if (t.id === 'pushon' || t.id === 'pushask-on') { document.querySelector('#pushask')?.remove(); if (await pushOn() && $('#sheet').classList.contains('on')) profileSheet(); return; }
-  if (t.id === 'instlater') { ls.set('instLater', Date.now()); $('#instb')?.remove(); return; }
+  if (t.id === 'instlater') { ls.set('instLater', Date.now()); try { sessionStorage.removeItem('ibFromInvite'); } catch (e) { } $('#instb')?.remove(); $('#instwrap')?.remove(); return; }
   if (t.id === 'instcopy') { copyLink(); return; }
-  if (t.id === 'instgo') { if (BIP) { BIP.prompt(); const r = await BIP.userChoice.catch(() => ({})); BIP = null; if (r.outcome === 'accepted') { ls.set('installed', 1); $('#instb')?.remove(); } } return; }
+  if (t.id === 'instgo') { if (BIP) { BIP.prompt(); const r = await BIP.userChoice.catch(() => ({})); BIP = null; if (r.outcome === 'accepted') { ls.set('installed', 1); $('#instb')?.remove(); $('#instwrap')?.remove(); } } return; }
   if (t.id === 'celebok' || t.id === 'celeb') { $('#celeb')?.remove(); return; }
   if (t.closest('#stchip')) { if (FAM_ON) profileSheet(); return; }
   if (t.id === 'pushask-no') { document.querySelector('#pushask')?.remove(); return; }

@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.103';
+const APP_VERSION = '1.9.104';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -18,6 +18,7 @@ const TOPICS = [
   ['nature', 'Nature', '🌿', '#059669', '#0e7490'],
   ['events', 'NZ events', '🎆', '#be123c', '#7c3aed'],
   ['food', 'Food (GF)', '🍲', '#c2410c', '#eab308'],
+  ['meals', 'Easy weeknight meals', '🍝', '#ea580c', '#16a34a'], // 1.9.104 Nicolle's idea, on for everyone
   ['gf', 'Gluten free & food brands', '🌾', '#a16207', '#16a34a'],
   ['kids', 'Kids & activities', '🧒', '#0284c7', '#f59e0b'], // 1.7.1: on for everyone (crafts, science, school holidays, family days out, sensory-friendly ideas) // 1.6.1: NZ meal kits, GF bread and brands, vegan and GF events (also shown in Food and For You)
   ['tech', 'AI & tech', '🤖', '#4f46e5', '#06b6d4'],
@@ -48,7 +49,7 @@ const TOPICS = [
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t]));
 Object.defineProperty(TOPIC.life, 1, { get: () => forMe(1), enumerable: true }); // 1.9.74 📌 For Shane / For Sarah … // 1.4.0: About-you chips are added to this as they're found
-const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down
+const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const NON_NZ_FOOD = /\b(walmart|wal-?mart|trader joe'?s|traderjoes|kroger|aldi\b|tesco|asda|sainsbury'?s?|waitrose|lidl|costco\s*(usa?|us|america)|sam'?s club|target(?!\s*(nz|new zealand))|whole foods|heb\b|publix|meijer|wegmans|shoprite|food lion|dollar general|walgreens|cvs\b|home depot|lowe'?s|usd\b|usda\b)\b/i; // 1.9.79
