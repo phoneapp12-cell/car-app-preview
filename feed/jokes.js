@@ -64,7 +64,7 @@ document.addEventListener('click', e => { const b = e.target && e.target.closest
 const jkCard = window.card; window.card = function (i) { return i && i.x === 'joke' ? jokeCard(i) : jkCard(i); };
 const jkFestive = window.festive;
 window.festive = function (order, nPins) {
-  order = jkFestive ? jkFestive(order, nPins) : order; if (order.length < 10) return order;
+  order = jkFestive ? jkFestive(order, nPins) : order; return order; // 1.9.97 Shane: joke only in the top row, no joke cards in the feed
   const out = order.slice(), J = jokesToday().filter(k => !out.some(x => x.id === k.id));
   J.forEach((k, n) => { const at = Math.min(Math.max(2, nPins) + 5 + n * 14 + (hash(k.id + seenDayN()) % 6), out.length); out.splice(at, 0, { id: k.id, x: 'joke', k, topic: 'games', t: k.q }); });
   return out;

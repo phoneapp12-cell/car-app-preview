@@ -31,7 +31,7 @@ function buildTiles() {
     }
   } catch (e) { }
   try {
-    if (false && typeof jokesToday === 'function') { // 1.9.96 Shane: no Joke of the day tile
+    if (typeof jokesToday === 'function') {
       const j = jokesToday()[0];
       if (j) push({ id: 'today-joke-' + j.id, img: 'img/joke.svg', label: 'Joke of the day', em: j.e || '😂', kind: 'joke', title: 'Joke of the day', text: j.q + '  😂 ' + j.a, url: null, _joke: j });
     }
