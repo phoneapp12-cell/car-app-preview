@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.83';
+const APP_VERSION = '1.9.84';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -47,7 +47,7 @@ const TOPICS = [
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t]));
 Object.defineProperty(TOPIC.life, 1, { get: () => forMe(1), enumerable: true }); // 1.9.74 📌 For Shane / For Sarah … // 1.4.0: About-you chips are added to this as they're found
-const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 1.2, gf: 1.0, kids: 0.9, sitcoms: 1.35, garden: 1.1, music: 1, scifi: 1.05, nz: 1, dogs: 1, nature: 0.95, events: 0.9, food: 0.95, tech: 0.85, diy: 0.85, science: 0.85, travel: 0.85, fitness: 0.85, selling: 0.85, creative: 0.8, culture: 0.75, learn: 0.75, games: 0.75, collect: 0.75, outdoors: 0.8, cars: 0.75 }; // sitcoms lead
+const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, tech: 0.7, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const NON_NZ_FOOD = /\b(walmart|wal-?mart|trader joe'?s|traderjoes|kroger|aldi\b|tesco|asda|sainsbury'?s?|waitrose|lidl|costco\s*(usa?|us|america)|sam'?s club|target(?!\s*(nz|new zealand))|whole foods|heb\b|publix|meijer|wegmans|shoprite|food lion|dollar general|walgreens|cvs\b|home depot|lowe'?s|usd\b|usda\b)\b/i; // 1.9.79
@@ -284,6 +284,26 @@ function moodLabel() { greet(); const el = $('#mood'); if (el) el.textContent = 
 /* 1.9.60 keep it local: NZ & Northland posts (and TVNZ / Three programmes) weigh more, overseas less */
 function isNZc(i) { return !!i && !!(i.nz || /^(nz|ef|epg|tvm-nz|rnz|stuff|1news|nzgeo|doc|nzh|na-|wdc)/i.test(i.src || '') || /\.nz(\/|$|:)/i.test(((i.url || '').match(/^https?:\/\/[^/]+/) || [''])[0]) || /new zealand|aotearoa|kiwi|whang[aā]rei|northland|auckland|wellington|christchurch|tvnz|threenow|\bnz\b/i.test((i.t || '') + ' ' + (i.s || ''))); }
 function nzW(i) { return isNZc(i) ? (i.src === 'nz-tvg2' ? 2.2 : 1.6) : (i.topic === 'sitcoms' ? 0.55 : 0.8); }
+/* 1.9.84 boost funny videos, animals, sitcom clips, wow pictures, amazing facts, Northland */
+const FUN_SRC = /^(fun-|yt-dodo|cosy-dodo|pets-yt|vid-animal|rd-dog|rd-rare|rd-pup|rd-earth|rd-aww|apod|nasa|colossal|mentalfloss|fun-bored|fun-good|nl-|advocate|doc$)/;
+function funW(i) {
+  let f = 1;
+  if (i.vid || i.kind === 'video') f *= 1.35;
+  if (['dogs', 'nature', 'pets', 'sitcoms'].includes(i.topic)) f *= 1.4;
+  if (['creative', 'learn', 'games', 'scifi'].includes(i.topic) && (i.img || i.vid)) f *= 1.25;
+  if (FUN_SRC.test(i.src || '')) f *= 1.45;
+  if (/northland|whang[aā]rei|advocate|doc|nl-/i.test(i.src || '') || /whang[aā]rei|northland|bay of islands/i.test((i.t || '') + ' ' + (i.sn || ''))) f *= 1.3;
+  if (['nz', 'science', 'tech', 'election'].includes(i.topic) && !i.vid) f *= 0.55;
+  if (i.kind === 'news' || (!i.vid && !i.img)) f *= 0.7;
+  if (i.pos) f *= 1.15;
+  return f;
+}
+function isDullCard(i) { // text-heavy dry news/science without wow media
+  if (!i || i.vid || i.pin || i.kind === 'tv' || i.kind === 'video') return false;
+  if (['dogs', 'nature', 'pets', 'sitcoms', 'garden', 'food', 'creative'].includes(i.topic)) return false;
+  return ['nz', 'science', 'tech', 'election', 'social'].includes(i.topic) || (!i.img && i.kind === 'news');
+}
+
 function rank(items) {
   const W = weights(), now = Date.now();
   const scored = items.map(i => {
@@ -293,7 +313,7 @@ function rank(items) {
     const media = i.vid ? 1.15 : i.img ? 1.1 : i.kind === 'tip' ? 0.8 : 0.6; // pictures and videos first
     const seen = Math.pow(0.8, SEEN[i.id] || 0);                   // seen a few times: let new things through
     const hot = i.hot ? 1.5 : 1;                                   // e.g. fireworks this week
-    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) * popW(i) * nzW(i) }; // 1.8.1 popW: family likes
+    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) * popW(i) * nzW(i) * funW(i) }; // 1.9.84 funW
   }).sort((a, b) => b.sc - a.sc);
   // Mix: each step takes the best next post from the topic that's due, so every interest gets a turn
   // (higher-voted topics, and sitcoms, come round more often). About 1 in 7 slots explores further down a list.
@@ -318,7 +338,25 @@ function rank(items) {
     else if (q[0].i.src === prevSrc) { const j = q.findIndex(p => p.i.src !== prevSrc); if (j > 0 && j < 6) k = j; }
     const [p] = q.splice(k, 1); p.i._x = explore; out.push(p.i);
   }
-  return out;
+  // 1.9.84: no two dull text-heavy cards in a row; keep news+science to about 1 in 8
+  const fun = [], dry = [];
+  for (const i of out) (isDullCard(i) ? dry : fun).push(i);
+  if (!fun.length) return out;
+  const mixed = [];
+  let di = 0, sinceDry = 0;
+  for (const i of fun) {
+    mixed.push(i); sinceDry++;
+    if (di < dry.length && sinceDry >= 7) {
+      mixed.push(dry[di++]); sinceDry = 0;
+    }
+  }
+  // leftover dry: only append if we still need a little variety, never adjacent
+  while (di < dry.length && mixed.length < out.length) {
+    if (isDullCard(mixed[mixed.length - 1])) break;
+    mixed.push(dry[di++]);
+    if (di < dry.length) break; // at most one extra
+  }
+  return mixed;
 }
 /* 1.8.5 🔮 Card of the day for anyone with Tarot on: the same card for everyone each day (NZ date), from the public-domain
    1909 Rider–Waite–Smith deck on Wikimedia Commons. Cards that are drawn with nudity (Lovers, Devil, Star, Sun, Judgement,
@@ -350,6 +388,7 @@ function visible() {
     if (!topicOn(i.topic) || intHidden(i)) return false;
     if (OPTIN.has(i.topic) && !optedIn(i.topic)) return false; // 1.9.0 parenting / drag & LGBTQ+ / social work: only when picked           // interests you've switched off
     if ((i.topic === 'election' || isElSrc(i.src)) && !elLive(i)) return false; // after election night
+    if (tab === 'all' && (i.topic === 'election' || isElSrc(i.src))) return false; // 1.9.84 election only via its chip, not All
     if (i.kind === 'event' && i.ev && i.ev < Date.now() - 6 * 36e5) return false; // 1.6.1: past events go
     if ((i.topic === 'food' || i.topic === 'gf') && NON_NZ_FOOD.test((i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''))) return false; // 1.9.79 NZ food only
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));

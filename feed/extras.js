@@ -471,11 +471,12 @@ const POLITICS_FIGHT = /\b(trump|congress|democrats?|republicans?|white house|ma
 function toneW(i) {
   if (i.pin || i.topic === 'life' || i._share || i.kind === 'tip') return 1;
   const txt = (i.t || '') + ' ' + (i.s || ''); let f = 1;
-  if (HEAVY_HARD.test(txt)) f *= NEWSY.has(i.topic) ? 0 : 0.35; else if (HEAVY_SOFT.test(txt)) f *= 0.55;
-  if (i.topic !== 'selling' && FINANCE.test(txt)) return 0; if (POLITICS_FIGHT.test(txt)) f *= NEWSY.has(i.topic) ? 0.15 : 0.4;
-  if (i.neg) f *= 0.5; // the data service's sentiment pass says it's a downer
-  if (FUN.test(txt)) f *= 1.25; if (i.pos) f *= 1.1;
-  if (i.topic === 'election' && /\b(slams?|attacks?|row|feud|clash\w*|blasts?|accus\w*)\b/i.test(txt)) f *= 0.4; // politics fights
+  if (HEAVY_HARD.test(txt)) f *= NEWSY.has(i.topic) ? 0 : 0.25; else if (HEAVY_SOFT.test(txt)) f *= NEWSY.has(i.topic) ? 0.35 : 0.55;
+  if (i.topic !== 'selling' && FINANCE.test(txt)) return 0; if (POLITICS_FIGHT.test(txt)) f *= NEWSY.has(i.topic) ? 0 : 0.3;
+  if (/\b(crash|court|sentenced|jailed|charged|election|parliament|politic|murder|stabbing)\b/i.test(txt) && NEWSY.has(i.topic)) return 0; // 1.9.84
+  if (i.neg) f *= 0.4;
+  if (FUN.test(txt)) f *= 1.35; if (i.pos) f *= 1.2;
+  if (i.topic === 'election' && /\b(slams?|attacks?|row|feud|clash\w*|blasts?|accus\w*)\b/i.test(txt)) f *= 0.3;
   return f;
 }
 window.popW = function (i) {
