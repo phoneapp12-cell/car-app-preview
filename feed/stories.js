@@ -76,7 +76,7 @@ function rowHtml(tiles) {
 let TILES = [], ST_I = 0, ST_TIMER = 0;
 
 function openViewer(i) {
-  TILES = buildTiles(); if (!TILES.length) return;
+  if (!TILES.length) TILES = buildTiles(); if (!TILES.length) return; // 1.9.94 use the row as shown (a rebuild could shift tiles and open the wrong one)
   ST_I = Math.max(0, Math.min(i, TILES.length - 1));
   let v = document.getElementById('stview');
   if (!v) {
