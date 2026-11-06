@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.16';
+const APP_VERSION = '2.29.17';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -9400,11 +9400,11 @@ function Shopping() {
   return header('Shopping list', open.length ? plural(open.length, 'thing') + ' to get' : 'Nothing to get') + mealTabs('shop') +
     `<form class="addbar" onsubmit="shopQuickAdd(event)"><input id="newshop" placeholder="Add an item…" autocomplete="off" enterkeyhint="done" maxlength="120" aria-label="New shopping item"><button aria-label="Add">${I('plus')}</button></form>
     <label class="sharechk"><input type="checkbox" id="shopshare"> Also add to Sarah’s list</label>
-    <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button>` : ''}</div>
+    <div class="btns shopbtns"><button class="btn primary" id="shopfrommeals" onclick="shopForm()">${I('meal')} Add from meal plan${nights ? ` (${nights})` : ''}</button><button class="btn" id="shopscanbtn" onclick="shopScanForm()">${I('camera')} Scan screenshot</button>${open.length ? `<button class="btn" id="copyshop" onclick="copyShopList()">${I('copy')} Copy</button>` : ''}</div>
     ${progLine(got.length, open.length + got.length, 'Shopping')}${wwTotalHtml(open)}${open.length ? `<div class="list" id="shoplist">${open.map(shopRow).join('')}</div>` : got.length ? '<div class="card empty"><div class="t">All got. Good as gold!</div></div>' : empty('Your shopping list is empty', 'Type an item above and tap +, or add the ingredients for your planned meals.', '', '')}
     ${got.length ? `<div class="sec">Got <button onclick="clearGot()">Clear</button></div><div class="list" id="shopgot">${got.map(shopRow).join('')}</div>` : ''}
     <div class="foot" id="shoppushline">${shopPushLine()}</div>
-    <div class="foot">“Check label” means gluten often hides in it, so look for “gluten free” on the pack. Tap an item to change or delete it. Prices are Woolworths NZ online prices (woolworths.co.nz), checked daily; tap one to open the product.</div>`;
+    <div class="foot">“Check label” means gluten often hides in it, so look for “gluten free” on the pack. Tap an item to change or delete it. Prices are Woolworths NZ online prices (woolworths.co.nz), checked daily; tap one to open the product. Scan screenshot reads a Messenger pic or shelf photo onto this list (on your phone).</div>`;
 }
 // 2.26.49: phone notification when Sarah adds to shopping (and Sarah gets one when you share an item with her)
 function shopPushLine() {
@@ -9518,6 +9518,113 @@ function homeShop() {
   return homeSec('Shopping list', '<a href="#shopping">See all</a>') + `<div class="list" id="homeshop">${open.slice(0, 5).map(shopRow).join('')}</div>` +
     (open.length > 5 ? `<div class="homemore"><a href="#shopping">${plural(open.length - 5, 'more item')}</a></div>` : '');
 }
+/* 2.29.17: Scan a screenshot / Messenger photo onto the shopping list (Tesseract on this phone, same as recipe scan). */
+let shopScanBusy = false, shopScanItems = [];
+function shopScanForm() {
+  shopScanBusy = false; shopScanItems = [];
+  openSheet('Scan to shopping list', shopScanInner(), async () => {
+    if (shopScanBusy) return 'Still reading the photo. Hang on a moment.';
+    const picked = [...document.querySelectorAll('#shopscanlist input[data-i]:checked')].map(el => shopScanItems[+el.dataset.i]).filter(Boolean);
+    if (!picked.length) return shopScanItems.length ? 'Tick at least one item to add.' : 'Choose a screenshot or photo first.';
+    const n = addToShop(picked, '');
+    await save();
+    return () => { render(); toast(n ? (n === 1 ? 'Added to the shopping list.' : `Added ${n} items.`) : 'Those were already on the list.'); };
+  }, 'Add to list');
+  shopScanButtons();
+}
+function shopScanInner() {
+  return `<p class="muted" style="margin:-4px 0 10px">Sarah sends shopping pics on Messenger? Share the photo into My App, or pick it here. Text is read on your phone — nothing is uploaded.</p>
+    <div class="scantips">A clear shot of the product name or a written list works best. Prices and store chrome are skipped when we can.</div>
+    <input type="file" accept="image/*" capture="environment" id="shopscancam" hidden onchange="shopScanFile(this)">
+    <input type="file" accept="image/*" id="shopscanpick" hidden onchange="shopScanFile(this)">
+    <div class="btns" id="shopscanbtns"></div>
+    <div id="shopscanstat" class="scanstat" hidden><div class="t" id="shopscanmsg"></div><div class="bar"><i id="shopscanbar"></i></div></div>
+    <div id="shopscanlist" class="list"></div>`;
+}
+function shopScanButtons() {
+  const b = $('#shopscanbtns'); if (!b) return;
+  const more = shopScanItems.length > 0;
+  b.innerHTML = `<button type="button" class="btn ${more ? '' : 'primary'}" id="shopscantake" onclick="document.getElementById('shopscancam').click()" ${shopScanBusy ? 'disabled' : ''}>${I('camera')} ${more ? 'Scan another' : 'Take a photo'}</button>
+    <button type="button" class="btn" id="shopscanchoose" onclick="document.getElementById('shopscanpick').click()" ${shopScanBusy ? 'disabled' : ''}>${I('image')} ${more ? 'Choose another' : 'Choose a screenshot'}</button>`;
+}
+function shopScanStatus(msg, pct) {
+  const box = $('#shopscanstat'); if (!box) return;
+  box.hidden = !msg; $('#shopscanmsg').textContent = msg || ''; $('#shopscanbar').style.width = Math.round((pct || 0) * 100) + '%';
+}
+function shopScanRenderList() {
+  const box = $('#shopscanlist'); if (!box) return;
+  if (!shopScanItems.length) { box.innerHTML = ''; return; }
+  const open = new Set(S.shop.items.filter(x => !x.done).map(x => mNorm(x.name)));
+  box.innerHTML = `<p class="muted" style="margin:8px 0 6px">Tick what to add (${shopScanItems.length} found).</p>` +
+    shopScanItems.map((name, i) => {
+      const already = open.has(mNorm(name));
+      return `<label class="srow"><input type="checkbox" data-i="${i}" ${already ? '' : 'checked'}><div class="tx"><div class="t">${esc(name)}</div>${already ? '<div class="s">Already on the list</div>' : ''}</div></label>`;
+    }).join('');
+}
+function parseShopScan(text) {
+  const SKIP = /^(ingredients?|method|directions?|instructions?|you will need|page\s*\d+|total|subtotal|gst|tax|change|eftpos|visa|mastercard|receipt|thank you|www\.|http|woolworths|countdown|new world|pak'?n?save|freshchoice|the warehouse|kmart|mitre\s*10|bunnings|messenger|facebook|instagram|screenshot)\b/i;
+  const PRICE_ONLY = /^\$?\d+([.,]\d{2})?$/;
+  const lines = String(text || '').split('\n').map(l => l.replace(/^[•·●○▪■*\-–—]\s*/, '').replace(/\s{2,}/g, ' ').trim());
+  const out = [], seen = new Set();
+  for (let l of lines) {
+    if (!l || PRICE_ONLY.test(l) || SKIP.test(l) || /^page\s*\d+$/i.test(l) || /^\d+$/.test(l)) continue;
+    l = l.replace(/\s+\$?\d+[.,]\d{2}\s*$/, '').replace(/\s+\$\d+(?:\.\d{2})?\s*$/, '').trim();
+    if (l.length < 2 || l.length > 80 || !/[a-zA-Z]{2}/.test(l)) continue;
+    if (/^[A-Z0-9\s\-_]{12,}$/.test(l) && !/[aeiou]/i.test(l)) continue; // barcode-ish
+    const k = mNorm(l); if (seen.has(k)) continue; seen.add(k);
+    out.push(l.slice(0, 120));
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+async function shopScanFile(input) {
+  const file = input.files && input.files[0]; input.value = '';
+  if (!file || shopScanBusy) return;
+  shopScanBusy = true; shopScanButtons();
+  const first = !ocrWorker;
+  scanLog = m => {
+    if (m.status === 'recognizing text') shopScanStatus('Reading the photo…', m.progress);
+    else if (/load|initiali/.test(m.status)) shopScanStatus(first ? 'Getting the text reader ready (first time only, about 7 MB)…' : 'Getting ready…', m.progress);
+  };
+  try {
+    shopScanStatus('Preparing the photo…', 0.02);
+    const img = await scanImage(file);
+    shopScanStatus(first ? 'Getting the text reader ready (first time only, about 7 MB)…' : 'Getting ready…', 0.05);
+    const w = await getOcr();
+    shopScanStatus('Reading the photo…', 0);
+    const { data } = await w.recognize(img);
+    const text = cleanOcr(data.text || '');
+    if (!sheetOpen) return;
+    const found = parseShopScan(text);
+    if (!found.length) { shopScanStatus(''); toast('Couldn’t find shopping items in that photo. Try a closer shot of the names.'); }
+    else {
+      const have = new Set(shopScanItems.map(mNorm));
+      found.forEach(n => { if (!have.has(mNorm(n))) { have.add(mNorm(n)); shopScanItems.push(n); } });
+      shopScanStatus(''); shopScanRenderList();
+      toast(found.length === 1 ? 'Found 1 item. Tick what to add.' : `Found ${found.length} items. Tick what to add.`);
+    }
+  } catch (e) {
+    shopScanStatus('');
+    toast(navigator.onLine ? 'Sorry, the photo couldn’t be read. Try again.' : 'The first scan needs internet to get the text reader. Try again when you’re online.');
+  } finally { shopScanBusy = false; scanLog = null; shopScanButtons(); }
+}
+async function shopScanFromBlob(blob, label) {
+  if (!blob || shopScanBusy) return;
+  shopScanBusy = false; shopScanItems = [];
+  openSheet('Scan to shopping list', shopScanInner(), async () => {
+    if (shopScanBusy) return 'Still reading the photo. Hang on a moment.';
+    const picked = [...document.querySelectorAll('#shopscanlist input[data-i]:checked')].map(el => shopScanItems[+el.dataset.i]).filter(Boolean);
+    if (!picked.length) return shopScanItems.length ? 'Tick at least one item to add.' : 'Still reading — hang on a moment.';
+    const n = addToShop(picked, '');
+    await save();
+    return () => { render(); toast(n ? (n === 1 ? 'Added to the shopping list.' : `Added ${n} items.`) : 'Those were already on the list.'); };
+  }, 'Add to list');
+  shopScanButtons();
+  const file = blob instanceof File ? blob : new File([blob], label || 'photo.jpg', { type: blob.type || 'image/jpeg' });
+  const fake = { files: [file], value: '' };
+  await shopScanFile(fake);
+}
+
 function takeShopNote() { const n = S && S.shop && S.shop.movedNote; if (n) delete S.shop.movedNote; return n || ''; }
 
 // One-off message after the gluten-free update of the starter ideas (set by migrateStarters)
@@ -29847,7 +29954,7 @@ function PhotosPage() {
 function phView(id) { const x = phGet(id); if (!x) return; const url = URL.createObjectURL(x.blob); let ov = document.getElementById('phview'); if (ov) ov.remove();
   ov = document.createElement('div'); ov.id = 'phview';
   const tagsH = () => (x.tags || []).map(t => `<span class="chip on">${esc(t)} <b role="button" aria-label="Remove ${esc(t)}" data-rm="${esc(t)}">×</b></span>`).join('');
-  ov.innerHTML = `<div class="phtop"><button type="button" class="btn small" data-a="close">${I('left')} Back</button><span style="flex:1"></span><button type="button" class="btn small" data-a="share">Share</button><button type="button" class="btn small" data-a="todo">Set as to-do</button><button type="button" class="btn small danger" data-a="del">Delete</button></div>
+  ov.innerHTML = `<div class="phtop"><button type="button" class="btn small" data-a="close">${I('left')} Back</button><span style="flex:1"></span><button type="button" class="btn small" data-a="share">Share</button><button type="button" class="btn small" data-a="shop">Add to shopping</button><button type="button" class="btn small" data-a="todo">Set as to-do</button><button type="button" class="btn small danger" data-a="del">Delete</button></div>
     <div class="phzoom"><img src="${url}" alt=""></div>
     <div class="phmeta"><input class="phtitle" placeholder="Title (optional)" value="${esc(x.title || '')}"><div class="s muted">Added ${esc(fmtW(nzStampLocal(new Date(x.added)).slice(0, 10)))}</div>
     <div class="phchips phtg">${tagsH()}</div>${phTagList()}<input class="phaddtag" list="phtags" placeholder="Add a tag" autocomplete="off">
@@ -29868,6 +29975,7 @@ function phView(id) { const x = phGet(id); if (!x) return; const url = URL.creat
   ov.querySelector('.phtop').onclick = async e => { const a = e.target.closest('[data-a]'); if (!a) return; const k = a.dataset.a;
     if (k === 'close') close();
     else if (k === 'share') { try { const f = new File([x.blob], (x.title || 'photo').replace(/[^\w-]+/g, '-').slice(0, 40) + '.jpg', { type: 'image/jpeg' }); if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: x.title || 'Photo', text: x.note || '' }); else toast('Sharing photos isn’t available here.'); } catch (er) { } }
+    else if (k === 'shop') { ov.remove(); URL.revokeObjectURL(url); shopScanFromBlob(x.blob, (x.title || 'photo') + '.jpg'); }
     else if (k === 'todo') { S.todos = S.todos || []; S.todos.push({ id: uid('todo'), title: (x.title || x.note || 'Photo').split('\n')[0].slice(0, 80), list: (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home'), due: '', notes: (x.note || '') + '\n📷 Photo: #photos/' + x.id, priority: 'normal', done: false, created: Date.now(), photo: x.id }); await save(); toast('Added to To-do', 'Open', () => { ov.remove(); go('#todo'); }); }
     else if (k === 'del') confirmSheet('Delete this photo?', 'It’s only stored on this phone.', 'Delete', async () => { await closeSheet(); const keep = Object.assign({}, x); await phTx('readwrite', st => st.delete(x.id)); ov.remove(); await phLoad(); render();
       toast('Photo deleted', 'Undo', async () => { await phSave(keep); delete PHurl[keep.id]; await phLoad(); render(); }); }); };
@@ -29875,7 +29983,7 @@ function phView(id) { const x = phGet(id); if (!x) return; const url = URL.creat
 // #photos/<id> (from a to-do link) opens that photo; #photos/tag after Android Share asks for tags
 window.addEventListener('hashchange', phRoute); setTimeout(phRoute, 800);
 async function phRoute() { const m = (location.hash || '').match(/^#photos\/(.+)$/); if (!m) return; await phLoad(); history.replaceState(history.state, '', '#photos'); render();
-  if (m[1] === 'tag') { const ids = PH.filter(x => x.shared).map(x => x.id); for (const id of ids) { const x = phGet(id); delete x.shared; await phSave(x); } if (ids.length) phTagSheet(ids); } else if (phGet(m[1])) phView(m[1]); }
+  if (m[1] === 'tag') { const ids = PH.filter(x => x.shared).map(x => x.id); for (const id of ids) { const x = phGet(id); delete x.shared; await phSave(x); } if (ids.length) { phTagSheet(ids); setTimeout(() => toast('Shared photo saved. Open it and tap Add to shopping to read items onto the list.', 'Open', () => { if (phGet(ids[0])) phView(ids[0]); }), 400); } } else if (phGet(m[1])) phView(m[1]); }
 // storage line + export (a plain .zip, store-only: JPEGs don't shrink further)
 async function phUsage() { try { const L = PH || await phLoad(); return { n: L.length, bytes: L.reduce((n, x) => n + (x.blob ? x.blob.size : 0) + (x.thumb ? x.thumb.size : 0), 0) }; } catch (e) { return { n: 0, bytes: 0 }; } }
 const phCrcT = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
