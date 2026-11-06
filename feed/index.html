@@ -474,6 +474,8 @@ html.force-light .stview,html:not(.force-dark) .stview{/* viewer always dark for
 /* 1.9.89 stories play short videos right in the viewer */.stmedia.stv{display:flex;align-items:center;justify-content:center;background:#000}.stmedia.stv iframe,.stmedia.stv video{width:100%;aspect-ratio:9/16;max-height:72vh;border:0;background:#000;object-fit:contain}
 *:has(> .stmedia.stv) > .sttap{width:14%}
 /* 1.9.92 video countdown */.stmedia.stv{position:relative}.stcd{position:absolute;top:10px;right:10px;z-index:3;padding:5px 11px;border-radius:999px;font-weight:800;font-size:.95rem;color:#fff;background:linear-gradient(135deg,#ff6fb1,#ff9a5a);box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none;font-variant-numeric:tabular-nums}.stcd.low{animation:stcdp .6s ease-in-out infinite alternate}@keyframes stcdp{to{transform:scale(1.15)}}
+/* 1.9.95 Shane: no + button */.fabpost{display:none!important}
+/* 1.9.95 Shane: no topic-label highlight */.tp.tplash{animation:none!important}
 </style>
 </head>
 <body>
@@ -493,15 +495,15 @@ html.force-light .stview,html:not(.force-dark) .stview{/* viewer always dark for
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.94"></script>
-<script src="app.js?v=1.9.94"></script>
-<script src="extras.js?v=1.9.94"></script>
-<script src="jokes.js?v=1.9.94"></script>
-<script src="learn.js?v=1.9.94"></script>
-<script src="common-en.js?v=1.9.94"></script>
-<script src="explain.js?v=1.9.94"></script>
-<script src="effects.js?v=1.9.94"></script>
-<script src="stories.js?v=1.9.94"></script>
+<script src="family.js?v=1.9.95"></script>
+<script src="app.js?v=1.9.95"></script>
+<script src="extras.js?v=1.9.95"></script>
+<script src="jokes.js?v=1.9.95"></script>
+<script src="learn.js?v=1.9.95"></script>
+<script src="common-en.js?v=1.9.95"></script>
+<script src="explain.js?v=1.9.95"></script>
+<script src="effects.js?v=1.9.95"></script>
+<script src="stories.js?v=1.9.95"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —
