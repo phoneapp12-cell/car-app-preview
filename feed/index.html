@@ -487,6 +487,16 @@ html.th-spring .card{border-color:#d6ecc4}
 html.th-candy{--bg:#ffe3f4;--card:#fffafd;--ink:#3b0a3f;--mute:#8a4f86;--line:#ffc2e5;--chip:#ffd6ef;--acc:#ff3fa4;--acc2:#ff8a00}
 html.th-candy body::before{background:radial-gradient(90% 50% at 0% 0%,#ff9ad5 0%,transparent 60%),radial-gradient(90% 50% at 100% 30%,#b28dff 0%,transparent 60%),radial-gradient(90% 50% at 10% 70%,#7ee8ff 0%,transparent 55%),radial-gradient(90% 50% at 100% 100%,#ffd36e 0%,transparent 60%),linear-gradient(180deg,#ffd6f0,#ffe9c9)!important}
 html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px rgba(255,63,164,.15)}
+
+/* 1.9.102 swipe-row cards: the picture/video grows to fill the card (no empty gap under the title) */
+.hscroll > .card{display:flex;flex-direction:column}
+.hscroll > .card > .media,.hscroll > .card > a:has(> .media){flex:1 1 auto;display:flex;flex-direction:column;min-height:180px}
+.hscroll > .card > .media.vid{aspect-ratio:auto!important;margin:0!important;background:#000}
+.hscroll > .card > .media .vslot,.hscroll > .card > .media .vthumb,.hscroll > .card > .media iframe,.hscroll > .card > .media video{flex:1 1 auto;width:100%;height:100%!important;min-height:180px;object-fit:cover}
+.hscroll > .card > .media .vslot{position:absolute;inset:0}
+.hscroll > .card > .media.vid{position:relative}
+.hscroll > .card > .media:not(.vid) img,.hscroll > .card > a > .media img{flex:1 1 auto;height:100%;max-height:none;min-height:180px;object-fit:cover}
+.hscroll > .card > .bd,.hscroll > .card > .exrow,.hscroll > .card > .ft{flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -506,15 +516,15 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.101"></script>
-<script src="app.js?v=1.9.101"></script>
-<script src="extras.js?v=1.9.101"></script>
-<script src="jokes.js?v=1.9.101"></script>
-<script src="learn.js?v=1.9.101"></script>
-<script src="common-en.js?v=1.9.101"></script>
-<script src="explain.js?v=1.9.101"></script>
-<script src="effects.js?v=1.9.101"></script>
-<script src="stories.js?v=1.9.101"></script>
+<script src="family.js?v=1.9.102"></script>
+<script src="app.js?v=1.9.102"></script>
+<script src="extras.js?v=1.9.102"></script>
+<script src="jokes.js?v=1.9.102"></script>
+<script src="learn.js?v=1.9.102"></script>
+<script src="common-en.js?v=1.9.102"></script>
+<script src="explain.js?v=1.9.102"></script>
+<script src="effects.js?v=1.9.102"></script>
+<script src="stories.js?v=1.9.102"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —
