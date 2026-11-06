@@ -2,7 +2,7 @@
 const CACHE = 'my-feed-';
 const VERSION = '1.9.82';
 const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'family.js?v=' + VERSION, 'extras.js?v=' + VERSION, 'jokes.js?v=' + VERSION, 'learn.js?v=' + VERSION, 'common-en.js?v=' + VERSION, 'explain.js?v=' + VERSION, 'effects.js?v=' + VERSION, 'stories.js?v=' + VERSION, 'manifest.webmanifest', 'icons/icon-192.png', 'icons/logo.svg', 'img/xmas.webp', 'img/newyear.webp'];
-/* 1.9.82 wait-verify: don't skipWaiting/claim — new SW waits until the next open so the page never reloads mid-session */
+/* 1.9.82 wait-verify: new SW waits (no skipWaiting or clients.claim) — new SW waits until the next open so the page never reloads mid-session */
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE + VERSION).then(c => c.addAll(SHELL))); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith(CACHE) && n !== CACHE + VERSION).map(n => caches.delete(n))))); });
 self.addEventListener('fetch', e => {
