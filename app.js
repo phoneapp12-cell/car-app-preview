@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.17';
+const APP_VERSION = '2.29.18';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -29981,6 +29981,23 @@ function phView(id) { const x = phGet(id); if (!x) return; const url = URL.creat
       toast('Photo deleted', 'Undo', async () => { await phSave(keep); delete PHurl[keep.id]; await phLoad(); render(); }); }); };
 }
 // #photos/<id> (from a to-do link) opens that photo; #photos/tag after Android Share asks for tags
+window.addEventListener('hashchange', shopScanRoute); setTimeout(shopScanRoute, 800);
+async function shopScanRoute() {
+  if ((location.hash || '') !== '#shopping/scan') return;
+  history.replaceState(history.state, '', '#shopping');
+  try {
+    await phLoad();
+    const pending = (PH || []).filter(x => x.shopScan);
+    if (!pending.length) { render(); shopScanForm(); return; }
+    const first = pending[0];
+    for (const x of pending) { delete x.shopScan; delete x.shared; await phSave(x); }
+    render();
+    if (first && first.blob) {
+      await shopScanFromBlob(first.blob, (first.title || first.name || 'photo') + '.jpg');
+      if (pending.length > 1) setTimeout(() => toast(pending.length - 1 === 1 ? '1 more shared photo is in Photos — open it and tap Add to shopping.' : (pending.length - 1) + ' more shared photos are in Photos — open each and tap Add to shopping.'), 600);
+    } else shopScanForm();
+  } catch (e) { render(); shopScanForm(); }
+}
 window.addEventListener('hashchange', phRoute); setTimeout(phRoute, 800);
 async function phRoute() { const m = (location.hash || '').match(/^#photos\/(.+)$/); if (!m) return; await phLoad(); history.replaceState(history.state, '', '#photos'); render();
   if (m[1] === 'tag') { const ids = PH.filter(x => x.shared).map(x => x.id); for (const id of ids) { const x = phGet(id); delete x.shared; await phSave(x); } if (ids.length) { phTagSheet(ids); setTimeout(() => toast('Shared photo saved. Open it and tap Add to shopping to read items onto the list.', 'Open', () => { if (phGet(ids[0])) phView(ids[0]); }), 400); } } else if (phGet(m[1])) phView(m[1]); }
