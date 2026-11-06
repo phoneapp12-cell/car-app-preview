@@ -392,15 +392,17 @@ html.nosnap{scroll-snap-type:none}
 
 /* 1.9.82 New ideas (.disc) compact on ~412px: wrap pills, clamp Discover tag, side-by-side buttons, short band */
 #feed > .card.disc{--band-e:'🧭';--band-g:linear-gradient(135deg,#6cc7ff,#b18cff 50%,#ff7eb6);overflow:hidden}
-#feed > .card.disc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{aspect-ratio:16/4.2;font-size:40px;flex:0 0 auto}
-#feed > .card.disc .hd .tp{max-width:38%;-webkit-line-clamp:2}
-#feed > .card.disc .bd{padding:8px 14px 10px;flex:1 1 auto;min-height:0;overflow:auto}
-#feed > .card.disc .obg.discpills{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 8px;grid-template-columns:unset}
-#feed > .card.disc .obt{flex:1 1 calc(50% - 8px);min-width:0;max-width:100%;padding:7px 9px;font-size:.82rem;gap:6px;border-radius:12px;box-sizing:border-box}
-#feed > .card.disc .obt span{font-size:1.05rem;flex:none}
-#feed > .card.disc .obt small{flex:none;margin-left:auto}
-#feed > .card.disc .xbtns.discbtns{display:flex;flex-wrap:nowrap;gap:8px;margin:6px 0 0;padding-left:0;padding-right:0}
-#feed > .card.disc .xbtns.discbtns .btn{flex:1 1 0;min-width:0;min-height:40px;width:auto;font-size:.92rem;padding:8px 10px}
+#feed > .card.disc:not(:has(.media,.pimg,.fph,.bdpic,.hero))::before{aspect-ratio:16/3.6;font-size:36px;flex:0 0 auto}
+#feed > .card.disc .hd{gap:8px;align-items:flex-start}
+#feed > .card.disc .hd .who{flex:1 1 auto;min-width:0}
+#feed > .card.disc .hd .tp{flex:0 1 auto;max-width:34%;font-size:.65rem;padding:3px 7px;-webkit-line-clamp:2;overflow:hidden}
+#feed > .card.disc .bd{padding:6px 12px 10px;flex:1 1 auto;min-height:0;overflow:auto;box-sizing:border-box}
+#feed > .card.disc .obg.discpills{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px;grid-template-columns:unset;width:100%;box-sizing:border-box}
+#feed > .card.disc .obt{flex:1 1 calc(50% - 8px);width:calc(50% - 8px);max-width:calc(50% - 8px);min-width:0;padding:6px 8px;font-size:.78rem;gap:5px;border-radius:12px;box-sizing:border-box;overflow:hidden}
+#feed > .card.disc .obt span{font-size:1rem;flex:none}
+#feed > .card.disc .obt small{flex:none;margin-left:4px;padding:1px 5px}
+#feed > .card.disc .xbtns.discbtns{display:flex;flex-wrap:nowrap;gap:8px;margin:4px 0 0;padding:0}
+#feed > .card.disc .xbtns.discbtns .btn{flex:1 1 0;min-width:0;min-height:38px;width:auto;font-size:.88rem;padding:7px 8px}
 .obt small{font-size:.68em;font-weight:800;text-transform:uppercase;letter-spacing:.04em;background:linear-gradient(90deg,#ff7eb6,#ffa24c);color:#fff;border-radius:999px;padding:1px 6px;margin-left:4px}
 
 /* 1.9.79 📍 explain pills: soft pastel chips under the blurb for places/people/orgs people might question */
@@ -422,6 +424,10 @@ html.nosnap{scroll-snap-type:none}
 #feed > .card > .media.vid{margin:auto 0}
 #feed > .hrow,#feed > section{min-height:calc(100svh - var(--hdr,120px) - 22px);display:flex;flex-direction:column;justify-content:center}
 
+
+/* 1.9.82 stories sit under header (outside #feed so scroll-snap does not skip them) */
+.stories-host:empty{display:none}
+.stories-host .stories{padding-top:2px;padding-bottom:8px}
 /* 1.9.82 no top chip bar — topics live in ☰; --hdr shrinks to the header bar only */
 .chips{display:none!important}
 .backfeed{display:flex;justify-content:center;padding:6px 14px 8px;max-width:640px;margin:0 auto}
@@ -477,6 +483,7 @@ html.force-light .stview,html:not(.force-dark) .stview{/* viewer always dark for
   <nav class="chips" id="chips" aria-label="Interests" hidden></nav>
   <div id="backfeed" class="backfeed" hidden><button type="button" class="backpill" data-backfeed>← Back to feed</button></div>
 </header>
+<div id="stories-host" class="stories-host" aria-label="Stories"></div>
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>

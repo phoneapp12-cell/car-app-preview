@@ -853,12 +853,19 @@ function draw() {
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
   if (typeof mediaFilter === 'function') order = mediaFilter(order); // 1.9.42 ☰ Videos & pictures / Videos only / Pictures only
   if (typeof carouselize === 'function') { try { order = carouselize(order); } catch (e) { } } // 1.9.56 ↔ swipe rows
-  const st = (tab === 'all' && window.ibStories && typeof ibStories.html === 'function') ? ibStories.html() : '';
-  m.innerHTML = st + (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'You’re all caught up ✨ New posts arrive through the day – check back soon.'}</div>`);
+  m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'You’re all caught up ✨ New posts arrive through the day – check back soon.'}</div>`);
   more();
   moodLabel();
   $('#upd').innerHTML = FEED.updated ? `Updated<br>${esc(ago(FEED.updated))} ago` : '';
-  try { const top = document.querySelector('header.top'); if (top) document.documentElement.style.setProperty('--hdr', top.offsetHeight + 'px'); } catch (e) { }
+  // 1.9.82 Stories under header (outside #feed so snap does not skip them)
+  const sh = document.getElementById('stories-host');
+  if (sh) sh.innerHTML = (tab === 'all' && window.ibStories && typeof ibStories.html === 'function') ? ibStories.html() : '';
+  try {
+    const top = document.querySelector('header.top');
+    const host = document.getElementById('stories-host');
+    const h = (top ? top.offsetHeight : 0) + (tab === 'all' && host ? host.offsetHeight : 0);
+    if (h) document.documentElement.style.setProperty('--hdr', h + 'px');
+  } catch (e) { }
   // 1.9.82 FAB: post photo/link when family is on
   let fab = document.getElementById('fabpost');
   if (!fab) { fab = document.createElement('button'); fab.id = 'fabpost'; fab.className = 'fabpost'; fab.type = 'button'; fab.setAttribute('aria-label', 'Post'); fab.textContent = '+'; document.body.append(fab); }

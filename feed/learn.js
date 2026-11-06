@@ -59,7 +59,7 @@ function picks() {
   return out.slice(0, 5);
 }
 function discCard(i) {
-  return `<article class="card xc disc" data-id="${esc(i.id)}">${xHead('🧭', 'New ideas ' + forMe(), (myName() ? myName() + ', based on' : 'Based on') + ' what you’ve been enjoying – tap to untick any', 'Discover')}
+  return `<article class="card xc disc" data-id="${esc(i.id)}">${xHead('🧭', 'New ideas ' + forMe(), (myName() ? myName() + ', based on' : 'Based on') + ' what you’ve been enjoying – tap to untick any', 'Ideas')}
     <div class="bd"><div class="obg discpills">${i.p.map(s => `<button class="obt on" data-dsc="${esc(s.k)}" style="--c1:${s.kind === 'topic' ? TOPIC[s.t][3] : '#7c3aed'};--c2:${s.kind === 'topic' ? TOPIC[s.t][4] : '#ec4899'}">${s.kind === 'new' ? '' : `<span>${s.em}</span>`}${esc(s.label)}${s.kind === 'new' ? ' <small>NEW</small>' : ''}</button>`).join('')}</div>
     <div class="xbtns discbtns"><button class="btn pri" id="dscadd">Add these</button><button class="btn" id="dscno">Not for me</button></div></div></article>`;
 }
