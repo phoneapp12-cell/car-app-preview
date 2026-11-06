@@ -886,6 +886,7 @@ function draw() {
   { const RD = i => i && !i.pin && (/^r\//i.test(String(i.sn || '')) || /(^|\.)(reddit\.com|redd\.it)\//i.test(String(i.url || '').replace(/^https?:\/\//, ''))); if (tab !== 'liked') order = order.filter(i => !RD(i)); } // 1.9.99 Shane: no Reddit (r/) posts in the feed; the stories row still uses Reddit clips
   if (tab === 'all') order = weave(order.filter(i => !i.pin), (SHOW_LIFE !== false && typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK) ? lifeMix() : []); // 1.9.79 Show My App stuff toggle
   if (tab === 'all' && FAM_ON) order = weaveShares(order); // 1.7.0: family reposts for everyone
+  if (tab !== 'liked') order = order.filter(i => !(i && !i.pin && (/^r\//i.test(String(i.sn || (i.it && i.it.sn) || '')) || /(reddit\.com|redd\.it)\//i.test(String(i.url || (i.it && i.it.url) || ''))))); // 1.9.99 also family shares of Reddit posts
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
   if (typeof mediaFilter === 'function') order = mediaFilter(order); // 1.9.42 ☰ Videos & pictures / Videos only / Pictures only
   if (typeof carouselize === 'function') { try { order = carouselize(order); } catch (e) { } } // 1.9.56 ↔ swipe rows
