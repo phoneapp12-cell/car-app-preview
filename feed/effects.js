@@ -63,12 +63,15 @@ function glow() { const el = document.getElementById('stchip'); if (!el || el.hi
 const sc = document.getElementById('stchip'); if (sc) { new MutationObserver(glow).observe(sc, { childList: true, attributes: true, attributeFilter: ['hidden'] }); glow(); }
 
 /* ✨ shimmer once on every swipe-row card as it comes into view (and on the first one a quick highlight on its "Swipe" hint); slow gentle zoom on big photos while they're on screen;
-   🎈 balloons the first time a birthday card shows */
+   🎈 balloons the first time a birthday card shows;
+   1.9.81 topic / "for [user]" pill (.tp) gently highlights once for 2s the first time each card comes into view */
 const shimmered = new Set();
 const io = new IntersectionObserver(es => es.forEach(e => { const c = e.target;
   if (e.isIntersecting) { c.classList.add('inv'); const id = c.dataset.id || '';
     if (!shimmered.has(id)) { shimmered.add(id);
       if (c.matches('.hscroll > .card') && !off()) { c.classList.add('shim'); setTimeout(() => c.classList.remove('shim'), 1400); const h = c.matches(':first-child') && c.closest('.hrow')?.querySelector('.hrhint'); if (h) { h.classList.remove('hrflash'); void h.offsetWidth; h.classList.add('hrflash'); setTimeout(() => h.classList.remove('hrflash'), 1800); } }
+      // 1.9.81 gentle one-shot highlight on the topic / For [user] pill
+      if (!off()) { const tp = c.querySelector('.hd .tp'); if (tp) { tp.classList.remove('tplash'); void tp.offsetWidth; tp.classList.add('tplash'); setTimeout(() => tp.classList.remove('tplash'), 2100); } }
       if (c.classList.contains('party')) { const r = c.getBoundingClientRect(); setTimeout(() => { drift(['🎈', '🎈', '🎉', '🎂'], 14, 6, 'fxb'); confetti(innerWidth / 2, r.top + 60, 40); }, 400); } } }
   else c.classList.remove('inv'); }), { threshold: .25 });
 const watch = () => document.querySelectorAll('#feed .card:not([data-fxw])').forEach(c => { c.dataset.fxw = 1; io.observe(c); });
