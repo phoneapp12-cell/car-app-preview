@@ -60,6 +60,7 @@ async function famInit() {
     return;
   }
   PICK = MEMBER.role === 'admin' ? null : ls.get('pick', null); giveDefaults();
+  if (MEMBER.role === 'admin' && !ls.get('seed103', 0)) { ls.set('optIn', [...new Set([...ls.get('optIn', []), 'aiassist', 'smart', 'innov'])]); ls.set('seed103', 1); } // 1.9.103 Shane's new tech topics on
   CSEEN = ls.get('cseen', {});
   if (MEMBER.role !== 'admin' && !PICK) { // a new phone: their settings from the server, or the welcome screen
     try { const r = await fam('/prefs'); if (r.prefs && Array.isArray(r.prefs.adds)) ls.set('addsPre', r.prefs.adds.filter(t => TOPIC[t])); if (r.nudge && Array.isArray(r.nudge.topics)) { ls.set('nudge', r.nudge); ls.set('addsPre', [...new Set([...ls.get('addsPre', []), ...r.nudge.topics.filter(t => TOPIC[t])])]); } if (r.prefs && Array.isArray(r.prefs.pick)) { applyPrefs(r.prefs); } } catch (e) { } // 1.8.5 addsPre: interests Shane switched on for them, ticked on the welcome screen
