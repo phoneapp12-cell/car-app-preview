@@ -44,7 +44,8 @@ function buildTiles() {
   const FUNV = /funny|hilarious|best of|bloopers?|fails?|cold open|prank|laugh|comedy|try not to|cute|adorable|epic|amazing|wow|unexpected|reaction/i, DULLV = /news|interview|explained|lecture|review|update|podcast|full episode|documentary|budget|report/i;
   const fs = i => { const t = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.sn || ''); let s = 0; if (/^fun-|^yt-(cc|nbc|fox|neon)/.test(i.src || i.id || '')) s += 3; if (['sitcoms', 'dogs', 'pets', 'comedy'].includes(i.topic)) s += 3; if (FUNV.test(t)) s += 4; if (DULLV.test(t)) s -= 6; if (['news', 'science', 'nz', 'election'].includes(i.topic)) s -= 4; return s + Math.min(2, ((i.at || 0) - Date.now() + 864e5 * 3) / 864e5); };
   const SHORT = i => /youtube\.com\/shorts\/|v\.redd\.it|tiktok|reel/i.test((i.url || '') + ' ' + (i.vid || '') + ' ' + (i.v || ''));
-  const playable = i => { if (i.vid) return true; const v = typeof vidOf === 'function' && vidOf(i); return !!(v && (v.k === 'reddit' || v.k === 'mp4')); };
+  // 1.9.93 Shane: under 30 seconds, no YouTube (no ads) — Reddit's own clips with a known length
+  const playable = i => { if (i.vid) return false; const v = typeof vidOf === 'function' && vidOf(i); return !!(v && v.k === 'reddit' && i.vdur > 0 && i.vdur <= 30); };
   const vids = items.filter(i => ok(i) && playable(i))
     .map(i => [fs(i) + (SHORT(i) ? 3 : 0), i]).filter(p => p[0] > 0).sort((a, b) => b[0] - a[0]).map(p => p[1]);
   const LAB = i => { const t = (i.t || '') + ' ' + (i.topic || ''); if (['dogs', 'pets'].includes(i.topic) || /\b(dogs?|cats?|pupp(y|ies)|kittens?|animals?|pets?|birds?|otters?)\b/i.test(t)) return ['Cute animal', '🐾'];
@@ -108,7 +109,7 @@ function paint() {
   const media = t.item && t.item.vid
     ? `<div class="stmedia stv"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" onload="stCdHook(this)" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
     : vo && (vo.k === 'reddit' || vo.k === 'mp4')
-    ? `<div class="stmedia stv"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_480.mp4')}" poster="${esc(t.img)}" autoplay muted loop playsinline controls ontimeupdate="stCdSet(this.duration-this.currentTime)"></video></div>`
+    ? `<div class="stmedia stv"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_720.mp4')}" data-rv="${esc(vo.k === 'reddit' ? vo.u : '')}" poster="${esc(t.img)}" autoplay muted playsinline ontimeupdate="stCdSet(this.duration-this.currentTime)" onerror="stVidErr(this)" onplay="stAud(this)" onended="stCdSet(0)"></video></div>`
     : `<div class="stmedia"><img src="${esc(t.img)}" alt=""></div>`;
   v.innerHTML = `<div class="stbars">${bars}</div>
     <button type="button" class="stx" data-stclose aria-label="Close">✕</button>
@@ -182,3 +183,14 @@ window.stCdHook = function (f) { ST_DUR = 0; const ping = () => { try { f.conten
 let ST_DUR = 0;
 addEventListener('message', e => { if (!/youtube(-nocookie)?\.com$/.test(new URL(e.origin || 'http://x').hostname)) return; let d; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch (x) { return; }
   const i = d && d.info; if (!i) return; if (i.duration) ST_DUR = i.duration; if (i.currentTime != null && ST_DUR) stCdSet(ST_DUR - i.currentTime); });
+
+/* 1.9.93 Reddit clips: try smaller sizes if one is missing, and play the separate sound track alongside */
+const ST_RES = ['CMAF_720', 'CMAF_480', 'DASH_720', 'DASH_480', 'CMAF_360', 'DASH_360'];
+window.stVidErr = function (v) { const id = v.dataset.rv; if (!id) return; const k = (+v.dataset.ri || 0) + 1; if (k >= ST_RES.length) return; v.dataset.ri = k; v.src = `https://v.redd.it/${id}/${ST_RES[k]}.mp4`; v.play().catch(() => { }); };
+let ST_AU = null;
+window.stAud = function (v) { const id = v.dataset.rv; if (!id) return; if (ST_AU) { ST_AU.pause(); ST_AU = null; }
+  const A = ['CMAF_AUDIO_128', 'CMAF_AUDIO_64', 'DASH_AUDIO_128', 'DASH_audio']; let ai = 0; const au = new Audio(`https://v.redd.it/${id}/${A[0]}.mp4`); ST_AU = au;
+  au.onerror = () => { if (++ai < A.length) au.src = `https://v.redd.it/${id}/${A[ai]}.mp4`; };
+  au.currentTime = v.currentTime; au.play().catch(() => { });
+  v.addEventListener('pause', () => au.pause()); v.addEventListener('ended', () => au.pause());
+  const iv = setInterval(() => { if (!v.isConnected) { au.pause(); clearInterval(iv); return; } if (Math.abs(au.currentTime - v.currentTime) > .4) au.currentTime = v.currentTime; }, 1000); };
