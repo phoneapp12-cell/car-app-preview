@@ -152,7 +152,7 @@ function paint() {
 
 function arm() {
   clearTimeout(ST_TIMER);
-  ST_TIMER = setTimeout(() => next(1), 6000);
+  // 1.9.88 no auto-advance: a story stays put until you tap or swipe
 }
 function next(d) {
   clearTimeout(ST_TIMER);
@@ -195,3 +195,9 @@ window.ibStories = { html, open: openViewer, build: buildTiles, close: closeView
   addEventListener('pageshow', () => { user = false; top(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && scrollY < 200) { user = false; top(); } });
 })();
+
+/* 1.9.88 hide Imgur's 'image was probably deleted' placeholder (161x81) anywhere it sneaks in */
+document.addEventListener('load', e => { const im = e.target; if (!(im instanceof HTMLImageElement)) return;
+  if ((im.naturalWidth === 161 && im.naturalHeight === 81) || /imgur\.com\/removed/i.test(im.currentSrc || '')) {
+    const c = im.closest('#feed .card'), tl = im.closest('.stile, .story, [data-story]');
+    if (c) c.remove(); else if (tl) tl.remove(); else { im.dataset.fb = 1; im.src = 'img/card-fallback.svg'; } } }, true);
