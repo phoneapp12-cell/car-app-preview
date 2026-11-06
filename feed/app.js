@@ -206,7 +206,7 @@ function noteSources() {
   if (ch) ls.set('known', KNOWN);
 }
 const isNewSrc = k => !!(KNOWN && KNOWN[k] && Date.now() - KNOWN[k] < 28 * 864e5);      // source -> when you brought it back (older 👎 for it no longer count)
-let tab = ls.get('tab', 'all');
+let tab = 'all'; ls.set('tab', 'all'); // 1.9.82 always open on All; topics/Family via ☰
 let order = [], shown = 0, io = null;
 
 /* ---- ranking (all on this phone) ---- */
@@ -823,12 +823,21 @@ function card(i) {
       ${famBar(i)}${i.url && !i.pin ? `<a class="open-l" href="${esc(i.url)}" target="_blank" rel="noopener">${i._share && i.kind === 'link' ? 'Open on ' + esc(i.sn || 'the site') + ' ↗' : 'Open ↗'}</a>` : ''}
     </div></article>`;
 }
-function chips() {
-  const list = TOPICS.filter(t => (t[0] !== 'photos' || PHOTOS.length) && (t[0] !== 'life' || PRIVATE_OK) && (t[0] !== 'family' || FAM_ON) && topicOn(t[0]) && (t[0] !== 'election' || (Date.now() < ELECTION_END && FEED && FEED.items.some(i => i.topic === 'election')))), at = list.findIndex(t => t[0] === 'photos' || t[0] === 'liked');
-  list.splice(at, 0, ...YOU_CHIPS.map(id => TOPIC[id]));
-  $('#chips').innerHTML = list.map(t => `<button class="chip${t[0] === tab ? ' on' : ''}" data-tab="${t[0]}">${t[2]} ${t[1]}${t[0] === 'family' && famNewLikes() ? '<i class="dot"></i>' : ''}</button>`).join('');
-  const on = $('#chips .on'); if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+function topicList() {
+  const list = TOPICS.filter(t => (t[0] !== 'photos' || PHOTOS.length) && (t[0] !== 'life' || PRIVATE_OK) && (t[0] !== 'family' || FAM_ON) && topicOn(t[0]) && (t[0] !== 'election' || (Date.now() < ELECTION_END && FEED && FEED.items.some(i => i.topic === 'election'))));
+  const at = list.findIndex(t => t[0] === 'photos' || t[0] === 'liked');
+  list.splice(at < 0 ? list.length : at, 0, ...YOU_CHIPS.map(id => TOPIC[id]));
+  return list;
 }
+function chips() { // 1.9.82 top chip bar removed — show Back to feed when browsing a topic/Family
+  const bf = document.getElementById('backfeed');
+  if (bf) { if (tab && tab !== 'all') { bf.hidden = false; const T = TOPIC[tab]; bf.querySelector('.backpill').textContent = '← Back to feed' + (T ? ' · ' + T[2] + ' ' + T[1] : ''); } else bf.hidden = true; }
+  try { if (typeof setH === 'function') setH(); else { const top = document.querySelector('header.top'); if (top) document.documentElement.style.setProperty('--hdr', top.offsetHeight + 'px'); } } catch (e) { }
+  // keep #chips empty (hidden) for any legacy callers
+  const c = $('#chips'); if (c) c.innerHTML = '';
+}
+function goTab(t) { tab = t || 'all'; ls.set('tab', tab); try { mfDrawer(false); } catch (e) { } draw(); window.scrollTo({ top: 0 }); if (tab === 'family') try { famFresh(); } catch (err) { } }
+
 function draw() {
   chips();
   const m = $('#feed');
@@ -844,11 +853,18 @@ function draw() {
   if (tab === 'all') { const P = pins(); order = P.concat(order); if (typeof window.festive === 'function') order = window.festive(order, P.length); } // 1.8.6 pinned specials first; 1.9.1 festive countdowns dropped in at random
   if (typeof mediaFilter === 'function') order = mediaFilter(order); // 1.9.42 ☰ Videos & pictures / Videos only / Pictures only
   if (typeof carouselize === 'function') { try { order = carouselize(order); } catch (e) { } } // 1.9.56 ↔ swipe rows
-  m.innerHTML = (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'You’re all caught up ✨ New posts arrive through the day – check back soon.'}</div>`);
+  const st = (tab === 'all' && window.ibStories && typeof ibStories.html === 'function') ? ibStories.html() : '';
+  m.innerHTML = st + (order.length ? '' : `<div class="empty">${tab === 'liked' ? 'Nothing here yet. Tap 👍 on posts you like and they’ll be kept here.' : 'You’re all caught up ✨ New posts arrive through the day – check back soon.'}</div>`);
   more();
   moodLabel();
   $('#upd').innerHTML = FEED.updated ? `Updated<br>${esc(ago(FEED.updated))} ago` : '';
+  try { const top = document.querySelector('header.top'); if (top) document.documentElement.style.setProperty('--hdr', top.offsetHeight + 'px'); } catch (e) { }
+  // 1.9.82 FAB: post photo/link when family is on
+  let fab = document.getElementById('fabpost');
+  if (!fab) { fab = document.createElement('button'); fab.id = 'fabpost'; fab.className = 'fabpost'; fab.type = 'button'; fab.setAttribute('aria-label', 'Post'); fab.textContent = '+'; document.body.append(fab); }
+  fab.hidden = !(typeof FAM_ON !== 'undefined' && FAM_ON);
 }
+
 function drawLife() { // For You: only My App cards. Yours first (soonest first), then the boards and hubs at random.
   const L = lifeItems(true), m = $('#feed');
   if (!L) { m.innerHTML = `<div class="empty">📌 Your own things show here: cars, birthdays, calendar, to-dos, garden, pets, meals, weather, power, and every board and hub in My App.<br><br>Open <a href="${MY_APP}">My App</a> once on this phone and they’ll appear. They stay on this phone.</div>`; return; }
@@ -969,7 +985,9 @@ function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.rem
 /* ---- events ---- */
 document.addEventListener('click', e => {
   const t = e.target;
-  const c = t.closest('[data-tab]'); if (c) { tab = c.dataset.tab; ls.set('tab', tab); draw(); window.scrollTo({ top: 0 }); if (tab === 'family') famFresh(); return; }
+  const c = t.closest('[data-tab], [data-mftab]'); if (c) { goTab(c.dataset.tab || c.dataset.mftab); return; }
+  if (t.closest('[data-backfeed]')) { goTab('all'); return; }
+  if (t.closest('#fabpost')) { e.preventDefault(); try { if (typeof pickPhotos === 'function') pickPhotos(); else if (typeof mfDrawer === 'function') { goTab('family'); } } catch (err) { goTab('family'); } return; }
   const v = t.closest('[data-vote]'); if (v) { vote(v, +v.dataset.vote); return; }
   const u = t.closest('[data-undo]'); if (u) { const id = u.dataset.undo; delete VOTES[id]; ls.set('votes', VOTES); const it = order.find(x => x.id === id); const card0 = u.closest('.card'); if (it && card0) { card0.outerHTML = it.topic === 'life' ? lifeCard(it) : card(it); fillPics(); watchVids(); } return; }
   const fb = t.closest('[data-fs]'); if (fb) { e.preventDefault(); vidFull(fb.closest('.media.vid')); return; }
@@ -1138,7 +1156,7 @@ function mfDrawer(open) {
   let d = document.getElementById('mfdrawer');
   if (!d) {
     d = document.createElement('div'); d.id = 'mfdrawer'; d.className = 'mfdrawer';
-    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Menu</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><div class="mfextra"></div><p class="mfnote">Videos only and Pictures only show just those cards. Alerts still come as notifications.</p></nav>`;
+    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Menu</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><div class="mfextra"></div><p class="mfnote">Browse topics and Family here. Videos only / Pictures only filter the All feed. Alerts still notify.</p></nav>`;
     document.body.append(d);
   }
   d.querySelector('.mfopts').innerHTML = `<p class="mfsec">Show me</p>` + MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
@@ -1149,7 +1167,12 @@ function mfDrawer(open) {
   if (typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK) {
     x = `<p class="mfsec">My App</p><button type="button" class="mfopt${SHOW_LIFE?' on':''}" data-showlife="1" role="switch" aria-checked="${!!SHOW_LIFE}"><span class="mfe">📌</span><span>Show My App stuff</span>${SHOW_LIFE?'<i>✓</i>':''}</button>` + x;
   }
-  extra.innerHTML = x;
+  // 1.9.82 Browse: Family, For [name], topics (replaces top chip bar)
+  const browse = topicList().filter(t => t[0] !== 'all');
+  const br = `<p class="mfsec">Browse</p>` + browse.map(t =>
+    `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
+  ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;
+  extra.innerHTML = br + x;
   requestAnimationFrame(() => d.classList.toggle('on', !!open));
 }
 (function () {
