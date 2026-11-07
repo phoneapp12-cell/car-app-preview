@@ -20,10 +20,8 @@ document.addEventListener('click', e => { const t = e.target; if (!t || !t.close
   if (t.closest('[data-vote="1"]')) learn(id, 3); else if (t.closest('[data-vote="-1"]')) learn(id, -4);
   else if (t.closest('[data-like]')) learn(id, 3); else if (t.closest('[data-cmt]')) learn(id, 2);
   else if (t.closest('a[href^="http"]')) learn(id, 2); else if (t.closest('[data-joke]')) learn(id, 1); }, true);
-const dwell = new Map();
-const dio = new IntersectionObserver(es => es.forEach(e => { const id = e.target.dataset.id; if (!id) return;
-  if (e.isIntersecting) dwell.set(id, Date.now()); else if (dwell.has(id)) { const s = (Date.now() - dwell.get(id)) / 1000; dwell.delete(id); if (s >= 5 && s < 300) learn(id, Math.min(1.5, s / 10)); } }), { threshold: .6 });
-const fd = document.getElementById('feed'); if (fd) new MutationObserver(() => fd.querySelectorAll('.card[data-id]:not([data-lw])').forEach(c => { c.dataset.lw = 1; dio.observe(c); })).observe(fd, { childList: true, subtree: true });
+/* 1.9.108 reading time moved to read.js. The old observer counted hidden-tab time and did not
+   change ranking. Votes and taps still teach topic suggestions here. */
 
 /* related topics: liking one makes the others worth offering */
 const REL = { sitcoms: ['culture', 'music', 'scifi', 'games'], scifi: ['science', 'tech', 'learn', 'vgames'], music: ['culture', 'events', 'sitcoms'], garden: ['nature', 'outdoors', 'diy', 'food'],

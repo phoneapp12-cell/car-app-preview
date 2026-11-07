@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.107';
+const APP_VERSION = '1.9.108';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -317,7 +317,7 @@ function rank(items) {
     const media = i.vid ? 1.15 : i.img ? 1.1 : i.kind === 'tip' ? 0.8 : 0.6; // pictures and videos first
     const seen = Math.pow(0.8, SEEN[i.id] || 0);                   // seen a few times: let new things through
     const hot = i.hot ? 1.5 : 1;                                   // e.g. fireworks this week
-    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) * popW(i) * nzW(i) * funW(i) }; // 1.9.84 funW
+    return { i, sc: (0.15 + fresh) * media * seen * hot * baseOf(i.topic) * W.topic(i.topic) * W.src(i.src) * intW(W, i) * moodW(i) * popW(i) * nzW(i) * funW(i) * (typeof readW === 'function' ? readW(i) : 1) }; // 1.9.84 funW; 1.9.108 reading nudge, capped in read.js
   }).sort((a, b) => b.sc - a.sc);
   // Mix: each step takes the best next post from the topic that's due, so every interest gets a turn
   // (higher-voted topics, and sitcoms, come round more often). About 1 in 7 slots explores further down a list.
@@ -849,7 +849,8 @@ function card(i) {
   let media = '';
   if (i.photos) media = famPhotos(i);
   else if (i.vid) media = vidMedia(i.vid, i.img, i.t, '', /\/shorts\//.test(i.url || ''));
-  else if (i.img && vidOf(i)) media = anyVidMedia(vidOf(i), i.img, i.t);
+  else if (ytIdOf(i)) media = vidMedia(ytIdOf(i), i.img, i.t, '', /\/shorts\//.test(i.url || ''));
+  else if (i.img && vidOf(i) && (vidOf(i).k === 'vimeo' || vidOf(i).k === 'mp4')) media = anyVidMedia(vidOf(i), i.img, i.t);
   else if (i.img) media = `<a class="media${i.kind === 'tv' ? ' tall' : ''}" href="${esc(i.url)}" target="_blank" rel="noopener"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(i.img)}" alt="${esc(i.t)}" onerror="if(!this.dataset.r){this.dataset.r=1;var s=this.src;setTimeout(()=>{this.src=s},1500)}else this.closest('.media').remove()"></a>`;
   else media = `<div class="hero"><span class="em">${T[2]}</span><h3>${esc(i.t)}</h3></div>`;
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
@@ -1083,6 +1084,11 @@ document.addEventListener('load', e => {
    Bigger: edge to edge on phones and wider on big screens; 9:16 for Shorts, TikTok and Reels; ⛶ goes full screen. ---- */
 var VID_SAVE = !!(navigator.connection && navigator.connection.saveData);
 try { navigator.getBattery && navigator.getBattery().then(b => { const f = () => { VID_SAVE = !!(navigator.connection && navigator.connection.saveData) || (!b.charging && b.level < 0.15); }; f(); b.addEventListener('levelchange', f); b.addEventListener('chargingchange', f); }); } catch (e) { }
+function ytIdOf(i) {
+  const u = String((i && i.url) || '');
+  const m = u.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : '';
+}
 function vidOf(i) {
   if (!i) return null; if (i.vk && i.vu) return { k: i.vk, u: i.vu, tall: !!i.vtall };
   const u = String(i.url || i.ext || ''); let m;
@@ -1249,7 +1255,6 @@ document.addEventListener('error', e => { const im = e.target; if (!(im instance
 const ROWS = [
   ['tv', '📺 Coming up on TV', i => (i.topic === 'sitcoms' || i.x === 'watch') && !/election|midterm|politic|how to watch/i.test(i.t || '')],
   ['ani', '😂 Funny & cute animals', i => /aww|derp|eyebleach|dog|cat|pupp|animal|pets?-|bros|rarepup|startled|caturday|simonscat/i.test(i.src || '') || ['dogs', 'pets'].includes(i.topic)],
-  ['vid', '🎬 Videos to watch', i => typeof mfIsVid === 'function' && mfIsVid(i)],
   ['facts', '🤯 Amazing & interesting', i => ['games', 'learn', 'science', 'scifi'].includes(i.topic) || /^fun-/.test(i.src || '')],
   ['hacks', '💡 Life hacks & making', i => ['diy', 'creative', 'craft'].includes(i.topic) || i.x === 'hometip'],
   ['food', '🍰 Food & treats', i => i.topic === 'food' || i.topic === 'gf'],
@@ -1257,7 +1262,7 @@ const ROWS = [
 ];
 function carouselize(order) {
   if (order.length < 14) return order;
-  const keep = i => i && !i.pin && i.topic !== 'life' && !i._share && (!i.x || ['vlog', 'watch', 'hometip'].includes(i.x)) && (i.img || (i.h && i.h.img) || i.vid);
+  const keep = i => i && !i.pin && i.topic !== 'life' && !i._share && (!i.x || ['watch', 'hometip'].includes(i.x)) && !i.vid && !(i.h && i.h.vid) && (i.img || (i.h && i.h.img));
   const used = new Set(), rows = [];
   const start = Math.min(6, order.length); // never take the first few cards
   for (const [k, title, test] of ROWS) {
@@ -1267,12 +1272,6 @@ function carouselize(order) {
     if (its.length >= 3) { its.forEach(i => used.add(i.id)); rows.push({ id: 'row-' + k, x: 'row', k, title, items: its, rank: (pos / its.length) * (k === 'tv' && topicOn('sitcoms') ? 0.25 : 1) }); } // sitcom fans: 📺 first
   }
   // vlogs picked for them (Sarah: cruises & family vlogs) that aren't already in the feed
-  if (typeof MF === 'undefined' || MF !== 'pic') {
-    const inFeed = new Set(order.map(i => i.id));
-    const vl = ((FEED && FEED.vlogs) || []).filter(v => v.vid && v.img && !inFeed.has(v.id) && !SEEN_BASE.has(v.id) && !(VOTES[v.id] && VOTES[v.id].v < 0) && !unsafe(v) && !SPORT.test(v.t))
-      .map(v => ({ v, sc: typeof vlScore === 'function' ? vlScore(v) : 1 })).sort((a, b) => b.sc - a.sc).slice(0, 6).map(x => ({ id: x.v.id, x: 'vlog', h: x.v, topic: 'vlogs', t: x.v.t }));
-    if (vl.length >= 3) rows.push({ id: 'row-vlog', x: 'row', k: 'vlog', title: '🎥 Vlogs ' + forMe(), items: vl, rank: (ls.get('vlTags', []).length ? 8 : 60) });
-  }
   if (!rows.length) return order;
   rows.sort((a, b) => a.rank - b.rank);
   const main = order.filter(i => !used.has(i.id)), out = []; let r = 0, since = 0;

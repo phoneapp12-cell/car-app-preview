@@ -140,6 +140,9 @@ Sorted overdue first (most overdue at the top), then by date; on the same day du
 ## Shipping an update
 Change `VERSION` in `sw.js` (and `APP_VERSION` in `app.js`), commit and push. The app picks up the new version the next time it's opened.
 
+## Info Book feed
+The family feed is `feed/` at `https://shane-my-app.pages.dev/feed/`. A feed update bumps `VERSION` in `feed/sw.js`, `APP_VERSION` in `feed/app.js`, and the `?v=` script tags in `feed/index.html` together. `tools/ship-pages.sh` publishes the site after review. The feed data service that builds `feed.json` is not in this repository, so filters in `feed/nz.js` hide Neon, non-NZ TV listings, and non-NZ garden posts that service may still send. Whangārei film cards read the existing relay `GET /events` field `cinema` (Event Cinemas’ public session JSON for cinema 503). Nothing here is deployed until that ship script is run on a reviewed change.
+
 ## Layout notes
 - **Left tab strip (v1.50.0):** the page itself never scrolls. `html, body` are `overflow:hidden`, `#app` is pinned to the screen (`position:fixed; inset 0`) and `#view` is the only thing that scrolls. The tab strip (Home, the chosen tabs and More) sits on the left edge of `#app`, off-screen until a swipe that starts within 20px of that edge. A swipe back, or a tap on the dimmed page, hides it again. Choosing a tab opens that page and hides the strip. `#view` no longer reserves space for a bottom bar, so the page uses the full height. A small chevron on the left edge shows where to swipe. Don't go back to sizing `#app` with `100vh`/`100dvh`: on Android Chrome those change as the address bar and keyboard come and go, which let the whole page scroll away.
 - While the on-screen keyboard is up (a text field has focus and the screen is more than 150px shorter), `body` gets the class `kb` and the bottom padding tightens. Sheets (`#sheet`, z-index 50) cover the strip.

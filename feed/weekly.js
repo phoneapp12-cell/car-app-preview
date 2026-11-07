@@ -214,8 +214,12 @@ const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const nzNow = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
 const weekNo = () => { const d = nzNow(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return Math.floor(d.getTime() / 6048e5); }; // Monday-start weeks
 const crystal = () => CRYSTALS[(weekNo() * 7) % CRYSTALS.length];
-const WN_ID = 'wn-1.9.104';
+const WN_ID = 'wn-1.9.108';
 const WN = [
+  ['🧩', 'Little puzzles in the feed: picture match, sitcom questions and NZ animal questions. Two discovery cards link out to Zoomquilt and Falling Falling.'],
+  ['📺', 'Streaming cards only if they’re on TVNZ, Three or Sky. Stan and Neon are left out. Garden posts are NZ ones, for the season it is here.'],
+  ['🎬', 'Sometimes a film from Event Cinemas Whangārei, with their poster. Times stay on their site.'],
+  ['▶️', 'Videos in the feed play large, across the card. Tiny video rows are gone.'],
   ['📖', 'A row of tiles at the top: weather, the Joke of the day and short funny or cute videos. Tap one to open it.'],
   ['⚠️', 'Whangārei weather warnings and power cuts show as a tile up top, only when something is happening.'],
   ['💎', 'New: Crystal of the week, every Monday.'],
