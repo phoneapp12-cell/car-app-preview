@@ -263,6 +263,13 @@ const ani = rowed.find(x => x.x === 'row' && x.k === 'ani');
 assert.ok(ani && ani.items.every(it => it.id !== 'bad'));
 assert.strictEqual(ani.items.length, 3);
 
+const ship = fs.readFileSync('tools/ship-pages.sh', 'utf8');
+const headers = ship.slice(ship.indexOf("<<'H'\n") + 6, ship.indexOf("\nH\n"));
+assert.match(headers, /\/\*\n {2}X-Content-Type-Options: nosniff\n {2}Referrer-Policy: strict-origin-when-cross-origin\n {2}X-Frame-Options: DENY/);
+assert.match(headers, /\/feed\/tetris\n {2}X-Frame-Options: SAMEORIGIN/);
+assert.match(headers, /\/feed\/tetris\.html\n {2}X-Frame-Options: SAMEORIGIN/);
+assert.ok(!/\/feed\/tetris(?:\.html)?\n {2}X-Frame-Options: DENY/.test(headers));
+
 console.log('feed-info tests ok');
 
 const live = process.env.SKIP_LIVE ? null : await fetch('https://due-dates-calendar-relay.phoneapp12.workers.dev/events', { headers: { Accept: 'application/json', Origin: 'https://shane-my-app.pages.dev' } });
