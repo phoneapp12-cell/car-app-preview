@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.19';
+const APP_VERSION = '2.29.20';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23403,6 +23403,16 @@ function alBoardHtml(list) {
   addCuRows('today', 'Today', today.sort(byPri), habH ? `<div id="habsug">${habH}</div>` : '');
   addCuRows('week', 'Coming up', week.sort(byPri), '');
   addCuRows('later', 'Later', later.sort(byPri), '');
+  try {
+    const ow = cardOwingRowHtml();
+    if (ow && notifCatOn('bills')) {
+      const g = ensure('cardpay', 'Credit card');
+      const wrap = document.createElement('div');
+      wrap.className = 'list nbrows';
+      wrap.innerHTML = ow;
+      g.nodes.unshift(wrap);
+    }
+  } catch (e) {}
   ensure('flagged', 'Flagged events');
   const countCards = g => {
     if (!g) return 0;
@@ -23418,6 +23428,7 @@ function alBoardHtml(list) {
     ['justin', 'Just in', false, 'Nothing new just in'],
     ['pinned', 'Pinned', false, 'Nothing pinned'],
     ['now', 'Urgent / Now', true, 'Nothing urgent right now'],
+    ['cardpay', 'Credit card', false, 'Nothing owing on the card'],
     ['newtoday', 'New today', true, 'Nothing new today'],
     ['foryou', 'For you today', true, 'Nothing for you right now'],
     ['today', 'Today', true, 'Nothing else today'],
@@ -23455,7 +23466,7 @@ function alBoardHtml(list) {
 }
 function alMenu(k) {
   const n = (() => { try { return justAddedList().filter(x => !nbIsBill(x)).length; } catch (e) { return 0; } })();
-  const titles = { justin: 'Just in', pinned: 'Pinned', now: 'Urgent / Now', newtoday: 'New today', foryou: 'For you today', today: 'Today', week: 'Coming up', prog: 'In progress', sarah: 'From Sarah', newlists: 'New on your lists', deliveries: 'Deliveries', cc: 'Click & collect', reminders: 'Reminders', power: 'Power', er: 'Everyday Rewards', gf: 'Gluten free', putback: 'Put back', flagged: 'Flagged events', later: 'Later', fun: 'Fun & Daily' };
+  const titles = { justin: 'Just in', pinned: 'Pinned', now: 'Urgent / Now', cardpay: 'Credit card', newtoday: 'New today', foryou: 'For you today', today: 'Today', week: 'Coming up', prog: 'In progress', sarah: 'From Sarah', newlists: 'New on your lists', deliveries: 'Deliveries', cc: 'Click & collect', reminders: 'Reminders', power: 'Power', er: 'Everyday Rewards', gf: 'Gluten free', putback: 'Put back', flagged: 'Flagged events', later: 'Later', fun: 'Fun & Daily' };
   openSheet(titles[k] || 'Notifications', `<p class="muted">Swipe sideways between boards, and scroll up and down inside each board. Tap ✕ on a card to archive it.</p><div class="btns" style="flex-direction:column;align-items:stretch">${k === 'justin' ? `<button type="button" class="btn" onclick="closeSheet().then(jiAllRead)">Mark all Just in as read</button>` : ''}${n ? `<button type="button" class="btn" onclick="closeSheet().then(justAddedClear)">Clear new… (${n})</button>` : ''}<button type="button" class="btn" onclick="closeSheet().then(()=>pwrNav('#archive','l'))">🗂 Open Archive</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#calendar'))">${I('cal')} Calendar</button><button type="button" class="btn" onclick="closeSheet().then(()=>go('#settings'))">${I('gear')} Settings</button></div>`, null);
 }
 let alView = (() => { try { return localStorage.getItem('alViewMode') === 'board' ? 'board' : 'briefing'; } catch (e) { return 'briefing'; } })();
@@ -24365,8 +24376,15 @@ function alBriefingHtml(list) {
     body = block('📦 Deliveries & Orders', sortedCars);
   }
 
-  return (alBriefFilter === 'all' || alBriefFilter === 'today' ? heroHtml + gridHtml : '') +
-    (body || `<div class="card empty" style="margin:10px 0"><div class="t">All caught up for today</div><div class="s">Nothing else needs your action right now.</div></div>`) +
+  let cardBlock = '';
+  try {
+    if ((alBriefFilter === 'all' || alBriefFilter === 'today') && notifCatOn('bills')) {
+      const ow = cardOwingRowHtml();
+      if (ow) cardBlock = `<div class="sec al-yd-sec">💳 Credit card <span class="al-cnt">1</span></div><div class="list al-yd-list">${ow}</div>`;
+    }
+  } catch (e) {}
+  return cardBlock + (alBriefFilter === 'all' || alBriefFilter === 'today' ? heroHtml + gridHtml : '') +
+    (body || (cardBlock ? '' : `<div class="card empty" style="margin:10px 0"><div class="t">All caught up for today</div><div class="s">Nothing else needs your action right now.</div></div>`)) +
     (alBriefFilter === 'all' ? discHtml : '');
 }
 function nbTopHtml() {
@@ -25513,7 +25531,15 @@ async function cfLoad(force) {
     else if (s === 429 && d.error === 'too_soon') { CFerr = 'Refreshed less than an hour ago. Next refresh after ' + cfWhen(d.next) + '.'; }
     else CFerr = cfErrText(s, d);
   } catch (e) { CFerr = 'Cash flow couldn’t load. Check your connection.'; }
-  CFbusy = false; if (/^#(cashflow|budget)/.test(location.hash || '') && !sheetOpen) render();
+  CFbusy = false;
+  try { cardSurfacesRedraw(); } catch (e) {}
+}
+// 2.29.20: a bank refresh changes cardGoal().left. Redraw the pages that show that figure (Cash flow, Budget, Bills, Notifications).
+function cardSurfacesRedraw() {
+  if (typeof sheetOpen !== 'undefined' && sheetOpen) return;
+  const h = location.hash || '';
+  if (/^#(cashflow|budget|bills)/.test(h)) { render(); return; }
+  if (h === '#alerts') { try { _cuCache = null; glWarnRedraw(true); } catch (e) { render(); } }
 }
 // the $1,000 ASB rewards card: its real available balance feeds the Budget card (owed = limit − available)
 function cfCardAcct(D) { const C = (D.accounts || []).filter(a => a.type === 'CREDITCARD'); return C.find(a => a.limit === 1000) || C.find(a => /reward/i.test(a.name)) || (C.length === 1 ? C[0] : null); }
@@ -38313,6 +38339,41 @@ function cardBillHtml() {
   var fresh = '';
   try { fresh = freshBillsNote(); } catch (e) { }
   return fresh + cardBillHtml0();
+}
+// 2.29.20: Notifications shows the same "still to pay" figure as Bills. Live from cardGoal()
+// (bank payments on the card plus ticks), so a refresh drops the amount without a manual edit.
+// Paid in full stays up briefly (a recent payment, or the due date is today/tomorrow), then drops.
+function cardOwingFresh(g) {
+  if (daysLeft(g.due) >= 0 && daysLeft(g.due) <= 1) return true;
+  try {
+    const c = debtsSt().card;
+    const pays = (c.akPays || []).filter(p => p && p.d > g.stmt);
+    const last = pays.length ? pays[pays.length - 1].d : '';
+    if (last && daysLeft(last) >= -1) return true;
+    const ticks = [].concat(c.ticks || []);
+    if (ticks.some(t => t && Date.now() - Date.parse(t.at || 0) < 2 * DAY)) return true;
+  } catch (e) {}
+  return false;
+}
+function cardOwingRowHtml() {
+  try {
+    const g = cardGoal();
+    if (!g || !g.due) return '';
+    const owing = !g.full && g.left > 0.005;
+    if (!owing && !(g.full && daysLeft(g.due) >= 0 && cardOwingFresh(g))) return '';
+    const go = "go('#cashflow')";
+    if (!owing) {
+      const sub = 'Paid in full for the ' + fmtW(g.stmt) + ' statement · due ' + fmtW(g.due);
+      return `<button type="button" class="row bill att" id="cardowing" data-kind="bill" data-ncat="bills" data-card-owing="full" data-date="${esc(g.due)}" onclick="${go}"><div class="ic bill">💳</div><div class="tx"><div class="t">${esc('✓ ASB card · paid in full')}</div><div class="s">${esc(sub)}</div></div><div class="amt">✓</div></button>`;
+    }
+    const d = daysLeft(g.due);
+    const when = d < 0 ? (d === -1 ? '1 day overdue' : (-d) + ' days overdue') : d === 0 ? 'due today' : d === 1 ? '1 day left' : d + ' days left';
+    const dueBit = d === 0 ? 'Due today · ' + fmtW(g.due) : d === 1 ? 'Due tomorrow · ' + fmtW(g.due) : 'Due ' + fmtW(g.due) + ' · ' + when;
+    const paidBit = g.paid > 0.005 ? ' · ' + money(g.paid) + ' paid so far' : '';
+    const rough = (g.about || g.proj) && !g.sb ? 'Worked out from the bank · ' : '';
+    const title = 'ASB card · still owing ' + money(g.left);
+    return `<button type="button" class="row bill att" id="cardowing" data-kind="bill" data-ncat="bills" data-card-owing="1" data-date="${esc(g.due)}" onclick="${go}"><div class="ic bill">💳</div><div class="tx"><div class="t">${esc(title)}</div><div class="s">${esc(rough + dueBit + paidBit)}</div></div>${moneyBadge(g.left, 'to clear')}</button>`;
+  } catch (e) { return ''; }
 }
 function cardBillHtml0() {
   try {
