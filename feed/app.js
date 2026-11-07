@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.114';
+const APP_VERSION = '1.9.115';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -871,6 +871,36 @@ function pinBox(i) {
     <a class="pbtn" href="${esc(i.url)}" target="_blank" rel="noopener">See event &amp; tickets ↗</a>
     ${i.credit ? `<small class="pcred">${esc(i.credit)}</small>` : ''}</div>`;
 }
+/* 1.9.115 phone pictures: ask for a larger original when the feed URL is a small derivative of the same file. */
+function sharper(u) {
+  if (!u || typeof u !== 'string') return u;
+  try {
+    const url = new URL(u, 'https://shane-my-app.pages.dev');
+    if (url.protocol !== 'https:') return u;
+    const host = url.hostname;
+    if (host === 'upload.wikimedia.org' && /\/thumb\//.test(url.pathname)) return u.replace(/\/(\d+)px-([^/]+)$/, (m, w, file) => (+w < 1600 ? '/1600px-' + file : m));
+    if ((host === 'commons.wikimedia.org' || host === 'en.wikipedia.org') && url.pathname.indexOf('/wiki/Special:FilePath/') === 0) {
+      const w = +(url.searchParams.get('width') || 0);
+      if (!w || w < 1600) { url.searchParams.set('width', '1600'); return url.href; }
+    }
+    if (/\/wp-content\/uploads\//.test(url.pathname)) {
+      const path = url.pathname.replace(/-(\d{2,4})x(\d{2,4})(?=\.(jpe?g|png|webp)$)/i, (m, w) => (+w < 1600 ? '' : m));
+      if (path !== url.pathname) { url.pathname = path; return url.href; }
+    }
+    if (/(^|\.)wp\.com$/.test(host)) {
+      for (const k of ['w', 'width']) { const v = url.searchParams.get(k); if (v && +v > 0 && +v < 1600) { url.searchParams.set(k, '1600'); return url.href; } }
+    }
+    return u;
+  } catch (e) { return u; }
+}
+/* Wide photos stay near square. Very wide banners stay 4:3. Portraits can grow to 4:5. */
+function stillFrame(w, h) {
+  const r = w / h;
+  if (!(r > 0)) return '1 / 1';
+  if (r > 1.9) return '4 / 3';
+  if (r < 0.98) return Math.max(r, 0.8).toFixed(4) + ' / 1';
+  return '1 / 1';
+}
 function card(i) {
   const T = TOPIC[i.topic] || TOPIC.all, v = VOTES[i.id] ? VOTES[i.id].v : 0;
   const style = `--c1:${T[3]};--c2:${T[4]}`;
@@ -879,7 +909,7 @@ function card(i) {
   else if (i.vid) media = vidMedia(i.vid, i.img, i.t, '', /\/shorts\//.test(i.url || ''));
   else if (ytIdOf(i)) media = vidMedia(ytIdOf(i), i.img, i.t, '', /\/shorts\//.test(i.url || ''));
   else if (i.img && vidOf(i) && (vidOf(i).k === 'vimeo' || vidOf(i).k === 'mp4')) media = anyVidMedia(vidOf(i), i.img, i.t);
-  else if (i.img) media = `<a class="media${i.kind === 'tv' ? ' tall' : ''}" href="${esc(i.url)}" target="_blank" rel="noopener"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(i.img)}" alt="${esc(i.t)}" onerror="if(!this.dataset.r){this.dataset.r=1;var s=this.src;setTimeout(()=>{this.src=s},1500)}else this.closest('.media').remove()"></a>`;
+  else if (i.img) { const pic = sharper(i.img); media = `<a class="media${i.kind === 'tv' ? ' tall' : ''}" href="${esc(i.url)}" target="_blank" rel="noopener"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(pic)}" data-src="${esc(i.img)}" alt="${esc(i.t)}" onerror="if(!this.dataset.r){this.dataset.r=1;this.src=this.dataset.src||this.src}else this.closest('.media').remove()"></a>`; }
   else media = `<div class="hero"><span class="em">${T[2]}</span><h3>${esc(i.t)}</h3></div>`;
   const when = i.kind === 'event' && i.ev ? `<span class="when">📅 ${esc(evDate(i.ev))}</span>` : i.kind === 'tv' && i.where ? `<span class="when">📺 ${esc(i.where)}</span>` : '';
   const showTitle = (i.img || i.vid || i.photos) && i.t;
@@ -1099,6 +1129,7 @@ document.addEventListener('load', e => {
   const im = e.target; if (!(im instanceof HTMLImageElement)) return;
   if (im.dataset.yt && im.naturalWidth > 0 && im.naturalWidth <= 120 && !im.dataset.f) { im.dataset.f = 1; im.src = 'https://i.ytimg.com/vi/' + im.dataset.yt + '/hqdefault.jpg'; return; }
   const box = im.closest('.media, .fph'); if (!box || box.classList.contains('vid') || !im.naturalWidth) return;
+  if (im.naturalHeight && box.closest('#feed > .card') && !box.closest('.puzzle,.zoomq,.fallq,.cine')) im.style.setProperty('--frame', stillFrame(im.naturalWidth, im.naturalHeight));
   const dpr = Math.min(window.devicePixelRatio || 1, 3), boxW = box.clientWidth || 400;
   if (im.naturalWidth * 1.6 < boxW * dpr) {
     box.classList.add('lowres'); box.style.setProperty('--lr', `url("${im.currentSrc || im.src}")`);
