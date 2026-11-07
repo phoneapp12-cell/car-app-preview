@@ -124,18 +124,10 @@
       <div class="xbtns"><button type="button" class="btn pri" data-art="fall">Play Falling Falling</button></div>
       <p class="plsrc"><a href="https://fallingfalling.com/" target="_blank" rel="noopener">fallingfalling.com</a> · Reinier Feijen wrote the code · sound by gloumouth1</p></div>`;
   }
-  function tetHtml(i) {
-    return `${head('🧱', 'Tetris', 'Still picture. The game opens here when you ask.', 'Play')}
-      <div class="media"><img src="img/play/tetris.svg" alt="Still picture of a Tetris board. The game has not started."></div>
-      <div class="bd"><h3>Tetris</h3>
-      <p class="plwarn">Shane’s game, on this phone. No sign-in. Music and sounds start after you tap Play and then the board. This card stays still.</p>
-      <div class="xbtns"><button type="button" class="btn pri" data-art="tet">Play Tetris</button></div></div>`;
-  }
   function render(i) {
     if (!i) return '';
     if (i.x === 'zoomq') return `<article class="card xc zoomq" data-id="${esc(i.id)}" data-topic="learn" style="${styleFor('learn')}">${zoomHtml(i)}</article>`;
     if (i.x === 'fallq') return `<article class="card xc fallq" data-id="${esc(i.id)}" data-topic="creative" style="${styleFor('creative')}">${fallHtml(i)}</article>`;
-    if (i.x === 'tetq') return `<article class="card xc tetq" data-id="${esc(i.id)}" data-topic="games" style="${styleFor('games')}">${tetHtml(i)}</article>`;
     if (i.x !== 'play') return '';
     const st = ensure(i);
     const topic = i.kind === 'sitcom' ? 'sitcoms' : i.kind === 'animal' ? 'nature' : 'kids';
@@ -175,13 +167,11 @@
     add(lo + 8, 'zoom');
     add(lo + 14, 'fall');
     if (n - lo >= 20) add(lo + 19, first === 'sitcom' ? other : 'sitcom');
-    add(lo + 24, 'tet');
     return spec;
   }
   function itemFor(kind, day, n) {
     if (kind === 'zoom') return { id: 'zoomq-' + day, x: 'zoomq', topic: 'learn', t: 'Zoomquilt' };
     if (kind === 'fall') return { id: 'fallq-' + day, x: 'fallq', topic: 'creative', t: 'Falling Falling' };
-    if (kind === 'tet') return { id: 'tetq-' + day, x: 'tetq', topic: 'games', t: 'Tetris' };
     const topic = kind === 'sitcom' ? 'sitcoms' : kind === 'animal' ? 'nature' : 'kids';
     const title = kind === 'sitcom' ? 'Sitcom question' : kind === 'animal' ? 'Animal question' : 'Picture match';
     return { id: 'play-' + kind + '-' + day + '-' + n, x: 'play', kind, topic, t: title };
@@ -198,7 +188,7 @@
   if (!root.document) return;
   const prevCard = root.card;
   root.card = function (i) {
-    if (i && (i.x === 'play' || i.x === 'zoomq' || i.x === 'fallq' || i.x === 'tetq')) return render(i);
+    if (i && (i.x === 'play' || i.x === 'zoomq' || i.x === 'fallq')) return render(i);
     return prevCard ? prevCard(i) : '';
   };
   const prevFest = root.festive;
@@ -209,8 +199,7 @@
   // so their canvas and looping sound unload. No top-navigation, so the framed page cannot take over Info Book.
   const ART = {
     fall: { url: 'https://fallingfalling.com/', title: 'Falling Falling', host: 'fallingfalling.com', live: 'Moves, and plays a looping sound' },
-    zoom: { url: 'https://zoomquilt.org/', title: 'Zoomquilt', host: 'zoomquilt.org', live: 'Zooms on its own' },
-    tet: { url: 'tetris.html', title: 'Tetris', host: 'On this phone', live: 'Sound starts when you play', local: true }
+    zoom: { url: 'https://zoomquilt.org/', title: 'Zoomquilt', host: 'zoomquilt.org', live: 'Zooms on its own' }
   };
   let artWin, artFrame, artScroll = 0, artHist = false, artBtn = null;
   function artParts() {

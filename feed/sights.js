@@ -1,6 +1,7 @@
 /* 1.9.112 A few colourful picture cards. Real Wikimedia photos and Wikipedia pages.
    One card from two of the four subjects each day, mixed in with the rest of the feed.
-   Not a random site. Pictures were checked on 7 Nov 2026. */
+   Not a random site. Pictures were checked on 7 Nov 2026.
+   1.9.113 steps that rotation forward once, still using only these eight pictures. */
 (function (root) {
   const pic = file => 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(file) + '?width=1200';
   const filePage = file => 'https://commons.wikimedia.org/wiki/File:' + encodeURIComponent(file).replace(/%20/g, '_');
@@ -15,6 +16,7 @@
     { key: 'reinga', topic: 'looks', file: 'Cape_Reinga.jpg', url: 'https://en.wikipedia.org/wiki/Cape_Reinga', t: 'Cape Reinga', s: 'Te Rerenga Wairua, at the top of the North Island. The picture is on Wikimedia Commons.' }
   ];
   const TOPICS = ['illusions', 'odd', 'colour', 'looks'];
+  const MIX = 1;
   function dayNum(now) { return Math.floor((now == null ? Date.now() : now) / 864e5); }
   function forTopic(topic, day) {
     const list = ITEMS.filter(i => i.topic === topic);
@@ -25,7 +27,7 @@
     };
   }
   function cards(now) {
-    const day = dayNum(now);
+    const day = dayNum(now) + MIX;
     const a = TOPICS[Math.abs(day) % TOPICS.length];
     const b = TOPICS[(Math.abs(day) + 2) % TOPICS.length];
     return [forTopic(a, day), forTopic(b, day + 1)];
@@ -43,7 +45,7 @@
     });
     return out;
   }
-  root.ibSights = { ITEMS, TOPICS, cards, insert, pic, filePage };
+  root.ibSights = { ITEMS, TOPICS, MIX, cards, insert, pic, filePage };
   if (!root.document) return;
   const prev = root.festive;
   root.festive = function (order, nPins) { order = prev ? prev(order, nPins) : (order || []); return insert(order, nPins); };

@@ -46,15 +46,14 @@ for (const day of [0, 1, 2]) {
   assert.ok(specials.some(x => x.kind === 'sitcom' || x.x === 'play' && x.kind === 'sitcom'), 'sitcom puzzle each day');
   assert.strictEqual(specials.filter(x => x.x === 'zoomq').length, 1);
   assert.strictEqual(specials.filter(x => x.x === 'fallq').length, 1);
-  assert.strictEqual(specials.filter(x => x.x === 'tetq').length, 1);
+  assert.strictEqual(specials.filter(x => x.x === 'tetq').length, 0);
   const idx = specials.map(s => out.indexOf(s));
   assert.ok(Math.min(...idx) >= 2);
   for (let i = 1; i < idx.length; i++) assert.ok(idx[i] - idx[i - 1] >= 4, 'spaced ' + idx);
 }
 const zoom = play.render({ id: 'zoomq-1', x: 'zoomq' });
 const fall = play.render({ id: 'fallq-1', x: 'fallq' });
-const tet = play.render({ id: 'tetq-1', x: 'tetq' });
-for (const html of [zoom, fall, tet]) {
+for (const html of [zoom, fall]) {
   assert.ok(!/<audio|<iframe|autoplay/i.test(html));
   assert.ok(!/boredbutton|cloudhiker/i.test(html));
 }
@@ -69,11 +68,13 @@ assert.ok(/Rafaël Rozendaal/.test(fall));
 assert.ok(!/isn’t part of this artwork/.test(fall));
 assert.ok(fall.includes('img/play/falling.svg'));
 assert.ok(!fall.includes('2011-falling-falling.png'));
-assert.ok(tet.includes('data-art="tet"'));
-assert.ok(tet.includes('img/play/tetris.svg'));
-assert.ok(/No sign-in/.test(tet) && /stays still/.test(tet));
-assert.ok(!/cursor\.com/.test(tet));
-assert.ok(!tet.includes('tetris.html'));
+assert.strictEqual(play.render({ id: 'tetq-1', x: 'tetq' }), '');
+assert.ok(!play.insert(feed, 2, 0).some(x => x && x.x === 'tetq'));
+assert.strictEqual(nz.drop({ id: 'tetq-12', x: 'tetq', t: 'Tetris' }), true);
+assert.strictEqual(nz.drop({ id: 'pin1', pin: 1, h: { id: 'tetq-3', x: 'tetq' } }), true);
+assert.strictEqual(nz.drop({ id: 'share1', _share: { snap: { url: 'https://shane-my-app.pages.dev/feed/tetris.html' } } }), true);
+assert.strictEqual(nz.drop({ id: 'keep-show', t: 'A sitcom about a board game', topic: 'sitcoms', url: 'https://www.tvnz.co.nz/shows/example' }), false);
+assert.strictEqual(nz.keptItems([{ id: 'tetq-1', x: 'tetq' }, { id: 'dogs', t: 'Top 5 Dogs of the Week' }]).map(i => i.id).join(','), 'dogs');
 
 function loadTetris() {
   const ctx = { console, Math, Object, Number, String, Array, setTimeout, parseInt, Date };
@@ -290,7 +291,9 @@ const at = sightsIn.map(s => placed.indexOf(s));
 assert.ok(at[0] >= 2 && at[1] - at[0] >= 4, at.join(','));
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.112'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.113'));
+assert.strictEqual(sights.MIX, 1);
+assert.strictEqual(sights.cards(0).map(c => c.topic).join(','), 'odd,looks');
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'sights.js?v=' + VERSION"));
 const ship = fs.readFileSync('tools/ship-pages.sh', 'utf8');
 const headers = ship.slice(ship.indexOf("<<'H'\n") + 6, ship.indexOf("\nH\n"));
