@@ -10,6 +10,14 @@ cat > "$out/_headers" <<'H'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
+# Tetris is our own page, opened in the feed window. DENY on /* made Chrome
+# show its error page in that frame (live check 7 Nov 2026: tetris.html 308
+# to /feed/tetris, both responses X-Frame-Options DENY). SAMEORIGIN lets the
+# feed frame it and still blocks other sites.
+/feed/tetris
+  X-Frame-Options: SAMEORIGIN
+/feed/tetris.html
+  X-Frame-Options: SAMEORIGIN
 /sw.js
   Cache-Control: no-cache
 /index.html
