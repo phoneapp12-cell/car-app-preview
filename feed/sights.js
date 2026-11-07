@@ -1,7 +1,8 @@
 /* 1.9.112 A few colourful picture cards. Real Wikimedia photos and Wikipedia pages.
    One card from two of the four subjects each day, mixed in with the rest of the feed.
    Not a random site. Pictures were checked on 7 Nov 2026.
-   1.9.113 steps that rotation forward once, still using only these eight pictures. */
+   1.9.114 shows one picture from each of these four subjects that is still switched on.
+   The photo inside a subject still alternates by day. No extra sources. */
 (function (root) {
   const pic = file => 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(file) + '?width=1200';
   const filePage = file => 'https://commons.wikimedia.org/wiki/File:' + encodeURIComponent(file).replace(/%20/g, '_');
@@ -28,9 +29,8 @@
   }
   function cards(now) {
     const day = dayNum(now) + MIX;
-    const a = TOPICS[Math.abs(day) % TOPICS.length];
-    const b = TOPICS[(Math.abs(day) + 2) % TOPICS.length];
-    return [forTopic(a, day), forTopic(b, day + 1)];
+    const on = TOPICS.filter(t => { try { return typeof root.topicOn !== 'function' || root.topicOn(t); } catch (e) { return true; } });
+    return on.map((t, n) => forTopic(t, day + n));
   }
   function busy(x) { return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || x.x === 'cine' || (x.id && String(x.id).indexOf('sight-') === 0)); }
   function insert(order, nPins, now) {
@@ -38,7 +38,7 @@
     const lo = Math.max(nPins | 0, 2);
     cards(now).forEach((item, n) => {
       if (out.some(x => x && x.id === item.id)) return;
-      let at = Math.min(out.length, lo + 12 + n * 8);
+      let at = Math.min(out.length, lo + 4 + n * 4);
       let g = 0;
       while (g++ < 6 && (busy(out[at]) || busy(out[at - 1]) || busy(out[at + 1]))) at = Math.min(out.length, at + 3);
       out.splice(at, 0, item);

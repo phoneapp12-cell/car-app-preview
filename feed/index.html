@@ -520,7 +520,7 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .stile{width:132px!important;height:215px!important}
 .stile .stlab{font-size:.82rem!important}
 
-/* 1.9.113 puzzles, discovery cards, Whangārei cinema. Still pictures only: no animation, no sound. */
+/* 1.9.114 puzzles, discovery cards, Whangārei cinema. Still pictures only: no animation, no sound. */
 #feed > .card.puzzle > .media,#feed > .card.zoomq > .media,#feed > .card.fallq > .media,#feed > .card.tetq > .media,#feed > .card.cine > .media{flex:0 0 auto;min-height:0;background:var(--chip)}
 #feed > .card.puzzle > .media img,#feed > .card.zoomq > .media img,#feed > .card.fallq > .media img,#feed > .card.tetq > .media img{height:auto!important;min-height:0!important;max-height:32vh;aspect-ratio:16/9!important;object-fit:cover}
 #feed > .card.cine > .media{background:#111}
@@ -556,7 +556,7 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .artlive{font-size:.72rem;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .artframe{flex:1 1 auto;width:100%;min-height:0;border:0;background:#000}
 @media (prefers-reduced-motion:reduce){#feed > .card.puzzle *,#feed > .card.zoomq *,#feed > .card.fallq *,#feed > .card.tetq *,#feed > .card.cine *{animation:none!important;transition:none!important}}
-/* 1.9.113 main-feed videos fill the card width. Landscape stays 16:9, portrait (Shorts) stays 9:16.
+/* 1.9.114 main-feed videos fill the card width. Landscape stays 16:9, portrait (Shorts) stays 9:16.
    The picture and the player are contained, not cropped or stretched. Swipe rows do not hold videos. */
 #feed > .card:has(> .media.vid){min-height:0!important;height:auto}
 #feed > .card > .media.vid{flex:0 0 auto;width:100%!important;max-width:100%!important;margin:0!important;aspect-ratio:16/9;max-height:calc(100svh - var(--hdr, 96px) - 132px);background:#000}
@@ -587,20 +587,20 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.113"></script>
-<script src="app.js?v=1.9.113"></script>
-<script src="extras.js?v=1.9.113"></script>
-<script src="jokes.js?v=1.9.113"></script>
-<script src="learn.js?v=1.9.113"></script>
-<script src="common-en.js?v=1.9.113"></script>
-<script src="explain.js?v=1.9.113"></script>
-<script src="effects.js?v=1.9.113"></script>
-<script src="stories.js?v=1.9.113"></script>
-<script src="weekly.js?v=1.9.113"></script>
-<script src="play.js?v=1.9.113"></script>
-<script src="nz.js?v=1.9.113"></script>
-<script src="sights.js?v=1.9.113"></script>
-<script src="read.js?v=1.9.113"></script>
+<script src="family.js?v=1.9.114"></script>
+<script src="app.js?v=1.9.114"></script>
+<script src="extras.js?v=1.9.114"></script>
+<script src="jokes.js?v=1.9.114"></script>
+<script src="learn.js?v=1.9.114"></script>
+<script src="common-en.js?v=1.9.114"></script>
+<script src="explain.js?v=1.9.114"></script>
+<script src="effects.js?v=1.9.114"></script>
+<script src="stories.js?v=1.9.114"></script>
+<script src="weekly.js?v=1.9.114"></script>
+<script src="play.js?v=1.9.114"></script>
+<script src="nz.js?v=1.9.114"></script>
+<script src="sights.js?v=1.9.114"></script>
+<script src="read.js?v=1.9.114"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.113';
+const APP_VERSION = '1.9.114';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -316,6 +316,12 @@ function isDullCard(i) { // dry news/science (fun/wow/Northland good-news source
   return ['nz', 'science', 'tech', 'election', 'social'].includes(i.topic) || (!i.img && i.kind === 'news');
 }
 
+/* 1.9.114: base weight counts once, and a topic that has not appeared yet is due.
+   Cubing the base (1.9.113) put about six sitcoms and three dog cards in the first
+   twelve when those topics were liked, and left most other enabled subjects out. */
+function topicDue(sc, gap, base, topicW, shown) {
+  return Math.sqrt(Math.max(0, sc)) * gap * base * (shown ? 1 : 2) * topicW;
+}
 function rank(items) {
   const W = weights(), now = Date.now();
   const scored = items.map(i => {
@@ -340,8 +346,8 @@ function rank(items) {
     let bestT = null, best = -1;
     for (const t in Q) {
       if (!Q[t].length) continue;
-      const gap = n - (t in lastAt ? lastAt[t] : -8); // 1.5.0: topics not shown yet keep getting more due too
-      const v = Math.sqrt(Q[t][0].sc) * gap * Math.pow(baseOf(t), 3) * W.topic(t) * TM[t] * (0.8 + 0.4 * r()); // sitcoms and liked topics come round more often
+      const gap = n - (t in lastAt ? lastAt[t] : -8); // topics not shown yet keep getting more due too
+      const v = topicDue(Q[t][0].sc, gap, baseOf(t), W.topic(t), t in lastAt) * TM[t] * (0.8 + 0.4 * r()); // liked topics still return more often, after each subject has had a turn
       if (v > best) { best = v; bestT = t; }
     }
     lastAt[bestT] = n;
