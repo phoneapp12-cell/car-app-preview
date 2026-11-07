@@ -3,7 +3,7 @@ import vm from 'vm';
 import assert from 'assert';
 
 function load(file) {
-  const ctx = { console, Intl, Date, Math, URL, Set, Map, Object, Number, String, Array };
+  const ctx = { console, Intl, Date, Math, URL, Set, Map, Object, Number, String, Array, encodeURIComponent, decodeURIComponent };
   ctx.window = ctx;
   ctx.globalThis = ctx;
   vm.createContext(ctx);
@@ -263,6 +263,35 @@ const ani = rowed.find(x => x.x === 'row' && x.k === 'ani');
 assert.ok(ani && ani.items.every(it => it.id !== 'bad'));
 assert.strictEqual(ani.items.length, 3);
 
+const sights = load('feed/sights.js').ibSights;
+assert.strictEqual([].slice.call(sights.TOPICS).join(','), 'illusions,odd,colour,looks');
+assert.strictEqual(sights.ITEMS.length, 8);
+const seenTopics = new Set(sights.ITEMS.map(i => i.topic));
+assert.strictEqual(seenTopics.size, 4);
+for (const i of sights.ITEMS) {
+  assert.ok(i.url.startsWith('https://'), i.key);
+  assert.ok(!/reddit|stan\.|neon|nbc|\/orders\//i.test(i.url + i.t + i.s), i.key);
+  assert.ok(!/open today|tickets from|admission/i.test(i.s), i.key);
+  const img = sights.pic(i.file);
+  assert.ok(img.includes('Special:FilePath') && img.includes('width=1200'), i.key);
+}
+const hundert = sights.ITEMS.find(i => i.key === 'hundert');
+assert.ok(/Kawakawa/.test(hundert.t) && /not the art centre in Whangārei/.test(hundert.s));
+assert.ok(!/Dent Street/.test(hundert.t + hundert.s));
+assert.ok(hundert.url.includes('Kawakawa'));
+const day0 = sights.cards(0);
+assert.strictEqual(day0.length, 2);
+assert.notStrictEqual(day0[0].topic, day0[1].topic);
+assert.ok(day0.every(c => c.img && c.src === 'sight-commons' && c.kind === 'photo'));
+const placed = sights.insert(Array.from({ length: 40 }, (_, n) => ({ id: 'p' + n, t: 'Post ' + n })), 2, 0);
+const sightsIn = placed.filter(x => x.src === 'sight-commons');
+assert.strictEqual(sightsIn.length, 2);
+const at = sightsIn.map(s => placed.indexOf(s));
+assert.ok(at[0] >= 2 && at[1] - at[0] >= 4, at.join(','));
+const appSrc = fs.readFileSync('feed/app.js', 'utf8');
+for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.112'));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'sights.js?v=' + VERSION"));
 const ship = fs.readFileSync('tools/ship-pages.sh', 'utf8');
 const headers = ship.slice(ship.indexOf("<<'H'\n") + 6, ship.indexOf("\nH\n"));
 assert.match(headers, /\/\*\n {2}X-Content-Type-Options: nosniff\n {2}Referrer-Policy: strict-origin-when-cross-origin\n {2}X-Frame-Options: DENY/);

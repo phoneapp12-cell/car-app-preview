@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.111';
+const APP_VERSION = '1.9.112';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -16,6 +16,10 @@ const TOPICS = [
   ['nz', 'Around NZ', '🇳🇿', '#0891b2', '#1d4ed8'],
   ['dogs', 'Dogs', '🐶', '#ea580c', '#a16207'],
   ['nature', 'Nature', '🌿', '#059669', '#0e7490'],
+  ['illusions', 'Optical illusions', '👁️', '#7c3aed', '#f43f5e'],
+  ['odd', 'Unusual animals', '🦎', '#0f766e', '#f59e0b'],
+  ['colour', 'Playful colour', '🖍️', '#e11d48', '#facc15'],
+  ['looks', 'Wow places', '🏞️', '#0369a1', '#22c55e'],
   ['events', 'NZ events', '🎆', '#be123c', '#7c3aed'],
   ['food', 'Food (GF)', '🍲', '#c2410c', '#eab308'],
   ['meals', 'Easy weeknight meals', '🍝', '#ea580c', '#16a34a'], // 1.9.104 Nicolle's idea, on for everyone
@@ -49,7 +53,7 @@ const TOPICS = [
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t]));
 Object.defineProperty(TOPIC.life, 1, { get: () => forMe(1), enumerable: true }); // 1.9.74 📌 For Shane / For Sarah … // 1.4.0: About-you chips are added to this as they're found
-const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down
+const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75, illusions: 0.9, odd: 1.0, colour: 0.9, looks: 0.95 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down. 1.9.112 new picture subjects stay lighter than sitcoms and dogs
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const NON_NZ_FOOD = /\b(walmart|wal-?mart|trader joe'?s|traderjoes|kroger|aldi\b|tesco|asda|sainsbury'?s?|waitrose|lidl|costco\s*(usa?|us|america)|sam'?s club|target(?!\s*(nz|new zealand))|whole foods|heb\b|publix|meijer|wegmans|shoprite|food lion|dollar general|walgreens|cvs\b|home depot|lowe'?s|usd\b|usda\b)\b/i; // 1.9.79
@@ -58,7 +62,7 @@ const SPORT = { test: t => SPORT1.test(t) || SPORT2.test(t) };
 // 1.7.1 family-safe: no nudity or adult content, anywhere (same rules as the data service's safe.js)
 const NUDE = /\b(nud(e|es|ity|ist|ists|ism)|semi-?nude|naked|nsfw|nsfl|topless|bottomless|erotic(a|ism|ally)?|lingerie|boudoir|sensual(ity)?|figure (study|studies|drawing|model)|life drawing|live model|nude model|odalisques?|breasts?|nipples?|genital(s|ia)?|penis|vagina|porn(o|ography|ographic)?|pin-?ups?|burlesque|undress(ed|ing)?|strip(per|pers|tease|club)|playboy|onlyfans|bikinis?|thongs?|skinny[- ]?dip\w*|sexy|sexual(ly|ity)?|sex (worker|work|toy|toys|scene|scenes)|fetish\w*|kinky|xxx|adult (content|film|films|only))\b/i;
 const ART_NUDE = /\b(venus|birth of venus|nymphs?|bathers|bathing|the bath|shower|reclining|olympia|adam and eve|the three graces|danaë|danae|leda|susanna|bathsheba|schiele|modigliani|bouguereau|klimt|courbet|rubens|titian|ingres|egon|figurative|the body|bodies|torso|male gaze)\b/i;
-const ART_TOPICS = new Set(['rainbow', 'parent', 'social', 'creative', 'culture', 'learn', 'collect', 'travel', 'kids', 'craft', 'vgames', 'boardg', 'fantasy', 'tarot']);
+const ART_TOPICS = new Set(['rainbow', 'parent', 'social', 'creative', 'culture', 'learn', 'collect', 'travel', 'kids', 'craft', 'vgames', 'boardg', 'fantasy', 'tarot', 'colour']);
 const GAME_TOPICS = new Set(['vgames', 'boardg', 'fantasy']), GAME_BAD = /\besports?\b|tournament|\bgore\b|gory|bloody|dismember|decapitat|mutilat|torture|\bR18\b|adults? only|seductive|succubus|bikini armou?r/i; // 1.8.3
 const BLOCKED = new Set(['4qrdzz', '4ek9op']); // the r/museum nude photos Shane reported (1 Nov 2026)
 const BLOCKED_SRC = new Set(['rd-museum', 'rd-historyporn', 'hyperallergic', 'openculture', 'yt-proko', 'rd-drawing']);
@@ -117,6 +121,10 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
   ['Astronomy', 'scifi', 'astronom(y|ers?)|telescope|stargaz(e|ing)|planets?|stars?|galax(y|ies)|nebula|comet|eclipse'], ['Space', 'scifi', 'space|nasa|rockets?|astronauts?|moon|mars|spacex'],
   ['Gardening', 'garden', 'garden(s|ing|er)?|plants?|seeds?|grow(ing)?|soil|compost'], ['Beekeeping', 'garden', 'bees?|beekeep(ing|er)|hives?|honey'],
   ['Nature', 'nature', 'nature|wildlife|forest|ocean|landscape'], ['Animals', 'nature', 'animals?|cats?|kittens?|birds?|wildlife|zoo'], ['Birdwatching', 'nature', 'birds?|birding|birdwatch(ing)?|tūī|tui|kererū|kiwi bird'],
+  ['Optical illusions', 'illusions', 'illusion|müller|muller|café wall|cafe wall'],
+  ['Unusual animals', 'odd', 'tuatara|wētā|weta|deinacrida'],
+  ['Playful colour', 'colour', 'hundertwasser|bucket fountain'],
+  ['Wow places', 'looks', 'whangārei falls|whangarei falls|cape reinga|te rerenga'],
   ['Travel', 'travel', 'travel|trip|holiday|destination|tourism'], ['Theme Parks', 'travel', 'theme parks?|roller ?coasters?|rides?|disneyland|rainbow’s end|rainbows end'],
   ['Technology', 'tech', 'tech(nology)?|gadgets?|smartphones?|iphone|android'], ['Computers', 'tech', 'computers?|pcs?|laptops?|windows|mac(book)?|linux'], ['Coding', 'tech', 'cod(e|ing)|programming|developers?|software|python|javascript'],
   ['Robotics', 'tech', 'robot(s|ics)?|automation|drones?'], ['Low Technology', 'diy', 'low-?tech|off-?grid|hand tools?|solar oven|repair'], ['Social Media', 'tech', 'social media|instagram|facebook|tiktok|youtube|reddit'],
@@ -146,7 +154,7 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['hp', 'monarch', 'nd', 'parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars'];
+const GROUP_TOPICS = ['hp', 'monarch', 'nd', 'parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars', 'illusions', 'odd', 'colour', 'looks'];
 // 1.9.0 topics nobody gets unless they pick them (members: in their interests; Shane: switched on in a suggestion or ⚙️)
 const OPTIN = new Set(['parent', 'rainbow', 'social', 'candy', 'pets', 'nd', 'hp', 'monarch', 'aiassist', 'smart', 'innov']);
 function optedIn(t) { return PICK ? PICK.includes(t) : ls.get('optIn', []).includes(t); }
