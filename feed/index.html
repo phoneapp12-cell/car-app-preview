@@ -80,7 +80,7 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .media.vid video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
 .media.vid.tall{aspect-ratio:9/16;width:min(100%,calc(82vh*9/16));margin:0 auto}
 .media.vid .fsb{position:absolute;left:10px;bottom:10px;z-index:4;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:0;font-size:20px;line-height:40px;padding:0}
-.media.vid.playing:is([data-vk=vimeo],[data-vk=tiktok],[data-vk=ig],[data-vk=fb]) .fsb{display:none}
+.media.vid.playing:is([data-vk=tiktok],[data-vk=ig],[data-vk=fb]) .fsb{display:none}
 .media.vid:fullscreen{width:100vw;height:100vh;max-height:none;aspect-ratio:auto}
 @media (max-width:660px){.card:has(.media.vid){margin-left:-10px;margin-right:-10px;border-radius:0;border-left:0;border-right:0}}
 @media (min-width:900px){.card:has(.media.vid){margin-left:-110px;margin-right:-110px}}
@@ -519,6 +519,40 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 #feed{padding-left:3px!important;padding-right:3px!important}
 .stile{width:132px!important;height:215px!important}
 .stile .stlab{font-size:.82rem!important}
+
+/* 1.9.108 puzzles, discovery cards, Whangārei cinema. Still pictures only: no animation, no sound. */
+#feed > .card.puzzle > .media,#feed > .card.zoomq > .media,#feed > .card.fallq > .media,#feed > .card.cine > .media{flex:0 0 auto;min-height:0;background:var(--chip)}
+#feed > .card.puzzle > .media img,#feed > .card.zoomq > .media img,#feed > .card.fallq > .media img{height:auto!important;min-height:0!important;max-height:32vh;aspect-ratio:16/9!important;object-fit:cover}
+#feed > .card.cine > .media{background:#111}
+#feed > .card.cine > .media img{height:auto!important;min-height:0!important;max-height:58vh;aspect-ratio:2/3!important;object-fit:contain!important;background:#111}
+#feed > .card.puzzle .bd p,#feed > .card.zoomq .bd p,#feed > .card.fallq .bd p,#feed > .card.cine .bd p{display:block;-webkit-line-clamp:unset;overflow:visible;color:var(--ink)}
+.plmsg{margin:8px 0;padding:10px 12px;border-radius:12px;font-weight:700;background:var(--chip);color:var(--ink)}
+.plmsg.ok{background:color-mix(in srgb,#16a34a 18%,var(--card));color:var(--ink)}
+.plmsg.no{background:color-mix(in srgb,#dc2626 14%,var(--card));color:var(--ink)}
+.plgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
+.pltile{aspect-ratio:1;min-height:48px;border-radius:14px;border:2px solid var(--line);background:var(--chip);padding:0;overflow:hidden;color:var(--ink);position:relative}
+.pltile:focus-visible,.plopt:focus-visible,.plact:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.pltile img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.pltile .plback{display:grid;place-items:center;width:100%;height:100%;font-size:1.4rem;font-weight:800;background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 35%,var(--chip)),color-mix(in srgb,var(--acc2) 28%,var(--chip)))}
+.pltile.up{border-color:var(--acc)}
+.pltile.match{box-shadow:inset 0 0 0 3px #16a34a}
+.plcap{position:absolute;left:0;right:0;bottom:0;padding:2px 4px;font-size:.68rem;font-weight:800;text-align:center;color:#fff;background:rgba(0,0,0,.55)}
+.plopts{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.plopt{min-height:48px;text-align:left;border:2px solid var(--line);background:var(--chip);color:var(--ink);border-radius:14px;padding:12px 14px;font-weight:700}
+.plopt.ok{border-color:#16a34a;background:color-mix(in srgb,#16a34a 18%,var(--card))}
+.plopt.no{border-color:#dc2626;background:color-mix(in srgb,#dc2626 14%,var(--card))}
+.plopt:disabled{cursor:default}
+.plact{min-height:48px}
+.plsrc{font-size:.78rem;color:var(--mute);margin:6px 0 0}
+.plsrc a{color:var(--acc);font-weight:700}
+.plwarn{margin:8px 0;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,#f59e0b 22%,var(--card));color:var(--ink);font-weight:700}
+@media (prefers-reduced-motion:reduce){#feed > .card.puzzle *,#feed > .card.zoomq *,#feed > .card.fallq *,#feed > .card.cine *{animation:none!important;transition:none!important}}
+/* 1.9.108 main-feed videos fill the card width. Landscape stays 16:9, portrait (Shorts) stays 9:16.
+   The picture and the player are contained, not cropped or stretched. Swipe rows do not hold videos. */
+#feed > .card > .media.vid{width:100%!important;max-width:100%!important;margin:0!important;aspect-ratio:16/9;max-height:85vh;background:#000}
+#feed > .card > .media.vid.tall{width:100%!important;aspect-ratio:9/16;max-height:85vh;margin:0!important}
+#feed > .card > .media.vid .vthumb,#feed > .card > .media.vid video,#feed > .card > .media.vid iframe{object-fit:contain!important;background:#000;width:100%;height:100%}
+#feed > .hrow{/* picture rows only */}
 </style>
 </head>
 <body>
@@ -538,16 +572,19 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.107"></script>
-<script src="app.js?v=1.9.107"></script>
-<script src="extras.js?v=1.9.107"></script>
-<script src="jokes.js?v=1.9.107"></script>
-<script src="learn.js?v=1.9.107"></script>
-<script src="common-en.js?v=1.9.107"></script>
-<script src="explain.js?v=1.9.107"></script>
-<script src="effects.js?v=1.9.107"></script>
-<script src="stories.js?v=1.9.107"></script>
-<script src="weekly.js?v=1.9.107"></script>
+<script src="family.js?v=1.9.108"></script>
+<script src="app.js?v=1.9.108"></script>
+<script src="extras.js?v=1.9.108"></script>
+<script src="jokes.js?v=1.9.108"></script>
+<script src="learn.js?v=1.9.108"></script>
+<script src="common-en.js?v=1.9.108"></script>
+<script src="explain.js?v=1.9.108"></script>
+<script src="effects.js?v=1.9.108"></script>
+<script src="stories.js?v=1.9.108"></script>
+<script src="weekly.js?v=1.9.108"></script>
+<script src="play.js?v=1.9.108"></script>
+<script src="nz.js?v=1.9.108"></script>
+<script src="read.js?v=1.9.108"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

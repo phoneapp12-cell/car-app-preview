@@ -60,11 +60,11 @@ function buildTiles() {
   const items = (typeof FEED !== 'undefined' && FEED && FEED.items) ? FEED.items : [];
   const ok = i => i && i.img && !SPORT.test((i.t || '') + ' ' + (i.s || '')) && i.topic !== 'election' && !POL.test((i.t || '') + ' ' + (i.s || ''));
   const FUNV = /funny|hilarious|best of|bloopers?|fails?|cold open|prank|laugh|comedy|try not to|cute|adorable|epic|amazing|wow|unexpected|reaction/i, DULLV = /news|interview|explained|lecture|review|update|podcast|full episode|documentary|budget|report/i;
-  const fs = i => { const t = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.sn || ''); let s = 0; if (/^fun-|^yt-(cc|nbc|fox|neon)/.test(i.src || i.id || '')) s += 3; if (['sitcoms', 'dogs', 'pets', 'comedy'].includes(i.topic)) s += 3; if (FUNV.test(t)) s += 4; if (DULLV.test(t)) s -= 6; if (['news', 'science', 'nz', 'election'].includes(i.topic)) s -= 4; return s + Math.min(2, ((i.at || 0) - Date.now() + 864e5 * 3) / 864e5); };
+  const fs = i => { const t = (i.t || '') + ' ' + (i.s || '') + ' ' + (i.sn || ''); let s = 0; if (/^fun-|^yt-(cc|nbc|fox)/.test(i.src || i.id || '')) s += 3; if (['sitcoms', 'dogs', 'pets', 'comedy'].includes(i.topic)) s += 3; if (FUNV.test(t)) s += 4; if (DULLV.test(t)) s -= 6; if (['news', 'science', 'nz', 'election'].includes(i.topic)) s -= 4; return s + Math.min(2, ((i.at || 0) - Date.now() + 864e5 * 3) / 864e5); };
   const SHORT = i => /youtube\.com\/shorts\/|v\.redd\.it|tiktok|reel/i.test((i.url || '') + ' ' + (i.vid || '') + ' ' + (i.v || ''));
   // 1.9.93 Shane: under 30 seconds, no YouTube (no ads) — Reddit's own clips with a known length
   const playable = i => { if (i.vid) return false; const v = typeof vidOf === 'function' && vidOf(i); return !!(v && v.k === 'reddit' && i.vdur > 0 && i.vdur <= 30); };
-  const vids = items.filter(i => ok(i) && playable(i))
+  const vids = items.filter(i => ok(i) && playable(i) && !(window.ibNz && ibNz.drop(i)))
     .map(i => [fs(i) + (SHORT(i) ? 3 : 0), i]).filter(p => p[0] > 0).sort((a, b) => b[0] - a[0]).map(p => p[1]);
   const LAB = i => { const t = (i.t || '') + ' ' + (i.topic || ''); if (['dogs', 'pets'].includes(i.topic) || /\b(dogs?|cats?|pupp(y|ies)|kittens?|animals?|pets?|birds?|otters?)\b/i.test(t)) return ['Cute animal', '🐾'];
     if (i.topic === 'sitcoms' || /sitcom|comedy|cold open|bloopers?/i.test(t)) return ['Sitcom clip', '📺']; if (/fail|prank|funny|hilarious|laugh/i.test(t)) return ['Funny', '😂']; if (/wow|amazing|epic|incredible/i.test(t)) return ['Wow', '🤩'];
