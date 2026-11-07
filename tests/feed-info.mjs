@@ -292,6 +292,12 @@ const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.112'));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'sights.js?v=' + VERSION"));
+const ship = fs.readFileSync('tools/ship-pages.sh', 'utf8');
+const headers = ship.slice(ship.indexOf("<<'H'\n") + 6, ship.indexOf("\nH\n"));
+assert.match(headers, /\/\*\n {2}X-Content-Type-Options: nosniff\n {2}Referrer-Policy: strict-origin-when-cross-origin\n {2}X-Frame-Options: DENY/);
+assert.match(headers, /\/feed\/tetris\n {2}X-Frame-Options: SAMEORIGIN/);
+assert.match(headers, /\/feed\/tetris\.html\n {2}X-Frame-Options: SAMEORIGIN/);
+assert.ok(!/\/feed\/tetris(?:\.html)?\n {2}X-Frame-Options: DENY/.test(headers));
 
 console.log('feed-info tests ok');
 
