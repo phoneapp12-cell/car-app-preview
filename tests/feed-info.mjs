@@ -265,10 +265,11 @@ assert.ok(ani && ani.items.every(it => it.id !== 'bad'));
 assert.strictEqual(ani.items.length, 3);
 
 const sights = load('feed/sights.js').ibSights;
-assert.strictEqual([].slice.call(sights.TOPICS).join(','), 'illusions,odd,colour,looks');
-assert.strictEqual(sights.ITEMS.length, 8);
+assert.strictEqual([].slice.call(sights.TOPICS).join(','), 'illusions,odd,colour,looks,reef,dolls,keeps,glass,kites,lanterns');
+assert.strictEqual(sights.ITEMS.length, 20);
 const seenTopics = new Set(sights.ITEMS.map(i => i.topic));
-assert.strictEqual(seenTopics.size, 4);
+assert.strictEqual(seenTopics.size, 10);
+for (const t of sights.TOPICS) assert.strictEqual(sights.ITEMS.filter(i => i.topic === t).length, 2, t);
 for (const i of sights.ITEMS) {
   assert.ok(i.url.startsWith('https://'), i.key);
   assert.ok(!/reddit|stan\.|neon|nbc|\/orders\//i.test(i.url + i.t + i.s), i.key);
@@ -281,20 +282,78 @@ assert.ok(/Kawakawa/.test(hundert.t) && /not the art centre in Whangārei/.test(
 assert.ok(!/Dent Street/.test(hundert.t + hundert.s));
 assert.ok(hundert.url.includes('Kawakawa'));
 const day0 = sights.cards(0);
-assert.strictEqual(day0.length, 2);
-assert.notStrictEqual(day0[0].topic, day0[1].topic);
+assert.strictEqual(day0.map(c => c.topic).join(','), sights.TOPICS.join(','));
 assert.ok(day0.every(c => c.img && c.src === 'sight-commons' && c.kind === 'photo'));
-const placed = sights.insert(Array.from({ length: 40 }, (_, n) => ({ id: 'p' + n, t: 'Post ' + n })), 2, 0);
+const mandarin = sights.ITEMS.find(i => i.key === 'mandarin');
+assert.ok(/not from New Zealand/.test(mandarin.s));
+const anemone = sights.ITEMS.find(i => i.key === 'anemone');
+assert.ok(/HMNZS Canterbury/.test(anemone.t + anemone.s) && /New Zealand/.test(anemone.t + anemone.s));
+const off = load('feed/sights.js');
+off.topicOn = t => t !== 'colour' && t !== 'kites';
+assert.ok(!off.ibSights.cards(0).some(c => c.topic === 'colour' || c.topic === 'kites'));
+assert.strictEqual(off.ibSights.cards(0).length, 8);
+const placed = sights.insert(Array.from({ length: 50 }, (_, n) => ({ id: 'p' + n, t: 'Post ' + n })), 2, 0);
 const sightsIn = placed.filter(x => x.src === 'sight-commons');
-assert.strictEqual(sightsIn.length, 2);
+assert.strictEqual(sightsIn.length, 10);
 const at = sightsIn.map(s => placed.indexOf(s));
-assert.ok(at[0] >= 2 && at[1] - at[0] >= 4, at.join(','));
+assert.ok(at[0] >= 2 && at[0] < 12, at.join(','));
+assert.ok(at.filter(n => n < 12).length <= 3, at.join(','));
+for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(','));
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.113'));
+assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.114'));
 assert.strictEqual(sights.MIX, 1);
-assert.strictEqual(sights.cards(0).map(c => c.topic).join(','), 'odd,looks');
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'sights.js?v=' + VERSION"));
+const dueSrc = (appSrc.match(/function topicDue\([\s\S]*?\n\}/) || [])[0];
+assert.ok(dueSrc, 'topicDue');
+const dueCtx = {};
+vm.runInNewContext(dueSrc + '\nglobalThis.topicDue = topicDue;', dueCtx);
+const BASE = { sitcoms: 1.55, dogs: 1.45, nature: 1.35, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, food: 0.95, kids: 0.9, creative: 1.15, science: 0.55, travel: 0.9, meals: 1.1, illusions: 0.9, odd: 1, colour: 0.9, looks: 0.95 };
+const baseOf = t => BASE[t] || 1;
+const WT = { sitcoms: 2.2, dogs: 1.8 };
+function likedScore(topic, vid) {
+  let f = (0.15 + 0.65) * (vid ? 1.15 : 1.1) * baseOf(topic) * (WT[topic] || 1);
+  if (vid) f *= 1.35;
+  if (['dogs', 'nature', 'sitcoms'].includes(topic)) f *= 1.4;
+  if (['creative', 'scifi'].includes(topic)) f *= 1.25;
+  if (['nz', 'science'].includes(topic) && !vid) f *= 0.55;
+  if (topic === 'sitcoms') f *= 1.18;
+  return f;
+}
+const spec = [['sitcoms', 10, true], ['dogs', 8, true], ['nature', 4, true], ['garden', 3, false], ['music', 3, false], ['scifi', 3, true], ['nz', 4, false], ['food', 3, false], ['kids', 2, false], ['creative', 3, false], ['science', 3, false], ['travel', 2, false], ['meals', 2, false], ['illusions', 1, false], ['odd', 1, false], ['colour', 1, false], ['looks', 1, false]];
+const pool = [];
+for (const [topic, n, vid] of spec) for (let i = 0; i < n; i++) pool.push({ topic, sc: likedScore(topic, vid) * (1 - i * 0.03) });
+function spread(due) {
+  const Q = {};
+  for (const p of pool) (Q[p.topic] = Q[p.topic] || []).push(Object.assign({}, p));
+  for (const t in Q) Q[t].sort((a, b) => b.sc - a.sc);
+  const lastAt = {}, out = [];
+  while (out.length < pool.length) {
+    const n = out.length; let bestT = null, best = -1;
+    for (const t in Q) {
+      if (!Q[t].length) continue;
+      const gap = n - (t in lastAt ? lastAt[t] : -8);
+      const v = due(Q[t][0].sc, gap, baseOf(t), WT[t] || 1, t in lastAt);
+      if (v > best) { best = v; bestT = t; }
+    }
+    lastAt[bestT] = n;
+    out.push(Q[bestT].shift());
+  }
+  const head = out.slice(0, 12);
+  const counts = {};
+  for (const i of head) counts[i.topic] = (counts[i.topic] || 0) + 1;
+  return counts;
+}
+const beforeDue = (sc, gap, base, topicW) => Math.sqrt(sc) * gap * Math.pow(base, 3) * topicW;
+const before = spread(beforeDue);
+const after = spread(dueCtx.topicDue);
+const uniq = o => Object.keys(o).length;
+assert.ok(uniq(before) <= 6, 'before ' + JSON.stringify(before));
+assert.ok(uniq(after) >= 8, 'after ' + JSON.stringify(after));
+assert.ok(after.sitcoms >= 1 && after.dogs >= 1, JSON.stringify(after));
+assert.ok(after.sitcoms >= (after.science || 0));
+assert.ok(!before.illusions && (after.odd || after.illusions || after.colour || after.looks), JSON.stringify(after));
 const ship = fs.readFileSync('tools/ship-pages.sh', 'utf8');
 const headers = ship.slice(ship.indexOf("<<'H'\n") + 6, ship.indexOf("\nH\n"));
 assert.match(headers, /\/\*\n {2}X-Content-Type-Options: nosniff\n {2}Referrer-Policy: strict-origin-when-cross-origin\n {2}X-Frame-Options: DENY/);

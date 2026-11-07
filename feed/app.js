@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.113';
+const APP_VERSION = '1.9.114';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -20,6 +20,12 @@ const TOPICS = [
   ['odd', 'Unusual animals', '🦎', '#0f766e', '#f59e0b'],
   ['colour', 'Playful colour', '🖍️', '#e11d48', '#facc15'],
   ['looks', 'Wow places', '🏞️', '#0369a1', '#22c55e'],
+  ['reef', 'Colourful sea life', '🐠', '#0891b2', '#f43f5e'],
+  ['dolls', "Doll's houses", '🪆', '#db2777', '#f59e0b'],
+  ['keeps', 'Everyday keepsakes', '☎️', '#92400e', '#facc15'],
+  ['glass', 'Stained glass', '🪟', '#7c3aed', '#22d3ee'],
+  ['kites', 'Kites', '🪁', '#0284c7', '#f97316'],
+  ['lanterns', 'Paper lanterns', '🏮', '#e11d48', '#f97316'],
   ['events', 'NZ events', '🎆', '#be123c', '#7c3aed'],
   ['food', 'Food (GF)', '🍲', '#c2410c', '#eab308'],
   ['meals', 'Easy weeknight meals', '🍝', '#ea580c', '#16a34a'], // 1.9.104 Nicolle's idea, on for everyone
@@ -53,7 +59,7 @@ const TOPICS = [
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t]));
 Object.defineProperty(TOPIC.life, 1, { get: () => forMe(1), enumerable: true }); // 1.9.74 📌 For Shane / For Sarah … // 1.4.0: About-you chips are added to this as they're found
-const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75, illusions: 0.9, odd: 1.0, colour: 0.9, looks: 0.95 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down. 1.9.112 new picture subjects stay lighter than sitcoms and dogs
+const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75, illusions: 0.9, odd: 1.0, colour: 0.9, looks: 0.95, reef: 0.95, dolls: 0.9, keeps: 0.9, glass: 0.9, kites: 0.9, lanterns: 0.9 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down. 1.9.112 new picture subjects stay lighter than sitcoms and dogs
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const NON_NZ_FOOD = /\b(walmart|wal-?mart|trader joe'?s|traderjoes|kroger|aldi\b|tesco|asda|sainsbury'?s?|waitrose|lidl|costco\s*(usa?|us|america)|sam'?s club|target(?!\s*(nz|new zealand))|whole foods|heb\b|publix|meijer|wegmans|shoprite|food lion|dollar general|walgreens|cvs\b|home depot|lowe'?s|usd\b|usda\b)\b/i; // 1.9.79
@@ -125,6 +131,12 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
   ['Unusual animals', 'odd', 'tuatara|wētā|weta|deinacrida'],
   ['Playful colour', 'colour', 'hundertwasser|bucket fountain'],
   ['Wow places', 'looks', 'whangārei falls|whangarei falls|cape reinga|te rerenga'],
+  ['Colourful sea life', 'reef', 'jewel anemones?|mandarinfish|corynactis|synchiropus'],
+  ["Doll's houses", 'dolls', "doll'?s houses?|dollhouse"],
+  ['Everyday keepsakes', 'keeps', 'typewriter|dial telephone|rotary telephone'],
+  ['Stained glass', 'glass', 'tiffany lamp|favrile|stained glass'],
+  ['Kites', 'kites', 'kite festival|kites over|kites at'],
+  ['Paper lanterns', 'lanterns', 'paper lantern'],
   ['Travel', 'travel', 'travel|trip|holiday|destination|tourism'], ['Theme Parks', 'travel', 'theme parks?|roller ?coasters?|rides?|disneyland|rainbow’s end|rainbows end'],
   ['Technology', 'tech', 'tech(nology)?|gadgets?|smartphones?|iphone|android'], ['Computers', 'tech', 'computers?|pcs?|laptops?|windows|mac(book)?|linux'], ['Coding', 'tech', 'cod(e|ing)|programming|developers?|software|python|javascript'],
   ['Robotics', 'tech', 'robot(s|ics)?|automation|drones?'], ['Low Technology', 'diy', 'low-?tech|off-?grid|hand tools?|solar oven|repair'], ['Social Media', 'tech', 'social media|instagram|facebook|tiktok|youtube|reddit'],
@@ -154,7 +166,7 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['hp', 'monarch', 'nd', 'parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars', 'illusions', 'odd', 'colour', 'looks'];
+const GROUP_TOPICS = ['hp', 'monarch', 'nd', 'parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars', 'illusions', 'odd', 'colour', 'looks', 'reef', 'dolls', 'keeps', 'glass', 'kites', 'lanterns'];
 // 1.9.0 topics nobody gets unless they pick them (members: in their interests; Shane: switched on in a suggestion or ⚙️)
 const OPTIN = new Set(['parent', 'rainbow', 'social', 'candy', 'pets', 'nd', 'hp', 'monarch', 'aiassist', 'smart', 'innov']);
 function optedIn(t) { return PICK ? PICK.includes(t) : ls.get('optIn', []).includes(t); }
@@ -316,6 +328,12 @@ function isDullCard(i) { // dry news/science (fun/wow/Northland good-news source
   return ['nz', 'science', 'tech', 'election', 'social'].includes(i.topic) || (!i.img && i.kind === 'news');
 }
 
+/* 1.9.114: base weight counts once, and a topic that has not appeared yet is due.
+   Cubing the base (1.9.113) put about six sitcoms and three dog cards in the first
+   twelve when those topics were liked, and left most other enabled subjects out. */
+function topicDue(sc, gap, base, topicW, shown) {
+  return Math.sqrt(Math.max(0, sc)) * gap * base * (shown ? 1 : 2) * topicW;
+}
 function rank(items) {
   const W = weights(), now = Date.now();
   const scored = items.map(i => {
@@ -340,8 +358,8 @@ function rank(items) {
     let bestT = null, best = -1;
     for (const t in Q) {
       if (!Q[t].length) continue;
-      const gap = n - (t in lastAt ? lastAt[t] : -8); // 1.5.0: topics not shown yet keep getting more due too
-      const v = Math.sqrt(Q[t][0].sc) * gap * Math.pow(baseOf(t), 3) * W.topic(t) * TM[t] * (0.8 + 0.4 * r()); // sitcoms and liked topics come round more often
+      const gap = n - (t in lastAt ? lastAt[t] : -8); // topics not shown yet keep getting more due too
+      const v = topicDue(Q[t][0].sc, gap, baseOf(t), W.topic(t), t in lastAt) * TM[t] * (0.8 + 0.4 * r()); // liked topics still return more often, after each subject has had a turn
       if (v > best) { best = v; bestT = t; }
     }
     lastAt[bestT] = n;
