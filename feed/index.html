@@ -520,7 +520,7 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .stile{width:132px!important;height:215px!important}
 .stile .stlab{font-size:.82rem!important}
 
-/* 1.9.108 puzzles, discovery cards, Whangārei cinema. Still pictures only: no animation, no sound. */
+/* 1.9.109 puzzles, discovery cards, Whangārei cinema. Still pictures only: no animation, no sound. */
 #feed > .card.puzzle > .media,#feed > .card.zoomq > .media,#feed > .card.fallq > .media,#feed > .card.cine > .media{flex:0 0 auto;min-height:0;background:var(--chip)}
 #feed > .card.puzzle > .media img,#feed > .card.zoomq > .media img,#feed > .card.fallq > .media img{height:auto!important;min-height:0!important;max-height:32vh;aspect-ratio:16/9!important;object-fit:cover}
 #feed > .card.cine > .media{background:#111}
@@ -546,12 +546,27 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .plsrc{font-size:.78rem;color:var(--mute);margin:6px 0 0}
 .plsrc a{color:var(--acc);font-weight:700}
 .plwarn{margin:8px 0;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,#f59e0b 22%,var(--card));color:var(--ink);font-weight:700}
+.artwin{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;background:#000;color:#fff}
+.artwin[hidden]{display:none!important}
+.artbar{display:flex;align-items:center;gap:8px;min-height:48px;padding:6px 8px;background:#141414}
+.artx{min-height:44px;border-radius:12px;border:0;background:#fff;color:#111;font-weight:800;padding:8px 12px}
+.artmeta{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
+.artmeta strong{font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artsite{color:#fff;font-weight:800;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artlive{font-size:.72rem;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artframe{flex:1 1 auto;width:100%;min-height:0;border:0;background:#000}
 @media (prefers-reduced-motion:reduce){#feed > .card.puzzle *,#feed > .card.zoomq *,#feed > .card.fallq *,#feed > .card.cine *{animation:none!important;transition:none!important}}
-/* 1.9.108 main-feed videos fill the card width. Landscape stays 16:9, portrait (Shorts) stays 9:16.
+/* 1.9.109 main-feed videos fill the card width. Landscape stays 16:9, portrait (Shorts) stays 9:16.
    The picture and the player are contained, not cropped or stretched. Swipe rows do not hold videos. */
-#feed > .card > .media.vid{width:100%!important;max-width:100%!important;margin:0!important;aspect-ratio:16/9;max-height:85vh;background:#000}
-#feed > .card > .media.vid.tall{width:100%!important;aspect-ratio:9/16;max-height:85vh;margin:0!important}
+#feed > .card:has(> .media.vid){min-height:0!important;height:auto}
+#feed > .card > .media.vid{flex:0 0 auto;width:100%!important;max-width:100%!important;margin:0!important;aspect-ratio:16/9;max-height:calc(100svh - var(--hdr, 96px) - 132px);background:#000}
+#feed > .card > .media.vid.tall{width:min(100%, calc((100svh - var(--hdr, 96px) - 132px) * 9 / 16))!important;max-width:100%;aspect-ratio:9/16;max-height:calc(100svh - var(--hdr, 96px) - 132px);margin-left:auto!important;margin-right:auto!important}
 #feed > .card > .media.vid .vthumb,#feed > .card > .media.vid video,#feed > .card > .media.vid iframe{object-fit:contain!important;background:#000;width:100%;height:100%}
+.media.vid.armed .vthumb,.media.vid.playing .vthumb,.media.vid.armed .play,.media.vid.playing .play{opacity:0;pointer-events:none}
+.media.vid .snd,.media.vid .fsb{opacity:0;pointer-events:none}
+.media.vid.showbar .snd,.media.vid.showbar .fsb,.media.vid:focus-within .snd,.media.vid:focus-within .fsb{opacity:1;pointer-events:auto}
+.stmedia.stv.land iframe,.stmedia.stv.land video{width:100%!important;height:auto!important;aspect-ratio:16/9;max-height:70vh!important;object-fit:contain}
+.stmedia.stv.tall iframe,.stmedia.stv.tall video{width:min(100%, calc(78vh * 9 / 16))!important;aspect-ratio:9/16;max-height:78vh!important;object-fit:contain}
 #feed > .hrow{/* picture rows only */}
 </style>
 </head>
@@ -572,19 +587,19 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.108"></script>
-<script src="app.js?v=1.9.108"></script>
-<script src="extras.js?v=1.9.108"></script>
-<script src="jokes.js?v=1.9.108"></script>
-<script src="learn.js?v=1.9.108"></script>
-<script src="common-en.js?v=1.9.108"></script>
-<script src="explain.js?v=1.9.108"></script>
-<script src="effects.js?v=1.9.108"></script>
-<script src="stories.js?v=1.9.108"></script>
-<script src="weekly.js?v=1.9.108"></script>
-<script src="play.js?v=1.9.108"></script>
-<script src="nz.js?v=1.9.108"></script>
-<script src="read.js?v=1.9.108"></script>
+<script src="family.js?v=1.9.109"></script>
+<script src="app.js?v=1.9.109"></script>
+<script src="extras.js?v=1.9.109"></script>
+<script src="jokes.js?v=1.9.109"></script>
+<script src="learn.js?v=1.9.109"></script>
+<script src="common-en.js?v=1.9.109"></script>
+<script src="explain.js?v=1.9.109"></script>
+<script src="effects.js?v=1.9.109"></script>
+<script src="stories.js?v=1.9.109"></script>
+<script src="weekly.js?v=1.9.109"></script>
+<script src="play.js?v=1.9.109"></script>
+<script src="nz.js?v=1.9.109"></script>
+<script src="read.js?v=1.9.109"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

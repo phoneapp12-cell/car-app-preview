@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.108';
+const APP_VERSION = '1.9.109';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -748,9 +748,9 @@ function mountVid(el) {
     const div = document.createElement('div'); el.querySelector('.vslot').appendChild(div);
     rec.p = new YT.Player(div, {
       videoId: el.dataset.vid, host: 'https://www.youtube-nocookie.com', width: '100%', height: '100%',
-      playerVars: { autoplay: 0, mute: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 1, iv_load_policy: 3, fs: 1 },
+      playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, iv_load_policy: 3, fs: 0, disablekb: 1 },
       events: {
-        onReady: () => { rec.ready = true; try { rec.p.mute(); } catch (e) { } if (rec.want) playVid(el); },
+        onReady: () => { rec.ready = true; el.classList.add('armed'); try { rec.p.mute(); } catch (e) { } ytPortrait(el); if (rec.want) playVid(el); },
         onStateChange: e => {
           if (e.data === 1) { el.classList.add('playing'); if (curVid && curVid !== el) pauseVid(el); }
           else if (e.data === 0) { let d = 0; try { d = rec.p.getDuration(); } catch (x) { } if (d && d <= 90 && curVid === el) { rec.p.seekTo(0, true); rec.p.playVideo(); } else el.classList.remove('playing'); } // loop short clips
@@ -784,13 +784,15 @@ function pauseVid(el) {
 function pickVid() {
   let best = null, br = 0;
   for (const [el, r] of RATIO) { if (!el.isConnected) { RATIO.delete(el); continue; } if (r > br && !el.classList.contains('verr')) { best = el; br = r; } }
-  const thr = typeof MF !== 'undefined' && MF === 'vid' ? 0.45 : 0.6; // 1.9.47 Videos only: big/tall players start a bit sooner
+  const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (document.body && document.body.dataset.artopen) { if (curVid) pauseVid(curVid); return; }
+  const thr = 0.34; // a large player must be able to start while most of the card is on screen
   if (curVid && !curVid.isConnected) curVid = null; // the list was redrawn (filter changed)
-  if (best && br >= thr) { if (best !== curVid && !VID_SAVE) playVid(best); else if (best === curVid && !VID_SAVE) { const r0 = PLAYERS.get(best); if (r0 && !r0.want) playVid(best); } }
+  if (best && br >= thr && !VID_SAVE && !reduceMotion) { if (best !== curVid) playVid(best); else { const r0 = PLAYERS.get(best); if (r0 && !r0.want) playVid(best); } }
   else if (curVid && (RATIO.get(curVid) || 0) < thr) pauseVid(curVid);
 }
 const nearIO = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? mountVid(e.target) : unmountVid(e.target)), { rootMargin: '350px 0px' });
-const visIO = new IntersectionObserver(es => { es.forEach(e => RATIO.set(e.target, e.isIntersecting ? e.intersectionRatio : 0)); pickVid(); }, { threshold: [0, 0.3, 0.6, 0.8, 1] });
+const visIO = new IntersectionObserver(es => { es.forEach(e => RATIO.set(e.target, e.isIntersecting ? e.intersectionRatio : 0)); pickVid(); }, { threshold: [0, 0.34, 0.6, 0.8, 1] });
 function watchVids() {
   for (const el of [...PLAYERS.keys()]) if (!el.isConnected) { if (curVid === el) curVid = null; unmountVid(el); }
   document.querySelectorAll('.media.vid:not(.watched)').forEach(el => { el.classList.add('watched'); nearIO.observe(el); visIO.observe(el); });
@@ -1038,7 +1040,7 @@ document.addEventListener('click', e => {
   const u = t.closest('[data-undo]'); if (u) { const id = u.dataset.undo; delete VOTES[id]; ls.set('votes', VOTES); const it = order.find(x => x.id === id); const card0 = u.closest('.card'); if (it && card0) { card0.outerHTML = it.topic === 'life' ? lifeCard(it) : card(it); fillPics(); watchVids(); } return; }
   const fb = t.closest('[data-fs]'); if (fb) { e.preventDefault(); vidFull(fb.closest('.media.vid')); return; }
   const sb = t.closest('[data-snd]'); if (sb) { e.preventDefault(); toggleSound(sb.closest('.media.vid')); return; }
-  const p = t.closest('.media.vid'); if (p) { if (!p.classList.contains('playing') || curVid !== p) playVid(p, true); return; } // tap: play this one with sound
+  const p = t.closest('.media.vid'); if (p) { p.classList.toggle('showbar'); if (!p.classList.contains('playing') || curVid !== p) playVid(p, true); return; } // tap shows mute / pause / fullscreen, and starts this clip
   const dm = t.closest('[data-dismiss]'); if (dm) { DISMISS[dm.dataset.dismiss] = Date.now(); ls.set('dismiss', DISMISS); const c0 = dm.closest('.card'); if (c0) { c0.style.transition = 'opacity .25s, transform .25s'; c0.style.opacity = 0; c0.style.transform = 'scale(.97)'; setTimeout(() => c0.remove(), 260); } toast('Hidden from Info Book'); return; }
   const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); return; }
   if (t.id === 'rf') { load(true); return; }
@@ -1084,6 +1086,17 @@ document.addEventListener('load', e => {
    Bigger: edge to edge on phones and wider on big screens; 9:16 for Shorts, TikTok and Reels; ⛶ goes full screen. ---- */
 var VID_SAVE = !!(navigator.connection && navigator.connection.saveData);
 try { navigator.getBattery && navigator.getBattery().then(b => { const f = () => { VID_SAVE = !!(navigator.connection && navigator.connection.saveData) || (!b.charging && b.level < 0.15); }; f(); b.addEventListener('levelchange', f); b.addEventListener('chargingchange', f); }); } catch (e) { }
+/* YouTube's documented oEmbed width/height. Portrait only when those numbers say so.
+   For the WeRateDogs and NBC clips checked 7 Nov 2026, oEmbed is 200×113 and the thumbnail is 480×360, so both stay 16:9. */
+function ytPortrait(el) {
+  const id = el && el.dataset.vid; if (!id || el.dataset.ratio) return;
+  el.dataset.ratio = '1';
+  fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id)).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j || !el.isConnected) return;
+    const h = +j.thumbnail_height || +j.height, w = +j.thumbnail_width || +j.width;
+    if (w && h > w * 1.05) el.classList.add('tall');
+  }).catch(() => { });
+}
 function ytIdOf(i) {
   const u = String((i && i.url) || '');
   const m = u.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/);
@@ -1116,7 +1129,7 @@ function otherPlayer(el, rec) {
     const RES = ['480', '360', '720', '270', '220']; let ri = 0, au = null;
     const vsrc = () => k === 'mp4' ? u : `https://v.redd.it/${u}/CMAF_${RES[ri]}.mp4`;
     v.src = vsrc(); v.onerror = () => { if (k === 'reddit' && ++ri < RES.length) { v.src = vsrc(); if (rec.want) v.play().catch(() => { }); } else { el.classList.add('verr'); mark(false); } };
-    v.onloadedmetadata = () => { if (v.videoHeight > v.videoWidth * 1.15) el.classList.add('tall'); };
+    v.controls = false; v.onloadedmetadata = () => { el.classList.add('armed'); if (v.videoHeight > v.videoWidth * 1.15) el.classList.add('tall'); };
     v.onplaying = () => { mark(true); if (au && !muted) { au.currentTime = v.currentTime; au.play().catch(() => { }); } }; v.onpause = () => { mark(false); au && au.pause(); };
     v.onseeked = () => { if (au) au.currentTime = v.currentTime; };
     slot.appendChild(v);
@@ -1127,7 +1140,7 @@ function otherPlayer(el, rec) {
   // the platforms' own embed players (an iframe); Vimeo and TikTok can be told to play/pause/mute, Facebook is (re)loaded on play
   let f = null; const ifr = src => { f = document.createElement('iframe'); f.src = src; f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true; f.onload = () => setTimeout(() => { if (rec.want && curVid === el && k !== 'fb') playVid(el); }, 400); f.referrerPolicy = 'strict-origin-when-cross-origin'; slot.innerHTML = ''; slot.appendChild(f); };
   const post = (msg, origin) => { try { f && f.contentWindow.postMessage(typeof msg === 'string' ? msg : JSON.stringify(msg), origin); } catch (e) { } };
-  if (k === 'vimeo') { ifr(`https://player.vimeo.com/video/${u}?muted=1&playsinline=1&loop=1&dnt=1&title=0&byline=0&portrait=0`);
+  if (k === 'vimeo') { ifr(`https://player.vimeo.com/video/${u}?muted=1&autoplay=1&playsinline=1&loop=1&dnt=1&controls=0&title=0&byline=0&portrait=0`); el.classList.add('armed');
     const vm = (method, value) => post(value === undefined ? { method } : { method, value }, 'https://player.vimeo.com');
     return { mute() { muted = true; vm('setMuted', true); vm('setVolume', 0); }, unMute() { muted = false; vm('setMuted', false); vm('setVolume', 1); }, setVolume() { }, isMuted: () => muted, playVideo() { vm('play'); setTimeout(() => mark(true), 700); }, pauseVideo() { vm('pause'); mark(false); }, getPlayerState: () => state, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } }; }
   if (k === 'tiktok') { ifr(`https://www.tiktok.com/player/v1/${u}?autoplay=0&muted=1&loop=1&rel=0&description=0&music_info=0&controls=1&progress_bar=1&play_button=1&volume_control=1&fullscreen_button=1`);

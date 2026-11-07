@@ -80,8 +80,19 @@
     if (!nzSrc && !nzHost) return true;
     return wrongSeason(i, now || Date.now());
   }
+  /* US network YouTube channels in the live source list. They are TV promotion, not an NZ service.
+   1.9.108 only looked at kind:tv / where / plat, so yt-nbc (kind:video, sn:NBC, no where) stayed. */
+  const US_NET_SRC = new Set(['yt-nbc', 'yt-fox', 'yt-cc']);
+  function usNetworkPromo(i) {
+    if (!i) return false;
+    const src = String(i.src || ''), sn = String(i.sn || '').trim();
+    if (US_NET_SRC.has(src)) return true;
+    if (/^(NBC|FOX|Comedy Central)$/i.test(sn) && (i.kind === 'video' || i.vid || /youtube\.com|youtu\.be/i.test(i.url || ''))) return true;
+    return false;
+  }
   function drop(i, now) {
     if (!i) return false;
+    if (usNetworkPromo(i) || usNetworkPromo(i.h) || usNetworkPromo(i._share && i._share.snap)) return true;
     if (blockedService(i) || blockedService(i.w) || blockedService(i.h) || blockedService(i._share && i._share.snap)) return true;
     if (i.x === 'watch') return watchDrop(i.w);
     if (watchDrop(i) && (i.plat || i.pk)) return true;
@@ -183,7 +194,7 @@ function presentVideos(order) {
   return out;
 }
 function keptItems(list) { return (list || []).filter(i => !drop(i)); }
-  root.ibNz = { neon, blockedService, streamingCard, nzVerified, tvDrop, watchDrop, gardenDrop, drop, keptItems, wrongSeason, currentFilms, pickFilm, insertCinema, cineCard, nzStamp, videoFate, presentVideos, CACHE, RELAY };
+  root.ibNz = { neon, blockedService, usNetworkPromo, streamingCard, nzVerified, tvDrop, watchDrop, gardenDrop, drop, keptItems, wrongSeason, currentFilms, pickFilm, insertCinema, cineCard, nzStamp, videoFate, presentVideos, CACHE, RELAY };
   if (!root.document) return;
   const prevVisible = root.visible;
   if (typeof prevVisible === 'function') root.visible = function () { return prevVisible().filter(i => !drop(i) && videoFate(i) !== 'drop'); };

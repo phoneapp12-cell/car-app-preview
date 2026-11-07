@@ -57,11 +57,14 @@ for (const html of [zoom, fall]) {
   assert.ok(!/boredbutton|cloudhiker/i.test(html));
 }
 assert.ok(zoom.includes('https://zoomquilt.org/'));
-assert.ok(/isn’t part of Zoomquilt/.test(zoom));
+assert.ok(zoom.includes('data-art="zoom"'));
+assert.ok(!/isn’t part of Zoomquilt/.test(zoom));
 assert.ok(zoom.includes('Nikolaus Baumgarten'));
 assert.ok(fall.includes('https://fallingfalling.com/'));
+assert.ok(fall.includes('data-art="fall"'));
 assert.ok(/looping sound/i.test(fall) && /keeps moving/i.test(fall));
 assert.ok(/Rafaël Rozendaal/.test(fall));
+assert.ok(!/isn’t part of this artwork/.test(fall));
 assert.ok(fall.includes('img/play/falling.svg'));
 assert.ok(!fall.includes('2011-falling-falling.png'));
 
@@ -85,6 +88,12 @@ const neonCard = { id: 'neon-stream', t: 'Break Clause', s: 'New series · Neon.
 const neonClip = { src: 'yt-neon', sn: 'Neon NZ', kind: 'video', t: 'The Good Daughter | Official Trailer | Neon', url: 'https://www.youtube.com/watch?v=UF8SUUnT6UM', topic: 'sitcoms' };
 for (const item of [stan, stanPin, stanShare, stanCache, neonCard, neonClip]) assert.strictEqual(nz.drop(item), true, item.id || item.t);
 assert.strictEqual(nz.drop(onTvnz), false);
+const nbc = { id: 'ytREHUssPBsZk', t: 'St. Denis Medical Season 3 | Official Trailer | NBC', s: '', sn: 'NBC', src: 'yt-nbc', kind: 'video', url: 'https://www.youtube.com/watch?v=REHUssPBsZk', vid: 'REHUssPBsZk', topic: 'sitcoms' };
+const dogs = { id: 'yth_e5npg-ibE', t: 'Top 5 Dogs of the Week', s: '', sn: 'WeRateDogs', src: 'cosy-weratedogs', kind: 'video', url: 'https://www.youtube.com/watch?v=h_e5npg-ibE', vid: 'h_e5npg-ibE', topic: 'dogs' };
+for (const item of [nbc, Object.assign({}, nbc, { pin: true, src: '' }), { id: 'share-nbc', t: nbc.t, s: nbc.s, sn: nbc.sn, src: nbc.src, kind: nbc.kind, url: nbc.url, vid: nbc.vid, topic: nbc.topic, _share: { snap: nbc } }]) assert.strictEqual(nz.drop(item), true, item.id);
+assert.strictEqual(nz.drop(dogs), false);
+assert.strictEqual(nz.drop({ src: 'yt-fox', sn: 'FOX', kind: 'video', t: 'Animal Control clip', url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa', vid: 'aaaaaaaaaaa', topic: 'sitcoms' }), true);
+assert.strictEqual(nz.keptItems([nbc, dogs, onTvnz]).map(i => i.id).join(','), 'yth_e5npg-ibE,nz-unskilled');
 assert.deepStrictEqual(nz.keptItems([stanPin, onTvnz, { id: 'fw', pin: true, t: 'Fireworks' }]).map(i => i.id), ['nz-unskilled', 'fw']);
 assert.strictEqual(nz.keptItems([stanCache]).length, 0);
 assert.strictEqual(nz.watchDrop({ plat: 'Neon', pk: 'neon', url: 'https://www.neontv.co.nz/show' }), true);
