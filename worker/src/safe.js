@@ -1,0 +1,9 @@
+/* 1.7.1 Family-safe filter: no nudity or adult content anywhere (Shane's feed, the family's feeds, shared cards).
+   Applied when posts are fetched, again when the feed is published, and again on the phone (app.js keeps a copy). */
+export const NUDE_RE = /\b(nud(e|es|ity|ist|ists|ism)|semi-?nude|naked|nsfw|nsfl|topless|bottomless|erotic(a|ism|ally)?|lingerie|boudoir|sensual(ity)?|figure (study|studies|drawing|model)|life drawing|live model|nude model|odalisques?|breasts?|nipples?|genital(s|ia)?|penis|vagina|porn(o|ography|ographic)?|pin-?ups?|burlesque|undress(ed|ing)?|strip(per|pers|tease|club)|playboy|onlyfans|bikinis?|thongs?|skinny[- ]?dip\w*|sexy|sexual(ly|ity)?|sex (worker|work|toy|toys|scene|scenes)|fetish\w*|kinky|xxx|adult (content|film|films|only))\b/i;
+// Extra words that in art, museum and history posts usually mean a nude (not used for space posts, where Venus is a planet)
+export const ART_RE = /\b(venus|birth of venus|nymphs?|bathers|bathing|the bath|shower|reclining|olympia|adam and eve|the three graces|danaë|danae|leda|susanna|bathsheba|schiele|modigliani|bouguereau|klimt|courbet|rubens|titian|ingres|egon|figurative|the body|bodies|torso|male gaze)\b/i;
+const ART_TOPICS = new Set(['creative', 'culture', 'learn', 'collect', 'travel', 'kids', 'craft', 'vgames', 'boardg', 'fantasy', 'tarot']);
+const GAME_TOPICS = new Set(['vgames', 'boardg', 'fantasy']);
+const GAME_BAD = /\besports?\b|tournament|\bgore\b|gory|bloody|dismember|decapitat|mutilat|torture|\bR18\b|adults? only|seductive|succubus|bikini armou?r/i;
+export const isUnsafe = (i, topic) => { const t = [i.t, i.s, i.url, i.tag].join(' '); if (GAME_TOPICS.has(topic || i.topic) && GAME_BAD.test(t)) return true; return NUDE_RE.test(t) || /\[nsfw\]|\bnsfw\b|over_?18/i.test(t) || (ART_TOPICS.has(topic || i.topic) && ART_RE.test(t)); };
