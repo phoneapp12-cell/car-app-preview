@@ -275,6 +275,10 @@ for (const i of sights.ITEMS) {
   const img = sights.pic(i.file);
   assert.ok(img.includes('Special:FilePath') && img.includes('width=1200'), i.key);
 }
+const hundert = sights.ITEMS.find(i => i.key === 'hundert');
+assert.ok(/Kawakawa/.test(hundert.t) && /not the art centre in Whangārei/.test(hundert.s));
+assert.ok(!/Dent Street/.test(hundert.t + hundert.s));
+assert.ok(hundert.url.includes('Kawakawa'));
 const day0 = sights.cards(0);
 assert.strictEqual(day0.length, 2);
 assert.notStrictEqual(day0[0].topic, day0[1].topic);
