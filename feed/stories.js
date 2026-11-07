@@ -124,10 +124,12 @@ function paint() {
   if (btn) { btn.classList.add('seen'); btn.classList.remove('fresh'); const a = btn.querySelector('.stav'); if (a) { a.classList.add('seen'); a.classList.remove('fresh'); } }
   const bars = TILES.map((_, k) => `<i class="${k < ST_I ? 'done' : k === ST_I ? 'on' : ''}"></i>`).join('');
   const vo = t.item && !t.item.vid && typeof vidOf === 'function' ? vidOf(t.item) : null;
+  const tallStory = !!(t.item && (/\/shorts\//.test(t.item.url || '') || (vo && (vo.tall || vo.k === 'reddit'))));
+  const motionOff = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const media = t.item && t.item.vid
-    ? `<div class="stmedia stv"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=1&mute=0&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" onload="stCdHook(this)" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`
+    ? `<div class="stmedia stv ${tallStory ? 'tall' : 'land'}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=${motionOff ? 0 : 1}&mute=1&controls=0&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" onload="stCdHook(this)" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="${esc(t.title || 'Video')}"></iframe></div>`
     : vo && (vo.k === 'reddit' || vo.k === 'mp4')
-    ? `<div class="stmedia stv"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_720.mp4')}" data-rv="${esc(vo.k === 'reddit' ? vo.u : '')}" poster="${esc(t.img)}" autoplay muted playsinline ontimeupdate="stCdSet(this.duration-this.currentTime)" onerror="stVidErr(this)" onplay="stAud(this)" onended="stCdSet(0)"></video></div>`
+    ? `<div class="stmedia stv ${tallStory ? 'tall' : 'land'}"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_720.mp4')}" data-rv="${esc(vo.k === 'reddit' ? vo.u : '')}" poster="${esc(t.img)}" ${motionOff ? '' : 'autoplay'} muted playsinline ontimeupdate="stCdSet(this.duration-this.currentTime)" onerror="stVidErr(this)" onplay="stAud(this)" onended="stCdSet(0)"></video></div>`
     : `<div class="stmedia"><img src="${esc(t.img)}" alt=""></div>`;
   v.innerHTML = `<div class="stbars">${bars}</div>
     <button type="button" class="stx" data-stclose aria-label="Close">✕</button>
@@ -135,10 +137,11 @@ function paint() {
     <div class="sttap stnext" data-stnext aria-label="Next"></div>
     ${media}
     <div class="stmeta"><b>${esc(t.title || t.label)}</b>${t.text ? `<p>${esc(String(t.text).slice(0, 180))}</p>` : ''}
-      ${t.url ? `<button type="button" class="btn pri" data-stopen>Open ↗</button>` : ''}</div>`;
+      ${(t.item && (t.item.vid || vo)) ? `<button type="button" class="btn" data-stsound>Sound</button>` : ''}${t.url ? `<button type="button" class="btn pri" data-stopen>Open ↗</button>` : ''}</div>`;
   v.classList.add('on');
-  // 1.9.105 sound on: MP4 clips play with their own sound (Reddit clips get a separate sound track); if the phone blocks it, play silently
-  const sv = v.querySelector('.stmedia.stv video'); if (sv && !sv.dataset.rv) { sv.muted = false; sv.play().catch(() => { sv.muted = true; sv.play().catch(() => { }); }); }
+  document.querySelectorAll('#feed .media.vid.playing').forEach(el => { try { pauseVid(el); } catch (err) { } });
+  // Start muted so the browser will play it. Sound turns on after a tap if the phone allows it.
+  const sv = v.querySelector('.stmedia.stv video'); if (sv && !motionOff) sv.play().catch(() => { });
 }
 
 function arm() {
@@ -153,7 +156,12 @@ function next(d) {
 }
 function closeViewer() {
   clearTimeout(ST_TIMER);
-  const v = document.getElementById('stview'); if (v) v.classList.remove('on');
+  const v = document.getElementById('stview');
+  if (v) {
+    v.querySelectorAll('video').forEach(el => { try { el.pause(); el.removeAttribute('src'); el.load(); } catch (err) { } });
+    v.querySelectorAll('iframe').forEach(el => { el.src = 'about:blank'; });
+    v.classList.remove('on');
+  }
   document.body.classList.remove('noscroll');
 }
 

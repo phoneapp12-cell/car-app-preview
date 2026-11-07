@@ -1,8 +1,9 @@
-/* 1.9.108 In-feed puzzles and two hand-picked discovery cards.
-   Original games only. Zoomquilt and Falling Falling are link-outs, not embeds.
-   Falling Falling (checked 7 Nov 2026): fullscreen canvas, shapes ease down at 60fps,
-   colours change often, and start() calls SoundController.play on a looping mp3.
-   This card is a still sketch and does not load their script, image, or sound. */
+/* 1.9.109 In-feed puzzles and two hand-picked discovery cards.
+   Original puzzles only. Zoomquilt and Falling Falling stay still on the card.
+   A tap opens the live site in this app's window. Checked 7 Nov 2026: neither site
+   sends X-Frame-Options or CSP frame-ancestors, and both draw inside a frame.
+   Falling Falling moves at 60fps and starts a looping sound only after that tap.
+   Closing the window sets the frame to about:blank so the picture and sound stop. */
 (function (root) {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hash = s => { let h = 2166136261; s = String(s); for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
@@ -108,23 +109,20 @@
       <p class="plsrc">Source: <a href="${esc(q.src)}" target="_blank" rel="noopener">${esc(q.srcName)}</a></p></div>`;
   }
   function zoomHtml(i) {
-    return `${head('🌀', 'Zoomquilt', 'A link out. This sketch is ours.', 'Discover')}
+    return `${head('🌀', 'Zoomquilt', 'Still sketch. The picture opens here when you ask.', 'Discover')}
       <div class="media"><img src="img/play/zoomquilt.svg" alt="Our sketch of frames shrinking toward a small moon. Not the Zoomquilt painting."></div>
       <div class="bd"><h3>The Zoomquilt</h3>
-      <p>A free picture on the web that zooms in forever. Nikolaus Baumgarten started it in 2004 with other illustrators. Each scene sits inside the last one, and the last one leads back to the first.</p>
-      <p>Info Book isn’t part of Zoomquilt. The picture on this card is our sketch, not their painting.</p>
-      <div class="xbtns"><a class="btn pri" href="https://zoomquilt.org/" target="_blank" rel="noopener">Open Zoomquilt ↗</a></div>
-      <p class="plsrc">zoomquilt.org · a project by Nikolaus Baumgarten, 2004</p></div>`;
+      <p>Nikolaus Baumgarten, 2004, with other illustrators. The picture zooms in on its own. This card stays still.</p>
+      <div class="xbtns"><button type="button" class="btn pri" data-art="zoom">Play Zoomquilt</button></div>
+      <p class="plsrc"><a href="https://zoomquilt.org/" target="_blank" rel="noopener">zoomquilt.org</a></p></div>`;
   }
   function fallHtml(i) {
-    return `${head('⬇️', 'Falling Falling', 'A link out. This sketch is ours.', 'Discover')}
-      <div class="media"><img src="img/play/falling.svg" alt="Our still sketch of flat colour bands. Not a screenshot of the artwork."></div>
+    return `${head('⬇️', 'Falling Falling', 'Still sketch. The artwork opens here when you ask.', 'Discover')}
+      <div class="media"><img src="img/play/falling.svg" alt="Our still sketch of flat colour bands. Not the artwork."></div>
       <div class="bd"><h3>Falling Falling</h3>
-      <p>A fullscreen abstract artwork by Rafaël Rozendaal from 2011. Flat shapes of colour ease down the screen. Reinier Feijen wrote the code. It is in the collection of Hampus Lindwall. The sound is by gloumouth1.</p>
-      <p class="plwarn">Their site keeps moving, and large areas of colour change. It also tries to play a looping sound. Nothing here moves or makes a sound. If flashing light bothers you, skip the link.</p>
-      <p>Info Book isn’t part of this artwork.</p>
-      <div class="xbtns"><a class="btn pri" href="https://fallingfalling.com/" target="_blank" rel="noopener">Open Falling Falling ↗</a></div>
-      <p class="plsrc">fallingfalling.com · Rafaël Rozendaal, 2011</p></div>`;
+      <p class="plwarn">Rafaël Rozendaal, 2011. It keeps moving, colours change, and it plays a looping sound. Nothing on this card moves or makes a sound.</p>
+      <div class="xbtns"><button type="button" class="btn pri" data-art="fall">Play Falling Falling</button></div>
+      <p class="plsrc"><a href="https://fallingfalling.com/" target="_blank" rel="noopener">fallingfalling.com</a> · Reinier Feijen wrote the code · sound by gloumouth1</p></div>`;
   }
   function render(i) {
     if (!i) return '';
@@ -195,7 +193,89 @@
   };
   const prevFest = root.festive;
   root.festive = function (order, nPins) { order = prevFest ? prevFest(order, nPins) : order; return insert(order, nPins); };
+  // Live sites that publish no X-Frame-Options and no CSP frame-ancestors.
+  // Checked 2026-11-07: fallingfalling.com and zoomquilt.org both HTTP 200 with neither header.
+  // The frame is created only after a tap. Closing or hiding the page sets the frame to about:blank
+  // so their canvas and looping sound unload. No top-navigation, so the framed page cannot take over Info Book.
+  const ART = {
+    fall: { url: 'https://fallingfalling.com/', title: 'Falling Falling', host: 'fallingfalling.com', live: 'Moves, and plays a looping sound' },
+    zoom: { url: 'https://zoomquilt.org/', title: 'Zoomquilt', host: 'zoomquilt.org', live: 'Zooms on its own' }
+  };
+  let artWin, artFrame, artScroll = 0, artHist = false, artBtn = null;
+  function artParts() {
+    if (artWin) return;
+    artWin = root.document.createElement('div');
+    artWin.className = 'artwin';
+    artWin.hidden = true;
+    artWin.setAttribute('role', 'dialog');
+    artWin.setAttribute('aria-modal', 'true');
+    artWin.setAttribute('aria-labelledby', 'arttitle');
+    artWin.innerHTML = '<div class="artbar"><button type="button" class="artx" data-artclose>Close</button><div class="artmeta"><strong id="arttitle"></strong><a class="artsite" target="_blank" rel="noopener"></a><span class="artlive"></span></div></div><iframe class="artframe" title="" sandbox="allow-scripts allow-same-origin" allow="autoplay" referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+    root.document.body.appendChild(artWin);
+    artFrame = artWin.querySelector('iframe');
+    artWin.addEventListener('click', e => { if (e.target.closest('[data-artclose]')) closeArt(false); });
+  }
+  function pauseFeed() {
+    root.document.querySelectorAll('.media.vid.playing, .media.vid.armed').forEach(el => { try { root.pauseVid(el); } catch (e) { } });
+  }
+  function lockFeed(on) {
+    const body = root.document.body;
+    if (on) {
+      artScroll = root.scrollY || root.document.documentElement.scrollTop || 0;
+      body.dataset.artopen = '1';
+      body.style.position = 'fixed';
+      body.style.top = '-' + artScroll + 'px';
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.width = '100%';
+    } else {
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.width = '';
+      delete body.dataset.artopen;
+      root.scrollTo(0, artScroll);
+    }
+  }
+  function unloadArt() {
+    if (artFrame && artFrame.getAttribute('src')) artFrame.src = 'about:blank';
+  }
+  function openArt(kind, btn) {
+    const spec = ART[kind]; if (!spec) return;
+    artParts();
+    pauseFeed();
+    artBtn = btn || null;
+    artWin.querySelector('#arttitle').textContent = spec.title;
+    artWin.querySelector('.artlive').textContent = spec.live;
+    const site = artWin.querySelector('.artsite');
+    site.href = spec.url;
+    site.textContent = spec.host;
+    artFrame.title = spec.title + ' on ' + spec.host;
+    artFrame.src = spec.url;
+    artWin.hidden = false;
+    lockFeed(true);
+    const close = artWin.querySelector('[data-artclose]');
+    if (close) close.focus();
+    if (!artHist) { try { root.history.pushState({ ibArt: kind }, ''); artHist = true; } catch (e) { artHist = false; } }
+  }
+  function closeArt(fromPop) {
+    if (!artWin || artWin.hidden) return;
+    unloadArt();
+    artWin.hidden = true;
+    lockFeed(false);
+    const back = artHist && !fromPop;
+    artHist = false;
+    if (back) { try { root.history.back(); } catch (e) { } }
+    if (artBtn && artBtn.focus) artBtn.focus();
+  }
+  root.addEventListener('keydown', e => { if (e.key === 'Escape' && artWin && !artWin.hidden) { e.preventDefault(); closeArt(false); } });
+  root.addEventListener('popstate', () => { if (artWin && !artWin.hidden) closeArt(true); });
+  root.document.addEventListener('visibilitychange', () => { if (root.document.hidden && artWin && !artWin.hidden) closeArt(false); });
+  root.addEventListener('pagehide', unloadArt);
   root.document.addEventListener('click', e => {
+    const art = e.target && e.target.closest && e.target.closest('[data-art]');
+    if (art) { e.preventDefault(); openArt(art.dataset.art, art); return; }
     const b = e.target && e.target.closest && e.target.closest('[data-pl]');
     if (!b) return;
     const card = b.closest('article[data-id]'); if (!card) return;
