@@ -42,17 +42,19 @@ const feed = Array.from({ length: 40 }, (_, n) => ({ id: 'p' + n, t: 'Post ' + n
 for (const day of [0, 1, 2]) {
   const when = day * 864e5;
   const out = play.insert(feed, 2, when);
-  const specials = out.filter(x => x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq');
+  const specials = out.filter(x => x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq');
   assert.ok(specials.some(x => x.kind === 'sitcom' || x.x === 'play' && x.kind === 'sitcom'), 'sitcom puzzle each day');
   assert.strictEqual(specials.filter(x => x.x === 'zoomq').length, 1);
   assert.strictEqual(specials.filter(x => x.x === 'fallq').length, 1);
+  assert.strictEqual(specials.filter(x => x.x === 'tetq').length, 1);
   const idx = specials.map(s => out.indexOf(s));
   assert.ok(Math.min(...idx) >= 2);
   for (let i = 1; i < idx.length; i++) assert.ok(idx[i] - idx[i - 1] >= 4, 'spaced ' + idx);
 }
 const zoom = play.render({ id: 'zoomq-1', x: 'zoomq' });
 const fall = play.render({ id: 'fallq-1', x: 'fallq' });
-for (const html of [zoom, fall]) {
+const tet = play.render({ id: 'tetq-1', x: 'tetq' });
+for (const html of [zoom, fall, tet]) {
   assert.ok(!/<audio|<iframe|autoplay/i.test(html));
   assert.ok(!/boredbutton|cloudhiker/i.test(html));
 }
@@ -67,6 +69,58 @@ assert.ok(/Rafaël Rozendaal/.test(fall));
 assert.ok(!/isn’t part of this artwork/.test(fall));
 assert.ok(fall.includes('img/play/falling.svg'));
 assert.ok(!fall.includes('2011-falling-falling.png'));
+assert.ok(tet.includes('data-art="tet"'));
+assert.ok(tet.includes('img/play/tetris.svg'));
+assert.ok(/No sign-in/.test(tet) && /stays still/.test(tet));
+assert.ok(!/cursor\.com/.test(tet));
+assert.ok(!tet.includes('tetris.html'));
+
+function loadTetris() {
+  const ctx = { console, Math, Object, Number, String, Array, setTimeout, parseInt, Date };
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync('feed/tetris.js', 'utf8'), ctx, { filename: 'feed/tetris.js' });
+  return ctx.Tetris;
+}
+const tetGame = loadTetris();
+assert.strictEqual(tetGame.dropInterval(1), 800);
+assert.ok(tetGame.dropInterval(30) >= 60);
+const spun = tetGame.rotateCW(tetGame.rotateCW(tetGame.rotateCW(tetGame.rotateCW(tetGame.SHAPES[1]))));
+assert.deepStrictEqual(spun, tetGame.SHAPES[1]);
+const gMove = tetGame.newGame();
+gMove.piece = { t: 4, m: [[4, 4], [4, 4]], x: 4, y: 0 };
+tetGame.act(gMove, 'left');
+assert.strictEqual(gMove.piece.x, 3);
+assert.strictEqual(tetGame.collides(gMove.board, gMove.piece.m, -1, 0), true);
+const gClear = tetGame.newGame();
+gClear.board = tetGame.emptyBoard();
+for (let c = 0; c < 9; c++) gClear.board[19][c] = 1;
+gClear.piece = { t: 4, m: [[4]], x: 9, y: 19 };
+gClear.next = 4;
+gClear.level = 1;
+tetGame.lockPiece(gClear);
+assert.strictEqual(gClear.lines, 1);
+assert.strictEqual(gClear.score, 100);
+assert.ok(gClear.popup.startsWith('Single'));
+assert.ok(gClear.board[19].every(v => v === 0));
+const gTet = tetGame.newGame();
+gTet.board = tetGame.emptyBoard();
+for (let r = 16; r < 20; r++) for (let c = 0; c < 9; c++) gTet.board[r][c] = 2;
+gTet.piece = { t: 1, m: [[1], [1], [1], [1]], x: 9, y: 16 };
+gTet.next = 4;
+gTet.level = 1;
+tetGame.lockPiece(gTet);
+assert.strictEqual(gTet.lines, 4);
+assert.strictEqual(gTet.score, 800);
+assert.ok(gTet.popup.startsWith('TETRIS!'));
+const gHold = tetGame.newGame();
+const held = gHold.piece.t;
+gHold.hold = 0;
+gHold.canHold = true;
+tetGame.act(gHold, 'hold');
+assert.strictEqual(gHold.hold, held);
+assert.strictEqual(gHold.canHold, false);
 
 // TV and garden filters, from labels seen on the live feed
 assert.strictEqual(nz.neon({ src: 'yt-neon', sn: 'Neon NZ', t: 'The Good Daughter' }), true);
