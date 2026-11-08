@@ -117,7 +117,7 @@ function openEx(x) {
   const img = x.img ? `<img class="eximg" src="${esc(x.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '';
   const more = x.url ? `<p class="exmore"><a href="${esc(x.url)}" target="_blank" rel="noopener">Read more on Wikipedia ↗</a></p>` : '';
   $('#sheetin').innerHTML = `<h2>${EMO[x.k] || '❓'} ${esc(x.q || x.t)}</h2>
-    <div class="exbody">${img}<div><p class="exa">${esc(x.a)}</p>${more}<p class="sst">From Wikipedia · kept short for the family</p></div></div>
+    <div class="exbody">${img}<div>${sumHtml(x.a, { open: true })}${more}<p class="sst">From Wikipedia · kept short for the family</p></div></div>
     <button class="btn" data-close>Close</button>`;
   $('#sheet').classList.add('on');
 }

@@ -97,6 +97,11 @@ main{max-width:640px;margin:0 auto;padding:12px 10px calc(40px + env(safe-area-i
 .bd h3{margin:0 0 4px;font-size:1.02rem;line-height:1.3}
 .bd p{margin:0;color:var(--mute);font-size:.9rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .bd p.open{-webkit-line-clamp:unset}
+.bd ul.sum{list-style:disc;margin:4px 0 0;padding:0 0 0 1.15em;color:var(--mute);font-size:.9rem}
+.bd ul.sum li{margin:0 0 3px;padding:0;line-height:1.35}
+.bd ul.sum li:last-child{margin-bottom:0}
+.bd ul.sum:not(.open) li:nth-child(n+3){display:none}
+.exbody ul.sum{margin-top:0}
 .when{display:inline-block;margin:6px 0 0;font-size:.78rem;font-weight:700;color:var(--acc)}
 .ft{display:flex;align-items:center;gap:8px;padding:8px 10px 12px}
 .vote{display:grid;place-items:center;width:46px;height:42px;border-radius:999px;color:var(--mute);transition:transform .12s,color .2s,background .2s}
@@ -568,6 +573,22 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 .stmedia.stv.land iframe,.stmedia.stv.land video{width:100%!important;height:auto!important;aspect-ratio:16/9;max-height:70vh!important;object-fit:contain}
 .stmedia.stv.tall iframe,.stmedia.stv.tall video{width:min(100%, calc(78vh * 9 / 16))!important;aspect-ratio:9/16;max-height:78vh!important;object-fit:contain}
 #feed > .hrow{/* picture rows only */}
+/* 1.9.115 phone picture cards lead with the photo. Square for ordinary photos, 4:5 at most for portraits,
+   4:3 for very wide pictures. The file is not stretched. Videos stay 16:9 or 9:16 and contained. */
+@media (max-width: 780px) {
+  #feed > .card:not(.puzzle):not(.zoomq):not(.fallq):not(.cine):not(:has(> .media.vid)):has(> .media, > a > .media){min-height:0}
+  #feed > .card:not(.puzzle):not(.zoomq):not(.fallq):not(.cine) > .media:not(.vid):not(.lowres),
+  #feed > .card:not(.puzzle):not(.zoomq):not(.fallq):not(.cine) > a:has(> .media:not(.vid)){flex:0 0 auto;min-height:0}
+  #feed > .card:not(.puzzle):not(.zoomq):not(.fallq):not(.cine) .media:not(.vid):not(.lowres) img{
+    flex:0 0 auto!important;width:100%!important;max-width:100%!important;height:auto!important;min-height:0!important;
+    aspect-ratio:var(--frame, 1 / 1)!important;
+    max-height:min(108vw, calc(100svh - var(--hdr, 96px) - 220px))!important;
+    object-fit:cover;object-position:center}
+  #feed > .card:not(.puzzle):not(.zoomq):not(.fallq):not(.cine) .media.tall:not(.vid):not(.lowres) img{--frame:4 / 5}
+  #feed > .card:not(.puzzle):not(.zoomq):not(.fallq):not(.cine):has(.media:not(.vid)) .bd p{-webkit-line-clamp:2}
+  #feed > .card .vote{min-width:44px;min-height:44px}
+  #feed > .card .open-l{min-height:44px;display:inline-flex;align-items:center}
+}
 </style>
 </head>
 <body>
@@ -587,20 +608,20 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.114"></script>
-<script src="app.js?v=1.9.114"></script>
-<script src="extras.js?v=1.9.114"></script>
-<script src="jokes.js?v=1.9.114"></script>
-<script src="learn.js?v=1.9.114"></script>
-<script src="common-en.js?v=1.9.114"></script>
-<script src="explain.js?v=1.9.114"></script>
-<script src="effects.js?v=1.9.114"></script>
-<script src="stories.js?v=1.9.114"></script>
-<script src="weekly.js?v=1.9.114"></script>
-<script src="play.js?v=1.9.114"></script>
-<script src="nz.js?v=1.9.114"></script>
-<script src="sights.js?v=1.9.114"></script>
-<script src="read.js?v=1.9.114"></script>
+<script src="family.js?v=1.9.116"></script>
+<script src="app.js?v=1.9.116"></script>
+<script src="extras.js?v=1.9.116"></script>
+<script src="jokes.js?v=1.9.116"></script>
+<script src="learn.js?v=1.9.116"></script>
+<script src="common-en.js?v=1.9.116"></script>
+<script src="explain.js?v=1.9.116"></script>
+<script src="effects.js?v=1.9.116"></script>
+<script src="stories.js?v=1.9.116"></script>
+<script src="weekly.js?v=1.9.116"></script>
+<script src="play.js?v=1.9.116"></script>
+<script src="nz.js?v=1.9.116"></script>
+<script src="sights.js?v=1.9.116"></script>
+<script src="read.js?v=1.9.116"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

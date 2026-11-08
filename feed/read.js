@@ -88,7 +88,7 @@
   }
   function textOf(el) {
     const bits = [];
-    el.querySelectorAll('.bd p, .wtb, .plcopy, .xq, h3').forEach(n => bits.push(n.textContent || ''));
+    el.querySelectorAll('.bd p, .bd li, .wtb, .plcopy, .xq, h3').forEach(n => bits.push(n.textContent || ''));
     return bits.join(' ');
   }
   function isArticle(el) {
