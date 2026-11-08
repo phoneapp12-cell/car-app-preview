@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.115';
+const APP_VERSION = '1.9.116';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -81,6 +81,44 @@ const THUMB = {
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/* 1.9.116 card summaries: the headline stays a heading. The body becomes a short list of the
+   sentences already in the text. Nothing is added, and a one-sentence note stays one bullet. */
+function holdBits(s) {
+  const bits = [];
+  const put = m => { bits.push(m); return '\uE000' + (bits.length - 1) + '\uE000'; };
+  s = s.replace(/https?:\/\/[^\s<>"']+/gi, put);
+  s = s.replace(/\bwww\.[^\s<>"']+/gi, put);
+  s = s.replace(/\b\d+(?:\.\d+)+\b/g, put);
+  s = s.replace(/\b(?:Mr|Mrs|Ms|Mx|Dr|Prof|Sr|Jr|St|vs|etc|Inc|Ltd|No|Fig|approx|dept|govt|Ph)\./gi, put);
+  s = s.replace(/\b(?:[A-Z]\.){2,}/g, put);
+  s = s.replace(/\b(?:e\.g|i\.e|a\.m|p\.m)\./gi, put);
+  return { s, bits };
+}
+function restoreBits(s, bits) { return s.replace(/\uE000(\d+)\uE000/g, (_, n) => bits[+n] || ''); }
+function sentences(text) {
+  const held = holdBits(text);
+  const parts = held.s.split(/(?<=[.!?])["”']?\s+(?=["“‘']?(?:[A-Z0-9]|\uE000))/);
+  const out = parts.map(p => restoreBits(p, held.bits).trim()).filter(Boolean);
+  return out.length ? out : [text];
+}
+function bullets(text) {
+  const raw = String(text || '').replace(/\u00a0/g, ' ').replace(/\r\n/g, '\n').trim();
+  if (!raw) return [];
+  const lines = raw.split(/\n+/).map(x => x.trim()).filter(Boolean);
+  const mark = /^(?:[-*•]|\d{1,2}[.)])\s+/;
+  if (lines.length > 1) return lines.map(l => l.replace(mark, '').trim()).filter(Boolean);
+  const one = lines[0];
+  const marks = one.match(/(?:^|\s)[•]\s+|(?:^|\s)\d{1,2}[.)]\s+/g) || [];
+  if (marks.length > 1) return one.split(/\s+(?=[•]|\d{1,2}[.)]\s)/).map(l => l.replace(/^(?:[•]|\d{1,2}[.)])\s+/, '').trim()).filter(Boolean);
+  if ((one.match(/ · /g) || []).length >= 2) return one.split(/\s·\s/).map(x => x.trim()).filter(Boolean);
+  return sentences(one.replace(/[ \t]+/g, ' '));
+}
+function sumHtml(text, opt) {
+  const items = bullets(text);
+  if (!items.length) return '';
+  const open = opt && opt.open;
+  return `<ul class="sum${open ? ' open' : ''}" data-more aria-expanded="${open ? 'true' : 'false'}">${items.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`;
+}
 const ls = { get(k, d) { try { const v = localStorage.getItem(LS_PREFIX + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(LS_PREFIX + k, JSON.stringify(v)); } catch (e) { } if (k === 'intOff' || k === 'moodOff' || k === 'pick') famPrefsChanged(); } }; // 1.7.0: each family member has their own settings
 
 /* ---- 1.5.0: Interests. Shane's list (simplicable.com/life/interests) plus cooking, exercise, weights and selling.
@@ -620,7 +658,7 @@ function lifeCard(x) {
   return `<article class="card life${hot ? ' hot' : ''}${['cinema', 'prime', 'book', 'tv'].includes(x.cat) ? ' tallpic' : ''}" data-id="${esc(x.id)}" style="--c1:${C[2]};--c2:${C[3]}">
     <div class="hd"><div class="av">${em}</div><div class="who"><b>${esc(x.sn)}</b><small>${esc(x.sn === C[1] ? (x.tag || (x.mine ? '' : 'From My App')) : x.tag && x.tag !== C[1] ? C[1] + ' · ' + x.tag : C[1])}</small></div><span class="tp">${esc(forMe(1))}</span></div>
     ${media}
-    <div class="bd"><h3>${esc(x.t)}</h3>${x.sub ? `<p class="lsub">${esc(x.sub)}</p>` : ''}${x.s ? `<p data-more>${esc(x.s)}</p>` : ''}${x.credit ? `<small class="cred">📷 ${esc(x.credit)}</small>` : ''}</div>
+    <div class="bd"><h3>${esc(x.t)}</h3>${x.sub ? `<p class="lsub">${esc(x.sub)}</p>` : ''}${x.s ? sumHtml(x.s) : ''}${x.credit ? `<small class="cred">📷 ${esc(x.credit)}</small>` : ''}</div>
     <div class="ft">
       <button class="vote up${v > 0 ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>
       <button class="vote dn${v < 0 ? ' on' : ''}" data-vote="-1" aria-pressed="${v < 0}" aria-label="Thumbs down">${THUMB.dn}</button>
@@ -916,7 +954,7 @@ function card(i) {
   return `<article class="card${i._share ? ' shared' : ''}${i.pin ? ' pinned' : ''}" data-id="${esc(i.id)}" style="${style}">${shareHead(i)}
     <div class="hd"><div class="av">${i.pin ? '📌' : T[2]}</div><div class="who"><b>${esc(i.pin ? 'Pinned for everyone' : i.sn || '')}</b>${i.pin ? '<small>Whangārei · this week</small>' : `<small>${esc(ago(i.at))}${i.party ? ' · ' + esc(i.party) : i.tag ? ' · ' + esc(i.tag) : itemInts(i)[0] ? ' · ' + esc(itemInts(i)[0]) : ''}${i._x ? '<span class="mx">new for you</span>' : weights().trial(i.src) ? '<span class="mx">new source</span>' : ''}</small>`}</div><span class="tp">${i.pin ? '🎆 Special' : esc(T[1])}</span></div>
     ${media}
-    <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? `<p data-more>${esc(i.s)}</p>` : ''}${i.pin ? pinBox(i) : when}${popLine(i)}</div>
+    <div class="bd">${showTitle ? `<h3>${esc(i.t)}</h3>` : ''}${i.s ? sumHtml(i.s) : ''}${i.pin ? pinBox(i) : when}${popLine(i)}</div>
     ${typeof exLine === 'function' ? exLine(i) : ''}${rxLine(i)}<div class="ft">
       <button class="vote up${(FAM_ON && rxOf(i) ? (rxOf(i).ups || []).some(isMe) : v > 0) ? ' on' : ''}" data-vote="1" aria-pressed="${v > 0}" aria-label="Thumbs up">${THUMB.up}</button>${upNames(i)}
       <button class="vote dn${v < 0 ? ' on' : ''}" data-vote="-1" aria-pressed="${v < 0}" aria-label="Thumbs down">${THUMB.dn}</button>
@@ -1098,7 +1136,7 @@ document.addEventListener('click', e => {
   const sb = t.closest('[data-snd]'); if (sb) { e.preventDefault(); toggleSound(sb.closest('.media.vid')); return; }
   const p = t.closest('.media.vid'); if (p) { p.classList.toggle('showbar'); if (!p.classList.contains('playing') || curVid !== p) playVid(p, true); return; } // tap shows mute / pause / fullscreen, and starts this clip
   const dm = t.closest('[data-dismiss]'); if (dm) { DISMISS[dm.dataset.dismiss] = Date.now(); ls.set('dismiss', DISMISS); const c0 = dm.closest('.card'); if (c0) { c0.style.transition = 'opacity .25s, transform .25s'; c0.style.opacity = 0; c0.style.transform = 'scale(.97)'; setTimeout(() => c0.remove(), 260); } toast('Hidden from Info Book'); return; }
-  const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); return; }
+  const mo = t.closest('[data-more]'); if (mo) { mo.classList.toggle('open'); if (mo.tagName === 'UL') mo.setAttribute('aria-expanded', mo.classList.contains('open') ? 'true' : 'false'); return; }
   if (t.id === 'rf') { load(true); return; }
   if (t.id === 'st') { settings(); return; }
   if (t.dataset && t.dataset.ts) { setTextSize(t.dataset.ts); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; toast('Text size: ' + t.textContent.replace('✓ ', '')); return; } // 1.8.7

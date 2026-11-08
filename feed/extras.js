@@ -970,7 +970,7 @@ function watchCard(i) {
   const badge = w.up && dd > 0 ? (dd === 1 ? 'Tomorrow' : `In ${dd} days`) : dd === 0 ? 'Out today' : 'Just added';
   return `<article class="card xc promo watch" data-id="${esc(w.id)}">${xHead('📺', 'Coming up to watch', w.plat + ' · picked ' + forMe(), w.gl || (w.movie ? 'Movie' : 'Series'))}
     <a class="pimg" href="${esc(w.url)}" target="_blank" rel="noopener"><img src="${esc(w.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"><span class="plat p-${esc(w.pk)}">${esc(w.plat)}</span><span class="away${dd <= 1 ? ' soon' : ''}">${esc(badge)}</span></a>
-    <div class="bd"><h3>${esc(w.t)}${w.label ? ` <small>${esc(w.label)}</small>` : ''}</h3><p class="pwhen">🗓️ ${esc(wtWhen(w))}</p>${w.s ? `<p class="wtb">${esc(w.s)}</p>` : ''}<p class="sst">${esc([w.movie ? 'Movie' : 'Series', w.gl, w.cert].filter(Boolean).join(' · '))}</p>
+    <div class="bd"><h3>${esc(w.t)}${w.label ? ` <small>${esc(w.label)}</small>` : ''}</h3><p class="pwhen">🗓️ ${esc(wtWhen(w))}</p>${w.s ? sumHtml(w.s) : ''}<p class="sst">${esc([w.movie ? 'Movie' : 'Series', w.gl, w.cert].filter(Boolean).join(' · '))}</p>
     <div class="xbtns"><a class="btn pri" href="${esc(w.url)}" target="_blank" rel="noopener">▶️ Watch on ${esc(w.plat)} ↗</a></div>${bar}${FAM_ON ? '' : ''}</div></article>`;
 }
 const wtFestive = window.festive;
@@ -1044,7 +1044,7 @@ function homeTipCard(i) {
   const t = i.h, host = (() => { try { return new URL(t.url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } })();
   return `<article class="card xc promo hometip" data-id="${esc(t.id)}">${xHead('🏡', 'Home & time-saving tip', t.sn || host, t.nz ? 'NZ tip' : 'Tip')}
     <a class="pimg" href="${esc(t.url)}" target="_blank" rel="noopener"><img src="${esc(t.img)}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>
-    <div class="bd"><h3>${esc(t.t)}</h3>${t.s ? `<p class="wtb">${esc(t.s)}</p>` : ''}
+    <div class="bd"><h3>${esc(t.t)}</h3>${t.s ? sumHtml(t.s) : ''}
     <div class="xbtns"><a class="btn pri" href="${esc(t.url)}" target="_blank" rel="noopener">✨ Read the tip ↗</a></div></div></article>`;
 }
 let HT_FOR = null, HT = null;
