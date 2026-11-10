@@ -19,10 +19,10 @@
   }
   root.ibCome = { nzHour, quiet, shouldPing, TWO };
 
-  if (!root.document || !root.ls) return;
+  if (!root.document || typeof ls === 'undefined') return;
 
   function mirror() {
-    const body = JSON.stringify({ on: !!root.ls.get('comeBack', 0), lastOpen: root.ls.get('comeOpen', 0) || 0, lastNote: root.ls.get('comeNote', 0) || 0 });
+    const body = JSON.stringify({ on: !!ls.get('comeBack', 0), lastOpen: ls.get('comeOpen', 0) || 0, lastNote: ls.get('comeNote', 0) || 0 });
     if (!root.caches) return;
     root.caches.open('ib-comeback').then(c => c.put('/feed/__comeback', new Response(body))).catch(() => {});
   }
@@ -62,23 +62,23 @@
       const pub = (await res.json()).publicKey || '';
       if (!pub) return;
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pub) });
-      await fetch('https://shane-my-feed-data.phoneapp12.workers.dev/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sub, lastOpen: root.ls.get('comeOpen', 0) || Date.now() }) });
+      await fetch('https://shane-my-feed-data.phoneapp12.workers.dev/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sub, lastOpen: ls.get('comeOpen', 0) || Date.now() }) });
     } catch (e) {}
   }
   function boot() {
     const now = Date.now();
-    const lastOpen = root.ls.get('comeOpen', 0) || 0;
-    const lastNote = root.ls.get('comeNote', 0) || 0;
-    if (root.ls.get('comeBack', 0) && shouldPing(lastOpen, lastNote, now)) {
-      root.ls.set('comeNote', now);
+    const lastOpen = ls.get('comeOpen', 0) || 0;
+    const lastNote = ls.get('comeNote', 0) || 0;
+    if (ls.get('comeBack', 0) && shouldPing(lastOpen, lastNote, now)) {
+      ls.set('comeNote', now);
       show('It has been a couple of days. Info Book is here when you want it.');
     }
-    root.ls.set('comeOpen', now);
+    ls.set('comeOpen', now);
     mirror();
-    if (root.ls.get('comeBack', 0)) { periodic(); subscribe(); }
+    if (ls.get('comeBack', 0)) { periodic(); subscribe(); }
   }
   root.ibComeOpt = function (on) {
-    root.ls.set('comeBack', on ? 1 : 0);
+    ls.set('comeBack', on ? 1 : 0);
     mirror();
     if (on) { periodic(); subscribe(); }
   };
@@ -86,7 +86,7 @@
     const b = e.target && e.target.closest && e.target.closest('[data-comeback]');
     if (!b) return;
     e.preventDefault();
-    const next = !root.ls.get('comeBack', 0);
+    const next = !ls.get('comeBack', 0);
     if (next && root.Notification && Notification.permission === 'default') {
       Notification.requestPermission().then(p => { if (p === 'granted') root.ibComeOpt(true); });
       return;

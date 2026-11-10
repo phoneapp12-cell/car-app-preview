@@ -24,16 +24,17 @@
     const want = Date.parse(date + 'T' + clock + ':00Z');
     return guess - (seen - want);
   }
-  function load() { try { return (root.ls && root.ls.get(KEY, [])) || []; } catch (e) { return []; } }
-  function save(list) { try { root.ls && root.ls.set(KEY, list); } catch (e) {} }
+  function load() { try { return (typeof ls !== 'undefined' && ls.get(KEY, [])) || []; } catch (e) { return []; } }
+  function save(list) { try { if (typeof ls !== 'undefined') ls.set(KEY, list); } catch (e) {} }
   function clean(e) {
     const title = String(e.title || '').trim().slice(0, 120);
     const date = /^\d{4}-\d{2}-\d{2}$/.test(e.date || '') ? e.date : '';
     const time = /^\d{2}:\d{2}$/.test(e.time || '') ? e.time : '';
     const note = String(e.note || '').trim().slice(0, 400);
     const remind = REMIND[e.remind] == null && e.remind !== 'none' ? 'none' : (e.remind || 'none');
+    const kind = ['tv', 'movie', 'event', 'own'].includes(e.kind) ? e.kind : 'own';
     if (!title || !date) return null;
-    return { id: e.id || ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), title, date, time, note, remind, url: String(e.url || '').slice(0, 400), fired: e.fired || '' };
+    return { id: e.id || ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), title, date, time, note, remind, kind, url: String(e.url || '').slice(0, 400), fired: e.fired || '' };
   }
   function upsert(raw) {
     const e = clean(raw); if (!e) return null;
@@ -80,26 +81,26 @@
     if (!i) return null;
     if (i.x === 'cine' && i.film && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(i.film.next || '')) {
       const [date, time] = i.film.next.split('T');
-      return { title: i.film.title, date, time, note: 'Event Cinemas Whangārei, 18 James Street. ' + (i.film.rating || ''), url: i.film.sessions || i.film.link || '', remind: 'h1' };
+      return { title: i.film.title, date, time, note: 'Event Cinemas Whangārei, 18 James Street. ' + (i.film.rating || ''), url: i.film.sessions || i.film.link || '', remind: 'h1', kind: 'movie' };
     }
     if (i.x === 'watch' && i.w && !/^(Stan|Neon)$/i.test(i.w.plat || '') && !/neon|stan\.(com|news)/i.test(i.w.url || '')) {
       const w = i.w;
       const day = /^\d{4}-\d{2}-\d{2}$/.test(w.day || '') ? w.day : (typeof w.ev === 'number' ? nzParts(w.ev).date : '');
       let time = '';
       if (typeof w.ev === 'number') { const clock = nzParts(w.ev).time; if (clock !== '12:00') time = clock; }
-      return { title: w.t, date: day, time, note: 'On ' + (w.plat || 'NZ TV'), url: w.url || '', remind: 'm15', tv: 1 };
+      return { title: w.t, date: day, time, note: 'On ' + (w.plat || 'NZ TV'), url: w.url || '', remind: 'm15', tv: 1, kind: 'tv' };
     }
-    if (i.x === 'concert' && i.c && typeof i.c.ev === 'number') return fromMs(i.c.ev, i.c.t, (i.c.venue || 'Auckland') + ', Auckland', i.c.url);
+    if (i.x === 'concert' && i.c && typeof i.c.ev === 'number') { const p = fromMs(i.c.ev, i.c.t, (i.c.venue || 'Auckland') + ', Auckland', i.c.url); return p && { ...p, kind: 'event' }; }
     if (i.kind === 'tv' && (NZ_TV.has(i.src) || NZ_HOST.test(hostOf(i.url || '')))) {
-      if (typeof i.ev !== 'number') return { title: i.t, date: '', time: '', note: i.where ? 'On ' + i.where : '', url: i.url || '', remind: 'm15', tv: 1 };
+      if (typeof i.ev !== 'number') return { title: i.t, date: '', time: '', note: i.where ? 'On ' + i.where : '', url: i.url || '', remind: 'm15', tv: 1, kind: 'tv' };
       const p = fromMs(i.ev, i.t, i.where ? 'On ' + i.where : '', i.url);
-      return p && { ...p, tv: 1 };
+      return p && { ...p, tv: 1, kind: 'tv' };
     }
-    if (i.kind === 'event' && typeof i.ev === 'number') return fromMs(i.ev, i.t, i.s || '', i.url);
+    if (i.kind === 'event' && typeof i.ev === 'number') { const p = fromMs(i.ev, i.t, i.s || '', i.url); return p && { ...p, kind: 'event' }; }
     return null;
   }
   function packOf(p) {
-    return encodeURIComponent(JSON.stringify({ title: p.title, date: p.date || '', time: p.time || '', note: p.note || '', url: p.url || '', remind: p.remind || 'm15', tv: p.tv ? 1 : 0 }));
+    return encodeURIComponent(JSON.stringify({ title: p.title, date: p.date || '', time: p.time || '', note: p.note || '', url: p.url || '', remind: p.remind || 'm15', tv: p.tv ? 1 : 0, kind: p.kind || (p.tv ? 'tv' : 'own') }));
   }
   function btn(raw) {
     const p = raw && raw.title && raw.date !== undefined && !raw.kind && !raw.x ? raw : prefill(raw);
@@ -123,12 +124,13 @@
     const first = new Date(Date.UTC(y, m - 1, 1));
     const start = (first.getUTCDay() + 6) % 7;
     const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const have = new Set(list.filter(e => e.date.slice(0, 7) === month).map(e => e.date));
+    const dots = kinds => kinds.length ? `<span class="caldots" aria-hidden="true">${kinds.slice(0, 4).map(k => `<i class="cdot ${esc(k)}"></i>`).join('')}</span>` : '';
     let cells = '';
     for (let i = 0; i < start; i++) cells += '<span></span>';
     for (let d = 1; d <= days; d++) {
       const ds = month + '-' + String(d).padStart(2, '0');
-      cells += `<button type="button" data-calday="${ds}" class="${ds === today() ? 'today' : ''}${have.has(ds) ? ' has' : ''}">${d}</button>`;
+      const kinds = ((all) => { const u = [...new Set(all)]; return u.concat(all.filter((k, n) => all.indexOf(k) !== n)).slice(0, 4); })(list.filter(e => e.date === ds).map(e => e.kind || 'own'));
+      cells += `<button type="button" data-calday="${ds}" class="${ds === today() ? 'today' : ''}${kinds.length ? ' has' : ''}"><span class="calnum">${d}</span>${dots(kinds)}</button>`;
     }
     const upcoming = list.filter(e => e.date >= today()).slice(0, 12);
     const form = edit ? `<form class="calform" data-calform>
@@ -139,16 +141,19 @@
       <label>Reminder<select name="remind">
         ${[['none', 'No reminder'], ['at', 'At the time'], ['m15', '15 minutes before'], ['h1', '1 hour before'], ['d1', '1 day before']].map(([k, lab]) => `<option value="${k}"${edit.remind === k ? ' selected' : ''}>${lab}</option>`).join('')}
       </select></label>
+      <input type="hidden" name="kind" value="${esc(edit.kind || 'own')}">
       <p class="calnote">Reminders show while Info Book is open. Add to phone calendar if you need a reminder when it is closed.</p>
       <div class="xbtns"><button class="btn pri" type="submit">Save</button><button class="btn" type="button" data-calback>Cancel</button></div>
     </form>` : '';
     return `<div class="calwrap"><button type="button" class="backpill" data-calclose>← Back to feed</button>
-      <h2>📅 Calendar</h2>
+      <div class="calmark" aria-hidden="true"><i class="cdot tv"></i><i class="cdot movie"></i><i class="cdot event"></i><i class="cdot own"></i></div>
+      <h2>Calendar</h2>
+      <p class="calkey"><i class="cdot tv"></i> TV <i class="cdot movie"></i> Movies <i class="cdot event"></i> Events <i class="cdot own"></i> Yours</p>
       <div class="calgrid">${cells}</div>
       ${form}
       <div class="xbtns"><button type="button" class="btn pri" data-calnew>Add something</button></div>
       <h3>Coming up</h3>
-      ${upcoming.length ? `<ul class="callist">${upcoming.map(e => `<li><b>${esc(e.title)}</b><small>${esc(e.date)}${e.time ? ' · ' + esc(e.time) : ''}${e.remind !== 'none' ? ' · reminder' : ''}</small>
+      ${upcoming.length ? `<ul class="callist">${upcoming.map(e => `<li><b><i class="cdot ${esc(e.kind || 'own')}"></i> ${esc(e.title)}</b><small>${esc(e.date)}${e.time ? ' · ' + esc(e.time) : ''}${e.remind !== 'none' ? ' · reminder' : ''}</small>
         <span><button type="button" data-caledit="${esc(e.id)}">Edit</button><button type="button" data-calics="${esc(e.id)}">Add to phone calendar</button><button type="button" data-caldel="${esc(e.id)}">Delete</button></span></li>`).join('')}</ul>` : '<p>Nothing saved yet.</p>'}
       </div>`;
   }
@@ -206,6 +211,7 @@
         <input type="hidden" name="title" value="${esc(p.title || '')}">
         <input type="hidden" name="note" value="${esc(p.note || '')}">
         <input type="hidden" name="url" value="${esc(p.url || '')}">
+        <input type="hidden" name="kind" value="${esc(p.kind || 'tv')}">
         <div class="xbtns"><button class="btn pri" type="submit">Save reminder</button><button class="btn" type="button" data-close>Close</button></div>
       </form>`;
     sheet.classList.add('on');

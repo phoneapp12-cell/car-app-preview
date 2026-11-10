@@ -302,11 +302,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.120'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.120'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.120'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.121'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.121'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.121'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.120'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.121'"));
 assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes('window.card(i)'));
 assert.ok(appSrc.includes('data-comeback'));
 const comeCtx = {};
@@ -343,6 +344,9 @@ assert.equal(cal.prefill({ kind: 'event', t: 'Market', url: 'https://www.eventfi
 const film = cal.prefill({ x: 'cine', film: { title: 'Pressure', next: '2026-11-12T19:30', rating: 'M', sessions: 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions' } });
 assert.equal(film.time, '19:30');
 assert.equal(tv.tv, 1);
+assert.equal(tv.kind, 'tv');
+assert.equal(film.kind, 'movie');
+assert.equal(cal.upsert({ title: 'Dentist', date: '2026-11-10', kind: 'nope' }).kind, 'own');
 const noon = cal.aucklandMs('2026-11-04', '12:00');
 const stream = cal.prefill({ x: 'watch', w: { t: 'The Chase', day: '2026-11-04', ev: noon, plat: 'TVNZ+', url: 'https://www.tvnz.co.nz/show' } });
 assert.equal(stream.date, '2026-11-04');
