@@ -591,6 +591,23 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
   #feed > .card .vote{min-width:44px;min-height:44px}
   #feed > .card .open-l{min-height:44px;display:inline-flex;align-items:center}
 }
+.calwrap{padding:8px 12px 28px}.calwrap h2,.calwrap h3{margin:8px 0}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0}
+.calgrid button,.calgrid span{min-height:40px;border-radius:10px;border:0;background:transparent;color:inherit;font:inherit}
+.calgrid button.has{background:color-mix(in srgb,var(--acc) 22%,var(--card));font-weight:800}
+.calgrid button.today{outline:2px solid var(--acc)}
+.calform{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.calform label{display:flex;flex-direction:column;gap:4px;font-weight:700}
+.calform input,.calform textarea,.calform select{font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:inherit}
+.calnote{font-size:.85rem;color:var(--mute)}
+.callist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.callist li{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-bottom:1px solid var(--line)}
+.callist small{color:var(--mute)}
+.callist button{min-height:36px;margin-right:6px}
+#calban{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:80;border:0;border-radius:14px;padding:14px;font:inherit;font-weight:700;color:#fff;background:linear-gradient(135deg,#7c3aed,#f59e0b)}
+.card.soon{background:linear-gradient(160deg,#4c1d95,#db2777 55%,#f59e0b);color:#fff}
+.soonband{font-size:2rem;letter-spacing:.2em;text-align:center;padding:18px 0}
+.card.soon h3,.card.soon li{color:#fff}
 </style>
 </head>
 <body>
@@ -610,20 +627,21 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.117"></script>
-<script src="app.js?v=1.9.117"></script>
-<script src="extras.js?v=1.9.117"></script>
-<script src="jokes.js?v=1.9.117"></script>
-<script src="learn.js?v=1.9.117"></script>
-<script src="common-en.js?v=1.9.117"></script>
-<script src="explain.js?v=1.9.117"></script>
-<script src="effects.js?v=1.9.117"></script>
-<script src="stories.js?v=1.9.117"></script>
-<script src="weekly.js?v=1.9.117"></script>
-<script src="play.js?v=1.9.117"></script>
-<script src="nz.js?v=1.9.117"></script>
-<script src="sights.js?v=1.9.117"></script>
-<script src="read.js?v=1.9.117"></script>
+<script src="family.js?v=1.9.118"></script>
+<script src="app.js?v=1.9.118"></script>
+<script src="extras.js?v=1.9.118"></script>
+<script src="jokes.js?v=1.9.118"></script>
+<script src="learn.js?v=1.9.118"></script>
+<script src="common-en.js?v=1.9.118"></script>
+<script src="explain.js?v=1.9.118"></script>
+<script src="effects.js?v=1.9.118"></script>
+<script src="stories.js?v=1.9.118"></script>
+<script src="weekly.js?v=1.9.118"></script>
+<script src="play.js?v=1.9.118"></script>
+<script src="nz.js?v=1.9.118"></script>
+<script src="sights.js?v=1.9.118"></script>
+<script src="read.js?v=1.9.118"></script>
+<script src="cal.js?v=1.9.118"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

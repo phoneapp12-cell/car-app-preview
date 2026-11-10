@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.117';
+const APP_VERSION = '1.9.118';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -175,6 +175,10 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
   ['Stained glass', 'glass', 'tiffany lamp|favrile|stained glass'],
   ['Kites', 'kites', 'kite festival|kites over|kites at'],
   ['Paper lanterns', 'lanterns', 'paper lantern'],
+  ['Books', 'learn', 'books?|novels?|authors?|reading|booker'],
+  ['Psychology', 'learn', 'psycholog\\w*|adhd|brain|\\biq\\b'],
+  ['Whangārei classes', 'events', 'yoga|workshop|whang[aā]rei|northland'],
+  ['Drawing & portraits', 'creative', 'portraits?|painting|drawing|opera'],
   ['Travel', 'travel', 'travel|trip|holiday|destination|tourism'], ['Theme Parks', 'travel', 'theme parks?|roller ?coasters?|rides?|disneyland|rainbow’s end|rainbows end'],
   ['Technology', 'tech', 'tech(nology)?|gadgets?|smartphones?|iphone|android'], ['Computers', 'tech', 'computers?|pcs?|laptops?|windows|mac(book)?|linux'], ['Coding', 'tech', 'cod(e|ing)|programming|developers?|software|python|javascript'],
   ['Robotics', 'tech', 'robot(s|ics)?|automation|drones?'], ['Low Technology', 'diy', 'low-?tech|off-?grid|hand tools?|solar oven|repair'], ['Social Media', 'tech', 'social media|instagram|facebook|tiktok|youtube|reddit'],
@@ -967,6 +971,7 @@ function goTab(t) { tab = t || 'all'; ls.set('tab', tab); try { mfDrawer(false);
 
 function draw() {
   chips();
+  if (window.ibCalOn && typeof window.ibCalDraw === 'function') { window.ibCalDraw(); return; }
   const m = $('#feed');
   if (!FEED) { m.innerHTML = '<div class="sk"></div><div class="sk"></div>'; return; }
   if (tab === 'life' && !PRIVATE_OK) tab = 'all';
@@ -1318,7 +1323,7 @@ function mfDrawer(open) {
   }
   // 1.9.82 Browse: Family, For [name], topics (replaces top chip bar)
   const browse = topicList().filter(t => t[0] !== 'all');
-  const br = `<p class="mfsec">Browse</p>` + browse.map(t =>
+  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button><button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · coming soon</span></button>` + browse.map(t =>
     `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
   ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;
   extra.innerHTML = br + x;
@@ -1329,6 +1334,8 @@ function mfDrawer(open) {
   document.addEventListener('click', e => {
     const t = e.target; if (!t || !t.closest) return;
     if (t.closest('#mfbtn')) { mfDrawer(true); return; }
+    if (t.closest('[data-calopen]')) { e.preventDefault(); mfDrawer(false); if (window.ibCalOpen) window.ibCalOpen(); return; }
+    if (t.closest('[data-soon]')) { e.preventDefault(); mfDrawer(false); if (window.ibSoon) window.ibSoon(); return; }
     const sb = t.closest('[data-mfset]'); if (sb) { e.preventDefault(); mfSet(sb.dataset.mfset); return; }
     const ab = t.closest('[data-appear]'); if (ab) { e.preventDefault(); APPEAR = ab.dataset.appear; ls.set('appear', APPEAR); applyAppear(); mfDrawer(true); toast('Appearance: ' + ({ dark: 'Dark', light: 'Light', auto: 'Match phone', ocean: 'Ocean 🌊', spring: 'Spring 🌸', candy: 'Candy Crush 🍬' }[APPEAR] || APPEAR)); return; }
     const lb = t.closest('[data-showlife]'); if (lb) { e.preventDefault(); SHOW_LIFE = !SHOW_LIFE; ls.set('showLife', SHOW_LIFE ? 1 : 0); mfDrawer(true); try { draw(); } catch (err) { } toast(SHOW_LIFE ? 'My App stuff: on' : 'My App stuff: off'); return; }
