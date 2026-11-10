@@ -34,16 +34,22 @@
   function dayNum(now) { return Math.floor((now == null ? Date.now() : now) / 864e5); }
   function forTopic(topic, day) {
     const list = ITEMS.filter(i => i.topic === topic);
-    const src = list[Math.abs(day) % list.length];
-    return {
-      id: 'sight-' + src.key, t: src.t, s: src.s, img: pic(src.file), url: src.url, topic: src.topic,
-      src: 'sight-commons', sn: 'Wikimedia Commons', kind: 'photo', at: Date.now() - 60e3, file: src.file
-    };
+    const start = Math.abs(day) % list.length;
+    for (let n = 0; n < list.length; n++) {
+      const src = list[(start + n) % list.length];
+      const item = {
+        id: 'sight-' + src.key, t: src.t, s: src.s, img: pic(src.file), url: src.url, topic: src.topic,
+        src: 'sight-commons', sn: 'Wikimedia Commons', kind: 'photo', at: Date.now() - 60e3, file: src.file
+      };
+      try { if (typeof root.wasSeen === 'function' && root.wasSeen(item)) continue; } catch (e) { }
+      return item;
+    }
+    return null;
   }
   function cards(now) {
     const day = dayNum(now) + MIX;
     const on = TOPICS.filter(t => { try { return typeof root.topicOn !== 'function' || root.topicOn(t); } catch (e) { return true; } });
-    return on.map((t, n) => forTopic(t, day + n));
+    return on.map((t, n) => forTopic(t, day + n)).filter(Boolean);
   }
   function busy(x) { return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || x.x === 'cine' || (x.id && String(x.id).indexOf('sight-') === 0)); }
   function insert(order, nPins, now) {
