@@ -13,6 +13,7 @@ import { runCrashes } from './crashes.js';
 import { refreshSarah } from './sarah.js';
 import { runSunshine } from './sunshine.js';
 import { runShop } from './shop-notify.js';
+import { cardFlush } from './card-notify.js';
 import { runSarahNotify } from './sarah-notify.js';
 import { runRenoReminder } from './reno.js';
 import { runAkahu, runAkahuInsight } from './akahu.js';
@@ -28,7 +29,7 @@ export default {
   // Cron: events list every 10 minutes, then a short check of Sarah Jenkins's channel.
   // Closures on the offset cron, then bridge alerts. Every minute: due reminders.
   scheduled: (event, env0, ctx) => ctx.waitUntil((async () => { const env = guardKV(env0); setHomeStreet(env0.HOME_STREET);
-    if (event.cron === REMIND_CRON) { try { await runShop(env); } catch (e) { /* next minute */ } try { await runSarahNotify(env); } catch (e) { } try { await runRenoReminder(env, fetch, Date.now()); } catch (e) { } try { await runAkahuInsight(env0); } catch (e) { } try { await runHealthDiag(env0); } catch (e) { } const sent = await runReminders(env); const sm = new Date(event.scheduledTime || Date.now()), mi = sm.getUTCMinutes(), hr = sm.getUTCHours(); /* 2.29.11: fixed minutes, not a per-data-centre cache (crons hop data centres, so these ran every minute) */ try { const rec = mi % 20 === 2 ? await runOutages(env, fetch, Date.now()) : null; if (rec) await applyOutages(env, rec); } catch (e) { /* 2.27.40: Northpower outages, about every 20 minutes */ } try { const ar = mi % 20 === 7 ? await runCrashes(env, fetch, Date.now()) : null; if (ar) await applyCrashes(env, ar); } catch (e) { /* 2.27.67: NZTA crashes, about every 20 minutes */ } try { const tr = mi === 12 && hr % 3 === 0 ? await runTolls(env, fetch, Date.now()) : null; if (tr) await applyTolls(env, tr); } catch (e) { /* 2.29.2: unpaid tolls, about every 3 hours */ } return sent; }
+    if (event.cron === REMIND_CRON) { try { await runShop(env); } catch (e) { /* next minute */ } try { await runSarahNotify(env); } catch (e) { } try { await runRenoReminder(env, fetch, Date.now()); } catch (e) { } try { await cardFlush(env, Date.now()); } catch (e) { /* 2.29.22: ASB Visa pushes */ } try { await runAkahuInsight(env0); } catch (e) { } try { await runHealthDiag(env0); } catch (e) { } const sent = await runReminders(env); const sm = new Date(event.scheduledTime || Date.now()), mi = sm.getUTCMinutes(), hr = sm.getUTCHours(); /* 2.29.11: fixed minutes, not a per-data-centre cache (crons hop data centres, so these ran every minute) */ try { const rec = mi % 20 === 2 ? await runOutages(env, fetch, Date.now()) : null; if (rec) await applyOutages(env, rec); } catch (e) { /* 2.27.40: Northpower outages, about every 20 minutes */ } try { const ar = mi % 20 === 7 ? await runCrashes(env, fetch, Date.now()) : null; if (ar) await applyCrashes(env, ar); } catch (e) { /* 2.27.67: NZTA crashes, about every 20 minutes */ } try { const tr = mi === 12 && hr % 3 === 0 ? await runTolls(env, fetch, Date.now()) : null; if (tr) await applyTolls(env, tr); } catch (e) { /* 2.29.2: unpaid tolls, about every 3 hours */ } return sent; }
     if (event.cron === CLOSURES_CRON) return scheduledClosures(env, fetch, Date.now(), st => runAlerts(env, st));
     await scheduled(env);
     try { await refreshSarah(env, fetch, Date.now(), { push: true }); } catch (e) { /* events list is already saved */ }

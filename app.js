@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.21';
+const APP_VERSION = '2.29.22';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -11943,9 +11943,9 @@ async function scheduleReminders() {
    Settings > Shopping pushes can switch it off. */
 async function shopPushReg(sub) {
   if (!sub || !RELAY_URL || !sharedKey()) return;
-  const shopOn = (S.settings || {}).shopPush !== false, tickOn = (S.settings || {}).sarahTicks !== false, off = !shopOn && !tickOn, ep = sub.endpoint, k = 'shopPushReg', was = localStorage.getItem(k) || '';
+  const shopOn = (S.settings || {}).shopPush !== false, tickOn = (S.settings || {}).sarahTicks !== false, cardOn = (() => { try { return cardPushOn(); } catch (e) { return false; } })(), off = !shopOn && !tickOn && !cardOn, ep = sub.endpoint, k = 'shopPushReg', was = localStorage.getItem(k) || '';
   if (off) { if (was) { try { await pushPost('/shared-push/unsubscribe', { key: sharedKey(), who: 'shane', endpoint: ep }); localStorage.removeItem(k); } catch (e) { } } return; }
-  const tag = ep.slice(-24) + '|k2|' + todayISO() + '|' + (shopOn ? 1 : 0) + (tickOn ? 1 : 0); if (was === tag) return;
+  const tag = ep.slice(-24) + '|k2|' + todayISO() + '|' + (shopOn ? 1 : 0) + (tickOn ? 1 : 0) + (cardOn ? 1 : 0); if (was === tag) return;
   const prev = was && !ep.endsWith(was.split('|')[0]) ? localStorage.getItem('shopPushEp') || undefined : undefined;
   await pushPost('/shared-push/subscribe', { key: sharedKey(), who: 'shane', subscription: sub.toJSON(), shop: shopOn, ticks: tickOn, ...(prev ? { previous: prev } : {}) });
   localStorage.setItem(k, tag); localStorage.setItem('shopPushEp', ep);
@@ -24016,6 +24016,7 @@ async function toggleNotifCat(k) {
   if (k === "power") { S.settings.outAlerts = next; S.settings.netAlerts = next; }
   if (k === "local") { S.settings.plnAlerts = next; }
   await save();
+  if (k === "bills") { try { cardPushSync(true); } catch (e) {} }
   _bellSigsMemo = null;
   bellMemo = null;
   refreshChooseNotifSheetUI();
@@ -25533,6 +25534,7 @@ async function cfLoad(force) {
   } catch (e) { CFerr = 'Cash flow couldn’t load. Check your connection.'; }
   CFbusy = false;
   try { cardSurfacesRedraw(); } catch (e) {}
+  try { if (CF && CF.data && !CFmock) cardPushSync(); } catch (e) {}
 }
 // 2.29.20: a bank refresh changes cardGoal().left. Redraw the pages that show that figure (Cash flow, Budget, Bills, Notifications).
 function cardSurfacesRedraw() {
@@ -29480,7 +29482,35 @@ function bkSettingsRows() {
       <div class="srow"><div class="tx"><div class="t">For money out over</div><div class="s">Blank = never for money out.</div></div><div class="moneyin" style="max-width:110px"><span>$</span><input style="width:72px" inputmode="decimal" aria-label="Push for money out over" value="${p.outOver == null ? '' : p.outOver}" onchange="bkSet('outOver', this.value)"></div></div>` : '') +
     A.map(a => `<div class="srow"><div class="tx"><div class="t">${esc(bkAcctName(a))}</div><div class="s">${esc(a.type === 'CREDITCARD' ? 'Credit card' : a.type === 'LOAN' ? 'Loan' : a.type === 'SAVINGS' ? 'Savings' : 'Account')}</div></div>${sw(!p.off.includes(a.id), bkAcctName(a), `bkSet('off', ${jsArg(a.id)})`)}</div>`).join('') : '');
 }
-(() => { const o = bfSettingsRows; bfSettingsRows = function () { let h = o.apply(this, arguments); try { h += bkSettingsRows(); } catch (e) { } return h; }; })();
+/* 2.29.22: ASB Visa "left to pay in full" phone notifications. The relay sends them (app closed too): when the bank shows
+   a payment or a new statement, Wednesday mornings, each morning in the last 3 days before the due date, and once when
+   it's paid in full. This phone hands the relay its card figures after each bank load. Follows the Bills category. */
+function cardPushOn() { return (S.settings || {}).cardPush !== false && notifCatOn('bills'); }
+async function cardPushSync(force) {
+  try {
+    if (!cfKey() || !RELAY_URL) return; const g = cardGoal(); if (!g || !g.due) return;
+    const c = debtsSt().card, k = cardDays();
+    const body = { on: cardPushOn(), stmt: g.stmt, due: g.due, goal: r2(+g.goal || 0), sb: !!g.sb, stmtDay: k.stmt, gap: k.gap,
+      pend: cardPend(c).map(t => ({ d: t.d, a: t.a, at: t.at })), weeks: (() => { try { return cardWeeks(g).map(w => ({ d: w.d, a: w.a, cum: w.cum })); } catch (e) { return []; } })() };
+    const sig = JSON.stringify(body), was = localStorage.getItem('cardPushSig') || '', [wSig, wAt] = was.split('|@'), age = Date.now() - (+wAt || 0);
+    if (!force && wSig === sig && age < 6 * 3600e3) return;
+    const [st] = await cfApi('/cashflow/card', 'POST', body);
+    if (st === 200) localStorage.setItem('cardPushSig', sig + '|@' + Date.now());
+  } catch (e) { }
+}
+async function cardPushToggle() {
+  S.settings.cardPush = !cardPushOn() ? true : false;
+  if (S.settings.cardPush && !notifCatOn('bills')) notifCatsState().bills = true;
+  await save(); render(); cardPushSync(true);
+  if (S.settings.cardPush) { try { if (pushOK() && Notification.permission !== 'granted') await enableReminderPush(); else await scheduleReminders(); } catch (e) { } }
+  else { try { await scheduleReminders(); } catch (e) { } }
+}
+function cardPushRow() {
+  const on = cardPushOn(), g = (() => { try { return cardGoal(); } catch (e) { return null; } })();
+  const now = g && g.due ? (g.full ? 'Paid in full for this statement.' : 'Now: ' + money(g.left) + ' left, due ' + fmtW(g.due) + '.') : '';
+  return `<div class="srow" id="cardpushset"><div class="tx"><div class="t">💳 ASB Visa: left to pay in full</div><div class="s">A phone notification with what’s left to pay to avoid interest: when a payment or new statement shows at the bank, Wednesday mornings, each morning in the last 3 days, and once when it’s paid in full. None 10pm–8am. ${esc(now)}</div></div><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" aria-label="ASB Visa left to pay notifications" onclick="cardPushToggle()"></button></div>`;
+}
+(() => { const o = bfSettingsRows; bfSettingsRows = function () { let h = o.apply(this, arguments); try { h += cardPushRow(); } catch (e) { } try { h += bkSettingsRows(); } catch (e) { } return h; }; })();
 
 /* ================= 2.27.10: Event Cinemas Whangārei in one card, plus "new at the cinema" and new local events in Notifications =================
    Movies come from Event Cinemas' own sessions JSON (relay /events → cinema; cinema 503, 18 James Street, read twice a day).

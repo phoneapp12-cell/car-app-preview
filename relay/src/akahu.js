@@ -6,6 +6,7 @@
    Akahu refreshes from the banks daily; we read it once a day (cron) and on 'Refresh' (at most once an hour). */
 const API = 'https://api.akahu.io/v1';
 import { bankPushRun, cleanBankPref, K_BPREF } from './bank-notify.js';
+import { cardNotifyRun, cleanSnap } from './card-notify.js';
 const K_CRED = 'akahu-cred-v1', K_DATA = 'akahu-data-v1', K_RL = 'akahu-rl-v1', K_DIAG = 'akahu-diag-v1';
 const DAY = 864e5;
 
@@ -94,6 +95,7 @@ async function authed(env, request) { const cred = await getCred(env); if (!cred
 async function refetch(env, cred, fetchImpl) { let old = null; try { old = await open(env, await env.EVENTS_KV.get(K_DATA)); } catch (e) { }
   const data = await fetchAll(cred, fetchImpl); await env.EVENTS_KV.put(K_DATA, await seal(env, data));
   try { await bankPushRun(env, old, data, Date.now(), fetchImpl); } catch (e) { } // 2.27.9: push for new money in / out
+  try { await cardNotifyRun(env, data, 'bank', Date.now()); } catch (e) { } // 2.29.22: ASB Visa left to pay in full
   return data; }
 const pubStatus = (cred, data) => ({ connected: true, name: cred.name || '', accounts: data ? data.accounts.length : cred.accounts || 0, at: data ? data.at : '', manualAt: cred.manualAt || '' });
 
@@ -138,6 +140,9 @@ export async function akahuRoute(path, request, env, fetchImpl = fetch) {
   }
   if (path === '/cashflow/prefs' && request.method === 'POST') { // 2.27.9: bank push settings (no account numbers; Akahu account ids only)
     const p = cleanBankPref(body); await env.EVENTS_KV.put(K_BPREF, JSON.stringify(p)); return [200, { ok: true, pref: p }]; }
+  if (path === '/cashflow/card' && request.method === 'POST') { // 2.29.22: the app's card snapshot for the 'left to pay in full' pushes
+    const snap = cleanSnap(body), data = await open(env, await env.EVENTS_KV.get(K_DATA)); const r = await cardNotifyRun(env, data, 'app', Date.now(), snap);
+    return [200, { ok: true, on: snap.on, left: r && !r.wait ? r.left : null, due: r ? r.due : '' }]; }
   if (path === '/cashflow/refresh' && request.method === 'POST') {
     const last = Date.parse(cred.manualAt || '') || 0;
     if (Date.now() - last < 3600e3) return [429, { error: 'too_soon', next: new Date(last + 3600e3).toISOString() }];
