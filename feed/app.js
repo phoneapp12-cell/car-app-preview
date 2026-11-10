@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.116';
+const APP_VERSION = '1.9.121';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -175,6 +175,10 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
   ['Stained glass', 'glass', 'tiffany lamp|favrile|stained glass'],
   ['Kites', 'kites', 'kite festival|kites over|kites at'],
   ['Paper lanterns', 'lanterns', 'paper lantern'],
+  ['Books', 'learn', 'books?|novels?|authors?|reading|booker'],
+  ['Psychology', 'learn', 'psycholog\\w*|adhd|brain|\\biq\\b'],
+  ['Whangārei classes', 'events', 'yoga|workshop|whang[aā]rei|northland'],
+  ['Drawing & portraits', 'creative', 'portraits?|painting|drawing|opera'],
   ['Travel', 'travel', 'travel|trip|holiday|destination|tourism'], ['Theme Parks', 'travel', 'theme parks?|roller ?coasters?|rides?|disneyland|rainbow’s end|rainbows end'],
   ['Technology', 'tech', 'tech(nology)?|gadgets?|smartphones?|iphone|android'], ['Computers', 'tech', 'computers?|pcs?|laptops?|windows|mac(book)?|linux'], ['Coding', 'tech', 'cod(e|ing)|programming|developers?|software|python|javascript'],
   ['Robotics', 'tech', 'robot(s|ics)?|automation|drones?'], ['Low Technology', 'diy', 'low-?tech|off-?grid|hand tools?|solar oven|repair'], ['Social Media', 'tech', 'social media|instagram|facebook|tiktok|youtube|reddit'],
@@ -774,19 +778,13 @@ async function refreshYou() {
   if (changed && scrollY < 200 && tab !== 'life' && tab !== 'photos' && tab !== 'liked') draw();
 }
 
-/* ---- 1.3.0: videos play by themselves, Instagram-style. A video starts (muted, as browsers require) when about 60% of
-   it is on screen and pauses when it scrolls away. Only one plays at a time. Tap the speaker to hear it; after that,
-   later videos start with sound too for this visit if the browser allows it. Short clips loop. The YouTube player is
-   only loaded when a card is close to the screen, and the thumbnail shows until the video is actually playing. ---- */
+/* 1.9.117 videos stay on their picture until a tap. Nothing starts from scrolling, opening, or coming back
+   to the page. The player is loaded on that tap. Sound follows the speaker switch. A clip pauses if it leaves the screen. */
 const SPK = {
   off: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="m22 9-6 6M16 9l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   on: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
 };
-let SOUND = sessionStorage.getItem('mf.sound') !== '0'; // 1.9.105 sound on for every clip unless they mute it
-// 1.9.105 browsers only allow sound after the first touch, so on that first touch turn the playing clip's sound on
-(() => { const go = e => { if (e.target && e.target.closest && e.target.closest('[data-snd]')) return; ['pointerdown', 'keydown', 'touchend'].forEach(t => removeEventListener(t, go, true));
-  setTimeout(() => { if (SOUND && curVid && curVid.isConnected) { const r = PLAYERS.get(curVid); try { if (r && r.ready && r.p.isMuted()) playVid(curVid, true); } catch (x) { } } }, 60); };
-  ['pointerdown', 'keydown', 'touchend'].forEach(t => addEventListener(t, go, true)); })();
+let SOUND = sessionStorage.getItem('mf.sound') !== '0'; // sound on when they tap play, unless they have muted it this visit
 // 1.8.5 sharp video pictures: YouTube's 1280px picture when the video has one (small grey stand-in → fall back to 480px)
 function ytThumb(id, img) { return !img || /i\.ytimg\.com\/vi\/[^/]+\/(hq|mq|sd)?default\.jpg/.test(img) ? 'https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg' : img; }
 function vidMedia(id, img, title, extra = '', tall = false) {
@@ -812,9 +810,9 @@ function mountVid(el) {
     const div = document.createElement('div'); el.querySelector('.vslot').appendChild(div);
     rec.p = new YT.Player(div, {
       videoId: el.dataset.vid, host: 'https://www.youtube-nocookie.com', width: '100%', height: '100%',
-      playerVars: { autoplay: 1, mute: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, iv_load_policy: 3, fs: 0, disablekb: 1 },
+      playerVars: { autoplay: 0, mute: SOUND ? 0 : 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, iv_load_policy: 3, fs: 0, disablekb: 1 },
       events: {
-        onReady: () => { rec.ready = true; el.classList.add('armed'); try { rec.p.mute(); } catch (e) { } ytPortrait(el); if (rec.want) playVid(el); },
+        onReady: () => { rec.ready = true; ytPortrait(el); if (rec.want) playVid(el); },
         onStateChange: e => {
           if (e.data === 1) { el.classList.add('playing'); if (curVid && curVid !== el) pauseVid(el); }
           else if (e.data === 0) { let d = 0; try { d = rec.p.getDuration(); } catch (x) { } if (d && d <= 90 && curVid === el) { rec.p.seekTo(0, true); rec.p.playVideo(); } else el.classList.remove('playing'); } // loop short clips
@@ -846,20 +844,15 @@ function pauseVid(el) {
   if (curVid === el) curVid = null;
 }
 function pickVid() {
-  let best = null, br = 0;
-  for (const [el, r] of RATIO) { if (!el.isConnected) { RATIO.delete(el); continue; } if (r > br && !el.classList.contains('verr')) { best = el; br = r; } }
-  const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (document.body && document.body.dataset.artopen) { if (curVid) pauseVid(curVid); return; }
-  const thr = 0.34; // a large player must be able to start while most of the card is on screen
-  if (curVid && !curVid.isConnected) curVid = null; // the list was redrawn (filter changed)
-  if (best && br >= thr && !VID_SAVE && !reduceMotion) { if (best !== curVid) playVid(best); else { const r0 = PLAYERS.get(best); if (r0 && !r0.want) playVid(best); } }
-  else if (curVid && (RATIO.get(curVid) || 0) < thr) pauseVid(curVid);
+  for (const el of [...RATIO.keys()]) if (!el.isConnected) RATIO.delete(el);
+  if (document.body && document.body.dataset.artopen && curVid) { pauseVid(curVid); return; }
+  if (curVid && !curVid.isConnected) { curVid = null; return; }
+  if (curVid && (RATIO.get(curVid) || 0) < 0.34) pauseVid(curVid);
 }
-const nearIO = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? mountVid(e.target) : unmountVid(e.target)), { rootMargin: '350px 0px' });
 const visIO = new IntersectionObserver(es => { es.forEach(e => RATIO.set(e.target, e.isIntersecting ? e.intersectionRatio : 0)); pickVid(); }, { threshold: [0, 0.34, 0.6, 0.8, 1] });
 function watchVids() {
   for (const el of [...PLAYERS.keys()]) if (!el.isConnected) { if (curVid === el) curVid = null; unmountVid(el); }
-  document.querySelectorAll('.media.vid:not(.watched)').forEach(el => { el.classList.add('watched'); nearIO.observe(el); visIO.observe(el); });
+  document.querySelectorAll('.media.vid:not(.watched)').forEach(el => { el.classList.add('watched'); visIO.observe(el); });
 }
 function toggleSound(el) {
   const rec = PLAYERS.get(el); let muted = true;
@@ -870,8 +863,8 @@ function toggleSound(el) {
   else { try { rec && rec.ready && rec.p.mute(); } catch (e) { } toast('🔇 Sound off'); }
 }
 let vScrollT = 0; // belt and braces: when scrolling stops, measure what's on screen directly
-addEventListener('scroll', () => { clearTimeout(vScrollT); vScrollT = setTimeout(() => { const H = innerHeight; document.querySelectorAll('.media.vid.watched').forEach(el => { const r = el.getBoundingClientRect(), vis = Math.max(0, Math.min(r.bottom, H) - Math.max(r.top, 0)); RATIO.set(el, r.height ? vis / r.height : 0); if (r.bottom > -350 && r.top < H + 350) mountVid(el); }); pickVid(); }, 250); }, { passive: true });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && curVid) { const el = curVid; pauseVid(el); } else if (document.visibilityState === 'visible') pickVid(); });
+addEventListener('scroll', () => { clearTimeout(vScrollT); vScrollT = setTimeout(() => { const H = innerHeight; document.querySelectorAll('.media.vid.watched').forEach(el => { const r = el.getBoundingClientRect(), vis = Math.max(0, Math.min(r.bottom, H) - Math.max(r.top, 0)); RATIO.set(el, r.height ? vis / r.height : 0); }); pickVid(); }, 250); }, { passive: true });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && curVid) pauseVid(curVid); });
 
 /* ---- rendering ---- */
 function ago(ms) {
@@ -978,6 +971,7 @@ function goTab(t) { tab = t || 'all'; ls.set('tab', tab); try { mfDrawer(false);
 
 function draw() {
   chips();
+  if (window.ibCalOn && typeof window.ibCalDraw === 'function') { window.ibCalDraw(); return; }
   const m = $('#feed');
   if (!FEED) { m.innerHTML = '<div class="sk"></div><div class="sk"></div>'; return; }
   if (tab === 'life' && !PRIVATE_OK) tab = 'all';
@@ -1096,7 +1090,7 @@ function settings() {
   $('#sheetin').innerHTML = `<h2>Text size</h2><div class="tsz">${[['n', 'Normal'], ['l', 'Large'], ['xl', 'Extra large']].map(([k, l]) => `<button class="ich${ts === k ? ' on' : ''}" data-ts="${k}" aria-pressed="${ts === k}">${ts === k ? '✓ ' : ''}${l}</button>`).join('')}</div><p class="tsp">Saved on this phone for you. Your phone’s own text size setting still applies on top.</p>` + famSettings() + `<h2>Info Book</h2>
     <p>Your own feed of photos and videos. No comments, followers or sharing. Your 👍 and 👎 stay on this phone and only change what this feed shows you. It refreshes itself through the day from ${(FEED && FEED.sources || []).length || 'about 180'} public sources. Sport is always left out.</p>
     <p>👍 / 👎 teach it which <b>sources</b> and <b>topics</b> you like. New sources get a short trial (“Trying”) so you can judge them; a source you give about four more 👎 than 👍 is dropped (you can bring it back below).</p>
-    <p>▶️ Videos play by themselves with sound when they’re on screen (after your first tap, as phones require) and pause when you scroll past. Tap the speaker to mute.</p>
+    <p>▶️ Videos stay still until you tap the play button. Sound is on for that tap unless you have muted it. They pause when you scroll past.</p>
     ${PRIVATE_OK ? `<a class="btn pri" href="${MY_APP}">← Back to My App</a>
     <p>📌 <b>For You</b> cards come from My App on this phone and are mixed through All at random: cars, birthdays, calendar, to-dos, garden, pets, meals and recipes (your own recipe photos too), weather, UV and power (kWh), roads, deliveries, plus every board and hub. Your own things never leave this phone, and bills and money are always left out.</p>
     <p>🖼️ <b>My Photos</b>: ${PHOTO_INFO.all ? `${PHOTO_INFO.used} of the ${PHOTO_INFO.all} photos on My App’s Photos page${PHOTO_INFO.approved ? ' (the ones you tagged approved, feed, keep or favourite)' : ''}` : 'photos from My App’s Photos page'}. Receipts, warranties, documents, screenshots and anything tagged <b>nofeed</b> or <b>private</b> are left out. Tag photos <b>approved</b> or <b>feed</b> in My App to show only those. Read on this phone only.</p>
@@ -1224,7 +1218,7 @@ function otherPlayer(el, rec) {
     const RES = ['480', '360', '720', '270', '220']; let ri = 0, au = null;
     const vsrc = () => k === 'mp4' ? u : `https://v.redd.it/${u}/CMAF_${RES[ri]}.mp4`;
     v.src = vsrc(); v.onerror = () => { if (k === 'reddit' && ++ri < RES.length) { v.src = vsrc(); if (rec.want) v.play().catch(() => { }); } else { el.classList.add('verr'); mark(false); } };
-    v.controls = false; v.onloadedmetadata = () => { el.classList.add('armed'); if (v.videoHeight > v.videoWidth * 1.15) el.classList.add('tall'); };
+    v.controls = false; v.autoplay = false; v.removeAttribute('autoplay'); v.onloadedmetadata = () => { if (v.videoHeight > v.videoWidth * 1.15) el.classList.add('tall'); };
     v.onplaying = () => { mark(true); if (au && !muted) { au.currentTime = v.currentTime; au.play().catch(() => { }); } }; v.onpause = () => { mark(false); au && au.pause(); };
     v.onseeked = () => { if (au) au.currentTime = v.currentTime; };
     slot.appendChild(v);
@@ -1235,7 +1229,7 @@ function otherPlayer(el, rec) {
   // the platforms' own embed players (an iframe); Vimeo and TikTok can be told to play/pause/mute, Facebook is (re)loaded on play
   let f = null; const ifr = src => { f = document.createElement('iframe'); f.src = src; f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true; f.onload = () => setTimeout(() => { if (rec.want && curVid === el && k !== 'fb') playVid(el); }, 400); f.referrerPolicy = 'strict-origin-when-cross-origin'; slot.innerHTML = ''; slot.appendChild(f); };
   const post = (msg, origin) => { try { f && f.contentWindow.postMessage(typeof msg === 'string' ? msg : JSON.stringify(msg), origin); } catch (e) { } };
-  if (k === 'vimeo') { ifr(`https://player.vimeo.com/video/${u}?muted=1&autoplay=1&playsinline=1&loop=1&dnt=1&controls=0&title=0&byline=0&portrait=0`); el.classList.add('armed');
+  if (k === 'vimeo') { ifr(`https://player.vimeo.com/video/${u}?muted=${SOUND ? 0 : 1}&autoplay=0&playsinline=1&loop=1&dnt=1&controls=0&title=0&byline=0&portrait=0`);
     const vm = (method, value) => post(value === undefined ? { method } : { method, value }, 'https://player.vimeo.com');
     return { mute() { muted = true; vm('setMuted', true); vm('setVolume', 0); }, unMute() { muted = false; vm('setMuted', false); vm('setVolume', 1); }, setVolume() { }, isMuted: () => muted, playVideo() { vm('play'); setTimeout(() => mark(true), 700); }, pauseVideo() { vm('pause'); mark(false); }, getPlayerState: () => state, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } }; }
   if (k === 'tiktok') { ifr(`https://www.tiktok.com/player/v1/${u}?autoplay=0&muted=1&loop=1&rel=0&description=0&music_info=0&controls=1&progress_bar=1&play_button=1&volume_control=1&fullscreen_button=1`);
@@ -1244,7 +1238,7 @@ function otherPlayer(el, rec) {
   if (k === 'ig') { ifr(`https://www.instagram.com/reel/${u}/embed/`); mark(true); // Instagram's embed has its own play button (no autoplay control)
     return { mute() { }, unMute() { }, setVolume() { }, isMuted: () => true, playVideo() { }, pauseVideo() { }, getPlayerState: () => 1, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } }; }
   // facebook
-  const fbSrc = m => `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u)}&show_text=false&autoplay=true&mute=${m ? 'true' : 'false'}`;
+  const fbSrc = m => `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u)}&show_text=false&autoplay=false&mute=${m ? 'true' : 'false'}`;
   return { mute() { if (!muted) { muted = true; if (state === 1) ifr(fbSrc(true)); } }, unMute() { if (muted) { muted = false; ifr(fbSrc(false)); mark(true); } }, setVolume() { }, isMuted: () => muted,
     playVideo() { if (state !== 1) { ifr(fbSrc(muted)); setTimeout(() => mark(true), 900); } }, pauseVideo() { slot.innerHTML = ''; f = null; mark(false); }, getPlayerState: () => state, getDuration: () => 0, seekTo() { }, destroy() { slot.innerHTML = ''; } };
 }
@@ -1302,7 +1296,7 @@ function mfVideos(order) {
 function mediaFilter(order) {
   if (!MF_OPTS || !MF) return order; // 1.9.51 still starting up
   mfChip(); if (MF === 'all') return order;
-  if (MF === 'vid') { try { ytApi(); } catch (e) { } setTimeout(() => { try { pickVid(); } catch (e) { } }, 900); setTimeout(() => { try { pickVid(); } catch (e) { } }, 2500); return mfVideos(order); }
+  if (MF === 'vid') return mfVideos(order);
   return order.filter(i => mfContent(i) && !mfIsVid(i) && mfPic(i));
 }
 function mfChip() {
@@ -1329,7 +1323,8 @@ function mfDrawer(open) {
   }
   // 1.9.82 Browse: Family, For [name], topics (replaces top chip bar)
   const browse = topicList().filter(t => t[0] !== 'all');
-  const br = `<p class="mfsec">Browse</p>` + browse.map(t =>
+  const backOn = !!ls.get('comeBack', 0);
+  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button><button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · coming soon</span></button><button type="button" class="mfopt${backOn ? ' on' : ''}" data-comeback="1" role="switch" aria-checked="${backOn}"><span class="mfe">🔔</span><span>Come-back reminders</span>${backOn ? '<i>✓</i>' : ''}</button>` + browse.map(t =>
     `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
   ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;
   extra.innerHTML = br + x;
@@ -1340,6 +1335,8 @@ function mfDrawer(open) {
   document.addEventListener('click', e => {
     const t = e.target; if (!t || !t.closest) return;
     if (t.closest('#mfbtn')) { mfDrawer(true); return; }
+    if (t.closest('[data-calopen]')) { e.preventDefault(); mfDrawer(false); if (window.ibCalOpen) window.ibCalOpen(); return; }
+    if (t.closest('[data-soon]')) { e.preventDefault(); mfDrawer(false); if (window.ibSoon) window.ibSoon(); return; }
     const sb = t.closest('[data-mfset]'); if (sb) { e.preventDefault(); mfSet(sb.dataset.mfset); return; }
     const ab = t.closest('[data-appear]'); if (ab) { e.preventDefault(); APPEAR = ab.dataset.appear; ls.set('appear', APPEAR); applyAppear(); mfDrawer(true); toast('Appearance: ' + ({ dark: 'Dark', light: 'Light', auto: 'Match phone', ocean: 'Ocean 🌊', spring: 'Spring 🌸', candy: 'Candy Crush 🍬' }[APPEAR] || APPEAR)); return; }
     const lb = t.closest('[data-showlife]'); if (lb) { e.preventDefault(); SHOW_LIFE = !SHOW_LIFE; ls.set('showLife', SHOW_LIFE ? 1 : 0); mfDrawer(true); try { draw(); } catch (err) { } toast(SHOW_LIFE ? 'My App stuff: on' : 'My App stuff: off'); return; }
@@ -1389,7 +1386,7 @@ function carouselize(order) {
 }
 function rowCard(row) {
   return `<section class="hrow" data-row="${esc(row.k)}" aria-label="${esc(row.title)}"><div class="hrhd"><h2>${esc(row.title)}</h2><span class="hrhint" aria-hidden="true">Swipe ›</span></div>
-  <div class="hscroll">${row.items.map(i => card(i)).join('')}</div>
+  <div class="hscroll">${row.items.map(i => window.card(i)).join('')}</div>
   <div class="hdots" aria-hidden="true">${row.items.map((_, n) => `<i${n ? '' : ' class="on"'}></i>`).join('')}</div></section>`;
 }
 const cardRow = window.card;

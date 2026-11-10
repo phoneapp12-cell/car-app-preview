@@ -106,6 +106,7 @@ function openViewer(i) {
       if (t.closest('[data-stopen]')) { const x = TILES[ST_I]; closeViewer(); if (x && x.url) window.open(x.url, '_blank', 'noopener'); else if (x && x.item && typeof draw === 'function') { /* stay */ } return; }
       if (t.closest('[data-stnext]')) { next(1); return; }
       if (t.closest('[data-stprev]')) { next(-1); return; }
+      if (t.closest('[data-stplay]')) { startStory(); return; }
     });
     let sy = 0;
     v.addEventListener('touchstart', e => { sy = e.touches[0].clientY; }, { passive: true });
@@ -125,11 +126,9 @@ function paint() {
   const bars = TILES.map((_, k) => `<i class="${k < ST_I ? 'done' : k === ST_I ? 'on' : ''}"></i>`).join('');
   const vo = t.item && !t.item.vid && typeof vidOf === 'function' ? vidOf(t.item) : null;
   const tallStory = !!(t.item && (/\/shorts\//.test(t.item.url || '') || (vo && (vo.tall || vo.k === 'reddit'))));
-  const motionOff = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const media = t.item && t.item.vid
-    ? `<div class="stmedia stv ${tallStory ? 'tall' : 'land'}"><iframe src="https://www.youtube-nocookie.com/embed/${esc(t.item.vid)}?autoplay=${motionOff ? 0 : 1}&mute=1&controls=0&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" onload="stCdHook(this)" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="${esc(t.title || 'Video')}"></iframe></div>`
-    : vo && (vo.k === 'reddit' || vo.k === 'mp4')
-    ? `<div class="stmedia stv ${tallStory ? 'tall' : 'land'}"><video src="${esc(vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_720.mp4')}" data-rv="${esc(vo.k === 'reddit' ? vo.u : '')}" poster="${esc(t.img)}" ${motionOff ? '' : 'autoplay'} muted playsinline ontimeupdate="stCdSet(this.duration-this.currentTime)" onerror="stVidErr(this)" onplay="stAud(this)" onended="stCdSet(0)"></video></div>`
+  const clip = !!(t.item && (t.item.vid || (vo && (vo.k === 'reddit' || vo.k === 'mp4'))));
+  const media = clip
+    ? `<div class="stmedia stv ${tallStory ? 'tall' : 'land'}"><img class="stposter" src="${esc(t.img)}" alt=""><button type="button" class="play" data-stplay aria-label="Play"><span></span></button></div>`
     : `<div class="stmedia"><img src="${esc(t.img)}" alt=""></div>`;
   v.innerHTML = `<div class="stbars">${bars}</div>
     <button type="button" class="stx" data-stclose aria-label="Close">✕</button>
@@ -140,8 +139,35 @@ function paint() {
       ${(t.item && (t.item.vid || vo)) ? `<button type="button" class="btn" data-stsound>Sound</button>` : ''}${t.url ? `<button type="button" class="btn pri" data-stopen>Open ↗</button>` : ''}</div>`;
   v.classList.add('on');
   document.querySelectorAll('#feed .media.vid.playing').forEach(el => { try { pauseVid(el); } catch (err) { } });
-  // Start muted so the browser will play it. Sound turns on after a tap if the phone allows it.
-  const sv = v.querySelector('.stmedia.stv video'); if (sv && !motionOff) sv.play().catch(() => { });
+}
+function startStory() {
+  const v = document.getElementById('stview'); const t = TILES[ST_I]; const box = v && v.querySelector('.stmedia.stv');
+  if (!box || !t || box.querySelector('iframe, video')) return;
+  const vo = t.item && !t.item.vid && typeof vidOf === 'function' ? vidOf(t.item) : null;
+  if (t.item && t.item.vid) {
+    const f = document.createElement('iframe');
+    f.title = t.title || 'Video';
+    f.allowFullscreen = true;
+    f.allow = 'autoplay; encrypted-media; picture-in-picture';
+    f.src = 'https://www.youtube-nocookie.com/embed/' + t.item.vid + '?playsinline=1&rel=0&modestbranding=1&enablejsapi=1&controls=0&origin=' + encodeURIComponent(location.origin);
+    f.onload = () => { try { stCdHook(f); const cmd = fn => f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: fn, args: [] }), '*'); cmd('unMute'); cmd('playVideo'); } catch (err) { } };
+    box.replaceChildren(f);
+    return;
+  }
+  if (!(vo && (vo.k === 'reddit' || vo.k === 'mp4'))) return;
+  const el = document.createElement('video');
+  el.poster = t.img || '';
+  el.playsInline = true;
+  el.setAttribute('playsinline', '');
+  el.dataset.go = '1';
+  el.dataset.rv = vo.k === 'reddit' ? vo.u : '';
+  el.src = vo.k === 'mp4' ? vo.u : 'https://v.redd.it/' + vo.u + '/CMAF_720.mp4';
+  el.ontimeupdate = () => stCdSet(el.duration - el.currentTime);
+  el.onerror = () => stVidErr(el);
+  el.onplay = () => stAud(el);
+  el.onended = () => stCdSet(0);
+  box.replaceChildren(el);
+  el.play().catch(() => { });
 }
 
 function arm() {
@@ -214,7 +240,7 @@ addEventListener('message', e => { if (!/youtube(-nocookie)?\.com$/.test(new URL
 
 /* 1.9.93 Reddit clips: try smaller sizes if one is missing, and play the separate sound track alongside */
 const ST_RES = ['CMAF_720', 'CMAF_480', 'DASH_720', 'DASH_480', 'CMAF_360', 'DASH_360'];
-window.stVidErr = function (v) { const id = v.dataset.rv; if (!id) return; const k = (+v.dataset.ri || 0) + 1; if (k >= ST_RES.length) return; v.dataset.ri = k; v.src = `https://v.redd.it/${id}/${ST_RES[k]}.mp4`; v.play().catch(() => { }); };
+window.stVidErr = function (v) { const id = v.dataset.rv; if (!id) return; const k = (+v.dataset.ri || 0) + 1; if (k >= ST_RES.length) return; v.dataset.ri = k; v.src = `https://v.redd.it/${id}/${ST_RES[k]}.mp4`; if (v.dataset.go) v.play().catch(() => { }); };
 let ST_AU = null;
 window.stAud = function (v) { const id = v.dataset.rv; if (!id) return; if (ST_AU) { ST_AU.pause(); ST_AU = null; }
   const A = ['CMAF_AUDIO_128', 'CMAF_AUDIO_64', 'DASH_AUDIO_128', 'DASH_audio']; let ai = 0; const au = new Audio(`https://v.redd.it/${id}/${A[0]}.mp4`); ST_AU = au;

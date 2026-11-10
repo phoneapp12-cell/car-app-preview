@@ -129,7 +129,7 @@
       if (!fut.length) continue;
       const link = filmLink(m) || 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions';
       if (/\/orders\//.test(link)) continue;
-      out.push({ id: m.id, title: m.title, rating: String(m.rating).trim(), mins: Number(m.mins) || 0, poster: m.poster, link, sessions: 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions' });
+      out.push({ id: m.id, title: m.title, rating: String(m.rating).trim(), mins: Number(m.mins) || 0, poster: m.poster, link, next: fut[0].t.slice(0, 16), sessions: 'https://www.eventcinemas.co.nz/cinema/whangarei/sessions' });
     }
     return out;
   }
