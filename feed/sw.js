@@ -25,7 +25,7 @@ self.addEventListener('periodicsync', e => {
     if (!saved) return;
     const s = await saved.json();
     const now = Date.now();
-    if (!s.on || !s.lastOpen || now - s.lastOpen < 2 * 86400000 || (s.lastNote && now - s.lastNote < 2 * 86400000) || nzQuiet(now)) return;
+    if (!s.lastOpen || now - s.lastOpen < 2 * 86400000 || (s.lastNote && now - s.lastNote < 2 * 86400000) || nzQuiet(now)) return;
     await self.registration.showNotification('Info Book', { body: 'It has been a couple of days. Come back when you have a minute.', tag: 'comeback', icon: 'icons/icon-192.png' });
     s.lastNote = now;
     await cache.put('/feed/__comeback', new Response(JSON.stringify(s)));

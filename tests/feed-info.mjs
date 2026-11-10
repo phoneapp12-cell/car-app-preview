@@ -352,7 +352,14 @@ assert.ok(sightAt.every(n => Math.abs(n - artAt) >= 2), sightAt.join(',') + ' ar
 mixCtx.topicOn = t => t !== 'art3d';
 assert.ok(!mixCtx.festive(Array.from({ length: 40 }, (_, n) => ({ id: 'q' + n })), 2).some(x => x && x.src === 'art3d-commons'));
 assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes('window.card(i)'));
-assert.ok(appSrc.includes('data-comeback'));
+assert.ok(!appSrc.includes('data-comeback'));
+const backSrc = fs.readFileSync('feed/back.js', 'utf8');
+assert.ok(backSrc.includes('Notification.requestPermission'));
+assert.ok(!backSrc.includes('data-comeback'));
+assert.ok(!/comeBack/.test(backSrc));
+assert.ok(backSrc.includes('on: true'));
+assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('!s.on'));
+assert.ok(!fs.readFileSync('feed/extras.js', 'utf8').includes("data-np=\"comeback\"") && !fs.readFileSync('feed/extras.js', 'utf8').includes("['comeback',"));
 const comeCtx = {};
 vm.runInNewContext(fs.readFileSync('feed/back.js', 'utf8'), comeCtx);
 const come = comeCtx.ibCome;
