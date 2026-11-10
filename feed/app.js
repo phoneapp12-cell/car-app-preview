@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.123';
+const APP_VERSION = '1.9.124';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1053,7 +1053,7 @@ function more() {
   const old = m.querySelectorAll('#sentinel'); old.forEach((s, n) => { if (n < old.length - 1) s.remove(); });
   const flat = next.flatMap(i => i.x === 'row' ? i.items : [i]); // 1.9.56 swipe rows: their cards count like any other
   for (const i of flat) { SEEN[i.id] = (SEEN[i.id] || 0) + 1; if (i.src) IMP[i.src] = (IMP[i.src] || 0) + 1; }
-  saveSeen(); fillPics(); watchVids(); famCounts(flat); watchSeen(m);
+  saveSeen(); fillPics(); watchVids(); famCounts(flat); watchSeen(m); try { if (window.ibPortalRise) window.ibPortalRise(); } catch (e) { }
   const s = $('#sentinel');
   if (s) { if (io) io.disconnect(); io = new IntersectionObserver(e => { if (e[0].isIntersecting) { io.disconnect(); s.remove(); more(); } }, { rootMargin: '900px' }); io.observe(s); }
 }
