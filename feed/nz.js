@@ -95,8 +95,21 @@
     if (i.x === 'tetq' || /^tetq-/.test(String(i.id || ''))) return true;
     return /(?:^|\/)tetris(?:\.html)?(?:$|[?#])/.test(String(i.url || ''));
   }
+  function aired(i, now) {
+    now = now == null ? Date.now() : now;
+    if (!i) return false;
+    if (i.kind === 'tv' && nzVerified(i) && typeof i.ev === 'number') return i.ev < now;
+    if (i.x === 'watch' && i.w && nzVerified(i.w) && typeof i.w.ev === 'number') {
+      const clock = nzStamp(i.w.ev).slice(11, 16);
+      if (clock === '12:00') return false;
+      return i.w.ev < now;
+    }
+    if (i.x === 'cine' && i.film && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(i.film.next || '')) return i.film.next.slice(0, 16) < nzStamp(now);
+    return false;
+  }
   function drop(i, now) {
     if (!i) return false;
+    if (aired(i, now)) return true;
     if (tetrisCard(i) || tetrisCard(i.h) || tetrisCard(i._share && i._share.snap)) return true;
     if (usNetworkPromo(i) || usNetworkPromo(i.h) || usNetworkPromo(i._share && i._share.snap)) return true;
     if (blockedService(i) || blockedService(i.w) || blockedService(i.h) || blockedService(i._share && i._share.snap)) return true;
@@ -200,7 +213,7 @@ function presentVideos(order) {
   return out;
 }
 function keptItems(list) { return (list || []).filter(i => !drop(i)); }
-  root.ibNz = { neon, blockedService, usNetworkPromo, tetrisCard, streamingCard, nzVerified, tvDrop, watchDrop, gardenDrop, drop, keptItems, wrongSeason, currentFilms, pickFilm, insertCinema, cineCard, nzStamp, videoFate, presentVideos, CACHE, RELAY };
+  root.ibNz = { neon, blockedService, usNetworkPromo, tetrisCard, streamingCard, nzVerified, tvDrop, watchDrop, gardenDrop, drop, aired, keptItems, wrongSeason, currentFilms, pickFilm, insertCinema, cineCard, nzStamp, videoFate, presentVideos, CACHE, RELAY };
   if (!root.document) return;
   const prevVisible = root.visible;
   if (typeof prevVisible === 'function') root.visible = function () { return prevVisible().filter(i => !drop(i) && videoFate(i) !== 'drop'); };
