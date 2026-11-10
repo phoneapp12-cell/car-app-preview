@@ -2489,6 +2489,17 @@ html.gfx .spotlight-bar{background:var(--glass);-webkit-backdrop-filter:blur(8px
 .wkg-p b{font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .wkg-pc{padding:2px 8px;justify-content:center}.wkg-pc b{font-size:12.5px}.wkg-pc small{display:none}.wkg-p small{font-size:13px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .wkg-now{position:absolute;top:0;bottom:0;width:2px;background:#facc15;z-index:2;box-shadow:0 0 6px #facc15}
+.ggseason .gghead{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.ggrow{padding:6px 0;border-top:1px solid var(--line)}.ggrow:first-of-type{border-top:0}
+.ggk{font-size:0.78125rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px}
+.ggv{font-size:0.90625rem;line-height:1.45;color:var(--ink)}
+.ggcard,.ggmonth{margin-bottom:8px}.ggcard summary,.ggmonth summary{cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;list-style:none}
+.ggcard summary::-webkit-details-marker,.ggmonth summary::-webkit-details-marker{display:none}
+.ggname{font-weight:700;font-size:1rem}.ggcat{font-size:0.8125rem;color:var(--ink3)}
+.ggbody{margin-top:8px}.ggprob{font-size:0.875rem;line-height:1.45;padding:5px 0}.ggprob b{display:block}
+.ggtip{margin-top:8px;background:var(--greenbg);color:var(--greenink);border-radius:12px;padding:8px 10px;font-size:0.875rem;line-height:1.4}
+.ggico{font-size:1.25rem;width:28px;text-align:center;flex:none}.ggtask .btn.small{flex:none}
+.ggsafe{margin:6px 0 0;padding-left:18px}.ggsafe li{margin:3px 0}
 </style>
 </head>
 <body>
@@ -2505,7 +2516,7 @@ html.gfx .spotlight-bar{background:var(--glass);-webkit-backdrop-filter:blur(8px
 <script src="core.js"></script>
 <script src="ical-import.js"></script>
 <script src="reno.js"></script>
-<script src="app.js?v=2.29.22"></script>
+<script src="app.js?v=2.29.23"></script>
 <script>
 setTimeout(function () {
   var v = document.getElementById("view");

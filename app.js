@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.22';
+const APP_VERSION = '2.29.23';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -10387,6 +10387,7 @@ function gardenSwitch(id) {
 function Garden() {
   const back = `<button class="back" onclick="go('#more')">${I('left')} More</button>`;
   return back + header('Gardening', 'Planting, feeding and spraying') +
+    `<div class="list" id="ggentry" style="margin-bottom:12px"><button class="row" onclick="go('#garden/tips')"><span class="ggico" aria-hidden="true">💡</span><div class="tx"><div class="t">Tips &amp; care guide</div><div class="s">This month in Northland, plus citrus, veggies, flowers, shrubs, perennials and trees</div></div>${I('right')}</button><button class="row" onclick="go('#garden/schedule')"><span class="ggico" aria-hidden="true">📅</span><div class="tx"><div class="t">Property schedule</div><div class="s">Spraying, feeding and weed control, month by month</div></div>${I('right')}</button></div>` +
     `<div class="callout green" id="gardennote">${I('info')}<div>Times are for Whangārei. A cold spring or a dry summer can move them by a couple of weeks. Reminders use the app’s existing notifications. Turn a plant off if you don’t grow it.</div></div>` +
     `<div id="gardenlist">${GARDEN_IDS.map(id => {
       const on = gardenGrowing(id);
@@ -10419,9 +10420,115 @@ function GardenDetail(id) {
     `<div class="list" style="margin-bottom:12px"><div class="srow"><div class="tx"><div class="t">I grow this</div><div class="s">${on ? 'Jobs and reminders are on.' : 'Jobs and reminders are hidden.'}</div></div>${gardenSwitch(id)}</div></div>` +
     `<div class="card" style="margin-bottom:4px"><div class="muted notes">${esc(copy.intro)}</div></div>` +
     block('Planting', copy.planting) + block('Feeding', copy.feeding) + block('Care', copy.care) +
+    `<div class="list" style="margin-top:12px"><button class="row" onclick="ggQ='';ggCat='all';ggOpen='${id}';go('#garden/tips')"><span class="ggico" aria-hidden="true">💡</span><div class="tx"><div class="t">Full care guide</div><div class="s">Sun, soil, pruning, problems and fixes</div></div>${I('right')}</button></div>` +
     `<div class="sec">This year’s jobs</div>` +
     (on ? gardenJobRows(id) : '<div class="card muted">Jobs and reminders are hidden while this plant is off.</div>') +
     `<div class="card muted" style="margin-top:12px;font-size:0.84375rem">Reminders use the app’s existing notifications, on the morning of each job. Mark the next one done and it will not notify again until next year.</div>`;
+}
+
+/* ---- 2.29.23: Gardening › Tips & care and Property schedule ----
+   The guide text lives in garden-guide.js (about 60 KB), loaded only when one of these two pages opens.
+   NZ seasons: spring Sep–Nov, summer Dec–Feb, autumn Mar–May, winter Jun–Aug. */
+let ggCat = 'all', ggQ = '', ggOpen = '', ggLoadErr = false;
+const GG_SRC = 'garden-guide.js?v=' + APP_VERSION;
+function ggReady() {
+  if (window.GARDEN_GUIDE) return true;
+  ggLoadErr = false;
+  loadScriptOnce(GG_SRC).then(() => { if (/^#garden\/(tips|schedule)/.test(location.hash)) render(); })
+    .catch(() => { ggLoadErr = true; if (/^#garden\/(tips|schedule)/.test(location.hash)) render(); });
+  return false;
+}
+function ggLoading(back, title) {
+  return back + header(title, 'Gardening') + (ggLoadErr
+    ? `<div class="card muted">The guide couldn’t load. Check you’re online, then <button class="btn small" onclick="render()">Try again</button></div>`
+    : '<div class="card muted">Loading the guide…</div>');
+}
+const ggWarm = () => { try { return feedTooWarm(); } catch (e) { return false; } };
+const ggMonthNow = () => +todayISO().slice(5, 7);
+function ggSeasonCard() {
+  const G = window.GARDEN_GUIDE, m = ggMonthNow(), s = G.SEASONS[m];
+  const row = (h, t) => `<div class="ggrow"><div class="ggk">${h}</div><div class="ggv">${esc(t)}</div></div>`;
+  return `<div class="card ggseason" id="ggseason"><div class="gghead"><span class="pill" style="background:var(--greenbg);color:var(--greenink)">${esc(s.s)}</span><b>${esc(s.w)} in Northland</b></div>` +
+    row('🌱 Plant now', s.plant) + row('✂️ Prune', s.prune) +
+    row('🧺 Feed', s.feed + (ggWarm() ? ' It’s warm right now, so leave feeding and watering for a cool morning or evening.' : '')) +
+    row('🐛 Pest watch', s.watch) + row('📝 Other jobs', s.jobs) + `</div>`;
+}
+function ggHay(p) {
+  const G = window.GARDEN_GUIDE;
+  return (p.n + ' ' + p.a + ' ' + p.c.map(k => (G.CATS.find(c => c[0] === k) || ['', ''])[1]).join(' ') + ' ' + p.probs.map(x => x[0] + ' ' + x[1]).join(' ')).toLowerCase();
+}
+function ggMineOn(p) { try { return !!p.mine && GARDEN_IDS.includes(p.mine) && gardenGrowing(p.mine); } catch (e) { return false; } }
+function ggCard(p, open) {
+  const G = window.GARDEN_GUIDE;
+  const cats = p.c.map(k => (G.CATS.find(c => c[0] === k) || ['', ''])[1]).join(' · ');
+  const row = (h, t) => `<div class="ggrow"><div class="ggk">${h}</div><div class="ggv">${esc(t)}</div></div>`;
+  let act = '';
+  if (p.mine && GARDEN_IDS.includes(p.mine)) act = ggMineOn(p)
+    ? `<button class="btn small" onclick="go('#garden/${p.mine}')">${I('leaf')} My reminders for this</button>`
+    : `<button class="btn small" onclick="toggleGrow('${p.mine}')">＋ Add to my garden (turn on reminders)</button>`;
+  return `<details class="card ggcard" data-plant="${esc(p.n)}"${open ? ' open' : ''}><summary><span class="ggname">${esc(p.n)}${ggMineOn(p) ? ' <span class="pill" style="background:var(--greenbg);color:var(--greenink)">Yours</span>' : ''}</span><span class="ggcat">${esc(cats)}</span></summary>
+    <div class="ggbody">${row('☀️ Sun', p.sun)}${row('🪴 Soil', p.soil)}${row('💧 Water', p.water)}${row('🧺 Feed', p.feed)}${row('✂️ Prune', p.prune)}${row('📅 When to plant', p.plant)}
+    <div class="ggk" style="margin-top:8px">🐛 Problems and fixes</div>${p.probs.map(x => `<div class="ggprob"><b>${esc(x[0])}</b><div>${esc(x[1])}</div></div>`).join('')}
+    <div class="ggtip">💡 ${esc(p.tip)}</div>${act ? `<div style="margin-top:10px">${act}</div>` : ''}</div></details>`;
+}
+function ggList() {
+  const G = window.GARDEN_GUIDE; if (!G) return '';
+  const qs = ggQ.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const list = G.PLANTS.filter(p => (ggCat === 'all' || (ggCat === 'mine' ? ggMineOn(p) : p.c.includes(ggCat))) && (!qs.length || qs.every(w => ggHay(p).includes(w))));
+  if (!list.length) return `<div class="card muted">Nothing matches “${esc(ggQ)}”. Try a plant name or a problem like “yellow leaves” or “aphids”.</div>`;
+  return list.map(p => ggCard(p, (ggOpen && p.mine === ggOpen) || (qs.length && list.length === 1))).join('');
+}
+function ggSetCat(c) { ggCat = c; ggOpen = ''; render(); }
+function GardenTips() {
+  const back = `<button class="back" onclick="go('#garden')">${I('left')} Gardening</button>`;
+  if (!ggReady()) return ggLoading(back, 'Tips & care');
+  const G = window.GARDEN_GUIDE;
+  const mine = G.PLANTS.filter(ggMineOn);
+  const chips = [['all', 'All']].concat(mine.length ? [['mine', 'Your plants']] : []).concat(G.CATS);
+  return back + header('Tips & care', 'What to do this month, and how to look after each plant') +
+    ggSeasonCard() +
+    (mine.length && ggCat === 'all' && !ggQ ? `<div class="sec">Your plants</div><div id="ggmine">${mine.map(p => ggCard(p, ggOpen && p.mine === ggOpen)).join('')}</div><div class="sec">All plant guides</div>` : '<div class="sec">Plant guides</div>') +
+    `<label class="search">${I('search')}<input id="ggq" type="search" placeholder="Search plants or problems, e.g. lemon, aphids" value="${esc(ggQ)}" aria-label="Search plant guides" oninput="ggQ=this.value;ggOpen='';document.getElementById('gglist').innerHTML=ggList()"></label>` +
+    `<div class="chips">${chips.map(([k, l]) => `<button class="chip ${ggCat === k ? 'on' : ''}" onclick="ggSetCat('${k}')">${esc(l)}</button>`).join('')}</div>` +
+    `<div id="gglist">${ggList()}</div>` +
+    `<div class="foot">General advice for Whangārei and Northland (frost-rare, humid). Spray and fertiliser types are generic: always follow the label, and keep Zeus off treated areas until dry.</div>`;
+}
+// Property schedule
+const GG_KIND = { spray: ['🧴', 'Spray'], feed: ['🧺', 'Feed'], weed: ['🌿', 'Weeds'] };
+function ggTodoOpen(title) { return (S.todos || []).some(t => t && !t.done && String(t.title) === title); }
+function ggTaskRow(m, i, add) {
+  const t = window.GARDEN_GUIDE.SCHEDULE[m][i], k = GG_KIND[t[0]] || ['•', ''];
+  const warmFeed = t[0] === 'feed' && ggWarm() && m === ggMonthNow();
+  let btn = '';
+  if (add) btn = ggTodoOpen(t[1]) ? '<span class="pill paid">On your list</span>'
+    : warmFeed ? '<span class="pill none" title="No feeding while it’s above 10°">Too warm now</span>'
+    : `<button class="btn small" onclick="ggAddTodo(${m},${i})">＋ To-do</button>`;
+  return `<div class="row ggtask" data-kind="${t[0]}"><span class="ggico" aria-hidden="true">${k[0]}</span><div class="tx"><div class="t">${esc(t[1])}</div><div class="s">${esc(k[1])} · ${esc(t[2])}</div></div>${btn}</div>`;
+}
+async function ggAddTodo(m, i) {
+  const G = window.GARDEN_GUIDE; if (!G || !G.SCHEDULE[m] || !G.SCHEDULE[m][i]) return;
+  const t = G.SCHEDULE[m][i];
+  if (t[0] === 'feed' && ggWarm() && m === ggMonthNow()) { toast('It’s too warm to feed right now. Try again on a cool morning or evening.'); return; }
+  if (ggTodoOpen(t[1])) { toast('That’s already on your list.'); return; }
+  const now = ggMonthNow(), y = +todayISO().slice(0, 4);
+  const due = m === now ? todayISO() : `${m < now ? y + 1 : y}-${String(m).padStart(2, '0')}-01`;
+  const list = (S.lists || []).includes('Home') ? 'Home' : ((S.lists || [])[0] || 'Home');
+  S.todos.push({ id: uid('todo'), title: t[1], list, due, notes: t[2] + ' · From the Property schedule. Read the label; keep Zeus off until dry.', priority: 'normal', done: false, created: Date.now() });
+  await save(); render(); toast(m === now ? 'Added to your to-do list for today.' : 'Added to your to-do list for ' + MONL[m - 1] + '.');
+}
+function GardenSchedule() {
+  const back = `<button class="back" onclick="go('#garden')">${I('left')} Gardening</button>`;
+  if (!ggReady()) return ggLoading(back, 'Property schedule');
+  const G = window.GARDEN_GUIDE, m = ggMonthNow(), n = m % 12 + 1;
+  const block = mm => `<div class="list">${G.SCHEDULE[mm].map((_, i) => ggTaskRow(mm, i, true)).join('')}</div>`;
+  const later = []; for (let k = 2; k < 12; k++) later.push((m + k - 1) % 12 + 1);
+  return back + header('Property schedule', 'Spraying, feeding and weed control around the property') +
+    `<div class="sec">This month · ${esc(MONL[m - 1])} (${esc(G.SEASONS[m].s.toLowerCase())})</div>` + block(m) +
+    `<div class="sec">Next up · ${esc(MONL[n - 1])} (${esc(G.SEASONS[n].s.toLowerCase())})</div>` + block(n) +
+    `<div class="callout" style="margin-top:14px">${I('info')}<div><b>Safety first</b><ul class="ggsafe">${G.SAFETY.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div></div>` +
+    `<div class="sec">The rest of the year</div>` +
+    later.map(mm => `<details class="card ggmonth"><summary><b>${esc(MONL[mm - 1])}</b> <span class="ggcat">${esc(G.SEASONS[mm].s)} · ${G.SCHEDULE[mm].length} jobs</span></summary><div class="list" style="margin-top:8px">${G.SCHEDULE[mm].map((_, i) => ggTaskRow(mm, i, false)).join('')}</div></details>`).join('') +
+    `<div class="foot">Seasons are New Zealand’s: spring Sep–Nov, summer Dec–Feb, autumn Mar–May, winter Jun–Aug. Product types are generic; always follow the label.</div>`;
 }
 
 
@@ -22164,7 +22271,7 @@ function render() {
   if (r !== 'home' && r !== '') homeEdit = false;
   let page = '';
   try {
-    page = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? moneyTabs('work') + workTabs('comm') + Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
+    page = r === 'car' ? CarDetail(arg) : r === 'driver' ? DriverDetail(arg) : r === 'meals' ? Meals(arg) : r === 'recipe' ? RecipeDetail(arg) : r === 'pet' ? PetDetail(arg) : r === 'commission' ? moneyTabs('work') + workTabs('comm') + Commission(arg) : r === 'loan' ? LoanDetail(arg) : r === 'health' ? Health(arg, h.split('/')[2]) : r === 'garden' ? (arg === 'tips' ? GardenTips() : arg === 'schedule' ? GardenSchedule() : arg ? GardenDetail(arg) : Garden()) : r === 'blogging' ? (arg === 'mine' ? YourPosts() : arg ? BlogPost(arg) : Blogging()) : (map[r] || Home)();
   } catch (e) {
     console.error('Render', e);
     page = renderFallback(r, e);
