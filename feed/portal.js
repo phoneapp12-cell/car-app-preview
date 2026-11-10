@@ -1,5 +1,7 @@
-/* 1.9.124 A short opening portal. Once per browser session, not on scroll or topic changes.
-   Skipped when the phone asks for less motion. The feed keeps loading underneath. */
+/* 1.9.125 Opening portal. Once per browser session, not on scroll or topic changes.
+   The phone's own splash screen finishes before this runs, so they do not play together.
+   Skipped when the phone asks for less motion. The feed keeps loading underneath.
+   Rings stay behind the feed and fade out with the dark overlay. */
 (function (root) {
   const KEY = 'ibPortal';
   function reduced() {
@@ -15,6 +17,7 @@
   } catch (e) { return; }
 
   const doc = root.document;
+  if (doc.getElementById('ibportal')) return;
   doc.documentElement.classList.add('portal-on');
   const el = doc.createElement('div');
   el.id = 'ibportal';
@@ -24,32 +27,42 @@
   el.innerHTML = `<div class="stage">${beams}${sparks}<i class="ring a"></i><i class="ring b"></i><i class="ring c"></i></div>`;
   doc.body.append(el);
 
-  let rose = false, done = false, timer = 0;
+  let rose = false, done = false, timer = 0, hard = 0;
   const cards = () => doc.querySelectorAll('#feed > .card, #feed > .hrow');
+  function kill() {
+    if (el.parentNode) el.remove();
+    doc.documentElement.classList.remove('portal-on');
+    doc.querySelectorAll('.portal-rise').forEach(n => n.classList.remove('portal-rise'));
+  }
   function finish() {
     if (done) return;
     done = true;
     clearTimeout(timer);
+    clearTimeout(hard);
     doc.removeEventListener('pointerdown', finish, true);
-    cards().forEach(n => n.classList.remove('portal-rise'));
     el.classList.add('out');
-    doc.documentElement.classList.remove('portal-on');
-    setTimeout(() => { if (el.parentNode) el.remove(); }, 380);
+    el.addEventListener('animationend', ev => { if (ev.target === el) kill(); });
+    hard = setTimeout(kill, 700);
   }
   doc.addEventListener('pointerdown', finish, true);
   root.ibPortalRise = function () {
     if (done || !el.isConnected) return;
     const list = cards();
-    if (!list.length || list[0].classList.contains('portal-rise')) return;
+    if (!list.length) return;
     const n = Math.min(4, list.length);
+    let stamped = false;
     for (let i = 0; i < n; i++) {
-      list[i].style.setProperty('--rise', (i * 0.12) + 's');
+      if (list[i].classList.contains('portal-rise')) continue;
+      list[i].style.setProperty('--rise', (i * 0.1) + 's');
       list[i].classList.add('portal-rise');
+      stamped = true;
     }
-    if (rose) return;
+    if (!stamped || rose) return;
     rose = true;
     clearTimeout(timer);
-    timer = setTimeout(finish, 1500);
+    timer = setTimeout(finish, 1000);
   };
-  timer = setTimeout(() => { if (!rose) finish(); }, 2200);
+  // No cards yet: keep the portal up until they arrive, then fade with them.
+  // If the feed never comes, take the portal down anyway.
+  hard = setTimeout(() => { if (!done && el.isConnected) finish(); }, 5000);
 })(typeof window !== 'undefined' ? window : globalThis);
