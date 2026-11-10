@@ -178,6 +178,10 @@ html.mf-only #instb,html.mf-only #feed > :not(.card):not(.load):not(.empty):not(
 .mfhd{display:flex;align-items:center;justify-content:space-between;font-size:1.15em;margin-bottom:6px}
 .mfopt{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 14px;border:2px solid transparent;border-radius:14px;background:rgba(127,127,127,.1);color:inherit;font:inherit;font-weight:600;text-align:left;cursor:pointer}
 .mfopt.on{border-color:var(--acc,#7c3aed);background:rgba(124,58,237,.12)}.mfopt i{margin-left:auto;font-style:normal;color:var(--acc,#7c3aed);font-weight:800}.mfe{font-size:1.3em;min-width:2.2em}
+.intsub{display:flex;flex-direction:column;gap:4px;margin:0 0 8px 10px;padding:2px 0 2px 8px;border-left:2px solid var(--line,rgba(127,127,127,.35))}
+.intsub[hidden]{display:none}
+.intlab{margin:8px 4px 0;font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.mfopt.intsw{min-height:44px;padding:6px 12px}
 .mfnote{font-size:.8em;opacity:.7;margin:8px 4px}
 @keyframes rxin{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:none}}
 .bdpic img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}.bdrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
@@ -627,6 +631,8 @@ html.force-light .cdot{box-shadow:0 0 0 2px #fff, inset 0 -6px 8px rgba(0,0,0,.1
 .card.soon{background:linear-gradient(160deg,#4c1d95,#db2777 55%,#f59e0b);color:#fff}
 .soonband{font-size:2rem;letter-spacing:.2em;text-align:center;padding:18px 0}
 .card.soon h3,.card.soon li{color:#fff}
+.soonnames{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}
+.soonnames span{display:inline-block;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.22);color:#fff;font-weight:800}
 </style>
 </head>
 <body>
@@ -646,22 +652,23 @@ html.force-light .cdot{box-shadow:0 0 0 2px #fff, inset 0 -6px 8px rgba(0,0,0,.1
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.121"></script>
-<script src="app.js?v=1.9.121"></script>
-<script src="extras.js?v=1.9.121"></script>
-<script src="jokes.js?v=1.9.121"></script>
-<script src="learn.js?v=1.9.121"></script>
-<script src="common-en.js?v=1.9.121"></script>
-<script src="explain.js?v=1.9.121"></script>
-<script src="effects.js?v=1.9.121"></script>
-<script src="stories.js?v=1.9.121"></script>
-<script src="weekly.js?v=1.9.121"></script>
-<script src="play.js?v=1.9.121"></script>
-<script src="nz.js?v=1.9.121"></script>
-<script src="sights.js?v=1.9.121"></script>
-<script src="read.js?v=1.9.121"></script>
-<script src="cal.js?v=1.9.121"></script>
-<script src="back.js?v=1.9.121"></script>
+<script src="family.js?v=1.9.122"></script>
+<script src="app.js?v=1.9.122"></script>
+<script src="extras.js?v=1.9.122"></script>
+<script src="jokes.js?v=1.9.122"></script>
+<script src="learn.js?v=1.9.122"></script>
+<script src="common-en.js?v=1.9.122"></script>
+<script src="explain.js?v=1.9.122"></script>
+<script src="effects.js?v=1.9.122"></script>
+<script src="stories.js?v=1.9.122"></script>
+<script src="weekly.js?v=1.9.122"></script>
+<script src="play.js?v=1.9.122"></script>
+<script src="nz.js?v=1.9.122"></script>
+<script src="sights.js?v=1.9.122"></script>
+<script src="art3d.js?v=1.9.122"></script>
+<script src="read.js?v=1.9.122"></script>
+<script src="cal.js?v=1.9.122"></script>
+<script src="back.js?v=1.9.122"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —

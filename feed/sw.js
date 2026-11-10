@@ -1,7 +1,7 @@
 /* Info Book – service worker. To ship an update: change VERSION. */
 const CACHE = 'my-feed-';
-const VERSION = '1.9.121';
-const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'family.js?v=' + VERSION, 'extras.js?v=' + VERSION, 'jokes.js?v=' + VERSION, 'learn.js?v=' + VERSION, 'common-en.js?v=' + VERSION, 'explain.js?v=' + VERSION, 'effects.js?v=' + VERSION, 'stories.js?v=' + VERSION, 'weekly.js?v=' + VERSION, 'play.js?v=' + VERSION, 'nz.js?v=' + VERSION, 'read.js?v=' + VERSION, 'sights.js?v=' + VERSION, 'cal.js?v=' + VERSION, 'back.js?v=' + VERSION, 'manifest.webmanifest', 'icons/icon-192.png', 'icons/logo.svg', 'img/xmas.webp', 'img/newyear.webp', 'img/play/banner-match.svg', 'img/play/banner-sitcom.svg', 'img/play/banner-animal.svg', 'img/play/zoomquilt.svg', 'img/play/falling.svg', 'img/play/tetris.svg', 'tetris.html', 'tetris.js', 'img/play/kiwi.svg', 'img/play/tui.svg', 'img/play/pukeko.svg', 'img/play/korora.svg', 'img/play/kea.svg', 'img/play/fantail.svg', 'img/play/ruru.svg', 'img/play/dog.svg'];
+const VERSION = '1.9.122';
+const SHELL = ['./', 'index.html', 'app.js?v=' + VERSION, 'family.js?v=' + VERSION, 'extras.js?v=' + VERSION, 'jokes.js?v=' + VERSION, 'learn.js?v=' + VERSION, 'common-en.js?v=' + VERSION, 'explain.js?v=' + VERSION, 'effects.js?v=' + VERSION, 'stories.js?v=' + VERSION, 'weekly.js?v=' + VERSION, 'play.js?v=' + VERSION, 'nz.js?v=' + VERSION, 'read.js?v=' + VERSION, 'sights.js?v=' + VERSION, 'art3d.js?v=' + VERSION, 'cal.js?v=' + VERSION, 'back.js?v=' + VERSION, 'manifest.webmanifest', 'icons/icon-192.png', 'icons/logo.svg', 'img/xmas.webp', 'img/newyear.webp', 'img/play/banner-match.svg', 'img/play/banner-sitcom.svg', 'img/play/banner-animal.svg', 'img/play/zoomquilt.svg', 'img/play/falling.svg', 'img/play/tetris.svg', 'tetris.html', 'tetris.js', 'img/play/kiwi.svg', 'img/play/tui.svg', 'img/play/pukeko.svg', 'img/play/korora.svg', 'img/play/kea.svg', 'img/play/fantail.svg', 'img/play/ruru.svg', 'img/play/dog.svg'];
 /* 1.9.83 wait-verify: new SW waits (no skipWaiting or clients.claim) — new SW waits until the next open so the page never reloads mid-session */
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE + VERSION).then(c => c.addAll(SHELL))); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith(CACHE) && n !== CACHE + VERSION).map(n => caches.delete(n))))); });
@@ -25,7 +25,7 @@ self.addEventListener('periodicsync', e => {
     if (!saved) return;
     const s = await saved.json();
     const now = Date.now();
-    if (!s.on || !s.lastOpen || now - s.lastOpen < 2 * 86400000 || (s.lastNote && now - s.lastNote < 2 * 86400000) || nzQuiet(now)) return;
+    if (!s.lastOpen || now - s.lastOpen < 2 * 86400000 || (s.lastNote && now - s.lastNote < 2 * 86400000) || nzQuiet(now)) return;
     await self.registration.showNotification('Info Book', { body: 'It has been a couple of days. Come back when you have a minute.', tag: 'comeback', icon: 'icons/icon-192.png' });
     s.lastNote = now;
     await cache.put('/feed/__comeback', new Response(JSON.stringify(s)));
