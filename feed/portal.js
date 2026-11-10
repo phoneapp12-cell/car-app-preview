@@ -1,13 +1,10 @@
-/* 1.9.127 Opening portal. Once per browser session, not on scroll or topic changes.
-   The phone's own splash screen finishes before this runs, so they do not play together.
-   Skipped when the phone asks for less motion.
-   The rise is a Web Animations clip on copies that live outside the feed. A feed
-   refresh used to delete the animating cards, so the rings showed for a second and
-   the real cards then popped in full size. These copies keep travelling. */
+/* 1.9.128 Opening portal. Once per app open, not on scroll or topic changes.
+   Skipped only when the phone asks for less motion (logged with ?portaldebug=1).
+   The rise is a CSS animation on plain copies that sit above the rings. Nothing
+   clips them, and their parents are not transformed, so a phone can paint it.
+   The class is added on a later frame, after the copies have been drawn. */
 (function (root) {
   const KEY = 'ibPortal';
-  const DUR = 1100;
-  const STAGGER = 180;
   function reduced() {
     try { return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; }
   }
@@ -25,7 +22,10 @@
   root.ibPortal = { KEY, reduced };
   root.ibPortalRise = function () {};
   if (!root.document || !root.sessionStorage) return;
-  if (reduced()) return;
+  if (reduced()) {
+    dbg('start', { skip: 'reduced-motion' });
+    return;
+  }
   try {
     if (root.sessionStorage.getItem(KEY) === '1') return;
     root.sessionStorage.setItem(KEY, '1');
@@ -43,13 +43,10 @@
   const layer = doc.createElement('div');
   layer.id = 'ibrise';
   layer.setAttribute('aria-hidden', 'true');
-  (doc.body || doc.documentElement).prepend(el);
-  el.insertAdjacentElement('afterend', layer);
-  dbg('start', { phase: 'portal', mode: (root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) ? 'standalone' : 'browser' });
+  (doc.body || doc.documentElement).append(el, layer);
 
-  let done = false, started = false, riseDone = false, fadeDone = false, tries = 0;
-  let timer = 0, hard = 0, bye = 0;
-  const anims = [];
+  let done = false, started = false, tries = 0;
+  let timer = 0, hard = 0, bye = 0, left = 0;
   const cards = () => doc.querySelectorAll('#feed > .card, #feed > .hrow');
 
   function kill() {
@@ -59,7 +56,6 @@
     clearTimeout(hard);
     clearTimeout(bye);
     doc.removeEventListener('pointerdown', skip, true);
-    anims.forEach(a => { try { a.cancel(); } catch (e) {} });
     if (layer.parentNode) layer.remove();
     if (el.parentNode) el.remove();
     doc.documentElement.classList.remove('portal-on');
@@ -68,33 +64,25 @@
       n.classList.remove('portal-rise');
     });
   }
-  function maybeKill() {
-    if (!done && riseDone && fadeDone) kill();
-  }
-  function finish() {
+  function fade() {
     if (done || el.classList.contains('out')) return;
-    clearTimeout(hard);
     el.classList.add('out');
     dbg('start', { name: 'portalFade' });
     el.addEventListener('animationend', ev => {
       if (ev.target !== el || !el.classList.contains('out')) return;
       if (ev.animationName && ev.animationName !== 'portalFade') return;
       dbg('finish', { name: 'portalFade' });
-      fadeDone = true;
       clearTimeout(bye);
-      maybeKill();
+      kill();
     });
-    bye = setTimeout(() => {
-      if (fadeDone || done) return;
-      dbg('finish', { name: 'portalFade', timeout: true });
-      fadeDone = true;
-      maybeKill();
-    }, 900);
+    bye = setTimeout(kill, 700);
+  }
+  function reveal() {
+    if (done) return;
+    fade();
   }
   function skip() {
     if (done) return;
-    riseDone = true;
-    fadeDone = true;
     kill();
   }
   doc.addEventListener('pointerdown', skip, true);
@@ -103,62 +91,46 @@
     const ring = el.querySelector('.ring.a');
     const b = ring && ring.getBoundingClientRect();
     if (b && b.width > 20 && b.height > 8) return b;
-    const w = root.innerWidth || 360, h = root.innerHeight || 700;
-    return { left: w * 0.08, width: w * 0.84, top: h * 0.62, height: Math.max(36, h * 0.1) };
+    const w = root.innerWidth || 390, h = root.innerHeight || 800;
+    return { left: w * 0.08, width: w * 0.84, top: h * 0.62, height: Math.max(40, h * 0.12) };
   }
   function begin(list) {
     const ring = ringBox();
-    const ringCx = ring.left + ring.width / 2;
-    const ringCy = ring.top + ring.height * 0.5;
-    let pending = 0;
+    const ringCy = ring.top + ring.height / 2;
+    const ghosts = [];
     list.forEach((card, i) => {
       if (!card.isConnected) return;
       const end = card.getBoundingClientRect();
-      if (end.width < 20 || end.height < 20) return;
+      const viewH = root.innerHeight || 800;
+      const w = end.width > 40 ? end.width : Math.max(160, (root.innerWidth || 390) - 24);
+      // A face of the card, not the whole article. A very tall card would sit
+      // on the ring already and would not look like it was rising out of it.
+      const h = Math.min(Math.max(end.height || 0, 260), Math.round(viewH * 0.5));
+      const left = end.width > 40 ? end.left : 12;
+      const top = end.top > 0 && end.top < viewH ? end.top : (92 + i * 12);
+      const dy = Math.round(ringCy - (top + h / 2));
       const ghost = card.cloneNode(true);
       ghost.removeAttribute('id');
       ghost.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
       ghost.querySelectorAll('iframe, video, audio').forEach(node => node.remove());
       ghost.classList.add('ib-ghost');
-      ghost.style.animation = 'none';
-      ghost.style.visibility = 'visible';
       ghost.style.position = 'fixed';
       ghost.style.boxSizing = 'border-box';
-      ghost.style.left = end.left + 'px';
-      ghost.style.top = end.top + 'px';
-      ghost.style.width = end.width + 'px';
-      ghost.style.height = end.height + 'px';
+      ghost.style.left = left + 'px';
+      ghost.style.top = top + 'px';
+      ghost.style.width = w + 'px';
+      ghost.style.height = h + 'px';
       ghost.style.margin = '0';
-      ghost.style.zIndex = String(12 - i);
-      ghost.style.transformOrigin = '50% 50%';
-      ghost.style.pointerEvents = 'none';
+      ghost.style.zIndex = '100';
+      ghost.style.visibility = 'visible';
+      ghost.style.setProperty('--dy', dy + 'px');
+      ghost.style.setProperty('--rise', (i * 0.3) + 's');
+      ghost.style.transform = 'translateY(' + dy + 'px) scale(0.4)';
+      ghost.style.opacity = '0.6';
       layer.appendChild(ghost);
-      const dx = Math.round(ringCx - (end.left + end.width / 2));
-      const dy = Math.round(ringCy - (end.top + end.height / 2));
-      let anim;
-      try {
-        anim = ghost.animate([
-          { transform: 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(0.3)', opacity: 0.48, clipPath: 'ellipse(44% 38% at 50% 60%)', offset: 0 },
-          { transform: 'translate3d(' + Math.round(dx * 0.72) + 'px,' + Math.round(dy * 0.72) + 'px,0) scale(0.42)', opacity: 0.62, clipPath: 'ellipse(52% 46% at 50% 58%)', offset: 0.38 },
-          { transform: 'translate3d(' + Math.round(dx * 0.28) + 'px,' + Math.round(dy * 0.28) + 'px,0) scale(0.78)', opacity: 0.9, clipPath: 'ellipse(100% 96% at 50% 52%)', offset: 0.72 },
-          { transform: 'translate3d(0px,0px,0) scale(1)', opacity: 1, clipPath: 'ellipse(150% 150% at 50% 50%)', offset: 1 }
-        ], { duration: DUR, delay: i * STAGGER, easing: 'linear', fill: 'both' });
-      } catch (err) { return; }
-      anims.push(anim);
-      pending++;
-      dbg('start', { card: i, dur: DUR, delay: i * STAGGER, dx: dx, dy: dy });
-      let closed = false;
-      const ended = why => {
-        if (closed) return;
-        closed = true;
-        dbg('finish', { card: i, why: why });
-        pending--;
-        if (pending <= 0) { riseDone = true; maybeKill(); }
-      };
-      anim.addEventListener('finish', () => ended('finish'));
-      anim.addEventListener('cancel', () => ended('cancel'));
+      ghosts.push(ghost);
     });
-    if (!anims.length) {
+    if (!ghosts.length) {
       started = false;
       if (tries++ < 8 && !done) {
         if (typeof requestAnimationFrame === 'function') requestAnimationFrame(stamp);
@@ -166,7 +138,27 @@
       }
       return;
     }
-    timer = setTimeout(finish, 780);
+    const arm = () => {
+      if (done) return;
+      clearTimeout(hard);
+      left = ghosts.length;
+      ghosts.forEach((ghost, i) => {
+        if (!ghost.isConnected) { left--; return; }
+        ghost.classList.add('ib-go');
+        dbg('start', { card: i, animation: 'ibRise', delay: (i * 0.3) + 's' });
+        ghost.addEventListener('animationend', ev => {
+          if (ev.target !== ghost) return;
+          if (ev.animationName && ev.animationName !== 'ibRise') return;
+          dbg('finish', { card: i, animation: 'ibRise' });
+          left--;
+          if (left <= 0) reveal();
+        });
+      });
+      if (left <= 0) { reveal(); return; }
+      timer = setTimeout(reveal, 2100);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(arm));
+    else setTimeout(arm, 32);
   }
   function stamp() {
     if (done || started || !el.isConnected) return;
@@ -180,8 +172,8 @@
       if (!use.length) { started = false; return; }
       begin(use);
     };
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(go));
-    else setTimeout(go, 32);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(go);
+    else go();
   }
   root.ibPortalRise = stamp;
   const feed = doc.getElementById('feed');
@@ -191,5 +183,5 @@
     setTimeout(() => mo.disconnect(), 6000);
   }
   stamp();
-  hard = setTimeout(() => { if (!done && el.isConnected) kill(); }, 5000);
+  hard = setTimeout(() => { if (!done && el.isConnected) kill(); }, 6000);
 })(typeof window !== 'undefined' ? window : globalThis);
