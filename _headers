@@ -1,7 +1,0 @@
-# Revalidate the Info Book shell so a phone cannot keep a cached portal.js
-/feed/sw.js
-  Cache-Control: no-cache
-/feed/index.html
-  Cache-Control: no-cache
-/feed/*.js
-  Cache-Control: no-cache

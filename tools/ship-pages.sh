@@ -24,6 +24,12 @@ cat > "$out/_headers" <<'H'
   Cache-Control: no-cache
 /
   Cache-Control: no-cache
+/feed/sw.js
+  Cache-Control: no-cache
+/feed/index.html
+  Cache-Control: no-cache
+/feed/*.js
+  Cache-Control: no-cache
 H
 (cd relay && npx wrangler pages deploy "$out" --project-name shane-my-app --branch main --commit-dirty=true --commit-message "$(git log -1 --format=%h)") 2>&1 | grep -E "Success|Deployment complete|https://|rror" || true
 rm -rf "$out"
