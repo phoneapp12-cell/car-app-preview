@@ -2,7 +2,7 @@
 'use strict';
 const { DAY, MONL, WDL, todayT, todayISO, parseD, isoT, daysLeft, addDays, addMonths, fmt, fmtY, fmtW, fmtLong, fmtTime,
   money, holidaysBetween, nzHolidays, REPEATS, nextDue, billDates, nextBday, bdayAge, bdayDates, ordinal, repeatDates, REPEAT_LABEL, repeatText, PET_CARE, careDue, careNextAfter, careEvery, dueItems, status, kvGet, kvSet, runCheck, GARDEN_IDS, gardenJobs } = DD;
-const APP_VERSION = '2.29.23';
+const APP_VERSION = '2.29.24';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -23227,7 +23227,7 @@ function renoSetting() { const on = renoOn(); return `<div class="list" id="reno
 async function renoShare() { try { if (navigator.share) { await navigator.share({ title: 'Millesha’s Renovation', text: 'Our renovation checklist – tick jobs off as you go:', url: RENO_LINK }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(RENO_LINK); toast('Link copied. Send it to Millesha.'); } catch (e) { prompt('Copy this link for Millesha', RENO_LINK); } }
 function RenoPage() {
   let body = ''; try { body = window.Reno ? Reno.html() : '<div class="card empty"><div class="t">Loading…</div></div>'; } catch (e) { body = ''; }
-  return `<button class="back" onclick="go('#projects')">${I('left')} Projects</button>` + header('Millesha’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, flooring') +
+  return `<button class="back" onclick="go('#projects')">${I('left')} Projects</button>` + header('Millesha’s Renovation', 'Room by room: clean, mop ceiling, speckle, sand, paint ceiling, paint walls, doors, flooring') +
     `<button type="button" class="row card" style="margin-bottom:12px" onclick="renoShare()"><div class="tx"><div class="t">Share with Millesha</div><div class="s">Her own page with just this checklist. Nothing else from My App.</div></div>${I('right')}</button>` + body;
 }
 try { if (window.Reno) Reno.init({ key: RENO_KEY, me: 'Shane', onChange: () => { if ((location.hash || '').slice(1) === 'reno') render(); } }); } catch (e) { }

@@ -1,4 +1,5 @@
-/* Job list v2 (2.26.29 / 2.28.70): jobs are defined here only; saved entries for removed jobs (out-prep, out-paint) are simply ignored, so nobody's other ticks are touched.
+/* Job list v2 (2.26.29 / 2.28.70 / 2.29.24): jobs are defined here only; saved entries for removed jobs (out-prep, out-paint) are simply ignored, so nobody's other ticks are touched.
+   2.29.24: Doors added to every inside room, listed before Flooring. Existing job ids are unchanged.
    2.26.25: Millesha's Renovation – shared by My App (#reno) and Millesha's own page (millesha.html).
    2.28.70: Daily 8:30 pm NZT countdown notification & SMS text reminder for every person that has the app.
    Only this job list travels, through the relay's /reno route with its own key. Nothing else from My App is shared. */
@@ -7,7 +8,7 @@ function makeReno(cfg) { // 2.26.36: one engine for every renovation list (Mille
   const RELAY = 'https://due-dates-calendar-relay.phoneapp12.workers.dev/reno';
   const VAPID_PUBLIC = 'BEsNn0TcOiNQqSE7AbDFgYGL_v45EEm-mma2_6DtecoG5c7ZvwZ7lKpAXOQry7cqfvWM0JTjtPPdK93arc0VXMU';
   const INSIDE = [['main', 'Main bedroom', '🛏️', 'carpet'], ['spare', 'Spare bedroom', '🛋️', 'carpet'], ['bath', 'Bathroom', '🛁', 'tiles'], ['hall', 'Hallway', '🚪', 'carpet'], ['lounge', 'Lounge', '📺', 'carpet'], ['dining', 'Dining', '🍽️', 'carpet'], ['kitchen', 'Kitchen', '🍳', 'tiles'], ['pantry', 'Pantry', '🥫', 'tiles'], ['laundry', 'Laundry', '🧺', 'tiles']];
-  let AREAS = cfg.areas ? cfg.areas() : INSIDE.map(([k, n, e, f]) => ({ k, n, e, floorDef: f, jobs: [['clean', 'Clean'], ['mop', 'Mop ceiling'], ['speckle', 'Apply speckle (filler)'], ['sand', 'Sand'], ['ceiling', 'Paint ceiling (roof)'], ['walls', 'Paint walls'], ['floor', 'Flooring']] }))
+  let AREAS = cfg.areas ? cfg.areas() : INSIDE.map(([k, n, e, f]) => ({ k, n, e, floorDef: f, jobs: [['clean', 'Clean'], ['mop', 'Mop ceiling'], ['speckle', 'Apply speckle (filler)'], ['sand', 'Sand'], ['ceiling', 'Paint ceiling (roof)'], ['walls', 'Paint walls'], ['doors', 'Doors'], ['floor', 'Flooring']] }))
     .concat([{ k: 'out', n: 'Outside', e: '🏡', jobs: [['wash', 'House wash (walls, windows, soffits)'], ['gutters', 'Clear gutters and downpipes'], ['decks', 'Clean decks and paths'], ['metal', 'Metal man (scrap metal pickup)'], ['dump', 'Dump runs']] },
     { k: 'final', n: 'Final stage', e: '✨', final: true, jobs: [['clean', 'Final clean-up'], ['switches', 'Check light switches (make sure they are all working)'], ['lawns', 'Final lawns'], ['weed', 'Weed eating']] }]);
   const ST = { todo: 'To do', doing: 'In progress', done: 'Done' };

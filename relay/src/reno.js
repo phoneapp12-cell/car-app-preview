@@ -2,7 +2,8 @@
    hash of its own key (separate from every other shared list, so it never exposes other My App data). Each entry merges on
    its own `updated` time (newest wins). Writes only when something actually changed.
    2.28.70: Daily 8:30 pm NZT countdown notification/reminder sent to every person/phone that has the app (millesha.html, My App, Sarah's To-do)
-   stating how many days until the project needs to be finished. */
+   stating how many days until the project needs to be finished.
+   2.29.24: Main job count is 77 after adding Doors to each inside room (before Flooring). */
 import { sendPush, cleanSub, b64u, loadSubs } from './push.js';
 import { SUN_KEY } from './sunshine.js';
 import { SHOP_KEY } from './shop-notify.js';
@@ -13,7 +14,7 @@ const RENO_SUBS_KEY = 'reno-subs-v1';
 const RENO_REM_STATE_KEY = 'reno-remind-state-v1';
 const DEFAULT_RENO_KEY = '3im0XgV50Be1sR1NgqrHDMIjKltsOJcmG9g8Gj57';
 const DEFAULT_DEADLINE = '2026-11-22';
-const TOTAL_MAIN_JOBS = 68; // 9 inside rooms * 7 + 5 outside jobs
+export const TOTAL_MAIN_JOBS = 77; // 9 inside rooms * 8 (incl. doors) + 5 outside jobs
 
 const str = (v, n) => String(v == null ? '' : v).slice(0, n);
 const enc = new TextEncoder();
