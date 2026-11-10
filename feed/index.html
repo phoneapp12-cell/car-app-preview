@@ -455,11 +455,12 @@ html.nosnap{scroll-snap-type:none}
 .stbars{display:flex;gap:4px;padding:10px 12px 0;position:absolute;top:0;left:0;right:0;z-index:3}
 .stbars i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.28)}
 .stbars i.done,.stbars i.on{background:#fff}
-.stbars i.on{animation:stbar 6s linear both}
+.stbars i.on{animation:none;background:#fff}
 @keyframes stbar{from{transform:scaleX(.05);transform-origin:left}to{transform:scaleX(1);transform-origin:left}}
 @media (prefers-reduced-motion:reduce){.stbars i.on{animation:none;background:#fff}}
 .stx{position:absolute;top:22px;right:12px;z-index:4;width:36px;height:36px;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:18px;cursor:pointer}
-.sttap{position:absolute;top:50px;bottom:120px;width:40%;z-index:2}
+.sttap{position:absolute;top:50px;bottom:120px;width:30%;z-index:4}
+.stmedia{z-index:1}
 .stprev{left:0}.stnext{right:0}
 .stmedia{flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:0}
 .stmedia img{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;background:#000}
@@ -567,7 +568,8 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 #feed > .card > .media.vid{flex:0 0 auto;width:100%!important;max-width:100%!important;margin:0!important;aspect-ratio:16/9;max-height:calc(100svh - var(--hdr, 96px) - 132px);background:#000}
 #feed > .card > .media.vid.tall{width:min(100%, calc((100svh - var(--hdr, 96px) - 132px) * 9 / 16))!important;max-width:100%;aspect-ratio:9/16;max-height:calc(100svh - var(--hdr, 96px) - 132px);margin-left:auto!important;margin-right:auto!important}
 #feed > .card > .media.vid .vthumb,#feed > .card > .media.vid video,#feed > .card > .media.vid iframe{object-fit:contain!important;background:#000;width:100%;height:100%}
-.media.vid.armed .vthumb,.media.vid.playing .vthumb,.media.vid.armed .play,.media.vid.playing .play{opacity:0;pointer-events:none}
+.media.vid.playing .vthumb,.media.vid.playing .play{opacity:0;pointer-events:none}
+.stmedia > .play{inset:auto;left:50%;top:46%;transform:translate(-50%,-50%);width:68px;height:68px;z-index:5;border:0;padding:0;background:transparent}
 .media.vid .snd,.media.vid .fsb{opacity:0;pointer-events:none}
 .media.vid.showbar .snd,.media.vid.showbar .fsb,.media.vid:focus-within .snd,.media.vid:focus-within .fsb{opacity:1;pointer-events:auto}
 .stmedia.stv.land iframe,.stmedia.stv.land video{width:100%!important;height:auto!important;aspect-ratio:16/9;max-height:70vh!important;object-fit:contain}
@@ -608,20 +610,20 @@ html.th-candy .card{border-color:#ffc2e5;box-shadow:0 2px 0 #ffb3dc,0 8px 20px r
 <main id="feed"><div class="sk"></div><div class="sk"></div></main>
 <div class="sheet" id="sheet"><div class="in" id="sheetin"></div></div>
 <div class="toast" id="toast"></div>
-<script src="family.js?v=1.9.116"></script>
-<script src="app.js?v=1.9.116"></script>
-<script src="extras.js?v=1.9.116"></script>
-<script src="jokes.js?v=1.9.116"></script>
-<script src="learn.js?v=1.9.116"></script>
-<script src="common-en.js?v=1.9.116"></script>
-<script src="explain.js?v=1.9.116"></script>
-<script src="effects.js?v=1.9.116"></script>
-<script src="stories.js?v=1.9.116"></script>
-<script src="weekly.js?v=1.9.116"></script>
-<script src="play.js?v=1.9.116"></script>
-<script src="nz.js?v=1.9.116"></script>
-<script src="sights.js?v=1.9.116"></script>
-<script src="read.js?v=1.9.116"></script>
+<script src="family.js?v=1.9.117"></script>
+<script src="app.js?v=1.9.117"></script>
+<script src="extras.js?v=1.9.117"></script>
+<script src="jokes.js?v=1.9.117"></script>
+<script src="learn.js?v=1.9.117"></script>
+<script src="common-en.js?v=1.9.117"></script>
+<script src="explain.js?v=1.9.117"></script>
+<script src="effects.js?v=1.9.117"></script>
+<script src="stories.js?v=1.9.117"></script>
+<script src="weekly.js?v=1.9.117"></script>
+<script src="play.js?v=1.9.117"></script>
+<script src="nz.js?v=1.9.117"></script>
+<script src="sights.js?v=1.9.117"></script>
+<script src="read.js?v=1.9.117"></script>
 <script>
 /* 1.9.82 self-heal: if the feed is still skeletons after 9s (crash/stale cache), offer a manual reload.
    Auto-reload only on a real JS error, at most once per 10 minutes (localStorage). No controllerchange reload —
