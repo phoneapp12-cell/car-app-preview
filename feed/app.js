@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.118';
+const APP_VERSION = '1.9.119';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1323,7 +1323,8 @@ function mfDrawer(open) {
   }
   // 1.9.82 Browse: Family, For [name], topics (replaces top chip bar)
   const browse = topicList().filter(t => t[0] !== 'all');
-  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button><button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · coming soon</span></button>` + browse.map(t =>
+  const backOn = !!ls.get('comeBack', 0);
+  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button><button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · coming soon</span></button><button type="button" class="mfopt${backOn ? ' on' : ''}" data-comeback="1" role="switch" aria-checked="${backOn}"><span class="mfe">🔔</span><span>Come-back reminders</span>${backOn ? '<i>✓</i>' : ''}</button>` + browse.map(t =>
     `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
   ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;
   extra.innerHTML = br + x;
