@@ -54,6 +54,10 @@ if (push) return push;
 
 The cron stays `*/10`. A run does nothing during 9pm–8am New Zealand time, skips phones opened in the last two days, and sends at most 20 notes per run. Each phone is stored with `lastSent`, so it still gets at most one note every two days.
 
+## Always on
+
+Info Book does not have an off switch for these notes. When someone opens the app, it asks for notification permission. The browser requires that prompt, so it cannot be skipped. If they allow it, the phone subscribes to `POST /push/subscribe` on its own. This module then sends to every stored subscription. A stored `on: false` value does not stop a note. It still needs `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` before any send. Do not deploy this folder by itself.
+
 ## Rollback
 
 Remove the `runComeback` call and the two secrets, or redeploy the previous worker script from the Cloudflare dashboard. Subscriptions left in KV are unused until the call is restored.

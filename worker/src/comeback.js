@@ -13,6 +13,7 @@ export function nzHour(ms) {
 }
 export function quiet(ms) { const h = nzHour(ms); return h >= 21 || h < 8; }
 export function shouldPing(row, now) {
+  // Always on once a phone has subscribed. An off flag is not consulted.
   if (!row || !row.sub) return false;
   const lastOpen = row.lastOpen || 0, lastSent = row.lastSent || 0;
   if (!lastOpen || now - lastOpen < TWO) return false;

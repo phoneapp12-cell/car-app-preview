@@ -12,6 +12,7 @@ test('a note waits two days and stays quiet overnight', () => {
   assert.equal(quiet(night), true);
   const sub = { endpoint: 'https://push.example/1' };
   assert.equal(shouldPing({ sub, lastOpen: morning - 3 * TWO, lastSent: 0 }, morning), true);
+  assert.equal(shouldPing({ sub, lastOpen: morning - 3 * TWO, lastSent: 0, on: false }, morning), true);
   assert.equal(shouldPing({ sub, lastOpen: morning - TWO / 2, lastSent: 0 }, morning), false);
   assert.equal(shouldPing({ sub, lastOpen: morning - 3 * TWO, lastSent: morning - TWO / 2 }, morning), false);
   assert.equal(shouldPing({ sub, lastOpen: night - 3 * TWO, lastSent: 0 }, night), false);
