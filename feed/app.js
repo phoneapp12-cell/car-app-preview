@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.119';
+const APP_VERSION = '1.9.120';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1386,7 +1386,7 @@ function carouselize(order) {
 }
 function rowCard(row) {
   return `<section class="hrow" data-row="${esc(row.k)}" aria-label="${esc(row.title)}"><div class="hrhd"><h2>${esc(row.title)}</h2><span class="hrhint" aria-hidden="true">Swipe ›</span></div>
-  <div class="hscroll">${row.items.map(i => card(i)).join('')}</div>
+  <div class="hscroll">${row.items.map(i => window.card(i)).join('')}</div>
   <div class="hdots" aria-hidden="true">${row.items.map((_, n) => `<i${n ? '' : ' class="on"'}></i>`).join('')}</div></section>`;
 }
 const cardRow = window.card;

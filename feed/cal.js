@@ -82,17 +82,31 @@
       const [date, time] = i.film.next.split('T');
       return { title: i.film.title, date, time, note: 'Event Cinemas Whangārei, 18 James Street. ' + (i.film.rating || ''), url: i.film.sessions || i.film.link || '', remind: 'h1' };
     }
-    if (i.x === 'watch' && i.w && typeof i.w.ev === 'number' && !/^(Stan|Neon)$/i.test(i.w.plat || '') && !/neon|stan\.(com|news)/i.test(i.w.url || '')) return fromMs(i.w.ev, i.w.t, 'On ' + (i.w.plat || 'NZ TV'), i.w.url);
+    if (i.x === 'watch' && i.w && !/^(Stan|Neon)$/i.test(i.w.plat || '') && !/neon|stan\.(com|news)/i.test(i.w.url || '')) {
+      const w = i.w;
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(w.day || '') ? w.day : (typeof w.ev === 'number' ? nzParts(w.ev).date : '');
+      let time = '';
+      if (typeof w.ev === 'number') { const clock = nzParts(w.ev).time; if (clock !== '12:00') time = clock; }
+      return { title: w.t, date: day, time, note: 'On ' + (w.plat || 'NZ TV'), url: w.url || '', remind: 'm15', tv: 1 };
+    }
     if (i.x === 'concert' && i.c && typeof i.c.ev === 'number') return fromMs(i.c.ev, i.c.t, (i.c.venue || 'Auckland') + ', Auckland', i.c.url);
-    if (i.kind === 'tv' && typeof i.ev === 'number' && (NZ_TV.has(i.src) || NZ_HOST.test(hostOf(i.url || '')))) return fromMs(i.ev, i.t, i.where ? 'On ' + i.where : '', i.url);
+    if (i.kind === 'tv' && (NZ_TV.has(i.src) || NZ_HOST.test(hostOf(i.url || '')))) {
+      if (typeof i.ev !== 'number') return { title: i.t, date: '', time: '', note: i.where ? 'On ' + i.where : '', url: i.url || '', remind: 'm15', tv: 1 };
+      const p = fromMs(i.ev, i.t, i.where ? 'On ' + i.where : '', i.url);
+      return p && { ...p, tv: 1 };
+    }
     if (i.kind === 'event' && typeof i.ev === 'number') return fromMs(i.ev, i.t, i.s || '', i.url);
     return null;
   }
+  function packOf(p) {
+    return encodeURIComponent(JSON.stringify({ title: p.title, date: p.date || '', time: p.time || '', note: p.note || '', url: p.url || '', remind: p.remind || 'm15', tv: p.tv ? 1 : 0 }));
+  }
   function btn(raw) {
-    const p = raw && raw.title ? raw : prefill(raw);
-    if (!p || !p.date) return '';
-    const pack = encodeURIComponent(JSON.stringify({ title: p.title, date: p.date, time: p.time || '', note: p.note || '', url: p.url || '', remind: p.remind || 'm15' }));
-    return `<button type="button" class="btn" data-caladd="${pack}">Add to calendar</button>`;
+    const p = raw && raw.title && raw.date !== undefined && !raw.kind && !raw.x ? raw : prefill(raw);
+    if (!p || (!p.date && !p.tv)) return '';
+    const pack = packOf(p);
+    const label = p.tv ? 'Add reminder' : 'Add to calendar';
+    return `<button type="button" class="btn" data-caladd="${pack}">${label}</button>`;
   }
 
   root.ibCal = { load, upsert, remove, due, markFired, ics, prefill, aucklandMs, nzParts, fireMs };
@@ -176,7 +190,35 @@
     const del = t.closest('[data-caldel]'); if (del) { remove(del.dataset.caldel); draw(); return; }
     const icsBtn = t.closest('[data-calics]'); if (icsBtn) { const item = load().find(x => x.id === icsBtn.dataset.calics); if (item) download(item); return; }
     if (t.closest('[data-calback]')) { edit = null; draw(); return; }
-    const add = t.closest('[data-caladd]'); if (add) { try { open(JSON.parse(decodeURIComponent(add.dataset.caladd))); } catch (err) {} return; }
+    const add = t.closest('[data-caladd]'); if (add) { try { const p = JSON.parse(decodeURIComponent(add.dataset.caladd)); if (p.tv) showReminder(p); else open(p); } catch (err) {} return; }
+  });
+  function showReminder(p) {
+    const sheet = root.document.getElementById('sheet'), box = root.document.getElementById('sheetin');
+    if (!sheet || !box) { open(p); return; }
+    const when = p.time ? esc(p.date) + ' · ' + esc(p.time) : (p.date ? esc(p.date) + ' · no air time was listed, so you can add one' : 'No date or time was listed. Add them yourself.');
+    box.innerHTML = `<h2>Add reminder</h2><p><b>${esc(p.title || '')}</b></p><p>${when}</p><p class="calnote">${esc(p.note || '')}</p>
+      <form class="calform" data-tvform>
+        ${p.date ? `<input type="hidden" name="date" value="${esc(p.date)}">` : '<label>Date<input name="date" type="date" required></label>'}
+        <label>Time<input name="time" type="time" value="${esc(p.time || '')}"></label>
+        <label>Remind me<select name="remind">
+          ${[['at', 'At the time'], ['m15', '15 minutes before'], ['h1', '1 hour before'], ['d1', '1 day before'], ['none', 'Save without a reminder']].map(([k, lab]) => `<option value="${k}"${(p.remind || 'm15') === k ? ' selected' : ''}>${lab}</option>`).join('')}
+        </select></label>
+        <input type="hidden" name="title" value="${esc(p.title || '')}">
+        <input type="hidden" name="note" value="${esc(p.note || '')}">
+        <input type="hidden" name="url" value="${esc(p.url || '')}">
+        <div class="xbtns"><button class="btn pri" type="submit">Save reminder</button><button class="btn" type="button" data-close>Close</button></div>
+      </form>`;
+    sheet.classList.add('on');
+  }
+  root.document.addEventListener('submit', e => {
+    const tv = e.target && e.target.matches && e.target.matches('[data-tvform]');
+    if (!tv) return;
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const saved = upsert(data);
+    const sheet = root.document.getElementById('sheet'); if (sheet) sheet.classList.remove('on');
+    if (saved && saved.remind !== 'none') askNotify();
+    if (root.toast) root.toast(saved ? 'Reminder saved' : 'Add a title and a date first');
   });
   root.document.addEventListener('submit', e => {
     const f = e.target; if (!f || !f.matches || !f.matches('[data-calform]')) return;
