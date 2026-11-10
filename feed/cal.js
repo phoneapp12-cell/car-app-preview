@@ -17,14 +17,31 @@
   function aucklandMs(date, time) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return NaN;
     const clock = /^\d{2}:\d{2}$/.test(time || '') ? time : '09:00';
-    const guess = Date.parse(date + 'T' + clock + ':00Z');
-    if (!isFinite(guess)) return NaN;
-    const got = nzParts(guess);
-    const seen = Date.parse(got.date + 'T' + got.time + ':00Z');
-    const want = Date.parse(date + 'T' + clock + ':00Z');
-    return guess - (seen - want);
+    // NZ is UTC+13 in daylight time and UTC+12 in standard time. Try both and keep the one that displays as this clock.
+    for (const off of ['+13:00', '+12:00']) {
+      const ms = Date.parse(date + 'T' + clock + ':00' + off);
+      if (!isFinite(ms)) continue;
+      const got = nzParts(ms);
+      if (got.date === date && got.time === clock) return ms;
+    }
+    return NaN;
   }
-  function load() { try { return (typeof ls !== 'undefined' && ls.get(KEY, [])) || []; } catch (e) { return []; } }
+  function load() {
+    let list = [];
+    try { list = (typeof ls !== 'undefined' && ls.get(KEY, [])) || []; } catch (e) { list = []; }
+    let changed = false;
+    const next = list.map(e => {
+      if (!e || !['tv', 'movie', 'event'].includes(e.kind)) return e;
+      if (typeof e.at === 'number' && isFinite(e.at)) return e;
+      if (!e.date || !e.time) return e;
+      const at = aucklandMs(e.date, e.time);
+      if (!isFinite(at)) return e;
+      changed = true;
+      return { ...e, at };
+    });
+    if (changed) save(next);
+    return changed ? next : list;
+  }
   function save(list) { try { if (typeof ls !== 'undefined') ls.set(KEY, list); } catch (e) {} }
   function clean(e) {
     const title = String(e.title || '').trim().slice(0, 120);
@@ -34,7 +51,12 @@
     const remind = REMIND[e.remind] == null && e.remind !== 'none' ? 'none' : (e.remind || 'none');
     const kind = ['tv', 'movie', 'event', 'own'].includes(e.kind) ? e.kind : 'own';
     if (!title || !date) return null;
-    return { id: e.id || ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), title, date, time, note, remind, kind, url: String(e.url || '').slice(0, 400), fired: e.fired || '' };
+    let at = typeof e.at === 'number' && isFinite(e.at) ? e.at : NaN;
+    if (time) {
+      const wall = isFinite(at) ? nzParts(at) : { date: '', time: '' };
+      if (!isFinite(at) || wall.date !== date || wall.time !== time) at = aucklandMs(date, time);
+    }
+    return { id: e.id || ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), title, date, time, note, remind, kind, url: String(e.url || '').slice(0, 400), fired: e.fired || '', at: isFinite(at) ? at : undefined };
   }
   function upsert(raw) {
     const e = clean(raw); if (!e) return null;
@@ -42,15 +64,19 @@
     list.push(e); save(list); return e;
   }
   function remove(id) { save(load().filter(x => x.id !== id)); }
+  function startMs(e) {
+    if (e && typeof e.at === 'number' && isFinite(e.at)) return e.at;
+    return aucklandMs(e && e.date, e && e.time);
+  }
   function fireMs(e) {
-    const start = aucklandMs(e.date, e.time);
+    const start = startMs(e);
     if (!isFinite(start) || REMIND[e.remind] == null) return NaN;
     return start - REMIND[e.remind];
   }
   function due(now) {
     return load().filter(e => {
       const f = fireMs(e); if (!isFinite(f)) return false;
-      const end = aucklandMs(e.date, e.time) + 2 * 3600000;
+      const end = startMs(e) + 2 * 3600000;
       return now >= f && now <= end && e.fired !== String(f);
     });
   }
@@ -58,13 +84,17 @@
     const list = load(); const e = list.find(x => x.id === id); if (!e) return;
     e.fired = String(fireMs(e)); save(list);
   }
-  function icsStamp(date, time) { return date.replace(/-/g, '') + 'T' + (time || '0900').replace(':', '') + '00'; }
+  function icsUtc(ms) {
+    const d = new Date(ms), p = n => String(n).padStart(2, '0');
+    return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + 'T' + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + 'Z';
+  }
   function ics(e) {
-    const clock = e.time || '09:00';
+    const start = startMs(e.time ? e : { ...e, time: e.time || '09:00' });
     const trigger = e.remind === 'm15' ? '-PT15M' : e.remind === 'h1' ? '-PT1H' : e.remind === 'd1' ? '-P1D' : e.remind === 'at' ? '-PT0M' : '';
     const text = s => String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, '\\$&');
     const alarm = trigger ? 'BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:' + text(e.title) + '\r\nTRIGGER:' + trigger + '\r\nEND:VALARM\r\n' : '';
-    return 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Info Book//Calendar//EN\r\nBEGIN:VEVENT\r\nUID:' + e.id + '@infobook\r\nDTSTART;TZID=Pacific/Auckland:' + icsStamp(e.date, clock) + '\r\nSUMMARY:' + text(e.title) + '\r\nDESCRIPTION:' + text(e.note) + '\r\n' + alarm + 'END:VEVENT\r\nEND:VCALENDAR\r\n';
+    const when = isFinite(start) ? 'DTSTART:' + icsUtc(start) + '\r\n' : '';
+    return 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Info Book//Calendar//EN\r\nBEGIN:VEVENT\r\nUID:' + e.id + '@infobook\r\n' + when + 'SUMMARY:' + text(e.title) + '\r\nDESCRIPTION:' + text(e.note) + '\r\n' + alarm + 'END:VEVENT\r\nEND:VCALENDAR\r\n';
   }
   function download(e) {
     const blob = new Blob([ics(e)], { type: 'text/calendar' });
@@ -75,28 +105,32 @@
   function fromMs(ms, title, note, url) {
     if (typeof ms !== 'number' || !isFinite(ms)) return null;
     const p = nzParts(ms);
-    return { title, date: p.date, time: p.time, note: note || '', url: url || '', remind: 'm15' };
+    return { title, date: p.date, time: p.time, at: ms, note: note || '', url: url || '', remind: 'm15' };
   }
-  function prefill(i) {
+  function prefill(i, now) {
     if (!i) return null;
+    now = now == null ? Date.now() : now;
+    const keep = p => (!p || (typeof p.at === 'number' && p.at < now)) ? null : p;
     if (i.x === 'cine' && i.film && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(i.film.next || '')) {
       const [date, time] = i.film.next.split('T');
-      return { title: i.film.title, date, time, note: 'Event Cinemas Whangārei, 18 James Street. ' + (i.film.rating || ''), url: i.film.sessions || i.film.link || '', remind: 'h1', kind: 'movie' };
+      const at = aucklandMs(date, time);
+      return keep({ title: i.film.title, date, time, at: isFinite(at) ? at : undefined, note: 'Event Cinemas Whangārei, 18 James Street. ' + (i.film.rating || ''), url: i.film.sessions || i.film.link || '', remind: 'h1', kind: 'movie' });
     }
     if (i.x === 'watch' && i.w && !/^(Stan|Neon)$/i.test(i.w.plat || '') && !/neon|stan\.(com|news)/i.test(i.w.url || '')) {
       const w = i.w;
       const day = /^\d{4}-\d{2}-\d{2}$/.test(w.day || '') ? w.day : (typeof w.ev === 'number' ? nzParts(w.ev).date : '');
       let time = '';
       if (typeof w.ev === 'number') { const clock = nzParts(w.ev).time; if (clock !== '12:00') time = clock; }
-      return { title: w.t, date: day, time, note: 'On ' + (w.plat || 'NZ TV'), url: w.url || '', remind: 'm15', tv: 1, kind: 'tv' };
+      const at = time ? aucklandMs(day, time) : undefined;
+      return keep({ title: w.t, date: day, time, at: at && isFinite(at) ? at : undefined, note: 'On ' + (w.plat || 'NZ TV'), url: w.url || '', remind: 'm15', tv: 1, kind: 'tv' });
     }
-    if (i.x === 'concert' && i.c && typeof i.c.ev === 'number') { const p = fromMs(i.c.ev, i.c.t, (i.c.venue || 'Auckland') + ', Auckland', i.c.url); return p && { ...p, kind: 'event' }; }
+    if (i.x === 'concert' && i.c && typeof i.c.ev === 'number') { const p = fromMs(i.c.ev, i.c.t, (i.c.venue || 'Auckland') + ', Auckland', i.c.url); return keep(p && { ...p, kind: 'event' }); }
     if (i.kind === 'tv' && (NZ_TV.has(i.src) || NZ_HOST.test(hostOf(i.url || '')))) {
       if (typeof i.ev !== 'number') return { title: i.t, date: '', time: '', note: i.where ? 'On ' + i.where : '', url: i.url || '', remind: 'm15', tv: 1, kind: 'tv' };
       const p = fromMs(i.ev, i.t, i.where ? 'On ' + i.where : '', i.url);
-      return p && { ...p, tv: 1, kind: 'tv' };
+      return keep(p && { ...p, tv: 1, kind: 'tv' });
     }
-    if (i.kind === 'event' && typeof i.ev === 'number') { const p = fromMs(i.ev, i.t, i.s || '', i.url); return p && { ...p, kind: 'event' }; }
+    if (i.kind === 'event' && typeof i.ev === 'number') { const p = fromMs(i.ev, i.t, i.s || '', i.url); return keep(p && { ...p, kind: 'event' }); }
     return null;
   }
   function packOf(p) {
@@ -132,7 +166,8 @@
       const kinds = ((all) => { const u = [...new Set(all)]; return u.concat(all.filter((k, n) => all.indexOf(k) !== n)).slice(0, 4); })(list.filter(e => e.date === ds).map(e => e.kind || 'own'));
       cells += `<button type="button" data-calday="${ds}" class="${ds === today() ? 'today' : ''}${kinds.length ? ' has' : ''}"><span class="calnum">${d}</span>${dots(kinds)}</button>`;
     }
-    const upcoming = list.filter(e => e.date >= today()).slice(0, 12);
+    const shown = e => (typeof e.at === 'number' && isFinite(e.at)) ? nzParts(e.at) : { date: e.date, time: e.time };
+    const upcoming = list.filter(e => shown(e).date >= today()).slice(0, 12);
     const form = edit ? `<form class="calform" data-calform>
       <label>Title<input name="title" required maxlength="120" value="${esc(edit.title || '')}"></label>
       <label>Date<input name="date" type="date" required value="${esc(edit.date || today())}"></label>
@@ -153,8 +188,8 @@
       ${form}
       <div class="xbtns"><button type="button" class="btn pri" data-calnew>Add something</button></div>
       <h3>Coming up</h3>
-      ${upcoming.length ? `<ul class="callist">${upcoming.map(e => `<li><b><i class="cdot ${esc(e.kind || 'own')}"></i> ${esc(e.title)}</b><small>${esc(e.date)}${e.time ? ' · ' + esc(e.time) : ''}${e.remind !== 'none' ? ' · reminder' : ''}</small>
-        <span><button type="button" data-caledit="${esc(e.id)}">Edit</button><button type="button" data-calics="${esc(e.id)}">Add to phone calendar</button><button type="button" data-caldel="${esc(e.id)}">Delete</button></span></li>`).join('')}</ul>` : '<p>Nothing saved yet.</p>'}
+      ${upcoming.length ? `<ul class="callist">${upcoming.map(e => { const s = shown(e); return `<li><b><i class="cdot ${esc(e.kind || 'own')}"></i> ${esc(e.title)}</b><small>${esc(s.date)}${s.time ? ' · ' + esc(s.time) + ' NZ' : ''}${e.remind !== 'none' ? ' · reminder' : ''}</small>
+        <span><button type="button" data-caledit="${esc(e.id)}">Edit</button><button type="button" data-calics="${esc(e.id)}">Add to phone calendar</button><button type="button" data-caldel="${esc(e.id)}">Delete</button></span></li>`; }).join('')}</ul>` : '<p>Nothing saved yet.</p>'}
       </div>`;
   }
   function draw() { const feed = root.document.getElementById('feed'); if (feed) feed.innerHTML = viewHtml(); const sh = root.document.getElementById('stories-host'); if (sh) sh.innerHTML = ''; }
@@ -200,7 +235,7 @@
   function showReminder(p) {
     const sheet = root.document.getElementById('sheet'), box = root.document.getElementById('sheetin');
     if (!sheet || !box) { open(p); return; }
-    const when = p.time ? esc(p.date) + ' · ' + esc(p.time) : (p.date ? esc(p.date) + ' · no air time was listed, so you can add one' : 'No date or time was listed. Add them yourself.');
+    const when = p.time ? esc(p.date) + ' · ' + esc(p.time) + ' New Zealand time' : (p.date ? esc(p.date) + ' · no air time was listed, so you can add one' : 'No date or time was listed. Add them yourself.');
     box.innerHTML = `<h2>Add reminder</h2><p><b>${esc(p.title || '')}</b></p><p>${when}</p><p class="calnote">${esc(p.note || '')}</p>
       <form class="calform" data-tvform>
         ${p.date ? `<input type="hidden" name="date" value="${esc(p.date)}">` : '<label>Date<input name="date" type="date" required></label>'}
