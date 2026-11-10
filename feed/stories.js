@@ -73,7 +73,7 @@ function buildTiles() {
   const FUNL = new Set(['Cute animal', 'Sitcom clip', 'Funny', 'Wow']);
   const fun = vids.filter(v => FUNL.has(LAB(v)[0])), rest = vids.filter(v => !FUNL.has(LAB(v)[0]));
   const pick = fun.length >= 6 ? fun : fun.concat(rest);
-  for (const v of pick) { if (out.length >= MAX) break; const k = LAB(v)[0]; if ((seenTopic[k] = (seenTopic[k] || 0) + 1) > 4) continue; const [label, em] = LAB(v);
+  for (const v of pick) { if (out.length >= MAX) break; if (typeof wasSeen === 'function' && wasSeen(v)) continue; if (isSeen('hl-vid-' + v.id)) continue; const k = LAB(v)[0]; if ((seenTopic[k] = (seenTopic[k] || 0) + 1) > 4) continue; const [label, em] = LAB(v);
     push({ id: 'hl-vid-' + v.id, img: v.img, label, em, kind: 'highlight', item: v, title: v.t, text: '', url: v.url }); }
 
   return out.slice(0, MAX);

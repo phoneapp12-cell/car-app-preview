@@ -1,6 +1,7 @@
 import fs from 'fs';
 import vm from 'vm';
 import assert from 'assert';
+import { execSync } from 'child_process';
 
 function load(file) {
   const ctx = { console, Intl, Date, Math, URL, Set, Map, Object, Number, String, Array, encodeURIComponent, decodeURIComponent };
@@ -302,16 +303,53 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.122'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.122'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.122'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.123'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.123'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.123'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.122'"));
-assert.ok(fs.readFileSync('sw.js', 'utf8').includes("const VERSION = '2.29.22'"));
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.122'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.123'"));
+function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
+const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
+let parentMain = parentHere;
+try { parentMain = swVersion(execSync('git show origin/main:sw.js', { encoding: 'utf8' })); } catch (e) { }
+assert.equal(parentHere, parentMain);
+assert.ok(appSrc.includes("new Set(['life', 'family', 'photos', 'liked'])"));
+assert.ok(!/already-seen ones/.test(appSrc));
+const seenBits = [
+  appSrc.match(/const seenOk = i => .*;/)[0],
+  appSrc.match(/function seenUrl\(i\) \{[\s\S]*?\n\}/)[0],
+  appSrc.match(/function cardSeen\(i, seen\) \{[\s\S]*?\n\}/)[0],
+  appSrc.match(/function pickFresh\(list, seen\) \{[\s\S]*?\n\}/)[0]
+].join('\n');
+const seenCtx = {};
+vm.runInNewContext(seenBits + '\nglobalThis.pickFresh = pickFresh; globalThis.seenUrl = seenUrl;', seenCtx);
+const seen = new Set(['old-id', 'u:https://example.com/story']);
+const fresh = seenCtx.pickFresh([
+  { id: 'old-id', t: 'Already shown', url: 'https://example.com/other' },
+  { id: 'same-link', t: 'Same link, new id', url: 'https://example.com/story?utm=1' },
+  { id: 'gamesoon', x: 'gamesoon', t: 'Games — coming soon' },
+  { id: 'next-one', t: 'A new post', url: 'https://example.com/new' }
+], seen);
+assert.equal([].map.call(fresh, i => i.id).join(','), 'gamesoon,next-one');
+assert.equal(seenCtx.seenUrl({ url: 'https://example.com/story?utm=1#x' }), 'https://example.com/story');
+const seenSights = load('feed/sights.js');
+const first = seenSights.ibSights.cards(0);
+seenSights.wasSeen = item => item.id === first[0].id;
+const again = seenSights.ibSights.cards(0);
+assert.ok(again[0] && again[0].id !== first[0].id && again[0].topic === first[0].topic);
+assert.ok(!again.some(c => c.id === first[0].id));
+const seenArt = load('feed/art3d.js');
+const artA = seenArt.ibArt.cards(0)[0];
+seenArt.wasSeen = item => item.id === artA.id;
+const artB = seenArt.ibArt.cards(0);
+assert.equal(artB.length, 1);
+assert.notEqual(artB[0].id, artA.id);
+seenArt.wasSeen = () => true;
+assert.equal(seenArt.ibArt.cards(0).length, 0);
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.123'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.122'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.123'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));

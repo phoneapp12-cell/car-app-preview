@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.122';
+const APP_VERSION = '1.9.123';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -230,14 +230,38 @@ let hidAt = 0; document.addEventListener('visibilitychange', () => { if (documen
 function seenRebase() { SEEN_BASE = new Set(Object.keys(SEEN1)); SH_BASE = { ...SHSEEN }; }
 let s1T = 0;
 function seenSave() { clearTimeout(s1T); s1T = setTimeout(() => { const d = seenDayN(); let e = Object.entries(SEEN1).filter(([, v]) => d - v <= SEEN_DAYS); if (e.length > SEEN_MAX) { e.sort((a, b) => b[1] - a[1]); e.length = SEEN_MAX; } SEEN1 = Object.fromEntries(e); const sh = Object.entries(SHSEEN); if (sh.length > 400) SHSEEN = Object.fromEntries(sh.slice(-400)); ls.set('seen1', SEEN1); ls.set('shseen', SHSEEN); }, 1500); }
-const seenOk = i => !!i && (!i.x || i.x === 'watch' || i.x === 'concert' || i.x === 'hometip' || i.x === 'vlog') && !i.pin && i.topic !== 'life' && !i._share && !/^(tarotday|sly-|fest)/.test(i.id || '');
+const seenOk = i => !!i && (!i.x || i.x === 'watch' || i.x === 'concert' || i.x === 'hometip' || i.x === 'vlog') && !i.pin && i.topic !== 'life' && !i._share && !/^(tarotday|sly-|fest|gamesoon)/.test(i.id || '');
+function seenUrl(i) {
+  const raw = String((i && (i.url || (i.h && i.h.url))) || '');
+  const u = raw.split('#')[0].replace(/\?.*$/, '').replace(/\/+$/, '');
+  if (!u || u.length > 300 || /^(data|blob):/i.test(u)) return '';
+  return u;
+}
+function cardSeen(i, seen) {
+  if (!seenOk(i)) return false;
+  if (seen.has(i.id) || (i._dups || []).some(d => seen.has(d))) return true;
+  const u = seenUrl(i);
+  return !!(u && seen.has('u:' + u));
+}
+function pickFresh(list, seen) {
+  const out = [], used = new Set();
+  for (const i of list || []) {
+    if (cardSeen(i, seen)) continue;
+    const k = i.id || seenUrl(i);
+    if (k && used.has(k)) continue;
+    if (k) used.add(k);
+    out.push(i);
+  }
+  return out;
+}
 const shSig = i => { const s = i._share || {}; return (s.nc || 0) + '/' + ((s.likes || []).length + (s.ups || []).length); };
-function wasSeen(i) { return seenOk(i) && (SEEN_BASE.has(i.id) || (i._dups || []).some(d => SEEN_BASE.has(d))); }
+function wasSeen(i) { return cardSeen(i, SEEN_BASE); }
+window.wasSeen = wasSeen;
 function shareSeen(i) { const k = i._share && i._share.card || i.id; return k in SH_BASE && SH_BASE[k] === shSig(i); }
 function markSeen(id) {
   const i = (typeof order !== 'undefined' && order.find(x => x.id === id)) || null; if (!i) return;
   if (i._share) { SHSEEN[i._share.card || i.id] = shSig(i); seenSave(); return; }
-  if (!seenOk(i)) return; const d = seenDayN(); SEEN1[i.id] = d; for (const x of i._dups || []) SEEN1[x] = d; seenSave();
+  if (!seenOk(i)) return; const d = seenDayN(); SEEN1[i.id] = d; const u = seenUrl(i); if (u) SEEN1['u:' + u] = d; for (const x of i._dups || []) SEEN1[x] = d; seenSave();
 }
 let seenIO = null; const seenTm = new Map();
 function watchSeen(root) {
@@ -462,7 +486,7 @@ function visible() {
     if ((i.topic === 'food' || i.topic === 'gf') && NON_NZ_FOOD.test((i.t || '') + ' ' + (i.s || '') + ' ' + (i.url || '') + ' ' + (i.sn || ''))) return false; // 1.9.79 NZ food only
     return tab === 'all' || i.topic === tab || (tab === 'food' && i.topic === 'gf') || (tab === 'games' && GAME_TOPICS.has(i.topic) && topicOn(i.topic));
   });
-  return collapseStories(list).filter(i => !wasSeen(i)); // 1.9.30 once seen, gone (and one card per story)
+  return pickFresh(collapseStories(list), SEEN_BASE); // 1.9.123 once seen (id or link), gone; the next unseen item from that source fills the gap
 }
 
 /* ---- For You: Shane's own things plus every board and hub in My App, read on this phone from what My App left in
@@ -1293,7 +1317,7 @@ function mfVideos(order) {
   const fv = ((FEED && FEED.items) || []).filter(i => mfIsVid(i) && mfOk(i));
   const mine = fv.filter(i => topicOn(i.topic) && !intHidden(i)), other = fv.filter(i => !(topicOn(i.topic) && !intHidden(i)));
   const rest = (typeof rank === 'function' ? rank(mine) : mine).concat(typeof vlScore === 'function' ? vl.sort((a, b) => vlScore(b.h) - vlScore(a.h)) : vl, other.sort((a, b) => (b.at || 0) - (a.at || 0)));
-  rest.filter(i => !seen(i)).forEach(add); rest.filter(seen).forEach(add); // unseen first, then already-seen ones
+  rest.filter(i => !seen(i) && !(typeof wasSeen === 'function' && wasSeen(i))).forEach(add); // unseen only; a seen clip is not shown again
   return out;
 }
 function mediaFilter(order) {
@@ -1325,7 +1349,7 @@ function mfDrawer(open) {
   let d = document.getElementById('mfdrawer');
   if (!d) {
     d = document.createElement('div'); d.id = 'mfdrawer'; d.className = 'mfdrawer';
-    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Menu</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><div class="mfextra"></div><p class="mfnote">Browse topics and Family here. Videos only / Pictures only filter the All feed. Alerts still notify.</p></nav>`;
+    d.innerHTML = `<div class="mfscrim" data-mfclose></div><nav class="mfpanel" aria-label="Menu"><div class="mfhd"><b>Menu</b><button type="button" class="ib" data-mfclose aria-label="Close menu">✕</button></div><div class="mfopts"></div><div class="mfextra"></div><p class="mfnote">Interests are in their own list. Videos only / Pictures only filter the All feed. Alerts still notify.</p></nav>`;
     document.body.append(d);
   }
   d.querySelector('.mfopts').innerHTML = `<p class="mfsec">Show me</p>` + MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
@@ -1337,8 +1361,9 @@ function mfDrawer(open) {
   if (typeof PRIVATE_OK !== 'undefined' && PRIVATE_OK) {
     x = `<p class="mfsec">My App</p><button type="button" class="mfopt${SHOW_LIFE?' on':''}" data-showlife="1" role="switch" aria-checked="${!!SHOW_LIFE}"><span class="mfe">📌</span><span>Show My App stuff</span>${SHOW_LIFE?'<i>✓</i>':''}</button>` + x;
   }
-  // 1.9.82 Browse: Family, For [name], topics (replaces top chip bar)
-  const browse = topicList().filter(t => t[0] !== 'all');
+  // 1.9.123 content topics live only inside the Interests submenu
+  const keepNav = new Set(['life', 'family', 'photos', 'liked']);
+  const browse = topicList().filter(t => keepNav.has(t[0]));
   const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button>${intSub()}<button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · coming soon</span></button>` + browse.map(t =>
     `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
   ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;

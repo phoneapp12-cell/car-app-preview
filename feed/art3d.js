@@ -9,13 +9,21 @@
     { key: 'suzanne', file: 'Two Suzanne heads.jpg', t: 'Two Suzanne heads, rendered in Blender', s: 'GrinningIodize made this computer-generated picture of two Suzanne heads and released it under CC0. Suzanne is the chimpanzee head that comes with Blender, and the picture is on Wikimedia Commons.' }
   ];
   function dayNum(now) { return Math.floor((now == null ? Date.now() : now) / 864e5); }
-  function cards(now) {
-    try { if (typeof root.topicOn === 'function' && !root.topicOn(TOPIC)) return []; } catch (e) { }
-    const src = ITEMS[Math.abs(dayNum(now)) % ITEMS.length];
-    return [{
+  function one(src) {
+    return {
       id: 'art3d-' + src.key, t: src.t, s: src.s, img: pic(src.file), url: filePage(src.file), topic: TOPIC,
       src: 'art3d-commons', sn: 'Wikimedia Commons', kind: 'photo', at: Date.now() - 60e3, file: src.file
-    }];
+    };
+  }
+  function cards(now) {
+    try { if (typeof root.topicOn === 'function' && !root.topicOn(TOPIC)) return []; } catch (e) { }
+    const start = Math.abs(dayNum(now)) % ITEMS.length;
+    for (let n = 0; n < ITEMS.length; n++) {
+      const item = one(ITEMS[(start + n) % ITEMS.length]);
+      try { if (typeof root.wasSeen === 'function' && root.wasSeen(item)) continue; } catch (e) { }
+      return [item];
+    }
+    return [];
   }
   function busy(x) { return x && (x.x === 'play' || x.x === 'zoomq' || x.x === 'fallq' || x.x === 'tetq' || x.x === 'cine' || (x.id && (String(x.id).indexOf('sight-') === 0 || String(x.id).indexOf('art3d-') === 0))); }
   function insert(order, nPins, now) {
