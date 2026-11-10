@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.121';
+const APP_VERSION = '1.9.122';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -26,6 +26,7 @@ const TOPICS = [
   ['glass', 'Stained glass', '🪟', '#7c3aed', '#22d3ee'],
   ['kites', 'Kites', '🪁', '#0284c7', '#f97316'],
   ['lanterns', 'Paper lanterns', '🏮', '#e11d48', '#f97316'],
+  ['art3d', '3D art', '🧊', '#7c3aed', '#22d3ee'],
   ['events', 'NZ events', '🎆', '#be123c', '#7c3aed'],
   ['food', 'Food (GF)', '🍲', '#c2410c', '#eab308'],
   ['meals', 'Easy weeknight meals', '🍝', '#ea580c', '#16a34a'], // 1.9.104 Nicolle's idea, on for everyone
@@ -59,7 +60,7 @@ const TOPICS = [
 ];
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t[0], t]));
 Object.defineProperty(TOPIC.life, 1, { get: () => forMe(1), enumerable: true }); // 1.9.74 📌 For Shane / For Sarah … // 1.4.0: About-you chips are added to this as they're found
-const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75, illusions: 0.9, odd: 1.0, colour: 0.9, looks: 0.95, reef: 0.95, dolls: 0.9, keeps: 0.9, glass: 0.9, kites: 0.9, lanterns: 0.9 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down. 1.9.112 new picture subjects stay lighter than sitcoms and dogs
+const BASE = { hp: 0.95, monarch: 0.95, nd: 0.9, candy: 0.9, pets: 1.35, parent: 0.85, rainbow: 0.85, social: 0.85, tarot: 0.8, craft: 0.85, vgames: 0.8, boardg: 0.8, fantasy: 0.8, election: 0.35, gf: 1.0, kids: 0.9, sitcoms: 1.55, garden: 1.1, music: 1, scifi: 1.15, nz: 0.7, dogs: 1.45, nature: 1.35, events: 0.95, food: 0.95, meals: 1.1, tech: 0.7, aiassist: 1.1, smart: 1.1, innov: 1.15, diy: 0.85, science: 0.55, travel: 0.9, fitness: 0.85, selling: 0.7, creative: 1.15, culture: 0.75, learn: 1.2, games: 1.05, collect: 0.75, outdoors: 1.0, cars: 0.75, illusions: 0.9, odd: 1.0, colour: 0.9, looks: 0.95, reef: 0.95, dolls: 0.9, keeps: 0.9, glass: 0.9, kites: 0.9, lanterns: 0.9, art3d: 0.95 }; // 1.9.84 fun: sitcoms/animals/wow/facts up; news/science/election down. 1.9.112 new picture subjects stay lighter than sitcoms and dogs
 const baseOf = t => BASE[t] || (String(t).startsWith('you:') ? 0.8 : 1);
 const SPORT1 = /\b(sports?|rugby|all blacks|black ferns|super rugby|league|nrl|warriors|cricket|black ?caps|netball|silver ferns|football|soccer|fifa|premier league|afl|basketball|nba|nfl|golf|tennis|motorsport|formula ?1|f1|grand prix|supercars|boxing|ufc|mma|wrestling|athletics|olympics?|commonwealth games|hockey|rowing|america'?s cup|sailgp|triathlon|horse racing|darts|snooker|volleyball|baseball|world cup|bledisloe|test match|tyson fury|heavyweight)\b/i;
 const NON_NZ_FOOD = /\b(walmart|wal-?mart|trader joe'?s|traderjoes|kroger|aldi\b|tesco|asda|sainsbury'?s?|waitrose|lidl|costco\s*(usa?|us|america)|sam'?s club|target(?!\s*(nz|new zealand))|whole foods|heb\b|publix|meijer|wegmans|shoprite|food lion|dollar general|walgreens|cvs\b|home depot|lowe'?s|usd\b|usda\b)\b/i; // 1.9.79
@@ -179,6 +180,7 @@ const INTERESTS = [ // name, topic, words that mark a post as being about it
   ['Psychology', 'learn', 'psycholog\\w*|adhd|brain|\\biq\\b'],
   ['Whangārei classes', 'events', 'yoga|workshop|whang[aā]rei|northland'],
   ['Drawing & portraits', 'creative', 'portraits?|painting|drawing|opera'],
+  ['3D art', 'art3d', '3d art|cgi|blender|voxels?|isometric'],
   ['Travel', 'travel', 'travel|trip|holiday|destination|tourism'], ['Theme Parks', 'travel', 'theme parks?|roller ?coasters?|rides?|disneyland|rainbow’s end|rainbows end'],
   ['Technology', 'tech', 'tech(nology)?|gadgets?|smartphones?|iphone|android'], ['Computers', 'tech', 'computers?|pcs?|laptops?|windows|mac(book)?|linux'], ['Coding', 'tech', 'cod(e|ing)|programming|developers?|software|python|javascript'],
   ['Robotics', 'tech', 'robot(s|ics)?|automation|drones?'], ['Low Technology', 'diy', 'low-?tech|off-?grid|hand tools?|solar oven|repair'], ['Social Media', 'tech', 'social media|instagram|facebook|tiktok|youtube|reddit'],
@@ -208,11 +210,12 @@ function intHidden(i) {
   if (Object.keys(INT_OFF).length) { const t = (i.t || '') + ' ' + (i.s || ''); for (const n in INT_OFF) { const x = INT_BY_NAME.get(n); if (x && x.re.test(t) && !(s && s.some(m => !INT_OFF[m]))) return true; } }
   return false;
 }
-const GROUP_TOPICS = ['hp', 'monarch', 'nd', 'parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars', 'illusions', 'odd', 'colour', 'looks', 'reef', 'dolls', 'keeps', 'glass', 'kites', 'lanterns'];
+const GROUP_TOPICS = ['hp', 'monarch', 'nd', 'parent', 'rainbow', 'social', 'candy', 'pets', 'election', 'gf', 'kids', 'tarot', 'craft', 'vgames', 'boardg', 'fantasy', 'fitness', 'selling', 'creative', 'culture', 'learn', 'games', 'collect', 'outdoors', 'cars', 'illusions', 'odd', 'colour', 'looks', 'reef', 'dolls', 'keeps', 'glass', 'kites', 'lanterns', 'art3d'];
 // 1.9.0 topics nobody gets unless they pick them (members: in their interests; Shane: switched on in a suggestion or ⚙️)
 const OPTIN = new Set(['parent', 'rainbow', 'social', 'candy', 'pets', 'nd', 'hp', 'monarch', 'aiassist', 'smart', 'innov']);
 function optedIn(t) { return PICK ? PICK.includes(t) : ls.get('optIn', []).includes(t); }
 const topicOn = t => pickOk(t) && (!OPTIN.has(t) || optedIn(t)) && (!GROUP_TOPICS.includes(t) || INTERESTS.some(x => x.topic === t && !INT_OFF[x.name]));
+window.topicOn = topicOn; // picture scripts (sights, 3D art) read this when a card is mixed in
 
 let FEED = ls.get('feed', null);
 let VOTES = ls.get('votes', {});        // id -> { v: 1 | -1, topic, src, at, item }
@@ -1135,7 +1138,7 @@ document.addEventListener('click', e => {
   if (t.id === 'st') { settings(); return; }
   if (t.dataset && t.dataset.ts) { setTextSize(t.dataset.ts); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; toast('Text size: ' + t.textContent.replace('✓ ', '')); return; } // 1.8.7
   if (t.id === 'moodt') { MOOD_OFF = !MOOD_OFF; ls.set('moodOff', MOOD_OFF); const y = $('#sheet').scrollTop; settings(); $('#sheet').scrollTop = y; draw(); toast(MOOD_OFF ? 'Time of day: off' : 'Time of day: on'); return; }
-  const ib = t.closest('[data-int]'); if (ib) { const n = ib.dataset.int; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); const y = $('#sheet').scrollTop; for (const i of (FEED && FEED.items) || []) delete i._ints; settings(); $('#sheet').scrollTop = y; draw(); toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
+  const ib = t.closest('[data-int]'); if (ib && !ib.closest('#mfdrawer')) { const n = ib.dataset.int; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); const y = $('#sheet').scrollTop; for (const i of (FEED && FEED.items) || []) delete i._ints; settings(); $('#sheet').scrollTop = y; draw(); toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
   const rv = t.closest('[data-revive]'); if (rv) { REVIVE[rv.dataset.revive] = Date.now(); ls.set('revive', REVIVE); settings(); draw(); toast('Brought back'); return; }
   if (t.id === 'resetv') { if (confirm('Clear all your 👍 and 👎?')) { VOTES = {}; ls.set('votes', VOTES); $('#sheet').classList.remove('on'); draw(); toast('Votes cleared'); } return; }
   if (t.id === 'sheet' || t.closest('[data-close]')) $('#sheet').classList.remove('on');
@@ -1306,6 +1309,18 @@ function mfChip() {
   c.innerHTML = MF === 'all' ? '' : `<button type="button" data-mfset="all" aria-label="Show videos and pictures">${o[1]} ${o[2]} <b>✕</b></button>`;
 }
 function mfSet(v) { MF = v; ls.set('mediaFilter', v); mfDrawer(false); try { draw(); scrollTo(0, 0); } catch (e) { } toast(MF_OPTS.find(x => x[0] === v)[2]); }
+let INT_OPEN = false; // 1.9.122 Interests stays open while its switches are tapped
+function intSub() {
+  const groups = TOPICS.filter(t => INTERESTS.some(x => x.topic === t[0]));
+  const body = groups.map(t => {
+    const rows = INTERESTS.filter(x => x.topic === t[0]).map(x => {
+      const on = !INT_OFF[x.name];
+      return `<button type="button" class="mfopt intsw${on ? ' on' : ''}" data-intoff="${esc(x.name)}" role="switch" aria-checked="${on}"><span>${esc(x.name)}</span><i>${on ? 'On' : 'Off'}</i></button>`;
+    }).join('');
+    return `<p class="intlab">${t[2]} ${esc(t[1])}</p>${rows}`;
+  }).join('');
+  return `<button type="button" class="mfopt${INT_OPEN ? ' on' : ''}" data-intmenu="1" aria-expanded="${INT_OPEN}"><span class="mfe">⭐</span><span>Interests</span><i>${INT_OPEN ? '▾' : '▸'}</i></button><div class="intsub"${INT_OPEN ? '' : ' hidden'}>${body}</div>`;
+}
 function mfDrawer(open) {
   let d = document.getElementById('mfdrawer');
   if (!d) {
@@ -1315,6 +1330,7 @@ function mfDrawer(open) {
   }
   d.querySelector('.mfopts').innerHTML = `<p class="mfsec">Show me</p>` + MF_OPTS.map(o => `<button type="button" class="mfopt${o[0] === MF ? ' on' : ''}" data-mfset="${o[0]}" role="menuitemradio" aria-checked="${o[0] === MF}"><span class="mfe">${o[1]}</span><span>${o[2]}</span>${o[0] === MF ? '<i>✓</i>' : ''}</button>`).join('');
   const extra = d.querySelector('.mfextra');
+  const kept = d.querySelector('.mfpanel').scrollTop;
   let x = `<p class="mfsec">Appearance</p><div class="mfappear">` +
     [['dark','🌙','Dark'],['light','☀️','Light'],['auto','📱','Match phone'],['ocean','🌊','Ocean'],['spring','🌸','Spring'],['candy','🍬','Candy Crush']].map(([k,em,l]) =>
       `<button type="button" class="mfopt${APPEAR===k?' on':''}" data-appear="${k}" role="menuitemradio" aria-checked="${APPEAR===k}"><span class="mfe">${em}</span><span>${l}</span>${APPEAR===k?'<i>✓</i>':''}</button>`).join('') + `</div>`;
@@ -1324,11 +1340,11 @@ function mfDrawer(open) {
   // 1.9.82 Browse: Family, For [name], topics (replaces top chip bar)
   const browse = topicList().filter(t => t[0] !== 'all');
   const backOn = !!ls.get('comeBack', 0);
-  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button><button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · coming soon</span></button><button type="button" class="mfopt${backOn ? ' on' : ''}" data-comeback="1" role="switch" aria-checked="${backOn}"><span class="mfe">🔔</span><span>Come-back reminders</span>${backOn ? '<i>✓</i>' : ''}</button>` + browse.map(t =>
+  const br = `<p class="mfsec">Browse</p><button type="button" class="mfopt" data-calopen="1"><span class="mfe">📅</span><span>Calendar</span></button>${intSub()}<button type="button" class="mfopt" data-soon="1"><span class="mfe">🎮</span><span>Games · coming soon</span></button><button type="button" class="mfopt${backOn ? ' on' : ''}" data-comeback="1" role="switch" aria-checked="${backOn}"><span class="mfe">🔔</span><span>Come-back reminders</span>${backOn ? '<i>✓</i>' : ''}</button>` + browse.map(t =>
     `<button type="button" class="mfopt${tab===t[0]?' on':''}" data-mftab="${t[0]}"><span class="mfe">${t[2]}</span><span>${esc(t[1])}${t[0]==='family'&&typeof famNewLikes==='function'&&famNewLikes()?' · new':''}</span>${tab===t[0]?'<i>✓</i>':''}</button>`
   ).join('') + `<button type="button" class="mfopt${tab==='all'?' on':''}" data-mftab="all"><span class="mfe">✨</span><span>All feed</span>${tab==='all'?'<i>✓</i>':''}</button>`;
   extra.innerHTML = br + x;
-  requestAnimationFrame(() => d.classList.toggle('on', !!open));
+  requestAnimationFrame(() => { d.classList.toggle('on', !!open); if (kept) d.querySelector('.mfpanel').scrollTop = kept; });
 }
 (function () {
   const bar = document.querySelector('header.top .bar'); if (bar && !document.getElementById('mfbtn')) { const b = document.createElement('button'); b.id = 'mfbtn'; b.className = 'ib mfbtn'; b.setAttribute('aria-label', 'Menu'); b.textContent = '☰'; bar.prepend(b); }
@@ -1336,6 +1352,8 @@ function mfDrawer(open) {
     const t = e.target; if (!t || !t.closest) return;
     if (t.closest('#mfbtn')) { mfDrawer(true); return; }
     if (t.closest('[data-calopen]')) { e.preventDefault(); mfDrawer(false); if (window.ibCalOpen) window.ibCalOpen(); return; }
+    if (t.closest('[data-intmenu]')) { e.preventDefault(); INT_OPEN = !INT_OPEN; mfDrawer(true); return; }
+    const io = t.closest('[data-intoff]'); if (io) { e.preventDefault(); e.stopPropagation(); const n = io.dataset.intoff; if (!INT_BY_NAME.has(n)) return; if (INT_OFF[n]) delete INT_OFF[n]; else INT_OFF[n] = 1; ls.set('intOff', INT_OFF); for (const i of (FEED && FEED.items) || []) delete i._ints; INT_OPEN = true; mfDrawer(true); try { const sheet = document.getElementById('sheet'); if (sheet && sheet.classList.contains('on')) { const y = sheet.scrollTop; settings(); sheet.scrollTop = y; } } catch (err) { } try { draw(); } catch (err) { } toast((INT_OFF[n] ? 'Off: ' : 'On: ') + n); return; }
     if (t.closest('[data-soon]')) { e.preventDefault(); mfDrawer(false); if (window.ibSoon) window.ibSoon(); return; }
     const sb = t.closest('[data-mfset]'); if (sb) { e.preventDefault(); mfSet(sb.dataset.mfset); return; }
     const ab = t.closest('[data-appear]'); if (ab) { e.preventDefault(); APPEAR = ab.dataset.appear; ls.set('appear', APPEAR); applyAppear(); mfDrawer(true); toast('Appearance: ' + ({ dark: 'Dark', light: 'Light', auto: 'Match phone', ocean: 'Ocean 🌊', spring: 'Spring 🌸', candy: 'Candy Crush 🍬' }[APPEAR] || APPEAR)); return; }
