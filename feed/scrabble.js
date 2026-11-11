@@ -531,6 +531,32 @@
     $('#overtitle').textContent = win.length > 1 ? 'A tie: ' + win.join(' and ') : (st.players[st.winners[0]].cpu ? 'The computer wins' : win[0] + ' wins!');
     $('#overlist').innerHTML = rows.map(x => `<li><span>${esc(x.p.name)}</span><strong>${x.p.score}</strong><small>${x.i === st.out ? 'used all tiles, +' + st.players.reduce((a, q, j) => a + (j === st.out ? 0 : q.left), 0) : (x.p.left ? '−' + x.p.left + ' left in rack' : '')}</small></li>`).join('');
     overlay('#over', true);
+    overScores();
+  }
+  // 1.9.149 family scoreboard (scores.js). Against the computer the score is the phone owner's. Passing the phone, only the
+  // phone owner is known to the family service, so only the player whose name matches theirs goes on the family board;
+  // everyone's scores are still kept on this phone.
+  function ownerIdx() {
+    const S = root.IBScores, me = S && S.who(); if (!me || !me.first) return -1;
+    if (st.mode === 'cpu') return st.players.findIndex(p => !p.cpu);
+    const f = me.first.toLowerCase(), hit = st.players.map((p, i) => (!p.cpu && String(p.name).trim().split(/\s+/)[0].toLowerCase() === f ? i : -1)).filter(i => i >= 0);
+    return hit.length === 1 ? hit[0] : -1;
+  }
+  function overScores() {
+    const S = root.IBScores, box = $('#overscores'); if (!S || !box || demo) return;
+    const opp = st.mode === 'cpu' ? 'computer' : 'family', oi = ownerIdx(), me = S.who();
+    const label = opp === 'computer' ? 'v 🤖' : 'pass the phone';
+    let sent = null;
+    if (!st.scored) { // once per game, even if the finished game is opened again
+      st.scored = 1;
+      st.players.forEach((p, i) => { if (!p.cpu && i !== oi) S.submit('scrabble', { score: p.score }, { name: p.name, note: label, localOnly: true }).then(() => { }, () => { }); }); // kept on this phone only (no family link for them)
+      const p = oi >= 0 ? st.players[oi] : null;
+      if (p) sent = S.submit('scrabble', { score: Math.max(0, Math.min(1500, p.score)), won: st.winners.length === 1 && st.winners[0] === oi, opponent: opp }, { name: p.name, note: label });
+      save();
+    }
+    const note = st.mode === 'pass' && me ? (oi >= 0 ? `Pass-the-phone games count for ${st.players[oi].name}, this phone’s owner. Everyone’s scores are kept on this phone.` : `Pass-the-phone scores go on the family board when one player is named ${me.first}, this phone’s owner.`) : '';
+    box.hidden = false;
+    S.fill(box, 'scrabble', { sent, note });
   }
 
   // Board taps
@@ -678,6 +704,7 @@
     d.querySelectorAll('[data-level]').forEach(b => b.addEventListener('click', () => { setupLevel = b.dataset.level; drawSetup(); }));
     d.querySelectorAll('[data-count]').forEach(b => b.addEventListener('click', () => { setupCount = +b.dataset.count; drawSetup(); }));
     $('#startbtn').addEventListener('click', startGame);
+    { const sb = $('#scoresbtn'), gb = $('#gscoresbtn'); const go = () => root.IBScores && root.IBScores.open('scrabble'); if (sb) sb.addEventListener('click', go); if (gb) gb.addEventListener('click', go); }
     $('#contbtn').addEventListener('click', () => { const s = loadSaved(); if (s) resume(s); });
     root.addEventListener('pagehide', save);
   }

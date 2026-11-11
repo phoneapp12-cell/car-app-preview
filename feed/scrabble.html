@@ -37,6 +37,9 @@
   .pl span, .bagc span { display: block; font-size: 11px; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pl strong, .bagc strong { display: block; font-size: 19px; line-height: 23px; font-variant-numeric: tabular-nums; }
   .bagc { flex: 0 0 54px; text-align: center; }
+  .trophy { flex: 0 0 44px; padding: 0; font-size: 20px; } /* 1.9.149 family scoreboard */
+  .ov { overflow: auto; }
+  #over .card { max-height: calc(100dvh - 40px); overflow: auto; }
   .boardwrap { width: 100%; overflow: hidden; border-radius: 8px; }
   .boardwrap.zoom { overflow: auto; max-height: min(64vh, 560px); -webkit-overflow-scrolling: touch; }
   .board { display: grid; grid-template-columns: repeat(15, 1fr); gap: 1.5px; padding: 3px; background: #0b3a45; width: 100%; aspect-ratio: 1; border-radius: 8px; user-select: none; -webkit-user-select: none; }
@@ -117,11 +120,12 @@
         <div id="namebox"></div>
       </div>
       <button type="button" id="startbtn" class="big pri">Start game</button>
+      <button type="button" id="scoresbtn" class="big">🏆 Family scoreboard</button>
       <p class="credit">Word list: ENABLE, public domain. Standard 100 tiles, 2 blanks, 50 bonus points for using all 7 tiles.</p>
     </div>
 
     <div id="game" hidden>
-      <div class="top"><div id="scores" class="scores"></div><div class="bagc"><span>Bag</span><strong id="bagn">100</strong></div></div>
+      <div class="top"><div id="scores" class="scores"></div><div class="bagc"><span>Bag</span><strong id="bagn">100</strong></div><button type="button" id="gscoresbtn" class="trophy" aria-label="Family scoreboard">🏆</button></div>
       <div id="boardwrap" class="boardwrap"><div id="board" class="board" role="grid" aria-label="Board"></div></div>
       <p id="msg" class="msg" role="status" aria-live="polite"></p>
       <div id="rack" class="rack" aria-label="Your tiles"></div>
@@ -150,9 +154,11 @@
     <div class="card">
       <h2 id="overtitle">Game over</h2>
       <ul class="final" id="overlist"></ul>
+      <div id="overscores" hidden></div>
       <div class="row2"><button type="button" id="overlook">See the board</button><button type="button" id="overnew" class="pri">New game</button></div>
     </div>
   </div>
+  <script src="scores.js"></script>
   <script src="scrabble.js"></script>
 </body>
 </html>

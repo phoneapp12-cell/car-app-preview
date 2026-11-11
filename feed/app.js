@@ -1,7 +1,7 @@
 /* Info Book – Shane's private photo and video feed. No likes counts, comments, followers or sharing.
    Thumbs up / down are saved on this phone only (localStorage) and only change the order of this feed. */
 'use strict';
-const APP_VERSION = '1.9.148';
+const APP_VERSION = '1.9.149';
 const FEED_URL = 'https://shane-my-feed-data.phoneapp12.workers.dev/feed.json';
 const MY_APP = '../'; // Info Book lives at My App's address + feed/, so My App is one level up
 const TOPICS = [
@@ -1333,7 +1333,7 @@ function mfChip() {
   c.innerHTML = MF === 'all' ? '' : `<button type="button" data-mfset="all" aria-label="Show videos and pictures">${o[1]} ${o[2]} <b>✕</b></button>`;
 }
 function mfSet(v) { MF = v; ls.set('mediaFilter', v); mfDrawer(false); try { draw(); scrollTo(0, 0); } catch (e) { } toast(MF_OPTS.find(x => x[0] === v)[2]); }
-let GAMES_OPEN = false; // 1.9.146 Games sub-menu: play straight from the menu. 1.9.148 adds Scrabble
+let GAMES_OPEN = false; // 1.9.146 Games sub-menu: play straight from the menu. 1.9.149 adds Scrabble
 function gameSub() {
   return `<button type="button" class="mfopt${GAMES_OPEN ? ' on' : ''}" data-gamesmenu="1" aria-expanded="${GAMES_OPEN}"><span class="mfe">🎮</span><span>Games · new</span><i>${GAMES_OPEN ? '▾' : '▸'}</i></button><div class="intsub"${GAMES_OPEN ? '' : ' hidden'}><button type="button" class="mfopt" data-art="tetris"><span class="mfe">🧱</span><span>Play Tetris</span></button><button type="button" class="mfopt" data-art="scrabble"><span class="mfe">🔤</span><span>Play Scrabble</span></button><button type="button" class="mfopt" disabled aria-disabled="true"><span class="mfe">🍬</span><span>Sugar Rush · coming soon</span></button></div>`;
 }
