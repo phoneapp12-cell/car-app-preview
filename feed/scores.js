@@ -14,7 +14,15 @@
   };
   function who() { // this phone's family member (Shane's admin link counts), or null
     const m = ls.get('mf.member', null);
-    return m && m.id && m.tok && !m.pending ? { tok: m.tok, name: String(m.name || '').trim(), first: String(m.name || '').trim().split(/\s+/)[0] || '', admin: m.role === 'admin' } : null;
+    return m && m.id && m.tok && !m.pending ? { id: String(m.id), tok: m.tok, name: String(m.name || '').trim(), first: String(m.name || '').trim().split(/\s+/)[0] || '', admin: m.role === 'admin' } : null;
+  }
+  // Shane is the member named Shane. Prefer a stable member id when one is known; otherwise match the first name.
+  const SHANE_IDS = [];
+  function isShane(me) {
+    me = me || who();
+    if (!me) return false;
+    if (SHANE_IDS.length && SHANE_IDS.indexOf(me.id) >= 0) return true;
+    return /^Shane$/i.test(me.first);
   }
   function nzDate(ms) {
     if (!ms) return '';
@@ -134,5 +142,5 @@
     if (!who()) return Promise.resolve(null);
     return Promise.resolve(opt.sent).catch(() => null).then(sent => { opt.sent = sent; return load(game); }).then(data => { el.innerHTML = html(game, data || null, opt); return data; });
   }
-  root.IBScores = { fill, API, who, submit, load, open, close, localBests, nzDate, isOpen: () => !!cur };
+  root.IBScores = { fill, API, who, isShane, submit, load, open, close, localBests, nzDate, isOpen: () => !!cur };
 })(typeof window !== 'undefined' ? window : globalThis);

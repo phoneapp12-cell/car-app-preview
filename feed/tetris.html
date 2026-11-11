@@ -29,11 +29,22 @@
   .row { margin-top: 12px; }
   .play { margin-top: 8px; }
   .credit { position: relative; z-index: 1; max-width: 440px; margin: 14px auto 0; font-size: 10px; color: rgba(255,255,255,.55); }
+
+  h1 .practice { margin-left: 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #facc15; vertical-align: middle; }
+  .lp { position: fixed; inset: 0; z-index: 40; background: rgba(5,8,12,.9); display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; }
+  .lp[hidden] { display: none; }
+  .lp-card { width: 100%; max-width: 400px; max-height: calc(100dvh - 32px); overflow: auto; background: #111a22; border: 1px solid rgba(255,255,255,.18); border-radius: 18px; padding: 16px; box-sizing: border-box; }
+  .lp-card h2 { margin: 0 0 4px; font-size: 22px; line-height: 1.2; }
+  .lp-note { font-size: 13px; color: rgba(255,255,255,.7); margin: 0 0 12px; }
+  .lp-list { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+  .lp-list button { flex: none; width: 100%; min-height: 46px; text-align: left; padding: 10px 14px; }
+  #levelpickclose { width: 100%; flex: none; }
+  #levelbtn[hidden], #practicelabel[hidden] { display: none; }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Tetris</h1>
+    <h1>Tetris <small id="practicelabel" class="practice" hidden>Practice</small></h1>
     <p class="help">Tap the board to rotate, drag to move, flick down to drop, swipe up to hold. Keyboard: arrows, Space drops, C holds, P pauses, M toggles music.</p>
     <div class="stats">
       <div class="stat big"><span>Score</span><strong id="score">0</strong></div>
@@ -60,10 +71,20 @@
       <button type="button" data-act="down" aria-label="Down">▼</button>
     </div>
     <div class="play">
+      <button type="button" class="wide" id="levelbtn" hidden>Choose level</button>
       <button type="button" class="wide" data-act="drop">Drop</button>
       <button type="button" data-act="hold">Hold</button>
       <button type="button" id="pausebtn" data-act="pause">Pause</button>
       <button type="button" id="restartbtn" data-act="restart">Restart</button>
+    </div>
+  </div>
+
+  <div id="levelpick" class="lp" hidden role="dialog" aria-label="Choose level">
+    <div class="lp-card">
+      <h2>Choose level</h2>
+      <p class="lp-note">Practice — won’t go on the family scoreboard</p>
+      <div id="levellist" class="lp-list"></div>
+      <button type="button" id="levelpickclose" class="wide">Close</button>
     </div>
   </div>
   <script src="scores.js"></script>

@@ -123,7 +123,7 @@ gHold.canHold = true;
 tetGame.act(gHold, 'hold');
 assert.strictEqual(gHold.hold, held);
 assert.strictEqual(gHold.canHold, false);
-// 1.9.151 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
+// 1.9.152 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
 assert.strictEqual(tetGame.themeFor(1), 6);
 assert.strictEqual(tetGame.themeFor(2), 11);
 assert.strictEqual(tetGame.themeFor(3), 0);
@@ -357,12 +357,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.151'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.151'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.151'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.152'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.152'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.152'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.151'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.152'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -401,10 +401,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.151'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.152'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.151'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.152'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -432,7 +432,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'no-cache'"));
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.151'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.152'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -556,7 +556,7 @@ assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-// 1.9.151 Scrabble is playable; Sugar Rush is the next game coming soon
+// 1.9.152 Scrabble is playable; Sugar Rush is the next game coming soon
 assert.ok(calFile.includes('data-art="scrabble"'));
 assert.ok(calFile.includes('Play Scrabble'));
 assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
@@ -576,7 +576,7 @@ assert.ok(/scrabble:[\s\S]{0,220}local: true/.test(playFile));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scrabble', 'scrabble.js'"));
 assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('scrabble-words'), 'word list is fetched when Scrabble opens, not precached');
 
-// 1.9.151 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
+// 1.9.152 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
 function loadScrabble() {
   const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date, Uint8Array, Int8Array, Int32Array, setTimeout, parseInt };
   ctx.window = ctx; ctx.globalThis = ctx;
@@ -764,6 +764,11 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.strictEqual(S.who(), null, 'an unchecked invite is not an identity');
   mem.set('mf.member', JSON.stringify({ id: 'm1', name: 'Shane Jenkins', role: 'admin', tok: 'tok-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' }));
   assert.strictEqual(S.who().first, 'Shane');
+  assert.strictEqual(S.who().id, 'm1');
+  assert.strictEqual(S.isShane(), true, 'Shane is identified by first name (and id when known)');
+  mem.set('mf.member', JSON.stringify({ id: 'm2', name: 'Sarah', role: 'member', tok: 'tok-yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy' }));
+  assert.strictEqual(S.isShane(), false, 'other family members are not Shane');
+  mem.set('mf.member', JSON.stringify({ id: 'm1', name: 'Shane Jenkins', role: 'admin', tok: 'tok-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' }));
   const r = await S.submit('tetris', { score: 900, lines: 8, level: 1 });
   assert.strictEqual(r.rank, 2);
   assert.strictEqual(calls[0].url, S.API + '/scores');
@@ -788,6 +793,54 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(!/importScripts\s*\(/.test(scr), 'scrabble.js also runs as the computer player worker, so it never loads scores.js itself');
   assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scores.js'"));
   execSync('node worker/test/scores.test.mjs', { stdio: 'pipe' });
+}
+
+// 1.9.152 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
+{
+  const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Rainforest', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'City', 'Night sky', 'Triangles', 'Space travel'];
+  assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7]);
+  assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.name)), names);
+  assert.deepStrictEqual(Array.from(tetGame.stages().map(s => s.level)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  const gPr = tetGame.newGame({ level: 11, practice: true });
+  assert.strictEqual(gPr.level, 11);
+  assert.strictEqual(gPr.lines, 100);
+  assert.strictEqual(gPr.practice, true);
+  assert.strictEqual(gPr.startLevel, 11);
+  assert.strictEqual(gPr.score, 0);
+  assert.strictEqual(tetGame.themeFor(gPr.level), 8);
+  assert.deepStrictEqual(tetGame.trianglePalette(gPr.lines, gPr.level), tetGame.TRI_PAL.early);
+  assert.strictEqual(tetGame.dropInterval(gPr.level), tetGame.dropInterval(11));
+  assert.strictEqual(tetGame.shouldSubmit(gPr), false, 'practice never goes on the family board');
+  const gSp = tetGame.newGame({ level: 12, practice: true });
+  assert.strictEqual(gSp.level, 12);
+  assert.strictEqual(gSp.lines, 110);
+  assert.strictEqual(tetGame.themeFor(gSp.level), 7);
+  const gFrog = tetGame.newGame({ level: 2, practice: true });
+  assert.strictEqual(tetGame.themeFor(gFrog.level), 11);
+  assert.strictEqual(tetGame.THEMES[11].name, 'Jeremiah was a bullfrog');
+  // Levelling up in practice, then restart, returns to the chosen stage
+  gPr.lines = 109; gPr.level = 11; gPr.board = tetGame.emptyBoard();
+  for (let c = 0; c < 9; c++) gPr.board[19][c] = 1;
+  gPr.piece = { t: 4, m: [[4]], x: 9, y: 19 }; gPr.next = 4;
+  tetGame.lockPiece(gPr);
+  assert.strictEqual(gPr.level, 12, 'practice can still move on to the next stage');
+  const again = tetGame.act(gPr, 'restart');
+  assert.strictEqual(again.practice, true);
+  assert.strictEqual(again.level, 11);
+  assert.strictEqual(again.lines, 100);
+  assert.strictEqual(again.startLevel, 11);
+  assert.strictEqual(again.score, 0);
+  const plain = tetGame.newGame();
+  assert.strictEqual(plain.practice, false);
+  assert.strictEqual(plain.level, 1);
+  assert.strictEqual(plain.lines, 0);
+  assert.strictEqual(tetGame.shouldSubmit({ ...plain, score: 200 }), true);
+  assert.strictEqual(tetGame.shouldSubmit({ ...plain, score: 0 }), false);
+  const tet = fs.readFileSync('feed/tetris.js', 'utf8'), tetHtml = fs.readFileSync('feed/tetris.html', 'utf8');
+  assert.ok(tetHtml.includes('id="levelbtn"') && tetHtml.includes('hidden') && tetHtml.includes('Choose level'));
+  assert.ok(tetHtml.includes('id="levelpick"') && tetHtml.includes('id="practicelabel"') && tetHtml.includes('Practice'));
+  assert.ok(tet.includes('IBScores.isShane()') && tet.includes('startPractice') && tet.includes('shouldSubmit(gm)'));
+  assert.ok(tet.includes("newGame({ level: Math.max(1, level || 1), practice: true })"));
 }
 
 console.log('feed-info tests ok');
