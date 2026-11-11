@@ -303,12 +303,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.148'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.148'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.148'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.149'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.149'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.149'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.148'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.149'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -347,10 +347,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.148'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.149'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.148'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.149'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -378,7 +378,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'no-cache'"));
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.148'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.149'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -502,7 +502,7 @@ assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-// 1.9.148 Scrabble is playable; Sugar Rush is the next game coming soon
+// 1.9.149 Scrabble is playable; Sugar Rush is the next game coming soon
 assert.ok(calFile.includes('data-art="scrabble"'));
 assert.ok(calFile.includes('Play Scrabble'));
 assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
@@ -522,7 +522,7 @@ assert.ok(/scrabble:[\s\S]{0,220}local: true/.test(playFile));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scrabble', 'scrabble.js'"));
 assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('scrabble-words'), 'word list is fetched when Scrabble opens, not precached');
 
-// 1.9.148 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
+// 1.9.149 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
 function loadScrabble() {
   const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date, Uint8Array, Int8Array, Int32Array, setTimeout, parseInt };
   ctx.window = ctx; ctx.globalThis = ctx;
@@ -691,6 +691,50 @@ assert.match(headers, /\/feed\/tetris\.html\n {2}! X-Frame-Options\n {2}X-Frame-
 assert.ok(!/\/feed\/tetris(?:\.html)?\n {2}X-Frame-Options: DENY/.test(headers));
 assert.match(headers, /\/feed\/scrabble\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
 assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
+
+// 1.9.149 family scoreboard: scores.js sends with this phone's family link only, keeps local bests, and the worker checks scores
+{
+  const mem = new Map(), calls = [];
+  const lsStub = { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
+  const ctx = { console, Math, Object, Number, String, Array, JSON, Date, Promise, setTimeout, clearTimeout, encodeURIComponent, localStorage: lsStub,
+    fetch: async (url, opt) => { calls.push({ url, opt }); return { ok: true, json: async () => ({ ok: 1, rank: 2, best: 900, newBest: false }) }; } };
+  ctx.window = ctx; ctx.globalThis = ctx; vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync('feed/scores.js', 'utf8'), ctx, { filename: 'feed/scores.js' });
+  const S = ctx.IBScores;
+  assert.strictEqual(S.API, 'https://shane-my-feed-data.phoneapp12.workers.dev/api');
+  assert.strictEqual(S.who(), null);
+  assert.strictEqual(await S.submit('tetris', { score: 500, lines: 4, level: 1 }), null, 'no family link: nothing sent');
+  assert.strictEqual(calls.length, 0);
+  assert.strictEqual(S.localBests('tetris')[0].score, 500, 'kept on this phone');
+  mem.set('mf.member', JSON.stringify({ tok: 'pending-token-xxxxxxxxxxxxxxxxxxxxxxxxx', pending: 1 }));
+  assert.strictEqual(S.who(), null, 'an unchecked invite is not an identity');
+  mem.set('mf.member', JSON.stringify({ id: 'm1', name: 'Shane Jenkins', role: 'admin', tok: 'tok-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' }));
+  assert.strictEqual(S.who().first, 'Shane');
+  const r = await S.submit('tetris', { score: 900, lines: 8, level: 1 });
+  assert.strictEqual(r.rank, 2);
+  assert.strictEqual(calls[0].url, S.API + '/scores');
+  assert.strictEqual(calls[0].opt.method, 'POST');
+  assert.strictEqual(calls[0].opt.headers.Authorization, 'Bearer tok-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
+  const sentBody = JSON.parse(calls[0].opt.body);
+  assert.deepStrictEqual({ ...sentBody }, { game: 'tetris', score: 900, lines: 8, level: 1 });
+  assert.ok(!('name' in sentBody), 'the server names the player from the token');
+  await S.submit('scrabble', { score: 210 }, { name: 'Aranea', localOnly: true });
+  assert.strictEqual(calls.length, 1, 'other pass-the-phone players stay on this phone');
+  assert.deepStrictEqual(S.localBests('tetris').map(x => x.score), [900, 500]);
+  await S.load('scrabble'); assert.strictEqual(calls[1].url, S.API + '/scores?game=scrabble');
+  assert.strictEqual(S.nzDate(Date.UTC(2026, 10, 11, 11, 30)), '12 Nov', 'dates are NZ dates');
+  ctx.fetch = async () => { throw new Error('offline'); };
+  assert.strictEqual(await S.load('tetris'), null, 'offline fails quietly');
+  const tet = fs.readFileSync('feed/tetris.js', 'utf8'), tetHtml = fs.readFileSync('feed/tetris.html', 'utf8');
+  assert.ok(tetHtml.indexOf('scores.js') > 0 && tetHtml.indexOf('scores.js') < tetHtml.indexOf('tetris.js'));
+  assert.ok(tetHtml.includes('id="scoresbtn"') && tet.includes("S.submit('tetris', { score: gm.score, lines: gm.lines, level: gm.level }"));
+  const scr = fs.readFileSync('feed/scrabble.js', 'utf8'), scrHtml = fs.readFileSync('feed/scrabble.html', 'utf8');
+  assert.ok(scrHtml.includes('<script src="scores.js"></script>') && scrHtml.includes('id="overscores"') && scrHtml.includes('id="gscoresbtn"'));
+  assert.ok(scr.includes('localOnly: true') && scr.includes('if (!st.scored)'));
+  assert.ok(!/importScripts\s*\(/.test(scr), 'scrabble.js also runs as the computer player worker, so it never loads scores.js itself');
+  assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scores.js'"));
+  execSync('node worker/test/scores.test.mjs', { stdio: 'pipe' });
+}
 
 console.log('feed-info tests ok');
 
