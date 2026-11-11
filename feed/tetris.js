@@ -119,7 +119,10 @@
       bells: ['F4', 'G4', 'A4', 'C5', 'D5', 'F5'] },
     { name: 'Snowy mountains', beat: 0.9, pad: 'sine', ambient: 'wind', critter: 'none', pitch: 1.06, sfx: 'sine',
       chords: [['A2', 'E3', 'A3', 'C4'], ['F2', 'C3', 'F3', 'A3'], ['C3', 'G3', 'C4', 'E4'], ['G2', 'D3', 'G3', 'B3']],
-      bells: ['A4', 'C5', 'D5', 'E5', 'G5', 'A5'] }
+      bells: ['A4', 'C5', 'D5', 'E5', 'G5', 'A5'] },
+    { name: 'Jeremiah was a bullfrog', beat: 0.6, pad: 'triangle', ambient: 'none', critter: 'none', pitch: 0.9, sfx: 'triangle',
+      chords: [['G2', 'D3', 'G3', 'B3'], ['C3', 'G3', 'C4', 'E4'], ['D3', 'A3', 'D4', 'FS4'], ['G2', 'D3', 'G3', 'B3']],
+      bells: ['G4', 'A4', 'B4', 'D5', 'E5', 'G5'] }
   ];
   // Colours and see-through backgrounds for each theme (same order as THEMES).
   const LOOKS = [
@@ -133,13 +136,14 @@
     { colors: ['#c084fc', '#f472b6', '#22d3ee', '#fb923c', '#a3e635', '#818cf8', '#fde047'], bg: 'linear-gradient(180deg,#1e1b4b 0%,#581c87 55%,#0f172a 100%)', board: 'rgba(15,10,40,0.55)' },
     { colors: ['#f43f5e', '#f59e0b', '#14b8a6', '#facc15', '#a855f7', '#06b6d4', '#ec4899'], bg: 'linear-gradient(135deg,#0f766e 0%,#7e22ce 50%,#ea580c 100%)', board: 'rgba(20,10,40,0.5)' },
     { colors: ['#ef4444', '#14b8a6', '#22c55e', '#facc15', '#38bdf8', '#e5e7eb', '#f97316'], bg: 'linear-gradient(180deg,#2563eb 0%,#22d3ee 45%,#15803d 100%)', board: 'rgba(5,30,30,0.5)' },
-    { colors: ['#e0f2fe', '#93c5fd', '#f9a8d4', '#fde68a', '#5eead4', '#c4b5fd', '#fca5a5'], bg: 'linear-gradient(180deg,#f9a8d4 0%,#818cf8 45%,#1e3a8a 100%)', board: 'rgba(15,23,60,0.5)' }
+    { colors: ['#e0f2fe', '#93c5fd', '#f9a8d4', '#fde68a', '#5eead4', '#c4b5fd', '#fca5a5'], bg: 'linear-gradient(180deg,#f9a8d4 0%,#818cf8 45%,#1e3a8a 100%)', board: 'rgba(15,23,60,0.5)' },
+    { colors: ['#4ade80', '#16a34a', '#f472b6', '#facc15', '#22d3ee', '#a3e635', '#fb923c'], bg: 'linear-gradient(180deg,#fb923c 0%,#f472b6 35%,#0e7490 70%,#14532d 100%)', board: 'rgba(5,30,20,0.5)' }
   ];
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
   let themeIdx = 0;
-  // Level order (indexes into THEMES): Farmyard, Triangles, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Space travel last.
-  const ORDER = [6, 8, 0, 1, 2, 3, 9, 10, 4, 5, 7];
+  // Level order (indexes into THEMES): Farmyard, Triangles, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Jeremiah was a bullfrog, Space travel last.
+  const ORDER = [6, 8, 0, 1, 2, 3, 9, 10, 4, 5, 11, 7];
   function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
   function sfx(name) {
     if (!soundOn || !ac) return;
@@ -616,7 +620,11 @@
      { e: ['🌿'], n: 3, m: 'drift', sp: [10, 16], sz: [16, 22], a: 0.85 }],
     [{ e: ['.'], n: 45, m: 'snow', sp: [16, 34], sz: [1.2, 3.2], a: 0.85 },
      { e: ['❄️'], n: 6, m: 'drift', sp: [10, 18], sz: [14, 22], a: 0.9 },
-     { e: ['🦅'], n: 1, m: 'fly', sp: [18, 26], y: [0.08, 0.3], sz: [26, 32], a: 0.9 }]
+     { e: ['🦅'], n: 1, m: 'fly', sp: [18, 26], y: [0.08, 0.3], sz: [26, 32], a: 0.9 }],
+    [{ e: ['🐸'], n: 3, m: 'walk', sp: [10, 20], y: [0.9, 0.97], sz: [26, 34], a: 0.95 },
+     { e: ['🪷'], n: 5, m: 'drift', sp: [6, 12], sz: [16, 24], a: 0.85 },
+     { e: ['🐞', '🦋'], n: 3, m: 'flutter', sp: [14, 22], y: [0.3, 0.8], sz: [16, 22], a: 0.9 },
+     { e: ['o'], n: 8, m: 'bubble', sp: [10, 20], sz: [3, 6], a: 0.45 }]
   ];
   const fx = { cv: null, ctx: null, w: 0, h: 0, list: [], theme: -1, last: 0, cache: new Map(), off: false };
   try { fx.off = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { }
