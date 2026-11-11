@@ -28,12 +28,12 @@
         if (!Ctor) return;
         ac = new Ctor();
         sfxGain = ac.createGain();
-        sfxGain.gain.value = 0.3;
+        sfxGain.gain.value = 0.48;
         const sfxSoft = ac.createBiquadFilter(); // take the sharp top off every sound
         sfxSoft.type = 'lowpass'; sfxSoft.frequency.value = 1400;
         sfxGain.connect(sfxSoft); sfxSoft.connect(ac.destination);
         musicGain = ac.createGain();
-        musicGain.gain.value = 0.16;
+        musicGain.gain.value = 0.26;
         const musicSoft = ac.createBiquadFilter();
         musicSoft.type = 'lowpass'; musicSoft.frequency.value = 1100;
         musicGain.connect(musicSoft); musicSoft.connect(ac.destination);
@@ -250,11 +250,14 @@
     if (!ac || !musicGain) return;
     const ti = themeFor(level || 1);
     if (ti !== themeIdx) { themeIdx = ti; noteIdx = 0; }
-    const T = THEMES[themeIdx], steps = STEPS[themeIdx], beat = T.beat;
+    // 1.9.142 Urgency: the tempo quickens a little each level (down to 55% of the beat by level 16) and a soft low pulse joins from level 6.
+    const lv = Math.max(1, level || 1), urge = Math.min(1, (lv - 1) / 15);
+    const T = THEMES[themeIdx], steps = STEPS[themeIdx], beat = T.beat * (1 - 0.45 * urge);
     if (nextNoteTime < ac.currentTime) nextNoteTime = ac.currentTime + 0.05;
     while (nextNoteTime < ac.currentTime + 0.25) {
       const evs = steps[noteIdx % steps.length];
       for (const e of evs) playEvent(e, nextNoteTime, beat, T);
+      if (lv >= 6 && noteIdx % 2 === 0) blip(82, 62, 55, nextNoteTime, Math.min(0.35, beat * 0.6), 0.05 + 0.07 * urge, musicGain);
       nextNoteTime += beat / 2;
       noteIdx++;
     }
@@ -504,9 +507,119 @@
     drawMini(doc.getElementById('next'), g.next, false);
     drawMini(doc.getElementById('hold'), g.hold, !g.canHold);
   }
+
+  // 1.9.142 Gentle moving things behind the board for each theme (same order as THEMES). Off when reduced motion is set.
+  const CRITTERS = [
+    [{ e: ['☁️'], n: 3, m: 'fly', sp: [6, 12], y: [0.04, 0.22], sz: [44, 64], a: 0.8 },
+     { e: ['🐦'], n: 2, m: 'fly', sp: [22, 34], y: [0.08, 0.3], sz: [18, 24], a: 0.85 },
+     { e: ['🦀'], n: 1, m: 'walk', sp: [10, 16], y: [0.93, 0.97], sz: [24, 28], a: 0.9 },
+     { e: ['✨'], n: 6, m: 'twinkle', y: [0.55, 0.85], sz: [10, 16], a: 0.8 }],
+    [{ e: ['🌺', '🌸', '🌼', '🌷'], n: 9, m: 'drift', sp: [14, 26], sz: [16, 26], a: 0.9 },
+     { e: ['🦋'], n: 3, m: 'flutter', sp: [16, 26], y: [0.2, 0.8], sz: [20, 26], a: 0.95 },
+     { e: ['🦜'], n: 1, m: 'fly', sp: [30, 40], y: [0.1, 0.35], sz: [28, 34], a: 0.95 }],
+    [{ e: ['🐬'], n: 3, m: 'swim', sp: [26, 40], y: [0.25, 0.7], sz: [34, 44], a: 0.95 },
+     { e: ['🐠', '🐟', '🐡'], n: 5, m: 'swim', sp: [14, 26], y: [0.4, 0.92], sz: [18, 26], a: 0.9 },
+     { e: ['🐋'], n: 1, m: 'swim', sp: [8, 12], y: [0.55, 0.8], sz: [60, 72], a: 0.75 },
+     { e: ['o'], n: 10, m: 'bubble', sp: [14, 28], sz: [3, 7], a: 0.5 }],
+    [{ e: ['🍃', '🍂', '🌿'], n: 8, m: 'drift', sp: [12, 22], sz: [16, 24], a: 0.9 },
+     { e: ['🐦'], n: 2, m: 'fly', sp: [24, 36], y: [0.08, 0.4], sz: [20, 26], a: 0.9 },
+     { e: ['🦋'], n: 2, m: 'flutter', sp: [14, 22], y: [0.3, 0.85], sz: [18, 24], a: 0.9 }],
+    [{ e: ['•'], n: 22, m: 'window', y: [0.35, 0.8], sz: [3, 5], a: 0.9 },
+     { e: ['🚗', '🚕', '🚌', '🚙'], n: 4, m: 'walk', sp: [30, 50], y: [0.94, 0.98], sz: [22, 28], a: 0.9 },
+     { e: ['✈️'], n: 1, m: 'fly', sp: [18, 26], y: [0.05, 0.18], sz: [22, 26], a: 0.85 }],
+    [{ e: ['*'], n: 40, m: 'star', y: [0, 0.7], sz: [1, 2.4], a: 1 },
+     { e: ['.'], n: 8, m: 'firefly', y: [0.55, 0.95], sz: [2, 3.5], a: 0.9 },
+     { e: ['-'], n: 1, m: 'shoot', sz: [2, 2], a: 0.9 }]
+  ];
+  const fx = { cv: null, ctx: null, w: 0, h: 0, list: [], theme: -1, last: 0, cache: new Map(), off: false };
+  try { fx.off = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function fxSize() {
+    if (!fx.cv) return;
+    const d = Math.min(2, root.devicePixelRatio || 1);
+    fx.w = root.innerWidth; fx.h = root.innerHeight;
+    fx.cv.width = Math.round(fx.w * d); fx.cv.height = Math.round(fx.h * d);
+    fx.ctx.setTransform(d, 0, 0, d, 0, 0);
+  }
+  function fxInit() {
+    if (fx.cv || fx.off || !doc.body || !doc.createElement) return;
+    const cv = doc.createElement('canvas'); if (!cv.getContext) return;
+    cv.className = 'fx'; cv.setAttribute('aria-hidden', 'true');
+    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
+    doc.body.insertBefore(cv, doc.body.firstChild);
+    const wrap = doc.querySelector('.wrap'); if (wrap) { wrap.style.position = 'relative'; wrap.style.zIndex = '1'; }
+    fx.cv = cv; fx.ctx = cv.getContext('2d'); fxSize();
+    root.addEventListener('resize', fxSize);
+  }
+  function fxSpawn(k, first) {
+    const dir = Math.random() < 0.5 ? 1 : -1, sz = rnd(k.sz[0], k.sz[1]);
+    const c = { k, ch: k.e[Math.floor(Math.random() * k.e.length)], sz, dir, ph: rnd(0, 6.28), sp: k.sp ? rnd(k.sp[0], k.sp[1]) : 0 };
+    const yr = k.y || [0, 1];
+    c.y = fx.h * rnd(yr[0], yr[1]); c.y0 = c.y;
+    if (k.m === 'drift') { c.x = rnd(0, fx.w); c.y = first ? rnd(-20, fx.h) : -30; }
+    else if (k.m === 'bubble') { c.x = rnd(0, fx.w); c.y = first ? rnd(0, fx.h) : fx.h + 10; }
+    else if (k.m === 'twinkle' || k.m === 'star' || k.m === 'window' || k.m === 'firefly') { c.x = rnd(0, fx.w); }
+    else if (k.m === 'shoot') { c.x = -999; c.wait = rnd(3, 9); }
+    else { c.x = first ? rnd(0, fx.w) : (dir > 0 ? -sz * 2 : fx.w + sz * 2); }
+    return c;
+  }
+  function fxTheme(i) {
+    fx.theme = i; fx.list = [];
+    for (const k of CRITTERS[i] || []) for (let n = 0; n < k.n; n++) fx.list.push(fxSpawn(k, true));
+  }
+  function glyph(ch, sz) {
+    const key = ch + '|' + Math.round(sz);
+    let g = fx.cache.get(key);
+    if (!g) {
+      g = doc.createElement('canvas'); const p = Math.ceil(sz * 1.5); g.width = g.height = p * 2;
+      const c = g.getContext('2d'); c.scale(2, 2); c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = Math.round(sz) + 'px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif';
+      c.fillText(ch, p / 2, p / 2); g.p = p; fx.cache.set(key, g);
+    }
+    return g;
+  }
+  function fxDraw(now) {
+    if (fx.off) return;
+    fxInit(); if (!fx.ctx) return;
+    if (fx.theme !== lookIdx) fxTheme(lookIdx < 0 ? 0 : lookIdx);
+    const t = now / 1000, dt = Math.min(0.05, fx.last ? t - fx.last : 0); fx.last = t;
+    const c = fx.ctx; c.clearRect(0, 0, fx.w, fx.h);
+    for (let i = 0; i < fx.list.length; i++) {
+      let o = fx.list[i]; const k = o.k, m = k.m;
+      let a = k.a, rot = 0, flip = o.dir > 0;
+      if (m === 'fly' || m === 'walk') { o.x += o.dir * o.sp * dt; o.y = o.y0 + (m === 'fly' ? Math.sin(t * 0.8 + o.ph) * 6 : 0); }
+      else if (m === 'flutter') { o.x += o.dir * o.sp * dt; o.y = o.y0 + Math.sin(t * 1.6 + o.ph) * 18; rot = Math.sin(t * 6 + o.ph) * 0.15; }
+      else if (m === 'swim') { o.x += o.dir * o.sp * dt; const s = Math.sin(o.x / 60 + o.ph); o.y = o.y0 + s * (o.sz * 0.5); rot = -Math.cos(o.x / 60 + o.ph) * 0.35 * o.dir; }
+      else if (m === 'drift') { o.y += o.sp * dt; o.x += Math.sin(t * 0.9 + o.ph) * 12 * dt; rot = Math.sin(t * 0.7 + o.ph) * 0.6; }
+      else if (m === 'bubble') { o.y -= o.sp * dt; o.x += Math.sin(t * 2 + o.ph) * 8 * dt; }
+      else if (m === 'twinkle' || m === 'star' || m === 'window') a = k.a * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * (m === 'window' ? 0.4 : 1.3) + o.ph * 3)));
+      else if (m === 'firefly') { o.x += Math.sin(t * 0.5 + o.ph) * 10 * dt; o.y += Math.cos(t * 0.6 + o.ph * 2) * 8 * dt; a = k.a * (0.5 + 0.5 * Math.sin(t * 1.8 + o.ph)); }
+      else if (m === 'shoot') {
+        if (o.x < -100) { o.wait -= dt; if (o.wait <= 0) { o.x = rnd(fx.w * 0.1, fx.w * 0.6); o.y = rnd(0, fx.h * 0.25); o.life = 0; } continue; }
+        o.life += dt; o.x += 220 * dt; o.y += 90 * dt; a = Math.max(0, 1 - o.life / 1.4);
+        if (a <= 0 || o.x > fx.w + 50) { fx.list[i] = fxSpawn(k, false); continue; }
+        const g2 = c.createLinearGradient(o.x - 70, o.y - 29, o.x, o.y); g2.addColorStop(0, 'rgba(255,255,255,0)'); g2.addColorStop(1, 'rgba(255,255,255,' + (a * 0.9) + ')');
+        c.strokeStyle = g2; c.lineWidth = 2; c.beginPath(); c.moveTo(o.x - 70, o.y - 29); c.lineTo(o.x, o.y); c.stroke(); continue;
+      }
+      const gone = o.x < -o.sz * 3 || o.x > fx.w + o.sz * 3 || o.y > fx.h + 40 || o.y < -60;
+      if (gone && m !== 'twinkle') { fx.list[i] = fxSpawn(k, false); continue; }
+      c.globalAlpha = a;
+      if (m === 'bubble') { c.strokeStyle = 'rgba(220,245,255,0.8)'; c.lineWidth = 1.2; c.beginPath(); c.arc(o.x, o.y, o.sz, 0, 6.283); c.stroke(); }
+      else if (m === 'star') { c.fillStyle = '#fff'; c.beginPath(); c.arc(o.x, o.y, o.sz, 0, 6.283); c.fill(); }
+      else if (m === 'window') { c.fillStyle = '#fde68a'; c.fillRect(o.x, o.y, o.sz, o.sz * 1.3); }
+      else if (m === 'firefly') { c.fillStyle = '#bef264'; c.shadowColor = '#bef264'; c.shadowBlur = 8; c.beginPath(); c.arc(o.x, o.y, o.sz, 0, 6.283); c.fill(); c.shadowBlur = 0; }
+      else {
+        const g = glyph(o.ch, o.sz);
+        c.save(); c.translate(o.x, o.y); if (rot) c.rotate(rot); if (flip && m !== 'drift' && m !== 'twinkle') c.scale(-1, 1);
+        c.drawImage(g, -g.p / 2, -g.p / 2, g.p, g.p); c.restore();
+      }
+    }
+    c.globalAlpha = 1;
+  }
   let last = performance.now();
   function loop(now) {
     applyLook(themeFor(g.level));
+    try { fxDraw(now); } catch (e) { fx.off = true; }
     const dt = now - last;
     last = now;
     const running = started && !g.over && !g.paused;
