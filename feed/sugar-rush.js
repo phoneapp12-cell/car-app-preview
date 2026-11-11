@@ -679,10 +679,66 @@
     return null;
   }
 
+  // 1.9.169 Tasteful candy sparkle: a glossy highlight on each sweet, a few
+  // staggered star glints (~0.6–1s), and a soft shimmer sweep. Cheap on a
+  // phone; prefers-reduced-motion keeps the gloss and tones the motion down.
+  const SPARKLE_MIN_MS = 600, SPARKLE_MAX_MS = 1000, SPARKLE_MAX = 4, SPARKLE_MAX_REDUCE = 1, SHIMMER_MS = 5200;
+  function sparkleCap(reduceMotion) { return reduceMotion ? SPARKLE_MAX_REDUCE : SPARKLE_MAX; }
+  function sparkleEase(p) {
+    if (p <= 0 || p >= 1) return 0;
+    const x = p < 0.4 ? (p / 0.4) : (1 - (p - 0.4) / 0.6);
+    return x * x * (3 - 2 * x);
+  }
+  function shimmerAt(t) {
+    const m = ((t % SHIMMER_MS) + SHIMMER_MS) % SHIMMER_MS;
+    return m / SHIMMER_MS;
+  }
+  // A 4-point sparkle (plus a smaller diagonal cross). No audio.
+  function drawStarGlint(ctx, x, y, r, a, rot) {
+    if (!ctx || !(a > 0.02) || !(r > 0)) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot || 0);
+    ctx.globalAlpha = Math.max(0, Math.min(1, a));
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    function cross(len, thick) {
+      ctx.beginPath();
+      ctx.moveTo(0, -len);
+      ctx.lineTo(thick, -thick);
+      ctx.lineTo(len, 0);
+      ctx.lineTo(thick, thick);
+      ctx.lineTo(0, len);
+      ctx.lineTo(-thick, thick);
+      ctx.lineTo(-len, 0);
+      ctx.lineTo(-thick, -thick);
+      ctx.closePath();
+      ctx.fill();
+    }
+    cross(r, r * 0.16);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    cross(r * 0.52, r * 0.1);
+    ctx.restore();
+  }
+  // Soft candy gloss: a sheen oval and a tiny specular, kept light so colours stay clear.
+  function drawCandyShine(ctx, R, amt) {
+    if (!ctx || !(R > 0)) return;
+    const a = amt == null ? 1 : amt;
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.42 * a) + ')';
+    ctx.beginPath();
+    ctx.ellipse(-R * .32, -R * .44, R * .34, R * .16, -.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.7 * a) + ')';
+    ctx.beginPath();
+    ctx.ellipse(-R * .16, -R * .54, R * .09, R * .055, -.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL,
-    VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep };
+    VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep,
+    SPARKLE_MIN_MS, SPARKLE_MAX_MS, SPARKLE_MAX, SPARKLE_MAX_REDUCE, SHIMMER_MS, sparkleCap, sparkleEase, shimmerAt, drawStarGlint, drawCandyShine };
 
   if (!root.document) return;
   const doc = root.document;
@@ -700,6 +756,7 @@
   let busy = false, sel = null, down = null, lastAct = performance.now();
   let sprites = new Map(), fx = [], hintMove = null;
   let winInfo = { newBadge: false, yum: false };
+  let sparkles = [], sparkleNext = 0, sparkleHoldT = null;
 
   function loadProg() {
     const p = ls.get('ib-sugar-progress', null) || {};
@@ -933,6 +990,7 @@
       ctx.fillStyle = '#c45c2e'; rr(-R * .7, -R * .55, R * 1.4, R * 1.2, R * .18); ctx.fill();
       ctx.fillStyle = '#e8b04a'; rr(-R * .7, -R * .55, R * 1.4, R * .4, R * .16); ctx.fill();
       ctx.fillStyle = '#fff6c8'; ctx.fillRect(-R * .08, -R * .7, R * .16, R * 1.35);
+      drawCandyShine(ctx, R * 0.85, 0.75);
       ctx.restore(); return;
     }
     if (t.ice > 0) {
@@ -941,11 +999,13 @@
       g.addColorStop(1, 'rgba(160,210,240,.8)');
       ctx.fillStyle = g; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .28); ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = R * .08; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .28); ctx.stroke();
+      drawCandyShine(ctx, R * 0.9, 0.7);
       ctx.restore(); return;
     }
     if (t.choco) {
       ctx.fillStyle = '#6b3a1f'; rr(-R * .85, -R * .85, R * 1.7, R * 1.7, R * .2); ctx.fill();
       ctx.fillStyle = '#4a2414'; rr(-R * .6, -R * .6, R * 1.2, R * 1.2, R * .12); ctx.fill();
+      drawCandyShine(ctx, R * 0.85, 0.55);
       ctx.restore(); return;
     }
     if (t.c < 0) {
@@ -953,6 +1013,7 @@
       g.addColorStop(0, '#9a6a4f'); g.addColorStop(.6, '#5b3423'); g.addColorStop(1, '#3a1f14');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * .95, 0, Math.PI * 2); ctx.fill();
       for (let i = 0; i < 14; i++) { const a = i * 2.39996, d = R * (.25 + .55 * ((i * 37) % 10) / 10); ctx.save(); ctx.translate(Math.cos(a) * d, Math.sin(a) * d); ctx.rotate(a * 1.7); ctx.fillStyle = COL[i % 6][1]; rr(-R * .13, -R * .05, R * .26, R * .1, R * .05); ctx.fill(); ctx.restore(); }
+      drawCandyShine(ctx, R, 0.8);
       ctx.restore(); return;
     }
     const c = COL[t.c];
@@ -969,7 +1030,7 @@
       for (let i = -2; i <= 2; i++) { if (t.s === 'row') ctx.fillRect(-R * 1.2, i * R * .42 - R * .08, R * 2.4, R * .16); else ctx.fillRect(i * R * .42 - R * .08, -R * 1.2, R * .16, R * 2.4); }
       ctx.restore();
     }
-    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.ellipse(-R * .3, -R * .42, R * .3, R * .15, -.5, 0, Math.PI * 2); ctx.fill();
+    drawCandyShine(ctx, R, 1);
     if (t.lock) {
       ctx.fillStyle = 'rgba(70,40,20,.8)'; rr(-R * .28, -R * .05, R * .56, R * .45, R * .08); ctx.fill();
       ctx.strokeStyle = 'rgba(70,40,20,.8)'; ctx.lineWidth = R * .1; ctx.beginPath(); ctx.arc(0, -R * .08, R * .2, Math.PI, 0); ctx.stroke();
@@ -989,9 +1050,42 @@
     DPR = Math.min(2.5, root.devicePixelRatio || 1);
     cv.width = Math.round(w * DPR); cv.height = cv.width; W = cv.width; CS = W / N;
   }
+  function tickSparkles(t, visible) {
+    const cap = sparkleCap(reduce);
+    sparkles = sparkles.filter(s => (t - s.t0) < s.dur && visible.has(s.id));
+    if (sparkleHoldT != null) return;
+    if (sparkles.length >= cap || t < sparkleNext || !visible.size) return;
+    const used = new Set(sparkles.map(s => s.id));
+    const pool = [];
+    for (const id of visible.keys()) if (!used.has(id)) pool.push(id);
+    if (!pool.length) return;
+    const id = pool[(Math.random() * pool.length) | 0];
+    const dur = reduce ? SPARKLE_MAX_MS : (SPARKLE_MIN_MS + Math.random() * (SPARKLE_MAX_MS - SPARKLE_MIN_MS));
+    sparkles.push({
+      id,
+      ox: (Math.random() - 0.5) * 0.5,
+      oy: (Math.random() - 0.55) * 0.5,
+      t0: t,
+      dur,
+      rot: Math.random() * Math.PI
+    });
+    sparkleNext = t + (reduce ? 900 : (160 + Math.random() * 260));
+  }
+  function drawShimmerSweep(t) {
+    if (reduce && sparkleHoldT == null) return;
+    const p = shimmerAt(t);
+    const x = (p * 1.7 - 0.35) * W;
+    const g = ctx.createLinearGradient(x - CS * 1.4, -CS * 0.2, x + CS * 1.4, CS * 0.5);
+    const peak = reduce ? 0.04 : 0.11;
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,252,245,' + peak + ')');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, W);
+  }
   function frame() {
     if (screen === 'game' && st) {
-      const t = now();
+      const t = sparkleHoldT != null ? sparkleHoldT : now();
       ctx.clearRect(0, 0, W, W);
       const sarah = st.lv && st.lv.theme === 'sarah';
       for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
@@ -1023,6 +1117,22 @@
         let wob = 0;
         if (hint && hint.some(h => h[0] === s.r && h[1] === s.c)) wob = Math.sin(t / 180) * .12;
         drawSweet(s.t, s.x * CS + CS / 2, s.y * CS + CS / 2, R, s.sc, s.al, wob);
+      }
+      const visible = new Map();
+      for (const s of sprites.values()) {
+        if (s.y < -0.5 || s.al < 0.35) continue;
+        visible.set(s.t.id, s);
+      }
+      tickSparkles(t, visible);
+      drawShimmerSweep(t);
+      for (const sp of sparkles) {
+        const s = visible.get(sp.id);
+        if (!s) continue;
+        const life = sparkleEase((t - sp.t0) / sp.dur);
+        if (life <= 0) continue;
+        const x = s.x * CS + CS / 2 + sp.ox * R * s.sc;
+        const y = s.y * CS + CS / 2 + sp.oy * R * s.sc;
+        drawStarGlint(ctx, x, y, R * (0.16 + 0.14 * life) * s.sc, 0.85 * life * s.al, sp.rot);
       }
       for (const f of fx) if (f.type === 'bit') {
         const p = Math.min(1, (t - f.t0) / f.dur); ctx.globalAlpha = 1 - p; ctx.fillStyle = f.col;
@@ -1323,6 +1433,40 @@
     setSound(on) { soundOn = !!on; ls.set('ib-sugar-sound', soundOn); paintButtons(); },
     setScore(n) { if (!st) return; st.score = n; st.moves = 0; st.over = true; st.won = goalsMet(st) || n >= (st.target || 0); st.stars = starsOf(st); hud(); },
     previewWin(opts) { opts = opts || {}; const n = opts.level || (st && st.lv && st.lv.n) || 2; if (!st || st.lv.n !== n) startLevel(n); st.score = opts.score || Math.max(st.lv.stars[2] || 0, 2400); st.moves = Math.max(st.moves, 1); st.won = true; st.over = true; st.stars = opts.stars || 3; if (opts.resetBadge) prog.badges[n - 1] = 0; winInfo = recordWin(st); hud(); showEnd(); },
-    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state })
+    view: () => ({ score: st && st.score, moves: st && st.moves, busy, soundOn, musicOn, screen, level: st && st.lv && st.lv.n, acState: ac && ac.state, sparkles: sparkles.length, hold: sparkleHoldT != null }),
+    // Freeze a sparkling board for screenshots (settled pieces, mid-sweep, a few glints at peak).
+    previewSparkle(opts) {
+      opts = opts || {};
+      startLevel(opts.level || 1);
+      musicOn = false; soundOn = false; paintButtons();
+      try { stopAllMusic(); } catch (e) { }
+      if (st && st.board && opts.specials !== false) {
+        const cells = [];
+        for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (isCandy(st.board[r][c])) cells.push([r, c]);
+        if (cells[10]) st.board[cells[10][0]][cells[10][1]].s = 'w';
+        if (cells[18]) st.board[cells[18][0]][cells[18][1]].s = 'row';
+        if (cells[25]) st.board[cells[25][0]][cells[25][1]].s = 'col';
+        if (cells[33]) st.board[cells[33][0]][cells[33][1]] = mk(-1, 'b');
+      }
+      syncAll();
+      for (const s of sprites.values()) { s.tw = null; s.pop = 0; s.grow = 0; s.x = s.c; s.y = s.r; s.sc = 1; s.al = 1; }
+      lastAct = now();
+      const want = opts.sweep != null ? opts.sweep : 0.48;
+      sparkleHoldT = Math.floor(now() / SHIMMER_MS) * SHIMMER_MS + want * SHIMMER_MS;
+      const ids = [...sprites.values()];
+      const picks = opts.glints || [1, 8, 19, 28];
+      sparkles = picks.slice(0, sparkleCap(false)).map((idx, i) => {
+        const s = ids[idx % Math.max(1, ids.length)];
+        return {
+          id: s.t.id,
+          ox: [-0.18, 0.22, -0.06, 0.14][i] || 0,
+          oy: [-0.28, 0.08, 0.24, -0.16][i] || 0,
+          t0: sparkleHoldT - 800 * 0.4,
+          dur: 800,
+          rot: i * 0.7
+        };
+      });
+      return { level: st.lv.n, sparkles: sparkles.length, sweep: want };
+    }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

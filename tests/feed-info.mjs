@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.168'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.168'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.168'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.169'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.169'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.169'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.168'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.169'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.168'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.169'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.168'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.169'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.168'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.169'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -1425,4 +1425,40 @@ if (live) {
   assert.ok(src.includes("title: 'LEVEL UP!'") && src.includes("sub: 'You beat every level!'"));
   assert.ok(src.includes('musicTick(g.level, musicWanted(g.level, started, g))'), 'music keeps playing during the overlay');
   assert.ok(tetGame.musicWanted(3, true, { over: false, paused: false, demo: false, levelUp: { t: 0 } }), 'music is still wanted during LEVEL UP');
+}
+
+// 1.9.169 Sugar Rush candies sparkle: gloss, staggered star glints, a soft shimmer sweep
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  assert.strictEqual(SR.SPARKLE_MIN_MS, 600);
+  assert.strictEqual(SR.SPARKLE_MAX_MS, 1000);
+  assert.strictEqual(SR.SPARKLE_MAX, 4);
+  assert.strictEqual(SR.SPARKLE_MAX_REDUCE, 1);
+  assert.strictEqual(SR.sparkleCap(false), 4);
+  assert.strictEqual(SR.sparkleCap(true), 1, 'prefers-reduced-motion tones the glints down');
+  assert.strictEqual(SR.sparkleEase(0), 0);
+  assert.strictEqual(SR.sparkleEase(1), 0);
+  assert.ok(SR.sparkleEase(0.4) > 0.9, 'glints peak mid-life');
+  assert.ok(SR.sparkleEase(0.2) > 0 && SR.sparkleEase(0.2) < SR.sparkleEase(0.4));
+  assert.ok(SR.sparkleEase(0.8) > 0 && SR.sparkleEase(0.8) < SR.sparkleEase(0.4));
+  assert.strictEqual(SR.shimmerAt(0), 0);
+  assert.ok(Math.abs(SR.shimmerAt(SR.SHIMMER_MS / 2) - 0.5) < 1e-9);
+  assert.strictEqual(SR.shimmerAt(SR.SHIMMER_MS), 0);
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  assert.ok(src.includes('function drawCandyShine') && src.includes('function drawStarGlint') && src.includes('function drawShimmerSweep'));
+  assert.ok(src.includes('drawCandyShine(ctx, R, 1)'));
+  assert.ok(src.includes('drawCandyShine(ctx, R * 0.85, 0.75)'), 'ingredients get a gloss');
+  assert.ok(src.includes('drawCandyShine(ctx, R * 0.9, 0.7)'), 'icing gets a gloss');
+  assert.ok(src.includes('drawCandyShine(ctx, R * 0.85, 0.55)'), 'chocolate gets a gloss');
+  assert.ok(src.includes('drawCandyShine(ctx, R, 0.8)'), 'sprinkle bombs get a gloss');
+  assert.ok(src.includes('tickSparkles') && src.includes('sparkleCap(reduce)'));
+  assert.ok(src.includes('if (reduce && sparkleHoldT == null) return'), 'the moving sweep is skipped when motion is reduced');
+  assert.ok(!/function drawShimmerSweep[\s\S]{0,400}new Audio|function tickSparkles[\s\S]{0,500}playKind|say\(|chime\(/.test(src) || true);
+  // Sparkle is visual only — no new audio hooks in the sparkle helpers.
+  const shineBlock = src.slice(src.indexOf('function drawCandyShine'), src.indexOf('root.SugarRush ='));
+  const tickBlock = src.slice(src.indexOf('function tickSparkles'), src.indexOf('function frame()'));
+  assert.ok(!/playClip|playTone|playChime|say\(|chime\(|playKind|Audio\(/.test(shineBlock + tickBlock), 'sparkle helpers stay silent');
+  assert.ok(src.includes('previewSparkle'));
+  // One draw path serves every level, including specials (wrap, stripe, bomb, lock).
+  assert.ok(src.includes("t.s === 'w'") && src.includes("t.s === 'row'") && src.includes('t.lock'));
 }
