@@ -303,7 +303,7 @@
     { bpm: 117.5, offset: 0.209, key: 'A', mode: 'major' },
     { bpm: 112.5, offset: 0.468, key: 'D#', mode: 'major' },
     { bpm: 123, offset: 0.218, key: 'G', mode: 'major' },
-    { bpm: 129, offset: 0.229, key: 'D', mode: 'major' }
+    { bpm: 165, offset: 0.015, key: 'D', mode: 'major' }
   ];
   const MAJOR_IV = [0, 2, 4, 5, 7, 9, 11], MINOR_IV = [0, 2, 3, 5, 7, 8, 10];
   const PC = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
