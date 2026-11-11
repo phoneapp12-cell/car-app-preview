@@ -138,7 +138,9 @@
   // Colourful picture behind each theme (same order as THEMES), softened with a dark veil so the blocks stand out.
   const PICS = THEMES.map((_, i) => 'tetris-bg/' + i + '.webp');
   let themeIdx = 0;
-  function themeFor(level) { return (Math.max(1, level) - 1) % THEMES.length; }
+  // Level order (indexes into THEMES): Farmyard, Triangles, Beach, Rainforest, Ocean, Bush walk, New Zealand, Snowy mountains, City, Night sky, Space travel last.
+  const ORDER = [6, 8, 0, 1, 2, 3, 9, 10, 4, 5, 7];
+  function themeFor(level) { return ORDER[(Math.max(1, level) - 1) % ORDER.length]; }
   function sfx(name) {
     if (!soundOn || !ac) return;
     const d = sfxGain, T = THEMES[themeIdx], m = T.pitch * 0.5, w = 'sine', lo = f => nf(f) / 2;
