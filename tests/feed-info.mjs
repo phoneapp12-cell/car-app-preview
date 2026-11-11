@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.166'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.166'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.166'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.167'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.167'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.167'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.166'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.167'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.166'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.167'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.166'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.167'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.166'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.167'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -1229,11 +1229,13 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   tetGame.lockPiece(gUp);
   assert.strictEqual(gUp.level, 2);
   assert.ok(gUp.pendingLevel);
-  assert.ok(gUp.popup.startsWith('Single'), 'level-up popup waits until the flourish ends');
+  assert.ok(gUp.popup.startsWith('Single'), 'LEVEL UP overlay waits until the flourish ends');
   tetGame.tickClear(gUp, 400);
   assert.strictEqual(gUp.clearFx, null);
   assert.strictEqual(gUp.pendingLevel, null);
-  assert.ok(gUp.popup.startsWith('Level 2'));
+  assert.ok(gUp.levelUp);
+  assert.strictEqual(gUp.levelUp.title, 'LEVEL UP!');
+  assert.ok(gUp.levelUp.sub.startsWith('Level 2'));
 
   const src = fs.readFileSync('feed/tetris.js', 'utf8');
   assert.ok(src.includes('function drawClearFx'));
@@ -1304,4 +1306,99 @@ if (live) {
   assert.ok(scrabbleHtml.includes('scrabble.js?v=') && scrabbleHtml.includes('scores.js?v='));
   const playFile = fs.readFileSync('feed/play.js', 'utf8');
   assert.ok(playFile.includes('const gameUrl = name =>') && playFile.includes("gameUrl('tetris')") && playFile.includes("gameUrl('sugar-rush')"));
+}
+
+// LEVEL UP! overlay after a theme change, plus a distinct whoosh-to-chord cue
+{
+  assert.strictEqual(tetGame.levelUpDuration(), 1800);
+  const c3 = tetGame.levelUpCopy(2, 3);
+  assert.strictEqual(c3.title, 'LEVEL UP!');
+  assert.strictEqual(c3.sub, 'Level 3: Beach');
+  assert.strictEqual(c3.beat, false);
+  assert.strictEqual(c3.theme, tetGame.themeFor(3));
+  const c2 = tetGame.levelUpCopy(1, 2);
+  assert.strictEqual(c2.sub, 'Level 2: Jeremiah was a bullfrog');
+  const c12 = tetGame.levelUpCopy(11, 12);
+  assert.strictEqual(c12.sub, 'Level 12: Space travel');
+  const beaten = tetGame.levelUpCopy(12, 13);
+  assert.strictEqual(beaten.beat, true);
+  assert.strictEqual(beaten.title, 'YOU DID IT!');
+  assert.strictEqual(beaten.sub, 'You beat every level!');
+  assert.strictEqual(tetGame.themeFor(12), tetGame.SPACE_THEME);
+
+  const PC = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+  const IV = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
+  const pcOf = hz => { const midi = 69 + 12 * Math.log2(hz / 440); return ((Math.round(midi) % 12) + 12) % 12; };
+  for (let i = 0; i < 12; i++) {
+    const notes = tetGame.levelUpNotes(i);
+    assert.ok(notes && notes.length >= 4, 'level-up notes theme ' + i);
+    const tr = tetGame.TRACKS[i];
+    const scale = new Set(IV[tr.mode].map(n => (n + PC[tr.key]) % 12));
+    notes.forEach(f => {
+      assert.ok(f >= tetGame.LU_LO && f <= tetGame.LU_HI, 'level-up Hz ' + f + ' theme ' + i);
+      assert.ok(scale.has(pcOf(f)), 'level-up in-key ' + f + ' theme ' + i);
+    });
+    const arp = tetGame.sfxFreqs(i, 'level');
+    arp.forEach(f => assert.ok(f >= 300 && f <= 800, 'level arp mid register ' + f));
+  }
+
+  function almostFull(g, rows) {
+    g.board = tetGame.emptyBoard();
+    rows.forEach(r => { for (let c = 0; c < 9; c++) g.board[r][c] = 2; });
+    const h = rows.length;
+    g.piece = { t: 1, m: Array.from({ length: h }, () => [1]), x: 9, y: rows[0] };
+    g.next = 4;
+  }
+  const g = tetGame.newGame();
+  g.lines = 9; g.level = 1;
+  almostFull(g, [19]);
+  tetGame.lockPiece(g);
+  assert.strictEqual(g.level, 2);
+  assert.ok(g.pendingLevel && g.pendingLevel.from === 1 && g.pendingLevel.to === 2);
+  assert.strictEqual(g.levelUp, null, 'level-up waits until the line-clear flourish ends');
+  tetGame.tickClear(g, 500);
+  assert.strictEqual(g.clearFx, null);
+  assert.ok(g.levelUp, 'LEVEL UP starts after the clear');
+  assert.strictEqual(g.levelUp.title, 'LEVEL UP!');
+  assert.strictEqual(g.levelUp.sub, 'Level 2: Jeremiah was a bullfrog');
+  assert.strictEqual(g.levelUp.kind, 'frog');
+  assert.ok(g.levelUp.parts.length >= 8);
+  assert.strictEqual(g.levelUp.dur, 1800);
+  const heldX = g.piece.x;
+  tetGame.act(g, 'left');
+  assert.strictEqual(g.piece.x, heldX, 'piece is frozen during the LEVEL UP banner');
+  assert.ok(tetGame.tickLevelUp(g, 400));
+  assert.ok(g.levelUp);
+  assert.ok(!tetGame.tickLevelUp(g, 2000));
+  assert.strictEqual(g.levelUp, null);
+  tetGame.act(g, 'left');
+  assert.notStrictEqual(g.piece.x, heldX, 'play resumes after the banner');
+
+  const pick = tetGame.newGame({ level: 11, practice: true });
+  assert.strictEqual(pick.level, 11);
+  pick.lines = 109;
+  almostFull(pick, [19]);
+  tetGame.lockPiece(pick);
+  assert.strictEqual(pick.level, 12);
+  tetGame.tickClear(pick, 1000);
+  assert.ok(pick.levelUp);
+  assert.strictEqual(pick.levelUp.sub, 'Level 12: Space travel');
+
+  const last = tetGame.newGame({ level: 12, practice: true });
+  last.lines = 119;
+  almostFull(last, [19]);
+  tetGame.lockPiece(last);
+  assert.strictEqual(last.level, 13);
+  tetGame.tickClear(last, 1000);
+  assert.ok(last.levelUp);
+  assert.strictEqual(last.levelUp.title, 'YOU DID IT!');
+  assert.strictEqual(last.levelUp.sub, 'You beat every level!');
+
+  const src = fs.readFileSync('feed/tetris.js', 'utf8');
+  assert.ok(src.includes('playLevelUpSfx(ti)') && src.includes("bp.type = 'bandpass'") && src.includes('luBell'));
+  assert.ok(src.includes('frequency.value = 1100') || src.includes('frequency.value = 1200'));
+  assert.ok(src.includes('duckMusic(delay, 0.75)'));
+  assert.ok(src.includes("title: 'LEVEL UP!'") && src.includes("sub: 'You beat every level!'"));
+  assert.ok(src.includes('musicTick(g.level, musicWanted(g.level, started, g))'), 'music keeps playing during the overlay');
+  assert.ok(tetGame.musicWanted(3, true, { over: false, paused: false, demo: false, levelUp: { t: 0 } }), 'music is still wanted during LEVEL UP');
 }
