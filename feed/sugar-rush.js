@@ -581,10 +581,13 @@
   // the SW leaves range requests alone.
   const MEDIA_HASH = {
     'sugar-rush-music.mp3': '39970f66', 'sugar-rush-menu.mp3': '3343a079', 'sugar-rush-win.mp3': '9b0efbad', 'sugar-rush-yum.mp3': 'ac1b2cf5',
+    'sugar-rush-l1.mp3': '3fd00f38',
     'sugar-rush-voice-yay.mp3': '6ca043f6', 'sugar-rush-voice-great.mp3': 'c287c114', 'sugar-rush-voice-awesome.mp3': 'a56af295',
     'sugar-rush-voice-sweetas.mp3': '50b435e6', 'sugar-rush-voice-succulent.mp3': '1d5018ba'
   };
   function mediaUrl(file) { return file.replace(/\.mp3$/, '-' + MEDIA_HASH[file] + '.mp3'); }
+  // Level 1 plays Shane's "Sugar Rush" song; later levels keep the usual gameplay loop.
+  function gameTrack(level) { return level === 1 ? 'sugar-rush-l1.mp3' : 'sugar-rush-music.mp3'; }
 
   function attachSfxBus(ctx) {
     const mix = ctx.createGain(); mix.gain.value = 1;
@@ -679,7 +682,7 @@
   root.SugarRush = { N, KINDS, PTS, LEVEL, LEVELS, BONUS, NAMES, HOLE, rng, fromRows, toRows, findRuns, groups, specialFor, resolve, collapse, applyStep, validSwap, findMove, hasMove, shuffle, newBoard, newGame, play, starsFor, starsOf, goalsMet, jellyLeft, iceLeft, cloneState, bestMove, tryBeat, lvOf, isHole, isCandy, isIng, isBlock,
     allowed: () => !!(root.IBScores && root.IBScores.isShane && root.IBScores.isShane()),
     SCALE, SFX_MAX_HZ, SFX_LP, SFX_NOTE, SFX_MASTER, VOICE_VOL, CHIME_VOL, CHIME_DUR, VOICE_GAP, BGM_VOL, BGM_DUCK, END_VOL, MENU_VOL,
-    VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, attachSfxBus, playTone, playChime, playClip, voiceForStep };
+    VOICE_FILES, VOICE_RANK, MEDIA_HASH, mediaUrl, gameTrack, attachSfxBus, playTone, playChime, playClip, voiceForStep };
 
   if (!root.document) return;
   const doc = root.document;
@@ -740,8 +743,9 @@
     loading[kind] = fetch(mediaUrl(TRACKS[kind])).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
-  const TRACKS = { game: 'sugar-rush-music.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent };
+  const TRACKS = { game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent };
   function volFor(kind) { return kind === 'menu' ? MENU_VOL : BGM_VOL; }
+  function gameKind(level) { return (level == null ? lvNum : level) === 1 ? 'game1' : 'game'; }
   function stopSrc(src, fade) {
     if (!src || !ac) return;
     try {
@@ -778,7 +782,7 @@
     else go();
   }
   function musicForScreen() { return (screen === 'game' && !$('end').hidden === false) || screen === 'game' ? ( $('end').hidden === false ? musicKind || 'game' : 'game') : 'menu'; }
-  function wantKind() { return screen === 'game' ? 'game' : 'menu'; }
+  function wantKind() { return screen === 'game' ? gameKind(lvNum) : 'menu'; }
   function duckMusic() {
     if (!ac || !musicGain) return;
     const t = ac.currentTime;
@@ -1123,7 +1127,7 @@
     fitCanvas(); syncAll(); hud();
     hintMove = findMove(st.board, st.mask);
     for (const s of sprites.values()) { s.y = s.r - N - 1 + (N - s.r) * .2; moveTo(s, s.r, s.c, 300 + (N - s.r) * 40, easeOut); }
-    if (musicOn) playKind('game');
+    if (musicOn) playKind(wantKind());
   }
 
   async function attempt(a, z) {
@@ -1248,7 +1252,7 @@
     leaveEnd();
     if (lvNum < 10) openLevel(lvNum + 1);
     else showMap();
-    if (screen === 'game' && musicOn) playKind('game');
+    if (screen === 'game' && musicOn) playKind(wantKind());
   }
   function backToMap() {
     leaveEnd();
