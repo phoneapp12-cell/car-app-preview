@@ -581,13 +581,14 @@
   // the SW leaves range requests alone.
   const MEDIA_HASH = {
     'sugar-rush-music.mp3': '39970f66', 'sugar-rush-menu.mp3': '3343a079', 'sugar-rush-win.mp3': '9b0efbad', 'sugar-rush-yum.mp3': 'ac1b2cf5',
-    'sugar-rush-l1.mp3': '3fd00f38',
+    'sugar-rush-l1.mp3': '3fd00f38', 'sugar-rush-l2.mp3': '34c4b4be',
     'sugar-rush-voice-yay.mp3': '6ca043f6', 'sugar-rush-voice-great.mp3': 'c287c114', 'sugar-rush-voice-awesome.mp3': 'a56af295',
     'sugar-rush-voice-sweetas.mp3': '50b435e6', 'sugar-rush-voice-succulent.mp3': '1d5018ba'
   };
   function mediaUrl(file) { return file.replace(/\.mp3$/, '-' + MEDIA_HASH[file] + '.mp3'); }
-  // Level 1 plays Shane's "Sugar Rush" song; later levels keep the usual gameplay loop.
-  function gameTrack(level) { return level === 1 ? 'sugar-rush-l1.mp3' : 'sugar-rush-music.mp3'; }
+  // Level 1 plays Shane's "Sugar Rush" song, level 2 plays "Sarah's Sugar Sprint";
+  // later levels keep the usual gameplay loop.
+  function gameTrack(level) { return level === 1 ? 'sugar-rush-l1.mp3' : level === 2 ? 'sugar-rush-l2.mp3' : 'sugar-rush-music.mp3'; }
 
   function attachSfxBus(ctx) {
     const mix = ctx.createGain(); mix.gain.value = 1;
@@ -800,9 +801,12 @@
     loading[kind] = fetch(mediaUrl(TRACKS[kind])).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { bufs[kind] = b; return b; }).catch(() => { loading[kind] = null; return null; });
     return loading[kind];
   }
-  const TRACKS = { game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent };
+  const TRACKS = { game: 'sugar-rush-music.mp3', game1: 'sugar-rush-l1.mp3', game2: 'sugar-rush-l2.mp3', menu: 'sugar-rush-menu.mp3', win: 'sugar-rush-win.mp3', yum: 'sugar-rush-yum.mp3', yay: VOICE_FILES.yay, great: VOICE_FILES.great, awesome: VOICE_FILES.awesome, sweetas: VOICE_FILES.sweetas, succulent: VOICE_FILES.succulent };
   function volFor(kind) { return kind === 'menu' ? MENU_VOL : BGM_VOL; }
-  function gameKind(level) { return (level == null ? lvNum : level) === 1 ? 'game1' : 'game'; }
+  function gameKind(level) {
+    const n = level == null ? lvNum : level;
+    return n === 1 ? 'game1' : n === 2 ? 'game2' : 'game';
+  }
   function stopSrc(src, fade) {
     if (!src || !ac) return;
     try {
