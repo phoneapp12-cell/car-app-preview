@@ -163,13 +163,15 @@
   }
   // 1.9.150 Space travel (theme 7, last level) plays like Space Invaders: bombs only clear one settled block,
   // never the falling piece, and blocks above do not drop.
+  // 1.9.154 First bomb comes in 4–6s, then every 6–10s, aiming at columns with blocks.
   const SPACE_THEME = 7;
-  function bombWaitRange(level) {
-    const t = Math.max(0, Math.min(1, (Math.max(1, level) - 12) / 24));
-    return [11 - 3 * t, 15 - 3 * t];
+  // First bomb 4–6s after the Space level starts, then every 6–10s.
+  function bombWaitRange(level, first) {
+    if (first) return [4, 6];
+    return [6, 10];
   }
-  function bombWait(level) {
-    const [lo, hi] = bombWaitRange(level);
+  function bombWait(level, first) {
+    const [lo, hi] = bombWaitRange(level, first);
     return (lo + Math.random() * (hi - lo)) * 1000;
   }
   function pieceCovers(g, c, r) {
@@ -185,9 +187,212 @@
     if (g.board[r][c]) { g.board[r][c] = 0; return 'block'; }
     return 'empty';
   }
-  function sfx(name) {
+  // Invader motion and bombs, kept here so tests can run it without a page.
+  const INV_PX = 2, INV_GAP = 48, INV_COUNT = 5;
+  const INV_W = 11 * INV_PX, INV_H = 8 * INV_PX;
+  const BOMB_VY = 3 * CELL; // px/s: slow enough to watch, fast enough to hit a stack within ~12s
+  function newInvaders() {
+    return { ready: false, x: 12, dir: 1, wait: 0, bombs: [], boom: [], t: 0, first: true };
+  }
+  function resetInvaders(inv, level) {
+    inv.ready = true; inv.x = 12; inv.dir = 1; inv.bombs = []; inv.boom = []; inv.t = 0; inv.first = true;
+    inv.wait = themeFor(level) === SPACE_THEME ? bombWait(level, true) : 0;
+    return inv;
+  }
+  function seedInvaders(inv, g, opts) {
+    opts = opts || {};
+    if (themeFor(g.level) !== SPACE_THEME) { inv.ready = false; inv.bombs = []; inv.boom = []; return inv; }
+    resetInvaders(inv, g.level);
+    inv.wait = 1e9; // still picture for screenshots: no bombs drop
+    if (opts.invX != null) inv.x = opts.invX;
+    if (opts.bomb) inv.bombs.push(opts.bomb);
+    if (opts.boom) inv.boom = opts.boom.slice();
+    return inv;
+  }
+  function dropBomb(inv, g) {
+    const choices = [];
+    for (let i = 0; i < INV_COUNT; i++) {
+      const cx = inv.x + i * INV_GAP + INV_W / 2;
+      const col = Math.max(0, Math.min(COLS - 1, Math.floor(cx / CELL)));
+      choices.push({ cx, col, stacked: g.board.some(row => row[col]) });
+    }
+    const stacked = choices.filter(c => c.stacked);
+    const pool = stacked.length ? stacked : choices;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    inv.bombs.push({ x: pick.cx, y: INV_H + 10, col: pick.col, vy: BOMB_VY });
+  }
+  function moveBombs(inv, g, dt, onThump) {
+    const keep = [];
+    for (const b of inv.bombs) {
+      const from = Math.floor(b.y / CELL);
+      b.y += b.vy * dt / 1000;
+      const to = Math.floor(b.y / CELL);
+      let dead = false;
+      for (let r = from; r <= to; r++) {
+        const hit = applyBombHit(g, b.col, r);
+        if (hit === 'block') {
+          inv.boom.push({ c: b.col, r: r, t: 420 });
+          if (onThump) onThump();
+          dead = true;
+          break;
+        }
+        if (hit === 'gone') { dead = true; break; }
+      }
+      if (!dead && b.y < ROWS * CELL + 10) keep.push(b);
+    }
+    inv.bombs = keep;
+  }
+  function stepInvaders(inv, g, dt, flags) {
+    flags = flags || {};
+    if (themeFor(g.level) !== SPACE_THEME) { if (inv.ready) { inv.ready = false; inv.bombs = []; inv.boom = []; } return inv; }
+    if (!inv.ready) resetInvaders(inv, g.level);
+    inv.t += dt;
+    if (flags.demo || g.demo) return inv;
+    if (inv.boom.length) {
+      for (const e of inv.boom) e.t -= dt;
+      inv.boom = inv.boom.filter(e => e.t > 0);
+    }
+    const moving = flags.started !== false && !g.over && !g.paused;
+    if (!moving) return inv;
+    const span = COLS * CELL - ((INV_COUNT - 1) * INV_GAP + INV_W) - 36;
+    inv.x += inv.dir * 22 * (dt / 1000);
+    if (inv.x < 4) { inv.x = 4; inv.dir = 1; }
+    if (inv.x > span - 4) { inv.x = span - 4; inv.dir = -1; }
+    if (inv.bombs.length === 0) {
+      inv.wait -= dt;
+      if (inv.wait <= 0) {
+        dropBomb(inv, g);
+        inv.wait = bombWait(g.level, false);
+        inv.first = false;
+      }
+    }
+    moveBombs(inv, g, dt, flags.onThump);
+    return inv;
+  }
+
+  // Offline analysis of tetris-bg/m0..m11.mp3: tempo, first-beat phase (loop-safe), key.
+  const TRACKS = [
+    { bpm: 143.5, offset: 0.069, key: 'E', mode: 'major' },
+    { bpm: 117.5, offset: 0.047, key: 'F#', mode: 'minor' },
+    { bpm: 136, offset: 0, key: 'C#', mode: 'major' },
+    { bpm: 117.5, offset: 0.348, key: 'G', mode: 'major' },
+    { bpm: 99.5, offset: 0.096, key: 'C', mode: 'major' },
+    { bpm: 117.5, offset: 0.282, key: 'D', mode: 'minor' },
+    { bpm: 161.5, offset: 0.279, key: 'D', mode: 'major' },
+    { bpm: 123, offset: 0.163, key: 'D', mode: 'minor' },
+    { bpm: 117.5, offset: 0.209, key: 'A', mode: 'major' },
+    { bpm: 112.5, offset: 0.468, key: 'D#', mode: 'major' },
+    { bpm: 123, offset: 0.218, key: 'G', mode: 'major' },
+    { bpm: 129, offset: 0.229, key: 'D', mode: 'major' }
+  ];
+  const MAJOR_IV = [0, 2, 4, 5, 7, 9, 11], MINOR_IV = [0, 2, 3, 5, 7, 8, 10];
+  const PC = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+  const SFX_MAX_HZ = 800, SFX_LO = 48, SFX_HI = 76, MAX_Q = 0.12;
+  function midiHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  function scaleMidi(tr) {
+    if (!tr || tr.key == null) return null;
+    const tonic = PC[tr.key];
+    if (tonic == null) return null;
+    const iv = tr.mode === 'minor' ? MINOR_IV : MAJOR_IV;
+    const out = [];
+    for (let m = SFX_LO; m <= SFX_HI; m++) if (iv.indexOf((m - tonic + 120) % 12) >= 0) out.push(m);
+    return out;
+  }
+  // Quantise a sound to the music grid. Delay is wall-clock seconds, never more than 120ms.
+  // land/clear: next beat or half-beat. rotate: nearest 8th note. Missing data → 0 (play now).
+  function quantizeDelay(currentTime, playbackRate, meta, mode) {
+    if (!meta || !(meta.bpm > 0)) return 0;
+    const rate = playbackRate > 0 ? playbackRate : 1;
+    const period = 60 / meta.bpm;
+    const offset = meta.offset || 0;
+    const t = currentTime - offset;
+    if (!isFinite(t) || !isFinite(period) || period <= 0) return 0;
+    const grid = period / 2;
+    if (mode === 'nearest8th') {
+      const k = Math.round(t / grid);
+      const target = offset + k * grid;
+      const wall = (target - currentTime) / rate;
+      if (wall > 0 && wall <= MAX_Q) return wall;
+      return 0;
+    }
+    const behind = ((t % grid) + grid) % grid;
+    if (behind < 0.004 || grid - behind < 0.004) return 0;
+    const kCeil = Math.ceil(t / grid - 1e-9);
+    const target = offset + kCeil * grid;
+    const wall = (target - currentTime) / rate;
+    if (wall > 0 && wall <= MAX_Q) return wall;
+    return 0;
+  }
+  function sfxFreqs(ti, name, lines) {
+    const scale = scaleMidi(TRACKS[ti]);
+    if (!scale || !scale.length) return null;
+    const mid = Math.max(0, scale.findIndex(m => m >= 55));
+    const hz = i => midiHz(scale[Math.max(0, Math.min(scale.length - 1, mid + i))]);
+    if (name === 'rotate') return [hz(2)];
+    if (name === 'land') return [hz(-2)];
+    if (name === 'level') return [0, 1, 2, 4].map(hz);
+    if (name === 'tetris') return [0, 1, 2, 3, 4, 5].map(hz);
+    if (name === 'clear') {
+      const n = Math.max(1, Math.min(3, lines || 1));
+      return [0, 2, 4, 7].slice(0, n + 1).map(hz);
+    }
+    return null;
+  }
+  function softTone(freq, dur, type, vol, dest, at) {
+    if (!ac || !dest) return;
+    const f = Math.max(40, Math.min(SFX_MAX_HZ, freq));
+    const t0 = at;
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 900;
+    o.type = type === 'triangle' ? 'triangle' : 'sine';
+    o.frequency.setValueAtTime(f, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    const att = Math.min(0.04, dur * 0.3);
+    g.gain.linearRampToValueAtTime(vol, t0 + att);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(lp); lp.connect(dest);
+    o.start(t0);
+    o.stop(t0 + dur + 0.03);
+  }
+  let duckTok = 0;
+  function duckMusic(delay, dur) {
+    if (!musicOn || !bgm) return;
+    const tok = ++duckTok;
+    const go = () => {
+      try {
+        if (!bgm || !musicOn || tok !== duckTok) return;
+        bgm.volume = 0.4;
+        setTimeout(() => { try { if (bgm && musicOn && tok === duckTok) bgm.volume = 0.5; } catch (e) { } }, Math.max(200, (dur || 0.45) * 1000));
+      } catch (e) { }
+    };
+    if (delay > 0) setTimeout(go, delay * 1000);
+    else go();
+  }
+  function sfxDelay(kind) {
+    if (!musicOn || !bgm || bgm.paused) return 0;
+    const tr = TRACKS[themeIdx];
+    if (!tr) return 0;
+    try { return quantizeDelay(bgm.currentTime, bgm.playbackRate || 1, tr, kind === 'rotate' ? 'nearest8th' : 'next'); }
+    catch (e) { return 0; }
+  }
+  function sfx(name, lines) {
     if (!soundOn || !ac) return;
     const d = sfxGain, T = THEMES[themeIdx], m = T.pitch * 0.5, w = 'sine', lo = f => nf(f) / 2;
+    const musical = name === 'rotate' || name === 'lock' || name === 'drop' || name === 'clear' || name === 'tetris' || name === 'level';
+    const notes = musical ? sfxFreqs(themeIdx, (name === 'drop' || name === 'lock') ? 'land' : name, lines) : null;
+    if (notes && notes.length) {
+      const delay = sfxDelay(name);
+      const t0 = ac.currentTime + delay;
+      const typ = (T && T.sfx) === 'triangle' ? 'triangle' : 'sine';
+      if (name === 'clear' || name === 'tetris') duckMusic(delay, name === 'tetris' ? 0.7 : 0.5);
+      const gap = (name === 'tetris' || name === 'level') ? 0.09 : 0.1;
+      const dur = (name === 'rotate') ? 0.12 : (name === 'lock' || name === 'drop') ? 0.2 : 0.5;
+      const vol = 0.08;
+      notes.forEach((f, i) => softTone(f, dur, typ, vol, d, t0 + i * gap));
+      return;
+    }
     switch (name) {
       // Soft chimes and drops, pitched and voiced to the current theme.
       case 'move': tone(880 * m, 0.05, w, 0.05, 0, 0, d); break;
@@ -430,7 +635,7 @@
       g.flashT = 180;
       g.popup = LINE_WORDS[full.length] + ' +' + pts;
       g.popupT = 1100;
-      sfx(full.length === 4 ? 'tetris' : 'clear');
+      sfx(full.length === 4 ? 'tetris' : 'clear', full.length);
       if (g.level > oldLevel) { themeIdx = themeFor(g.level); noteIdx = 0; setTimeout(() => sfx('level'), 350); g.popup = 'Level ' + g.level + '! +' + pts; }
     } else sfx('lock');
     g.piece = spawn(g.next);
@@ -497,11 +702,12 @@
     if (!bgmWant) { bgmWant = true; try { const p = a.play(); if (p && p.catch) p.catch(() => { bgmWant = false; }); } catch (e) { bgmWant = false; } }
   }
   function stopAudio() {
-    if (bgm) { try { bgm.pause(); } catch (e) { } bgmWant = false; }
+    duckTok++;
+    if (bgm) { try { bgm.pause(); bgm.volume = 0.5; } catch (e) { } bgmWant = false; }
     if (ac) { try { ac.close(); } catch (e) { } }
     ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY };
 
   if (!root.document) return;
   const doc = root.document;
@@ -545,7 +751,7 @@
   function press(a) {
     if (!started) started = true;
     const next = act(g, a);
-    if (a === 'restart') { g = next; if (root.IBScores) root.IBScores.close(); }
+    if (a === 'restart') { g = next; invReset(); if (root.IBScores) root.IBScores.close(); }
     syncHud();
   }
   root.Tetris.press = press;
@@ -604,7 +810,7 @@
     themeIdx = themeFor(g.level);
     lookIdx = -1;
     applyLook(themeIdx);
-    invSeed();
+    invReset();
     syncHud();
   }
   function showShanePicker(force) {
@@ -907,84 +1113,16 @@
     c.globalAlpha = 1;
   }
   // Pixel invaders on the Space travel board. They drift; bombs fall slowly down a column.
-  const INV_PX = 2, INV_GAP = 48, INV_COUNT = 5;
-  const INV_W = 11 * INV_PX, INV_H = 8 * INV_PX;
   const INV_SPRITES = [
     [['..#.....#..','...#...#...','..#######..','.##.#.#.##.','###########','#.#.###.#.#','#.#.....#.#','...##.##...'],
      ['..#.....#..','#..#...#..#','#.#######.#','###.#.#.###','.#########.','..#.###.#..','..#.....#..','.#.......#.' ]],
     [['...#.#.....','..#####....','.#######...','.#.#.#.#...','#########..','.#####.#...','#.#...#.#..','.#.#.......'],
      ['...#.#.....','..#####....','.#######...','#.#.#.#.#..','#########..','.#.#####...','..#...#.#..','.......#.#.']]
   ];
-  const inv = { ready: false, x: 12, dir: 1, wait: 0, bombs: [], boom: [], t: 0 };
-  function invReset() {
-    inv.ready = true; inv.x = 12; inv.dir = 1; inv.bombs = []; inv.boom = []; inv.t = 0;
-    inv.wait = themeFor(g.level) === SPACE_THEME ? bombWait(g.level) : 0;
-  }
-  function invSeed(opts) {
-    opts = opts || {};
-    if (themeFor(g.level) !== SPACE_THEME) { inv.ready = false; inv.bombs = []; inv.boom = []; return; }
-    invReset();
-    inv.wait = 1e9;
-    if (opts.invX != null) inv.x = opts.invX;
-    if (opts.bomb) inv.bombs.push(opts.bomb);
-    if (opts.boom) inv.boom = opts.boom.slice();
-  }
-  function invDrop() {
-    const choices = [];
-    for (let i = 0; i < INV_COUNT; i++) {
-      const cx = inv.x + i * INV_GAP + INV_W / 2;
-      const col = Math.max(0, Math.min(COLS - 1, Math.floor(cx / CELL)));
-      choices.push({ cx, col, stacked: g.board.some(row => row[col]) });
-    }
-    const stacked = choices.filter(c => c.stacked);
-    const pool = stacked.length ? stacked : choices;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    inv.bombs.push({ x: pick.cx, y: INV_H + 10, col: pick.col, vy: 2.2 * CELL });
-  }
-  function invMoveBombs(dt) {
-    const keep = [];
-    for (const b of inv.bombs) {
-      const from = Math.floor(b.y / CELL);
-      b.y += b.vy * dt / 1000;
-      const to = Math.floor(b.y / CELL);
-      let dead = false;
-      for (let r = from; r <= to; r++) {
-        const hit = applyBombHit(g, b.col, r);
-        if (hit === 'block') {
-          inv.boom.push({ c: b.col, r: r, t: 420 });
-          sfx('thump');
-          dead = true;
-          break;
-        }
-        if (hit === 'gone') { dead = true; break; }
-      }
-      if (!dead && b.y < ROWS * CELL + 10) keep.push(b);
-    }
-    inv.bombs = keep;
-  }
-  function invStep(dt) {
-    if (themeFor(g.level) !== SPACE_THEME) { if (inv.ready) { inv.ready = false; inv.bombs = []; inv.boom = []; } return; }
-    if (!inv.ready) invReset();
-    inv.t += dt;
-    if (g.demo) return; // keep a seeded still for screenshots
-    if (inv.boom.length) {
-      for (const e of inv.boom) e.t -= dt;
-      inv.boom = inv.boom.filter(e => e.t > 0);
-    }
-    const moving = started && !g.over && !g.paused;
-    if (!moving) return;
-    const span = COLS * CELL - ((INV_COUNT - 1) * INV_GAP + INV_W) - 36; // leave room for the on-board score
-    inv.x += inv.dir * 22 * (dt / 1000);
-    if (inv.x < 4) { inv.x = 4; inv.dir = 1; }
-    if (inv.x > span - 4) { inv.x = span - 4; inv.dir = -1; }
-    if (!g.demo) {
-      if (inv.bombs.length === 0) {
-        inv.wait -= dt;
-        if (inv.wait <= 0) { invDrop(); inv.wait = bombWait(g.level); }
-      }
-      invMoveBombs(dt);
-    }
-  }
+  const inv = newInvaders();
+  function invReset() { resetInvaders(inv, g.level); }
+  function invSeed(opts) { seedInvaders(inv, g, opts); }
+  function invStep(dt) { stepInvaders(inv, g, dt, { started: started, onThump: () => sfx('thump') }); }
   function invSprite(ctx, rows, x, y, color) {
     const px = INV_PX;
     ctx.fillStyle = color;
