@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.167'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.167'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.167'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.168'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.168'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.168'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.167'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.168'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.167'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.168'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.167'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.168'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.167'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.168'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -921,7 +921,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(srJs.includes('playbackRate') && srJs.includes('silentUnlock') && srJs.includes('createBuffer(1, 1'));
   assert.ok(srJs.includes('t < voiceUntil && rank <= voiceRank') && srJs.includes('stopVoice()'), 'voices rate-limit and never overlap');
   assert.ok(!srJs.includes('sugar-rush-sfx-pop') && !srJs.includes('SFX_CUTS') && !srJs.includes('CLIP_VOL'), 'old pack and synth effects are gone');
-  const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
+  const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-l1.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
     'sugar-rush-voice-yay.mp3', 'sugar-rush-voice-great.mp3', 'sugar-rush-voice-awesome.mp3',
     'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3'];
   for (const f of sugarFiles) assert.ok(fs.existsSync('feed/' + SR.mediaUrl(f)), 'audio ' + f);
@@ -1284,7 +1284,7 @@ if (live) {
   assert.ok(tet.includes('musicTick(g.level, musicWanted(g.level, started, g))'));
   assert.ok(tet.includes('bgmGain.gain.linearRampToValueAtTime(BGM_VOL') && tet.includes('duckUntil'));
 
-  const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
+  const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-l1.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
     'sugar-rush-voice-yay.mp3', 'sugar-rush-voice-great.mp3', 'sugar-rush-voice-awesome.mp3',
     'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3'];
   const SR = load('feed/sugar-rush.js').SugarRush;
@@ -1306,6 +1306,30 @@ if (live) {
   assert.ok(scrabbleHtml.includes('scrabble.js?v=') && scrabbleHtml.includes('scores.js?v='));
   const playFile = fs.readFileSync('feed/play.js', 'utf8');
   assert.ok(playFile.includes('const gameUrl = name =>') && playFile.includes("gameUrl('tetris')") && playFile.includes("gameUrl('sugar-rush')"));
+}
+
+// 1.9.168 Sugar Rush level 1 plays Shane's "Sugar Rush" song; later levels keep the usual loop
+{
+  const SR = load('feed/sugar-rush.js').SugarRush;
+  assert.strictEqual(SR.gameTrack(1), 'sugar-rush-l1.mp3');
+  for (let n = 2; n <= 10; n++) assert.strictEqual(SR.gameTrack(n), 'sugar-rush-music.mp3', 'level ' + n + ' keeps the usual track');
+  const url = SR.mediaUrl('sugar-rush-l1.mp3');
+  assert.strictEqual(url, 'sugar-rush-l1-3fd00f38.mp3');
+  assert.ok(fs.existsSync('feed/' + url));
+  const h = crypto.createHash('sha256').update(fs.readFileSync('feed/' + url)).digest('hex').slice(0, 8);
+  assert.strictEqual(h, '3fd00f38');
+  assert.strictEqual(SR.MEDIA_HASH['sugar-rush-l1.mp3'], h);
+  // Menu, end songs and the usual gameplay loop are unchanged.
+  assert.strictEqual(SR.mediaUrl('sugar-rush-music.mp3'), 'sugar-rush-music-39970f66.mp3');
+  assert.strictEqual(SR.mediaUrl('sugar-rush-menu.mp3'), 'sugar-rush-menu-3343a079.mp3');
+  assert.strictEqual(SR.mediaUrl('sugar-rush-win.mp3'), 'sugar-rush-win-9b0efbad.mp3');
+  assert.strictEqual(SR.mediaUrl('sugar-rush-yum.mp3'), 'sugar-rush-yum-ac1b2cf5.mp3');
+  const src = fs.readFileSync('feed/sugar-rush.js', 'utf8');
+  assert.ok(src.includes("game1: 'sugar-rush-l1.mp3'"));
+  assert.ok(src.includes('function wantKind() { return screen === \'game\' ? gameKind(lvNum) : \'menu\'; }') || src.includes('gameKind(lvNum)'));
+  assert.ok(src.includes('playKind(wantKind())'));
+  assert.ok(!src.includes("playKind('game')"), 'level start must pick the level-1 track');
+  assert.ok(src.includes('IBScores.isShane'), 'level 1 (and the game) stay Shane-only');
 }
 
 // LEVEL UP! overlay after a theme change, plus a distinct whoosh-to-chord cue
