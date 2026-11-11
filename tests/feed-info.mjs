@@ -123,7 +123,7 @@ gHold.canHold = true;
 tetGame.act(gHold, 'hold');
 assert.strictEqual(gHold.hold, held);
 assert.strictEqual(gHold.canHold, false);
-// 1.9.155 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
+// 1.9.156 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
 assert.strictEqual(tetGame.themeFor(1), 6);
 assert.strictEqual(tetGame.themeFor(2), 11);
 assert.strictEqual(tetGame.themeFor(3), 0);
@@ -358,12 +358,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.155'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.155'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.155'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.156'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.156'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.156'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.155'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.156'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -402,10 +402,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.155'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.156'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.155'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.156'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -433,7 +433,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'no-cache'"));
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.155'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.156'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -557,7 +557,7 @@ assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-// 1.9.155 Scrabble is playable; Sugar Rush is the next game coming soon
+// 1.9.156 Scrabble is playable; Sugar Rush is the next game coming soon
 assert.ok(calFile.includes('data-art="scrabble"'));
 assert.ok(calFile.includes('Play Scrabble'));
 assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
@@ -577,7 +577,7 @@ assert.ok(/scrabble:[\s\S]{0,220}local: true/.test(playFile));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scrabble', 'scrabble.js'"));
 assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('scrabble-words'), 'word list is fetched when Scrabble opens, not precached');
 
-// 1.9.155 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
+// 1.9.156 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
 function loadScrabble() {
   const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date, Uint8Array, Int8Array, Int32Array, setTimeout, parseInt };
   ctx.window = ctx; ctx.globalThis = ctx;
@@ -796,7 +796,138 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   execSync('node worker/test/scores.test.mjs', { stdio: 'pipe' });
 }
 
-// 1.9.155 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
+// 1.9.156 Sugar Rush level 1: match-3 rules, cascades, special sweets, no-move shuffle, and Shane-only access
+{
+  const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date };
+  ctx.window = ctx; ctx.globalThis = ctx; vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync('feed/sugar-rush.js', 'utf8'), ctx, { filename: 'feed/sugar-rush.js' });
+  const SR = ctx.SugarRush;
+  assert.strictEqual(SR.N, 8); assert.strictEqual(SR.KINDS, 6);
+  assert.deepStrictEqual({ ...SR.LEVEL, stars: Array.from(SR.LEVEL.stars) }, { n: 1, target: 3000, moves: 20, stars: [3000, 6000, 9000] });
+  const game = (rows, seed) => SR.newGame({ board: SR.fromRows(rows), seed: seed || 7 });
+  // A fresh board has no ready-made lines, always has a move, and uses all six sweets
+  for (let s = 1; s <= 25; s++) {
+    const b = SR.newBoard(SR.rng(s));
+    assert.strictEqual(SR.findRuns(b).length, 0); assert.ok(SR.hasMove(b));
+    assert.strictEqual(new Set(b.flat().map(t => t.c)).size, 6);
+  }
+  // Match detection: rows and columns of 3+, not 2, bombs never match
+  let b = SR.fromRows(['00012345', '12345012', '1.......', '1.......', '2.......', '3.......', '4*******', '5***....']);
+  let runs = SR.findRuns(b);
+  assert.strictEqual(runs.length, 2);
+  assert.ok(runs.some(r => r.dir === 'h' && r.cells.length === 3 && r.color === 0));
+  assert.ok(runs.some(r => r.dir === 'v' && r.cells.length === 3 && r.color === 1));
+  // Invalid swaps bounce back: board and moves unchanged
+  const rowsA = ['01201201', '12012012', '20120120', '01201201', '12012012', '20120120', '01201201', '34534534'];
+  let st = game(rowsA);
+  let before = SR.toRows(st.board).join('|');
+  assert.strictEqual(SR.play(st, [0, 0], [0, 1]).valid, false);
+  assert.strictEqual(SR.play(st, [0, 0], [2, 0]).valid, false, 'not neighbours');
+  assert.strictEqual(SR.toRows(st.board).join('|'), before); assert.strictEqual(st.moves, 20);
+  // A valid 3-match clears, drops, refills, scores and uses a move
+  st = game(['44543232', '23232323', '32323232', '23232323', '32323232', '23232323', '32323232', '01010101']);
+  let res = SR.play(st, [0, 2], [1, 2]); // the 5 drops and a 2 comes up: no line
+  assert.strictEqual(res.valid, false);
+  st = game(['44053232', '23432323', '32323232', '23232323', '32323232', '23232323', '32323232', '01010101']);
+  res = SR.play(st, [0, 2], [1, 2]); // 4 4 _ with a 4 below the gap: swap makes 4 4 4
+  assert.strictEqual(res.valid, true); assert.strictEqual(st.moves, 19);
+  assert.strictEqual(res.steps[0].popped.length, 3); assert.strictEqual(res.steps[0].points, 3 * SR.PTS);
+  assert.ok(st.score >= 90); assert.ok(st.board.flat().every(Boolean), 'board refilled');
+  assert.strictEqual(SR.findRuns(st.board).length, 0, 'cascades run until no lines are left');
+  // Gravity: sweets above a clear fall down, new ones arrive from above
+  b = SR.fromRows(['0.......', '1.......', '2.......', '3.......', '4.......', '5.......', '0.......', '1.......']);
+  b[3][0] = null; const ids = b.map(r => r[0] && r[0].id);
+  const falls = SR.collapse(b, SR.rng(1));
+  assert.strictEqual(b[3][0].id, ids[2]); assert.strictEqual(b[1][0].id, ids[0]);
+  assert.ok(falls.some(f => f.fresh && f.r === 0 && f.from === -1));
+  // Cascades: one move clears, the drop makes a second line, which scores double per sweet
+  // column 2 clears 3 and drops 3, bringing the 5 from row 2 down beside the two 5s on row 5
+  st = game(['34343434', '43434343', '34543434', '43134343', '34143434', '55214343', '34343434', '43434343']);
+  res = SR.play(st, [5, 2], [5, 3]);
+  assert.ok(res.steps[0].popped.every(p => p.c === 2 && p.color === 1));
+  assert.ok(res.steps[1].popped.some(p => p.r === 5 && p.c === 0 && p.color === 5));
+  assert.strictEqual(res.valid, true);
+  assert.ok(res.steps.length >= 2, 'a cascade follows');
+  assert.strictEqual(res.steps[1].cascade, 2);
+  assert.ok(res.steps[1].points >= res.steps[1].popped.length * SR.PTS * 2);
+  // Special sweets: 4 in a row makes a striped sweet at the moved spot; 5 makes a bomb; an L makes a wrapped sweet
+  const g4 = SR.groups(SR.findRuns(SR.fromRows(['1111....', '........', '........', '........', '........', '........', '........', '........'])));
+  assert.strictEqual(SR.specialFor(g4[0]), 'col');
+  const g4v = SR.groups(SR.findRuns(SR.fromRows(['1.......', '1.......', '1.......', '1.......', '........', '........', '........', '........'])));
+  assert.strictEqual(SR.specialFor(g4v[0]), 'row');
+  const g5 = SR.groups(SR.findRuns(SR.fromRows(['22222...', '........', '........', '........', '........', '........', '........', '........'])));
+  assert.strictEqual(SR.specialFor(g5[0]), 'b');
+  const gL = SR.groups(SR.findRuns(SR.fromRows(['333.....', '3.......', '3.......', '........', '........', '........', '........', '........'])));
+  assert.strictEqual(gL.length, 1); assert.strictEqual(SR.specialFor(gL[0]), 'w');
+  const gT = SR.groups(SR.findRuns(SR.fromRows(['444.....', '.4......', '.4......', '........', '........', '........', '........', '........'])));
+  assert.strictEqual(SR.specialFor(gT[0]), 'w');
+  st = game(['11213343', '54154525', '32323232', '23232323', '32323232', '23232323', '32323232', '04040404']);
+  res = SR.play(st, [1, 2], [0, 2]);
+  assert.strictEqual(res.valid, true);
+  assert.strictEqual(res.steps[0].madeTiles.length, 1);
+  assert.strictEqual(res.steps[0].madeTiles[0].t.s, 'col'); assert.strictEqual(res.steps[0].madeTiles[0].t.c, 1);
+  assert.strictEqual(res.steps[0].points, 4 * SR.PTS + SR.BONUS.col);
+  // A striped sweet caught in a line clears its whole row
+  b = SR.fromRows(['01201201', '12012012', '20120120', '33345345', '12012012', '20120120', '01201201', '45045045']);
+  b[3][1].s = 'row';
+  let step = SR.resolve(b, null);
+  assert.ok(step.fired.some(f => f.s === 'row' && f.r === 3));
+  for (let c = 0; c < 8; c++) assert.ok(step.clear.has(3 * 8 + c));
+  // A wrapped sweet clears the 3x3 around it
+  b = SR.fromRows(['01201201', '12012012', '20120120', '01333201', '12012012', '20120120', '01201201', '45045045']);
+  b[3][4].s = 'w';
+  step = SR.resolve(b, null);
+  assert.ok(step.fired.some(f => f.s === 'w'));
+  for (const [r, c] of [[2, 3], [2, 5], [4, 3], [4, 5]]) assert.ok(step.clear.has(r * 8 + c));
+  // Swapping a sprinkle bomb clears every sweet of the other colour
+  st = game(['*1201201', '12012012', '20120120', '01201201', '12012012', '20120120', '01201201', '45045045']);
+  const ones = st.board.flat().filter(t => t.c === 1).length;
+  res = SR.play(st, [0, 0], [0, 1]);
+  assert.strictEqual(res.valid, true);
+  assert.strictEqual(res.steps[0].popped.length, ones + 1);
+  assert.ok(res.steps[0].popped.every(p => p.color === 1 || p.color === -1));
+  assert.ok(SR.validSwap(SR.fromRows(['*0......', '........', '........', '........', '........', '........', '........', '........']), [0, 0], [0, 1]));
+  // No moves left: shuffle into a board with a move and no ready-made lines
+  b = SR.fromRows(['01230123', '23012301', '01230123', '23012301', '01230123', '23012301', '01230123', '23012301']);
+  assert.strictEqual(SR.hasMove(b), false);
+  const kinds = b.flat().map(t => t.c).sort().join('');
+  SR.shuffle(b, SR.rng(3), 4);
+  assert.ok(SR.hasMove(b)); assert.strictEqual(SR.findRuns(b).length, 0);
+  assert.strictEqual(b.flat().map(t => t.c).sort().join(''), kinds, 'same sweets, new places');
+  // After a move that leaves no moves, play() shuffles
+  for (let s = 1; s <= 40; s++) { const g = SR.newGame({ seed: s }); while (!g.over) { const m = SR.findMove(g.board); assert.ok(m); assert.ok(SR.play(g, m[0], m[1]).valid); assert.ok(SR.hasMove(g.board)); } assert.strictEqual(g.moves, 0); assert.strictEqual(g.won, g.score >= 3000); assert.strictEqual(g.stars, SR.starsFor(g.score)); }
+  assert.strictEqual(SR.starsFor(2999), 0); assert.strictEqual(SR.starsFor(3000), 1); assert.strictEqual(SR.starsFor(6500), 2); assert.strictEqual(SR.starsFor(9000), 3);
+  // Access: only Shane (IBScores.isShane()); no scores sent yet
+  assert.strictEqual(SR.allowed(), false, 'no scores.js: nobody');
+  ctx.IBScores = { isShane: () => false }; assert.strictEqual(SR.allowed(), false);
+  ctx.IBScores = { isShane: () => true }; assert.strictEqual(SR.allowed(), true);
+  const srJs = fs.readFileSync('feed/sugar-rush.js', 'utf8'), srHtml = fs.readFileSync('feed/sugar-rush.html', 'utf8');
+  assert.ok(!/\.submit\(/.test(srJs), 'Sugar Rush does not post to the family scoreboard yet');
+  assert.ok(srHtml.indexOf('scores.js') > 0 && srHtml.indexOf('scores.js') < srHtml.indexOf('sugar-rush.js'));
+  assert.ok(srHtml.includes('id="soon" class="soon" hidden') && srHtml.includes('Sugar Rush is coming soon') && srHtml.includes('id="game" hidden'));
+  assert.ok(!/candy crush/i.test(srJs + srHtml), 'our own game: no Candy Crush names in the game');
+  // Soft sounds: lowpass, sine/triangle only, nothing above 400 Hz
+  assert.ok(srJs.includes("lp.type = 'lowpass'") && !/'(square|sawtooth)'/.test(srJs));
+  const scale = srJs.match(/const SCALE = \[([^\]]+)\]/)[1].split(',').map(Number);
+  assert.ok(Math.max(...scale) <= 400);
+  assert.ok(srJs.includes("ls.get('ib-sugar-music', false)"), 'music is off by default');
+  // Menu and Games card: Play Sugar Rush only for Shane
+  const app = fs.readFileSync('feed/app.js', 'utf8'), cal = fs.readFileSync('feed/cal.js', 'utf8'), play = fs.readFileSync('feed/play.js', 'utf8'), idx = fs.readFileSync('feed/index.html', 'utf8'), sw = fs.readFileSync('feed/sw.js', 'utf8');
+  assert.ok(app.includes('window.IBScores.isShane()') && app.includes('data-art="sugar"><span class="mfe">🍬</span><span>Play Sugar Rush</span>') && app.includes('<span>Sugar Rush · coming soon</span>'));
+  const sugarOpt = new Function('window', app.match(/function sugarOk\(\)[^\n]+\nfunction sugarOpt\(\)[^\n]+/)[0] + '\nreturn sugarOpt();');
+  assert.ok(sugarOpt({ IBScores: { isShane: () => true } }).includes('Play Sugar Rush'));
+  assert.ok(sugarOpt({ IBScores: { isShane: () => false } }).includes('Sugar Rush · coming soon'));
+  assert.ok(sugarOpt({}).includes('disabled'));
+  assert.ok(cal.includes("root.IBScores && root.IBScores.isShane()") && cal.includes('data-art="sugar">Play Sugar Rush'));
+  assert.ok(play.includes("sugar: { url: 'sugar-rush'") && /sugar:[\s\S]{0,220}local: true/.test(play));
+  assert.ok(idx.indexOf('scores.js?v=') > 0 && idx.indexOf('scores.js?v=') < idx.indexOf('app.js?v='));
+  assert.ok(sw.includes("'sugar-rush', 'sugar-rush.js'") && sw.includes("'scores.js?v=' + VERSION"));
+  const ship = fs.readFileSync('tools/ship-pages.sh', 'utf8');
+  assert.match(ship, /\/feed\/sugar-rush\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
+  assert.match(ship, /\/feed\/sugar-rush\.html\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
+}
+
+// 1.9.156 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
 {
   const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Rainforest', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'City', 'Night sky', 'Triangles', 'Space travel'];
   assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7]);
@@ -845,7 +976,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 }
 
 
-// 1.9.155 Tetris sounds follow the music (tempo/key), and Space bombs actually drop
+// 1.9.156 Tetris sounds follow the music (tempo/key), and Space bombs actually drop
 {
   const almost = (a, b, eps) => assert.ok(Math.abs(a - b) <= (eps || 1e-6), a + ' != ' + b);
   assert.strictEqual(tetGame.TRACKS.length, 12);
@@ -945,7 +1076,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(!/invSeed\(/.test(sp), 'Choose level must not use the screenshot seed');
 }
 
-// 1.9.155 Tetris game sounds sit ~6 dB above the music, still soft and low
+// 1.9.156 Tetris game sounds sit ~6 dB above the music, still soft and low
 {
   assert.strictEqual(tetGame.SFX_MASTER, 0.96);
   assert.strictEqual(tetGame.SFX_NOTE, 0.25);

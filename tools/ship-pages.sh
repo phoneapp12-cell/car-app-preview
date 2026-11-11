@@ -27,6 +27,13 @@ cat > "$out/_headers" <<'H'
 /feed/scrabble.html
   ! X-Frame-Options
   X-Frame-Options: SAMEORIGIN
+# 1.9.156 Sugar Rush opens in the same feed window too.
+/feed/sugar-rush
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN
+/feed/sugar-rush.html
+  ! X-Frame-Options
+  X-Frame-Options: SAMEORIGIN
 /sw.js
   Cache-Control: no-cache
 /index.html
