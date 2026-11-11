@@ -376,27 +376,36 @@
     o.start(t0);
     o.stop(t0 + dur + 0.03);
   }
-  let duckTok = 0;
+  let duckTok = 0, duckUntil = 0;
   function duckMusic(delay, dur) {
-    if (!musicOn || !bgm) return;
+    if (!musicOn || !bgmGain || !ac) return;
     const tok = ++duckTok;
+    const hold = Math.max(0.2, dur || 0.45);
     const go = () => {
       try {
-        if (!bgm || !musicOn || tok !== duckTok) return;
-        bgm.volume = BGM_DUCK;
-        setTimeout(() => { try { if (bgm && musicOn && tok === duckTok) bgm.volume = BGM_VOL; } catch (e) { } }, Math.max(200, (dur || 0.45) * 1000));
+        if (!bgmGain || !musicOn || tok !== duckTok || !ac) return;
+        const t0 = ac.currentTime;
+        duckUntil = performance.now() + (hold + 0.25) * 1000;
+        bgmGain.gain.cancelScheduledValues(t0);
+        bgmGain.gain.setValueAtTime(Math.max(0.0001, bgmGain.gain.value), t0);
+        bgmGain.gain.linearRampToValueAtTime(BGM_DUCK, t0 + 0.03);
+        bgmGain.gain.setValueAtTime(BGM_DUCK, t0 + hold);
+        bgmGain.gain.linearRampToValueAtTime(BGM_VOL, t0 + hold + 0.22);
       } catch (e) { }
     };
     if (delay > 0) setTimeout(go, delay * 1000);
     else go();
   }
   function sfxDelay(kind) {
-    if (!musicOn || !bgm || bgm.paused) return 0;
+    if (!musicOn || !bgmNode || !ac) return 0;
     const tr = TRACKS[themeIdx];
     if (!tr) return 0;
-    try { return quantizeDelay(bgm.currentTime, bgm.playbackRate || 1, tr, kind === 'rotate' ? 'nearest8th' : 'next'); }
-    catch (e) { return 0; }
+    try {
+      const pos = Math.max(0, (ac.currentTime - bgmAt) * (bgmRate || 1));
+      return quantizeDelay(pos, bgmRate || 1, tr, kind === 'rotate' ? 'nearest8th' : 'next');
+    } catch (e) { return 0; }
   }
+
   function sfx(name, lines) {
     if (!soundOn || !ac) return;
     const d = sfxGain, T = THEMES[themeIdx], m = T.pitch * 0.5, w = 'sine', lo = f => nf(f) / 2;
@@ -781,34 +790,98 @@
     }
     return g;
   }
-  // 1.9.145 Real recorded music, one track per theme (tetris-bg/m<theme>.mp3, Kevin MacLeod, CC BY 4.0).
-  // It speeds up a little each level (pitch kept), and the old generated music is no longer played.
-  // 1.9.163 Each URL carries a short content hash so a replaced track is not replayed from the
-  // browser HTTP cache. The SW still matches on pathname (it ends in .mp3) and leaves range requests alone.
+  // 1.9.145 Real recorded music, one track per theme (tetris-bg/m<theme>-<hash>.mp3, Kevin MacLeod, CC BY 4.0).
+  // It speeds up a little each level, and the old generated music is no longer played.
+  // 1.9.164 Music plays through the shared AudioContext (decoded loop), so line-clear
+  // effects cannot pause or mute a separate HTML audio element on iOS/Android WebView.
+  // Filenames include a content hash because some phone media caches ignore ?v= query strings
+  // (1.9.163 busted the URL but Shane still heard the old bullfrog track).
   const BGM_HASH = ['a719f241', '9711dc01', '9ca3b84e', '7776197f', '6a9bd0f6', '63c9eafe', 'ef3f9675', 'b76dd1d3', 'fdec4369', '2b10c8ba', 'cdbe7d34', 'b61bc42a'];
-  function bgmSrc(ti) { return 'tetris-bg/m' + ti + '.mp3?v=' + BGM_HASH[ti]; }
-  let bgm = null, bgmIdx = -1, bgmWant = false;
-  function bgmEl() {
-    if (!bgm && root.Audio) { bgm = new root.Audio(); bgm.loop = true; bgm.preload = 'auto'; bgm.volume = BGM_VOL; try { bgm.preservesPitch = true; } catch (e) { } }
-    return bgm;
+  function bgmSrc(ti) { return 'tetris-bg/m' + ti + '-' + BGM_HASH[ti] + '.mp3'; }
+  let bgmGain = null, bgmNode = null, bgmIdx = -1, bgmBufs = {}, bgmLoading = {}, bgmAt = 0, bgmRate = 1, bgmWant = false;
+  function silentUnlock() {
+    if (!ac) return;
+    try { const z = ac.createBuffer(1, 1, ac.sampleRate || 44100); const s = ac.createBufferSource(); s.buffer = z; s.connect(ac.destination); s.start(0); } catch (e) { }
   }
-  function musicTick(level, running) {
-    const a = bgmEl(); if (!a) return;
-    const want = !!(musicOn && running);
-    if (!want) { if (bgmWant) { bgmWant = false; a.pause(); } return; }
+  function ensureBgmGain() {
+    if (!ac) return;
+    if (!bgmGain) {
+      bgmGain = ac.createGain();
+      bgmGain.gain.value = BGM_VOL;
+      bgmGain.connect(ac.destination);
+    }
+  }
+  function loadBgm(ti) {
+    if (bgmBufs[ti]) return Promise.resolve(bgmBufs[ti]);
+    if (bgmLoading[ti]) return bgmLoading[ti];
+    if (!ac) return Promise.resolve(null);
+    bgmLoading[ti] = fetch(bgmSrc(ti)).then(r => r.arrayBuffer()).then(ab => ac.decodeAudioData(ab.slice(0))).then(b => { bgmBufs[ti] = b; return b; }).catch(() => { bgmLoading[ti] = null; return null; });
+    return bgmLoading[ti];
+  }
+  function stopBgmNode() {
+    if (bgmNode) { try { bgmNode.onended = null; bgmNode.stop(); } catch (e) { } bgmNode = null; }
+  }
+  function startBgm(ti, rate) {
+    if (!ac || !bgmGain || !bgmBufs[ti] || !musicOn) return;
+    stopBgmNode();
+    const src = ac.createBufferSource();
+    src.buffer = bgmBufs[ti];
+    src.loop = true;
+    bgmRate = rate || 1;
+    src.playbackRate.value = bgmRate;
+    src.connect(bgmGain);
+    src.start(0);
+    bgmAt = ac.currentTime;
+    bgmNode = src;
+    bgmIdx = ti;
+    src.onended = () => { if (bgmNode === src) { bgmNode = null; } };
+    const t0 = ac.currentTime;
+    bgmGain.gain.cancelScheduledValues(t0);
+    bgmGain.gain.setValueAtTime(BGM_VOL, t0);
+  }
+  function musicWanted(level, started, g) {
+    return !!(musicOn && started && g && !g.over && !g.paused && !g.demo);
+  }
+  function musicTick(level, want) {
+    if (!want || !musicOn) {
+      if (bgmWant) { bgmWant = false; stopBgmNode(); }
+      return;
+    }
+    ensureAudio();
+    if (!ac) return;
+    ensureBgmGain();
+    silentUnlock();
+    if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().catch(() => { });
     const ti = themeFor(level || 1);
-    if (ti !== bgmIdx) { bgmIdx = ti; a.src = bgmSrc(ti); bgmWant = false; }
     const lv = Math.max(1, level || 1), rate = Math.min(1.25, 1 + (lv - 1) * 0.02);
-    if (Math.abs(a.playbackRate - rate) > 0.001) a.playbackRate = rate;
-    if (!bgmWant) { bgmWant = true; try { const p = a.play(); if (p && p.catch) p.catch(() => { bgmWant = false; }); } catch (e) { bgmWant = false; } }
+    bgmWant = true;
+    if (ti !== bgmIdx || !bgmNode) {
+      loadBgm(ti).then(b => { if (b && musicOn && bgmWant && themeFor(level || 1) === ti) startBgm(ti, rate); });
+      return;
+    }
+    if (Math.abs(bgmRate - rate) > 0.001 && bgmNode) { bgmRate = rate; try { bgmNode.playbackRate.value = rate; } catch (e) { } }
+    // Watchdog: restart a dropped source, and restore gain after a duck that never came back.
+    if (performance.now() > duckUntil && bgmGain && bgmGain.gain.value < BGM_VOL * 0.85) {
+      const t0 = ac.currentTime;
+      bgmGain.gain.cancelScheduledValues(t0);
+      bgmGain.gain.setValueAtTime(BGM_VOL, t0);
+    }
+  }
+
+  function musicState() {
+    return { idx: bgmIdx, src: bgmIdx >= 0 ? bgmSrc(bgmIdx) : '', playing: !!(bgmNode && musicOn && bgmWant), rate: bgmRate, gain: bgmGain ? bgmGain.gain.value : 0, wanted: bgmWant };
   }
   function stopAudio() {
     duckTok++;
-    if (bgm) { try { bgm.pause(); bgm.volume = BGM_VOL; } catch (e) { } bgmWant = false; }
+    duckUntil = 0;
+    bgmWant = false;
+    stopBgmNode();
+    bgmIdx = -1;
     if (ac) { try { ac.close(); } catch (e) { } }
-    ac = null; sfxGain = null; musicGain = null; melodyBus = null; noiseBuf = null;
+    ac = null; sfxGain = null; musicGain = null; bgmGain = null; melodyBus = null; noiseBuf = null;
+    bgmBufs = {}; bgmLoading = {};
   }
-  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear };
+  root.Tetris = { THEMES, LOOKS, PICS, ORDER, themeFor, stages, shouldSubmit, SHAPES, COLORS, TRI_THEME, TRI_PAL, triangleLate, trianglePalette, blockColor, SPACE_THEME, bombWaitRange, bombWait, pieceCovers, applyBombHit, emptyBoard, rotateCW, rotateCCW, collides, newGame, lockPiece, act, dropInterval, spawn, stopAudio, audio: () => ac && ac.state, TRACKS, quantizeDelay, sfxFreqs, BGM_VOL, BGM_DUCK, SFX_MASTER, SFX_NOTE, BGM_HASH, bgmSrc, musicWanted, musicState, newInvaders, resetInvaders, seedInvaders, stepInvaders, dropBomb, INV_COUNT, INV_GAP, INV_W, BOMB_VY, clearDuration, clearKind, clearPartCount, startClear, tickClear };
 
   if (!root.document) return;
   const doc = root.document;
@@ -856,6 +929,7 @@
     syncHud();
   }
   root.Tetris.press = press;
+  root.Tetris.live = () => g;
   root.Tetris.view = () => ({ x: g.piece.x, y: g.piece.y, t: g.piece.t, score: g.score, lines: g.lines, level: g.level, practice: !!g.practice, startLevel: g.startLevel || 1, paused: g.paused, over: g.over, started, musicOn, soundOn });
   // Seed a still board (used for screenshots and checks). No overlay, no gravity, music off.
   root.Tetris.show = function (opts) {
@@ -1440,7 +1514,7 @@
       }
     }
     try { if (!clearing) invStep(dt); } catch (e) { }
-    musicTick(g.level, running);
+    musicTick(g.level, musicWanted(g.level, started, g));
     if (g.flashT > 0) g.flashT -= dt;
     if (g.popupT > 0) g.popupT -= dt;
     const ctx = board.getContext('2d');
