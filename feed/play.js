@@ -197,15 +197,18 @@
   // Checked 2026-11-07: fallingfalling.com and zoomquilt.org both HTTP 200 with neither header.
   // The frame is created only after a tap. Closing or hiding the page sets the frame to about:blank
   // so their canvas and looping sound unload. No top-navigation, so the framed page cannot take over Info Book.
+  // 1.9.164 Version the iframe URL from this script's own ?v= so a cached /feed/tetris page is not reused.
+  const VER = ((root.document && root.document.currentScript && /[?&]v=([^&]+)/.exec(root.document.currentScript.src)) || [])[1] || '';
+  const gameUrl = name => name + (VER ? '?v=' + VER : '');
   const ART = {
     fall: { url: 'https://fallingfalling.com/', title: 'Falling Falling', host: 'fallingfalling.com', live: 'Moves, and plays a looping sound' },
     zoom: { url: 'https://zoomquilt.org/', title: 'Zoomquilt', host: 'zoomquilt.org', live: 'Zooms on its own' },
     // Relative tetris.html is /feed/tetris.html. ship-pages.sh already sends SAMEORIGIN for /feed/tetris.html and /feed/tetris.
-    tetris: { url: 'tetris', title: 'Tetris', host: 'Info Book', live: 'Sound starts when you tap', local: true },
+    tetris: { url: gameUrl('tetris'), title: 'Tetris', host: 'Info Book', live: 'Sound starts when you tap', local: true },
     // 1.9.147 Scrabble, our own page like Tetris. ship-pages.sh sends SAMEORIGIN for /feed/scrabble too.
-    scrabble: { url: 'scrabble', title: 'Scrabble', host: 'Info Book', live: 'Play the computer or pass the phone', local: true },
+    scrabble: { url: gameUrl('scrabble'), title: 'Scrabble', host: 'Info Book', live: 'Play the computer or pass the phone', local: true },
     // 1.9.156 Sugar Rush level 1 (Shane only for now; the page itself checks too). ship-pages.sh sends SAMEORIGIN for /feed/sugar-rush.
-    sugar: { url: 'sugar-rush', title: 'Sugar Rush', host: 'Info Book', live: 'Levels 1–10 · soft sounds start when you tap', local: true }
+    sugar: { url: gameUrl('sugar-rush'), title: 'Sugar Rush', host: 'Info Book', live: 'Levels 1–10 · soft sounds start when you tap', local: true }
   };
   let artWin, artFrame, artScroll = 0, artHist = false, artBtn = null;
   function artParts() {

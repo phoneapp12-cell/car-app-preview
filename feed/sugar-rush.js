@@ -587,7 +587,8 @@
     'sugar-rush-sfx-pop.mp3': '677f075b', 'sugar-rush-sfx-crush.mp3': '0d496f41', 'sugar-rush-sfx-bomb.mp3': '741b2cf5',
     'sugar-rush-sfx-hammer.mp3': '18a643dd', 'sugar-rush-sfx-spread.mp3': '616bda2b', 'sugar-rush-sfx-fail.mp3': '9c99f845'
   };
-  function mediaUrl(file) { return file + '?v=' + MEDIA_HASH[file]; }
+  // 1.9.164 Hash goes in the filename: some phone media caches ignore ?v= on audio.
+  function mediaUrl(file) { return file.replace(/\.mp3$/, '-' + MEDIA_HASH[file] + '.mp3'); }
 
   function attachSfxBus(ctx) {
     const mix = ctx.createGain(); mix.gain.value = 1;
@@ -808,6 +809,13 @@
     musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
     musicGain.gain.linearRampToValueAtTime(v, t + 0.5);
   }
+  function musicWatch() {
+    if (!musicOn || (doc && doc.hidden) || !ac) return;
+    if (endSrc) return; // end-of-level song is playing, music is meant to stay ducked
+    if (ac.state === 'suspended' || ac.state === 'interrupted') ac.resume().catch(() => { });
+    if (!musicSrc) { playKind(wantKind()); return; }
+    if (!ducked && musicGain && musicGain.gain.value < volFor(wantKind()) * 0.4) resumeMusic();
+  }
   function stopEnd() {
     if (endSrc) { try { endSrc.stop(); } catch (e) { } endSrc = null; }
   }
@@ -1008,6 +1016,7 @@
       fx = fx.filter(f => t - f.t0 < f.dur);
       for (const [id, s] of sprites) if (s.pop && t - s.pop > 230 * SP) sprites.delete(id);
     }
+    try { musicWatch(); } catch (e) { }
     root.requestAnimationFrame(frame);
   }
 
@@ -1241,6 +1250,7 @@
   }
   function backToMap() {
     leaveEnd();
+    resumeMusic();
     showMap();
   }
 
