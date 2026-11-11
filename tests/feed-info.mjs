@@ -124,7 +124,7 @@ gHold.canHold = true;
 tetGame.act(gHold, 'hold');
 assert.strictEqual(gHold.hold, held);
 assert.strictEqual(gHold.canHold, false);
-// 1.9.164 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
+// 1.9.165 triangle Tetris on the Triangles theme (level 11, second to last): two-colour palette, gameplay unchanged
 assert.strictEqual(tetGame.themeFor(1), 6);
 assert.strictEqual(tetGame.themeFor(2), 11);
 assert.strictEqual(tetGame.themeFor(3), 0);
@@ -359,12 +359,12 @@ for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 3, at.join(',
 const appSrc = fs.readFileSync('feed/app.js', 'utf8');
 for (const id of sights.TOPICS) assert.ok(appSrc.includes("'" + id + "'"), id);
 assert.ok(!/Math\.pow\(baseOf\(t\), 3\)/.test(appSrc));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.164'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.164'));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.164'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('sights.js?v=1.9.165'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('cal.js?v=1.9.165'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('back.js?v=1.9.165'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.cdot.tv'));
 assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('.bd ul.sum'));
-assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.164'"));
+assert.ok(fs.readFileSync('feed/app.js', 'utf8').includes("const APP_VERSION = '1.9.165'"));
 function swVersion(src) { const m = String(src).match(/const VERSION = '([^']+)'/); assert.ok(m, 'parent sw.js VERSION'); return m[1]; }
 const parentHere = swVersion(fs.readFileSync('sw.js', 'utf8'));
 let parentMain = parentHere;
@@ -403,10 +403,10 @@ assert.equal(artB.length, 1);
 assert.notEqual(artB[0].id, artA.id);
 seenArt.wasSeen = () => true;
 assert.equal(seenArt.ibArt.cards(0).length, 0);
-assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.164'"));
+assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("const VERSION = '1.9.165'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'art3d.js?v=' + VERSION"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'portal.js?v=' + VERSION"));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.164'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('portal.js?v=1.9.165'));
 const portalSrc = fs.readFileSync('feed/portal.js', 'utf8');
 assert.ok(portalSrc.includes('prefers-reduced-motion'));
 assert.ok(portalSrc.includes("sessionStorage.getItem(KEY)"));
@@ -434,7 +434,7 @@ assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("cache: 'reload'"));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("u.pathname + '?v=' + VERSION"), 'game scripts are fetched at this VERSION, not from a stale unversioned cache');
 assert.ok(appSrc.includes('ibPortalRise'));
 assert.ok(!/portal-style\.jpg|attachments\/image/.test(portalSrc + fs.readFileSync('feed/index.html', 'utf8')));
-assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.164'));
+assert.ok(fs.readFileSync('feed/index.html', 'utf8').includes('art3d.js?v=1.9.165'));
 assert.ok(appSrc.includes("['art3d', '3D art'"));
 assert.ok(appSrc.includes("['3D art', 'art3d'"));
 assert.ok(appSrc.includes("'art3d'"));
@@ -558,7 +558,7 @@ assert.ok(cal.ics(saved).includes('TRIGGER:-PT1H'));
 const calFile = fs.readFileSync('feed/cal.js', 'utf8');
 assert.ok(calFile.includes('data-art="tetris"'));
 assert.ok(calFile.includes('Play Tetris'));
-// 1.9.164 Scrabble is playable; Sugar Rush is the next game coming soon
+// 1.9.165 Scrabble is playable; Sugar Rush is the next game coming soon
 assert.ok(calFile.includes('data-art="scrabble"'));
 assert.ok(calFile.includes('Play Scrabble'));
 assert.ok(calFile.includes('<span>Coming soon: Sugar Rush 🍬, a Candy Crush style matching game</span>'));
@@ -578,7 +578,7 @@ assert.ok(/scrabble:[\s\S]{0,220}local: true/.test(playFile));
 assert.ok(fs.readFileSync('feed/sw.js', 'utf8').includes("'scrabble.js?v=' + VERSION"));
 assert.ok(!fs.readFileSync('feed/sw.js', 'utf8').includes('scrabble-words'), 'word list is fetched when Scrabble opens, not precached');
 
-// 1.9.164 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
+// 1.9.165 Scrabble rules and word checks (small word list here; tests/scrabble-sim.mjs plays full games with the real one)
 function loadScrabble() {
   const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date, Uint8Array, Int8Array, Int32Array, setTimeout, parseInt };
   ctx.window = ctx; ctx.globalThis = ctx;
@@ -797,7 +797,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   execSync('node worker/test/scores.test.mjs', { stdio: 'pipe' });
 }
 
-// 1.9.164 Sugar Rush level 1: match-3 rules, cascades, special sweets, no-move shuffle, and Shane-only access
+// 1.9.165 Sugar Rush level 1: match-3 rules, cascades, special sweets, no-move shuffle, and Shane-only access
 {
   const ctx = { console, Math, Object, Number, String, Array, Set, Map, JSON, Date };
   ctx.window = ctx; ctx.globalThis = ctx; vm.createContext(ctx);
@@ -907,23 +907,45 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(srHtml.indexOf('scores.js') > 0 && srHtml.indexOf('scores.js') < srHtml.indexOf('sugar-rush.js'));
   assert.ok(srHtml.includes('id="soon" class="soon" hidden') && srHtml.includes('Sugar Rush is coming soon') && srHtml.includes('id="game" hidden'));
   assert.ok(!/candy crush/i.test(srJs + srHtml), 'our own game: no Candy Crush names in the game');
-  // Soft sounds: sine/triangle synth (no square/saw), fundamentals 300–800 Hz, 2.5 kHz synth lowpass.
-  // Shane's pack clips are used for matches and specials; UI select/swap/nope stay synth.
+  // Soft sounds: spoken words for good moves, a short chime for a plain 3-match.
+  // Chime is sine (no square/saw), fundamentals 400–800 Hz, 2.5 kHz lowpass, quieter than the voices.
   assert.ok(srJs.includes("sfxLp.type = 'lowpass'") && srJs.includes('SFX_LP = 2500') && srJs.includes('sfxLp.frequency.value = SFX_LP') && !/'(square|sawtooth)'/.test(srJs));
   const scale = srJs.match(/const SCALE = \[([^\]]+)\]/)[1].split(',').map(Number);
-  assert.ok(Math.min(...scale) >= 300 && Math.max(...scale) <= 800);
-  assert.ok(srJs.includes('createDynamicsCompressor') && srJs.includes('BGM_DUCK = 0.078') && srJs.includes('CLIP_VOL = 0.24'));
+  assert.ok(Math.min(...scale) >= 400 && Math.max(...scale) <= 800);
+  assert.ok(srJs.includes('createDynamicsCompressor') && srJs.includes('BGM_DUCK = 0.078') && srJs.includes('VOICE_VOL = 0.36') && srJs.includes('CHIME_VOL = 0.10'));
+  assert.ok(SR.CHIME_DUR >= 0.15 && SR.CHIME_DUR <= 0.25 && SR.CHIME_VOL < SR.VOICE_VOL);
+  assert.ok(SR.VOICE_GAP === 1.2 && SR.playChime && SR.voiceForStep && SR.playClip);
   assert.ok(srJs.includes("ls.get('ib-sugar-sound', true)"), 'sound effects are on by default');
   assert.ok(srJs.includes("ls.get('ib-sugar-music', true)"), 'music is on by default');
   assert.ok(srJs.includes("doc.addEventListener('pointerup', unlockAudio") && srJs.includes("doc.addEventListener('touchend', unlockAudio"), 'game page resumes audio on pointerup/touchend');
   assert.ok(srJs.includes('playbackRate') && srJs.includes('silentUnlock') && srJs.includes('createBuffer(1, 1'));
+  assert.ok(srJs.includes('t < voiceUntil && rank <= voiceRank') && srJs.includes('stopVoice()'), 'voices rate-limit and never overlap');
+  assert.ok(!srJs.includes('sugar-rush-sfx-pop') && !srJs.includes('SFX_CUTS') && !srJs.includes('CLIP_VOL'), 'old pack and synth effects are gone');
   const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
-    'sugar-rush-sfx-pop.mp3', 'sugar-rush-sfx-crush.mp3', 'sugar-rush-sfx-bomb.mp3',
-    'sugar-rush-sfx-hammer.mp3', 'sugar-rush-sfx-spread.mp3', 'sugar-rush-sfx-fail.mp3'];
+    'sugar-rush-voice-yay.mp3', 'sugar-rush-voice-great.mp3', 'sugar-rush-voice-awesome.mp3',
+    'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3'];
   for (const f of sugarFiles) assert.ok(fs.existsSync('feed/' + SR.mediaUrl(f)), 'audio ' + f);
+  for (const old of ['pop', 'crush', 'bomb', 'hammer', 'spread', 'fail']) {
+    const leftovers = fs.readdirSync('feed').filter(n => n.startsWith('sugar-rush-sfx-' + old));
+    assert.deepStrictEqual(leftovers, [], 'removed old pack clip ' + old);
+  }
   assert.ok(srJs.includes('decodeAudioData') && srJs.includes("src.loop = true") && srJs.includes('const BGM_VOL = 0.12'));
   assert.ok(srJs.includes('sugar-rush-menu.mp3') && srJs.includes('sugar-rush-win.mp3') && srJs.includes('sugar-rush-yum.mp3'));
-  assert.ok(SR.SFX_CUTS && SR.SFX_CUTS.pop.start === 0 && SR.playClip && SR.CLIP_VOL === 0.24);
+  // Callout mapping: plain 3-match is a chime (null); good moves get a spoken word; bigger words win.
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 1 }, 1), null);
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}, {}], made: [{ s: 'row' }], fired: [], cascade: 1 }, 1), 'great');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 2 }, 2), 'great');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [{ s: 'w' }], fired: [], cascade: 1 }, 1), 'sweetas');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 3 }, 3), 'sweetas');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [{ s: 'row' }], cascade: 1 }, 1), 'awesome');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [{ s: 'row' }, { s: 'w' }], cascade: 1 }, 1), 'awesome');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 4 }, 4), 'awesome');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [{ s: 'b' }], fired: [], cascade: 1 }, 1), 'succulent');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [{ s: 'b' }], bomb: true, cascade: 1 }, 1), 'succulent');
+  assert.strictEqual(SR.voiceForStep({ popped: Array(12).fill({}), made: [], fired: [], cascade: 1 }, 1), 'succulent');
+  assert.strictEqual(SR.voiceForStep({ popped: [{}, {}, {}], made: [], fired: [], cascade: 5 }, 5), 'succulent');
+  assert.ok(srJs.includes("if (won) say('yay')") && srJs.includes('function chime') && srJs.includes('function say'));
+  assert.ok(srJs.includes('duckMusicBrief') && srJs.includes('linearRampToValueAtTime(v, t + dur'));
   assert.ok(SR.LEVELS.length === 10 && SR.LEVELS[1].name === "Sarah's Sweet Spot");
   assert.ok(SR.LEVELS[1].theme === 'sarah' && SR.LEVELS[1].badge && SR.LEVELS[1].badge.special);
   assert.ok(SR.LEVELS[1].intro && /Sarah, Shane's partner/.test(SR.LEVELS[1].intro.body));
@@ -950,7 +972,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.match(ship, /\/feed\/sugar-rush\.html\n {2}! X-Frame-Options\n {2}X-Frame-Options: SAMEORIGIN/);
 }
 
-// 1.9.164 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
+// 1.9.165 Shane-only Tetris level picker (practice mode, not posted to the family scoreboard)
 {
   const names = ['Farmyard', 'Jeremiah was a bullfrog', 'Beach', 'Rainforest', 'Ocean', 'Bush walk', 'New Zealand', 'Snowy mountains', 'City', 'Night sky', 'Triangles', 'Space travel'];
   assert.deepStrictEqual(Array.from(tetGame.ORDER), [6, 11, 0, 1, 2, 3, 9, 10, 4, 5, 8, 7]);
@@ -999,7 +1021,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
 }
 
 
-// 1.9.164 Tetris sounds follow the music (tempo/key), and Space bombs actually drop
+// 1.9.165 Tetris sounds follow the music (tempo/key), and Space bombs actually drop
 {
   const almost = (a, b, eps) => assert.ok(Math.abs(a - b) <= (eps || 1e-6), a + ' != ' + b);
   assert.strictEqual(tetGame.TRACKS.length, 12);
@@ -1099,7 +1121,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(!/invSeed\(/.test(sp), 'Choose level must not use the screenshot seed');
 }
 
-// 1.9.164 Tetris game sounds sit ~6 dB above the music, still soft and low
+// 1.9.165 Tetris game sounds sit ~6 dB above the music, still soft and low
 {
   assert.strictEqual(tetGame.SFX_MASTER, 0.96);
   assert.strictEqual(tetGame.SFX_NOTE, 0.25);
@@ -1123,7 +1145,7 @@ assert.match(headers, /\/feed\/scrabble\.html\n {2}! X-Frame-Options\n {2}X-Fram
   assert.ok(!/bgm\.volume = 0\.5/.test(src));
 }
 
-// 1.9.164 Tetris line-clear flourish: themed sweep and sparkles, a short pause, a soft Tetris banner
+// 1.9.165 Tetris line-clear flourish: themed sweep and sparkles, a short pause, a soft Tetris banner
 {
   assert.strictEqual(tetGame.clearDuration(1), 280);
   assert.strictEqual(tetGame.clearDuration(2), 320);
@@ -1236,7 +1258,7 @@ if (live) {
   console.log('live cinema films', list.length, list.slice(0, 3).map(f => f.rating + ' ' + f.title).join('; '));
 }
 
-// 1.9.164 Hashed audio filenames, versioned game scripts, Tetris music stays on through line clears
+// 1.9.165 Hashed audio filenames, versioned game scripts, Tetris music stays on through line clears
 {
   const sha8 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
   for (let i = 0; i < 12; i++) {
@@ -1261,8 +1283,8 @@ if (live) {
   assert.ok(tet.includes('bgmGain.gain.linearRampToValueAtTime(BGM_VOL') && tet.includes('duckUntil'));
 
   const sugarFiles = ['sugar-rush-music.mp3', 'sugar-rush-menu.mp3', 'sugar-rush-win.mp3', 'sugar-rush-yum.mp3',
-    'sugar-rush-sfx-pop.mp3', 'sugar-rush-sfx-crush.mp3', 'sugar-rush-sfx-bomb.mp3',
-    'sugar-rush-sfx-hammer.mp3', 'sugar-rush-sfx-spread.mp3', 'sugar-rush-sfx-fail.mp3'];
+    'sugar-rush-voice-yay.mp3', 'sugar-rush-voice-great.mp3', 'sugar-rush-voice-awesome.mp3',
+    'sugar-rush-voice-sweetas.mp3', 'sugar-rush-voice-succulent.mp3'];
   const SR = load('feed/sugar-rush.js').SugarRush;
   for (const f of sugarFiles) {
     const url = SR.mediaUrl(f);
