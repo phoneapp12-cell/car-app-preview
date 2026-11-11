@@ -225,6 +225,8 @@
     if (on) {
       artScroll = root.scrollY || root.document.documentElement.scrollTop || 0;
       body.dataset.artopen = '1';
+      root.document.documentElement.style.overscrollBehavior = 'none'; // no pull-to-refresh while a game or window is open
+      body.style.overscrollBehavior = 'none';
       body.style.position = 'fixed';
       body.style.top = '-' + artScroll + 'px';
       body.style.left = '0';
@@ -236,6 +238,8 @@
       body.style.left = '';
       body.style.right = '';
       body.style.width = '';
+      root.document.documentElement.style.overscrollBehavior = '';
+      body.style.overscrollBehavior = '';
       delete body.dataset.artopen;
       root.scrollTo(0, artScroll);
     }
